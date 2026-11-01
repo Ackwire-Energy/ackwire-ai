@@ -44,6 +44,7 @@ import { errnoCode, RunnerError, toMachineError } from "./errors";
 import type { RequestScope } from "./handlers";
 import { readJson, writeJson } from "./json-file";
 import { readLines } from "./lines";
+import { type NetworkConfig, networkConfig, networkKey } from "./network-state";
 import { type FetchLike, UPLOAD_TIMEOUT_MS, uploadUrl } from "./push";
 import type { ScopeKind } from "./scope-gate";
 import { type ActivatedSecret, activatedSecret, handleSecret } from "./secrets";
@@ -215,6 +216,8 @@ export type WorkerLinkFrame =
 
 /** A started worker (a process; tests: in-memory pipes). */
 export interface WorkerProcess {
+  /** Root-owned launch wrapper identity; real Linux processes only. */
+  pid?: number;
   stdin: Writable;
   stdout: Readable;
   stderr?: Readable;
@@ -232,6 +235,9 @@ export interface SupervisorOptions {
   requireRootBroker?: boolean;
   /** Root runtime configuration also applies to workers restored from the persisted user list. */
   network?: Pick<AgentUser, "networkLauncher" | "networkMark">;
+  /** Root scopes can pin this UID to its old network until the desktop and terminals close. */
+  resolveNetwork?: (user: AgentUser) => NetworkConfig;
+  networkBusy?: (agentId: string) => boolean;
   /** The agent's OS user, made on its first request (`AgentUsers.ensure`). */
   user: (agent: AgentScope) => AgentUser;
   /** Starts an agent's worker (`launchWorker`). */
@@ -293,6 +299,9 @@ interface Worker {
   proc: WorkerProcess | null;
   /** Its current session said hello: frames and requests can go to it. */
   ready: boolean;
+  networkRetiring: boolean;
+  browserStreaming: boolean;
+  networkStopTimer: ReturnType<typeof setTimeout> | null;
   /** The `worker.state` line this session last got. */
   state: string;
   startedAt: number;
@@ -320,6 +329,7 @@ interface Show {
 
 export class Supervisor {
   private readonly workers = new Map<string, Worker>();
+  private network: NetworkConfig;
   private readonly owners = new Map<string, { agentId: string; startedAt: string }>();
   /** `mcp.call` / `mcp.list` in flight → the worker that asked. */
   private readonly calls = new Map<string, Worker>();
@@ -346,6 +356,7 @@ export class Supervisor {
   };
 
   constructor(private readonly opts: SupervisorOptions) {
+    this.network = networkConfig(opts.network ?? {});
     this.secretRoot = secureSecretRoot(opts.home, opts.requireRootBroker);
     const saved = readJson<Record<string, { agentId?: unknown; startedAt?: unknown } | null>>(this.ownersFile);
     const cutoff = Date.now() - TASK_OWNER_KEEP_MS;
@@ -450,6 +461,8 @@ export class Supervisor {
     await this.ready(w, scope.signal);
     const secret = await activatedSecret(this.secretRoot, req.agent, req.requestId);
     if (!secret) throw new RunnerError("not_found", "This request has no activated secret");
+    // The file read can overlap an idle network transition: acquire the current worker again.
+    await this.ready(w, scope.signal);
     return this.install(w, req.agent, secret, scope.signal);
   }
 
@@ -533,6 +546,68 @@ export class Supervisor {
     if (w && this.online) this.send(w, frame);
   }
 
+  /** New launches take the new network; occupied workers finish their work before retiring. */
+  setNetwork(value: NetworkConfig) {
+    this.network = networkConfig(value);
+    this.drainNetwork();
+  }
+
+  runningPid(agentId: string): number | undefined {
+    return this.workers.get(agentId)?.proc?.pid;
+  }
+
+  runningNetwork(agentId: string): NetworkConfig | null {
+    const w = this.workers.get(agentId);
+    return w?.proc ? networkConfig(w.user) : null;
+  }
+
+  private withNetwork(user: AgentUser): AgentUser {
+    const { networkLauncher: _launcher, networkMark: _mark, ...identity } = user;
+    return { ...identity, ...(this.opts.resolveNetwork?.(user) ?? this.network) };
+  }
+
+  /** Safe to call on a short timer: no active requests, tasks, handoffs or desktop viewers are interrupted. */
+  drainNetwork(): number[] {
+    const pending: number[] = [];
+    for (const w of this.workers.values()) {
+      if (networkKey(w.user) === networkKey(this.network)) continue;
+      if (!w.proc) {
+        try {
+          w.user = this.withNetwork(w.user);
+        } catch {
+          pending.push(w.user.uid);
+        }
+        continue;
+      }
+      pending.push(w.user.uid);
+      if (
+        w.networkRetiring ||
+        w.inflight.size ||
+        w.installs.size ||
+        w.shows.size ||
+        w.waiters.size ||
+        this.handoffs.has(w.user.id) ||
+        this.opts.networkBusy?.(w.user.id) ||
+        this.onDesktopInUse(w.user.id) ||
+        w.browserStreaming ||
+        (this.opts.desktopViewers?.(w.user.id) ?? 0) > 0 ||
+        [...this.owners.values()].some((o) => o.agentId === w.user.id) ||
+        [...this.calls.values()].includes(w)
+      )
+        continue;
+      const proc = w.proc;
+      w.networkRetiring = true;
+      w.ready = false;
+      this.opts.log(`[${w.user.user}] applying network settings after its work finished`);
+      proc.stdin.end();
+      w.networkStopTimer = setTimeout(() => {
+        if (w.proc === proc && w.networkRetiring) proc.kill();
+      }, 5000);
+      w.networkStopTimer.unref?.();
+    }
+    return [...new Set(pending)].sort((a, b) => a - b);
+  }
+
   /** The computer's pause, access or limits, or who watches an agent's desktop, may have changed. */
   stateChanged() {
     for (const w of this.workers.values()) this.sendState(w);
@@ -593,6 +668,8 @@ export class Supervisor {
     const exits: Promise<unknown>[] = [];
     for (const w of this.workers.values()) {
       if (w.timer) clearTimeout(w.timer);
+      if (w.networkStopTimer) clearTimeout(w.networkStopTimer);
+      w.networkStopTimer = null;
       w.timer = null;
       for (const waiter of [...w.waiters]) waiter.reject(new RunnerError("dropped", STOPPING));
       w.ready = false;
@@ -614,9 +691,12 @@ export class Supervisor {
     let w = this.workers.get(user.id);
     if (!w) {
       w = {
-        user: { ...user, ...this.opts.network },
+        user: this.withNetwork(user),
         proc: null,
         ready: false,
+        networkRetiring: false,
+        browserStreaming: false,
+        networkStopTimer: null,
         state: "",
         startedAt: 0,
         attempt: 0,
@@ -678,6 +758,7 @@ export class Supervisor {
     w.startedAt = Date.now();
     let proc: WorkerProcess;
     try {
+      w.user = this.withNetwork(w.user);
       proc = this.opts.start(w.user);
     } catch (err) {
       this.opts.log(`couldn't start the worker of ${w.user.user}: ${err instanceof Error ? err.message : String(err)}`);
@@ -722,15 +803,20 @@ export class Supervisor {
   /** The worker exited: what it ran fails, and it starts again after a backoff when it has tasks or requests waiting. */
   private stopped(w: Worker, proc: WorkerProcess | null, code?: unknown) {
     if (proc && w.proc !== proc) return;
+    const retired = w.networkRetiring;
+    if (w.networkStopTimer) clearTimeout(w.networkStopTimer);
+    w.networkStopTimer = null;
+    w.networkRetiring = false;
     w.proc = null;
     w.ready = false;
     w.browserLeaseAt = 0;
+    w.browserStreaming = false;
     this.endSession(
       w,
       "The agent's worker on this computer stopped while this ran: it may have stopped partway or finished. Check before running it again.",
     );
     this.endShows(w, "The agent's worker stopped on this computer. Try again.");
-    w.attempt = Date.now() - w.startedAt >= WORKER_STABLE_MS ? 0 : w.attempt + 1;
+    w.attempt = retired || Date.now() - w.startedAt >= WORKER_STABLE_MS ? 0 : w.attempt + 1;
     w.notBefore = w.attempt > 0 ? Date.now() + backoffDelay(w.attempt - 1) : 0;
     if (this.closed) return;
     this.opts.log(`[${w.user.user}] stopped${typeof code === "number" ? ` (exit ${code})` : ""}`);
@@ -794,6 +880,8 @@ export class Supervisor {
     const frame: WorkerLinkFrame = {
       type: "worker.state",
       ...s,
+      privateNetwork:
+        w.user.networkLauncher || w.user.networkMark ? true : s.privateNetwork === undefined ? undefined : false,
       access: { ...s.access, folders },
       ...(viewers > 0 ? { desktopViewers: viewers } : {}),
       ...(this.opts.account ? { account: this.opts.account(w.user.id) } : {}),
@@ -818,6 +906,7 @@ export class Supervisor {
   }
 
   private frame(w: Worker, f: RunnerFrame, line: string) {
+    if (w.networkRetiring) return;
     if (f.type === "hello") return this.hello(w);
     if (!w.ready) return;
     switch (f.type) {
@@ -826,6 +915,8 @@ export class Supervisor {
         if (!e) return;
         // Refused by the worker: that task never started.
         if (!f.ok && e.req.op === "task.start") this.disown(e.req.taskId);
+        if (f.ok && e.req.op === "browser.stream.start") w.browserStreaming = true;
+        if (f.ok && e.req.op === "browser.stream.stop") w.browserStreaming = false;
         e.settle(
           f.ok ? { ok: true, data: f.data } : { ok: false, error: new RunnerError(f.error.code, f.error.message) },
         );
@@ -864,6 +955,7 @@ export class Supervisor {
       }
       case "browser.frame":
       case "browser.stream.ended":
+        if (f.agentId === w.user.id) w.browserStreaming = f.type === "browser.frame";
         if (f.agentId === w.user.id && this.opts.send(f) && f.type === "browser.frame" && this.opts.relayed) {
           this.opts.relayed.browserView.up += Buffer.byteLength(line);
         }
@@ -1271,6 +1363,7 @@ export function launchWorker(runner: string[], base = AGENT_WORKER_HOMES): Start
       events.once("error", (err: Error) => resolve(err));
     });
     return {
+      pid: child.pid,
       stdin: child.stdin,
       stdout: child.stdout,
       stderr: child.stderr,

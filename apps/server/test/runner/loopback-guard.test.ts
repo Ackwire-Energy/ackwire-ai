@@ -325,3 +325,19 @@ test("a configured routing bit exempts only unchanged foreign destinations, keep
   expect(marked).toContain('oif "lo" tcp dport @guarded drop');
   expect(() => renderRuleset([], "drop", RANGE, new Set(), 0)).toThrow("networkMark");
 });
+
+test("network mark reconciliation updates atomically and retains the previous setting on failure", () => {
+  const options = { ssFails: false };
+  const nft = fakeNft(options);
+  const { g } = guard(nft.run, [21000]);
+  expect(g.reconcile()).toBe(true);
+  expect(g.setNetworkMark(0x08000000)).toBe(true);
+  const applied = nft.applied();
+  expect(applied).toContain("agentes network mark 134217728");
+  options.ssFails = true;
+  expect(g.setNetworkMark(0x10000000)).toBe(false);
+  expect(nft.applied()).toBe(applied);
+  options.ssFails = false;
+  expect(g.reconcile()).toBe(true);
+  expect(nft.applied()).toBe(applied);
+});

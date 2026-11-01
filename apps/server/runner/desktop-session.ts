@@ -553,6 +553,7 @@ export class DesktopSessions {
   private readonly desktops = new Map<string, Desktop>();
   /** Each agent's starts, stops and restarts, one after another. */
   private readonly queue = new KeyedQueue();
+  private readonly operations = new Map<string, number>();
   /** When each agent's desktop was started again after ending by itself. */
   private readonly restarts = new Map<string, number[]>();
   /** Displays of desktops being started. */
@@ -665,6 +666,16 @@ export class DesktopSessions {
       await this.end(d);
       return { stopped: true };
     });
+  }
+
+  /** Root's scope identity for a network transition; an existing desktop is never stopped to apply one. */
+  hasActivity(agentId: string): boolean {
+    return (this.operations.get(agentId) ?? 0) > 0 || this.processId(agentId) !== null;
+  }
+
+  processId(agentId: string): number | null {
+    const d = this.desktops.get(agentId);
+    return d && this.alive(d) ? d.pid : null;
   }
 
   status(agent: Pick<AgentScope, "id">): MachineReplies["desktop.session.status"] {
@@ -810,7 +821,12 @@ export class DesktopSessions {
   }
 
   private serial<T>(agentId: string, fn: () => Promise<T>): Promise<T> {
-    return this.queue.run(agentId, fn);
+    this.operations.set(agentId, (this.operations.get(agentId) ?? 0) + 1);
+    return this.queue.run(agentId, fn).finally(() => {
+      const left = (this.operations.get(agentId) ?? 1) - 1;
+      if (left) this.operations.set(agentId, left);
+      else this.operations.delete(agentId);
+    });
   }
 
   private add(d: Desktop) {

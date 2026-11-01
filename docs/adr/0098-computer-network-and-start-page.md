@@ -25,7 +25,7 @@ socket inspection and the bind-enforcement self-check enter it; the worker then 
 Thus Chrome, agent-browser, CDP HTTP/WebSocket calls, terminal shells and desktop processes inherit the same
 context. VNC and worker coordination retain their filesystem sockets. Every executable path component is
 root-owned and immutable to ordinary users. The existing host loopback guard remains for old processes.
-Changing the setting requires an operator-coordinated restart; the hook does not migrate live processes.
+Changing the setting updates launch defaults live; existing processes retain their network until they finish.
 
 The offline new-tab page is a permissionless extension loaded by Chrome's command line. It reuses the desktop
 art and brand fonts, contains no links or buttons, and hides its decorative content from accessibility snapshots.
@@ -66,3 +66,22 @@ clearing and live updates, forwarded-address handling, helper ownership and comm
 permissions, localization, accidental input, and streaming backpressure. A release using a custom helper also
 needs Linux acceptance checks of both IPv4 and IPv6, existing-process coexistence, browser CDP, desktop and
 terminal paths, Chrome's user-namespace sandbox under no-new-privileges, and rollback before any production rollout.
+
+Network changes do not reconnect the machine or cancel foreground work. Workers with requests, background tasks,
+secret installs, handoffs, browser streams or desktop leases finish those before they retire. Every launch for
+one UID keeps its previous network while that worker, desktop (including startup) or terminal still exists.
+Linux also retains that context while any other process runs as the UID, including daemonized services.
+Only the launch wrapper's first UID-owned worker is excluded from that process hold; an incomplete process
+scan keeps the transition pending. Once all those scopes drain, the next launch uses the new settings.
+Existing desktops and terminals keep running. The root service atomically writes `network-state.json`
+in its runner home (0600): version 1, PID and Linux `/proc` start ticks, observation time, active
+`networkLauncher`/`networkMark` (null when absent), `pendingUids` for old workers and tracked scopes, and
+`uidNetworks` pins saved before launch (only held or imminent contexts; inactive pins are removed).
+The observation is bounded to 4 MiB; an oversized new launch is refused before creating a process.
+Pins survive a daemon restart while its desktops remain. Existing processes
+without a saved pin are adopted only after proving they share the runner's host namespace; otherwise new work
+waits for those old processes to end. Every directory containing this root observation must be root controlled.
+An integrator must verify process identity, root ownership, the actual firewall rule, and live process namespace
+membership before declaring a migration complete; the file describes launch defaults, not proof that every
+process moved. External routing must preserve already established connections during a change. Keep an installed
+routing mark until connections using it have drained before removing its exception.

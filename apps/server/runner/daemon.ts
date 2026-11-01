@@ -49,7 +49,14 @@ import {
 } from "./access";
 import { AccountManager, lchownTree, SYSTEM_ACCOUNTS_ROOT } from "./accounts";
 import { ActivityLog } from "./activity";
-import { type AgentUser, AgentUsers, agentGid, readAgentUsers, systemLauncher } from "./agent-users";
+import {
+  type AgentUser,
+  AgentUsers,
+  agentGid,
+  readAgentUsers,
+  systemLauncher,
+  trustedNetworkLauncher,
+} from "./agent-users";
 import { BrainManager } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager } from "./browser";
@@ -81,6 +88,18 @@ import { currentProcess, isCompiled, selfCommand } from "./launch";
 import { tailLines } from "./logfile";
 import { LoopbackGuard } from "./loopback-guard";
 import { McpBridge, type McpTaskInfo, mcpSocketPath } from "./mcp";
+import {
+  AgentNetworks,
+  desktopUsesHostNetwork,
+  type NetworkConfig,
+  type NetworkProcess,
+  networkConfig,
+  networkKey,
+  readNetworkPins,
+  readNetworkProcesses,
+  uidHasOtherProcesses,
+  writeNetworkState,
+} from "./network-state";
 import { type CachedLogo, logoDataUrl, readCachedLogo, removeCachedLogo, syncOrgLogo } from "./org-logo";
 import { type DeviceGrant, devicePair, type FetchFn, PairingError, uniqueWorkspace } from "./pairing";
 import { agentWorkspace } from "./paths";
@@ -233,6 +252,8 @@ const firstLine = (s: string, max = 120) => {
 
 interface Session {
   config: RunnerConfig;
+  network: NetworkConfig;
+  changeNetwork(value: NetworkConfig): boolean;
   workspaceReal: string;
   tasks: TaskManager;
   brains: BrainManager;
@@ -297,6 +318,10 @@ export class RunnerDaemon implements RequestObserver {
   private egress = new EgressObservation();
   private probingEgress = false;
   private egressGeneration = 0;
+  private readonly uidNetworks: AgentNetworks;
+  private readonly networkUsers = new Map<number, AgentUser>();
+  private writtenNetworkPins = "";
+  private networkProcesses: NetworkProcess[] | null = null;
   private readonly jobs = new Map<string, ControlJob>();
   readonly activity: ActivityLog;
   private readonly requests: AccessRequests;
@@ -339,6 +364,7 @@ export class RunnerDaemon implements RequestObserver {
   private readonly desktopRefsGiven = new Map<string, { last: number }>();
 
   constructor(private readonly opts: DaemonOptions) {
+    this.uidNetworks = new AgentNetworks({}, readNetworkPins(opts.home));
     this.activity = new ActivityLog(opts.home);
     this.now = opts.now ?? Date.now;
     this.requests = new AccessRequests(opts.home, this.now);
@@ -509,6 +535,13 @@ export class RunnerDaemon implements RequestObserver {
     const egress = setInterval(() => void this.sampleEgress(), 30_000);
     egress.unref?.();
     this.timers.push(egress);
+    const network = setInterval(() => {
+      this.observeNetwork();
+      if (this.session && this.config && networkKey(this.session.network) !== networkKey(this.config))
+        void this.reconcile();
+    }, 2000);
+    network.unref?.();
+    this.timers.push(network);
     // System mode: for the Cloud's guard, at most once a minute.
     const relayed = setInterval(() => {
       if (!this.session?.supervisor) return;
@@ -674,7 +707,9 @@ export class RunnerDaemon implements RequestObserver {
     return {
       access: this.access(),
       paused: this.pauseState(),
-      privateNetwork: Boolean(c?.networkLauncher || c?.networkMark),
+      privateNetwork: Boolean(
+        (this.session?.network ?? c)?.networkLauncher || (this.session?.network ?? c)?.networkMark,
+      ),
       limits: {
         maxConcurrentTasks: c?.maxConcurrentTasks ?? DEFAULT_LIMITS.maxConcurrentTasks,
         taskMaxSeconds: c?.taskMaxSeconds ?? DEFAULT_LIMITS.taskMaxSeconds,
@@ -758,6 +793,21 @@ export class RunnerDaemon implements RequestObserver {
       s.config.machineId === want.machineId &&
       s.config.workspace === want.workspace
     ) {
+      if (s.supervisor && networkKey(s.network) !== networkKey(want)) {
+        const next = networkConfig(want);
+        if (!this.opts.workers && next.networkLauncher) trustedNetworkLauncher(next.networkLauncher);
+        if (!s.changeNetwork(next)) {
+          this.opts.log("Network settings are waiting for the local guard");
+          return;
+        }
+        this.egressGeneration++;
+        this.egress.clear();
+        s.connection.send({ type: "pong", at: this.now(), egress: { ip: null } });
+        s.supervisor.setNetwork(next);
+        s.supervisor.stateChanged();
+        this.observeNetwork();
+        void this.sampleEgress();
+      }
       return;
     }
     if (s) {
@@ -779,6 +829,11 @@ export class RunnerDaemon implements RequestObserver {
     const home = this.opts.home;
     const log = this.opts.log;
     const workspaceReal = prepareWorkspace(config.workspace);
+    const network = networkConfig(config);
+    this.uidNetworks.set(network);
+    this.refreshNetworkProcesses();
+    const prepared = new Map<number, string>();
+    let guard: LoopbackGuard | undefined;
     const secretsDir = path.join(home, "secrets");
     const socketPath = mcpSocketPath(home);
     const mcpCommand = { socketPath, command: this.self.command };
@@ -860,37 +915,68 @@ export class RunnerDaemon implements RequestObserver {
     let agentUser: Session["agentUser"] = null;
     if (config.mode === "system") {
       const users = new AgentUsers({ home, range: config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE });
-      const prepared = new Set<number>();
-      const prepare = (user: AgentUser) => {
-        if (prepared.has(user.uid)) return;
-        ensureBrowserBindPolicy(
-          { ...user, networkLauncher: config.networkLauncher, networkMark: config.networkMark },
-          this.self.command,
+      for (const user of readAgentUsers(home)) this.networkUsers.set(user.uid, user);
+      const resolveNetwork = (user: AgentUser): NetworkConfig => {
+        this.networkUsers.set(user.uid, user);
+        const running = supervisor?.runningNetwork(user.id) != null;
+        if (!running) this.refreshNetworkProcesses();
+        if (
+          !this.uidNetworks.has(user.uid) &&
+          this.networkProcesses === null &&
+          process.platform === "linux" &&
+          process.getuid?.() === 0 &&
+          !this.opts.workers
+        )
+          throw new Error(
+            "Cannot determine the agent's existing network context; retry once process inspection is available",
+          );
+        const desktop = this.desktops.processId(user.id);
+        const previous = this.networkProcesses?.filter((proc) => proc.uids.includes(user.uid)) ?? [];
+        if (!this.uidNetworks.has(user.uid) && (desktop !== null || previous.length > 0)) {
+          if (
+            (desktop !== null && !desktopUsesHostNetwork(desktop)) ||
+            previous.some((proc) => !desktopUsesHostNetwork(proc.pid))
+          )
+            throw new Error(
+              "The agent's existing processes have no trusted network context; stop that agent's old processes before starting new work",
+            );
+          this.uidNetworks.seed(user.uid, {});
+        }
+        const effective = this.uidNetworks.resolve(
+          user.uid,
+          running || this.networkScopesBusy(user.id) || this.networkProcessesBusy(user),
         );
+        // Save the pin before any child can outlive this daemon, including a desktop still starting.
+        this.uidNetworks.pending((uid) => uid === user.uid || this.networkUidBusy(uid));
+        this.persistNetworkPins(network);
+        return effective;
+      };
+      const prepare = (user: AgentUser, effective = resolveNetwork(user)) => {
+        if (this.opts.workers || prepared.get(user.uid) === networkKey(effective)) return;
+        ensureBrowserBindPolicy({ ...user, ...effective }, this.self.command);
         const known = this.agents.find((agent) => agent.id === user.id);
         prepareSystemStartPage(user, known ?? { name: user.user, handle: user.user }, {
           locale: known?.locale,
           egress: this.egress.current,
         });
-        prepared.add(user.uid);
+        prepared.set(user.uid, networkKey(effective));
       };
-      // Desktops and terminals can start before a worker. The first use of a
-      // newly allocated UID installs its bind policy before returning it.
-      agentUser =
-        this.opts.workers?.user ??
-        ((agent) => {
-          const user = users.ensure(agent);
-          prepare(user);
+      // All root children and the worker use one effective UID context, including while a desktop starts.
+      agentUser = (agent) => {
+        const user = this.opts.workers?.user(agent) ?? users.ensure(agent);
+        const effective = resolveNetwork(user);
+        prepare(user, effective);
+        if (!this.opts.workers)
           prepareSystemStartPage(user, agent, {
             locale: this.agents.find((a) => a.id === agent.id)?.locale,
             egress: this.egress.current,
           });
-          return { ...user, networkLauncher: config.networkLauncher, networkMark: config.networkMark };
-        });
+        return { id: user.id, user: user.user, uid: user.uid, ...effective };
+      };
       // Tests inject `workers`; a real guard (nft/ss as root) belongs only to the real supervisor. On the
       // server's own computer one guard covers every organization's agents (`host.ts`): a guard per runner
       // would replace the others' rules with its own.
-      const guard =
+      guard =
         this.opts.workers || config.managedBy === "host"
           ? undefined
           : new LoopbackGuard({
@@ -903,7 +989,16 @@ export class RunnerDaemon implements RequestObserver {
       supervisor = new Supervisor({
         home,
         requireRootBroker: !this.opts.workers,
-        network: { networkLauncher: config.networkLauncher, networkMark: config.networkMark },
+        network,
+        resolveNetwork: (user) => {
+          const effective = resolveNetwork(user);
+          prepare(user, effective);
+          return effective;
+        },
+        networkBusy: (agentId) => {
+          const user = [...this.networkUsers.values()].find((u) => u.id === agentId);
+          return this.networkScopesBusy(agentId) || (!!user && this.networkProcessesBusy(user));
+        },
         user: agentUser,
         start: launchWorker(this.self.command),
         ...(this.opts.workers || config.managedBy === "host"
@@ -922,7 +1017,7 @@ export class RunnerDaemon implements RequestObserver {
         desktop: (agent, use) => this.workerDesktop(agent, use),
         desktopViewers: (agentId) => this.desktops.status({ id: agentId }).streams,
         account: (agentId) => this.agentAccount(agentId),
-        ...this.opts.workers,
+        ...(this.opts.workers ? { start: this.opts.workers.start } : {}),
         ...(guard ? { guard } : {}),
         token: config.token,
         server: config.server,
@@ -1027,6 +1122,19 @@ export class RunnerDaemon implements RequestObserver {
     live = connection;
     const session: Session = {
       config,
+      network,
+      changeNetwork: (value) => {
+        if (config.managedBy === "host" && value.networkMark !== network.networkMark) return false;
+        if (guard && !guard.setNetworkMark(value.networkMark)) return false;
+        delete network.networkLauncher;
+        delete network.networkMark;
+        Object.assign(network, value);
+        this.uidNetworks.set(value);
+        this.refreshNetworkProcesses();
+        this.uidNetworks.pending((uid) => this.networkUidBusy(uid));
+        prepared.clear();
+        return true;
+      },
       workspaceReal,
       tasks,
       brains,
@@ -1041,10 +1149,68 @@ export class RunnerDaemon implements RequestObserver {
     };
     this.session = session;
     supervisor?.boot();
+    this.observeNetwork();
     log(
       `agentes-runner ${RUNNER_VERSION}: connecting to ${config.server} (workspace ${workspaceReal}${this.access().tools.commands ? "" : ", commands off"})`,
     );
     void connection.run().then((outcome) => this.sessionEnded(session, outcome));
+  }
+
+  private networkScopesBusy(agentId: string): boolean {
+    return this.desktops.hasActivity(agentId) || this.terminals.count(agentId) > 0;
+  }
+
+  private networkUidBusy(uid: number): boolean {
+    const user = this.networkUsers.get(uid);
+    return (
+      !!user &&
+      (this.session?.supervisor?.runningNetwork(user.id) != null ||
+        this.networkScopesBusy(user.id) ||
+        this.networkProcessesBusy(user))
+    );
+  }
+
+  private refreshNetworkProcesses() {
+    const configured =
+      this.config?.networkLauncher ||
+      this.config?.networkMark ||
+      this.uidNetworks.snapshot().some((pin) => pin.networkLauncher || pin.networkMark);
+    if (!configured) {
+      this.networkProcesses = [];
+      return;
+    }
+    if (process.platform === "linux" && process.getuid?.() === 0 && !this.opts.workers)
+      this.networkProcesses = readNetworkProcesses();
+  }
+
+  private networkProcessesBusy(user: AgentUser): boolean {
+    if (process.platform !== "linux" || process.getuid?.() !== 0 || this.opts.workers) return false;
+    return uidHasOtherProcesses(this.networkProcesses, user.uid, this.session?.supervisor?.runningPid(user.id));
+  }
+
+  private persistNetworkPins(network: NetworkConfig, pending?: number[]) {
+    const pins = this.uidNetworks.snapshot();
+    const pendingUids = pending ?? pins.filter((row) => networkKey(row) !== networkKey(network)).map((row) => row.uid);
+    const key = JSON.stringify([networkKey(network), pins, pendingUids]);
+    if (key === this.writtenNetworkPins) return;
+    writeNetworkState(this.opts.home, network, pendingUids, pins);
+    this.writtenNetworkPins = key;
+  }
+
+  private observeNetwork() {
+    const session = this.session;
+    if (!session?.supervisor || this.stopped) return;
+    this.refreshNetworkProcesses();
+    const pending = new Set(session.supervisor.drainNetwork());
+    for (const uid of this.uidNetworks.pending((uid) => this.networkUidBusy(uid))) pending.add(uid);
+    try {
+      this.persistNetworkPins(
+        session.network,
+        [...pending].sort((a, b) => a - b),
+      );
+    } catch {
+      this.opts.log("Could not write the active network settings");
+    }
   }
 
   private async sampleEgress() {

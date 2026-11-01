@@ -24,6 +24,7 @@ import { RunnerDaemon } from "../../runner/daemon";
 import { RunnerError } from "../../runner/errors";
 import { type HandlerContext, handleRequest, type RequestScope } from "../../runner/handlers";
 import { readLines } from "../../runner/lines";
+import { AgentNetworks } from "../../runner/network-state";
 import type { FetchLike } from "../../runner/push";
 import { agentSecrets } from "../../runner/secrets";
 import { RelayCount } from "../../runner/streams";
@@ -2574,4 +2575,231 @@ test("workers restored before a server welcome inherit root network configuratio
   const stored = JSON.parse(readFileSync(path.join(home, AGENT_USERS_FILE), "utf8"));
   expect(stored[0].networkLauncher).toBeUndefined();
   expect(stored[0].networkMark).toBeUndefined();
+});
+
+test("network changes preserve an occupied worker and viewers, then retire it before the next launch", async () => {
+  let viewers = 1;
+  const t = setup({ desktopViewers: () => viewers });
+  t.sup.boot();
+  t.sup.attach();
+  const run = t.sup.run(exec(ANA), scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const old = t.last(ANA.id);
+  old.hello();
+  const req = await requestOn(old);
+  const network = { networkLauncher: "/root/network-launcher", networkMark: 0x08000000 };
+  t.sup.setNetwork(network);
+  expect(t.sup.drainNetwork()).toEqual([21000]);
+  expect(old.stdin.writableEnded).toBe(false);
+  old.send({ type: "result", ok: true, id: req.id, data: execDone });
+  await run;
+  expect(t.sup.drainNetwork()).toEqual([21000]);
+  expect(old.stdin.writableEnded).toBe(false);
+  viewers = 0;
+  t.sup.drainNetwork();
+  await old.exited;
+  await waitFor(() => t.sup.drainNetwork().length === 0);
+  expect(old.killed).toBe(false);
+  const again = t.sup.run(exec(ANA), scope().scope);
+  await waitFor(() => t.workers.length === 2);
+  const next = t.last(ANA.id);
+  expect(next.user).toMatchObject(network);
+  next.hello();
+  const nextReq = await requestOn(next);
+  next.send({ type: "result", ok: true, id: nextReq.id, data: execDone });
+  await again;
+});
+
+test("a running background task delays network retirement until its acknowledged completion", async () => {
+  const home = newHome();
+  writeFileSync(
+    path.join(home, WORKER_TASKS_FILE),
+    JSON.stringify({ task1: { agentId: ANA.id, startedAt: new Date().toISOString() } }),
+  );
+  const t = setup({}, home);
+  t.sup.boot();
+  t.sup.attach();
+  const worker = t.last(ANA.id);
+  worker.hello();
+  t.sup.setNetwork({ networkMark: 0x08000000 });
+  expect(t.sup.drainNetwork()).toEqual([21000]);
+  expect(worker.stdin.writableEnded).toBe(false);
+  t.sup.ack("task1");
+  t.sup.drainNetwork();
+  await worker.exited;
+  await waitFor(() => t.sup.drainNetwork().length === 0);
+  expect(worker.killed).toBe(false);
+});
+
+test.if(posix)("editing only network settings applies without reconnecting or interrupting a request", async () => {
+  const home = newHome();
+  const ws = tempDir("network-change-");
+  dirs.push(ws);
+  const config = {
+    server: "https://agentes.test",
+    machineId: "m1",
+    name: "box",
+    token: "agm_test_only",
+    workspace: ws,
+    exec: true,
+    mode: "system" as const,
+    agentUidRange: [21000, 21099] as [number, number],
+  };
+  writeConfig(config, home);
+  const workers: FakeWorker[] = [];
+  const sockets: FakeSocket[] = [];
+  const probed: AgentUser[] = [];
+  const daemon = new RunnerDaemon({
+    home,
+    mode: "start",
+    log: () => {},
+    watch: true,
+    executors: () => ({}),
+    caffeinate: false,
+    self: { command: ["/opt/agentes-runner/agentes-runner"], compiled: true },
+    fetch: async () => new Response("", { status: 404 }),
+    probeEgress: async (_server, user) => {
+      if (user) probed.push(user);
+      return null;
+    },
+    workers: {
+      user: userOf,
+      start: (user) => {
+        const w = new FakeWorker(user);
+        workers.push(w);
+        return w;
+      },
+    },
+    dial: (_url, handlers) => {
+      const s = new FakeSocket(handlers);
+      sockets.push(s);
+      return s;
+    },
+  });
+  daemon.start();
+  try {
+    await waitFor(() => sockets.length === 1);
+    const socket = sockets[0] as FakeSocket;
+    socket.handlers.onOpen();
+    socket.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25000 });
+    socket.frame({ type: "agents", agents: [ANA] });
+    socket.frame({ type: "request", id: "work", ...exec(ANA) });
+    await waitFor(() => workers.length === 1);
+    const old = workers[0] as FakeWorker;
+    old.hello();
+    const req = await requestOn(old);
+    const network = { networkLauncher: "/root/network-launcher", networkMark: 0x08000000 };
+    await waitFor(() => probed.length > 0);
+    const before = probed.length;
+    writeConfig({ ...config, ...network }, home);
+    await waitFor(() => probed.length > before);
+    // A root-side probe (like a new desktop or terminal) retains the occupied worker's context.
+    expect(probed.at(-1)?.networkLauncher).toBeUndefined();
+    expect(old.of("worker.state").at(-1)?.privateNetwork).toBe(false);
+    expect(sockets).toHaveLength(1);
+    expect(old.stdin.writableEnded).toBe(false);
+    old.send({ type: "result", ok: true, id: req.id, data: execDone });
+    await waitFor(() => socket.of("result").some((x) => x.id === "work"));
+    await waitFor(() => old.stdin.writableEnded, 5000);
+    socket.frame({ type: "request", id: "next", ...exec(ANA) });
+    await waitFor(() => workers.length === 2);
+    const next = workers[1] as FakeWorker;
+    expect(next.user).toMatchObject(network);
+    next.hello();
+    const nextReq = await requestOn(next);
+    next.send({ type: "result", ok: true, id: nextReq.id, data: execDone });
+    await waitFor(() => socket.of("result").some((x) => x.id === "next"));
+    expect(sockets).toHaveLength(1);
+    expect(old.killed).toBe(false);
+  } finally {
+    await daemon.stop();
+  }
+});
+
+test("a retained desktop or terminal pins a new worker to the same old network until both drain", async () => {
+  const target = { networkLauncher: "/root/net", networkMark: 0x08000000 };
+  const pins = new AgentNetworks({}, [{ uid: 21000 }]);
+  pins.set(target);
+  let desktop = true;
+  let terminal = true;
+  const t = setup({
+    network: target,
+    networkBusy: () => desktop || terminal,
+    resolveNetwork: (user) => pins.resolve(user.uid, desktop || terminal || t.sup.runningNetwork(user.id) !== null),
+  });
+  t.sup.boot();
+  t.sup.attach();
+  const run = t.sup.run(exec(ANA), scope().scope);
+  const old = t.last(ANA.id);
+  old.hello();
+  const req = await requestOn(old);
+  old.send({ type: "result", ok: true, id: req.id, data: execDone });
+  await run;
+  expect(old.user.networkLauncher).toBeUndefined();
+  expect(t.sup.drainNetwork()).toEqual([21000]);
+  desktop = false;
+  t.sup.drainNetwork();
+  expect(old.stdin.writableEnded).toBe(false);
+  terminal = false;
+  t.sup.drainNetwork();
+  await old.exited;
+  await waitFor(() => t.sup.drainNetwork().length === 0);
+  const nextRun = t.sup.run(exec(ANA), scope().scope);
+  await waitFor(() => t.workers.length === 2);
+  const next = t.last(ANA.id);
+  expect(next.user).toMatchObject(target);
+  next.hello();
+  const nextReq = await requestOn(next);
+  next.send({ type: "result", ok: true, id: nextReq.id, data: execDone });
+  await nextRun;
+});
+
+test("browser stream and desktop leases prevent idle network retirement", async () => {
+  let now = 100000;
+  const t = setup({ now: () => now });
+  t.sup.boot();
+  t.sup.attach();
+  const stream = t.sup.run({ op: "browser.stream.start", mode: "watch", agent: ANA } as MachineRequest, scope().scope);
+  const worker = t.last(ANA.id);
+  worker.hello();
+  const req = await requestOn(worker);
+  worker.send({ type: "result", ok: true, id: req.id, data: { mode: "watch" } });
+  await stream;
+  t.sup.setNetwork({ networkMark: 0x08000000 });
+  expect(worker.stdin.writableEnded).toBe(false);
+  worker.send({ type: "browser.desktop", agentId: ANA.id, active: true });
+  worker.send({ type: "browser.stream.ended", agentId: ANA.id, reason: "stopped" });
+  await waitFor(() => t.sup.onDesktopInUse(ANA.id));
+  t.sup.drainNetwork();
+  expect(worker.stdin.writableEnded).toBe(false);
+  now += 120000;
+  t.sup.drainNetwork();
+  await worker.exited;
+  expect(worker.killed).toBe(false);
+});
+
+test("a late hello cannot reopen a retiring worker to a new request", async () => {
+  const t = setup();
+  t.sup.boot();
+  t.sup.attach();
+  const run = t.sup.run(exec(ANA), scope().scope);
+  const old = t.last(ANA.id);
+  old.hello();
+  const req = await requestOn(old);
+  old.send({ type: "result", ok: true, id: req.id, data: execDone });
+  await run;
+  old.stdin.removeAllListeners("end");
+  t.sup.setNetwork({ networkMark: 0x08000000 });
+  old.hello();
+  const nextRun = t.sup.run(exec(ANA), scope().scope);
+  await new Promise((r) => setTimeout(r, 10));
+  expect(old.of("request")).toHaveLength(1);
+  old.crash(0);
+  await waitFor(() => t.workers.length === 2);
+  const next = t.last(ANA.id);
+  expect(next.user.networkMark).toBe(0x08000000);
+  next.hello();
+  const nextReq = await requestOn(next);
+  next.send({ type: "result", ok: true, id: nextReq.id, data: execDone });
+  await nextRun;
 });

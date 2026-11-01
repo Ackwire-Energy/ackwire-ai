@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { browserPortsForUid, checkEphemeralRange, validateBrowserUidRange } from "./browser-ports";
-import { networkMarkExemption } from "./network-mark";
+import { networkMarkExemption, validateNetworkMark } from "./network-mark";
 import { type RunCommand, runSync, systemdBooted } from "./service";
 
 /**
@@ -196,6 +196,17 @@ export class LoopbackGuard {
       throw new Error(`Reserved browser ports have the wrong owner: ${this.conflicts.join(", ")}`);
     this.timer = setInterval(() => this.reconcile(), GUARD_RESCAN_MS);
     this.timer.unref?.();
+  }
+
+  /** Apply a trusted routing exception atomically; keep the last active setting on failure. */
+  setNetworkMark(mark: number | undefined): boolean {
+    if (mark !== undefined) validateNetworkMark(mark);
+    if (this.opts.networkMark === mark) return true;
+    const before = this.opts.networkMark;
+    this.opts.networkMark = mark;
+    if (this.reconcile()) return true;
+    this.opts.networkMark = before;
+    return false;
   }
 
   stop() {
