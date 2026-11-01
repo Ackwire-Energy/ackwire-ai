@@ -181,6 +181,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@agenteschat/providers": "workspace:*",
+        "@agenteschat/ui": "workspace:*",
       },
       "devDependencies": {
         "@tanstack/react-query": "^5.104.1",

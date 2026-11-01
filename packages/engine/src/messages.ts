@@ -15,6 +15,7 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import { CHANNEL_REF } from "@agenteschat/ui/channel-refs";
 import { type AgentActionView, actionsFor } from "./agent-actions";
 import { currentHandles } from "./agents";
 import { withDeletedArtifacts } from "./artifacts";
@@ -318,6 +319,36 @@ export function parseMentionHandles(body: string): string[] {
 }
 
 /**
+ * `#name` channel references in a message, lower-cased and de-duplicated, outside code and links (they stay as
+ * typed), by the rule the apps share (`CHANNEL_REF`).
+ */
+export function parseChannelNames(body: string): string[] {
+  const prose = body
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`[^`\n]+`/g, " ")
+    .replace(/\[[^\]]*\]\([^)\s]*\)|https?:\/\/\S+/g, " ");
+  const found = new Set<string>();
+  for (const match of prose.matchAll(CHANNEL_REF)) {
+    if (match[2]) found.add(match[2].toLowerCase());
+  }
+  return [...found];
+}
+
+/**
+ * `{ channelRefs }` for a new message's meta: each `#name` it writes → the channel's id (`{}` when none), so the link
+ * survives a rename. Archived channels count (they show as archived). A private channel only when the message is
+ * posted in it: `meta` reaches every reader, and only then are they all its members. Elsewhere its members' apps
+ * match the channel by its current name.
+ */
+function channelRefsSql(orgId: string, channelId: string, names: string[]) {
+  // Names match [a-z0-9_-]: safe as an array literal.
+  return sql`coalesce((select jsonb_build_object('channelRefs', jsonb_object_agg(c.name, c.id)) from ${channels} c
+      where c.org_id = ${orgId}::uuid and c.kind = 'channel' and c.name = any(${`{${names.join(",")}}`}::text[])
+        and (c.visibility = 'public' or c.id = ${channelId}::uuid)
+      having count(*) > 0), '{}'::jsonb)`;
+}
+
+/**
  * The org's agents an agent's text @mentions that aren't members of `channelId`: a mention reaches only members
  * (`insertMessageWithRuns`), so for them it is plain text that wakes nobody. Handles, lower case; never the author,
  * an archived agent or a handle a person holds (the @ is theirs).
@@ -522,6 +553,7 @@ export async function insertMessageWithRuns(
   const stretchId =
     (input.author.type === "agent" && input.author.runId === null ? input.author.stretchId : null) ?? null;
   const threadId = input.threadId ?? null;
+  const channelNames = parseChannelNames(body);
   const startRuns = options.startRuns && person && !mediaOnly;
   const deliver = person && options.deliver !== false && !mediaOnly;
   // Agents the person only referenced (`classifyAddressees`): mentioned, but no run and no steering.
@@ -691,6 +723,7 @@ export async function insertMessageWithRuns(
           coalesce((select array_agg(id) from mentioned), '{}'::uuid[]),
           coalesce((select array_agg(user_id) from mentioned_people), '{}'::text[]),
           ${JSON.stringify(input.meta ?? {})}::jsonb
+            || ${channelNames.length > 0 ? channelRefsSql(input.orgId, input.channelId, channelNames) : sql`'{}'::jsonb`}
             || coalesce((select jsonb_build_object('answersQuestionId', id) from answered), '{}'::jsonb)
             -- Delivered to a task in progress: nobody routes it again (no second run).
             || coalesce((select jsonb_build_object('steeredRunIds', jsonb_agg(st.id)) from steered st

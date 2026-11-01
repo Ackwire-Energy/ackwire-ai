@@ -47,6 +47,7 @@ import type {
   CalendarEvent,
   CalendarRange,
   Channel,
+  ChannelCard,
   ChannelCategory,
   ChannelMember,
   CodeSent,
@@ -629,6 +630,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       place: (orgId, channelId, input) =>
         request<void>(`${org(orgId)}/channels/${enc(channelId)}/place`, { method: "PUT", json: input }),
       join: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}/join`, { json: {} }),
+      card: (orgId, channelId) => request<ChannelCard>(`${org(orgId)}/channels/${enc(channelId)}/card`),
       update: (orgId, channelId, input) =>
         request<Channel>(`${org(orgId)}/channels/${enc(channelId)}`, { method: "PATCH", json: input }),
       reactions: async (orgId, messageId) =>

@@ -110,6 +110,7 @@ import { receiptMessageId, turnHeadId } from "./agent-receipts";
 import { AskStore } from "./ask-store";
 import { AskBar, AskProbes, AskStoreProvider, useAskWatch, useAwayAsk } from "./asks";
 import { ChannelMembersSheet } from "./ChannelMembers";
+import { ChannelPicker } from "./ChannelPicker";
 import { ConversationSwitcher } from "./ConversationSwitcher";
 import { takeComposerRequest, useComposerRequest } from "./composer-request";
 import { DmComputerButton } from "./DmComputerButton";
@@ -134,7 +135,7 @@ import { MediaPickerSheet } from "./MediaPickerSheet";
 import { MentionPicker, useMentionMembers } from "./MentionPicker";
 import { MessageRow } from "./MessageRow";
 import { stickerRowsOnScreen } from "./media";
-import { insertMention, mentionQuery } from "./mentions";
+import { insertRef, refQuery } from "./mentions";
 import { NoAiBanner } from "./NoAiBanner";
 import { endsOnNoAiCard, noAiBanner } from "./no-ai-banner";
 import { PinsSheet } from "./PinsSheet";
@@ -1729,12 +1730,16 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                   inputNativeID={COMPOSER_INPUT_ID}
                   {...(suggestions.length > 0 ? { suggestions } : {})}
                   {...(dmAgentId && !isThread ? { face: <AgentFace agentId={dmAgentId} size={22} /> } : {})}
-                  mentionAt={mentionQuery}
-                  insertMention={insertMention}
+                  mentionAt={refQuery}
+                  insertMention={insertRef}
                   prefill={prefill}
-                  mention={({ query, pick }) => (
-                    <MentionPicker query={query} pick={pick} channelId={channelId} members={mentionMembers} />
-                  )}
+                  mention={({ query, sigil, pick }) =>
+                    sigil === "#" ? (
+                      <ChannelPicker query={query} pick={pick} />
+                    ) : (
+                      <MentionPicker query={query} pick={pick} channelId={channelId} members={mentionMembers} />
+                    )
+                  }
                   onType={() => sendTyping(threadId)}
                 />
               ) : (

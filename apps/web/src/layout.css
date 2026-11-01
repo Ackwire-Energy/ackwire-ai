@@ -2688,6 +2688,50 @@ html:not([data-pointer]) .profile-trigger:focus-visible {
   text-overflow: ellipsis;
 }
 
+/* #channel links in messages: the mention's chip, as a link; archived ones muted and struck through */
+.channel-ref {
+  display: inline;
+  padding: 0 3px;
+  border: 0;
+  border-radius: var(--radius-cut);
+  background: var(--surface-sunken);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+.channel-ref:hover {
+  text-decoration: underline;
+}
+html:not([data-pointer]) .channel-ref:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.channel-ref--archived {
+  color: var(--ink-muted);
+  text-decoration: line-through;
+}
+.channel-card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.channel-card__head .profile-card__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.channel-card__topic {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+.channel-card__facts {
+  margin: 0;
+}
+
 /* "Ada não está no canal" after an @ pick */
 .mention-offer {
   display: flex;

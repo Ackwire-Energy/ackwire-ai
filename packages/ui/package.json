@@ -31,6 +31,7 @@
     "./sky/chart": "./src/sky/chart.ts",
     "./sky/avatar": "./src/sky/avatar.ts",
     "./sky/workspace": "./src/sky/workspace.ts",
+    "./channel-refs": "./src/channel-refs.ts",
     "./diff": "./src/diff.ts",
     "./media-grid": "./src/media-grid.ts",
     "./names": "./src/names.ts",

@@ -2152,6 +2152,22 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const c = state.channels.find((x) => x.id === channelId);
         if (c) c.isMember = true;
       },
+      card: async (_orgId, channelId) => {
+        const c = state.channels.find((x) => x.id === channelId);
+        if (!c || (c.visibility === "private" && !c.isMember))
+          throw new ApiError(404, "not_found", "Channel not found");
+        const members = state.channelMembers[channelId] ?? [];
+        return {
+          id: c.id,
+          name: c.name,
+          topic: c.topic,
+          visibility: c.visibility,
+          isMember: c.isMember,
+          archived: false,
+          people: members.filter((m) => m.type === "person").length,
+          agents: members.filter((m) => m.type === "agent").length,
+        };
+      },
       members: async (_orgId, channelId) => state.channelMembers[channelId] ?? [],
       archive: async (orgId, channelId) => {
         log("chat.archive", orgId, channelId);

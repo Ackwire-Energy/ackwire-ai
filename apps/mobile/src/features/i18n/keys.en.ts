@@ -778,6 +778,13 @@ export const featureKeysEn: FeatureTranslations = {
       newAgent: "Create agent",
     },
   },
+  channelRef: {
+    list: "Channels",
+    a11y: "Channel #{{name}}",
+    archivedA11y: "Channel #{{name}}, archived",
+    archived: "#{{name}} was archived",
+    notMember: "you're not in it",
+  },
   mention: {
     list: "People and agents",
     inChannel: "In this channel",

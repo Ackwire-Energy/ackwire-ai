@@ -784,6 +784,13 @@ export const featureKeysPtBR = {
       newAgent: "Criar agente",
     },
   },
+  channelRef: {
+    list: "Canais",
+    a11y: "Canal #{{name}}",
+    archivedA11y: "Canal #{{name}}, arquivado",
+    archived: "#{{name}} foi arquivado",
+    notMember: "você não participa",
+  },
   mention: {
     list: "Pessoas e agentes",
     inChannel: "Neste canal",

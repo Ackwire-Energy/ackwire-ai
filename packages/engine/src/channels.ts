@@ -204,6 +204,62 @@ export async function listChannels(db: Database, userId: string, orgId: string):
   });
 }
 
+/** A `#channel` link's card: what the channel is, how many are in it, and whether I am. */
+export interface ChannelCard {
+  id: string;
+  name: string;
+  topic: string;
+  visibility: "public" | "private";
+  isMember: boolean;
+  archived: boolean;
+  /** People in it. */
+  people: number;
+  /** Agents in it (not archived). */
+  agents: number;
+}
+
+/**
+ * The card of a channel I can see: public, or private and mine; archived ones too. Any other id (a private
+ * channel I'm not in, a DM, another organization's) is "not found", so a link tells nothing about it.
+ */
+export async function channelCard(
+  db: Database,
+  userId: string,
+  orgId: string,
+  channelId: string,
+): Promise<ChannelCard> {
+  await requirePermission(db, userId, orgId, "read");
+  const [row] = rowsOf<{
+    id: string;
+    name: string;
+    topic: string;
+    visibility: "public" | "private";
+    archived: boolean;
+    is_member: boolean;
+    people: number | string;
+    agents: number | string;
+  }>(
+    await db.execute(sql`select c.id, c.name, c.topic, c.visibility, (c.archived_at is not null) as archived,
+        exists (select 1 from ${channelMembers} m where m.channel_id = c.id and m.user_id = ${userId}) as is_member,
+        (select count(*) from ${channelMembers} m where m.channel_id = c.id and m.user_id is not null) as people,
+        (select count(*) from ${channelMembers} m join ${agents} a on a.id = m.agent_id
+          where m.channel_id = c.id and a.archived_at is null) as agents
+      from ${channels} c
+      where c.id = ${channelId}::uuid and c.org_id = ${orgId}::uuid and c.kind = 'channel'`),
+  );
+  if (!row || (row.visibility === "private" && row.is_member !== true)) throw new NotFoundError("Channel not found");
+  return {
+    id: row.id,
+    name: row.name,
+    topic: row.topic,
+    visibility: row.visibility,
+    isMember: row.is_member === true,
+    archived: row.archived === true,
+    people: Number(row.people),
+    agents: Number(row.agents),
+  };
+}
+
 export async function isChannelMember(db: Database, orgId: string, channelId: string, userId: string) {
   const [row] = await db
     .select({ id: channelMembers.id })

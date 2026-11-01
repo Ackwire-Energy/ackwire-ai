@@ -15,6 +15,7 @@ import {
   useToggleReaction,
   useWaiting,
 } from "@agenteschat/client";
+import { channelRefsOf } from "@agenteschat/client/lib/channel-refs";
 import { CONTINUE_ERRORS, errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
@@ -270,7 +271,13 @@ export const MessageRow = memo(function MessageRow({
     // beside it.
     const lead = body ? (
       <View style={[styles.bubble, styles.lead, { backgroundColor: c.bubble }]}>
-        <MessageText body={body} muted={m.local === "pending"} selectable={false} accent={accent} />
+        <MessageText
+          body={body}
+          muted={m.local === "pending"}
+          selectable={false}
+          accent={accent}
+          channelRefs={channelRefsOf(m.meta)}
+        />
       </View>
     ) : media ? (
       <View style={styles.grow}>
@@ -409,11 +416,25 @@ export const MessageRow = memo(function MessageRow({
           <BrainWait
             message={m}
             fallback={
-              body ? <MessageText body={body} muted={m.local === "pending"} selectable={false} accent={accent} /> : null
+              body ? (
+                <MessageText
+                  body={body}
+                  muted={m.local === "pending"}
+                  selectable={false}
+                  accent={accent}
+                  channelRefs={channelRefsOf(m.meta)}
+                />
+              ) : null
             }
           />
         ) : body ? (
-          <MessageText body={body} muted={m.local === "pending"} selectable={false} accent={accent} />
+          <MessageText
+            body={body}
+            muted={m.local === "pending"}
+            selectable={false}
+            accent={accent}
+            channelRefs={channelRefsOf(m.meta)}
+          />
         ) : null}
         {media ? <ChatMedia media={media} liveId={m.id} /> : null}
         {(stopped || atLimit) && m.agentRunId ? (
