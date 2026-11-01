@@ -644,6 +644,8 @@ describe("a lone quick read that only fed the answer shows no card", () => {
       ["it changed something", [call("1", "create_routine")]],
       ["an app", [call("1", "github_list_issues")]],
       ["the browser", [call("1", "browser_navigate")]],
+      ["another server's read", [call("1", "mcp__linear__list_issues")]],
+      ["another server's calendar", [call("1", "mcp__gcal__list_events")]],
       ["a file on the PC", [call("1", "read_file")]],
       ["it failed", [call("1", "get_my_usage", { failed: true })]],
       ["still running", [call("1", "get_my_usage", { running: true })]],

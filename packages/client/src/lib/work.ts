@@ -646,9 +646,16 @@ const QUIET_READS: ReadonlySet<ActivityKind> = new Set([
   "openingSkill",
 ]);
 
-/** One quick internal read that ended well, with nothing of its own to show (no code, no output). */
-export const quietLine = (l: Pick<ToolLine, "kind" | "state" | "count" | "ms" | "code" | "output">) =>
+/**
+ * One quick internal read that ended well, with nothing of its own to show (no code, no output). Ours only: another
+ * MCP server's `list_issues` takes our kind's name (`toolActivity`) but reached an outside app.
+ */
+export const quietLine = (
+  l: Pick<ToolLine, "tool" | "service" | "kind" | "state" | "count" | "ms" | "code" | "output">,
+) =>
   l.count === 1 &&
+  !l.service &&
+  (!/^mcp__/i.test(l.tool) || /^mcp__agentes__/i.test(l.tool)) &&
   l.state === "done" &&
   QUIET_READS.has(l.kind) &&
   !l.code &&
