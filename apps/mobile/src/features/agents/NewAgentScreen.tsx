@@ -359,24 +359,6 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
             onPress={() => router.push("/settings/import")}
           />
         ) : null}
-        {ROLE_GROUPS.map((group) => (
-          <View key={group.id} style={styles.group}>
-            <Text variant="footnote" tone="faint" style={styles.groupTitle}>
-              {t(`newAgent.roleGroups.${group.id}`)}
-            </Text>
-            {group.roles.map((id) => (
-              <RoleCard
-                key={id}
-                on={role === id}
-                onPress={() => pickRole(id)}
-                leading={<AgentAvatar agent={fullLook(ROLE_DEFAULTS[id].look)} size={48} live={false} />}
-                title={t(`newAgent.roles.${id}.name`)}
-                caption={t("newAgent.startsAs", { name: t(`newAgent.roles.${id}.agent`) })}
-                desc={t(`newAgent.roles.${id}.desc`)}
-              />
-            ))}
-          </View>
-        ))}
         <View style={styles.group}>
           <RoleCard
             on={role === "custom"}
@@ -406,6 +388,24 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
             </>
           ) : null}
         </View>
+        {ROLE_GROUPS.map((group) => (
+          <View key={group.id} style={styles.group}>
+            <Text variant="footnote" tone="faint" style={styles.groupTitle}>
+              {t(`newAgent.roleGroups.${group.id}`)}
+            </Text>
+            {group.roles.map((id) => (
+              <RoleCard
+                key={id}
+                on={role === id}
+                onPress={() => pickRole(id)}
+                leading={<AgentAvatar agent={fullLook(ROLE_DEFAULTS[id].look)} size={44} live={false} />}
+                title={t(`newAgent.roles.${id}.name`)}
+                caption={t("newAgent.startsAs", { name: t(`newAgent.roles.${id}.agent`) })}
+                desc={t(`newAgent.roles.${id}.desc`)}
+              />
+            ))}
+          </View>
+        ))}
         {tried && !role ? <ErrorLine text={t("newAgent.errors.roleRequired")} /> : null}
       </>
     ),
@@ -758,8 +758,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   blank: {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     borderRadius: 15,
     borderWidth: 1.5,
     borderStyle: "dashed",

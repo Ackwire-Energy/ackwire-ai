@@ -7583,13 +7583,16 @@ html:not([data-pointer]) .onb__step:focus-visible {
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink2);
 }
-/* The role step: groups of presets under small headings, "Do zero" last. */
+/* The role step: "Do zero" first (its Cargo field right under it, one card's gap apart), then the groups of presets
+   under small headings. */
 .newag__role-groups {
   display: flex;
   flex-direction: column;
 }
-.newag__role-groups > .newag__role--blank {
-  margin-top: 22px;
+.newag__scratch {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 /* Two across while a card holds its longest name ("Atendimento", 150px) beside the face and clear of the check, one per
    row below that. */
@@ -7641,9 +7644,26 @@ html:not([data-pointer]) .newag__addrow:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* A choice card's head: one name and its short line, centred on the tile beside it (not a chat row's face line). */
+.newag__role-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  /* Clear of the check in the card's corner. */
+  padding-right: 28px;
+}
+.newag__role-head > :first-child {
+  flex: none;
+}
+/* 44px tiles: the agent canvas draws at the box's device pixels, so any whole-pixel size stays crisp. */
+.newag__role-head > .ac-avatar {
+  width: 44px;
+  height: 44px;
+}
 .newag__role-name {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 .newag__role-name b {
   font-family: var(--font-display);
@@ -7682,12 +7702,7 @@ html:not([data-pointer]) .newag__addrow:focus-visible {
   opacity: 1;
   transform: none;
 }
-/* Its tile leads the name as a face does: the name's capitals at its top, however the line under it wraps. */
 .newag__role--blank {
-  grid-column: 1 / -1;
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 14px;
   background: transparent;
   box-shadow: inset 0 0 0 1.5px var(--line2);
 }
@@ -7707,8 +7722,9 @@ html:not([data-pointer]) .newag__addrow:focus-visible {
   display: grid;
   place-items: center;
   flex: none;
-  width: 46px;
-  height: 46px;
+  width: 44px;
+  height: 44px;
+  box-sizing: border-box;
   border: 1.5px dashed var(--line2);
   border-radius: 15px 15px 15px 5px;
   color: var(--muted);
