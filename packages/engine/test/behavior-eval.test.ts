@@ -23,6 +23,8 @@ test("every case is well formed: known presets, connectors and tools", () => {
     "ask_agent",
     "post_message",
     "send_dm",
+    "send_gif",
+    "send_sticker",
     "list_routines",
     "update_routine",
     "create_routine",
