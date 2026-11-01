@@ -4984,6 +4984,24 @@ html:not([data-pointer]) .tr-ok:focus-visible {
 .sidebar__item[data-status="active"] > .sidebar__item-meta {
   color: var(--ink2);
 }
+/* The open channel (or tool, or person): on the plate, a soft glow of the accent from the right edge inward, faded out
+   well before the label. An agent's row keeps its own color's sky alone. */
+.sidebar__item[data-status="active"]::before {
+  background:
+    linear-gradient(
+      to left,
+      color-mix(in srgb, var(--agent) var(--sel-glow, 11%), transparent),
+      transparent var(--sel-glow-reach, 44px)
+    ),
+    var(--side-active);
+}
+[data-theme="dark"] .sidebar__item[data-status="active"] {
+  --sel-glow: 16%;
+}
+.sidebar__row[data-agent-row] > .sidebar__item[data-status="active"]::before {
+  background: var(--side-active);
+}
+
 /* The icon rail is too narrow for a frame. */
 .sidebar[data-rail="true"] .sidebar__item[data-status="active"] {
   background-image: none;
@@ -10245,19 +10263,25 @@ html[data-menu-overlay] .shell {
   margin: 0 2px;
   color: var(--faint);
 }
+/* Faces in the lists: a step up from the kit's small (24px), here and on the rail. */
+.sidebar__item > .ac-avatar--sm {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+}
 .sidebar:not([data-rail="true"]) .sidebar__item:has(> .ac-avatar) {
   padding-left: 6px;
-  gap: 6px;
+  gap: 8px;
 }
-/* An agent with a role: the face at the top beside the name (20px line, 2px down, centred on the 24px face), the role
-   under the name, 4px above the face and below the role like a 30px row's face (46px with a one-line role, 62px with
-   two); the count, lock or state stays centred at the end. */
+/* An agent with a role: the face at the top beside the name (20px line, 4px down, centred on the 28px face), the role
+   under the name, 4px above the face and below the role (48px with a one-line role, 64px with two); the count, lock or
+   state stays centred at the end. */
 .sidebar:not([data-rail="true"]) .sidebar__item:has(> .sidebar__item-text > .sidebar__item-role) {
   align-items: flex-start;
   padding-block: 4px;
 }
 .sidebar:not([data-rail="true"]) .sidebar__item:has(> .sidebar__item-text > .sidebar__item-role) > .sidebar__item-text {
-  padding-top: 2px;
+  padding-top: 4px;
 }
 .sidebar:not([data-rail="true"]) .sidebar__item-text > .sidebar__item-label {
   line-height: 20px;
@@ -10552,6 +10576,96 @@ html:not([data-pointer]) .sidebar__more:focus-visible {
 }
 .sidebar__more-active > :not([data-status="active"]) {
   display: none;
+}
+/* A section of the sidebar in the person's order (SidebarOrder.tsx): its parts keep the list's spacing; a grip in the
+   gutter on hover drags it, and a line in the gap shows where it would land. The rail lays the parts out alone. */
+.sidebar__block {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.sidebar[data-rail="true"] .sidebar__block {
+  display: contents;
+}
+.sidebar__grip {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: -13px;
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--faint);
+  cursor: grab;
+  opacity: 0;
+  transition:
+    opacity 0.15s,
+    color 0.15s;
+}
+.sidebar__block:has(> .sidebar__grip + :is(.sidebar__tools, .sidebar__group[role="group"])) > .sidebar__grip {
+  top: 6px;
+}
+.sidebar__block:hover > .sidebar__grip,
+.sidebar__grip:focus-visible {
+  opacity: 1;
+}
+.sidebar__grip:hover {
+  color: var(--ink);
+}
+.sidebar__grip:active {
+  cursor: grabbing;
+}
+html:not([data-pointer]) .sidebar__grip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.sidebar__block[data-drop]::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--agent);
+  pointer-events: none;
+}
+.sidebar__block[data-drop="before"]::after {
+  top: -11px;
+}
+.sidebar__block[data-drop="after"]::after {
+  bottom: -11px;
+}
+@media (pointer: coarse) {
+  .sidebar__grip {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar__grip {
+    transition: none;
+  }
+}
+/* "Personalizar a barra lateral": the sections' order under the tools, a number and the arrows on each line. */
+.sidebar-setup__heading {
+  margin: 20px 0 2px;
+  font-size: 14px;
+  font-weight: 650;
+}
+.sidebar-setup__hint {
+  margin: 0 0 4px;
+}
+.sidebar-setup.sidebar-setup--order {
+  grid-template-columns: auto 1fr auto auto;
+}
+.sidebar-setup--order .settings-row__icon {
+  font-size: 12px;
+  font-weight: 650;
 }
 /* Empty, so in a list longer than its room the column would shrink it to nothing. */
 .sidebar__divider {

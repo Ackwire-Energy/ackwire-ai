@@ -1,13 +1,15 @@
 import type { Artifact, ArtifactContent, ArtifactKind } from "@agenteschat/client";
 import { ApiError, keys } from "@agenteschat/client";
 import { fileName } from "@agenteschat/client/lib/artifacts";
-import { Button, Dialog, DialogFooter, type IconName, Menu, MenuItem, MenuSeparator } from "@agenteschat/ui";
+import { Button, Dialog, DialogFooter, type IconName, Menu } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
+import { MenuEntries } from "@/components/DesktopMenus";
 import { useOrg } from "@/components/org-context";
+import { copyText, type MenuEntry } from "@/lib/context-menu";
 import { useToast } from "@/lib/toast";
 import { artifactLink } from "./ArtifactViewer";
 import { fileSaver } from "./fileSaver";
@@ -155,23 +157,85 @@ export function useArtifactDownload() {
   return { save, formats };
 }
 
-/** "…" on a file (viewer header, Drive rows): link, channel, versions, delete. */
-export function ArtifactMoreMenu({
-  artifact,
-  onVersions,
-  onDelete,
-  extra,
-}: {
-  artifact: Artifact;
-  onVersions?: () => void;
-  onDelete: () => void;
-  /** Items before the separator (Drive adds "Abrir"). */
-  extra?: React.ReactNode;
-}) {
+/**
+ * A file's actions, for its "…" (viewer header, Drive rows) and its right click (Drive cards and rows): open and
+ * download when given, link, channel, versions, delete.
+ */
+export function useArtifactEntries() {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
   const navigate = useNavigate();
+  const downloads = useArtifactDownload();
+  return (artifact: Artifact, { onOpen, onVersions, onDelete, download }: ArtifactMenuOptions): MenuEntry[] => [
+    ...(onOpen
+      ? ([
+          { kind: "item", id: "open", label: t("artifacts.openFile"), icon: "external", run: () => onOpen() },
+        ] satisfies MenuEntry[])
+      : []),
+    ...(download
+      ? ([
+          {
+            kind: "item",
+            id: "download",
+            label: t("artifacts.download"),
+            icon: "download",
+            run: () => void downloads.save(artifact),
+          },
+        ] satisfies MenuEntry[])
+      : []),
+    {
+      kind: "item",
+      id: "copy-link",
+      label: t("artifacts.copyLink"),
+      icon: "link",
+      run: () =>
+        void copyText(artifactLink(window.location.origin, org.id, artifact.id), () =>
+          toast.show(t("artifacts.linkCopied")),
+        ),
+    },
+    ...(artifact.channelId
+      ? ([
+          {
+            kind: "item",
+            id: "channel",
+            label: t("artifacts.openInChannel"),
+            icon: "channel",
+            run: () =>
+              void navigate({
+                to: "/org/$orgId/c/$channelId",
+                params: { orgId: org.id, channelId: artifact.channelId ?? "" },
+              }),
+          },
+        ] satisfies MenuEntry[])
+      : []),
+    ...(onVersions
+      ? ([
+          { kind: "item", id: "versions", label: t("artifacts.seeVersions"), icon: "waiting", run: onVersions },
+        ] satisfies MenuEntry[])
+      : []),
+    ...(artifact.canDelete
+      ? ([
+          { kind: "separator" },
+          { kind: "item", id: "delete", label: t("artifacts.delete"), icon: "trash", danger: true, run: onDelete },
+        ] satisfies MenuEntry[])
+      : []),
+  ];
+}
+
+export interface ArtifactMenuOptions {
+  /** "Abrir" (Drive). */
+  onOpen?: () => void;
+  onVersions?: () => void;
+  onDelete: () => void;
+  /** "Baixar" the original (Drive's right click; the details and the viewer have their own button). */
+  download?: boolean;
+}
+
+/** "…" on a file (viewer header, Drive rows): its actions (`useArtifactEntries`). */
+export function ArtifactMoreMenu({ artifact, ...options }: { artifact: Artifact } & ArtifactMenuOptions) {
+  const { t } = useTranslation();
+  const entries = useArtifactEntries();
   const label = t("artifacts.more", { title: artifact.title });
   return (
     <Menu
@@ -181,42 +245,7 @@ export function ArtifactMoreMenu({
         <Button size="sm" variant="ghost" iconOnly icon="more" aria-label={label} title={t("artifacts.moreShort")} />
       }
     >
-      {extra}
-      <MenuItem
-        icon="link"
-        onSelect={async () => {
-          await navigator.clipboard?.writeText(artifactLink(window.location.origin, org.id, artifact.id));
-          toast.show(t("artifacts.linkCopied"));
-        }}
-      >
-        {t("artifacts.copyLink")}
-      </MenuItem>
-      {artifact.channelId && (
-        <MenuItem
-          icon="channel"
-          onSelect={() =>
-            void navigate({
-              to: "/org/$orgId/c/$channelId",
-              params: { orgId: org.id, channelId: artifact.channelId ?? "" },
-            })
-          }
-        >
-          {t("artifacts.openInChannel")}
-        </MenuItem>
-      )}
-      {onVersions && (
-        <MenuItem icon="waiting" onSelect={onVersions}>
-          {t("artifacts.seeVersions")}
-        </MenuItem>
-      )}
-      {artifact.canDelete && (
-        <>
-          <MenuSeparator />
-          <MenuItem icon="trash" danger onSelect={onDelete}>
-            {t("artifacts.delete")}
-          </MenuItem>
-        </>
-      )}
+      <MenuEntries entries={entries(artifact, options)} />
     </Menu>
   );
 }

@@ -154,6 +154,7 @@ import type {
   SecretRequest,
   ServerTelemetry,
   SidebarItems,
+  SidebarSection,
   SignInOptions,
   Skill,
   SkillDetail,
@@ -426,6 +427,15 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           .items,
       setSidebarItems: async (orgId, items) =>
         (await request<{ items: SidebarItems }>(`${org(orgId)}/me/sidebar`, { method: "PUT", json: { items } })).items,
+      sidebarOrder: async (orgId) =>
+        (await request<{ order: SidebarSection[] }>(`${org(orgId)}/me/sidebar/order`)).order,
+      setSidebarOrder: async (orgId, order) =>
+        (
+          await request<{ order: SidebarSection[] }>(`${org(orgId)}/me/sidebar/order`, {
+            method: "PUT",
+            json: { order },
+          })
+        ).order,
       update: (orgId, input) => request<void>(org(orgId), { method: "PATCH", json: input }),
       members: async (orgId) => (await request<{ members: Member[] }>(`${org(orgId)}/members`)).members,
       changeRole: (orgId, userId, role) =>

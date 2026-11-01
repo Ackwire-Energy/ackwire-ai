@@ -1,6 +1,13 @@
 import type { SidebarItem, SidebarPlace } from "@agenteschat/client";
 import { useSetSidebarItem, useSidebarItems } from "@agenteschat/client";
-import { SIDEBAR_COUNTED, SIDEBAR_ITEMS, sidebarPlace } from "@agenteschat/client/lib/sidebar-items";
+import {
+  moveSection,
+  SIDEBAR_COUNTED,
+  SIDEBAR_ITEMS,
+  SIDEBAR_SECTIONS,
+  sameOrder,
+  sidebarPlace,
+} from "@agenteschat/client/lib/sidebar-items";
 import {
   Button,
   Dialog,
@@ -14,6 +21,7 @@ import {
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "./org-context";
+import { sectionName, useSectionOrder } from "./SidebarOrder";
 
 /** The tools at the top of the sidebar: the page each opens and its icon. */
 export const SIDEBAR_TOOLS = {
@@ -37,6 +45,7 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
   const { org } = useOrg();
   const { data: items, refetch } = useSidebarItems(org.id);
   const save = useSetSidebarItem(org.id);
+  const sections = useSectionOrder(org.id);
   // What another device changed since this one loaded shows as the dialog opens.
   useEffect(() => {
     if (open) void refetch();
@@ -75,8 +84,46 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
             </li>
           ))}
         </ul>
+        <h3 className="sidebar-setup__heading">{t("shell.sidebarSetup.order")}</h3>
+        <p className="small muted sidebar-setup__hint">{t("shell.sidebarSetup.orderHint")}</p>
+        <ol className="sidebar-setup sidebar-setup--order">
+          {sections.order.map((id, i) => (
+            <li key={id} className="sidebar-setup__row" data-section={id}>
+              <span className="settings-row__icon ac-num" aria-hidden="true">
+                {i + 1}
+              </span>
+              <span className="sidebar-setup__name">{sectionName(t, id)}</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                iconOnly
+                icon="chevronUp"
+                aria-label={`${t("contextMenu.moveUp")}: ${sectionName(t, id)}`}
+                disabled={i === 0}
+                onClick={() => sections.put(moveSection(sections.order, id, -1))}
+              />
+              <Button
+                size="sm"
+                variant="ghost"
+                iconOnly
+                icon="chevronDown"
+                aria-label={`${t("contextMenu.moveDown")}: ${sectionName(t, id)}`}
+                disabled={i === sections.order.length - 1}
+                onClick={() => sections.put(moveSection(sections.order, id, 1))}
+              />
+            </li>
+          ))}
+        </ol>
       </DialogBody>
       <DialogFooter note={t("shell.sidebarSetup.instant")}>
+        <Button
+          variant="ghost"
+          icon="undo"
+          disabled={sameOrder(sections.order, SIDEBAR_SECTIONS)}
+          onClick={() => sections.put([...SIDEBAR_SECTIONS])}
+        >
+          {t("contextMenu.restoreOrder")}
+        </Button>
         <Button
           variant="ghost"
           icon="undo"

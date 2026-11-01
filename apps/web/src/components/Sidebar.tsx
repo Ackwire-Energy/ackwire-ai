@@ -5,6 +5,7 @@ import type {
   Channel,
   ChannelCategory,
   Member,
+  SidebarSection as SectionKey,
   SidebarItem,
 } from "@agenteschat/client";
 import {
@@ -34,7 +35,6 @@ import {
 import { agentSections } from "@agenteschat/client/lib/agent-groups";
 import { audienceChip, audienceNotice, listsAgent } from "@agenteschat/client/lib/audience";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
-import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { waitingAgents } from "@agenteschat/client/lib/outages";
 import { can, managesChannel } from "@agenteschat/client/lib/permissions";
 import { AVAILABILITIES, clearsText, presenceOfAvailability } from "@agenteschat/client/lib/presence";
@@ -86,16 +86,16 @@ import { useApi } from "@/api/context";
 import { useAuth } from "@/auth/context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { agentLine, availabilityOf, personLine, useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
-import { requestChannelDetails } from "@/lib/channel-details";
-import { contextMenuHandler, copyText, type MenuEntry } from "@/lib/context-menu";
+import type { MenuEntry } from "@/lib/context-menu";
 import { onPhoneAsk, takePhoneAsk } from "@/lib/desktop";
+import { entityMenu } from "@/lib/entity-menu";
 import { useOpenParam } from "@/lib/open-param";
 import { markOpen } from "@/lib/perf";
 import { ownPlanLines, planNearLimit, planWord } from "@/lib/plan-usage";
 import { STORAGE_KEYS, storage, storedStrings } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/settings-sections";
-import { useLiveStore, useStreams } from "@/realtime/context";
+import { useStreams } from "@/realtime/context";
 import { ProfileDialog } from "./AccountSettings";
 import { AddPasswordDialog } from "./AddPassword";
 import { AgentAvatar } from "./AgentAvatar";
@@ -110,6 +110,7 @@ import {
 import { MoveChannelDialog, NewCategoryDialog, RenameCategoryDialog } from "./ChannelCategoryDialogs";
 import { openPalette } from "./CommandMenu";
 import { DeleteAccountDialog } from "./DeleteAccount";
+import { useAgentMenu, useChannelMenu, usePersonMenu } from "./entity-menus";
 import { useInviteDialog } from "./invite/InviteDialog";
 import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
 import { NewChannelDialog } from "./NewChannelDialog";
@@ -117,10 +118,10 @@ import { OpenOnPhoneDialog } from "./OpenOnPhone";
 import { useOrg } from "./org-context";
 import { StatusLine } from "./Presence";
 import { MyFace, OrgMark } from "./ProfilePhoto";
+import { sectionName, useSectionOrder } from "./SidebarOrder";
 import { SIDEBAR_TOOLS, SidebarSetupDialog } from "./SidebarSetup";
 import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon, WorkspaceSky } from "./Sky";
 import { SetStatusDialog, useSaveStatus } from "./StatusDialog";
-import { isStoppable, useStopRun } from "./StopRun";
 
 /** The chosen item's sky: both themes, the CSS picks one. */
 const selectionSky = (color: AgentColor = "sky") =>
@@ -133,7 +134,7 @@ function SidebarSkeleton({ count, avatar, label }: { count: number; avatar?: boo
       {Array.from({ length: count }, (_, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: fixed placeholders
         <span key={i} className="sidebar__item sidebar__item--skeleton">
-          <Skeleton shape={avatar ? "square" : "block"} width={avatar ? 24 : 16} height={avatar ? 24 : 16} />
+          <Skeleton shape={avatar ? "square" : "block"} width={avatar ? 28 : 16} height={avatar ? 28 : 16} />
           <Skeleton width={[96, 72, 112][i % 3]} />
         </span>
       ))}
@@ -372,65 +373,30 @@ export function Sidebar() {
     if (a.top < n.top || a.bottom > n.bottom) nav.scrollTop += a.top - n.top - (nav.clientHeight - a.height) / 2;
   }, [pathname, channels.data, dir.agents.length, people.length, rail]);
 
-  return (
-    <nav className="sidebar" aria-label={t("shell.nav")} data-rail={rail} style={selectionSky()} {...drawer?.navProps}>
-      <div className="sidebar__top">
-        <WorkspaceSky part="side" rail={rail} />
-        <div className="sidebar__org">
-          <WorkspaceMenu
-            summary={
-              overview.data
-                ? t("shell.summary", {
-                    count: overview.data.people,
-                    people: overview.data.people,
-                    agents: overview.data.agents,
-                  })
-                : null
-            }
-          />
-        </div>
-
-        <div className="sidebar__jump-row">
-          <button type="button" className="sidebar__jump" onClick={openPalette} title={t("palette.jump")}>
-            <Icon name="search" />
-            <span className="sidebar__item-label">{t("palette.jump")}</span>
-            <Kbd>{modKey()}</Kbd>
-            <Kbd>K</Kbd>
-          </button>
-          {!compact && !tablet && (
-            <Button
-              variant="ghost"
-              iconOnly
-              icon="sidebar"
-              className="sidebar__collapse"
-              aria-label={collapsed ? t("shell.expandNav") : t("shell.collapseNav")}
-              title={collapsed ? t("shell.expandNav") : t("shell.collapseNav")}
-              aria-expanded={!collapsed}
-              onClick={toggleCollapsed}
-            />
-          )}
-        </div>
+  // The person's order of the sections (SidebarOrder.tsx); a section with nothing to show leaves no line.
+  const sectionOrder = useSectionOrder(orgId);
+  const sectionMenu = (id: SectionKey) =>
+    entityMenu(() => [{ kind: "header", label: sectionName(t, id) }, ...sectionOrder.entries(id)]);
+  const blocks: Record<SectionKey, ReactNode> = {
+    tools: (
+      // The tools each person keeps in sight; the rest open beside the sidebar from More.
+      <div className="sidebar__group sidebar__tools">
+        {listed.map(toolRow)}
+        <MoreTools items={inMore} row={toolRow} countOf={countOf} />
       </div>
-
-      <div className="sidebar__scroll" ref={navRef}>
-        {/* The tools each person keeps in sight; the rest open beside the sidebar from More. */}
-        <div className="sidebar__group sidebar__tools">
-          {listed.map(toolRow)}
-          <MoreTools items={inMore} row={toolRow} countOf={countOf} />
-        </div>
-
-        {/* Lines between the tools, the channels, the agents and the people: parts of the sidebar, not categories. */}
-        <span className="sidebar__divider" aria-hidden="true" />
-
-        <SidebarChannels
-          channels={(channels.data ?? []).filter((c) => !dmChannels.has(c.id))}
-          loading={channels.isLoading}
-          sections={sections}
-          onNewChannel={(categoryId) => setCreatingChannel(categoryId ?? true)}
-          onPrefetch={prefetch}
-        />
-
-        {agentsShown && <span className="sidebar__divider" aria-hidden="true" />}
+    ),
+    channels: (
+      <SidebarChannels
+        channels={(channels.data ?? []).filter((c) => !dmChannels.has(c.id))}
+        loading={channels.isLoading}
+        sections={sections}
+        onNewChannel={(categoryId) => setCreatingChannel(categoryId ?? true)}
+        onPrefetch={prefetch}
+        headProps={sectionMenu("channels")}
+      />
+    ),
+    agents: agentsShown && (
+      <>
         {dir.loading && dir.agents.length === 0 && (
           // Loading: the same header as the open section, so nothing jumps when the list arrives.
           <div className="sidebar__group sidebar__section sidebar__section--part" data-open="true">
@@ -451,6 +417,7 @@ export function Sidebar() {
             label={t("shell.agents")}
             sections={sections}
             className="sidebar__section--part"
+            headProps={sectionMenu("agents")}
             summary={unreadOf(byGroup.ungrouped) > 0 && <UnreadCount count={unreadOf(byGroup.ungrouped)} />}
             action={
               <>
@@ -524,28 +491,81 @@ export function Sidebar() {
               </SidebarSection>
             );
           })}
+      </>
+    ),
+    people: people.length > 0 && (
+      <SidebarSection
+        id="people"
+        label={t("shell.directMessages")}
+        sections={sections}
+        className="sidebar__section--part"
+        headProps={sectionMenu("people")}
+        summary={peopleUnread > 0 && <UnreadCount count={peopleUnread} />}
+      >
+        {people.map((m) => (
+          <ErrorBoundary key={m.userId} resetKey={m} fallback={unshownRow}>
+            <PersonRow
+              member={m}
+              unread={unreadWith.get(m.userId) ?? 0}
+              onPrefetch={() => prefetchDm(m.userId)}
+              onOpen={() => markOpen(dmWith.get(m.userId) ?? m.userId)}
+            />
+          </ErrorBoundary>
+        ))}
+      </SidebarSection>
+    ),
+  };
 
-        {people.length > 0 && <span className="sidebar__divider" aria-hidden="true" />}
-        {people.length > 0 && (
-          <SidebarSection
-            id="people"
-            label={t("shell.directMessages")}
-            sections={sections}
-            className="sidebar__section--part"
-            summary={peopleUnread > 0 && <UnreadCount count={peopleUnread} />}
-          >
-            {people.map((m) => (
-              <ErrorBoundary key={m.userId} resetKey={m} fallback={unshownRow}>
-                <PersonRow
-                  member={m}
-                  unread={unreadWith.get(m.userId) ?? 0}
-                  onPrefetch={() => prefetchDm(m.userId)}
-                  onOpen={() => markOpen(dmWith.get(m.userId) ?? m.userId)}
-                />
-              </ErrorBoundary>
-            ))}
-          </SidebarSection>
-        )}
+  return (
+    <nav className="sidebar" aria-label={t("shell.nav")} data-rail={rail} style={selectionSky()} {...drawer?.navProps}>
+      <div className="sidebar__top">
+        <WorkspaceSky part="side" rail={rail} />
+        <div className="sidebar__org">
+          <WorkspaceMenu
+            summary={
+              overview.data
+                ? t("shell.summary", {
+                    count: overview.data.people,
+                    people: overview.data.people,
+                    agents: overview.data.agents,
+                  })
+                : null
+            }
+          />
+        </div>
+
+        <div className="sidebar__jump-row">
+          <button type="button" className="sidebar__jump" onClick={openPalette} title={t("palette.jump")}>
+            <Icon name="search" />
+            <span className="sidebar__item-label">{t("palette.jump")}</span>
+            <Kbd>{modKey()}</Kbd>
+            <Kbd>K</Kbd>
+          </button>
+          {!compact && !tablet && (
+            <Button
+              variant="ghost"
+              iconOnly
+              icon="sidebar"
+              className="sidebar__collapse"
+              aria-label={collapsed ? t("shell.expandNav") : t("shell.collapseNav")}
+              title={collapsed ? t("shell.expandNav") : t("shell.collapseNav")}
+              aria-expanded={!collapsed}
+              onClick={toggleCollapsed}
+            />
+          )}
+        </div>
+      </div>
+
+      <div className="sidebar__scroll" ref={navRef}>
+        {/* Lines between the tools, the channels, the agents and the people: parts of the sidebar, not categories. */}
+        {sectionOrder.order
+          .filter((id) => blocks[id])
+          .map((id, i) => (
+            <Fragment key={id}>
+              {i > 0 && <span className="sidebar__divider" aria-hidden="true" />}
+              {sectionOrder.block(id, blocks[id], !rail)}
+            </Fragment>
+          ))}
       </div>
 
       <NewChannelDialog
@@ -708,6 +728,7 @@ function SidebarChannels({
   sections,
   onNewChannel,
   onPrefetch,
+  headProps,
 }: {
   channels: Channel[];
   loading: boolean;
@@ -715,12 +736,13 @@ function SidebarChannels({
   /** The + of a category (its id) or of "Canais" (null). */
   onNewChannel: (categoryId: string | null) => void;
   onPrefetch: (channelId: string) => void;
+  /** "Canais"' header, with no categories: the section's own menu (its place in the sidebar). */
+  headProps?: HTMLAttributes<HTMLDivElement>;
 }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const orgId = org.id;
   const toast = useToast();
-  const navigate = useNavigate();
   const categories = useChannelCategories(orgId);
   const place = usePlaceChannel(orgId);
   const placeCategory = usePlaceChannelCategory(orgId);
@@ -815,52 +837,35 @@ function SidebarChannels({
   };
   const dropMark = (key: string) => (mark?.key === key ? mark.where : undefined);
 
-  // ── Menus: the desktop app's right click (lib/context-menu.ts) and a category's ⋯ ──
+  // ── Menus: a channel's and a category's right click (lib/entity-menu.ts), and a category's ⋯ ──
+  const channelEntries = useChannelMenu();
   const channelMenu = (c: Channel) =>
-    contextMenuHandler(() => {
-      const entries: MenuEntry[] = [{ kind: "header", label: `#${c.name}` }];
-      if (mayChange(c))
-        entries.push({
-          kind: "item",
-          id: "edit",
-          label: t("channelCategories.editChannel"),
-          icon: "edit",
-          run: () => {
-            requestChannelDetails(c.id);
-            void navigate({ to: "/org/$orgId/c/$channelId", params: { orgId, channelId: c.id } });
-          },
-        });
-      if (mayChange(c) && list.length > 0)
-        entries.push({
-          kind: "item",
-          id: "move",
-          label: t("channelCategories.move"),
-          icon: "move",
-          run: () => setMoving(c),
-        });
-      if (manages)
-        entries.push({
-          kind: "item",
-          id: "new-category",
-          label: t("channelCategories.newWithChannel"),
-          icon: "layers",
-          run: () => setNewCategory({ withChannel: c.id }),
-        });
-      entries.push(
-        { kind: "separator" },
-        {
-          kind: "item",
-          id: "copy-link",
-          label: t("contextMenu.copyLink"),
-          icon: "link",
-          run: () =>
-            void copyText(`${window.location.origin}/org/${orgId}/c/${c.id}`, () =>
-              toast.show(t("contextMenu.linkCopied")),
-            ),
-        },
-      );
-      return entries;
-    });
+    entityMenu(() =>
+      channelEntries(c, [
+        ...(mayChange(c) && list.length > 0
+          ? ([
+              {
+                kind: "item",
+                id: "move",
+                label: t("channelCategories.move"),
+                icon: "move",
+                run: () => setMoving(c),
+              },
+            ] satisfies MenuEntry[])
+          : []),
+        ...(manages
+          ? ([
+              {
+                kind: "item",
+                id: "new-category",
+                label: t("channelCategories.newWithChannel"),
+                icon: "layers",
+                run: () => setNewCategory({ withChannel: c.id }),
+              },
+            ] satisfies MenuEntry[])
+          : []),
+      ]),
+    );
   const deleteCategory = (category: ChannelCategory) => {
     const taken = inCategory(category.id).map((c) => c.id);
     const next = list[list.findIndex((c) => c.id === category.id) + 1]?.id ?? null;
@@ -951,7 +956,7 @@ function SidebarChannels({
         onMouseEnter={() => onPrefetch(c.id)}
         onFocus={() => onPrefetch(c.id)}
         onClick={() => markOpen(c.id)}
-        onContextMenu={channelMenu(c)}
+        {...channelMenu(c)}
       >
         <Icon name="channel" className="sidebar__channel-icon" />
         <span className="sidebar__channel-abbr" aria-hidden="true">
@@ -1001,6 +1006,7 @@ function SidebarChannels({
           label={t("shell.channels")}
           sections={sections}
           className="sidebar__section--part"
+          headProps={headProps}
           action={addButton(null, t("newChannel.open"))}
         >
           {loading && <SidebarSkeleton count={3} label={t("common.loadingList")} />}
@@ -1041,7 +1047,7 @@ function SidebarChannels({
                 onDragEnd: endDrag,
                 onDragOver: (e) => overCategory(e, category),
                 onDrop: drop,
-                onContextMenu: contextMenuHandler(() => [
+                ...entityMenu(() => [
                   { kind: "header", label: category.name },
                   ...actions.map(
                     (a): MenuEntry => ({
@@ -1202,55 +1208,12 @@ function AgentRow({
   const word = shown ? t(`presence.${shown.presence}`) : null;
   const line = agentLine(t, shown?.line ?? null);
   const dir = useDirectory(org.id);
-  const navigate = useNavigate();
-  const live = useLiveStore();
-  const runs = useStopRun();
-  const toast = useToast();
-  // The desktop app's right click on an agent: talk, its page, its link, and stop while it works.
-  const onContextMenu = contextMenuHandler(() => {
-    const working = Object.values(live.get().streams.runs).filter(
-      (r) => r.agentId === a.id && isStoppable(r) && runs.canStop(r),
-    );
-    return [
-      { kind: "header", label: a.name },
-      {
-        kind: "item",
-        id: "agent-page",
-        label: t("contextMenu.agentPage"),
-        icon: "agent",
-        run: () => void navigate({ to: "/org/$orgId/agents/$agentId", params: { orgId: org.id, agentId: a.id } }),
-      },
-      {
-        kind: "item",
-        id: "copy-link",
-        label: t("contextMenu.copyLink"),
-        icon: "link",
-        run: () =>
-          void copyText(`${window.location.origin}/org/${org.id}/dm/agent/${a.id}`, () =>
-            toast.show(t("contextMenu.linkCopied")),
-          ),
-      },
-      ...(working.length
-        ? ([
-            { kind: "separator" },
-            {
-              kind: "item",
-              id: "stop",
-              label: t("run.stopAgent", agentGrammar(t, a.name)),
-              icon: "stop",
-              danger: true,
-              run: () => {
-                for (const r of working) runs.stop(r);
-              },
-            },
-          ] satisfies MenuEntry[])
-        : []),
-    ];
-  });
+  const agentEntries = useAgentMenu();
+  const rowMenu = entityMenu(() => agentEntries(a));
   return (
     <div className="sidebar__row" data-agent-row={a.id}>
       <Link
-        onContextMenu={onContextMenu}
+        {...rowMenu}
         to="/org/$orgId/dm/agent/$agentId"
         params={{ orgId: org.id, agentId: a.id }}
         className="sidebar__item"
@@ -1324,8 +1287,10 @@ function PersonRow({
   const shown = usePersonPresence(m.userId);
   const word = shown ? t(`presence.${shown.presence}`) : null;
   const line = shown?.status ? personLine(shown.status) : null;
+  const personEntries = usePersonMenu();
   return (
     <Link
+      {...entityMenu(() => personEntries(m))}
       to="/org/$orgId/dm/person/$userId"
       params={{ orgId: org.id, userId: m.userId }}
       className="sidebar__item"

@@ -43,7 +43,6 @@ import {
   useAiStatus,
   useApproval,
   useApprovals,
-  useArchiveChannel,
   useCardApprovals,
   useChannelCategories,
   useChannelMembers,
@@ -220,6 +219,7 @@ import {
 import { CorrectionAsk } from "@/components/CorrectionAsk";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
 import { MenuEntries } from "@/components/DesktopMenus";
+import { useArchiveChannelWithUndo, useChannelMenu } from "@/components/entity-menus";
 import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
 import { InPlaceProvider } from "@/components/InPlace";
 import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
@@ -297,6 +297,7 @@ import { TYPED_VALUES } from "@/i18n";
 import { onChannelDetails, takeChannelDetails } from "@/lib/channel-details";
 import { selectingIn } from "@/lib/context-menu";
 import { useDocumentTitle } from "@/lib/desktop";
+import { entityMenu } from "@/lib/entity-menu";
 import { reportPainted } from "@/lib/perf";
 import { useToast } from "@/lib/toast";
 import {
@@ -657,6 +658,7 @@ function ChannelView({
     if (draftKey) clearDraft(draftKey);
   }, [draftKey]);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const channelEntries = useChannelMenu();
   // "Editar canal" from the sidebar's right click: the details open once this channel shows.
   useEffect(() => {
     if (chrome?.header) return;
@@ -1704,7 +1706,10 @@ function ChannelView({
             {chrome?.header ?? (
               <header className="channel__header">
                 <NavToggle />
-                <div style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
+                <div
+                  style={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}
+                  {...entityMenu(() => channelEntries(channel))}
+                >
                   <h1 className="channel__title"># {channel.name}</h1>
                   {subtitle && <span className="channel__topic">{subtitle}</span>}
                 </div>
@@ -3799,11 +3804,10 @@ function ChannelDetails({
   const routing = useAiStatus(org.id, open).data?.routing;
   const update = useUpdateChannel(org.id, channel.id);
   const editable = managesChannel(channel, me.user.id, org);
-  const navigate = useNavigate();
   const toast = useToast();
   const categories = useChannelCategories(org.id);
   const place = usePlaceChannel(org.id);
-  const archive = useArchiveChannel(org.id);
+  const archive = useArchiveChannelWithUndo();
   // Name: saved on blur or Enter, like the description.
   const [name, setName] = useState(channel.name);
   const [nameError, setNameError] = useState<string | undefined>();
@@ -3886,22 +3890,7 @@ function ChannelDetails({
         onError: (e) => toast.show((e as Error).message, "error"),
       },
     );
-  const archiveIt = () =>
-    archive.mutate(channel.id, {
-      onSuccess: () => {
-        onOpenChange(false);
-        void navigate({ to: "/org/$orgId", params: { orgId: org.id } });
-        toast.show(t("channel.archived", { channel: channel.name }), "info", {
-          label: t("channelCategories.undo"),
-          run: () =>
-            void api.chat.unarchive(org.id, channel.id).then(async () => {
-              await qc.invalidateQueries({ queryKey: keys.channels(org.id) });
-              await navigate({ to: "/org/$orgId/c/$channelId", params: { orgId: org.id, channelId: channel.id } });
-            }),
-        });
-      },
-      onError: (e) => toast.show((e as Error).message, "error"),
-    });
+  const archiveIt = () => archive.run(channel, () => onOpenChange(false));
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: keys.roster(org.id, channel.id) });
     void qc.invalidateQueries({ queryKey: keys.channelMembers(org.id, channel.id) });
@@ -4150,7 +4139,7 @@ function ChannelDetails({
               variant="ghost"
               icon="archive"
               className="channel-details__archive"
-              loading={archive.isPending}
+              loading={archive.pending}
               onClick={archiveIt}
             >
               {t("channel.archive")}

@@ -2,12 +2,13 @@ import type { Artifact, ArtifactKind } from "@agenteschat/client";
 import { KIND_ICON } from "@agenteschat/client/lib/artifacts";
 import { fileIcon } from "@agenteschat/client/lib/files";
 import { relativeTime } from "@agenteschat/client/lib/format";
-import { Checkbox, cx, Icon, type IconName, MenuItem } from "@agenteschat/ui";
+import { Checkbox, cx, Icon, type IconName } from "@agenteschat/ui";
 import type { MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar } from "@/components/AgentAvatar";
-import { ArtifactMoreMenu } from "@/components/artifacts/ArtifactActions";
+import { ArtifactMoreMenu, useArtifactEntries } from "@/components/artifacts/ArtifactActions";
 import { useAuthorName } from "@/components/artifacts/ArtifactViewer";
+import { entityMenu } from "@/lib/entity-menu";
 import { DrivePreview } from "./DrivePreview";
 
 /** The details panel's id (cards and rows control it). */
@@ -34,14 +35,25 @@ export interface ItemProps {
  * who made it, where and when. The title's button stretches over the card;
  * the checkbox sits above it.
  */
-export function DriveCard({ artifact: a, open, selected, channelName, onPick, onToggle, onOpen }: ItemProps) {
+export function DriveCard({
+  artifact: a,
+  open,
+  selected,
+  channelName,
+  onPick,
+  onToggle,
+  onOpen,
+  onDelete,
+}: ItemProps & { onDelete: (a: Artifact) => void }) {
   const { t, i18n } = useTranslation();
   const authorName = useAuthorName();
   const name = authorName(a.createdBy);
+  const menu = useItemMenu(a, onOpen, onDelete);
   return (
     <article
       className={cx("drive-card", open && "drive-card--open", selected && "drive-card--selected")}
       data-kind={a.kind}
+      {...menu}
     >
       <DrivePreview artifact={a} />
       <span className="drive-card__kind">
@@ -80,6 +92,15 @@ export function DriveCard({ artifact: a, open, selected, channelName, onPick, on
   );
 }
 
+/** A card's or row's right click and menu key: the same actions as its "…", with open and download first. */
+function useItemMenu(a: Artifact, onOpen: (a: Artifact) => void, onDelete: (a: Artifact) => void) {
+  const entries = useArtifactEntries();
+  return entityMenu(() => [
+    { kind: "header", label: a.title },
+    ...entries(a, { onOpen: () => onOpen(a), onDelete: () => onDelete(a), download: true }),
+  ]);
+}
+
 /** A list row: checkbox, small preview + title, who, where, when, "…". */
 export function DriveRow({
   artifact: a,
@@ -95,8 +116,13 @@ export function DriveRow({
   const authorName = useAuthorName();
   const name = authorName(a.createdBy);
   const when = relativeTime(t, i18n.language, a.updatedAt);
+  const menu = useItemMenu(a, onOpen, onDelete);
   return (
-    <li className={cx("drive-row", open && "drive-row--open", selected && "drive-row--selected")} data-kind={a.kind}>
+    <li
+      className={cx("drive-row", open && "drive-row--open", selected && "drive-row--selected")}
+      data-kind={a.kind}
+      {...menu}
+    >
       <Checkbox
         className="drive-check"
         checked={selected}
@@ -132,15 +158,7 @@ export function DriveRow({
         {when}
       </time>
       <span className="drive-row__more">
-        <ArtifactMoreMenu
-          artifact={a}
-          onDelete={() => onDelete(a)}
-          extra={
-            <MenuItem icon="external" onSelect={() => onOpen(a)}>
-              {t("artifacts.openFile")}
-            </MenuItem>
-          }
-        />
+        <ArtifactMoreMenu artifact={a} onOpen={() => onOpen(a)} onDelete={() => onDelete(a)} />
       </span>
     </li>
   );

@@ -71,6 +71,7 @@ import type {
   SecretRequest,
   ServerTelemetry,
   SidebarItems,
+  SidebarSection,
   SignInOptions,
   StoragePlatform,
   StorageUsage,
@@ -341,6 +342,8 @@ export interface FakeState {
   sidebarItems?: SidebarItems;
   /** Make `orgs.setSidebarItem` and `orgs.setSidebarItems` fail with this error. */
   sidebarItemsError?: ApiError;
+  /** The sidebar's sections in my order (`orgs.sidebarOrder`); unset = the default. */
+  sidebarOrder?: SidebarSection[];
 }
 
 /** A new workspace's "Admin" role (ADR 0085); João holds it. */
@@ -1394,6 +1397,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (state.sidebarItemsError) throw state.sidebarItemsError;
         state.sidebarItems = structuredClone(items);
         return structuredClone(items);
+      },
+      sidebarOrder: async () => [...(state.sidebarOrder ?? ["tools", "channels", "agents", "people"])],
+      setSidebarOrder: async (orgId, order) => {
+        log("orgs.setSidebarOrder", orgId, order);
+        state.sidebarOrder = order ? [...order] : undefined;
+        return [...(order ?? ["tools", "channels", "agents", "people"])];
       },
       setAvatar: async (orgId, input) => {
         log("orgs.setAvatar", orgId, { contentType: input.contentType, bytes: input.imageBase64.length });
@@ -2615,7 +2624,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         });
         return { channelId };
       },
-      markRead: async () => {},
+      markRead: async (orgId, channelId) => log("dms.markRead", orgId, channelId),
       reads: async () => [],
     },
     questions: {

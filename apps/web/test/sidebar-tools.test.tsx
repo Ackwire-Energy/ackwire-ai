@@ -219,7 +219,7 @@ describe("the sidebar's parts", () => {
       within(nav()).getByRole("button", { name }).closest(".sidebar__section") as HTMLElement;
     expect(nav().querySelectorAll(".sidebar__divider")).toHaveLength(3);
     for (const part of ["Agentes", "Mensagens diretas"]) {
-      expect(section(part).previousElementSibling?.className).toBe("sidebar__divider");
+      expect(section(part).closest(".sidebar__block")?.previousElementSibling?.className).toBe("sidebar__divider");
       expect(section(part).classList.contains("sidebar__section--part")).toBe(true);
     }
     expect(section("Engenharia").classList.contains("sidebar__section--part")).toBe(false);
