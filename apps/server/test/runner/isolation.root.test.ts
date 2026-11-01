@@ -575,6 +575,9 @@ describe.if(ROOT)("the agents' isolation on this computer, as root", () => {
     }
     expect(existsSync(path.join(agentTmp(A.uid), "agentes-isolation-a.sock"))).toBe(true);
     expect(runAs(B, ["/bin/ls", "-a", "/tmp"]).out).not.toContain("agentes-isolation-a.sock");
+    // Nor by the socket's own absolute path on the computer: the tmpfs root is root-owned and 0700, so another
+    // agent can't traverse into it even knowing the path.
+    expect(probe(B, "unix-connect", path.join(agentTmp(A.uid), "agentes-isolation-a.sock"))).toBe("EACCES");
     // In memory as the computer's are, on a tmpfs of the agent's own; /var/tmp on disk as the computer's is.
     expect(runSync("findmnt", ["-n", "-o", "FSTYPE", path.join(AGENT_RAM_ROOT, String(A.uid))]).output).toBe("tmpfs");
     expect(runAs(A, ["/usr/bin/stat", "-f", "-c", "%T", "/tmp", "/dev/shm", "/run/lock"]).out.split("\n")).toEqual([
@@ -721,6 +724,16 @@ describe.if(ROOT)("the agents' isolation on this computer, as root", () => {
     expect(curl(A).out).toBe("200");
     const refused = curl(B);
     expect(refused.code).toBe(7);
+  });
+
+  test("a wildcard listener is still only its own agent's, over loopback and the computer's own address", async () => {
+    // A dev server an agent starts often binds 0.0.0.0, which the kernel's socket lookup matches for every local
+    // address; a connection to the computer's own address routes over lo too, so it is marked the same way.
+    const own = await serve(A, "listen", "0.0.0.0", "0");
+    for (const via of ["127.0.0.1", hostAddress()].filter(Boolean)) {
+      expect(probe(A, "connect", via, String(own.port))).toBe("connected");
+      expect(probe(B, "connect", via, String(own.port))).toBe("ECONNREFUSED");
+    }
   });
 
   test.if(has(GRADLE))(
