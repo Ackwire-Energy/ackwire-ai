@@ -27,6 +27,7 @@ import {
 import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
 import { withRead } from "../lib/seen";
+import { SIDEBAR_DEFAULTS, withSidebarPlace } from "../lib/sidebar-items";
 import { playSound } from "../lib/sounds";
 import { upsertMessage, withLocalCopies } from "../lib/timeline";
 import type { RealtimeConnection } from "../realtime/connection";
@@ -101,7 +102,9 @@ import type {
   SandboxSettingsInput,
   SearchKind,
   SeriesScope,
+  SidebarItem,
   SidebarItems,
+  SidebarPlace,
   SkillInput,
   SkillPatch,
   StatusInput,
@@ -3263,26 +3266,32 @@ export const useSidebarItems = (orgId: string) => {
 };
 
 /**
- * Replaces my choices: the sidebar changes at once and goes back if the server refuses. The requests go one at a
- * time, each with every choice so far, so the last one is what stays (`onMutate` still runs at once for one that
- * waits its turn).
+ * Moves one tool, or with `null` puts every tool back on its default: the sidebar changes at once and goes back if the
+ * server refuses. The server keeps my other choices as it has them, so one made on another device stays, and answers
+ * with every choice it keeps. The requests go one at a time, so the last answer is what stays (`onMutate` still runs
+ * at once for one that waits its turn).
  */
-export function useSetSidebarItems(orgId: string) {
+export function useSetSidebarItem(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   const mutationKey = ["sidebar-items", orgId];
   return useMutation({
     mutationKey,
     scope: { id: `sidebar-items:${orgId}` },
-    mutationFn: (items: SidebarItems) => api.orgs.setSidebarItems(orgId, items),
-    onMutate: async (items) => {
+    mutationFn: (move: { item: SidebarItem; place: SidebarPlace } | null) =>
+      move
+        ? api.orgs.setSidebarItem(orgId, move.item, move.place === SIDEBAR_DEFAULTS[move.item] ? null : move.place)
+        : api.orgs.setSidebarItems(orgId, {}),
+    onMutate: async (move) => {
       await qc.cancelQueries({ queryKey: keys.sidebarItems(orgId) });
       const before = qc.getQueryData<SidebarItems>(keys.sidebarItems(orgId));
-      qc.setQueryData<SidebarItems>(keys.sidebarItems(orgId), items);
+      qc.setQueryData<SidebarItems>(keys.sidebarItems(orgId), (items) =>
+        move ? withSidebarPlace(items, move.item, move.place) : {},
+      );
       return { before };
     },
-    onError: (_error, _items, context) => {
-      // A later choice still on its way carries this one too: its answer decides.
+    onError: (_error, _move, context) => {
+      // A later choice still on its way answers with every choice the server keeps: its answer decides.
       if (qc.isMutating({ mutationKey }) > 1) return;
       qc.setQueryData(keys.sidebarItems(orgId), context?.before);
       // `before` can hold an earlier choice the server refused as well: it says what stays.

@@ -1,6 +1,6 @@
 import type { SidebarItem, SidebarPlace } from "@agenteschat/client";
-import { useSetSidebarItems, useSidebarItems } from "@agenteschat/client";
-import { SIDEBAR_COUNTED, SIDEBAR_ITEMS, sidebarPlace, withSidebarPlace } from "@agenteschat/client/lib/sidebar-items";
+import { useSetSidebarItem, useSidebarItems } from "@agenteschat/client";
+import { SIDEBAR_COUNTED, SIDEBAR_ITEMS, sidebarPlace } from "@agenteschat/client/lib/sidebar-items";
 import {
   Button,
   Dialog,
@@ -11,6 +11,7 @@ import {
   Segmented,
   type SegmentedOption,
 } from "@agenteschat/ui";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "./org-context";
 
@@ -34,8 +35,12 @@ export const SIDEBAR_TOOLS = {
 export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const items = useSidebarItems(org.id).data;
-  const save = useSetSidebarItems(org.id);
+  const { data: items, refetch } = useSidebarItems(org.id);
+  const save = useSetSidebarItem(org.id);
+  // What another device changed since this one loaded shows as the dialog opens.
+  useEffect(() => {
+    if (open) void refetch();
+  }, [open, refetch]);
   const options = (id: SidebarItem): SegmentedOption<SidebarPlace>[] => [
     { value: "always", label: t("shell.sidebarSetup.always") },
     { value: "more", label: t("shell.sidebarSetup.more") },
@@ -64,7 +69,7 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
                 size="sm"
                 label={t(`shell.${id}`)}
                 value={sidebarPlace(items, id)}
-                onValueChange={(place) => save.mutate(withSidebarPlace(items, id, place))}
+                onValueChange={(place) => save.mutate({ item: id, place })}
                 options={options(id)}
               />
             </li>
@@ -76,7 +81,7 @@ export function SidebarSetupDialog({ open, onClose }: { open: boolean; onClose: 
           variant="ghost"
           icon="undo"
           disabled={Object.keys(items ?? {}).length === 0}
-          onClick={() => save.mutate({})}
+          onClick={() => save.mutate(null)}
         >
           {t("shell.sidebarSetup.reset")}
         </Button>

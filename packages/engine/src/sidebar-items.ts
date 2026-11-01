@@ -1,4 +1,5 @@
-import { and, type Database, eq, schema } from "@agenteschat/db";
+import { and, type Database, eq, schema, sql } from "@agenteschat/db";
+import { ValidationError } from "./errors";
 import { requirePermission } from "./organizations";
 
 const { organizationMembers } = schema;
@@ -54,6 +55,34 @@ export async function mySidebarItems(db: Database, orgId: string, userId: string
     .select({ items: organizationMembers.sidebarItems })
     .from(organizationMembers)
     .where(mine(orgId, userId));
+  return sidebarItemsOf(row?.items);
+}
+
+/**
+ * Puts one item where the person wants it in this workspace (`null`: back on its default) and leaves their other
+ * choices as the row has them, so one made on another device in the meantime stays.
+ */
+export async function setMySidebarItem(
+  db: Database,
+  orgId: string,
+  userId: string,
+  item: SidebarItem,
+  place: SidebarPlace | null,
+): Promise<SidebarItems> {
+  await requirePermission(db, userId, orgId, "read");
+  if (!isItem(item) || (place !== null && !(isPlace(place) && sidebarPlaceAllowed(item, place))))
+    throw new ValidationError(`${item} can't go to ${place}`);
+  const items = organizationMembers.sidebarItems;
+  const [row] = await db
+    .update(organizationMembers)
+    .set({
+      sidebarItems:
+        place === null
+          ? sql`${items} - ${item}::text`
+          : sql`${items} || jsonb_build_object(${item}::text, ${place}::text)`,
+    })
+    .where(mine(orgId, userId))
+    .returning({ items });
   return sidebarItemsOf(row?.items);
 }
 

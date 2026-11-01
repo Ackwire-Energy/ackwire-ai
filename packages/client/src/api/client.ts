@@ -188,7 +188,9 @@ import type {
   SecretRequest,
   SeriesScope,
   ServerTelemetry,
+  SidebarItem,
   SidebarItems,
+  SidebarPlace,
   SignInOptions,
   Skill,
   SkillDetail,
@@ -323,6 +325,8 @@ export interface ApiClient {
     setStatus(orgId: string, input: StatusInput): Promise<Person>;
     /** Where I put the tools at the top of my sidebar here (only the ones I moved). */
     sidebarItems(orgId: string): Promise<SidebarItems>;
+    /** Moves one tool (`null`: back on its default), my others as the server has them. Answers with every choice. */
+    setSidebarItem(orgId: string, item: SidebarItem, place: SidebarPlace | null): Promise<SidebarItems>;
     /** Replaces my choices (`{}`: every tool back on its default). */
     setSidebarItems(orgId: string, items: SidebarItems): Promise<SidebarItems>;
     /** My profile photo: a square image (JSON only: base64), already cropped. */

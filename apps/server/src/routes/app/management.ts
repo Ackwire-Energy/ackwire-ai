@@ -31,6 +31,7 @@ import {
   STATUS_EMOJI_MAX,
   STATUS_TEXT_MAX,
   setAgentChannels,
+  setMySidebarItem,
   setMySidebarItems,
   setMyStatus,
   sidebarPlaceAllowed,
@@ -437,12 +438,41 @@ export function managementRoutes(deps: AppDeps) {
 
   app.openapi(
     createRoute({
+      method: "patch",
+      path: "/organizations/{orgId}/me/sidebar",
+      tags: ["Members"],
+      security,
+      summary: "Put one tool at the top of your sidebar where you want it in this workspace",
+      description:
+        "Your other choices stay as the server has them, so one made on another device in the meantime is kept. `place: null` puts the tool back on the app's default.",
+      request: {
+        params: OrgParams,
+        body: body(
+          z
+            .object({ item: z.enum(SIDEBAR_ITEMS), place: z.enum(SIDEBAR_PLACES).nullable() })
+            .refine(({ item, place }) => place === null || sidebarPlaceAllowed(item, place), {
+              message: "Only approvals and threads have a count, so only they can be `auto`",
+            }),
+        ),
+      },
+      responses: { 200: json(z.object({ items: SidebarItems })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const { item, place } = c.req.valid("json");
+      return c.json({ items: await setMySidebarItem(db, orgId, c.get("user").id, item, place) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
       method: "put",
       path: "/organizations/{orgId}/me/sidebar",
       tags: ["Members"],
       security,
       summary: "Put the tools at the top of your sidebar where you want them in this workspace",
-      description: "Replaces your choices: `{}` puts every tool back on the app's default.",
+      description:
+        "Replaces your choices: `{}` puts every tool back on the app's default. To move one tool, `PATCH` keeps the others as the server has them.",
       request: { params: OrgParams, body: body(z.object({ items: SidebarItems })) },
       responses: { 200: json(z.object({ items: SidebarItems })), ...errors },
     }),

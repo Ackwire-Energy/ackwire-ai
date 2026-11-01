@@ -68,3 +68,44 @@ test("the sidebar's tools: each person's own, per workspace, known tools and pla
   expect((await stranger(sidebar)).status).toBe(403);
   expect((await stranger(sidebar, { method: "PUT", json: { items: {} } })).status).toBe(403);
 });
+
+test("one tool at a time: the server keeps the other choices, so a device that never heard of them can't undo them", async () => {
+  t = await createTestServer();
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const orgId = await workspace(owner, "Acme");
+  const sidebar = `/api/app/organizations/${orgId}/me/sidebar`;
+  const move = (json: unknown, b = owner) => b(sidebar, { method: "PATCH", json });
+  const items = async () => ((await (await owner(sidebar)).json()) as { items: unknown }).items;
+
+  // The browser puts Wiki in the list; the desktop app, loaded before that, moves Drive to More.
+  expect(await (await move({ item: "wiki", place: "always" })).json()).toEqual({ items: { wiki: "always" } });
+  expect(await (await move({ item: "drive", place: "more" })).json()).toEqual({
+    items: { wiki: "always", drive: "more" },
+  });
+  expect(await (await move({ item: "approvals", place: "auto" })).json()).toEqual({
+    items: { wiki: "always", drive: "more", approvals: "auto" },
+  });
+
+  // Back on its default: the tool leaves the choices, the others stay.
+  expect(await (await move({ item: "wiki", place: null })).json()).toEqual({
+    items: { drive: "more", approvals: "auto" },
+  });
+
+  // A tool or a place the app doesn't know, "when there's something" for a tool with no count, no place: refused, kept.
+  for (const bad of [
+    { item: "settings", place: "always" },
+    { item: "wiki", place: "hidden" },
+    { item: "wiki", place: "auto" },
+    { item: "wiki" },
+  ])
+    expect((await move(bad)).status).toBe(400);
+  expect(await items()).toEqual({ drive: "more", approvals: "auto" });
+
+  // Not a member (invited, not in yet): refused.
+  await owner(`/api/app/organizations/${orgId}/invitations`, { json: { email: "stranger@example.com" } });
+  const stranger = browser(t);
+  await signUp(stranger, "stranger@example.com");
+  expect((await move({ item: "wiki", place: "always" }, stranger)).status).toBe(403);
+  expect(await items()).toEqual({ drive: "more", approvals: "auto" });
+});

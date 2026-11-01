@@ -48,7 +48,11 @@ const chosen = (dialog: HTMLElement, tool: string) =>
   within(within(dialog).getByRole("radiogroup", { name: tool }))
     .getAllByRole("radio")
     .find((r) => r.getAttribute("aria-checked") === "true")?.textContent;
-const saved = (state: State) => state.calls.filter((c) => c.method === "orgs.setSidebarItems").map((c) => c.args[1]);
+/** What each choice sent: the tool and its place (null: back on its default), or `{}` for Restaurar o padrão. */
+const sent = (state: State) =>
+  state.calls
+    .filter((c) => c.method === "orgs.setSidebarItem" || c.method === "orgs.setSidebarItems")
+    .map((c) => c.args.slice(1));
 const noneWaiting = () => {
   const state = seedState();
   for (const a of state.approvals) a.status = "approved";
@@ -111,14 +115,52 @@ describe("the tools on top", () => {
     // Threads with no mission waiting for me: in More until one does.
     await choose(dialog, "Threads", "Quando tiver algo");
     expect(listed()).toEqual(["Aprovações", "Tarefas", "Wiki"]);
-    expect(saved(state).at(-1)).toEqual({ wiki: "always", drive: "more", approvals: "always", threads: "auto" });
+    // One tool each time: what another device chose meanwhile stays.
+    expect(sent(state)).toEqual([
+      ["wiki", "always"],
+      ["drive", "more"],
+      ["approvals", "always"],
+      ["threads", "auto"],
+    ]);
     expect(state.sidebarItems).toEqual({ wiki: "always", drive: "more", approvals: "always", threads: "auto" });
+    // Back on its default: the tool leaves the saved choices.
+    await choose(dialog, "Threads", "Sempre");
+    expect(sent(state).at(-1)).toEqual(["threads", null]);
+    expect(state.sidebarItems).toEqual({ wiki: "always", drive: "more", approvals: "always" });
 
     expect(reset.disabled).toBe(false);
     await click(reset);
     expect(listed()).toEqual(["Threads", "Tarefas", "Drive"]);
-    expect(saved(state).at(-1)).toEqual({});
+    expect(sent(state).at(-1)).toEqual([{}]);
     expect(chosen(dialog, "Wiki")).toBe("Em Mais");
+  });
+
+  test("another device moved a tool after this one loaded: Personalizar shows it, and a choice here keeps it", async () => {
+    const state = await go(noneWaiting());
+    state.sidebarItems = { wiki: "always" };
+    const dialog = await openSetup();
+    expect(chosen(dialog, "Wiki")).toBe("Sempre");
+    expect(listed()).toEqual(["Threads", "Tarefas", "Wiki", "Drive"]);
+    await choose(dialog, "Drive", "Em Mais");
+    expect(state.sidebarItems).toEqual({ wiki: "always", drive: "more" });
+    expect(listed()).toEqual(["Threads", "Tarefas", "Wiki"]);
+  });
+
+  test("the choices couldn't be read: a choice here moves only its tool, and the server's answer shows the rest", async () => {
+    const state = noneWaiting();
+    state.sidebarItems = { wiki: "always", routines: "always" };
+    const api = createFakeApi(state);
+    api.orgs.sidebarItems = async () => {
+      throw new ApiError(500, "internal", "Não deu");
+    };
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(8);
+    const dialog = await openSetup();
+    expect(chosen(dialog, "Wiki")).toBe("Em Mais");
+    await choose(dialog, "Drive", "Em Mais");
+    expect(state.sidebarItems).toEqual({ wiki: "always", routines: "always", drive: "more" });
+    expect(chosen(dialog, "Wiki")).toBe("Sempre");
+    expect(listed()).toEqual(["Threads", "Tarefas", "Wiki", "Rotinas"]);
   });
 
   test("the choices are the server's: the same sidebar on every device", async () => {
@@ -142,15 +184,15 @@ describe("the tools on top", () => {
     const state = seedState();
     state.sidebarItemsError = new ApiError(500, "internal", "Não deu");
     const api = createFakeApi(state);
-    const refuse = api.orgs.setSidebarItems;
+    const refuse = api.orgs.setSidebarItem;
     let release = () => {};
     const first = new Promise<void>((resolve) => {
       release = resolve;
     });
     let calls = 0;
-    api.orgs.setSidebarItems = async (orgId, items) => {
+    api.orgs.setSidebarItem = async (orgId, item, place) => {
       if (calls++ === 0) await first;
-      return refuse(orgId, items);
+      return refuse(orgId, item, place);
     };
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(8);

@@ -294,7 +294,7 @@ export interface FakeState {
   roles?: OrgRole[];
   /** Where I put the sidebar's tools (`orgs.sidebarItems`); unset = none moved. */
   sidebarItems?: SidebarItems;
-  /** Make `orgs.setSidebarItems` fail with this error. */
+  /** Make `orgs.setSidebarItem` and `orgs.setSidebarItems` fail with this error. */
   sidebarItemsError?: ApiError;
 }
 
@@ -1285,6 +1285,15 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return { ...m, ...presenceOf(state, m.userId), lastSeenAt: new Date().toISOString() };
       },
       sidebarItems: async () => structuredClone(state.sidebarItems ?? {}),
+      setSidebarItem: async (orgId, item, place) => {
+        log("orgs.setSidebarItem", orgId, item, place);
+        if (state.sidebarItemsError) throw state.sidebarItemsError;
+        const items = { ...state.sidebarItems };
+        if (place === null) delete items[item];
+        else items[item] = place;
+        state.sidebarItems = items;
+        return structuredClone(items);
+      },
       setSidebarItems: async (orgId, items) => {
         log("orgs.setSidebarItems", orgId, items);
         if (state.sidebarItemsError) throw state.sidebarItemsError;
