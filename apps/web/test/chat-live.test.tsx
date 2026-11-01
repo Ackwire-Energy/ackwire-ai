@@ -466,6 +466,79 @@ describe("bottom anchoring", () => {
   });
 });
 
+describe("bottom anchoring: reading without a wheel", () => {
+  const said = (socket: Parameters<typeof push>[0], id: string) =>
+    push(socket, {
+      type: "message.created",
+      messageId: id,
+      message: {
+        id,
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "person", id: "u-joao" },
+        body: `mensagem ${id}`,
+        mentionedAgentIds: [],
+        agentRunId: null,
+        createdAt: new Date().toISOString(),
+      },
+    });
+
+  test("dragging a selection up from a row lets go of the bottom, even inside the near-bottom band", async () => {
+    const { socket } = await open();
+    const log = screen().getByRole("region", { name: "Mensagens" });
+    const height = (value: number) => Object.defineProperty(log, "scrollHeight", { configurable: true, value });
+    height(2000);
+    Object.defineProperty(log, "clientHeight", { configurable: true, value: 500 });
+    await sendText("primeira");
+    await settle(3);
+    await act(async () => fireEvent.scroll(log));
+    const row = rowsWith("primeira")[0] as HTMLElement;
+    const selection = window.getSelection() as Selection;
+    try {
+      await act(async () => fireEvent.pointerDown(row));
+      const range = document.createRange();
+      range.selectNodeContents(row);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      // The browser's selection autoscroll moves the list up a little.
+      log.scrollTop = 1960;
+      await act(async () => fireEvent.scroll(log));
+      height(2400);
+      await said(socket, "m-while-selecting");
+      await settle();
+      expect(log.scrollTop).toBe(1960);
+    } finally {
+      selection.removeAllRanges();
+    }
+  });
+
+  test("a click on a row doesn't count as reading a window without focus: a new message still brings the list to it", async () => {
+    const { socket } = await open();
+    const log = screen().getByRole("region", { name: "Mensagens" });
+    Object.defineProperty(log, "scrollHeight", { configurable: true, value: 2000 });
+    Object.defineProperty(log, "clientHeight", { configurable: true, value: 500 });
+    await sendText("primeira");
+    await settle(3);
+    await act(() => new Promise((r) => setTimeout(r, 1600)));
+    // Up by the keys (no wheel), then a click inside a row, then the window loses focus.
+    log.scrollTop = 100;
+    await act(async () => {
+      fireEvent.keyDown(log, { key: "PageUp" });
+      fireEvent.scroll(log);
+    });
+    await act(async () => fireEvent.pointerDown(rowsWith("primeira")[0] as HTMLElement));
+    const hasFocus = document.hasFocus;
+    document.hasFocus = () => false;
+    try {
+      await said(socket, "m-away");
+      await settle(3);
+      expect(log.scrollTop).toBe(2000);
+    } finally {
+      document.hasFocus = hasFocus;
+    }
+  });
+});
+
 describe("receipts: a check with a popover", () => {
   const checkOf = (text: string) => rowsWith(text)[0]?.querySelector(".ac-receipt__check") as HTMLButtonElement;
   const icon = (b: HTMLElement) => b.querySelector("path")?.getAttribute("d");

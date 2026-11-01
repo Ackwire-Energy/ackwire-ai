@@ -94,6 +94,12 @@ export function selectedTextAt(target: EventTarget | null): string {
   return selection.toString().trim();
 }
 
+/** Text is being selected inside `el` (a drag, or a selection left there). */
+export function selectingIn(el: Node | null): boolean {
+  const selection = typeof window.getSelection === "function" ? window.getSelection() : null;
+  return !!el && !!selection && !selection.isCollapsed && el.contains(selection.anchorNode);
+}
+
 export interface OpenMenu {
   key: number;
   x: number;
