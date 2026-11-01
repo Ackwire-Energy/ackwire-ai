@@ -196,10 +196,11 @@ export function AuthPage({
     setStep(next);
   };
 
-  // An unconfirmed account's refusal still in view: its address is right, and on a server that emails, a new password
-  // is a click away. Never a new confirmation: that would keep the password of whoever made the account (ADR 0006).
-  const unconfirmed = refused === ACCOUNT_NOT_LINKED && error === refusal;
-  const offerReset = unconfirmed && canReset && isEmail(email);
+  // A provider's refusal still in view says nothing against the address in the field. An unconfirmed account's has its
+  // address, and on a server that emails, a new password is a click away. Never a new confirmation: that would keep
+  // the password of whoever made the account (ADR 0006).
+  const providerRefused = refusal !== null && error === refusal;
+  const offerReset = providerRefused && refused === ACCOUNT_NOT_LINKED && canReset && isEmail(email);
 
   const fail = (e: unknown) =>
     setError(
@@ -504,7 +505,7 @@ export function AuthPage({
                   placeholder={t("auth.flow.emailPlaceholder")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  invalid={error !== null && !unconfirmed}
+                  invalid={error !== null && !providerRefused}
                   autoFocus
                 />
                 {fix && (

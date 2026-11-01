@@ -476,6 +476,8 @@ describe("Acesso antecipado (o link do convite)", () => {
     expect(screen().getByRole("alert").textContent).toBe(
       "O cadastro está fechado. Peça um convite a quem administra o seu workspace.",
     );
+    // Nothing is wrong with a field nobody typed in.
+    expect(screen().getByLabelText("E-mail").getAttribute("aria-invalid")).toBeNull();
     cleanup();
     await renderApp("/login?error=state_mismatch", { api, auth: createFakeAuth().auth });
     expect(screen().queryByRole("alert")).toBeNull();
@@ -527,6 +529,7 @@ describe("Google para um e-mail com senha não confirmada", () => {
       "Seu provedor de login ainda não confirmou este endereço. Confirme lá, ou entre com o e-mail.",
     );
     expect(screen().queryByRole("button", { name: "Criar uma senha nova" })).toBeNull();
+    expect(screen().getByLabelText("E-mail").getAttribute("aria-invalid")).toBeNull();
   });
 
   test("on a server that sends no email: only the password, and no new one", async () => {
