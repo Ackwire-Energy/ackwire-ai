@@ -1,6 +1,7 @@
 import type { SearchDocument, SearchHit, SearchIndexResolver, SearchKind } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, gt, inArray, isNull, schema } from "@agenteschat/db";
 import { caches } from "./cache";
+import { cutText } from "./format";
 import type { ModelGateway } from "./gateway";
 import { requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
@@ -77,7 +78,7 @@ async function upsertWithEmbeddings(deps: SearchDeps, orgId: string, docs: Searc
   if (docs.length === 0) return;
   const embedded = await deps.gateway.embed({
     orgId,
-    texts: docs.map((d) => `${d.title ? `${d.title}\n` : ""}${d.body}`.slice(0, 8000)),
+    texts: docs.map((d) => cutText(`${d.title ? `${d.title}\n` : ""}${d.body}`, 8000)),
     inputType: "document",
   });
   const withVectors = docs.map((d, i) => ({

@@ -7,6 +7,7 @@ import {
   type ToolSpec,
   textOf,
 } from "@agenteschat/providers";
+import { cutText } from "./format";
 import type { Judge } from "./judge";
 
 /**
@@ -131,7 +132,7 @@ export function removableToolResults(messages: ModelMessage[]): ToolResultCandid
           name: call?.name ?? "unknown",
           input: call?.input ?? {},
           chars: b.content.length,
-          excerpt: b.content.slice(0, EXCERPT_CHARS),
+          excerpt: cutText(b.content, EXCERPT_CHARS),
           position: out.length,
         });
       }
@@ -213,7 +214,7 @@ async function scoreToolResults(
       `r${i}`,
       {
         type: "noul" as const,
-        instructions: `An AI agent is working on \`task\` for a person; \`now\` is what it said last. Earlier in this run it called a tool and got the result below. Does it still need this result in front of it to finish the task? Tool: ${c.name} ${JSON.stringify(c.input).slice(0, 300)}. Result (${c.chars} chars, start): ${c.excerpt}`,
+        instructions: `An AI agent is working on \`task\` for a person; \`now\` is what it said last. Earlier in this run it called a tool and got the result below. Does it still need this result in front of it to finish the task? Tool: ${c.name} ${cutText(JSON.stringify(c.input), 300)}. Result (${c.chars} chars, start): ${c.excerpt}`,
         criteria: {
           true: "It still needs it: what it is doing now builds on this result, or its answer depends on details only this result has.",
           false: "It no longer needs it: the step it served is done, or it was not useful.",
@@ -233,7 +234,7 @@ async function scoreToolResults(
         runId: input.runId,
         kind: "context_budget",
         calibrated: true,
-        state: { task: input.task.slice(0, 2000), now: input.now.slice(0, 1500) },
+        state: { task: cutText(input.task, 2000), now: cutText(input.now, 1500) },
         questions,
       }),
       timeout,

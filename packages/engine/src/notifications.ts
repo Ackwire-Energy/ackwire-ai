@@ -16,6 +16,7 @@ import {
 } from "@agenteschat/db";
 import { NotFoundError, ValidationError } from "./errors";
 import { publishUserEvent } from "./events";
+import { cutText } from "./format";
 import { noticeOn, noticePrefsOf } from "./notice-prefs";
 import { requirePermission } from "./organizations";
 import { enqueuePush } from "./push";
@@ -219,7 +220,7 @@ export function notificationSnippet(text: string | null | undefined, max = SNIPP
     .replace(/(^|\s)[>*-]\s+/g, "$1")
     .replace(/\s+/g, " ")
     .trim();
-  return plain.length > max ? `${plain.slice(0, max - 1).trimEnd()}…` : plain;
+  return plain.length > max ? `${cutText(plain, max - 1).trimEnd()}…` : plain;
 }
 
 export function notificationView(r: Row): NotificationView {

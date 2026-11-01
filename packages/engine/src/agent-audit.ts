@@ -1,6 +1,7 @@
 import { and, type Database, desc, type Executor, eq, inArray, lt, ne, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import type { RunAuthority } from "./authority";
+import { cutText } from "./format";
 import { requirePermission } from "./organizations";
 import { redactCredentials as masked } from "./tool-detail";
 
@@ -31,7 +32,7 @@ export function auditInput(input: Record<string, unknown>): Record<string, unkno
   const clean = (value: unknown, depth: number): unknown => {
     if (typeof value === "string") {
       const text = masked(value);
-      return text.length > MAX_STRING ? `${text.slice(0, MAX_STRING)}…` : text;
+      return text.length > MAX_STRING ? `${cutText(text, MAX_STRING)}…` : text;
     }
     if (value === null || typeof value !== "object") return value;
     if (depth >= MAX_DEPTH) return "…";
@@ -48,7 +49,7 @@ export function auditInput(input: Record<string, unknown>): Record<string, unkno
   };
   const out = clean(input, 0) as Record<string, unknown>;
   const text = JSON.stringify(out);
-  return text.length > MAX_INPUT ? { cut: `${text.slice(0, MAX_INPUT)}…` } : out;
+  return text.length > MAX_INPUT ? { cut: `${cutText(text, MAX_INPUT)}…` } : out;
 }
 
 /**
@@ -115,13 +116,13 @@ export async function recordToolCall(
     details: {
       kind: call.kind,
       ...(call.connector ? { connector: call.connector } : {}),
-      ...(call.title ? { title: masked(call.title).slice(0, MAX_TITLE) } : {}),
+      ...(call.title ? { title: cutText(masked(call.title), MAX_TITLE) } : {}),
       behind: call.authority?.kind ?? null,
       ...(call.authority?.kind === "routine" && call.authority.brief
         ? { routine: { id: call.authority.brief.routineId, name: call.authority.brief.name } }
         : {}),
       input: auditInput(call.input),
-      ...(call.reason ? { reason: masked(call.reason).slice(0, MAX_STRING) } : {}),
+      ...(call.reason ? { reason: cutText(masked(call.reason), MAX_STRING) } : {}),
       ...(call.approvalId ? { approvalId: call.approvalId } : {}),
       ...(call.secretRequestId ? { secretRequestId: call.secretRequestId } : {}),
       ...(call.approvalRules?.length ? { approvalRules: call.approvalRules } : {}),

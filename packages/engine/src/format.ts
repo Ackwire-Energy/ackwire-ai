@@ -1,3 +1,13 @@
+/**
+ * At most `max` UTF-16 units of `text`, never half of a pair (an emoji) at the end: Postgres refuses jsonb that
+ * holds a lone surrogate.
+ */
+export const cutText = (text: string, max: number) => text.slice(0, max).replace(/[\uD800-\uDBFF]$/, "");
+
+/** `cutText` from the end: the last `max` units, never half of a pair at the start. */
+export const cutTextEnd = (text: string, max: number) =>
+  text.slice(Math.max(0, text.length - max)).replace(/^[\uDC00-\uDFFF]/, "");
+
 /** `2.3 MB`, `12 KB`, `512 bytes`, `50.0 GB`: sizes in the English agents read. */
 export function formatBytes(n: number) {
   if (n < 1024) return `${n} bytes`;

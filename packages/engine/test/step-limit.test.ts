@@ -14,7 +14,6 @@ import {
   drainOutbox,
   getForumTopic,
   insertMessage,
-  isScreenCall,
   postPersonMessage,
   queueOnRun,
   type ToolSource,
@@ -25,8 +24,7 @@ import { addMember, type Fixture, setup } from "./fixtures";
 
 /**
  * A conversation run at its cap of model calls: told once to wrap up near it, it ends done with where it
- * stands and Continuar instead of failing; Continuar replays its conversation with the same tools; calls
- * that only drive the browser or the desktop count apart.
+ * stands and Continuar instead of failing; Continuar replays its conversation with the same tools.
  */
 
 // PGlite setup on a slow machine.
@@ -47,7 +45,7 @@ const agentMessages = async (runId: string) =>
 const lastText = (req: ModelRequest) => JSON.stringify(req.messages.at(-1)?.content ?? "");
 const handlers = (maxToolTurns: number) => createJobHandlers({ ...f.jobDeps, maxToolTurns });
 
-/** A read tool (core), one more that tools on demand keep behind `find_tools`, and a stand-in for the browser. */
+/** A read tool (core), and one more that tools on demand keep behind `find_tools`. */
 function workTools(): ToolSource {
   const schemaless = { type: "object", properties: {} };
   return {
@@ -66,13 +64,6 @@ function workTools(): ToolSource {
         scope: "drive:write",
         inputSchema: schemaless,
         execute: async () => ({ content: "Issue #7 created" }),
-      },
-      {
-        name: "browser_read",
-        description: "Read the page",
-        scope: "context:read",
-        inputSchema: schemaless,
-        execute: async () => ({ content: "LinkedIn: Start a post" }),
       },
     ],
   };
@@ -329,59 +320,6 @@ describe("a conversation run that reaches its step limit mid-work", () => {
     await expect(continueRun(deps(), f.owner.id, f.org.id, run?.id ?? "")).rejects.toMatchObject({
       code: "run.not_continuable",
     });
-  });
-});
-
-describe("calls that only drive the browser or the desktop", () => {
-  test("count apart from the cap, up to twice it; any other call counts toward it", async () => {
-    f = await setup({
-      toolSources: [workTools()],
-      reply: (_req, n) => ({ chunks: [], toolUses: [{ name: n <= 4 ? "browser_read" : "look", input: {} }] }),
-    });
-    await ask("@dev posta no LinkedIn");
-    await drainOutbox(f.db, handlers(2));
-
-    // 4 browser steps (twice the cap of 2) and the 2 the cap allows: 6 calls, then the step limit's line.
-    expect(f.provider.calls).toHaveLength(6);
-    const [run] = await runs();
-    expect(run).toMatchObject({ status: "done", turns: 6 });
-    expect((run?.transcript as unknown as Transcript | undefined)?.screenTurns).toBe(4);
-    const [line] = await agentMessages(run?.id ?? "");
-    expect(line?.meta.bodyCode).toBe("step_limit");
-  });
-
-  test("a step that fails counts toward the cap: a loop on a browser that isn't open stops there", async () => {
-    const closed: ToolSource = {
-      name: "browser",
-      tools: async () => [
-        {
-          name: "browser_open",
-          description: "Open a page",
-          scope: "context:read",
-          inputSchema: { type: "object", properties: {} },
-          execute: async () => ({ content: "The browser isn't open.", isError: true }),
-        },
-      ],
-    };
-    f = await setup({
-      toolSources: [closed],
-      reply: () => ({ chunks: [], toolUses: [{ name: "browser_open", input: {} }] }),
-    });
-    await ask("@dev posta no LinkedIn");
-    await drainOutbox(f.db, handlers(2));
-
-    expect(f.provider.calls).toHaveLength(2);
-    const [run] = await runs();
-    expect(run).toMatchObject({ status: "done", turns: 2 });
-    expect((run?.transcript as unknown as Transcript | undefined)?.screenTurns).toBeUndefined();
-  });
-
-  test("by name, through use_tool, or from a computer brain's bridge; a call with any other tool isn't one", () => {
-    expect(isScreenCall({ name: "browser_do", input: {} })).toBe(true);
-    expect(isScreenCall({ name: "use_tool", input: { tool: "desktop_do", arguments: {} } })).toBe(true);
-    expect(isScreenCall({ name: "mcp__agentes__browser_open", input: {} })).toBe(true);
-    expect(isScreenCall({ name: "use_tool", input: { tool: "github_get_pr", arguments: {} } })).toBe(false);
-    expect(isScreenCall({ name: "find_tools", input: { query: "browser" } })).toBe(false);
   });
 });
 

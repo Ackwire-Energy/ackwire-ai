@@ -4,6 +4,7 @@ import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { getChannelCached } from "./context";
 import { publishUserEvent } from "./events";
+import { cutText } from "./format";
 import { taskRequester } from "./machine-tasks";
 import { getMessage } from "./messages";
 import { missionOfRun, type RunMission, runActsForMission } from "./mission-context";
@@ -418,7 +419,7 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
         await recordMissionEvent(ctx.db, mission, "approval_granted", {
           runId: ctx.runId,
           action: str(input.action),
-          target: str(input.target).slice(0, 300),
+          target: cutText(str(input.target), 300),
         });
         return {
           content: `Approved: go ahead with the ${str(input.action)} of ${str(input.target)} now, then report it.`,

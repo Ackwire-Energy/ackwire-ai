@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { cutText } from "../format";
 import type { Judge, JudgeAnswer } from "../judge";
 import {
   describeElement,
@@ -31,7 +32,7 @@ export type ConditionResult = { met: true; p: number } | { met: false; p: number
 
 const changesText = (c: ScreenChanges | null | undefined) =>
   c && !c.newPage
-    ? [...c.added.map((l) => `+ ${l.trim()}`), ...c.removed.map((l) => `- ${l.trim()}`)].join("\n").slice(0, 6000)
+    ? cutText([...c.added.map((l) => `+ ${l.trim()}`), ...c.removed.map((l) => `- ${l.trim()}`)].join("\n"), 6000)
     : null;
 
 /**
@@ -169,8 +170,8 @@ export async function findInPage(
       const criteria: Record<string, string> = {};
       for (let i = w.from; i < w.to; i++) {
         const line = (lines[i] as string).trim();
-        numbered.push(`${id(i)}: ${line.slice(0, LINE_CHARS)}`);
-        criteria[id(i)] = line.slice(0, OPTION_CHARS) || "(empty)";
+        numbered.push(`${id(i)}: ${cutText(line, LINE_CHARS)}`);
+        criteria[id(i)] = cutText(line, OPTION_CHARS) || "(empty)";
       }
       criteria.none = "No line here answers it.";
       return input.judge.ask({
@@ -220,7 +221,7 @@ export async function findInPage(
     out.push(lines[i] as string);
     prev = i;
   }
-  const text = out.join("\n").slice(0, input.maxChars ?? 6000);
+  const text = cutText(out.join("\n"), input.maxChars ?? 6000);
   const answered = exists >= 0.7 && text ? "yes" : exists >= 0.35 && text ? "partly" : "no";
   return { answered, text, ...(searched < lines.length ? { searched: { lines: searched, of: lines.length } } : {}) };
 }
@@ -250,7 +251,7 @@ export async function findDismiss(
       kind: "screen_dismiss",
       // Clicked on its probability alone: only a calibrated judge answers (the cheap model would say 1).
       calibrated: true,
-      state: { covering: input.covering.slice(0, 300), screen: { address: input.observation.url } },
+      state: { covering: cutText(input.covering, 300), screen: { address: input.observation.url } },
       questions: {
         close: {
           type: "choice",

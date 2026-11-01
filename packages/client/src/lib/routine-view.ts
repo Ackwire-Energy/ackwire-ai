@@ -80,6 +80,7 @@ export const RUN_CODES = [
   "model_refused",
   "runner_outdated",
   "too_many_tool_calls",
+  "stuck",
   "missing_credential",
   "credential_revoked",
   "credential_wrong_provider",

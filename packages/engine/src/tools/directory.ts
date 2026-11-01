@@ -1,4 +1,5 @@
 import type { MissingConnector } from "../connectors/listing";
+import { cutText } from "../format";
 import { oneLine } from "../mail/text";
 import type { JsonSchema } from "./json-schema";
 import type { ToolDefinition } from "./types";
@@ -397,7 +398,7 @@ export function rankTools(tools: ToolDefinition[], prefix: string, query: string
 /** A tool's input schema, short enough for a search result. */
 export function compactSchema(schema: JsonSchema) {
   const text = JSON.stringify(schema);
-  return text.length > SCHEMA_CHARS ? `${text.slice(0, SCHEMA_CHARS)}…` : text;
+  return text.length > SCHEMA_CHARS ? `${cutText(text, SCHEMA_CHARS)}…` : text;
 }
 
 /** How a person gets a connector the agent lacks, in the app's words (and the Portuguese the app shows). */
@@ -461,7 +462,7 @@ function findTools(
   const more = matches.slice(ready.length);
   const parts: string[] = [];
   if (ready.length > 0) {
-    const names = ready.map((t) => `- ${t.name}: ${t.description.slice(0, 300)}`);
+    const names = ready.map((t) => `- ${t.name}: ${cutText(t.description, 300)}`);
     parts.push(
       `Already in your tool list for "${query}": call ${ready.length > 1 ? "them" : "it"} directly, not through ${useName}.\n${names.join("\n")}`,
     );
@@ -469,8 +470,8 @@ function findTools(
   if (more.length > 0) {
     const lines = more.map((t) =>
       listed.has(t)
-        ? `- ${t.name} (already in your tool list: call it directly): ${t.description.slice(0, 300)}`
-        : `- ${t.name}${sensitive(t) ? " (asks a person's approval; its input includes why)" : ""}: ${t.description.slice(0, 300)}\n  input: ${compactSchema(t.inputSchema)}`,
+        ? `- ${t.name} (already in your tool list: call it directly): ${cutText(t.description, 300)}`
+        : `- ${t.name}${sensitive(t) ? " (asks a person's approval; its input includes why)" : ""}: ${cutText(t.description, 300)}\n  input: ${compactSchema(t.inputSchema)}`,
     );
     parts.push(`${label} tools for "${query}" (call one with ${useName}):\n${lines.join("\n")}`);
   }
