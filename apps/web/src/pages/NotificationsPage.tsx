@@ -36,6 +36,7 @@ import {
   workspaceHeadline,
 } from "@agenteschat/client/lib/notifications";
 import { routineNotificationWords, type Words } from "@agenteschat/client/lib/routine-view";
+import { secretNoticeLine } from "@agenteschat/client/lib/secret-requests";
 import {
   Avatar,
   Button,
@@ -288,6 +289,7 @@ type WhatKey =
   | "machineConnectedAny"
   | "browserHandoff"
   | "desktopHandoff"
+  | "secretRequest"
   | "joinRequest"
   | "joinRequestMany"
   | "joinSuggestion"
@@ -356,6 +358,8 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
         : k("machineConnectedAny", { name });
     case "browser_handoff":
       return k(n.source.screen === "desktop" ? "desktopHandoff" : "browserHandoff", { name });
+    case "secret_request":
+      return k("secretRequest", { name });
     case "join_request": {
       // Merged while unread: the first ones to ask, by name, then how many more.
       const asked = askersOf(n);
@@ -1364,8 +1368,14 @@ function WaitRow({
 }) {
   const { t, i18n } = useTranslation();
   const unread = n.readAt === null;
-  // A request to join says it all in its headline; an agent's hand and an approval add what they are about.
-  const sub = n.kind === "join_request" ? null : (n.latest.title ?? n.latest.text);
+  // A request to join says it all in its headline; an agent's hand and an approval add what they are about, a
+  // secret its name and what it is for.
+  const sub =
+    n.kind === "join_request"
+      ? null
+      : n.kind === "secret_request"
+        ? secretNoticeLine(n)
+        : (n.latest.title ?? n.latest.text);
   const l1 = useRef<HTMLDivElement>(null);
   const wraps = useWraps(l1);
   return (

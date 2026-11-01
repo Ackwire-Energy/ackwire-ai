@@ -2175,8 +2175,11 @@ export interface AgentQuestion {
   answeredByUserId: string | null;
 }
 
-/** Where a secret goes on the agent's computer (ADR 0027). */
-export type SecretTarget = { kind: "env" } | { kind: "file"; path: string };
+/**
+ * Where a secret goes on the agent's computer (ADR 0027): a variable of its commands, a file in its folder, or
+ * (`site`) only its browser's typing on that site (`https://host`), never its commands.
+ */
+export type SecretTarget = { kind: "env" } | { kind: "file"; path: string } | { kind: "site"; site: string };
 
 /**
  * An agent asked a person for a secret for its computer (`request_secret`,
@@ -4762,6 +4765,11 @@ export type NotificationKind =
   | "machine_connected"
   /** ADR 0040 §6: an agent needs a person in its browser (sign in, a code). `source.handoffId`. */
   | "browser_handoff"
+  /**
+   * ADR 0027: an agent waits for a secret only this person can give (`latest.title` its name, `latest.text` what it
+   * is for, `latest.expiresAt`). Opens the conversation at its card, where it is typed: never answered in the inbox.
+   */
+  | "secret_request"
   /**
    * ADR 0056 §8: the workspace was held, suspended or restored (owners and admins). `latest.statusTo`, `latest.text`:
    * why. On agentes.chat Cloud also an agent held (`statusTo: "agent_hold"`, `latest.holdKind`, `source.agentId`).

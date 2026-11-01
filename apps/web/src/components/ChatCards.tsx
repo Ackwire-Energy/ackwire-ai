@@ -17,7 +17,8 @@ import {
   rowStatus,
   staleCount,
 } from "@agenteschat/client/lib/proposals";
-import { MAX_SECRET_BYTES, sealSecret, secretAad } from "@agenteschat/client/lib/secret-box";
+import { sealSecret, secretAad } from "@agenteschat/client/lib/secret-box";
+import { secretValueProblem, secretWhere } from "@agenteschat/client/lib/secret-requests";
 import { secretEndedAt, secretOutcome } from "@agenteschat/client/lib/secret-words";
 import { Button, Chip, Diff, diffLines, Field, Icon, Input, MessageText, Switch, Textarea } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -631,14 +632,11 @@ export function SecretCard({ request }: { request: SecretRequest }) {
     onError: failed,
   });
   const submit = () => {
-    if (!value) return setError(t("secret.empty"));
-    if (new TextEncoder().encode(value).byteLength > MAX_SECRET_BYTES) return setError(t("secret.tooLarge"));
+    const problem = secretValueProblem(value);
+    if (problem) return setError(t(problem));
     deliver.mutate(value);
   };
-  const where =
-    current.target.kind === "file"
-      ? t("secret.targetFile", { path: current.target.path, agent: agentName })
-      : t("secret.targetEnv", { name: current.name, agent: agentName });
+  const where = secretWhere(t, current, agentName);
   const until = t("secret.until", { time: formatTime(i18n.language, current.expiresAt) });
   // Waiting: a request card; only the person asked gets the field (the whole card is its form).
   if (pending) {

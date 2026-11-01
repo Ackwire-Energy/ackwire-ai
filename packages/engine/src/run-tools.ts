@@ -823,7 +823,7 @@ export async function publishPauseCards(deps: { db: Database; pubsub?: PubSub },
     await publishQuestion(pubsub, q, "question.asked");
     await notifyQuestion({ db, pubsub } as Parameters<typeof notifyQuestion>[0], q).catch(() => {});
   }
-  for (const r of posted.secrets) await publishSecret(pubsub, r, "secret.requested");
+  for (const r of posted.secrets) await publishSecret({ db, pubsub }, r, "secret.requested");
 }
 
 /**

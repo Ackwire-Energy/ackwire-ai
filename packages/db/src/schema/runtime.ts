@@ -677,7 +677,11 @@ export const secretRequests = pgTable(
     /** `GITHUB_TOKEN`… */
     name: text().notNull(),
     purpose: text().notNull(),
-    targetKind: text().notNull().$type<"env" | "file">(),
+    /**
+     * `site`: only the agent browser types it, on `site`, never its commands (a runner that says it can, ADR 0027);
+     * a site's password on an older runner is `env`, with `site` set.
+     */
+    targetKind: text().notNull().$type<"env" | "file" | "site">(),
     targetPath: text(),
     /** The connected machine holding the key (ADR 0025). */
     machineId: uuid(),

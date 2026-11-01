@@ -3,6 +3,7 @@ import type { LiveConsult, LiveRun, LiveWork, Message, RunConsultation } from "@
 import { activitySentence, barElapsed, barFaces, barWords, PHRASE_TURN_MS } from "@agenteschat/client/lib/activity";
 import { consultBlocksNearEnd, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
+import { secretRequestOf, secretValueProblem, secretWhere } from "@agenteschat/client/lib/secret-requests";
 import { toolCalls, toolNow, toolPhrase, toolWhy } from "@agenteschat/client/lib/work";
 import {
   AGENT_WORDS_MIN,
@@ -1063,5 +1064,65 @@ describe("automatic lines (notices) and fast replies", () => {
       message({ id: "c", author: ada, createdAt: at(6) }),
     ]).flatMap((r) => (r.kind === "message" ? [r.grouped] : []));
     expect(rows).toEqual([false, false, false, false, true]);
+  });
+});
+
+describe("an agent's secret request (ADR 0027), as its card reads it", () => {
+  const request = {
+    id: "s1",
+    agentId: "theo",
+    channelId: "c1",
+    threadId: null,
+    messageId: "m1",
+    requestedForUserId: "u1",
+    name: "SHOP_PASSWORD",
+    purpose: "entrar na loja (shop.example.com)",
+    target: { kind: "site", site: "https://shop.example.com" },
+    site: "https://shop.example.com",
+    machineId: "mac1",
+    publicKey: "BPk",
+    status: "pending",
+    expiresAt: at(-15),
+    deliveredAt: null,
+    removed: false,
+  } as const;
+
+  test("its card stands alone, and its message's text isn't repeated above it", () => {
+    const card = message({ id: "m1", author: { type: "agent", id: "theo" }, body: "Secret request: SHOP_PASSWORD" });
+    const asked = { ...card, meta: { secretRequest: request } };
+    expect(secretRequestOf(asked.meta)).toEqual(request);
+    expect(hidesBody(asked)).toBe(true);
+    expect(standsAlone(asked)).toBe(true);
+    expect(hidesBody(card)).toBe(false);
+    // Anything else under its name is no card.
+    expect(secretRequestOf({ secretRequest: { ...request, target: { kind: "ssh" } } })).toBeNull();
+    expect(secretRequestOf({ secretRequest: { ...request, status: "opened" } })).toBeNull();
+    expect(secretRequestOf({ secretRequest: "SHOP_PASSWORD" })).toBeNull();
+    expect(secretRequestOf(undefined)).toBeNull();
+  });
+
+  test("where the value goes, said truly for each kind, in both languages", async () => {
+    const en = await translator("en");
+    const pt = await translator("pt-BR");
+    expect(secretWhere(en, request, "Theo")).toBe(
+      "Only Theo's browser types it, on shop.example.com. It stays out of Theo's commands.",
+    );
+    expect(secretWhere(pt, request, "Theo")).toBe(
+      "Só o navegador de Theo digita, em shop.example.com. Fica fora dos comandos de Theo.",
+    );
+    expect(secretWhere(en, { ...request, name: "NPM_TOKEN", target: { kind: "env" } }, "Theo")).toBe(
+      "Goes in as the variable NPM_TOKEN on Theo's computer.",
+    );
+    expect(secretWhere(pt, { ...request, target: { kind: "file", path: ".npmrc" } }, "Theo")).toBe(
+      "Vai para o arquivo .npmrc no computador de Theo.",
+    );
+  });
+
+  test("an empty or too large value is caught before it is sealed", async () => {
+    const en = await translator("en");
+    expect(secretValueProblem("")).toBe("secret.empty");
+    expect(secretValueProblem("é".repeat(8 * 1024 + 1))).toBe("secret.tooLarge");
+    expect(secretValueProblem("hunter2")).toBeNull();
+    expect(en("secret.tooLarge")).toBe("Too large (16 KB at most).");
   });
 });

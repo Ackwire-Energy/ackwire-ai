@@ -69,6 +69,8 @@ export const NOTIFICATION_KINDS = [
   "machine_connected",
   /** An agent needs a person in its browser (ADR 0040 §6). */
   "browser_handoff",
+  /** An agent waits for a secret only that person can give (ADR 0027): `latest.title` its name, `text` its purpose. */
+  "secret_request",
   /**
    * The workspace was held, suspended or restored, with the notice shown (owners and admins, ADR 0056 §8), or on
    * agentes.chat Cloud one of its agents was held (`statusTo: "agent_hold"`, also its responsible person, §9).

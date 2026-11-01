@@ -23,6 +23,7 @@ import {
   noticeRoutineName,
 } from "@agenteschat/client/lib/notices";
 import { isRoutineCall, routineReplyOf } from "@agenteschat/client/lib/routines";
+import { secretRequestOf } from "@agenteschat/client/lib/secret-requests";
 import { previewOf } from "../shared/logic";
 import { continuesReply } from "./media";
 
@@ -81,6 +82,7 @@ export function standsAlone(m: Message) {
       meta.issueWork ||
       meta.issueTaken ||
       questionOf(meta) ||
+      secretRequestOf(meta) ||
       consultationsOf(meta).length > 0 ||
       routineReplyOf(m) ||
       isEventLine(meta),
@@ -282,13 +284,13 @@ export function questionOf(meta: Message["meta"]): AgentQuestion | null {
 export const hidesBody = (m: Message) =>
   Boolean(
     approvalIdOf(m.meta) ||
+      secretRequestOf(m.meta) ||
       agentProposalOf(m.meta) ||
       stretchCardOf(m.meta) ||
       m.meta?.missionStart ||
       m.meta?.threadStart ||
       m.meta?.issueWork ||
       m.meta?.browserHandoff ||
-      m.meta?.secretRequest ||
       m.meta?.missionSetup ||
       questionOf(m.meta)?.text.trim() === m.body.trim(),
   );

@@ -40,7 +40,7 @@ export function requestSecretTool(opts: {
     type: "string",
     maxLength: 300,
     description:
-      "For a password your browser types (browser_type_secret): the address of the page it goes into (https://…). It will only ever be typed on that site.",
+      "For a password your browser types (browser_type_secret): the address of the page it goes into (https://…). It will only ever be typed on that site, and it stays out of your commands; leave `site` out for a secret a command uses.",
   } as const;
   return {
     name: REQUEST_SECRET_TOOL,
@@ -117,8 +117,10 @@ export function requestSecretTool(opts: {
         }
         const row = await opts.onComputer(ctx, async (computer) => {
           const id = Bun.randomUUIDv7();
-          const { publicKey } = await secretOnComputer(computer, { action: "keypair", requestId: id });
+          const { publicKey, sites } = await secretOnComputer(computer, { action: "keypair", requestId: id });
           if (!publicKey) throw new Error("the computer made no key");
+          // A site's password is for the browser alone where the runner keeps it so; an older one gets a variable.
+          const kind = file ? "file" : origin && sites === true ? "site" : "env";
           const [inserted] = await ctx.db
             .insert(schema.secretRequests)
             .values({
@@ -133,7 +135,7 @@ export function requestSecretTool(opts: {
               // The person sees the one site a browser password may be typed on.
               purpose: origin ? `${str(input.purpose).trim()} (${new URL(origin).host})` : str(input.purpose).trim(),
               site: origin,
-              targetKind: file ? "file" : "env",
+              targetKind: kind,
               targetPath: file ? path : null,
               machineId: computer.machineId,
               publicKey,
@@ -149,7 +151,7 @@ export function requestSecretTool(opts: {
             details: {
               requestId: id,
               name,
-              target: file ? { kind: "file", path } : { kind: "env" },
+              target: kind === "file" ? { kind, path } : kind === "site" && origin ? { kind, site: origin } : { kind },
               requestedFor: requester,
             },
           });

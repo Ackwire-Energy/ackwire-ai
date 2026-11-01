@@ -15,6 +15,7 @@ import {
   type RunnerAccess,
   type RunnerFrame,
 } from "@agenteschat/adapters/machine-protocol";
+import { sealSecret, secretAad } from "@agenteschat/adapters/secret-box";
 import { browserErrorText, formatPlanReport, runPlan } from "@agenteschat/engine";
 import { type BrowserLink, type BrowserReply, browserSurface } from "../../../../packages/engine/src/browser/surface";
 import { reduceAccess, setTool, TOOL_NAMES, widens } from "../../runner/access";
@@ -44,6 +45,7 @@ import {
 } from "../../runner/browser";
 import { handleRequest, type RequestScope } from "../../runner/handlers";
 import { agentWorkspace } from "../../runner/paths";
+import { handleSecret, secretValue } from "../../runner/secrets";
 import { errorCode, removeDirs, tempDir, waitFor } from "./helpers";
 
 const dirs: string[] = [];
@@ -59,28 +61,72 @@ interface Logged {
   stdin: string;
 }
 
-/** A Chrome the fake "starts": records its command line, answers on a port, and quits when killed. */
+/**
+ * A Chrome the fake "starts": records its command line, answers on a port, and quits when killed or when it closes
+ * itself (`close`, what its DevTools' `Browser.close` does). What it finds in
+ * its profile as it starts follows Chrome's own rules, as measured on Chrome for Testing 155: the cookies of the
+ * sites' sessions (`session`) stay only with `--restore-last-session`, and with it the tabs it saved come back
+ * beside the page it starts on. The profile's `Default/cookies.json` and `Default/Sessions/tabs.json` stand for
+ * what Chrome keeps there.
+ */
 interface FakeChrome {
   exe: string;
   args: string[];
   profile: string;
   port: number;
+  /** Signaled while it ran. */
   killed: boolean;
+  /** It closed itself. */
+  closed: boolean;
+  close: () => void;
+  /** The cookies it started with, by name. */
+  cookies: string[];
+  /** The tabs it opened as it started. */
+  tabs: string[];
+}
+
+function chromeStartsWith(profile: string, args: string[]) {
+  const restore = args.includes("--restore-last-session");
+  const jar = path.join(profile, "Default", "cookies.json");
+  const all = existsSync(jar) ? (JSON.parse(readFileSync(jar, "utf8")) as { name: string; session?: boolean }[]) : [];
+  const kept = restore ? all : all.filter((c) => !c.session);
+  if (existsSync(jar)) writeFileSync(jar, JSON.stringify(kept));
+  const saved = path.join(profile, "Default", "Sessions", "tabs.json");
+  const restored = restore && existsSync(saved) ? (JSON.parse(readFileSync(saved, "utf8")) as string[]) : [];
+  return { cookies: kept.map((c) => c.name), tabs: [...restored, args.at(-1) ?? ""] };
 }
 
 function fakeChromes() {
   const started: FakeChrome[] = [];
   const start = async (exe: string, args: string[], profile: string): Promise<OwnChrome> => {
-    const c: FakeChrome = { exe, args, profile, port: 9300 + started.length, killed: false };
-    started.push(c);
     let quit = () => {};
+    let gone = false;
     const exited = new Promise<void>((resolve) => {
-      quit = () => resolve();
+      quit = () => {
+        gone = true;
+        resolve();
+      };
     });
+    const c: FakeChrome = {
+      exe,
+      args,
+      profile,
+      port: 9300 + started.length,
+      killed: false,
+      closed: false,
+      close: () => {
+        c.closed = true;
+        quit();
+      },
+      ...chromeStartsWith(profile, args),
+    };
+    started.push(c);
     return {
       pid: 40_000 + started.length,
       port: c.port,
+      // As `launchChrome`'s: a Chrome that is gone isn't signaled.
       kill: () => {
+        if (gone) return;
         c.killed = true;
         quit();
       },
@@ -108,7 +154,7 @@ function setup(over: Partial<BrowserManagerOptions> = {}, secrets: Record<string
       frames.push(f);
       return true;
     },
-    secret: async (_agent, name) => secrets[name] ?? null,
+    secret: async (_agent, name) => (name in secrets ? { value: secrets[name] as string, site: null } : null),
     command: [process.execPath, FAKE],
     chrome: () => "/fake/browsers/chrome-155.0.8059.84/chrome-linux64/chrome",
     userHome: home,
@@ -246,8 +292,8 @@ test("only Chrome for Testing is driven: the newest installed one, never the per
   expect(findChrome(home, "linux", shared)).toBe(newer);
   expect(chromeLabel(newer, home, shared)).toBe("Chrome for Testing");
   expect(chromeLabel(newer, home)).toBe("Google Chrome");
-  // On every launch: nothing updating Chrome's files, pages asked to hold still (`prefers-reduced-motion`), and no
-  // chip asking to sign in to Chrome itself.
+  // On every launch: nothing updating Chrome's files, pages asked to hold still (`prefers-reduced-motion`), no
+  // chip asking to sign in to Chrome itself, and the sites' sessions kept across its restarts.
   expect(CHROME_ARGS).toEqual([
     "--no-first-run",
     "--no-default-browser-check",
@@ -255,6 +301,7 @@ test("only Chrome for Testing is driven: the newest installed one, never the per
     "--disable-component-update",
     "--force-prefers-reduced-motion",
     "--disable-features=SigninPromoOnAvatarPill",
+    "--restore-last-session",
   ]);
 });
 
@@ -553,6 +600,8 @@ test.if(posix)("a fixed CDP port accepts only its owned listener and ignores a s
  */
 function fakeDevtools(down: number[], answer: (reply: () => void) => void = (reply) => reply()) {
   const asked: string[] = [];
+  /** `Browser.close` on connection `n` (`chromesAt` closes that Chrome). */
+  const closing = { on: (_n: number) => {} };
   const navigated: string[] = [];
   const sockets: { send(data: string): unknown }[] = [];
   let connections = 0;
@@ -597,18 +646,22 @@ function fakeDevtools(down: number[], answer: (reply: () => void) => void = (rep
         } else if (msg.method === "Page.navigate") {
           navigated.push(msg.params?.url ?? "");
           result({ frameId: "main" });
+        } else if (msg.method === "Browser.close") {
+          result({});
+          closing.on(n);
         }
       },
     },
   });
   const crash = (n: number) =>
     sockets[n]?.send(JSON.stringify({ method: "Inspector.targetCrashed", params: {}, sessionId: `page-${n}` }));
-  return { port: server.port as number, asked, navigated, crash, stop: () => server.stop(true) };
+  return { port: server.port as number, asked, navigated, crash, closing, stop: () => server.stop(true) };
 }
 
-/** Fake Chromes whose endpoint is `devtools`. */
-function chromesAt(devtools: { port: number }) {
+/** Fake Chromes whose endpoint is `devtools`, one connection each: `Browser.close` on it closes that Chrome. */
+function chromesAt(devtools: { port: number; closing: { on: (n: number) => void } }) {
   const chromes = fakeChromes();
+  devtools.closing.on = (n) => chromes.started[n]?.close();
   const start = async (exe: string, args: string[], profile: string): Promise<OwnChrome> => ({
     ...(await chromes.start(exe, args, profile)),
     port: devtools.port,
@@ -666,11 +719,11 @@ test.if(posix)("takeTraffic: what each Chrome moved, across a restart and after 
     await t.manager.stop(dev);
     await t.act("open", ["https://a.example/again"]);
     await counted(1);
-    expect(chromes.started.map((c) => c.killed)).toEqual([true, false]);
+    expect(chromes.started.map((c) => c.closed)).toEqual([true, false]);
     expect(t.manager.takeTraffic()).toEqual({ up: 2 * SENT, down: 1500 });
     expect(t.manager.takeTraffic()).toEqual({ up: 0, down: 0 });
     await t.manager.close();
-    expect(chromes.started.map((c) => c.killed)).toEqual([true, true]);
+    expect(chromes.started.map((c) => c.closed)).toEqual([true, true]);
     expect(t.manager.takeTraffic()).toEqual({ up: 0, down: 0 });
   } finally {
     devtools.stop();
@@ -1092,6 +1145,65 @@ test.if(posix)("a secret is typed through stdin into a password field only, and 
   expect(t.logged().filter((c) => c.args.includes("batch")).length).toBe(typedBefore);
 });
 
+test.if(posix)(
+  "a site's password: out of every command's environment, typed only by the browser and only on its site",
+  async () => {
+    const secretsDir = path.join(tempDir("secrets-"), "secrets");
+    dirs.push(path.dirname(secretsDir));
+    const t = setup({ secret: (agent, name) => secretValue(secretsDir, agent, name) });
+    const value = "hunter2-signed-in-for-real";
+    // Delivered as the server does: sealed to the computer's key, bound to its site, then activated.
+    const requestId = "req-site-0001";
+    const target = { kind: "site" as const, site: "https://shop.example.com" };
+    const keypair = await handleSecret(secretsDir, dev, t.ws, { action: "keypair", requestId });
+    expect(keypair.sites).toBe(true);
+    const aad = secretAad({ requestId, orgId: "org-1", name: "SHOP_PASSWORD", target });
+    const box = await sealSecret(keypair.publicKey ?? "", value, aad);
+    await handleSecret(secretsDir, dev, t.ws, {
+      action: "deliver",
+      requestId,
+      name: "SHOP_PASSWORD",
+      target,
+      aad,
+      box,
+    });
+    await handleSecret(secretsDir, dev, t.ws, {
+      action: "activate",
+      requestId,
+      order: `2026-10-31T12:00:00.000Z|${requestId}`,
+    });
+
+    // The agent's commands never see it, by name or in their whole environment.
+    const ctx = { workspaceReal: t.ws, exec: true, token: "agm_x", secretsDir };
+    const scope: RequestScope = { signal: new AbortController().signal, output: () => {} };
+    const ran = (await handleRequest(
+      ctx,
+      { agent: dev, op: "exec", command: 'echo "[$SHOP_PASSWORD]"; env', timeoutSeconds: 10, stream: false },
+      scope,
+    )) as { stdout: string };
+    expect(ran.stdout.split("\n")[0]).toBe("[]");
+    expect(ran.stdout).not.toContain(value);
+    expect(ran.stdout).not.toContain("SHOP_PASSWORD");
+
+    // The browser types it on its site.
+    await t.act("open", ["https://shop.example.com/login"]);
+    t.page({ attrs: { "@e4": { type: "password" } } });
+    expect(await t.act("agentes:type_secret", ["e4", "SHOP_PASSWORD", "https://shop.example.com"])).toEqual({
+      success: true,
+      data: { typed: "SHOP_PASSWORD", into: "@e4" },
+    });
+    const batch = t.logged().find((c) => c.args.includes("batch"));
+    expect(JSON.parse(batch?.stdin ?? "[]")).toEqual([["fill", "@e4", value]]);
+    // A request naming another site never gets it, even with the page there: the person sealed it to this one.
+    await t.act("open", ["https://bank.example/login"]);
+    expect(await t.act("agentes:type_secret", ["e4", "SHOP_PASSWORD", "https://bank.example"])).toMatchObject({
+      success: false,
+      error: expect.stringContaining("only for shop.example.com"),
+    });
+    expect(t.logged().filter((c) => c.args.includes("batch"))).toHaveLength(1);
+  },
+);
+
 test.if(posix)("stop closes the agent's browser and its Chrome; a second stop finds nothing", async () => {
   const t = setup();
   await t.act("open", ["https://a.example"]);
@@ -1123,6 +1235,61 @@ test.if(posix)("an idle browser's Chrome stops, but not while someone watches or
   await t.manager.sweep();
   expect(t.chromes[1]?.killed).toBe(true);
 });
+
+test.if(posix)(
+  "a site's session (kept only until the browser closes) outlives an idle stop, and the last tabs don't come back",
+  async () => {
+    let now = 1_000_000;
+    const t = setup({ now: () => now, idleMs: 60_000 });
+    await t.act("open", ["https://shop.example.com/login"]);
+    const profile = t.chromes[0]?.profile ?? "";
+    // Signed in without "remember me": a session cookie. Chrome saved its tabs meanwhile too.
+    mkdirSync(path.join(profile, "Default", "Sessions"), { recursive: true });
+    writeFileSync(
+      path.join(profile, "Default", "cookies.json"),
+      JSON.stringify([{ name: "shop_session", session: true }, { name: "shop_prefs" }]),
+    );
+    writeFileSync(
+      path.join(profile, "Default", "Sessions", "tabs.json"),
+      JSON.stringify(["https://shop.example.com/cart", "https://shop.example.com/orders"]),
+    );
+    now += 61_000;
+    await t.manager.sweep();
+    expect(t.chromes[0]?.killed).toBe(true);
+
+    await t.act("open", ["https://shop.example.com/orders"]);
+    expect(t.chromes).toHaveLength(2);
+    expect(t.chromes[1]?.profile).toBe(profile);
+    expect(t.chromes[1]?.cookies).toEqual(["shop_session", "shop_prefs"]);
+    // One page, as before: the agent's command goes on it.
+    expect(t.chromes[1]?.tabs).toEqual(["about:blank"]);
+  },
+);
+
+test.if(posix)(
+  "a stop asks Chrome to close itself first, so its last cookies reach the profile; one that stays is killed",
+  async () => {
+    const devtools = fakeDevtools([]);
+    try {
+      const chromes = chromesAt(devtools);
+      const t = setup({ startChrome: chromes.start });
+      await t.act("open", ["https://shop.example.com/"]);
+      await t.manager.stop(dev);
+      expect(devtools.asked).toContain("Browser.close");
+      expect(chromes.started[0]).toMatchObject({ closed: true, killed: false });
+
+      // A Chrome that doesn't close (hung) is signaled after a while.
+      devtools.closing.on = () => {};
+      await t.act("open", ["https://shop.example.com/again"]);
+      const at = Date.now();
+      await t.manager.stop(dev);
+      expect(chromes.started[1]).toMatchObject({ closed: false, killed: true });
+      expect(Date.now() - at).toBeGreaterThanOrEqual(1900);
+    } finally {
+      devtools.stop();
+    }
+  },
+);
 
 test.if(posix)(
   "the runner stopping stops its Chromes; one a crashed run left is stopped on the next start",

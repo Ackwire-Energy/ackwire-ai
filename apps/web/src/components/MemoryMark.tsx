@@ -104,7 +104,7 @@ function MemoryMark({ message, memory }: { message: Message; memory: MessageMemo
           openPanel
             ? (e) =>
                 inPlaceClick(e, () => {
-                  setMode(null);
+                  card.close();
                   openPanel(memory.agentId, "memory");
                 })
             : undefined

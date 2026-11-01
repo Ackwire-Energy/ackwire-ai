@@ -1,13 +1,11 @@
 import { useChannelCard, useChannels, useJoinChannel } from "@agenteschat/client";
 import { channelCardFacts, resolveChannelRef } from "@agenteschat/client/lib/channel-refs";
-import { Button, Chip, hoverPointer, Icon, Popover } from "@agenteschat/ui";
+import { Button, Chip, Icon, Popover, useHoverCard } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { type FocusEvent, type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
+import { type FocusEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { HOVER_OPEN_MS } from "@/components/ProfileCard";
-
-const HOVER_CLOSE_MS = 200;
 
 /**
  * `#name` in a message: a link to the channel it means (`resolveChannelRef`), with its card on hover or keyboard
@@ -21,71 +19,45 @@ export function ChannelRef({ name, text, refs }: { name: string; text: string; r
   const ref = resolveChannelRef(name, refs, channels);
   // A channel the list doesn't have (archived, or not mine): only the server knows if it may show.
   const lookup = useChannelCard(org.id, ref?.id ?? "", Boolean(ref && !ref.known));
-  const [open, setOpen] = useState<false | "hover" | "press">(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const card = useHoverCard(HOVER_OPEN_MS);
+  // Keyboard focus on the link shows the card too, without taking the focus (Enter opens the channel).
+  const [focused, setFocused] = useState(false);
+  const open = card.open || (focused ? "hover" : false);
   const body = useRef<HTMLDivElement>(null);
   const [intoCard, setIntoCard] = useState(false);
-  const clear = () => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-  };
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
   // The card may already be open from the focus (without taking it): move in once it shows.
   useEffect(() => {
     if (!intoCard || open !== "press") return;
     setIntoCard(false);
     (body.current?.querySelector<HTMLElement>("button") ?? body.current)?.focus();
   });
-  const later = (next: boolean, ms: number) => {
-    clear();
-    timer.current = setTimeout(() => {
-      timer.current = null;
-      setOpen(next && "hover");
-    }, ms);
-  };
   if (!ref || (!ref.known && !lookup.data)) return <>{text}</>;
   const shown = ref.known?.name ?? lookup.data?.name ?? name;
   const archived = !ref.known && lookup.data?.archived === true;
   const label = archived ? t("channelRefs.archivedLabel", { name: shown }) : t("channelRefs.label", { name: shown });
-  const hover = {
-    onPointerEnter: (e: PointerEvent) => {
-      if (hoverPointer(e.pointerType) && !open) later(true, HOVER_OPEN_MS);
-    },
-    onPointerLeave: (e: PointerEvent) => {
-      if (!hoverPointer(e.pointerType)) return;
-      if (open) later(false, HOVER_CLOSE_MS);
-      else clear();
-    },
-    // Keyboard focus shows the card too; the focus stays on the link (Enter opens the channel).
+  const focus = {
     onFocus: (e: FocusEvent<HTMLElement>) => {
-      if (!open && e.currentTarget.matches(":focus-visible")) setOpen("hover");
+      if (!open && e.currentTarget.matches(":focus-visible")) setFocused(true);
     },
-    onBlur: () => {
-      if (open === "hover") later(false, HOVER_CLOSE_MS);
+    onBlur: (e: FocusEvent<HTMLElement>) => {
+      if (!(e.relatedTarget instanceof Node && body.current?.contains(e.relatedTarget))) setFocused(false);
     },
   };
   const className = archived ? "channel-ref channel-ref--archived" : "channel-ref";
   return (
     <Popover
+      hover={card}
       open={open !== false}
       onOpenChange={(o) => {
-        clear();
-        setOpen(o && "press");
+        if (!o) setFocused(false);
       }}
       moveFocus={open === "press"}
       label={t("channelRefs.card", { name: shown })}
       side="bottom"
       className="profile-card channel-card"
-      onContentPointerEnter={(e) => hoverPointer(e.pointerType) && clear()}
-      onContentPointerLeave={(e) => hoverPointer(e.pointerType) && later(false, HOVER_CLOSE_MS)}
       trigger={
         archived ? (
-          <button type="button" className={className} aria-label={label} aria-haspopup="dialog" {...hover}>
+          <button type="button" className={className} aria-label={label} aria-haspopup="dialog" {...focus}>
             #{shown}
           </button>
         ) : (
@@ -99,11 +71,11 @@ export function ChannelRef({ name, text, refs }: { name: string; text: string; r
             onKeyDown={(e: KeyboardEvent) => {
               if (e.key !== "ArrowDown" && e.key !== " ") return;
               e.preventDefault();
-              clear();
-              setOpen("press");
+              setFocused(false);
+              card.onOpenChange(true);
               setIntoCard(true);
             }}
-            {...hover}
+            {...focus}
           >
             #{shown}
           </Link>
@@ -112,7 +84,13 @@ export function ChannelRef({ name, text, refs }: { name: string; text: string; r
     >
       {open && (
         <div ref={body} tabIndex={-1}>
-          <ChannelCardBody channelId={ref.id} onDone={() => setOpen(false)} />
+          <ChannelCardBody
+            channelId={ref.id}
+            onDone={() => {
+              setFocused(false);
+              card.close();
+            }}
+          />
         </div>
       )}
     </Popover>
