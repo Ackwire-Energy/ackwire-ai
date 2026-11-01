@@ -73,6 +73,7 @@ import {
   type ResolveHost,
   ROUTER_QUIET_MS,
   type RunExecutorDeps,
+  reauthorizeStream,
   recheckStream,
   resolveSummaryModel,
   type SandboxDeps,
@@ -371,6 +372,7 @@ export function buildEngine(o: EngineOptions) {
       return target;
     },
     recheck: (stream) => recheckStream(db, stream),
+    reauthorize: (stream, mode) => reauthorizeStream(db, stream, mode),
     onReady: sessions ? (stream) => sessions.ready(stream) : undefined,
     onClosed: (stream) => Promise.all([streamClosed(db, stream), sessions?.closed(stream)]),
     log: o.log,

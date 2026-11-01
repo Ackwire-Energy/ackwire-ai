@@ -639,7 +639,11 @@ async function handleStream(
       if (ctx.paused?.()) throw new RunnerError("paused", PAUSED);
       await ctx.desktops.ensure(agent);
     }
-    await openDesktopStream(ctx.desktops, agent, req.mode, dial);
+    // A switch to control in place (protocol 30) is new work too, as a control stream's open is.
+    await openDesktopStream(ctx.desktops, agent, req.mode, dial, (mode) => {
+      requireTool(ctx, "desktop");
+      if (mode === "control" && ctx.paused?.()) throw new RunnerError("paused", PAUSED);
+    });
   } else if (req.kind === "terminal") {
     requireTool(ctx, "terminal");
     if (!ctx.terminals) throw new RunnerError("terminal_unavailable", "This runner opens no terminals");

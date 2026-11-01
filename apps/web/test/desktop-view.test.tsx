@@ -12,29 +12,46 @@ import { ADA_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState
 import { fakeSockets } from "./fake-socket";
 import { renderPage, screen, settle } from "./render";
 
-/** A person's socket to the screen: the server side closes it with a code. */
+/** A person's socket to the screen: the server side sends frames and closes it with a code. */
 class DesktopSocket {
   binaryType = "blob";
+  readyState = 1;
   closed = false;
   /** A microtask after it was made: what the computer sends first may arrive from then on. */
   late = false;
-  private onClose: ((e: { code: number; reason: string }) => void)[] = [];
+  /** Something listened to its frames in the tick it was made, before anything could arrive on it. */
+  heardOnTime = false;
+  /** What the page sent on it. */
+  sent: unknown[] = [];
+  private listeners = new Map<string, ((e: unknown) => void)[]>();
   constructor(readonly url: string) {
     queueMicrotask(() => {
       this.late = true;
     });
   }
-  addEventListener(type: string, fn: (e: { code: number; reason: string }) => void) {
-    if (type === "close") this.onClose.push(fn);
+  addEventListener(type: string, fn: (e: unknown) => void) {
+    if (type === "message" && !this.late) this.heardOnTime = true;
+    this.listeners.set(type, [...(this.listeners.get(type) ?? []), fn]);
+  }
+  send(data: unknown) {
+    this.sent.push(data);
   }
   close() {
     this.closed = true;
   }
+  /** A frame from the server: text, or the computer's bytes. */
+  serverSends(data: string | Uint8Array) {
+    const frame = typeof data === "string" ? data : data.buffer;
+    for (const fn of this.listeners.get("message") ?? []) fn({ data: frame });
+  }
   serverClose(code: number, reason = "") {
     this.closed = true;
-    for (const fn of this.onClose) fn({ code, reason });
+    for (const fn of this.listeners.get("close") ?? []) fn({ code, reason });
   }
 }
+
+/** The server's word on a socket whose stream changes mode in place (ADR 0058 §17): first, then at each switch. */
+const MODE = (mode: "watch" | "control") => JSON.stringify({ type: "mode", mode });
 
 /** A key event as the log reads it: `keydown a KeyA ctrl`. */
 const keyText = (e: KeyboardEvent) =>
@@ -44,8 +61,9 @@ const keyText = (e: KeyboardEvent) =>
 
 /**
  * noVNC's RFB as the screen drives it: how it was set and what it pasted; `log` holds, in order, the key events
- * replayed on its canvas and the keys it sent (`send Insert down`); `emit` plays its events. Like noVNC, it drops
- * keys and pastes until its connection opens (`emit("connect")`).
+ * replayed on its canvas, the keys it sent (`send Insert down`) and the clicks it sent (`mousedown`); `emit` plays its
+ * events. Like noVNC, it drops keys, clicks and pastes until its connection opens (`emit("connect")`), and clicks
+ * while view-only.
  */
 class FakeRfb {
   static all: FakeRfb[] = [];
@@ -59,17 +77,23 @@ class FakeRfb {
   pasted: string[] = [];
   log: string[] = [];
   connected = false;
-  /** It took its socket in the tick the socket was made, before anything could arrive on it. */
-  readonly onTime: boolean;
+  /** The computer's bytes its socket gave it, as noVNC reads them (`onmessage`). */
+  got: number[][] = [];
   /** Like noVNC, it draws into a canvas of its own inside the screen, and takes its keys there. */
   readonly canvas = document.createElement("canvas");
   private listeners = new Map<string, ((e: Event) => void)[]>();
   constructor(
     readonly el: HTMLElement,
-    readonly ws: DesktopSocket,
+    readonly ws: {
+      onmessage: ((e: MessageEvent) => void) | null;
+      onclose: ((e: CloseEvent) => void) | null;
+      close(): void;
+    },
     readonly options?: { shared?: boolean },
   ) {
-    this.onTime = !ws.late;
+    ws.onmessage = (e) => this.got.push([...new Uint8Array(e.data as ArrayBuffer)]);
+    // Like noVNC, a socket that closes takes its screen off the page.
+    ws.onclose = () => this.canvas.remove();
     FakeRfb.all.push(this);
     this.canvas.width = 1280;
     this.canvas.height = 900;
@@ -78,6 +102,9 @@ class FakeRfb {
         if (this.connected) this.log.push(keyText(e as KeyboardEvent));
       });
     }
+    this.canvas.addEventListener("mousedown", () => {
+      if (this.connected && !this.viewOnly) this.log.push("mousedown");
+    });
     el.appendChild(this.canvas);
   }
   addEventListener(type: string, fn: (e: Event) => void) {
@@ -208,6 +235,8 @@ const WATCHING = "Os programas do computador da Ada veem a tela e tudo o que é 
 const said = () => document.querySelector(".dsk-line > .dsk-said")?.textContent;
 /** The last picture the screen holds over its next connection. */
 const still = () => document.querySelector(".dsk-screen > .dsk-still");
+/** Where a click on the screen lands: a cover over it takes it, a picture held over it lets it through (desktop.css). */
+const clickLandsOn = () => document.querySelector(".dsk-stage > .brw-dim") ?? rfb().canvas;
 const pasteOn = (el: Element, text: string) =>
   act(
     async () =>
@@ -278,8 +307,9 @@ afterEach(() => {
 
 /**
  * What the screen's canvas shows, read back the way the screen reads it (a small copy, off the page): black until
- * `dock()` (its dock on that black, two pixels of the copy) or `picture()` (the wallpaper drawn). The DOM here
- * draws nothing, so that copy's context is this stand-in while it's on; the canvases on the page keep their own.
+ * `dock()` (its dock on that black, two pixels of the copy) or `picture()` (the wallpaper drawn), and again after
+ * `black()` (a new session that hasn't drawn). The DOM here draws nothing, so that copy's context is this stand-in
+ * while it's on; the canvases on the page keep their own.
  */
 function screenPixels() {
   let shows: "black" | "dock" | "picture" = "black";
@@ -303,6 +333,9 @@ function screenPixels() {
     return this.isConnected ? getContext.apply(this, args) : copy;
   } as unknown as typeof proto.getContext;
   return {
+    black: () => {
+      shows = "black";
+    },
     dock: () => {
       shows = "dock";
     },
@@ -321,11 +354,13 @@ describe("the agent's screen in the computer dialog", () => {
     const t = await dialog();
     expect(t.sockets.desktops).toHaveLength(1);
     const ws = t.sockets.desktops[0];
-    expect(ws?.url).toBe(`ws://localhost:3000/api/desktop?orgId=${ORG_ID}&agentId=${ADA_ID}&mode=watch`);
+    // It takes its mode changing in place, where the server and the computer can (ADR 0058 §17).
+    expect(ws?.url).toBe(`ws://localhost:3000/api/desktop?orgId=${ORG_ID}&agentId=${ADA_ID}&switch=1&mode=watch`);
     expect(ws?.binaryType).toBe("arraybuffer");
-    expect(rfb().ws).toBe(ws as DesktopSocket);
-    // The computer speaks first: bytes that reach the socket before noVNC listens are lost.
-    expect(rfb().onTime).toBe(true);
+    // The computer speaks first: bytes that reach the socket before anything listens are lost.
+    expect(ws?.heardOnTime).toBe(true);
+    await act(async () => ws?.serverSends(Uint8Array.of(82, 70, 66)));
+    expect(rfb().got).toEqual([[82, 70, 66]]);
     expect(rfb().options).toEqual({ shared: true });
     expect(rfb()).toMatchObject({
       viewOnly: true,
@@ -370,6 +405,20 @@ describe("the agent's screen in the computer dialog", () => {
       expect(sub()).toBe("Ao vivo · você está assistindo");
       expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
       expect(view().getByRole("button", { name: "Assumir o controle" })).toBeTruthy();
+    } finally {
+      pixels.restore();
+    }
+  });
+
+  test("a picture that comes after noVNC connected lifts the cover within 50 ms: a first click on it isn't held back", async () => {
+    const pixels = screenPixels();
+    try {
+      await dialog();
+      await connected();
+      expect(screen().getByText("Abrindo o computador da Ada…")).toBeTruthy();
+      pixels.picture();
+      await act(() => new Promise((r) => setTimeout(r, 80)));
+      expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
     } finally {
       pixels.restore();
     }
@@ -639,6 +688,150 @@ describe("the agent's screen in the computer dialog", () => {
     expect(still()).not.toBeNull();
     expect(screen().getByText("Assumindo o controle…")).toBeTruthy();
     expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
+  });
+
+  test("a stream that changes mode in place: taking control keeps its socket, the picture frosted until the computer's mark, then noVNC starts again on it in control", async () => {
+    const t = await dialog();
+    const ws = t.sockets.desktops[0] as DesktopSocket;
+    await act(async () => ws.serverSends(MODE("watch")));
+    await connected();
+    const watching = rfb();
+    await click(view().getByRole("button", { name: "Assumir o controle" }));
+    await settle(4);
+    // The server switches this socket's stream: none opens, and the picture is frosted until the switch comes.
+    expect(t.sockets.desktops).toHaveLength(1);
+    expect(ws.closed).toBe(false);
+    expect(rfb()).toBe(watching);
+    expect(screen().getByText("Assumindo o controle…")).toBeTruthy();
+    expect(sub()).toBe("Você no controle · a Ada espera");
+    // The mark: the socket says it took the switch, and noVNC starts again on it in control over the last picture,
+    // with what came after the mark.
+    await act(async () => {
+      ws.serverSends(MODE("control"));
+      ws.serverSends(Uint8Array.of(82, 70, 66));
+    });
+    await settle(4);
+    expect(ws.sent).toEqual([MODE("control")]);
+    expect(rfb()).not.toBe(watching);
+    expect(watching.canvas.isConnected).toBe(false);
+    expect(rfb()).toMatchObject({ viewOnly: false, showDotCursor: true, qualityLevel: 6, got: [[82, 70, 66]] });
+    expect(still()).not.toBeNull();
+    expect(screen().getByText("Assumindo o controle…")).toBeTruthy();
+    await connected();
+    expect(still()).toBeNull();
+    expect(screen().queryByText("Assumindo o controle…")).toBeNull();
+    const field = view().getByRole("textbox", { name: "Digitar no computador da Ada" });
+    expect(document.activeElement).toBe(field);
+    fireEvent.keyDown(field, { key: "b", code: "KeyB" });
+    expect(rfb().log).toEqual(["keydown b KeyB"]);
+    expect(t.sockets.desktops).toHaveLength(1);
+  });
+
+  test("in place, control's first click goes with its first key: the frost lifts as noVNC connects, the last picture kept until control draws", async () => {
+    const pixels = screenPixels();
+    try {
+      const t = await dialog();
+      const ws = t.sockets.desktops[0] as DesktopSocket;
+      await act(async () => ws.serverSends(MODE("watch")));
+      pixels.picture();
+      await connected();
+      await click(view().getByRole("button", { name: "Assumir o controle" }));
+      await act(async () => ws.serverSends(MODE("control")));
+      await settle(4);
+      expect(still()).not.toBeNull();
+      // A new login's first picture is a whole screen: it comes a round trip and more after noVNC connects.
+      pixels.black();
+      await connected();
+      await waitLooks();
+      expect(screen().queryByText("Assumindo o controle…")).toBeNull();
+      expect(still()).not.toBeNull();
+      fireEvent.mouseDown(clickLandsOn());
+      expect(rfb().log).toEqual(["mousedown"]);
+      pixels.picture();
+      await waitLooks();
+      expect(still()).toBeNull();
+    } finally {
+      pixels.restore();
+    }
+  });
+
+  test("in place, handing back: the same socket watches again after the mark, over the last picture, never Abrindo", async () => {
+    const t = await dialog();
+    const ws = t.sockets.desktops[0] as DesktopSocket;
+    await act(async () => ws.serverSends(MODE("watch")));
+    await connected();
+    await click(view().getByRole("button", { name: "Assumir o controle" }));
+    await act(async () => ws.serverSends(MODE("control")));
+    await settle(4);
+    await connected();
+    await click(view().getByRole("button", { name: "Devolver" }));
+    await click(view().getByRole("button", { name: "Devolver" }));
+    await settle(4);
+    await act(async () => ws.serverSends(MODE("watch")));
+    await settle(4);
+    expect(t.sockets.desktops).toHaveLength(1);
+    expect(ws.sent).toEqual([MODE("control"), MODE("watch")]);
+    expect(rfb()).toMatchObject({ viewOnly: true, showDotCursor: false, qualityLevel: 3 });
+    expect(sub()).toBe("Ao vivo · você está assistindo");
+    expect(still()).not.toBeNull();
+    expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();
+    await connected();
+    expect(still()).toBeNull();
+  });
+
+  test("opened while already in control: one socket, in control, kept when its stream says it changes in place", async () => {
+    const b = await backend(RUNNING);
+    const mine = { ...controlOf(ADA_ID, "u-walter"), id: "h-mine" };
+    b.fake.handoffs.set(mine.id, mine);
+    const ada = b.state.agents.find((a) => a.id === ADA_ID) as Agent;
+    await renderPage(<ComputerDialog agent={ada} open onClose={() => undefined} />, {
+      api: b.api,
+      org: true,
+      createSocket: b.sockets.factory,
+    });
+    await settle(8);
+    const ws = b.sockets.desktops[0] as DesktopSocket;
+    await act(async () => ws.serverSends(MODE("control")));
+    await settle(4);
+    expect(b.sockets.desktops).toHaveLength(1);
+    expect(ws.url).toEndWith("&switch=1&mode=control");
+    expect(ws.closed).toBe(false);
+    expect(rfb()).toMatchObject({ viewOnly: false, qualityLevel: 6 });
+  });
+
+  test("in place, a drop after the switch opens the screen again once, in the mode of the moment", async () => {
+    const t = await dialog();
+    const ws = t.sockets.desktops[0] as DesktopSocket;
+    await act(async () => ws.serverSends(MODE("watch")));
+    await connected();
+    await click(view().getByRole("button", { name: "Assumir o controle" }));
+    await act(async () => ws.serverSends(MODE("control")));
+    await settle(4);
+    await connected();
+    await act(async () => ws.serverClose(1006));
+    await act(() => new Promise((r) => setTimeout(r, 1_100)));
+    await settle(6);
+    expect(t.sockets.desktops).toHaveLength(2);
+    expect(t.sockets.desktops[1]?.url).toEndWith("&mode=control");
+    await act(async () => t.sockets.desktops[1]?.serverSends(MODE("control")));
+    await settle(6);
+    expect(t.sockets.desktops).toHaveLength(2);
+    expect(t.sockets.desktops[1]?.closed).toBe(false);
+  });
+
+  test("in place, a switch that never comes: 3 s after the mode changed the screen opens again in the new mode", async () => {
+    const t = await dialog();
+    const ws = t.sockets.desktops[0] as DesktopSocket;
+    await act(async () => ws.serverSends(MODE("watch")));
+    await connected();
+    await click(view().getByRole("button", { name: "Assumir o controle" }));
+    await settle(4);
+    expect(t.sockets.desktops).toHaveLength(1);
+    await act(() => new Promise((r) => setTimeout(r, 3_100)));
+    await settle(4);
+    expect(ws.closed).toBe(true);
+    expect(t.sockets.desktops).toHaveLength(2);
+    expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=control");
   });
 
   test("Take control refused: said in the head, in its line's place, not in a toast over the window's corner", async () => {

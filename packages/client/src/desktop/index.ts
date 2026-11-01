@@ -38,6 +38,9 @@ export type DesktopViewState =
 /** How the panel opens the screen again after a close: at once, after a wait (`desktopRetryMs`), or not by itself. */
 export type DesktopRetry = "now" | "later" | "never";
 
+/** A person's stream of the desktop: watching it, or in control of it. */
+export type DesktopMode = "watch" | "control";
+
 /** Close codes of the viewer sockets; mirrors `STREAM_CLOSE` in packages/adapters/src/machine-protocol.ts. */
 export const DESKTOP_CLOSE = {
   normal: 1000,
@@ -103,7 +106,7 @@ export function desktopStatusState(status: DesktopStatus, userId: string): Deskt
 }
 
 /** Control only while the desktop's own handoff is this person's; the browser's (same window) leaves them watching. */
-export function desktopMode(status: Pick<DesktopStatus, "handoff">, userId: string): "watch" | "control" {
+export function desktopMode(status: Pick<DesktopStatus, "handoff">, userId: string): DesktopMode {
   const h = status.handoff;
   return h?.status === "active" && handoffScreen(h) === "desktop" && h.controllerUserId === userId
     ? "control"
@@ -114,9 +117,26 @@ export function desktopMode(status: Pick<DesktopStatus, "handoff">, userId: stri
 const RETRY_MS = [1000, 2000, 5000, 10_000];
 export const desktopRetryMs = (attempt: number) => RETRY_MS[Math.min(attempt, RETRY_MS.length - 1)] ?? 10_000;
 
-/** A person's socket to the agent's desktop (raw RFB). */
-export function desktopSocketUrl(base: SocketBase, v: { orgId: string; agentId: string; mode: "watch" | "control" }) {
-  return socketUrl(base, "/api/desktop", { orgId: v.orgId, agentId: v.agentId, mode: v.mode });
+/**
+ * A person's socket to the agent's desktop (raw RFB). `switches`: it takes its mode changing in place (ADR 0058 §17),
+ * with `{"type":"mode"}` text frames around each new RFB session (`DesktopLink` in the web app).
+ */
+export function desktopSocketUrl(
+  base: SocketBase,
+  v: { orgId: string; agentId: string; mode: DesktopMode; switches?: boolean },
+) {
+  const params = { orgId: v.orgId, agentId: v.agentId, ...(v.switches ? { switch: 1 } : {}), mode: v.mode };
+  return socketUrl(base, "/api/desktop", params);
+}
+
+/** The mode a desktop socket's text frame names (`{"type":"mode","mode"}`, ADR 0058 §17); null for any other. */
+export function desktopModeFrame(text: string): DesktopMode | null {
+  try {
+    const frame = JSON.parse(text) as { type?: unknown; mode?: unknown };
+    return frame.type === "mode" && (frame.mode === "watch" || frame.mode === "control") ? frame.mode : null;
+  } catch {
+    return null;
+  }
 }
 
 /** The agent's screen as this person sees it; `poll`: ask again this often (nothing else says when it is handed back). */
