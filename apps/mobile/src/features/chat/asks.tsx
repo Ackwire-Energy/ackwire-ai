@@ -10,11 +10,12 @@ import {
   type SecretRequest,
   useApproval,
   useBrowserHandoff,
-  useProposals,
+  useCardProposals,
 } from "@agenteschat/client";
 import { agentProposalOf, proposalStatus } from "@agenteschat/client/lib/action-cards";
 import { timeLeft } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
+import { isOpen, messageProposalCards, proposalTarget, proposerOf } from "@agenteschat/client/lib/proposals";
 import {
   type ComponentRef,
   createContext,
@@ -60,16 +61,7 @@ import {
   timerDelay,
 } from "./ask-store";
 import { LineStop } from "./LiveRows";
-import {
-  approvalIdOf,
-  changeProposalIdsOf,
-  lineStops,
-  markedParts,
-  markName,
-  proposalTarget,
-  questionOf,
-  workingEntries,
-} from "./logic";
+import { approvalIdOf, lineStops, markedParts, markName, questionOf, workingEntries } from "./logic";
 
 /**
  * A request in the conversation (an approval, a secret, a question, help in the agent's browser or on its
@@ -136,7 +128,7 @@ const AskProbe = memo(function AskProbe({ message: m, order }: { message: Messag
   const secret = secretRequestOf(m.meta);
   const handoff = browserHandoffOf(m.meta);
   const proposal = agentProposalOf(m.meta);
-  const changes = changeProposalIdsOf(m.meta);
+  const changes = messageProposalCards(m.meta);
   const asked: PendingAsk | null =
     question?.status === "open"
       ? { id: question.id, kind: "question", agentId: question.agentId, what: question.text, messageId: m.id, order }
@@ -157,8 +149,8 @@ const AskProbe = memo(function AskProbe({ message: m, order }: { message: Messag
       {proposal && m.author.id ? (
         <ProposalProbe card={proposal} agentId={m.author.id} messageId={m.id} order={order} />
       ) : null}
-      {changes.map((id) => (
-        <ChangeProposalProbe key={id} id={id} messageId={m.id} order={order} />
+      {changes.map((ids) => (
+        <ChangeProposalProbe key={ids.join(",")} ids={ids} messageId={m.id} order={order} />
       ))}
     </>
   );
@@ -252,23 +244,28 @@ function ProposalProbe({
   return <Report id={messageId} ask={ask} />;
 }
 
-/** An agent's proposal to change the workspace's context or an agent's instructions: who may decide it, while open. */
-function ChangeProposalProbe({ id, messageId, order }: { id: string; messageId: string; order: number }) {
+/**
+ * A proposal card of the agent's (a change to the context or to agents' instructions, roles or apps, for one agent or
+ * several): one request while any of its rows waits on the person. Its id is the card's (`InstructionProposals`).
+ */
+function ChangeProposalProbe({ ids, messageId, order }: { ids: string[]; messageId: string; order: number }) {
   const { t } = useTranslation();
   const { orgId, org } = useOrg();
   const dir = useDirectory();
-  const p = useProposals(orgId).data?.find((x) => x.id === id);
-  const ask =
-    p && p.status === "pending" && !p.stale && p.canDecide
-      ? {
-          id,
-          kind: "proposal" as const,
-          agentId: p.agentId,
-          what: proposalTarget(t, p, org?.name ?? "", (a) => dir.anyAgent(a)?.name ?? t("channel.unknownAgent")),
-          messageId,
-          order,
-        }
-      : null;
+  const rows = useCardProposals(orgId, ids);
+  const open = rows.find((p) => isOpen(p) && p.canDecide);
+  const id = ids.join(",");
+  const agentName = (a: string) => dir.anyAgent(a)?.name ?? t("channel.unknownAgent");
+  const ask = open
+    ? {
+        id,
+        kind: "proposal" as const,
+        agentId: proposerOf(open),
+        what: proposalTarget(t, open, agentName, org?.name ?? ""),
+        messageId,
+        order,
+      }
+    : null;
   return <Report id={id} ask={ask} />;
 }
 

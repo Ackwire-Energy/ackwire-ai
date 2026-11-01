@@ -87,6 +87,8 @@ export const keys = {
   memoryAboutMe: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "memory", "me"] as const,
   agentForYou: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "for-you"] as const,
   proposals: (orgId: string) => ["org", orgId, "proposals"] as const,
+  /** A chat card's rows (under `proposals`: deciding any refreshes it too). */
+  cardProposals: (orgId: string, ids: string[]) => ["org", orgId, "proposals", "card", ids.join(",")] as const,
   dms: (orgId: string) => ["org", orgId, "dms"] as const,
   dmReads: (orgId: string, channelId: string) => ["org", orgId, "dmReads", channelId] as const,
   storage: (orgId: string) => ["org", orgId, "storage"] as const,

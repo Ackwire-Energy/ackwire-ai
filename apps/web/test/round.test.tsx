@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { modelChoices } from "@agenteschat/client/lib/providers";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { channelNameError, toChannelName } from "@/components/NewChannelDialog";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { proceed, startAs } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";
 
@@ -184,9 +184,18 @@ describe("Detalhes do canal: membros", () => {
     return screen().getByRole("menu");
   };
 
-  test("'⋯' sets how an agent replies, keeping its other channels; remove and add members", async () => {
+  /** Picks "Quando alguém chama" in an open "⋯" menu and returns what the app sent. */
+  const mentionOnly = async (state: ReturnType<typeof seedState>, menu: HTMLElement) => {
+    await click(within(menu).getByRole("menuitemradio", { name: /^Quando alguém chama/ }));
+    await settle(4);
+    return {
+      patch: state.calls.find((c) => c.method === "chat.setAutoReply")?.args,
+      put: state.calls.some((c) => c.method === "agents.setChannels"),
+    };
+  };
+
+  test("'⋯' sets how an agent replies in this channel alone; remove and add members", async () => {
     const state = seedState();
-    state.channelMembers[GENERAL_ID]?.push({ type: "agent", id: ATLAS_ID });
     await go(`c/${ENG_ID}`, state);
     let dialog = await openDetails();
     expect(dialog.textContent).toContain("Entra na conversa por conta própria");
@@ -196,14 +205,8 @@ describe("Detalhes do canal: membros", () => {
         .getByRole("menuitemradio", { name: /^Por conta própria/ })
         .getAttribute("aria-checked"),
     ).toBe("true");
-    await click(within(menu).getByRole("menuitemradio", { name: /^Quando alguém chama/ }));
-    await settle(4);
-    const put = state.calls.find((c) => c.method === "agents.setChannels");
-    expect(put?.args[1]).toBe(ATLAS_ID);
-    expect(put?.args[2]).toEqual([
-      { channelId: ENG_ID, autoReply: false },
-      { channelId: GENERAL_ID, autoReply: true },
-    ]);
+    expect(await mentionOnly(state, menu)).toEqual({ patch: [ORG_ID, ENG_ID, ATLAS_ID, false], put: false });
+    expect(screen().getByRole("dialog", { name: "#eng" }).textContent).toContain("Espera alguém chamar @atlas");
     // Not on my own row; on another, it asks first.
     expect(within(dialog).queryByRole("button", { name: "Opções de Walter" })).toBeNull();
     await click(within(await openMenu("João")).getByRole("menuitem", { name: "Tirar do canal" }));
@@ -246,6 +249,37 @@ describe("Detalhes do canal: membros", () => {
     expect(within(dialog).queryByRole("button", { name: /^Opções de/ })).toBeNull();
     expect(within(dialog).queryByRole("textbox", { name: "Descrição do canal" })).toBeNull();
     expect(dialog.textContent).toContain("Só quem criou o canal e os admins mudam os membros.");
+  });
+
+  test("the channel's creator, not an admin, sets how an agent replies here", async () => {
+    const state = seedState();
+    if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
+    const eng = state.channels.find((c) => c.id === ENG_ID);
+    if (eng) eng.createdByUserId = "u-walter";
+    await go(`c/${ENG_ID}`, state);
+    await openDetails();
+    expect(await mentionOnly(state, await openMenu("Atlas"))).toEqual({
+      patch: [ORG_ID, ENG_ID, ATLAS_ID, false],
+      put: false,
+    });
+  });
+
+  test("an agent's owner sets how it replies here, and nothing else of the channel", async () => {
+    const state = seedState();
+    if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
+    const atlas = state.agents.find((a) => a.id === ATLAS_ID);
+    if (atlas) atlas.ownerUserId = "u-walter";
+    await go(`c/${ENG_ID}`, state);
+    const dialog = await openDetails();
+    expect(
+      within(dialog)
+        .queryAllByRole("button", { name: /^Opções de/ })
+        .map((b) => b.getAttribute("aria-label")),
+    ).toEqual(["Opções de Atlas"]);
+    expect(within(dialog).queryByRole("button", { name: "Adicionar pessoa ou agente" })).toBeNull();
+    const menu = await openMenu("Atlas");
+    expect(within(menu).queryByRole("menuitem", { name: "Tirar do canal" })).toBeNull();
+    expect(await mentionOnly(state, menu)).toEqual({ patch: [ORG_ID, ENG_ID, ATLAS_ID, false], put: false });
   });
 });
 

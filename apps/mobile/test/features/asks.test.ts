@@ -13,7 +13,7 @@ import {
   secretRequestOf,
   timerDelay,
 } from "../../src/features/chat/ask-store";
-import { changeProposalIdsOf, lineStops, workingEntries } from "../../src/features/chat/logic";
+import { lineStops, workingEntries } from "../../src/features/chat/logic";
 
 const ask = (id: string, order: number, over: Partial<PendingAsk> = {}): PendingAsk => ({
   id,
@@ -177,21 +177,6 @@ describe("which messages may ask something", () => {
     expect(mayAsk({ author: agent, meta: { consulted: [] } })).toBe(false);
     expect(mayAsk({ author: agent })).toBe(false);
     expect(mayAsk({ author: { type: "person", id: "u1" }, meta: { approvalId: "a1" } })).toBe(false);
-  });
-
-  test("the change proposals a message carries, its own and among its memory changes, once each", () => {
-    expect(
-      changeProposalIdsOf({
-        proposalId: "p1",
-        memoryUpdates: [
-          { action: "proposed", itemId: "p2", proposalId: "p2", text: "Responder em português" },
-          { action: "remembered", itemId: "i1", text: "Reuniões às segundas" },
-          { action: "proposed", itemId: "p1", proposalId: "p1", text: "Responder em português" },
-        ],
-      }),
-    ).toEqual(["p1", "p2"]);
-    expect(changeProposalIdsOf(undefined)).toEqual([]);
-    expect(changeProposalIdsOf({ memoryUpdates: "p3" })).toEqual([]);
   });
 });
 

@@ -1,9 +1,22 @@
-import type { AgentQuestion, MemoryUpdate, SecretRequest } from "@agenteschat/client";
-import { keys, useDecideProposal, useProposals } from "@agenteschat/client";
+import type { AgentQuestion, MemoryUpdate, Proposal, SecretRequest } from "@agenteschat/client";
+import { keys, useCardProposals, useDecideProposal, useDecideProposals } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import {
+  appLabel,
+  cardHead,
+  cardProposalIds,
+  chosenRows,
+  isOpen,
+  proposalSections,
+  proposalTarget,
+  proposalTitle,
+  proposerOf,
+  rowStatus,
+  staleCount,
+} from "@agenteschat/client/lib/proposals";
 import { MAX_SECRET_BYTES, sealSecret, secretAad } from "@agenteschat/client/lib/secret-box";
-import { Button, Chip, Diff, diffLines, Field, Icon, Input, Textarea } from "@agenteschat/ui";
+import { Button, Chip, Diff, diffLines, Field, Icon, Input, Switch, Textarea } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -13,10 +26,12 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { TYPED_VALUES } from "@/i18n";
 import { useToast } from "@/lib/toast";
 import { useLive, useLiveStore } from "@/realtime/context";
+import { AgentAvatar } from "./AgentAvatar";
 import { SiteIcon } from "./browser/SiteIcon";
 import { useChannelActions } from "./channel-actions";
 import { useOrg } from "./org-context";
 import { RequestCard, RequestTile, useExpired } from "./RequestCard";
+import "./proposals.css";
 
 /** The host of a site the request names (`https://host`), or null. */
 const hostOf = (site: string | null | undefined) => {
@@ -48,7 +63,11 @@ export function MemoryChangeCard({ update, agentId }: { update: MemoryUpdate; ag
       void qc.invalidateQueries({ queryKey: keys.memory(org.id, agentId) });
     },
   });
-  if (update.action === "proposed") return update.proposalId ? <InlineProposal proposalId={update.proposalId} /> : null;
+  if (update.action === "proposed") {
+    const ids = cardProposalIds(update);
+    if (ids.length > 1) return <ProposalGroup proposalIds={ids} />;
+    return ids[0] ? <InlineProposal proposalId={ids[0]} /> : null;
+  }
   const name = dir.anyAgent(agentId)?.name ?? t("channel.unknownAgent");
   const g = agentGrammar(t, name);
 
@@ -87,28 +106,48 @@ export function MemoryChangeCard({ update, agentId }: { update: MemoryUpdate; ag
   );
 }
 
-/** A proposal the agent made in the chat (`message.meta.proposalId`): the Propostas diff with Aceitar / Editar / Recusar. */
+/** What a role or access proposal changes: "Papel: Dev → Revisora", or a chip per app turned on or off. */
+export function SettingChange({ p }: { p: Proposal }) {
+  const { t } = useTranslation();
+  if (p.target.type === "agent_role")
+    return <span className="proposal-change">{t("proposals.roleLine", { from: p.before, to: p.after })}</span>;
+  return (
+    <span className="proposal-change proposal-change--apps">
+      {(p.access ?? []).map((l) => (
+        <Chip key={l.id} icon={l.on ? "plus" : "dash"}>
+          {t(l.on ? "proposals.accessOn" : "proposals.accessOff", { app: appLabel(t, l) })}
+        </Chip>
+      ))}
+    </span>
+  );
+}
+
+export const isText = (p: Proposal) => p.target.type === "agent_instructions" || p.target.type === "org_context";
+
+/**
+ * A proposal the agent made in the chat (`message.meta.proposalId`, or a card of one): the Propostas diff with
+ * Aceitar / Editar / Recusar; a role or an app is taken as proposed, so it has no Editar.
+ */
 export function InlineProposal({ proposalId }: { proposalId: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
-  const proposals = useProposals(org.id);
+  const [p] = useCardProposals(org.id, [proposalId]);
   const decide = useDecideProposal(org.id);
   const toast = useToast();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string | null>(null);
-  const p = proposals.data?.find((x) => x.id === proposalId);
   if (!p) return null;
-  const name = dir.anyAgent(p.agentId)?.name ?? t("channel.unknownAgent");
-  const target =
-    p.target.type === "org_context"
-      ? t("proposals.targetContext", { org: org.name })
-      : t("proposals.targetInstructions", agentGrammar(t, dir.anyAgent(p.target.agentId)?.name ?? name));
+  const agentName = (id: string) => dir.anyAgent(id)?.name ?? t("channel.unknownAgent");
+  const name = agentName(proposerOf(p));
+  const target = proposalTarget(t, p, agentName, org.name);
   const text = draft ?? p.after;
   const pending = p.status === "pending" && !p.stale;
   const onError = (e: unknown) =>
     toast.show(
-      e instanceof Error && "status" in e && e.status === 409 ? t("proposals.staleError") : t("common.unknownError"),
+      e instanceof Error && "status" in e && e.status === 409
+        ? t(isText(p) ? "proposals.staleError" : "proposals.staleErrorAgent")
+        : t("common.unknownError"),
       "error",
     );
   const edited = draft !== null && draft !== p.after;
@@ -121,22 +160,24 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
     />
   );
 
-  // Waiting: a request card, the change behind "Ver a mudança" (edited there before accepting).
+  // Waiting: a request card, the change behind "Ver a mudança" (a text is edited there before accepting).
   if (pending) {
     const before = new Set(p.before.split("\n"));
-    const firstNew = p.after
-      .split("\n")
-      .find((line) => line.trim() && !before.has(line))
-      ?.trim();
+    const firstNew = isText(p)
+      ? p.after
+          .split("\n")
+          .find((line) => line.trim() && !before.has(line))
+          ?.trim()
+      : undefined;
     return (
       <RequestCard
         id={p.id}
         kind="proposal"
-        agent={dir.anyAgent(p.agentId)}
+        agent={dir.anyAgent(proposerOf(p))}
         label={t("inlineProposal.group", { name })}
         mine={p.canDecide}
-        waitingFor={t("proposals.waitingAdmin")}
-        lead={p.title}
+        waitingFor={rowStatus(t, p) ?? undefined}
+        lead={proposalTitle(t, p, org.name, agentName)}
         object={{
           logo: (
             <RequestTile>
@@ -145,38 +186,38 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
           ),
           title: target,
           detail: firstNew,
-          more: t("ask.seeChange"),
+          ...(isText(p) ? { more: t("ask.seeChange") } : {}),
         }}
         details={
-          <>
-            {editing ? (
-              <Field label={t("proposals.finalText")} id={`inline-prop-${p.id}`}>
-                <Textarea rows={6} value={text} onChange={(e) => setDraft(e.target.value)} />
-              </Field>
-            ) : (
-              diff
-            )}
-            <div className="ac-acts">
-              {p.canDecide && (
-                <Button variant="ghost" size="sm" onClick={() => setEditing((v) => !v)}>
-                  {editing ? t("proposals.viewDiff") : t("inlineProposal.edit")}
-                </Button>
+          isText(p) ? (
+            <>
+              {editing ? (
+                <Field label={t("proposals.finalText")} id={`inline-prop-${p.id}`}>
+                  <Textarea rows={6} value={text} onChange={(e) => setDraft(e.target.value)} />
+                </Field>
+              ) : (
+                diff
               )}
-              <Button asChild variant="ghost" size="sm">
-                <Link to="/org/$orgId/proposals" params={{ orgId: org.id }} search={{ agent: p.agentId }}>
-                  {t("inlineProposal.open")}
-                </Link>
-              </Button>
-            </div>
-          </>
+              <div className="ac-acts">
+                {p.canDecide && (
+                  <Button variant="ghost" size="sm" onClick={() => setEditing((v) => !v)}>
+                    {editing ? t("proposals.viewDiff") : t("inlineProposal.edit")}
+                  </Button>
+                )}
+                <ProposalsLink agentId={p.agentId} />
+              </div>
+            </>
+          ) : undefined
         }
+        // A role or an app is short: it shows as it is, with nothing to open.
+        body={isText(p) ? undefined : <SettingChange p={p} />}
         actions={
           p.canDecide ? (
             <>
               <Button
                 variant="primary"
                 size="sm"
-                disabled={decide.isPending || !text.trim()}
+                disabled={decide.isPending || (isText(p) && !text.trim())}
                 loading={decide.isPending && decide.variables?.decision === "accept"}
                 onClick={() =>
                   decide.mutate(
@@ -226,14 +267,165 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
           <Chip icon="close">{t("proposals.refused")}</Chip>
         )}
       </div>
-      <p className="ac-approval__title">{p.title}</p>
-      {diff}
+      <p className="ac-approval__title">{proposalTitle(t, p, org.name, agentName)}</p>
+      {isText(p) ? diff : <SettingChange p={p} />}
       <div className="ac-approval__actions ac-acts">
-        <Button asChild variant="ghost" size="sm">
-          <Link to="/org/$orgId/proposals" params={{ orgId: org.id }} search={{ agent: p.agentId }}>
-            {t("inlineProposal.open")}
-          </Link>
-        </Button>
+        <ProposalsLink agentId={p.agentId} />
+      </div>
+    </div>
+  );
+}
+
+function ProposalsLink({ agentId }: { agentId: string }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  return (
+    <Button asChild variant="ghost" size="sm">
+      <Link to="/org/$orgId/proposals" params={{ orgId: org.id }} search={{ agent: agentId }}>
+        {t("inlineProposal.open")}
+      </Link>
+    </Button>
+  );
+}
+
+/**
+ * One change proposed for several agents (or several changes for one): each change shown once, then a row per
+ * agent and kind of change with its switch, and "Aceitar para todos" / "Aceitar para N" and Recusar on the rows
+ * the viewer may decide and left on. Each row applies on its own, so one that went stale never stops the rest.
+ */
+export function ProposalGroup({ proposalIds }: { proposalIds: string[] }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const rows = useCardProposals(org.id, proposalIds);
+  const decide = useDecideProposals(org.id);
+  const toast = useToast();
+  const [off, setOff] = useState<ReadonlySet<string>>(new Set());
+  const [first] = rows;
+  if (!first) return null;
+  const agentName = (id: string) => dir.anyAgent(id)?.name ?? t("channel.unknownAgent");
+  const proposer = agentName(proposerOf(first));
+  const head = cardHead(t, rows, proposer, agentName, org.name);
+  const agents = new Set(rows.map((p) => p.agentId)).size;
+  const { chosen, all } = chosenRows(rows, off);
+  const decides = rows.some((p) => isOpen(p) && p.canDecide);
+  const toggle = (id: string, on: boolean) =>
+    setOff((prev) => {
+      const next = new Set(prev);
+      if (on) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const run = (decision: "accept" | "refuse") =>
+    decide.mutate(
+      { ids: chosen.map((p) => p.id), decision },
+      {
+        onSuccess: ({ failed }) => {
+          const stale = staleCount(failed);
+          const agentRows = failed.some((f) => rows.find((p) => p.id === f.id && !isText(p)));
+          if (stale > 0)
+            toast.show(t(agentRows ? "proposals.staleSomeAgent" : "proposals.staleSome", { count: stale }), "error");
+          if (failed.length > stale) toast.show(t("common.unknownError"), "error");
+        },
+      },
+    );
+
+  const label = t("inlineProposal.groupMany", { name: proposer, count: agents });
+  const who = <Trans i18nKey={head.key} values={head.values} components={{ b: <b /> }} {...TYPED_VALUES} />;
+  const sections = proposalSections(rows).map((section) => (
+    <div key={section.rows[0]?.id} className="proposal-section">
+      {section.kind === "text" && section.lines.length > 0 && (
+        <Diff
+          aria-label={t("proposals.changeLabel")}
+          addedLabel={t("proposals.added")}
+          removedLabel={t("proposals.removed")}
+          lines={section.lines}
+        />
+      )}
+      <ul className="proposal-rows">
+        {section.rows.map((p) => {
+          const name = p.target.type === "org_context" ? org.name : agentName(p.agentId);
+          const status = rowStatus(t, p);
+          return (
+            <li key={p.id} className="proposal-row">
+              {p.target.type === "org_context" ? (
+                <Icon name="layers" size={20} />
+              ) : (
+                <AgentAvatar agentId={p.agentId} size="sm" name={name} />
+              )}
+              <span className="proposal-row__what">
+                <span className="proposal-row__name">{name}</span>
+                {!isText(p) && <SettingChange p={p} />}
+              </span>
+              {status && <span className="proposal-row__status">{status}</span>}
+              {isOpen(p) && (
+                <Switch
+                  checked={p.canDecide && !off.has(p.id)}
+                  disabled={!p.canDecide || decide.isPending}
+                  onCheckedChange={(on) => toggle(p.id, on)}
+                  aria-label={t("proposals.include", { name })}
+                />
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  ));
+
+  // Waiting: a request card like every other, the rows and their switches above its decision.
+  if (rows.some(isOpen)) {
+    const tt = t as unknown as (key: string, options: Record<string, unknown>) => string;
+    return (
+      <RequestCard
+        id={first.id}
+        kind="proposal"
+        agent={dir.anyAgent(proposerOf(first))}
+        label={label}
+        mine={decides}
+        lead={who}
+        body={sections}
+        actions={
+          <>
+            {decides && (
+              <>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={decide.isPending || chosen.length === 0}
+                  loading={decide.isPending && decide.variables?.decision === "accept"}
+                  onClick={() => run("accept")}
+                >
+                  {all ? t("proposals.acceptAll") : t("proposals.acceptSome", { count: chosen.length })}
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={decide.isPending || chosen.length === 0}
+                  loading={decide.isPending && decide.variables?.decision === "refuse"}
+                  onClick={() => run("refuse")}
+                >
+                  {t("proposals.refuse")}
+                </Button>
+              </>
+            )}
+            <ProposalsLink agentId={first.agentId} />
+          </>
+        }
+        what={tt(head.key, head.values).replace(/<\/?b>/g, "")}
+      />
+    );
+  }
+
+  // Decided, or overtaken by a newer text.
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
+    <div className="ac-approval" role="group" aria-label={label}>
+      <div className="ac-approval__head">
+        <span className="ac-approval__who">{who}</span>
+      </div>
+      {sections}
+      <div className="ac-approval__actions ac-acts">
+        <ProposalsLink agentId={first.agentId} />
       </div>
     </div>
   );

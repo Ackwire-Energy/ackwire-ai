@@ -5,12 +5,10 @@ import type {
   Message,
   MessageConsultation,
   MessagePin,
-  Proposal,
   ReactionCount,
 } from "@agenteschat/client";
 import { agentProposalOf, stretchCardOf } from "@agenteschat/client/lib/action-cards";
 import { type ActivityEntry, barEntries, type barWords } from "@agenteschat/client/lib/activity";
-import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
 import {
   answeredNotices,
@@ -23,7 +21,6 @@ import {
   noticeRoutineName,
 } from "@agenteschat/client/lib/notices";
 import { isRoutineCall, routineReplyOf } from "@agenteschat/client/lib/routines";
-import type { TFunction } from "i18next";
 import { previewOf } from "../shared/logic";
 
 /**
@@ -184,46 +181,6 @@ const obj = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? (
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
 export const approvalIdOf = (meta: Message["meta"]) => str(meta?.approvalId) || null;
-
-/**
- * The changes an agent proposes to the workspace's context or to an agent's instructions, to decide in the
- * conversation: `meta.proposalId`, and the proposals among its memory changes (`meta.memoryUpdates`).
- */
-export function changeProposalIdsOf(meta: Message["meta"]): string[] {
-  const ids = new Set<string>();
-  if (str(meta?.proposalId)) ids.add(str(meta?.proposalId));
-  const updates = meta?.memoryUpdates;
-  if (Array.isArray(updates))
-    for (const u of updates) {
-      const o = obj(u);
-      if (o?.action === "proposed" && str(o.proposalId)) ids.add(str(o.proposalId));
-    }
-  return [...ids];
-}
-
-/** Where a change proposal goes, in the reader's words ("contexto da Acme", "instruções do Theo"). */
-export function proposalTarget(
-  t: TFunction,
-  p: Pick<Proposal, "target">,
-  orgName: string,
-  agentName: (id: string) => string,
-): string {
-  return p.target.type === "org_context"
-    ? t("proposals.targetContext", { org: orgName })
-    : t("proposals.targetInstructions", agentGrammar(t, agentName(p.target.agentId)));
-}
-
-/** A change proposal's title in the reader's language: the server writes it in English (kept if a line is missing). */
-export function proposalTitle(
-  t: TFunction,
-  p: Pick<Proposal, "target" | "title">,
-  orgName: string,
-  agentName: (id: string) => string,
-): string {
-  return p.target.type === "org_context"
-    ? t("proposals.titleContext", { org: orgName, defaultValue: p.title })
-    : t("proposals.titleInstructions", { ...agentGrammar(t, agentName(p.target.agentId)), defaultValue: p.title });
-}
 
 const STATUSES = new Set(["answered", "expired", "failed"]);
 

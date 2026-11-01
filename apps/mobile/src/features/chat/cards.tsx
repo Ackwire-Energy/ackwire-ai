@@ -6,16 +6,12 @@ import {
   useApi,
   useApproval,
   useDecideApproval,
-  useDecideProposal,
-  useProposals,
 } from "@agenteschat/client";
 import { approvalWhy } from "@agenteschat/client/lib/approval-origin";
-import { diffLines } from "@agenteschat/ui/diff";
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { useOrg } from "@/providers/org";
 import { Button, Count, HoldButton, Icon, Text, useToast } from "@/ui";
 import { approvalAction, approvalRisk, approveAlwaysToast } from "../approvals/logic";
 import {
@@ -27,7 +23,6 @@ import {
   approvalTitleText,
   useOriginShort,
 } from "../approvals/parts";
-import { IconTile } from "../connectors/ConnectorIcon";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
@@ -35,9 +30,8 @@ import { genderOf, previewOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
 import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
-import { DiffView } from "../wiki/WikiScreen";
 import { AskButtons, AskCard, AskFoot, ExpiryLine, useAskStore } from "./asks";
-import { proposalTarget, proposalTitle, threadFaces } from "./logic";
+import { threadFaces } from "./logic";
 
 /**
  * The cards inside a message: the agent it consulted, the approval it asks for, an agent's question and a change
@@ -384,119 +378,6 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
             <Button variant="primary" size="card" wide label={t("question.answer")} onPress={write} />
           )}
         </AskFoot>
-      }
-    />
-  );
-}
-
-// ── Change proposal ──────────────────────────────────────────────────────────
-
-/**
- * An agent's proposal to change the workspace's context or an agent's instructions (`meta.proposalId`, or one of
- * its memory changes), as on the web: while it waits, the request card (its title, where it goes in the well, the
- * change as lines added and removed under "Ver a mudança"), Aceitar beside Recusar for who decides; once accepted,
- * refused or overtaken by a newer text, one line. Editing it before accepting is the web's.
- */
-export function ChangeProposalCard({ proposalId }: { proposalId: string }) {
-  const { t } = useTranslation();
-  const { orgId, org } = useOrg();
-  const meId = useMeId();
-  const dir = useDirectory();
-  const c = useColors();
-  const toast = useToast();
-  const surface = useSurface();
-  const when = useWhen();
-  const asks = useAskStore();
-  const decide = useDecideProposal(orgId);
-  const p = useProposals(orgId).data?.find((x) => x.id === proposalId);
-  if (!p) return null;
-  const agentName = (id: string) => dir.anyAgent(id)?.name ?? t("channel.unknownAgent");
-  const title = proposalTitle(t, p, org?.name ?? "", agentName);
-
-  if (p.status !== "pending" || p.stale) {
-    const accepted = p.status === "accepted" && !p.stale;
-    const by = p.decidedBy && p.decidedAt ? { ...p.decidedBy, when: when.short(p.decidedAt) } : null;
-    const outcome = p.stale
-      ? t("proposals.stale")
-      : by
-        ? by.userId === meId
-          ? t(accepted ? "proposals.acceptedByYou" : "proposals.refusedByYou", { when: by.when })
-          : t(accepted ? "proposals.acceptedBy" : "proposals.refusedBy", { name: by.name, when: by.when })
-        : t(accepted ? "proposals.accepted" : "proposals.refused");
-    return (
-      <View style={[styles.done, surface]}>
-        <Icon name={accepted ? "checkc" : p.stale ? "clock" : "x"} size={16} color={accepted ? c.ok : c.muted} />
-        <Text variant="small" tone="muted" style={styles.grow}>
-          {`${title} · ${outcome}`}
-        </Text>
-      </View>
-    );
-  }
-
-  const before = p.before.split("\n");
-  const after = p.after.split("\n");
-  // Under where it goes, the first line it adds (as on the web).
-  const was = new Set(before);
-  const firstNew = after.find((line) => line.trim() && !was.has(line))?.trim() ?? null;
-  const decideAs = (decision: "accept" | "refuse") =>
-    decide.mutate(
-      { id: p.id, decision },
-      {
-        onSuccess: () => {
-          if (decision === "accept") successHaptic();
-          asks?.settle(p.id);
-        },
-        onError: (err) =>
-          toast({
-            title: (err as { status?: number }).status === 409 ? t("proposals.staleError") : t("mobile.app.failed"),
-            icon: "x",
-          }),
-      },
-    );
-  const deciding = decide.isPending ? decide.variables?.decision : undefined;
-  return (
-    <AskCard
-      id={p.id}
-      kind="proposal"
-      agentId={p.agentId}
-      waitsFor={p.canDecide ? "you" : t("proposals.waitingAdmin")}
-      lead={title}
-      well={{
-        tile: <IconTile name="file" size={32} />,
-        title: proposalTarget(t, p, org?.name ?? "", agentName),
-        detail: firstNew,
-        more: { label: t("ask.seeChange"), content: <DiffView prose lines={diffLines(before, after)} /> },
-      }}
-      foot={
-        p.canDecide ? (
-          <AskFoot>
-            <AskButtons
-              primary={
-                <Button
-                  variant="primary"
-                  size="card"
-                  wide
-                  icon="check"
-                  label={t("proposals.accept")}
-                  loading={deciding === "accept"}
-                  disabled={decide.isPending}
-                  onPress={() => decideAs("accept")}
-                />
-              }
-              secondary={
-                <Button
-                  variant="secondary"
-                  size="card"
-                  wide
-                  label={t("proposals.refuse")}
-                  loading={deciding === "refuse"}
-                  disabled={decide.isPending}
-                  onPress={() => decideAs("refuse")}
-                />
-              }
-            />
-          </AskFoot>
-        ) : null
       }
     />
   );

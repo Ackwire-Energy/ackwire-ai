@@ -18,26 +18,28 @@ import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useDeferredValue, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  Text as RNText,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import { Button, EmptyState, fieldText, IconButton, Row, SearchField, SectionHeader, Text, useToast } from "@/ui";
+import {
+  Button,
+  DiffView,
+  EmptyState,
+  fieldText,
+  IconButton,
+  Row,
+  SearchField,
+  SectionHeader,
+  Text,
+  useToast,
+} from "@/ui";
 import { Note } from "../ai/parts";
 import { chatHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
-import { ActionList, copyText, goBack, MONO, PushedHeader, successHaptic, Tile, useSurface } from "../shared/parts";
+import { ActionList, copyText, goBack, PushedHeader, successHaptic, Tile, useSurface } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { foldersIn, searchWiki, wikiHome } from "./logic";
 import { WikiDoc } from "./WikiDoc";
@@ -586,31 +588,6 @@ function BacklinkRow({ link: b, divider }: { link: WikiBacklink; divider: boolea
   }
 }
 
-/** A line diff drawn as the web's: added lines bold on a soft band, removed ones struck through. */
-/** `prose`: words, not code, so no mono (a proposed change to a text). */
-export function DiffView({ lines, prose = false }: { lines: DiffLine[]; prose?: boolean }) {
-  const c = useColors();
-  return (
-    <View style={[styles.diff, { backgroundColor: c.sunken, borderColor: c.line }]}>
-      {lines.map((l, i) => (
-        <RNText
-          // biome-ignore lint/suspicious/noArrayIndexKey: lines are positional
-          key={i}
-          style={[
-            prose ? styles.diffProse : styles.diffLine,
-            { color: l.kind === "del" ? c.faint : c.ink2 },
-            l.kind === "add" && styles.added,
-            l.kind === "del" && styles.removed,
-          ]}
-        >
-          {l.kind === "add" ? "+ " : l.kind === "del" ? "− " : "  "}
-          {l.text || " "}
-        </RNText>
-      ))}
-    </View>
-  );
-}
-
 /**
  * The page's history (the web's dialog as a screen): every version with who made it, at whose request and
  * what changed; a version opens what it changed from the one before.
@@ -842,11 +819,6 @@ const styles = StyleSheet.create({
   note: { paddingTop: 10 },
   body: { paddingTop: 14 },
   diffWrap: { paddingHorizontal: 20, paddingBottom: 12, gap: 6 },
-  diff: { borderRadius: 14, padding: 12, borderWidth: StyleSheet.hairlineWidth },
-  diffLine: { fontFamily: MONO, fontSize: 13, lineHeight: 19 },
-  diffProse: { fontSize: 13, lineHeight: 19 },
-  added: { fontWeight: "600" },
-  removed: { textDecorationLine: "line-through" },
   form: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 40, gap: 8 },
   field: { borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 },
   gapTop: { marginTop: 12 },

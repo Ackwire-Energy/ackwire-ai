@@ -32,6 +32,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { CHROME_MAX_SCALE, Count, Icon, InkOrbit, PixelStopped, PressScale, Text, useTheme, useToast } from "@/ui";
+import { InstructionProposals } from "../agents/InstructionProposalCard";
 import { ProposalCard } from "../agents/ProposalCard";
 import { NoAiCard } from "../ai/NoAiCard";
 import { StretchCard } from "../ai/StretchCard";
@@ -48,13 +49,12 @@ import { tapHaptic } from "../shared/parts";
 import { ReceiptMark } from "./AgentReceipts";
 import { secretRequestOf } from "./ask-store";
 import { ConsultGroup } from "./ConsultGroup";
-import { ApprovalInline, ChangeProposalCard, ConsultationCard, QuestionCard, ThreadLink } from "./cards";
+import { ApprovalInline, ConsultationCard, QuestionCard, ThreadLink } from "./cards";
 import { IssueWorkCard } from "./issue-work";
 import { cacheContinued } from "./live";
 import {
   approvalIdOf,
   artifactsOf,
-  changeProposalIdsOf,
   consultationsOf,
   hidesBody,
   mayStopRun,
@@ -182,7 +182,6 @@ export const MessageRow = memo(function MessageRow({
   // An agent asks a person for a secret for its computer (ADR 0027).
   const secret = isAgent ? secretRequestOf(meta) : null;
   // An agent proposes a change to the workspace's context or to an agent's instructions: decided right here.
-  const changes = isAgent ? changeProposalIdsOf(meta) : [];
   // The agent needs a person in its browser (ADR 0040): the request, live.
   const handoff = isAgent ? browserHandoffOf(meta) : null;
   // Where it browsed, or what it did on its desktop, after the run (as on the web): the steps' card.
@@ -408,7 +407,7 @@ export const MessageRow = memo(function MessageRow({
             message={m}
             runId={m.agentRunId}
             stopped={stopped ?? { byUserId: null, continuedRunId: atLimit?.continuedRunId ?? null }}
-            limit={Boolean(atLimit)}
+            limit={atLimit ? (atLimit.stuck ? "stuck" : "steps") : undefined}
           />
         ) : null}
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
@@ -416,9 +415,7 @@ export const MessageRow = memo(function MessageRow({
         {isAgent ? <NoAiCard message={m} /> : null}
         {isAgent ? <StretchCard message={m} /> : null}
         {isAgent ? <ProposalCard message={m} /> : null}
-        {changes.map((id) => (
-          <ChangeProposalCard key={id} proposalId={id} />
-        ))}
+        {isAgent ? <InstructionProposals message={m} /> : null}
         {files.length > 0 ? <MessageFiles files={files} /> : null}
         {approvalId ? <ApprovalInline approvalId={approvalId} /> : null}
         {handoff ? <HandoffCard handoff={handoff} /> : null}
@@ -477,12 +474,13 @@ function StoppedLine({
   message: m,
   runId,
   stopped,
-  limit = false,
+  limit,
 }: {
   message: Message;
   runId: string;
   stopped: { byUserId: string | null; continuedRunId: string | null };
-  limit?: boolean;
+  /** It ended at its step limit, or because it got stuck: nobody stopped it. */
+  limit?: "steps" | "stuck";
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
@@ -498,7 +496,7 @@ function StoppedLine({
   const continued = useContinuedRun(m.id) ?? stopped.continuedRunId;
   const byMe = Boolean(meId) && stopped.byUserId === meId;
   const by = limit
-    ? t("mobile.chat.stopped.limit")
+    ? t(limit === "stuck" ? "mobile.chat.stopped.stuck" : "mobile.chat.stopped.limit")
     : byMe
       ? t("mobile.chat.stopped.byYou")
       : stopped.byUserId

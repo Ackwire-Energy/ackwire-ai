@@ -527,6 +527,8 @@ export interface ApiClient {
     members(orgId: string, channelId: string): Promise<ChannelMember[]>;
     addMember(orgId: string, channelId: string, member: { userId: string } | { agentId: string }): Promise<void>;
     removeMember(orgId: string, channelId: string, member: { userId: string } | { agentId: string }): Promise<void>;
+    /** "Quando responde" for an agent in this channel (its creator, an admin or the agent's owner). */
+    setAutoReply(orgId: string, channelId: string, agentId: string, autoReply: boolean): Promise<void>;
     messages(
       orgId: string,
       channelId: string,
@@ -717,7 +719,8 @@ export interface ApiClient {
     revert(orgId: string, memoryId: string): Promise<void>;
   };
   proposals: {
-    list(orgId: string): Promise<Proposal[]>;
+    /** The newest 200, pending ones first; with `ids`, only those (a chat card's rows). */
+    list(orgId: string, filter?: { ids?: string[] }): Promise<Proposal[]>;
     accept(orgId: string, proposalId: string, finalText?: string): Promise<Proposal>;
     refuse(orgId: string, proposalId: string): Promise<Proposal>;
   };
