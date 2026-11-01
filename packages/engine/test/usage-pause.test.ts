@@ -402,6 +402,27 @@ test("the budget's wall: the run waits for the next month or a raise, and goes o
   expect((await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).at(-1)?.body).toBe("Feito pela API.");
 });
 
+test("fallen back to the API and out of budget: it looks again when its own plan resets, not next month", async () => {
+  f = await setup({ budgetNanoUsd: 0, reply: () => ({ chunks: ["pela API"] }) });
+  await computerAgent(f);
+  const resetsAt = later(3600_000).toISOString();
+  const { brain } = scripted(() => [
+    { type: "limit", resetsAt },
+    { type: "error", code: "plan_limit", message: "You've hit your session limit", worked: false },
+  ]);
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlersWith(f, brain));
+  const [run] = await runs(f);
+  expect(run?.status).toBe("waiting_input");
+  expect((run?.transcript as { waitingForBrain?: { code: string } } | undefined)?.waitingForBrain?.code).toBe("budget");
+  expect((await resumeJob(f, run?.id ?? ""))?.nextAttemptAt.getTime()).toBe(Date.parse(resetsAt) + RESUME_AFTER_MS);
+  const [note] = await notes(f, "budget_wait");
+  expect(note?.meta.usageWait).toEqual({
+    code: "budget",
+    resetsAt: new Date(nextMonthStart(Date.now())).toISOString(),
+  });
+});
+
 test("other runs' reservations filling the budget: the run looks again in minutes, quietly", async () => {
   f = await setup({ budgetNanoUsd: 1_000_000_000, reply: () => ({ chunks: ["ok"] }) });
   const first = await post(f, "@dev um");

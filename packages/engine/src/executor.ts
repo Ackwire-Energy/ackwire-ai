@@ -361,7 +361,7 @@ export interface Transcript {
    */
   request?: string;
   /** The computer brain couldn't answer and the model brain did (ADR 0032 §5): the reply carries a quiet note. */
-  fallback?: { from: BrainKind; code: string; message: string };
+  fallback?: { from: BrainKind; code: string; message: string; resetsAt?: string };
   /**
    * The computer brain is unavailable and nothing can stand in: the run waits for the computer. A usage wait
    * (`USAGE_WAIT_CODES`: the plan's limit, the agent's budget) has no computer to wait for: `machineId` is empty,
@@ -1645,7 +1645,7 @@ async function executeRunInner(
       mayFallBack(agent, run) &&
       (await deps.gateway.hasModelCredential(thinker).catch(() => false))
     ) {
-      t.fallback = { from, code: u.code, message: u.message };
+      t.fallback = { from, code: u.code, message: u.message, ...(u.resetsAt ? { resetsAt: u.resetsAt } : {}) };
       // On "Automático" the API answers with the model and effort chosen for this run.
       const autoEffort = isAutoModel(agent.model) ? t.autoModel?.effort : undefined;
       plan = {
@@ -1974,6 +1974,13 @@ async function executeRunInner(
       at = now + ladderDelay(wait.step);
       wait.step++;
     }
+    const resetsAt = known ? new Date(at).toISOString() : undefined;
+    // Thinking through the API only because its computer brain couldn't: that brain may be back (its plan reset)
+    // long before the budget renews, and a resume picks it again. The note still says when the budget renews.
+    if (budget && t.fallback && !u.soon) {
+      const brainBack = Date.parse(t.fallback.resetsAt ?? "");
+      at = Math.min(at, brainBack > now ? brainBack : now + ladderDelay(wait.step++));
+    }
     const key = budget
       ? usageWaitKey({ code: "budget", agentId: agent.id })
       : usageWaitKey({ code: "plan_limit", machineId, kind: plan.kind, accountId: plan.account?.id });
@@ -1983,7 +1990,6 @@ async function executeRunInner(
     t.usageWait = wait;
     const cut = t.interruptedTurn?.cause === "plan_limit";
     const name = planName(plan.kind, plan.account?.provider);
-    const resetsAt = known ? new Date(at).toISOString() : undefined;
     // A routine's run waits quietly (Rotinas says so); any other says it once per wait.
     const say = !(run.background || viaRoutine !== null || u.soon) && t.brainNotice !== u.code;
     const note = say
