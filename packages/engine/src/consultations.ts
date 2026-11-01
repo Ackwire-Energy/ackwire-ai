@@ -16,6 +16,7 @@ import {
 } from "@agenteschat/db";
 import { type AiStatusDeps, agentAiState } from "./ai-status";
 import { canTalkTo, talksToAgents } from "./audience";
+import { routineBriefOfRun } from "./background";
 import { stopRun } from "./cancel";
 import { publishDelivery } from "./delivery";
 import { createAgentRuns, startOrJoinRun } from "./dispatch";
@@ -25,7 +26,7 @@ import { cutText } from "./format";
 import type { Judge } from "./judge";
 import { getMessage, insertMessage, type MessageView, withMessageDetails } from "./messages";
 import type { Notice } from "./notices";
-import { personBehindCall } from "./requester";
+import { personBehindCall, routineCreatorOfCall } from "./requester";
 import { deliverNoticeToRun, resumeRunWithResult } from "./run-resume";
 import { isTerminal, replyThreadOf } from "./runs";
 import { refusedAtLimit } from "./stretch";
@@ -58,9 +59,10 @@ type AiCheck = Omit<AiStatusDeps, "db">;
 
 /**
  * Who an agent may ask or tell something: an active agent of the org, not
- * itself, one the person behind the run can talk to, and one with an AI to
- * think with (its run would only fail with `no_ai`, so no answer would come).
- * The asking run comes along: its hop and stretch go on to the other agent.
+ * itself, one the person behind the run (a routine's: its creator) can talk
+ * to, and one with an AI to think with (its run would only fail with `no_ai`,
+ * so no answer would come). The asking run comes along: its hop and stretch
+ * go on to the other agent.
  */
 async function reachableAgent(ctx: ToolContext, input: unknown, ai?: AiCheck) {
   const handle = String(input).trim().replace(/^@/, "").toLowerCase();
@@ -71,7 +73,7 @@ async function reachableAgent(ctx: ToolContext, input: unknown, ai?: AiCheck) {
     .where(and(eq(agents.orgId, ctx.orgId), eq(agents.handle, handle), isNull(agents.archivedAt)));
   if (!target) return { refused: refuse(await noAgentText(ctx, [handle])) };
   if (target.id === ctx.agentId) return { refused: refuse("That is you: answer it yourself.") };
-  const person = await personBehindCall(ctx);
+  const person = (await personBehindCall(ctx)) ?? (await routineCreatorOfCall(ctx));
   if (!canTalkTo(target, person, await talksToAgents(db, ctx.orgId, person))) {
     return {
       refused: refuse(`@${handle} only works with some people, and the person you are helping isn't one of them.`),
@@ -1067,7 +1069,8 @@ async function stopUnwantedRun(deps: { db: Database; pubsub?: PubSub }, orgId: s
 
 /**
  * Where people see a consulted run's cards: the conversation of the run that
- * started the chain of consultations (the agents' DM has no person in it).
+ * started the chain of consultations (the agents' DM has no person in it), or
+ * where the routine reports when a routine's run asked (nobody reads its room).
  * Null when the run isn't answering a consultation.
  */
 export async function consultationOrigin(
@@ -1088,13 +1091,23 @@ export async function consultationOrigin(
     if (!row) break;
     const [asker] = await db
       .select({
+        orgId: agentRuns.orgId,
         channelId: agentRuns.channelId,
         threadRootId: agentRuns.threadRootId,
         triggerMessageId: agentRuns.triggerMessageId,
+        background: agentRuns.background,
       })
       .from(agentRuns)
       .where(eq(agentRuns.id, row.askerRunId));
     if (!asker) break;
+    const report = asker.background ? (await routineBriefOfRun(db, asker))?.deliverTo : undefined;
+    if (report) {
+      return {
+        channelId: report.channelId,
+        threadRootId: report.threadId ?? asker.threadRootId,
+        threadId: report.threadId,
+      };
+    }
     origin = { channelId: asker.channelId, threadRootId: asker.threadRootId, threadId: replyThreadOf(asker) };
     current = row.askerRunId;
   }

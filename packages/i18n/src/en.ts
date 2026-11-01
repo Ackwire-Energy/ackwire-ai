@@ -4120,7 +4120,7 @@ export const en: Translations = {
     access: {
       read: "Only look and tell",
       act: "Can act",
-      hint: "Only look and tell: it reads and reports what it found. To change anything, it asks someone. Can act: it can also create and change tasks, memory, the wiki and Drive files, and work on its own code. Changes in connected apps, merges and deploys always ask for approval first.",
+      hint: "Only look and tell: it reads and reports what it found. To change anything, it asks someone. Can act: it can also create and change tasks, memory, the wiki and Drive files, work on its own code, talk to other agents and post where its creator can. Changes in connected apps, merges and deploys always ask for approval first.",
     },
     report: {
       always: "Every time",
@@ -8080,6 +8080,7 @@ export const en: Translations = {
       tooFrequent: "A routine runs at most every 15 minutes. Pick a longer interval.",
       tooMany: "This agent already has 20 active routines. Pause or delete one first.",
       creatorCannotPost: "Whoever creates the routine must be in the conversation and able to post there.",
+      actTakeOver: "Take the routine over before changing what it does when it can act.",
       takeOverNoAccess: "Join the routine's conversation before taking it over.",
       agentNotInChannel: "Add the agent to the conversation first.",
     },

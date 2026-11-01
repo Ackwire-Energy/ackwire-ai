@@ -7,8 +7,9 @@ import { openPersonAgentDm } from "./dms";
 import { publishMessageCreated } from "./events";
 import { getMessage, insertMessage, MAX_MESSAGE_LENGTH, messageView, unreachedAgents, unreachedNote } from "./messages";
 import { enqueue } from "./outbox";
-import { personBehindCall } from "./requester";
+import { actingRoutineOfCall, personBehindCall } from "./requester";
 import { isRoutineRoomKey } from "./routine-brief";
+import { personCanPost } from "./routine-state";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { withWikiLinks } from "./wiki-links";
 
@@ -25,7 +26,7 @@ const failed = (error: unknown): ToolOutput => ({
   isError: true,
 });
 
-/** Posting where the run already is: a reply. (A routine's run never posts: the run policy refuses it.) */
+/** Posting where the run already is: a reply. */
 const SAME_CONVERSATION = "That is this conversation: just reply.";
 
 /** For matching what someone typed against names: lower case, no accents, no leading @. */
@@ -99,6 +100,9 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
       async execute(input, ctx) {
         try {
           const requester = await personBehindCall(ctx);
+          // A routine set to act posts where its creator can post, as itself: never with their files.
+          const routine = requester ? null : await actingRoutineOfCall(ctx);
+          const creator = routine?.creatorUserId ?? null;
           const name = str(input.channel).trim().replace(/^#/, "").toLowerCase();
           const { channels, channelMembers } = schema;
           const [found] = await ctx.db
@@ -121,8 +125,13 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
                 .where(eq(channelMembers.channelId, channel.id))
             : [];
           // Not in it = not found: never reveal private channels. Nobody behind the run: the agent's own channels.
-          if (!channel || !members.some((m) => (requester ? m.userId === requester : m.agentId === ctx.agentId))) {
-            const who = requester ? "the person who asked is" : "you are";
+          if (
+            !channel ||
+            !(creator
+              ? await personCanPost(ctx.db, ctx.orgId, creator, channel.id)
+              : members.some((m) => (requester ? m.userId === requester : m.agentId === ctx.agentId)))
+          ) {
+            const who = creator ? "this routine's creator can post" : requester ? "the person who asked is" : "you are";
             return { content: `No channel #${name} that ${who} in.`, isError: true };
           }
           if (channel.id === ctx.channelId) return { content: SAME_CONVERSATION, isError: true };
@@ -145,7 +154,11 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
           };
           const files: string[] = [];
           for (const id of ids) {
-            const shared = await shareArtifact(deps.artifacts, actor, ctx.orgId, id, { requesterUserId: requester });
+            // A routine's own files live in its room, which only its run reads.
+            const shared = await shareArtifact(deps.artifacts, actor, ctx.orgId, id, {
+              requesterUserId: requester,
+              alsoFrom: routine ? ctx.channelId : null,
+            });
             files.push(shared.artifact.id);
           }
           const [run] = await ctx.db
@@ -180,6 +193,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
               toChannelId: channel.id,
               requesterUserId: requester,
               artifactIds: files,
+              ...(routine ? { routineId: routine.routineId, creatorUserId: creator } : {}),
             },
           });
           if (deps.pubsub) {
@@ -217,7 +231,10 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
       async execute(input, ctx) {
         try {
           const requester = await personBehindCall(ctx);
-          if (!requester) return { content: "Only a person's request can send a DM.", isError: true };
+          // A routine set to act writes in its creator's DM with the agent, and no one else's.
+          const routine = requester ? null : await actingRoutineOfCall(ctx);
+          const creator = routine?.creatorUserId ?? null;
+          if (!requester && !creator) return { content: "Only a person's request can send a DM.", isError: true };
           const text = str(input.text).trim();
           if (!text) return { content: "Give the text to send.", isError: true };
           const matches = await findMember(ctx, str(input.person));
@@ -229,6 +246,13 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             return { content: `Several people match: ${names}. Ask which one.`, isError: true };
           }
           const to = matches[0] as (typeof matches)[number];
+          if (creator && to.userId !== creator) {
+            return {
+              content:
+                "A routine's background work sends a DM only to the person who set it up. Put what others should hear in hand_off.",
+              isError: true,
+            };
+          }
           const { messages } = schema;
           const [sent] = await ctx.db
             .select({ n: count() })
@@ -275,7 +299,12 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             actor: { type: "agent", id: ctx.agentId },
             action: "message.sent_dm",
             target: { type: "message", id: message.id },
-            details: { toUserId: to.userId, fromChannelId: ctx.channelId, requesterUserId: requester },
+            details: {
+              toUserId: to.userId,
+              fromChannelId: ctx.channelId,
+              requesterUserId: requester,
+              ...(routine ? { routineId: routine.routineId, creatorUserId: creator } : {}),
+            },
           });
           if (deps.pubsub) {
             const [view] = await withWikiLinks(ctx.db, ctx.orgId, [messageView(message)]);

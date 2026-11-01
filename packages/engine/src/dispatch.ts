@@ -4,6 +4,7 @@ import { messageRoot, personOfMessage, runAuthorityById } from "./authority";
 import { dmAgents, isAgentOnlyDm } from "./dms";
 import { getMessage, type Message } from "./messages";
 import { enqueue } from "./outbox";
+import { routineCreatorOf } from "./requester";
 import { holdsMessages } from "./run-hold";
 import { ACTIVE_RUN_STATUSES, queueOnRun } from "./run-inbox";
 import { inChannelRun } from "./run-scope";
@@ -246,9 +247,13 @@ export async function dispatchMentions(
   if (await hopLimitReached(db, message, options.maxHops)) return { runs: [], skipped: "hop_limit" };
 
   // Re-check at dispatch time: the agent may have been archived or removed from the channel since.
-  // An agent asking another one acts for the person behind its run, who must be allowed to talk to it.
+  // An agent asking another one acts for the person behind its run, who must be allowed to talk to it;
+  // a routine set to act wakes only agents its creator can talk to.
+  const requester =
+    (await requesterOf(db, message)) ??
+    (message.agentRunId ? routineCreatorOf(await runAuthorityById(db, message.orgId, message.agentRunId)) : null);
   const eligible = await eligibleChannelAgents(db, message.orgId, message.channelId, candidates, {
-    requesterUserId: await requesterOf(db, message),
+    requesterUserId: requester,
   });
   const runs = await db.transaction((tx) =>
     createAgentRuns(

@@ -1137,6 +1137,18 @@ export async function updateRoutine(
   }
   if (patch.access !== undefined) set.access = routineAccessOf(patch.access);
   if (patch.report !== undefined) set.report = routineReportOf(patch.report);
+  // A routine set to act reaches what its creator reaches (their rooms, the agents they talk to), so
+  // only its creator may decide what it does with that; anyone else takes it over first.
+  const access = set.access ?? current.access;
+  if (
+    actorId !== current.createdByUserId &&
+    access === "act" &&
+    (access !== current.access ||
+      (set.prompt !== undefined && set.prompt !== current.prompt) ||
+      set.agentId !== undefined)
+  ) {
+    throw new ForbiddenError("Take the routine over before setting what it does as it acts", "routine.act_take_over");
+  }
   if (patch.trigger !== undefined) {
     Object.assign(set, await resolveTrigger(deps, actorId, orgId, patch.trigger, current.timezone));
   }

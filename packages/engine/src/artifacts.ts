@@ -957,7 +957,8 @@ export async function shareArtifact(
   actor: Extract<ArtifactActor, { type: "agent" }>,
   orgId: string,
   artifactId: string,
-  input: { requesterUserId: string | null; note?: string | null },
+  /** `alsoFrom`: a conversation the agent's run may take files from on its own (a routine's room). */
+  input: { requesterUserId: string | null; note?: string | null; alsoFrom?: string | null },
 ): Promise<{ artifact: ArtifactView; copied: boolean; from: { channelId: string | null; kind: string | null } }> {
   const { db } = deps;
   const a = await loadArtifact(db, orgId, artifactId);
@@ -973,8 +974,11 @@ export async function shareArtifact(
   if (!openHere) {
     // From a DM or a private channel: the requester and the agent must both be in it.
     const allowed =
-      input.requesterUserId !== null &&
-      (await requesterSharedChannels(db, orgId, actor.agentId, input.requesterUserId)).includes(a.channelId as string);
+      (input.alsoFrom != null && a.channelId === input.alsoFrom) ||
+      (input.requesterUserId !== null &&
+        (await requesterSharedChannels(db, orgId, actor.agentId, input.requesterUserId)).includes(
+          a.channelId as string,
+        ));
     // Not visible = not found: never reveal files of conversations the requester isn't in.
     if (!allowed) throw new NotFoundError("Artifact not found");
   }

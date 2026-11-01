@@ -1,5 +1,6 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, schema, sql } from "@agenteschat/db";
+import { routineBriefOfRun } from "./background";
 import type { ToolResult } from "./brains/types";
 import { deliverNotice, publishDelivery } from "./delivery";
 import type { Message } from "./messages";
@@ -143,14 +144,24 @@ const ACTIVE: AgentRun["status"][] = ["queued", "running", "waiting_approval", "
  * run is still active it reads it at its next step (queued on that run, in
  * its conversation); once it ended (or while it is held by a decision), the notice goes to its conversation and
  * joins the agent's run there or starts one, in the run's stretch: past its limits the run is held for the pause
- * card (ADR 0089), and the notice is still read by the agent's next run there. In the caller's transaction;
+ * card (ADR 0089), and the notice is still read by the agent's next run there. A routine's run that ended hears
+ * it where the routine reports, like its approval cards: nobody reads its room. In the caller's transaction;
  * publish with `publishDelivery` after the commit.
  */
 export async function deliverNoticeToRun(
   tx: Executor,
   run: Pick<
     AgentRun,
-    "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId" | "hop" | "trigger" | "stretchId"
+    | "id"
+    | "orgId"
+    | "agentId"
+    | "channelId"
+    | "threadRootId"
+    | "triggerMessageId"
+    | "hop"
+    | "trigger"
+    | "stretchId"
+    | "background"
   >,
   notice: Notice,
 ): Promise<{ message: Message; runs: AgentRun[] }> {
@@ -162,11 +173,12 @@ export async function deliverNoticeToRun(
   // A run held by a decision (an approval, a secret, a mission's) reads nothing new until it comes: the
   // notice wakes the agent in a run of its own instead.
   const active = Boolean(current && ACTIVE.includes(current.status) && !(await holdsMessages(tx, current)));
+  const report = !active && run.background ? (await routineBriefOfRun(tx, run))?.deliverTo : undefined;
   const delivered = await deliverNotice(tx, {
     orgId: run.orgId,
     agentId: run.agentId,
-    channelId: run.channelId,
-    threadId: replyThreadOf(run),
+    channelId: report?.channelId ?? run.channelId,
+    threadId: report ? report.threadId : replyThreadOf(run),
     hop: run.hop,
     stretchId: runStretchOf(run),
     notice,

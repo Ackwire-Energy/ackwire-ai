@@ -1,6 +1,6 @@
 # 0053. Routines and unattended work: safe and dependable on every brain
 
-- Status: Accepted. Amended 2026-10-30: §3 (one command policy on every path that runs a command on a computer; where a push goes is read with git there). Amended 2026-10-31: §3 (through our git proxy, what it refuses never runs from the computer); by ADR 0089 §9 (a chain stays a person's for 1000 links, each message's root remembered)
+- Status: Accepted. Amended 2026-10-30: §3 (one command policy on every path that runs a command on a computer; where a push goes is read with git there). Amended 2026-10-31: §3 (through our git proxy, what it refuses never runs from the computer), §2 (a routine set to act reaches other agents and posts where its creator can); by ADR 0089 §9 (a chain stays a person's for 1000 links, each message's root remembered)
 - Date: 2026-10-23
 - Builds on: ADR 0032 (one engine, swappable brains), ADR 0034 (agents consult each other), ADR 0037 (agents investigate first, act with undo), the chat-delivery work (background runs, `hand_off`, run inbox)
 - Evaluates: ADRs 0045–0052 and the `feat/agent-runtime` branch (taken where they fit, see the end)
@@ -47,6 +47,17 @@ Only authorship and server-set links are followed (a message's run, a notice's `
 - **Person runs:** unchanged.
 
 The mail taint generalizes: any routine or unattended run that sends mail gets a card.
+
+*Amended 2026-10-31 (routines reach agents):* the owner decided that a routine may post and message without an approval step when the person who set it up asked for it, which is what access `act` says. A routine's own work had no way to reach another agent: a sales agent's routine set to nag a dev agent until its pull request was ready could only hand off, and its run told people the tool to message other agents was down. Now a routine set to act also reaches other agents and posts where its creator can, through the tools any run uses, each holding it to its creator's rooms and agents (`routineCreatorOf` in `requester.ts`):
+
+- **`tell_agent` and `ask_agent`:** only agents its creator can talk to (their audience and `talk_to_agents`, as for a message of theirs), with the consultations' own rules (no cycles, their chain limit, the same note once an hour).
+- **`post_message`:** only in a channel its creator can post in now (`personCanPost`: in the workspace, holding `post`, a member of the channel), and in a private one only when the agent is in it too. Files only from where it posts: never through its creator's access to a DM or a private channel. An @mention there wakes only agents its creator can talk to (`dispatchMentions`).
+- **`send_dm`:** only to its creator, in their DM with the agent.
+- **What stays refused, any access:** reactions, questions to people, reminders, routines (a routine never creates, changes or runs one), forum topics, channels, secrets and permissions. The tools' own approvals hold: a sensitive or outside action asks a person, on a card where the routine reports.
+- **A routine set to only look and tell** keeps its limits: the four tools aren't listed, and a call is refused with why (`routineReachReadOnly`: its creator set it to only look and tell, and a person can set it to act). The routine block says what each level reaches.
+- **Nobody is behind what it starts (§1):** the agent its note, question or mention wakes works `unattended`, and the routine's run never acts as its creator, who stays accountable.
+- **Loops stay held:** what a routine's run starts counts in its stretch (ADR 0089) as work nobody asked for, 10 runs (`STRETCH.unattendedRuns`): its brief, the stretch's first message, counts like its report does. The pause card goes where the routine reports (a refused `tell_agent` or `ask_agent` too, never its room) and is for its creator, who may Continuar. The per-routine limits of §6 hold as they were (one run at a time, at most every 15 minutes, 20 active per agent) and no routine starts another, so two routines nagging each other's agents open one bounded stretch per firing each.
+- **Where answers go:** a note's reply or a question's answer that comes after the routine's run ended goes where the routine reports and wakes the agent there (`deliverNoticeToRun`); while the run still works, it reads it at its next step. A consulted agent's cards for a routine's question go where the routine reports too (`consultationOrigin`).
 
 ### 3. Computer brains follow the same authority
 

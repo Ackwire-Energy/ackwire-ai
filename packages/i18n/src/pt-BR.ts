@@ -4158,7 +4158,7 @@ export const ptBR = {
     access: {
       read: "Só olhar e contar",
       act: "Pode agir",
-      hint: "Só olhar e contar: ela lê e conta o que achou. Para mudar alguma coisa, pede a alguém. Pode agir: também pode criar e mudar tarefas, a memória, a wiki e arquivos do Drive, e trabalhar no próprio código. Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.",
+      hint: "Só olhar e contar: ela lê e conta o que achou. Para mudar alguma coisa, pede a alguém. Pode agir: também pode criar e mudar tarefas, a memória, a wiki e arquivos do Drive, trabalhar no próprio código, falar com outros agentes e postar onde quem a criou posta. Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.",
     },
     report: {
       always: "Toda vez",
@@ -8135,6 +8135,7 @@ export const ptBR = {
       tooFrequent: "Uma rotina roda no máximo a cada 15 minutos. Escolha um intervalo maior.",
       tooMany: "Este agente já tem 20 rotinas ativas. Pause ou apague uma antes.",
       creatorCannotPost: "Quem cria a rotina precisa estar na conversa e poder escrever nela.",
+      actTakeOver: "Assuma a rotina antes de mudar o que ela faz quando pode agir.",
       takeOverNoAccess: "Entre na conversa da rotina antes de assumi-la.",
       agentNotInChannel: "Adicione o agente à conversa antes.",
     },
