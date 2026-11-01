@@ -4,8 +4,10 @@ import {
   approvalCardItems,
   approvalCards,
   approveAllScope,
+  approveAlwaysOn,
   asOfNow,
   cardDeadline,
+  itemOwnWords,
 } from "@agenteschat/client/lib/approval-card";
 import { approvalRuleWords, approvalTitle } from "@agenteschat/client/lib/approval-words";
 import {
@@ -337,6 +339,25 @@ describe("several requests on one card", () => {
     expect(asOfNow(goal("late", { expiresAt: at(-1) }), now).status).toBe("expired");
     expect(cardDeadline(items)).toBe(at(20));
     expect(cardDeadline([goal("done", { status: "refused" })])).toBeNull();
+    // A request's own why and origin show where they differ from the card's lead.
+    const lead = goal("g1", { why: "Pedido do time" });
+    expect(itemOwnWords(goal("g22", { why: "Pedido do time" }), lead)).toEqual({ why: null, origin: null });
+    expect(itemOwnWords(goal("g22", { why: "Branch velha" }), lead).why).toBe("Branch velha");
+    expect(itemOwnWords(goal("g22", { origin: { kind: "unattended" } }), lead).origin?.key).toBe(
+      "approval.originShort.unattended",
+    );
+    expect(itemOwnWords(lead, lead)).toEqual({ why: null, origin: null });
+    // "Aprovar sempre": once per kind, on the first request offering it.
+    const kind = { tool: "goal_upsert", actions: [] };
+    const other = { tool: "branch_delete", actions: [] };
+    expect([
+      ...approveAlwaysOn([
+        goal("g1", { approveAlways: kind, canDecide: true }),
+        goal("g22", { approveAlways: kind, canDecide: true }),
+        goal("g333", { approveAlways: other, canDecide: true }),
+        goal("g4444", { approveAlways: null, canDecide: true }),
+      ]),
+    ]).toEqual(["g1", "g333"]);
     // Aprovações: the card's requests together, one without a card alone.
     expect(approvalCards(list).map((card) => card.map((a) => a.id))).toEqual([
       ["g1", "g22", "g333", "g4444"],

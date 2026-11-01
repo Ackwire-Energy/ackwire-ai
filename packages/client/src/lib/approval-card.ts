@@ -1,4 +1,6 @@
 import type { Approval } from "../api/types";
+import { approveAlwaysOffered } from "./approval-kind";
+import { approvalOriginShort, approvalWhy } from "./approval-origin";
 
 /**
  * The requests on one approval card, oldest first: the card's own (`first`) and every request of the agent
@@ -45,4 +47,27 @@ export function approvalCards(list: readonly Approval[]): Approval[][] {
     else cards.set(key, [a]);
   }
   return [...cards.values()].map((items) => items.sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+}
+
+/**
+ * What a request on a shared card says for itself: its why and where it came from, where they differ from the
+ * card's lead request (one that joined from another turn or run keeps its own explanation).
+ */
+export function itemOwnWords(a: Approval, lead: Approval) {
+  const why = approvalWhy(a);
+  const origin = approvalOriginShort(a);
+  return {
+    why: why && why !== approvalWhy(lead) ? why : null,
+    origin: origin && JSON.stringify(origin) !== JSON.stringify(approvalOriginShort(lead)) ? origin : null,
+  };
+}
+
+/** "Aprovar sempre" on a shared card: once per kind, on the first request where it is offered. */
+export function approveAlwaysOn(items: readonly Approval[]): Set<string> {
+  const kinds = new Map<string, string>();
+  for (const a of items) {
+    const kind = JSON.stringify(a.approveAlways);
+    if (approveAlwaysOffered(a) && !kinds.has(kind)) kinds.set(kind, a.id);
+  }
+  return new Set(kinds.values());
 }

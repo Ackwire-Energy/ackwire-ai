@@ -229,6 +229,47 @@ describe("Canal", () => {
     expect(after.textContent).toContain("Aprovado por você");
   });
 
+  test("a shared card: a joined request keeps its own why, and 'Aprovar sempre' is offered once per kind", async () => {
+    const state = seedState();
+    const [merge] = state.approvals;
+    if (!merge) throw new Error("no approval");
+    const goal = (id: string, month: string, why: string, minutes: number) => ({
+      ...merge,
+      id,
+      tool: "goal_upsert",
+      scope: "",
+      title: "Painel: Goal upsert",
+      detail: `panel.goal_upsert · month=${month}`,
+      connector: "panel",
+      params: { month },
+      why,
+      approveAlways: { tool: "goal_upsert", actions: [] },
+      createdAt: new Date(Date.now() - minutes * 60_000).toISOString(),
+    });
+    state.approvals.splice(
+      0,
+      1,
+      goal("ap-g1", "2026-11", "Pedido do time de vendas.", 4),
+      goal("ap-g2", "2026-12", "Pedido do time de vendas.", 3),
+      goal("ap-g3", "2027-01", "Branch velha, já mergeada.", 2),
+    );
+    const cardMessage = state.messages.find((m) => m.id === "msg-card");
+    if (cardMessage) cardMessage.meta = { ...cardMessage.meta, approvalId: "ap-g1" };
+    await open(state);
+    const card = screen().getByRole("group", { name: "Pedido de aprovação" });
+    const items = [...card.querySelectorAll(".rq__item")] as HTMLElement[];
+    expect(items).toHaveLength(3);
+    // The lead's why is the card's; the one asked for another reason says its own on its line.
+    expect(items[1]?.querySelector(".rq__item-why")).toBeNull();
+    expect(items[2]?.querySelector(".rq__item-why")?.textContent).toBe("Branch velha, já mergeada.");
+    for (const item of items) {
+      const more = within(item).getByRole("button", { name: "Ver detalhes" });
+      await act(async () => fireEvent.click(more));
+    }
+    expect(within(items[0] as HTMLElement).queryByRole("button", { name: /Aprovar sempre/ })).not.toBeNull();
+    expect(within(items[1] as HTMLElement).queryByRole("button", { name: /Aprovar sempre/ })).toBeNull();
+  });
+
   test("a card older than the approvals list reaches still lists all its requests, fetched by the card", async () => {
     const state = seedState();
     const [merge] = state.approvals;

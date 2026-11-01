@@ -10,7 +10,14 @@ import {
   useDecideApproval,
   useDecideApprovals,
 } from "@agenteschat/client";
-import { approvalCardItems, approveAllScope, asOfNow, cardDeadline } from "@agenteschat/client/lib/approval-card";
+import {
+  approvalCardItems,
+  approveAllScope,
+  approveAlwaysOn,
+  asOfNow,
+  cardDeadline,
+  itemOwnWords,
+} from "@agenteschat/client/lib/approval-card";
 import { approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import { approvalSummary, decisionOutcome } from "@agenteschat/client/lib/approval-words";
 import { consultAskedKey } from "@agenteschat/client/lib/consult-group";
@@ -209,6 +216,9 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
   const ownerId = first.ownerUserId ?? dir.agentById.get(first.agentId)?.ownerUserId ?? null;
   const owner = ownerId ? dir.memberById.get(ownerId)?.name : undefined;
   const deadline = cardDeadline(items);
+  const leadItem = waiting[0] ?? first;
+  const always = approveAlwaysOn(items);
+  const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
   const done = (title: string) => {
     successHaptic();
     toast({ title, subtitle: t(`mobile.approval.approvedSub${g}`, { name }), agentId: first.agentId });
@@ -241,7 +251,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
       kind="approval"
       agentId={first.agentId}
       waitsFor={ids.length > 0 ? "you" : owner ? t("ask.waitingFor", { name: owner }) : null}
-      lead={approvalWhy(waiting[0] ?? first) ?? t("approval.askMany", { count: waiting.length })}
+      lead={approvalWhy(leadItem) ?? t("approval.askMany", { count: waiting.length })}
       body={
         <View style={styles.items}>
           {items.map((a) => {
@@ -251,6 +261,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
               : !a.connector
                 ? a.detail
                 : approvalSummary(a, i18n.language) || null;
+            const own = itemOwnWords(a, leadItem);
             return (
               <View key={a.id} style={[styles.item, { backgroundColor: c.sunken }, !pending && styles.itemDone]}>
                 <View style={styles.itemRow}>
@@ -262,6 +273,16 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
                     {detail ? (
                       <Text variant="footnote" tone="muted" numberOfLines={1}>
                         {detail}
+                      </Text>
+                    ) : null}
+                    {own.why ? (
+                      <Text variant="footnote" tone="ink">
+                        {own.why}
+                      </Text>
+                    ) : null}
+                    {own.origin ? (
+                      <Text variant="footnote" tone="muted">
+                        {tt(own.origin.key, own.origin.values)}
                       </Text>
                     ) : null}
                   </View>
@@ -309,6 +330,25 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
                     {decisionOutcome(t, a, meId, (id) => dir.memberById.get(id)?.name)}
                   </Text>
                 )}
+                {always.has(a.id) ? (
+                  <ApproveAlways
+                    approval={a}
+                    name={name}
+                    disabled={one.isPending || all.isPending}
+                    onPress={() =>
+                      one.mutate(
+                        { id: a.id, decision: "approve", always: true },
+                        {
+                          onSuccess: () => {
+                            asks?.settle(a.id);
+                            toast({ ...approveAlwaysToast(t, name), agentId: a.agentId });
+                          },
+                          onError: failed,
+                        },
+                      )
+                    }
+                  />
+                ) : null}
               </View>
             );
           })}

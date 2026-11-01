@@ -1,5 +1,5 @@
 import type { Agent, Approval, Member } from "@agenteschat/client";
-import { approveAllScope, cardDeadline } from "@agenteschat/client/lib/approval-card";
+import { approveAllScope, approveAlwaysOn, cardDeadline, itemOwnWords } from "@agenteschat/client/lib/approval-card";
 import { approveAlwaysOffered } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import { approvalSummary, approvalTitle, decisionOutcome } from "@agenteschat/client/lib/approval-words";
@@ -116,7 +116,9 @@ export function ApprovalGroupAsk({
   const waiting = items.filter((a) => a.status === "pending");
   const mine = waiting.some((a) => a.canDecide);
   const owner = members.get(first.ownerUserId ?? agent?.ownerUserId ?? "");
-  const why = approvalWhy(waiting[0] ?? first);
+  const leadItem = waiting[0] ?? first;
+  const why = approvalWhy(leadItem);
+  const always = approveAlwaysOn(items);
   const deadline = cardDeadline(items);
   const left = deadline ? Math.max(0, new Date(deadline).getTime() - Date.now()) / DAY_MS : 0;
   const partial = approveAllPartial(t, items, owner);
@@ -133,7 +135,14 @@ export function ApprovalGroupAsk({
         <>
           <ul className="rq__items">
             {items.map((a) => (
-              <GroupItem key={a.id} approval={a} agent={agent} members={members} />
+              <GroupItem
+                key={a.id}
+                approval={a}
+                lead={leadItem}
+                always={always.has(a.id)}
+                agent={agent}
+                members={members}
+              />
             ))}
           </ul>
           {partial && <p className="rq__note">{partial}</p>}
@@ -148,13 +157,21 @@ export function ApprovalGroupAsk({
   );
 }
 
-/** One request on a shared card: its values, its own decision while it waits, how it ended once decided. */
+/**
+ * One request on a shared card: its values (and its own why and origin where they differ from the card's lead),
+ * its own decision while it waits ("Aprovar sempre" under "Ver detalhes" on the first of its kind), how it
+ * ended once decided.
+ */
 function GroupItem({
   approval,
+  lead,
+  always,
   agent,
   members,
 }: {
   approval: Approval;
+  lead: Approval;
+  always: boolean;
   agent: Agent | undefined;
   members: Map<string, Member>;
 }) {
@@ -167,6 +184,8 @@ function GroupItem({
     ? [email.to.join(", "), email.subject].filter(Boolean).join(" · ")
     : (approval.connector ? approvalSummary(approval, i18n.language) : approval.detail) || undefined;
   const pending = approval.status === "pending";
+  const own = itemOwnWords(approval, lead);
+  const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
     <li className={pending ? "rq__item" : "rq__item rq__item--done"} data-status={approval.status}>
       <div className="rq__well">
@@ -176,6 +195,8 @@ function GroupItem({
         <span className="rq__wt">
           <b>{approvalTitle(t, approval)}</b>
           {detail && <small>{detail}</small>}
+          {own.why && <small className="rq__item-why">{own.why}</small>}
+          {own.origin && <small className="rq__item-why">{tt(own.origin.key, own.origin.values)}</small>}
         </span>
         {pending ? (
           approval.canDecide &&
@@ -199,6 +220,11 @@ function GroupItem({
       {open && (
         <div className="rq__details">
           <ExactAction approval={approval} />
+          {always && !refusing && (
+            <div className="rq__always">
+              <ApproveAlways approval={approval} agent={agent} />
+            </div>
+          )}
         </div>
       )}
       {refusing && <RefuseBox approval={approval} agent={agent} onCancel={() => setRefusing(false)} />}

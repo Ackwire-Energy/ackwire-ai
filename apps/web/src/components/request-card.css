@@ -384,6 +384,11 @@ html:not([data-pointer]) .rq__more:focus-visible {
   font-size: 12.5px;
   color: var(--muted);
 }
+/* A request's own why, when it differs from the card's lead: read whole. */
+.rq__wt small.rq__item-why {
+  white-space: normal;
+  color: var(--ink2);
+}
 .rq__item--done .rq__wt b {
   color: var(--ink2);
   font-weight: 500;
