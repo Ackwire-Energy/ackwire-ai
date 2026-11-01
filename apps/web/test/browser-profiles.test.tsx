@@ -84,13 +84,17 @@ function withProfiles(as: "owner" | "member" = "owner") {
       p.holder = null;
       return { ...p };
     },
-    open: async (_o, id, url) => log("open", id, url),
+    open: async (_o, id, url) => {
+      log("open", id, url);
+    },
     setDefault: async (_o, agentId, profileId) => {
       log("setDefault", agentId, profileId);
       const s = fakeBrowserOf.get(api)?.settings.get(agentId);
       if (s) fakeBrowserOf.get(api)?.settings.set(agentId, { ...s, profileId });
     },
-    request: async (_o, agentId) => log("request", agentId),
+    request: async (_o, agentId) => {
+      log("request", agentId);
+    },
   };
   return { state, api, machine: m, calls };
 }

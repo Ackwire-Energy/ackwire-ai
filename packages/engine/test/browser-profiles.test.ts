@@ -58,8 +58,9 @@ function fakeHub(state: { machineId: string; orgId: string }) {
         ...s.status,
       };
     },
-    async call(_id, request) {
-      calls.push(request as MachineRequest);
+    async call(_id, sent) {
+      const request = sent as MachineRequest;
+      calls.push(request);
       if (request.op === "browser.batch") {
         return {
           answers: request.commands.map(() => ({ success: true, data: { snapshot: '- button "Send" [ref=e1]' } })),
