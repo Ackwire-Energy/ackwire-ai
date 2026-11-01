@@ -26,6 +26,11 @@ export interface ImportFile {
 
 export type ImportErrorCode = "empty" | "tooLarge" | "unknown" | "newerVersion" | "noAgents" | "unsafe" | "corrupt";
 
+/** An archive the import unpacks (on the web; the phone opens none). */
+export const ARCHIVE_PATH = /\.(zip|tar\.gz|tgz|tar)$/i;
+/** The text files the formats use: the only ones read. */
+export const TEXT_PATH = /\.(md|markdown|json|json5|yaml|yml|txt)$/i;
+
 export class ImportError extends Error {
   constructor(readonly code: ImportErrorCode) {
     super(code);

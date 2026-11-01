@@ -54,8 +54,11 @@ import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { PushedHeader, successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { type FullLook, fullLook } from "./edit";
+import { ImportAgents } from "./ImportAgents";
+import { arrivedAgents, landingOf, reportCounts } from "./import";
 import { LookPicker } from "./LookPicker";
 import { firstBlockedStep, NEW_AGENT_PHONE_STEPS, type PhoneStep, stepBlocked } from "./new-agent";
+import { useAgentImport } from "./useAgentImport";
 
 /**
  * "Criar agente" on the phone, the web's steps for a thumb: Papel (the presets, grouped), Quem é
@@ -69,9 +72,12 @@ import { firstBlockedStep, NEW_AGENT_PHONE_STEPS, type PhoneStep, stepBlocked } 
 export function NewAgentScreen({
   initialWhat = "",
   proposalId = null,
+  startImport = false,
 }: {
   initialWhat?: string;
   proposalId?: string | null;
+  /** Opens on bringing agents from another app (Configurações › Importar e exportar). */
+  startImport?: boolean;
 }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -99,10 +105,18 @@ export function NewAgentScreen({
       </View>
     );
   }
-  return <NewAgentForm initialWhat={initialWhat} from={opened.current ?? undefined} />;
+  return <NewAgentForm initialWhat={initialWhat} from={opened.current ?? undefined} startImport={startImport} />;
 }
 
-function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: AgentProposal }) {
+function NewAgentForm({
+  initialWhat,
+  from,
+  startImport,
+}: {
+  initialWhat: string;
+  from?: AgentProposal;
+  startImport: boolean;
+}) {
   const { t, i18n } = useTranslation();
   const c = useColors();
   const toast = useToast();
@@ -161,6 +175,10 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
     : "";
   const created = useRef(false);
   const denied = useRef(false);
+  // Bringing agents from another app, in place of the role cards (the web's create-agent import step).
+  const imp = useAgentImport(orgId);
+  const [importing, setImporting] = useState(startImport && mayImport && !proposed);
+  const [applyError, setApplyError] = useState<unknown>(null);
   const deny = useDenyAgentProposal(orgId);
 
   const step: PhoneStep = NEW_AGENT_PHONE_STEPS[index] ?? "role";
@@ -322,6 +340,40 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
       setBusy(false);
     }
   };
+  const runImport = async () => {
+    if (busy) return;
+    setBusy(true);
+    setApplyError(null);
+    try {
+      const report = await imp.apply();
+      const ids = arrivedAgents(report);
+      const counts = reportCounts(report, imp.picks.length);
+      created.current = true;
+      successHaptic();
+      const first = report.find((i) => i.kind === "agent" && i.targetId === ids[0]);
+      toast({
+        title: counts.partial
+          ? t("mobile.newAgent.import.partial", counts)
+          : ids.length > 0
+            ? t("mobile.newAgent.import.arrived", { count: ids.length, name: first?.label ?? "" })
+            : t("onboarding.import.report.title"),
+        ...(ids.length === 1 ? { agentId: ids[0] } : {}),
+      });
+      const land = landingOf(ids);
+      if (land.how === "replace") router.replace(land.href as never);
+      else router.dismissTo(land.href as never);
+    } catch (e) {
+      setApplyError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const closeImport = () => {
+    setApplyError(null);
+    if (imp.planned) imp.reset();
+    else setImporting(false);
+    scroll.current?.scrollTo({ y: 0, animated: false });
+  };
   const next = () => {
     if (busy) return;
     if (stepBlocked(step, draft)) {
@@ -356,7 +408,10 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
             size="sm"
             icon="archive"
             label={t("shell.importAgents")}
-            onPress={() => router.push("/settings/import")}
+            onPress={() => {
+              setImporting(true);
+              scroll.current?.scrollTo({ y: 0, animated: false });
+            }}
           />
         ) : null}
         {ROLE_GROUPS.map((group) => (
@@ -635,7 +690,7 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
     <View style={[styles.fill, { backgroundColor: c.bg }]}>
       <PushedHeader
         title={t("newAgent.title")}
-        subtitle={t("newAgent.stepOf", { n: index + 1, total })}
+        subtitle={importing ? undefined : t("newAgent.stepOf", { n: index + 1, total })}
         solid={false}
       />
       <KeyboardAvoidingView behavior="padding" style={styles.fill}>
@@ -645,12 +700,40 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.body}
         >
-          <Steps index={index} total={total} />
-          {views[step]()}
+          {importing ? (
+            <>
+              {head(t("shell.importAgents"), t("onboarding.import.lead"))}
+              <ImportAgents imp={imp} orgId={orgId} applyError={applyError} />
+            </>
+          ) : (
+            <>
+              <Steps index={index} total={total} />
+              {views[step]()}
+            </>
+          )}
         </ScrollView>
         <View style={[styles.footer, { borderTopColor: c.line, paddingBottom: Math.max(insets.bottom, 12) }]}>
-          {index > 0 ? <Button variant="secondary" label={t("common.back")} onPress={() => goTo(index - 1)} /> : null}
-          {step !== "role" || role ? (
+          {importing ? (
+            <>
+              <Button variant="secondary" label={t("common.back")} disabled={busy} onPress={closeImport} />
+              {imp.planned && imp.picks.length > 0 ? (
+                <View style={styles.fill}>
+                  <Button
+                    variant="primary"
+                    wide
+                    label={t("onboarding.import.go", { count: imp.picks.length })}
+                    loading={busy}
+                    disabled={busy}
+                    onPress={() => void runImport()}
+                  />
+                </View>
+              ) : null}
+            </>
+          ) : null}
+          {!importing && index > 0 ? (
+            <Button variant="secondary" label={t("common.back")} onPress={() => goTo(index - 1)} />
+          ) : null}
+          {!importing && (step !== "role" || role) ? (
             <View style={styles.fill}>
               <Button
                 variant="primary"

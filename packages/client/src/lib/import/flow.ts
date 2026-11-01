@@ -200,3 +200,48 @@ export async function applyInChunks(
   }
   return input.pick.flatMap((id) => done.get(id) ?? []);
 }
+
+/** A card's name: the brand, or our own name and "Outro app" in the person's words. */
+export function cardName(t: TFunction, card: ImportCard): string {
+  if (card === "other") return t("onboarding.import.otherName");
+  if (card === "agenteschat") return t("onboarding.import.agenteschatName");
+  if (card === "grok-bot" || card === "chatgpt-dots") {
+    return EXPORT_PROMPT_APPS.find((a) => a.app === card)?.name ?? card;
+  }
+  return SOURCE_NAME[card];
+}
+
+/**
+ * What went wrong reading or planning, and what to do next. `offline` tells a request that never got an answer
+ * (each app knows its own way).
+ */
+export function importFailureText(
+  t: TFunction,
+  { from, step, cause }: ImportFailure,
+  offline: (e: unknown) => boolean,
+) {
+  if (cause === NOT_GITHUB) return t("onboarding.import.errors.notGithub");
+  if (cause instanceof ImportError) {
+    return cause.code === "unknown" && from === "paste"
+      ? t("onboarding.import.errors.unknownPasted")
+      : t(`onboarding.import.errors.${cause.code}`);
+  }
+  const network = step === "plan" || (step === "read" && from === "link");
+  if (network && offline(cause)) return t("onboarding.import.errors.offline");
+  if (cause instanceof ApiError && cause.status === 413) return t("onboarding.import.errors.tooBig");
+  if (cause instanceof ApiError && cause.status === 403) return t("common.notAllowed");
+  if (step === "plan" && cause instanceof ApiError && cause.status === 400) {
+    return t("onboarding.import.errors.invalidBundle");
+  }
+  if (step === "plan") return t("onboarding.import.errors.plan");
+  return from === "link" ? t("onboarding.import.errors.link") : t("onboarding.import.errors.read");
+}
+
+/** Why the apply stopped (what arrived stays: trying again brings the rest). */
+export function importApplyErrorText(t: TFunction, error: unknown, offline: (e: unknown) => boolean) {
+  if (offline(error)) return t("onboarding.import.errors.offline");
+  if (error instanceof ApiError && error.status === 413) return t("onboarding.import.errors.tooBig");
+  if (error instanceof ApiError && error.status === 403) return t("common.notAllowed");
+  if (error instanceof ApiError && error.code === "import.too_many_items") return t("onboarding.import.errors.tooMany");
+  return t("onboarding.import.errors.apply");
+}

@@ -7,7 +7,7 @@ import type {
   ImportSkipReason,
   MigrationBundle,
 } from "@agenteschat/client";
-import { ApiError, keys } from "@agenteschat/client";
+import { keys } from "@agenteschat/client";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { frontmatter } from "@agenteschat/client/lib/import/shared";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -47,27 +47,27 @@ import {
   EXPORT_PROMPT,
   groupLeftOut,
   IMPORT_ACCEPT,
-  ImportError,
   type ImportFile,
   type LeftOutKind,
   type PickedFile,
   parseImport,
   readImportFiles,
-  SOURCE_NAME,
 } from "@/lib/import";
 import {
   applyInChunks,
   blockedItems,
   bundleOrigin,
   CARD_MARK,
+  cardName,
   choosable,
   droppedFiles,
-  EXPORT_PROMPT_APPS,
   githubRoot,
   IMPORT_CARDS,
   IMPORT_KINDS,
   type ImportCard,
   type ImportFailure,
+  importApplyErrorText,
+  importFailureText,
   isGithubLink,
   itemId,
   kindsLine,
@@ -285,32 +285,8 @@ function useFocusOn<T extends HTMLElement>(flow: ImportFlowState, target: Exclud
   return el;
 }
 
-/** What went wrong reading or planning, and what to do next. */
-function failureText(t: TFunction, { from, step, cause }: ImportFailure) {
-  if (cause === NOT_GITHUB) return t("onboarding.import.errors.notGithub");
-  if (cause instanceof ImportError) {
-    return cause.code === "unknown" && from === "paste"
-      ? t("onboarding.import.errors.unknownPasted")
-      : t(`onboarding.import.errors.${cause.code}`);
-  }
-  const network = step === "plan" || (step === "read" && from === "link");
-  if (network && failedOffline(cause)) return t("onboarding.import.errors.offline");
-  if (cause instanceof ApiError && cause.status === 413) return t("onboarding.import.errors.tooBig");
-  if (cause instanceof ApiError && cause.status === 403) return t("common.notAllowed");
-  if (step === "plan" && cause instanceof ApiError && cause.status === 400) {
-    return t("onboarding.import.errors.invalidBundle");
-  }
-  if (step === "plan") return t("onboarding.import.errors.plan");
-  return from === "link" ? t("onboarding.import.errors.link") : t("onboarding.import.errors.read");
-}
-
-function applyErrorText(t: TFunction, error: unknown) {
-  if (failedOffline(error)) return t("onboarding.import.errors.offline");
-  if (error instanceof ApiError && error.status === 413) return t("onboarding.import.errors.tooBig");
-  if (error instanceof ApiError && error.status === 403) return t("common.notAllowed");
-  if (error instanceof ApiError && error.code === "import.too_many_items") return t("onboarding.import.errors.tooMany");
-  return t("onboarding.import.errors.apply");
-}
+const failureText = (t: TFunction, failure: ImportFailure) => importFailureText(t, failure, failedOffline);
+const applyErrorText = (t: TFunction, error: unknown) => importApplyErrorText(t, error, failedOffline);
 
 /** Why an item doesn't come, in plain words (an existing skill or channel says which). */
 function whyText(t: TFunction, kind: ImportItemKind, reason: ImportSkipReason) {
@@ -384,12 +360,6 @@ function Picker({ flow }: { flow: ImportFlowState }) {
     const files = Array.from(list ?? []);
     if (files.length) void flow.read({ files });
   };
-  const cardName = (c: ImportCard) => {
-    if (c === "other") return t("onboarding.import.otherName");
-    if (c === "agenteschat") return t("onboarding.import.agenteschatName");
-    if (c === "grok-bot" || c === "chatgpt-dots") return EXPORT_PROMPT_APPS.find((a) => a.app === c)?.name;
-    return SOURCE_NAME[c];
-  };
 
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: a bigger drop target; the drop zone button and the pickers are the keyboard way
@@ -425,7 +395,7 @@ function Picker({ flow }: { flow: ImportFlowState }) {
             className="imp-source"
           >
             <SourceMark card={c} />
-            <span className="ac-option__title">{cardName(c)}</span>
+            <span className="ac-option__title">{cardName(t, c)}</span>
           </OptionCard>
         ))}
       </div>

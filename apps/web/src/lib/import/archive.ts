@@ -1,9 +1,11 @@
 import {
+  ARCHIVE_PATH,
   IMPORT_MAX_BYTES,
   ImportError,
   type ImportFile,
   isSecretPath,
   normalizePath,
+  TEXT_PATH,
 } from "@agenteschat/client/lib/import/shared";
 import { readZip, ZipError } from "@agenteschat/client/lib/zip";
 
@@ -27,8 +29,6 @@ export const ARCHIVE_LIMITS = {
   text: 32 * 1024 * 1024,
 };
 
-const ARCHIVE = /\.(zip|tar\.gz|tgz|tar)$/i;
-const TEXT = /\.(md|markdown|json|json5|yaml|yml|txt)$/i;
 const JUNK = /(^|\/)(__MACOSX\/|\.DS_Store$|\._[^/]*$|\.git\/|node_modules\/)/;
 /** Folders a format itself has at its root: an archive with only one of them is not wrapped in a folder. */
 const LAYOUT = new Set(["agents", "skills", "memory", "memories", "cron", "tasks", "projects", "teams", "profiles"]);
@@ -44,7 +44,7 @@ export async function readImportFiles(
       : { path: normalizePath(p.webkitRelativePath || p.name), blob: p },
   );
   const [only] = items;
-  if (items.length === 1 && only && ARCHIVE.test(only.path)) return readArchive(only.blob, only.path);
+  if (items.length === 1 && only && ARCHIVE_PATH.test(only.path)) return readArchive(only.blob, only.path);
   const wants = budget();
   const files: ImportFile[] = [];
   for (const { path, blob } of items) {
@@ -67,7 +67,7 @@ async function readArchive(blob: Blob, path: string): Promise<{ files: ImportFil
 function budget() {
   let total = 0;
   return (path: string, size: number) => {
-    if (isSecretPath(path) || !TEXT.test(path) || size > IMPORT_MAX_BYTES || total + size > ARCHIVE_LIMITS.text) {
+    if (isSecretPath(path) || !TEXT_PATH.test(path) || size > IMPORT_MAX_BYTES || total + size > ARCHIVE_LIMITS.text) {
       return false;
     }
     total += size;

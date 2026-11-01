@@ -668,6 +668,34 @@ export const featureKeysEn: FeatureTranslations = {
     leaveText: "The agent you started won't be created.",
     keepGoing: "Keep creating",
     partly: "The agent was created, but part of what its role brings didn't go through. Adjust it on its profile.",
+    import: {
+      where: {
+        openbotrun:
+          "Pick openbot-import.json (from Migrator by OpenBot) or openbot-transfer.json (from the instance transfer). A .zip opens in the Files app first: a tap unzips it.",
+        openmausbot:
+          "In OpenMausBot: right-click the team\u00a0›\u00a0Share team…\u00a0›\u00a0Save file. Then pick that file here.",
+        hermes:
+          "Hermes exports from a terminal (hermes profile export), as a .tar.gz the phone can't open. Import it on the computer, or pick the profile's .md and .yaml files here.",
+        openclaw:
+          "OpenClaw keeps agents in the ~/.openclaw folder on the computer. Pick a workspace's .md files here, or import the whole folder on the computer.",
+        paperclip: "Paste the package's GitHub link below, or pick its COMPANY.md and the other .md files.",
+        agenteschat:
+          "In the other workspace: Settings\u00a0›\u00a0Import and export\u00a0›\u00a0Download the file. Then pick the .json here.",
+      },
+      pick: "Choose files",
+      pasteTitle: "Or paste the other app's reply or a GitHub link",
+      paste: "Paste",
+      read: "Read",
+      copyFailed: "Couldn't copy. Try again.",
+      archive:
+        "The phone doesn't open .zip or .tar.gz files. In the Files app, tap the .zip to unzip it and pick the files inside, or import on the computer.",
+      privacy: "Read on this phone. Key and login files are never opened.",
+      also: "Also comes along",
+      leftOut: "Doesn't come along: {{groups}}",
+      arrived_one: "{{name}} arrived",
+      arrived_other: "{{count}} agents arrived",
+      partial: "{{done}} of {{total}} arrived. Importing again brings the rest.",
+    },
   },
   agent: {
     talk: "Chat",
@@ -1559,8 +1587,6 @@ export const featureKeysEn: FeatureTranslations = {
       toolsHow: "Tap a tool that's on to turn it off. Turning it back on happens only on the computer itself.",
     },
     import: {
-      onComputer:
-        "Bringing agents, skills and channels from another app happens on a computer: open agentes.chat in a browser, in Settings\u00a0›\u00a0Import and export.",
       preparing: "Preparing the file…",
       failed: "Couldn't download the file. Try again.",
     },
