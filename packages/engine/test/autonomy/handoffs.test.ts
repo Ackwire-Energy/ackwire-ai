@@ -118,12 +118,16 @@ scenario("S40", "a renamed agent's old @handle still reaches it", async () => {
       otto: [
         { calls: [{ name: "tell_agent", input: { agent: "@agent-801fab", message: "O deploy é às 18h." } }] },
         { text: "Avisei o Caio." },
+        { text: "O Caio confirmou o deploy às 18h." },
       ],
       caio,
       "agent-801fab": caio,
     },
   });
-  const renamed = await updateAgent(w.db, w.owner.id, w.org.id, w.agents["agent-801fab"]?.id ?? "", { name: "Caio" });
+  const renamed = await updateAgent(w.db, w.owner.id, w.org.id, w.agents["agent-801fab"]?.id ?? "", {
+    name: "Caio",
+    handle: "caio",
+  } as Parameters<typeof updateAgent>[4]);
   expect(renamed.handle).toBe("caio");
   await w.say("@otto avisa o agent-801fab que o deploy é às 18h");
   await w.settle();

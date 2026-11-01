@@ -76,6 +76,7 @@ scenario("S26", "a routine set to only look says who limited it, and its report 
                 input: {
                   question: "Quer que essa rotina passe a corrigir sozinha os erros do checkout?",
                   choices: ["Sim", "Não"],
+                  why: "A rotina só olha: os 3 erros do checkout ficam abertos até alguém corrigir.",
                 },
               },
             ],
@@ -89,7 +90,7 @@ scenario("S26", "a routine set to only look says who limited it, and its report 
   // The run is told who set it to only look (I7), not only that it can't act.
   expect(/What it may do: [^\n]*\bana\b/i.test(background)).toBe(true);
   const asks = (await w.calls("otto")).filter((c) => c.name === "ask_user");
-  expect(asks.map((c) => c.isError)).toEqual([false]);
+  expect(asks.map((c) => [c.isError, c.result])).toEqual([[false, expect.any(String)]]);
   await assertInvariants(w);
 });
 

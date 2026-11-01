@@ -21,7 +21,10 @@ cp -R "$here" "$tmp/packages/engine/test/autonomy"
 lock() { if command -v lockf >/dev/null; then lockf -k /tmp/agentes-heavy.lock "$@"; else "$@"; fi; }
 (cd "$tmp" && lock bun install --frozen-lockfile >/dev/null)
 status=0
+# AUTONOMY_FILES=handoffs,routines runs only those files.
 for f in "$tmp"/packages/engine/test/autonomy/*.test.ts; do
+  name=$(basename "$f" .test.ts)
+  [[ -n "${AUTONOMY_FILES:-}" && ",$AUTONOMY_FILES," != *",$name,"* ]] && continue
   echo "== $(basename "$f")"
   (cd "$tmp" && AUTONOMY_BRANCHES="$branches" lock bun test "$f") || status=1
 done
