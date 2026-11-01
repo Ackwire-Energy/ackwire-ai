@@ -265,6 +265,34 @@ describe("live row in the timeline", () => {
     expect(row().textContent).toContain("O login devolve 401");
   });
 
+  test("under the agent's own message the row keeps its face, waiting and once its words arrive (no jump)", async () => {
+    const { ev } = await open();
+    await ev({
+      type: "message.created",
+      messageId: "m-ada",
+      message: {
+        id: "m-ada",
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "agent", id: ADA_ID },
+        body: "Feito, o deploy subiu.",
+        mentionedAgentIds: [],
+        agentRunId: "r-old",
+        createdAt: new Date().toISOString(),
+      },
+    });
+    await settle(2);
+    await ev({ type: "agent.run", ...ids, status: "running" });
+    await act(() => new Promise((r) => setTimeout(r, 2100)));
+    expect(row().classList.contains("ac-msg--grouped")).toBe(false);
+    expect(row().querySelector(".ac-msg__avatar .ac-avatar")).not.toBeNull();
+    await ev({ type: "agent.delta", ...ids, seq: 0, text: "Também revisei o rollback." });
+    await settle(3);
+    expect(row().classList.contains("ac-msg--grouped")).toBe(false);
+    expect(row().querySelector(".ac-msg__avatar .ac-avatar")).not.toBeNull();
+    expect(row().querySelector(".ac-msg__head")?.textContent).toContain("Ada");
+  });
+
   test("two agents: each has its own waiting row, last; one that answers goes above; the bar says both", async () => {
     const { ev } = await open();
     const atlas = { threadId: null, runId: "r-atlas", agentId: ATLAS_ID };

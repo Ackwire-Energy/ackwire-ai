@@ -124,7 +124,7 @@ import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/cl
 import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@agenteschat/client/lib/threads";
-import { buildTimeline, groupsWith, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
+import { buildTimeline, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
 import { splitCanceled } from "@agenteschat/client/lib/work";
 import {
   AffixInput,
@@ -2362,16 +2362,12 @@ const Timeline = memo(function Timeline({
       ),
     );
   }
-  // The first block at work follows the last message: under the agent's own, it has no header of its own.
-  const lastItem = items.at(-1);
-  const after = lastItem?.kind === "message" && !afterUnshown() ? lastItem.message : null;
-  drawn.forEach((slot, i) => {
+  drawn.forEach((slot) => {
     if (!blockEnters.current.has(slot.key)) blockEnters.current.set(slot.key, ready && Date.now() - mountedAt > 1500);
     rows.push(
       <RunBlock
         key={slot.key}
         runId={slot.runId}
-        after={i === 0 ? after : null}
         grouped={false}
         entering={blockEnters.current.get(slot.key) ?? false}
         modelLabels={modelLabels}
@@ -2453,14 +2449,11 @@ function liveMessageOf(r: LiveRun): MessageType {
 function RunBlock({
   runId,
   message,
-  after,
   grouped,
   ...rest
 }: {
   runId: string;
   message?: MessageType;
-  /** At work: the message right above it (the agent's own groups it, as a saved message would). */
-  after?: Pick<MessageType, "author" | "createdAt"> | null;
   grouped: boolean;
   entering: boolean;
   modelLabels: Map<string, string>;
@@ -2489,9 +2482,9 @@ function RunBlock({
   const shown = message ?? placeholder;
   if (!shown) return null;
   if (live && !message && quiet && !due) return null;
-  const together = message
-    ? grouped
-    : Boolean(placeholder && groupsWith(after, placeholder.author, placeholder.createdAt));
+  // At work it never groups under the agent's own message: it starts as the waiting row with its face, and taking the
+  // face away when the words arrive would move the row. Its saved message groups as any other.
+  const together = message ? grouped : false;
   return (
     <TimelineMessage
       message={shown}
