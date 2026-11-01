@@ -74,25 +74,25 @@ test("a routine set to act tells another agent: it wakes, and its reply reaches 
       if (isRoutine(req))
         return routineTurn(
           req,
-          [{ name: "tell_agent", input: { agent: "@lee", message: "O PR #42 já está pronto? Preciso dele hoje." } }],
-          "Cobrei o Lee sobre o PR #42.",
+          [{ name: "tell_agent", input: { agent: "@iris", message: "O PR #42 já está pronto? Preciso dele hoje." } }],
+          "Cobrei a Iris sobre o PR #42.",
         );
       if (inAgentDm(req)) return { chunks: ["Ainda não: faltam dois testes, termino em 1 hora."] };
-      return { chunks: ["O Lee respondeu: faltam dois testes, termina em 1 hora."] };
+      return { chunks: ["A Iris respondeu: faltam dois testes, termina em 1 hora."] };
     },
   });
-  const lee = await agentIn(f, "Lee", "lee");
-  const routine = await channelRoutine(f, { access: "act", prompt: "Cobre o Lee até o PR #42 ficar pronto." });
+  const iris = await agentIn(f, "Iris", "iris");
+  const routine = await channelRoutine(f, { access: "act", prompt: "Cobre a Iris até o PR #42 ficar pronto." });
   await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);
   await drainOutbox(f.db, f.handlers);
 
   const [brief] = await briefs(f);
   if (!brief) throw new Error("the routine didn't fire");
   const [background, note, told] = await runsOf(f);
-  // The routine's run, Lee's run on the note in the agents' DM, and the agent where the routine reports.
+  // The routine's run, Iris's run on the note in the agents' DM, and the agent where the routine reports.
   expect([background, note, told].map((r) => [r?.agentId, r?.background, r?.hop, r?.status])).toEqual([
     [f.agent.id, true, 1, "done"],
-    [lee.id, false, 2, "done"],
+    [iris.id, false, 2, "done"],
     [f.agent.id, false, 2, "done"],
   ]);
   // All of it in the routine's stretch: what it starts counts against its limits.
@@ -101,7 +101,7 @@ test("a routine set to act tells another agent: it wakes, and its reply reaches 
     .select()
     .from(schema.channels)
     .where(eq(schema.channels.id, note?.channelId ?? ""));
-  expect(dm?.dmKey).toContain(`a:${lee.id}`);
+  expect(dm?.dmKey).toContain(`a:${iris.id}`);
   const [sent] = await messagesIn(f, dm?.id ?? "");
   expect(sent).toMatchObject({
     authorAgentId: f.agent.id,
@@ -109,7 +109,7 @@ test("a routine set to act tells another agent: it wakes, and its reply reaches 
     body: "O PR #42 já está pronto? Preciso dele hoje.",
     meta: { agentNote: { runId: background?.id } },
   });
-  // Lee's reply woke the agent where the routine reports, not in the routine's room (nobody reads it).
+  // Iris's reply woke the agent where the routine reports, not in the routine's room (nobody reads it).
   expect(told?.channelId).toBe(f.general.id);
   const general = await messagesIn(f, f.general.id);
   expect(general.map((m) => [m.authorAgentId, (m.meta.notice as { kind?: string } | undefined)?.kind ?? null])).toEqual(
@@ -118,7 +118,7 @@ test("a routine set to act tells another agent: it wakes, and its reply reaches 
       [f.agent.id, null],
     ],
   );
-  expect(general[0]?.meta.notice).toMatchObject({ from: "@lee", text: expect.stringContaining("faltam dois testes") });
+  expect(general[0]?.meta.notice).toMatchObject({ from: "@iris", text: expect.stringContaining("faltam dois testes") });
   expect((await messagesIn(f, brief.channelId)).map((m) => m.id)).toEqual([brief.id]);
   // Its routine block says what it may reach.
   const asked = f.provider.calls.map((c) => c.request).find(isRoutine);
@@ -137,15 +137,15 @@ test("a routine that only looks and tells can't reach other agents or post, and 
       return routineTurn(
         req,
         [
-          { name: "tell_agent", input: { agent: "@lee", message: "O PR #42 já está pronto?" } },
-          { name: "post_message", input: { channel: "general", text: "@lee o PR #42 já está pronto?" } },
+          { name: "tell_agent", input: { agent: "@iris", message: "O PR #42 já está pronto?" } },
+          { name: "post_message", input: { channel: "general", text: "@iris o PR #42 já está pronto?" } },
         ],
-        "Não consegui cobrar o Lee.",
+        "Não consegui cobrar a Iris.",
       );
     },
   });
-  await agentIn(f, "Lee", "lee");
-  const routine = await channelRoutine(f, { prompt: "Cobre o Lee até o PR #42 ficar pronto." });
+  await agentIn(f, "Iris", "iris");
+  const routine = await channelRoutine(f, { prompt: "Cobre a Iris até o PR #42 ficar pronto." });
   await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);
   await drainOutbox(f.db, f.handlers);
 
@@ -174,26 +174,26 @@ test("a routine posts only where its creator can post, and writes in a DM only t
         return routineTurn(
           req,
           [
-            { name: "post_message", input: { channel: "vendas", text: "@lee o PR #42 já está pronto?" } },
-            { name: "post_message", input: { channel: "dev", text: "@lee o PR #42 já está pronto?" } },
-            { name: "send_dm", input: { person: "bob", text: "O Lee ainda não terminou o PR #42." } },
-            { name: "send_dm", input: { person: "ana", text: "Cobrei o Lee no #dev sobre o PR #42." } },
+            { name: "post_message", input: { channel: "vendas", text: "@iris o PR #42 já está pronto?" } },
+            { name: "post_message", input: { channel: "dev", text: "@iris o PR #42 já está pronto?" } },
+            { name: "send_dm", input: { person: "bob", text: "A Iris ainda não terminou o PR #42." } },
+            { name: "send_dm", input: { person: "ana", text: "Cobrei a Iris no #dev sobre o PR #42." } },
           ],
-          "Cobrei o Lee no #dev.",
+          "Cobrei a Iris no #dev.",
         );
       }
       return { chunks: ["Ainda não: faltam dois testes."] };
     },
   });
-  const lee = await agentIn(f, "Lee", "lee");
-  // Lee answers only Ana, its owner: her routine's @mention wakes it.
-  await f.db.update(schema.agents).set({ audienceMode: "owner" }).where(eq(schema.agents.id, lee.id));
+  const iris = await agentIn(f, "Iris", "iris");
+  // Iris answers only Ana, its owner: her routine's @mention wakes it.
+  await f.db.update(schema.agents).set({ audienceMode: "owner" }).where(eq(schema.agents.id, iris.id));
   const bob = await addMember(f.db, f.org.id, "member", "bob");
-  // #dev: Ana and Lee are in it. #vendas: Bob's, Ana isn't in it.
+  // #dev: Ana and Iris are in it. #vendas: Bob's, Ana isn't in it.
   const dev = await createChannel(f.db, f.owner.id, f.org.id, { name: "dev" });
-  await addChannelMember(f.db, f.owner.id, f.org.id, dev.id, { agentId: lee.id });
+  await addChannelMember(f.db, f.owner.id, f.org.id, dev.id, { agentId: iris.id });
   const vendas = await createChannel(f.db, bob.id, f.org.id, { name: "vendas" });
-  const routine = await channelRoutine(f, { access: "act", prompt: "Cobre o Lee até o PR #42 ficar pronto." });
+  const routine = await channelRoutine(f, { access: "act", prompt: "Cobre a Iris até o PR #42 ficar pronto." });
   await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);
   await drainOutbox(f.db, f.handlers);
 
@@ -203,14 +203,14 @@ test("a routine posts only where its creator can post, and writes in a DM only t
   const [background, woken] = await runsOf(f);
   const posted = await messagesIn(f, dev.id);
   expect(posted.map((m) => [m.authorAgentId, m.body])).toEqual([
-    [f.agent.id, "@lee o PR #42 já está pronto?"],
-    [lee.id, "Ainda não: faltam dois testes."],
+    [f.agent.id, "@iris o PR #42 já está pronto?"],
+    [iris.id, "Ainda não: faltam dois testes."],
   ]);
-  expect(posted[0]).toMatchObject({ agentRunId: background?.id, hop: 1, mentionedAgentIds: [lee.id] });
-  expect(woken).toMatchObject({ agentId: lee.id, channelId: dev.id, hop: 2, stretchId: background?.stretchId });
+  expect(posted[0]).toMatchObject({ agentRunId: background?.id, hop: 1, mentionedAgentIds: [iris.id] });
+  expect(woken).toMatchObject({ agentId: iris.id, channelId: dev.id, hop: 2, stretchId: background?.stretchId });
   // Its creator's DM with the agent, and nobody else's.
   const anaDm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
-  expect((await messagesIn(f, anaDm.id)).map((m) => m.body)).toEqual(["Cobrei o Lee no #dev sobre o PR #42."]);
+  expect((await messagesIn(f, anaDm.id)).map((m) => m.body)).toEqual(["Cobrei a Iris no #dev sobre o PR #42."]);
   const bobDms = (await f.db.select().from(schema.channelMembers)).filter((m) => m.userId === bob.id);
   expect(bobDms.map((m) => m.channelId)).toEqual([vendas.id]);
 });
@@ -225,33 +225,33 @@ test("a routine wakes only agents its creator can talk to", async () => {
       if (seen(req).includes("tool_result")) results.push(seen(req));
       return routineTurn(
         req,
-        [{ name: "tell_agent", input: { agent: "@lee", message: "O PR #42 já está pronto?" } }],
+        [{ name: "tell_agent", input: { agent: "@iris", message: "O PR #42 já está pronto?" } }],
         "ok",
       );
     },
   });
-  const lee = await agentIn(f, "Lee", "lee");
+  const iris = await agentIn(f, "Iris", "iris");
   const bob = await addMember(f.db, f.org.id, "member", "bob");
-  // Lee works only with Bob, its owner.
+  // Iris works only with Bob, its owner.
   await f.db
     .update(schema.agents)
     .set({ ownerUserId: bob.id, audienceMode: "owner" })
-    .where(eq(schema.agents.id, lee.id));
-  const routine = await channelRoutine(f, { access: "act", prompt: "Cobre o Lee até o PR #42 ficar pronto." });
+    .where(eq(schema.agents.id, iris.id));
+  const routine = await channelRoutine(f, { access: "act", prompt: "Cobre a Iris até o PR #42 ficar pronto." });
   await fire(f, routine.id, new Date(Date.now() - 60_000));
   await drainOutbox(f.db, f.handlers);
-  expect(results[0]).toContain("@lee only works with some people");
-  expect((await runsOf(f)).filter((r) => r.agentId === lee.id)).toEqual([]);
+  expect(results[0]).toContain("@iris only works with some people");
+  expect((await runsOf(f)).filter((r) => r.agentId === iris.id)).toEqual([]);
 
-  // Bob lets Ana talk to Lee: her routine reaches it.
+  // Bob lets Ana talk to Iris: her routine reaches it.
   await f.db
     .update(schema.agents)
     .set({ audienceMode: "people", audienceUserIds: [f.owner.id] })
-    .where(eq(schema.agents.id, lee.id));
+    .where(eq(schema.agents.id, iris.id));
   await fire(f, routine.id, new Date());
   await drainOutbox(f.db, f.handlers);
-  expect(results[1]).toContain("Told @lee");
-  expect((await runsOf(f)).filter((r) => r.agentId === lee.id).map((r) => r.status)).toEqual(["done"]);
+  expect(results[1]).toContain("Told @iris");
+  expect((await runsOf(f)).filter((r) => r.agentId === iris.id).map((r) => r.status)).toEqual(["done"]);
 });
 
 test("a consulted agent's approval for a routine's question shows where the routine reports", async () => {
@@ -269,39 +269,41 @@ test("a consulted agent's approval for a routine's question shows where the rout
           [
             {
               name: "ask_agent",
-              input: { agent: "@lee", question: "Pode fechar o PR #42, que foi trocado pelo #57?" },
+              input: { agent: "@iris", question: "Pode fechar o PR #42, que foi trocado pelo #57?" },
             },
           ],
-          "Pedi ao Lee para fechar o PR #42.",
+          "Pedi à Iris para fechar o PR #42.",
         );
       return seen(req).includes("tool_result")
         ? { chunks: ["Fechado."] }
         : { chunks: [], toolUses: [{ name: "github_close_pr", input: { repo: "acme/app", pr: 42, why: WHY } }] };
     },
   });
-  const lee = await agentIn(f, "Lee", "lee");
-  await grantScopes(f.db, f.org.id, lee.id, [{ connectionId: null, scope: "github:pr.write" }]);
+  const iris = await agentIn(f, "Iris", "iris");
+  await grantScopes(f.db, f.org.id, iris.id, [{ connectionId: null, scope: "github:pr.write" }]);
   const routine = await channelRoutine(f, { access: "act", prompt: "Cuide da fila de PRs." });
   await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);
   await drainOutbox(f.db, f.handlers);
 
   const [approval] = await f.db.select().from(schema.approvals);
-  expect(approval).toMatchObject({ agentId: lee.id, channelId: f.general.id, status: "pending", why: WHY });
+  expect(approval).toMatchObject({ agentId: iris.id, channelId: f.general.id, status: "pending", why: WHY });
   const card = (await messagesIn(f, f.general.id)).find((m) => m.meta.approvalId === approval?.id);
-  expect(card).toMatchObject({ authorAgentId: lee.id, threadId: null });
+  expect(card).toMatchObject({ authorAgentId: iris.id, threadId: null });
   expect(github.executed).toEqual([]);
 });
 
-/** Lee and Dev hand the work back to each other forever. */
+/** Iris and Dev hand the work back to each other forever. */
 const pingPong = (req: ModelRequest) => {
   if (req.outputSchema) return NO_ROUTE;
   if (isRoutine(req))
     return routineTurn(
       req,
-      [{ name: "post_message", input: { channel: "dev", text: "@lee o PR #42 já está pronto?" } }],
-      "Cobrei o Lee.",
+      [{ name: "post_message", input: { channel: "dev", text: "@iris o PR #42 já está pronto?" } }],
+      "Cobrei a Iris.",
     );
-  return { chunks: [isFor(req, "Lee", "lee") ? "@dev ainda não: revisa os testes?" : "@lee revisei: corrige o lint?"] };
+  return {
+    chunks: [isFor(req, "Iris", "iris") ? "@dev ainda não: revisa os testes?" : "@iris revisei: corrige o lint?"],
+  };
 };
 
 test("loops stay held: agents a routine's post set off stop at the limit of work nobody asked for, with one card for its creator", async () => {
@@ -311,10 +313,10 @@ test("loops stay held: agents a routine's post set off stop at the limit of work
     judge: (kind) => (kind === "mention_handoff" ? 0.9 : undefined),
     reply: pingPong,
   });
-  const lee = await agentIn(f, "Lee", "lee");
+  const iris = await agentIn(f, "Iris", "iris");
   const dev = await createChannel(f.db, f.owner.id, f.org.id, { name: "dev" });
-  for (const agentId of [lee.id, f.agent.id]) await addChannelMember(f.db, f.owner.id, f.org.id, dev.id, { agentId });
-  const routine = await channelRoutine(f, { access: "act", prompt: "Cobre o Lee até o PR #42 ficar pronto." });
+  for (const agentId of [iris.id, f.agent.id]) await addChannelMember(f.db, f.owner.id, f.org.id, dev.id, { agentId });
+  const routine = await channelRoutine(f, { access: "act", prompt: "Cobre a Iris até o PR #42 ficar pronto." });
   await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);
   await drainOutbox(f.db, f.handlers, { maxBatches: 2000 });
 
@@ -344,13 +346,13 @@ test("a routine's tell_agent at the limit is refused, and the card goes where th
       if (seen(req).includes("tool_result")) results.push(seen(req));
       return routineTurn(
         req,
-        [{ name: "tell_agent", input: { agent: "@lee", message: "O PR #42 já está pronto?" } }],
+        [{ name: "tell_agent", input: { agent: "@iris", message: "O PR #42 já está pronto?" } }],
         "ok",
       );
     },
   });
-  const lee = await agentIn(f, "Lee", "lee");
-  const routine = await channelRoutine(f, { access: "act", prompt: "Cobre o Lee até o PR #42 ficar pronto." });
+  const iris = await agentIn(f, "Iris", "iris");
+  const routine = await channelRoutine(f, { access: "act", prompt: "Cobre a Iris até o PR #42 ficar pronto." });
   await fire(f, routine.id, new Date());
   const [brief] = await briefs(f);
   if (!brief) throw new Error("the routine didn't fire");
@@ -358,7 +360,7 @@ test("a routine's tell_agent at the limit is refused, and the card goes where th
   await f.db.insert(schema.agentRuns).values(
     Array.from({ length: STRETCH.unattendedRuns }, () => ({
       orgId: f.org.id,
-      agentId: lee.id,
+      agentId: iris.id,
       channelId: f.general.id,
       threadRootId: brief.id,
       triggerMessageId: Bun.randomUUIDv7(),
@@ -374,5 +376,5 @@ test("a routine's tell_agent at the limit is refused, and the card goes where th
   const [card] = await cardsOf(f);
   expect(card?.channelId).toBe(f.general.id);
   expect(card?.meta.actionCard).toMatchObject({ limit: STRETCH.unattendedRuns, forUserId: f.owner.id });
-  expect((await runsOf(f)).filter((r) => r.agentId === lee.id && r.status !== "done")).toEqual([]);
+  expect((await runsOf(f)).filter((r) => r.agentId === iris.id && r.status !== "done")).toEqual([]);
 });
