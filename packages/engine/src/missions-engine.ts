@@ -4,8 +4,8 @@ import type { BrainKind, BrainSession, BrainTurn, ToolResult } from "./brains/ty
 import { abortLocalRun, RUN_CANCEL_TOPIC } from "./cancel";
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import type { RunIdentity } from "./executor";
-import { cutText } from "./format";
 import { wakesLater } from "./follow-through";
+import { cutText } from "./format";
 import { insertMessage, messageView } from "./messages";
 import { MISSION_LIMITS } from "./mission-limits";
 import { enqueueRunJob } from "./mission-runs";
@@ -30,6 +30,7 @@ import { enqueue } from "./outbox";
 import { resumeRunWithResult } from "./run-resume";
 import { revokeRunToolTokens } from "./run-tool-tokens";
 import { isTerminal, type RunStatus, transitionRun } from "./runs";
+import { pauseStretch, runStretchOf, stretchStop } from "./stretch";
 
 const {
   missions,
@@ -75,6 +76,8 @@ export interface MissionRunStart
   triggerMessageId: string;
   /** Hop of the notice (the mission's own wake-ups are 0, so their runs are hop 1). */
   hop: number;
+  /** The notice's stretch (ADR 0089), when its run counts toward one (`TellOptions.stretchId`). */
+  stretchId?: string | null;
   brain: BrainKind;
   missionId: string;
   /** The person behind it (audience and acting rights), or null for the mission's own notices. */
@@ -219,6 +222,8 @@ export interface TellOptions {
   resume?: NonNullable<ToolResult["pause"]>;
   /** A new main session (planning after a proposal or a new brain): its first turn starts it. */
   freshSession?: boolean;
+  /** The stretch the wake-up counts in (its run at hop 2, as agents' own wake-ups are): none, it counts in none. */
+  stretchId?: string;
 }
 
 /** The latest run of the agent in the thread that waits for a person (approval or input). */
@@ -308,7 +313,13 @@ export async function tellMainSession(
       orgId: fresh.orgId,
       channelId: fresh.channelId,
       threadId: fresh.threadRootId,
-      author: { type: "agent", agentId: fresh.agentId, runId: null, hop: 0, stretchId: null },
+      author: {
+        type: "agent",
+        agentId: fresh.agentId,
+        runId: null,
+        hop: options.stretchId ? 1 : 0,
+        stretchId: options.stretchId ?? null,
+      },
       body: options.notice?.body ?? (noMentions(body).slice(0, 39_000) || "…"),
       meta: options.notice?.meta ?? {
         missionInbox: { missionId: fresh.id, from, text: noMentions(body), requestedBy: requester, kind },
@@ -324,6 +335,7 @@ export async function tellMainSession(
           threadRootId: fresh.threadRootId,
           triggerMessageId: message.id,
           hop: message.hop,
+          stretchId: message.stretchId,
           trigger: body,
           brain: choice.brain,
           ...(choice.model ? { model: choice.model } : {}),
@@ -517,14 +529,52 @@ export async function missionReportSince(
 /**
  * Job `mission.keep_going`: a mission run ended a while ago. With plan items open and nothing waiting on a person,
  * the main session is told to go on (`tellMainSession`): a wake-up of the mission's own, so the stuck guard counts it
- * (wake-ups in a row with no plan item moving pause the mission) and the budget brakes it. Returns whether it woke.
+ * (wake-ups in a row with no plan item moving pause the mission), and in the stretch of its last run, so the stretch
+ * limits hold it even while the plan keeps changing (a person's message opens a new one). Returns whether it woke.
  */
 export async function keepMissionGoing(deps: MissionDeps, missionId: string) {
   const mission = await getMissionRow(deps.db, missionId);
   // What waits in its inbox goes out with the inbox's own delivery.
   if (!mission || mission.inbox.some((e) => e.sessionId === mission.mainSessionId)) return false;
   if (await keepGoingBlocker(deps.db, mission)) return false;
-  const out = await tellMainSession(deps, mission, KEEP_GOING_PROMPT, { kind: "system", from: "the mission" });
+  // It counts in the stretch of the thread's last run: past its limit, the pause card instead (its Continuar goes on).
+  const [last] = await deps.db
+    .select()
+    .from(agentRuns)
+    .where(
+      and(
+        eq(agentRuns.orgId, mission.orgId),
+        eq(agentRuns.agentId, mission.agentId),
+        eq(agentRuns.channelId, mission.channelId),
+        eq(agentRuns.threadRootId, mission.threadRootId),
+      ),
+    )
+    .orderBy(desc(agentRuns.createdAt))
+    .limit(1);
+  const stretchId = last ? runStretchOf(last) : undefined;
+  if (last && stretchId) {
+    const stop = await stretchStop(deps.db, mission.orgId, stretchId, mission.agentId);
+    if (stop) {
+      await pauseStretch(deps.db, mission.orgId, {
+        stretchId,
+        channelId: mission.channelId,
+        threadId: mission.threadRootId,
+        authorAgentId: mission.agentId,
+        runId: last.id,
+        hop: last.hop,
+        agentId: mission.agentId,
+        messageId: null,
+        trigger: "mention",
+        stop,
+      });
+      return false;
+    }
+  }
+  const out = await tellMainSession(deps, mission, KEEP_GOING_PROMPT, {
+    kind: "system",
+    from: "the mission",
+    ...(stretchId ? { stretchId } : {}),
+  });
   return out.delivered;
 }
 
@@ -577,6 +627,7 @@ export function createMissionEngine(deps: { pubsub?: PubSub; db: MissionDeps["db
           channelId: input.channelId,
           threadId: input.threadRootId,
           hop: input.hop,
+          stretchId: input.stretchId ?? null,
         },
         input.agentId,
       );

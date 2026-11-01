@@ -16,7 +16,9 @@ import {
   pauseMission,
   postPersonMessage,
   resumeMission,
+  STRETCH,
   startMission,
+  stretchCardOf,
   updatePlan,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
@@ -247,6 +249,37 @@ describe("a mission keeps going between people's messages", () => {
       .where(eq(schema.agentRuns.id, question?.runId as string));
     expect(resumed?.status).toBe("done");
     expect(await keepGoingBlocker(f.db, await missionRow())).toBeNull();
+  });
+
+  test("its own wake-ups count in a stretch: past the limit, the pause card instead, even while the plan keeps changing", async () => {
+    await agentMission({ reply: () => ({ chunks: ["ok"] }) });
+    const view = await createMission(md(), f.owner.id, f.org.id, {
+      agentId: f.agent.id,
+      channelId: f.general.id,
+      goal: "Relatório diário",
+      title: "Relatório",
+    });
+    await drainOutbox(f.db, f.handlers);
+    await startMission(md(), f.owner.id, f.org.id, view.id);
+    await drainOutbox(f.db, f.handlers);
+    let woke = 0;
+    for (let i = 0; i < STRETCH.unattendedRuns + 2; i++) {
+      // A plan that changes on every wake resets the stuck guard: only the stretch holds it.
+      await updatePlan(md(), await missionRow(), {
+        items: [...PLAN, { id: `again-${i}`, title: `Verificar de novo ${i}`, status: "todo" }],
+        source: "executor",
+      });
+      if (!(await keepMissionGoing(md(), view.id))) break;
+      woke++;
+      await drainOutbox(f.db, f.handlers);
+    }
+    expect(woke).toBe(STRETCH.unattendedRuns);
+    expect((await missionRow()).status).toBe("active");
+    await drainOutbox(f.db, f.handlers);
+    const cards = (await f.db.select().from(schema.messages).where(eq(schema.messages.threadId, view.threadId))).filter(
+      (m) => stretchCardOf(m.meta)?.state === "paused",
+    );
+    expect(cards).toHaveLength(1);
   });
 
   test("waiting on a card that already asks the person, it isn't told to ask again", async () => {
