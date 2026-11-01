@@ -144,6 +144,16 @@ export function around(text: string, part: string): [before: string, after: stri
   return at < 0 ? null : [text.slice(0, at), text.slice(at + part.length)];
 }
 
+const WORD_CHAR = /[\p{L}\p{N}]/u;
+/** Where `word` first stands as a whole word in `text` ("Max" in "Max está", not in "Maximizando"), or -1. */
+export function wordIndex(text: string, word: string): number {
+  if (!word) return -1;
+  for (let at = text.indexOf(word); at >= 0; at = text.indexOf(word, at + 1)) {
+    if (!WORD_CHAR.test(text[at - 1] ?? "") && !WORD_CHAR.test(text[at + word.length] ?? "")) return at;
+  }
+  return -1;
+}
+
 /** Where a shortened text may stop with nothing added: a sentence's end, or a line's. */
 const STOPS = /[.!?…](?=\s)|\n/g;
 

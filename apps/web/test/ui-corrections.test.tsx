@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -7,7 +7,9 @@ import { join } from "node:path";
 import type { Approval, Message } from "@agenteschat/client";
 import { mentionsHandle } from "@agenteschat/client/lib/markdown";
 import { apiProviderOf } from "@agenteschat/client/lib/providers";
+import { wordIndex } from "@agenteschat/client/lib/text";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { withAgentFace } from "@/components/AgentAvatar";
 import { InlineApproval } from "@/components/ApprovalItem";
 import { declarations, topLevel } from "./built-css";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
@@ -100,6 +102,104 @@ describe("Fixar mensagem", () => {
     await settle(4);
     expect(pins.at(-1)).toEqual(["unpin", ENG_ID, "m-1"]);
   });
+
+  const menuNames = () =>
+    within(screen().getByRole("menu"))
+      .getAllByRole("menuitem")
+      .map((i) => i.getAttribute("aria-label") ?? i.textContent);
+
+  test("someone else's pin, live: the menu offers Desafixar, and Fixar again once it's unpinned", async () => {
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState()) });
+    await settle(6);
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    await settle(2);
+    const push = (event: Record<string, unknown>) =>
+      act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { channelId: ENG_ID, ...event } }));
+    await push({
+      type: "message.pinned",
+      messageId: "m-1",
+      threadId: null,
+      pinnedByUserId: "u-joao",
+      pinnedAt: new Date().toISOString(),
+    });
+    await settle(2);
+    await act(async () => fireEvent.contextMenu(row("m-1"), { clientX: 40, clientY: 60 }));
+    await settle(2);
+    expect(menuNames()).toContain("Desafixar mensagem");
+    await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
+    await push({ type: "message.unpinned", messageId: "m-1" });
+    await settle(2);
+    await act(async () => fireEvent.contextMenu(row("m-1"), { clientX: 40, clientY: 60 }));
+    await settle(2);
+    expect(menuNames()).toContain("Fixar mensagem");
+  });
+
+  test("someone who can't post there gets no Fixar (the server would refuse it)", async () => {
+    const state = seedState();
+    const org = state.me?.organizations[0];
+    if (org) org.permissions = ["read"];
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(8);
+    await act(async () => fireEvent.contextMenu(row("m-1"), { clientX: 40, clientY: 60 }));
+    await settle(2);
+    const names = menuNames();
+    expect(names).toContain("Copiar link");
+    expect(names).not.toContain("Fixar mensagem");
+  });
+});
+
+describe("right click in the browser", () => {
+  const withLink = () => {
+    const state = seedState();
+    state.messages.push({
+      id: "m-link",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "person", id: "u-joao" },
+      body: "o doc está em https://example.com/doc e o trecho é `npm run build`",
+      mentionedAgentIds: [],
+      agentRunId: null,
+      createdAt: new Date().toISOString(),
+    } as Message);
+    return state;
+  };
+  const rightClick = async (target: Element) => {
+    const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 40, clientY: 60 });
+    await act(async () => void target.dispatchEvent(event));
+    await settle(2);
+    return event;
+  };
+
+  test("a link or code in a message keeps the browser's menu; the message's own space gets ours", async () => {
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(withLink()) });
+    await settle(8);
+    const link = row("m-link").querySelector('a[href^="https://example.com"]') as HTMLElement;
+    expect((await rightClick(link)).defaultPrevented).toBe(false);
+    expect(screen().queryByRole("menu")).toBeNull();
+    const code = row("m-link").querySelector("code") as HTMLElement;
+    expect((await rightClick(code)).defaultPrevented).toBe(false);
+    expect(screen().queryByRole("menu")).toBeNull();
+    expect((await rightClick(row("m-link"))).defaultPrevented).toBe(true);
+    expect(screen().getByRole("menu")).toBeTruthy();
+  });
+
+  test("on touch, a long press keeps selecting text: no menu", async () => {
+    const real = window.matchMedia.bind(window);
+    const media = spyOn(window, "matchMedia").mockImplementation((query: string) =>
+      query === "(pointer: coarse)"
+        ? ({ matches: true, addEventListener: () => {}, removeEventListener: () => {} } as unknown as MediaQueryList)
+        : real(query),
+    );
+    try {
+      await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState()) });
+      await settle(8);
+      expect((await rightClick(row("m-1"))).defaultPrevented).toBe(false);
+      expect(screen().queryByRole("menu")).toBeNull();
+    } finally {
+      media.mockRestore();
+    }
+  });
 });
 
 describe("official provider logos", () => {
@@ -159,13 +259,33 @@ describe("agent faces in a line of text", () => {
     expect(who.querySelector("b")?.textContent).toBe("Ada");
     expect(document.body.textContent).toContain("Ada pede aprovação");
   });
+
+  test("the face goes before the name as a word, never inside another word", async () => {
+    expect(wordIndex("Maximizando a janela · Max está abrindo", "Max")).toBe(23);
+    expect(wordIndex("Anadia", "Ana")).toBe(-1);
+    expect(wordIndex("Ana: pronto", "Ana")).toBe(0);
+    await renderPage(<p>{withAgentFace("Maximizando a janela · Max está abrindo", "Max")}</p>, {
+      api: createFakeApi(seedState()),
+      org: true,
+    });
+    await settle(2);
+    const line = document.querySelector("p") as HTMLElement;
+    expect(line.firstChild?.textContent).toBe("Maximizando a janela · ");
+    expect(line.querySelector(".ac-who b")?.textContent).toBe("Max");
+  });
 });
 
 describe("the agent page's cards and the chat's", () => {
   test("agent cards: 12px above and below, the head pulled into the padding", async () => {
     const css = await sheet("apps/web/src/layout.css");
     expect(value(css, ".agp-card.ac-card", "padding-block")).toBe("12px");
-    expect(value(css, ".agp-card>.ac-card__head:first-child", "margin-block")).toBe("-6px -2px");
+    // Only a head with a button (32px) reaches into the padding; a title alone (22px) stays 12px in.
+    expect(declarations(css, ".agp-card>.ac-card__head:first-child")).toEqual([]);
+    expect(value(css, ".agp-card>.ac-card__head:first-child:has(.ac-card__action .ac-btn)", "margin-block")).toBe(
+      "-6px -2px",
+    );
+    // The foot reaches the card's bottom edge (12px), not past it (--card-pad is 20px).
+    expect(value(css, ".agp-card>.ac-card__foot", "margin-bottom")).toBe("-12px");
     expect(value(css, ".agp-aside__work", "padding")).toBe("12px 20px");
   });
 

@@ -8978,14 +8978,17 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   gap: 16px;
   min-width: 0;
 }
-/* 12px above and below, as the attention tiles (`.agp-attn`): the head's 32px row (its ghost button) reaches 6px into
-   the padding, so the title still sits 12px in. */
+/* 12px above and below, as the attention tiles (`.agp-attn`): a head with a button (a 32px row) reaches 6px into
+   the padding, so the title still sits 12px in. The foot meets the card's edge, so it pulls 12px, not --card-pad. */
 .agp-card.ac-card {
   gap: 12px;
   padding-block: 12px;
 }
-.agp-card > .ac-card__head:first-child {
+.agp-card > .ac-card__head:first-child:has(.ac-card__action .ac-btn) {
   margin-block: -6px -2px;
+}
+.agp-card > .ac-card__foot {
+  margin-bottom: -12px;
 }
 /* Something changed in it: a bar on its left edge, inside the card's line. */
 .agp-card[data-changed] {

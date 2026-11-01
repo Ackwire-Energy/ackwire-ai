@@ -1,4 +1,5 @@
 import { type Message, usePinMessage } from "@agenteschat/client";
+import { can } from "@agenteschat/client/lib/permissions";
 import { Button, EmojiPickerPopover, Menu } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -81,12 +82,13 @@ export function PersonMessageActions({
  * emoji, Responder, Copiar texto, Copiar link, Fixar mensagem, Salvar na wiki. With text selected in it, the
  * selection's own menu (Copiar, Responder; Salvar na wiki saves the selection). `touch` is the same menu for a tap on
  * touch, where it stands in for the bar, so an agent's reply (`feedback`) also has the bar's Não ajudou and Corrigir
- * resposta. `dialog` goes with the message.
+ * resposta. `dialog` goes with the message. Fixar needs `post` (the server's rule) and a conversation that isn't
+ * read only.
  */
 export function useMessageMenu(
   message: Message,
   channelName: string,
-  options: { feedback?: boolean; agentName?: string } = {},
+  options: { feedback?: boolean; agentName?: string; readOnly?: boolean } = {},
 ) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -142,17 +144,20 @@ export function useMessageMenu(
     // A file with no words has no text to copy or save.
     const words = message.body.trim() !== "";
     const pinned = Boolean(message.pinned);
-    const pinEntry: MenuEntry = {
-      kind: "item",
-      id: "pin",
-      label: t(pinned ? "contextMenu.unpin" : "contextMenu.pin"),
-      icon: "pin",
-      run: () =>
-        pin.mutate(
-          { channelId: message.channelId, messageId: message.id, pinned: !pinned },
-          { onSuccess: () => toast.show(t(pinned ? "contextMenu.unpinned" : "contextMenu.pinned")) },
-        ),
-    };
+    const pinEntry: MenuEntry | null =
+      options.readOnly || !can(org, "post")
+        ? null
+        : {
+            kind: "item",
+            id: "pin",
+            label: t(pinned ? "contextMenu.unpin" : "contextMenu.pin"),
+            icon: "pin",
+            run: () =>
+              pin.mutate(
+                { channelId: message.channelId, messageId: message.id, pinned: !pinned },
+                { onSuccess: () => toast.show(t(pinned ? "contextMenu.unpinned" : "contextMenu.pinned")) },
+              ),
+          };
     return [
       {
         kind: "reactions",
@@ -178,7 +183,7 @@ export function useMessageMenu(
       ...(words ? [copy(message.body, "copy-text", t("contextMenu.copyText"))] : []),
       copyLink,
       { kind: "separator" },
-      pinEntry,
+      ...(pinEntry ? [pinEntry] : []),
       ...(words ? [wiki(message.body)] : []),
     ];
   };

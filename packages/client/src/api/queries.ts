@@ -2095,6 +2095,25 @@ export function cacheMessageMemories(
 }
 
 /**
+ * `message.pinned` / `message.unpinned` (and "Fixar" / "Desafixar" optimistically): the message's pin mark in every
+ * cached list of that channel (timeline and threads).
+ */
+export function cachePinned(
+  qc: ReturnType<typeof useQueryClient>,
+  orgId: string,
+  channelId: string,
+  messageId: string,
+  pinned: boolean,
+) {
+  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
+    if (!Array.isArray(data)) return data;
+    const list = data as Message[];
+    if (!list.some((m) => m && m.id === messageId)) return data;
+    return list.map((m) => (m.id === messageId ? { ...m, pinned } : m));
+  });
+}
+
+/**
  * `message.actions` (and undo/redo results): an agent message's receipts, in
  * every cached list of that channel (timeline and threads). Replaces the list.
  */

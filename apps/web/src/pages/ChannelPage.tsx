@@ -3295,6 +3295,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   const feedback = !readOnly && m.author.type === "agent" && !card && !m.local && !live && !mediaAfter;
   const menu = useMessageMenu(m, channelName ?? "", {
     feedback,
+    readOnly,
     agentName: agent?.name ?? t("channel.unknownAgent"),
   });
   // A row with a bar has the same actions in a menu that a tap opens on touch (an agent's sticker gets a person's).

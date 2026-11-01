@@ -1,5 +1,6 @@
 import type { AgentPresence } from "@agenteschat/client";
 import { agentStateIn } from "@agenteschat/client";
+import { wordIndex } from "@agenteschat/client/lib/text";
 import {
   type AgentAppearance,
   type AgentState,
@@ -68,9 +69,9 @@ export function AgentWho({ agentId, name }: { agentId?: string; name: string }) 
   );
 }
 
-/** `text` with the agent's name, where it first appears, drawn as `AgentWho`. */
+/** `text` with the agent's name, where it first stands as a word, drawn as `AgentWho`. */
 export function withAgentFace(text: string, name: string, agentId?: string): ReactNode {
-  const at = name ? text.indexOf(name) : -1;
+  const at = wordIndex(text, name);
   if (at < 0) return text;
   return (
     <>
