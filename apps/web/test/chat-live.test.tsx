@@ -380,6 +380,90 @@ describe("bottom anchoring", () => {
     expect(log.scrollTop).toBe(1960);
     expect(screen().getByRole("button", { name: /Novas mensagens/ })).not.toBeNull();
   });
+
+  test("the end shrinking right after a wheel down or a click on a row keeps the list at the bottom", async () => {
+    const { socket } = await open();
+    const log = screen().getByRole("region", { name: "Mensagens" });
+    const height = (value: number) => Object.defineProperty(log, "scrollHeight", { configurable: true, value });
+    height(2000);
+    Object.defineProperty(log, "clientHeight", { configurable: true, value: 500 });
+    await sendText("primeira");
+    await settle(3);
+    await act(async () => fireEvent.scroll(log));
+    const said = (id: string) =>
+      push(socket, {
+        type: "message.created",
+        messageId: id,
+        message: {
+          id,
+          channelId: ENG_ID,
+          threadId: null,
+          author: { type: "person", id: "u-joao" },
+          body: `mensagem ${id}`,
+          mentionedAgentIds: [],
+          agentRunId: null,
+          createdAt: new Date().toISOString(),
+        },
+      });
+    // Wheel down at the bottom, then something at the end gets shorter: the browser clamps scrollTop lower.
+    await act(async () => fireEvent.wheel(log, { deltaY: 40 }));
+    height(1800);
+    log.scrollTop = 1300;
+    await act(async () => fireEvent.scroll(log));
+    height(2400);
+    await said("m-after-wheel");
+    await settle();
+    expect(log.scrollTop).toBe(2400);
+    // A click inside a row (a tools block folding) then the same clamp.
+    const row = rowsWith("primeira")[0] as HTMLElement;
+    await act(async () => fireEvent.pointerDown(row));
+    height(2000);
+    log.scrollTop = 1500;
+    await act(async () => fireEvent.scroll(log));
+    height(2600);
+    await said("m-after-click");
+    await settle();
+    expect(log.scrollTop).toBe(2600);
+    expect(screen().queryByRole("button", { name: /Novas mensagens/ })).toBeNull();
+  });
+
+  test("a window without focus still scrolled by the wheel is being read: a new message doesn't pull the list", async () => {
+    const { socket } = await open();
+    const log = screen().getByRole("region", { name: "Mensagens" });
+    Object.defineProperty(log, "scrollHeight", { configurable: true, value: 2000 });
+    Object.defineProperty(log, "clientHeight", { configurable: true, value: 500 });
+    await sendText("primeira");
+    await settle(3);
+    // Past the opening, when a new message may bring an idle list to it.
+    await act(() => new Promise((r) => setTimeout(r, 1600)));
+    const hasFocus = document.hasFocus;
+    document.hasFocus = () => false;
+    try {
+      log.scrollTop = 100;
+      await act(async () => {
+        fireEvent.wheel(log, { deltaY: -1900 });
+        fireEvent.scroll(log);
+      });
+      await push(socket, {
+        type: "message.created",
+        messageId: "m-unfocused",
+        message: {
+          id: "m-unfocused",
+          channelId: ENG_ID,
+          threadId: null,
+          author: { type: "person", id: "u-joao" },
+          body: "enquanto lia",
+          mentionedAgentIds: [],
+          agentRunId: null,
+          createdAt: new Date().toISOString(),
+        },
+      });
+      await settle();
+      expect(log.scrollTop).toBe(100);
+    } finally {
+      document.hasFocus = hasFocus;
+    }
+  });
 });
 
 describe("receipts: a check with a popover", () => {

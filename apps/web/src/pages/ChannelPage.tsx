@@ -75,6 +75,7 @@ import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
 import {
   entersWithMotion,
   greetingSuggestions,
+  isScrollUpKey,
   messageUsage,
   nearBottom,
   usageLine,
@@ -923,6 +924,14 @@ function ChannelView({
   const markGesture = () => {
     lastGesture.current = Date.now();
   };
+  // The last gesture that can move the list up (wheel up, an up key, a finger, the scrollbar). Only a scroll up
+  // right after one of these lets go of the bottom: content at the end shrinking clamps scrollTop lower too, and
+  // right after a wheel down or a click on a row (a tools block folding) that read as "the person scrolled up".
+  const lastUpGesture = useRef(0);
+  const markUpGesture = () => {
+    lastGesture.current = Date.now();
+    lastUpGesture.current = lastGesture.current;
+  };
   // Scrolling up always lets go at once: no waiting to leave the "near bottom" band or for a glide to end.
   const letGo = () => {
     stick.current = false;
@@ -1006,7 +1015,10 @@ function ChannelView({
   const idleAway = () => {
     const selection = typeof window.getSelection === "function" ? window.getSelection() : null;
     if (selection && !selection.isCollapsed && scroller.current?.contains(selection.anchorNode)) return false;
-    if (document.hidden || (typeof document.hasFocus === "function" && !document.hasFocus())) return true;
+    if (document.hidden) return true;
+    // A wheel still scrolls a window without focus: whoever does that is reading, not away.
+    if (typeof document.hasFocus === "function" && !document.hasFocus())
+      return Date.now() - lastGesture.current > IDLE_CATCH_UP_MS;
     // Right after opening, the same grace as a fresh scroll.
     return Date.now() - Math.max(lastGesture.current, openedAt.current) > IDLE_CATCH_UP_MS;
   };
@@ -1737,19 +1749,23 @@ function ChannelView({
                     aria-live="polite"
                     aria-relevant="additions"
                     onWheel={(e) => {
-                      markGesture();
-                      if (e.deltaY < 0) letGo();
+                      if (e.deltaY < 0) {
+                        markUpGesture();
+                        letGo();
+                      } else markGesture();
                     }}
-                    onTouchMove={markGesture}
-                    onPointerDown={markGesture}
-                    onKeyDown={markGesture}
+                    onTouchMove={markUpGesture}
+                    // On the list itself, not on a row: its scrollbar.
+                    onPointerDown={(e) => (e.target === e.currentTarget ? markUpGesture() : markGesture())}
+                    onKeyDown={(e) => (isScrollUpKey(e) ? markUpGesture() : markGesture())}
                     onScroll={(e) => {
                       const previousTop = lastScrollTop.current;
                       lastScrollTop.current = e.currentTarget.scrollTop;
                       // Only the person scrolling unpins (or loads older pages); layout changes never do.
                       const byPerson = Date.now() - lastGesture.current < GESTURE_MS;
+                      const upByPerson = Date.now() - lastUpGesture.current < GESTURE_MS;
                       if (byPerson && e.currentTarget.scrollTop < 240) loadOlder();
-                      if (byPerson && previousTop !== null && e.currentTarget.scrollTop < previousTop) {
+                      if (upByPerson && previousTop !== null && e.currentTarget.scrollTop < previousTop) {
                         letGo();
                         return;
                       }
