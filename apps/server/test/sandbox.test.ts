@@ -55,6 +55,7 @@ test("the agent's browser: unavailable without a connected computer; its sites a
     reason: "no_machine",
     detail: null,
     machine: null,
+    profileId: null,
   });
   const bad = await api(`/agents/${agentId}/browser`, { method: "PUT", json: { allowedDomains: ["not a site"] } });
   expect(bad.status).toBe(400);

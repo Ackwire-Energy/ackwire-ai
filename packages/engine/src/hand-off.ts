@@ -10,7 +10,7 @@ import { personCanPost } from "./routine-state";
 import { type AgentRun, addRunStep } from "./runs";
 import { REQUEST_SECRET_TOOL } from "./secrets";
 import { maskCredentials } from "./tool-detail";
-import { turnMeans } from "./tools/directory";
+import { reachesTeammates, turnMeans } from "./tools/directory";
 import type { ToolContext, ToolDefinition, ToolSource } from "./tools/types";
 
 export const HAND_OFF_TOOL = "hand_off";
@@ -202,7 +202,8 @@ async function runEvidence(deps: ResourcefulDeps, ctx: ToolContext, run: RunRow)
     .catch(() => []);
   const names = new Set((listed ?? []).map((x) => x.name));
   const own = ctx.bridge ? ["your computer's own tools: shell and files"] : [];
-  const means = [...turnMeans(names, await teammateMeans(ctx).catch(() => [])), ...own];
+  const teammates = reachesTeammates(names) ? await teammateMeans(ctx).catch(() => []) : [];
+  const means = [...turnMeans(names, teammates), ...own];
   const tried = await triedCalls(ctx.db, run, t.harnessTried);
   const [trigger] = t.request
     ? []

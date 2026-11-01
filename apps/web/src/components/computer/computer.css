@@ -15,15 +15,16 @@
     inset 0 0 0 1px color-mix(in srgb, var(--warn) 35%, transparent),
     var(--e1);
 }
-/* The title and the line under it, together, centred on the computer's icon. */
-.cmp-entry__row.ac-faceline {
+/*
+ * The title and the line under it, together, centred on the computer's icon: not an `.ac-faceline`, whose first line
+ * rises to the picture's top.
+ */
+.cmp-entry__row {
+  display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 12px;
   padding: 12px 14px;
-}
-.cmp-entry__t > .ac-captop {
-  margin-block-start: 0;
 }
 .cmp-entry__row > .ac-btn {
   align-self: center;

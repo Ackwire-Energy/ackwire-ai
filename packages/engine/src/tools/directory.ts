@@ -451,10 +451,13 @@ function onDemandTools(
         ON_DEMAND_USE,
         loaded,
         await blocked?.(),
-        turnMeans(
-          new Set([...tools, ...loaded].map((t) => t.name)),
-          await import("../team").then((m) => m.teammateMeans(ctx)).catch(() => []),
-        ),
+        await (async () => {
+          const names = new Set([...tools, ...loaded].map((t) => t.name));
+          const teammates = reachesTeammates(names)
+            ? await import("../team").then((m) => m.teammateMeans(ctx)).catch(() => [])
+            : [];
+          return turnMeans(names, teammates);
+        })(),
       ),
     }),
   };
@@ -659,6 +662,9 @@ function coverage(tool: ToolDefinition, prefix: string, query: string) {
  * demand): what the prompt's "Your means", `find_tools` with no good match and the turn-end judge all name, so none
  * points the agent at something it lacks. `teammates`: their handles with what they do, when known.
  */
+/** Whether a run reaches other agents (`ask_agent`, `tell_agent`): only then does `turnMeans` name its teammates. */
+export const reachesTeammates = (names: ReadonlySet<string>) => names.has("ask_agent") || names.has("tell_agent");
+
 export function turnMeans(names: ReadonlySet<string>, teammates: string[] = []): string[] {
   const out: string[] = [];
   if (names.has("web_search")) out.push("the web: `web_search` to search it, `web_fetch` to read any public page");
@@ -666,7 +672,7 @@ export function turnMeans(names: ReadonlySet<string>, teammates: string[] = []):
     out.push("your browser (`browser_*`): open any website and read it, search engines included");
   if (names.has("run_code")) out.push("your computer's terminal (`run_code`): commands, scripts, files");
   if (names.has("find_tools")) out.push("the tool directory (`find_tools`): tools for apps and services");
-  if (names.has("ask_agent") || names.has("tell_agent"))
+  if (reachesTeammates(names))
     out.push(
       `teammates (\`ask_agent\`, \`tell_agent\`)${teammates.length > 0 ? `: ${teammates.join("; ")}` : ": the ones whose role covers it"}`,
     );
