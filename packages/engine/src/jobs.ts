@@ -488,7 +488,9 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           // Never silent: who its mention didn't reach hears it as a note, or the people here read why not.
           await settleReach(deps, message, {
             outside: handed.allowed.filter((id) => outside.includes(id)),
-            blocked: [...new Set([...dropped.filter((d) => d.reason === "audience").map((d) => d.agentId), ...refused])],
+            blocked: [
+              ...new Set([...dropped.filter((d) => d.reason === "audience").map((d) => d.agentId), ...refused]),
+            ],
           });
           await reportDroppedMentions({ db: deps.db, pubsub: deps.pubsub }, message, dropped);
           await publishRouted(deps.pubsub, message, {
