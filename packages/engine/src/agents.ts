@@ -5,9 +5,9 @@ import { recordAudit } from "./audit";
 import { isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
 import { modelInfoFor } from "./credentials";
-import { ConflictError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
+import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { recordOperatorEvent } from "./operator-events";
-import { getMembership, requirePermission } from "./organizations";
+import { can, getMembership, requirePermission } from "./organizations";
 import { DEFAULT_AGENT_SCOPES, grantScopes } from "./tools/scopes";
 import { resyncBudgetCounter } from "./usage";
 
@@ -75,7 +75,11 @@ export async function createAgent(
   input: AgentInput,
   defaults: { model: string },
 ): Promise<Agent> {
-  await requirePermission(db, actorId, orgId, "create_agents");
+  const membership = await requirePermission(db, actorId, orgId, "create_agents");
+  // `create_agents` makes the creator's own agent (ADR 0085 §5): another owner, or none, is for who edits any agent.
+  if (input.ownerUserId !== undefined && input.ownerUserId !== actorId && !can(membership, "manage_agents")) {
+    throw new ForbiddenError("Only an admin can create an agent for someone else or with no owner");
+  }
   const values = { ...input, handle: input.handle.toLowerCase(), model: input.model ?? defaults.model };
   await validate(db, orgId, values);
   // An agent born on "Automático" is automatic on every brain: switched to Claude Code or Codex later, it

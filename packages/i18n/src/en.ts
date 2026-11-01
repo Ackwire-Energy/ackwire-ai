@@ -3101,6 +3101,7 @@ export const en: Translations = {
     noOwnerShort: "Admins get the alerts and approve",
     noOwnerHelp: "Without an owner, admins get the alerts and approve sensitive actions.",
     ownerHelp: "Gets the budget alerts and approves sensitive actions.",
+    ownerYours: "Whoever creates the agent is its owner. An admin can hand it to someone else later.",
     modelAndCost: "Model and cost",
     model: "Model",
     modelDesc: {

@@ -3130,6 +3130,7 @@ export const ptBR = {
     noOwnerShort: "Os admins recebem os avisos e aprovam",
     noOwnerHelp: "Sem responsável, os admins recebem os avisos e aprovam as ações sensíveis.",
     ownerHelp: "Recebe os avisos de orçamento e aprova as ações sensíveis.",
+    ownerYours: "Quem cria o agente é o responsável. Um admin pode passar para outra pessoa depois.",
     modelAndCost: "Modelo e custo",
     model: "Modelo",
     modelDesc: {

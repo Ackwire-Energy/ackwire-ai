@@ -23,11 +23,13 @@ import {
   fakeMachinesOf,
   fakeMailOf,
   GENERAL_ID,
+  meWithRole,
   OPENROUTER_KEY,
   OPENROUTER_MODELS,
   ORG_ID,
   seedState,
 } from "./fake-api";
+import { hintOf } from "./hint";
 import {
   click,
   continueButton,
@@ -689,6 +691,31 @@ describe("Criar agente: what gets created", () => {
     // What came after the channels was still saved.
     expect(state.calls.some((c) => c.method === "access.set")).toBe(true);
     expect(state.agents.filter((a) => a.handle === "iris")).toHaveLength(1);
+  });
+});
+
+describe("Criar agente with Criar agentes alone: an agent of my own", () => {
+  const asMaker = () => {
+    const state = seedState();
+    meWithRole(state, ["create_agents"]);
+    return open(state);
+  };
+
+  test("Responsável is me, with an ⓘ: nobody else and no one to pick", async () => {
+    const state = await asMaker();
+    await startAs("QA");
+    await proceed(3);
+    expect(title()).toBe("Onde trabalha e com quem");
+    expect(screen().queryByRole("combobox", { name: "Responsável" })).toBeNull();
+    expect(document.querySelector(".newag .agp-person__t")?.textContent).toBe("Walter (você)Membro");
+    expect(hintOf("Responsável").text).toBe(
+      "Quem cria o agente é o responsável. Um admin pode passar para outra pessoa depois.",
+    );
+    await proceed(2);
+    await click(screen().getByRole("button", { name: "Criar Iris" }));
+    await settle(8);
+    expect(createdWith(state)?.ownerUserId).toBe("u-walter");
+    expect(screen().getByRole("heading", { name: "Iris entrou no time" })).toBeTruthy();
   });
 });
 

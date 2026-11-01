@@ -68,6 +68,7 @@ import {
   ModelCards,
   NO_OWNER,
   OwnerSelect,
+  OwnerValue,
   PlanCards,
   type PlanChoice,
   usd,
@@ -231,6 +232,8 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const preview = useRef<HTMLDivElement>(null);
   const phone = useMediaQuery("(max-width: 820px)");
+  // Who edits any agent picks its owner. Anyone else makes their own (the server's rule, ADR 0085 §5).
+  const managesAgents = can(org, "manage_agents");
 
   // An agent's proposal starts on the last step, filled in: its role as written, its look, levels and channels.
   const draft = from?.params.draft;
@@ -679,6 +682,12 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
       .map((m) => m.name.split(/\s+/)[0] ?? m.name);
     return names.length ? joinNames(names, t("newAgent.and")) : t("audience.summary.nobody");
   };
+  const ownerTitle = (
+    <h2>
+      <Icon name="person" />
+      {t("newAgent.owner")}
+    </h2>
+  );
 
   const views: Record<NewAgentStep, () => ReactNode> = {
     role: () => (
@@ -1063,21 +1072,29 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
           <p className="small muted">{t("newAgent.noChannels")}</p>
         )}
         <div className="newag__sect">
-          <h2>
-            <Icon name="person" />
-            {t("newAgent.owner")}
-          </h2>
+          {managesAgents ? (
+            ownerTitle
+          ) : (
+            <div className="ac-hintline">
+              {ownerTitle}
+              <InfoHint name={t("common.about", { label: t("newAgent.owner") })}>{t("newAgent.ownerYours")}</InfoHint>
+            </div>
+          )}
         </div>
         <Card as="div" className="newag__card">
-          <OwnerSelect
-            value={owner}
-            members={members.data ?? []}
-            meId={me.user.id}
-            onChange={(v) => {
-              setOwner(v);
-              if (v !== NO_OWNER) setAudience((a) => ({ ...a, userIds: a.userIds.filter((id) => id !== v) }));
-            }}
-          />
+          {managesAgents ? (
+            <OwnerSelect
+              value={owner}
+              members={members.data ?? []}
+              meId={me.user.id}
+              onChange={(v) => {
+                setOwner(v);
+                if (v !== NO_OWNER) setAudience((a) => ({ ...a, userIds: a.userIds.filter((id) => id !== v) }));
+              }}
+            />
+          ) : (
+            <OwnerValue member={ownerMember} meId={me.user.id} />
+          )}
           <span className="small muted">{ownerId ? t("newAgent.ownerHelp") : t("newAgent.noOwnerHelp")}</span>
         </Card>
         <div className="newag__sect">

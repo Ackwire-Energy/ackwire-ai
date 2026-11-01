@@ -141,6 +141,40 @@ test("PUT an agent's channels: its owner with Create agents alone, in the channe
   expect(listed.channels.map((c) => c.name)).toEqual(["sales", "squad"]);
 });
 
+test("POST an agent with Create agents alone: her own, never someone else's or nobody's, and nothing is left behind", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const ana = await joinByInvitation(t, owner, orgId, "ana@example.com");
+  const as = (b: Browser) => (path: string, init?: Parameters<Browser>[1]) =>
+    b(`/api/app/organizations/${orgId}${path}`, init);
+  const json = async <T>(res: Promise<Response>) => (await (await res).json()) as T;
+  const { id: makers } = await json<{ id: string }>(
+    as(owner)("/roles", { json: { name: "Makers", permissions: ["create_agents"] } }),
+  );
+  const { user } = await json<{ user: { id: string } }>(ana("/api/app/me"));
+  const { user: boss } = await json<{ user: { id: string } }>(owner("/api/app/me"));
+  await as(owner)(`/members/${user.id}/roles`, { method: "PUT", json: { roleIds: [makers] } });
+  // What Criar agente sends: the owner, who can talk to it and its look.
+  const make = (ownerUserId: string | null) =>
+    as(ana)("/agents", {
+      json: {
+        name: "Iris",
+        handle: "iris",
+        ownerUserId,
+        audience: { mode: "everyone", userIds: [] },
+        appearance: { color: "violet", eyes: "round", accessory: "headset" },
+      },
+    });
+  expect((await make(boss.id)).status).toBe(403);
+  expect((await make(null)).status).toBe(403);
+  const team = await json<{ agents: { handle: string }[] }>(as(owner)("/agents"));
+  expect(team.agents.map((a) => a.handle)).not.toContain("iris");
+  const res = await make(user.id);
+  expect(res.status).toBe(201);
+  expect(await res.json()).toMatchObject({ handle: "iris", ownerUserId: user.id });
+});
+
 test("channel members API: add an agent with autoReply off, turn it on, roster shows it", async () => {
   const owner = browser(t);
   await signUp(owner, "owner@example.com");

@@ -339,6 +339,17 @@ export function meAsAdmin(state: FakeState) {
   if (me) me.roleIds = [ADMIN_ROLE_ID];
 }
 
+/** Me as a member whose one role, "Criadores", holds `permissions` past what `everyone` gives ("Criar agentes"…). */
+export function meWithRole(state: FakeState, permissions: string[]) {
+  const [admin, everyone] = seedRoles() as [OrgRole, OrgRole];
+  const makers = { ...admin, id: "role-makers", name: "Criadores", icon: "bolt", color: "amber", position: 1 };
+  state.roles = [admin, { ...makers, permissions }, { ...everyone, position: 2 }];
+  const org = state.me?.organizations[0];
+  if (org) org.role = "member";
+  const me = state.members.find((m) => m.userId === state.me?.user.id);
+  if (me) Object.assign(me, { role: "member", roleIds: [makers.id] });
+}
+
 /** The permission areas `roles.list` sends (the server's `PERMISSION_AREAS`). */
 const PERMISSION_AREAS = [
   { id: "chat", use: ["post", "create_channels"], keys: ["post", "create_channels", "manage_channels"] },

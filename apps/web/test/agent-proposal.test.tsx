@@ -3,9 +3,9 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { AgentDraft, AgentInput, AgentProposalCard, Message, OrgRole } from "@agenteschat/client";
+import type { AgentDraft, AgentInput, AgentProposalCard, Message } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ATLAS_ID, createFakeApi, ENG_ID, NOW, ORG_ID, seedRoles, seedState } from "./fake-api";
+import { ATLAS_ID, createFakeApi, ENG_ID, meWithRole, NOW, ORG_ID, seedState } from "./fake-api";
 import { railStep, title, typeIn } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";
 
@@ -281,15 +281,7 @@ describe("Revisar: Criar agente filled in with the draft", () => {
 
   test("with Create agents alone, a channel it proposes that I'm not in isn't offered: it joins the ones I'm in", async () => {
     const state = seedState();
-    asMember(state);
-    const [admin, everyone] = seedRoles() as [OrgRole, OrgRole];
-    state.roles = [
-      admin,
-      { ...admin, id: "role-makers", name: "Criadores", position: 1, permissions: ["create_agents"] },
-      { ...everyone, position: 2 },
-    ];
-    const me = state.members.find((m) => m.userId === "u-walter");
-    if (me) me.roleIds = ["role-makers"];
+    meWithRole(state, ["create_agents"]);
     state.channels.push({
       id: DESIGN_ID,
       name: "design",

@@ -6,7 +6,6 @@ import { formatMonth, formatPercent, formatTokensShort, formatUsd } from "@agent
 import { addsAgentsTo } from "@agenteschat/client/lib/permissions";
 import {
   type AgentAppearance,
-  Avatar,
   agentGradient,
   Button,
   Card,
@@ -26,7 +25,7 @@ import { useTranslation } from "react-i18next";
 import { AudienceChoice } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { AgentComputerPanel } from "@/components/AgentComputer";
-import { BudgetField, LookRows, NO_OWNER, OwnerSelect, usd } from "@/components/AgentFields";
+import { BudgetField, LookRows, NO_OWNER, OwnerSelect, OwnerValue, usd } from "@/components/AgentFields";
 import { AgentSecretsList } from "@/components/AgentSecrets";
 import { LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
@@ -361,25 +360,7 @@ export function SettingsTab({
                 <WasLine changeKey="owner" />
               </>
             ) : (
-              <div className="agp-person">
-                {owner ? (
-                  <Avatar kind="person" size="md" name={owner.name} imageUrl={owner.image} />
-                ) : (
-                  <span className="newag__ib">
-                    <Icon name="members" size={16} />
-                  </span>
-                )}
-                <span className="agp-person__t">
-                  <b>
-                    {owner
-                      ? owner.userId === me.user.id
-                        ? t("newAgent.you", { name: owner.name })
-                        : owner.name
-                      : t("newAgent.noOwnerOption")}
-                  </b>
-                  {owner && <span>{t(`roles.${owner.role}`)}</span>}
-                </span>
-              </div>
+              <OwnerValue member={owner} meId={me.user.id} />
             )}
             <span className="small muted">{ownerId ? t("newAgent.ownerHelp") : t("newAgent.noOwnerHelp")}</span>
           </Section>
