@@ -152,9 +152,14 @@ describe("Regras em: remove all, copy to other agents", () => {
     await type(within(flow()).getByRole("textbox", { name: "Colunas que ele nunca vê" }), "users.password_hash");
     await click(within(flow()).getByRole("button", { name: "Adicionar em Colunas que ele nunca vê" }));
     expect(hidden()).toHaveLength(2);
+    // The live regions are there, empty, before anything is announced.
+    const [clearStatus, copyStatus] = within(flow()).getAllByRole("status");
+    expect(clearStatus?.textContent).toBe("");
+    expect(copyStatus?.textContent).toBe("");
     await click(within(flow()).getByRole("button", { name: "Remover tudo de Colunas que ele nunca vê" }));
     expect(hidden()).toHaveLength(0);
-    expect(within(flow()).getByRole("status").textContent).toContain("2 itens removidos.");
+    expect(clearStatus?.textContent).toContain("2 itens removidos.");
+    expect(document.activeElement?.textContent).toBe("Desfazer");
     await click(within(flow()).getByRole("button", { name: "Desfazer" }));
     expect(hidden()).toHaveLength(2);
     await click(within(flow()).getByRole("button", { name: "Remover tudo de Colunas que ele nunca vê" }));
@@ -175,6 +180,44 @@ describe("Regras em: remove all, copy to other agents", () => {
     const policy = { tables: ["public.orders"], hiddenColumns: [], dailyQueryCap: null, timeoutSeconds: 15 };
     expect(saves.map((c) => c.args[1]).sort()).toEqual([ADA_ID, ATLAS_ID].sort());
     for (const c of saves) expect(c.args[3]).toEqual({ level: "read", policy });
+  });
+});
+
+describe("Regras em: undo a copy", () => {
+  test("Desfazer after Copiar regras gives Atlas back its own unsaved edits", async () => {
+    const { api, state } = databaseApi();
+    const dialog = await openCatalog(api);
+    await pick(dialog, "Banco de dados");
+    await type(within(flow()).getByLabelText("Nome"), "Produção");
+    await type(within(flow()).getByLabelText("Endereço do banco"), "postgres://reader:pw@db.acme.com:6543/app");
+    await click(within(flow()).getByRole("button", { name: "Conectar" }));
+    await settle(4);
+    await click(within(flow()).getByRole("button", { name: "Continuar" }));
+    await settle(4);
+    for (const name of ["Ada", "Atlas"]) {
+      const level = within(flow()).getByRole("radiogroup", { name: `Nível de ${name}` });
+      await click(within(level).getByRole("radio", { name: "Ler" }));
+    }
+    await click(within(flow()).getByRole("button", { name: "Continuar" }));
+    await settle(6);
+    // Atlas's own edit, then Ada's rules copied over it.
+    await click(within(flow()).getByRole("radio", { name: "Atlas" }));
+    await settle(4);
+    await click(within(flow()).getByLabelText("orders"));
+    await click(within(flow()).getByRole("radio", { name: "Ada" }));
+    await settle(4);
+    await click(within(flow()).getByLabelText("Atlas"));
+    await click(within(flow()).getByRole("button", { name: "Copiar regras" }));
+    const status = within(flow()).getAllByRole("status").at(-1) as HTMLElement;
+    expect(status.textContent).toContain("Copiadas para Atlas.");
+    await click(within(status).getByRole("button", { name: "Desfazer" }));
+    expect(status.textContent).toBe("");
+    await click(within(flow()).getByRole("button", { name: "Salvar regras" }));
+    await settle(6);
+    const atlas = state.calls.filter((c) => c.method === "databases.setAgent" && c.args[1] === ATLAS_ID).at(-1);
+    expect((atlas?.args[3] as { policy?: { tables: string[] } } | undefined)?.policy?.tables).toEqual([
+      "public.orders",
+    ]);
   });
 });
 

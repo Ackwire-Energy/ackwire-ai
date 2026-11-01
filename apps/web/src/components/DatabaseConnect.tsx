@@ -544,7 +544,20 @@ function RulesStep({
             policy={edits[agent.id]}
             onChange={(policy) => setEdits((e) => ({ ...e, [agent.id]: policy }))}
             others={agents.filter((a) => a.id !== agent.id)}
-            onCopy={(ids, policy) => setEdits((e) => ({ ...e, ...Object.fromEntries(ids.map((id) => [id, policy])) }))}
+            onCopy={(ids, policy) => {
+              const before = edits;
+              setEdits((e) => ({ ...e, ...Object.fromEntries(ids.map((id) => [id, policy])) }));
+              return () =>
+                setEdits((e) => {
+                  const next = { ...e };
+                  for (const id of ids) {
+                    const was = before[id];
+                    if (was) next[id] = was;
+                    else delete next[id];
+                  }
+                  return next;
+                });
+            }}
           />
         )}
         {save.isError && <Alert>{t("mail.agent.saveError.unknown")}</Alert>}
@@ -577,13 +590,14 @@ function AgentRules({
   policy: DatabasePolicy | undefined;
   onChange: (policy: DatabasePolicy) => void;
   others: Agent[];
-  onCopy: (agentIds: string[], policy: DatabasePolicy) => void;
+  /** Returns the undo: the targets' entries as they were before the copy. */
+  onCopy: (agentIds: string[], policy: DatabasePolicy) => () => void;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const saved = useAgentDatabases(org.id, agent.id);
   const [copyTo, setCopyTo] = useState<string[]>([]);
-  const [copied, setCopied] = useState<string[]>([]);
+  const [copied, setCopied] = useState<{ ids: string[]; undo: () => void } | null>(null);
   if (saved.isLoading) return <LoadingList count={2} />;
   const mine = saved.data?.find((d) => d.connectionId === connection.id);
   const shown = policy ?? mine?.policy ?? defaultDatabasePolicy(connection);
@@ -597,7 +611,7 @@ function AgentRules({
         connectionId={connection.id}
         policy={shown}
         onChange={(next) => {
-          setCopied([]);
+          setCopied(null);
           onChange(next);
         }}
       />
@@ -622,23 +636,35 @@ function AgentRules({
                 size="sm"
                 disabled={copyTo.length === 0}
                 onClick={() => {
-                  onCopy(copyTo, shown);
-                  setCopied(copyTo);
+                  setCopied({ ids: copyTo, undo: onCopy(copyTo, shown) });
                   setCopyTo([]);
                 }}
               >
                 {t("database.copy.apply")}
               </Button>
-              {copied.length > 0 && (
-                <span className="small muted" role="status">
-                  {t("database.copy.done", {
-                    names: others
-                      .filter((a) => copied.includes(a.id))
-                      .map((a) => a.name)
-                      .join(", "),
-                  })}
-                </span>
-              )}
+              <span className="mail-list__status" role="status">
+                {copied && (
+                  <span className="mail-list__clear small muted">
+                    {t("database.copy.done", {
+                      names: others
+                        .filter((a) => copied.ids.includes(a.id))
+                        .map((a) => a.name)
+                        .join(", "),
+                    })}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        copied.undo();
+                        setCopied(null);
+                      }}
+                    >
+                      {t("mail.list.undo")}
+                    </Button>
+                  </span>
+                )}
+              </span>
             </span>
           </fieldset>
         </div>

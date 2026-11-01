@@ -1,6 +1,6 @@
 import { splitAddresses } from "@agenteschat/client/lib/mail";
 import { Button, Field, Input, Token, TokenList } from "@agenteschat/ui";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /**
@@ -40,6 +40,11 @@ export function AddressList({
   const [text, setText] = useState("");
   const [invalid, setInvalid] = useState(false);
   const [cleared, setCleared] = useState<string[] | null>(null);
+  const undoRef = useRef<HTMLButtonElement>(null);
+  // "Remover tudo" unmounts with the chips; focus lands on "Desfazer" instead of the page.
+  useEffect(() => {
+    if (cleared) undoRef.current?.focus();
+  }, [cleared]);
   const add = () => {
     const { valid, invalid: wrong } = split(text);
     if (wrong.length > 0 || valid.length === 0) {
@@ -112,23 +117,27 @@ export function AddressList({
           </Button>
         </span>
       )}
-      {cleared && values.length === 0 && (
-        <span className="mail-list__clear small muted" role="status">
-          {t("mail.list.cleared", { count: cleared.length })}
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            disabled={disabled}
-            onClick={() => {
-              onChange(cleared);
-              setCleared(null);
-            }}
-          >
-            {t("mail.list.undo")}
-          </Button>
-        </span>
-      )}
+      {/* Always mounted: screen readers skip a live region inserted already filled. */}
+      <span className="mail-list__status" role="status">
+        {cleared && values.length === 0 && (
+          <span className="mail-list__clear small muted">
+            {t("mail.list.cleared", { count: cleared.length })}
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={disabled}
+              ref={undoRef}
+              onClick={() => {
+                onChange(cleared);
+                setCleared(null);
+              }}
+            >
+              {t("mail.list.undo")}
+            </Button>
+          </span>
+        )}
+      </span>
     </div>
   );
 }

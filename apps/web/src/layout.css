@@ -4121,6 +4121,10 @@ p {
   gap: 8px;
 }
 /* A leading ghost's text lines up with the chips above, its plate reaching out (as in .ac-acts). */
+/* Empty live region out of the flex flow (no extra gap), still in the a11y tree. */
+.mail-list__status:empty {
+  position: absolute;
+}
 .mail-list__clear > .ac-btn--ghost {
   padding-inline: var(--ghost-plate);
 }
