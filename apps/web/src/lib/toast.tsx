@@ -36,8 +36,11 @@ interface ToastApi {
 
 const ToastContext = createContext<ToastApi>({ show: () => {} });
 
-/** How long a toast stays; a word said in a toast's place (`useSaid`) stays as long. */
-const TOAST_MS = 6000;
+/**
+ * How long a toast stays; a word said in a toast's place (`useSaid`) stays as long, and so does an action that waits
+ * for its Desfazer (cancelling an invitation).
+ */
+export const TOAST_MS = 6000;
 
 let nextId = 1;
 

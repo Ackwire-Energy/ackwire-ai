@@ -1,12 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import { ApiError } from "@agenteschat/client";
 import { invitedErrorText } from "@agenteschat/client/lib/errors";
-import { joinRequestLine } from "../../src/features/activity/logic";
+import { joinRequestLine, subtitleOf } from "../../src/features/activity/logic";
 import { afterSignIn, boldParts, signInPurpose, storedInvite, storedInviteOf } from "../../src/features/auth/links";
 import { membersByName, requestChips, roleLine } from "../../src/features/members/logic";
 import { notification, translator } from "./fixtures";
 
 const TOKEN = "k3J8sQ2xY7pL0vB4nM6cD1eF9gH5jK2a";
+
+test("someone who accepted an invitation isn't named twice: the title says who (ADR 0090)", () => {
+  const accepted = notification({ id: "a1", kind: "invitation_accepted", latest: { title: "Rui" } });
+  expect(subtitleOf(accepted, () => "")).toBe("");
+});
 
 describe("an invitation remembered before signing in", () => {
   test("a link's page opens again, for the account to ask; an email invitation is accepted", () => {
@@ -19,6 +24,15 @@ describe("an invitation remembered before signing in", () => {
     expect(afterSignIn(null)).toBeNull();
     expect(afterSignIn("link:../../etc")).toBeNull();
     expect(afterSignIn("link:")).toBeNull();
+  });
+
+  test("an email invitation opened from its email keeps the proof until it's accepted (ADR 0090)", () => {
+    const mail = "p".repeat(43);
+    expect(afterSignIn(storedInvite(TOKEN, "email", mail))).toEqual({ accept: TOKEN, mail });
+    expect(storedInviteOf(storedInvite(TOKEN, "email", mail))).toEqual({ token: TOKEN, kind: "email", mail });
+    // A link only asks, and a proof of any other shape confirms nothing: the invitation itself still works.
+    expect(storedInvite(TOKEN, "link", mail)).toBe(`link:${TOKEN}`);
+    expect(afterSignIn(`${TOKEN}.short`)).toEqual({ accept: TOKEN });
   });
 
   test("read back with its kind, so the sign-in can say where it leads", () => {

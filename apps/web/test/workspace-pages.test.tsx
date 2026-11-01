@@ -302,44 +302,55 @@ describe("Membros", () => {
     expect(atlasRow?.textContent).not.toMatch(/orçamento|%/);
   });
 
-  test("batch invites: one result per email; resend and revoke; expired status", async () => {
+  test("sent invitations: pending first, who sent each and until when; an expired one renews with the same link", async () => {
     const state = seedState();
-    state.invitations.push({
-      id: "inv-old",
-      email: "rafa@acme.com.br",
-      role: "member",
-      status: "expired",
-      expiresAt: new Date(Date.now() - 86_400_000).toISOString(),
-      createdAt: new Date(Date.now() - 8 * 86_400_000).toISOString(),
-    });
+    state.invitations.push(
+      {
+        id: "inv-old",
+        email: "rafa@acme.com.br",
+        role: "member",
+        status: "expired",
+        expiresAt: new Date(Date.now() - 86_400_000).toISOString(),
+        createdAt: new Date(Date.now() - 8 * 86_400_000).toISOString(),
+        invitedBy: "Walter",
+        url: "http://localhost:3000/invite/tok-inv-old",
+      },
+      {
+        id: "inv-new",
+        email: "carla@acme.com.br",
+        role: "member",
+        status: "pending",
+        expiresAt: new Date(Date.now() + 5 * 86_400_000 + 60_000).toISOString(),
+        createdAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+        invitedBy: "João",
+        url: "http://localhost:3000/invite/tok-inv-new",
+      },
+    );
     await go("members", state);
-    const pendingBefore = screen().getByRole("region", { name: "Convites pendentes" });
-    expect(pendingBefore.textContent).toContain("rafa@acme.com.br");
-    expect(pendingBefore.textContent).toContain("Expirou ontem");
-    const input = screen().getByLabelText("E-mails, separados por vírgula");
-    await type(input, "x");
-    await click(screen().getByRole("button", { name: "Convidar" }));
-    expect(screen().getByText("Nenhum e-mail válido. Use algo como nome@empresa.com.br.")).toBeTruthy();
-    await type(input, "carla@acme.com.br, joao@acme.com.br");
-    await click(screen().getByRole("button", { name: "Convidar" }));
-    await settle(6);
-    expect(state.calls.find((c) => c.method === "orgs.inviteMany")?.args[1]).toEqual({
-      emails: ["carla@acme.com.br", "joao@acme.com.br"],
-      roleIds: [],
-    });
-    expect(document.body.textContent).toContain("joao@acme.com.br já faz parte do workspace.");
-    expect((input as HTMLInputElement).value).toBe("joao@acme.com.br");
-    const pending = screen().getByRole("region", { name: "Convites pendentes" });
-    expect(pending.textContent).toContain("carla@acme.com.br");
-    expect(pending.textContent).toContain("Enviado agora · expira em 7 dias");
-    const rafa = within(pending).getByText("rafa@acme.com.br").parentElement as HTMLElement;
-    await click(within(rafa).getByRole("button", { name: "Reenviar" }));
+    const sent = () => screen().getByRole("region", { name: "Convites enviados" });
+    const rows = within(sent()).getAllByRole("group");
+    expect(rows.map((r) => r.getAttribute("aria-label"))).toEqual([
+      "Convite para carla@acme.com.br",
+      "Convite para rafa@acme.com.br",
+    ]);
+    const [carla, rafa] = rows as [HTMLElement, HTMLElement];
+    // The role, who sent it (mine: "convite seu"), when; until when it works, or since when it doesn't.
+    expect(carla.textContent).toMatch(/Membro · convite de João · em \d+ \S+/);
+    expect(carla.textContent).toContain("Expira em 5 dias");
+    expect(rafa.textContent).toMatch(/Membro · convite seu · enviado em \d+ \S+/);
+    expect(rafa.textContent).toContain("Expirou ontem");
+    expect(rafa.getAttribute("data-off")).toBe("true");
+    // An expired link opens nothing: no Copy; Renovar sends it again, with the same link.
+    expect(within(rafa).queryByRole("button", { name: "Copiar link" })).toBeNull();
+    expect(within(rafa).getByRole("button", { name: "Tirar" })).toBeTruthy();
+    await click(within(rafa).getByRole("button", { name: "Renovar" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "orgs.resendInvitation")?.args).toEqual([ORG_ID, "inv-old"]);
-    expect(within(rafa).getByRole("button", { name: "Copiar link" })).toBeTruthy();
-    await click(within(rafa).getByRole("button", { name: "Revogar" }));
-    await settle(4);
-    expect(state.invitations.map((i) => i.email)).toEqual(["carla@acme.com.br"]);
+    expect(document.body.textContent).toContain("Convite renovado e mandado de novo para rafa@acme.com.br.");
+    const renewed = within(sent()).getByRole("group", { name: "Convite para rafa@acme.com.br" });
+    expect(renewed.textContent).toMatch(/Mandado de novo · vale até \d+ \S+/);
+    expect(within(renewed).getByRole("button", { name: "Copiar link" })).toBeTruthy();
+    expect(state.invitations.find((i) => i.id === "inv-old")?.url).toBe("http://localhost:3000/invite/tok-inv-old");
   });
 });
 

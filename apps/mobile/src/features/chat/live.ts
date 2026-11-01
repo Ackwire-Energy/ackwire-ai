@@ -45,6 +45,7 @@ import {
   unmarkStopping,
   useApi,
 } from "@agenteschat/client";
+import { isMediaAfterReply } from "@agenteschat/client/lib/media";
 import { playSound } from "@agenteschat/client/lib/sounds";
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
@@ -232,8 +233,9 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
       // A new top-level message may get agent replies in its thread: start that list.
       if (event.message && !event.message.threadId)
         qc.setQueryData(keys.thread(orgId, channelId, event.message.id), (list: unknown) => list ?? []);
-      // A reply: its root's "2 respostas" link comes from the channel's thread list, which counts it.
-      if (event.message?.threadId)
+      // A reply: its root's "2 respostas" link comes from the channel's thread list, which counts it. An agent's
+      // sticker or GIF after its reply (ADR 0091) changes none of them.
+      if (event.message?.threadId && !isMediaAfterReply(event.message.meta))
         void qc.invalidateQueries({ queryKey: ["org", orgId, "threads", "channel", channelId] });
       // The conversation list's last line and unread.
       void qc.invalidateQueries({ queryKey: keys.dms(orgId) });

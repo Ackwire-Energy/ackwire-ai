@@ -32,6 +32,21 @@ async function go(path: string, over: Partial<WorkspaceLimits>, billing = true) 
   const billingLinks = () => state.calls.filter((c) => c.method === "orgs.billingLink").map((c) => c.args[1]);
   return { api, state, left, billingLinks, sockets };
 }
+/**
+ * Members' "Convidar pessoas" opens the invite dialog (ADR 0090); an address goes in, so the only thing that can keep
+ * its button waiting is a full workspace.
+ */
+async function inviteDialog() {
+  const [open] = screen().getAllByRole("button", { name: "Convidar pessoas" });
+  await click(open as HTMLElement);
+  await settle(2);
+  const dialog = () => screen().getByRole("dialog", { name: "Convidar para a Acme" });
+  const emails = within(dialog()).getByLabelText("E-mails");
+  await act(async () => fireEvent.change(emails, { target: { value: "nova@acme.com.br" } }));
+  await act(async () => fireEvent.keyDown(emails, { key: "Enter" }));
+  return dialog;
+}
+const sendButton = (dialog: HTMLElement) => within(dialog).getByRole("button", { name: "Convidar 1 pessoa" });
 
 describe("a workspace's limits (ADR 0079)", () => {
   test("Plano e cobrança: people and files against them, in plain numbers", async () => {
@@ -51,49 +66,49 @@ describe("a workspace's limits (ADR 0079)", () => {
     expect(within(own).queryAllByRole("meter")).toHaveLength(0);
   });
 
-  test("a full workspace: Convidar waits, and owners see the plan's options; without a billing service, who to ask", async () => {
+  test("a full workspace: inviting waits, and owners see the plan's options; without a billing service, who to ask", async () => {
     const { billingLinks, left } = await go("settings/members", { members: { used: 2, limit: 2 } });
-    const invite = screen().getByRole("region", { name: "Convidar pessoas" });
-    expect(invite.textContent).toContain("Este workspace está com 2 de 2 pessoas.");
-    expect(invite.textContent).toContain("Para chamar mais gente, veja as opções do plano do agentes.chat.");
-    expect(within(invite).getByRole("button", { name: "Convidar" }).hasAttribute("disabled")).toBe(true);
-    await click(within(invite).getByRole("button", { name: "Ver opções" }));
+    const invite = await inviteDialog();
+    expect(invite().textContent).toContain("Este workspace está com 2 de 2 pessoas.");
+    expect(invite().textContent).toContain("Para chamar mais gente, veja as opções do plano do agentes.chat.");
+    expect(sendButton(invite()).hasAttribute("disabled")).toBe(true);
+    await click(within(invite()).getByRole("button", { name: "Ver opções" }));
     await settle(4);
     expect(billingLinks()).toEqual(["invite_full"]);
     expect(left).toEqual([`${BILLING}/link?t=invite_full`]);
     cleanup();
 
     await go("settings/members", { members: { used: 1, limit: 1 } }, false);
-    const plain = screen().getByRole("region", { name: "Convidar pessoas" });
-    expect(plain.textContent).toContain("No plano do agentes.chat deste workspace cabe 1 pessoa.");
-    expect(plain.textContent).toContain("Peça a quem administra o workspace para abrir espaço.");
-    expect(within(plain).queryByRole("button", { name: "Ver opções" })).toBeNull();
+    const plain = await inviteDialog();
+    expect(plain().textContent).toContain("No plano do agentes.chat deste workspace cabe 1 pessoa.");
+    expect(plain().textContent).toContain("Peça a quem administra o workspace para abrir espaço.");
+    expect(within(plain()).queryByRole("button", { name: "Ver opções" })).toBeNull();
     cleanup();
 
     await go("settings/members", { members: { used: 2, limit: 3 } });
-    const room = screen().getByRole("region", { name: "Convidar pessoas" });
-    expect(room.textContent).not.toContain("pessoas.");
-    expect(within(room).getByRole("button", { name: "Convidar" }).hasAttribute("disabled")).toBe(false);
+    const room = await inviteDialog();
+    expect(room().textContent).not.toContain("pessoas.");
+    expect(sendButton(room()).hasAttribute("disabled")).toBe(false);
   });
 
-  test("a new plan opens a full workspace by itself: Convidar is back once the limits change, with no reload", async () => {
+  test("a new plan opens a full workspace by itself: inviting is back once the limits change, with no reload", async () => {
     const { state, sockets } = await go("settings/members", { members: { used: 1, limit: 1 } });
-    const invite = () => screen().getByRole("region", { name: "Convidar pessoas" });
+    const invite = await inviteDialog();
     expect(invite().textContent).toContain("No plano do agentes.chat deste workspace cabe 1 pessoa.");
-    expect(within(invite()).getByRole("button", { name: "Convidar" }).hasAttribute("disabled")).toBe(true);
+    expect(sendButton(invite()).hasAttribute("disabled")).toBe(true);
     const socket = sockets.last();
     await act(async () => socket.open());
     state.limits = limits({ members: { used: 1, limit: 10 } });
     await act(async () => socket.push({ type: "event", scope: "org", event: { type: "org.limits", orgId: ORG_ID } }));
     await settle(6);
     expect(invite().textContent).not.toContain("cabe 1 pessoa");
-    expect(within(invite()).getByRole("button", { name: "Convidar" }).hasAttribute("disabled")).toBe(false);
+    expect(sendButton(invite()).hasAttribute("disabled")).toBe(false);
   });
 
-  test("a new plan while this tab was away: the reconnect asks for the limits again, and Convidar is back", async () => {
+  test("a new plan while this tab was away: the reconnect asks for the limits again, and inviting is back", async () => {
     const { state, sockets } = await go("settings/members", { members: { used: 1, limit: 1 } });
-    const invite = () => screen().getByRole("region", { name: "Convidar pessoas" });
-    expect(within(invite()).getByRole("button", { name: "Convidar" }).hasAttribute("disabled")).toBe(true);
+    const invite = await inviteDialog();
+    expect(sendButton(invite()).hasAttribute("disabled")).toBe(true);
     await act(async () => sockets.last().open());
     // The socket drops; meanwhile the plan changes, and its `org.limits` never reaches this tab.
     await act(async () => sockets.last().drop());
@@ -102,19 +117,19 @@ describe("a workspace's limits (ADR 0079)", () => {
     await act(async () => sockets.last().open());
     await settle(6);
     expect(invite().textContent).not.toContain("cabe 1 pessoa");
-    expect(within(invite()).getByRole("button", { name: "Convidar" }).hasAttribute("disabled")).toBe(false);
+    expect(sendButton(invite()).hasAttribute("disabled")).toBe(false);
   });
 
   test("back from the billing service: the plan lands in core before this page's socket opens, and its first open asks again", async () => {
     const { state, sockets } = await go("settings/members", { members: { used: 1, limit: 1 } });
-    const invite = () => screen().getByRole("region", { name: "Convidar pessoas" });
-    expect(within(invite()).getByRole("button", { name: "Convidar" }).hasAttribute("disabled")).toBe(true);
+    const invite = await inviteDialog();
+    expect(sendButton(invite()).hasAttribute("disabled")).toBe(true);
     // Read, then the plan changes before the socket opens: its `org.limits` went out to no one.
     state.limits = limits({ members: { used: 1, limit: 10 } });
     await act(async () => sockets.last().open());
     await settle(6);
     expect(invite().textContent).not.toContain("cabe 1 pessoa");
-    expect(within(invite()).getByRole("button", { name: "Convidar" }).hasAttribute("disabled")).toBe(false);
+    expect(sendButton(invite()).hasAttribute("disabled")).toBe(false);
   });
 
   test("Armazenamento: the meter, near the limit with the plan's options; on its own bucket, no limit from us", async () => {
@@ -180,7 +195,7 @@ describe("a workspace's limits (ADR 0079)", () => {
     };
     await renderApp("/invite/full", { api });
     await settle(4);
-    await click(screen().getByRole("button", { name: "Aceitar e entrar na Acme" }));
+    await click(screen().getByRole("button", { name: "Entrar na Acme" }));
     await settle(4);
     expect(screen().getByRole("alert").textContent).toBe(
       "Este workspace está sem lugar para mais pessoas agora. Avise quem convidou você.",

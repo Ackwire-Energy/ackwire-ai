@@ -79,11 +79,15 @@ export interface GroupedRowProps {
   value?: string;
   /** A chevron: it opens a screen. */
   chevron?: boolean;
+  /** Three dots: it opens a sheet of actions. */
+  more?: boolean;
   /** A checkmark: the chosen option. */
   checked?: boolean;
   /** A switch on the right (the whole row toggles). */
   toggle?: boolean;
   danger?: boolean;
+  /** The label in faint: something listed that won't count. */
+  faint?: boolean;
   disabled?: boolean;
   onPress?: () => void;
 }
@@ -100,14 +104,16 @@ export function GroupedRow({
   leading,
   value,
   chevron = false,
+  more = false,
   checked,
   toggle,
   danger = false,
+  faint = false,
   disabled = false,
   onPress,
 }: GroupedRowProps) {
   const { colors: c } = useTheme();
-  const tone = danger ? c.danger : c.ink;
+  const tone = danger ? c.danger : faint ? c.faint : c.ink;
   return (
     <Pressable
       onPress={onPress}
@@ -151,6 +157,7 @@ export function GroupedRow({
       {checked ? <Icon name="check" size={18} color={c.ink} /> : null}
       {toggle !== undefined ? <ToggleSwitch value={toggle} /> : null}
       {chevron ? <Icon name="right" size={15} color={c.faint} /> : null}
+      {more ? <Icon name="more" size={18} color={c.faint} /> : null}
     </Pressable>
   );
 }

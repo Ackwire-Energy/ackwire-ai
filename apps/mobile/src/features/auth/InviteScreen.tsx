@@ -2,6 +2,7 @@ import {
   ApiError,
   type AskToJoinResult,
   type InvitationPreview,
+  invitationQuery,
   keys,
   useApi,
   useAuthConfig,
@@ -22,32 +23,57 @@ import {
 import { emailTypoFix, isEmail } from "@agenteschat/client/lib/text";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { type ComponentRef, type ReactNode, type Ref, useEffect, useRef, useState } from "react";
+import { type ComponentRef, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AccessibilityInfo, ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { signOut } from "@/features/account";
 import { useNow } from "@/features/shared/hooks";
-import { agentLook, joinNames } from "@/features/shared/logic";
 import { useOrgGate } from "@/providers/org";
 import { useSession } from "@/providers/session";
-import { AgentAvatar, Button, haptics, Icon, InfoHint, LineIcon, Text, useTheme } from "@/ui";
+import { Button, haptics, Icon, InfoHint, Text, useTheme } from "@/ui";
 import { AuthField } from "@/ui/auth/AuthField";
 import { AuthLink } from "@/ui/auth/AuthLink";
 import { AuthScaffold, CENTER } from "@/ui/auth/AuthScaffold";
-import { SocialButtons, useSocialProviders } from "@/ui/auth/SocialButtons";
+import { AskWaiting } from "./AskWaiting";
+import { EmailSteps } from "./EmailSteps";
 import { useHumanCheck } from "./HumanCheck";
 import { CheckCancelled, failureText } from "./human-check";
-import { forgetInvite, rememberInvite } from "./invite";
-import { boldParts } from "./links";
+import { InviteGone, InviteLoadFailed, InviteLoading } from "./InviteGone";
+import { forgetInvite, keepAsk, rememberInvite, waitingAsk } from "./invite";
+import { AgentsThere, DidYouMean, LeaveButton, Said, useLeaveInvite } from "./invite-parts";
+import type { Asked } from "./invite-steps";
+import { LinkSteps } from "./LinkSteps";
 
 /**
- * An invitation's link opened in the app: who invited, the org, the
- * role and who already works there; the e-mail locked. Signed out: Apple, a password, or "Já tenho conta"
- * (the invitation waits and is accepted once the person is in). Signed in: one tap to join. Expired:
- * "Pedir um novo convite" (the person who invited gets the request at once), or, on a server that sends no
- * email, whom to ask. A workspace's invitation link only lets people ask to join (`AskToJoin`).
+ * An invitation's link opened in the app. A request this phone made through it still waits: its screen, which needs
+ * nothing from the server to show (`AskWaiting`, ADR 0090 §3), and it goes on through the signing in that ends it, so
+ * the invitation's other screens never flash on the way in.
  */
-export function InviteScreen({ token }: { token: string }) {
+export function InviteScreen({ token, mail }: { token: string; mail?: string }) {
+  const [asked, setAsked] = useState<Asked | null>(() => {
+    const waiting = waitingAsk();
+    return waiting?.token === token ? waiting : null;
+  });
+  if (asked) return <AskWaiting asked={asked} />;
+  return (
+    <Invitation
+      token={token}
+      mail={mail}
+      onAsked={(next) => {
+        keepAsk(next);
+        setAsked(next);
+      }}
+    />
+  );
+}
+
+/**
+ * What the link says, read from the server. A workspace's invitation link only lets people ask to join (`AskToJoin`,
+ * `LinkSteps`). An email invitation: paused, deleting or full says so before anyone makes an account (ADR 0090 §6);
+ * signed out, it asks only what's missing (`EmailSteps`); signed in, one tap to join, as the invited address. One
+ * that no longer opens says what happened to it (`InviteGone`).
+ */
+function Invitation({ token, mail, onAsked }: { token: string; mail?: string; onAsked: (asked: Asked) => void }) {
   const { t } = useTranslation();
   const api = useApi();
   const qc = useQueryClient();
@@ -55,54 +81,19 @@ export function InviteScreen({ token }: { token: string }) {
   const gate = useOrgGate();
   const me = useMe();
   const { colors: c } = useTheme();
-  const apple = useSocialProviders(["apple"]);
-  const preview = useQuery({
-    queryKey: keys.invitation(token),
-    queryFn: () => api.orgs.previewInvitation(token),
-    retry: false,
-  });
-  // Asking for a new one is an email to whoever invited.
-  const emails = sendsEmail(useAuthConfig().data);
+  const preview = useQuery(invitationQuery(api, token));
   const [error, setError] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
-  const [asked, setAsked] = useState(false);
+  // The steps signed in from here: they stay up while the session arrives and `me` reloads, until joining ends.
+  const [signingIn, setSigningIn] = useState(false);
 
-  if (preview.isPending || (session.signedIn && me.isPending)) {
-    return (
-      <View style={[styles.center, { backgroundColor: c.bg }]}>
-        <ActivityIndicator color={c.muted} />
-      </View>
-    );
-  }
-
+  if (preview.isPending || (session.signedIn && me.isPending && !signingIn)) return <InviteLoading />;
   const invitation = preview.data;
-  if (!invitation) {
-    return (
-      <AuthScaffold
-        title={t("invite.expiredTitle")}
-        subtitle={emails ? t("invite.expiredText") : `${t("invite.expiredText")} ${t("invite.ask.closedText")}`}
-        expression="closed"
-      >
-        {emails ? (
-          <Button
-            variant="primary"
-            wide
-            label={asked ? t("invite.askedNew") : t("invite.askNew")}
-            disabled={asked}
-            onPress={() =>
-              void api.invites
-                .requestNew(token)
-                .catch(() => undefined)
-                .finally(() => setAsked(true))
-            }
-          />
-        ) : null}
-        <LeaveButton />
-      </AuthScaffold>
-    );
-  }
-  if (invitation.kind === "link") return <AskToJoin token={token} preview={invitation} />;
-  // Its workspace is being deleted: it takes nobody, as a closed link says.
+  if (invitation === undefined)
+    return <InviteLoadFailed retrying={preview.isFetching} retry={() => void preview.refetch()} />;
+  if (invitation === null) return <InviteGone token={token} />;
+  if (invitation.kind === "link") return <LinkInvitation token={token} preview={invitation} onAsked={onAsked} />;
+  // Paused, or being deleted: it takes nobody, as a closed link says.
   if (invitation.closed) {
     return (
       <AuthScaffold title={t("invite.ask.closedTitle")} subtitle={t("invite.ask.closedText")} expression="closed">
@@ -112,18 +103,22 @@ export function InviteScreen({ token }: { token: string }) {
   }
 
   const org = invitation.orgName;
-  const title = invitation.invitedBy
-    ? t("mobile.invite.invitedBy", { name: invitation.invitedBy.split(/\s+/)[0], org })
-    : t("mobile.invite.invited", { org });
-  const role = t(`roles.${invitation.role}Lower`);
-  const user = me.data?.user;
-  const matches = user ? user.email.toLowerCase() === invitation.email.toLowerCase() : false;
+  if (invitation.full) {
+    return (
+      <AuthScaffold title={t("invite.fullTitle", { org })} subtitle={t("invite.fullLead")}>
+        <Text variant="small" tone="muted" style={CENTER}>
+          {t("invite.fullFine")}
+        </Text>
+        <LeaveButton />
+      </AuthScaffold>
+    );
+  }
 
   const join = async () => {
     setJoining(true);
     setError(null);
     try {
-      const { orgId } = await api.orgs.acceptInvitation(token);
+      const { orgId } = await api.orgs.acceptInvitation(token, mail);
       forgetInvite();
       await qc.invalidateQueries({ queryKey: keys.me });
       gate.choose(orgId);
@@ -134,16 +129,27 @@ export function InviteScreen({ token }: { token: string }) {
         invitedErrorText(t, e) ??
           (wrong ? t("mobile.invite.wrongAccount", { email: invitation.email }) : t("mobile.invite.failed")),
       );
+      // Signed in now, the account stays: what's below says why, and trying again only accepts.
+      setSigningIn(false);
+      // One that stopped working meanwhile then says what happened to it.
+      void qc.invalidateQueries({ queryKey: keys.invitation(token) });
     } finally {
       setJoining(false);
     }
   };
 
-  /** Signed out: the invitation waits, then the chosen way in. */
-  const signUpWith = (path: "/sign-up" | "/sign-in") => {
-    rememberInvite(token, "email");
-    router.push({ pathname: path, params: { email: invitation.email } });
-  };
+  if (!session.signedIn || signingIn) {
+    return (
+      <EmailSteps token={token} mail={mail} preview={invitation} onSigningIn={() => setSigningIn(true)} join={join} />
+    );
+  }
+
+  const title = invitation.invitedBy
+    ? t("mobile.invite.invitedBy", { name: invitation.invitedBy.split(/\s+/)[0], org })
+    : t("mobile.invite.invited", { org });
+  const role = t(`roles.${invitation.role}Lower`);
+  const user = me.data?.user;
+  const matches = user ? user.email.toLowerCase() === invitation.email.toLowerCase() : false;
 
   return (
     <AuthScaffold title={title} subtitle={t("mobile.invite.joinAs", { role })}>
@@ -160,101 +166,56 @@ export function InviteScreen({ token }: { token: string }) {
           {error}
         </Text>
       ) : null}
-      {session.signedIn ? (
-        matches ? (
-          <Button
-            variant="primary"
-            wide
-            label={t("mobile.invite.accept", { org })}
-            disabled={joining}
-            onPress={() => void join()}
-          />
-        ) : (
-          <>
-            <Text variant="small" tone="muted" style={CENTER}>
-              {t("mobile.invite.wrongAccount", { email: invitation.email })}
-            </Text>
-            <Button
-              variant="secondary"
-              wide
-              label={t("mobile.invite.otherAccount")}
-              onPress={() => {
-                rememberInvite(token, "email");
-                void signOut();
-              }}
-            />
-          </>
-        )
+      {matches ? (
+        <Button
+          variant="primary"
+          wide
+          label={t("mobile.invite.accept", { org })}
+          disabled={joining}
+          onPress={() => void join()}
+        />
       ) : (
         <>
-          {apple.length > 0 ? (
-            <View onTouchStart={() => rememberInvite(token, "email")}>
-              <SocialButtons providers={apple} divider={false} onError={setError} />
-            </View>
-          ) : null}
+          <Text variant="small" tone="muted" style={CENTER}>
+            {t("mobile.invite.wrongAccount", { email: invitation.email })}
+          </Text>
           <Button
-            variant={apple.length > 0 ? "secondary" : "primary"}
+            variant="secondary"
             wide
-            label={t("mobile.invite.createPassword")}
-            onPress={() => signUpWith("/sign-up")}
+            label={t("mobile.invite.otherAccount")}
+            // Signed out, this same screen goes on to the invited address's own step.
+            onPress={() => void signOut()}
           />
-          <Button variant="ghost" wide label={t("mobile.invite.haveAccount")} onPress={() => signUpWith("/sign-in")} />
         </>
       )}
     </AuthScaffold>
   );
 }
 
-/** Leaves an invitation that leads nowhere: home when signed in, else the sign-in. */
-function LeaveButton() {
-  const { t } = useTranslation();
+/**
+ * Which way a link asks: one question per screen when signed out where email goes out (`LinkSteps`, ADR 0090 §1);
+ * the account's own form when signed in, the typed form of ADR 0068 where no email goes out, and a link that no longer
+ * works (`AskToJoin`).
+ */
+function LinkInvitation({
+  token,
+  preview,
+  onAsked,
+}: {
+  token: string;
+  preview: InvitationPreview;
+  onAsked: (asked: Asked) => void;
+}) {
   const session = useSession();
-  return (
-    <Button
-      variant="ghost"
-      wide
-      label={t("mobile.invite.otherAccount")}
-      onPress={() => router.replace(session.signedIn ? "/" : "/sign-in")}
-    />
-  );
-}
-
-/** The faces leading "who already works there": as tall as that line, so they sit on it. */
-const FACE = 22;
-
-/** "Ada, Theo, Lia e mais 2 já trabalham lá", their faces leading the first line. */
-function AgentsThere({ agents, more }: { agents: NonNullable<InvitationPreview["agents"]>; more: number }) {
-  const { t } = useTranslation();
-  if (agents.length === 0) return null;
-  return (
-    <View style={styles.lead}>
-      <LineIcon variant="small" size={FACE}>
-        <View style={styles.faces}>
-          {agents.map((a, i) => (
-            <View key={a.id} style={i > 0 ? styles.overlap : undefined}>
-              <AgentAvatar agent={{ ...agentLook(a), id: a.id }} size={FACE} live={false} />
-            </View>
-          ))}
-        </View>
-      </LineIcon>
-      <Text variant="small" tone="muted" style={styles.grow}>
-        {t("invite.ask.agents", {
-          count: agents.length + more,
-          names: joinNames(
-            [...agents.map((a) => a.name), ...(more ? [t("invite.ask.moreAgents", { count: more })] : [])],
-            t("newAgent.and"),
-          ),
-        })}
-      </Text>
-    </View>
-  );
+  const emails = sendsEmail(useAuthConfig().data);
+  if (session.signedIn || preview.closed || !emails) return <AskToJoin token={token} preview={preview} />;
+  return <LinkSteps token={token} preview={preview} onAsked={onAsked} />;
 }
 
 /**
- * A workspace's invitation link (ADR 0068): whoever opens it asks, and an admin of the workspace approves each
- * person. Signed out they type a name and an email, and no account is made: the answer comes by email. Signed in
- * their account asks, and the screen checks for the answer while it is open. The same states as the web's page
- * (`askView`).
+ * A workspace's invitation link (ADR 0068) outside `LinkSteps`: an admin of the workspace approves each person.
+ * Signed in their account asks, and the screen checks for the answer while it is open; where no email goes out they
+ * type a name and an email, and no account is made. The same states as the web's page (`askView`).
  */
 function AskToJoin({ token, preview }: { token: string; preview: InvitationPreview }) {
   const { t } = useTranslation();
@@ -284,23 +245,24 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
-  const [proof, setProof] = useState<{ email: string; code: string } | null>(null);
+  // The code that proved the account's address (for 30 minutes).
+  const [proof, setProof] = useState<string | null>(null);
+  const leave = useLeaveInvite();
   const emailField = useRef<ComponentRef<typeof AuthField>>(null);
   const noteField = useRef<ComponentRef<typeof AuthField>>(null);
 
   const org = preview.orgName;
   const address = sent?.email ?? preview.you?.email ?? user?.email ?? "";
   const emailsGoOut = sent?.emailed ?? sendsEmail(config.data);
-  // On a server that sends email, an address that isn't a confirmed account's proves itself first (ADR 0072).
-  const proofNeeded = emailsGoOut && !user?.emailVerified;
-  const typedEmail = user ? user.email : email;
-  const proven = proof !== null && proof.email === typedEmail.trim().toLowerCase();
+  // On a server that sends email, an account whose address isn't confirmed proves it first (ADR 0072).
+  const proofNeeded = emailsGoOut && user !== null && !user.emailVerified;
+  const proven = proof !== null;
   const human = useHumanCheck(view.state === "form" && proofNeeded ? "ask-code" : null);
   const fix = user ? null : emailTypoFix(email);
   const ready = (user !== null || (name.trim() !== "" && isEmail(email))) && (!proofNeeded || proven);
   const refresh = () => qc.invalidateQueries({ queryKey: keys.invitation(token) });
   const onProven = (code: string) => {
-    setProof({ email: typedEmail.trim().toLowerCase(), code });
+    setProof(code);
     noteField.current?.focus();
   };
 
@@ -312,7 +274,7 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
       const result = await api.invites.ask(token, {
         ...(user ? {} : { name: name.trim(), email: email.trim() }),
         ...(note.trim() ? { note: note.trim() } : {}),
-        ...(proofNeeded && proof ? { code: proof.code } : {}),
+        ...(proofNeeded && proof ? { code: proof } : {}),
       });
       haptics.success();
       setSent(result);
@@ -327,11 +289,6 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
     } finally {
       setAsking(false);
     }
-  };
-
-  const leave = () => {
-    if (router.canGoBack()) router.back();
-    else router.replace(session.signedIn ? "/" : "/sign-in");
   };
 
   let title: string;
@@ -422,23 +379,12 @@ function AskToJoin({ token, preview }: { token: string; preview: InvitationPrevi
               onSubmitEditing={() => emailField.current?.focus()}
             />
           )}
-          {proofNeeded ? (
-            // Signed in, the account's own address, read-only, takes the place of "You'll ask as".
-            <EmailProof
-              token={token}
-              email={typedEmail}
-              onEmail={user ? undefined : setEmail}
-              emailRef={emailField}
-              proven={proven}
-              onProven={onProven}
-              check={human.check}
-            >
-              {fix ? <DidYouMean fix={fix} onFix={setEmail} /> : null}
-              {user ? (
-                <View style={styles.as}>
-                  <NotYou />
-                </View>
-              ) : null}
+          {user && proofNeeded ? (
+            // The account's own address, read-only, takes the place of "You'll ask as".
+            <EmailProof token={token} email={user.email} proven={proven} onProven={onProven} check={human.check}>
+              <View style={styles.as}>
+                <NotYou />
+              </View>
             </EmailProof>
           ) : user ? null : (
             <View style={styles.field}>
@@ -529,33 +475,18 @@ function NotYou() {
   );
 }
 
-/** "Did you mean …?" under an address with a common typo. */
-function DidYouMean({ fix, onFix }: { fix: string; onFix: (email: string) => void }) {
-  const { t } = useTranslation();
-  return (
-    <Pressable onPress={() => onFix(fix)} accessibilityRole="button" hitSlop={6}>
-      <Text variant="subhead" style={styles.link}>
-        {t("auth.flow.didYouMean", { email: fix })}
-      </Text>
-    </Pressable>
-  );
-}
-
 /** What the slot inside the email's right edge shows: every one is laid out, so the slot never changes width. */
 const SLOTS = ["verify", "wait", "resend", "verified"] as const;
 type Slot = (typeof SLOTS)[number];
 
 /**
- * The ask's email with Verify inside its right edge (ADR 0072): a code goes to the address, and typed back here it
- * proves it. Verify, the countdown, Resend and Verified share one slot as wide as the longest, so the address never
- * moves. A code and a proof belong to the address they were for: editing the email starts over. `onEmail` absent:
- * the signed-in account's own address, read-only. `children` go under the email.
+ * The signed-in account's address, read-only, with Verify inside its right edge (ADR 0072): a code goes to it, and
+ * typed back here it proves it. Verify, the countdown, Resend and Verified share one slot as wide as the longest, so
+ * the address never moves. `children` go under the email.
  */
 function EmailProof({
   token,
   email,
-  onEmail,
-  emailRef,
   proven,
   onProven,
   check,
@@ -563,8 +494,6 @@ function EmailProof({
 }: {
   token: string;
   email: string;
-  onEmail?: (email: string) => void;
-  emailRef?: Ref<ComponentRef<typeof AuthField>>;
   proven: boolean;
   onProven: (code: string) => void;
   check: HumanCheck | null;
@@ -588,7 +517,6 @@ function EmailProof({
   // A repaint every second while the countdown runs; the time itself is read just above.
   useNow(left > 0 && !proven ? 1000 : 60_000);
   const said = error?.email === key ? error.text : null;
-  const body = onEmail ? { email: email.trim() } : {};
   const showCode = out && !proven;
   const slot: Slot = proven ? "verified" : !out ? "verify" : left > 0 ? "wait" : "resend";
 
@@ -606,7 +534,7 @@ function EmailProof({
     const to = key;
     setSending(true);
     try {
-      const r = await withHumanCheck(check, (humanCheck) => api.invites.sendCode(token, body, humanCheck));
+      const r = await withHumanCheck(check, (humanCheck) => api.invites.sendCode(token, {}, humanCheck));
       codeOut(to, r.resendIn);
     } catch (e) {
       if (e instanceof CheckCancelled) return;
@@ -623,7 +551,7 @@ function EmailProof({
     const to = key;
     setChecking(true);
     try {
-      await api.invites.checkCode(token, { ...body, code: typed });
+      await api.invites.checkCode(token, { code: typed });
       setError(null);
       haptics.success();
       AccessibilityInfo.announceForAccessibility(t("invite.ask.verified"));
@@ -654,10 +582,8 @@ function EmailProof({
       <View style={styles.field}>
         <View style={styles.inside}>
           <AuthField
-            ref={emailRef}
             value={email}
-            onChangeText={onEmail}
-            editable={onEmail !== undefined}
+            editable={false}
             placeholder={t("invite.ask.email")}
             accessibilityLabel={t("invite.ask.email")}
             keyboardType="email-address"
@@ -672,7 +598,7 @@ function EmailProof({
             {SLOTS.map((s) => {
               const shown = s === slot;
               const press = s === "verify" || s === "resend";
-              const off = capped === key || (s === "verify" && !isEmail(email));
+              const off = capped === key;
               return (
                 <Pressable
                   key={s}
@@ -744,42 +670,11 @@ function EmailProof({
   );
 }
 
-/** Stands in for the person's words while the sentence is split into its bold label and the rest. */
-const WORDS = "\u2063";
-
-/** Someone else's words, as they wrote them (an admin's note to someone turned down), after the label in bold. */
-function Said({ reason }: { reason: string }) {
-  const { t } = useTranslation();
-  const { colors: c } = useTheme();
-  return (
-    <View style={[styles.said, { backgroundColor: c.sunken }]}>
-      <Text variant="body">
-        {boldParts(t("invite.ask.reasonSaid", { reason: WORDS })).map((part, i) =>
-          part.bold ? (
-            // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one fixed sentence, in order
-            <Text key={i} variant="body" style={styles.link}>
-              {part.text.replace(WORDS, reason)}
-            </Text>
-          ) : (
-            part.text.replace(WORDS, reason)
-          ),
-        )}
-      </Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  lead: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
-  faces: { flexDirection: "row" },
-  overlap: { marginLeft: -6 },
-  grow: { flex: 1, minWidth: 0 },
   locked: { gap: 2, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14 },
   field: { gap: 6 },
   as: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", columnGap: 6, rowGap: 2 },
   link: { fontWeight: "600" },
-  said: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14 },
   // Verify's slot sits inside the email's right edge, as the password's eye does.
   inside: { justifyContent: "center" },
   slot: { position: "absolute", right: 4, alignItems: "center" },

@@ -1,4 +1,5 @@
 import type { ChannelEvent, ConsultationStatus, OpenConsult } from "../api/types";
+import { isMediaAfterReply } from "../lib/media";
 
 /**
  * An agent asking another agent, live (`agent.consulting` → `agent.consulted`):
@@ -106,7 +107,8 @@ export function applyConsultEvent(
     case "message.created": {
       const message = (event as Extract<ChannelEvent, { type: "message.created" }>).message;
       const runId = message?.agentRunId;
-      if (!runId) return state;
+      // An agent's sticker after its reply (ADR 0091) is no answer: what its run still asks stays out.
+      if (!runId || isMediaAfterReply(message?.meta)) return state;
       // "I asked; I'll tell you when the answer comes": the question is still out.
       const next = dropIfBack(state, runId);
       return message.author.type === "agent" ? dropBackOf(next, message.author.id, message.channelId) : next;

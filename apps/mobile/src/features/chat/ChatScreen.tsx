@@ -7,6 +7,7 @@ import {
   type LiveRun,
   MESSAGES_PAGE,
   type Message,
+  type MessageMedia,
   type MessagePin,
   type RunConsultation,
   sendHelpers,
@@ -27,6 +28,7 @@ import {
   useMissionControl,
   usePostMessage,
   useRoster,
+  useSettings,
   useSteerState,
   useThreadInfo,
   useThreadMessages,
@@ -41,11 +43,18 @@ import {
 } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
+import {
+  isMediaAfterReply,
+  isMediaAlone,
+  mediaTabsOf,
+  messageMediaOf,
+  textOrMedia,
+} from "@agenteschat/client/lib/media";
 import { isEventLine } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { KeyboardAwareLegendList, useKeyboardChatComposerInset } from "@legendapp/list/keyboard";
-import type { LegendListRef } from "@legendapp/list/react-native";
+import type { LegendListRef, OnViewableItemsChanged } from "@legendapp/list/react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -64,6 +73,8 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StickerStageContext } from "@/agent/StickerCanvas";
+import { createStickerStage } from "@/agent/sticker-stage";
 import { holdOpenConversation } from "@/lib/push";
 import { useOrg } from "@/providers/org";
 import { useRealtime } from "@/providers/realtime";
@@ -89,7 +100,7 @@ import { isOpenMission } from "../missions/logic";
 import { RemindSheet } from "../reminders/RemindSheet";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
-import { agentLook } from "../shared/logic";
+import { agentLook, previewOf } from "../shared/logic";
 import { FocusLive, PushedHeader, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { useDmStatusLine, usePresenceWord } from "../status/hooks";
@@ -119,8 +130,10 @@ import {
   stoppableInLine,
   workingEntries,
 } from "./logic";
+import { MediaPickerSheet } from "./MediaPickerSheet";
 import { MentionPicker, useMentionMembers } from "./MentionPicker";
 import { MessageRow } from "./MessageRow";
+import { stickerRowsOnScreen } from "./media";
 import { insertMention, mentionQuery } from "./mentions";
 import { NoAiBanner } from "./NoAiBanner";
 import { endsOnNoAiCard, noAiBanner } from "./no-ai-banner";
@@ -174,10 +187,15 @@ const rowKey = (r: Row) => r.key;
 const rowType = (r: Row) => {
   if (r.kind === "run" || (r.kind === "message" && r.key.startsWith("turn-"))) return "turn";
   if (r.kind !== "message") return r.kind;
+  // A GIF or a sticker alone (ADR 0091) is about its picture's size, not a text's.
+  const media = r.message.body.trim() ? null : messageMediaOf(r.message.meta);
+  if (media) return `message-${media.kind}`;
   const n = r.message.body.length;
   const size = n < 80 ? "s" : n < 320 ? "m" : n < 1200 ? "l" : "xl";
   return r.message.meta && Object.keys(r.message.meta).length > 0 ? `message-${size}-card` : `message-${size}`;
 };
+/** A sticker's row counts as in view from here: one barely in at the edge doesn't take a place among those playing. */
+const STICKER_VIEW = { id: "stickers", itemVisiblePercentThreshold: 30 };
 const DIVIDER_KEY = "unseen-divider";
 /** The "Novas" line stays this long after the person reached it, then fades (~0.6 s). */
 const DIVIDER_FADE_MS = 3500;
@@ -434,9 +452,9 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     const registry = turnKeysRef.current;
     return (runId: string) => registry.get(runId)?.key;
   }, [shownRuns]);
-  // The messages an agent read while working (its "Leu seu recado" wells quote them).
+  // The messages an agent read while working (its "Leu seu recado" wells quote them; a GIF or a sticker by its word).
   const bodiesRef = useRef(new Map<string, string>());
-  bodiesRef.current = useMemo(() => new Map(list.map((m) => [m.id, m.body])), [list]);
+  bodiesRef.current = useMemo(() => new Map(list.map((m) => [m.id, textOrMedia(t, m.body, m.meta)])), [list, t]);
   const bodyOf = useCallback((id: string) => bodiesRef.current.get(id), []);
   const [openBrowsers, setOpenBrowsers] = useState<ReadonlySet<string>>(() => new Set());
   const toggleBrowser = useCallback((agentId: string, open: boolean) => {
@@ -549,6 +567,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         key: r.key,
         kind: r.kind === "message" ? "message" : r.kind === "run" ? "run" : "other",
         mine: r.kind === "message" && r.message.author.type === "person" && r.message.author.id === meId,
+        // An agent's sticker or GIF after its reply (ADR 0091) is never news of its own.
+        silent: r.kind === "message" && isMediaAfterReply(r.message.meta),
         ...(r.kind === "message" && r.message.author.id
           ? { who: `${r.message.author.type}:${r.message.author.id}` }
           : r.kind === "run"
@@ -698,10 +718,13 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const post = usePostMessage(orgId, channelId, {
     me: { id: meId ?? "" },
     // An agent DM: "pensando…" at once, on the message the agent answers. Not when it went into the work
-    // already going (the server steered it: no second run, its block says "lê na próxima pausa").
+    // already going (the server steered it: no second run, its block says "lê na próxima pausa"), nor for a GIF or a
+    // sticker alone, which no agent answers (ADR 0091).
     onSent: (message) => {
       const steered = Array.isArray(message.meta?.steeredRunIds) && message.meta.steeredRunIds.length > 0;
-      if (dmAgentId && !steered) live.expect(message.threadId ?? message.id, [dmAgentId], message.id);
+      if (dmAgentId && !steered && !isMediaAlone(message)) {
+        live.expect(message.threadId ?? message.id, [dmAgentId], message.id);
+      }
     },
     onFailed: (_error, { waits }) => {
       if (!waits) toast({ title: t("mobile.chat.notSent"), icon: "x" });
@@ -806,6 +829,26 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       }
     }
   };
+
+  // GIFs and stickers (ADR 0091): the button only where one can go; one tap in the sheet sends it like any message of
+  // mine. The list is aimed at the end before the sheet closes: the place it held under the sheet doesn't come back.
+  const settings = useSettings(orgId).data;
+  const mediaTabs = mediaTabsOf(settings, dir.agents.length, Boolean(api.gifs));
+  const sendMedia = (media: MessageMedia) => {
+    send("", threadId, { media });
+    toEnd();
+    sheet.close();
+  };
+  const openMedia = () =>
+    sheet.open(
+      <MediaPickerSheet
+        tabs={mediaTabs}
+        channelId={channelId}
+        isDm={Boolean(dm)}
+        dmAgentId={dmAgentId}
+        onSend={sendMedia}
+      />,
+    );
 
   const upload = async (file: { uri: string; name: string; type: string }) => {
     toast({ title: t("mobile.chat.uploading"), icon: "file" });
@@ -917,12 +960,14 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   const info = thread.data;
   // A task's work thread: its root was written by the server in one language ("Issue #1: …"); the card's
   // number and title, in the reader's.
-  const rootWork = isThread ? issueWorkOf(list.find((m) => m.id === threadId)?.meta) : null;
+  const root = isThread ? list.find((m) => m.id === threadId) : undefined;
+  const rootWork = issueWorkOf(root?.meta);
   const title = isThread
     ? rootWork
       ? t("issues.open", { number: rootWork.number, title: rootWork.title })
       : info
-        ? threadTitle(info)
+        ? // A thread on a GIF or a sticker has no words of its own to title it (ADR 0091).
+          threadTitle(info) || previewOf(root ? textOrMedia(t, root.body, root.meta) : "") || t("mobile.chat.thread")
         : ""
     : dm
       ? dm.with.name
@@ -1014,6 +1059,13 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
     };
     requestAnimationFrame(check);
   }, []);
+  // Stickers play in the rows in view (a few of them), never under a sheet (ADR 0091).
+  const [stickers] = useState(createStickerStage);
+  useEffect(() => sheet.subscribe(stickers.setCovered), [sheet, stickers]);
+  const onViewable = useCallback<NonNullable<OnViewableItemsChanged<Row>>>(
+    ({ viewableItems }) => stickers.setOnScreen(stickerRowsOnScreen(viewableItems)),
+    [stickers],
+  );
   // While something covers the conversation (a sheet, the agent's computer) the list ignores the keyboard: it
   // leaving under the cover, or coming back, must not move it (Bluesky and Mattermost freeze or dismiss first too).
   const freeze = useSharedValue(false);
@@ -1311,8 +1363,15 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
           // An agent took an issue made from this conversation: one quiet line, not a voice.
           if (issueTakenOf(item.message.meta)) return <IssueTakenLine message={item.message} />;
           return (
-            // A finished reply replaces its streaming row in place: it doesn't rise in again.
-            <Animated.View entering={isFresh(item.key) && !item.message.agentRunId ? ENTER : undefined}>
+            // A finished reply replaces its streaming row in place: it doesn't rise in again. An agent's sticker or
+            // GIF after its reply (ADR 0091) replaces nothing: it rises in.
+            <Animated.View
+              entering={
+                isFresh(item.key) && (!item.message.agentRunId || isMediaAfterReply(item.message.meta))
+                  ? ENTER
+                  : undefined
+              }
+            >
               <MessageRow
                 message={item.message}
                 grouped={item.grouped}
@@ -1532,49 +1591,53 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
               <Animated.View style={[styles.grow, listFade]}>
                 {/* The list's frame, where the waiting requests' cards are measured from (never flattened away). */}
                 <View ref={listFrame} collapsable={false} style={styles.grow} onLayout={watchAsks}>
-                  <KeyboardAwareLegendList
-                    ref={listRef}
-                    style={styles.grow}
-                    data={shownRows}
-                    keyExtractor={rowKey}
-                    getItemType={rowType}
-                    renderItem={renderItem}
-                    // The list redraws mounted rows only when this changes: what a row shows beyond its message (the
-                    // thread link that loads after it, a held state) lives in `renderItem`'s dependencies.
-                    extraData={renderItem}
-                    estimatedItemSize={72}
-                    // Opens at the latest message, short conversations sit at the bottom like any chat.
-                    initialScrollAtEnd
-                    alignItemsAtEnd
-                    // New messages, a reply growing word by word and the working line keep the end in view, but
-                    // only while the person is near it.
-                    maintainScrollAtEnd={!readHold}
-                    maintainScrollAtEndThreshold={STICK_TO_END_THRESHOLD}
-                    // Older pages above and rows changing size keep what is on screen still.
-                    maintainVisibleContentPosition
-                    // Our own insets, never the system's (the keyboard library's advice for chat lists): the bar's
-                    // room is the content's top padding, the indicator kept below the bar.
-                    contentInsetAdjustmentBehavior="never"
-                    automaticallyAdjustContentInsets={false}
-                    scrollIndicatorInsets={{ top: headerHeight }}
-                    // Still while a sheet or the agent's computer covers the conversation.
-                    freeze={freeze}
-                    onReady={revealList}
-                    onStartReached={loadOlder}
-                    // A look at the waiting requests' cards, once a frame and only while one waits.
-                    onScroll={watchAsks}
-                    onScrollBeginDrag={() => {
-                      dragging.current = true;
-                    }}
-                    onScrollEndDrag={releaseAtEnd}
-                    onMomentumScrollEnd={releaseAtEnd}
-                    onStartReachedThreshold={0.5}
-                    keyboardDismissMode="interactive"
-                    keyboardShouldPersistTaps="handled"
-                    keyboardOffset={lift}
-                    contentInsetEndAdjustment={contentInsetEndAdjustment}
-                    contentContainerStyle={listPad}
-                  />
+                  <StickerStageContext.Provider value={stickers}>
+                    <KeyboardAwareLegendList
+                      ref={listRef}
+                      style={styles.grow}
+                      data={shownRows}
+                      keyExtractor={rowKey}
+                      getItemType={rowType}
+                      renderItem={renderItem}
+                      // The list redraws mounted rows only when this changes: what a row shows beyond its message (the
+                      // thread link that loads after it, a held state) lives in `renderItem`'s dependencies.
+                      extraData={renderItem}
+                      estimatedItemSize={72}
+                      // Opens at the latest message, short conversations sit at the bottom like any chat.
+                      initialScrollAtEnd
+                      alignItemsAtEnd
+                      // New messages, a reply growing word by word and the working line keep the end in view, but
+                      // only while the person is near it.
+                      maintainScrollAtEnd={!readHold}
+                      maintainScrollAtEndThreshold={STICK_TO_END_THRESHOLD}
+                      // Older pages above and rows changing size keep what is on screen still.
+                      maintainVisibleContentPosition
+                      // Our own insets, never the system's (the keyboard library's advice for chat lists): the bar's
+                      // room is the content's top padding, the indicator kept below the bar.
+                      contentInsetAdjustmentBehavior="never"
+                      automaticallyAdjustContentInsets={false}
+                      scrollIndicatorInsets={{ top: headerHeight }}
+                      // Still while a sheet or the agent's computer covers the conversation.
+                      freeze={freeze}
+                      onReady={revealList}
+                      onStartReached={loadOlder}
+                      // A look at the waiting requests' cards, once a frame and only while one waits.
+                      onScroll={watchAsks}
+                      onViewableItemsChanged={onViewable}
+                      viewabilityConfig={STICKER_VIEW}
+                      onScrollBeginDrag={() => {
+                        dragging.current = true;
+                      }}
+                      onScrollEndDrag={releaseAtEnd}
+                      onMomentumScrollEnd={releaseAtEnd}
+                      onStartReachedThreshold={0.5}
+                      keyboardDismissMode="interactive"
+                      keyboardShouldPersistTaps="handled"
+                      keyboardOffset={lift}
+                      contentInsetEndAdjustment={contentInsetEndAdjustment}
+                      contentContainerStyle={listPad}
+                    />
+                  </StickerStageContext.Provider>
                 </View>
               </Animated.View>
               {showList ? null : (
@@ -1662,6 +1725,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                   onSend={onSend}
                   working={working}
                   onPlus={() => sheet.open(<PlusActions onPick={(p) => void onPlus(p)} />)}
+                  media={mediaTabs.length > 0 ? { label: t("media.picker.send"), onPress: openMedia } : null}
                   inputNativeID={COMPOSER_INPUT_ID}
                   {...(suggestions.length > 0 ? { suggestions } : {})}
                   {...(dmAgentId && !isThread ? { face: <AgentFace agentId={dmAgentId} size={22} /> } : {})}
