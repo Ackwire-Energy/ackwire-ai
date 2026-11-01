@@ -8067,6 +8067,7 @@ export const ptBR = {
       accountNotFound: "Esta caixa de email não está mais conectada. Conecte de novo em Conectores.",
       fromNotMailbox: "“Enviar como” precisa ser um endereço desta caixa. Escolha outro.",
       ownerOnly: "Só {{ownerName}} pode dar a um agente acesso a {{address}}: foi quem conectou a caixa.",
+      ownerOnlyUnknown: "Só quem conectou {{address}} pode dar a um agente acesso a ela.",
     },
     join: {
       linkClosed: "Este link não funciona mais. Peça um novo a quem mandou.",

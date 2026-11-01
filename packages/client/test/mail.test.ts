@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import type { TFunction } from "i18next";
 import { ApiError, createHttpApi } from "../src/index";
+import { knownErrorText } from "../src/lib/errors";
 import {
   canSendWithoutAsking,
   choiceOf,
@@ -160,4 +162,14 @@ test("only who connected a mailbox gives access to it; whoever manages the agent
     removes: false,
   });
   expect(mailAccessOf({ ownerUserId: null }, { userId: null, talks: true, managesAgent: true }).gives).toBe(false);
+});
+
+test("the owner-only refusal names who connected the mailbox, or says so without a blank name", () => {
+  const t = ((key: string, o?: Record<string, unknown>) => `${key} ${JSON.stringify(o)}`) as unknown as TFunction;
+  const refusal = (ownerName: string) =>
+    new ApiError(403, "mail.owner_only", "Only", { address: "x@y.com", ownerUserId: "", ownerName });
+  expect(knownErrorText(t, refusal("Ana"))).toStartWith("errors.mail.ownerOnly {");
+  expect(knownErrorText(t, refusal(""))).toBe(
+    'errors.mail.ownerOnlyUnknown {"address":"x@y.com","ownerUserId":"","ownerName":""}',
+  );
 });

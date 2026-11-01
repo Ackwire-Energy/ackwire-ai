@@ -8012,6 +8012,7 @@ export const en: Translations = {
       accountNotFound: "This mailbox is no longer connected. Connect it again in Connectors.",
       fromNotMailbox: "“Send as” must be one of this mailbox's addresses. Pick another one.",
       ownerOnly: "Only {{ownerName}} can give an agent access to {{address}}: they connected it.",
+      ownerOnlyUnknown: "Only the person who connected {{address}} can give an agent access to it.",
     },
     join: {
       linkClosed: "This link no longer works. Ask whoever sent it for a new one.",

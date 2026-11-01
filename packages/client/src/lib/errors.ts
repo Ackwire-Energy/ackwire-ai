@@ -308,6 +308,9 @@ export function knownErrorText(t: TFunction, error: unknown, locale = "en"): str
   if (restriction) return restriction;
   const limit = limitRefusalText(t, locale, error.code, error.params);
   if (limit) return limit;
+  // The person who connected the mailbox is gone or unnamed: no blank name in the sentence.
+  if (error.code === "mail.owner_only" && !error.params?.ownerName)
+    return t("errors.mail.ownerOnlyUnknown", error.params);
   const key = KNOWN[error.code as keyof typeof KNOWN];
   if (key) return t(key, { max: MAX_UPLOAD_MB, ...error.params });
   return error.status === 429 || error.code === "rate_limited" ? t("common.tooMany") : null;
