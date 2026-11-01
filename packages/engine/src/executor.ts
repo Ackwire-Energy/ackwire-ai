@@ -1032,7 +1032,12 @@ async function executeRunInner(
       readsWiki && !viaRoutine
         ? retrieveWikiForRun(
             { db, search: contextDeps },
-            { orgId: run.orgId, agentId: agent.id, text: trigger?.body ?? "" },
+            {
+              orgId: run.orgId,
+              agentId: agent.id,
+              text: trigger?.body ?? "",
+              readers: { channelId: run.channelId, person: async () => (await runAuthority(db, run)).personId },
+            },
           ).catch(() => ({ text: "", pageIds: [] as string[] }))
         : Promise.resolve({ text: "", pageIds: [] as string[] }),
     ]);

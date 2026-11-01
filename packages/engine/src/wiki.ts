@@ -734,7 +734,8 @@ export async function createWikiPage(
     if (!wanted) throw new ValidationError("The title needs letters or numbers", "wiki.title_empty_slug");
     const existing = (await pagesBySlug(tx, orgId, [wanted])).get(wanted);
     // A restricted page the writer doesn't see takes the next free slug instead of naming itself in the conflict.
-    const hidden = existing?.restricted && actor.type === "person" && !(await sees(tx, actor.userId, existing));
+    const who = actor.type === "person" ? actor.userId : actor.requestedByUserId;
+    const hidden = existing?.restricted && who && !(await sees(tx, who, existing));
     if (existing && existing.slug === wanted && !options.allowDuplicate && !hidden) {
       throw new ConflictError(`A page "${existing.title}" already exists`, "slug_taken", {
         title: existing.title,
@@ -1120,14 +1121,17 @@ export async function renameWikiPage(
     let slug = current.slug;
     if (wanted !== current.slug) {
       const [taken] = await tx
-        .select({ id: wikiPages.id, title: wikiPages.title })
+        .select({ id: wikiPages.id, title: wikiPages.title, restricted: wikiPages.restricted })
         .from(wikiPages)
         .where(and(eq(wikiPages.orgId, orgId), eq(wikiPages.slug, wanted), isNull(wikiPages.deletedAt)));
-      if (taken)
+      const who = actor.type === "person" ? actor.userId : actor.requestedByUserId;
+      // A page the renamer doesn't see is never named: the page takes the next free address instead.
+      if (taken?.restricted && who && !(await sees(tx, who, taken))) slug = await freeSlug(tx, orgId, wanted);
+      else if (taken)
         throw new ConflictError(`A page "${taken.title}" already uses this address`, "slug_taken", {
           title: taken.title,
         });
-      slug = wanted;
+      else slug = wanted;
     }
     const aliases = [...new Set([...current.aliases, current.slug])].filter((a) => a !== slug).slice(-20);
     const [page] = await tx
@@ -1146,11 +1150,14 @@ export async function renameWikiPage(
     if (!page) throw new NotFoundError("Page not found", "wiki.page_not_found");
     await addVersion(tx, page, actor, await defaultNote(tx, actor, `renamed from "${current.title}" to "${title}"`));
     await claimLinks(tx, page);
-    // Pages that link here: rewrite their `[[…]]` to the new title, as a new version each.
-    const linking = await tx
-      .select({ id: wikiLinks.fromId })
-      .from(wikiLinks)
-      .where(and(eq(wikiLinks.orgId, orgId), eq(wikiLinks.fromType, "page"), eq(wikiLinks.toPageId, page.id)));
+    // Pages that link here: rewrite their `[[…]]` to the new title, as a new version each. Not for a restricted
+    // page: its new title would land in pages its audience doesn't cover, and the old slug resolves as an alias.
+    const linking = current.restricted
+      ? []
+      : await tx
+          .select({ id: wikiLinks.fromId })
+          .from(wikiLinks)
+          .where(and(eq(wikiLinks.orgId, orgId), eq(wikiLinks.fromType, "page"), eq(wikiLinks.toPageId, page.id)));
     const touched: string[] = [];
     for (const { id } of linking) {
       const [other] = await tx
@@ -1268,15 +1275,11 @@ export async function restoreWikiPage(deps: WikiDeps, actor: WikiActor, orgId: s
   await requireWriter(db, actor, orgId, page);
   const row = await db.transaction(async (tx) => {
     const [taken] = await tx
-      .select({ title: wikiPages.title })
+      .select({ id: wikiPages.id })
       .from(wikiPages)
       .where(and(eq(wikiPages.orgId, orgId), eq(wikiPages.slug, page.slug), isNull(wikiPages.deletedAt)));
-    if (taken)
-      throw new ConflictError(
-        `Another page uses this address ("${taken.title}"): rename it first`,
-        "wiki.restore_slug_taken",
-        { title: taken.title },
-      );
+    // No title: the page holding the address may be one the restorer doesn't see.
+    if (taken) throw new ConflictError("Another page uses this address: rename it first", "wiki.restore_slug_taken");
     const [restored] = await tx
       .update(wikiPages)
       .set({ deletedAt: null, updatedAt: new Date() })
@@ -1879,7 +1882,7 @@ export async function createPageFromSource(
  */
 export async function retrieveWikiForRun(
   deps: WikiDeps,
-  input: { orgId: string; agentId: string; text: string; budgetChars?: number },
+  input: { orgId: string; agentId: string; text: string; budgetChars?: number; readers: WikiRunReaders },
 ): Promise<{ text: string; pageIds: string[] }> {
   const { db } = deps;
   const hasAny = (await caches.contextPresence.getOrLoad(`${input.orgId}:wiki`, async () => {
@@ -1917,6 +1920,11 @@ export async function retrieveWikiForRun(
     5,
   ).catch(() => [] as PageRow[]);
   const budget = input.budgetChars ?? 6000;
+  const outside = await restrictedOutsiders(
+    db,
+    [...namedRows, ...found].filter((p) => p.restricted).map((p) => p.id),
+    input.readers,
+  );
   const lines: string[] = [];
   const ids: string[] = [];
   let used = 0;
@@ -1929,14 +1937,63 @@ export async function retrieveWikiForRun(
     if (room < 120) break;
     const body = p.body.trim();
     const where = `${p.folder ? `${p.folder}/` : ""}${p.slug}, v${p.version}`;
-    const text = full.has(p.id)
-      ? `## [[${p.title}]] (${where})\n${body.length > room ? `${cutText(body, room)}\n[… continues: read it with read_wiki_page]` : body}`
-      : `- [[${p.title}]] (${where}): ${cutText(body.replace(/\s+/g, " "), room)}${body.length > room ? "… [read it with read_wiki_page]" : ""}`;
+    // The person the run acts for doesn't see it: no text in the prompt, only the rule and where to read it.
+    const text = outside.person.has(p.id)
+      ? `- [[${p.title}]] (${where}): ${RESTRICTED_WIKI_RULE} Read it with read_wiki_page only when you need it to decide.`
+      : outside.some.has(p.id)
+        ? `## [[${p.title}]] (${where})\n${RESTRICTED_WIKI_RULE}\n${body.length > room ? `${cutText(body, room)}\n[… continues: read it with read_wiki_page]` : body}`
+        : full.has(p.id)
+          ? `## [[${p.title}]] (${where})\n${body.length > room ? `${cutText(body, room)}\n[… continues: read it with read_wiki_page]` : body}`
+          : `- [[${p.title}]] (${where}): ${cutText(body.replace(/\s+/g, " "), room)}${body.length > room ? "… [read it with read_wiki_page]" : ""}`;
     lines.push(text);
     ids.push(p.id);
     used += text.length;
   }
   return { text: lines.join("\n\n"), pageIds: ids };
+}
+
+/** Who reads what a run writes: the person it acts for (null for nobody) and the channel it answers in. */
+export interface WikiRunReaders {
+  channelId: string | null;
+  person: () => Promise<string | null>;
+}
+
+/** Marks a restricted page in an agent's context when someone in the conversation can't see it. */
+export const RESTRICTED_WIKI_RULE =
+  "Restricted page: someone in this conversation can't see it. Use it to decide; never quote or summarize it, and never reveal its title, its text or that it exists.";
+
+/**
+ * Of these restricted pages, the ones someone who reads the conversation doesn't see (`some`), and the ones the person
+ * the run acts for doesn't see (`person`, a subset). The channel's readers are its members (a forum topic: the whole
+ * workspace). With neither a channel nor a person, nobody can be told, so every page counts as unseen by someone.
+ */
+export async function restrictedOutsiders(db: Executor, ids: string[], readers: WikiRunReaders) {
+  const out = { some: new Set<string>(), person: new Set<string>() };
+  if (ids.length === 0) return out;
+  const personId = await readers.person();
+  if (personId) {
+    const seen = await visibleWikiPageIds(db, personId, ids);
+    for (const id of ids) if (!seen.has(id)) out.person.add(id);
+  }
+  if (!readers.channelId && !personId) for (const id of ids) out.some.add(id);
+  if (readers.channelId) {
+    const rows = await db
+      .select({ id: wikiPages.id })
+      .from(wikiPages)
+      .where(
+        and(
+          inArray(wikiPages.id, ids),
+          sql`(exists (select 1 from ${channelMembers} where ${channelMembers.channelId} = ${readers.channelId}
+              and ${channelMembers.userId} is not null and not ${wikiPageVisibleSql(sql`${channelMembers.userId}`)})
+            or exists (select 1 from ${channels} join organization_members om on om.org_id = ${channels.orgId}
+              where ${channels.id} = ${readers.channelId} and ${channels.kind} = 'forum'
+              and not ${wikiPageVisibleSql(sql`om.user_id`)}))`,
+        ),
+      );
+    for (const r of rows) out.some.add(r.id);
+  }
+  for (const id of out.person) out.some.add(id);
+  return out;
 }
 
 /** A page the run's message names, or its best match, goes in up to this much (ADR 0043). */

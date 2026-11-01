@@ -1,18 +1,27 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { eq, schema } from "@agenteschat/db";
 import {
   createWikiPage,
+  createWikiToolSource,
+  deleteWikiPage,
   drainOutbox,
   ForbiddenError,
   getWikiPage,
+  insertMessage,
   listWikiPages,
   parseWikiLinks,
+  RESTRICTED_WIKI_RULE,
   recordWikiReads,
+  removeMember,
+  renameWikiPage,
   resolveWikiTargets,
+  restoreWikiPage,
   retrieveWikiForRun,
   searchForUser,
   searchWiki,
   setWikiPageAudience,
   suggestWikiPages,
+  type ToolContext,
   topWikiReads,
   updateWikiPage,
   ValidationError,
@@ -104,9 +113,12 @@ describe("restricted wiki pages", () => {
       orgId: f.org.id,
       agentId: f.agent.id,
       text: "qual a margem mínima dos contratos?",
+      readers: { channelId: null, person: async () => ana.id },
     });
     expect(run.pageIds).toContain(secret.id);
-    const [linked] = await withWikiLinks(f.db, f.org.id, [{ body: "veja [[Margens]]", meta: {} as Record<string, unknown> }]);
+    const [linked] = await withWikiLinks(f.db, f.org.id, [
+      { body: "veja [[Margens]]", meta: {} as Record<string, unknown> },
+    ]);
     expect(linked?.meta.wikiLinks).toEqual([
       {
         target: "Margens",
@@ -164,5 +176,129 @@ describe("restricted wiki pages", () => {
     });
     expect((await setWikiPageAudience(deps, f.owner.id, f.org.id, "margens", null)).audience).toBeNull();
     expect((await getWikiPage(f.db, person(bia.id), f.org.id, "margens")).title).toBe("Margens");
+  });
+});
+
+describe("agents with a restricted page", () => {
+  const ask = (text: string, readers: { channelId: string | null; person: string | null }) =>
+    retrieveWikiForRun(wikiDeps(), {
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      text,
+      readers: { channelId: readers.channelId, person: async () => readers.person },
+    });
+
+  test("an outsider naming it gets no text in the run, only the rule; the audience gets it, marked when others read", async () => {
+    const { ana, bia, secret } = await restricted();
+    const outsider = await ask("resuma [[Margens]]", { channelId: null, person: bia.id });
+    expect(outsider.pageIds).toContain(secret.id);
+    expect(outsider.text).not.toContain("40%");
+    expect(outsider.text).toContain(RESTRICTED_WIKI_RULE);
+    const alone = await ask("resuma [[Margens]]", { channelId: null, person: ana.id });
+    expect(alone.text).toContain("40%");
+    expect(alone.text).not.toContain(RESTRICTED_WIKI_RULE);
+    // Bia reads #geral: Ana asking there gets the text with the rule.
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: bia.id });
+    const shared = await ask("resuma [[Margens]]", { channelId: f.general.id, person: ana.id });
+    expect(shared.text).toContain("40%");
+    expect(shared.text).toContain(RESTRICTED_WIKI_RULE);
+    // Nobody to tell (no channel, no person): marked.
+    expect((await ask("resuma [[Margens]]", { channelId: null, person: null })).text).toContain(RESTRICTED_WIKI_RULE);
+  });
+
+  test("the wiki tools mark it and the edit receipt leaves out its title", async () => {
+    f = await setup({ wikiTools: true });
+    const deps = wikiDeps();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await createWikiPage(deps, person(f.owner.id), f.org.id, { title: "Margens", body: "Margem mínima de 40%." });
+    await setWikiPageAudience(deps, f.owner.id, f.org.id, "margens", { roleIds: [], userIds: [] });
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: bia.id });
+    const trigger = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "person", userId: f.owner.id },
+      body: "@dev documenta na wiki Margens que vale para 2027",
+    });
+    const ctx: ToolContext = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: crypto.randomUUID(),
+      channelId: f.general.id,
+      threadRootId: trigger.id,
+      triggerMessageId: trigger.id,
+    };
+    const tools = await createWikiToolSource({ pubsub: f.pubsub, search: f.context }).tools(ctx);
+    const tool = (name: string) => {
+      const t = tools.find((x) => x.name === name);
+      if (!t) throw new Error(`${name} missing`);
+      return t;
+    };
+    const read = await tool("read_wiki_page").execute({ page: "margens" }, ctx);
+    expect(read.content).toContain(RESTRICTED_WIKI_RULE);
+    expect(read.content).toContain("40%");
+    const found = await tool("search_wiki").execute({ query: "margem" }, ctx);
+    expect(found.content).toContain(RESTRICTED_WIKI_RULE);
+    expect(found.content).not.toContain("40%");
+    const saved = await tool("update_wiki_page").execute(
+      { page: "margens", mode: "append", content: "Vale para 2027." },
+      ctx,
+    );
+    expect(saved.isError).toBeFalsy();
+    const [receipt] = await f.db.select().from(schema.agentActions).where(eq(schema.agentActions.orgId, f.org.id));
+    expect(JSON.stringify([receipt?.target, receipt?.params])).not.toContain("argens");
+    expect(receipt?.params).toEqual({ restricted: true });
+  });
+
+  test("an agent creating a page for an outsider takes the next address instead of naming the hidden page", async () => {
+    const { deps, bia } = await restricted();
+    const mine = await createWikiPage(
+      deps,
+      { type: "agent", agentId: f.agent.id, requestedByUserId: bia.id },
+      f.org.id,
+      { title: "Margens", body: "outra" },
+    );
+    expect(mine.slug).toBe("margens-2");
+  });
+});
+
+describe("renames, restores and people leaving", () => {
+  test("renaming a restricted page leaves the open pages that link to it alone", async () => {
+    const { deps, ana, open } = await restricted();
+    await renameWikiPage(deps, person(ana.id), f.org.id, "margens", { title: "Margens e salários da diretoria" });
+    const after = await getWikiPage(f.db, person(f.owner.id), f.org.id, "processos");
+    expect(after.body).toBe(open.body);
+    expect(after.version).toBe(open.version);
+  });
+
+  test("renaming onto, or restoring under, a hidden page's address never names it", async () => {
+    const { deps, bia } = await restricted();
+    const mine = await createWikiPage(deps, person(bia.id), f.org.id, { title: "Rascunho", body: "x" });
+    const renamed = await renameWikiPage(deps, person(bia.id), f.org.id, mine.slug, { title: "margens" });
+    expect(renamed.slug).toBe("margens-2");
+    // A deleted page whose address a restricted page holds now.
+    const old = await createWikiPage(deps, person(f.owner.id), f.org.id, { title: "Comissões", body: "y" });
+    await deleteWikiPage(deps, person(f.owner.id), f.org.id, old.slug);
+    await f.db.update(schema.wikiPages).set({ slug: "comissoes-old" }).where(eq(schema.wikiPages.id, old.id));
+    const secret = await createWikiPage(deps, person(f.owner.id), f.org.id, {
+      title: "Comissões da diretoria",
+      body: "z",
+    });
+    await f.db
+      .update(schema.wikiPages)
+      .set({ slug: "comissoes-old", restricted: true })
+      .where(eq(schema.wikiPages.id, secret.id));
+    const refused = await restoreWikiPage(deps, person(f.owner.id), f.org.id, old.id).catch((e) => e);
+    expect(code(refused)).toBe("wiki.restore_slug_taken");
+    expect(JSON.stringify(refused.params ?? {})).not.toContain("diretoria");
+    expect(String(refused.message)).not.toContain("diretoria");
+  });
+
+  test("a person who leaves drops off the pages they were named on", async () => {
+    const { deps, bia } = await restricted();
+    await setWikiPageAudience(deps, f.owner.id, f.org.id, "margens", { roleIds: [], userIds: [bia.id] });
+    await removeMember(f.db, f.owner.id, f.org.id, bia.id);
+    await f.db.insert(schema.organizationMembers).values({ orgId: f.org.id, userId: bia.id, role: "member" });
+    expect(code(await getWikiPage(f.db, person(bia.id), f.org.id, "margens").catch((e) => e))).toBe("wiki.no_access");
   });
 });

@@ -1651,6 +1651,7 @@ export const en: Translations = {
     wiki: {
       page_created: "Created the wiki page <b>{{title}}</b>",
       page_edited: "Edited the wiki page <b>{{title}}</b>",
+      page_edited_restricted: "Edited a restricted wiki page",
     },
     thread: {
       renamed: "Renamed the conversation to <b>{{to}}</b>",
@@ -6350,7 +6351,7 @@ export const en: Translations = {
     audienceEveryone: "Everyone in the workspace",
     audienceEveryoneText: "Any member reads the page.",
     audienceLimited: "Only agents and who I choose",
-    audienceLimitedText: "Agents keep using what it says in their answers.",
+    audienceLimitedText: "Agents keep using it to decide, without quoting it to anyone outside the audience.",
     audienceRoles: "Roles",
     audiencePeople: "People",
     audienceSearch: "Search people",

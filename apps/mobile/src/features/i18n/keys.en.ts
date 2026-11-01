@@ -1132,6 +1132,7 @@ export const featureKeysEn: FeatureTranslations = {
         agentAdded: "Brought {{name}} to #{{channel}}",
         pageCreated: "Created the page {{title}}",
         pageEdited: "Edited the page {{title}}",
+        pageEditedRestricted: "Edited a restricted page",
         threadRenamed: "Renamed a thread to {{to}}",
         threadClosed: "Closed the thread {{title}}",
       },

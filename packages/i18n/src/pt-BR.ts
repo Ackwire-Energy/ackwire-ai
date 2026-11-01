@@ -1667,6 +1667,7 @@ export const ptBR = {
     wiki: {
       page_created: "Criei a página <b>{{title}}</b> na wiki",
       page_edited: "Editei a página <b>{{title}}</b> da wiki",
+      page_edited_restricted: "Editei uma página restrita da wiki",
     },
     thread: {
       renamed: "Renomeei a conversa para <b>{{to}}</b>",
@@ -6398,7 +6399,7 @@ export const ptBR = {
     audienceEveryone: "Todos do workspace",
     audienceEveryoneText: "Qualquer membro lê a página.",
     audienceLimited: "Só os agentes e quem eu escolher",
-    audienceLimitedText: "Os agentes continuam usando o que ela diz nas respostas.",
+    audienceLimitedText: "Os agentes continuam usando o que ela diz para decidir, sem citá-la para quem está fora.",
     audienceRoles: "Papéis",
     audiencePeople: "Pessoas",
     audienceSearch: "Buscar pessoas",
