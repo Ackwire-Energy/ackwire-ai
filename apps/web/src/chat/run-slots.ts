@@ -131,6 +131,10 @@ export const saysNothingYet = (r: Pick<LiveRun, "status" | "text" | "work">) =>
   (r.work ?? []).length === 0 &&
   (r.status === "thinking" || r.status === "queued" || r.status === "running");
 
+/** Its block is in the conversation: it has something of its own, or the moment before its waiting row passed. */
+export const rowShows = (r: Pick<LiveRun, "runId" | "status" | "text" | "work" | "startedAt">, now: number) =>
+  !saysNothingYet(r) || now >= (r.startedAt ?? 0) + openerDelayMs(r.runId);
+
 function hashOf(s: string) {
   let h = 0;
   for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0;

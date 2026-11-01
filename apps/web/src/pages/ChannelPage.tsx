@@ -192,6 +192,7 @@ import {
   openerDelayMs,
   openerOf,
   type RunSlot,
+  rowShows,
   SLOT_HOLD_MS,
   sameSlots,
   saysNothingYet,
@@ -3021,8 +3022,10 @@ function ActivityBar({
                 <span />
               </span>
             )}
-            {/* One agent on its own: its face is on its row in the conversation, not here again. */}
-            {!(entries.length === 1 && firstAgent && !barAsking(entries)) && <WorkingStack entries={entries} />}
+            {/* One agent on its own: its face is on its row in the conversation once the row shows, not here again. */}
+            {!(entries.length === 1 && soloRun && rowShows(soloRun, now) && !barAsking(entries)) && (
+              <WorkingStack entries={entries} />
+            )}
             {/* The phrase turns: the old one leaves upward, the new one comes from below. Names in ink. */}
             <span className="ac-typing__text">
               <BarPhrase entries={entries} />

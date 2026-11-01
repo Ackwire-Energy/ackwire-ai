@@ -15,7 +15,16 @@ import {
 } from "@agenteschat/client";
 import { elapsedParts } from "@agenteschat/client/lib/activity";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { blockRowByRun, nextSlots, openerOf, SLOT_HOLD_MS, sameSlots, waitingLast } from "@/chat/run-slots";
+import {
+  blockRowByRun,
+  nextSlots,
+  openerDelayMs,
+  openerOf,
+  rowShows,
+  SLOT_HOLD_MS,
+  sameSlots,
+  waitingLast,
+} from "@/chat/run-slots";
 import { createStreamsStore, reconcileChannelRuns } from "@/realtime/context";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -104,6 +113,14 @@ describe("one block per answer (run-slots)", () => {
     const waiting = new Set(["a", "c"]);
     expect(waitingLast(slots, (id) => waiting.has(id)).map((s) => s.runId)).toEqual(["b", "d", "a", "c"]);
     expect(waitingLast(slots, () => false)).toEqual(slots);
+  });
+
+  test("its row shows after a moment, or once it has something of its own (the bar keeps its face till then)", () => {
+    const fresh = { runId: "a", status: "running" as const, text: "", work: [], startedAt: 10_000 };
+    const due = 10_000 + openerDelayMs("a");
+    expect(rowShows(fresh, 10_500)).toBe(false);
+    expect(rowShows(fresh, due)).toBe(true);
+    expect(rowShows({ ...fresh, text: "Oi" }, 10_500)).toBe(true);
   });
 
   test("it opens with the first thing it said (no placeholder before); the elapsed time", () => {
@@ -214,8 +231,9 @@ describe("live row in the timeline", () => {
     const { ev } = await open();
     await ev({ type: "agent.run", ...ids, status: "running" });
     await settle(2);
-    // Right after it starts: no row yet (the bar says it works).
+    // Right after it starts: no row yet (the bar says it works, with its face until the row shows).
     expect(row()).toBeNull();
+    expect(bar().querySelector(".ac-typing__avatars")).not.toBeNull();
     await act(() => new Promise((r) => setTimeout(r, 2100)));
     expect(row().classList.contains("ac-msg--waiting")).toBe(true);
     expect(row().querySelector(".ac-msg__avatar .ac-avatar")).not.toBeNull();

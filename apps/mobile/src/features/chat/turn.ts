@@ -37,6 +37,15 @@ export function openerDelayMs(runId: string) {
   return 1200 + (h % 800);
 }
 
+/**
+ * Its block is in the conversation (as `TurnRow` draws it): it has something of its own, or the moment before its
+ * waiting row passed. Until then the line above the box keeps its face.
+ */
+export const turnShows = (
+  r: Pick<LiveRun, "runId" | "status" | "text" | "work" | "startedAt" | "since">,
+  now: number,
+) => turnItems(r).length > 0 || r.text.length > 0 || now >= (r.startedAt ?? r.since ?? 0) + openerDelayMs(r.runId);
+
 /** The first thing it said, out of the lines below (the line its block opens with, above its tools). */
 export function turnOpener(items: readonly ToolItem[]): { said: string | null; lines: ToolItem[] } {
   const first = items.find((x) => x.kind === "say");

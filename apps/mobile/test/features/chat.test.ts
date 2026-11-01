@@ -42,6 +42,7 @@ import {
 } from "../../src/features/chat/logic";
 import {
   fadeTail,
+  openerDelayMs,
   outputTail,
   pruneMarks,
   recentTurn,
@@ -53,6 +54,7 @@ import {
   turnOrder,
   turnPhase,
   turnRuns,
+  turnShows,
   waitDot,
   withContinued,
   withOpacity,
@@ -394,7 +396,9 @@ describe("working line", () => {
     expect(barWords(en, workingEntries([ada, atlas], [], name))[0]).toBe("Ada and Atlas are working…");
     const lines = await source("features/chat/LiveRows.tsx");
     const line = lines.slice(lines.indexOf("export function WorkingLine("), lines.indexOf("type LinePiece"));
-    expect(line).toContain("(entries.length === 1 && lead && !asking ? [] : barFaces(entries))");
+    expect(line).toContain(
+      "entries.length === 1 && soloRun && turnShows(soloRun, now) && !asking ? [] : barFaces(entries)",
+    );
   });
 
   test("Parar: real runs at work, also while they write (not a guess, not one waiting)", () => {
@@ -719,6 +723,15 @@ describe("an agent's turn as one block", () => {
     code: null,
     output: [],
     running,
+  });
+
+  test("its block shows after a moment, or once it has something of its own (the line keeps its face till then)", () => {
+    const fresh = run({ runId: "a", status: "running", startedAt: 10_000 });
+    const due = 10_000 + openerDelayMs("a");
+    expect(turnShows(fresh, 10_500)).toBe(false);
+    expect(turnShows(fresh, due)).toBe(true);
+    expect(turnShows({ ...fresh, text: "Oi" }, 10_500)).toBe(true);
+    expect(turnShows({ ...fresh, work: [call("1", "sentry_list_issues", true)] }, 10_500)).toBe(true);
   });
 
   test("the header word: thinking, working on steps, writing, stopped", () => {

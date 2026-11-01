@@ -64,6 +64,7 @@ import {
   turnItems,
   turnOpener,
   turnPhase,
+  turnShows,
   WORD_FADE_MS,
   waitDot,
   withOpacity,
@@ -328,6 +329,7 @@ export function WorkingLine({
   // new pace reads the clock afresh (`useNow`).
   const now = useNow(asking || solo ? 1000 : 60_000);
   if (entries.length === 0) return null;
+  const soloRun = solo ? runs.find((r) => r.agentId === solo.id) : undefined;
   const color = lead ? agentLook(dir.agentById.get(lead.id)).color : null;
   const stoppable = lineStops(entries, runs, canStop);
   const sentence = activitySentence(t, entries, markName);
@@ -357,6 +359,8 @@ export function WorkingLine({
   const clock = asking ? elapsedClock(now - asking.since) : null;
   const pop = reduced ? undefined : ZoomIn.springify().damping(11).stiffness(320).mass(0.6);
   const plate = [styles.tok, { backgroundColor: c.glassSolid }];
+  // One agent on its own: its face is on its row in the conversation once the row shows, not here again.
+  const faces = entries.length === 1 && soloRun && turnShows(soloRun, now) && !asking ? [] : barFaces(entries);
   // An agent working in its browser: the line says so, and a tap opens its browser card in the conversation.
   const browsing = browsingRuns(runs)[0];
   const openBrowser = browsing && onOpenBrowser ? () => onOpenBrowser(browsing.agentId) : undefined;
@@ -376,8 +380,7 @@ export function WorkingLine({
         ) : null}
         {color ? <PixelOrbit color={color} size={14} /> : <TypingDots color={c.muted} />}
         <View style={styles.stack} importantForAccessibility="no-hide-descendants">
-          {/* One agent on its own: its face is on its row in the conversation, not here again. */}
-          {(entries.length === 1 && lead && !asking ? [] : barFaces(entries)).map((e, i) => {
+          {faces.map((e, i) => {
             const gap = i > 0 ? styles.overlap : undefined;
             if (e.type === "person")
               return (
