@@ -3,6 +3,7 @@ import {
   appLabel,
   type ChangedLine,
   cardHead,
+  cardOutcome,
   chosenRows,
   firstChange,
   isOpen,
@@ -20,7 +21,9 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, Chip, DiffView, haptics, Icon, Text, ToggleSwitch, useTheme, useToast } from "@/ui";
 import { boldRuns } from "../chat/actions";
-import { AskButtons, AskCard, AskFoot } from "../chat/asks";
+import { lastDecidedAt } from "../chat/ask-store";
+import { AskButtons, AskCard, AskDone, AskFoot } from "../chat/asks";
+import { markName } from "../chat/logic";
 import { IconTile } from "../connectors/ConnectorIcon";
 import { useFailed } from "../routines/hooks";
 import { Face } from "../shared/Face";
@@ -208,7 +211,7 @@ function InstructionProposalCard({ ids }: { ids: string[] }) {
         }
       />
     );
-  return (
+  const card = (
     <View style={[styles.card, { backgroundColor: colors.sunken }]}>
       <View style={styles.head}>
         <Icon name="doc" size={16} color={colors.ink2} />
@@ -231,6 +234,20 @@ function InstructionProposalCard({ ids }: { ids: string[] }) {
         </View>
       ))}
     </View>
+  );
+  if (rows.some(isOpen)) return card;
+  // Decided: one line like a decided approval, the card when asked for.
+  const outcome = cardOutcome(t, rows);
+  const what = many
+    ? runs.map((r) => (r.bold ? markName(r.text) : r.text)).join("")
+    : markName(proposalTitle(t, first, orgName, agentName));
+  return (
+    <AskDone
+      done={outcome.accepted}
+      words={`${outcome.label}: ${what}`}
+      at={lastDecidedAt(rows)}
+      more={{ label: t("ask.seeChange"), content: card }}
+    />
   );
 }
 
