@@ -335,6 +335,54 @@ jobs:
         if: success() || failure()
         run: bun run check:boundaries
 
+  # System mode's isolation on real kernels, as root (apps/server/test/runner/isolation.root.test.ts): real
+  # agent users, slices, the loopback table and the bind policy, then what each agent reaches. Ubuntu runs on
+  # GitHub's own kernel, with real Gradle, Kotlin and adb as two agents at once; its systemd lacks
+  # BPF_FRAMEWORK, so the bind policy is left out there. Debian 13 (the Cloud's release: its own kernel and
+  # systemd, built with BPF_FRAMEWORK) boots in QEMU, with KVM where the runner has it.
+  isolation-root:
+    name: Isolation as root (${{ matrix.leg }})
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        leg: [ubuntu, debian13]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - *setup-bun
+      - *cache-bun
+      - *install
+      # What the agents' users run in the bind check, built as the image builds it.
+      - name: The runner bundle
+        run: bun build apps/server/runner/main.ts --target=node --banner '#!/usr/bin/env node' --outfile "$RUNNER_TEMP/agentes-runner.mjs"
+      - name: Test as root (Ubuntu)
+        if: matrix.leg == 'ubuntu'
+        timeout-minutes: 30
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get -qq install -y nftables > /dev/null
+          uname -r
+          systemctl --version | head -2
+          sudo -E env "PATH=$PATH" AGENTES_ROOT_TESTS=1 AGENTES_TEST_RUNNER="$RUNNER_TEMP/agentes-runner.mjs" \
+            bun test apps/server/test/runner/isolation.root.test.ts
+      - name: The Debian 13 image
+        if: matrix.leg == 'debian13'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/isolation-image
+          key: isolation-image-${{ hashFiles('scripts/isolation-vm.sh') }}
+      - name: Test as root (Debian 13 in QEMU)
+        if: matrix.leg == 'debian13'
+        timeout-minutes: 45
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get -qq install -y --no-install-recommends qemu-system-x86 qemu-utils genisoimage > /dev/null
+          bun build apps/server/test/runner/isolation.root.test.ts --target=bun --outfile "$RUNNER_TEMP/isolation.root.test.js"
+          scripts/isolation-vm.sh "$RUNNER_TEMP/isolation.root.test.js" "$RUNNER_TEMP/agentes-runner.mjs" ~/isolation-image
+
   # The image as self-hosters run it: the docker-compose.yml at the repository root with this
   # commit's image, a .env with only the three values it asks for, migrations on boot, the health
   # probe, the first sign-up (the installation's owner), an organization, a second sign-up refused
@@ -621,7 +669,7 @@ jobs:
     name: CI result
     if: always() && github.event.pull_request.draft != true
     needs:
-      [changes, check, test-backend, test-web, test-desktop-rust, secrets, compose, build, publish, release-install, release-native]
+      [changes, check, test-backend, test-web, test-desktop-rust, secrets, isolation-root, compose, build, publish, release-install, release-native]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
