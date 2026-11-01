@@ -6883,9 +6883,6 @@ export const en: Translations = {
     },
     canceledBy: "Stopped by {{name}}",
     canceled: "Stopped",
-    opener0: "Let me see…",
-    opener1: "Looking into it…",
-    opener2: "One moment…",
     elapsedSeconds: "{{n}}s",
     elapsedMinutes: "{{m}}m {{s}}s",
     stopAgent: "Stop {{name}}",
@@ -9374,17 +9371,8 @@ export const en: Translations = {
     /** "Theo and 2 more" (3 or more names in the working line). */
     namesMore: "{{first}} and {{count}} more",
     /** The card above the box turns its phrase. */
-    phrase: {
-      thinking: {
-        l0: "Thinking about your request",
-        l1: "Putting the pieces together",
-        l2: "Reading carefully",
-        l3: "Sorting out the ideas",
-        l4: "Finding the best way",
-      },
-      long: { l0: "This takes a minute", l1: "Going carefully", l2: "Checking the details", l3: "Almost there" },
-      said: "{{name}}: {{text}}",
-    },
+    /** The waiting row's step line before its first step (`waitStep`). */
+    wait: { thinking: "Thinking…", held: "Waiting for approval…" },
     /** The working line while an agent asks another one (names come in bold). */
     consult: {
       asking: "{{from}} is asking {{to}}",

@@ -15,9 +15,18 @@ import {
 } from "@agenteschat/client";
 import { elapsedParts } from "@agenteschat/client/lib/activity";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { blockRowByRun, nextSlots, OPENERS, openerOf, SLOT_HOLD_MS, sameSlots } from "@/chat/run-slots";
+import {
+  blockRowByRun,
+  nextSlots,
+  openerDelayMs,
+  openerOf,
+  rowShows,
+  SLOT_HOLD_MS,
+  sameSlots,
+  waitingLast,
+} from "@/chat/run-slots";
 import { createStreamsStore, reconcileChannelRuns } from "@/realtime/context";
-import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -99,12 +108,24 @@ describe("one block per answer (run-slots)", () => {
     expect(blockRowByRun(items, new Set(["r1"]))).toEqual(new Map([["r2", "m4"]]));
   });
 
-  test("it opens with a generic phrase, then the first thing it said; the elapsed time", () => {
-    const base = { runId: "r-1", text: "", status: "running" as const, work: [] };
-    const generic = openerOf(base);
-    expect(generic.said).toBeNull();
-    expect(generic.opener).toBeGreaterThanOrEqual(0);
-    expect(generic.opener).toBeLessThan(OPENERS);
+  test("every block draws, the ones waiting for words last (each group in its order)", () => {
+    const slots = ["a", "b", "c", "d"].map((runId) => ({ runId }));
+    const waiting = new Set(["a", "c"]);
+    expect(waitingLast(slots, (id) => waiting.has(id)).map((s) => s.runId)).toEqual(["b", "d", "a", "c"]);
+    expect(waitingLast(slots, () => false)).toEqual(slots);
+  });
+
+  test("its row shows after a moment, or once it has something of its own (the bar keeps its face till then)", () => {
+    const fresh = { runId: "a", status: "running" as const, text: "", work: [], startedAt: 10_000 };
+    const due = 10_000 + openerDelayMs("a");
+    expect(rowShows(fresh, 10_500)).toBe(false);
+    expect(rowShows(fresh, due)).toBe(true);
+    expect(rowShows({ ...fresh, text: "Oi" }, 10_500)).toBe(true);
+  });
+
+  test("it opens with the first thing it said (no placeholder before); the elapsed time", () => {
+    const base = { work: [] };
+    expect(openerOf(base)).toEqual({ said: null, work: [] });
     const said = openerOf({
       ...base,
       work: [
@@ -112,10 +133,8 @@ describe("one block per answer (run-slots)", () => {
         { kind: "say" as const, text: "Uso as ferramentas.", turn: 2 },
       ],
     });
-    expect(said).toMatchObject({ said: "Vou ler o código.", opener: null });
+    expect(said.said).toBe("Vou ler o código.");
     expect(said.work).toEqual([{ kind: "say", text: "Uso as ferramentas.", turn: 2 }]);
-    expect(openerOf({ ...base, text: "Olá" }).opener).toBeNull();
-    expect(openerOf({ ...base, status: "canceled" }).opener).toBeNull();
     expect(elapsedParts(1_500)).toBeNull();
     expect(elapsedParts(4_200)).toEqual({ m: 0, s: 4 });
     expect(elapsedParts(75_000)).toEqual({ m: 1, s: 15 });
@@ -205,25 +224,131 @@ describe("live row in the timeline", () => {
       },
     });
 
-  test("one block after a moment: it stays last while it works; a later message goes above it", async () => {
+  const bar = () => document.querySelector(".ac-typing") as HTMLElement;
+  const shownText = (el: Element) => [...el.querySelectorAll(".ac-turn__in")].map((e) => e.textContent).join("|");
+
+  test("the waiting row after a moment: face, pixels and step, no name or time; it stays last while it works", async () => {
     const { ev } = await open();
     await ev({ type: "agent.run", ...ids, status: "running" });
     await settle(2);
-    // Right after it starts: no block yet, a moment as a person would take (the bar says it works).
+    // Right after it starts: no row yet (the bar says it works, with its face until the row shows).
     expect(row()).toBeNull();
-    // Then it opens as if it had answered.
+    expect(bar().querySelector(".ac-typing__avatars")).not.toBeNull();
     await act(() => new Promise((r) => setTimeout(r, 2100)));
-    expect(row().textContent).toMatch(/Deixa eu ver…|Já vejo isso…|Um instante…/);
-    expect(row().textContent).not.toContain("pensando");
-    await ev({ type: "agent.delta", ...ids, seq: 0, text: "Olhando o login." });
-    await settle(2);
-    expect(row().classList.contains("ac-msg--grouped")).toBe(false);
-    expect(row().textContent).toContain("Ada");
-    expect(row().textContent).toContain("Olhando o login.");
+    expect(row().classList.contains("ac-msg--waiting")).toBe(true);
+    expect(row().querySelector(".ac-msg__avatar .ac-avatar")).not.toBeNull();
+    expect(row().querySelectorAll(".ac-wait__dots > i")).toHaveLength(3);
+    expect(shownText(row().querySelector(".ac-wait__step") as Element)).toBe("Pensando…");
+    // No name, no time, no placeholder words on screen (the name is there for screen readers only).
+    expect(row().querySelector(".ac-msg__head")).toBeNull();
+    expect(row().querySelector("time")?.closest(".ac-visually-hidden")).not.toBeNull();
+    expect(row().querySelector(".ac-msg__text")).toBeNull();
+    // The bar: the agent's name and no face of its own (its row has it).
+    expect(bar().querySelector(".ac-typing__text")?.textContent).toBe("Ada");
+    expect(bar().querySelector(".ac-typing__avatars")).toBeNull();
     await post(ev, "m-later", "Também confere o refresh");
     await settle(3);
     const later = screen().getByText("Também confere o refresh").closest(".ac-msg") as HTMLElement;
     expect(later.compareDocumentPosition(row()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  test("the step line follows the run: the step running now, then thinking again; words turn the row into the message", async () => {
+    const { ev } = await open();
+    await ev({ type: "agent.run", ...ids, status: "running" });
+    await act(() => new Promise((r) => setTimeout(r, 2100)));
+    const waiting = row();
+    const step = () => shownText(row().querySelector(".ac-wait__step") as Element);
+    await ev({
+      type: "agent.tool",
+      ...ids,
+      tool: "browser_navigate",
+      toolUseId: "t1",
+      detail: "https://console.example.com/login",
+    });
+    await settle(2);
+    expect(step()).toBe("Usando o navegador · console.example.com…");
+    // The tool block waits for words: the step line says it.
+    expect(row().querySelector(".ac-tools")).toBeNull();
+    await ev({ type: "agent.tool", ...ids, tool: null, toolUseId: "t1" });
+    await settle(2);
+    expect(step()).toBe("Pensando…");
+    await ev({ type: "agent.delta", ...ids, seq: 0, text: "O login devolve 401 depois do refresh." });
+    await settle(3);
+    // The same row, now the message: name and time beside the same face; the pixels and the step line are gone.
+    expect(row()).toBe(waiting);
+    expect(row().classList.contains("ac-msg--waiting")).toBe(false);
+    expect(row().querySelector(".ac-msg__head")?.textContent).toContain("Ada");
+    expect(row().querySelector(".ac-msg__head time")).not.toBeNull();
+    expect(row().querySelector(".ac-wait")).toBeNull();
+    expect(row().textContent).toContain("O login devolve 401");
+  });
+
+  test("under the agent's own message the row keeps its face, waiting and once its words arrive (no jump)", async () => {
+    const { ev } = await open();
+    await ev({
+      type: "message.created",
+      messageId: "m-ada",
+      message: {
+        id: "m-ada",
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "agent", id: ADA_ID },
+        body: "Feito, o deploy subiu.",
+        mentionedAgentIds: [],
+        agentRunId: "r-old",
+        createdAt: new Date().toISOString(),
+      },
+    });
+    await settle(2);
+    await ev({ type: "agent.run", ...ids, status: "running" });
+    await act(() => new Promise((r) => setTimeout(r, 2100)));
+    expect(row().classList.contains("ac-msg--grouped")).toBe(false);
+    expect(row().querySelector(".ac-msg__avatar .ac-avatar")).not.toBeNull();
+    await ev({ type: "agent.delta", ...ids, seq: 0, text: "Também revisei o rollback." });
+    await settle(3);
+    expect(row().classList.contains("ac-msg--grouped")).toBe(false);
+    expect(row().querySelector(".ac-msg__avatar .ac-avatar")).not.toBeNull();
+    expect(row().querySelector(".ac-msg__head")?.textContent).toContain("Ada");
+  });
+
+  test("a call that waits for approval keeps the waiting row, and its step line says so", async () => {
+    const { ev } = await open();
+    await ev({ type: "agent.run", ...ids, status: "running" });
+    await act(() => new Promise((r) => setTimeout(r, 2100)));
+    const waiting = row();
+    const step = () => shownText(row().querySelector(".ac-wait__step") as Element);
+    await ev({ type: "agent.tool", ...ids, tool: "github_merge_pull_request", toolUseId: "t1" });
+    await ev({ type: "agent.tool", ...ids, tool: null, toolUseId: "t1", held: true });
+    await ev({ type: "agent.run", ...ids, status: "waiting_approval" });
+    await settle(2);
+    expect(row()).toBe(waiting);
+    expect(row().classList.contains("ac-msg--waiting")).toBe(true);
+    expect(row().querySelector(".ac-msg__head")).toBeNull();
+    expect(step()).toBe("Esperando aprovação…");
+  });
+
+  test("two agents: each has its own waiting row, last; one that answers goes above; the bar says both", async () => {
+    const { ev } = await open();
+    const atlas = { threadId: null, runId: "r-atlas", agentId: ATLAS_ID };
+    await ev({ type: "agent.run", ...ids, status: "running" });
+    await ev({ type: "agent.run", ...atlas, status: "running" });
+    await act(() => new Promise((r) => setTimeout(r, 2100)));
+    const atlasRow = () => document.querySelector('[data-run-id="r-atlas"]') as HTMLElement;
+    expect(row().classList.contains("ac-msg--waiting")).toBe(true);
+    expect(atlasRow().classList.contains("ac-msg--waiting")).toBe(true);
+    expect(shownText(bar())).toBe("Ada e Atlas estão trabalhando…");
+    await ev({ type: "agent.tool", ...atlas, tool: "read_file", toolUseId: "t2", detail: "apps/api/auth/refresh.ts" });
+    await settle(2);
+    expect(shownText(atlasRow().querySelector(".ac-wait__step") as Element)).toBe(
+      "Mexendo nos arquivos do PC · refresh.ts…",
+    );
+    expect(shownText(row().querySelector(".ac-wait__step") as Element)).toBe("Pensando…");
+    // Atlas answers: its row becomes its message and goes above Ada's, still waiting last.
+    await ev({ type: "agent.delta", ...atlas, seq: 0, text: "Nenhum deploy desde ontem." });
+    await settle(3);
+    expect(atlasRow().classList.contains("ac-msg--waiting")).toBe(false);
+    expect(atlasRow().compareDocumentPosition(row()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(row().classList.contains("ac-msg--waiting")).toBe(true);
   });
 
   test("steering: 'lê na próxima pausa' → 'leu', 'Leu seu recado' in the block; 'Ver' leads back", async () => {

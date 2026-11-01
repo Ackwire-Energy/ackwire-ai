@@ -387,7 +387,7 @@ describe("the working line while the block shows the questions", () => {
     // Ada at work again (another turn): her own line, not the question.
     await push(socket, { type: "agent.thinking", runId: "r-next", agentId: ADA_ID });
     await settle(2);
-    expect(bar()).toBe("Ada está trabalhando…");
+    expect(bar()).toBe("Ada");
   });
 
   test("the reply that asked is farther up: the line still says it (the only sign at the bottom)", async () => {

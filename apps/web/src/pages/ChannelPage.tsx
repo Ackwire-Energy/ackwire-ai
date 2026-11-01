@@ -70,11 +70,13 @@ import {
 import { actionCardOf } from "@agenteschat/client/lib/action-cards";
 import {
   activityVerb,
+  barAsking,
   barElapsed,
   barEntries,
   barFaces,
   isWriting,
   toolActivity,
+  waitsForWords,
 } from "@agenteschat/client/lib/activity";
 import type { AgentTab } from "@agenteschat/client/lib/agent-edit";
 import { looksLikeApiKey } from "@agenteschat/client/lib/api-key-text";
@@ -124,7 +126,7 @@ import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { holdsText } from "@agenteschat/client/lib/text";
 import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@agenteschat/client/lib/threads";
-import { buildTimeline, groupsWith, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
+import { buildTimeline, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
 import { splitCanceled } from "@agenteschat/client/lib/work";
 import {
   AffixInput,
@@ -188,14 +190,15 @@ import { useBrowserOffline } from "@/chat/offline";
 import { readingLanding } from "@/chat/reading";
 import {
   blockRowByRun,
-  drawsBehind,
   nextSlots,
   openerDelayMs,
   openerOf,
   type RunSlot,
+  rowShows,
   SLOT_HOLD_MS,
   sameSlots,
   saysNothingYet,
+  waitingLast,
 } from "@/chat/run-slots";
 import { dividerIsFar, firstNewKey, pillParts, unseenOf } from "@/chat/unseen";
 import { ActionCard } from "@/components/ActionCard";
@@ -298,7 +301,7 @@ import {
   useChannelThreadsView,
 } from "@/components/threads/ThreadLines";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
-import { BarPhrase, ConsultClock, WorkingStack } from "@/components/WorkingLine";
+import { BarPhrase, ConsultClock, WaitLine, WorkingStack } from "@/components/WorkingLine";
 import { useChannelSearch } from "@/hooks/useChannelSearch";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
@@ -2301,14 +2304,20 @@ const Timeline = memo(function Timeline({
         out.set(i.message.agentRunId, i.key);
     return out;
   }, [items]);
-  // The block that opens is the first one at work: a failed or stopped block draws anyway and never hides it.
-  const opener = useStreams(
-    (s) =>
-      slots.find((x) => {
+  // Every agent at work has its block; the ones still waiting for their first words stay last.
+  const waitingKey = useStreams((s) =>
+    slots
+      .filter((x) => {
         const r = s.runs[x.runId];
-        return !r || !drawsBehind(r);
-      })?.runId,
+        return r && waitsForWords(r);
+      })
+      .map((x) => x.runId)
+      .join(" "),
   );
+  const drawn = useMemo(() => {
+    const waiting = new Set(waitingKey.split(" "));
+    return waitingLast(slots, (runId) => waiting.has(runId));
+  }, [slots, waitingKey]);
   // A take over whose run has no live block and no message here: its card at the end (`HeldBrowserRow`).
   const heldPlaces = useHeldPlaces();
   const held = useMemo(
@@ -2379,17 +2388,12 @@ const Timeline = memo(function Timeline({
       ),
     );
   }
-  // The first block at work follows the last message: under the agent's own, it has no header of its own.
-  const lastItem = items.at(-1);
-  const after = lastItem?.kind === "message" && !afterUnshown() ? lastItem.message : null;
-  slots.forEach((slot, i) => {
+  drawn.forEach((slot) => {
     if (!blockEnters.current.has(slot.key)) blockEnters.current.set(slot.key, ready && Date.now() - mountedAt > 1500);
     rows.push(
       <RunBlock
         key={slot.key}
         runId={slot.runId}
-        after={i === 0 ? after : null}
-        opens={slot.runId === (opener ?? slots[0]?.runId)}
         grouped={false}
         entering={blockEnters.current.get(slot.key) ?? false}
         modelLabels={modelLabels}
@@ -2471,17 +2475,11 @@ function liveMessageOf(r: LiveRun): MessageType {
 function RunBlock({
   runId,
   message,
-  after,
-  opens = true,
   grouped,
   ...rest
 }: {
   runId: string;
   message?: MessageType;
-  /** At work: the message right above it (the agent's own groups it, as a saved message would). */
-  after?: Pick<MessageType, "author" | "createdAt"> | null;
-  /** At work: the first block, the only one drawn while others work too (`drawsBehind`). */
-  opens?: boolean;
   grouped: boolean;
   entering: boolean;
   modelLabels: Map<string, string>;
@@ -2504,15 +2502,15 @@ function RunBlock({
     () => (live ? liveMessageOf(live) : null),
     [liveId, liveAgent, liveChannel, liveThread, liveStart],
   );
-  // Just started and nothing of its own yet: it waits a moment, as a person would before answering.
+  // Just started and nothing of its own yet: its waiting row comes after a moment (the bar says it works at once).
   const quiet = Boolean(live && saysNothingYet(live));
   const due = useDue(liveStart ?? null, live ? openerDelayMs(live.runId) : 0, quiet);
   const shown = message ?? placeholder;
-  if (!shown || (live && !opens && !drawsBehind(live))) return null;
+  if (!shown) return null;
   if (live && !message && quiet && !due) return null;
-  const together = message
-    ? grouped
-    : Boolean(placeholder && groupsWith(after, placeholder.author, placeholder.createdAt));
+  // At work it never groups under the agent's own message: it starts as the waiting row with its face, and taking the
+  // face away when the words arrive would move the row. Its saved message groups as any other.
+  const together = message ? grouped : false;
   return (
     <TimelineMessage
       message={shown}
@@ -2579,9 +2577,6 @@ function LiveMemoryCards({ channelId }: { channelId: string }) {
 
 const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
 
-/** The generic phrases a block opens with (`openerOf`). */
-const OPENER_KEYS = ["run.opener0", "run.opener1", "run.opener2"] as const;
-
 /**
  * The block's header: the time it started, as any message. What it is doing and for how long is the
  * bar's above the composer (saying it twice was noise).
@@ -2593,7 +2588,13 @@ function RunClock({ run }: { run: LiveRun }) {
 }
 
 /** Under a live block: "sem notícias há 4 min · Atualizar", or what it is doing between its steps. */
-function LiveRunStatus({ run }: { run: LiveRun }) {
+function LiveRunStatus({
+  run,
+  quietOnly = false,
+}: {
+  run: LiveRun /** The waiting row's step line says what it does. */;
+  quietOnly?: boolean;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
@@ -2623,7 +2624,11 @@ function LiveRunStatus({ run }: { run: LiveRun }) {
   };
   const doing = run.tool ? toolActivity(run.tool, run.connector, null, run) : null;
   const showDoing =
-    !quiet && doing && doing.kind !== "thinking" && !(run.work ?? []).some((w) => w.kind === "call" && w.running);
+    !quietOnly &&
+    !quiet &&
+    doing &&
+    doing.kind !== "thinking" &&
+    !(run.work ?? []).some((w) => w.kind === "call" && w.running);
   if (!quiet && !showDoing) return null;
   return (
     <div className="run-status">
@@ -3025,7 +3030,7 @@ function ActivityBar({
             {/* Agents at work: their faces open the pill, else the pixel orbit in the first one's color; people only
                 typing: the dots. */}
             {firstAgent ? (
-              barFaces(entries).length > 0 ? null : (
+              facesShown ? null : (
                 <AgentSpinner agentId={firstAgent.id} size={14} />
               )
             ) : (
@@ -3035,10 +3040,10 @@ function ActivityBar({
                 <span />
               </span>
             )}
-            <WorkingStack entries={entries} />
+            {stackShown && <WorkingStack entries={entries} />}
             {/* The phrase turns: the old one leaves upward, the new one comes from below. Names in ink. */}
             <span className="ac-typing__text">
-              <BarPhrase entries={entries} runs={runs} />
+              <BarPhrase entries={entries} />
             </span>
             <ConsultClock entries={entries} now={now} />
             {took && <span className="ac-typing__elapsed ac-num">{took}</span>}
@@ -3130,10 +3135,12 @@ export const TimelineMessage = memo(function TimelineMessage({
   const refusal = liveFailed ? restrictionLine(t, live?.errorCode, live?.errorParams) : null;
   const liveWaiting = live?.status === "waiting_approval";
   const liveStopped = live?.status === "canceled";
-  const opening = live ? openerOf(live) : { said: null, opener: null, work: [] };
-  // Nothing said and no steps yet: its words stream where the opener stands, so the line it opens with
-  // stays put when a tool call turns it into narration (and the answer, with no tools, starts there too).
+  const opening = live ? openerOf(live) : { said: null, work: [] };
+  // Nothing said and no steps yet: its words stream at the top, so the line it opens with stays put when a tool
+  // call turns it into narration (and the answer, with no tools, starts there too).
   const wordsOnTop = !opening.said && opening.work.length === 0;
+  // At work with no words shown yet: the waiting row (its face, the pixels and what it does now), no name or time.
+  const waiting = Boolean(live && waitsForWords({ ...live, text: revealed }));
   // A sent message that waits for the connection: not "Não enviada", it goes out on its own.
   const queued = useWaiting(m.local === "failed" ? m.clientId : undefined);
   const local = m.local === "failed" && queued ? "pending" : m.local;
@@ -3351,7 +3358,8 @@ export const TimelineMessage = memo(function TimelineMessage({
               ? m.id
               : undefined
       }
-      grouped={grouped}
+      grouped={grouped && !waiting}
+      waiting={waiting}
       entering={entering && !replacesLive}
       streaming={Boolean(live) && !liveFailed && !liveWaiting && !liveStopped}
       className={cx(
@@ -3461,9 +3469,19 @@ export const TimelineMessage = memo(function TimelineMessage({
       }
       stacked={Boolean(card)}
     >
-      {live ? (
+      {live && waiting ? (
         <Parts resetKey={m}>
-          {/* It opens as if it had answered: a generic phrase until the first thing it says takes its place. */}
+          <WaitLine work={live.work} color={colorOf(agent)} />
+          <LiveRunStatus run={live} quietOnly />
+          {m.author.id && m.agentRunId && (
+            <ConsultGroup runId={m.agentRunId} askerId={m.author.id} color={colorOf(agent)} />
+          )}
+          <RunBrowserCard run={live} name={name} />
+          <span className="ac-visually-hidden">{t("channel.writing")}</span>
+        </Parts>
+      ) : live ? (
+        <Parts resetKey={m}>
+          {/* The first thing it said opens the block, above its tools; with nothing said, its words stream on top. */}
           {wordsOnTop && !liveFailed && revealed ? (
             <MessageText>
               <MessageBody
@@ -3474,12 +3492,9 @@ export const TimelineMessage = memo(function TimelineMessage({
               />
             </MessageText>
           ) : (
-            (opening.said || opening.opener !== null) && (
+            opening.said && (
               <MessageText>
-                <MessageBody
-                  body={opening.said ?? t(OPENER_KEYS[opening.opener ?? 0] ?? "run.opener0")}
-                  resolveMention={dir.mentionName}
-                />
+                <MessageBody body={opening.said} resolveMention={dir.mentionName} />
               </MessageText>
             )
           )}

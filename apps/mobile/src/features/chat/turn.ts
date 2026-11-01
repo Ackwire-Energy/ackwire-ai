@@ -1,5 +1,6 @@
 import type { LiveRun } from "@agenteschat/client";
 import { holdsText } from "@agenteschat/client/lib/text";
+import { waitsForWords } from "@agenteschat/client/lib/activity";
 import { type ToolItem, toolItemsLive } from "@agenteschat/client/lib/work";
 
 /**
@@ -28,8 +29,8 @@ export function turnItems(r: Pick<LiveRun, "work" | "status">): ToolItem[] {
 }
 
 /**
- * How long after it starts the block waits before it shows anything of its own (1.2–2 s, one per run):
- * a reply in the same instant reads as a machine; the line above the box already says it works.
+ * How long after it starts the block waits before its waiting row shows (1.2–2 s, one per run): the line above the
+ * box says it works at once, and a row in the same instant reads as a machine.
  */
 export function openerDelayMs(runId: string) {
   let h = 0;
@@ -37,40 +38,45 @@ export function openerDelayMs(runId: string) {
   return 1200 + (h % 800);
 }
 
-/** How many generic openers there are (`mobile.chat.turn.opener0`…): one per run, always the same. */
-export const OPENERS = 3;
-
 /**
- * What the block opens with, as if it had answered at once: the first thing it said (out of the lines
- * below), or a generic phrase with an ellipsis until then (`opener`, which of `OPENERS`). Nothing when
- * its words already arrive or it was stopped before saying anything.
+ * Its block is in the conversation (as `TurnRow` draws it): it has something of its own, or the moment before its
+ * waiting row passed. Until then the line above the box keeps its face.
  */
-export function turnOpener(
-  run: Pick<LiveRun, "runId" | "status" | "text">,
-  items: readonly ToolItem[],
-  posted = "",
-): { said: string | null; opener: number | null; lines: ToolItem[] } {
+export const turnShows = (
+  r: Pick<LiveRun, "runId" | "status" | "text" | "work" | "startedAt" | "since">,
+  now: number,
+) => turnItems(r).length > 0 || r.text.length > 0 || now >= (r.startedAt ?? r.since ?? 0) + openerDelayMs(r.runId);
+
+/** The first thing it said, out of the lines below (the line its block opens with, above its tools). */
+export function turnOpener(items: readonly ToolItem[], posted = ""): { said: string | null; lines: ToolItem[] } {
   const first = items.find((x) => x.kind === "say");
   // Said before a call and then posted as the saved reply (`posted`, the lead before a card): the reply shows it.
   if (first)
-    return {
-      said: posted && holdsText(posted, first.text) ? null : first.text,
-      opener: null,
-      lines: items.filter((x) => x !== first),
-    };
-  const generic = run.text.length === 0 && run.status !== "canceled";
-  let h = 0;
-  for (const ch of run.runId) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return { said: null, opener: generic ? h % OPENERS : null, lines: [...items] };
+    return { said: posted && holdsText(posted, first.text) ? null : first.text, lines: items.filter((x) => x !== first) };
+  return { said: null, lines: [...items] };
 }
 
 /**
- * The blocks drawn now: one at a time, the first at work, so what is on screen never changes order (who
- * finishes first can't be known). The others are in the line above the box and come in as their saved
- * reply, like any new message, or as the block once the first is done. A stopped one still shows.
+ * The blocks in the order they draw: every agent at work has its own, and the ones still waiting for their first
+ * words (`waitsForWords`) stay last, so an answer that starts goes above them; each group keeps its order.
  */
-export function openingRuns<R extends Pick<LiveRun, "status">>(runs: readonly R[]): R[] {
-  return runs.filter((r, i) => i === 0 || r.status === "canceled");
+export function turnOrder<R extends Pick<LiveRun, "status" | "text" | "work">>(runs: readonly R[]): R[] {
+  return [...runs.filter((r) => !waitsForWords(r)), ...runs.filter((r) => waitsForWords(r))];
+}
+
+/** One turn of the waiting row's pixels (as the web's `ac-wait-dot`): each lights up in turn, 0.2 s apart. */
+export const WAIT_DOT_PERIOD = 1.2;
+
+/**
+ * Pixel `i` (0–2) of the waiting row at `t` seconds: lit and 2px up for the first 18% of its turn, then 60%, then
+ * 30%, stepped (no easing). Reduce Motion: still, at 60%.
+ */
+export function waitDot(t: number, i: number, reduced = false): { opacity: number; lift: number } {
+  if (reduced) return { opacity: 0.6, lift: 0 };
+  const p = ((((t - i * 0.2) % WAIT_DOT_PERIOD) + WAIT_DOT_PERIOD) % WAIT_DOT_PERIOD) / WAIT_DOT_PERIOD;
+  if (p < 0.18) return { opacity: 1, lift: -2 };
+  if (p < 0.36) return { opacity: 0.6, lift: 0 };
+  return { opacity: 0.3, lift: 0 };
 }
 
 const TURN_STATUSES: ReadonlySet<string> = new Set(["thinking", "queued", "running", "canceled"]);

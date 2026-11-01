@@ -13,7 +13,6 @@ import {
   barEntries,
   type barWords,
   markedPieces,
-  markFaced,
   markInk,
 } from "@agenteschat/client/lib/activity";
 import { splitChannelRefs } from "@agenteschat/client/lib/channel-refs";
@@ -365,7 +364,6 @@ export function mayStopRun(
 
 /** Names in a sentence: in ink, or with the agent's face (shared with the web's `WorkingLine`). */
 export const markName = markInk;
-export const markFace = markFaced;
 
 /** A marked sentence split into plain and bold (name) pieces; a faced name carries its agent's id. */
 export const markedParts = markedPieces;

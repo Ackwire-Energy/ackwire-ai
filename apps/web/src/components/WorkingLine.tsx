@@ -1,4 +1,4 @@
-import { elapsedClock, type LiveRun } from "@agenteschat/client";
+import { elapsedClock, type LiveWork } from "@agenteschat/client";
 import {
   type ActivityEntry,
   activitySentence,
@@ -6,12 +6,11 @@ import {
   barFaces,
   barWords,
   markedPieces,
-  markFaced,
   markInk,
-  PHRASE_TURN_MS,
 } from "@agenteschat/client/lib/activity";
-import { Avatar, Icon } from "@agenteschat/ui";
-import { Fragment, type ReactNode, useEffect, useState } from "react";
+import { waitStep } from "@agenteschat/client/lib/work";
+import { type AgentColor, Avatar, agentGradient, Icon } from "@agenteschat/ui";
+import { type CSSProperties, Fragment, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, AgentWho } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
@@ -52,20 +51,12 @@ export function WorkingWords({ entries }: { entries: ActivityEntry[] }) {
 }
 
 /**
- * The card's phrase, turning: one agent on its own gets a light line
- * while it only thinks, then what it does, an aside on a long step and what it said last, in turn.
- * Who is typing comes last, in a piece of its own that keeps its width (`barWords`).
+ * The card's phrase: one agent on its own is just its name (its row in the conversation says what it does), several
+ * the sentence. Who is typing comes last, in a piece of its own that keeps its width (`barWords`).
  */
-export function BarPhrase({ entries, runs }: { entries: ActivityEntry[]; runs: LiveRun[] }) {
+export function BarPhrase({ entries }: { entries: ActivityEntry[] }) {
   const { t } = useTranslation();
-  const [tick, setTick] = useState(0);
-  const turning = entries.length === 1 && entries[0]?.type === "agent";
-  useEffect(() => {
-    if (!turning) return;
-    const timer = setInterval(() => setTick((n) => n + 1), PHRASE_TURN_MS);
-    return () => clearInterval(timer);
-  }, [turning]);
-  const [agents, sep, typers, typing] = barWords(t, entries, runs, tick, Date.now(), markInk, markFaced);
+  const [agents, sep, typers, typing] = barWords(t, entries, markInk);
   return (
     <>
       {agents && (
@@ -106,6 +97,28 @@ function TurnText({ text }: { text: string }) {
         {boldNames(shown.now)}
       </span>
     </span>
+  );
+}
+
+/**
+ * The waiting row's body, beside the agent's face until its first words arrive: three pixels in its color lighting up
+ * in turn, then a muted line saying what it does now (`waitStep`), turning like the bar's phrase. In the dark theme
+ * the pixels take the color's light tone.
+ */
+export function WaitLine({ work, color }: { work: LiveWork[] | undefined; color?: AgentColor }) {
+  const { t } = useTranslation();
+  const [light, deep] = agentGradient(color);
+  return (
+    <div className="ac-wait" style={{ "--wait-deep": deep, "--wait-light": light } as CSSProperties}>
+      <span className="ac-wait__dots" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </span>
+      <span className="ac-wait__step">
+        <TurnText text={waitStep(t, work)} />
+      </span>
+    </div>
   );
 }
 

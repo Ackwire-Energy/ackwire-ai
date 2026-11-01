@@ -6940,9 +6940,6 @@ export const ptBR = {
     },
     canceledBy: "Interrompido por {{name}}",
     canceled: "Interrompido",
-    opener0: "Deixa eu ver…",
-    opener1: "Já vejo isso…",
-    opener2: "Um instante…",
     elapsedSeconds: "{{n}} s",
     elapsedMinutes: "{{m}} min {{s}} s",
     stopAgent: "Parar {{article}} {{name}}",
@@ -9447,17 +9444,8 @@ export const ptBR = {
     /** "Theo e mais 2" (3 or more names in the working line). */
     namesMore: "{{first}} e mais {{count}}",
     /** The card above the box turns its phrase. */
-    phrase: {
-      thinking: {
-        l0: "Pensando no seu pedido",
-        l1: "Juntando as peças",
-        l2: "Lendo com calma",
-        l3: "Organizando as ideias",
-        l4: "Vendo o melhor caminho",
-      },
-      long: { l0: "Isso leva um minutinho", l1: "Indo com cuidado", l2: "Conferindo os detalhes", l3: "Quase lá" },
-      said: "{{name}}: {{text}}",
-    },
+    /** The waiting row's step line before its first step (`waitStep`). */
+    wait: { thinking: "Pensando…", held: "Esperando aprovação…" },
     /** The working line while an agent asks another one (names come in bold). */
     consult: {
       asking: "{{from}} está perguntando {{prep}} {{to}}",

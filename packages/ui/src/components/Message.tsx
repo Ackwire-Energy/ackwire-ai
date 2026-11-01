@@ -28,6 +28,11 @@ export interface MessageProps extends Omit<HTMLAttributes<HTMLElement>, "childre
   grouped?: boolean;
   /** Agent still writing: adds the `agent` cursor at the end of the text. */
   streaming?: boolean;
+  /**
+   * An agent at work before its first words: only its face shows, the name and time stay for screen readers until the
+   * words arrive (the same row, so nothing moves).
+   */
+  waiting?: boolean;
   agent?: boolean;
   /** The message text (use `MessageText`), plus attachments or cards. */
   children: ReactNode;
@@ -85,6 +90,7 @@ export function Message({
   entering,
   grouped,
   streaming,
+  waiting,
   agent,
   children,
   stacked,
@@ -130,6 +136,7 @@ export function Message({
         agent && "ac-msg--agent",
         grouped && "ac-msg--grouped",
         streaming && "ac-msg--streaming",
+        waiting && "ac-msg--waiting",
         entering && "ac-msg--enter",
         className,
       )}
@@ -156,7 +163,7 @@ export function Message({
         <span className="ac-msg__avatar">{avatar}</span>
       )}
       <div className="ac-msg__body" style={stacked ? { display: "flex", flexDirection: "column", gap: 8 } : undefined}>
-        <div className={grouped ? "ac-visually-hidden" : "ac-msg__head"}>
+        <div className={grouped || waiting ? "ac-visually-hidden" : "ac-msg__head"}>
           <span className="ac-msg__author">{author}</span>
           {meta ? (
             // Focusable so the details are reachable without a mouse.

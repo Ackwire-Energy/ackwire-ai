@@ -11026,6 +11026,16 @@ html:not([data-pointer]) .channel__newpill:focus-visible {
   flex: none;
   color: var(--faint);
 }
+/* "Ada · 2 s": the time right after the phrase, what follows kept at the end. */
+.ac-typing[data-active="true"] .ac-typing__text:has(+ .ac-typing__elapsed) {
+  flex: 0 1 auto;
+}
+.ac-typing__text + .ac-typing__elapsed {
+  margin-right: auto;
+}
+.ac-typing__text + .ac-typing__elapsed::before {
+  content: "· ";
+}
 .ac-typing__see {
   flex: none;
   padding: 0 4px;

@@ -150,20 +150,21 @@ const bar = () => ({ textContent: typingBar().querySelector(".ac-typing__text")?
 const lastPerson = (state: ReturnType<typeof seedState>) => state.messages[state.messages.length - 1];
 
 describe("typing bar above the composer", () => {
-  test("mention → 'Atlas está trabalhando…'; its block from the start, last in the timeline", async () => {
+  test("mention → the bar says 'Atlas' (its face only until its row shows); its block, last in the timeline", async () => {
     const { socket } = await open();
     await sendText("@atlas olha o deploy");
-    expect(bar().textContent).toBe("Atlas está trabalhando…");
+    expect(bar().textContent).toBe("Atlas");
     // Agents at work: their faces open the pill, no pixel orbit beside them (the dots are for people typing).
     expect(typingBar().querySelector(".ac-pixspin")).toBeNull();
     expect(typingBar().querySelector(".ac-typing__dots")).toBeNull();
+    // Its row isn't in the conversation yet: the bar keeps its face meanwhile.
     expect(typingBar().querySelector(".ac-avatar--agent")).not.toBeNull();
-    // The words are the bar's; the block in the timeline opens with a short phrase.
+    // The words are the bar's.
     expect(rowsWith("Atlas está")).toHaveLength(0);
     await settle(4);
     const run = { threadId: null, runId: "r-live", agentId: ATLAS_ID };
     await push(socket, { type: "agent.thinking", ...run });
-    expect(bar().textContent).toBe("Atlas está trabalhando…");
+    expect(bar().textContent).toBe("Atlas");
     await push(socket, { type: "agent.typing", ...run });
     await push(socket, { type: "agent.delta", ...run, seq: 1, text: "Deploy ok" });
     await settle();
@@ -172,7 +173,9 @@ describe("typing bar above the composer", () => {
     // It's the last row of the timeline; the card above the box stays on while it works.
     const rows = screen().getAllByRole("article");
     expect(rows[rows.length - 1]).toBe(streaming);
-    expect(bar().textContent).toBe("Atlas está escrevendo…");
+    expect(bar().textContent).toBe("Atlas");
+    // One agent on its own with its row in the conversation: its face is there, not in the bar again.
+    expect(typingBar().querySelector(".ac-avatar--agent")).toBeNull();
     await push(socket, { type: "agent.idle", ...run });
     await settle();
     expect(document.querySelector(".ac-msg--streaming")).toBeNull();
@@ -789,7 +792,7 @@ describe("regression: the router picks nobody (production #general, 'oi' after '
     await sendText("oi @ada");
     await settle(4);
     const first = lastPerson(state);
-    expect(bar().textContent).toBe("Ada está trabalhando…");
+    expect(bar().textContent).toBe("Ada");
     const run = { threadId: first?.id, runId: "r-1st", agentId: ADA_ID };
     await pushG({ type: "agent.delta", ...run, seq: 1, text: "Oi!" });
     await pushG({
@@ -953,7 +956,7 @@ describe("direct messages with an agent", () => {
         .map((l) => l.getAttribute("href")),
     ).toContain(`/org/${ORG_ID}/dm/agent/${ADA_ID}`);
     await sendText("lembra que deploy é só de segunda a quinta");
-    expect(bar().textContent).toBe("Ada está trabalhando…");
+    expect(bar().textContent).toBe("Ada");
   });
 });
 

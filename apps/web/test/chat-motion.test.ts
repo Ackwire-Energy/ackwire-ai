@@ -8,6 +8,7 @@ import {
   barEntries,
   barPhrase,
   toolActivity,
+  waitsForWords,
 } from "@agenteschat/client/lib/activity";
 import {
   entersWithMotion,
@@ -17,15 +18,17 @@ import {
   suggestionTopic,
   usageLine,
 } from "@agenteschat/client/lib/chat";
-import { dayLabel } from "@agenteschat/client/lib/format";
+import { dayLabel, shortTarget } from "@agenteschat/client/lib/format";
 import { initialReveal, REVEAL_MAX_LAG_MS, rebaseReveal, revealStep, wordEnd } from "@agenteschat/client/lib/reveal";
 import { buildTimeline, groupsWith, messageKey } from "@agenteschat/client/lib/timeline";
-import { stepLabel, stepPhrase, toolPhrase, toolWhy } from "@agenteschat/client/lib/work";
+import { stepLabel, stepPhrase, toolPhrase, toolWhy, waitStep } from "@agenteschat/client/lib/work";
 import type { TFunction } from "i18next";
 import { createI18n } from "@/i18n";
 
 const i18n = createI18n("pt-BR");
 const t = i18n.t.bind(i18n) as TFunction;
+const i18nEn = createI18n("en");
+const tEn = i18nEn.t.bind(i18nEn) as TFunction;
 
 describe("smooth reveal of streamed text", () => {
   const text = "Os 401 no Sentry";
@@ -77,70 +80,108 @@ describe("smooth reveal of streamed text", () => {
   });
 });
 
-describe("the card's turning phrase", () => {
+describe("the card's phrase and the waiting row's step line", () => {
   const name = () => "Theo";
   const base = { channelId: "c1", threadId: "m1", runId: "r1", agentId: "theo", lastSeq: 0 } as const;
-  const call = (since: number, running = true): LiveWork => ({
+  const call = (over: Partial<Extract<LiveWork, { kind: "call" }>> = {}): LiveWork => ({
     kind: "call",
     id: "k1",
-    tool: "browser_read",
+    tool: "browser_navigate",
     connector: null,
     detail: null,
     code: null,
     output: [],
-    running,
-    since,
+    running: true,
+    since: 1000,
+    ...over,
   });
 
-  test("nothing done yet: who it is, then light lines that move on each round", () => {
-    const runs = [{ ...base, status: "running" as const, text: "" }];
-    const entries = barEntries(runs, [], name, () => undefined, [], true);
-    const turns = [0, 1, 2, 3, 4].map((tick) => barPhrase(t, entries, runs, tick, 0));
-    expect(turns).toEqual([
-      "Theo está trabalhando…",
-      "Pensando no seu pedido…",
-      "Juntando as peças…",
-      "Theo está trabalhando…",
-      "Lendo com calma…",
-    ]);
+  test("one agent on its own: just its name (its row says what it does); several: the sentence", () => {
+    for (const run of [
+      { ...base, status: "running" as const, text: "" },
+      { ...base, status: "running" as const, text: "", tool: "browser_read", work: [call()] },
+      { ...base, status: "running" as const, text: "Pronto: criei" },
+    ]) {
+      const entries = barEntries([run], [], name, () => undefined, [], true);
+      expect(barPhrase(t, entries)).toBe("Theo");
+      expect(barPhrase(t, entries, (n) => `[${n}]`)).toBe("[Theo]");
+    }
+    const two = barEntries(
+      [
+        { ...base, status: "running" as const, text: "" },
+        { ...base, runId: "r2", agentId: "iris", status: "running" as const, text: "" },
+      ],
+      [],
+      (id) => (id === "theo" ? "Theo" : "Iris"),
+      () => undefined,
+      [],
+      true,
+    );
+    expect(barPhrase(t, two)).toBe("Theo e Iris estão trabalhando…");
   });
 
-  test("at work: what it does, an aside on a long step and what it said last, in turn", () => {
-    const runs = [
-      {
-        ...base,
-        status: "running" as const,
-        text: "",
-        tool: "browser_read",
-        work: [{ kind: "say" as const, text: "Achei a área de viagens." }, call(1000)],
-      },
-    ];
-    const entries = barEntries(runs, [], name, () => undefined, [], true);
-    const turns = [0, 1, 2].map((tick) => barPhrase(t, entries, runs, tick, 1000 + 5000));
-    expect(turns[0]).toBe(activityText(t, entries));
-    expect(turns[1]).toBe("Isso leva um minutinho…");
-    expect(turns[2]).toBe("Theo: Achei a área de viagens.");
-  });
-
-  test("writing stays in the card and does not turn", () => {
-    const runs = [{ ...base, status: "running" as const, text: "Pronto: criei" }];
-    expect(barEntries(runs, [], name, () => undefined)).toEqual([]);
-    const entries = barEntries(runs, [], name, () => undefined, [], true);
-    expect(barPhrase(t, entries, runs, 3, 0)).toBe("Theo está escrevendo…");
-  });
-
-  test("a turn it stopped, or one that failed, lends the phrase nothing: phrase and time are the new turn's", () => {
+  test("a turn it stopped, or one that failed, lends the time nothing: the time is the new turn's", () => {
     const again = { ...base, runId: "r2", status: "running" as const, text: "", startedAt: 90_000 };
     for (const status of ["canceled", "failed"] as const) {
-      const said = { kind: "say" as const, text: "Vou checar o deploy." };
-      const old = { ...base, status, text: "", startedAt: 0, work: [said, call(1000, false)] };
-      const runs = [old, again];
-      const entries = barEntries(runs, [], name, () => undefined, [], true);
-      const turns = [0, 1, 2].map((tick) => barPhrase(t, entries, runs, tick, 100_000));
-      expect(turns).toEqual([0, 1, 2].map((tick) => barPhrase(t, entries, [again], tick, 100_000)));
-      expect(turns[1]).toBe("Pensando no seu pedido…");
-      expect(barElapsed(t, entries, runs, 100_000)).toBe("10 s");
+      const old = { ...base, status, text: "", startedAt: 0, work: [call({ running: false })] };
+      const entries = barEntries([old, again], [], name, () => undefined, [], true);
+      expect(barPhrase(t, entries)).toBe("Theo");
+      expect(barElapsed(t, entries, [old, again], 100_000)).toBe("10 s");
     }
+  });
+
+  test("waiting for words: at work with nothing written, said or read", () => {
+    const run = { status: "running" as const, text: "", work: [call()] };
+    expect(waitsForWords(run)).toBe(true);
+    expect(waitsForWords({ ...run, status: "thinking" })).toBe(true);
+    expect(waitsForWords({ ...run, text: "Olá" })).toBe(false);
+    expect(waitsForWords({ ...run, work: [{ kind: "say", text: "Vou olhar o login." }] })).toBe(false);
+    expect(waitsForWords({ ...run, work: [{ kind: "steer", messageId: "m1" }] })).toBe(false);
+    // Waiting on an approval keeps the waiting row (no header in and out again).
+    expect(waitsForWords({ ...run, status: "waiting_approval" })).toBe(true);
+    for (const status of ["canceled", "failed"] as const) expect(waitsForWords({ ...run, status })).toBe(false);
+  });
+
+  test("the step line: 'Pensando…', then the step running now, verb first, its target cut to what names it", () => {
+    expect(waitStep(t, [])).toBe("Pensando…");
+    expect(waitStep(t, undefined)).toBe("Pensando…");
+    expect(waitStep(t, [call({ detail: "https://console.example.com/login?next=/home" })])).toBe(
+      "Usando o navegador · console.example.com…",
+    );
+    expect(waitStep(t, [call({ tool: "read_file", detail: "src/auth/refresh.ts" })])).toBe(
+      "Mexendo nos arquivos do PC · refresh.ts…",
+    );
+    // A step that ended: back to thinking until the next one starts.
+    expect(waitStep(t, [call({ running: false })])).toBe("Pensando…");
+    expect(waitStep(t, [call({ detail: null })])).toBe("Usando o navegador…");
+    expect(waitStep(tEn, [])).toBe("Thinking…");
+    expect(waitStep(t, [call({ running: false, held: true })])).toBe("Esperando aprovação…");
+    expect(waitStep(tEn, [call({ running: false, held: true })])).toBe("Waiting for approval…");
+    // Two of the same step in a row fold into one tool line; the step line names the one running now.
+    const site = (id: string, detail: string, running: boolean) => call({ id, detail, running });
+    expect(
+      waitStep(t, [site("c1", "https://one.example.com/x", false), site("c2", "https://two.example.com/y", true)]),
+    ).toBe("Usando o navegador · two.example.com…");
+    const file = (id: string, detail: string, running: boolean) => call({ id, tool: "read_file", detail, running });
+    expect(waitStep(t, [file("f1", "auth/refresh.ts", false), file("f2", "auth/session.ts", true)])).toBe(
+      "Mexendo nos arquivos do PC · session.ts…",
+    );
+  });
+
+  test("a target is a URL's host, a path's last part, else a short start cut at a word", () => {
+    expect(shortTarget("https://console.example.com/a/b")).toBe("console.example.com");
+    expect(shortTarget("apps/web/src/auth/refresh.ts")).toBe("refresh.ts");
+    expect(shortTarget("/var/log/")).toBe("log");
+    expect(shortTarget("console.example.com/login")).toBe("console.example.com");
+    expect(shortTarget("./src/auth/refresh.ts")).toBe("refresh.ts");
+    expect(shortTarget("~/notes/plan.md")).toBe("plan.md");
+    expect(shortTarget("acme/repo")).toBe("acme/repo");
+    expect(shortTarget("10/31")).toBe("10/31");
+    expect(shortTarget("and/or")).toBe("and/or");
+    expect(shortTarget("relatório de vendas")).toBe("relatório de vendas");
+    expect(shortTarget("a long line about the quarterly numbers of the north team")).toBe(
+      "a long line about the quarterly numbers",
+    );
   });
 });
 

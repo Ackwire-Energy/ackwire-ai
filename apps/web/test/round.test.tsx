@@ -612,7 +612,7 @@ describe("flat DM replies", () => {
     const composer = screen().getByRole("combobox", { name: /Mensagem para/ });
     await act(async () => fireEvent.change(composer, { target: { value: "oi" } }));
     await act(async () => fireEvent.keyDown(composer, { key: "Enter" }));
-    expect(document.querySelector(".ac-typing__text")?.textContent).toBe("Ada está trabalhando…");
+    expect(document.querySelector(".ac-typing__text")?.textContent).toBe("Ada");
     await settle(4);
     const dm = state.dms[0];
     await act(async () =>
