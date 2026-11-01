@@ -3,6 +3,7 @@ import { noPlatformCredentials } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
   acceptInvitation,
+  addChannelMember,
   agentDetail,
   budgetPercent,
   ConflictError,
@@ -24,6 +25,7 @@ import {
   openDm,
   orgOverview,
   postPersonMessage,
+  removeChannelMember,
   resendInvitation,
   rotateCredential,
   setAgentChannels,
@@ -297,7 +299,7 @@ describe("agents, runs and usage", () => {
 });
 
 describe("where an agent works: its owner in their channels, Manage agents for anyone's", () => {
-  /** Bia may create agents and nothing past the base role; her @bot; #squad (Ana's, Bia in it), #sales (Bia not in it). */
+  /** Bia may create agents and nothing past the base role; her @bot; #squad (the owner's, Bia in it), #sales (not). */
   async function start() {
     f = await setup();
     const makers = await createRole(f.db, f.owner.id, f.org.id, { name: "Makers", permissions: ["create_agents"] });
@@ -396,5 +398,34 @@ describe("where an agent works: its owner in their channels, Manage agents for a
     const secret = await createChannel(f.db, f.owner.id, f.org.id, { name: "secret", visibility: "private" });
     await setAgentChannels(f.db, dora.id, f.org.id, f.agent.id, [{ channelId: sales.id }, { channelId: secret.id }]);
     expect(await names(f.agent.id)).toEqual(["sales", "secret"]);
+  });
+
+  test("a channel's members follow the same rule; who created the channel still takes any agent out", async () => {
+    const { bia, bot, squad, sales, names } = await start();
+    const pub = { pubsub: f.pubsub };
+    // As from its page (and an agent's add_agent_to_channel, its Undo, an import): hers, where she is.
+    await addChannelMember(f.db, bia.id, f.org.id, squad.id, { agentId: bot.id }, pub);
+    expect(await names(bot.id)).toEqual(["squad"]);
+    await expect(addChannelMember(f.db, bia.id, f.org.id, sales.id, { agentId: bot.id })).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+    await expect(addChannelMember(f.db, bia.id, f.org.id, squad.id, { agentId: f.agent.id })).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+    const caio = await addMember(f.db, f.org.id, "member", "caio");
+    await expect(addChannelMember(f.db, bia.id, f.org.id, squad.id, { userId: caio.id })).rejects.toBeInstanceOf(
+      ForbiddenError,
+    );
+    await addChannelMember(f.db, f.owner.id, f.org.id, squad.id, { agentId: f.agent.id }, pub);
+    await expect(
+      removeChannelMember(f.db, bia.id, f.org.id, squad.id, { agentId: f.agent.id }, pub),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    await removeChannelMember(f.db, bia.id, f.org.id, squad.id, { agentId: bot.id }, pub);
+    expect(await names(bot.id)).toEqual([]);
+    const room = await createChannel(f.db, caio.id, f.org.id, { name: "room" });
+    await joinChannel(f.db, bia.id, f.org.id, room.id);
+    await addChannelMember(f.db, bia.id, f.org.id, room.id, { agentId: bot.id }, pub);
+    await removeChannelMember(f.db, caio.id, f.org.id, room.id, { agentId: bot.id }, pub);
+    expect(await names(bot.id)).toEqual([]);
   });
 });

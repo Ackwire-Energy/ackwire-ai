@@ -261,9 +261,45 @@ export async function joinChannel(db: Database, userId: string, orgId: string, c
 }
 
 /**
- * Adds a person or an agent of the same organization to a channel. Allowed
- * for the channel's creator and admins; adding an agent also needs an admin
- * or the agent's owner (an agent works only where they allowed it).
+ * Where `actorId` may put an agent of theirs (or any, with `manage_agents`) or take it out (ADR 0085 §5): a channel
+ * they're in and may post in, or one they manage (its creator, `manage_channels`). One rule for an agent's page
+ * (`setAgentChannels`) and a channel's members; the apps mirror it (`addsAgentsTo` in packages/client).
+ */
+export const placesAgentsIn = (
+  membership: Membership,
+  actorId: string,
+  channel: { createdByUserId: string | null },
+  actorIn: boolean,
+) => (actorIn && can(membership, "post")) || channel.createdByUserId === actorId || can(membership, "manage_channels");
+
+/**
+ * Refuses unless `actorId` may put `agentId` in `channel` or take it out: the agent theirs or `manage_agents`, and
+ * `placesAgentsIn`.
+ */
+async function requirePlacesAgent(
+  db: Database,
+  membership: Membership,
+  actorId: string,
+  channel: Channel,
+  agentId: string,
+) {
+  const [agent] = await db
+    .select({ ownerUserId: agents.ownerUserId })
+    .from(agents)
+    .where(and(eq(agents.id, agentId), eq(agents.orgId, channel.orgId), isNull(agents.archivedAt)));
+  if (!agent) throw new ValidationError("That agent does not exist in this organization");
+  if (agent.ownerUserId !== actorId && !can(membership, "manage_agents")) {
+    throw new ForbiddenError("Only an admin or the agent's owner can change where it works");
+  }
+  if (!placesAgentsIn(membership, actorId, channel, await isChannelMember(db, channel.orgId, channel.id, actorId))) {
+    throw new ForbiddenError("An agent joins or leaves only the channels you're in or manage");
+  }
+}
+
+/**
+ * Adds a person or an agent of the same organization to a channel. A person:
+ * the channel's creator or `manage_channels`. An agent: `requirePlacesAgent`,
+ * as on its page (an agent works only where its owner or an admin allowed it).
  * `autoReply` (agents): the router may pick it here without a mention.
  * Members see `channel.member_added`; an added person also gets it on their
  * own topic so the channel shows up in their sidebar. The router reads
@@ -285,10 +321,10 @@ export async function addChannelMember(
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId), isNull(channels.archivedAt)));
   if (!channel) throw new NotFoundError("Channel not found");
   if (channel.kind === "dm") throw new ValidationError("A direct conversation keeps its participants");
-  if (channel.createdByUserId !== actorId && !can(membership, "manage_channels")) {
-    throw new ForbiddenError("Only the channel's creator or an admin can add members");
-  }
   if ("userId" in member) {
+    if (channel.createdByUserId !== actorId && !can(membership, "manage_channels")) {
+      throw new ForbiddenError("Only the channel's creator or an admin can add members");
+    }
     if (!(await getMembership(db, member.userId, orgId))) {
       throw new ValidationError("That person is not a member of this organization");
     }
@@ -303,14 +339,7 @@ export async function addChannelMember(
     await publishUserEvent(options.pubsub, orgId, member.userId, event);
     return;
   }
-  const [agent] = await db
-    .select({ id: agents.id, ownerUserId: agents.ownerUserId })
-    .from(agents)
-    .where(and(eq(agents.id, member.agentId), eq(agents.orgId, orgId), isNull(agents.archivedAt)));
-  if (!agent) throw new ValidationError("That agent does not exist in this organization");
-  if (agent.ownerUserId !== actorId && !can(membership, "manage_agents")) {
-    throw new ForbiddenError("Only an admin or the agent's owner can add this agent to a channel");
-  }
+  await requirePlacesAgent(db, membership, actorId, channel, member.agentId);
   const autoReply = member.autoReply ?? true;
   await db
     .insert(channelMembers)
@@ -380,7 +409,8 @@ export async function listChannelMembers(db: Database, actorId: string, orgId: s
 
 /**
  * Removes a person or an agent from a channel. Allowed for yourself (leave),
- * the channel's creator, and admins. Publishes `membership.revoked` so open
+ * the channel's creator, and admins; an agent also for whoever may put it
+ * there (`requirePlacesAgent`). Publishes `membership.revoked` so open
  * WebSocket subscriptions of that person end immediately.
  */
 export async function removeChannelMember(
@@ -399,7 +429,8 @@ export async function removeChannelMember(
   if (!channel) throw new NotFoundError("Channel not found");
   const self = "userId" in member && member.userId === actorId;
   if (!self && channel.createdByUserId !== actorId && !can(membership, "manage_channels")) {
-    throw new ForbiddenError("Only the channel's creator or an admin can remove members");
+    if ("userId" in member) throw new ForbiddenError("Only the channel's creator or an admin can remove members");
+    await requirePlacesAgent(db, membership, actorId, channel, member.agentId);
   }
   await db
     .delete(channelMembers)

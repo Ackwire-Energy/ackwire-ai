@@ -3,7 +3,7 @@ import { MODEL_TIERS, type ModelTier } from "@agenteschat/providers";
 import { getAgent } from "./agents";
 import type { AutoModels } from "./auto-model";
 import { caches } from "./cache";
-import { CHANNEL_NAME_PATTERN } from "./channels";
+import { CHANNEL_NAME_PATTERN, placesAgentsIn } from "./channels";
 import { invalidateDefaults, modelInfoFor } from "./credentials";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { agentBudgetState } from "./gateway";
@@ -340,9 +340,9 @@ export async function listAgentChannels(db: Database, actorId: string, orgId: st
 /**
  * Sets where an agent works: the channels it belongs to and, per channel, whether the router may pick it without a
  * mention. Its owner or who may manage every agent (`manage_agents`) sets it, and puts it in or takes it out of a
- * channel only where they're a member who may post, or that they manage (its creator, `manage_channels`). The apps
- * offer the same channels (`addsAgentsTo` in packages/client/src/lib/permissions.ts). The list replaces the channels
- * `listAgentChannels` shows them: a private channel they can't see, a DM or an archived channel stays as it is.
+ * channel only where they're a member who may post, or that they manage (`placesAgentsIn`, the rule a channel's
+ * members follow too). The list replaces the channels `listAgentChannels` shows them: a private channel they can't
+ * see, a DM or an archived channel stays as it is.
  */
 export async function setAgentChannels(
   db: Database,
@@ -391,11 +391,7 @@ export async function setAgentChannels(
   const removing = current.filter(
     (c) => c.kind === "channel" && !wanted.has(c.id) && (actorIn.has(c.id) || c.visibility === "public" || admin),
   );
-  const posts = can(membership, "post");
-  const managesAll = can(membership, "manage_channels");
-  const outside = (c: (typeof found)[number]) =>
-    !(posts && actorIn.has(c.id)) && !managesAll && c.createdByUserId !== actorId;
-  if ([...adding, ...removing].some(outside)) {
+  if ([...adding, ...removing].some((c) => !placesAgentsIn(membership, actorId, c, actorIn.has(c.id)))) {
     throw new ForbiddenError("An agent joins or leaves only the channels you're in or manage");
   }
   const retuned = current.flatMap((c) => {
