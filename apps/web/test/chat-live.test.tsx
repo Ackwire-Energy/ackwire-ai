@@ -154,8 +154,8 @@ describe("typing bar above the composer", () => {
     const { socket } = await open();
     await sendText("@atlas olha o deploy");
     expect(bar().textContent).toBe("Atlas está trabalhando…");
-    // Agents at work: the pixel orbit (the dots are for people typing).
-    expect(typingBar().querySelector(".ac-pixspin")).not.toBeNull();
+    // Agents at work: their faces open the pill, no pixel orbit beside them (the dots are for people typing).
+    expect(typingBar().querySelector(".ac-pixspin")).toBeNull();
     expect(typingBar().querySelector(".ac-typing__dots")).toBeNull();
     expect(typingBar().querySelector(".ac-avatar--agent")).not.toBeNull();
     // The words are the bar's; the block in the timeline opens with a short phrase.
@@ -290,7 +290,7 @@ describe("typing bar above the composer", () => {
     expect(people?.textContent).toBe("João está digitando…");
     expect(people?.querySelector(".ac-typing__typers")?.textContent).toBe("João");
     expect(typingBar().querySelectorAll(".ac-typing__tok")).toHaveLength(3);
-    expect(typingBar().querySelector(".ac-pixspin")).not.toBeNull();
+    expect(typingBar().querySelector(".ac-pixspin")).toBeNull();
     // The time, "Ver" and the stop are one agent's: with two at work the line shows none (the composer still stops).
     expect(typingBar().querySelector(".ac-typing__elapsed")).toBeNull();
     expect(within(typingBar()).queryByRole("button", { name: "Ver" })).toBeNull();

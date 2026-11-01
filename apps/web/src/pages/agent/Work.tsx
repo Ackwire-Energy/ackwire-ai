@@ -91,7 +91,7 @@ import {
   planModel as planModelOf,
   planOf,
 } from "@agenteschat/client/lib/plans";
-import { AUTO, isAuto, modelChoices, providerLabel } from "@agenteschat/client/lib/providers";
+import { AUTO, apiProviderOf, isAuto, modelChoices, providerLabel } from "@agenteschat/client/lib/providers";
 import { cleanSite, SITE } from "@agenteschat/client/lib/sites";
 import {
   BrainLogo,
@@ -256,6 +256,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
     : kind === "model"
       ? "key"
       : planOfAccount({ kind, provider: agent.brain?.provider ?? null });
+  const keyProvider = apiProviderOf(saved.model, models.data?.models ?? []);
   const orgModel = isAuto(saved.model)
     ? t("brain.auto.label")
     : (models.data?.models.find((m) => m.id === saved.model)?.label ?? saved.model);
@@ -339,7 +340,15 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
             />
           ) : (
             <Cell
-              icon={ai === "key" ? <Icon name="brainAgent" size={16} /> : <ProviderLogo id={planMark(ai)} size="sm" />}
+              icon={
+                ai !== "key" ? (
+                  <ProviderLogo id={planMark(ai)} size="sm" />
+                ) : keyProvider ? (
+                  <ProviderLogo id={keyProvider} size="sm" />
+                ) : (
+                  <Icon name="brainAgent" size={16} />
+                )
+              }
               label={t("agentPage.work.cell.brain")}
               value={ai === "key" ? orgModel : planModel}
               more={ai === "key" ? null : effort}
@@ -1070,7 +1079,12 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     return t(`brain.reasons.${o.reason}`, { computer: view.computer?.name ?? "", program });
   };
   const whereName = home?.name ?? "";
-  const keyChoices = keyOptions(t, credentials.data ?? [], settings.data?.defaultCredentialId ?? null);
+  const keyChoices = keyOptions(
+    t,
+    credentials.data ?? [],
+    settings.data?.defaultCredentialId ?? null,
+    apiProviderOf(model, all),
+  );
   const accountIcon = accountKind ? <BrainLogo kind={accountKind} size="sm" /> : null;
   const shownModel = brainModelChoice(kind, plan, planModel ?? option?.defaultModel ?? "");
   const accountOptions: SelectOption[] = [
@@ -1178,7 +1192,13 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   // each is for ("O mais capaz…"), a plan's what it's sold as, and what it needs from the plan's account behind its ⓘ;
   // several makers' models are grouped by maker, each beside its logo, the others beside their plan's. An alias the
   // plan leaves out runs its main model: shown as that one (`shownModel`).
-  const planLogo = card === "key" ? null : <ProviderLogo id={planMark(card)} size="sm" />;
+  const apiProvider = apiProviderOf(model, all);
+  const planLogo =
+    card !== "key" ? (
+      <ProviderLogo id={planMark(card)} size="sm" />
+    ) : apiProvider ? (
+      <ProviderLogo id={apiProvider} size="sm" />
+    ) : null;
   const modelLine = (m: BrainModelChoice) =>
     !plan && kind === "claude_code" && isClaudeAlias(m.value)
       ? t(`agentPage.work.brain.modelLine.${m.value}`)
@@ -1316,7 +1336,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
               // Each plan by its maker's mark; the API key by the agent itself, which it pays for per use.
               leading:
                 c === "key" ? (
-                  <BrainPortrait kind="agent" state={card === c ? "working" : "idle"} agent={draft.look} />
+                  apiProvider ? (
+                    <ProviderLogo id={apiProvider} />
+                  ) : (
+                    <BrainPortrait kind="agent" state={card === c ? "working" : "idle"} agent={draft.look} />
+                  )
                 ) : (
                   <ProviderLogo id={planMark(c)} off={off} />
                 ),

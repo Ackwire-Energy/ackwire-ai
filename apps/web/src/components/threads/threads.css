@@ -190,6 +190,22 @@ html:not([data-pointer]) .thread-pop__row:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* "Fixadas": a row goes to the message; its Desafixar sits beside it, not inside the row's button. */
+.pins-pop__item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pins-pop__item > .thread-pop__row {
+  flex: 1;
+  min-width: 0;
+}
+.pins-pop__time {
+  font-size: 12px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 .thread-pop__foot {
   display: flex;
   justify-content: flex-end;

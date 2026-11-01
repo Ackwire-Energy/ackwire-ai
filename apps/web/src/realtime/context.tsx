@@ -38,6 +38,7 @@ import {
   cacheMessage,
   cacheMessageActions,
   cacheMessageMemories,
+  cachePinned,
   cacheReceipts,
   cacheTask,
   catchUpChannel,
@@ -769,6 +770,11 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
       // An agent saved something from a person's message: the memory mark appears (or goes) live.
       if (event.type === "message.memories")
         cacheMessageMemories(qc, orgId, event.channelId, event.messageId, event.memories);
+      // Someone pinned or unpinned a message: its "Fixar" / "Desafixar" and the pins list follow.
+      if (event.type === "message.pinned" || event.type === "message.unpinned") {
+        cachePinned(qc, orgId, channelId, event.messageId, event.type === "message.pinned");
+        void qc.invalidateQueries({ queryKey: keys.pins(orgId, channelId) });
+      }
       // Act with undo: an agent message's receipts changed (made, undone, redone): replace the list.
       if (event.type === "message.actions") {
         cacheMessageActions(qc, orgId, event.channelId, event.messageId, event.actions);

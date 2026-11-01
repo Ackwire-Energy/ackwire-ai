@@ -907,7 +907,7 @@ textarea.ac-input {
  * (code, a quote, "Leu seu recado") is `--msg-well`, darker than the row whether it is hovered or not.
  */
 :root {
-  --msg-card-w: 560px;
+  --msg-card-w: 640px;
 }
 .ac-msg > * {
   --raised: var(--raised-2);
@@ -3969,6 +3969,35 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
 .ac-btn--ghost[disabled] {
   background: transparent;
 }
+/*
+ * A ghost button on a dark or agent-colored surface (`.ac-on-dark`: an agent's frame, a graphite bar): its own white
+ * ink and a light plate, so hover and press never turn it the page's ink on a dark plate, in either theme.
+ */
+.ac-on-dark .ac-btn--ghost {
+  color: var(--on-dark-soft);
+}
+.ac-on-dark .ac-who > b {
+  color: inherit;
+}
+.ac-on-dark .ac-btn--ghost:hover,
+.ac-on-dark .ac-btn--ghost[aria-pressed="true"] {
+  color: var(--on-dark);
+  background: var(--on-dark-plate);
+}
+.ac-on-dark .ac-btn--ghost:active:not([disabled]) {
+  color: var(--on-dark);
+  background: var(--on-dark-plate-strong);
+}
+.ac-on-dark .ac-btn--ghost[disabled] {
+  color: var(--on-dark-faint);
+  background: transparent;
+}
+.ac-on-dark .ac-btn--ghost.ac-btn--glyph:hover {
+  background: transparent;
+}
+.ac-on-dark .ac-btn--ghost.ac-btn--glyph:hover::before {
+  background: var(--on-dark-plate);
+}
 .ac-btn .ac-icon {
   width: var(--control-icon-md);
   height: var(--control-icon-md);
@@ -4790,19 +4819,18 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   background: var(--plate);
 }
 /*
- * A raised bar of 32px ghost icon buttons at the end of the row's first line: react, reply, more. Hidden at rest,
- * shown on hover and on keyboard focus inside the row. Its middle is on that line's capitals, as the receipt's
- * check's is, and it stands left of the check. So it only reaches into the room between rows: never over the row
- * above, still in view at the top of a scrolled list, and clear of a receipt's line under the text.
+ * A small raised bar of 26px ghost icon buttons: react, reply, more. Hidden at rest, shown on hover and on keyboard
+ * focus inside the row. Its middle sits on the row's top edge, so half of it is in the gap above and it never covers
+ * the first line of text.
  */
 .ac-msg__actions {
-  /* The name's 20px line starts at the row's 6px padding (`.ac-msg__head`): its capitals' middle. */
-  top: calc(16px - var(--cap-mid));
-  right: 10px;
+  top: 0;
+  right: 12px;
   z-index: var(--z-sticky);
-  padding: 3px;
+  gap: 0;
+  padding: 2px;
   border: 0;
-  border-radius: 13px;
+  border-radius: 10px;
   background: var(--raised);
   box-shadow: var(--e2);
   /* Placed by its middle (-50%), 4px lower at rest. One transform: the build's minifier (Lightning CSS) drops a
@@ -4818,21 +4846,22 @@ html:not([data-pointer]) .ac-hint:focus-visible {
 .ac-msg__actions:has([aria-expanded="true"]) {
   transform: translateY(-50%);
 }
-/* A grouped row's first line is its text's, under the text's 2px margin (`.ac-msg__text`, 26.35px lines). */
 .ac-msg--grouped > .ac-msg__body > .ac-msg__actions {
-  top: calc(4px + 13.175px - var(--cap-mid));
-}
-/* A grouped row with a line under its text: under one line of text, the room between that line and the row above's
-   last one (6px up) is 38.35px, so the bar (38px, on touch too) takes that room's middle. */
-.ac-msg--grouped:has(> .ac-msg__body > .ac-msg__foot:not(:empty)) > .ac-msg__body > .ac-msg__actions {
-  top: 13.175px;
+  top: 0;
 }
 /* Left of the check (20px wide), 8px from it, past the row's side padding. */
 .ac-msg:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
   right: calc(var(--msg-inline) + 28px);
 }
 .ac-msg__actions .ac-btn--sm {
-  min-width: 32px;
+  min-width: 26px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+}
+.ac-msg__actions .ac-btn--sm .ac-icon {
+  width: 16px;
+  height: 16px;
 }
 /* The row being hovered stays above its neighbours, so its bar is never under the next row. */
 .ac-msg:hover,

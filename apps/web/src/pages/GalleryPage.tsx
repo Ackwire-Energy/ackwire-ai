@@ -163,7 +163,7 @@ export function GalleryPage() {
         </div>
         <Card padded>
           <CardHeader
-            icon="key"
+            mark="anthropic"
             title="Seu plano do Claude"
             hint={{
               name: about("Seu plano do Claude"),

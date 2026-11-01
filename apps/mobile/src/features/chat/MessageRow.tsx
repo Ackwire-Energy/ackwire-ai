@@ -20,6 +20,7 @@ import { CONTINUE_ERRORS, errorCode, errorText } from "@agenteschat/client/lib/e
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
 import { brainUnavailableOf } from "@agenteschat/client/lib/machine-outages";
+import { mentionsHandle } from "@agenteschat/client/lib/markdown";
 import { isMediaAfterReply, messageMediaOf } from "@agenteschat/client/lib/media";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import { missionSetupOf } from "@agenteschat/client/lib/missions";
@@ -44,8 +45,8 @@ import { MessageFiles } from "../files/MessageFiles";
 import { consultationHref, routineHref } from "../links/logic";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard, SetupFailedCard } from "../missions/cards";
 import { BrainWait } from "../outages/WaitCard";
-import { AgentFace, Face } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useNamesComputers, useOrgId, useWhen } from "../shared/hooks";
+import { AgentFace, Face, withAgentFaces } from "../shared/Face";
+import { useColors, useDirectory, useMeId, useMyHandle, useNamesComputers, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
 import { ReceiptMark } from "./AgentReceipts";
@@ -222,6 +223,8 @@ export const MessageRow = memo(function MessageRow({
   const issueWork = issueWorkOf(meta);
   // My own message: a light bubble on the right, no face or name.
   const mine = m.author.type === "person" && Boolean(meId) && m.author.id === meId;
+  const myHandle = useMyHandle();
+  const mentionsMe = !mine && !!myHandle && mentionsHandle(body, myHandle);
 
   // The cards it carries: above an agent's tools, which come last.
   const cards = (
@@ -338,7 +341,12 @@ export const MessageRow = memo(function MessageRow({
       onLongPress={press}
       delayLongPress={380}
       accessibilityHint={press ? t("mobile.chat.longPressHint") : undefined}
-      style={({ pressed }) => [styles.msg, grouped && styles.cont, pressed && press && { backgroundColor: c.sunken }]}
+      style={({ pressed }) => [
+        styles.msg,
+        grouped && styles.cont,
+        mentionsMe && { backgroundColor: `${c.amber}17`, borderLeftWidth: 2, borderLeftColor: c.amber },
+        pressed && press && { backgroundColor: c.sunken },
+      ]}
     >
       <View style={styles.avslot}>{grouped ? null : <Face who={m.author} size={32} live={false} />}</View>
       <View style={styles.body}>
@@ -670,7 +678,11 @@ function HelpingTag({ consultation: c, channelId }: { consultation: RunConsultat
   return (
     <>
       <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
-        {t("chat.consultPanel.helping", { name: from.name, article: from.article })}
+        {withAgentFaces(
+          t("chat.consultPanel.helping", { name: from.name, article: from.article }),
+          [{ name: from.name, agentId: c.agentId }],
+          12,
+        )}
       </Text>
       <Pressable
         onPress={() => router.push(consultationHref(c.id, channelId))}

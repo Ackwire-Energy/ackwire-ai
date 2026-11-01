@@ -1,4 +1,5 @@
-import { Icon } from "@agenteschat/ui";
+import { splitAtNames } from "@agenteschat/client/lib/text";
+import { type AgentAppearance, Avatar, Icon } from "@agenteschat/ui";
 import {
   createContext,
   type ReactNode,
@@ -23,7 +24,20 @@ export interface Toast {
   detail?: string;
   /** Quick actions ("Ajustar", "Desfazer"); usually one. */
   actions?: ToastAction[];
+  /** The agent the words name: its face goes before its name. */
+  who?: ToastWho;
 }
+
+/**
+ * An agent named in a toast. Toasts draw outside the workspace (no directory there), so the caller hands its look.
+ */
+export interface ToastWho {
+  name: string;
+  appearance?: AgentAppearance;
+}
+
+/** Words for a toast: plain, or naming an agent (`who`), drawn with its face before its name. */
+export type ToastText = string | { text: string; who: ToastWho };
 
 export interface ToastAction {
   label: string;
@@ -31,7 +45,7 @@ export interface ToastAction {
 }
 
 interface ToastApi {
-  show: (text: string, tone?: Toast["tone"], action?: ToastAction | ToastAction[], detail?: string) => void;
+  show: (text: ToastText, tone?: Toast["tone"], action?: ToastAction | ToastAction[], detail?: string) => void;
 }
 
 const ToastContext = createContext<ToastApi>({ show: () => {} });
@@ -52,12 +66,14 @@ export function createToastStore() {
     for (const l of listeners) l();
   };
   return {
-    show(text: string, tone: Toast["tone"] = "info", action?: ToastAction | ToastAction[], detail?: string) {
+    show(words: ToastText, tone: Toast["tone"] = "info", action?: ToastAction | ToastAction[], detail?: string) {
       const actions = action ? (Array.isArray(action) ? action : [action]) : [];
+      const text = typeof words === "string" ? words : words.text;
       const toast = {
         id: nextId++,
         tone,
         text,
+        ...(typeof words === "string" ? {} : { who: words.who }),
         ...(detail ? { detail } : {}),
         ...(actions.length > 0 ? { actions } : {}),
       };
@@ -95,7 +111,7 @@ export function ToastProvider({
 }) {
   const toasts = useSyncExternalStore(store.subscribe, store.get, store.get);
   const show = useCallback(
-    (text: string, tone?: Toast["tone"], action?: ToastAction | ToastAction[], detail?: string) =>
+    (text: ToastText, tone?: Toast["tone"], action?: ToastAction | ToastAction[], detail?: string) =>
       store.show(text, tone, action, detail),
     [store],
   );
@@ -115,11 +131,13 @@ export function ToastProvider({
             <span className="ac-toast__text">
               {toast.detail ? (
                 <>
-                  <b className="ac-toast__title">{toast.text}</b>
+                  <b className="ac-toast__title">
+                    <ToastWords toast={toast} />
+                  </b>
                   <small className="ac-toast__detail">{toast.detail}</small>
                 </>
               ) : (
-                toast.text
+                <ToastWords toast={toast} />
               )}
             </span>
             {toast.actions?.map((action) => (
@@ -151,6 +169,26 @@ export function ToastProvider({
 }
 
 export const useToast = () => useContext(ToastContext);
+
+/** A toast's words; the agent it names with its face before the name (`.ac-who`), as in the conversation. */
+function ToastWords({ toast }: { toast: Toast }) {
+  const who = toast.who;
+  if (!who) return <>{toast.text}</>;
+  return (
+    <>
+      {splitAtNames(toast.text, [who.name]).map((part) =>
+        typeof part === "string" ? (
+          part
+        ) : (
+          <span key="who" className="ac-who">
+            <Avatar kind="agent" size="xs" name={who.name} appearance={who.appearance} />
+            <b>{who.name}</b>
+          </span>
+        ),
+      )}
+    </>
+  );
+}
 
 /**
  * A word said in a toast's place, for as long as a toast would stay: a window that fills the page says it in a line

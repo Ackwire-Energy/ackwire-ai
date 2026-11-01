@@ -36,7 +36,7 @@ import { useFrameTime } from "@/agent/live";
 import { Dither } from "@/sky/Dither";
 import { softTones } from "@/sky/math";
 import { CHROME_MAX_SCALE, haptics, Icon, PixelOrbit, PixelStop, Text, useReducedMotion, useTheme } from "@/ui";
-import { AgentFace, Face } from "../shared/Face";
+import { AgentFace, AgentWho, Face } from "../shared/Face";
 import { useDirectory, useNow } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import {
@@ -46,6 +46,7 @@ import {
   lineFit,
   lineStops,
   markedParts,
+  markFace,
   markName,
   narrowDrawn,
   PHRASE_FADE_MS,
@@ -290,7 +291,12 @@ export function WorkingLine({
       onTextLayout={onTextLayout}
     >
       {markedParts(text).map((p, i) =>
-        p.bold ? (
+        p.agentId ? (
+          // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
+          <RNText key={i} style={{ color: c.ink }}>
+            <AgentWho agentId={p.agentId} name={p.text} size={13} />
+          </RNText>
+        ) : p.bold ? (
           // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
           <RNText key={i} style={[styles.ink, { color: c.ink }]}>
             {p.text}
@@ -461,7 +467,7 @@ function TurningWords({
     const timer = setInterval(() => setTick((k) => ({ n: k.n + 1, at: Date.now() })), PHRASE_TURN_MS);
     return () => clearInterval(timer);
   }, [turning]);
-  const words = barWords(t, entries, runs, tick.n, tick.at, markName);
+  const words = barWords(t, entries, runs, tick.n, tick.at, markName, markFace);
   const [shown, setShown] = useState<PhraseTurn>(() => ({ now: words, was: null, n: 0, since: Date.now() }));
   const [, wake] = useState(0);
   const next = turnPhrase(shown, words, Date.now());

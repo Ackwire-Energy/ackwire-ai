@@ -1,5 +1,6 @@
 import {
   ApiError,
+  cachePinned,
   keys,
   type Message,
   type Mission,
@@ -41,7 +42,7 @@ import { SheetTitle } from "../shared/PromptForm";
 import { ActionList, copyText, successHaptic, Tile, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 import { TextArea } from "../shared/TextArea";
-import { cachePinned } from "./live";
+
 import { QUICK_REACTIONS, reactionName, reactionPills } from "./logic";
 
 // ── Long press on a message ──────────────────────────────────────────────────

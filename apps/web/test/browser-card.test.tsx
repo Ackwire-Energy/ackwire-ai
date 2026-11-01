@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
+import { afterEach, describe, expect, setSystemTime, spyOn, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -10,7 +10,23 @@ import { BrowserCard, titleKind } from "@/components/browser/BrowserCard";
 import { ADA_ID, createFakeApi, ENG_ID, fakeBrowserOf, ORG_ID, seedState } from "./fake-api";
 import { onScreen, renderApp, renderPage, screen, settle } from "./render";
 
-afterEach(() => cleanup());
+let untouch: (() => void) | undefined;
+afterEach(() => {
+  cleanup();
+  untouch?.();
+  untouch = undefined;
+});
+
+/** A touch screen until the test ends: `(pointer: coarse)` matches. */
+const onTouch = () => {
+  const real = window.matchMedia.bind(window);
+  const media = spyOn(window, "matchMedia").mockImplementation((query: string) =>
+    query === "(pointer: coarse)"
+      ? ({ matches: true, addEventListener: () => {}, removeEventListener: () => {} } as unknown as MediaQueryList)
+      : real(query),
+  );
+  untouch = () => media.mockRestore();
+};
 
 const HANDOFF_ID = "h-card";
 
@@ -66,7 +82,8 @@ describe("a help request opens the agent's browser in its card", () => {
     expect(document.querySelector(".brw-rq--settled")?.textContent).toContain("pediu ajuda · expirou");
   }, 15_000);
 
-  test("Abrir aqui takes control in place: Pronto in the header, the app's own text field, no page change", async () => {
+  test("Abrir aqui takes control in place: Pronto in the header, on touch the app's own text field, no page change", async () => {
+    onTouch();
     const { state, handoff } = seedRequest();
     const api = createFakeApi(state);
     fakeBrowserOf.get(api)?.handoffs.set(handoff.id, handoff);
@@ -94,7 +111,15 @@ describe("a help request opens the agent's browser in its card", () => {
     const top = card.querySelector(".brw-mf__top") as HTMLElement;
     expect(top.querySelector("b")?.textContent).toBe("Entrar no painel com a conta de teste");
     expect(within(top).getByRole("button", { name: "Pronto" })).toBeTruthy();
-    expect(within(card).getByRole("textbox", { name: "Texto para a página" })).toBeTruthy();
+    const field = within(card).getByRole("textbox", { name: "Texto para a página" }) as HTMLInputElement;
+    // Nothing marked yet: the field says where to start, the line before it only its pointer.
+    expect(field.placeholder).toBe("Toque num campo da página e digite aqui");
+    expect(card.querySelector(".brw-tfield__to")?.textContent).toBe("");
+    // On touch "Abrir um site" stays in the bar, not the header.
+    expect(within(top).queryByRole("button", { name: "Abrir um site" })).toBeNull();
+    expect(
+      within(card.querySelector(".brw-tfield") as HTMLElement).getByRole("button", { name: "Abrir um site" }),
+    ).toBeTruthy();
     // Desistir next to Pronto (the old "Não consegui" under the field is gone).
     expect(within(top).getByRole("button", { name: "Desistir" })).toBeTruthy();
     expect(within(card).queryByRole("button", { name: "Não consegui" })).toBeNull();
@@ -144,6 +169,24 @@ describe("a help request opens the agent's browser in its card", () => {
       [ORG_ID, HANDOFF_ID, "Entrei com a conta de teste"],
     ]);
     expect(document.querySelector(".brw-ac")).toBeNull();
+  });
+
+  test("with a mouse: no text bar (keys go to the page), Abrir um site in the header, Devolver asks for a note", async () => {
+    const { state, handoff } = seedRequest();
+    const active: BrowserHandoff = { ...handoff, kind: "takeover", status: "active", controllerUserId: "u-walter" };
+    const api = createFakeApi(state);
+    fakeBrowserOf.get(api)?.handoffs.set(handoff.id, active);
+    await renderPage(<BrowserCard agentId={ADA_ID} name="Ada" handoff={active} canTakeOver />, { api, org: true });
+    await settle(6);
+    const card = document.querySelector(".brw-ac") as HTMLElement;
+    expect(card.querySelector(".brw-type")).toBeNull();
+    expect(within(card).queryByRole("textbox", { name: "Texto para a página" })).toBeNull();
+    const top = card.querySelector(".brw-mf__top") as HTMLElement;
+    expect(within(top).getByRole("button", { name: "Abrir um site" })).toBeTruthy();
+    await act(async () => fireEvent.click(within(top).getByRole("button", { name: "Devolver" })));
+    expect(card.textContent).toContain("Devolver à Ada");
+    expect(within(card).getByRole("textbox", { name: "Recado para a Ada" })).toBeTruthy();
+    expect(within(top).queryByRole("button", { name: "Devolver" })).toBeNull();
   });
 });
 
@@ -402,6 +445,30 @@ describe("the card in the message", () => {
     await act(async () => fireEvent.click(within(top).getByRole("button", { name: "Ver a tela inteira" })));
     await settle(6);
     expect(screen().getByRole("dialog", { name: "Computador da Ada" })).toBeTruthy();
+  });
+});
+
+describe("the frame's stop", () => {
+  test("asks 'Parar a Ada?' with her name, its words off the toolbar's edge; the frame's top is a dark surface", async () => {
+    const api = createFakeApi(seedState());
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(5);
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    const run = { channelId: ENG_ID, threadId: null, runId: "r-stop", agentId: ADA_ID };
+    await act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.thinking", ...run } }));
+    await act(async () =>
+      socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.tool", tool: "browser_open", ...run } }),
+    );
+    await settle(3);
+    const card = document.querySelector(".brw-ac") as HTMLElement;
+    expect(card.querySelector(".brw-mf__top")?.classList.contains("ac-on-dark")).toBe(true);
+    const over = card.querySelector(".brw-mf__over") as HTMLElement;
+    await act(async () => fireEvent.click(within(over).getByRole("button", { name: "Parar" })));
+    await settle(2);
+    const ask = over.querySelector(".brw-stopask") as HTMLElement;
+    expect(ask.textContent).toBe("Parar a Ada?");
+    expect(within(over).getByRole("button", { name: "Não" })).toBeTruthy();
   });
 });
 

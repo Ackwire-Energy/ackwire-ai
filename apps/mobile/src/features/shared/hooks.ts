@@ -44,6 +44,13 @@ export function useMeId(): string | null {
   return useMe().data?.user.id ?? null;
 }
 
+/** The signed-in person's @handle in this organization, lower-cased (null while it loads). */
+export function useMyHandle(): string | null {
+  const meId = useMeId();
+  const members = useMembers(useOrgId());
+  return members.data?.find((m) => m.userId === meId)?.handle?.toLowerCase() || null;
+}
+
 export interface Directory {
   agents: Agent[];
   agentById: Map<string, Agent>;

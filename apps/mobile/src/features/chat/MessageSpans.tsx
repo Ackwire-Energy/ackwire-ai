@@ -1,7 +1,7 @@
 import { Text as RNText, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "@/ui";
 import { openPage } from "../ai/parts";
-import { useColors } from "../shared/hooks";
+import { useColors, useMyHandle } from "../shared/hooks";
 import { MONO } from "../shared/parts";
 import { ChannelRefText } from "./ChannelRefText";
 import type { Block, Inline } from "./logic";
@@ -12,6 +12,7 @@ import type { Block, Inline } from "./logic";
  */
 export function Spans({ inline, channelRefs }: { inline: Inline[]; channelRefs?: Record<string, string> }) {
   const c = useColors();
+  const myHandle = useMyHandle();
   return (
     <>
       {inline.map((s, i) => {
@@ -46,7 +47,15 @@ export function Spans({ inline, channelRefs }: { inline: Inline[]; channelRefs?:
             return <ChannelRefText key={key} name={s.name} text={s.text} refs={channelRefs} />;
           case "mention":
             return (
-              <RNText key={key} style={[styles.bold, { color: c.ink }]}>
+              <RNText
+                key={key}
+                style={[
+                  styles.bold,
+                  s.text.slice(1).toLowerCase() === myHandle
+                    ? { color: c.amber, backgroundColor: `${c.amber}2e` }
+                    : { color: c.ink },
+                ]}
+              >
                 {s.text}
               </RNText>
             );

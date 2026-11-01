@@ -68,7 +68,9 @@ import {
   useState,
 } from "react";
 import { Trans, useTranslation } from "react-i18next";
+import { withAgentFace } from "@/components/AgentAvatar";
 import { useDirectory } from "@/hooks/useDirectory";
+import { TOUCH, useMatchMedia } from "@/hooks/useMatchMedia";
 import { useToast } from "@/lib/toast";
 import { useBrowserLive, useConnectionStatus, useStreams } from "@/realtime/context";
 import { AgentWho } from "../AgentAvatar";
@@ -440,6 +442,8 @@ export function BrowserCard({
   const [confirmStop, setConfirmStop] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
   const [goOpen, setGoOpen] = useState(false);
+  // On touch the text bar types into the page; a mouse and keyboard type into it directly (`onPageKey`).
+  const touch = useMatchMedia(TOUCH);
   const [full, setFull] = useState(false);
   // The wheel scrolls the conversation; a click into the page (in control) hands it to the page until Esc.
   const [capturing, setCapturing] = useState(false);
@@ -935,7 +939,7 @@ export function BrowserCard({
     )
   ) : confirmStop ? (
     <>
-      <span className="small muted">{t("browser.watch.stopAsk")}</span>
+      <span className="brw-stopask small muted">{t("browser.watch.stopAsk", g)}</span>
       <Button size="sm" variant="ghost" onClick={() => setConfirmStop(false)}>
         {t("browser.watch.no")}
       </Button>
@@ -973,6 +977,20 @@ export function BrowserCard({
       </>
     ))
   );
+  const goToggle = (tool: boolean) => (
+    <Button
+      size="sm"
+      variant="ghost"
+      iconOnly
+      icon="globe"
+      className={tool ? "brw-tfield__tool" : undefined}
+      aria-pressed={goShown}
+      aria-label={t("browser.inCard.goToggle")}
+      title={t("browser.inCard.goToggle")}
+      disabled={goForced}
+      onClick={() => setGoOpen((v) => !v)}
+    />
+  );
   const controlActs = (
     <>
       {ask && (
@@ -1002,6 +1020,7 @@ export function BrowserCard({
           <span className="cmp-act-label">{handBackLabel}</span>
         </Button>
       )}
+      {!touch && goToggle(false)}
     </>
   );
   const seeWhole = onDesktop && !full && (
@@ -1026,7 +1045,7 @@ export function BrowserCard({
   const subText = (
     <small>
       {spinning && <PixelSpinner size={14} color={color} />}
-      <span>{sub}</span>
+      <span>{withAgentFace(sub, name, agentId)}</span>
     </small>
   );
   const cover = profileWait ? (
@@ -1086,7 +1105,7 @@ export function BrowserCard({
       {!surface && !framed && <SkyStrip color={color} muted={inControl} moving={live_} />}
       {framed ? (
         // The frame's top: where it is, and what it does now (its steps on hover), or the person's controls.
-        <div className="brw-mf__top">
+        <div className="brw-mf__top ac-on-dark">
           <span className="brw-mf__site">
             {profile && <Chip>{profile.name}</Chip>}
             {asTitle === "host" ? <SiteIcon host={host} /> : <Icon name="globe" size={14} />}
@@ -1104,7 +1123,7 @@ export function BrowserCard({
             // Focusable so the steps also open from the keyboard.
             <span className="brw-mf__now" tabIndex={steps.length > 0 ? 0 : -1}>
               {spinning && <PixelSpinner size={14} color={color} />}
-              <span>{sub}</span>
+              <span>{withAgentFace(sub, name, agentId)}</span>
               {steps.length > 0 && (
                 <span className="brw-mf__hist" role="tooltip">
                   <ol>
@@ -1128,7 +1147,7 @@ export function BrowserCard({
         // The dialog's head says it; above the page, the site it is on.
         <>
           <DialogHead
-            sub={surfaceSub}
+            sub={withAgentFace(surfaceSub, name, agentId)}
             actions={
               <>
                 {inControl ? controlActs : watchActs}
@@ -1327,7 +1346,7 @@ export function BrowserCard({
               </Button>
             </div>
           </div>
-        ) : (
+        ) : touch ? (
           // One quiet field like the message composer: where the text goes, the field, Senha, Teclas, a site, send.
           <div className="brw-ac__foot brw-type">
             {keysOpen && (
@@ -1350,11 +1369,17 @@ export function BrowserCard({
             <label className="brw-tfield">
               <span className={mark ? "brw-tfield__to is-marked" : "brw-tfield__to"}>
                 <Icon name="pointer" size={14} />
-                {mark ? t("browser.inCard.targetMarked") : t("browser.inCard.targetNone")}
+                {mark && t("browser.inCard.targetMarked")}
               </span>
               <input
                 type={secure ? "password" : "text"}
-                placeholder={secure ? t("browser.inCard.typePlaceholderSecret") : t("browser.inCard.typePlaceholder")}
+                placeholder={
+                  !mark
+                    ? t("browser.inCard.typePlaceholderTouch")
+                    : secure
+                      ? t("browser.inCard.typePlaceholderSecret")
+                      : t("browser.inCard.typePlaceholder")
+                }
                 aria-label={t("browser.live.typeLabel")}
                 autoComplete={secure ? "current-password" : "off"}
                 value={text}
@@ -1388,18 +1413,7 @@ export function BrowserCard({
                 title={t("browser.inCard.keysLabel")}
                 onClick={() => setKeysOpen((v) => !v)}
               />
-              <Button
-                size="sm"
-                variant="ghost"
-                iconOnly
-                icon="globe"
-                className="brw-tfield__tool"
-                aria-pressed={goShown}
-                aria-label={t("browser.inCard.goToggle")}
-                title={t("browser.inCard.goToggle")}
-                disabled={goForced}
-                onClick={() => setGoOpen((v) => !v)}
-              />
+              {goToggle(true)}
               <Button
                 variant="primary"
                 size="sm"
@@ -1413,7 +1427,7 @@ export function BrowserCard({
               />
             </label>
           </div>
-        ))}
+        ) : null)}
       {otherInControl && !hidden && (
         <div className="brw-ac__foot">
           <span className="small muted">{t("browser.inCard.otherHelp", { person: controllerName })}</span>

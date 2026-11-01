@@ -41,7 +41,7 @@ import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
-import { AgentAvatar } from "@/components/AgentAvatar";
+import { AgentAvatar, AgentWho } from "@/components/AgentAvatar";
 import {
   AheadLine,
   ApproveAlways,
@@ -387,7 +387,9 @@ export function ApprovalsPage() {
                         i18nKey="approvals.groupHead"
                         count={items.length}
                         values={{ name: agent?.name ?? t("channel.unknownAgent") }}
-                        components={{ b: <b /> }}
+                        components={{
+                          b: <AgentWho agentId={first.agentId} name={agent?.name ?? t("channel.unknownAgent")} />,
+                        }}
                         {...TYPED_VALUES}
                       />
                     </span>

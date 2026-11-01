@@ -15,14 +15,15 @@
     inset 0 0 0 1px color-mix(in srgb, var(--warn) 35%, transparent),
     var(--e1);
 }
-/* An `.ac-faceline` on the portrait's drawing, not its box: the title's capitals where the pixels start. */
-.cmp-entry__row {
+/* The title and the line under it, together, centred on the computer's icon. */
+.cmp-entry__row.ac-faceline {
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px 12px;
-  padding: 10px 12px;
+  padding: 12px 14px;
 }
-.cmp-entry__row > .ac-computer {
-  margin-top: calc(-1 * var(--art-top));
+.cmp-entry__t > .ac-captop {
+  margin-block-start: 0;
 }
 .cmp-entry__row > .ac-btn {
   align-self: center;
@@ -171,6 +172,11 @@
  * with and the line under the screen float at the top, centred, in that order. The stage and the screen restate
  * their size container, which the phone's sheet turns off.
  */
+/* The take-control head: its icon centred on the title and the line under it together. */
+.cmp-dialog .ac-dialog__lead:has(+ .ac-dialog__titles) {
+  align-self: center;
+  translate: none;
+}
 .ac-dialog.cmp-dialog.is-screen-only {
   display: grid;
   grid-template: auto auto auto auto 1fr / minmax(0, 1fr);

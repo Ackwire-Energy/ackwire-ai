@@ -453,6 +453,55 @@ export const appLabel = (a: { kind: string; app?: string }) => {
 /** Wraps a name in the sentence (the bar shows names in bold); plain text by default. */
 export type MarkName = (name: string) => string;
 const plain: MarkName = (name) => name;
+/** Wraps an agent's name that the line draws with its face before it (the bar's "Theo: …"); `mark` by default. */
+export type MarkFace = (name: string, agentId: string) => string;
+
+// Names travel through i18n wrapped in these, then come back drawn: in ink, or with the agent's face (its id rides
+// along). Control characters, so no name or translation ever holds one.
+const NAME_OPEN = "\u0001";
+const NAME_CLOSE = "\u0002";
+const FACE_OPEN = "\u0003";
+const FACE_ID = "\u0004";
+/** A name the line draws in ink. */
+export const markInk: MarkName = (name) => `${NAME_OPEN}${name}${NAME_CLOSE}`;
+/** A name the line draws with its agent's face before it. */
+export const markFaced: MarkFace = (name, agentId) => `${FACE_OPEN}${agentId}${FACE_ID}${name}${NAME_CLOSE}`;
+
+/** A piece of a marked sentence: plain words, a name in ink, or a name with its agent's face (`agentId`). */
+export interface MarkedPiece {
+  text: string;
+  bold: boolean;
+  agentId?: string;
+}
+
+/** A sentence marked with `markInk` / `markFaced`, in pieces (an unclosed name runs to the end). */
+export function markedPieces(text: string): MarkedPiece[] {
+  const out: MarkedPiece[] = [];
+  let at = 0;
+  while (at < text.length) {
+    const ink = text.indexOf(NAME_OPEN, at);
+    const faced = text.indexOf(FACE_OPEN, at);
+    const open = ink < 0 ? faced : faced < 0 ? ink : Math.min(ink, faced);
+    if (open < 0) {
+      out.push({ text: text.slice(at), bold: false });
+      break;
+    }
+    if (open > at) out.push({ text: text.slice(at, open), bold: false });
+    const close = text.indexOf(NAME_CLOSE, open);
+    const end = close < 0 ? text.length : close;
+    if (open === ink) {
+      const name = text.slice(open + 1, end);
+      if (name) out.push({ text: name, bold: true });
+    } else {
+      const sep = text.indexOf(FACE_ID, open);
+      const id = sep < 0 || sep > end ? "" : text.slice(open + 1, sep);
+      const name = text.slice(sep < 0 || sep > end ? open + 1 : sep + 1, end);
+      if (name) out.push({ text: name, bold: true, ...(id ? { agentId: id } : {}) });
+    }
+    at = end + 1;
+  }
+  return out;
+}
 
 /** "Theo", "Theo e Iris", "Theo e mais 2". */
 export function listNames(t: TFunction, names: string[], mark: MarkName = plain) {
@@ -535,6 +584,7 @@ export function barPhrase(
   tick: number,
   now: number,
   mark: MarkName = plain,
+  face: MarkFace = mark,
 ): string {
   const sentence = activitySentence(t, entries, mark);
   const only = entries.length === 1 ? entries[0] : undefined;
@@ -553,7 +603,7 @@ export function barPhrase(
   if (step?.kind === "call" && step.running && step.since !== undefined && now - step.since >= LONG_STEP_MS)
     pool.push(`${t(LONG_LINES[Math.floor(tick / 2) % LONG_LINES.length] ?? LONG_LINES[0])}…`);
   const said = narrationOf(run).at(-1);
-  if (said) pool.push(t("chat.phrase.said", { name: mark(only.name), text: said }));
+  if (said) pool.push(t("chat.phrase.said", { name: face(only.name, only.id), text: said }));
   return pool[tick % pool.length] ?? sentence;
 }
 
@@ -569,9 +619,10 @@ export function barWords(
   tick: number,
   now: number,
   mark: MarkName = plain,
+  face: MarkFace = mark,
 ): [agents: string, sep: string, typers: string, typing: string] {
   const typing = typingPhrase(t, entries, mark);
-  if (!typing) return [barPhrase(t, entries, runs, tick, now, mark), "", "", ""];
+  if (!typing) return [barPhrase(t, entries, runs, tick, now, mark, face), "", "", ""];
   const agents = agentsPhrase(t, entries, mark);
   // The names lead the phrase in pt-BR and en; a language that puts them later keeps the phrase whole.
   const names = listNames(t, typingNames(entries), mark);

@@ -1,5 +1,5 @@
 import type { AgentPlanUsage } from "@agenteschat/client";
-import { useAgentPlanUsage, useApi } from "@agenteschat/client";
+import { useAgentPlanUsage, useApi, useModels } from "@agenteschat/client";
 import {
   formatMonth,
   formatPercent,
@@ -8,6 +8,7 @@ import {
   formatUsd,
   joinNames,
 } from "@agenteschat/client/lib/format";
+import { apiProviderOf } from "@agenteschat/client/lib/providers";
 import { Card, CardFooter, Icon, Meter, PlanMeter, ProviderLogo, UsageDays, UsageSwatch } from "@agenteschat/ui";
 import { type CSSProperties, useEffect } from "react";
 import { useTranslation } from "react-i18next";
@@ -176,6 +177,7 @@ function BySource({ data }: { data: AgentPlanUsage }) {
   const { t, i18n } = useTranslation();
   const { agent, g } = useAgentEdit();
   const onApi = !agent.brain || agent.brain.kind === "model";
+  const keyProvider = apiProviderOf(agent.model, useModels().data?.models ?? []);
   return (
     <Card as="section" className="agp-card" aria-labelledby="agent-usage-sources">
       <CardHead id="agent-usage-sources" icon="wallet" title={t("usageViews.agent.byAccount")} />
@@ -203,7 +205,9 @@ function BySource({ data }: { data: AgentPlanUsage }) {
                 <AccountHead account={s.account} extra={when} />
               ) : (
                 <div className="plan-acct ac-faceline">
-                  {s.type === "api" ? (
+                  {s.type === "api" && keyProvider ? (
+                    <ProviderLogo id={keyProvider} size="sm" />
+                  ) : s.type === "api" ? (
                     <span className="plan-source__key" aria-hidden="true">
                       <Icon name="key" size={16} />
                     </span>

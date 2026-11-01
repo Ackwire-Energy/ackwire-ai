@@ -216,7 +216,6 @@ export function Sidebar() {
   // The bell: unread notifications (live through `notification.counts`); the badge bumps when one arrives.
   const unreadNotifications = useNotificationCount(orgId).data?.unread ?? 0;
   const lastUnread = useRef(unreadNotifications);
-  const meRow = useRef<HTMLDivElement>(null);
   const [bumps, setBumps] = useState(0);
   useEffect(() => {
     if (unreadNotifications > lastUnread.current) setBumps((b) => b + 1);
@@ -562,11 +561,7 @@ export function Sidebar() {
       {deletingGroup && <DeleteGroupDialog group={deletingGroup} onClose={() => setDeletingGroup(null)} />}
 
       <div className="sidebar__foot">
-        <SidebarHorizon
-          working={working}
-          total={dir.agents.length}
-          clear={() => [meRow.current?.querySelector(".ac-avatar")]}
-        />
+        <SidebarHorizon working={working} total={dir.agents.length} />
         {can(org, "create_agents") && (
           <Button asChild block variant="ghost" className="sidebar__create">
             <Link to="/org/$orgId/agents/new" params={{ orgId }} title={t("shell.createAgent")}>
@@ -575,7 +570,7 @@ export function Sidebar() {
             </Link>
           </Button>
         )}
-        <div className="sidebar__me" ref={meRow}>
+        <div className="sidebar__me">
           <AccountMenu />
           <Link
             to="/org/$orgId/notifications"

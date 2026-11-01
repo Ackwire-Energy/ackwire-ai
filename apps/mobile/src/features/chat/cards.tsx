@@ -42,7 +42,7 @@ import {
   useOriginShort,
 } from "../approvals/parts";
 import { chatHref } from "../links/logic";
-import { AgentFace, Face } from "../shared/Face";
+import { AgentFace, Face, withAgentFaces } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
 import { genderOf, previewOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
@@ -106,7 +106,7 @@ export function ConsultationCard({
       {open ? (
         <View style={styles.csBody}>
           <Text variant="caption" tone="faint" style={styles.bold}>
-            {t(consultAskedKey(cs), { name: asker })}
+            {withAgentFaces(t(consultAskedKey(cs), { name: asker }), [{ name: asker, agentId: askerId }], 12)}
           </Text>
           <Text variant="small" tone="muted">
             {cs.question}

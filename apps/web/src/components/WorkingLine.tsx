@@ -5,13 +5,15 @@ import {
   barAsking,
   barFaces,
   barWords,
-  type MarkName,
+  markedPieces,
+  markFaced,
+  markInk,
   PHRASE_TURN_MS,
 } from "@agenteschat/client/lib/activity";
 import { Avatar, Icon } from "@agenteschat/ui";
 import { Fragment, type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AgentAvatar } from "@/components/AgentAvatar";
+import { AgentAvatar, AgentWho } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 
@@ -22,30 +24,31 @@ import { useDirectory } from "@/hooks/useDirectory";
  * perguntando ao Infra…") and the clock of a question that is out.
  */
 
-// Names travel through i18n wrapped in these, then come back as <b>.
-const OPEN = "\u0001";
-const CLOSE = "\u0002";
-const mark: MarkName = (name) => `${OPEN}${name}${CLOSE}`;
+/** A marked sentence as plain text (what the leaving phrase reads). */
+const plainText = (text: string) =>
+  markedPieces(text)
+    .map((p) => p.text)
+    .join("");
 
-/** Splits a marked sentence into text and bold names. */
+/** Splits a marked sentence into text, bold names and faced names. */
 export function boldNames(text: string): ReactNode[] {
-  const [head = "", ...rest] = text.split(OPEN);
-  const out: ReactNode[] = head ? [head] : [];
-  rest.forEach((part, i) => {
-    const at = part.indexOf(CLOSE);
-    const name = at < 0 ? part : part.slice(0, at);
-    const after = at < 0 ? "" : part.slice(at + 1);
-    // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
-    out.push(<b key={i}>{name}</b>);
-    if (after) out.push(after);
-  });
-  return out;
+  return markedPieces(text).map((p, i) =>
+    p.agentId ? (
+      // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
+      <AgentWho key={i} agentId={p.agentId} name={p.text} />
+    ) : p.bold ? (
+      // biome-ignore lint/suspicious/noArrayIndexKey: same
+      <b key={i}>{p.text}</b>
+    ) : (
+      p.text
+    ),
+  );
 }
 
 /** The sentence with names in bold (its text content equals `activityText`). */
 export function WorkingWords({ entries }: { entries: ActivityEntry[] }) {
   const { t } = useTranslation();
-  return <>{boldNames(activitySentence(t, entries, mark))}</>;
+  return <>{boldNames(activitySentence(t, entries, markInk))}</>;
 }
 
 /**
@@ -62,7 +65,7 @@ export function BarPhrase({ entries, runs }: { entries: ActivityEntry[]; runs: L
     const timer = setInterval(() => setTick((n) => n + 1), PHRASE_TURN_MS);
     return () => clearInterval(timer);
   }, [turning]);
-  const [agents, sep, typers, typing] = barWords(t, entries, runs, tick, Date.now(), mark);
+  const [agents, sep, typers, typing] = barWords(t, entries, runs, tick, Date.now(), markInk, markFaced);
   return (
     <>
       {agents && (
@@ -95,7 +98,7 @@ function TurnText({ text }: { text: string }) {
           key={`was-${shown.n}`}
           className="ac-turn__out"
           aria-hidden="true"
-          data-text={shown.was.split(OPEN).join("").split(CLOSE).join("")}
+          data-text={plainText(shown.was)}
           onAnimationEnd={() => setShown((s) => (s.n === shown.n ? { ...s, was: null } : s))}
         />
       )}
