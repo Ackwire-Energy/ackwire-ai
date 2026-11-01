@@ -214,7 +214,7 @@ describe("the browser's card says what it did: no 'Ver o que ele fez' that opens
         <SavedTools
           runId="r-1"
           meta={{ work: { steps: 3, calls: [{ name: "browser_navigate" }], durationMs: 43_000 } }}
-          agentName="Caio"
+          agentName="Ada"
           skipScreens={["browser"]}
         />
         <SavedTools
@@ -229,7 +229,7 @@ describe("the browser's card says what it did: no 'Ver o que ele fez' that opens
               durationMs: 43_000,
             },
           }}
-          agentName="Caio"
+          agentName="Ada"
           skipScreens={["browser"]}
         />
       </>,
