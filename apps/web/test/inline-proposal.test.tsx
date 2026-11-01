@@ -98,6 +98,11 @@ describe("a change proposed for several agents in the chat", () => {
     expect(accepted(state)).toEqual(["p-ada", "p-atlas"]);
     // Decided: the settled card takes the request card's place.
     const done = screen().getByRole("group", { name: "Proposta de mudança de Atlas para 2 agentes" });
+    // One line: how it ended, the change and its rows when asked for.
+    expect(done.textContent).toContain("Aceita");
+    expect(done.querySelector(".ac-diff")).toBeNull();
+    await click(within(done).getByRole("button", { name: "Ver a mudança" }));
+    expect(done.querySelector(".ac-diff")).not.toBeNull();
     expect([...done.querySelectorAll(".proposal-row__status")].map((s) => s.textContent)).toEqual(["Aceita", "Aceita"]);
   });
 
@@ -134,6 +139,8 @@ describe("a change proposed for several agents in the chat", () => {
       "Uma não foi aceita: o texto mudou desde a proposta.",
     );
     const done = screen().getByRole("group", { name: "Proposta de mudança de Atlas para 2 agentes" });
+    expect(done.textContent).toContain("1 de 2 aceitas");
+    await click(within(done).getByRole("button", { name: "Ver a mudança" }));
     expect([...done.querySelectorAll(".proposal-row__status")].map((s) => s.textContent)).toEqual([
       "Aceita",
       "Ficou velha",

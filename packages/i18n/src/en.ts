@@ -3011,6 +3011,7 @@ export const en: Translations = {
     staleNoteAgent: "The agent changed after this proposal, so it can't be accepted anymore.",
     accepted: "Accepted",
     refused: "Refused",
+    acceptedSome: "{{done}} of {{total}} accepted",
     acceptedBy: "Accepted by {{name}} · {{when}}",
     refusedBy: "Refused by {{name}} · {{when}}",
     acceptedByYou: "Accepted by you · {{when}}",

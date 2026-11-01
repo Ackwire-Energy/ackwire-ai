@@ -1,10 +1,11 @@
 import type { AgentQuestion, MemoryUpdate, Proposal, SecretRequest } from "@agenteschat/client";
 import { keys, useCardProposals, useDecideProposal, useDecideProposals } from "@agenteschat/client";
-import { formatTime } from "@agenteschat/client/lib/format";
+import { formatTime, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   appLabel,
   cardHead,
+  cardOutcome,
   cardProposalIds,
   chosenRows,
   firstChange,
@@ -17,10 +18,10 @@ import {
   staleCount,
 } from "@agenteschat/client/lib/proposals";
 import { MAX_SECRET_BYTES, sealSecret, secretAad } from "@agenteschat/client/lib/secret-box";
-import { Button, Chip, Diff, diffLines, Field, Icon, Input, Switch, Textarea } from "@agenteschat/ui";
+import { ApprovalCard, Button, Chip, Diff, diffLines, Field, Icon, Input, Switch, Textarea } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -251,35 +252,57 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
     );
   }
 
-  // Decided, or overtaken by a newer text: the settled card with the change as it was.
+  // Decided, or overtaken by a newer text: one line, the change as it was behind "Ver a mudança".
   return (
-    // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
-    <div className="ac-approval" role="group" aria-label={t("inlineProposal.group", { name })}>
-      <div className="ac-approval__head">
-        <span className="ac-approval__who">
-          <Trans
-            i18nKey="proposals.proposes"
-            values={{ agent: name, target }}
-            components={{ b: <b /> }}
-            {...TYPED_VALUES}
-          />
-        </span>
-        {p.stale ? (
-          <Chip icon="close">{t("proposals.stale")}</Chip>
-        ) : p.status === "accepted" ? (
-          <Chip icon="check" tone="done">
-            {t("proposals.accepted")}
-          </Chip>
-        ) : (
-          <Chip icon="close">{t("proposals.refused")}</Chip>
-        )}
-      </div>
-      <p className="ac-approval__title">{proposalTitle(t, p, org.name, agentName)}</p>
+    <SettledProposal
+      label={t("inlineProposal.group", { name })}
+      who={
+        <Trans
+          i18nKey="approval.doneWho"
+          values={{ agent: name, title: lowerFirst(proposalTitle(t, p, org.name, agentName)) }}
+          components={{ b: <b /> }}
+          {...TYPED_VALUES}
+        />
+      }
+      rows={[p]}
+    >
       {isText(p) ? diff : <SettingChange p={p} />}
-      <div className="ac-approval__actions ac-acts">
+      <div className="ac-acts">
         <ProposalsLink agentId={p.agentId} />
       </div>
-    </div>
+    </SettledProposal>
+  );
+}
+
+/** A decided proposal, one line like a decided approval: what it was and how it ended, the rest when asked for. */
+function SettledProposal({
+  label,
+  who,
+  rows,
+  children,
+}: {
+  label: string;
+  who: ReactNode;
+  rows: Proposal[];
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const outcome = cardOutcome(t, rows);
+  return (
+    <ApprovalCard
+      compact
+      status={outcome.accepted ? "approved" : "refused"}
+      aria-label={label}
+      who={who}
+      statusLabel={outcome.label}
+      action={open ? children : undefined}
+      actions={
+        <Button variant="ghost" size="sm" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+          {t("ask.seeChange")}
+        </Button>
+      }
+    />
   );
 }
 
@@ -446,11 +469,7 @@ export function ProposalGroup({ proposalIds }: { proposalIds: string[] }) {
 
   // Decided, or overtaken by a newer text.
   return (
-    // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
-    <div className="ac-approval" role="group" aria-label={label}>
-      <div className="ac-approval__head">
-        <span className="ac-approval__who">{who}</span>
-      </div>
+    <SettledProposal label={label} who={who} rows={rows}>
       {groups.map((section) => (
         <div key={section.rows[0]?.id} className="proposal-section">
           {section.kind === "text" && section.lines.length > 0 && (
@@ -464,10 +483,10 @@ export function ProposalGroup({ proposalIds }: { proposalIds: string[] }) {
           {rowList(section.rows)}
         </div>
       ))}
-      <div className="ac-approval__actions ac-acts">
+      <div className="ac-acts">
         <ProposalsLink agentId={first.agentId} />
       </div>
-    </div>
+    </SettledProposal>
   );
 }
 

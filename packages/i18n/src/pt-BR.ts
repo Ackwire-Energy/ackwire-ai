@@ -3037,6 +3037,7 @@ export const ptBR = {
     staleNoteAgent: "O agente mudou depois desta proposta, então ela não pode mais ser aceita.",
     accepted: "Aceita",
     refused: "Recusada",
+    acceptedSome: "{{done}} de {{total}} aceitas",
     acceptedBy: "Aceita por {{name}} · {{when}}",
     refusedBy: "Recusada por {{name}} · {{when}}",
     acceptedByYou: "Aceita por você · {{when}}",
