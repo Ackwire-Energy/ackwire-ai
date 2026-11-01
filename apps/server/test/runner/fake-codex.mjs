@@ -1,9 +1,13 @@
-// A fake `codex` for route tests (`brain.route`). Each start appends its argv, $CODEX_HOME, its folder and
+// A fake `codex` for route and task tests. Each start appends its argv, $CODEX_HOME, its folder and
 // $OPENAI_API_KEY to $FAKE_CODEX_LOG (one JSON line).
 // `debug models` prints a catalog with several Luna models. `exec … --output-schema <file> -o <file>` reads
 // the prompt on stdin, writes an answer in the schema's shape (its first handle 0.9) to the `-o` file and
 // prints Codex's `--json` events. "SLOW_ROUTE" never answers.
-import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+// `exec` without `--output-schema` is a background task (`task.start`): signed in only with a key or a
+// sign-in in $CODEX_HOME (an `auth.json` there), it answers in `-o` and its events; otherwise its turn fails
+// "Not logged in" (exit 1). "CURL401" ends at once on a command's "401 Unauthorized" (exit 1).
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
 
 const args = process.argv.slice(2);
 const log = process.env.FAKE_CODEX_LOG;
@@ -27,6 +31,29 @@ const flag = (name) => {
 if (args[0] === "debug" && args[1] === "models") {
   const slugs = ["gpt-5.6-sol", "gpt-5.4-luna", "gpt-5.10-luna", "gpt-5.6-luna", "gpt-5.4-mini", "codex-auto-review"];
   process.stdout.write(JSON.stringify({ models: slugs.map((slug) => ({ slug, visibility: "list" })) }));
+  process.exit(0);
+}
+
+if (args[0] === "exec" && flag("--output-schema") === undefined) {
+  let prompt = "";
+  process.stdin.setEncoding("utf8");
+  for await (const chunk of process.stdin) prompt += chunk;
+  const event = (o) => process.stdout.write(`${JSON.stringify(o)}\n`);
+  event({ type: "thread.started", thread_id: "01a17ab8-bb80-7d22-b98e-b2ad4ec03ce8" });
+  const home = process.env.CODEX_HOME ?? path.join(process.env.HOME ?? "/nonexistent", ".codex");
+  if (!process.env.OPENAI_API_KEY && !existsSync(path.join(home, "auth.json"))) {
+    event({ type: "turn.failed", error: { message: "Not logged in" } });
+    process.exit(1);
+  }
+  if (prompt.includes("CURL401")) {
+    event({
+      type: "item.completed",
+      item: { id: "item_0", type: "agent_message", text: "curl said 401 Unauthorized" },
+    });
+    process.exit(1);
+  }
+  writeFileSync(flag("-o"), `done: ${prompt.trim()}`);
+  event({ type: "item.completed", item: { id: "item_0", type: "agent_message", text: `done: ${prompt.trim()}` } });
   process.exit(0);
 }
 

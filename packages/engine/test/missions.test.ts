@@ -58,6 +58,7 @@ import {
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
+import { ownerWrites } from "./mission-helpers";
 
 let f: Fixture;
 afterEach(async () => {
@@ -246,7 +247,7 @@ async function mainCall(tool: string, args: Record<string, unknown>) {
       agentId: f.agent.id,
       channelId: mission.channelId,
       threadRootId: mission.threadRootId,
-      triggerMessageId: crypto.randomUUID(),
+      triggerMessageId: await ownerWrites(f, mission),
       trigger: "mention",
       hop: 1,
       status: "running",

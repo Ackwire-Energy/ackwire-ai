@@ -131,7 +131,10 @@ export type ChannelEvent =
       /** Background work (a routine's run): not the conversation's "working" indicator. */
       background?: true;
     }
-  /** An agent asked another agent (`ask_agent`, ADR 0034); the answer comes later as a notice: "Dev asked Infra…". */
+  /**
+   * An agent asked another agent (`ask_agent`, ADR 0034), or handed it work (`kind` `note`, `tell_agent`, ADR 0095);
+   * what comes of it arrives later as a notice: "Dev asked Infra…".
+   */
   | {
       type: "agent.consulting";
       channelId: string;
@@ -139,10 +142,11 @@ export type ChannelEvent =
       runId: string;
       agentId: string;
       consultedAgentId: string;
+      kind?: "note";
     }
   /**
-   * An agent's question to another agent (`ask_agent`, ADR 0034) came back:
-   * `status` answered, expired or failed. The asking run resumes.
+   * An agent's question to another agent (`ask_agent`, ADR 0034), or the work it handed it (`kind` `note`), came
+   * back: `status` answered, expired or failed.
    */
   | {
       type: "agent.consulted";
@@ -152,11 +156,12 @@ export type ChannelEvent =
       agentId: string;
       consultedAgentId: string;
       status: "answered" | "expired" | "failed";
+      kind?: "note";
     }
   /**
-   * A question still out changed without closing: the consulted agent stopped on a person (an approval, a
-   * question, a secret) or on its computer, or went back to work. The app reloads the conversation's questions
-   * (`GET …/consultations`).
+   * A question or hand-off still out changed without closing: the consulted agent stopped on a person (an approval,
+   * a question, a secret) or on its computer, went back to work, or got more time while still at it. The app reloads
+   * the conversation's questions (`GET …/consultations`).
    */
   | {
       type: "agent.consultation";

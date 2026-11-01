@@ -167,6 +167,33 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
     expect(group()?.textContent).toContain("espera uma aprovação");
   });
 
+  test("work handed off: 'Passou para 1 colega', its part done and waiting to hear back, opened as a request", async () => {
+    const c = consultation({ kind: "note", waiting: "agents" });
+    await open(withTalk(withAsk([c]), c));
+    const block = group() as HTMLElement;
+    expect(block.getAttribute("aria-label")).toBe("Pedidos da Ada a outros agentes");
+    expect(block.textContent).toContain("Passou para 1 colega");
+    expect(block.textContent).toContain("0 de 1");
+    const line = within(block).getByRole("button", { name: /O Atlas passou uma parte adiante e espera o retorno/ });
+    await act(async () => fireEvent.click(line));
+    await settle(3);
+    const side = panel() as HTMLElement;
+    expect(side.textContent).toContain("Ada fez um pedido ao Atlas em #eng");
+    expect(side.textContent).toContain("O Atlas passou uma parte adiante e espera o retorno");
+  });
+
+  test("questions and work handed off in one turn: 'Chamou 2 colegas'; a request that couldn't finish says so", async () => {
+    await open(
+      withAsk([
+        consultation({}),
+        consultation({ id: "q2", kind: "note", status: "failed", answer: "stopped by a person", answeredAt: ago(2) }),
+      ]),
+    );
+    const text = group()?.textContent ?? "";
+    expect(text).toContain("Chamou 2 colegas");
+    expect(text).toContain("O Atlas não conseguiu terminar");
+  });
+
   test("waiting for its computer: says so, still out, not as waiting on a person", async () => {
     await open(withAsk([consultation({ waiting: "computer" })]));
     const text = group()?.textContent ?? "";

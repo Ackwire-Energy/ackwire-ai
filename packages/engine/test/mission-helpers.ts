@@ -1,5 +1,5 @@
 import { MACHINE_PROTOCOL_VERSION, type ServerFrame } from "@agenteschat/adapters";
-import { grantScopes, type MachineHub, setAgentComputerTarget } from "../src";
+import { grantScopes, insertMessageWithRuns, type MachineHub, setAgentComputerTarget } from "../src";
 import type { Fixture } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
@@ -106,4 +106,20 @@ export async function pairedMachine(f: Fixture) {
   await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
   await setAgentComputerTarget(deps, f.owner.id, f.org.id, f.agent.id, paired.machineId);
   return paired;
+}
+
+/** The owner writes in the mission's thread: what a main-session run that works for them starts on. */
+export async function ownerWrites(f: Fixture, mission: { channelId: string; threadRootId: string }) {
+  const { message } = await insertMessageWithRuns(
+    f.db,
+    {
+      orgId: f.org.id,
+      channelId: mission.channelId,
+      threadId: mission.threadRootId,
+      author: { type: "person", userId: f.owner.id },
+      body: "Pode seguir.",
+    },
+    { startRuns: false, deliver: false },
+  );
+  return message.id;
 }

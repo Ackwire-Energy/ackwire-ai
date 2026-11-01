@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { EmailError, type EmailSender } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, inArray, isNull, lt, schema } from "@agenteschat/db";
 import { appLocale } from "@agenteschat/i18n/locale";
+import { nanoUsdToUsd } from "@agenteschat/providers";
 import { z } from "zod";
 import { approverIds } from "./approvals";
 import { invitationMailProof } from "./crypto";
@@ -215,6 +216,23 @@ export type EmailTemplate =
       /** The agents around the computer in its picture (`emailCrew`); none: the onboarding's own. */
       crew?: Look[];
       /** The workspace in the app; the button adds its step's path. */
+      url: string;
+    }
+  /**
+   * The daily stall-and-noise report to the people who run the server (`OPS_REPORT_EMAIL`, `autonomy-report.ts`):
+   * each count of the UTC `day` against its daily average over the 7 days before, and the workspaces with the most.
+   * Workspace names and counts only. `url`: the server's own address, for the pictures.
+   */
+  | {
+      kind: "autonomy_report";
+      locale?: EmailLocale;
+      day: string;
+      /** The day's stalls, each once (a line can be part of the one above it). */
+      totalStalls: number;
+      stalls: { metric: string; today: number; average: number }[];
+      noise: { metric: string; today: number; average: number }[];
+      topStalls: { name: string; count: number }[];
+      topNoise: { name: string; count: number; costNanoUsd: number }[];
       url: string;
     };
 
@@ -593,6 +611,50 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
           { small: t.support ? c.support(t.support) : c.noSupport },
         ],
         org === null ? c.whyAccount : c.whyWorkspace(org),
+      );
+    }
+    case "autonomy_report": {
+      const c = w.autonomy;
+      const num = (v: number, digits = 0) => v.toLocaleString(lang, { maximumFractionDigits: digits });
+      const money = (nano: number) =>
+        `US$\u00a0${nanoUsdToUsd(nano).toLocaleString(lang, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      // An average keeps a decimal, except a count of tokens.
+      const shown = (metric: string, v: number, average = false) =>
+        metric === "noiseCostNanoUsd" ? money(v) : num(v, average && metric !== "noiseTokens" ? 1 : 0);
+      const counts = (list: { metric: string; today: number; average: number }[]): Block => ({
+        facts: list.map((m) => [
+          c.metric[m.metric] ?? m.metric,
+          c.value(shown(m.metric, m.today), shown(m.metric, m.average, true)),
+        ]),
+      });
+      // A workspace's name is typed text: a fact's value, which wraps, never its label.
+      const top = (list: { name: string; count: number; costNanoUsd?: number }[]): Block =>
+        list.length > 0
+          ? {
+              facts: list.map((x) => [
+                num(x.count),
+                x.costNanoUsd === undefined ? inertText(x.name) : `${inertText(x.name)} · ${money(x.costNanoUsd)}`,
+              ]),
+            }
+          : { small: c.none };
+      const noise = t.noise.find((m) => m.metric === "noiseRuns")?.today ?? 0;
+      return doc(
+        c.subject(t.day, num(t.totalStalls), num(noise)),
+        c.preheader,
+        c.headline(t.day),
+        [
+          { p: c.body },
+          { h2: c.stalls },
+          counts(t.stalls),
+          { h2: c.noise },
+          counts(t.noise),
+          { h2: c.topStalls },
+          top(t.topStalls),
+          { h2: c.topNoise },
+          top(t.topNoise),
+          { small: c.table(t.day) },
+        ],
+        c.why,
       );
     }
     case "workspace_deleting": {

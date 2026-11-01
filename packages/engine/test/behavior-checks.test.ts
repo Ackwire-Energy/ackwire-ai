@@ -311,3 +311,48 @@ describe("act with undo and investigated missions", () => {
     expect(why(undefined)?.pass).toBe(false);
   });
 });
+
+describe("agents working together (ADR 0095)", () => {
+  const base = { turns: [], calls: [], reply: "Pronto.", noReply: false, approvals: [] };
+  const check = (
+    expect_: Parameters<typeof deterministicChecks>[0],
+    run: Partial<Parameters<typeof deterministicChecks>[1]>,
+  ) => deterministicChecks(expect_, { ...base, ...run });
+  const one = (checks: ReturnType<typeof deterministicChecks>, id: string) => checks.find((c) => c.id === id);
+
+  test("hand-offs: exactly as many for each pair listed, any for the rest", () => {
+    const made = { handOffs: { "chefe>rita": 1, "rita>diogo": 1 } };
+    expect(one(check({ handOffs: { "chefe>rita": 1 } }, made), "hands_off")?.pass).toBe(true);
+    expect(one(check({ handOffs: { "chefe>rita": 1 } }, { handOffs: { "chefe>rita": 2 } }), "hands_off")?.pass).toBe(
+      false,
+    );
+    expect(one(check({ handOffs: { "chefe>diogo": 0 } }, made), "hands_off")?.pass).toBe(true);
+    expect(one(check({ handOffs: { "chefe>rita": 1 } }, {}), "hands_off")?.pass).toBe(false);
+  });
+
+  test('what the person sees: at most so many agent messages, and no "Nota de" lines', () => {
+    const seen = (agentMessages: number, noteLines: number) => ({ personSaw: { agentMessages, noteLines } });
+    expect(one(check({ personSees: { maxAgentMessages: 2, noteLines: 0 } }, seen(2, 0)), "person_sees")?.pass).toBe(
+      true,
+    );
+    expect(one(check({ personSees: { maxAgentMessages: 2 } }, seen(3, 0)), "person_sees")?.pass).toBe(false);
+    expect(one(check({ personSees: { noteLines: 0 } }, seen(1, 1)), "person_sees")?.pass).toBe(false);
+  });
+
+  test("agent runs: at most so many in all, or for one agent", () => {
+    const runs = { agentRuns: { all: 4, chefe: 2, rita: 1, diogo: 1 } };
+    expect(one(check({ maxAgentRuns: 6 }, runs), "agent_runs")?.pass).toBe(true);
+    expect(one(check({ maxAgentRuns: 3 }, runs), "agent_runs")).toMatchObject({
+      pass: false,
+      detail: "all: 4 runs (at most 3)",
+    });
+    expect(one(check({ maxAgentRuns: { rita: 1 } }, runs), "agent_runs")?.pass).toBe(true);
+    expect(one(check({ maxAgentRuns: { chefe: 1 } }, runs), "agent_runs")?.pass).toBe(false);
+  });
+
+  test("a note's result went back to its sender, or nothing did", () => {
+    expect(one(check({ reported: false }, { reported: false }), "nothing_went_back")?.pass).toBe(true);
+    expect(one(check({ reported: false }, { reported: true }), "nothing_went_back")?.pass).toBe(false);
+    expect(one(check({ reported: true }, { reported: true }), "result_went_back")?.pass).toBe(true);
+  });
+});

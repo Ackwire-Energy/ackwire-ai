@@ -15,6 +15,7 @@ import { cutText } from "./format";
 import type { MachineMissionHooks } from "./machine-hub";
 import { getTask, type MachineTaskRow, publishTaskEvent, setTaskPrUrl } from "./machine-tasks";
 import { handlePermissionPrompt, runPermissionPrompt } from "./mission-commands";
+import { NOT_FOR_MISSION, runActsForMission } from "./mission-context";
 import { completeMission } from "./mission-delivery";
 import { MISSION_LIMITS } from "./mission-limits";
 import { onMachineOnline } from "./mission-sync";
@@ -278,6 +279,10 @@ export function createMissionRunToolSource(deps: Omit<MissionDeps, "db">): ToolS
             return { content: runPermissionPrompt(input, { canRun: granted.has(grantKey(null, SANDBOX_SCOPE)) }) };
           }
           if (!live) return refused("mission.not_allowed", "This conversation has no open mission.");
+          // Like its other tools: only a run its owner or a decider is behind, or one it woke, makes the mission act.
+          if (tool !== "get_context" && !(await runActsForMission(c, live))) {
+            return refused("mission.not_allowed", NOT_FOR_MISSION);
+          }
           return {
             content: await run(d, live, asTask(live), tool, masked(input) as Record<string, unknown>),
           };
