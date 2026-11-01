@@ -155,6 +155,7 @@ test("a routine that only looks and tells can't reach other agents or post, and 
   const names = (offered?.tools ?? []).map((t) => t.name);
   for (const name of ["tell_agent", "ask_agent", "post_message", "send_dm"]) expect(names).not.toContain(name);
   expect(JSON.stringify(offered)).toContain("don't post, send DMs, react");
+  expect(JSON.stringify(offered)).toContain('a person can set the routine to \\"Pode agir\\"');
   expect(JSON.stringify(offered)).not.toContain("tell_agent leaves an agent a note");
   expect(results[0]?.split(REFUSALS.routineReachReadOnly).length).toBe(3);
   // Nobody woke, and nothing was posted.
