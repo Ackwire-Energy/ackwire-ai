@@ -231,6 +231,12 @@ export function createFakeWiki(ctx: MockContext, log: (method: string, ...args: 
       s.page = { ...s.page, pinned };
       return withBacklinks(orgId, s);
     },
+    audience: async (orgId, slug, audience) => {
+      log("wiki.audience", orgId, slug, audience);
+      const s = await find(orgId, slug);
+      s.page = { ...s.page, audience };
+      return withBacklinks(orgId, s);
+    },
     remove: async (orgId, slug) => {
       log("wiki.remove", orgId, slug);
       const list = await store(orgId);

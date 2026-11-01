@@ -306,6 +306,68 @@ export function browser(t: TestServer) {
 
 export type Browser = ReturnType<typeof browser>;
 
+/** The Google app `googleSignIn` expects the server to have. */
+export const GOOGLE_ENV = { GOOGLE_CLIENT_ID: "google-client", GOOGLE_CLIENT_SECRET: "google-secret" };
+
+/** Google's token endpoint answering an ID token for `email`, which Google verified or not. Nothing else is reached. */
+function fakeGoogle(email: string, verified: boolean): typeof fetch {
+  const part = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const claims = { iss: "https://accounts.google.com", aud: GOOGLE_ENV.GOOGLE_CLIENT_ID, sub: `g-${email}`, email };
+  const idToken = `${part({ alg: "RS256", kid: "k" })}.${part({ ...claims, email_verified: verified, name: "Ana" })}.sig`;
+  return (async (input: string | URL | Request) => {
+    const url = input instanceof Request ? input.url : String(input);
+    if (url !== "https://oauth2.googleapis.com/token") throw new Error(`unexpected fetch: ${url}`);
+    return Response.json({ access_token: "ya29.test", id_token: idToken, token_type: "Bearer", expires_in: 3600 });
+  }) as typeof fetch;
+}
+
+/** Where each app's Google sign-in comes back to: the web's page, the Mac app's browser page, the phone app. */
+export const GOOGLE_BACK = {
+  web: "/",
+  desktop: `/desktop/sign-in?provider=google&request=${"r".repeat(43)}&done=1`,
+  phone: "agenteschat:///",
+} as const;
+
+/**
+ * A Google sign-in as `email`, started the way `app` starts it, back through its callback: where the browser lands, and
+ * that browser. The web and the Mac app's browser page (apps/web better-auth.ts) name `/login` for a refusal; the phone
+ * goes through the Expo plugin, then its system browser. `earlyAccess` rides in the state as every app sends it.
+ */
+export async function googleSignIn(
+  t: TestServer,
+  app: keyof typeof GOOGLE_BACK,
+  email: string,
+  options: { earlyAccess?: string; verified?: boolean } = {},
+) {
+  const body = {
+    provider: "google",
+    callbackURL: GOOGLE_BACK[app],
+    ...(app === "phone" ? {} : { errorCallbackURL: "/login" }),
+    ...(options.earlyAccess ? { additionalData: { earlyAccess: options.earlyAccess } } : {}),
+  };
+  const starter = browser(t);
+  const phone = { origin: null, headers: { "expo-origin": "agenteschat://", "x-agentes-client": "mobile" } };
+  const start = await starter("/api/auth/sign-in/social", { json: body, ...(app === "phone" ? phone : {}) });
+  if (start.status !== 200) throw new Error(`sign-in start: ${start.status} ${await start.text()}`);
+  const authorizationURL = ((await start.json()) as { url: string }).url;
+  const at = app === "phone" ? browser(t) : starter;
+  if (app === "phone") {
+    const proxy = await at(`/api/auth/expo-authorization-proxy?${new URLSearchParams({ authorizationURL })}`, {
+      origin: null,
+    });
+    if (proxy.status !== 302) throw new Error(`expo proxy: ${proxy.status}`);
+  }
+  const state = new URL(authorizationURL).searchParams.get("state") ?? "";
+  const real = globalThis.fetch;
+  globalThis.fetch = fakeGoogle(email, options.verified ?? true);
+  try {
+    const back = await at(`/api/auth/callback/google?code=c0de&state=${state}`, { origin: null });
+    return { location: back.headers.get("location") ?? "", browser: at };
+  } finally {
+    globalThis.fetch = real;
+  }
+}
+
 /** The code the last code email carries (its subject starts with it). */
 export const lastCode = (t: TestServer) =>
   t.email.sent.flatMap((m) => /^(\d{6}) /.exec(m.subject)?.[1] ?? []).at(-1) ?? "";

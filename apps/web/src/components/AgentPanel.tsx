@@ -10,12 +10,12 @@ import { AgentPage } from "@/pages/AgentPage";
  * The agent's page in the panel beside the conversation, over an overlay that dims it; a click there
  * closes the panel (asking first when something is unsaved).
  */
-export function AgentPanel({ agentId, onClose }: { agentId: string; onClose: () => void }) {
+export function AgentPanel({ agentId, tab, onClose }: { agentId: string; tab?: AgentTab; onClose: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const name = dir.agentById.get(agentId)?.name ?? "";
-  const [place, setPlace] = useState<{ tab: AgentTab; section?: AgentSection }>({ tab: "overview" });
+  const [place, setPlace] = useState<{ tab: AgentTab; section?: AgentSection }>({ tab: tab ?? "overview" });
   const [closeRequest, setCloseRequest] = useState(0);
   return (
     <>

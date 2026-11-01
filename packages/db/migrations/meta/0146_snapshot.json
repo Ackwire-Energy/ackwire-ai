@@ -1,5 +1,5 @@
 {
-  "id": "70232e0c-b3de-4839-95d6-2347e709937b",
+  "id": "8bfe1b71-beac-4908-a094-cdeeaa2fb1f0",
   "prevId": "2b9f1d76-dd6c-40a9-b10d-06ce76ed2230",
   "version": "7",
   "dialect": "postgresql",
@@ -7016,12 +7016,6 @@
         },
         "browser_traffic": {
           "name": "browser_traffic",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "egress": {
-          "name": "egress",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
@@ -16135,6 +16129,13 @@
         },
         "notice_prefs": {
           "name": "notice_prefs",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "sidebar_items": {
+          "name": "sidebar_items",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,

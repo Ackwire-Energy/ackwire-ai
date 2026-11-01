@@ -1025,10 +1025,24 @@
       "breakpoints": true
     },
     {
-      "idx": 147,
+      "idx": 146,
       "version": "7",
-      "when": 1793546812707,
-      "tag": "0147_machine_egress",
+      "when": 1793535287779,
+      "tag": "0146_sidebar_items",
+      "breakpoints": true
+    },
+    {
+      "idx": 148,
+      "version": "7",
+      "when": 1793544676936,
+      "tag": "0148_previous_handles",
+      "breakpoints": true
+    },
+    {
+      "idx": 149,
+      "version": "7",
+      "when": 1793544830928,
+      "tag": "0149_wiki_visibility",
       "breakpoints": true
     }
   ]

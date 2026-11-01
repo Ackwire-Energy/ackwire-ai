@@ -262,7 +262,7 @@ describe("create_channel", () => {
     const refused = await call(f, ctx, "create_channel", { name: "pesquisa", agents: ["@dev"] });
     expect(refused).toMatchObject({
       isError: true,
-      content: "Failed: Only an admin or the agent's owner can add this agent to a channel",
+      content: "Failed: Only an admin or the agent's owner can change where it works",
     });
     expect(await channelNamed(f, "pesquisa")).toBeUndefined();
     expect(await f.db.select().from(schema.agentActions)).toEqual([]);

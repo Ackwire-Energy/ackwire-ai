@@ -75,6 +75,7 @@ import {
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { formatPercent } from "@agenteschat/client/lib/format";
 import { isMediaAfterReply } from "@agenteschat/client/lib/media";
+import { nextMonthIso, usageWhen } from "@agenteschat/client/lib/plan-usage";
 import { playSound, soundForNotification } from "@agenteschat/client/lib/sounds";
 import { playAgentReaction } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -381,7 +382,7 @@ export const SocketFactoryContext = createContext<SocketFactory>(browserSocket);
 /** Text of a budget alert for the agent's owner: a percentage, never money. */
 export function budgetAlert(t: TFunction, locale: string, event: BudgetEvent, agentName: string) {
   return event.type === "budget.exhausted"
-    ? t("budget.exhausted", { name: agentName })
+    ? t("budget.exhausted", { name: agentName, when: usageWhen(t, locale, nextMonthIso()) })
     : t("budget.warning", { name: agentName, percent: formatPercent(locale, event.percent) });
 }
 

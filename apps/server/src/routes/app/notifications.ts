@@ -46,6 +46,10 @@ const Notification = z
         .string()
         .optional()
         .openapi({ description: "`org_standing` to `agent_hold`: the agent held (its name in `label`)." }),
+      userId: z
+        .string()
+        .optional()
+        .openapi({ description: "`agent_unreached`: the routine's creator, whom the agent's owner may let in." }),
       label: z.string().optional(),
     }),
     latest: z.object({

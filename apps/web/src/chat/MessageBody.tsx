@@ -1,12 +1,13 @@
 import { type AgentColor, Mention } from "@agenteschat/ui";
 import { memo, type ReactNode, useCallback, useRef } from "react";
+import { ChannelRef } from "@/chat/ChannelRef";
 import { splitSettled } from "@/chat/live-text";
 import { ChartAccent } from "@/components/ChartBlock";
-import { Markdown, type MentionRenderer, type WikiLinkRenderer } from "@/lib/markdown";
+import { type ChannelRenderer, Markdown, type MentionRenderer, type WikiLinkRenderer } from "@/lib/markdown";
 
 /**
  * Renders a message body as safe Markdown (bold, italic, `code`, ```blocks```,
- * lists, links, line breaks) with neutral @mentions (people and agents alike).
+ * lists, links, line breaks) with neutral @mentions (people and agents alike) and #channel links.
  * React elements only: HTML in a message is shown as text.
  *
  * `live` (an agent's answer still streaming): the finished blocks render once
@@ -19,6 +20,7 @@ export function MessageBody({
   resolveMention,
   renderMention,
   wikiLink,
+  channelRefs,
   live,
   accent = "sky",
 }: {
@@ -28,6 +30,8 @@ export function MessageBody({
   renderMention?: (handle: string, key: string) => ReactNode;
   /** `[[Título]]`: wiki link chips (with a preview on hover). */
   wikiLink?: WikiLinkRenderer;
+  /** The message's `meta.channelRefs`: the channel each `#name` meant when written (a renamed one still links). */
+  channelRefs?: Record<string, string>;
   /** Still streaming: settled blocks memoized, the tail's words fade in. */
   live?: boolean;
   /** The writing agent's color: its charts take its tones. */
@@ -38,10 +42,15 @@ export function MessageBody({
       renderMention ? renderMention(handle, key) : <Mention key={key}>@{resolveMention?.(handle) ?? handle}</Mention>,
     [resolveMention, renderMention],
   );
+  const channel = useCallback<ChannelRenderer>(
+    (name, text, key) => <ChannelRef key={key} name={name} text={text} refs={channelRefs} />,
+    [channelRefs],
+  );
   // The settled part reads the renderers through refs: a new function identity doesn't re-render it.
-  const latest = useRef({ mention, wikiLink });
-  latest.current = { mention, wikiLink };
+  const latest = useRef({ mention, wikiLink, channel });
+  latest.current = { mention, wikiLink, channel };
   const stableMention = useCallback<MentionRenderer>((h, k) => latest.current.mention(h, k), []);
+  const stableChannel = useCallback<ChannelRenderer>((n, text, k) => latest.current.channel(n, text, k), []);
   const stableWiki = useCallback<WikiLinkRenderer>(
     (title, label, k) =>
       latest.current.wikiLink ? (
@@ -56,14 +65,24 @@ export function MessageBody({
   if (!live)
     return (
       <ChartAccent.Provider value={accent}>
-        <Markdown source={body} variant="message" mention={mention} wikiLink={wikiLink} />
+        <Markdown source={body} variant="message" mention={mention} channel={channel} wikiLink={wikiLink} />
       </ChartAccent.Provider>
     );
   const { settled, tail } = splitSettled(body);
   return (
     <ChartAccent.Provider value={accent}>
-      {settled && <SettledBlocks source={settled} mention={stableMention} wikiLink={stableWiki} />}
-      <Markdown source={tail} variant="message" mention={mention} wikiLink={wikiLink} words className="md--tail" />
+      {settled && (
+        <SettledBlocks source={settled} mention={stableMention} channel={stableChannel} wikiLink={stableWiki} />
+      )}
+      <Markdown
+        source={tail}
+        variant="message"
+        mention={mention}
+        channel={channel}
+        wikiLink={wikiLink}
+        words
+        className="md--tail"
+      />
     </ChartAccent.Provider>
   );
 }
@@ -72,11 +91,13 @@ export function MessageBody({
 const SettledBlocks = memo(function SettledBlocks({
   source,
   mention,
+  channel,
   wikiLink,
 }: {
   source: string;
   mention: MentionRenderer;
+  channel: ChannelRenderer;
   wikiLink: WikiLinkRenderer;
 }) {
-  return <Markdown source={source} variant="message" mention={mention} wikiLink={wikiLink} />;
+  return <Markdown source={source} variant="message" mention={mention} channel={channel} wikiLink={wikiLink} />;
 });

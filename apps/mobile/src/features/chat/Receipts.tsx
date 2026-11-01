@@ -1,13 +1,13 @@
 import { type AgentAction, ApiError, cacheMessageActions, type Message, useAgentActions } from "@agenteschat/client";
-import { actionErrorKey, actionTextKey, actionTextValues } from "@agenteschat/client/lib/actions";
+import { actionErrorKey, actionTextKey, actionTextValues, formatTimeLeft } from "@agenteschat/client/lib/actions";
 import { can } from "@agenteschat/client/lib/permissions";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { CHROME_MAX_SCALE, Icon, PillButton, systemText, Text, useLivePaused, useTheme, useToast } from "@/ui";
+import { Icon, PillButton, Text, useLivePaused, useTheme, useToast } from "@/ui";
 import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
@@ -27,10 +27,11 @@ import {
 } from "./actions";
 
 /**
- * What the agent changed with this reply (ADR 0037 round 2):
- * one change is a sunken row with a raised Desfazer and the time left under the sentence (system font) (A); two or more are a group with "N mudanças · há X" and
- * Desfazer tudo (B). Undone rows are struck through with "Desfeito por …" and Refazer; past the window
- * they stay as plain history. Optimistic, rolled back with a toast when the server refuses.
+ * What the agent changed with this reply (ADR 0037 round 2), on the card of the reply's tools (a hairline, the cut
+ * corner): one change is a row with a raised Desfazer and the time left in it (A); two or more are a group with
+ * "N mudanças · há X" and Desfazer tudo (B). The sentence wraps, whole, and a button that goes keeps its room, so it
+ * never rewraps. Undone rows are struck through with "Desfeito por …" and Refazer; past the window they stay as plain
+ * history. Optimistic, rolled back with a toast when the server refuses.
  */
 export function Receipts({ message: m }: { message: Message }) {
   const list = m.actions ?? [];
@@ -109,18 +110,10 @@ function ReceiptList({
   if (!group) {
     const { a, v } = rows[0] as { a: AgentAction; v: ReceiptView };
     return (
-      <View style={[styles.one, { backgroundColor: c.sunken }]}>
+      <View style={[styles.one, styles.card, { backgroundColor: c.raised, borderColor: c.line2 }]}>
         <IconTile kind={a} />
-        <View style={styles.grow}>
+        <View style={[styles.grow, styles.oneTx]}>
           <Sentence action={a} channelId={m.channelId} struck={v.struck} size="one" />
-          {v.button === "undo" && v.timeLeft ? (
-            <RNText
-              maxFontSizeMultiplier={CHROME_MAX_SCALE}
-              style={[systemText("caption"), styles.left, { color: c.faint }]}
-            >
-              {t("agentActions.timeLeft", { time: v.timeLeft })}
-            </RNText>
-          ) : null}
           {a.undoneAt ? <UndoneBy action={a} /> : null}
         </View>
         <RowButton view={v} big onUndo={() => undo(a)} onRedo={() => redo(a)} />
@@ -131,9 +124,9 @@ function ReceiptList({
   const live = rows.filter((r) => r.v.button === "undo").map((r) => r.a.id);
   const start = groupStart(list);
   return (
-    <View style={[styles.group, { backgroundColor: c.sunken }]}>
+    <View style={[styles.group, styles.card, { backgroundColor: c.raised, borderColor: c.line2 }]}>
       <View style={styles.hd}>
-        <Text variant="small" tone="muted" style={styles.grow} numberOfLines={1}>
+        <Text variant="small" tone="muted" style={styles.grow}>
           <Text variant="small" tone="ink" style={styles.bold}>
             {t("agentActions.changes", { count: list.length })}
           </Text>
@@ -149,7 +142,9 @@ function ReceiptList({
       </View>
       {rows.map(({ a, v }) => (
         <View key={a.id} style={[styles.it, { borderTopColor: c.line }]}>
-          <Icon name={receiptIcon(a.kind)} size={14} color={c.muted} />
+          <View style={styles.itIcon}>
+            <Icon name={receiptIcon(a.kind)} size={14} color={c.muted} />
+          </View>
           <View style={styles.grow}>
             <Sentence action={a} channelId={m.channelId} struck={v.struck} size="item" />
             {a.undoneAt ? <UndoneBy action={a} /> : null}
@@ -162,9 +157,9 @@ function ReceiptList({
 }
 
 function IconTile({ kind: a }: { kind: AgentAction }) {
-  const { colors } = useTheme();
+  const { colors, shadows } = useTheme();
   return (
-    <View style={[styles.tile, { backgroundColor: colors.raised }]}>
+    <View style={[styles.tile, { backgroundColor: colors.raised, boxShadow: shadows.e1 }]}>
       <Icon name={receiptIcon(a.kind)} size={14} color={colors.ink2} />
     </View>
   );
@@ -197,7 +192,6 @@ function Sentence({
     <Text
       variant={size === "one" ? "small" : "footnote"}
       tone={struck ? "faint" : "ink2"}
-      numberOfLines={size === "one" ? 2 : 1}
       style={[size === "one" && styles.oneText, struck && styles.struck]}
       onPress={open}
       accessibilityRole={open ? "link" : undefined}
@@ -231,15 +225,16 @@ function UndoneBy({ action: a }: { action: AgentAction }) {
       ? t("agentActions.you")
       : dir.nameOf({ type: "user", id: a.undoneByUserId }) || t("mobile.chat.someone");
   return (
-    <Text variant="caption" tone="faint" style={styles.undoneBy} numberOfLines={1}>
+    <Text variant="caption" tone="faint" style={styles.undoneBy}>
       {t("agentActions.undoneBy", { name })}
     </Text>
   );
 }
 
 /**
- * Desfazer or Refazer: a raised pill next to one change (the time left is the line under the sentence),
- * a quiet word in a group; nothing once settled or for who may not use it.
+ * Desfazer or Refazer: a raised pill next to one change, Desfazer with the time left in it; a quiet word in a group.
+ * None for who may not use it. Once it had one, its room stays when its time is up, empty: the sentence never
+ * rewraps.
  */
 function RowButton({
   view: v,
@@ -253,23 +248,40 @@ function RowButton({
   onRedo: () => void;
 }) {
   const { t } = useTranslation();
-  if (!v.button) return null;
-  const redo = v.button === "redo";
+  const had = useRef<ReceiptView["button"]>(null);
+  if (v.button) had.current = v.button;
+  const shown = v.button ?? had.current;
+  if (!shown) return null;
+  const redo = shown === "redo";
   const label = redo ? t("agentActions.redo") : t("agentActions.undo");
-  if (big)
-    return (
-      <PillButton
-        label={label}
-        onPress={redo ? onRedo : onUndo}
-        accessibilityLabel={!redo && v.timeLeft ? `${label}, ${v.timeLeft}` : label}
-      />
-    );
-  return (
+  const button = big ? (
+    <PillButton
+      label={label}
+      detail={redo ? undefined : v.timeLeft || formatTimeLeft(0)}
+      onPress={redo ? onRedo : onUndo}
+      accessibilityLabel={!redo && v.timeLeft ? `${label}, ${v.timeLeft}` : label}
+    />
+  ) : (
     <Pressable onPress={redo ? onRedo : onUndo} accessibilityRole="button" hitSlop={8}>
       <Text variant="footnote" tone="muted" style={styles.bold}>
         {label}
       </Text>
     </Pressable>
+  );
+  return v.button ? button : <Room>{button}</Room>;
+}
+
+/** A button gone, its room kept: not seen, not read, not tapped. */
+function Room({ children }: { children: ReactNode }) {
+  return (
+    <View
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={styles.room}
+    >
+      {children}
+    </View>
   );
 }
 
@@ -277,29 +289,39 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   struck: { textDecorationLine: "line-through" },
+  // The tool block's card (ToolCalls.tsx): a hairline and the cut corner, bottom left.
+  card: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderBottomRightRadius: 16,
+    borderBottomLeftRadius: 4,
+  },
+  // The tile, the sentence's first line and the 32px pill share one middle; the sentence wraps under it.
   one: {
     marginTop: 12,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 10,
     minHeight: 50,
     paddingVertical: 9,
     paddingLeft: 12,
     paddingRight: 10,
-    borderRadius: 16,
   },
+  oneTx: { paddingTop: 6 },
   oneText: { fontSize: 14.5, lineHeight: 19 },
-  left: { marginTop: 1, fontVariant: ["tabular-nums"] },
-  tile: { width: 24, height: 24, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  tile: { width: 24, height: 24, marginTop: 4, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   undoneBy: { marginTop: 2 },
-  group: { marginTop: 12, borderRadius: 16, overflow: "hidden" },
+  room: { opacity: 0 },
+  group: { marginTop: 12, overflow: "hidden" },
   hd: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 9, paddingHorizontal: 12 },
   it: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 8,
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
+  itIcon: { height: 18, justifyContent: "center" },
 });

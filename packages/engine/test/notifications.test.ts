@@ -8,8 +8,14 @@ import {
   commentIssue,
   createIssue,
   drainOutbox,
+  getThread,
+  insertMessage,
+  listChannels,
+  listDms,
   listMembers,
+  listMessages,
   listNotifications,
+  type MachineTaskRow,
   markAllNotificationsRead,
   markChannelRead,
   markNotificationDone,
@@ -18,15 +24,18 @@ import {
   notificationCounts,
   notificationSnippet,
   notify,
+  notifyMessage,
   openDm,
   postPersonMessage,
   resolveNotifications,
   setNoticePref,
   snoozeNotification,
+  taskEndNotice,
   updateIssue,
   ValidationError,
   wakeSnoozedNotifications,
 } from "../src";
+import { deliverNotice } from "../src/delivery";
 import { addMember, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
@@ -372,6 +381,44 @@ test("issues: assigned (resolved when unassigned), status by others, comments me
   expect(row?.doneAt).not.toBeNull();
 });
 
+test("a task's end in a thread names its computer only where the workspace has more than one", async () => {
+  f = await setup();
+  const { bia } = await people();
+  const root = await post(bia.id, "Can someone run the tests?");
+  const computer = "agentes.chat's computer";
+  await f.db.insert(schema.machines).values({ orgId: f.org.id, name: computer, kind: "managed" });
+  const task = {
+    id: "00000000-0000-4000-8000-000000000001",
+    title: "Run the tests",
+    status: "done",
+    exitCode: 0,
+    seconds: 134,
+    endedAt: new Date(),
+    executor: "claude",
+    files: [],
+  } as unknown as MachineTaskRow;
+  const end = async () => {
+    const m = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      threadId: root.id,
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0, stretchId: null },
+      ...taskEndNotice(task, computer),
+    });
+    await notifyMessage(deps(), f.org.id, m.id);
+    return m;
+  };
+  const latest = async () => (await inbox(bia.id)).items.find((n) => n.kind === "thread_reply")?.latest.text;
+  // The Cloud's one computer: Bia hears how it ended, not where. The agent still reads where.
+  const first = await end();
+  expect(first.body).toBe(`Task "Run the tests" finished on ${computer} after 2 min.`);
+  expect(await latest()).toBe('Task "Run the tests" finished after 2 min.');
+  // A second computer: the line says which.
+  await f.db.insert(schema.machines).values({ orgId: f.org.id, name: "MacBook" });
+  await end();
+  expect(await latest()).toBe(`Task "Run the tests" finished on ${computer} after 2 min.`);
+});
+
 test("snippets are plain text and at most 280 characters", () => {
   expect(notificationSnippet("**Bold** and [a link](https://x.y) in `code`\n\n```ts\nconst a = 1\n```")).toBe(
     "Bold and a link in code const a = 1",
@@ -379,4 +426,68 @@ test("snippets are plain text and at most 280 characters", () => {
   const long = notificationSnippet("x".repeat(500));
   expect(long).toHaveLength(280);
   expect(long.endsWith("…")).toBe(true);
+});
+
+test("a notice only its agent reads notifies nobody, counts for nobody and is no preview", async () => {
+  f = await setup();
+  const { bia } = await people();
+  const root = await post(f.owner.id, "Cria um agente que lê meus emails");
+  // What a person decided on its proposal, another agent's note, the late result of a wait: in the thread people follow.
+  for (const kind of ["proposal_result", "agent_note", "wait_result"] as const) {
+    await f.db.transaction((tx) =>
+      deliverNotice(tx, {
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        channelId: f.general.id,
+        threadId: root.id,
+        hop: 1,
+        stretchId: null,
+        notice: { kind, from: "Your proposal of the agent «Caio»", text: "ana created it: @caio (Caio)." },
+        wake: false,
+      }),
+    );
+  }
+  // And one at the channel's top level.
+  await f.db.transaction((tx) =>
+    deliverNotice(tx, {
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      channelId: f.general.id,
+      threadId: null,
+      hop: 1,
+      stretchId: null,
+      notice: { kind: "proposal_result", text: "bia said no." },
+      wake: false,
+    }),
+  );
+  await drainOutbox(f.db, f.handlers);
+  expect((await inbox(f.owner.id)).items).toEqual([]);
+  const general = (await listChannels(f.db, bia.id, f.org.id)).find((c) => c.id === f.general.id);
+  expect(general?.lastMessage?.preview).toBe("Cria um agente que lê meus emails");
+  expect(general?.unreadCount).toBe(1);
+  // Its author follows the thread: nothing in it is unread for her, and it has no reply.
+  expect((await listChannels(f.db, f.owner.id, f.org.id)).find((c) => c.id === f.general.id)?.unreadCount).toBe(0);
+  const thread = await getThread(f.db, f.owner.id, f.org.id, root.id);
+  expect(thread.replyCount).toBe(0);
+  // Nor the thread's last line or a participant in it, here or in the channel's replies.
+  expect(thread.lastMessage).toBeNull();
+  expect(thread.participants.map((a) => a.id)).toEqual([f.owner.id]);
+  const [listed] = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { includeReplies: true });
+  expect(listed?.replies).toEqual({ count: 0, lastAt: null, latest: [] });
+  // A DM with the agent: the same.
+  const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+  await f.db.transaction((tx) =>
+    deliverNotice(tx, {
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      channelId: dm.id,
+      threadId: null,
+      hop: 1,
+      stretchId: null,
+      notice: { kind: "proposal_result", text: "ana created it." },
+      wake: false,
+    }),
+  );
+  const [mine] = (await listDms(f.db, f.owner.id, f.org.id)).filter((d) => d.channelId === dm.id);
+  expect(mine).toMatchObject({ lastMessage: null, unread: 0 });
 });

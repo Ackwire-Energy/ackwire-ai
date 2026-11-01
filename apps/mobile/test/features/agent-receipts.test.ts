@@ -11,6 +11,7 @@ import {
 } from "@agenteschat/client";
 import { deciderOf } from "@agenteschat/client/lib/routing";
 import {
+  keepsLine,
   markLabel,
   markOf,
   phaseKey,
@@ -86,6 +87,35 @@ describe("the agents' receipt line under a person's message", () => {
     const line = receiptLine(handled(routed({}), "ada", "waiting_approval").m1);
     expect(line?.mark).toBe("waiting");
     expect(line?.words?.key).toBe("receipts.waiting");
+  });
+
+  test("a run parked because its AI provider is down says so on its own line, never that it asks you", async () => {
+    const parked = applyReceiptEvent(routed({}), {
+      type: "message.handled",
+      channelId: "c1",
+      messageId: "m1",
+      agentId: "ada",
+      status: "waiting_input",
+      outage: true,
+    });
+    const line = receiptLine(parked.m1);
+    expect(line?.words).toEqual({ key: "receipts.outage", agents: ["ada"] });
+    expect(line && keepsLine(line)).toBe(true);
+    expect(line?.alert).toBe(false);
+    const asking = applyReceiptEvent(routed({}), {
+      type: "message.handled",
+      channelId: "c1",
+      messageId: "m1",
+      agentId: "ada",
+      status: "waiting_input",
+    });
+    expect(receiptLine(asking.m1)?.words?.key).toBe("receipts.asking");
+    const pt = await translator("pt-BR");
+    expect(pt("receipts.outage", { count: 1, names: "Ada" })).toBe(
+      "Ada: o provedor de IA está fora do ar · tenta de novo sozinho",
+    );
+    const en = await translator("en");
+    expect(en("receipts.outage", { count: 1, names: "Ada" })).toBe("Ada: the AI provider is down · retries by itself");
   });
 
   test("a failure is the danger tone with Retry", () => {

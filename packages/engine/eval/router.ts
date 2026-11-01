@@ -41,9 +41,11 @@ export interface RouterCase {
    * `asks`: to one agent, about another it should ask or tell; `direct`: to that other agent; `anyone`: to
    * nobody in particular; `about`: to nobody in particular, news for an agent; `reply`: a quote reply or a
    * thread reply to an agent's message; `resumed`: to nobody in particular, within half an hour of a talk with an
-   * agent. The rest already worked (`person` also when it talks about an agent).
+   * agent; `default`: what the step may give nobody but is for the agents (a complaint to them, a short question
+   * after a talk), or clearly isn't (people talking, a thanks). The rest already worked (`person` also when it
+   * talks about an agent).
    */
-  kind: "asks" | "direct" | "anyone" | "about" | "reply" | "resumed" | "everyone" | "person" | "follow-up";
+  kind: "asks" | "direct" | "anyone" | "about" | "reply" | "resumed" | "everyone" | "person" | "follow-up" | "default";
   /** The conversation before it, oldest first, a minute apart: "Ana", "Walter" or an agent's "@handle". */
   before?: { from: string; text: string }[];
   /** Minutes between the last line of `before` and the message (default 1). */
@@ -459,6 +461,57 @@ export const ROUTER_CASES: RouterCase[] = [
     ],
     message: "which one hits more people?",
     answers: ["atlas"],
+  },
+  // A message for the agents always gets one (ADR 0074, R5), and people talking among themselves still get none.
+  {
+    id: "pt-default-complaint",
+    lang: "pt",
+    kind: "default",
+    before: [
+      { from: "Ana", text: "Ada, olha o build do app que quebrou" },
+      { from: "@ada", text: "Olhei, é o teste de login que falha desde ontem." },
+    ],
+    pause: 5,
+    message: "Eu mesmo peguei e corrigi tudo aqui no meu computador, vocês se enrolaram muito.",
+    answers: ["ada"],
+  },
+  {
+    id: "pt-default-followup-question",
+    lang: "pt",
+    kind: "default",
+    before: [
+      { from: "Ana", text: "Ada, olha o build do app que quebrou" },
+      { from: "@ada", text: "Olhei, é o teste de login que falha desde ontem. Vou corrigir." },
+    ],
+    pause: 4,
+    message: "E aí, conseguiram?",
+    answers: ["ada"],
+  },
+  {
+    id: "pt-default-people-talking",
+    lang: "pt",
+    kind: "default",
+    before: [{ from: "Walter", text: "Ana, consegue revisar o contrato até amanhã?" }],
+    message: "consigo sim, de manhã eu vejo",
+    answers: [],
+  },
+  {
+    id: "en-default-to-room",
+    lang: "en",
+    kind: "default",
+    message: "did any of you see what broke in production this morning?",
+    answers: ["atlas"],
+  },
+  {
+    id: "pt-default-ack",
+    lang: "pt",
+    kind: "default",
+    before: [
+      { from: "Ana", text: "Theo, o que tenho na agenda amanhã?" },
+      { from: "@theo", text: "Amanhã: reunião com a Lumen às 10h." },
+    ],
+    message: "valeu",
+    answers: [],
   },
 ];
 

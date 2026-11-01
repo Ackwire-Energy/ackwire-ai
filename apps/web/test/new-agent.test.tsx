@@ -3,9 +3,9 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { AgentInput } from "@agenteschat/client";
+import { type AgentInput, ApiError } from "@agenteschat/client";
 import { en, ptBR } from "@agenteschat/i18n";
-import { cleanup, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import {
   freeHandle,
   handleProblem,
@@ -23,11 +23,13 @@ import {
   fakeMachinesOf,
   fakeMailOf,
   GENERAL_ID,
+  meWithRole,
   OPENROUTER_KEY,
   OPENROUTER_MODELS,
   ORG_ID,
   seedState,
 } from "./fake-api";
+import { hintOf } from "./hint";
 import {
   click,
   continueButton,
@@ -80,14 +82,17 @@ describe("Criar agente: steps", () => {
     );
   });
 
-  test("the preview waits for a role: none before a pick, then the picked role's agent, on to the next steps", async () => {
+  test("the preview waits for something in it: a template, or the first thing typed; never all empty", async () => {
     await open();
     const preview = () => screen().queryByRole("complementary", { name: "Prévia do agente" });
     expect(preview()).toBeNull();
-    // A pick shows it on the role step itself: Do zero has no name yet, QA starts as Iris.
+    // Do zero alone has nothing to show yet: no preview.
     await click(screen().getByRole("button", { name: /^Do zero/ }));
     expect(title()).toBe("Qual vai ser o papel?");
-    expect(preview()?.textContent).toContain("Seu agente");
+    expect(preview()).toBeNull();
+    await typeIn(screen().getByLabelText("Cargo"), "Pesquisa de preços");
+    expect(preview()?.textContent).toContain("Pesquisa de preços");
+    // A template shows it on the role step itself: QA starts as Iris.
     await click(screen().getByRole("button", { name: /^QA/ }));
     expect(preview()?.textContent).toContain("Iris");
     // Headed by its name alone. It says which step it's on: a narrow screen keeps it out of the role step.
@@ -196,7 +201,7 @@ describe("Criar agente: steps", () => {
     });
   });
 
-  test("roles for any team, in groups (tech, customers, operations); Do zero last", async () => {
+  test("roles for any team, in groups (tech, customers, operations); Do zero first", async () => {
     await open();
     const step = screen().getByRole("group", { name: "Papel" });
     expect(
@@ -211,13 +216,31 @@ describe("Criar agente: steps", () => {
     expect(names("Produto e tecnologia")).toEqual(["Dev", "Ops", "QA", "PM"]);
     expect(names("Clientes")).toEqual(["Atendimento", "Vendas", "Marketing", "Conteúdo"]);
     expect(names("Operação")).toEqual(["Dados", "Financeiro", "Pessoas", "Pesquisa", "Assistente"]);
-    expect(within(step).getAllByRole("button").at(-1)?.textContent).toContain("Do zero");
-    // A preset's first row under the card's padding is the shared face line alone: no class of its own to add room
-    // above the face.
-    const firstRows = [...step.querySelectorAll(".newag__role:not(.newag__role--blank)")].map(
+    expect(within(step).getAllByRole("button")[0]?.textContent).toContain("Do zero");
+    // Every card, Do zero too, opens on its tile with the name and its line centred beside it (no cap-top rise).
+    const firstRows = [...step.querySelectorAll(".newag__role")].map(
       (card) => [...card.children].find((c) => !c.classList.contains("newag__check"))?.className,
     );
-    expect(firstRows).toEqual(ROLE_IDS.filter((id) => id !== "custom").map(() => "ac-faceline"));
+    expect(firstRows).toEqual(ROLE_IDS.map(() => "newag__role-head"));
+    expect(step.querySelector(".newag__role .ac-captop, .newag__role .ac-faceline")).toBeNull();
+    const css = await Bun.file(new URL("../src/layout.css", import.meta.url).pathname).text();
+    expect(css).toMatch(/\n\.newag__role-head \{\s*display: flex;\s*align-items: center;/);
+    // Smaller tiles than a profile's 56px face, the + as big as a face.
+    expect(css).toMatch(/\n\.newag__role-head > \.ac-avatar \{\s*width: 44px;\s*height: 44px;/);
+    expect(css).toMatch(/\n\.newag__blank-icon \{[^}]*width: 44px;\s*height: 44px;/);
+
+    // Do zero's Cargo comes right under its card, in the same column with the cards' gap, before the templates; the
+    // field has the focus, and its hint doesn't ask for one short word.
+    await click(within(step).getByRole("button", { name: /^Do zero/ }));
+    const scratch = step.querySelector(".newag__scratch");
+    expect([...(scratch?.children ?? [])].map((c) => c.className)).toEqual([
+      "newag__role newag__role--blank",
+      expect.stringContaining("newag__card"),
+    ]);
+    expect(scratch?.nextElementSibling?.tagName).toBe("SECTION");
+    expect(css).toMatch(/\n\.newag__scratch \{[^}]*gap: 12px;/);
+    expect(document.activeElement).toBe(screen().getByLabelText("Cargo"));
+    expect(screen().getByText("O que ele faz pelo time, ex.: Assistente de e-mails e agenda.")).toBeTruthy();
 
     // A role outside engineering fills the rest the same way.
     await click(within(step).getByRole("button", { name: /^Atendimento/ }));
@@ -229,6 +252,81 @@ describe("Criar agente: steps", () => {
     expect((screen().getByLabelText("Instruções") as HTMLTextAreaElement).value).toContain(
       "Enviar mensagem ao cliente, reembolso e desconto só com aprovação.",
     );
+  });
+
+  test("Trazer agentes de outro app: the import flow in place of the cards, Voltar (or Esc) back to them", async () => {
+    const state = await open();
+    await click(screen().getByRole("button", { name: "Trazer agentes de outro app" }));
+    // Still here (the rail on its first step): the import's sources in the cards' place, no preview, no Continuar.
+    expect(title()).toBe("Trazer agentes de outro app");
+    expect(railStep("Papel").getAttribute("aria-current")).toBe("step");
+    expect(document.activeElement).toBe(screen().getByRole("heading", { level: 1 }));
+    expect(screen().getByRole("group", { name: "De onde vêm os agentes" })).toBeTruthy();
+    expect(screen().queryByRole("group", { name: "Papel" })).toBeNull();
+    expect(screen().queryByRole("complementary", { name: "Prévia do agente" })).toBeNull();
+    expect(screen().queryByRole("button", { name: /^Continuar/ })).toBeNull();
+    // Enter in its field reads what's there, never moves the steps on.
+    const field = screen().getByLabelText("Ou cole um link do GitHub ou a resposta do outro app");
+    await press(field, "Enter");
+    expect(title()).toBe("Trazer agentes de outro app");
+
+    // A pasted reply: planned, then Importar brings the agent, and the report links to it.
+    const reply = {
+      format: "agenteschat.bundle",
+      version: 1,
+      source: { app: "claude", ref: "my-bots", name: "Minhas automações", files: [] },
+      agents: [
+        {
+          key: "news",
+          name: "Newsy",
+          handle: "news",
+          role: "Notícias do dia",
+          instructions: "Resume as notícias do dia.",
+          model: null,
+          appearance: {},
+          skills: [],
+        },
+      ],
+      skills: [],
+      channels: [],
+      routines: [],
+      notes: [],
+      todo: [],
+      leftOut: [],
+    };
+    const pasted = `\`\`\`json\n${JSON.stringify(reply)}\n\`\`\``;
+    await act(async () => fireEvent.paste(field, { clipboardData: { getData: () => pasted } }));
+    await settle(10);
+    expect(screen().getByRole("heading", { name: "Minhas automações" })).toBeTruthy();
+    await click(screen().getByRole("button", { name: /^Importar 1 / }));
+    await settle(8);
+    expect(state.calls.some((c) => c.method === "imports.apply" && !(c.args[1] as { dryRun?: boolean }).dryRun)).toBe(
+      true,
+    );
+    const link = screen().getByRole("link", { name: /Newsy/ });
+    expect(link.getAttribute("href")).toMatch(new RegExp(`^/org/${ORG_ID}/agents/`));
+
+    // Voltar goes back to the cards; so does Esc outside a field.
+    await click(screen().getByRole("button", { name: "Voltar" }));
+    expect(title()).toBe("Qual vai ser o papel?");
+    expect(screen().getByRole("group", { name: "Papel" })).toBeTruthy();
+    await click(screen().getByRole("button", { name: "Trazer agentes de outro app" }));
+    await press(document.body, "Escape");
+    expect(title()).toBe("Qual vai ser o papel?");
+  });
+
+  test("the rail during an import leaves it: the step it goes to is whole (Continuar, Enter)", async () => {
+    await open();
+    await startAs("Assistente");
+    expect(title()).toBe("Quem é");
+    await click(screen().getByRole("button", { name: "Voltar" }));
+    await click(screen().getByRole("button", { name: "Trazer agentes de outro app" }));
+    expect(title()).toBe("Trazer agentes de outro app");
+    await click(railStep("Identidade"));
+    expect(title()).toBe("Quem é");
+    expect(screen().getByRole("button", { name: /^Continuar/ })).toBeTruthy();
+    await press(document.body, "Enter");
+    expect(title()).not.toBe("Quem é");
   });
 
   test("Dev starts as Ada, whose @ is taken: the error suggests a free one and blocks the step", async () => {
@@ -443,7 +541,10 @@ describe("Criar agente: what gets created", () => {
         .getByRole("button", { name: /^Codex.*Indisponível/ })
         .getAttribute("aria-disabled"),
     ).toBe("true");
-    const claude = screen().getByRole("button", { name: /^Claude Code.*Mac mini/ });
+    const claude = screen().getByRole("button", { name: /^Claude Code/ });
+    // The workspace's only computer: the card doesn't name it.
+    expect(claude.querySelector(".newag__cost")).toBeNull();
+    expect(claude.textContent).not.toContain("Mac mini");
     await click(claude);
     expect(claude.getAttribute("aria-pressed")).toBe("true");
     // In the words of the switch it points to, "Atende outras pessoas".
@@ -472,6 +573,33 @@ describe("Criar agente: what gets created", () => {
     expect(screen().queryByRole("dialog", { name: /^Conectar uma IA/ })).toBeNull();
   });
 
+  test("plan: with more than one computer, each card names its own", async () => {
+    const state = seedState();
+    state.brainMachines = [
+      {
+        machineId: "machine_1",
+        name: "MacBook",
+        online: true,
+        options: [plan("claude_code", true), plan("codex", false)],
+      },
+      {
+        machineId: "machine_mini",
+        name: "Mac mini",
+        online: false,
+        options: [plan("claude_code", true), plan("codex", false)],
+      },
+    ];
+    await open(state);
+    await startAs("Assistente");
+    await proceed(4);
+    const cards = within(screen().getByRole("group", { name: "Pelo plano, num computador" })).getAllByRole("button");
+    expect(cards.map((c) => c.querySelector(".newag__cost")?.textContent)).toEqual([
+      "MacBook",
+      "Mac mini · offline",
+      "Indisponível",
+    ]);
+  });
+
   test("plan: Codex on the workspace's computer, whose own sign-in thinks for nobody: ChatGPT's sign-in opens once it's created", async () => {
     const state = seedState();
     state.credentials = [];
@@ -488,7 +616,9 @@ describe("Criar agente: what gets created", () => {
     await startAs("Assistente");
     await proceed(4);
     expect(title()).toBe("Modelo e orçamento");
-    await click(screen().getByRole("button", { name: /^Codex.*Computador da Acme/ }));
+    const codex = screen().getByRole("button", { name: /^Codex/ });
+    expect(codex.textContent).not.toContain("Computador da Acme");
+    await click(codex);
     await proceed();
     await click(screen().getByRole("button", { name: "Criar Eva" }));
     await settle(8);
@@ -536,11 +666,10 @@ describe("Criar agente: what gets created", () => {
     await startAs("Assistente");
     await proceed(4);
     expect(title()).toBe("Modelo e orçamento");
-    expect(
-      screen()
-        .getByRole("button", { name: /^Claude Code.*Mac mini/ })
-        .getAttribute("aria-pressed"),
-    ).toBe("true");
+    // Its only computer: the card doesn't name it.
+    const planCard = screen().getByRole("button", { name: /^Claude Code/ });
+    expect(planCard.getAttribute("aria-pressed")).toBe("true");
+    expect(planCard.textContent).not.toContain("Mac mini");
     expect(screen().getByText("Começa com a última escolha: Opus pelo plano do Claude · Esforço alto.")).toBeTruthy();
     await proceed();
     await click(screen().getByRole("button", { name: "Criar Eva" }));
@@ -732,28 +861,32 @@ describe("Criar agente: what gets created", () => {
     expect(createdWith(state)?.monthlyBudgetUsd).toBeNull();
   });
 
-  test("connected mailboxes are in 'Ferramentas e acesso', off by default; the chosen level is saved", async () => {
+  test("my connected mailboxes are in 'Ferramentas e acesso', off by default; the chosen level is saved", async () => {
     const state = seedState();
     const api = createFakeApi(state);
     const mail = fakeMailOf.get(api);
     if (!mail) throw new Error("no mail fake");
+    const box = (id: string, address: string, ownerUserId: string | null) => ({
+      id,
+      provider: "imap" as const,
+      via: "imap" as const,
+      address,
+      label: "Atendimento",
+      status: "active" as const,
+      lastError: null,
+      preset: "icloud",
+      createdAt: new Date().toISOString(),
+      offActions: [],
+      askActions: [],
+      aliases: [],
+      defaultFrom: null,
+      ownerUserId,
+      agents: [],
+    });
+    // João's mailbox is his to give: it isn't offered here.
     mail.accounts = [
-      {
-        id: "mail-1",
-        provider: "imap",
-        via: "imap",
-        address: "ola@acme.com.br",
-        label: "Atendimento",
-        status: "active",
-        lastError: null,
-        preset: "icloud",
-        createdAt: new Date().toISOString(),
-        offActions: [],
-        askActions: [],
-        aliases: [],
-        defaultFrom: null,
-        agents: [],
-      },
+      box("mail-1", "ola@acme.com.br", state.me?.user.id ?? null),
+      box("mail-2", "joao@acme.com.br", "u-joao"),
     ];
     await renderApp(`/org/${ORG_ID}/agents/new`, { api });
     await settle(8);
@@ -761,9 +894,10 @@ describe("Criar agente: what gets created", () => {
     await proceed(2);
     expect(title()).toBe("Ferramentas e acesso");
     const levels = within(screen().getByRole("list", { name: "Conectores e níveis" }));
-    const box = levels.getByRole("radiogroup", { name: "Nível em ola@acme.com.br" });
-    expect(within(box).getByRole("radio", { name: "Sem acesso" }).getAttribute("aria-checked")).toBe("true");
-    await click(within(box).getByRole("radio", { name: "Ler" }));
+    expect(levels.queryByRole("radiogroup", { name: "Nível em joao@acme.com.br" })).toBeNull();
+    const mine = levels.getByRole("radiogroup", { name: "Nível em ola@acme.com.br" });
+    expect(within(mine).getByRole("radio", { name: "Sem acesso" }).getAttribute("aria-checked")).toBe("true");
+    await click(within(mine).getByRole("radio", { name: "Ler" }));
     await proceed(3);
     await click(screen().getByRole("button", { name: "Criar Iris" }));
     await settle(8);
@@ -866,6 +1000,79 @@ describe("Criar agente: what gets created", () => {
     expect(screen().queryByRole("complementary", { name: "Prévia do agente" })).toBeNull();
     await startAs("Do zero");
     expect((screen().getByLabelText("Nome") as HTMLInputElement).value).toBe("");
+  });
+
+  test("a save refused once the agent exists is said, and the flow still ends on the agent, without the channel", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    api.agents.setChannels = async () => {
+      throw new ApiError(403, "forbidden", "Forbidden");
+    };
+    await open(state, api);
+    await startAs("QA");
+    await toReview();
+    await click(screen().getByRole("button", { name: "Criar Iris" }));
+    await settle(8);
+    expect(document.querySelector(".ac-toasts")?.textContent).toContain(
+      "A Iris já existe, mas parte do que você escolheu não foi salva. Você não tem permissão para isso. Peça a um admin do workspace.",
+    );
+    expect(screen().getByRole("heading", { name: "Iris entrou no time" })).toBeTruthy();
+    expect(document.body.textContent).toContain(
+      "Adicione Iris a um canal e mencione @iris numa conversa para começar.",
+    );
+    // What came after the channels was still saved.
+    expect(state.calls.some((c) => c.method === "access.set")).toBe(true);
+    expect(state.agents.filter((a) => a.handle === "iris")).toHaveLength(1);
+  });
+});
+
+describe("Criar agente with Criar agentes alone: an agent of my own, without apps", () => {
+  const asMaker = () => {
+    const state = seedState();
+    meWithRole(state, ["create_agents"]);
+    return open(state);
+  };
+
+  test("Responsável is me, with an ⓘ: nobody else and no one to pick", async () => {
+    const state = await asMaker();
+    await startAs("QA");
+    await proceed(3);
+    expect(title()).toBe("Onde trabalha e com quem");
+    expect(screen().queryByRole("combobox", { name: "Responsável" })).toBeNull();
+    expect(document.querySelector(".newag .agp-person__t")?.textContent).toBe("Walter (você)Membro");
+    expect(hintOf("Responsável").text).toBe(
+      "Quem cria o agente é o responsável. Um admin pode passar para outra pessoa depois.",
+    );
+    await proceed(2);
+    await click(screen().getByRole("button", { name: "Criar Iris" }));
+    await settle(8);
+    expect(createdWith(state)?.ownerUserId).toBe("u-walter");
+    expect(screen().getByRole("heading", { name: "Iris entrou no time" })).toBeTruthy();
+  });
+
+  test("apps start without access and can't be changed here; Criar saves none, so nothing is refused", async () => {
+    const state = await asMaker();
+    // QA's apps (GitHub) aren't on its card: they wouldn't come with it.
+    expect(screen().getByRole("button", { name: /^QA/ }).textContent).not.toContain("GitHub");
+    await startAs("QA");
+    await proceed(2);
+    expect(title()).toBe("Ferramentas e acesso");
+    expect(document.querySelector(".onb__lead")?.textContent).toBe("A Iris começa sem acesso aos apps do workspace.");
+    expect(hintOf("Ferramentas e acesso").text).toBe(
+      "Só admins dão acesso a apps e caixas de email. Depois de criar, peça a um admin.",
+    );
+    const apps = screen().getByRole("list", { name: "Conectores e níveis" });
+    expect(within(apps).queryByRole("radiogroup")).toBeNull();
+    expect(apps.textContent).toContain("GitHub");
+    expect(apps.textContent).toContain("Sem acesso");
+    expect(screen().queryByRole("button", { name: "Ler" })).toBeNull();
+    expect(screen().queryByRole("link", { name: /Conectar outro app/ })).toBeNull();
+    await proceed(3);
+    await click(screen().getByRole("button", { name: "Criar Iris" }));
+    await settle(8);
+    expect(state.calls.some((c) => c.method === "access.set" || c.method === "mail.setAgent")).toBe(false);
+    expect(document.querySelector(".ac-toasts")?.textContent ?? "").not.toContain("não foi salva");
+    expect(screen().getByRole("heading", { name: "Iris entrou no time" })).toBeTruthy();
   });
 });
 

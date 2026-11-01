@@ -21,6 +21,7 @@ import {
 } from "@agenteschat/client/lib/computer";
 import { joinNames, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { namesComputers } from "@agenteschat/client/lib/machines";
 import { around, endSentence } from "@agenteschat/client/lib/text";
 import {
   Button,
@@ -55,6 +56,11 @@ import { Egress } from "./computer/Egress";
  */
 export function useComputerEdition(orgId: string) {
   return computerEdition(useComputerSetup(orgId).data, useAuthConfig().data?.workspaceComputer);
+}
+
+/** Whether lines about where things run name the computer here (`namesComputers`); false while the list loads. */
+export function useNamesComputers(orgId: string) {
+  return namesComputers(useMachines(orgId).data);
 }
 
 /** This workspace's computer on its way, or null where people connect their own (`pair`). */

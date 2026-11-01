@@ -47,3 +47,7 @@ Customers asked to pin one agent that takes what no other agent takes, the way s
 - **A summary after each hand-off, or waking the coordinator when its delegates finish:** more turns for little.
 - **A manager agent with a person's permissions:** ADR 0081 rejected it; the coordinator gains nothing.
 - **Giving existing workspaces their oldest active agent:** decided against on 2026-10-31. An admin turns it on.
+
+## Addendum (2026-11-01): the coordinator is a tier of R5
+
+ADR 0074's R5 ("a message for the agents always gets one") subsumes §4 and §5. The coordinator takes a person's message nobody was picked for when it is for the agents and the person talks with no agent: the agent replied to, last talked to or that just spoke comes first. Its need gate drops from the pick gate (0.5) to `DEFAULT_NEED` (0.25), and the ack guard, the people-talking check and the hourly cap of default picks apply. Its decision keeps strategy `rule:coordinator`, with the reason `coordinator; default`. When no step of the chain could read the message it is the coordinator's after R1 to R4 too, also with other people in the channel, under the same guards.

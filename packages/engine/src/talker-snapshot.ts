@@ -69,6 +69,8 @@ function stepLine(kind: string, data: Record<string, unknown>): string | null {
     case "approval":
       return "asked for an approval";
     case "error":
+      if (data.reason === "usage_wait")
+        return data.code === "budget" ? "ran out of its monthly budget" : "hit its plan's limit";
       return typeof data.reason === "string" ? `hit a problem: ${data.reason}` : "hit a problem";
     case "context":
       return Array.isArray(data.steeredMessageIds) ? "read new messages from people" : null;
@@ -80,8 +82,13 @@ function stepLine(kind: string, data: Record<string, unknown>): string | null {
 /** What a waiting run waits on, from the rows it waits for. */
 async function waitsOf(db: Database, run: AgentRun): Promise<string[]> {
   const out: string[] = [];
-  if (run.waitingMachineId) {
-    const code = (run.transcript as { waitingForBrain?: { code?: string } } | null)?.waitingForBrain?.code;
+  const brainWait = (run.transcript as { waitingForBrain?: { code?: string; until?: string } } | null)?.waitingForBrain;
+  // A usage wait has no computer to wait for: never "its computer is offline".
+  if (brainWait?.code === "plan_limit" || brainWait?.code === "budget") {
+    const what = brainWait.code === "budget" ? "its monthly budget to renew" : "its plan's usage limit to reset";
+    out.push(`${what} (it picks up by itself${brainWait.until ? ` around ${brainWait.until}` : ""})`);
+  } else if (run.waitingMachineId) {
+    const code = brainWait?.code;
     out.push(
       code === "busy"
         ? "room on its computer (busy with other tasks)"

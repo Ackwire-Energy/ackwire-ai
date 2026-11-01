@@ -3,6 +3,7 @@ import { and, type Database, type Executor, eq, schema, sql } from "@agenteschat
 import { routineBriefOfRun } from "./background";
 import type { ToolResult } from "./brains/types";
 import { deliverNotice, publishDelivery } from "./delivery";
+import { pgSafeJson } from "./format";
 import type { Message } from "./messages";
 import type { Notice } from "./notices";
 import { enqueue } from "./outbox";
@@ -94,7 +95,7 @@ export async function resumeRunWithResult(
     if (input.consulted) t.consulted = [...(t.consulted ?? []), input.consulted];
     await tx
       .update(agentRuns)
-      .set({ transcript: t as Record<string, unknown>, updatedAt: new Date() })
+      .set({ transcript: pgSafeJson(t) as Record<string, unknown>, updatedAt: new Date() })
       .where(eq(agentRuns.id, row.id));
     await enqueue(tx, {
       orgId: row.orgId,
@@ -236,7 +237,14 @@ export async function resumeRunsWaitingForMachine(
       updatedAt: agentRuns.updatedAt,
     })
     .from(agentRuns)
-    .where(and(eq(agentRuns.waitingMachineId, machineId), eq(agentRuns.status, "waiting_input")))
+    .where(
+      and(
+        eq(agentRuns.waitingMachineId, machineId),
+        eq(agentRuns.status, "waiting_input"),
+        // The computer coming back says nothing about a plan's limit or a budget.
+        sql`coalesce(${agentRuns.transcript}->'waitingForBrain'->>'code', '') not in ('plan_limit', 'budget')`,
+      ),
+    )
     .limit(200);
   const resumed: string[] = [];
   for (const r of rows) {

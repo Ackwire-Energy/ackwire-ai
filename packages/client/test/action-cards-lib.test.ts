@@ -5,7 +5,9 @@ import {
   actionCardOf,
   agentProposalOf,
   draftLevels,
+  draftMailLevels,
   mayContinueStretch,
+  proposalLines,
   proposalStatus,
   stretchCardOf,
   stretchCardText,
@@ -67,6 +69,85 @@ test("the draft's levels by connection, and the AI it suggests in words", () => 
   expect(
     suggestedAiText(t, { kind: "account", brain: "codex", machineId: "m", accountId: "a", label: "ChatGPT Plus" }),
   ).toBe('actionCard.agentProposal.aiAccount:{"account":"ChatGPT Plus"}');
+});
+
+test("what a proposed agent gets, a line each: who gives what the viewer can't, and what one click gave", () => {
+  const ROUTINE = {
+    name: "E-mails do dia",
+    prompt: "Resume a caixa de entrada.",
+    schedule: "todo dia ao meio-dia",
+    rule: null,
+    cron: "0 12 * * *",
+    timezone: "America/Sao_Paulo",
+    description: "Every day, at 12:00",
+    report: "when_new" as const,
+    access: "read" as const,
+    reportsIn: "ch-private",
+  };
+  const draft = {
+    ...card().params.draft,
+    channelIds: ["ch-private"],
+    access: [{ connectionId: "c-github", level: "read" as const }],
+    mail: [
+      { accountId: "mb-ana", address: "ana@acme.com", level: "read" as const, ownerUserId: "u-ana" },
+      { accountId: "mb-bia", address: "bia@acme.com", level: "write" as const, ownerUserId: "u-bia" },
+    ],
+    routine: ROUTINE,
+  };
+  // Open now (the lines read the clock).
+  const open = card({ params: { draft, why: "x" }, expiresAt: new Date(Date.now() + HOUR).toISOString() });
+  const at = (lines: ReturnType<typeof proposalLines>) => lines.map((l) => [l.key, l.given, l.needs]);
+  // Ana, an admin: everything but Bia's mailbox, which only Bia gives.
+  expect(at(proposalLines(open, { userId: "u-ana", admin: true }))).toEqual([
+    ["channel:ch-private", null, null],
+    ["app:c-github", null, null],
+    ["mail:mb-ana", null, null],
+    ["mail:mb-bia", null, { who: "person", userId: "u-bia" }],
+    ["routine", null, null],
+  ]);
+  // A member who isn't an admin: the channel and the app wait for one, and so does the routine reporting in that
+  // channel; her own mailbox is hers to give, admin or not.
+  expect(at(proposalLines(open, { userId: "u-ana", admin: false }))).toEqual([
+    ["channel:ch-private", null, { who: "admin" }],
+    ["app:c-github", null, { who: "admin" }],
+    ["mail:mb-ana", null, null],
+    ["mail:mb-bia", null, { who: "person", userId: "u-bia" }],
+    ["routine", null, { who: "admin" }],
+  ]);
+  expect(draftMailLevels(draft, "u-ana")).toEqual({ "mb-ana": "read" });
+  // Created in one click by Ana: what it got takes a check, Bia's mailbox still waits for her.
+  const made = card({
+    params: { draft, why: "x" },
+    state: "created",
+    agentId: "a-caio",
+    applied: { channelIds: ["ch-private"], connectionIds: ["c-github"], mailAccountIds: ["mb-ana"] },
+    routineId: "r-1",
+  });
+  expect(at(proposalLines(made, { userId: "u-ana", admin: true }))).toEqual([
+    ["channel:ch-private", true, null],
+    ["app:c-github", true, null],
+    ["mail:mb-ana", true, null],
+    ["mail:mb-bia", false, { who: "person", userId: "u-bia" }],
+    ["routine", true, null],
+  ]);
+  // Created by someone who couldn't put it in the channel: its routine wasn't made and waits for an admin.
+  const stuck = card({
+    params: { draft, why: "x" },
+    state: "created",
+    agentId: "a-caio",
+    applied: { channelIds: [], connectionIds: [], mailAccountIds: [] },
+    routineId: null,
+  });
+  expect(at(proposalLines(stuck, { userId: "u-ana", admin: true })).at(-1)).toEqual([
+    "routine",
+    false,
+    { who: "admin" },
+  ]);
+  // Created from the review: the card can't say what it got, so no line says it.
+  const reviewed = card({ params: { draft, why: "x" }, state: "created", agentId: "a-caio" });
+  expect(proposalLines(reviewed, { userId: "u-ana", admin: true }).every((l) => l.given === null && !l.needs)).toBe(
+    true,
+  );
 });
 
 test("a stretch's pause card (ADR 0089): read safely, said with the agents' names, Continuar for the right people", () => {

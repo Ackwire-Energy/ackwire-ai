@@ -235,7 +235,6 @@ html:not([data-pointer]) .wiki-import-card:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 30px;
-  max-width: 1180px;
   animation: wiki-in 0.3s var(--out) both;
 }
 .wiki-home__head {
@@ -536,12 +535,10 @@ html:not([data-pointer]) .wiki-minigraph:focus-visible {
   grid-template-columns: minmax(0, 1fr) 272px;
   gap: 40px;
   align-items: start;
-  max-width: 1180px;
   animation: wiki-in 0.25s var(--out) both;
 }
 .wiki-doc[data-editing] {
   grid-template-columns: minmax(0, 1fr);
-  max-width: 900px;
 }
 .wiki-doc__main {
   min-width: 0;
@@ -682,7 +679,6 @@ button.wiki-chip:hover {
 
 /* The text of a page */
 .wiki-prose .md {
-  max-width: 72ch;
   font-size: 16px;
   line-height: 1.72;
   color: var(--ink2);
@@ -1082,7 +1078,6 @@ html:not([data-pointer]) .wiki-backlink:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  max-width: 1180px;
 }
 .wiki-graph__box {
   position: relative;
@@ -1101,9 +1096,8 @@ html:not([data-pointer]) .wiki-backlink:focus-visible {
 .wiki-graph__svg {
   display: block;
   width: 100%;
-  height: auto;
+  height: calc(100vh - 220px);
   min-height: 420px;
-  max-height: calc(100vh - 220px);
 }
 .wiki-graph__edges line {
   stroke: var(--line2);

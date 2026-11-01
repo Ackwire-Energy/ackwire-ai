@@ -86,12 +86,13 @@ describe("a run that must answer never posts the silence word", () => {
     expect((await runRow())?.status).toBe("done");
   });
 
-  test("still only the word after the nudge: empty_reply, nothing posted", async () => {
+  test("still only the word after the nudges: empty_reply, nothing posted", async () => {
     f = await setup({ reply: () => ({ chunks: ["NO_REPLY"] }) });
     await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
     await drainOutbox(f.db, f.handlers);
     expect(await agentMessages()).toEqual([]);
-    expect(f.provider.calls.length).toBe(2);
+    // Answer nudges share the run's two continues (ADR 0097): the first answer and two nudged turns.
+    expect(f.provider.calls.length).toBe(3);
     const run = await runRow();
     expect(run?.status).toBe("failed");
     expect(run?.error).toBe("empty_reply");

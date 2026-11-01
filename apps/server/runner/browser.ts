@@ -6,6 +6,7 @@ import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import os from "node:os";
 import path from "node:path";
 import { isStartPage, START_PAGE_URL } from "@agenteschat/adapters/browser-start";
+import { AGENT_BROWSER_PROFILE } from "@agenteschat/adapters/command-policy";
 import { cgroupCounters } from "@agenteschat/adapters/host-stats";
 import {
   AGENT_BROWSER_SHA256,
@@ -120,6 +121,8 @@ const WINDOW_MS = 20_000;
 const WINDOW_DRAW_MS = 500;
 /** A Chrome asked to quit that is still there after this is killed. */
 const CHROME_KILL_MS = 3000;
+/** How long a Chrome gets to close itself (`Browser.close`; it takes a tenth of a second) before it is signaled. */
+const CHROME_QUIT_MS = 2000;
 /** Memory one live browser takes, roughly (the per-machine cap). */
 const SESSION_BYTES = 300 * 1024 * 1024;
 /** Frames a second per stream mode. */
@@ -451,7 +454,14 @@ export function findChrome(
  * kept two of a 4-core computer's cores busy whether anyone watched or not,
  * and sent its desktop's viewers a stream of changes. The chip asking to sign
  * in to the browser, a feature of Chrome 147 (at least) to 155, stays off;
- * later versions read the profile's own switch (`prepareProfile`).
+ * later versions read the profile's own switch (`prepareProfile`). The sites'
+ * sessions outlive Chrome stopping (idle, or moving to or from the agent's
+ * desktop), as with Chrome's "Continue where you left off": a site that keeps
+ * you signed in only until the browser closes (no "remember me") still has
+ * its cookies when Chrome starts again. Measured 2026-10-31 on Chrome for
+ * Testing 155: without `--restore-last-session` those cookies were dropped at
+ * the next start; with it they stayed, and so did the last session's tabs,
+ * which `forgetTabs` removes before each start.
  */
 export const CHROME_ARGS = [
   "--no-first-run",
@@ -460,6 +470,7 @@ export const CHROME_ARGS = [
   "--disable-component-update",
   "--force-prefers-reduced-motion",
   "--disable-features=SigninPromoOnAvatarPill",
+  "--restore-last-session",
 ];
 const HEADLESS_ARGS = ["--headless=new", "--window-size=1280,800"];
 /**
@@ -590,6 +601,15 @@ export function prepareProfile(profile: string) {
   } catch {
     // Chrome starts with the settings it has.
   }
+}
+
+/**
+ * Before every start: the tabs Chrome saved go (`--restore-last-session` would open them again beside the page it
+ * starts on, more of them at each restart), so the agent's browser starts on one page, as it always did. Its
+ * cookies stay.
+ */
+export function forgetTabs(profile: string) {
+  return rm(path.join(profile, "Default", "Sessions"), { recursive: true, force: true }).catch(() => undefined);
 }
 
 /** A Chrome the runner started for one agent. */
@@ -822,6 +842,8 @@ const DISCRETE_KEYS = new Set([
   " ",
 ]);
 const MODIFIER_KEYS = new Set(["Alt", "Control", "Meta", "Shift"]);
+/** CDP's bit for each mouse button in `buttons`. */
+const BUTTON_BITS = { none: 0, left: 1, right: 2, middle: 4 } as const;
 /** CDP's modifier bits, as `press` spells a chord (`Control+a`). */
 const CHORD = [
   [1, "Alt"],
@@ -830,10 +852,48 @@ const CHORD = [
   [8, "Shift"],
 ] as const;
 
-/** Where a person's pointer is and which modifier keys they hold, per stream. */
+/** Where a person's pointer is, and which mouse buttons and modifier keys they hold, per stream. */
 export interface InputState {
   pointer?: { x: number; y: number };
+  /** The mouse buttons down, as CDP's mask (left 1, right 2, middle 4). */
+  buttons?: number;
   held: Set<string>;
+  /** While the person drags: when they made its last event (`at`, their clock) and when it went to the page. */
+  drag?: { at: number; sent: number };
+}
+
+/** The longest gap a drag keeps between two of its events: a pause longer than this plays shorter. */
+export const DRAG_GAP_MAX_MS = 100;
+/** The furthest a drag's gaps may put an event behind the time its batch reached the computer. */
+export const DRAG_LAG_MAX_MS = 1000;
+
+/**
+ * How long to wait before `e` goes to the page so a drag keeps the gaps the person made between its
+ * events: the server sends input in batches and a slow link bunches them, and a slider handed a whole
+ * drag at once jumps to its end. Never past `until`: the sender writes `at`, and 100 ms gaps alone would
+ * let one batch hold the queue for seconds. Notes `e` as sent once that wait is over. Clicks and anything
+ * else go at once.
+ */
+export function dragDelay(
+  e: BrowserInputEvent,
+  state: InputState,
+  now: number,
+  until = Number.POSITIVE_INFINITY,
+): number {
+  if (e.kind !== "mouse" || e.type === "mouseWheel") return 0;
+  const drag = state.drag;
+  const wait = Math.min(
+    drag && e.at !== undefined && e.type !== "mousePressed"
+      ? Math.max(0, drag.sent + Math.min(Math.max(e.at - drag.at, 0), DRAG_GAP_MAX_MS) - now)
+      : 0,
+    Math.max(0, until - now),
+  );
+  // A press starts a drag and a release ends it; a move with no press before it is the pointer hovering.
+  state.drag =
+    e.at === undefined || e.type === "mouseReleased" || (e.type === "mouseMoved" && !drag)
+      ? undefined
+      : { at: e.at, sent: now + wait };
+  return wait;
 }
 
 /**
@@ -842,43 +902,61 @@ export interface InputState {
  * active tab and answers once Chrome has it, unlike the stream socket, whose
  * input goes to the tab it attached to and is never confirmed. Keys go
  * through `press` (it fills in codes and text); a modifier held on its own is
- * a raw key-down/up pair; a tap from the phone is a left click.
+ * a raw key-down/up pair; a tap from the phone is a left click. Every mouse
+ * command says which buttons are down (`buttons`, which the daemon passes to
+ * Chrome as given), so a move after a press reaches the page as a drag.
  */
 export function relayCommands(e: BrowserInputEvent, state: InputState): Record<string, unknown>[] {
   switch (e.kind) {
-    case "mouse":
+    case "mouse": {
+      const button = e.button ?? (e.type === "mouseMoved" || e.type === "mouseWheel" ? "none" : "left");
+      // A release that never came (dropped on the way, or control that ended mid-press) is sent first, where the
+      // pointer was: before a new press of that button, or a move that says no button is down.
+      const lost =
+        (state.buttons ?? 0) &
+        (e.type === "mousePressed" ? BUTTON_BITS[button] : e.type === "mouseMoved" && e.button === "none" ? ~0 : 0);
+      if (lost) return [...releaseHeld(state, lost), ...relayCommands(e, state)];
       state.pointer = { x: e.x, y: e.y };
+      if (e.type === "mousePressed") state.buttons = (state.buttons ?? 0) | BUTTON_BITS[button];
+      else if (e.type === "mouseReleased") state.buttons = (state.buttons ?? 0) & ~BUTTON_BITS[button];
       return [
         {
           action: "input_mouse",
           type: e.type,
           x: e.x,
           y: e.y,
-          button: e.button ?? (e.type === "mouseMoved" || e.type === "mouseWheel" ? "none" : "left"),
+          button,
+          buttons: state.buttons ?? 0,
           clickCount: e.clickCount ?? (e.type === "mousePressed" || e.type === "mouseReleased" ? 1 : 0),
           deltaX: e.deltaX ?? 0,
           deltaY: e.deltaY ?? 0,
           modifiers: e.modifiers ?? 0,
         },
       ];
+    }
     case "touch": {
       const at = e.touchPoints[0] ?? state.pointer;
       if (!at) return [];
-      state.pointer = { x: at.x, y: at.y };
-      const mouse = (type: string, button: string, clickCount: number) => ({
-        action: "input_mouse",
-        type,
-        x: at.x,
-        y: at.y,
-        button,
-        clickCount,
-        deltaX: 0,
-        deltaY: 0,
-        modifiers: e.modifiers ?? 0,
-      });
-      if (e.type === "touchStart") return [mouse("mouseMoved", "none", 0), mouse("mousePressed", "left", 1)];
-      if (e.type === "touchMove") return [mouse("mouseMoved", "left", 0)];
-      return [mouse("mouseReleased", "left", 1)];
+      const mouse = (
+        type: "mouseMoved" | "mousePressed" | "mouseReleased",
+        button: "none" | "left",
+        clickCount: number,
+      ) =>
+        relayCommands(
+          {
+            kind: "mouse",
+            type,
+            x: at.x,
+            y: at.y,
+            button,
+            clickCount,
+            ...(e.modifiers ? { modifiers: e.modifiers } : {}),
+          },
+          state,
+        );
+      if (e.type === "touchStart") return [...mouse("mouseMoved", "none", 0), ...mouse("mousePressed", "left", 1)];
+      if (e.type === "touchMove") return mouse("mouseMoved", "left", 0);
+      return mouse("mouseReleased", "left", 1);
     }
     case "key": {
       if (e.type === "char") return e.text ? [{ action: "keyboard", subaction: "insertText", text: e.text }] : [];
@@ -900,6 +978,15 @@ export function relayCommands(e: BrowserInputEvent, state: InputState): Record<s
   }
 }
 
+/** The mouse buttons in `mask` that `state` still holds, let go where the pointer is. */
+function releaseHeld(state: InputState, mask = ~0): Record<string, unknown>[] {
+  const at = state.pointer;
+  if (!at) return [];
+  return (["left", "right", "middle"] as const)
+    .filter((b) => (state.buttons ?? 0) & mask & BUTTON_BITS[b])
+    .flatMap((button) => relayCommands({ kind: "mouse", type: "mouseReleased", x: at.x, y: at.y, button }, state));
+}
+
 /** The subset of a WebSocket the stream relay uses (a fake in tests). */
 export interface StreamSocket {
   send(data: string): void;
@@ -916,8 +1003,8 @@ export interface BrowserManagerOptions {
   log: (line: string) => void;
   /** Sends a frame on the current connection; false when it is down. */
   send: (frame: RunnerFrame) => boolean;
-  /** A secret delivered to the agent (ADR 0027), by name, or null. */
-  secret: (agent: AgentScope, name: string) => Promise<string | null>;
+  /** A secret delivered to the agent (ADR 0027), by name, with the one site it was sealed to, or null. */
+  secret: (agent: AgentScope, name: string) => Promise<{ value: string; site: string | null } | null>;
   /** System mode: root preguards this UID's fixed CDP and stream listener ports. */
   fixedPorts?: BrowserPorts;
   /** Root-owned extension in system mode; absent uses the single-user runner home. */
@@ -1766,7 +1853,7 @@ export class BrowserManager {
       void this.stopChrome(s);
     }
     await this.ensureReady();
-    await mkdir(path.join(folder, ".agentes", "browser"), { recursive: true });
+    await mkdir(path.join(folder, AGENT_BROWSER_PROFILE), { recursive: true });
     // Where screenshots and downloads land: there before the first one (the browser doesn't make them).
     await mkdir(path.join(folder, "screenshots"), { recursive: true });
     await mkdir(path.join(folder, "downloads"), { recursive: true });
@@ -1821,7 +1908,7 @@ export class BrowserManager {
       await this.run(session, ["close"], { timeoutMs: QUICK_TIMEOUT_MS }).catch(() => undefined);
       await this.stopChrome(session);
     }
-    const profile = path.join(session.folder, ".agentes", "browser");
+    const profile = path.join(session.folder, AGENT_BROWSER_PROFILE);
     const starting = (async () => {
       const exe = this.chromePath ?? this.chrome();
       if (!exe) throw new RunnerError("browser_unavailable", "No browser is installed for the agent yet");
@@ -1835,6 +1922,7 @@ export class BrowserManager {
             agent,
             this.opts.startPageData?.(agent),
           );
+        await forgetTabs(profile);
         const args = chromeLaunchArgs(
           exe,
           profile,
@@ -1972,12 +2060,25 @@ export class BrowserManager {
     return total;
   }
 
-  /** The agent's Chrome stops (the profile, and so its logins, stay). */
+  /**
+   * The agent's Chrome stops (the profile, and so its logins, stay). It is asked to close itself first, as a person
+   * quits it, so what it holds reaches the profile: measured 2026-10-31 on Chrome for Testing 155, cookies set a
+   * second and a half before a SIGTERM were gone at the next start, the "remember me" one too in three runs of four
+   * (a sign-in just before the browser moved to or from the agent's desktop); 35 s before it, or with
+   * `Browser.close`, they stayed. One that doesn't close in time is signaled, then killed.
+   */
   private async stopChrome(session: Session) {
     const chrome = session.chrome ?? (await session.chromeStarting?.catch(() => undefined));
     session.chrome = undefined;
     session.aliveAt = null;
     if (!chrome) return;
+    const counter = this.counters.get(chrome);
+    if (counter) {
+      counter.quit();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([chrome.exited, new Promise((r) => (timer = setTimeout(r, CHROME_QUIT_MS)))]);
+      clearTimeout(timer);
+    }
     chrome.kill();
     await chrome.exited;
     await this.forgetChrome(chrome.pid);
@@ -2260,14 +2361,23 @@ export class BrowserManager {
     if (!site) {
       throw new RunnerError("bad_request", "agentes:type_secret needs the site the secret is for (https://host)");
     }
-    const value = await this.opts.secret(agent, name);
-    if (value === null) {
+    const held = await this.opts.secret(agent, name);
+    if (held === null) {
       return {
         success: false,
         data: null,
         error: `No secret named ${name} was delivered to this agent; ask for it with request_secret first`,
       };
     }
+    // The site the person sealed it to, on this computer, wins over the one the request names.
+    if (held.site && held.site !== site) {
+      return {
+        success: false,
+        data: null,
+        error: `${name} is only for ${new URL(held.site).host}, not ${new URL(site).host}; it wasn't typed`,
+      };
+    }
+    const { value } = held;
     if (!(await this.browserOpen(session, signal))) {
       return { success: false, data: null, error: "The browser isn't open: open a page first" };
     }
@@ -2532,6 +2642,7 @@ export class BrowserManager {
     while (session.streamOpening) await session.streamOpening.catch(() => undefined);
     if (session.stream) {
       if (session.stream.mode !== mode) {
+        if (mode === "watch") this.letGo(session.stream);
         session.stream.mode = mode;
         session.stream.socket.send(JSON.stringify({ type: "config", maxFps: STREAM_FPS[mode] }));
         this.changed();
@@ -2740,6 +2851,7 @@ export class BrowserManager {
     const session = this.sessions.get(String(agent.id ?? ""));
     while (session?.streamOpening) await session.streamOpening.catch(() => undefined);
     if (!session?.stream) return { stopped: false };
+    this.letGo(session.stream);
     this.endStream(session, "stopped");
     return { stopped: true };
   }
@@ -2772,7 +2884,8 @@ export class BrowserManager {
   /**
    * `browser.input`: a person's input during a take over, in order, through
    * the daemon's command relay (the active tab, each one confirmed before the
-   * next). The stream socket only carries frames.
+   * next), a drag with the gaps the person made (`dragDelay`), never more
+   * than `DRAG_LAG_MAX_MS` behind. The stream socket only carries frames.
    */
   async input(agent: AgentScope, events: unknown[]): Promise<MachineReplies["browser.input"]> {
     const session = this.sessions.get(String(agent.id ?? ""));
@@ -2782,13 +2895,18 @@ export class BrowserManager {
       throw new RunnerError("bad_request", `At most ${BROWSER_LIMITS.inputEvents} events at once`);
     }
     session.lastUsed = this.now();
+    const until = this.now() + DRAG_LAG_MAX_MS;
     const parsed = events.map((raw) => parseBrowserInputEvent(raw)).filter((e) => e !== null);
+    // Nothing queued reaches the page once the stream ended (the browser closed under it) or is back to watching:
+    // the person's control ended, and the server checks control only as it forwards a batch.
+    const driving = () => session.stream === stream && stream.mode === "control";
     const run = stream.inputQueue.then(async () => {
       let accepted = 0;
       let failed = 0;
       for (const e of parsed) {
-        // The stream ended (the browser closed under it): nothing is sent to a browser that isn't there.
-        if (session.stream !== stream) {
+        const wait = driving() ? dragDelay(e, stream.input, this.now(), until) : 0;
+        if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+        if (!driving()) {
           failed += 1;
           continue;
         }
@@ -2803,6 +2921,16 @@ export class BrowserManager {
     });
     stream.inputQueue = run.catch(() => undefined);
     return run;
+  }
+
+  /**
+   * The person's control ended (back to watching, or nobody watches): a button they still hold lets go where their
+   * pointer was, after the input queued before, so the agent doesn't go on with it held.
+   */
+  private letGo(stream: Stream) {
+    stream.inputQueue = stream.inputQueue.then(async () => {
+      for (const command of releaseHeld(stream.input)) await this.relay(stream.port, command);
+    });
   }
 
   /** One command on the daemon's relay (`POST /api/command` on the stream port); true when it ran. */

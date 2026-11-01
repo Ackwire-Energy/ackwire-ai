@@ -3,6 +3,7 @@ import type { AgentBrain, Credential, MachineAccount, PlanUsage } from "@agentes
 import { newAgentStart } from "@agenteschat/client/lib/agent-setup";
 import { accountTitle, ownSignInTitle } from "@agenteschat/client/lib/ai-accounts";
 import { planOf, planReplies } from "@agenteschat/client/lib/plans";
+import { markOf } from "@agenteschat/ui/brand/marks";
 import type { TFunction } from "i18next";
 import {
   accountInput,
@@ -505,7 +506,7 @@ describe("the agent's AI", () => {
         value: "deepseek-v4.1-flash",
         label: "DeepSeek V4.1 Flash",
         sub: "Econômico",
-        note: "Precisa da região Global no OpenCode",
+        note: "Precisa da região Global no OpenCode.",
         needs: "globalRegion",
         maker: "deepseek",
         checked: true,
@@ -533,6 +534,12 @@ describe("the agent's AI", () => {
       "OpenCode",
     ]);
     expect(sections[0]?.rows.map((r) => r.label)).toEqual(["Automático"]);
+    // Every maker beside its own mark, never a letter.
+    expect(sections.slice(1).filter((s) => !markOf(s.maker))).toEqual([]);
+    // A model that trains on what it's sent: its provider does, said behind the row's ⓘ.
+    expect(go.find((r) => r.value === "beam-free")?.note).toBe(
+      "Grátis. O provedor pode usar os pedidos para treinar o modelo. Ligue a permissão no OpenCode.",
+    );
     expect(sections.flatMap((s) => s.rows)).toEqual(go);
     expect(modelSections(modelRows(t, view("k3-256k"), planOf("kimi")))).toHaveLength(1);
     // On Claude's sign-in: its aliases; a plan's model kept from before runs Sonnet there.
@@ -633,7 +640,13 @@ describe("the agent's AI", () => {
     expect(screen).toMatch(/belowText: t\(`brain\.modelHow\.\$\{model\.needs\}`\)/);
     expect(screen).toContain("refused ? openConnectAi({ agentId, plan: refused }) : connect(current)");
     expect(screen).toContain('brain: ai === "key" ? r.label : thinksWith(t, ai, r.label),');
+    // What a model needs is behind the ⓘ at its row's end, not a line of the row.
+    expect(screen).toContain('hint: { name: t("common.about", { label: r.label }), text: r.note }');
+    expect(screen).not.toContain("belowText: r.note");
     const t = await translator("pt-BR");
+    expect(t("brain.modelHow.paidTraining")).toBe(
+      "O provedor deste modelo pode usar os pedidos para treiná-lo. No OpenCode, em Settings\u00a0›\u00a0Privacy, ligue a permissão para os modelos pagos. Sem ela, este modelo não responde.",
+    );
     expect(t("agentPage.work.brain.account")).toBe("Conta");
     expect(t("brain.modelHow.globalRegion")).toBe(
       "Ligue a região Global no OpenCode, em Settings\u00a0›\u00a0Privacy. Sem ela, este modelo não responde.",
@@ -653,7 +666,7 @@ describe("the agent's AI", () => {
     expect(screen).toContain("void save(modelInput(r.value, view), done);");
     expect(screen).toContain("modelSections(rows).map(");
     expect(screen).toContain("<GroupedHeader>{providerLabel(s.maker)}</GroupedHeader>");
-    expect(screen).toContain("belowText: r.note");
+    expect(screen).toContain('hint: { name: t("common.about", { label: r.label }), text: r.note }');
     const route = await Bun.file(new URL("../../app/(app)/agent-model/[id].tsx", import.meta.url).pathname).text();
     expect(route).toContain("<AgentModelScreen agentId={id");
   });

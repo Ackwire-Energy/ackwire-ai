@@ -133,7 +133,7 @@ export function actionTextValues(
       return { name: str(p.name) || a.target.title || "" };
     case "wiki.page_created":
     case "wiki.page_edited":
-      return { title };
+      return p.restricted ? { context: "restricted" } : { title };
     case "thread.renamed":
       return { from: str(p.from), to: str(p.to) || title };
     case "routine.deleted":

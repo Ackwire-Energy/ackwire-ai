@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { RunConsultation } from "../api/types";
+import { previewOf } from "./consultations";
 import { noticeOf } from "./notices";
 
 /**
@@ -12,13 +13,29 @@ import { noticeOf } from "./notices";
 
 /**
  * Where one question is, for its line. `waiting`: the consulted agent waits on a person; `offline`: for its
- * computer to come back (still out, paused, on no one); `handedOn`: its part done, it waits on agents it handed
- * some to.
+ * computer or its AI provider to come back (still out, paused, on no one); `handedOn`: its part done, it waits on
+ * agents it handed some to.
  */
 export type ConsultLineState = "working" | "waiting" | "offline" | "handedOn" | "answered" | "failed" | "expired";
 
-/** Reloads the list this often while a question is out (a consulted agent that stops waiting sends no event). */
-export const CONSULT_GROUP_POLL_MS = 20_000;
+/**
+ * Reloads the list this often while a question is out (a consulted agent that stops waiting sends no event), so the
+ * work handed off shows moving (`progress`).
+ */
+export const CONSULT_GROUP_POLL_MS = 10_000;
+
+/**
+ * What an open line shows of the work so far (ADR 0097): how many messages the consulted agent posted in the agents'
+ * DM and the start of the latest ("12 mensagens · Gerei a imagem 40"), or null. Answered lines show the answer.
+ */
+export function consultProgress(c: Pick<RunConsultation, "status" | "progress">) {
+  return c.status === "open" && c.progress && c.progress.posts > 0
+    ? {
+        key: "chat.consultGroup.posted" as const,
+        values: { count: c.progress.posts, latest: previewOf(c.progress.latest) },
+      }
+    : null;
+}
 
 /** An opened question reloads this often while it's out: its agents' DM sends the page no events. */
 export const CONSULT_CONVERSATION_POLL_MS = 4_000;
@@ -29,7 +46,7 @@ export function consultLineState(c: RunConsultation, now: number): ConsultLineSt
   if (c.status === "expired") return "expired";
   // Past its deadline the worker closes it within a minute: show it as it will be.
   if (Date.parse(c.expiresAt) < now) return "expired";
-  if (c.waiting === "computer") return "offline";
+  if (c.waiting === "computer" || c.waiting === "outage") return "offline";
   if (c.waiting === "agents") return "handedOn";
   return c.waiting ? "waiting" : "working";
 }
@@ -46,7 +63,9 @@ export function consultLineKey(state: ConsultLineState, c: Pick<RunConsultation,
         ? ("chat.consultGroup.waitingApproval" as const)
         : ("chat.consultGroup.waitingInput" as const);
     case "offline":
-      return "chat.consultGroup.waitingComputer" as const;
+      return c.waiting === "outage"
+        ? ("chat.consultGroup.waitingProvider" as const)
+        : ("chat.consultGroup.waitingComputer" as const);
     case "handedOn":
       return "chat.consultGroup.waitingAgents" as const;
     case "answered":

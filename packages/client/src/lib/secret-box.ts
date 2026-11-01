@@ -21,7 +21,8 @@ const b64 = (bytes: ArrayBuffer | Uint8Array) => {
 const unb64 = (text: string) => Uint8Array.from(atob(text), (ch) => ch.charCodeAt(0));
 
 export function secretAad(input: { requestId: string; orgId: string; name: string; target: SecretTarget }) {
-  const target = input.target.kind === "file" ? `file:${input.target.path}` : "env";
+  const t = input.target;
+  const target = t.kind === "file" ? `file:${t.path}` : t.kind === "site" ? `site:${t.site}` : "env";
   return `agentes-secret|v1|${input.requestId}|${input.orgId}|${input.name}|${target}`;
 }
 

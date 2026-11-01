@@ -12,6 +12,7 @@ import {
 } from "../../runner/brain-codex";
 import {
   approvalCalls,
+  CodexAppMapper,
   CodexAppServers,
   type CodexAppServersOptions,
   codexAppServerArgs,
@@ -377,7 +378,7 @@ test.skipIf(!posix)("a usage limit is limit + plan_limit, as exec's", async () =
   await turn.done;
   expect(notDeltas(turn.events)).toEqual([
     { type: "limit" },
-    { type: "error", code: "plan_limit", message: "You've hit your usage limit. Try again later." },
+    { type: "error", code: "plan_limit", message: "You've hit your usage limit. Try again later.", worked: false },
   ]);
 });
 
@@ -602,3 +603,15 @@ test.skipIf(!posix)(
   },
   20_000,
 );
+
+test("a refusal known by its words after a command says the turn worked", () => {
+  const m = new CodexAppMapper({ cwd: "" });
+  m.completed({ id: "c", type: "commandExecution", command: "git push", aggregatedOutput: "", status: "completed" });
+  const message = "Your workspace is out of credits.";
+  expect(m.end({ id: "t", status: "failed", error: { message } } as never, SESSION, []).at(-1)).toEqual({
+    type: "error",
+    code: "plan_limit",
+    message,
+    worked: true,
+  });
+});

@@ -4,8 +4,9 @@
  * A routine fires a background run of its agent (`agent_runs.background`) in the routine's own room:
  * a private, agent-only conversation (`routineRoomKey`) that no person reads. The run's trigger there
  * is the routine's brief: its instructions, written by its creator, with `meta.routineBrief` set by the
- * server. Nothing of it reaches the routine's conversation; only `hand_off` does (a `routine_handoff`
- * notice in `deliverTo`, which wakes the agent there), and the approval cards it asks for go there too.
+ * server. Nothing of it reaches the routine's conversation; only `hand_off` does (by default the agent's
+ * own message in `deliverTo`, tagged with the routine; with `wake_me`, a `routine_handoff` notice there that
+ * wakes the agent to act on it), and the approval cards it asks for go there too.
  *
  * Nobody is behind a routine's run (`authority.ts`): the creator set it up and stays accountable
  * (notifications, approvals), but the run never acts as them.
@@ -32,7 +33,7 @@ export interface RoutineBrief {
   name: string;
   /** Who set it up (accountable for it, never "behind" its run). Null when they were deleted. */
   creatorUserId: string | null;
-  /** The routine's conversation: where `hand_off` wakes the agent and where its approval cards go. */
+  /** The routine's conversation: where `hand_off` posts (or wakes the agent) and where its approval cards go. */
   deliverTo: { channelId: string; threadId: string | null };
   access: RoutineAccess;
   report: RoutineReport;

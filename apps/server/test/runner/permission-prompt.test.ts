@@ -461,3 +461,27 @@ test("every profile: secrets and normalized deny-list commands are refused at on
   });
   expect(s.calls).toHaveLength(1);
 });
+
+test("the agent's browser profile (its logins) is refused at once from its own folder; its mission's files are read", async () => {
+  const scope = { cwd: "/w/dev", folders: ["/w/dev"], home: "/Users/w" };
+  for (const call of [
+    bash("cat .agentes/browser/Default/Cookies"),
+    bash("sqlite3 /w/dev/.agentes/browser/Default/Cookies 'select * from cookies'"),
+    bash("cp -r .agentes/browser /tmp/b"),
+    { tool_name: "Read", input: { file_path: "/w/dev/.agentes/browser/Default/Login Data" } },
+    { tool_name: "Grep", input: { pattern: "sid", path: ".agentes/browser" } },
+  ]) {
+    const s = server([{ behavior: "allow" }]);
+    expect(await permissionPrompt(call, s.call, { ...instant, scope })).toMatchObject({ behavior: "deny" });
+    expect(s.calls).toHaveLength(0);
+  }
+  const notes = server([]);
+  expect(await permissionPrompt(bash("cat .agentes/notes.md"), notes.call, { ...instant, scope })).toEqual({
+    behavior: "allow",
+    updatedInput: { command: "cat .agentes/notes.md" },
+  });
+  // Claude Code's own rules refuse it too, also where a mission's settings allow `cat`.
+  const deny = claudePermissionSettings("work", ["Bash(cat *)"], undefined, { promptReads: true }).permissions.deny;
+  expect(deny.some((r) => ruleMatches(r, "Bash", { command: "cat .agentes/browser/Default/Cookies" }))).toBe(true);
+  expect(deny.some((r) => ruleMatches(r, "Bash", { command: "cat .agentes/notes.md" }))).toBe(false);
+});

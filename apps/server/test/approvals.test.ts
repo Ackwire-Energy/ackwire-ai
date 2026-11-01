@@ -73,3 +73,58 @@ test("approvals API: list, approve (resumes the run), and decisions are final", 
   const one = (await (await owner(`/api/app/organizations/${orgId}/approvals/${id}`)).json()) as { status: string };
   expect(one.status).toBe("approved");
 });
+
+test("approvals API: 'Aprovar tudo' decides exactly the ids sent and resumes the run once", async () => {
+  await t.close();
+  t = await createTestServer({
+    toolSources: [github],
+    reply: (req) => {
+      const last = JSON.stringify(req.messages.at(-1)?.content);
+      if (last.includes("merged")) return { chunks: ["Both merged."] };
+      const why = "CI passed and the review is done: merging ships the fix today.";
+      return {
+        chunks: [],
+        toolUses: [
+          { name: "github_merge_pr", input: { pr: 42, why } },
+          { name: "github_merge_pr", input: { pr: 43, why } },
+        ],
+      };
+    },
+  });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId, agentId } = await seedOrg(owner);
+  await grantScopes(t.db, orgId, agentId, [{ connectionId: null, scope: "github:pr.merge" }]);
+  await owner(`/api/app/organizations/${orgId}/channels/${channelId}/messages`, { json: { body: "@dev merge both" } });
+  await t.drain();
+  const list = (await (await owner(`/api/app/organizations/${orgId}/approvals?status=pending`)).json()) as {
+    approvals: { id: string; messageId: string }[];
+  };
+  expect(list.approvals).toHaveLength(2);
+  // One card for both.
+  expect(new Set(list.approvals.map((a) => a.messageId)).size).toBe(1);
+  // The card's requests by the card, wherever the org's list stops.
+  const cardId = list.approvals[0]?.messageId ?? "";
+  const onCard = (await (await owner(`/api/app/organizations/${orgId}/approvals?messageId=${cardId}`)).json()) as {
+    approvals: unknown[];
+  };
+  expect(onCard.approvals).toHaveLength(2);
+  const elsewhere = (await (
+    await owner(`/api/app/organizations/${orgId}/approvals?messageId=${crypto.randomUUID()}`)
+  ).json()) as { approvals: unknown[] };
+  expect(elsewhere.approvals).toHaveLength(0);
+  const ids = list.approvals.map((a) => a.id);
+  const res = await owner(`/api/app/organizations/${orgId}/approvals/decide`, {
+    json: { ids, decision: "approve" },
+  });
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { approvals: { status: string }[]; skipped: string[] };
+  expect(body.approvals.map((a) => a.status)).toEqual(["approved", "approved"]);
+  expect(body.skipped).toEqual([]);
+  await t.drain();
+  expect(merged.map((m) => m.pr).sort()).toEqual([42, 43]);
+  expect(
+    (await owner(`/api/app/organizations/${orgId}/approvals/decide`, { json: { ids: [], decision: "approve" } }))
+      .status,
+  ).toBe(400);
+});

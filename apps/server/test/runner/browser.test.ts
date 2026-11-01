@@ -15,6 +15,7 @@ import {
   type RunnerAccess,
   type RunnerFrame,
 } from "@agenteschat/adapters/machine-protocol";
+import { sealSecret, secretAad } from "@agenteschat/adapters/secret-box";
 import { browserErrorText, formatPlanReport, runPlan } from "@agenteschat/engine";
 import { type BrowserLink, type BrowserReply, browserSurface } from "../../../../packages/engine/src/browser/surface";
 import { reduceAccess, setTool, TOOL_NAMES, widens } from "../../runner/access";
@@ -31,8 +32,11 @@ import {
   chromeLaunchArgs,
   chromeUserAgent,
   crashPage,
+  DRAG_GAP_MAX_MS,
+  DRAG_LAG_MAX_MS,
   defaultMaxSessions,
   domainAllowed,
+  dragDelay,
   findChrome,
   type InputState,
   isWebPage,
@@ -44,6 +48,7 @@ import {
 } from "../../runner/browser";
 import { handleRequest, type RequestScope } from "../../runner/handlers";
 import { agentWorkspace } from "../../runner/paths";
+import { handleSecret, secretValue } from "../../runner/secrets";
 import { errorCode, removeDirs, tempDir, waitFor } from "./helpers";
 
 const dirs: string[] = [];
@@ -59,28 +64,72 @@ interface Logged {
   stdin: string;
 }
 
-/** A Chrome the fake "starts": records its command line, answers on a port, and quits when killed. */
+/**
+ * A Chrome the fake "starts": records its command line, answers on a port, and quits when killed or when it closes
+ * itself (`close`, what its DevTools' `Browser.close` does). What it finds in
+ * its profile as it starts follows Chrome's own rules, as measured on Chrome for Testing 155: the cookies of the
+ * sites' sessions (`session`) stay only with `--restore-last-session`, and with it the tabs it saved come back
+ * beside the page it starts on. The profile's `Default/cookies.json` and `Default/Sessions/tabs.json` stand for
+ * what Chrome keeps there.
+ */
 interface FakeChrome {
   exe: string;
   args: string[];
   profile: string;
   port: number;
+  /** Signaled while it ran. */
   killed: boolean;
+  /** It closed itself. */
+  closed: boolean;
+  close: () => void;
+  /** The cookies it started with, by name. */
+  cookies: string[];
+  /** The tabs it opened as it started. */
+  tabs: string[];
+}
+
+function chromeStartsWith(profile: string, args: string[]) {
+  const restore = args.includes("--restore-last-session");
+  const jar = path.join(profile, "Default", "cookies.json");
+  const all = existsSync(jar) ? (JSON.parse(readFileSync(jar, "utf8")) as { name: string; session?: boolean }[]) : [];
+  const kept = restore ? all : all.filter((c) => !c.session);
+  if (existsSync(jar)) writeFileSync(jar, JSON.stringify(kept));
+  const saved = path.join(profile, "Default", "Sessions", "tabs.json");
+  const restored = restore && existsSync(saved) ? (JSON.parse(readFileSync(saved, "utf8")) as string[]) : [];
+  return { cookies: kept.map((c) => c.name), tabs: [...restored, args.at(-1) ?? ""] };
 }
 
 function fakeChromes() {
   const started: FakeChrome[] = [];
   const start = async (exe: string, args: string[], profile: string): Promise<OwnChrome> => {
-    const c: FakeChrome = { exe, args, profile, port: 9300 + started.length, killed: false };
-    started.push(c);
     let quit = () => {};
+    let gone = false;
     const exited = new Promise<void>((resolve) => {
-      quit = () => resolve();
+      quit = () => {
+        gone = true;
+        resolve();
+      };
     });
+    const c: FakeChrome = {
+      exe,
+      args,
+      profile,
+      port: 9300 + started.length,
+      killed: false,
+      closed: false,
+      close: () => {
+        c.closed = true;
+        quit();
+      },
+      ...chromeStartsWith(profile, args),
+    };
+    started.push(c);
     return {
       pid: 40_000 + started.length,
       port: c.port,
+      // As `launchChrome`'s: a Chrome that is gone isn't signaled.
       kill: () => {
+        if (gone) return;
         c.killed = true;
         quit();
       },
@@ -108,7 +157,7 @@ function setup(over: Partial<BrowserManagerOptions> = {}, secrets: Record<string
       frames.push(f);
       return true;
     },
-    secret: async (_agent, name) => secrets[name] ?? null,
+    secret: async (_agent, name) => (name in secrets ? { value: secrets[name] as string, site: null } : null),
     command: [process.execPath, FAKE],
     chrome: () => "/fake/browsers/chrome-155.0.8059.84/chrome-linux64/chrome",
     userHome: home,
@@ -246,8 +295,8 @@ test("only Chrome for Testing is driven: the newest installed one, never the per
   expect(findChrome(home, "linux", shared)).toBe(newer);
   expect(chromeLabel(newer, home, shared)).toBe("Chrome for Testing");
   expect(chromeLabel(newer, home)).toBe("Google Chrome");
-  // On every launch: nothing updating Chrome's files, pages asked to hold still (`prefers-reduced-motion`), and no
-  // chip asking to sign in to Chrome itself.
+  // On every launch: nothing updating Chrome's files, pages asked to hold still (`prefers-reduced-motion`), no
+  // chip asking to sign in to Chrome itself, and the sites' sessions kept across its restarts.
   expect(CHROME_ARGS).toEqual([
     "--no-first-run",
     "--no-default-browser-check",
@@ -255,6 +304,7 @@ test("only Chrome for Testing is driven: the newest installed one, never the per
     "--disable-component-update",
     "--force-prefers-reduced-motion",
     "--disable-features=SigninPromoOnAvatarPill",
+    "--restore-last-session",
   ]);
 });
 
@@ -313,6 +363,7 @@ test("relay input: clicks as input_mouse, keys through press (chords), text inse
       x: 10,
       y: 20,
       button: "left",
+      buttons: 1,
       clickCount: 1,
       deltaX: 0,
       deltaY: 0,
@@ -343,6 +394,8 @@ test("relay input: clicks as input_mouse, keys through press (chords), text inse
   ]);
   const tap = relayCommands({ kind: "touch", type: "touchStart", touchPoints: [{ x: 1, y: 2 }] }, state);
   expect(tap.map((c) => [c.type, c.x, c.y, c.button])).toEqual([
+    // The press above never got its release: it lets go where it was first.
+    ["mouseReleased", 10, 20, "left"],
     ["mouseMoved", 1, 2, "none"],
     ["mousePressed", 1, 2, "left"],
   ]);
@@ -350,6 +403,71 @@ test("relay input: clicks as input_mouse, keys through press (chords), text inse
   expect(relayCommands({ kind: "touch", type: "touchEnd", touchPoints: [] }, state)).toMatchObject([
     { action: "input_mouse", type: "mouseReleased", x: 1, y: 2, button: "left" },
   ]);
+});
+
+test("relay input: every move between a press and its release says the button is down, a finger's too", () => {
+  const state: InputState = { held: new Set() };
+  const buttons = (e: Parameters<typeof relayCommands>[0]) => relayCommands(e, state).map((c) => c.buttons);
+  expect(buttons({ kind: "mouse", type: "mouseMoved", x: 1, y: 1 })).toEqual([0]);
+  expect(buttons({ kind: "mouse", type: "mousePressed", x: 1, y: 1, button: "left" })).toEqual([1]);
+  expect(buttons({ kind: "mouse", type: "mouseMoved", x: 5, y: 1, button: "left" })).toEqual([1]);
+  // A move that names no button (an older app) still drags while the press holds.
+  expect(buttons({ kind: "mouse", type: "mouseMoved", x: 9, y: 1 })).toEqual([1]);
+  expect(buttons({ kind: "mouse", type: "mouseReleased", x: 9, y: 1, button: "left" })).toEqual([0]);
+  expect(buttons({ kind: "mouse", type: "mouseMoved", x: 12, y: 1 })).toEqual([0]);
+  expect(buttons({ kind: "touch", type: "touchStart", touchPoints: [{ x: 1, y: 1 }] })).toEqual([0, 1]);
+  expect(buttons({ kind: "touch", type: "touchMove", touchPoints: [{ x: 9, y: 1 }] })).toEqual([1]);
+  expect(buttons({ kind: "touch", type: "touchEnd", touchPoints: [] })).toEqual([0]);
+});
+
+test("relay input: a press whose release was lost lets go where it was, before the next click", () => {
+  const state: InputState = { held: new Set() };
+  const sent = (e: Parameters<typeof relayCommands>[0]) =>
+    relayCommands(e, state).map((c) => [c.type, c.x, c.button, c.buttons]);
+  sent({ kind: "mouse", type: "mousePressed", x: 10, y: 10, button: "left" });
+  sent({ kind: "mouse", type: "mouseMoved", x: 60, y: 10, button: "left" });
+  // The release never came. The next click doesn't drag from there to its own point.
+  expect(sent({ kind: "mouse", type: "mouseMoved", x: 300, y: 200, button: "none" })).toEqual([
+    ["mouseReleased", 60, "left", 0],
+    ["mouseMoved", 300, "none", 0],
+  ]);
+  expect(sent({ kind: "mouse", type: "mousePressed", x: 300, y: 200, button: "left" })).toEqual([
+    ["mousePressed", 300, "left", 1],
+  ]);
+  // Pressed again while still down (its release lost too): it lets go first.
+  expect(sent({ kind: "mouse", type: "mousePressed", x: 400, y: 200, button: "left" })).toEqual([
+    ["mouseReleased", 300, "left", 0],
+    ["mousePressed", 400, "left", 1],
+  ]);
+});
+
+test("a drag keeps the gaps the person made, each at most 100 ms; a click and the hovering pointer go at once", () => {
+  const state: InputState = { held: new Set() };
+  const mouse = (type: "mouseMoved" | "mousePressed" | "mouseReleased", at?: number, button?: "left") =>
+    ({ kind: "mouse", type, x: 1, y: 1, ...(button ? { button } : {}), ...(at === undefined ? {} : { at }) }) as const;
+  expect(dragDelay(mouse("mouseMoved", 0), state, 1000)).toBe(0);
+  expect(dragDelay(mouse("mousePressed", 0, "left"), state, 1000)).toBe(0);
+  // The drag's moves came in one batch: each waits its own gap after the one before it went.
+  expect(dragDelay(mouse("mouseMoved", 40, "left"), state, 1001)).toBe(39);
+  expect(dragDelay(mouse("mouseMoved", 80, "left"), state, 1040)).toBe(40);
+  // A two second pause plays as 100 ms; a move that came late goes at once.
+  expect(DRAG_GAP_MAX_MS).toBe(100);
+  expect(dragDelay(mouse("mouseMoved", 2080, "left"), state, 1080)).toBe(100);
+  expect(dragDelay(mouse("mouseMoved", 2100, "left"), state, 1500)).toBe(0);
+  expect(dragDelay(mouse("mouseReleased", 2110, "left"), state, 1500)).toBe(10);
+  // After the release the pointer only hovers; a click's events all say the same time.
+  expect(dragDelay(mouse("mouseMoved", 2400), state, 1501)).toBe(0);
+  expect(dragDelay(mouse("mousePressed", 2500, "left"), state, 1600)).toBe(0);
+  expect(dragDelay(mouse("mouseReleased", 2500, "left"), state, 1601)).toBe(0);
+  // A sender that says nothing of time (an older app) goes at once.
+  expect(dragDelay(mouse("mousePressed", undefined, "left"), state, 1700)).toBe(0);
+  expect(dragDelay(mouse("mouseMoved", 3000, "left"), state, 1700)).toBe(0);
+  // Never past `until`, and what was cut stays cut: the next gap counts from when its event really went.
+  expect(dragDelay(mouse("mousePressed", 0, "left"), state, 2000, 2150)).toBe(0);
+  expect(dragDelay(mouse("mouseMoved", 100, "left"), state, 2000, 2150)).toBe(100);
+  expect(dragDelay(mouse("mouseMoved", 200, "left"), state, 2100, 2150)).toBe(50);
+  expect(dragDelay(mouse("mouseMoved", 300, "left"), state, 2150, 2150)).toBe(0);
+  expect(dragDelay(mouse("mouseMoved", 400, "left"), state, 2160)).toBe(90);
 });
 
 // ── Commands ─────────────────────────────────────────────────────────────────
@@ -553,6 +671,8 @@ test.if(posix)("a fixed CDP port accepts only its owned listener and ignores a s
  */
 function fakeDevtools(down: number[], answer: (reply: () => void) => void = (reply) => reply()) {
   const asked: string[] = [];
+  /** `Browser.close` on connection `n` (`chromesAt` closes that Chrome). */
+  const closing = { on: (_n: number) => {} };
   const navigated: string[] = [];
   const sockets: { send(data: string): unknown }[] = [];
   let connections = 0;
@@ -597,18 +717,22 @@ function fakeDevtools(down: number[], answer: (reply: () => void) => void = (rep
         } else if (msg.method === "Page.navigate") {
           navigated.push(msg.params?.url ?? "");
           result({ frameId: "main" });
+        } else if (msg.method === "Browser.close") {
+          result({});
+          closing.on(n);
         }
       },
     },
   });
   const crash = (n: number) =>
     sockets[n]?.send(JSON.stringify({ method: "Inspector.targetCrashed", params: {}, sessionId: `page-${n}` }));
-  return { port: server.port as number, asked, navigated, crash, stop: () => server.stop(true) };
+  return { port: server.port as number, asked, navigated, crash, closing, stop: () => server.stop(true) };
 }
 
-/** Fake Chromes whose endpoint is `devtools`. */
-function chromesAt(devtools: { port: number }) {
+/** Fake Chromes whose endpoint is `devtools`, one connection each: `Browser.close` on it closes that Chrome. */
+function chromesAt(devtools: { port: number; closing: { on: (n: number) => void } }) {
   const chromes = fakeChromes();
+  devtools.closing.on = (n) => chromes.started[n]?.close();
   const start = async (exe: string, args: string[], profile: string): Promise<OwnChrome> => ({
     ...(await chromes.start(exe, args, profile)),
     port: devtools.port,
@@ -666,11 +790,11 @@ test.if(posix)("takeTraffic: what each Chrome moved, across a restart and after 
     await t.manager.stop(dev);
     await t.act("open", ["https://a.example/again"]);
     await counted(1);
-    expect(chromes.started.map((c) => c.killed)).toEqual([true, false]);
+    expect(chromes.started.map((c) => c.closed)).toEqual([true, false]);
     expect(t.manager.takeTraffic()).toEqual({ up: 2 * SENT, down: 1500 });
     expect(t.manager.takeTraffic()).toEqual({ up: 0, down: 0 });
     await t.manager.close();
-    expect(chromes.started.map((c) => c.killed)).toEqual([true, true]);
+    expect(chromes.started.map((c) => c.closed)).toEqual([true, true]);
     expect(t.manager.takeTraffic()).toEqual({ up: 0, down: 0 });
   } finally {
     devtools.stop();
@@ -1092,6 +1216,65 @@ test.if(posix)("a secret is typed through stdin into a password field only, and 
   expect(t.logged().filter((c) => c.args.includes("batch")).length).toBe(typedBefore);
 });
 
+test.if(posix)(
+  "a site's password: out of every command's environment, typed only by the browser and only on its site",
+  async () => {
+    const secretsDir = path.join(tempDir("secrets-"), "secrets");
+    dirs.push(path.dirname(secretsDir));
+    const t = setup({ secret: (agent, name) => secretValue(secretsDir, agent, name) });
+    const value = "hunter2-signed-in-for-real";
+    // Delivered as the server does: sealed to the computer's key, bound to its site, then activated.
+    const requestId = "req-site-0001";
+    const target = { kind: "site" as const, site: "https://shop.example.com" };
+    const keypair = await handleSecret(secretsDir, dev, t.ws, { action: "keypair", requestId });
+    expect(keypair.sites).toBe(true);
+    const aad = secretAad({ requestId, orgId: "org-1", name: "SHOP_PASSWORD", target });
+    const box = await sealSecret(keypair.publicKey ?? "", value, aad);
+    await handleSecret(secretsDir, dev, t.ws, {
+      action: "deliver",
+      requestId,
+      name: "SHOP_PASSWORD",
+      target,
+      aad,
+      box,
+    });
+    await handleSecret(secretsDir, dev, t.ws, {
+      action: "activate",
+      requestId,
+      order: `2026-10-31T12:00:00.000Z|${requestId}`,
+    });
+
+    // The agent's commands never see it, by name or in their whole environment.
+    const ctx = { workspaceReal: t.ws, exec: true, token: "agm_x", secretsDir };
+    const scope: RequestScope = { signal: new AbortController().signal, output: () => {} };
+    const ran = (await handleRequest(
+      ctx,
+      { agent: dev, op: "exec", command: 'echo "[$SHOP_PASSWORD]"; env', timeoutSeconds: 10, stream: false },
+      scope,
+    )) as { stdout: string };
+    expect(ran.stdout.split("\n")[0]).toBe("[]");
+    expect(ran.stdout).not.toContain(value);
+    expect(ran.stdout).not.toContain("SHOP_PASSWORD");
+
+    // The browser types it on its site.
+    await t.act("open", ["https://shop.example.com/login"]);
+    t.page({ attrs: { "@e4": { type: "password" } } });
+    expect(await t.act("agentes:type_secret", ["e4", "SHOP_PASSWORD", "https://shop.example.com"])).toEqual({
+      success: true,
+      data: { typed: "SHOP_PASSWORD", into: "@e4" },
+    });
+    const batch = t.logged().find((c) => c.args.includes("batch"));
+    expect(JSON.parse(batch?.stdin ?? "[]")).toEqual([["fill", "@e4", value]]);
+    // A request naming another site never gets it, even with the page there: the person sealed it to this one.
+    await t.act("open", ["https://bank.example/login"]);
+    expect(await t.act("agentes:type_secret", ["e4", "SHOP_PASSWORD", "https://bank.example"])).toMatchObject({
+      success: false,
+      error: expect.stringContaining("only for shop.example.com"),
+    });
+    expect(t.logged().filter((c) => c.args.includes("batch"))).toHaveLength(1);
+  },
+);
+
 test.if(posix)("stop closes the agent's browser and its Chrome; a second stop finds nothing", async () => {
   const t = setup();
   await t.act("open", ["https://a.example"]);
@@ -1123,6 +1306,61 @@ test.if(posix)("an idle browser's Chrome stops, but not while someone watches or
   await t.manager.sweep();
   expect(t.chromes[1]?.killed).toBe(true);
 });
+
+test.if(posix)(
+  "a site's session (kept only until the browser closes) outlives an idle stop, and the last tabs don't come back",
+  async () => {
+    let now = 1_000_000;
+    const t = setup({ now: () => now, idleMs: 60_000 });
+    await t.act("open", ["https://shop.example.com/login"]);
+    const profile = t.chromes[0]?.profile ?? "";
+    // Signed in without "remember me": a session cookie. Chrome saved its tabs meanwhile too.
+    mkdirSync(path.join(profile, "Default", "Sessions"), { recursive: true });
+    writeFileSync(
+      path.join(profile, "Default", "cookies.json"),
+      JSON.stringify([{ name: "shop_session", session: true }, { name: "shop_prefs" }]),
+    );
+    writeFileSync(
+      path.join(profile, "Default", "Sessions", "tabs.json"),
+      JSON.stringify(["https://shop.example.com/cart", "https://shop.example.com/orders"]),
+    );
+    now += 61_000;
+    await t.manager.sweep();
+    expect(t.chromes[0]?.killed).toBe(true);
+
+    await t.act("open", ["https://shop.example.com/orders"]);
+    expect(t.chromes).toHaveLength(2);
+    expect(t.chromes[1]?.profile).toBe(profile);
+    expect(t.chromes[1]?.cookies).toEqual(["shop_session", "shop_prefs"]);
+    // One page, as before: the agent's command goes on it.
+    expect(t.chromes[1]?.tabs).toEqual(["about:blank"]);
+  },
+);
+
+test.if(posix)(
+  "a stop asks Chrome to close itself first, so its last cookies reach the profile; one that stays is killed",
+  async () => {
+    const devtools = fakeDevtools([]);
+    try {
+      const chromes = chromesAt(devtools);
+      const t = setup({ startChrome: chromes.start });
+      await t.act("open", ["https://shop.example.com/"]);
+      await t.manager.stop(dev);
+      expect(devtools.asked).toContain("Browser.close");
+      expect(chromes.started[0]).toMatchObject({ closed: true, killed: false });
+
+      // A Chrome that doesn't close (hung) is signaled after a while.
+      devtools.closing.on = () => {};
+      await t.act("open", ["https://shop.example.com/again"]);
+      const at = Date.now();
+      await t.manager.stop(dev);
+      expect(chromes.started[1]).toMatchObject({ closed: false, killed: true });
+      expect(Date.now() - at).toBeGreaterThanOrEqual(1900);
+    } finally {
+      devtools.stop();
+    }
+  },
+);
 
 test.if(posix)(
   "the runner stopping stops its Chromes; one a crashed run left is stopped on the next start",
@@ -1569,7 +1807,14 @@ test.if(posix)("a stream that closes on the machine says so; one dropped with th
 
 /** agent-browser's command relay on the stream port: records each command and answers like the daemon. */
 function fakeRelay(answer: (body: Record<string, unknown>) => Record<string, unknown> = () => ({ success: true })) {
-  const received: { body: Record<string, unknown>; origin: string | null; type: string | null; path: string }[] = [];
+  const received: {
+    body: Record<string, unknown>;
+    origin: string | null;
+    type: string | null;
+    path: string;
+    /** When it reached the page (ms). */
+    at: number;
+  }[] = [];
   const server = Bun.serve({
     port: 0,
     hostname: "127.0.0.1",
@@ -1577,6 +1822,7 @@ function fakeRelay(answer: (body: Record<string, unknown>) => Record<string, unk
       const body = (await req.json()) as Record<string, unknown>;
       received.push({
         body,
+        at: performance.now(),
         origin: req.headers.get("origin"),
         type: req.headers.get("content-type"),
         path: new URL(req.url).pathname,
@@ -1633,6 +1879,113 @@ test.if(posix)("a person's input goes through the daemon's command relay, in ord
       t.manager.input(dev, [{ kind: "mouse", type: "mouseReleased", x: 1, y: 1 }]),
     ]);
     expect(relay.received.map((r) => r.body.type)).toEqual(["mousePressed", "mouseReleased"]);
+  } finally {
+    relay.server.stop(true);
+  }
+});
+
+test.if(posix)("a drag in one batch reaches the page in order, its button held, with its gaps", async () => {
+  const t = setup();
+  const relay = fakeRelay();
+  try {
+    await t.act("open", ["https://shop.example.com"]);
+    t.page({ port: relay.port });
+    await t.manager.streamStart(dev, "control");
+    // A slider dragged right over 120 ms, its events bunched by a slow link.
+    const res = await t.manager.input(dev, [
+      { kind: "mouse", type: "mouseMoved", x: 10, y: 50, button: "none", at: 5000 },
+      { kind: "mouse", type: "mousePressed", x: 10, y: 50, button: "left", clickCount: 1, at: 5000 },
+      { kind: "mouse", type: "mouseMoved", x: 60, y: 50, button: "left", at: 5060 },
+      { kind: "mouse", type: "mouseMoved", x: 110, y: 50, button: "left", at: 5120 },
+      { kind: "mouse", type: "mouseReleased", x: 110, y: 50, button: "left", clickCount: 1, at: 5120 },
+    ]);
+    expect(res).toEqual({ accepted: 5 });
+    // Every move between the press and the release says the left button is down.
+    const sent = relay.received.map((r) => [r.body.type, r.body.x, r.body.button, r.body.buttons, r.body.clickCount]);
+    expect(sent).toEqual([
+      ["mouseMoved", 10, "none", 0, 0],
+      ["mousePressed", 10, "left", 1, 1],
+      ["mouseMoved", 60, "left", 1, 0],
+      ["mouseMoved", 110, "left", 1, 0],
+      ["mouseReleased", 110, "left", 0, 1],
+    ]);
+    const at = relay.received.map((r) => r.at);
+    const gap = (i: number) => (at[i] ?? 0) - (at[i - 1] ?? 0);
+    // Each move 60 ms after the one before it (a little less for the timer's rounding), not all at once.
+    expect(gap(2)).toBeGreaterThan(50);
+    expect(gap(3)).toBeGreaterThan(50);
+  } finally {
+    relay.server.stop(true);
+  }
+});
+
+test.if(posix)("a drag's gaps hold input a second at most, and none reaches the page once control ends", async () => {
+  const t = setup();
+  const relay = fakeRelay();
+  try {
+    await t.act("open", ["https://shop.example.com"]);
+    t.page({ port: relay.port });
+    await t.manager.streamStart(dev, "control");
+    // Moves 100 ms apart by the `at` their sender wrote: as written, one batch would hold the queue 5 s.
+    const drag = (x: number) => [
+      { kind: "mouse", type: "mousePressed", x, y: 1, button: "left", clickCount: 1, at: 0 },
+      ...Array.from({ length: 50 }, (_, i) => ({
+        kind: "mouse",
+        type: "mouseMoved",
+        x: x + i + 1,
+        y: 1,
+        button: "left",
+        at: (i + 1) * 100,
+      })),
+      { kind: "mouse", type: "mouseReleased", x: x + 50, y: 1, button: "left", clickCount: 1, at: 5000 },
+    ];
+    const start = performance.now();
+    expect(await t.manager.input(dev, drag(0))).toEqual({ accepted: 52 });
+    expect(performance.now() - start).toBeLessThan(DRAG_LAG_MAX_MS * 2.5);
+    // Handed back mid-drag: the rest is dropped at once, and the page lets go where the pointer was.
+    relay.received.length = 0;
+    const queued = t.manager.input(dev, drag(100));
+    await waitFor(() => relay.received.length === 3);
+    const back = performance.now();
+    await t.manager.streamStart(dev, "watch");
+    expect(await queued).toEqual({ accepted: 3, failed: 49 });
+    expect(performance.now() - back).toBeLessThan(500);
+    await waitFor(() => relay.received.length === 4);
+    expect(relay.received.map((r) => [r.body.type, r.body.x, r.body.buttons])).toEqual([
+      ["mousePressed", 100, 1],
+      ["mouseMoved", 101, 1],
+      ["mouseMoved", 102, 1],
+      ["mouseReleased", 102, 0],
+    ]);
+  } finally {
+    relay.server.stop(true);
+  }
+});
+
+test.if(posix)("a button still down when control ends lets go where the pointer was", async () => {
+  const t = setup();
+  const relay = fakeRelay();
+  const sent = () => relay.received.map((r) => [r.body.type, r.body.x, r.body.y, r.body.buttons]);
+  const press = (x: number) => [{ kind: "mouse", type: "mousePressed", x, y: 8, button: "left", clickCount: 1 }];
+  try {
+    await t.act("open", ["https://shop.example.com"]);
+    t.page({ port: relay.port });
+    await t.manager.streamStart(dev, "control");
+    // Handed back mid-press.
+    await t.manager.input(dev, press(7));
+    await t.manager.streamStart(dev, "watch");
+    await waitFor(() => relay.received.length === 2);
+    // Nobody watches any more mid-press.
+    await t.manager.streamStart(dev, "control");
+    await t.manager.input(dev, press(9));
+    await t.manager.streamStop(dev);
+    await waitFor(() => relay.received.length === 4);
+    expect(sent()).toEqual([
+      ["mousePressed", 7, 8, 1],
+      ["mouseReleased", 7, 8, 0],
+      ["mousePressed", 9, 8, 1],
+      ["mouseReleased", 9, 8, 0],
+    ]);
   } finally {
     relay.server.stop(true);
   }
