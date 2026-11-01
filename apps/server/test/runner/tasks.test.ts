@@ -735,6 +735,11 @@ test.skipIf(!posix)(
     expect(done(id(47))?.result).toStartWith(
       "Codex has no sign-in for this agent on this computer (the agent has no ChatGPT account here)",
     );
+
+    // A 401 from some API a command called is the task's own failure, not Codex's sign-in.
+    await tasks.start(AGENT, { taskId: id(51), executor: "codex", prompt: "CURL401", account: FOLDER_ACCOUNT });
+    await waitFor(() => Boolean(done(id(51))), 8000);
+    expect(done(id(51))?.result).toBe("curl said 401 Unauthorized");
   },
   20_000,
 );
@@ -755,6 +760,7 @@ test.skipIf(!posix)(
     tasks.keepAccount(null);
     await waitFor(() => Boolean(done(id(48))), 8000);
     expect(done(id(48))).toMatchObject({ canceled: true });
+    expect(done(id(48))?.lastLine).toBe("Stopped: this agent's AI account changed. Start it again to use the new one.");
     expect(done(id(49))).toBeUndefined();
     tasks.cancel(AGENT, id(49));
     await waitFor(() => Boolean(done(id(49))), 8000);
@@ -787,6 +793,34 @@ test.skipIf(!posix)(
     // Claude Code refused the session flag, which the runner would otherwise retry with the other one.
     expect(done(id(50))?.result).toContain("No conversation found");
     expect(cli.claudeRuns()).toHaveLength(1);
+  },
+  20_000,
+);
+
+test.skipIf(!posix)(
+  "a runner restarted mid-task never lets out a coding plan's key it can no longer hide",
+  async () => {
+    const { make, home, send, done, frames } = setup();
+    const cli = fakeClis(home);
+    const first = make(cli.options);
+    await first.init();
+    first.attach(send);
+    const KEY = "zai-fake-key-for-tests-only";
+    await first.start(
+      AGENT,
+      { taskId: id(52), executor: "claude", prompt: "SLOWKEY ECHOKEY", account: ROOTS_ACCOUNT },
+      undefined,
+      { kind: "key", provider: "zai", key: KEY },
+    );
+    // Root kept the key: the next runner only has the journal, so it can't hide it and stops the task.
+    first.close();
+    const again = make(cli.options);
+    await again.init();
+    again.attach(send);
+    await waitFor(() => Boolean(done(id(52))), 8000);
+    expect(done(id(52))).toMatchObject({ canceled: true });
+    expect(done(id(52))?.result).toStartWith("Stopped: the runner restarted");
+    expect(JSON.stringify(frames)).not.toContain(KEY);
   },
   20_000,
 );

@@ -5,7 +5,7 @@
 // prints Codex's `--json` events. "SLOW_ROUTE" never answers.
 // `exec` without `--output-schema` is a background task (`task.start`): signed in only with a key or a
 // sign-in in $CODEX_HOME (an `auth.json` there), it answers in `-o` and its events; otherwise its turn fails
-// "Not logged in" (exit 1).
+// "Not logged in" (exit 1). "CURL401" ends at once on a command's "401 Unauthorized" (exit 1).
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
@@ -43,6 +43,13 @@ if (args[0] === "exec" && flag("--output-schema") === undefined) {
   const home = process.env.CODEX_HOME ?? path.join(process.env.HOME ?? "/nonexistent", ".codex");
   if (!process.env.OPENAI_API_KEY && !existsSync(path.join(home, "auth.json"))) {
     event({ type: "turn.failed", error: { message: "Not logged in" } });
+    process.exit(1);
+  }
+  if (prompt.includes("CURL401")) {
+    event({
+      type: "item.completed",
+      item: { id: "item_0", type: "agent_message", text: "curl said 401 Unauthorized" },
+    });
     process.exit(1);
   }
   writeFileSync(flag("-o"), `done: ${prompt.trim()}`);

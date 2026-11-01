@@ -21,7 +21,7 @@
 // Without `--input-format` it is a background task (`task.start`): the prompt as plain text on stdin, one
 // result, then it exits. Like Claude Code, it is signed in only with a token, a key, or a sign-in in its
 // config folder ($CLAUDE_CONFIG_DIR, else ~/.claude: a `.credentials.json` there); otherwise its result is
-// "Not logged in · Please run /login" (exit 1). "SLOWTASK" takes 30 s, "ECHOKEY" answers with
+// "Not logged in · Please run /login" (exit 1). "SLOWTASK" takes 30 s, "SLOWKEY" 3 s, "ECHOKEY" answers with
 // $ANTHROPIC_AUTH_TOKEN, "NOSESSION" refuses its session flag after 1.5 s (exit 1).
 import { appendFileSync, closeSync, existsSync, readFileSync, readSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -89,6 +89,7 @@ async function task() {
     process.exit(1);
   }
   if (prompt.includes("SLOWTASK")) await new Promise((resolve) => setTimeout(resolve, 30_000));
+  if (prompt.includes("SLOWKEY")) await new Promise((resolve) => setTimeout(resolve, 3000));
   if (prompt.includes("NOSESSION")) {
     await new Promise((resolve) => setTimeout(resolve, 1500));
     say({ type: "result", subtype: "error_during_execution", is_error: true, result: `No conversation found: ${id}` });

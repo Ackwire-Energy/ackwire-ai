@@ -51,7 +51,7 @@ import {
   withSignIn,
   yieldRoute,
 } from "./accounts";
-import { CODEX_AUTH, codexThreadKey } from "./brain-codex";
+import { codexThreadKey } from "./brain-codex";
 import { commandApproval, ownBranches } from "./command-gate";
 import { RunnerError } from "./errors";
 import { shellCommand } from "./exec";
@@ -183,6 +183,10 @@ interface Entry {
   startSha?: string;
   /** Protocol 31: the agent's account its CLI signs in with (absent: the computer's own sign-in). */
   account?: string;
+  /** Its env holds that account's coding plan key, which its redaction must hide (never the key itself). */
+  planKey?: boolean;
+  /** Why the runner canceled it: what its agent reads first in the result. */
+  canceledWhy?: string;
 }
 
 interface Journal {
@@ -422,7 +426,12 @@ export const WRONG_SESSION_FLAG = /already in use|no conversation found|session 
 export const FAST_FAIL_SECONDS = 30;
 
 /** What a coding CLI says when it has nothing to sign in with (Claude Code: "Not logged in · Please run /login"). */
-const NOT_SIGNED_IN = { claude: /not logged in|please run \/login/i, codex: CODEX_AUTH } as const;
+const NOT_SIGNED_IN = {
+  claude: /not logged in|please run \/login/i,
+  // Not `CODEX_AUTH`'s "401 unauthorized": a command the task ran can print that about some other API.
+  codex:
+    /not logged in|codex login|refresh token (?:was )?(?:expired|revoked|already used)|access token could not be refreshed/i,
+} as const;
 
 /**
  * A Claude Code or Codex task that ended at once because its CLI had nothing to sign in with: what its agent reads
@@ -834,10 +843,28 @@ export class TaskManager {
       }
     }
     for (const t of this.journal.tasks) {
-      if (t.status === "running") await this.watch(t, true);
+      if (t.status === "running") await this.watch(t, true, await this.reattachRedact(t));
     }
     this.save();
     this.updateCaffeinate();
+  }
+
+  /**
+   * After a restart, the redaction of a task whose env holds a coding plan's key: the key read again from the
+   * account's folder, else (root kept it) the task is canceled and nothing it says leaves the computer.
+   */
+  private async reattachRedact(t: Entry): Promise<((text: string) => string) | undefined> {
+    if (!t.planKey || !t.account) return undefined;
+    const kind: AccountKind = t.executor === "codex" ? "codex" : "claude_code";
+    const signIn = await accountSignIn(this.opts.accounts, kind, t.account).catch(() => "missing" as const);
+    if (typeof signIn === "object" && signIn.planKey) {
+      const secrets = await this.opts.secrets?.({ id: t.agentId, handle: t.agentHandle }).catch(() => null);
+      return withSignIn(secrets, signIn)?.redact;
+    }
+    t.canceledWhy =
+      "Stopped: the runner restarted and could no longer hide this account's key from what the task says. Start it again.";
+    this.cancel(undefined, t.taskId);
+    return () => "";
   }
 
   /** For `hello`: every task the server may not know the end of. */
@@ -923,8 +950,10 @@ export class TaskManager {
    */
   keepAccount(account: string | null) {
     for (const t of this.journal.tasks) {
-      if (t.status === "running" && t.account && t.account !== account && !t.canceling)
+      if (t.status === "running" && t.account && t.account !== account && !t.canceling) {
+        t.canceledWhy = "Stopped: this agent's AI account changed. Start it again to use the new one.";
         this.cancel(undefined, t.taskId);
+      }
     }
   }
 
@@ -1274,6 +1303,7 @@ export class TaskManager {
       ...(mcpToken && isRunToolToken(req.mission?.mcpToken) ? { serverToken: req.mission.mcpToken } : {}),
       ...(commitMessage && startSha ? { commit: commitMessage, startSha } : {}),
       ...(signIn ? { account: signIn.account } : {}),
+      ...(plan && signIn?.planKey ? { planKey: true } : {}),
       status: "running",
       pid,
       startedAt: new Date(this.now()).toISOString(),
@@ -1481,8 +1511,8 @@ export class TaskManager {
         w.denials.push({ tool: d.tool, command });
       }
     }
-    if (parsed.line) {
-      const line = w.redact(parsed.line).slice(0, TASK_LIMITS.line);
+    const line = parsed.line ? w.redact(parsed.line).slice(0, TASK_LIMITS.line) : "";
+    if (line) {
       w.pendingLine = line;
       t.lastLine = line;
       w.tail.push(line);
@@ -1652,10 +1682,12 @@ export class TaskManager {
     const note = commit?.error ? `\n\nThe changes were not committed: ${commit.error}`.slice(0, 600) : "";
     const said = w.result ?? codexLast ?? w.tail.join("\n");
     const noSignIn = noSignInResult(t, exit, seconds, said);
-    if (noSignIn) t.lastLine = noSignIn.slice(0, TASK_LIMITS.line);
+    const why = canceled ? t.canceledWhy : undefined;
+    if (noSignIn || why) t.lastLine = (why ?? noSignIn ?? "").slice(0, TASK_LIMITS.line);
     const text = noSignIn ?? said;
-    const result = w
-      .redact(note ? `${text.slice(0, TASK_LIMITS.result - note.length)}${note}`.trim() : text)
+    const result = [why, w.redact(note ? `${text.slice(0, TASK_LIMITS.result - note.length)}${note}`.trim() : text)]
+      .filter(Boolean)
+      .join("\n\n")
       .slice(0, TASK_LIMITS.result);
     t.status = interrupted ? "interrupted" : "done";
     t.endedAt = endedAt;

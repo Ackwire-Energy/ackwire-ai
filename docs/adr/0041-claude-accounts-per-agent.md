@@ -86,7 +86,8 @@ Background tasks (`start_task`, mission items, resumes) ran their Claude Code or
 
   The refused start stays as a failed task saying why. A mission's queued item refused this way fails as any refused start does, and the mission hears it.
 - **Still not signed in.** A CLI that finds nothing to sign in with anyway (the computer's own sign-in expired, an account refused) ends at once with "Not logged in". The runner puts what the agent can do in the task's result and last line instead: its owner signs in again or connects an account, and meanwhile the agent does the work in its own turn.
-- **Known gaps.** After a runner restart mid-task, a coding plan's key in the task's environment is no longer hidden from what the task says (the restarted runner doesn't have it), and a task on an account isn't retried with the other session flag (that needs the account's sign-in again, which the runner never stores); it ends as it ended.
+- **After a runner restart.** A task whose environment holds a coding plan's key (the journal says so, never the key) is watched with the key read again from the account's folder. When root kept the key, the restarted runner can't have it: it cancels the task, sends nothing the task says, and the agent reads why. A task on an account isn't retried with the other session flag (that needs the account's sign-in again, which the runner never stores); it ends as it ended.
+- **Canceled for an account change.** A task canceled because its agent switched or removed the account says so first in its result and last line, so the agent knows to start it again.
 
 ### 6. No automatic rotation
 
