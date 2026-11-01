@@ -283,7 +283,10 @@ export function createRealtime(deps: RealtimeDeps) {
       // Wrapped: a bare promise returned here would hold the line until the computer answers.
       return { sent: live.input(user.id, orgId, agentId, frame.events) };
     });
-    const settled = entered.catch(() => null);
+    const settled = entered.catch(() => {
+      if (ws.readyState === 1) send(ws, { type: "browser.unavailable", agentId, reason: "unavailable" });
+      return null;
+    });
     inputLanes.set(ws, settled);
     return settled.then(async (step) => {
       if (!step) return;
