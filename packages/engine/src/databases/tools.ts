@@ -13,7 +13,8 @@ import {
   markDatabaseNeedsReconnect,
   orgDbConnections,
 } from "./connections";
-import { guardSql, relationName } from "./guard";
+import { allowedRelations, guardSql, hiddenColumnsOf, relationName } from "./guard";
+import { identPath, parseIdentPath, quoteIdent } from "./identifiers";
 import { agentDatabasePolicies, type DatabasePolicy } from "./policies";
 import { formatRows, MAX_ROWS, wrapRows } from "./text";
 
@@ -23,7 +24,6 @@ export type DatabaseToolDeps = Omit<DatabaseDeps, "db">;
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const utcDayStart = (now: Date) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-const quoteIdent = (s: string) => `"${s.replace(/"/g, '""')}"`;
 
 /**
  * Tool name slugs per connection (`pg_<slug>_query`): the label as `[a-z0-9]`,
@@ -123,7 +123,7 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
 
   function toolsFor(connection: DbConnectionRow, slug: string, policy: DatabasePolicy): ToolDefinition[] {
     const label = `[Database ${connection.label}]`;
-    const allowed = new Set(policy.tables.map(relationName));
+    const allowed = allowedRelations(policy.tables);
     const rules = { tables: policy.tables, hiddenColumns: policy.hiddenColumns };
     const capCheck = async (ctx: ToolContext): Promise<CallCheck> => {
       if (policy.dailyQueryCap === null) return { ok: true };
@@ -163,7 +163,9 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
           try {
             const client = await clientFor({ ...deps, db: ctx.db }, connection);
             const rows = await client.readOnly(CATALOG_LIMITS, async (run) => (await run(LIST_TABLES_SQL)).rows);
-            const visible = rows.filter((r) => allowed.size === 0 || allowed.has(`${r[0]}.${r[1]}`.toLowerCase()));
+            const visible = rows.filter(
+              (r) => allowed.size === 0 || allowed.has(identPath([String(r[0]), String(r[1])])),
+            );
             await log(ctx.db, ctx, connection, {
               kind: "list_tables",
               statement: "list tables",
@@ -173,7 +175,7 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
             if (visible.length === 0) return { content: `${label} No tables this agent may read.` };
             const lines = visible.map(
               (r) =>
-                `${r[0]}.${r[1]} (${r[2]}, ~${Number(r[3] ?? 0).toLocaleString("en-US")} rows)${r[4] ? ` — ${cutText(String(r[4]), 200)}` : ""}`,
+                `${identPath([String(r[0]), String(r[1])])} (${r[2]}, ~${Number(r[3] ?? 0).toLocaleString("en-US")} rows)${r[4] ? ` — ${cutText(String(r[4]), 200)}` : ""}`,
             );
             return {
               content: `${label} ${visible.length} tables. Use schema.table names in queries (unqualified names are public.*).\n${wrapRows(lines.join("\n"))}`,
@@ -187,7 +189,7 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
     );
 
     const tableAllowed = (table: string): CallCheck =>
-      allowed.size > 0 && !allowed.has(relationName(table))
+      allowed.size > 0 && !allowed.has(relationName(table) ?? "")
         ? { ok: false, message: `Not allowed: this agent may only read the tables ${[...allowed].join(", ")}.` }
         : { ok: true };
 
@@ -211,18 +213,23 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
           return t.ok ? capCheck(ctx) : t;
         },
         execute: async (input, ctx) => {
-          const name = relationName(str(input.table));
-          const [schemaName = "public", tableName = ""] = name.split(".");
-          const regclass = `${quoteIdent(schemaName)}.${quoteIdent(tableName)}`;
+          const parts = parseIdentPath(str(input.table), 2);
+          if (!parts)
+            return {
+              content: `${label} "${str(input.table)}" is not a table name: write schema.table, quoting names with capitals or spaces ("My Table").`,
+              isError: true,
+            };
+          const [schemaName = "", tableName = ""] = parts;
+          const name = identPath(parts);
           const hidden = new Set(
-            policy.hiddenColumns.filter((c) => c.toLowerCase().startsWith(`${name}.`)).map((c) => c.split(".").at(-1)),
+            hiddenColumnsOf(policy.hiddenColumns, schemaName, tableName).map((c) => c.toLowerCase()),
           );
           const started = Date.now();
           try {
             const client = await clientFor({ ...deps, db: ctx.db }, connection);
             const { columns, fks } = await client.readOnly(CATALOG_LIMITS, async (run) => ({
-              columns: (await run(DESCRIBE_SQL, [regclass])).rows,
-              fks: (await run(FOREIGN_KEYS_SQL, [regclass])).rows,
+              columns: (await run(DESCRIBE_SQL, [name])).rows,
+              fks: (await run(FOREIGN_KEYS_SQL, [name])).rows,
             }));
             await log(ctx.db, ctx, connection, {
               kind: "describe_table",
@@ -233,7 +240,7 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
             if (columns.length === 0) return { content: `${label} Table ${name} not found.`, isError: true };
             const lines = columns.map(
               (c) =>
-                `${c[0]} ${c[1]}${c[2] ? "" : " not null"}${c[4] ? " primary key" : ""}${hidden.has(String(c[0])) ? " [hidden from you: never select it]" : ""}${c[3] ? ` — ${cutText(String(c[3]), 200)}` : ""}`,
+                `${quoteIdent(String(c[0]))} ${c[1]}${c[2] ? "" : " not null"}${c[4] ? " primary key" : ""}${hidden.has(String(c[0]).toLowerCase()) ? " [hidden from you: never select it]" : ""}${c[3] ? ` — ${cutText(String(c[3]), 200)}` : ""}`,
             );
             const keys = fks.map((f) => `${f[0]}: ${f[1]}`);
             return {

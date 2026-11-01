@@ -7669,9 +7669,11 @@ export const en: Translations = {
       tablesError: "Couldn't read the tables right now.",
       tablesHelp: "None checked = every table.",
       hidden: "Columns it never sees",
-      hiddenHelp: "table.column. We already hid the ones that look like personal data or passwords.",
+      hiddenHelp:
+        'table.column, with names that have capitals, spaces or symbols in double quotes (customers."Tax ID"). We already hid the ones that look like personal data or passwords.',
       hiddenPlaceholder: "customers.cpf",
-      hiddenInvalid: "Type table.column (or schema.table.column).",
+      hiddenInvalid:
+        'Type table.column (or schema.table.column), with "double quotes" around names that have capitals, spaces or symbols.',
       cap: "Queries per day",
       capHelp: "Empty = no limit.",
       timeout: "Time limit per query",

@@ -1,4 +1,5 @@
 import { parse } from "libpg-query";
+import { identPath, parseIdentPath, quoteIdent } from "./identifiers";
 
 /**
  * What an agent's SQL may be (ADR 0039), checked with Postgres's own parser
@@ -10,13 +11,13 @@ import { parse } from "libpg-query";
  * read-only transaction and the role are the other layers.
  */
 
-/** A relation as `schema.table` (lowercase; unqualified = `public`). */
+/** A relation as `schema.table` (`identPath`: exact names, quoted where needed; unqualified = `public`). */
 export type RelationName = string;
 
 export interface SqlRules {
-  /** `schema.table`; empty = every table. */
+  /** `schema.table` (`identPath`); empty = every table. */
   tables: string[];
-  /** `schema.table.column`. */
+  /** `schema.table.column` (`identPath`). */
   hiddenColumns: string[];
 }
 
@@ -121,10 +122,25 @@ const CATALOG_RELATIONS = new Set(
 );
 
 const lower = (s: string) => s.toLowerCase();
-/** `schema.table` → `schema.table` lowercase; `table` → `public.table`. */
-export function relationName(name: string): RelationName {
-  const parts = name.trim().toLowerCase().split(".");
-  return parts.length >= 2 ? `${parts.at(-2)}.${parts.at(-1)}` : `public.${parts[0]}`;
+/** `schema.table` or `table` (SQL, quoted parts kept exact) → the stored form; null when it isn't a table name. */
+export function relationName(name: string): RelationName | null {
+  const parts = parseIdentPath(name, 2);
+  return parts && identPath(parts);
+}
+
+/** The agent's allowed tables as stored; empty = every table. */
+export const allowedRelations = (tables: string[]) =>
+  new Set(tables.map(relationName).filter((n): n is RelationName => n !== null));
+
+/**
+ * The hidden columns of one table, matched case-insensitively: rules saved before names were kept exact are
+ * lowercase, and hiding a column that differs only in case is the safe side.
+ */
+export function hiddenColumnsOf(hiddenColumns: string[], schema: string, table: string): string[] {
+  return hiddenColumns.flatMap((h) => {
+    const [s = "", t = "", column = ""] = parseIdentPath(h, 3) ?? [];
+    return column && lower(s) === lower(schema) && lower(t) === lower(table) ? [column] : [];
+  });
 }
 
 type Node = Record<string, unknown>;
@@ -183,7 +199,7 @@ export async function guardSql(text: string, rules: SqlRules): Promise<GuardResu
 
   const problems: string[] = [];
   const ctes = new Set<string>();
-  const relations: { name: RelationName; alias: string | null }[] = [];
+  const relations: { schema: string | null; table: string; alias: string | null }[] = [];
   const functions: string[] = [];
   const columnRefs: string[][] = [];
   let star = false;
@@ -195,12 +211,12 @@ export async function guardSql(text: string, rules: SqlRules): Promise<GuardResu
       if (node.intoClause) problems.push("SELECT INTO is not allowed.");
       if (node.lockingClause) problems.push("FOR UPDATE / FOR SHARE is not allowed.");
     }
-    if (key === "CommonTableExpr" && typeof node.ctename === "string") ctes.add(lower(node.ctename));
+    // The parser already folds unquoted names to lowercase and keeps quoted ones exact, as Postgres resolves them.
+    if (key === "CommonTableExpr" && typeof node.ctename === "string") ctes.add(node.ctename);
     if (key === "RangeVar" && typeof node.relname === "string") {
-      const schema = typeof node.schemaname === "string" ? lower(node.schemaname) : null;
-      const alias =
-        isObject(node.alias) && typeof node.alias.aliasname === "string" ? lower(node.alias.aliasname) : null;
-      relations.push({ name: schema ? `${schema}.${lower(node.relname)}` : `?${lower(node.relname)}`, alias });
+      const schema = typeof node.schemaname === "string" ? node.schemaname : null;
+      const alias = isObject(node.alias) && typeof node.alias.aliasname === "string" ? node.alias.aliasname : null;
+      relations.push({ schema, table: node.relname, alias });
     }
     // `t(a, b)` after a table, join, subquery or function renames its columns by position.
     if (key === "alias" && Array.isArray(node.colnames) && node.colnames.length > 0) aliasColumns = true;
@@ -208,7 +224,7 @@ export async function guardSql(text: string, rules: SqlRules): Promise<GuardResu
     if (key === "ColumnRef" && Array.isArray(node.fields)) {
       const fields = node.fields as unknown[];
       if (fields.some((f) => isObject(f) && "A_Star" in f)) star = true;
-      columnRefs.push(svalsOf(fields).map(lower));
+      columnRefs.push(svalsOf(fields));
     }
   });
   if (problems[0]) return { ok: false, reason: problems[0] };
@@ -221,17 +237,15 @@ export async function guardSql(text: string, rules: SqlRules): Promise<GuardResu
   // Unqualified names that aren't CTEs are catalogs (pg_catalog is searched first) or tables in `public`
   // (the search path we set).
   const resolved = relations
-    .filter((r) => !(r.name.startsWith("?") && ctes.has(r.name.slice(1))))
+    .filter((r) => r.schema !== null || !ctes.has(r.table))
     .map((r) => {
-      if (!r.name.startsWith("?")) return r;
-      const bare = r.name.slice(1);
-      return { ...r, name: CATALOG_RELATIONS.has(bare) ? `pg_catalog.${bare}` : `public.${bare}` };
+      const schema = r.schema ?? (CATALOG_RELATIONS.has(r.table) ? "pg_catalog" : "public");
+      return { ...r, schema, name: identPath([schema, r.table]) };
     });
-  const allowed = new Set(rules.tables.map(relationName));
+  const allowed = allowedRelations(rules.tables);
   for (const r of resolved) {
     if (BLOCKED_RELATIONS.has(r.name)) return { ok: false, reason: `${r.name} is not allowed (it holds data values).` };
-    const schema = r.name.split(".")[0] ?? "";
-    if (CATALOG_SCHEMAS.has(schema)) continue;
+    if (CATALOG_SCHEMAS.has(r.schema)) continue;
     if (allowed.size > 0 && !allowed.has(r.name))
       return {
         ok: false,
@@ -240,21 +254,17 @@ export async function guardSql(text: string, rules: SqlRules): Promise<GuardResu
   }
 
   // Hidden columns of the tables this query reads: never named, never through * or a whole-row reference.
-  const hiddenByTable = new Map<string, Set<string>>();
-  for (const h of rules.hiddenColumns) {
-    const parts = h.trim().toLowerCase().split(".");
-    const column = parts.at(-1);
-    if (!column || parts.length < 2) continue;
-    const table = relationName(parts.slice(0, -1).join("."));
-    const set = hiddenByTable.get(table) ?? new Set<string>();
-    set.add(column);
-    hiddenByTable.set(table, set);
-  }
-  const touched = resolved.filter((r) => hiddenByTable.has(r.name));
+  const hiddenOf = (r: { schema: string; table: string }) => hiddenColumnsOf(rules.hiddenColumns, r.schema, r.table);
+  const touched = resolved.filter((r) => hiddenOf(r).length > 0);
   if (touched.length > 0) {
-    const hidden = new Set(touched.flatMap((r) => [...(hiddenByTable.get(r.name) ?? [])]));
-    const rowNames = new Set(touched.flatMap((r) => [r.alias, r.name.split(".")[1]]).filter((x): x is string => !!x));
-    const list = touched.map((r) => `${r.name}: ${[...(hiddenByTable.get(r.name) ?? [])].join(", ")}`).join("; ");
+    const hidden = new Set(touched.flatMap((r) => hiddenOf(r).map(lower)));
+    const rowNames = new Set(
+      touched
+        .flatMap((r) => [r.alias, r.table])
+        .filter((x): x is string => !!x)
+        .map(lower),
+    );
+    const list = touched.map((r) => `${r.name}: ${hiddenOf(r).map(quoteIdent).join(", ")}`).join("; ");
     if (aliasColumns)
       return {
         ok: false,
@@ -267,9 +277,9 @@ export async function guardSql(text: string, rules: SqlRules): Promise<GuardResu
       };
     for (const ref of columnRefs) {
       const last = ref.at(-1);
-      if (last && hidden.has(last))
-        return { ok: false, reason: `The column ${last} is hidden from this agent (${list}).` };
-      if (ref.length === 1 && last && rowNames.has(last))
+      if (last && hidden.has(lower(last)))
+        return { ok: false, reason: `The column ${quoteIdent(last)} is hidden from this agent (${list}).` };
+      if (ref.length === 1 && last && rowNames.has(lower(last)))
         return { ok: false, reason: `Some columns are hidden from this agent (${list}); name the columns you need.` };
     }
   }

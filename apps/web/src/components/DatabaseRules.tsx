@@ -1,6 +1,6 @@
 import type { DatabasePolicy } from "@agenteschat/client";
 import { useDatabaseTables } from "@agenteschat/client";
-import { DATABASE_TIMEOUTS, splitColumns } from "@agenteschat/client/lib/databases";
+import { DATABASE_TIMEOUTS, identPath, splitColumns } from "@agenteschat/client/lib/databases";
 import { CheckboxPill, Field, Input, Segmented } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 import { AddressList } from "@/components/AddressList";
@@ -45,7 +45,7 @@ export function DatabaseRulesPanel({
           ) : (
             <div className="newag__pills">
               {(tables.data ?? []).map((table) => {
-                const name = `${table.schema}.${table.name}`.toLowerCase();
+                const name = identPath([table.schema, table.name]);
                 return (
                   <CheckboxPill
                     key={name}
@@ -56,7 +56,7 @@ export function DatabaseRulesPanel({
                       set({ tables: on ? [...policy.tables, name] : policy.tables.filter((x) => x !== name) })
                     }
                   >
-                    {table.schema === "public" ? table.name : name}
+                    {table.schema === "public" ? table.name : `${table.schema}.${table.name}`}
                   </CheckboxPill>
                 );
               })}

@@ -7720,9 +7720,11 @@ export const ptBR = {
       tablesError: "Não deu para ler as tabelas agora.",
       tablesHelp: "Nenhuma marcada = todas as tabelas.",
       hidden: "Colunas que ele nunca vê",
-      hiddenHelp: "tabela.coluna. Já escondemos as que parecem dados pessoais ou senhas.",
+      hiddenHelp:
+        'tabela.coluna, com aspas duplas nos nomes que têm maiúsculas, espaços ou símbolos (clientes."CPF/CNPJ"). Já escondemos as que parecem dados pessoais ou senhas.',
       hiddenPlaceholder: "clientes.cpf",
-      hiddenInvalid: "Digite tabela.coluna (ou schema.tabela.coluna).",
+      hiddenInvalid:
+        'Digite tabela.coluna (ou schema.tabela.coluna), com "aspas duplas" nos nomes que têm maiúsculas, espaços ou símbolos.',
       cap: "Consultas por dia",
       capHelp: "Vazio = sem limite.",
       timeout: "Tempo máximo por consulta",
