@@ -681,6 +681,28 @@ describe("the agent a person last talked to", () => {
     expect(greeted.selected).toEqual([t.ada.id]);
   });
 
+  test("with a coordinator, a message nobody picked goes to the agent last talked to when it could answer", async () => {
+    const t = await privateRoom();
+    await f.db.update(schema.agents).set({ coordinator: true }).where(eq(schema.agents.id, t.theo.id));
+    // Nobody picked, 23 minutes after a talk with Ada: she gets it, as a run she may pass, not the coordinator.
+    const nobody = await t.talk(
+      [
+        [null, "ada quanto ta seu limite de uso?", 23.4, [t.ada]],
+        [t.ada, "Não consigo ver meu saldo por aqui.", 23],
+      ],
+      BOM_DIA,
+      () => ({
+        nouls: { "@theo": 0.3, "@ada": 0.45 },
+        needs: 0.7,
+        best: "theo",
+        choice: { theo: 0.83, ada: 0.12, none: 0.05 },
+      }),
+    );
+    expect(nobody.selected).toEqual([t.ada.id]);
+    expect(nobody.decision?.strategy).toBe("jev");
+    expect(nobody.decision?.reason).toBe("last talked to; jev: best @theo (confidence 0.83)");
+  });
+
   test("with no pick between agents to settle, nothing changes", async () => {
     const t = await privateRoom();
     const talkWithAda: Said[] = [

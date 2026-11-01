@@ -1152,6 +1152,7 @@ export async function routeMessage(
   const scoreOf = (agentId: string | null) =>
     Math.max(0, ...decided.agents.filter((a) => a.agentId === agentId).map((a) => a.score));
   const clearPickScore = policy.clearPickScore ?? DEFAULT_ROUTER_POLICY.clearPickScore;
+  const continuityBar = policy.continuityMinScore ?? policy.minScore;
   // Speaking to no agent in particular, a message the router gives another agent is for the agent this person last
   // talked to when that one could do it too: it clears its own bar (`minScore`, no lower) and, on its own, the need
   // check; unless the message clearly fits another agent better, by the step's tie-break (`CLEAR_CHOICE`) or by the
@@ -1216,8 +1217,20 @@ export async function routeMessage(
     !duplicate &&
     !toPerson &&
     ((decided.needsAgent ?? 0) >= needGateOf(policy, candidates.length === 1) || (!onlyAgentId && (await aloneHere())));
-  const toCoordinator = coordinates && (addressee === null || addressee === coordinatorId);
-  const chosen = coordinates && addressee ? [addressee] : toCoordinator && coordinatorId ? [coordinatorId] : selected;
+  // Before the coordinator, the agent this person last talked to, when it could still answer (continuity's bar):
+  // the same run it may pass the coordinator would get.
+  const backTo =
+    coordinates && addressee === null && lastTalkedTo !== null && scoreOf(lastTalkedTo) >= continuityBar
+      ? lastTalkedTo
+      : null;
+  const toCoordinator = coordinates && !backTo && (addressee === null || addressee === coordinatorId);
+  const chosen = backTo
+    ? [backTo]
+    : coordinates && addressee
+      ? [addressee]
+      : toCoordinator && coordinatorId
+        ? [coordinatorId]
+        : selected;
   const stepName = decided.strategy ?? deps.strategy.name;
   const strategy = toCoordinator ? "rule:coordinator" : stepName;
   const decidedBy: DecidedBy | undefined = toCoordinator ? { step: "rule", rule: "coordinator" } : decided.decidedBy;
@@ -1242,7 +1255,7 @@ export async function routeMessage(
           [
             followUp ? FOLLOW_UP : null,
             strategy === "rule:coordinator" ? "coordinator" : null,
-            followUp && resumes ? "last talked to" : null,
+            (followUp && resumes) || backTo ? "last talked to" : null,
             duplicate ? "already answered by another agent" : null,
             words,
           ]
