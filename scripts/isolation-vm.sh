@@ -14,7 +14,7 @@ work=${RUNNER_TEMP:-/tmp}/isolation-vm
 image=$images/debian-13.qcow2
 
 mkdir -p "$images"
-if ! echo "$image_sha512  $image" | sha512sum -c --quiet - 2> /dev/null; then
+if ! echo "$image_sha512  $image" | sha512sum -c --quiet - > /dev/null 2>&1; then
   curl -fsSL --retry 3 -o "$image" "$image_url"
   echo "$image_sha512  $image" | sha512sum -c --quiet -
 fi

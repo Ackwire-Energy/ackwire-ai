@@ -68,6 +68,7 @@ elif mode == "bind":
         print(err(e))
 elif mode == "listen":
     s = socket.socket(fam, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
         s.bind((host, port))
         s.listen(64)
@@ -137,7 +138,7 @@ function launch(user: AgentUser | null, argv: string[]) {
 
 function runAs(user: AgentUser | null, argv: string[], timeout = 30_000) {
   const c = launch(user, argv);
-  const r = spawnSync(c.argv[0] as string, c.argv.slice(1), { env: c.env, encoding: "utf8", timeout });
+  const r = spawnSync(c.argv[0] as string, c.argv.slice(1), { cwd: "/", env: c.env, encoding: "utf8", timeout });
   return { code: r.status, out: `${r.stdout ?? ""}${r.stderr ?? ""}`.trim() };
 }
 
@@ -146,13 +147,14 @@ const lastLine = (out: string) => out.trim().split("\n").at(-1) ?? "";
 /** A probe's outcome: the last line it printed. */
 function probe(user: AgentUser | null, ...args: string[]): string {
   const { argv, env } = launch(user, [PYTHON, "-c", PY, ...args]);
-  const r = spawnSync(argv[0] as string, argv.slice(1), { env, encoding: "utf8", timeout: 30_000 });
+  const r = spawnSync(argv[0] as string, argv.slice(1), { cwd: "/", env, encoding: "utf8", timeout: 30_000 });
   return lastLine(r.stdout ?? "") || `nothing (${(r.stderr ?? "").trim().slice(0, 300)})`;
 }
 
 /** As `runuser -u <name>` alone, the way cron or at start it: outside every agent's slice. */
 function probeOutside(name: string, ...args: string[]): string {
   const r = spawnSync("/usr/sbin/runuser", ["-u", name, "--", PYTHON, "-c", PY, ...args], {
+    cwd: "/",
     encoding: "utf8",
     timeout: 30_000,
   });
@@ -170,7 +172,11 @@ async function until(cond: () => boolean, ms: number) {
 /** A process held running (`argv` as `user`, or as root), and the lines it printed. */
 async function hold(user: AgentUser | null, argv: string[], ready: (lines: string[]) => boolean) {
   const c = launch(user, argv);
-  const child = spawn(c.argv[0] as string, c.argv.slice(1), { env: c.env, stdio: ["ignore", "pipe", "pipe"] });
+  const child = spawn(c.argv[0] as string, c.argv.slice(1), {
+    cwd: "/",
+    env: c.env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
   running.push(child);
   const lines: string[] = [];
   let rest = "";
@@ -519,7 +525,11 @@ describe.if(ROOT)("the agents' isolation on this computer, as root", () => {
         must("chown", ["-R", `${u.uid}:${agentGid(u.user)}`, dir]);
         const c = launch(u, ["/bin/sh", "-c", `cd ${dir} && ${GRADLE} build --console=plain 2>&1`]);
         return new Promise<{ code: number | null; out: string }>((resolve) => {
-          const child = spawn(c.argv[0] as string, c.argv.slice(1), { env: c.env, stdio: ["ignore", "pipe", "pipe"] });
+          const child = spawn(c.argv[0] as string, c.argv.slice(1), {
+            cwd: "/",
+            env: c.env,
+            stdio: ["ignore", "pipe", "pipe"],
+          });
           let out = "";
           child.stdout?.setEncoding("utf8").on("data", (d: string) => {
             out += d;

@@ -144,16 +144,15 @@ export function renderRuleset(i: RulesetInput): string {
     `\t\tmeta skuid 0 ct mark set ${hex(ROOT_MARK)} return`,
     `\t\tct mark set ${hex(OTHER_USER_MARK)}`,
     "\t}",
+    // In this hook `oif` is where the route went before any DNAT: a loopback port DNAT'ed into a container still
+    // reads as lo here, so it is told by its conntrack entry (where it was sent, and where it goes now).
     "\tchain agent_out {",
     '\t\toif "lo" ct state untracked goto refuse',
     '\t\toif "lo" meta l4proto != { tcp, udp, icmp, ipv6-icmp } goto refuse',
-    '\t\tmeta oifkind { "bridge", "veth" } oifname != @uplinks jump guest',
-    "\t}",
-    // A container's or a VM's network on this computer: only what is published beyond it.
-    "\tchain guest {",
-    "\t\tct status dnat ct original ip daddr != 127.0.0.0/8 return",
-    "\t\tct status dnat ct original ip6 daddr != ::1 return",
-    "\t\tgoto refuse",
+    "\t\tct status dnat ct original ip daddr 127.0.0.0/8 ct reply ip saddr != 127.0.0.0/8 goto refuse",
+    "\t\tct status dnat ct original ip6 daddr ::1 ct reply ip6 saddr != ::1 goto refuse",
+    // A container's or a VM's network on this computer, but for what is published on its other addresses.
+    '\t\tmeta oifkind { "bridge", "veth" } oifname != @uplinks goto refuse',
     "\t}",
     "\tchain input {",
     "\t\ttype filter hook input priority filter; policy accept;",

@@ -61,12 +61,9 @@ table inet agentes_runner {
 	chain agent_out {
 		oif "lo" ct state untracked goto refuse
 		oif "lo" meta l4proto != { tcp, udp, icmp, ipv6-icmp } goto refuse
-		meta oifkind { "bridge", "veth" } oifname != @uplinks jump guest
-	}
-	chain guest {
-		ct status dnat ct original ip daddr != 127.0.0.0/8 return
-		ct status dnat ct original ip6 daddr != ::1 return
-		goto refuse
+		ct status dnat ct original ip daddr 127.0.0.0/8 ct reply ip saddr != 127.0.0.0/8 goto refuse
+		ct status dnat ct original ip6 daddr ::1 ct reply ip6 saddr != ::1 goto refuse
+		meta oifkind { "bridge", "veth" } oifname != @uplinks goto refuse
 	}
 	chain input {
 		type filter hook input priority filter; policy accept;
