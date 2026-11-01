@@ -221,11 +221,12 @@ function Mark({ mark, color }: { mark: ReceiptLine["mark"]; color: string }) {
   }
 }
 
-/** The web's icon for what a rule follows: the reply, the one person with the agent, the thread. */
+/** The web's icon for what a rule follows: the reply, the one person with the agent, the thread, the coordinator. */
 const RULE_ICON: Record<Extract<DecidedBy, { step: "rule" }>["rule"], IconName> = {
   reply: "replyTo",
   only_agent: "person",
   follow_up: "reply",
+  coordinator: "flag",
 };
 
 /**

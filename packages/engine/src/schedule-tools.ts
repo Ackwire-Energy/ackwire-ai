@@ -7,6 +7,7 @@ import { consultationOrigin } from "./consultations";
 import { getChannelCached } from "./context";
 import { schedulesOf } from "./context/summaries";
 import { isAgentOnlyDm } from "./dms";
+import { cutText } from "./format";
 import { ROUTINE_ACCESS, ROUTINE_REPORT, routineAccessOf, routineReportOf } from "./routine-brief";
 import {
   cancelReminder,
@@ -242,7 +243,7 @@ function routineLine(r: RoutineView, where: string, handle: string | null, promp
       ? "(instructions private: it reports in a conversation you and the person aren't in)"
       : full
         ? prompt
-        : prompt.replace(/\s+/g, " ").slice(0, 300);
+        : cutText(prompt.replace(/\s+/g, " "), 300);
   const runs = r.recentRuns.slice(0, LISTED_RUNS).map((run) => runText(run, zone));
   return [
     `${r.id} — ${handle ? `@${handle} ` : ""}"${r.name}" (${stateText(r)}): ${whenText(r.trigger)}; next: ${next}; reports in ${where}; ${reportText(r)}; ${accessText(r)}`,
