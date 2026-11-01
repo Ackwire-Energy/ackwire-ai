@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, isNotNull, schema } from "@agenteschat/db";
-import { approvalCardThreads, approvalOriginOf } from "./approvals";
+import { approvalCardThreads, approvalOriginOf, approverIds } from "./approvals";
 import { accountablePerson, runAuthorityById } from "./authority";
 import { threadFollowChoices } from "./follows";
 import { isMediaAfterReply } from "./media";
@@ -11,6 +11,7 @@ import {
   notificationSnippet,
   notify,
   resolveNotifications,
+  retargetNotifications,
 } from "./notifications";
 import { maySql, type RolePermission } from "./permissions";
 import { stretchCardOf } from "./stretch";
@@ -35,6 +36,7 @@ const {
   missionParticipants,
   routines,
   messageReactions,
+  approvals,
 } = schema;
 
 type ApprovalRow = typeof schema.approvals.$inferSelect;
@@ -370,13 +372,34 @@ export async function resolveQuestionNotifications(deps: NotificationDeps, orgId
  * A sensitive action waits: everyone who may decide it, with the agent's why (short, in `text`) and,
  * asked while nobody watched, where it came from (`origin`: a routine, or no one): ADR 0053 §8.
  */
+/**
+ * One notification per approval card (`openApprovalCard`): a request joining a card that already waits
+ * updates that card's notification (its count, the newest title) instead of adding one.
+ */
+const approvalGroupKey = (approval: Pick<ApprovalRow, "id" | "messageId">) =>
+  approval.messageId ? `approval-card:${approval.messageId}` : `approval:${approval.id}`;
+
 export async function notifyApproval(deps: NotificationDeps, approval: ApprovalRow, deciders: string[]) {
-  const [[channel], cardThreads] = await Promise.all([
+  const [[channel], cardThreads, [first]] = await Promise.all([
     deps.db
       .select({ kind: channels.kind, name: channels.name })
       .from(channels)
       .where(eq(channels.id, approval.channelId)),
     approvalCardThreads(deps.db, [approval]),
+    approval.messageId
+      ? deps.db
+          .select({ id: approvals.id })
+          .from(approvals)
+          .where(
+            and(
+              eq(approvals.orgId, approval.orgId),
+              eq(approvals.messageId, approval.messageId),
+              eq(approvals.status, "pending"),
+            ),
+          )
+          .orderBy(asc(approvals.createdAt))
+          .limit(1)
+      : Promise.resolve([]),
   ]);
   // Where its card is (the main timeline has no thread).
   const threadId = cardThreads.get(approval.id) ?? null;
@@ -384,28 +407,57 @@ export async function notifyApproval(deps: NotificationDeps, approval: ApprovalR
     orgId: approval.orgId,
     userIds: deciders,
     kind: "approval",
-    groupKey: `approval:${approval.id}`,
+    groupKey: approvalGroupKey(approval),
     waiting: true,
     actor: agent(approval.agentId),
     source: {
-      approvalId: approval.id,
+      // The card's oldest waiting request: the notification opens the card, which lists the rest.
+      approvalId: first?.id ?? approval.id,
       channelId: approval.channelId,
       ...(threadId ? { threadId } : {}),
       ...(approval.messageId ? { messageId: approval.messageId } : {}),
       ...(approval.missionId ? { missionId: approval.missionId } : {}),
       ...(channel?.kind === "channel" ? { label: channel.name } : {}),
     },
-    latest: {
-      title: notificationSnippet(approval.title, 200),
-      text: notificationSnippet(approval.why, 200),
-      origin: approvalOriginOf(approval.origin) ?? undefined,
-      expiresAt: approval.expiresAt.toISOString(),
-    },
+    latest: approvalLatest(approval),
   });
 }
 
-export async function resolveApprovalNotifications(deps: NotificationDeps, orgId: string, approvalId: string) {
-  await resolveNotifications(deps, orgId, { groupKey: `approval:${approvalId}` });
+const approvalLatest = (approval: ApprovalRow) => ({
+  title: notificationSnippet(approval.title, 200),
+  text: notificationSnippet(approval.why, 200),
+  origin: approvalOriginOf(approval.origin) ?? undefined,
+  expiresAt: approval.expiresAt.toISOString(),
+});
+
+/**
+ * Out of the inbox once nothing on its card waits any more. Until then each person's entry describes the
+ * card's oldest request still waiting that they may decide, and leaves the inbox of whoever has none left.
+ */
+export async function resolveApprovalNotifications(
+  deps: NotificationDeps,
+  approval: Pick<ApprovalRow, "id" | "orgId" | "messageId">,
+) {
+  const groupKey = approvalGroupKey(approval);
+  const waiting = approval.messageId
+    ? await deps.db
+        .select()
+        .from(approvals)
+        .where(
+          and(
+            eq(approvals.orgId, approval.orgId),
+            eq(approvals.messageId, approval.messageId),
+            eq(approvals.status, "pending"),
+          ),
+        )
+        .orderBy(asc(approvals.createdAt))
+    : [];
+  if (waiting.length === 0) return resolveNotifications(deps, approval.orgId, { groupKey });
+  const deciders = await Promise.all(waiting.map(async (a) => new Set(await approverIds(deps.db, a))));
+  await retargetNotifications(deps, approval.orgId, groupKey, (userId) => {
+    const next = waiting.find((_, i) => deciders[i]?.has(userId));
+    return next ? { source: { approvalId: next.id }, latest: approvalLatest(next) } : null;
+  });
 }
 
 // ── Issues ────────────────────────────────────────────────────────────────────
@@ -646,6 +698,45 @@ export async function notifyRoutineFailed(
 }
 
 /**
+ * A routine set to act couldn't call an agent its creator can't talk to (`reach.ts`, and its own tell_agent or
+ * ask_agent, `consultations.ts`): the agent's owner hears it once per routine and agent, or who manages agents when
+ * it has none. It opens the agent's page (who talks to it), the place they may not otherwise reach being private;
+ * `source.userId` is the routine's creator, whom its one-click action lets talk to the agent.
+ */
+export async function notifyAgentUnreached(
+  deps: NotificationDeps,
+  input: {
+    orgId: string;
+    agentId: string;
+    routineId: string;
+    routineName: string;
+    creatorUserId: string;
+    channelId: string;
+    threadId?: string | null;
+    messageId?: string;
+  },
+) {
+  const owner = await agentOwner(deps, input.agentId);
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: owner ? [owner] : await adminsOf(deps, input.orgId, "manage_agents"),
+    kind: "agent_unreached",
+    groupKey: `agent_unreached:${input.routineId}:${input.agentId}`,
+    actor: agent(input.agentId),
+    source: {
+      routineId: input.routineId,
+      agentId: input.agentId,
+      userId: input.creatorUserId,
+      channelId: input.channelId,
+      ...(input.threadId ? { threadId: input.threadId } : {}),
+      ...(input.messageId ? { messageId: input.messageId } : {}),
+      label: input.routineName,
+    },
+    latest: { title: input.routineName, reason: "routine_creator_reach" },
+  });
+}
+
+/**
  * A routine paused itself (§6.2, §6.6): its creator and the agent's owner hear it once per pause
  * (`key`), with the coded reason (`latest.reason`, the app translates it) and its English fallback.
  */
@@ -696,6 +787,58 @@ export async function notifyRoutineStalled(
 }
 
 /**
+ * A routine's run waits for its agent's plan to reset: its creator and the agent's owner hear it once per
+ * outage (`outageKey`, as `notifyRoutineStalled`). Resolved by the next good run.
+ */
+export async function notifyRoutineWaitingPlan(
+  deps: NotificationDeps,
+  input: { orgId: string; routineId: string; outageKey: string },
+) {
+  const r = await routineAudience(deps, input.orgId, input.routineId);
+  if (!r) return;
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: [r.creator, r.owner],
+    kind: "routine_waiting_plan",
+    groupKey: `routine_waiting_plan:${input.routineId}:${input.outageKey}`,
+    actor: agent(r.agentId),
+    source: { routineId: input.routineId, label: r.name },
+    latest: { title: r.name },
+  });
+}
+
+/**
+ * An agent's work has waited `UNKNOWN_RESET_NOTICE_MS` on its plan's limit and the plan never said when it resets:
+ * the agent's owner hears it once per wait, opening the conversation the work waits in.
+ */
+export async function notifyPlanResetUnknown(
+  deps: NotificationDeps,
+  input: {
+    orgId: string;
+    agentId: string;
+    agentName: string;
+    plan: string;
+    runId: string;
+    channelId: string;
+    threadId: string | null;
+  },
+) {
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: [await agentOwner(deps, input.agentId)],
+    kind: "plan_reset_unknown",
+    groupKey: `plan_reset_unknown:${input.runId}`,
+    actor: agent(input.agentId),
+    source: {
+      channelId: input.channelId,
+      ...(input.threadId ? { threadId: input.threadId } : {}),
+      label: input.agentName,
+    },
+    latest: { title: input.plan },
+  });
+}
+
+/**
  * The agent told people what a routine found (the message its report woke, §7): its creator hears
  * it, opening that message, unless they are a member of that conversation (they see it there).
  */
@@ -731,10 +874,54 @@ export async function notifyRoutineFinished(
   });
 }
 
+// ── Runs (ADR 0097) ─────────────────────────────────────────────────────────────
+
+const runFailedGroup = (run: { agentId: string; channelId: string; threadRootId: string }) =>
+  `run_failed:${run.agentId}:${run.channelId}:${run.threadRootId}`;
+
+/**
+ * A conversation run failed for good (`reportRunFailure`): `userId` (else the agent's owner) hears it once per agent
+ * and conversation, with the run's coded reason (`latest.reason`). Resolved by the agent's next good run there.
+ */
+export async function notifyRunFailed(
+  deps: NotificationDeps,
+  run: { orgId: string; agentId: string; channelId: string; threadRootId: string; triggerMessageId: string },
+  userId: string | null,
+  reason: string,
+) {
+  const to = userId ?? (await agentOwner(deps, run.agentId));
+  if (!to) return;
+  const [channel] = await deps.db.select({ name: channels.name }).from(channels).where(eq(channels.id, run.channelId));
+  await notify(deps, {
+    orgId: run.orgId,
+    userIds: [to],
+    kind: "run_failed",
+    groupKey: runFailedGroup(run),
+    actor: agent(run.agentId),
+    source: {
+      channelId: run.channelId,
+      ...(run.threadRootId !== run.triggerMessageId ? { threadId: run.threadRootId } : {}),
+      messageId: run.triggerMessageId,
+      agentId: run.agentId,
+      ...(channel?.name ? { label: channel.name } : {}),
+    },
+    latest: { reason: reason.split(":")[0] ?? reason },
+  });
+}
+
+/** The agent's run in that conversation ended well: its failure there is done. */
+export async function resolveRunFailed(
+  deps: NotificationDeps,
+  run: { orgId: string; agentId: string; channelId: string; threadRootId: string },
+) {
+  await resolveNotifications(deps, run.orgId, { groupKey: runFailedGroup(run) });
+}
+
 /** A routine ran well again: its failure streak and computer outage notifications are done. */
 export async function resolveRoutineTrouble(deps: NotificationDeps, orgId: string, routineId: string) {
   await resolveNotifications(deps, orgId, { groupKeyPrefix: `routine_failed:${routineId}:` });
   await resolveNotifications(deps, orgId, { groupKeyPrefix: `routine_stalled:${routineId}:` });
+  await resolveNotifications(deps, orgId, { groupKeyPrefix: `routine_waiting_plan:${routineId}:` });
 }
 
 /** A person resumed or took over a routine: its pause notifications are done. */

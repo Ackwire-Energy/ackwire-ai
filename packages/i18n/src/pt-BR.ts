@@ -1017,6 +1017,7 @@ export const ptBR = {
     forum_turn: "Sua vez de opinar",
     mission_stopped: "Uma missão parou",
     routine_failed: "Uma rotina não terminou",
+    run_failed: "Um agente não conseguiu terminar",
     routine_paused: "Uma rotina foi pausada",
     browser_handoff: "Um agente precisa de você no navegador",
     waiting: "Tem algo esperando você",
@@ -1405,6 +1406,8 @@ export const ptBR = {
     failed_other: "{{names}} não conseguiram responder",
     asking_one: "{{names}} está esperando sua resposta",
     asking_other: "{{names}} estão esperando sua resposta",
+    outage_one: "{{names}}: o provedor de IA está fora do ar · tenta de novo sozinho",
+    outage_other: "{{names}}: o provedor de IA está fora do ar · tenta de novo sozinho",
     nobody: "Nenhum agente vai responder",
     status: {
       seen: "Viu",
@@ -1412,6 +1415,7 @@ export const ptBR = {
       claimed: "Respondendo",
       waiting: "Esperando aprovação",
       asking: "Esperando sua resposta",
+      outage: "O provedor de IA está fora do ar · tenta de novo sozinho",
       handled: "Respondeu",
       failed: "Falhou",
       referenced: "Só mencionado",
@@ -1434,6 +1438,7 @@ export const ptBR = {
       only_agent: "Só {{article}} {{name}} responde aqui sem menção",
       follow_up: "Segue a conversa com {{article}} {{name}}",
       coordinator: "{{The}} {{name}} coordena o time",
+      default: "Ninguém foi chamado, então {{article}} {{name}} respondeu",
     },
   },
   /** The agent that coordinates the team (ADR 0093): its switch, its chip and the lines about it. */
@@ -1629,6 +1634,24 @@ export const ptBR = {
     undo: "Desfazer",
     undone: "Desfeito",
     group: "Memória atualizada por {{name}}",
+  },
+  reach: {
+    group: "Quem a mensagem não chamou direto",
+    handed: "Entregue {{to}} <b>{{name}}</b> por mensagem direta, {{she}} não está {{place}}",
+    private: "Não repassei {{to}} <b>{{name}}</b>: {{she}} não está {{place}}, e o que se fala aqui fica aqui",
+    noAi: "Não consegui entregar {{to}} <b>{{name}}</b>: {{she}} não está {{place}} e ainda não tem IA conectada",
+    inChannel: "em #{{name}}",
+    inHere: "nesta conversa",
+    blocked: "Não consegui chamar {{article}} <b>{{name}}</b>: só quem cuida {{hers}} pode",
+    routineRead: "Não consegui chamar {{article}} <b>{{name}}</b>: esta rotina só olha e conta",
+    routinePost: "Não chamei {{article}} <b>{{name}}</b>: uma rotina que só olha e conta não acorda ninguém",
+    outside: "Não está {{place}}",
+    routine: "Rotina {{name}}",
+    see: "Ver",
+    add: "Adicionar ao canal",
+    added: "{{name}} entrou no canal.",
+    allow: "Deixar {{person}} falar com {{pronoun}}",
+    allowed: "Pronto: {{person}} já pode falar com {{name}}.",
   },
   teamChecks: {
     group: "O que o agente não repetiu",
@@ -1910,6 +1933,9 @@ export const ptBR = {
       waiting_approval: "Esperando aprovação",
       waiting_answer: "Esperando resposta",
       waiting_computer: "Esperando o computador",
+      waiting_plan: "Esperando o plano renovar",
+      waiting_budget: "Esperando o orçamento renovar",
+      provider_down: "O provedor de IA está fora do ar · tenta de novo sozinho",
     },
     agentWhy: {
       online: "Ativo agora",
@@ -2019,6 +2045,17 @@ export const ptBR = {
     seeEmail: "Ver o e-mail",
     seeDetails: "Ver detalhes",
     notNow: "Agora não",
+    /** Several requests of one agent in one conversation: one card with all of them (ApprovalGroupAsk). */
+    askMany_one: "Preciso do seu ok para seguir com isto:",
+    askMany_other: "Preciso do seu ok para seguir com estes {{count}}:",
+    all: {
+      approve: "Aprovar tudo",
+      refuse: "Agora não para todos",
+      partial: "Você pode decidir {{mine}} de {{count}}: Aprovar tudo vale só para esses. Os outros esperam {{who}}.",
+      partialAdmin: "um admin",
+      waitingCount_one: "{{count}} esperando",
+      waitingCount_other: "{{count}} esperando",
+    },
     /** "Aprovar sempre": the agent's next calls of this kind run without asking. */
     always: {
       button: "Aprovar sempre",
@@ -2197,8 +2234,12 @@ export const ptBR = {
       missionStopped: "<b>{{name}}</b> parou uma missão",
       routineFinished: "<b>{{name}}</b> terminou uma rotina",
       routineFailed: "<b>{{name}}</b> não conseguiu rodar uma rotina",
+      runFailed: "<b>{{name}}</b> não conseguiu terminar",
       routinePaused: "Uma rotina de <b>{{name}}</b> foi pausada",
       routineStalled: "<b>{{name}}</b> espera o computador para rodar uma rotina",
+      agentUnreached: "Uma rotina não conseguiu chamar <b>{{name}}</b>",
+      routineWaitingPlan: "<b>{{name}}</b> espera o plano renovar para rodar uma rotina",
+      planResetUnknown: "O {{plan}} não disse quando o limite renova. O trabalho de <b>{{name}}</b> segue esperando.",
       machineConnected: "<b>{{name}}</b> conectou o computador <b>{{label}}</b>",
       machineConnectedAny: "<b>{{name}}</b> conectou um computador",
       browserHandoff: "<b>{{name}}</b> precisa de você no navegador",
@@ -2293,6 +2334,9 @@ export const ptBR = {
   },
   approvals: {
     title: "Aprovações",
+    /** Requests sharing one card in the conversation, together here too. */
+    groupHead_one: "<b>{{name}}</b> pediu {{count}} coisa de uma vez",
+    groupHead_other: "<b>{{name}}</b> pediu {{count}} coisas de uma vez",
     readsOnly: "Só lê",
     technical: "Detalhes técnicos",
     summary_one: "{{count}} pedido esperando você",
@@ -4149,6 +4193,11 @@ export const ptBR = {
       tokens: "{{tokens}} tokens do plano",
       cost: "{{cost}} na API",
     },
+    reachWarning: {
+      blocked:
+        "Esta rotina não vai conseguir chamar {{article}} <b>{{name}}</b>: só quem cuida {{hers}} pode. O resto da rotina roda normalmente.",
+      read: "Esta rotina só olha e conta, então não chama {{article}} <b>{{name}}</b>. Para chamar, escolha Pode agir.",
+    },
     access: {
       read: "Só olhar e contar",
       act: "Pode agir",
@@ -4180,8 +4229,12 @@ export const ptBR = {
       previous_running: "Pulada: a anterior ainda estava rodando",
       previous_waiting: "Pulada: a anterior ainda esperava alguém",
       waiting_computer: "Pulada: esperando o computador do agente",
+      waiting_plan: "Pulada: esperando o plano renovar",
+      waiting_budget: "Pulada: esperando o orçamento renovar",
       superseded: "Deu lugar à execução seguinte",
       stale: "Perdeu o horário: o computador voltou tarde demais",
+      waiting_plan_late: "Perdeu o horário: o plano renovou tarde demais",
+      waiting_budget_late: "Perdeu o horário: o orçamento renovou tarde demais",
       stopped: "Parada por alguém",
       stoppedBy: "Parada por {{name}}",
       no_report: "Terminou sem contar o resultado",
@@ -8890,7 +8943,7 @@ export const ptBR = {
   },
   budget: {
     warning: "{{name}} usou {{percent}} do orçamento do mês.",
-    exhausted: "{{name}} atingiu o orçamento do mês e parou. Um admin pode aumentar o limite para continuar.",
+    exhausted: "{{name}} atingiu o orçamento do mês e pausou. Continua {{when}} ou quando um admin aumentar o limite.",
   },
   gallery: {
     title: "Galeria de componentes",
@@ -8932,6 +8985,8 @@ export const ptBR = {
     hersM: "dele",
   },
   chat: {
+    /** When a waiting agent goes on (`usageWhen`). */
+    usageWhen: { at: "às {{time}}", on: "{{day}} às {{time}}", date: "em {{date}}" },
     /** Typing bar: "{{names}} está {{doing}}" (agents' verbs come from their tool calls). */
     doing_one: "{{names}} está {{doing}}",
     doing_other: "{{names}} estão {{doing}}",
@@ -8995,8 +9050,13 @@ export const ptBR = {
       waitingInput: "{{The}} {{name}} espera uma resposta",
       /** The consulted agent's computer is away: paused, not on a person (as the computer screen says it). */
       waitingComputer: "{{The}} {{name}} espera o computador voltar",
+      /** The consulted agent's AI provider is down: its run is parked and retries by itself. */
+      waitingProvider: "{{name}}: o provedor de IA está fora do ar · tenta de novo sozinho",
       /** Its part done, the agent waits on what it handed to other agents. */
       waitingAgents: "{{The}} {{name}} passou uma parte adiante e espera o retorno",
+      /** What a teammate at work posted so far in the agents' conversation, and the start of the latest. */
+      posted_one: "{{count}} mensagem até agora · {{latest}}",
+      posted_other: "{{count}} mensagens até agora · {{latest}}",
       /** An answer whose question is in a reply farther up: one line where it arrived, "Ver" goes to that reply. */
       answeredFar: "{{to}} respondeu à pergunta {{of}} {{from}}",
       answeredRequestFar: "{{to}} respondeu ao pedido {{of}} {{from}}",
@@ -9045,6 +9105,7 @@ export const ptBR = {
       followUpWake: "{{name}} voltou para «{{about}}»",
       followUpCancel: "Cancelar",
       other: "Aviso para {{name}}",
+      wakeSkipped: "A menção de {{name}} não chamou {{agents}}",
       show: "Ver",
       hide: "Ocultar",
       talker: "enquanto trabalha",
@@ -9307,8 +9368,14 @@ export const ptBR = {
         "{{computer}} voltou: “{{title}}” retoma de onde parou quando o projeto estiver pronto.",
       machine_offline: "{{computer}} ficou offline.",
       brain_unavailable: "O {{brain}} não está disponível agora. Respondo quando ele voltar.",
+      provider_unavailable: "Meu provedor de IA não está respondendo agora. Respondo assim que ele voltar.",
       brain_busy: "Meu computador está ocupado com outras tarefas agora. Respondo assim que ele estiver livre.",
       brain_interrupted: "O {{brain}} parou antes de terminar. Já feito, sem repetir: {{tools}}.",
+      plan_limit_cut: "Parei no limite do plano do {{plan}}. Continuo de onde parei {{when}}, quando ele renovar.",
+      plan_limit_cut_unknown: "Parei no limite do plano do {{plan}}. Continuo de onde parei assim que ele renovar.",
+      plan_limit_wait: "O plano do {{plan}} chegou ao limite. Respondo {{when}}, quando ele renovar.",
+      plan_limit_wait_unknown: "O plano do {{plan}} chegou ao limite. Respondo assim que ele renovar.",
+      budget_wait: "Meu orçamento do mês acabou. Continuo {{when}}, ou antes se um admin aumentar o limite.",
       no_ai: "Ainda não consigo responder: não tenho uma IA conectada.",
       no_ai_signed_out: "Ainda não consigo responder: minha IA saiu da conta.",
       /** The computer's own sign-in of that CLI isn't there (`meta.noAi.own`); `brain`: Codex or Claude Code. */

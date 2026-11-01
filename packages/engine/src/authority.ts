@@ -2,7 +2,7 @@ import { and, type Executor, eq, schema } from "@agenteschat/db";
 import { caches } from "./cache";
 import { type RoutineBrief, routineBriefOf } from "./routine-brief";
 
-const { agentRuns, messages } = schema;
+const { agentRuns, messages, routineRuns } = schema;
 
 /**
  * Who is behind a run (ADR 0053, addendum of 2026-10-31): the one gate every "who asked?" check goes
@@ -121,8 +121,9 @@ async function walkRoot(db: Executor, orgId: string, messageId: string, walked: 
       const runId = notice.refs?.runId;
       return { kind: "routine_report", backgroundRunId: typeof runId === "string" ? runId : null };
     }
-    // Work that comes back to the agent continues the run it came back to, for whoever is behind that run.
-    const runId = returnsTo(m.meta) ?? m.agentRunId;
+    // Work that comes back to the agent continues the run it came back to, for whoever is behind that run; a
+    // routine's own message roots in the routine's run that posted it.
+    const runId = returnsTo(m.meta) ?? m.agentRunId ?? (await routinePostRun(db, { orgId, ...m }));
     if (!runId) return { kind: "agent" };
     const [run] = await db
       .select({ triggerMessageId: agentRuns.triggerMessageId, background: agentRuns.background })
@@ -133,6 +134,21 @@ async function walkRoot(db: Executor, orgId: string, messageId: string, walked: 
     id = run.triggerMessageId;
   }
   return null;
+}
+
+/** The routine's background run behind a routine's own message (`hand_off`, `meta.routine`, posted with no run). */
+export async function routinePostRun(
+  db: Executor,
+  message: { orgId: string; agentRunId: string | null; meta: Record<string, unknown> },
+) {
+  const routine = message.meta.routine as { runId?: unknown } | undefined;
+  if (message.agentRunId || message.meta.reminder || typeof routine?.runId !== "string" || !UUID.test(routine.runId))
+    return null;
+  const [row] = await db
+    .select({ agentRunId: routineRuns.agentRunId })
+    .from(routineRuns)
+    .where(and(eq(routineRuns.orgId, message.orgId), eq(routineRuns.id, routine.runId)));
+  return row?.agentRunId ?? null;
 }
 
 /** The person behind a message (see `messageRoot`), or null. */

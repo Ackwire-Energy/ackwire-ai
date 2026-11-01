@@ -404,6 +404,8 @@ export class CodexAppMapper {
   private total?: TokenUsageBreakdown;
   /** An `error` notification Codex won't retry (the turn's own error says more). */
   lastError?: string;
+  /** The turn ran a command, changed a file or called our bridge: a cut now loses work the API couldn't see. */
+  private worked = false;
 
   constructor(private readonly opts: { cwd: string; model?: string; redact?: (text: string) => string }) {}
 
@@ -437,6 +439,8 @@ export class CodexAppMapper {
   /** `item/completed`: executed tool calls, the answer, and the text of a message that wasn't streamed. */
   completed(item: Record<string, unknown>): { events: CodexBrainEvent[]; text?: string } {
     const id = str(item.id) || `codex-${randomUUID()}`;
+    if (item.type === "commandExecution" || item.type === "fileChange" || item.type === "mcpToolCall")
+      this.worked = true;
     switch (item.type) {
       case "agentMessage": {
         const t = str(item.text);
@@ -516,9 +520,10 @@ export class CodexAppMapper {
         this.lastError ||
         (turn.status === "interrupted" ? "Codex stopped the turn" : "The turn failed"),
     );
-    if (info === "usageLimitExceeded") return [{ type: "limit" }, { type: "error", code: "plan_limit", message }];
+    if (info === "usageLimitExceeded")
+      return [{ type: "limit" }, { type: "error", code: "plan_limit", message, worked: this.worked }];
     if (info === "unauthorized") return [{ type: "error", code: "not_logged_in", message, retryable: true }];
-    return codexProblem(message, turn.status === "failed");
+    return codexProblem(message, turn.status === "failed", this.worked);
   }
 }
 

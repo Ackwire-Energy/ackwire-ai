@@ -505,6 +505,8 @@ describe("approval flow (end to end)", () => {
       "approval",
       "tool_result",
       "model_call",
+      // How the turn ended (`decideTurnEnd`, ADR 0097).
+      "context",
       "message",
     ]);
     // Usage for all three model calls.

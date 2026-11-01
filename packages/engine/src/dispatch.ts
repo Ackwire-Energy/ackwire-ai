@@ -1,6 +1,6 @@
 import { and, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { audienceSql } from "./audience";
-import { messageRoot, personOfMessage, runAuthorityById } from "./authority";
+import { messageRoot, personOfMessage, routinePostRun, runAuthorityById } from "./authority";
 import { dmAgents, isAgentOnlyDm } from "./dms";
 import { getMessage, type Message } from "./messages";
 import { enqueue } from "./outbox";
@@ -19,6 +19,11 @@ export interface DispatchResult {
   runs: AgentRun[];
   /** Why nothing was started, when nothing was. */
   skipped?: "no_mentions" | "hop_limit" | "message_missing";
+  /**
+   * Mentioned agents dispatch couldn't wake (I5, I7): no longer in the conversation, archived, or only certain
+   * people may talk to them and the person behind the message (nobody, for a run with none) isn't one.
+   */
+  dropped?: { agentId: string; handle: string; reason: "not_in_channel" | "audience" }[];
 }
 
 /** What starting a run on a message reads of it. */
@@ -254,12 +259,14 @@ export async function dispatchMentions(
   // Re-check at dispatch time: the agent may have been archived or removed from the channel since.
   // An agent asking another one acts for the person behind its run, who must be allowed to talk to it;
   // a routine set to act wakes only agents its creator can talk to.
+  const behind = message.agentRunId ?? (await routinePostRun(db, message));
   const requester =
     (await requesterOf(db, message)) ??
-    (message.agentRunId ? routineCreatorOf(await runAuthorityById(db, message.orgId, message.agentRunId)) : null);
-  const eligible = await eligibleChannelAgents(db, message.orgId, message.channelId, candidates, {
-    requesterUserId: requester,
-  });
+    (behind ? routineCreatorOf(await runAuthorityById(db, message.orgId, behind)) : null);
+  const [eligible, here] = await Promise.all([
+    eligibleChannelAgents(db, message.orgId, message.channelId, candidates, { requesterUserId: requester }),
+    eligibleChannelAgents(db, message.orgId, message.channelId, candidates),
+  ]);
   const runs = await db.transaction((tx) =>
     createAgentRuns(
       tx,
@@ -268,7 +275,24 @@ export async function dispatchMentions(
       "mention",
     ),
   );
-  return { runs };
+  const woken = new Set(eligible.map((a) => a.id));
+  const present = new Map(here.map((a) => [a.id, a.handle]));
+  const missing = candidates.filter((id) => !woken.has(id));
+  if (missing.length === 0) return { runs };
+  const handles = new Map(
+    (
+      await db
+        .select({ id: agents.id, handle: agents.handle })
+        .from(agents)
+        .where(and(eq(agents.orgId, message.orgId), inArray(agents.id, missing)))
+    ).map((a) => [a.id, a.handle]),
+  );
+  const dropped = missing.map((agentId) => ({
+    agentId,
+    handle: handles.get(agentId) ?? agentId,
+    reason: present.has(agentId) ? ("audience" as const) : ("not_in_channel" as const),
+  }));
+  return { runs, dropped };
 }
 
 /**

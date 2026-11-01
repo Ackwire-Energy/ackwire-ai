@@ -25,12 +25,19 @@ export type NoticeCategory = (typeof NOTICE_CATEGORIES)[number];
 /** The kinds of each category. Anything waiting on the person is `waiting`, whatever its kind. */
 export const NOTICE_KINDS: Record<NoticeCategory, readonly NotificationKind[]> = {
   waiting: ["approval", "agent_question", "forum_turn", "browser_handoff", "join_request"],
-  replies: ["agent_reply"],
+  replies: ["agent_reply", "run_failed"],
   mentions: ["mention", "dm"],
   threads: ["thread_reply"],
   tasks: ["issue_assigned", "issue_comment", "issue_status"],
-  routines: ["mission_stopped", "routine_failed", "routine_paused", "routine_stalled"],
-  computers: ["machine_connected", "computer_ready"],
+  routines: [
+    "mission_stopped",
+    "routine_failed",
+    "routine_paused",
+    "routine_stalled",
+    "agent_unreached",
+    "routine_waiting_plan",
+  ],
+  computers: ["machine_connected", "computer_ready", "plan_reset_unknown"],
   reactions: ["reaction"],
 };
 

@@ -109,6 +109,16 @@ describe("inbox items", () => {
       expect(notificationHref({ ...n, source: { channelId: "c1" } })).toBe("/routines");
     }
   });
+
+  test("a routine that couldn't call an agent opens the agent's page (who talks to it), not the report", () => {
+    const n = notification({
+      id: "n",
+      kind: "agent_unreached",
+      actors: [{ type: "agent" as const, id: "a1" }],
+      source: { routineId: "r1", agentId: "a1", userId: "u1", channelId: "c1", messageId: "m1" },
+    });
+    expect(notificationHref(n)).toBe("/agent/a1");
+  });
 });
 
 describe("the workspace's computer is ready", () => {

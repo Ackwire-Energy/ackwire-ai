@@ -19,6 +19,7 @@ import {
   noticeAgentHandle,
   noticeOf,
   noticeRoutineName,
+  skippedHandles,
 } from "@agenteschat/client/lib/notices";
 import { isRoutineCall, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { previewOf } from "../shared/logic";
@@ -170,6 +171,13 @@ export function eventLineOf(
       return from ? line("chat.notice.agentNote", { from }) : line("chat.notice.agentNoteAnon");
     case "wait_result":
       return line("chat.notice.waitResult", { name: names.author });
+    case "wake_skipped":
+      return line("chat.notice.wakeSkipped", {
+        name: names.author,
+        agents: skippedHandles(notice)
+          .map((h) => names.agentByHandle(h) ?? h)
+          .join(", "),
+      });
     case "follow_up": {
       const followUp = followUpLine(notice, names.author, when);
       return followUp ? line(followUp.key, followUp.values) : null;

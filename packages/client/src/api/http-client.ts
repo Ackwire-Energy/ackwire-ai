@@ -692,6 +692,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }),
       refuse: (orgId, id, reason) =>
         request<Approval>(`${org(orgId)}/approvals/${enc(id)}/refuse`, { json: reason ? { reason } : {} }),
+      decideMany: (orgId, input) =>
+        request<{ approvals: Approval[]; skipped: string[] }>(`${org(orgId)}/approvals/decide`, { json: input }),
       rules: async (orgId, agentId) =>
         (await request<{ rules: ApprovalRule[] }>(`${org(orgId)}/agents/${enc(agentId)}/approval-rules`)).rules,
       removeRule: (orgId, agentId, ruleId) =>
