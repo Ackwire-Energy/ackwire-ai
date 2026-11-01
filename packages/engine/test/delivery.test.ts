@@ -4,6 +4,7 @@ import type { ModelRequest } from "@agenteschat/providers";
 import {
   addChannelMember,
   cancelRun,
+  createAgent,
   createAgentRuns,
   deliverNoticeToRun,
   drainOutbox,
@@ -334,6 +335,33 @@ describe("the floor (a follow-up without @ in the channel)", () => {
     expect((await runById(run.id))?.pendingMessageIds).toEqual([follow.id]);
     expect(await runs()).toHaveLength(1);
   });
+});
+
+describe("the floor with two agents answering the same person", () => {
+  const twoAnswering = async () => {
+    f = await setup();
+    const theo = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Theo", handle: "theo" },
+      { model: "claude-sonnet-5-5" },
+    );
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: theo.id });
+    await post("@dev @theo como está o limite de uso de vocês?");
+    expect(await runs()).toHaveLength(2);
+  };
+  for (const [lang, body] of [
+    ["pt-BR", "quanto de cpu e ram nossa máquina tá usando agora?"],
+    ["en", "how much cpu and ram is our machine using right now?"],
+  ] as const) {
+    test(`a follow-up without @ goes to neither run: the router picks who it is for (${lang})`, async () => {
+      await twoAnswering();
+      const follow = await post(body);
+      expect((await messageById(follow.id))?.meta.steeredRunIds).toBeUndefined();
+      expect((await runs()).every((r) => r.pendingMessageIds.length === 0)).toBe(true);
+    });
+  }
 });
 
 describe("a run held by a decision takes nothing new: the agent stays responsive", () => {

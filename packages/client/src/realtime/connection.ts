@@ -10,7 +10,9 @@ import { steerStore } from "./steer";
  *   events arrive only from then on, so what a page read before may be behind;
  * - reconnects with backoff; tells listeners so they catch up over HTTP
  *   (real-time is best effort, the database is the source of truth);
- * - pings to keep the connection alive through proxies.
+ * - pings to keep the connection alive through proxies, and drops a socket whose pong doesn't come back
+ *   (`pongTimeoutMs`): after a network change or a sleep the browser can keep a dead socket "open" for
+ *   minutes while HTTP still works, so messages send and nothing arrives live.
  */
 
 export type ServerFrame =
@@ -115,6 +117,7 @@ export class RealtimeConnection {
   private attempt = 0;
   private retryTimer: unknown = null;
   private pingTimer: unknown = null;
+  private pongTimer: unknown = null;
   private everOpened = false;
   private stopped = true;
   status: ConnectionStatus = "idle";
@@ -125,6 +128,8 @@ export class RealtimeConnection {
       createSocket: SocketFactory;
       timers?: Timers;
       pingMs?: number;
+      /** How long after a ping with nothing heard back the socket counts as dead and is replaced. */
+      pongTimeoutMs?: number;
       backoffMs?: number[];
     },
   ) {}
@@ -236,6 +241,28 @@ export class RealtimeConnection {
     this.send(frame);
   }
 
+  /**
+   * Pings now and replaces the socket if nothing comes back in time (`pongTimeoutMs`). Runs on the ping interval;
+   * call it too when the page may have slept or changed networks (visible again, back online).
+   */
+  checkAlive() {
+    if (!this.isOpen || this.pongTimer !== null) return;
+    this.send({ type: "ping" });
+    const socket = this.socket;
+    this.pongTimer = this.timers.setTimeout(() => {
+      this.pongTimer = null;
+      if (this.socket !== socket || !socket) return;
+      // Its close event may never come (or come late, after the new socket opened): detach it first.
+      socket.onclose = null;
+      socket.onmessage = null;
+      socket.onerror = null;
+      try {
+        socket.close(4000, "no pong");
+      } catch {}
+      this.lost();
+    }, this.options.pongTimeoutMs ?? 10_000);
+  }
+
   /** Whether frames can go out now. */
   get isOpen() {
     return this.socket !== null && this.socket.readyState === OPEN;
@@ -269,15 +296,22 @@ export class RealtimeConnection {
       this.startPing();
       if (reconnected) for (const l of this.reconnectListeners) l();
     };
-    socket.onmessage = (ev) => this.handle(parseServerFrame(ev.data));
+    socket.onmessage = (ev) => {
+      // Anything heard proves the socket alive.
+      if (this.pongTimer !== null) this.timers.clearTimeout(this.pongTimer);
+      this.pongTimer = null;
+      this.handle(parseServerFrame(ev.data));
+    };
     socket.onerror = () => {
       // `onclose` follows and schedules the retry.
     };
-    socket.onclose = () => {
-      this.socket = null;
-      this.clearTimers();
-      if (!this.stopped) this.scheduleReconnect();
-    };
+    socket.onclose = () => this.lost();
+  }
+
+  private lost() {
+    this.socket = null;
+    this.clearTimers();
+    if (!this.stopped) this.scheduleReconnect();
   }
 
   private handle(frame: ServerFrame | null) {
@@ -319,14 +353,16 @@ export class RealtimeConnection {
   private startPing() {
     const ms = this.options.pingMs ?? 30_000;
     if (ms <= 0) return;
-    this.pingTimer = this.timers.setInterval(() => this.send({ type: "ping" }), ms);
+    this.pingTimer = this.timers.setInterval(() => this.checkAlive(), ms);
   }
 
   private clearTimers() {
     if (this.retryTimer !== null) this.timers.clearTimeout(this.retryTimer);
     if (this.pingTimer !== null) this.timers.clearInterval(this.pingTimer);
+    if (this.pongTimer !== null) this.timers.clearTimeout(this.pongTimer);
     this.retryTimer = null;
     this.pingTimer = null;
+    this.pongTimer = null;
   }
 
   private setStatus(status: ConnectionStatus) {

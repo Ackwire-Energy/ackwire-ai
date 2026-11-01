@@ -127,6 +127,51 @@ describe("RealtimeConnection", () => {
     expect(live).toEqual(["c1", "c1"]);
   });
 
+  test("a socket that stops answering (asleep, a network change) is replaced, re-subscribes and catches up", () => {
+    const { factory, sockets } = fakeSockets();
+    const clock = manualTimers();
+    let ping: (() => void) | null = null;
+    clock.timers.setInterval = (fn) => {
+      ping = fn;
+      return 999;
+    };
+    const conn = new RealtimeConnection({
+      url: "ws://x",
+      createSocket: factory,
+      timers: clock.timers,
+      pingMs: 30_000,
+      pongTimeoutMs: 10_000,
+      backoffMs: [100],
+    });
+    let caughtUp = 0;
+    conn.onReconnect(() => caughtUp++);
+    const got: unknown[] = [];
+    conn.subscribe("c1", (e) => got.push(e));
+    conn.start();
+    sockets[0]?.open();
+    // Answered: still the same socket.
+    (ping as unknown as () => void)();
+    sockets[0]?.push({ type: "pong" });
+    expect(clock.pending).toEqual([]);
+    // Silent (half-open: the browser never fires close): replaced.
+    conn.checkAlive();
+    expect(sockets[0]?.sent.at(-1)).toEqual({ type: "ping" });
+    expect(clock.pending.map((p) => p.ms)).toEqual([10_000]);
+    clock.runNext();
+    expect(sockets[0]?.closed).toBe(true);
+    expect(conn.status).toBe("reconnecting");
+    clock.runNext();
+    sockets[1]?.open();
+    expect(sockets[1]?.sent).toEqual([{ type: "subscribe", channelId: "c1" }]);
+    expect(caughtUp).toBe(1);
+    // A late close of the dead socket changes nothing.
+    sockets[0]?.drop();
+    expect(conn.status).toBe("open");
+    const event = { type: "agent.thinking", channelId: "c1", threadId: null, agentId: "a", runId: "r" };
+    sockets[1]?.push({ type: "event", channelId: "c1", event });
+    expect(got).toEqual([event]);
+  });
+
   test("stop closes the socket and never reconnects", () => {
     const { factory, last } = fakeSockets();
     const clock = manualTimers();
