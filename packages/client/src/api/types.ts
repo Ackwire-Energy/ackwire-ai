@@ -2363,8 +2363,8 @@ export type ArtifactAudience =
   | { kind: "workspace" }
   /** A public channel's files: anyone in the workspace may open them. */
   | { kind: "channel"; name: string; private: boolean }
-  /** `with`: the other participant of the DM. */
-  | { kind: "dm"; with: ArtifactAuthor | null };
+  /** `with`: the other participant of the DM; `gone`: an archived agent or a person who left (the DM can't open). */
+  | { kind: "dm"; with: ArtifactAuthor | null; gone?: true };
 
 /** `GET …/artifacts-trash`: deleted files, kept for 30 days. */
 export interface TrashedArtifact extends Artifact {

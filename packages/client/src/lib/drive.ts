@@ -83,14 +83,14 @@ export function driveSections(list: Artifact[], group: DriveGroup, now = new Dat
 
 /**
  * Where "Abrir na conversa" goes: its thread, else its DM (by the other side) or channel. Null for a file
- * of no conversation, or a DM whose other side is gone.
+ * of no conversation, or a DM whose other side is gone (missing, an archived agent, a person who left).
  */
 export function artifactPlace(a: Pick<Artifact, "channelId" | "threadId" | "audience">): OpenTarget | null {
   if (!a.channelId) return null;
   if (a.threadId) return { to: "/org/$orgId/threads/$threadId", params: { threadId: a.threadId } };
   if (a.audience.kind !== "dm") return { to: "/org/$orgId/c/$channelId", params: { channelId: a.channelId } };
   const other = a.audience.with;
-  if (!other) return null;
+  if (!other || a.audience.gone) return null;
   return other.type === "agent"
     ? { to: "/org/$orgId/dm/agent/$agentId", params: { agentId: other.id } }
     : { to: "/org/$orgId/dm/person/$userId", params: { userId: other.id } };

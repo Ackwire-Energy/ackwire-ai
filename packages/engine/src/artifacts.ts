@@ -373,6 +373,18 @@ async function personCanRead(db: Database, userId: string, orgId: string, a: Pic
   return row.memberId !== null || (row.visibility === "public" && (row.kind === "channel" || row.kind === "forum"));
 }
 
+/** The channels whose files this person may read: those they belong to, and public channels and forums. */
+async function personReadableChannels(db: Database, userId: string, orgId: string): Promise<string[]> {
+  const member = and(eq(channelMembers.channelId, channels.id), eq(channelMembers.userId, userId));
+  const open = and(eq(channels.visibility, "public"), inArray(channels.kind, ["channel", "forum"]));
+  const rows = await db
+    .select({ id: channels.id })
+    .from(channels)
+    .leftJoin(channelMembers, member)
+    .where(and(eq(channels.orgId, orgId), or(sql`${channelMembers.id} is not null`, open)));
+  return rows.map((r) => r.id);
+}
+
 async function canRead(db: Database, actor: ArtifactActor, orgId: string, a: Pick<ArtifactRow, "channelId">) {
   if (actor.type === "person") return personCanRead(db, actor.userId, orgId, a);
   if (!a.channelId) return true;
@@ -842,14 +854,7 @@ export async function listArtifacts(
       visible = [...new Set([...visible, ...shared])];
     }
   } else {
-    const member = and(eq(channelMembers.channelId, channels.id), eq(channelMembers.userId, actor.userId));
-    const open = and(eq(channels.visibility, "public"), inArray(channels.kind, ["channel", "forum"]));
-    const rows = await db
-      .select({ id: channels.id })
-      .from(channels)
-      .leftJoin(channelMembers, member)
-      .where(and(eq(channels.orgId, orgId), or(sql`${channelMembers.id} is not null`, open)));
-    visible = rows.map((r) => r.id);
+    visible = await personReadableChannels(db, actor.userId, orgId);
   }
   const q = filters.q?.trim();
   const rows = await db
@@ -1084,7 +1089,8 @@ const canDeleteArtifact = async (db: Database, userId: string, orgId: string, a:
 export type ArtifactAudience =
   | { kind: "workspace" }
   | { kind: "channel"; name: string; private: boolean }
-  | { kind: "dm"; with: ArtifactAuthor | null };
+  /** `gone`: the other side is an archived agent or a person who left, so the DM can't be opened any more. */
+  | { kind: "dm"; with: ArtifactAuthor | null; gone?: true };
 
 /** What the app adds for the person viewing: may they delete it, and who can see it. */
 export interface PersonArtifactFacts {
@@ -1121,6 +1127,38 @@ export async function withPersonFacts<T extends Pick<ArtifactView, "id" | "chann
         .from(channelMembers)
         .where(inArray(channelMembers.channelId, dmIds))
     : [];
+  const others = dmMembers.filter((m) => m.userId !== userId);
+  const otherAgents = [...new Set(others.flatMap((m) => (m.agentId ? [m.agentId] : [])))];
+  const otherPeople = [...new Set(others.flatMap((m) => (m.userId && !m.agentId ? [m.userId] : [])))];
+  // What `openDm` refuses: an archived agent, or a person no longer (or blocked) in the workspace.
+  const [liveAgents, livePeople] = await Promise.all([
+    otherAgents.length
+      ? db
+          .select({ id: schema.agents.id })
+          .from(schema.agents)
+          .where(
+            and(
+              eq(schema.agents.orgId, orgId),
+              inArray(schema.agents.id, otherAgents),
+              isNull(schema.agents.archivedAt),
+            ),
+          )
+      : Promise.resolve([]),
+    otherPeople.length
+      ? db
+          .select({ id: schema.organizationMembers.userId })
+          .from(schema.organizationMembers)
+          .innerJoin(schema.users, eq(schema.users.id, schema.organizationMembers.userId))
+          .where(
+            and(
+              eq(schema.organizationMembers.orgId, orgId),
+              inArray(schema.organizationMembers.userId, otherPeople),
+              isNull(schema.users.blockedAt),
+            ),
+          )
+      : Promise.resolve([]),
+  ]);
+  const live = new Set([...liveAgents, ...livePeople].map((r) => r.id));
   const audience = new Map<string, ArtifactAudience>(
     chans.map((c): [string, ArtifactAudience] => {
       if (c.kind !== "dm") return [c.id, { kind: "channel", name: c.name, private: c.visibility !== "public" }];
@@ -1130,7 +1168,7 @@ export async function withPersonFacts<T extends Pick<ArtifactView, "id" | "chann
         : other?.userId
           ? { type: "person", id: other.userId }
           : null;
-      return [c.id, { kind: "dm", with: who }];
+      return [c.id, who && !live.has(who.id) ? { kind: "dm", with: who, gone: true } : { kind: "dm", with: who }];
     }),
   );
   return list.map((a) => ({
@@ -1182,13 +1220,18 @@ export interface TrashedArtifactView {
   purgeAt: string;
 }
 
-async function deletedRow(db: Database, orgId: string, id: string) {
+/** A trashed file this person can still read (as `readable` for live files), else null. */
+async function deletedRow(db: Database, userId: string, orgId: string, id: string) {
   const [a] = await db
     .select()
     .from(artifacts)
     .where(and(eq(artifacts.id, id), eq(artifacts.orgId, orgId), sql`${artifacts.deletedAt} is not null`));
-  return a ?? null;
+  return a && (await personCanRead(db, userId, orgId, a)) ? a : null;
 }
+
+/** Still in the trash: deleted, and not longer ago than the trash keeps files. */
+const inTrash = () =>
+  sql`${artifacts.deletedAt} > ${new Date(Date.now() - ARTIFACT_TRASH_DAYS * 86_400_000).toISOString()}::timestamptz`;
 
 const purgeAt = (deletedAt: Date) => new Date(deletedAt.getTime() + ARTIFACT_TRASH_DAYS * 86_400_000);
 
@@ -1206,7 +1249,14 @@ export async function listDeletedArtifacts(
     .where(and(eq(artifacts.orgId, orgId), sql`${artifacts.deletedAt} > ${since.toISOString()}::timestamptz`))
     .orderBy(desc(artifacts.deletedAt))
     .limit(500);
-  const deletable = await deletableIds(db, userId, orgId, rows);
+  // Deleting a file never widens who may read it: the trash shows only files this person could still open.
+  const readable = new Set(await personReadableChannels(db, userId, orgId));
+  const deletable = await deletableIds(
+    db,
+    userId,
+    orgId,
+    rows.filter((a) => !a.channelId || readable.has(a.channelId)),
+  );
   const out: TrashedArtifactView[] = [];
   for (const a of rows) {
     if (!deletable.has(a.id)) continue;
@@ -1225,7 +1275,7 @@ export async function listDeletedArtifacts(
 
 /** Brings a deleted file back (within 30 days), for the same people who may delete it. */
 export async function restoreArtifact(deps: ArtifactDeps, userId: string, orgId: string, artifactId: string) {
-  const a = await deletedRow(deps.db, orgId, artifactId);
+  const a = await deletedRow(deps.db, userId, orgId, artifactId);
   if (!a?.deletedAt) throw new NotFoundError("Artifact not found", "artifact.not_found");
   if (purgeAt(a.deletedAt).getTime() <= Date.now()) {
     throw new ConflictError("This file was deleted more than 30 days ago", "artifact.purged", {
@@ -1243,7 +1293,13 @@ export async function restoreArtifact(deps: ArtifactDeps, userId: string, orgId:
   const bytes = Number(kept?.bytes ?? 0);
   if (bytes > 0) await assertStorageRoom(deps.db, orgId, bytes, { daily: false });
   const [row] = await deps.db.transaction(async (tx) => {
-    const updated = await tx.update(artifacts).set({ deletedAt: null }).where(eq(artifacts.id, a.id)).returning();
+    // Conditional: a "delete for good" that committed since the read above wins.
+    const updated = await tx
+      .update(artifacts)
+      .set({ deletedAt: null })
+      .where(and(eq(artifacts.id, a.id), inTrash()))
+      .returning();
+    if (updated.length === 0) throw new NotFoundError("Artifact not found", "artifact.not_found");
     await enqueueIndex(tx, { orgId, kind: "file", sourceId: a.id });
     await recordAudit(tx, {
       orgId,
@@ -1289,7 +1345,7 @@ export async function purgeDeletedArtifacts(deps: ArtifactDeps, now = new Date()
  * would take them after 30 days. The same people who may restore it.
  */
 export async function purgeArtifactNow(deps: ArtifactDeps, userId: string, orgId: string, artifactId: string) {
-  const a = await deletedRow(deps.db, orgId, artifactId);
+  const a = await deletedRow(deps.db, userId, orgId, artifactId);
   if (!a?.deletedAt || purgeAt(a.deletedAt).getTime() <= Date.now()) {
     throw new NotFoundError("Artifact not found", "artifact.not_found");
   }
@@ -1300,7 +1356,13 @@ export async function purgeArtifactNow(deps: ArtifactDeps, userId: string, orgId
   // (and out of restore) with no column of its own.
   const gone = new Date(Date.now() - ARTIFACT_TRASH_DAYS * 86_400_000 - 1000);
   await deps.db.transaction(async (tx) => {
-    await tx.update(artifacts).set({ deletedAt: gone }).where(eq(artifacts.id, a.id));
+    // Conditional: a restore that committed since the read above wins, and its contents stay.
+    const updated = await tx
+      .update(artifacts)
+      .set({ deletedAt: gone })
+      .where(and(eq(artifacts.id, a.id), inTrash()))
+      .returning({ id: artifacts.id });
+    if (updated.length === 0) throw new NotFoundError("Artifact not found", "artifact.not_found");
     await recordAudit(tx, {
       orgId,
       actor: { type: "person", id: userId },

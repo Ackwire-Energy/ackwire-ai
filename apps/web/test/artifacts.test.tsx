@@ -156,6 +156,33 @@ describe("artifact cards in the chat", () => {
   });
 });
 
+describe("a file card's right click (desktop app)", () => {
+  test("who may delete it gets Mover para a lixeira, which asks first and sends it to the trash", async () => {
+    const w = window as { __agentesDesktop?: unknown; __TAURI_INTERNALS__?: unknown };
+    w.__agentesDesktop = { version: "0.6.0" };
+    w.__TAURI_INTERNALS__ = { invoke: async (cmd: string) => (cmd === "this_mac" ? { orgs: [] } : {}) };
+    try {
+      const { api, a } = await openChannel();
+      await act(async () =>
+        fireEvent.contextMenu(card("Relatório de incidente: checkout"), { clientX: 40, clientY: 60 }),
+      );
+      await settle(2);
+      const menu = screen().getByRole("menu");
+      await click(within(menu).getByRole("menuitem", { name: "Mover para a lixeira" }));
+      await settle(2);
+      const confirm = screen().getByRole("dialog", {
+        name: "Mover “Relatório de incidente: checkout” para a lixeira?",
+      });
+      await click(within(confirm).getByRole("button", { name: "Mover para a lixeira" }));
+      await settle(4);
+      expect((await api.artifacts.trash(ORG_ID)).map((x) => x.id)).toContain(a.document.id);
+    } finally {
+      delete w.__agentesDesktop;
+      delete w.__TAURI_INTERNALS__;
+    }
+  });
+});
+
 describe("artifact viewer", () => {
   test("document: rendered Markdown with code in mono, download and copy link", async () => {
     const { a } = await openChannel();
@@ -776,6 +803,8 @@ describe("artifact helpers", () => {
     });
     expect(artifactPlace(drive)).toBeNull();
     expect(artifactPlace(file("gone", { kind: "dm", with: null }))).toBeNull();
+    // An archived agent's or a departed person's DM can't be opened: no button, never an error page.
+    expect(artifactPlace(file("archived", { kind: "dm", with: { type: "agent", id: "a" }, gone: true }))).toBeNull();
   });
 
   test("document preview skips marks and code", () => {

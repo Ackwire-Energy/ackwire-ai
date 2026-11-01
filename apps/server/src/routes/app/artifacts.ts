@@ -76,7 +76,13 @@ const Audience = z
   .discriminatedUnion("kind", [
     z.object({ kind: z.literal("workspace") }),
     z.object({ kind: z.literal("channel"), name: z.string(), private: z.boolean() }),
-    z.object({ kind: z.literal("dm"), with: Author.nullable().openapi({ description: "The other participant." }) }),
+    z.object({
+      kind: z.literal("dm"),
+      with: Author.nullable().openapi({ description: "The other participant." }),
+      gone: z.literal(true).optional().openapi({
+        description: "The other side is an archived agent or a person who left: the DM can't be opened.",
+      }),
+    }),
   ])
   .openapi("ArtifactAudience", { description: "Who can see the file, from the conversation it came from." });
 

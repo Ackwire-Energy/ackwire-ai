@@ -30,6 +30,9 @@ The Drive already had a trash: deleting a file sets `artifacts.deleted_at`, the 
 
 ## Consequences
 
-- No leak was found: people read a channel's file only as members or when the channel is public, and a DM's file only as one of its two sides.
+- Live files had no leak: people read a channel's file only as members or when the channel is public, and a DM's file only as one of its two sides. The trash had one: its list, restore and delete for good checked only who may delete, so an admin or an agent's owner saw (and could restore or destroy) a trashed file from a DM they aren't in. The trash now applies the same read rule (`personReadableChannels`, `personCanRead`); outside it, restore and delete for good answer 404.
+- Restore and delete for good both write only while the file is still in the trash (a conditional update), so when they race the first to commit wins and a restored file keeps its contents.
+- A DM whose other side is an archived agent or a person who left (or was blocked) can't be opened (`openDm` refuses it): its files carry `audience.gone`, and the app shows no way into it.
+- The chat file card's right click (desktop app) offers "Mover para a lixeira" to the same people.
 - Moving a file between conversations isn't possible, so `audience` never changes after creation; a DM's file that someone re-attaches elsewhere stays readable only by the DM's two sides.
 - If the trash should count toward storage, that's `storedBytesQueries` dropping the `deleted_at` filter and `restoreArtifact` dropping its room check; it stays a product decision.
