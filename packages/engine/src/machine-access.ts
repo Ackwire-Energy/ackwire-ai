@@ -26,6 +26,7 @@ import {
 import { insertMessage, messageView } from "./messages";
 import { enqueue } from "./outbox";
 import { replyThreadOf } from "./runs";
+import { hopLimitReached, runStretchOf } from "./stretch";
 import type { ToolContext } from "./tools/types";
 
 const { machines, machineAccessRequests, agentRuns } = schema;
@@ -231,7 +232,7 @@ async function postRequestedNote(deps: AccessDeps, row: AccessRequestRow, comput
     orgId: row.orgId,
     channelId: row.channelId,
     threadId: row.threadRootId,
-    author: { type: "agent", agentId: row.agentId, runId: null, hop: 0 },
+    author: { type: "agent", agentId: row.agentId, runId: null, hop: 0, stretchId: null },
     body: `Asked the owner of ${computer} for ${row.path}${row.reason ? ` (${row.reason})` : ""}. Without the app there, they can run: ${command}`,
     meta: {
       machineAccess: { requestId: row.id, path: row.path, decision: "pending", computer, machineId: row.machineId },
@@ -297,6 +298,8 @@ export function accessDecisionNotice(row: AccessRequestRow, computer: string) {
         ...(row.scope ? { scope: row.scope } : {}),
         computer,
         machineId: row.machineId,
+        // The run that asked: the work it needed the folder for continues for whoever is behind it (`authority.ts`).
+        ...(row.runId ? { runId: row.runId } : {}),
       },
       bodyCode: `machine_access_${row.status}`,
       bodyParams: { path: row.path, computer },
@@ -315,9 +318,14 @@ export async function wakeForAccessDecision(deps: AccessDeps, requestId: string,
   const machine = await getMachineById(deps.db, row.machineId);
   const computer = machine?.name ?? "the computer";
   const [origin] = row.runId
-    ? await deps.db.select({ hop: agentRuns.hop }).from(agentRuns).where(eq(agentRuns.id, row.runId))
+    ? await deps.db
+        .select({ hop: agentRuns.hop, stretchId: agentRuns.stretchId, triggerMessageId: agentRuns.triggerMessageId })
+        .from(agentRuns)
+        .where(eq(agentRuns.id, row.runId))
     : [];
   const hop = origin?.hop ?? 1;
+  // The work it ends is the origin run's, in its stretch (ADR 0089).
+  const stretchId = origin ? runStretchOf(origin) : null;
   const eligible = await eligibleChannelAgents(
     deps.db,
     row.orgId,
@@ -337,12 +345,12 @@ export async function wakeForAccessDecision(deps: AccessDeps, requestId: string,
       orgId: row.orgId,
       channelId: row.channelId,
       threadId: row.threadRootId,
-      author: { type: "agent", agentId: row.agentId, runId: null, hop },
+      author: { type: "agent", agentId: row.agentId, runId: null, hop, stretchId },
       body: notice.body,
       meta: notice.meta,
     });
     const runs =
-      eligible.length > 0 && message.hop < options.maxHops
+      eligible.length > 0 && !(await hopLimitReached(tx, message, options.maxHops))
         ? await createAgentRuns(tx, message, [row.agentId], "mention")
         : [];
     return { message, runs };

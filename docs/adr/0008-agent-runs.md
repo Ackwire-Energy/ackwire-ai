@@ -1,6 +1,6 @@
 # 0008. Agent runs: a Postgres state machine; mentions and the hop limit
 
-- Status: Accepted
+- Status: Accepted. Amended 2026-10-31 by ADR 0089: the hop limit is a depth backstop (`AGENT_MAX_HOPS`, default 100) behind the limits per stretch
 - Date: 2026-10-14
 
 ## Decision

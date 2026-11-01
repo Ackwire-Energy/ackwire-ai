@@ -30,6 +30,8 @@ import {
   recoverStaleRuns,
   releaseInbox,
   runBrainOf,
+  STUCK_END_NOTE,
+  STUCK_NOTE,
   type ToolSource,
   WRAP_UP_NOTE,
 } from "../src";
@@ -459,6 +461,46 @@ describe("a routine's background run never posts by itself", () => {
     expect((await runById(run.id))?.status).toBe("done");
     expect(ends()).toEqual([{ runId: run.id, status: "done", text: "Resumo: 3 PRs abertos, nenhum novo." }]);
   });
+
+  test("going in circles: one note, then told to hand off what it has, then it fails as stuck in its ledger", async () => {
+    f = await setup({
+      toolSources: [workTools()],
+      judge: (kind) => (kind === "stuck_run" ? 0.9 : undefined),
+      reply: () => ({ chunks: [], toolUses: [{ name: "look", input: {} }] }),
+    });
+    const { run, routineRun } = await backgroundRun();
+    await drainOutbox(f.db, f.handlers);
+
+    const requests = f.provider.calls.map((c) => c.request);
+    expect(requests).toHaveLength(8);
+    expect(lastText(requests[3] as ModelRequest)).toContain(STUCK_NOTE);
+    expect(lastText(requests[6] as ModelRequest)).toContain(STUCK_END_NOTE);
+    expect(await runById(run.id)).toMatchObject({ status: "failed", error: "stuck" });
+    expect(await agentMessages()).toEqual([]);
+    expect(await routineRunById(routineRun.id)).toMatchObject({ status: "failed", code: "stuck" });
+  });
+
+  test("going in circles, it does as told and ends with its record: the routine run still fails as stuck", async () => {
+    const record = "Olhei os PRs 6 vezes e nada mudou.";
+    f = await setup({
+      toolSources: [workTools()],
+      judge: (kind) => (kind === "stuck_run" ? 0.9 : undefined),
+      reply: (req) =>
+        lastText(req).includes(STUCK_END_NOTE)
+          ? { chunks: [record] }
+          : { chunks: [], toolUses: [{ name: "look", input: {} }] },
+    });
+    const { run, routine, routineRun } = await backgroundRun();
+    await drainOutbox(f.db, f.handlers);
+
+    expect(f.provider.calls).toHaveLength(7);
+    expect(await runById(run.id)).toMatchObject({ status: "failed", error: "stuck" });
+    expect(ends()).toEqual([{ runId: run.id, status: "failed", code: "stuck", detail: record }]);
+    expect(await routineRunById(routineRun.id)).toMatchObject({ status: "failed", code: "stuck", summary: record });
+    // A failure like any other: a routine stuck on every firing is paused as a failing one.
+    const [after] = await f.db.select().from(schema.routines).where(eq(schema.routines.id, routine.id));
+    expect(after?.failuresInRow).toBe(1);
+  });
 });
 
 describe("the brain a run thinks with", () => {
@@ -536,6 +578,7 @@ describe("what a run owes", () => {
         channelId: f.general.id,
         threadId: null,
         hop: 0,
+        stretchId: null,
         notice: { kind: "agent_note", text, from: "@infra", refs: {} },
       }),
     );
@@ -630,8 +673,8 @@ describe("what a run owes", () => {
     expect(after?.status).toBe("done");
     expect(after?.transcript).not.toHaveProperty("answerOwed");
     expect(after?.transcript).not.toHaveProperty("steeredBy");
-    // It passed: the person was talking to QA.
-    expect(await agentMessages()).toEqual([]);
+    // It passed: the person was talking to QA (whose own run answers them).
+    expect((await agentMessages()).filter((m) => m.authorAgentId === f.agent.id)).toEqual([]);
   });
 
   test("a run that changed something posts its receipts instead of passing", async () => {
@@ -697,8 +740,8 @@ describe("what a run owes", () => {
     const events = f.listen(f.general.id);
     await drainOutbox(f.db, handlers);
 
-    expect(await runById(first?.id ?? "")).toMatchObject({ status: "failed", error: "too_many_tool_calls" });
-    // Never marked read by the run that failed at the cap.
+    expect(await runById(first?.id ?? "")).toMatchObject({ status: "done", error: null });
+    // Never marked read by the run that ended at the cap.
     const read = events.filter((e) => e.type === "agent.run.read" && e.runId === first?.id) as {
       messageIds?: string[];
     }[];
@@ -746,7 +789,7 @@ describe("handing on unread messages", () => {
       orgId: f.org.id,
       channelId: f.general.id,
       threadId: other.threadRootId,
-      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0 },
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0, stretchId: null },
       body: "Nota",
       meta: { notice: { kind: "agent_note", text: "Nota", refs: {} } },
     });
@@ -760,7 +803,7 @@ describe("handing on unread messages", () => {
     const dmNote = await insertMessage(f.db, {
       orgId: f.org.id,
       channelId: dm.id,
-      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0 },
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0, stretchId: null },
       body: "Nota",
       meta: { notice: { kind: "agent_note", text: "Nota", refs: {} } },
     });
@@ -791,6 +834,7 @@ describe("the run a routine's report woke", () => {
         channelId: f.general.id,
         threadId: null,
         hop: 0,
+        stretchId: null,
         notice: {
           kind: "routine_handoff",
           text: "12 erros novos no checkout desde as 9h.",

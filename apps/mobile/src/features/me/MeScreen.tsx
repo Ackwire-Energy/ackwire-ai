@@ -1,5 +1,5 @@
 import { useAiAccounts, useCredentials, useIssues, useJoinRequests, useMe } from "@agenteschat/client";
-import { accountTitle, groupPlans, ownSignIns } from "@agenteschat/client/lib/ai-accounts";
+import { accountTitle, groupPlans, ownSignIns, ownSignInTitle } from "@agenteschat/client/lib/ai-accounts";
 import { can } from "@agenteschat/client/lib/permissions";
 import Constants from "expo-constants";
 import { router } from "expo-router";
@@ -52,8 +52,6 @@ export function MeScreen() {
   const accounts = groupPlans(ai.data?.accounts ?? []);
   const plans = own.length + accounts.length;
   const c = useColors();
-  // Membros, for who invites people or manages members (the requests to join and the invitation link live there).
-  const manager = can(org.org, "invite_people") || can(org.org, "manage_members");
   const requests = useJoinRequests(org.orgId, can(org.org, "invite_people"));
   const waiting = requests.data?.length ?? 0;
   const push = usePushSwitch().on;
@@ -74,16 +72,13 @@ export function MeScreen() {
   const myAgents = dir.agents.filter((a) => a.ownerUserId === meId);
   const headline = [mine?.handle ? `@${mine.handle}` : null, role, org.org?.name].filter(Boolean).join(" · ");
   const workspaceRows: { icon: IconName; label: string; value?: string; href: string }[] = [
-    ...(manager
-      ? [
-          {
-            icon: "members" as const,
-            label: t("members.title"),
-            ...(waiting > 0 ? { value: t("mobile.members.waiting", { count: waiting }) } : {}),
-            href: "/me/members",
-          },
-        ]
-      : []),
+    // Everyone's: who invites finds the requests there, and a member who may not suggests someone (ADR 0090).
+    {
+      icon: "members",
+      label: t("members.title"),
+      ...(waiting > 0 ? { value: t("mobile.members.waiting", { count: waiting }) } : {}),
+      href: "/me/members",
+    },
     {
       icon: "checkc",
       label: t("mobile.me.issues"),
@@ -213,7 +208,7 @@ export function MeScreen() {
         <PlanRow
           key={o.key}
           logo={o.kind}
-          title={accountTitle({ label: t(`aiAccounts.connect.${o.kind}`), plan: o.plan })}
+          title={ownSignInTitle(t, o)}
           sub={t("mobile.me.ownOn", { computer: o.computer })}
           usage={o.usage}
           divider={i > 0}

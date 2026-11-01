@@ -71,8 +71,8 @@
   background: var(--plate);
   color: var(--ink);
 }
-.brw-site button:focus-visible {
-  outline: 2px solid var(--ink);
+html:not([data-pointer]) .brw-site button:focus-visible {
+  outline: 2px solid var(--focus-color);
   outline-offset: 1px;
 }
 .brw-sites__add {
@@ -270,12 +270,6 @@
   gap: 8px;
   flex-wrap: wrap;
 }
-.brw-rq__hint {
-  flex: 1 1 240px;
-  min-width: 0;
-  font-size: 12px;
-  color: var(--faint);
-}
 .brw-rq__res {
   display: flex;
   align-items: center;
@@ -441,9 +435,9 @@
     inset 0 2px 5px rgba(0, 0, 0, 0.08),
     inset 0 0 0 1px var(--line);
 }
-.brw-secure:focus-visible,
-.brw-key:focus-visible {
-  outline: 2px solid var(--ink);
+html:not([data-pointer]) .brw-secure:focus-visible,
+html:not([data-pointer]) .brw-key:focus-visible {
+  outline: 2px solid var(--focus-color);
   outline-offset: 2px;
 }
 .brw-keys {
@@ -563,8 +557,8 @@
   gap: 10px;
   border-radius: 12px;
 }
-.brw-ac__tt:focus-visible {
-  outline: 2px solid var(--ink);
+html:not([data-pointer]) .brw-ac__tt:focus-visible {
+  outline: 2px solid var(--focus-color);
   outline-offset: 2px;
 }
 .brw-ac__tx {
@@ -714,8 +708,8 @@
 .brw-ac__page.is-control img {
   cursor: pointer;
 }
-.brw-ac__page.is-control:focus-visible {
-  outline: 2px solid var(--ink);
+html:not([data-pointer]) .brw-ac__page.is-control:focus-visible {
+  outline: 2px solid var(--focus-color);
   outline-offset: 2px;
 }
 /* Before the first frame: a page-shaped placeholder (a site is a light page in both themes). */
@@ -887,8 +881,8 @@
 .brw-kc:hover {
   color: var(--ink);
 }
-.brw-kc:focus-visible {
-  outline: 2px solid var(--ink);
+html:not([data-pointer]) .brw-kc:focus-visible {
+  outline: 2px solid var(--focus-color);
   outline-offset: 2px;
 }
 
@@ -1236,8 +1230,8 @@
   background: var(--plate);
   color: var(--ink);
 }
-.brw-trail__ext:focus-visible {
-  outline: 2px solid var(--ink);
+html:not([data-pointer]) .brw-trail__ext:focus-visible {
+  outline: 2px solid var(--focus-color);
   outline-offset: 1px;
 }
 .brw-trail__page ol {
@@ -1508,7 +1502,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.brw-mf__now:focus-visible {
+/* The frame's own ink on the agent's color, where gray wouldn't show. */
+html:not([data-pointer]) .brw-mf__now:focus-visible {
   box-shadow: 0 0 0 2px var(--frame-ink);
 }
 .brw-mf__acts {
@@ -1675,8 +1670,8 @@
   font-size: 13px;
   color: var(--ink2);
 }
-.brw-mf-end__row:focus-visible {
-  outline: 2px solid var(--ink);
+html:not([data-pointer]) .brw-mf-end__row:focus-visible {
+  outline: 2px solid var(--focus-color);
   outline-offset: -2px;
   border-radius: inherit;
 }

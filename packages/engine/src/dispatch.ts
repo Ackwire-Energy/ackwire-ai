@@ -4,10 +4,12 @@ import { messageRoot, personOfMessage, runAuthorityById } from "./authority";
 import { dmAgents, isAgentOnlyDm } from "./dms";
 import { getMessage, type Message } from "./messages";
 import { enqueue } from "./outbox";
+import { routineCreatorOf } from "./requester";
 import { holdsMessages } from "./run-hold";
 import { ACTIVE_RUN_STATUSES, queueOnRun } from "./run-inbox";
 import { inChannelRun } from "./run-scope";
 import type { AgentRun } from "./runs";
+import { holdOf, hopLimitReached, pauseStretch, stretchOf, stretchStop } from "./stretch";
 
 const { agents, channelMembers, channels, agentRuns, messages } = schema;
 
@@ -19,6 +21,12 @@ export interface DispatchResult {
   skipped?: "no_mentions" | "hop_limit" | "message_missing";
 }
 
+/** What starting a run on a message reads of it. */
+type Trigger = Pick<
+  Message,
+  "id" | "orgId" | "channelId" | "threadId" | "hop" | "stretchId" | "authorAgentId" | "agentRunId"
+>;
+
 /**
  * Creates one `agent_run` per agent for a trigger message and enqueues its
  * execution, in the caller's transaction. Shared by every way agents wake up
@@ -26,11 +34,11 @@ export interface DispatchResult {
  * `(trigger_message_id, agent_id)` is unique and the execute job has a dedupe
  * key, so a redelivered event starts nothing twice.
  *
- * Callers decide WHO may run (eligibility, hop limit); this never grants anything.
+ * Callers decide WHO may run (eligibility, the depth backstop); this never grants anything.
  */
 export async function createAgentRuns(
   tx: Executor,
-  message: Pick<Message, "id" | "orgId" | "channelId" | "threadId" | "hop">,
+  message: Trigger,
   agentIds: string[],
   trigger: RunTrigger,
   options: StartRunOptions = {},
@@ -55,17 +63,23 @@ export interface StartRunOptions {
    * conversation's active run (nor does anything ever join it).
    */
   background?: boolean;
+  /**
+   * A person let the work go on (Continuar on a stretch's pause card): the run starts at hop 1 in this fresh
+   * stretch, past the limits of the one that held it (ADR 0089).
+   */
+  granted?: string;
 }
 
 /**
  * One agent and one message: the message joins the agent's active run in that conversation (read
  * at its next step; `joined`), or a run starts on it (`created`). Null: nothing to do (a
- * redelivered event). A run that ends between the lookup and the append is never appended to:
- * the message starts a run of its own instead.
+ * redelivered event), or a run agents started on their own would pass its stretch's limits
+ * (`stretchStop`): the wake-up is held for the pause card (ADR 0089). A run that ends between the
+ * lookup and the append is never appended to: the message starts a run of its own instead.
  */
 export async function startOrJoinRun(
   tx: Executor,
-  message: Pick<Message, "id" | "orgId" | "channelId" | "threadId" | "hop">,
+  message: Trigger,
   agentId: string,
   trigger: RunTrigger,
   options: StartRunOptions = {},
@@ -92,8 +106,13 @@ export async function startOrJoinRun(
           eq(agentRuns.channelId, message.channelId),
           inArray(agentRuns.status, [...ACTIVE_RUN_STATUSES]),
           eq(agentRuns.background, false),
-          sql`(${agentRuns.threadRootId} = ${message.threadId ?? message.id}::uuid or exists (
-            select 1 from channels c where c.id = ${message.channelId}::uuid and c.kind = 'dm')
+          // In a DM the main timeline is one conversation; each thread (a mission's) is its own.
+          sql`(${agentRuns.threadRootId} = ${message.threadId ?? message.id}::uuid or ${
+            message.threadId
+              ? sql`false`
+              : sql`(${inChannelRun(sql`${agentRuns}`)} and exists (
+            select 1 from channels c where c.id = ${message.channelId}::uuid and c.kind = 'dm'))`
+          }
             or ${
               options.joinChannelRun && !message.threadId
                 ? sql`(${agentRuns.status} in ('queued', 'running') and ${inChannelRun(sql`${agentRuns}`)})`
@@ -114,6 +133,15 @@ export async function startOrJoinRun(
       break;
     }
   }
+  // Agents started it (its trigger is an agent's, hop 1 or more): within its stretch's limits. A forum's turns and a
+  // routine's background run keep their own.
+  if (!options.granted && trigger !== "forum" && !options.background && message.hop >= 1) {
+    const stop = await stretchStop(tx, message.orgId, stretchOf(message), agentId, message.id);
+    if (stop) {
+      await pauseStretch(tx, message.orgId, await holdOf(tx, message, agentId, trigger, stop));
+      return null;
+    }
+  }
   const [run] = await tx
     .insert(agentRuns)
     .values({
@@ -123,7 +151,8 @@ export async function startOrJoinRun(
       threadRootId: message.threadId ?? message.id,
       triggerMessageId: message.id,
       trigger,
-      hop: message.hop + 1,
+      hop: options.granted ? 1 : message.hop + 1,
+      stretchId: options.granted ?? stretchOf(message),
       ...(options.background ? { background: true } : {}),
     })
     .onConflictDoNothing()
@@ -142,10 +171,10 @@ export async function startOrJoinRun(
 /**
  * Whether a message may join a run active in its conversation (ADR 0053 §4, §9). A person's own words
  * steer the agent's run there (and put them behind an unattended one), except in the agents' DM, where a
- * run works for one person. Another agent's message for a person joins only a run working for that same
- * person. A routine's report or another agent's note joins only a run such news woke: never one working
- * for a person, nor the agent's own work (a mission's); it starts a run of its own. The agent's own
- * events (a task that ended, a folder decision) still go to whatever run is working there.
+ * run works for one person. Another agent's message for a person, and work coming back to a person's run (a
+ * note's reply, a task that ended, a folder decision), joins only a run working for that same person. A
+ * routine's report joins only a run such news woke: never one working for a person, nor the agent's own work
+ * (a mission's); it starts a run of its own. What nobody is behind still goes to whatever run works there.
  */
 export async function mayJoin(
   tx: Executor,
@@ -206,9 +235,8 @@ export const requesterOf = (db: Executor, message: Pick<Message, "orgId" | "id">
 
 /**
  * Handles `message.posted` for messages with mentions: starts one run per
- * explicitly @mentioned agent. Enforces the per-thread hop limit: a message
- * whose hop already reached `maxHops` (that many consecutive agent replies
- * since a person last posted in the thread) triggers nobody.
+ * explicitly @mentioned agent. A message whose hop already reached `maxHops`
+ * (the depth backstop, `hopLimitReached`) triggers nobody.
  */
 export async function dispatchMentions(
   db: Database,
@@ -221,12 +249,16 @@ export async function dispatchMentions(
     (id) => id !== message.authorAgentId && (!options.onlyAgentIds || options.onlyAgentIds.includes(id)),
   );
   if (candidates.length === 0) return { runs: [], skipped: "no_mentions" };
-  if (message.hop >= options.maxHops) return { runs: [], skipped: "hop_limit" };
+  if (await hopLimitReached(db, message, options.maxHops)) return { runs: [], skipped: "hop_limit" };
 
   // Re-check at dispatch time: the agent may have been archived or removed from the channel since.
-  // An agent asking another one acts for the person behind its run, who must be allowed to talk to it.
+  // An agent asking another one acts for the person behind its run, who must be allowed to talk to it;
+  // a routine set to act wakes only agents its creator can talk to.
+  const requester =
+    (await requesterOf(db, message)) ??
+    (message.agentRunId ? routineCreatorOf(await runAuthorityById(db, message.orgId, message.agentRunId)) : null);
   const eligible = await eligibleChannelAgents(db, message.orgId, message.channelId, candidates, {
-    requesterUserId: await requesterOf(db, message),
+    requesterUserId: requester,
   });
   const runs = await db.transaction((tx) =>
     createAgentRuns(

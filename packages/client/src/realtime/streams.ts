@@ -1,4 +1,5 @@
 import type { ActiveRun, ChannelEvent, RunStatus } from "../api/types";
+import { isMediaAfterReply } from "../lib/media";
 import { NO_AI } from "../lib/no-ai";
 
 /**
@@ -600,8 +601,9 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
     }
     case "message.created": {
       const m = event.message;
-      // A fast reply while the task works (`meta.talker`): the task's row goes on.
-      if (!m?.agentRunId || m.meta?.talker) return state;
+      // A fast reply while the task works (`meta.talker`): the task's row goes on. The sticker or GIF an agent adds
+      // after its reply (ADR 0091) ends nothing: its reply already did, and a new "pensando…" stays.
+      if (!m?.agentRunId || m.meta?.talker || isMediaAfterReply(m.meta)) return state;
       const next = finish(state, m.agentRunId);
       if (m.author?.type !== "agent" || !m.author.id) return next;
       if (m.threadId) return settleProvisional(next, m.author.id, m.threadId);

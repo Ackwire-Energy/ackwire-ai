@@ -10,7 +10,7 @@ import type {
   PlanUsage,
 } from "../api/types";
 import { joinNames } from "./format";
-import { loginPerAgent, planName } from "./plans";
+import { isPlanId, loginPerAgent, planName } from "./plans";
 
 /** One account as a row shows it: its logins, one per agent where its plan allows it (`LOGIN_PER_AGENT`). */
 export interface PlanAccount<A extends MachineAccount> {
@@ -146,7 +146,10 @@ export function accountAbout(
 ): string | undefined {
   if (!a.mine) return t("agentPage.work.brain.accountOf", { name: a.ownerName?.split(" ")[0] ?? "" });
   if (also) return t("agentPage.work.brain.accountAlso", { agents: joinNames(usedBy, t("newAgent.and")) });
-  if (a.status === "signed_out") return t("agentPage.work.brain.accountSignedOut");
+  // A coding plan's key never signs out: it reads signed out once its endpoint refused it.
+  if (a.status === "signed_out") {
+    return t(isPlanId(a.provider) ? "aiAccounts.page.keyRefused" : "agentPage.work.brain.accountSignedOut");
+  }
   const others = a.usedBy.filter((n) => n !== agentName);
   // One made for all of its owner's agents there thinks for this one too: nothing moves.
   if (others.length && a.shared === true) {
@@ -235,6 +238,10 @@ export function ownSignIns(view: Pick<AiAccounts, "computers"> | null | undefine
 /** The plan's name as people know it ("Max", "Ultra", "Pro"): the runner's word with a capital, or nothing. */
 export const planWordOf = (plan: string | null) =>
   plan ? plan.charAt(0).toUpperCase() + plan.slice(1).toLowerCase() : null;
+
+/** A computer's own sign-in as "Seus planos" titles it: its CLI's maker and its plan ("Claude · Max"). */
+export const ownSignInTitle = (t: TFunction, o: Pick<OwnSignInRow, "kind" | "plan">) =>
+  accountTitle({ label: t(`aiAccounts.connect.${o.kind}`), plan: o.plan });
 
 /**
  * A computer's own sign-in by name: on a computer the viewer connected, the account their agents there share; on

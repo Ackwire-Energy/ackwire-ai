@@ -217,12 +217,12 @@ describe("Atende outras pessoas (Quem pensa)", () => {
     const state = await ada({ brain: "model", effectiveModel: null, onlyOwner: false }, { ownPlan: "max" });
     const d = await brainDialog();
     await click(
-      within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getByRole("radio", { name: /^Claude Code/ }),
+      within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getByRole("radio", { name: /^Claude/ }),
     );
     const a = await advanced(d);
     expect(replies(a).getAttribute("aria-checked")).toBe("false");
     await done(a);
-    await click(within(d).getByRole("button", { name: "Usar meu plano do Claude" }));
+    await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
     expect(brainCalls(state)).toEqual([{ brain: "claude_code", model: null, fallback: true }]);
   });
@@ -246,7 +246,7 @@ describe("Atende outras pessoas (Quem pensa)", () => {
     const d = await brainDialog();
     await click(
       within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getByRole("radio", {
-        name: /^Modelo do workspace/,
+        name: /^Chave de API/,
       }),
     );
     await click(within(d).getByRole("button", { name: "Usar" }));

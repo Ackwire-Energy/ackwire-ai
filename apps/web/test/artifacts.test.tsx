@@ -138,11 +138,12 @@ describe("artifact cards in the chat", () => {
     expect(img.getAttribute("src")?.startsWith("data:image/svg+xml")).toBe(true);
 
     const html = card("Painel de erros da semana");
-    // A live thumbnail: the same sandbox, out of the tab order and hidden from screen readers.
+    // A live thumbnail: the same sandbox, a picture with no scrollbar, out of the tab order and hidden from screen readers.
     await settle(3);
     expect(within(html).getByRole("img", { name: "Página interativa. Abra para ver." })).toBeTruthy();
     const thumb = html.querySelector("iframe") as HTMLIFrameElement;
     expect(thumb.getAttribute("sandbox")).toBe("allow-scripts");
+    expect(thumb.getAttribute("scrolling")).toBe("no");
     expect(thumb.getAttribute("tabindex")).toBe("-1");
     expect(thumb.getAttribute("aria-hidden")).toBe("true");
   });
@@ -243,6 +244,7 @@ describe("artifact viewer", () => {
     expect(frame.hasAttribute("srcdoc")).toBe(false);
     expect(frame.getAttribute("src")).toMatch(/^(blob:|data:text\/html)/);
     expect(frame.hasAttribute("loading")).toBe(false);
+    expect(frame.hasAttribute("scrolling")).toBe(false);
     expect(frame.getAttribute("title")).toBe("Página: Painel de erros da semana");
     // The page is never inlined into our DOM.
     expect(document.body.innerHTML).not.toContain("Erros da semana</h1>");

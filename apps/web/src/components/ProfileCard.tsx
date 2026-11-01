@@ -15,6 +15,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOpenAgentPanel } from "@/components/agent-panel-context";
+import { CoordinatorChip } from "@/components/CoordinatorChip";
 import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -45,7 +46,8 @@ export function ProfileTrigger({
   decorative?: boolean;
 }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
+  // How it opened: hover leaves the focus where it is (the box someone types in), a press or a key brings it in.
+  const [open, setOpen] = useState<false | "hover" | "press">(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clear = () => {
     if (timer.current) clearTimeout(timer.current);
@@ -62,16 +64,17 @@ export function ProfileTrigger({
     clear();
     timer.current = setTimeout(() => {
       timer.current = null;
-      setOpen(next);
+      setOpen(next && "hover");
     }, ms);
   };
   return (
     <Popover
-      open={open}
+      open={open !== false}
       onOpenChange={(o) => {
         clear();
-        setOpen(o);
+        setOpen(o && "press");
       }}
+      moveFocus={open !== "hover"}
       label={t("profile.cardLabel")}
       side="bottom"
       className="profile-card"
@@ -239,7 +242,9 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
     ? t("brain.auto.label")
     : (models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model);
   const thinks =
-    agent.brain && agent.brain.kind !== "model" ? brainLine(t, agent.brain, model, owner?.split(" ")[0]) : null;
+    agent.brain && agent.brain.kind !== "model"
+      ? brainLine(t, agent.brain, model, { owner: owner?.split(" ")[0], agents: dir.agents })
+      : null;
   // Its presence from its work and its line (ADR 0084): its own words or what it is doing now.
   const shown = useAgentPresence(agent.id);
   const line = agentLine(t, shown?.line ?? null);
@@ -259,6 +264,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
             {agent.role ? t("issues.agentRole", { role: agent.role }) : t("profile.agent")}
           </span>
           <NoAiChip agentId={agent.id} />
+          <CoordinatorChip agent={agent} />
         </div>
       </div>
       {line && shown?.line && (

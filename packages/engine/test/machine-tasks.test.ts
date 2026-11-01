@@ -1,22 +1,33 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { MACHINE_PROTOCOL_VERSION, orgTopic, type RunnerTask, type ServerFrame } from "@agenteschat/adapters";
+import {
+  MACHINE_PROTOCOL_VERSION,
+  orgTopic,
+  type RunnerTask,
+  type ServerFrame,
+  TASK_ACCOUNTS_PROTOCOL,
+  type TaskExecutor,
+} from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
+  createAgent,
   createMachineHub,
   drainOutbox,
   grantScopes,
   interruptOfflineMachineTasks,
   listMessages,
   type MachineHub,
+  NEW_AGENT_DEFAULTS,
   postPersonMessage,
   queueMachineTask,
   RESUME_PROMPT,
   setAgentComputerTarget,
   startMachineTask,
   TASK_START_GRACE_MS,
+  type TaskCall,
+  TaskSignInError,
   taskNotice,
 } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 let f: Fixture;
@@ -838,5 +849,169 @@ describe("background tasks (ADR 0029)", () => {
     expect(text).toContain("Tell the people");
     expect(taskNotice(m) ?? "").not.toContain("Tell the people");
     expect(taskNotice({ body: "hi", meta: {} })).toBeNull();
+  });
+});
+
+describe("tasks sign in with their agent's own account (ADR 0041 §5.1, protocol 31)", () => {
+  const ACCOUNT = "0193ffff-0000-7000-8000-000000000001";
+
+  /** A computer the owner connected, its runner taking task starts; Dev thinks with Claude Code on its own account. */
+  async function devOnAccount() {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    const paired = await pairedMachine();
+    const runner = taskRunner(f.machineHub as MachineHub);
+    await runner.hello(paired.token);
+    await f.db.insert(schema.machineAccounts).values({
+      id: ACCOUNT,
+      orgId: f.org.id,
+      machineId: paired.machineId,
+      kind: "claude_code",
+      label: "Trabalho",
+      createdBy: f.owner.id,
+    });
+    await f.db
+      .update(schema.agents)
+      .set({ brain: "claude_code", brainAccountId: ACCOUNT })
+      .where(eq(schema.agents.id, f.agent.id));
+    const bia = await createAgent(f.db, f.owner.id, f.org.id, { name: "Bia", handle: "bia" }, NEW_AGENT_DEFAULTS);
+    await f.db.update(schema.agents).set({ machineId: paired.machineId }).where(eq(schema.agents.id, bia.id));
+    const call: TaskCall = (machineId, request) => (f.machineHub as MachineHub).call(machineId, request);
+    const start = (agent: { id: string; handle: string }, executor: TaskExecutor) =>
+      startMachineTask(
+        { db: f.db, pubsub: f.pubsub, call },
+        {
+          orgId: f.org.id,
+          agent,
+          machineId: paired.machineId,
+          protocol: MACHINE_PROTOCOL_VERSION,
+          machineName: "MacBook",
+          channelId: f.general.id,
+          threadRootId: null,
+          runId: null,
+          requestedByUserId: f.owner.id,
+          title: "Build",
+          executor,
+          ...(executor === "shell" ? { command: "make" } : { prompt: "Build it" }),
+        },
+      );
+    const machine = (set: Partial<typeof schema.machines.$inferInsert>) =>
+      f.db.update(schema.machines).set(set).where(eq(schema.machines.id, paired.machineId));
+    const dev = { id: f.agent.id, handle: "dev" };
+    return { runner, start, machine, dev, bia: { id: bia.id, handle: "bia" } };
+  }
+
+  test("the engine sends an agent's account only with that agent's own tasks of that CLI, and only to a runner that takes it", async () => {
+    const { runner, start, machine, dev, bia } = await devOnAccount();
+    await start(dev, "claude");
+    expect(runner.started[0]).toMatchObject({ executor: "claude", agent: { id: dev.id }, account: ACCOUNT });
+    // Its account signs Claude Code in, not Codex, and a shell task signs nothing in.
+    await start(dev, "codex");
+    await start(dev, "shell");
+    // Bia thinks with no account of her own: her task never carries Dev's (the computer's own sign-in, as before).
+    await start(bia, "claude");
+    expect(runner.started.slice(1).map((s) => s.account)).toEqual([undefined, undefined, undefined]);
+    // A runner before protocol 31 never gets it: the task starts on the computer's own sign-in, as before.
+    await machine({ protocol: TASK_ACCOUNTS_PROTOCOL - 1 });
+    await start(dev, "claude");
+    expect(runner.started).toHaveLength(5);
+    expect(runner.started[4]?.account).toBeUndefined();
+  });
+
+  test("a task with nothing to sign in with is refused at once with what the agent can do, never sent", async () => {
+    const { runner, start, machine, dev, bia } = await devOnAccount();
+    // The workspace's own computer: nobody signs its CLIs in.
+    await machine({ kind: "managed", pairedByUserId: null });
+    const refused = (agent: { id: string; handle: string }, executor: TaskExecutor) =>
+      start(agent, executor).then(
+        () => "",
+        (error: unknown) => (error instanceof TaskSignInError ? error.message : `not a sign-in refusal: ${error}`),
+      );
+    expect(await refused(bia, "claude")).toBe(
+      "Claude Code has nothing to sign in with on MacBook: you have no Claude account there, and nobody signs Claude Code in on that computer itself. Tell the person: your owner can connect a Claude account on your page (until then do this work with run_code or a shell task).",
+    );
+    // Dev has an account for the other CLI there: he hears which executor signs in.
+    expect(await refused(dev, "codex")).toContain(
+      'Your own account there signs in Claude Code: start the task with executor "claude".',
+    );
+    // His own account does sign Claude Code in there.
+    await start(dev, "claude");
+    expect(runner.started).toEqual([expect.objectContaining({ executor: "claude", account: ACCOUNT })]);
+    // A runner before protocol 31 would start it on a sign-in that computer doesn't have.
+    await machine({ protocol: TASK_ACCOUNTS_PROTOCOL - 1 });
+    // Nobody connected it, so nobody there can run an update command: the agent hears to try again later.
+    expect(await refused(dev, "claude")).toBe(
+      "The runner on MacBook is too old to sign tasks in with your Claude account. Tell the person: the computer's runner needs an update before tasks can use your account, so try again later (until then do this work with run_code or a shell task).",
+    );
+    await machine({ protocol: MACHINE_PROTOCOL_VERSION });
+    // His account signed out.
+    await f.db
+      .update(schema.machineAccounts)
+      .set({ status: "signed_out" })
+      .where(eq(schema.machineAccounts.id, ACCOUNT));
+    expect(await refused(dev, "claude")).toStartWith(
+      'Your Claude account "Trabalho" on MacBook is signed out, so Claude Code can\'t sign in for this task.',
+    );
+    expect(runner.started).toHaveLength(1);
+    // Each refused start stays as a failed task saying why.
+    const failed = (await tasks()).filter((t) => t.status === "failed");
+    expect(failed).toHaveLength(4);
+    expect(failed.every((t) => t.lastLine?.includes("Tell the person"))).toBe(true);
+  });
+
+  test("on the computer the owner connected: someone else's agent never thinks on the owner's plan, nor any agent on a CLI signed out there", async () => {
+    const { runner, start, machine, bia } = await devOnAccount();
+    const refused = (executor: TaskExecutor) =>
+      start(bia, executor).then(
+        () => "",
+        (error: unknown) => (error instanceof TaskSignInError ? error.message : `not a sign-in refusal: ${error}`),
+      );
+    await machine({ executors: { claude: { version: "2.1.314", loggedIn: false } } });
+    expect(await refused("claude")).toStartWith("Claude Code isn't signed in on MacBook.");
+    const bruna = await addMember(f.db, f.org.id, "member", "Bruna");
+    await f.db.update(schema.agents).set({ ownerUserId: bruna.id }).where(eq(schema.agents.id, bia.id));
+    // Bia thinks with the platform model: her Codex task keeps the computer's own sign-in, as before.
+    await start(bia, "codex");
+    expect(runner.started.map((s) => [s.executor, s.account])).toEqual([["codex", undefined]]);
+    // Once she thinks with Codex, its sign-in there is the owner's plan, which never thinks for her.
+    await f.db.update(schema.agents).set({ brain: "codex" }).where(eq(schema.agents.id, bia.id));
+    expect(await refused("codex")).toStartWith(
+      "Codex on MacBook would think with a plan that isn't your owner's (a plan thinks only for its owner's agents).",
+    );
+    expect(runner.started).toHaveLength(1);
+  });
+
+  test("start_task says it didn't start, and why, in the agent's own turn", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    const paired = await pairedMachine();
+    const runner = taskRunner(f.machineHub as MachineHub);
+    await runner.hello(paired.token);
+    await f.db
+      .update(schema.machines)
+      .set({ kind: "managed", pairedByUserId: null })
+      .where(eq(schema.machines.id, paired.machineId));
+    const msg = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev oi",
+    });
+    await drainOutbox(f.db, f.handlers);
+    const [run] = await f.db.select().from(schema.agentRuns);
+    if (!run) throw new Error("no run");
+    const ctx = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: run.id,
+      channelId: f.general.id,
+      threadRootId: run.threadRootId,
+      triggerMessageId: msg.id,
+    };
+    const outcome = await f.tools?.invoke(ctx, {
+      toolUseId: crypto.randomUUID(),
+      name: "start_task",
+      input: { title: "Build", prompt: "Build the app" },
+    });
+    if (outcome?.type !== "result") throw new Error("expected a result");
+    expect(outcome.output).toMatchObject({ isError: true, data: { code: "task.no_sign_in" } });
+    expect(outcome.output.content).toStartWith("Not started: Claude Code has nothing to sign in with on MacBook");
+    expect(runner.started).toHaveLength(0);
   });
 });

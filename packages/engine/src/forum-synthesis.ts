@@ -1,3 +1,5 @@
+import { cutText } from "./format";
+
 /**
  * The forum's text formats: the stance line an agent starts its post
  * with, and the synthesis in two formats ("decision" or "plan"). The model
@@ -74,7 +76,7 @@ export function splitStance(text: string): ForumPostHeader {
     const key = (m[1] ?? "").toLowerCase();
     const value = (m[2] ?? "").trim();
     if (key === "stance") stance = stanceOf(value);
-    else if (key === "position") position = value.slice(0, 300) || null;
+    else if (key === "position") position = cutText(value, 300) || null;
     else replyTo = UUID.exec(value)?.[0] ?? (/@[a-z0-9_-]+/i.exec(value)?.[0]?.toLowerCase() || null);
     consumed = i + 1;
   }
@@ -185,13 +187,16 @@ function items(text: string, max = 30): string[] {
 }
 
 const paragraph = (text: string) =>
-  clean(
-    text
-      .split("\n")
-      .filter((l) => !/^\s*#/.test(l))
-      .join(" ")
-      .replace(/\s+/g, " "),
-  ).slice(0, 4000);
+  cutText(
+    clean(
+      text
+        .split("\n")
+        .filter((l) => !/^\s*#/.test(l))
+        .join(" ")
+        .replace(/\s+/g, " "),
+    ),
+    4000,
+  );
 
 const firstParagraph = (markdown: string) =>
   paragraph(
@@ -232,7 +237,7 @@ export function parseSuggestedIssues(markdown: string, resolve?: OwnerResolver):
       const [title, ...rest] = parts;
       const owner = ownerLabel && resolve ? resolve(ownerLabel) : null;
       return {
-        title: clean(title ?? line).slice(0, 200),
+        title: cutText(clean(title ?? line), 200),
         description: rest.join(" — ").trim(),
         ...(step && Number.isFinite(step) ? { step } : {}),
         ...(ownerLabel ? { owner } : {}),
@@ -297,7 +302,7 @@ function parseSteps(text: string, resolve: OwnerResolver): ForumPlanSynthesis["s
       else if (s) size = clean(s);
       else if (!/^(?:after|depends on)\s*:?\s*(?:none|-|—)?$/i.test(p)) titleParts.push(p);
     }
-    return { title: clean(titleParts.join(" — ")).slice(0, 300), owner, ownerLabel, after, size };
+    return { title: cutText(clean(titleParts.join(" — ")), 300), owner, ownerLabel, after, size };
   });
 }
 

@@ -2,7 +2,7 @@ import { invitationQuery, type SignInOptions, useApi, useAuthConfig } from "@age
 import { type HumanAction, humanCheckHeaders, withHumanCheck } from "@agenteschat/client/lib/human-check";
 import { emailTypoFix, isEmail, passwordState, webmailOf } from "@agenteschat/client/lib/text";
 import { useQuery } from "@tanstack/react-query";
-import { router } from "expo-router";
+import { router, useIsFocused } from "expo-router";
 import { openBrowserAsync } from "expo-web-browser";
 import { type ComponentRef, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -35,7 +35,7 @@ import { signInPurpose } from "./links";
  * session gate moves to the app.
  */
 /** The e-mail this phone last signed in with: the next sign-in starts with it (kept on signing out). */
-const LAST_EMAIL = "last-email";
+export const LAST_EMAIL = "last-email";
 
 type Step = "email" | "password" | "social" | "noPassword" | "name" | "newPassword" | "closed" | "forgot" | "sent";
 
@@ -72,6 +72,8 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
   const [email, setEmail] = useState(initialEmail ?? readValueSync(LAST_EMAIL) ?? "");
   // The e-mail takes the keyboard once the launch splash has left, not under it.
   const launched = useLaunched();
+  // Under an invitation's screen (a request still waiting, reopened) it stays out of the way.
+  const focused = useIsFocused();
   const emailField = useRef<ComponentRef<typeof TextInput>>(null);
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -136,10 +138,10 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
   }, [config.isPending]);
 
   // Mounted under the launch splash: the keyboard comes up once the splash leaves.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the splash leaves
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the splash leaves or the screen comes back
   useEffect(() => {
-    if (launched && step === "email" && !initialEmail) emailField.current?.focus();
-  }, [launched]);
+    if (launched && focused && step === "email" && !initialEmail) emailField.current?.focus();
+  }, [launched, focused]);
 
   /** Better Auth's refusal → the sentence to show (never the server's raw text). */
   const failed = (refusal: { status: number; code?: string }) =>
@@ -355,7 +357,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
             onSubmitEditing={submit}
             accessibilityLabel={t("auth.email")}
             ref={emailField}
-            autoFocus={!initialEmail && launched}
+            autoFocus={!initialEmail && launched && focused}
           />
           {fix ? (
             <Pressable
@@ -493,7 +495,7 @@ function Who({ email, onChange }: { email: string; onChange?: () => void }) {
 }
 
 /** A quiet text link under the main answer ("Esqueci a senha"). */
-function Quiet({ label, onPress }: { label: string; onPress: () => void }) {
+export function Quiet({ label, onPress }: { label: string; onPress: () => void }) {
   return (
     <View style={{ alignItems: "center", marginTop: 4 }}>
       <AuthLink label={label} onPress={onPress} />
@@ -502,7 +504,7 @@ function Quiet({ label, onPress }: { label: string; onPress: () => void }) {
 }
 
 /** "Ao continuar, você aceita os Termos e a Política de privacidade." */
-function Terms({ termsUrl, privacyUrl }: { termsUrl: string; privacyUrl: string }) {
+export function Terms({ termsUrl, privacyUrl }: { termsUrl: string; privacyUrl: string }) {
   const { t } = useTranslation();
   const link = (label: string, url: string): ReactNode => (
     <Text

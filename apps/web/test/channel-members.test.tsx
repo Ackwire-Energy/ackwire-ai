@@ -5,7 +5,7 @@ setupDom();
 
 import type { AiStatus } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -102,6 +102,25 @@ describe("channel header: who's here", () => {
     await settle(2);
     expect(screen().getByRole("region", { name: "Pessoas" })).toBeTruthy();
   });
+
+  test("hover opens it without taking the focus, open or closed; a press brings the focus in", async () => {
+    await open();
+    const box = screen().getByRole("combobox", { name: /Mensagem para/ });
+    box.focus();
+    const stack = screen().getByRole("button", { name: "Membros do canal (4)" });
+    await act(async () => fireEvent.pointerEnter(stack, { pointerType: "mouse" }));
+    await act(() => new Promise((r) => setTimeout(r, 220)));
+    await settle(2);
+    expect(screen().getByRole("region", { name: "Pessoas" })).toBeTruthy();
+    expect(document.activeElement).toBe(box);
+    await act(async () => fireEvent.pointerLeave(stack, { pointerType: "mouse" }));
+    await act(() => new Promise((r) => setTimeout(r, 300)));
+    expect(screen().queryByRole("region", { name: "Pessoas" })).toBeNull();
+    expect(document.activeElement).toBe(box);
+    await act(async () => fireEvent.click(stack));
+    await settle(2);
+    expect(screen().getByRole("dialog", { name: "Membros do canal (4)" }).contains(document.activeElement)).toBe(true);
+  });
 });
 
 describe("answering without a mention, as true for my own messages as who picks them", () => {
@@ -174,5 +193,26 @@ describe("answering without a mention, as true for my own messages as who picks 
       line: "Entra na conversa por conta própria",
       option: "Responde quando o assunto pede, sem precisar de @",
     });
+  });
+});
+
+describe("the team's coordinator here (ADR 0093)", () => {
+  test("its chip says it coordinates the team, and its line in the details what that means", async () => {
+    const state = seedState();
+    const atlas = state.agents.find((a) => a.id === ATLAS_ID);
+    if (atlas) atlas.coordinator = true;
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(6);
+    await act(async () => r.sockets.last().open());
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Membros do canal (4)" })));
+    await settle(4);
+    const chips = [...screen().getByRole("region", { name: "Agentes" }).querySelectorAll(".members-pop__chip")];
+    expect(chips.map((c) => c.textContent).sort()).toEqual(["coordena o time", "responde sem menção"]);
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Ver detalhes do canal" })));
+    await settle(3);
+    const row = within(screen().getByRole("dialog", { name: /eng/ }))
+      .getByText("Atlas")
+      .closest(".member-row") as HTMLElement;
+    expect(row.querySelector(".small")?.textContent).toBe("Coordena o time: pega o que ninguém pegou");
   });
 });

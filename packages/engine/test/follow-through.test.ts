@@ -1,32 +1,39 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { and, eq, schema } from "@agenteschat/db";
 import { type ModelRequest, systemText, textOf } from "@agenteschat/providers";
+import type { FakeReply } from "@agenteschat/providers/testing";
 import {
   askAgentToImplement,
   CANCEL_FOLLOW_UP_TOOL,
   cancelFollowUp,
+  createAgent,
+  createAgentRuns,
   createIssue,
   drainOutbox,
   FOLLOW_UP_JOB,
   FOLLOW_UP_TOOL,
+  insertMessage,
   invokeToolForRun,
   joinChannel,
   listIssueActivity,
-  NOTICE_WAKE_MAX_HOP,
+  openAgentDm,
   postPersonMessage,
-  promiseIn,
   removeChannelMember,
   runAuthority,
+  STRETCH,
+  STRETCH_JOB,
+  STRETCH_REFUSAL,
   toolPolicy,
   wakeFollowUp,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
 /**
- * Agents follow through (ADR 0037, round 3): a promise nothing keeps gets one judge call and one more turn,
- * never two; a person's go-ahead they wait for is no unkept promise, nor is one that something the run set up
- * keeps; `follow_up` posts its line, wakes the agent in the same conversation at its time for the same person,
- * and keeps its bounds; a canceled one, or one whose agent or person left the conversation, wakes nobody.
+ * Agents follow through (ADR 0037, round 3; ADR 0089): every conversation run's end gets one judge call, in any
+ * language, and work it said it would do that nothing keeps gets one more turn, never two; a person's go-ahead
+ * they wait for is no unkept promise, nor is one that something the run set up keeps; `follow_up` posts its line,
+ * wakes the agent in the same conversation at its time for the same person, and keeps its bounds; a canceled one,
+ * or one whose agent or person left the conversation, wakes nobody.
  */
 
 let f: Fixture;
@@ -72,8 +79,9 @@ test("a promise nothing keeps: the answer posts, one more turn is told to keep i
 
   expect(f.provider.calls.length).toBe(2);
   const nudge = lastUserText(f.provider.calls[1]?.request as ModelRequest);
-  expect(nudge).toContain("You ended with a promise nothing keeps");
-  expect(nudge).toContain("Vou checar de novo daqui a pouco e te passo os números.");
+  expect(nudge).toContain("You ended saying you would do more");
+  // No sentence of it is quoted back: the judge read the whole message, in whatever language.
+  expect(nudge).not.toContain("Vou checar");
   // Asked once: the second promise ends the run.
   expect(followThroughCalls(f).length).toBe(1);
   const steps = await f.db.select().from(schema.agentRunSteps);
@@ -97,42 +105,28 @@ test("waiting on a person for something specific is legitimate: no nudge", async
   expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("done");
 });
 
-test("a plain answer asks no judge; only a promise at the end of the message counts", async () => {
+test("every run's end is read once by the judge, in any language: a promise in Japanese is caught, a plain answer isn't", async () => {
+  const promised = "CIはまだ実行中です。あとでもう一度確認して数字を送ります。";
   f = await setup({
-    judge: (kind) => (kind === "follow_through" ? "unkept" : undefined),
-    reply: () => ({ chunks: ["O CI levou 12 minutos: testes 9, lint 2. Nada fora do normal."] }),
+    // The fake judge reads no words: it answers by the run it is asked about.
+    judge: (kind, _id, state) =>
+      kind === "follow_through" ? (String(state.reply) === promised ? "unkept" : "done") : undefined,
+    reply: (_request, call) => ({
+      chunks: [call === 1 ? promised : call === 2 ? "数字です: テスト9分、lint 2分。" : "O CI levou 12 minutos."],
+    }),
   });
-  await ask(f, "@dev o ci demora tanto assim?");
+  await ask(f, "@dev CIはどうなっていますか？");
   await drainOutbox(f.db, f.handlers);
-  expect(followThroughCalls(f).length).toBe(0);
-  expect(f.provider.calls.length).toBe(1);
-});
+  // No word list stood in front of the judge: it read the reply and told the run to do it now.
+  expect(followThroughCalls(f).length).toBe(1);
+  expect(f.provider.calls.length).toBe(2);
+  expect(lastUserText(f.provider.calls[1]?.request as ModelRequest)).toContain("You ended saying you would do more");
 
-test("promises of later work by the agent, in English, Portuguese and Spanish; other future words aren't", () => {
-  expect(promiseIn("When you approve, I'll give you the numbers and say if any job is slower.")).toBe(
-    "When you approve, I'll give you the numbers and say if any job is slower.",
-  );
-  expect(promiseIn("Pronto. Quando terminar eu aviso.")).toBe("Quando terminar eu aviso.");
-  for (const said of [
-    "Let me check the CI logs.",
-    "Let me look into that and get back to you.",
-    "One moment, checking now.",
-    "The build is still running. I'll keep an eye on it.",
-  ])
-    expect(promiseIn(said)).not.toBeNull();
-  for (const said of ["Deixa eu ver os logs do CI.", "Já volto com os números.", "Vou rodar os testes de novo."])
-    expect(promiseIn(said)).not.toBeNull();
-  for (const said of ["Déjame revisar el log.", "Voy a revisar el pipeline y te cuento."])
-    expect(promiseIn(said)).not.toBeNull();
-  // Future words that promise no later work: no judge call.
-  for (const said of [
-    "Okay. I'll be honest: the CI took 12 minutes, which is normal.",
-    "I'll keep it short: tests 9 min, lint 2.",
-    "Vou ser direto: o CI levou 12 minutos, normal.",
-    "Let me know if you want the per-job times.",
-    `I'll explain. ${"Tests took 9 min. ".repeat(60)}All green.`,
-  ])
-    expect(promiseIn(said)).toBeNull();
+  await ask(f, "@dev e o tempo do CI?");
+  await drainOutbox(f.db, f.handlers);
+  // A plain answer: asked once too, done, no more turns.
+  expect(followThroughCalls(f).length).toBe(2);
+  expect(f.provider.calls.length).toBe(3);
 });
 
 test("the prompt asks to finish what it starts, and names follow_up only when the run has it", async () => {
@@ -157,7 +151,8 @@ test("follow_up: a line now; at its time the agent wakes in the same thread with
   f = await setup({
     followUps: true,
     // A promise kept by the follow-up just set: nothing to nudge.
-    judge: (kind) => (kind === "follow_through" ? "unkept" : undefined),
+    judge: (kind, _id, state) =>
+      kind === "follow_through" && String(state.reply).startsWith("Ainda rodando") ? "unkept" : undefined,
     reply: (_request, call) =>
       call === 1
         ? {
@@ -194,8 +189,8 @@ test("follow_up: a line now; at its time the agent wakes in the same thread with
   const ahead = (job?.nextAttemptAt.getTime() ?? 0) - Date.now();
   expect(ahead).toBeGreaterThan(29 * 60_000);
   expect(ahead).toBeLessThanOrEqual(30 * 60_000);
-  // The follow-up keeps the promise: no judge call, no nudge.
-  expect(followThroughCalls(f).length).toBe(0);
+  // The follow-up keeps the promise: the judge read it unkept, but what the run set up brings it back.
+  expect(followThroughCalls(f).length).toBe(1);
   expect(f.provider.calls.length).toBe(2);
 
   // Its time comes.
@@ -236,7 +231,7 @@ test("follow_up: a line now; at its time the agent wakes in the same thread with
   expect(notified).toContain(answer?.id);
 });
 
-test("follow_up bounds: a day ahead at most, two per run, three per conversation, none past the chain's cap", async () => {
+test("follow_up bounds: a day ahead at most, two per run, three per conversation, none past the stretch's limit", async () => {
   f = await setup({ followUps: true });
   await ask(f, "@dev acompanha o deploy");
   const [run] = await f.db.select().from(schema.agentRuns);
@@ -287,9 +282,24 @@ test("follow_up bounds: a day ahead at most, two per run, three per conversation
   expect((await call(other.id, { minutes: 5 })).result.isError).toBeUndefined();
   expect((await call(other.id, { minutes: 6 })).result.content).toContain("3 follow-ups already wait");
 
-  // Each follow-up wakes a run one hop further: at the cap there is no more coming back.
-  await f.db.update(schema.agentRuns).set({ hop: NOTICE_WAKE_MAX_HOP }).where(eq(schema.agentRuns.id, other.id));
-  expect((await call(other.id, { minutes: 5 })).result.content).toContain("No more follow-ups from here");
+  // Its wake is one more run agents start on their own: with the stretch at its limit (ADR 0089), it is refused
+  // and the pause card goes out, whatever the hop.
+  await f.db.insert(schema.agentRuns).values(
+    Array.from({ length: STRETCH.runs }, () => ({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      channelId: f.general.id,
+      threadRootId: later.id,
+      triggerMessageId: Bun.randomUUIDv7(),
+      trigger: "mention" as const,
+      hop: 2,
+      stretchId: later.id,
+      status: "done" as const,
+    })),
+  );
+  const refusedAtLimit = await call(other.id, { minutes: 5 });
+  expect(refusedAtLimit.result).toMatchObject({ content: STRETCH_REFUSAL, isError: true });
+  expect((await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, STRETCH_JOB))).length).toBe(1);
 
   // A routine's background work runs again on its own schedule: no follow-ups there.
   const tool = { name: FOLLOW_UP_TOOL, scope: "" };
@@ -432,7 +442,7 @@ test("in a channel's timeline the follow-ups are each person's: cancel_follow_up
   expect(await lineState(f, anaThird)).toBe("pending");
 });
 
-test("a reminder it set to do the work itself keeps the promise: no judge, no nudge", async () => {
+test("a reminder it set to do the work itself keeps the promise: read as unkept, but no nudge", async () => {
   f = await setup({
     scheduleTools: true,
     judge: (kind) => (kind === "follow_through" ? "unkept" : undefined),
@@ -451,7 +461,7 @@ test("a reminder it set to do the work itself keeps the promise: no judge, no nu
   });
   await ask(f, "@dev daqui a 2 horas verifica o deploy");
   await drainOutbox(f.db, f.handlers);
-  expect(followThroughCalls(f).length).toBe(0);
+  expect(followThroughCalls(f).length).toBe(1);
   expect(f.provider.calls.length).toBe(2);
 });
 
@@ -469,4 +479,188 @@ test("asked to implement an issue: an answer posted before a nudge is a comment 
   await drainOutbox(f.db, f.handlers);
   const comments = (await listIssueActivity(f.db, person, f.org.id, issue.id)).filter((a) => a.kind === "comment");
   expect(comments.map((a) => a.text)).toEqual([first, second]);
+});
+
+test("a promise is kept by work handed off from this conversation still out, by any run; not another conversation's or a closed one", async () => {
+  f = await setup({
+    judge: (kind) => (kind === "follow_through" ? "unkept" : undefined),
+    reply: (request) => ({
+      chunks: [
+        lastUserText(request).includes("You ended saying")
+          ? "Ok, vou ver agora."
+          : "A Rita ainda está nisso, te aviso quando terminar.",
+      ],
+    }),
+  });
+  const fx = f;
+  const rita = await createAgent(
+    fx.db,
+    fx.owner.id,
+    fx.org.id,
+    { name: "Rita", handle: "rita", role: "Operations", credentialId: fx.credential.id },
+    { model: "claude-sonnet-5-5" },
+  );
+  /** An earlier run of Dev in #general, done: on a message of its own, or in a thread. */
+  const earlier = async (thread?: string) => {
+    const m = await insertMessage(fx.db, {
+      orgId: fx.org.id,
+      channelId: fx.general.id,
+      ...(thread ? { threadId: thread } : {}),
+      author: { type: "person", userId: fx.owner.id },
+      body: "pedido",
+    });
+    const [run] = await fx.db
+      .insert(schema.agentRuns)
+      .values({
+        orgId: fx.org.id,
+        agentId: fx.agent.id,
+        channelId: fx.general.id,
+        threadRootId: thread ?? m.id,
+        triggerMessageId: m.id,
+        trigger: "mention",
+        hop: 1,
+        status: "done",
+      })
+      .returning();
+    if (!run) throw new Error("no run");
+    return run;
+  };
+  const handedOff = (run: { id: string }, over: Partial<typeof schema.agentConsultations.$inferInsert> = {}) =>
+    fx.db.insert(schema.agentConsultations).values({
+      orgId: fx.org.id,
+      kind: "note",
+      askerRunId: run.id,
+      askerAgentId: fx.agent.id,
+      targetAgentId: rita.id,
+      channelId: fx.general.id,
+      messageId: Bun.randomUUIDv7(),
+      waitId: `async:${Bun.randomUUIDv7()}`,
+      question: "Passa a pasta ao Diogo.",
+      chain: [fx.agent.id],
+      expiresAt: new Date(Date.now() + 60_000),
+      ...over,
+    });
+  const nudges = async () =>
+    (await fx.db.select().from(schema.agentRunSteps)).filter((s) => s.data.nudged === "promise").length;
+
+  const thread = await earlier();
+  await handedOff(await earlier(thread.triggerMessageId));
+  await handedOff(await earlier(), { status: "answered", answer: "Feito.", answeredAt: new Date() });
+  await ask(fx, "@dev e a Rita?");
+  await drainOutbox(fx.db, fx.handlers);
+  expect(await nudges()).toBe(1);
+
+  // Still out from here, handed off by an earlier run: what comes of it wakes the agent here, keeping "te aviso".
+  await handedOff(await earlier());
+  await ask(fx, "@dev e agora?");
+  await drainOutbox(fx.db, fx.handlers);
+  expect(followThroughCalls(fx).length).toBe(2);
+  expect(await nudges()).toBe(1);
+});
+
+describe("between agents (ADR 0095)", () => {
+  /** Whose model call it is: its prompt says which agent it is. */
+  const youAre = (request: ModelRequest, name: string) =>
+    systemText(request.system).includes(`You are ${name} (@${name.toLowerCase()})`);
+  const addAgent = (fx: Fixture, name: string) =>
+    createAgent(
+      fx.db,
+      fx.owner.id,
+      fx.org.id,
+      { name, handle: name.toLowerCase(), role: "Operations", credentialId: fx.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+  /** Dev hands Infra the queue when Ana asks; Infra answers with `infra` (by its call), Ops with "Fila limpa.". */
+  const handing = (infra: (request: ModelRequest, call: number) => FakeReply) => {
+    let infraCalls = 0;
+    return (request: ModelRequest): FakeReply => {
+      if (youAre(request, "Infra")) return infra(request, ++infraCalls);
+      if (youAre(request, "Ops")) return { chunks: ["Fila limpa."] };
+      const last = lastUserText(request);
+      if (last.includes("did with the work you handed it") || last.includes("Note from @infra"))
+        return { chunks: ["Pronto."] };
+      if (JSON.stringify(request.messages.at(-1)?.content).includes("tool_result"))
+        return { chunks: ["Passei a fila ao Infra."] };
+      return {
+        chunks: [],
+        toolUses: [{ name: "tell_agent", input: { agent: "@infra", message: "Limpa a fila de jobs de staging." } }],
+      };
+    };
+  };
+  /** The judge reads Infra's replies as an unkept promise, and every note's reply as one the sender needs. */
+  let infraId = "";
+  const judge = (kind: string, _id: string, _state: unknown, _q: unknown, request: { agentId?: string | null }) =>
+    kind === "follow_through" && request.agentId === infraId ? "unkept" : kind === "note_reply" ? 0.9 : undefined;
+  const infraJudged = (fx: Fixture) =>
+    (fx.context.judge as unknown as { calls: { kind: string; agentId?: string }[] }).calls.filter(
+      (c) => c.kind === "follow_through" && c.agentId === infraId,
+    );
+  const dmNudges = (fx: Fixture) =>
+    fx.provider.calls.filter((c) => lastUserText(c.request).includes("your answer goes back as it is"));
+
+  test("a run that owes an answer and ends on a promise gets the DM nudge once; one answering nothing gets no check", async () => {
+    f = await setup({
+      askAgent: true,
+      judge,
+      reply: handing((_request, call) => ({
+        chunks: [call === 1 ? "Vou limpar a fila e te digo." : "Fila limpa: 0 jobs pendentes."],
+      })),
+    });
+    const fx = f;
+    const infra = await addAgent(fx, "Infra");
+    infraId = infra.id;
+    await ask(fx, "@dev pede ao infra para limpar a fila");
+    await drainOutbox(fx.db, fx.handlers);
+    expect(infraJudged(fx)).toHaveLength(1);
+    expect(dmNudges(fx)).toHaveLength(1);
+    expect(await fx.db.select().from(schema.agentConsultations)).toMatchObject([
+      { status: "answered", answer: "Fila limpa: 0 jobs pendentes." },
+    ]);
+
+    // A note from before notes were rows: its run owes no answer, and isn't read.
+    const [dev] = await fx.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.agentId, fx.agent.id));
+    if (!dev) throw new Error("no run");
+    const dm = await openAgentDm(fx.db, fx.org.id, fx.agent.id, infra.id);
+    await fx.db.transaction(async (tx) => {
+      const m = await insertMessage(tx, {
+        orgId: fx.org.id,
+        channelId: dm.id,
+        author: { type: "agent", agentId: fx.agent.id, runId: dev.id, hop: dev.hop },
+        body: "A fila voltou a encher.",
+        meta: { agentNote: { runId: dev.id } },
+      });
+      await createAgentRuns(tx, m, [infra.id], "dm");
+    });
+    await drainOutbox(fx.db, fx.handlers);
+    expect(infraJudged(fx)).toHaveLength(1);
+  });
+
+  test("a run that handed part on and ends saying it will come back gets no nudge: what it handed on goes back with its answer", async () => {
+    f = await setup({
+      askAgent: true,
+      judge,
+      reply: handing((request) =>
+        JSON.stringify(request.messages.at(-1)?.content).includes("tool_result")
+          ? { chunks: ["Passei a fila ao Ops; te digo quando ele terminar."] }
+          : {
+              chunks: [],
+              toolUses: [{ name: "tell_agent", input: { agent: "@ops", message: "Limpa a fila de staging." } }],
+            },
+      ),
+    });
+    const fx = f;
+    const infra = await addAgent(fx, "Infra");
+    infraId = infra.id;
+    await addAgent(fx, "Ops");
+    await ask(fx, "@dev pede ao infra para limpar a fila");
+    await drainOutbox(fx.db, fx.handlers);
+    expect(infraJudged(fx)).toHaveLength(1);
+    expect(dmNudges(fx)).toEqual([]);
+    const [handed] = (await fx.db.select().from(schema.agentConsultations)).filter((c) => c.targetAgentId === infra.id);
+    expect(handed).toMatchObject({
+      status: "answered",
+      answer:
+        "Passei a fila ao Ops; te digo quando ele terminar.\n\n[@ops, to whom @infra handed part of it]: Fila limpa.",
+    });
+  });
 });

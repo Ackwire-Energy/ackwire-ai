@@ -1,9 +1,11 @@
 import { expect, test } from "bun:test";
+import { type ModelRequest, systemText } from "@agenteschat/providers";
 import { createFakeProvider, type FakeReply } from "@agenteschat/providers/testing";
 import cases from "../eval/behavior-cases.json";
 import { deterministicChecks } from "../eval/behavior-checks";
 import { CONNECTORS } from "../eval/behavior-fakes";
 import { type BehaviorCase, runCase } from "../eval/behavior-run";
+import { createFakeJudge } from "../src";
 
 // The behavior eval's harness, driven by the fake provider: the case goes through the
 // real engine path (no network). The eval itself (real model) is manual: `bun run eval:behavior`.
@@ -21,8 +23,15 @@ test("every case is well formed: known presets, connectors and tools", () => {
     "search_context",
     "ask_user",
     "ask_agent",
+    "tell_agent",
+    "follow_up",
+    "list_artifacts",
+    "read_artifact",
+    "list_files",
     "post_message",
     "send_dm",
+    "send_gif",
+    "send_sticker",
     "list_routines",
     "update_routine",
     "create_routine",
@@ -270,4 +279,78 @@ test("called by name in a DM: no pass tool; the silence word is never posted", a
   const checks = deterministicChecks(c.expect, run);
   expect(checks.find((k) => k.id === "answers_when_called")?.pass).toBe(true);
   expect(checks.find((k) => k.id === "no_silence_word")?.pass).toBe(true);
+});
+
+test("agents working together: colleagues really run, one is held until a step lets it go, and the case sees it all", async () => {
+  const c = byId("status-while-colleague-works");
+  const youAre = (req: ModelRequest, name: string) =>
+    systemText(req.system).includes(`You are ${name} (@${name.toLowerCase()})`);
+  const provider = createFakeProvider((req): FakeReply => {
+    const last = JSON.stringify(req.messages.at(-1)?.content);
+    if (youAre(req, "Diogo")) return { chunks: ["Recebi as notas da Acme, da Borba e do Cais, abri tudo."] };
+    if (youAre(req, "Rita"))
+      return last.includes("tool_result")
+        ? { chunks: ["Passei ao Diogo as notas dos 3 clientes, e ele confirmou que abriu."] }
+        : {
+            chunks: [],
+            toolUses: [
+              { name: "tell_agent", input: { agent: "@diogo", message: "Acme, Borba e Cais: as notas de cada um." } },
+            ],
+          };
+    if (last.includes("did with the work you handed it"))
+      return { chunks: ["Pronto: a Rita passou ao Diogo as notas dos 3 clientes, e ele confirmou."] };
+    if (last.includes("como ficou")) return { chunks: ["A Rita ainda está nisso, desde agora há pouco."] };
+    if (last.includes("tool_result")) return { chunks: ["Pedi à Rita: ela já está nisso."] };
+    return {
+      chunks: [],
+      toolUses: [
+        {
+          name: "tell_agent",
+          input: { agent: "@rita", message: "Passa ao Diogo tudo o que sabes dos teus clientes." },
+        },
+      ],
+    };
+  });
+  const run = await runCase(c, {
+    apiKey: "sk-ant-fake-key-1234",
+    provider,
+    maxToolTurns: 6,
+    lang: "pt",
+    judge: createFakeJudge((kind) => (kind === "note_reply" ? 0.9 : undefined)),
+  });
+  expect(run.error).toBeUndefined();
+  expect(run.handOffs).toEqual({ "chefe>rita": 1, "rita>diogo": 1 });
+  expect(run.agentRuns).toEqual({ all: 5, chefe: 3, rita: 1, diogo: 1 });
+  expect(run.personSaw).toEqual({ agentMessages: 3, noteLines: 0 });
+  // Asked while Rita was held, Chefe said who has it, and asked nobody again.
+  expect(run.stepChecks?.find((k) => k.id === "step2:no_forbidden_call")).toMatchObject({ pass: true });
+  expect(run.transcript).toContain("[Marina]: E aí, como ficou?");
+  expect(run.transcript).toContain("A Rita ainda está nisso");
+  expect(run.transcript?.split("\n").at(-1)).toContain("Pronto: a Rita passou ao Diogo");
+  // Only the agent under test's turns are its own.
+  expect(run.turns.every((t) => !t.text.includes("Recebi as notas"))).toBe(true);
+  expect(deterministicChecks(c.expect, run).filter((k) => !k.pass)).toEqual([]);
+});
+
+test("another agent's note as the trigger: the real tell_agent, and whether what came of it went back", async () => {
+  const c = byId("note-announces-work");
+  const provider = createFakeProvider(
+    (): FakeReply => ({ chunks: ["Combinado, assumo os clientes da Rita assim que chegarem."] }),
+  );
+  const run = await runCase(c, {
+    apiKey: "sk-ant-fake-key-1234",
+    provider,
+    maxToolTurns: 4,
+    lang: "en",
+    // An acknowledgement: nothing for the sender.
+    judge: createFakeJudge((kind) => (kind === "note_reply" ? 0.1 : undefined)),
+  });
+  expect(run.error).toBeUndefined();
+  expect(run.system).toContain("handed you work or news (`tell_agent`)");
+  expect(JSON.stringify(provider.calls[0]?.request.messages)).toContain(
+    "Rita will send you her folder and notes shortly",
+  );
+  expect(run.handOffs).toEqual({ "chefe>diogo": 1 });
+  expect(run.reported).toBe(false);
+  expect(deterministicChecks(c.expect, run).filter((k) => !k.pass)).toEqual([]);
 });

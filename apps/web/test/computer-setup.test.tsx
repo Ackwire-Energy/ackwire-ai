@@ -504,9 +504,8 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
 
     await readyWorkspace(`/org/${ORG_ID}/agents/${ADA_ID}`);
     const work = document.querySelector(".agp-workcard") as HTMLElement;
-    expect(work.textContent).toContain("Trabalha no");
-    expect(work.textContent).toContain("Computador da Acme");
-    // A static line: no chevron, no picker.
+    // Nothing to pick, so no cell for it: the page's computer entry says how the computer is.
+    expect(work.textContent).not.toContain("Trabalha no");
     expect(screen().queryByRole("button", { name: "Mudar onde trabalha" })).toBeNull();
     expect(work.textContent).not.toMatch(/nuvem/i);
   });
@@ -603,22 +602,21 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
 });
 
 describe("an agent's computer while the workspace's is on its way", () => {
-  test("Como trabalha says where it will work and why it waits", async () => {
+  test("the page's computer entry says why it waits: Como trabalha has no cell for it", async () => {
     await open(`/org/${ORG_ID}/agents/${ADA_ID}`, { state: "waiting", reason: "capacity" });
     const work = document.querySelector(".agp-workcard") as HTMLElement;
-    expect(work.textContent).toContain("Trabalha no");
-    expect(work.textContent).toContain("Computador da Acme");
-    expect(work.textContent).toContain("Na fila");
-    expect(work.textContent).not.toContain("nuvem");
-    // The cell says where it will work and how far along it is: no line under it saying the agent waits.
+    expect(work.textContent).not.toContain("Trabalha no");
+    const entry = screen().getByRole("region", { name: "Computador da Ada" });
+    expect(entry.querySelector(".cmp-entry__line")?.textContent).toContain("Esperando um computador disponível");
+    // No line under the card saying the agent waits.
     expect(document.body.textContent).not.toContain("começa a usar assim que ele ficar pronto");
   });
 
-  test("once ready, the agent works on the workspace's computer, by its name", async () => {
+  test("once ready, the page's computer entry is the agent's: no cell to change, no line saying it waits", async () => {
     await readyWorkspace(`/org/${ORG_ID}/agents/${ADA_ID}`);
     const work = document.querySelector(".agp-workcard") as HTMLElement;
-    expect(work.textContent).toContain("Trabalha no");
-    expect(work.textContent).toContain("Computador da Acme");
+    expect(work.textContent).not.toContain("Trabalha no");
+    expect(screen().getByRole("region", { name: "Computador da Ada" })).toBeTruthy();
     expect(document.body.textContent).not.toContain("A Ada começa a usar");
     expect(screen().queryByRole("region", { name: NOTICE })).toBeNull();
   });
@@ -1237,7 +1235,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(meet?.querySelectorAll(".ac-avatar")).toHaveLength(4);
     expect(meet?.querySelector(".onb__faces-more")?.textContent).toBe("+26");
     await click(screen().getByRole("button", { name: "Pular esta etapa" }));
-    expect(document.querySelector(".onb__welcome-lead")?.textContent).toStartWith(
+    expect(document.querySelector(".welcome-card__lead")?.textContent).toStartWith(
       "Ada, Atlas, Theo, Lia e mais 26 já estão no #general.",
     );
   });

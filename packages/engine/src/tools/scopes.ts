@@ -88,6 +88,9 @@ export const BUILTIN_SCOPES: Record<string, { label: string; description: string
   },
 };
 
+/** A built-in scope by name: own keys only, so "constructor" or "toString" never passes as one. */
+export const isBuiltinScope = (scope: string) => Object.hasOwn(BUILTIN_SCOPES, scope);
+
 /**
  * Granted to every new agent: reading context, keeping its own notes,
  * reading and writing Drive files, and reading issues (so any agent can check
@@ -197,6 +200,11 @@ export function accessWithNeeds(
     : { state: own, of: tool };
 }
 
+/** Whether the agent holds some access to a connection (a scope, a tool, all of it), denials aside. */
+export const holdsConnection = (granted: Set<string>, connectionId: string | null | undefined) =>
+  !!connectionId &&
+  [...granted].some((k) => k.startsWith(grantKey(connectionId, "")) && !k.startsWith(grantKey(connectionId, "deny:")));
+
 /** The agent's grants straight from the database (no cache): for checks right before a call runs. */
 export async function freshGrantedKeys(db: Executor, orgId: string, agentId: string) {
   return loadScopeKeys(db, orgId, agentId);
@@ -246,7 +254,7 @@ export async function listAgentScopes(db: Database, orgId: string, agentId: stri
 export type GrantValidator = (db: Database, orgId: string, grant: ScopeGrant) => Promise<string | null>;
 
 const builtinOnly: GrantValidator = async (_db, _orgId, grant) =>
-  grant.connectionId === null && !BUILTIN_SCOPES[grant.scope] ? `Unknown scope ${grant.scope}` : null;
+  grant.connectionId === null && !isBuiltinScope(grant.scope) ? `Unknown scope ${grant.scope}` : null;
 
 /**
  * Replaces an agent's grants (admins: `manage_agents`). Each grant is checked

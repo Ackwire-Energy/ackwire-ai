@@ -81,6 +81,7 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
       "org:general",
       "org:members",
       "org:audit",
+      "org:media",
       "agents:access",
       "agents:connectors",
       "agents:skills",
@@ -97,16 +98,24 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
     const ids = (permissions: string[]) => visibleSections(as("member", permissions)).map((s) => s.id);
     const all = ["read", "invite_people", "view_audit", "manage_agents", "configure", "create_agents"];
     expect(visibleSections(as("owner", all)).length).toBe(SETTINGS_SECTIONS.length);
-    expect(ids(["read", "post"])).toEqual(["general", "connectors", "computers", "usage", "keys"]);
-    // Membros is the page of who invites or manages members on the phone (requests to join, the invitation link).
-    expect(ids(["read", "invite_people"])).toContain("members");
-    expect(ids(["read", "manage_members"])).toContain("members");
+    // Membros is everyone's, as on the web: a member who may not invite suggests someone there (ADR 0090).
+    expect(ids(["read", "post"])).toEqual(["general", "members", "media", "connectors", "computers", "usage", "keys"]);
     const agents = ids(["read", "manage_agents"]);
-    expect(agents).toEqual(["general", "access", "connectors", "skills", "computers", "usage", "keys"]);
+    expect(agents).toEqual([
+      "general",
+      "members",
+      "media",
+      "access",
+      "connectors",
+      "skills",
+      "computers",
+      "usage",
+      "keys",
+    ]);
     expect(ids(["read", "view_audit"])).toContain("audit");
     expect(ids(["read", "create_agents"])).toContain("import");
     expect(ids(["read", "configure"])).toContain("storage");
-    expect(visibleSections(undefined).map((s) => s.id)).toEqual(["general", "connectors", "usage"]);
+    expect(visibleSections(undefined).map((s) => s.id)).toEqual(["general", "media", "connectors", "usage"]);
   });
 
   test("each section opens a screen the app has", () => {
@@ -135,6 +144,7 @@ describe("Geral", () => {
     expect(
       tileStates(t, "pt-BR", {
         overview: { people: 3, agents: 2, budgetUsedPercent: 42 },
+        usesApi: true,
         invitations: 1,
         connectors: ["GitHub", "Slack", "Linear", "Sentry"],
         skills: 5,
@@ -173,6 +183,10 @@ describe("Geral", () => {
       keys: "Usando a chave deste servidor",
     });
     expect(tileStates(t, "pt-BR", {})).toEqual({});
+    // A workspace on plans alone (ADR 0063 §5): Uso says no 0% budget.
+    expect(
+      tileStates(t, "pt-BR", { overview: { people: 3, agents: 2, budgetUsedPercent: 0 }, usesApi: false }),
+    ).toEqual({ members: "3 membros", access: "2 agentes" });
     const en = await translator("en");
     expect(tileStates(en, "en", { computers: { count: 3, online: 2 } }).computers).toBe("2 of 3 on");
   });

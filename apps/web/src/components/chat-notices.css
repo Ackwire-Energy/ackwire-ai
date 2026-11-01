@@ -8,6 +8,10 @@
   line-height: 18px;
   color: var(--faint);
 }
+/* Inside a message, in place of one of its parts: already in the text's column. */
+.cn-line--part {
+  margin: 2px 0;
+}
 /* Never wider than the room beside the icon (14px + the 8px gap): long text wraps here. */
 .cn-line__text {
   flex: 0 1 auto;
@@ -29,7 +33,7 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-.cn-line__toggle:focus-visible {
+html:not([data-pointer]) .cn-line__toggle:focus-visible {
   outline: none;
   border-radius: 2px;
   box-shadow: var(--focus-ring);

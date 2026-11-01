@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import {
   BROWSER_WARM_PROTOCOL,
   DESKTOP_PROTOCOL,
+  DESKTOP_SWITCH_PROTOCOL,
   type RunnerAccess,
   type RunnerInfo,
   STREAM_CLOSE,
@@ -346,12 +347,12 @@ const bytesOf = (viewer: ReturnType<typeof openViewer>) =>
   Buffer.concat(viewer.got.filter((f): f is ArrayBuffer => typeof f !== "string").map((f) => Buffer.from(f)));
 
 /** The runner's own connection and stream code on real sockets, its desktop a fake Xvnc and its shells `spawn`. */
-function runnerOn(token: string, dir: string, vncSocket: string, spawn: SpawnPty) {
+function runnerOn(token: string, dir: string, vncSocket: string, spawn: SpawnPty, hello: Partial<RunnerInfo> = {}) {
   const http = `http://127.0.0.1:${server.port}`;
   const runner = new RunnerConnection({
     url: connectUrl(http),
     token,
-    info: RUNNER as RunnerInfo,
+    info: { ...RUNNER, ...hello } as RunnerInfo,
     context: {
       workspaceReal: dir,
       exec: true,
@@ -405,25 +406,29 @@ test("the runner's own stream code through the server: a watcher's RFB handshake
   try {
     await until(() => runner.online, "the runner");
 
-    // noVNC's side: the runner offers RFB 3.8 and security None, and the desktop's ServerInit follows ClientInit.
+    // noVNC's side: the runner offers RFB 3.8 and security None, the desktop's ServerInit right behind, all before
+    // the viewer answers anything; each its own frame through the server, as noVNC takes one step a frame.
     const viewer = openViewer(desktop, owner);
     const sendBytes = (bytes: Uint8Array | string) =>
       viewer.socket.send(typeof bytes === "string" ? new TextEncoder().encode(bytes) : bytes);
-    await until(() => bytesOf(viewer).length >= 12, "the desktop's version");
-    expect(bytesOf(viewer).toString("latin1")).toBe("RFB 003.008\n");
-    sendBytes("RFB 003.008\n");
-    await until(() => bytesOf(viewer).length >= 14, "the security types");
-    sendBytes(Uint8Array.of(1));
-    await until(() => bytesOf(viewer).length >= 18, "the security result");
-    sendBytes(Uint8Array.of(0));
-    await until(() => bytesOf(viewer).length >= 18 + 27, "the ServerInit");
-    expect([...bytesOf(viewer).subarray(12, 18)]).toEqual([1, 1, 0, 0, 0, 0]);
+    await until(() => bytesOf(viewer).length >= 18 + 27, "the runner's side of the handshake");
+    expect(viewer.got.slice(0, 3).map((f) => [...new Uint8Array(f as ArrayBuffer)])).toEqual([
+      [...new TextEncoder().encode("RFB 003.008\n")],
+      [1, 1],
+      [0, 0, 0, 0],
+    ]);
     expect(
       bytesOf(viewer)
         .subarray(18 + 24)
         .toString(),
     ).toBe("Dev");
     expect(xvnc.logins[0]).toMatchObject({ password: "view", shared: 1 });
+    sendBytes("RFB 003.008\n");
+    sendBytes(Uint8Array.of(1));
+    sendBytes(Uint8Array.of(0));
+    // A request once the answers checked out: the desktop's update comes back.
+    sendBytes(Uint8Array.of(3, 0, 0, 0, 0, 0, 5, 0, 3, 32));
+    await until(() => bytesOf(viewer).length === 18 + 27 + 4, "the update");
     viewer.socket.close();
     await until(() => xvnc.logins[0]?.socket.destroyed === true, "the desktop's connection to close");
 
@@ -441,6 +446,60 @@ test("the runner's own stream code through the server: a watcher's RFB handshake
     await until(() => term.closed !== null, "the end");
     expect(term.got.filter((f) => typeof f === "string")).toEqual(['{"type":"exit","code":0}']);
     expect(term.closed?.code).toBe(STREAM_CLOSE.normal);
+  } finally {
+    runner.stop();
+    xvnc.close();
+    removeDirs([dir]);
+  }
+});
+
+test("taking control and handing back change the stream's mode in place, through the runner's own code: one socket, the desktop's full login, then its view-only one again", async () => {
+  const { owner, org, machine } = await seeded();
+  const dir = tempDir("streams-switch-");
+  const xvnc = await fakeXvnc(dir);
+  const noShell: SpawnPty = () => {
+    throw new Error("no terminal here");
+  };
+  const runner = runnerOn(machine.token, dir, xvnc.socketPath, noShell, { protocol: DESKTOP_SWITCH_PROTOCOL });
+  const MODE = (mode: string) => JSON.stringify({ type: "mode", mode });
+  const VERSION = new TextEncoder().encode("RFB 003.008\n");
+  const pointer = Uint8Array.of(5, 0, 0, 100, 0, 120);
+  try {
+    await until(() => runner.online, "the runner");
+    const viewer = openViewer(
+      `${base()}/api/desktop?orgId=${org.orgId}&agentId=${org.agentId}&switch=1&mode=watch`,
+      owner,
+    );
+    const answer = () => {
+      viewer.socket.send(VERSION);
+      viewer.socket.send(Uint8Array.of(1));
+      viewer.socket.send(Uint8Array.of(1));
+    };
+    await until(() => bytesOf(viewer).length >= 45, "the runner's side of the handshake");
+    expect(viewer.got[0]).toBe(MODE("watch"));
+    answer();
+    viewer.socket.send(pointer);
+    await until(() => (xvnc.logins[0]?.got.length ?? 0) >= 6, "the pointer at the desktop");
+    expect(xvnc.desktop.pointer).toEqual([640, 400]);
+
+    const api = (path: string, init?: Parameters<Browser>[1]) =>
+      owner(`/api/app/organizations/${org.orgId}${path}`, init);
+    const taken = (await (await api(`/agents/${org.agentId}/desktop/takeover`, { json: {} })).json()) as { id: string };
+    await until(() => viewer.got.includes(MODE("control")), "the switch");
+    viewer.socket.send(MODE("control"));
+    await until(() => bytesOf(viewer).length >= 90, "the new session's handshake");
+    answer();
+    viewer.socket.send(pointer);
+    await until(() => xvnc.desktop.pointer[0] === 100, "the person's pointer");
+    expect(xvnc.logins.map((l) => l.password)).toEqual(["view", "full"]);
+
+    expect((await api(`/browser/handoffs/${taken.id}/done`, { json: {} })).status).toBe(200);
+    await until(() => viewer.got.filter((f) => f === MODE("watch")).length === 2, "the switch back");
+    viewer.socket.send(MODE("watch"));
+    await until(() => bytesOf(viewer).length >= 135, "the watching session's handshake");
+    expect(xvnc.logins.map((l) => l.password)).toEqual(["view", "full", "view"]);
+    expect(viewer.closed).toBeNull();
+    viewer.socket.close();
   } finally {
     runner.stop();
     xvnc.close();

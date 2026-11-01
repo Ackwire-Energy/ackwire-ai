@@ -4,6 +4,7 @@ import {
   createMemoryBlobStore,
   createMemoryPubSub,
   createPostgresSearchResolver,
+  type GifProvider,
   type KeyWrapper,
   noPlatformCredentials,
   type PlatformCredentials,
@@ -38,6 +39,7 @@ import {
   createJobHandlers,
   createLocalKeyWrapper,
   createMachineHub,
+  createMediaToolSource,
   createMissionHooks,
   createMissionToolSource,
   createModelGateway,
@@ -172,6 +174,8 @@ export async function setup(
     askAgent?: boolean;
     /** Add the built-in `react` tool. */
     react?: boolean;
+    /** Add the built-in `send_gif` and `send_sticker` tools (ADR 0091), with `gifs` as the server's GIF search. */
+    mediaTools?: boolean;
     /** Add the built-in `follow_up` and `cancel_follow_up` tools. */
     followUps?: boolean;
     /** Add the built-in `hand_off` tool (background runs: routines). */
@@ -197,7 +201,10 @@ export async function setup(
     machines?: boolean;
     /** With `machines`: the mission tools (propose_mission and, in a mission thread, its tools). The hub's mission hooks are always set. */
     missionTools?: boolean;
-    /** Answers of the fake judge (judge.ts): by judgment kind and question id. Default: every Noul 0. */
+    /**
+     * Answers of the fake judge (judge.ts): by judgment kind and question id. Default: every Noul 0, but an agent's
+     * mention needs nothing (`createFakeJudge`).
+     */
     judge?: Parameters<typeof createFakeJudge>[0];
     /** The fake schedule reader's table (phrase → answer), on top of `TEST_SCHEDULES`. */
     schedules?: FakeScheduleAnswers;
@@ -207,6 +214,11 @@ export async function setup(
     warmBrowser?: RunExecutorDeps["warmBrowser"];
     /** What the server can connect: `find_tools` names the connectors an agent lacks. None: it names none. */
     catalog?: ServerCatalog;
+    /**
+     * GIF search for the jobs (ADR 0091): an agent's GIF after its reply, and `send_gif` with `mediaTools`. None: its
+     * own stickers only.
+     */
+    gifs?: GifProvider | null;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -221,7 +233,7 @@ export async function setup(
     label: "main",
     apiKey: "sk-ant-test-key-1234",
   });
-  const agent = await createAgent(
+  const first = await createAgent(
     db,
     owner.id,
     org.id,
@@ -235,6 +247,9 @@ export async function setup(
     },
     { model: "claude-sonnet-5-5" },
   );
+  // The first agent coordinates its team (ADR 0093); here nobody does, and the tests about it pick one themselves.
+  await db.update(schema.agents).set({ coordinator: false }).where(eq(schema.agents.id, first.id));
+  const agent = { ...first, coordinator: false };
   // New agents get their computer by default; tests that use it grant it themselves.
   await db
     .delete(schema.agentScopes)
@@ -306,6 +321,7 @@ export async function setup(
         ]
       : []),
     ...(options.react ? [createReactToolSource({ pubsub })] : []),
+    ...(options.mediaTools ? [createMediaToolSource({ pubsub, gifs: options.gifs ?? null })] : []),
     ...(options.followUps ? [createFollowUpToolSource({ pubsub })] : []),
     ...(options.handOff ? [createHandOffToolSource({ pubsub })] : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
@@ -337,7 +353,7 @@ export async function setup(
     pubsub,
     maxOutputTokens: 1000,
     contextMessages: 30,
-    maxHops: 3,
+    maxHops: 100,
     deltaFlushMs: 0,
     tools,
     context,
@@ -347,6 +363,7 @@ export async function setup(
     sandbox: sandboxDeps,
     toolsOnDemand: options.toolsOnDemand ?? false,
     ...(options.warmBrowser ? { warmBrowser: options.warmBrowser } : {}),
+    ...(options.gifs ? { gifs: options.gifs } : {}),
   };
   const handlers = createJobHandlers(jobDeps);
 

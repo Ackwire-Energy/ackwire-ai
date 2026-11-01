@@ -115,7 +115,7 @@ test("an unknown handle is answered with the closest handles of the agents here"
   const results: string[] = [];
   f = await setup({
     askAgent: true,
-    reply: callsTool("ask_agent", { agent: "@infra-codevale", question: "Pode fazer o deploy?" }, results),
+    reply: callsTool("ask_agent", { agent: "@infra-acme", question: "Pode fazer o deploy?" }, results),
   });
   await addAgent("QA", "qa", "Testes");
   await addAgent("Infra", "infra", "Infrastructure");
@@ -123,14 +123,14 @@ test("an unknown handle is answered with the closest handles of the agents here"
   await post("@dev go");
   await drainOutbox(f.db, f.handlers);
 
-  expect(results[0]).toContain("No agent @infra-codevale here. Closest handles: @infra, @qa, @design.");
+  expect(results[0]).toContain("No agent @infra-acme here. Closest handles: @infra, @qa, @design.");
 });
 
 test("the closest handles leave out the agents the person behind the run can't talk to", async () => {
   const results: string[] = [];
   f = await setup({
     askAgent: true,
-    reply: callsTool("ask_agent", { agent: "@infra-codevale", question: "Pode fazer o deploy?" }, results),
+    reply: callsTool("ask_agent", { agent: "@infra-acme", question: "Pode fazer o deploy?" }, results),
   });
   await addAgent("QA", "qa", "Testes");
   await addAgent("Infra", "infra", "Infrastructure");
@@ -147,7 +147,7 @@ test("the closest handles leave out the agents the person behind the run can't t
   await postPersonMessage({ db: f.db, pubsub: f.pubsub }, bia.id, f.org.id, f.general.id, { body: "@dev go" });
   await drainOutbox(f.db, f.handlers);
 
-  expect(results[0]).toContain("No agent @infra-codevale here.");
+  expect(results[0]).toContain("No agent @infra-acme here.");
   expect(results[0]).not.toContain("Closest handles");
 });
 

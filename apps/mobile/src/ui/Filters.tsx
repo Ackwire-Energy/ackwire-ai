@@ -27,6 +27,7 @@ export function Filters({ items, value, onChange }: FiltersProps) {
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
       contentContainerStyle={{ gap: 6, paddingHorizontal: 16, paddingBottom: 4 }}
     >
       {items.map((item) => {

@@ -16,27 +16,30 @@ export const UNDO_WINDOW_MS = 5 * 60_000;
 
 /**
  * What an agent did. Covered: issues (created, fields changed, assigned),
- * memory (saved, changed, forgotten), routines (created, changed), an agent
+ * memory (saved, changed, forgotten), routines (created, changed, deleted), an agent
  * added to a channel, a channel created, wiki pages (created, edited), threads
  * (renamed, closed). Merge, deploy, rollback, anything that leaves the organization
- * and deletes that can't be restored keep asking (approvals).
+ * and deletes that can't be restored keep asking (approvals). The API's enum is this list. The apps keep their own
+ * copy (`@agenteschat/client`'s `AGENT_ACTION_KINDS`), and a test keeps the two the same.
  */
-export type AgentActionKind =
-  | "issue.created"
-  | "issue.updated"
-  | "issue.assigned"
-  | "memory.saved"
-  | "memory.updated"
-  | "memory.forgotten"
-  | "routine.created"
-  | "routine.updated"
-  | "routine.deleted"
-  | "channel.agent_added"
-  | "channel.created"
-  | "wiki.page_created"
-  | "wiki.page_edited"
-  | "thread.renamed"
-  | "thread.closed";
+export const AGENT_ACTION_KINDS = [
+  "issue.created",
+  "issue.updated",
+  "issue.assigned",
+  "memory.saved",
+  "memory.updated",
+  "memory.forgotten",
+  "routine.created",
+  "routine.updated",
+  "routine.deleted",
+  "channel.agent_added",
+  "channel.created",
+  "wiki.page_created",
+  "wiki.page_edited",
+  "thread.renamed",
+  "thread.closed",
+] as const;
+export type AgentActionKind = (typeof AGENT_ACTION_KINDS)[number];
 
 /** Built-in tools whose changes are receipts with Undo (no approval; "What you can do" lists them). */
 export const UNDOABLE_TOOLS = new Set([

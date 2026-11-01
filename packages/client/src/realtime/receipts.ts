@@ -1,10 +1,12 @@
 import type { ChannelEvent, ConnectIntent, DecidedBy, Message, MessageReceipts, RunStatus } from "../api/types";
 import { PLATFORM_CAP } from "../lib/limits";
+import { isMediaAfterReply } from "../lib/media";
 import { NO_AI } from "../lib/no-ai";
 import type { RunSteeredEvent } from "./streams";
 
 /**
- * Agent receipts under a person's message: who saw it and who is answering.
+ * Agent receipts under a person's message, or an agent's that mentions agents (ADR 0089: whom it handed work to, and
+ * who it only mentioned): who saw it and who is answering.
  * Built from `message.receipts` (list API) and live events: the expected
  * `message.routed` / `message.claimed` / `message.handled`, plus the run
  * events. Run events land on the messages that run answers (its trigger, and
@@ -28,8 +30,13 @@ export interface MessageReceipt {
   mentioned?: string[];
   /** Mentioned agents that won't answer (they don't reply to this person). */
   blocked?: string[];
-  /** Mentioned agents the message only references (part of the request to another agent): no answer expected. */
+  /**
+   * Mentioned agents the message only references (part of the request to another agent, or an agent's mention the
+   * judge read as no hand-off): no answer expected.
+   */
   referenced?: string[];
+  /** An agent's message: nobody answering it is no news (it waits for nobody). */
+  byAgent?: true;
   /** Routed to nobody: the organization has no AI connected (with the Connect step the message asked for). */
   noAi?: { intent?: ConnectIntent; provider?: string };
   /** Routed to nobody: the workspace used up its platform AI for the month, so only @mentions start agents. */
@@ -139,12 +146,14 @@ function setForRun(
  * read was asked for, so the read is the newest word on it.
  */
 export function seedReceipt(state: ReceiptsState, message: Message, fresh = false): ReceiptsState {
-  if (message.author?.type !== "person") return state;
+  const mentioned = message.mentionedAgentIds ?? [];
+  // An agent's message has one only for the agents it mentions: the judge decides whom it hands off to.
+  const byAgent = message.author?.type === "agent";
+  if (message.author?.type !== "person" && !(byAgent && mentioned.length > 0)) return state;
   const existing = state[message.id];
   const r = message.receipts;
   const metaReferenced = message.meta?.referencedAgentIds;
   const referenced = r?.referenced ?? (Array.isArray(metaReferenced) ? (metaReferenced as string[]) : []);
-  const mentioned = message.mentionedAgentIds ?? [];
   // The mentions stay on the receipt: "nobody will answer" needs the server to say they can't.
   const withMentions = (s: ReceiptsState): ReceiptsState => {
     const current = s[message.id];
@@ -153,8 +162,11 @@ export function seedReceipt(state: ReceiptsState, message: Message, fresh = fals
       ...current,
       ...(current.mentioned ? {} : { mentioned }),
       ...(referenced.length > 0 && !current.referenced ? { referenced } : {}),
+      ...(byAgent && !current.byAgent ? { byAgent: true as const } : {}),
     };
-    return next.mentioned === current.mentioned && next.referenced === current.referenced
+    return next.mentioned === current.mentioned &&
+      next.referenced === current.referenced &&
+      next.byAgent === current.byAgent
       ? s
       : { ...s, [message.id]: next };
   };
@@ -203,9 +215,10 @@ export function seedReceipt(state: ReceiptsState, message: Message, fresh = fals
       },
     });
   }
-  // A mention: the server resolved it, so that agent will answer (unless the message only references it).
+  // A person's mention: the server resolved it, so that agent will answer (unless the message only references it). An
+  // agent's waits for the judge.
   for (const id of mentioned)
-    next = set(next, message.id, id, referenced.includes(id) ? "seen" : "picked", false, false);
+    next = set(next, message.id, id, byAgent || referenced.includes(id) ? "seen" : "picked", false, false);
   return withMentions(next);
 }
 
@@ -320,7 +333,14 @@ export function applyReceiptEvent(
       return setForRun(state, event.question.runId, event.threadId, event.question.agentId, "claimed", true);
     case "message.created": {
       const m = event.message;
-      if (m?.author?.type === "agent" && m.author.id && m.threadId && !m.meta?.approvalId) {
+      // An agent's sticker after its reply (ADR 0091) answers nobody: a newer message's receipt stays.
+      if (
+        m?.author?.type === "agent" &&
+        m.author.id &&
+        m.threadId &&
+        !m.meta?.approvalId &&
+        !isMediaAfterReply(m.meta)
+      ) {
         return setForRun(state, m.agentRunId, m.threadId, m.author.id, "handled");
       }
       return state;
@@ -380,5 +400,11 @@ export function receiptView(receipt: MessageReceipt | undefined): ReceiptView {
   const nobody = receipt.mentionNeeded
     ? { kind: "nobody" as const, mentionNeeded: true as const }
     : { kind: "nobody" as const };
-  return { seen, status: receipt.routed && !unanswered ? nobody : null, done: false, referenced, ...decided };
+  return {
+    seen,
+    status: receipt.routed && !unanswered && !receipt.byAgent ? nobody : null,
+    done: false,
+    referenced,
+    ...decided,
+  };
 }

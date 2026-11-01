@@ -4,6 +4,7 @@ import { applyChannelEvent, emptyStreams, runsInChannel } from "@agenteschat/cli
 import {
   type ActivityEntry,
   activityText,
+  barElapsed,
   barEntries,
   barPhrase,
   toolActivity,
@@ -126,6 +127,20 @@ describe("the card's turning phrase", () => {
     expect(barEntries(runs, [], name, () => undefined)).toEqual([]);
     const entries = barEntries(runs, [], name, () => undefined, [], true);
     expect(barPhrase(t, entries, runs, 3, 0)).toBe("Theo está escrevendo…");
+  });
+
+  test("a turn it stopped, or one that failed, lends the phrase nothing: phrase and time are the new turn's", () => {
+    const again = { ...base, runId: "r2", status: "running" as const, text: "", startedAt: 90_000 };
+    for (const status of ["canceled", "failed"] as const) {
+      const said = { kind: "say" as const, text: "Vou checar o deploy." };
+      const old = { ...base, status, text: "", startedAt: 0, work: [said, call(1000, false)] };
+      const runs = [old, again];
+      const entries = barEntries(runs, [], name, () => undefined, [], true);
+      const turns = [0, 1, 2].map((tick) => barPhrase(t, entries, runs, tick, 100_000));
+      expect(turns).toEqual([0, 1, 2].map((tick) => barPhrase(t, entries, [again], tick, 100_000)));
+      expect(turns[1]).toBe("Pensando no seu pedido…");
+      expect(barElapsed(t, entries, runs, 100_000)).toBe("10 s");
+    }
   });
 });
 

@@ -1,7 +1,7 @@
 import { mkdirSync, realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { LoadWindow, machineSize, sampleLoad, TrafficWindow } from "@agenteschat/adapters/host-stats";
+import { cgroupCounters, LoadWindow, machineSize, sampleLoad, TrafficWindow } from "@agenteschat/adapters/host-stats";
 import {
   type AccountKind,
   type AgentScope,
@@ -84,6 +84,7 @@ import { type CachedLogo, logoDataUrl, readCachedLogo, removeCachedLogo, syncOrg
 import { type DeviceGrant, devicePair, type FetchFn, PairingError, uniqueWorkspace } from "./pairing";
 import { agentWorkspace } from "./paths";
 import { agentSecrets, secretValue } from "./secrets";
+import { AGENTS_CGROUP } from "./service";
 import { DataSockets, RELAYED_FILE, RelayCount } from "./streams";
 import {
   launchWorker,
@@ -486,7 +487,10 @@ export class RunnerDaemon implements RequestObserver {
       const s = this.session;
       this.traffic.add((s?.supervisor ?? s?.browser)?.takeTraffic() ?? { up: 0, down: 0 });
       void sampleLoad()
-        .then((l) => this.load.add(l))
+        .then((l) => {
+          const oomKills = cgroupCounters(path.join(AGENTS_CGROUP, "memory.events"))?.oom_kill;
+          this.load.add(l && oomKills !== undefined ? { ...l, oomKills } : l);
+        })
         .catch(() => undefined);
     };
     sample();
@@ -774,6 +778,7 @@ export class RunnerDaemon implements RequestObserver {
       log,
       agentFolder: (agent) => agentWorkspace(workspaceReal, agent),
       secrets: (agent) => agentSecrets(secretsDir, agent),
+      accounts: this.accounts,
       ...(this.self.compiled ? { wrapperCommand: [...this.self.command, "task-wrapper"] } : {}),
       onSettled: (t) => this.taskSettled(t),
       ...(this.opts.caffeinate !== undefined ? { caffeinate: this.opts.caffeinate } : {}),

@@ -63,7 +63,7 @@
 .audit-row[aria-pressed="true"] {
   background: var(--plate);
 }
-.audit-row:focus-visible {
+html:not([data-pointer]) .audit-row:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { StreamSocket } from "../../runner/browser";
-import { countChromeTraffic } from "../../runner/browser-traffic";
+import { type CrashedPage, countChromeTraffic } from "../../runner/browser-traffic";
 
 /** Chrome's end of the counter's DevTools socket: what the counter sent, and events pushed to it. */
 class FakeCdp implements StreamSocket {
@@ -21,8 +21,8 @@ class FakeCdp implements StreamSocket {
   event(method: string, params: Record<string, unknown>, sessionId?: string) {
     this.onmessage?.({ data: JSON.stringify({ method, params, ...(sessionId ? { sessionId } : {}) }) });
   }
-  reply(id: number) {
-    this.onmessage?.({ data: JSON.stringify({ id, result: {} }) });
+  reply(id: number, result: Record<string, unknown> = {}) {
+    this.onmessage?.({ data: JSON.stringify({ id, result }) });
   }
   attach(sessionId: string, type = "page") {
     this.event("Target.attachedToTarget", {
@@ -33,12 +33,16 @@ class FakeCdp implements StreamSocket {
   }
 }
 
-function counter() {
+function counter(onCrash?: (page: CrashedPage) => void) {
   let cdp: FakeCdp | undefined;
-  const c = countChromeTraffic("ws://127.0.0.1:9222/devtools/browser/abc", (url) => {
-    cdp = new FakeCdp(url);
-    return cdp;
-  });
+  const c = countChromeTraffic(
+    "ws://127.0.0.1:9222/devtools/browser/abc",
+    (url) => {
+      cdp = new FakeCdp(url);
+      return cdp;
+    },
+    onCrash,
+  );
   if (!cdp) throw new Error("no socket");
   return { c, cdp };
 }
@@ -183,6 +187,54 @@ test("a detached session drops what it had in flight; garbage and unknown events
   cdp.event("Network.requestWillBeSentExtraInfo", { requestId: "x", headers: "accept: */*" }, "p");
   cdp.event("Page.frameNavigated", { frame: { url: "https://example.com" } }, "p");
   expect(c.take()).toEqual({ up: 0, down: 0 });
+});
+
+test("a tab whose page died: said once per crash, opened again at its address by a fresh visit, or shown another page", () => {
+  const crashes: CrashedPage[] = [];
+  const { cdp } = counter((page) => crashes.push(page));
+  cdp.onopen?.();
+  cdp.reply(1);
+  cdp.attach("tab");
+  // A frame inside it, and a worker: their renderers dying isn't the tab's page dying.
+  cdp.event("Target.attachedToTarget", { sessionId: "frame", targetInfo: { targetId: "f", type: "iframe" } }, "tab");
+  cdp.attach("worker", "worker");
+  cdp.event("Inspector.targetCrashed", {}, "frame");
+  cdp.event("Inspector.targetCrashed", {}, "worker");
+  cdp.event("Inspector.targetCrashed", {});
+  expect(crashes).toEqual([]);
+  cdp.event("Inspector.targetCrashed", {}, "tab");
+  expect(crashes.map((p) => p.targetId)).toEqual(["t-tab"]);
+  const asked = () => cdp.sent.filter((m) => m.method.startsWith("Page."));
+
+  // Opened again at the address it was on, found in its history: a form's answer is fetched, never posted again.
+  crashes[0]?.reopen();
+  const history = asked().at(-1);
+  expect(history).toMatchObject({ method: "Page.getNavigationHistory", params: {}, sessionId: "tab" });
+  const entries = [
+    { id: 1, url: "https://shop.example/cart", title: "Cart" },
+    { id: 2, url: "https://shop.example/order", title: "Order" },
+  ];
+  cdp.reply(history?.id ?? 0, { currentIndex: 1, entries });
+  expect(asked().at(-1)).toMatchObject({
+    method: "Page.navigate",
+    params: { url: "https://shop.example/order" },
+    sessionId: "tab",
+  });
+  // A history it can't read opens nothing.
+  crashes[0]?.reopen();
+  cdp.reply(asked().at(-1)?.id ?? 0, { currentIndex: 5, entries });
+  expect(asked().at(-1)?.method).toBe("Page.getNavigationHistory");
+
+  crashes[0]?.show("data:text/html,notice");
+  expect(asked().at(-1)).toMatchObject({
+    method: "Page.navigate",
+    params: { url: "data:text/html,notice" },
+    sessionId: "tab",
+  });
+  // Gone: its crash isn't anyone's anymore.
+  cdp.event("Target.detachedFromTarget", { sessionId: "tab", targetId: "t-tab" });
+  cdp.event("Inspector.targetCrashed", {}, "tab");
+  expect(crashes).toHaveLength(1);
 });
 
 test("a socket that fails or closes settles the attach and keeps what was counted", async () => {

@@ -343,6 +343,9 @@ describe("git on a connected machine through the proxy (ADR 0024 addendum)", () 
     expect(
       await prepareAgentCode(w.machineDeps, { ...turn("x"), session: { machineId: w.paired.machineId, cwd: "m/1" } }),
     ).toBeNull();
+    // A session started afresh because its folder was gone stays in the agent's own folder.
+    const fresh = { machineId: w.paired.machineId, cwd: "", ownFolder: true };
+    expect(await prepareAgentCode(w.machineDeps, { ...turn("olha acme/web"), session: fresh })).toBeNull();
     w.answers.fn = () => {
       throw new Error("boom");
     };

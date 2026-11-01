@@ -20,7 +20,11 @@ import {
   cancelRun,
   clearPlanLimits,
   computerBrainUnavailable,
+  computerMediaNote,
+  createAgent,
+  createAgentRuns,
   createChannel,
+  createCredential,
   createJobHandlers,
   createMissionEngine,
   decideApproval,
@@ -28,6 +32,7 @@ import {
   drainOutbox,
   executeToolForRun,
   grantScopes,
+  insertMessage,
   invokeToolForRun,
   listApprovals,
   listChannels,
@@ -45,6 +50,7 @@ import {
   runWhere,
   SESSION_IDLE_MS,
   SESSION_MAX_INPUT_TOKENS,
+  sessionLostNote,
   type ToolSource,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -351,7 +357,8 @@ test("a gated call through the bridge leaves the run waiting; the decision resum
   expect(gh.executed).toEqual([]);
   expect(seen.length).toBe(1);
   const main = await timeline(f);
-  expect(main.map((m) => m.body)).toContain("Pedi aprovação para o merge.");
+  // The card says it all: a line that only announces it stays out of the conversation.
+  expect(main.map((m) => m.body)).not.toContain("Pedi aprovação para o merge.");
   expect(main.some((m) => typeof m.meta.approvalId === "string")).toBe(true);
   const transcript = run?.transcript as { pending?: { calls: { toolUseId: string; bridged?: boolean }[] } };
   expect(transcript.pending?.calls).toMatchObject([{ toolUseId: "call-1", bridged: true }]);
@@ -462,7 +469,6 @@ test("approved, it ran, and the brain ended its turn without a word: one more tu
   expect(run?.status).toBe("done");
   const fromAgent = (await timeline(f)).filter((m) => m.author.type === "agent" && !m.meta.approvalId);
   expect(fromAgent.map((m) => m.body)).toEqual([
-    promised,
     "The preview hid the rows, so I read them again: tests took 9 min, lint 2.",
   ]);
   const steps = await f.db
@@ -594,7 +600,7 @@ test("two decisions of one pause: the resume that finds the run running under th
   const [run] = await f.db.select().from(schema.agentRuns);
   expect(run?.status).toBe("done");
   const fromAgent = (await timeline(f)).filter((m) => m.author.type === "agent" && !m.meta.approvalId);
-  expect(fromAgent.map((m) => m.body)).toEqual(["Reading both CI runs.", "Tests took 9 min, lint 2."]);
+  expect(fromAgent.map((m) => m.body)).toEqual(["Tests took 9 min, lint 2."]);
 });
 
 test("a question asked through the bridge: the text written before it comes first, what follows isn't posted", async () => {
@@ -1796,6 +1802,30 @@ test("a computer brain with the react tool is told to end with an empty reply af
   expect(systems[0]).toContain("not even the emoji again");
 });
 
+test("a computer brain with the GIF and sticker tools is told an empty reply after one adds nothing", async () => {
+  f = await setup({ mediaTools: true });
+  await computerAgent(f);
+  const systems: string[] = [];
+  const brain: Brain = {
+    kind: "claude_code",
+    async *run(turn) {
+      systems.push(turn.system);
+      yield { type: "done", text: "Oi." };
+    },
+  };
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  // No GIF search on this server: the note names only the sticker, and no reaction note without `react`.
+  expect(systems[0]).toContain(computerMediaNote(["send_sticker"]));
+  expect(systems[0]).not.toContain("`send_gif`");
+  expect(systems[0]).not.toContain(COMPUTER_REACT_NOTE);
+});
+
 test("bridged side effects reach the engine: artifacts and memory cards on the reply, memory.updated published", async () => {
   const fx = effectTools(() => f);
   f = await setup({ toolSources: [fx.source] });
@@ -2183,4 +2213,151 @@ test("no room on the computer and a model key: the model brain answers, as for a
   const last = (await timeline(f)).at(-1);
   expect(last?.body).toBe("Respondi pela API.");
   expect(last?.meta).toMatchObject({ brainFallback: { from: "claude_code", code: "busy" } });
+});
+
+test("a session whose folder is gone from the computer goes on fresh in the agent's own folder, told so", async () => {
+  f = await setup();
+  await computerAgent(f);
+  // A Claude Code runner answers a missing folder as `bad_request`; nothing ran.
+  const { brain, seen } = scriptedComputerBrain((n) =>
+    n === 0
+      ? [{ type: "error", code: "bad_request", message: "The folder repos/acme/app doesn't exist", retryable: false }]
+      : [{ type: "done", text: "Pronto." }],
+  );
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  const [run] = await f.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("done");
+  expect(seen).toHaveLength(2);
+  const [lost, fresh] = seen as [BrainTurn, BrainTurn];
+  expect(lost.session?.ownFolder).toBeUndefined();
+  expect(fresh.session).toMatchObject({ resume: false, cwd: "", ownFolder: true });
+  expect(fresh.session?.id).not.toBe(lost.session?.id);
+  // Later turns and resumes of the run continue that one.
+  expect(run?.brainSessionId).toBe(fresh.session?.id ?? "");
+  expect((fresh as BrainTurn & { thisTurn?: string }).thisTurn).toContain(
+    "Your previous session on the computer was lost: the folder it worked in (repos/acme/app) isn't there anymore.",
+  );
+  expect((await timeline(f)).map((m) => m.body)).toEqual(["@dev oi", "Pronto."]);
+});
+
+test("a Codex session whose folder is gone: a fresh session before the API takes over, once per run", async () => {
+  f = await setup();
+  await computerAgent(f);
+  // A Codex runner throws the same refusal, which the brain says is retryable: the model brain would take it.
+  const gone = {
+    type: "error",
+    code: "runner_failed",
+    message: "The folder repos/acme/app doesn't exist",
+    retryable: true,
+  };
+  const { brain, seen } = scriptedComputerBrain(() => [gone as BrainEvent]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  // Gone again in the fresh session: no third session, the run goes on as any failed turn would.
+  expect(seen).toHaveLength(2);
+  expect(seen[1]?.session).toMatchObject({ resume: false, ownFolder: true });
+  expect(f.provider.calls.length).toBeGreaterThan(0);
+});
+
+test("in a busy channel, its teammates now and why its session was lost reach the computer brain whole", async () => {
+  f = await setup();
+  await computerAgent(f);
+  for (const [name, handle, role] of [
+    ["Caio", "caio", "Desenvolvedor"],
+    ["Lia", "lia", "Revisora de código"],
+    ["Rui", "rui", "Backend"],
+  ] as const) {
+    const a = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name, handle, role, instructions: "", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: a.id });
+  }
+  await f.db
+    .update(schema.channels)
+    .set({
+      topic:
+        "Canal do time de produto: aqui combinamos o que entra no app, quem revisa cada PR e quando cada entrega vai para produção. Use threads.",
+    })
+    .where(eq(schema.channels.id, f.general.id));
+  const { brain, seen } = scriptedComputerBrain((n) =>
+    n === 0
+      ? [{ type: "error", code: "bad_request", message: "The folder repos/acme/app doesn't exist", retryable: false }]
+      : [{ type: "done", text: "Pronto." }],
+  );
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  // Nobody named it: the router brought it in, so "# This turn" also says why it was called.
+  const message = await insertMessage(f.db, {
+    orgId: f.org.id,
+    channelId: f.general.id,
+    author: { type: "person", userId: f.owner.id },
+    body: "alguém revisa o PR do app hoje?",
+  });
+  await f.db.transaction((tx) => createAgentRuns(tx, message, [f.agent.id], "router"));
+  await drainOutbox(f.db, handlers);
+  expect(seen).toHaveLength(2);
+  const thisTurn = (seen[1] as BrainTurn & { thisTurn?: string }).thisTurn ?? "";
+  expect(thisTurn).toContain("## Why you were called");
+  expect(thisTurn).toContain(
+    "## Your teammates now\n- @caio: has an AI, answers when called\n- @lia: has an AI, answers when called\n- @rui: has an AI, answers when called\nThis is how they are now: it outweighs what older messages here say about them",
+  );
+  expect(thisTurn).toContain(sessionLostNote("repos/acme/app").replace(/^# /, "## "));
+});
+
+test("a run that waited for its computer reads its teammates as they are when it goes on, not as they were", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f);
+  const rui = await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: "Rui", handle: "rui", role: "Backend", instructions: "", credentialId: f.credential.id },
+    { model: "claude-sonnet-5-5" },
+  );
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: rui.id });
+  // No key anywhere: Rui has no AI, and @dev has nothing to fall back on while its computer is off.
+  await f.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  let online = false;
+  const { brain, seen } = scriptedComputerBrain(() => [{ type: "done", text: "Já tem." }]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id, { online }) },
+  });
+  await post(f, "@dev o Rui já tem IA?");
+  await drainOutbox(f.db, handlers);
+  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("waiting_input");
+
+  // Meanwhile Rui gets a key of his own, and the computer comes back.
+  const key = await createCredential(f.db, f.keyWrapper, f.owner.id, f.org.id, {
+    provider: "anthropic",
+    label: "rui",
+    apiKey: "sk-ant-test-key-1234",
+  });
+  await f.db.update(schema.agents).set({ credentialId: key.id }).where(eq(schema.agents.id, rui.id));
+  online = true;
+  await resumeRunsWaitingForMachine(f.db, machineId);
+  await drainOutbox(f.db, handlers);
+  expect(seen).toHaveLength(1);
+  const thisTurn = (seen[0] as BrainTurn & { thisTurn?: string }).thisTurn ?? "";
+  expect(thisTurn).toContain("## Your teammates now\n- @rui: has an AI, answers when called\n");
+  expect(thisTurn).not.toContain("no AI connected yet");
 });

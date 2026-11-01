@@ -3,17 +3,23 @@ import {
   ApiError,
   useAgentProposal,
   useApi,
+  useBrainMachines,
   useCatalog,
   useChannels,
   useConnections,
   useCreateAgent,
+  useCredentials,
   useCustomServers,
   useDenyAgentProposal,
   useDms,
+  useModels,
+  useNewAgentSetup,
+  usePlatformKey,
   useSkills,
 } from "@agenteschat/client";
 import { LEVELS, type Level, nextLevel, saveLevels } from "@agenteschat/client/lib/access-levels";
 import { draftLevels, suggestedAiText } from "@agenteschat/client/lib/action-cards";
+import { newAgentStart, newAgentStartText } from "@agenteschat/client/lib/agent-setup";
 import { connectedItems, itemName } from "@agenteschat/client/lib/connected";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
@@ -28,7 +34,7 @@ import {
   type RoleId,
 } from "@agenteschat/client/lib/new-agent";
 import { can } from "@agenteschat/client/lib/permissions";
-import { AUTO } from "@agenteschat/client/lib/providers";
+import { modelChoices, usableModels } from "@agenteschat/client/lib/providers";
 import { router, usePreventRemove } from "expo-router";
 import { type ReactNode, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -37,11 +43,13 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { AgentAvatar, Button, Card, fieldText, Icon, Row, Text, Toggle, useToast } from "@/ui";
+import { newAgentAi } from "../ai/logic";
 import { openConnectAi } from "../ai/NoAiCard";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { suggestAgentName } from "../new/logic";
 import { useOpenDm } from "../new/useOpenDm";
 import { useFailed } from "../routines/hooks";
+import { chooseAction } from "../settings/parts";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { PushedHeader, successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
@@ -52,8 +60,9 @@ import { firstBlockedStep, NEW_AGENT_PHONE_STEPS, type PhoneStep, stepBlocked } 
 /**
  * "Criar agente" on the phone, the web's steps for a thumb: Papel (the presets, grouped), Quem é
  * (name, @ and look), O que faz (the instructions, prefilled by the role) and Revisar (what it can use
- * and the channels it joins, from the role). Model, budget and who it answers start at the workspace's
- * defaults and change on its page. Created, it opens the direct conversation with it. `initialWhat`
+ * and the channels it joins, from the role, and who thinks: the workspace's last setup or Automático,
+ * ADR 0094). Budget and who it answers start at the workspace's defaults and change on its page.
+ * Created, it opens the direct conversation with it. `initialWhat`
  * (an example in the empty Conversas) starts from scratch with that text. `proposalId` (an agent's
  * proposal card, ADR 0081) starts on Revisar, filled in with the draft, while the proposal is open.
  */
@@ -94,14 +103,15 @@ export function NewAgentScreen({
 }
 
 function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: AgentProposal }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const c = useColors();
   const toast = useToast();
   const failed = useFailed();
   const api = useApi();
   const insets = useSafeAreaInsets();
   const orgId = useOrgId();
-  const mayImport = can(useOrg().org, "create_agents");
+  const { org } = useOrg();
+  const mayImport = can(org, "create_agents");
   const meId = useMeId();
   const dir = useDirectory();
   const create = useCreateAgent(orgId);
@@ -113,6 +123,11 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
   const dms = useDms(orgId);
   const library = useSkills(orgId);
   const scroll = useRef<ScrollViewInstance>(null);
+  const lastSetup = useNewAgentSetup(orgId, mayImport);
+  const brainMachines = useBrainMachines(orgId);
+  const models = useModels();
+  const credentials = useCredentials(orgId, can(org, "manage_credentials"));
+  const platform = usePlatformKey(orgId);
 
   const suggested = suggestAgentName(dir.agents.map((a) => a.name));
   const proposed = from?.params.draft;
@@ -131,6 +146,19 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
   const [proposedLevels, setProposedLevels] = useState<Record<string, Level>>(() =>
     proposed ? draftLevels(proposed) : {},
   );
+  // Who thinks (ADR 0094): the workspace's last setup where it can think for an agent of mine, unless a proposal says.
+  const keys = credentials.data ?? [];
+  const usable = usableModels(modelChoices(models.data?.models ?? [], keys, platform.data ?? false));
+  const start = proposed ? null : newAgentStart(lastSetup.data, { ownerIsMe: true, usable, keys });
+  const [useLast, setUseLast] = useState(true);
+  const thinks = newAgentAi(start && useLast ? start : null);
+  const startText = start
+    ? newAgentStartText(t, i18n.language, start, {
+        models: models.data?.models ?? [],
+        machines: brainMachines.data ?? [],
+        provider: lastSetup.data?.account?.provider,
+      })
+    : "";
   const created = useRef(false);
   const denied = useRef(false);
   const deny = useDenyAgentProposal(orgId);
@@ -239,13 +267,14 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
         handle,
         role: role && role !== "custom" ? t(`newAgent.roles.${role}.name`) : roleText.trim(),
         instructions,
-        model: AUTO,
+        model: thinks.model,
         ownerUserId: meId ?? null,
         audience: { mode: "everyone", userIds: [] },
-        credentialId: null,
+        credentialId: thinks.credentialId,
         monthlyBudgetUsd: null,
         appearance: look,
         ...(from ? { proposal: from.messageId } : {}),
+        ...(thinks.autonomy ? { autonomy: thinks.autonomy } : {}),
       });
       created.current = true;
       // What the role brings, as the web's last step: its channels, its apps' levels, the default skills.
@@ -270,6 +299,13 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
       if (ai?.kind === "account") {
         await api.sandbox.setTarget(orgId, agent.id, ai.machineId);
         await api.agents.setBrain(orgId, agent.id, { brain: ai.brain, account: ai.accountId });
+      }
+      // Or the last setup's plan, with its model, effort and the rest; on the API, its context window.
+      if (thinks.plan) {
+        await api.sandbox.setTarget(orgId, agent.id, thinks.plan.machineId);
+        await api.agents.setBrain(orgId, agent.id, thinks.plan.input);
+      } else if (thinks.contextTokens !== null) {
+        await api.agents.setBrain(orgId, agent.id, { brain: "model", contextTokens: thinks.contextTokens });
       }
       successHaptic();
       toast({ title: t("mobile.agents.created", { name: agent.name }), agentId: agent.id });
@@ -495,6 +531,26 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
           <Text variant="footnote" tone="muted">
             {suggestedAiText(t, proposed.ai)}
           </Text>
+        ) : null}
+        {start ? (
+          <Card>
+            <Row
+              title={t("brain.title")}
+              subtitle={useLast ? t("newAgent.lastSetup", { setup: startText }) : t("brain.auto.label")}
+              subtitleLines={2}
+              chevron
+              onPress={() =>
+                chooseAction(
+                  t("brain.title"),
+                  [
+                    { label: startText, onPress: () => setUseLast(true) },
+                    { label: t("brain.auto.label"), onPress: () => setUseLast(false) },
+                  ],
+                  t("common.cancel"),
+                )
+              }
+            />
+          </Card>
         ) : null}
 
         <View style={styles.section}>

@@ -83,7 +83,7 @@
     left 0.5s var(--out),
     top 0.5s var(--out);
 }
-.team-sky__agent:focus-visible {
+html:not([data-pointer]) .team-sky__agent:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }

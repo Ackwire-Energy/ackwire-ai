@@ -370,7 +370,7 @@ test("a plan that stops with the agent's browser on the screen says its window i
   expect(acts(d.calls)).toEqual([]);
 });
 
-test("routines that only read, and runs nobody asked for, can't use the desktop; the prompt says how to", () => {
+test("routines that only read can't use the desktop, a run nobody is behind can; the prompt says how to", () => {
   const brief = (access: "read" | "act") => ({
     routineId: "00000000-0000-4000-8000-000000000001",
     routineRunId: "00000000-0000-4000-8000-000000000002",
@@ -383,11 +383,11 @@ test("routines that only read, and runs nobody asked for, can't use the desktop;
     dueAt: new Date().toISOString(),
   });
   const routine = (access: "read" | "act"): RunAuthority => ({ kind: "routine", personId: null, brief: brief(access) });
-  const unattended: RunAuthority = { kind: "unattended", personId: null, reason: "routine_report" };
+  const unattended: RunAuthority = { kind: "unattended", personId: null, reason: "agent" };
   for (const name of TOOLS) {
     const tool = { name, scope: DESKTOP_SCOPE, connectionId: null };
     expect(toolPolicy(routine("read"), tool)).toEqual({ action: "refuse", reason: REFUSALS.routineDesktopReadOnly });
-    expect(toolPolicy(unattended, tool).action).toBe("refuse");
+    expect(toolPolicy(unattended, tool).action).toBe("allow");
     expect(toolPolicy(routine("act"), tool).action).toBe("allow");
   }
   const prompt = describeCapabilities(TOOLS.map((name) => ({ name, description: "", scope: DESKTOP_SCOPE })));

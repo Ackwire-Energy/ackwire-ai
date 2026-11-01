@@ -11,9 +11,13 @@ import {
   listChannels,
   listMessages,
   listWorkingRuns,
+  MEDIA_REFUSALS,
+  type MessageView,
   openConsultationsIn,
   postPersonMessage,
   requireChannelAccess,
+  STICKER_MOODS,
+  ValidationError,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiError, errorResponse } from "../../http/errors";
@@ -34,9 +38,12 @@ import { Channel, Message } from "./schemas";
 const tags = ["Chat"];
 const ChannelParams = OrgParams.extend({ channelId: z.uuid() });
 
-/** A question an agent asked another from a conversation (`consultationsIn`). */
+/** A question an agent asked another from a conversation, or work it handed one (`consultationsIn`). */
 const Consultation = z.object({
   id: z.uuid(),
+  kind: z
+    .enum(["question", "note"])
+    .openapi({ description: "`question`: `ask_agent`. `note`: work or news handed off with `tell_agent`." }),
   runId: z.uuid().openapi({ description: "The asking run: its reply (`agentRunId`) shows the list." }),
   agentId: z.uuid(),
   consultedAgentId: z.uuid(),
@@ -45,9 +52,9 @@ const Consultation = z.object({
     .nullable()
     .openapi({ description: "The consulted agent's run: the cards it posts here carry it (`agentRunId`)." }),
   status: z.enum(["open", "answered", "expired", "failed"]),
-  waiting: z.enum(["approval", "input", "computer"]).nullable().openapi({
+  waiting: z.enum(["approval", "input", "computer", "agents"]).nullable().openapi({
     description:
-      "Open, and the consulted agent waits: on a person (`approval`; `input`: an answer or a secret), or for its computer to come back online (`computer`).",
+      "Open, and the consulted agent waits: on a person (`approval`; `input`: an answer or a secret), for its computer to come back online (`computer`), or, its part done, on agents it handed some to (`agents`).",
   }),
   question: z.string(),
   answer: z.string().nullable().openapi({ description: "The answer once answered; why it couldn't once failed." }),
@@ -329,7 +336,8 @@ export function chatRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/channels/{channelId}/consultations",
       tags,
       security,
-      summary: "Questions agents asked other agents from here, latest first (drawn inside the reply that asked)",
+      summary:
+        "Questions agents asked other agents from here, and work they handed them, latest first (drawn inside the reply that asked)",
       request: { params: ChannelParams },
       responses: {
         200: json(
@@ -444,12 +452,22 @@ export function chatRoutes(deps: AppDeps) {
             body: z
               .string()
               .max(40_000)
-              .openapi({ description: "Markdown. May be empty only when `attachments` has files." }),
+              .openapi({ description: "Markdown. May be empty only when `attachments` has files or `media` is set." }),
             threadId: z.uuid().nullable().optional(),
             replyTo: z.uuid().nullable().optional().openapi({
               description:
-                "Quote reply: a message of this channel. Stored as `meta.replyTo` ({ messageId, threadId, author, authorName, excerpt }).",
+                "Quote reply: a message of this channel. Stored as `meta.replyTo` ({ messageId, threadId, author, authorName, excerpt, mediaKind? }); `mediaKind` (`gif` or `sticker`) when the quoted message has one (ADR 0091), so a quote of a GIF or sticker with no text still says what it was.",
             }),
+            media: z
+              .discriminatedUnion("kind", [
+                z.object({ kind: z.literal("gif"), id: z.string().max(64) }),
+                z.object({ kind: z.literal("sticker"), agentId: z.uuid(), mood: z.enum(STICKER_MOODS) }),
+              ])
+              .optional()
+              .openapi({
+                description:
+                  "A GIF (its `id` from `GET …/gifs`) or an agent's sticker (ADR 0091); `body` may be empty then. Looked up on the server and stored as `meta.media`: a GIF as { kind, provider, id, title, width, height } at the workspace's rating, a sticker as { kind, agentId, mood } of an agent of this workspace. 422 `message.media_off` (GIFs or stickers off here, or no GIF provider), 422 `message.media_not_found`.",
+              }),
             attachments: z.array(z.uuid()).max(10).optional().openapi({
               description:
                 "Files (artifact ids) you uploaded or files of this channel. Stored as `meta.artifacts` ({ id, version, title }).",
@@ -470,7 +488,12 @@ export function chatRoutes(deps: AppDeps) {
           }),
         ),
       },
-      responses: { 201: json(Message, "Created"), 429: errorResponse("Too many messages"), ...errors },
+      responses: {
+        201: json(Message, "Created"),
+        422: errorResponse("A GIF or sticker that can't be sent (`message.media_off`, `message.media_not_found`)"),
+        429: errorResponse("Too many messages"),
+        ...errors,
+      },
     }),
     async (c) => {
       const { orgId, channelId } = c.req.valid("param");
@@ -478,13 +501,28 @@ export function chatRoutes(deps: AppDeps) {
       const limit = await adapters.rateLimiter.consume(`post:${user.id}`, { limit: 30, windowMs: 10_000 });
       if (!limit.allowed) return apiError(c, 429, "rate_limited", "Slow down");
       const started = performance.now();
-      const message = await postPersonMessage(
-        { db, pubsub: adapters.pubsub, judge: deps.extras?.context?.judge, talker: deps.extras?.talker },
-        user.id,
-        orgId,
-        channelId,
-        c.req.valid("json"),
-      );
+      let message: MessageView;
+      try {
+        message = await postPersonMessage(
+          {
+            db,
+            pubsub: adapters.pubsub,
+            judge: deps.extras?.context?.judge,
+            talker: deps.extras?.talker,
+            gifs: adapters.gifs,
+          },
+          user.id,
+          orgId,
+          channelId,
+          c.req.valid("json"),
+        );
+      } catch (error) {
+        // A GIF or sticker that can't go (ADR 0091): the request was fine, what it names can't be sent.
+        if (error instanceof ValidationError && MEDIA_REFUSALS.includes(error.code)) {
+          return apiError(c, 422, error.code, error.message);
+        }
+        throw error;
+      }
       // Wake the workers now (router, runs, indexing) instead of waiting for the poll.
       deps.wakeWorkers?.();
       // post → `message.created` published (the commit and the event happen inside postPersonMessage).
@@ -501,7 +539,7 @@ export function chatRoutes(deps: AppDeps) {
       security,
       summary: "Once an AI is connected, the agent answers what it couldn't (Responder agora)",
       description:
-        "The id is a no-AI card (`meta.noAi`: its agent's failed run in that conversation starts again on the person's message) or the person's message (its failed `no_ai` runs start again, else it is routed again). Who asked, the agent's owner or an admin. 409 `ai.still_missing` while there's still no AI; 409 `run.not_restartable` when that run had already done something (a tool, a reply, an approval), so starting over would repeat it; 403 `audience.only` or `audience.nobody` when the agent no longer answers who asked (an agent moved onto a plan answers only its owner until they turn on \"Atende outras pessoas\"). Pressed again, it returns the runs that answer it.",
+        "The id is a no-AI card (`meta.noAi`: its agent's failed run in that conversation starts again on the person's message) or the person's message (its failed `no_ai` runs start again, else it is routed again). Who asked, the agent's owner or an admin. 409 `ai.still_missing` while there's still no AI; 409 `run.not_restartable` when that run had already done something (a tool, a reply, an approval), so starting over would repeat it; 403 `audience.only` or `audience.nobody` when the agent no longer answers who asked (an agent moved onto a plan answers only its owner until they turn on \"Atende outras pessoas\"). Pressed again, it returns the runs that answer it. On a stretch's pause card (`meta.actionCard.kind` `stretch_paused`, ADR 0089) it is Continuar: the wake-ups it holds start at hop 1 in a fresh stretch, once (pressed again, no runs); who asked, the agents' owners or an admin.",
       request: { params: OrgParams.extend({ messageId: z.uuid() }) },
       responses: {
         200: json(z.object({ runs: z.array(z.object({ agentId: z.uuid(), runId: z.uuid() })) })),

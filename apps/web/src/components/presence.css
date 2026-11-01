@@ -49,10 +49,12 @@
   white-space: nowrap;
 }
 
-/* The account row: your line under your name. */
+/* The account row: your line under your name. The lines end at its baseline (out of its 16px line), as the name's
+   `.ac-captop` starts them at its capitals. */
 .sidebar__user-line {
   font-size: 12px;
   line-height: 16px;
+  margin-bottom: calc(var(--cap-top) - 2 * var(--cap-mid) - 8px);
 }
 /* A sidebar row: someone offline is quieter. */
 .sidebar__item[data-presence="offline"] .sidebar__item-label {
@@ -147,7 +149,7 @@
   background: var(--plate);
   color: var(--ink);
 }
-.status-field__emoji:focus-visible {
+html:not([data-pointer]) .status-field__emoji:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }

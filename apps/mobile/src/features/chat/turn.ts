@@ -197,11 +197,28 @@ export function stoppedOf(
   };
 }
 
-/** `meta.canceled` once the stopped reply was continued (the `run.continued` event; also optimistic). */
+/**
+ * `meta.stepLimit` of the reply of a run that reached its step limit, or stopped because it got stuck (`stuck`):
+ * the run that continued it ("Continuar" goes away then). Null for any other reply.
+ */
+export function stepLimitOf(
+  meta: Record<string, unknown> | undefined,
+): { continuedRunId: string | null; stuck: boolean } | null {
+  const c = meta?.stepLimit;
+  if (!c || typeof c !== "object") return null;
+  const { continuedRunId: id, stuck } = c as Record<string, unknown>;
+  return { continuedRunId: typeof id === "string" ? id : null, stuck: stuck === true };
+}
+
+/**
+ * The reply's meta once it was continued (the `run.continued` event; also optimistic): `meta.canceled`, or
+ * `meta.stepLimit` on a reply at the step limit.
+ */
 export function withContinued(meta: Record<string, unknown> | undefined, newRunId: string): Record<string, unknown> {
-  const c = meta?.canceled;
+  const key = !meta?.canceled && meta?.stepLimit ? "stepLimit" : "canceled";
+  const c = meta?.[key];
   const base = c && typeof c === "object" ? (c as Record<string, unknown>) : {};
-  return { ...(meta ?? {}), canceled: { ...base, continuedRunId: newRunId } };
+  return { ...(meta ?? {}), [key]: { ...base, continuedRunId: newRunId } };
 }
 
 // ── A tool line's open view ──────────────────────────────────────────────────

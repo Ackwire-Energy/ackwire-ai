@@ -15,7 +15,7 @@ import {
   runMatches,
   type Saved,
 } from "@/lib/agent-edit";
-import { ADA_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -114,7 +114,7 @@ describe("agent page: tabs and the URL", () => {
     expect(within(cover).getByRole("button", { name: "Mais ações" })).toBeTruthy();
     expect(screen().getByRole("heading", { level: 1 }).textContent).toBe("Ada");
     expect(hero.querySelector(".agp-handle")?.textContent).toContain("@ada");
-    expect(work.textContent).toContain("o modelo do workspace");
+    expect(work.textContent).toContain("Pela API");
   });
 });
 
@@ -234,7 +234,8 @@ describe("agent page: the budget on the overview", () => {
     if (ada) ada.brain = { kind: "claude_code", model: "Sonnet" };
     await go("", state);
     const work = screen().getByRole("region", { name: "Como trabalha" });
-    expect(work.textContent).toContain("Pensa comClaude Code · Sonnet");
+    // The model, over the plan that pays for it.
+    expect(work.textContent).toContain("Pensa comSonnetClaude");
     // A member doesn't see where it works or its browser.
     expect(work.textContent).not.toContain("Trabalha");
   });
@@ -374,6 +375,42 @@ describe("agent page: who edits what", () => {
     await click(within(saveBar() as HTMLElement).getByRole("button", { name: /^Salvar/ }));
     await settle(6);
     expect(updates(state)).toEqual([{ appearance: { color: "rose", eyes: "round", accessory: "none" } }]);
+  });
+});
+
+describe("agent page: who coordinates the team (ADR 0093)", () => {
+  /** Atlas coordinates the team. */
+  const withAtlas = (state = seedState()) => {
+    const atlas = state.agents.find((a) => a.id === ATLAS_ID);
+    if (atlas) atlas.coordinator = true;
+    return state;
+  };
+
+  test("an admin turns it on in Identidade and saves it with the page; the line under it says who coordinates now", async () => {
+    const { state } = await go("?tab=settings", withAtlas());
+    const toggle = screen().getByRole("switch", { name: "Coordena o time" });
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    const identity = document.getElementById("agp-sec-identity") as HTMLElement;
+    expect(identity.contains(toggle)).toBe(true);
+    expect(identity.textContent).toContain(
+      "Pega as mensagens que pedem um agente quando nenhum outro pegou, e passa o trabalho para quem sabe. Vale nos canais em que ela responde por conta própria.",
+    );
+    expect(identity.textContent).toContain("Hoje quem coordena é o Atlas.");
+    await click(toggle);
+    expect(identity.textContent).toContain("Hoje quem coordena é o Atlas. Só um agente coordena por vez.");
+    expect(saveBar()?.textContent).toContain("1 alteração");
+    await click(within(saveBar() as HTMLElement).getByRole("button", { name: /^Salvar/ }));
+    await settle(6);
+    expect(updates(state)).toEqual([{ coordinator: true }]);
+    // Ada coordinates now: the chip by her name, and no line about another agent.
+    expect(document.querySelector(".agp-ident")?.textContent).toContain("Coordena o time");
+    expect(identity.textContent).not.toContain("Hoje quem coordena");
+  });
+
+  test("a member reads it: the switch can't be moved", async () => {
+    await go("?tab=settings", asMember(withAtlas()));
+    expect(screen().getByRole("switch", { name: "Coordena o time" }).hasAttribute("disabled")).toBe(true);
+    expect(document.body.textContent).toContain("Hoje quem coordena é o Atlas.");
   });
 });
 
@@ -664,6 +701,7 @@ describe("agent page rules", () => {
     levels: { "connector:gh": "none", "area:skills": "read" },
     budget: null,
     channels: ["c1"],
+    coordinator: false,
   };
 
   test("only real differences count; undo removes one", () => {

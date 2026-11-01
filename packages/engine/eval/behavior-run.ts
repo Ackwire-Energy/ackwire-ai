@@ -5,12 +5,13 @@
  * provider is passed in, so tests drive it with the fake provider (no network).
  */
 import {
+  createFakeGifs,
   createMemoryBlobStore,
   createMemoryPubSub,
   createPostgresSearchResolver,
   noPlatformCredentials,
 } from "@agenteschat/adapters";
-import { and, asc, eq, gt, inArray, schema, sql } from "@agenteschat/db";
+import { and, asc, eq, gt, gte, inArray, schema, sql } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
 import {
   type ContentBlock,
@@ -34,6 +35,7 @@ import {
   createCredential,
   createFakeJudge,
   createFakeScheduleReader,
+  createFindAgentToolSource,
   createHandOffToolSource,
   createIssue,
   createIssueToolSource,
@@ -41,6 +43,7 @@ import {
   createJobHandlers,
   createLlmJudge,
   createLocalKeyWrapper,
+  createMediaToolSource,
   createModelGateway,
   createOrganization,
   createPassToolSource,
@@ -50,6 +53,7 @@ import {
   createToolGateway,
   createWorkspaceToolSource,
   drainOutbox,
+  enqueue,
   getMessage,
   grantScopes,
   insertContextItem,
@@ -60,10 +64,17 @@ import {
   postPersonMessage,
   type RoutineBrief,
   startRoutineRun,
+  stretchCardOf,
   type ToolSource,
   withJudgeFallback,
 } from "../src";
-import type { CheckResult, EvalToolCall, EvalTurn, Expectations } from "./behavior-checks";
+import {
+  type CheckResult,
+  deterministicChecks,
+  type EvalToolCall,
+  type EvalTurn,
+  type Expectations,
+} from "./behavior-checks";
 import { type Canned, CONNECTORS, fakeConnectorSource, fakeMissionSource } from "./behavior-fakes";
 
 // ── Cases ────────────────────────────────────────────────────────────────────
@@ -76,6 +87,17 @@ interface CaseMessage {
   body: string;
   meta?: Record<string, unknown>;
 }
+
+/** A person's line, or the same line per language (`--lang` picks one; the first when that one is missing). */
+export type Line = string | Record<string, string>;
+export const lineIn = (line: Line, lang?: string) =>
+  typeof line === "string" ? line : ((lang && line[lang]) ?? Object.values(line)[0] ?? "");
+
+/**
+ * What happens after the trigger, in order: a person's line in the conversation (`say`), or other agents' runs held
+ * (`hold`: they wait, queued) or let go (`release`). `expect`: checks on what the agent under test did in that step.
+ */
+export type CaseStep = ({ say: Line } | { hold: string[] } | { release: string[] }) & { expect?: Expectations };
 
 export interface BehaviorCase {
   id: string;
@@ -99,7 +121,7 @@ export interface BehaviorCase {
     /** Channel only: everything after the first prior message (and the trigger) is a reply in its thread. */
     thread?: boolean;
     prior?: CaseMessage[];
-    trigger: CaseMessage;
+    trigger: Omit<CaseMessage, "body"> & { body: Line };
     /**
      * The trigger is a routine's firing (ADR 0053): its background run starts in the routine's room with
      * `trigger.body` as its instructions (written by `trigger.author`, its creator) and reports to this
@@ -111,19 +133,37 @@ export interface BehaviorCase {
      * The trigger is another agent's question (`ask_agent`) on behalf of the person who wrote
      * `origin` in the channel: `trigger.author` is that person, `trigger.body` the question.
      */
-    consultation?: { from: string; origin: string };
+    consultation?: { from: string; origin: Line };
+    /**
+     * The trigger is another agent's hand-off (`tell_agent`, ADR 0095) on behalf of the person who wrote `origin` in
+     * the channel: `trigger.author` is that person, `trigger.body` the note.
+     */
+    note?: { from: string; origin: Line };
+    steps?: CaseStep[];
     /**
      * Nobody called the agent by name: the router picked it for the trigger (a person's message
      * without a mention). The run may pass (reply-policy.ts).
      */
     router?: boolean;
   };
-  /** Other agents of the org, in the channel too (their own runs are recorded, never executed). */
-  otherAgents?: { name: string; handle: string; role?: string; instructions?: string }[];
+  /**
+   * Other agents of the org, in the channel too. Their runs are recorded, never executed, unless `runs` (the real
+   * model answers for them too). `memory`: theirs, as the agent's own.
+   */
+  otherAgents?: {
+    name: string;
+    handle: string;
+    role?: string;
+    instructions?: string;
+    runs?: boolean;
+    memory?: { kind?: "note" | "fact" | "decision" | "lesson"; title?: string; content: string }[];
+  }[];
   /** Routines already there: `agent` is a handle (or "self"), answering in the case's channel. */
   routines?: { agent: string; name: string; prompt: string; schedule: string }[];
   /** The scheduling tools (list_routines, update_routine…) and `ask_agent`. */
   schedule?: boolean;
+  /** The server has no GIF search: agents get only `send_sticker` (ADR 0091). */
+  noGifs?: boolean;
   /** Who a person's message with several mentions is for: the org's cheap model decides (real call). */
   addressees?: boolean;
   /** Fake connectors granted to the agent (all their scopes). */
@@ -199,6 +239,18 @@ export interface CaseRun {
   toolGroups?: unknown;
   /** The cheap model's structured answers during the run (addressees), for the report. */
   classifier?: string[];
+  /** What the agent under test did in each step with an `expect`, checked (`step2:…`). */
+  stepChecks?: CheckResult[];
+  /** With steps or colleagues that run: the conversation after the trigger, as the person saw it (for the judge). */
+  transcript?: string;
+  /** Work handed off with `tell_agent`, by `"from>to"` handles. */
+  handOffs?: Record<string, number>;
+  /** In the case's conversation: the agents' messages (notices aside) and the "Nota de…" lines. */
+  personSaw?: { agentMessages: number; noteLines: number };
+  /** Agent runs in the case, by handle and `all` (a scripted asker's run aside). */
+  agentRuns?: Record<string, number>;
+  /** A `conversation.note` case: what came of the note went back to its sender as a notice. */
+  reported?: boolean;
   error?: string;
 }
 
@@ -251,6 +303,30 @@ export interface RunOptions {
    * (only that judgment is Jev's; the others stay fake). Without `jevKey` the run gets the core tools.
    */
   toolsOnDemand?: boolean;
+  /** The language of the people's lines given per language (`Line`). */
+  lang?: string;
+  /** Tests: the judge for how agents work together, instead of Jev or the cheap model. */
+  judge?: Judge;
+}
+
+/** The judgments of agents working together that a case where they do asks of production's judge. */
+const TOGETHER = new Set(["note_reply", "follow_through", "mention_needs_nothing"]);
+
+/** A case's conversation with every person's line in one language. */
+function inLanguage(
+  conv: BehaviorCase["conversation"],
+  lang?: string,
+): Omit<BehaviorCase["conversation"], "trigger" | "consultation" | "note"> & {
+  trigger: CaseMessage;
+  consultation?: { from: string; origin: string };
+  note?: { from: string; origin: string };
+} {
+  return {
+    ...conv,
+    trigger: { ...conv.trigger, body: lineIn(conv.trigger.body, lang) },
+    consultation: conv.consultation && { ...conv.consultation, origin: lineIn(conv.consultation.origin, lang) },
+    note: conv.note && { ...conv.note, origin: lineIn(conv.note.origin, lang) },
+  };
 }
 
 /** Runs one case through the engine on a fresh in-memory database. */
@@ -259,7 +335,7 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
   const { db, close } = await createTestDatabase();
   try {
     const keyWrapper = createLocalKeyWrapper(crypto.randomUUID().repeat(2));
-    const conv = c.conversation;
+    const conv = inLanguage(c.conversation, options.lang);
     const personNames = [
       ...new Set([conv.trigger, ...(conv.prior ?? [])].map((m) => m.author).filter((a) => a !== "agent")),
     ];
@@ -301,6 +377,8 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       ].map((scope) => ({ connectionId: null, scope })),
     );
 
+    // Colleagues run, or another agent's note is the trigger: agents work together here.
+    const together = Boolean(conv.note || c.otherAgents?.some((o) => o.runs));
     const recorder = recording(options.provider);
     const pubsub = createMemoryPubSub();
     const gateway = createModelGateway({
@@ -328,7 +406,11 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
     const sources: ToolSource[] = [
       createAskUserToolSource(),
       ...(c.schedule ? [createAskAgentToolSource({ pubsub }), createScheduleToolSource({ pubsub, context })] : []),
+      // Colleagues that really run: who they are, and ask_agent and tell_agent to reach them.
+      ...(together ? [createFindAgentToolSource()] : []),
+      ...(together && !c.schedule ? [createAskAgentToolSource({ pubsub })] : []),
       createReactToolSource({ pubsub }),
+      createMediaToolSource({ pubsub, gifs: c.noGifs ? null : createFakeGifs() }),
       // Routine cases run in the background and speak through it.
       createHandOffToolSource({ pubsub }),
       // Runs nobody called by name may pass (offered only to them, as in production).
@@ -352,6 +434,17 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       ...fakes.map((f) => f.source),
     ];
     const tools = createToolGateway({ sources });
+    if (together) {
+      // How agents work together is judged as in production (ADR 0089, ADR 0095): Jev, the cheap model as fallback.
+      const llmJudge = createLlmJudge({ gateway, resolveModel: async () => "claude-haiku-5-5" });
+      const real =
+        options.judge ??
+        (options.jevKey
+          ? withJudgeFallback(createJevJudge({ key: options.jevKey, gateway, timeoutMs: 5000 }), llmJudge)
+          : llmJudge);
+      const fake = context.judge as Judge;
+      context.judge = { name: "eval", ask: (r) => (TOGETHER.has(r.kind) ? real : fake).ask(r) };
+    }
     if (options.toolsOnDemand && options.jevKey) {
       const jev = createJevJudge({ key: options.jevKey, gateway, timeoutMs: 5000 });
       const fake = context.judge as Judge;
@@ -363,7 +456,8 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       pubsub,
       maxOutputTokens: 16_000,
       contextMessages: 30,
-      maxHops: 3,
+      // Production's depth backstop (`AGENT_MAX_HOPS`): the stretch limits bound agents that run on their own.
+      maxHops: 100,
       maxToolTurns,
       deltaFlushMs: 0,
       tools,
@@ -371,15 +465,22 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       search,
       toolsOnDemand: options.toolsOnDemand ?? false,
     });
-    // Other agents' runs (an `ask_agent` question, a mention) are recorded, never executed.
+    // Other agents' runs (an `ask_agent` question, a mention) are recorded, never executed, unless they run; a held
+    // agent's wait until a step lets them go.
     const execute = handlers["agent_run.execute"];
+    const held = new Set<string>();
+    const waiting = new Set<string>();
     handlers["agent_run.execute"] = async (job, ctx) => {
       const runId = String(job.payload.runId ?? "");
       const [row] = await db
         .select({ agentId: schema.agentRuns.agentId })
         .from(schema.agentRuns)
         .where(eq(schema.agentRuns.id, runId));
-      if (row && others.has(row.agentId)) return;
+      if (row && held.has(row.agentId)) {
+        waiting.add(runId);
+        return;
+      }
+      if (row && others.has(row.agentId) && !running.has(row.agentId)) return;
       await execute?.(job, ctx);
     };
 
@@ -395,6 +496,7 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
         if (name !== ownerName) await addChannelMember(db, owner.id, org.id, channelId, { userId: p.id });
     }
     const others = new Map<string, string>();
+    const running = new Set<string>();
     for (const o of c.otherAgents ?? []) {
       const other = await createAgent(
         db,
@@ -410,6 +512,21 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
         { model: a.model },
       );
       others.set(other.id, o.handle);
+      if (o.runs) running.add(other.id);
+      for (const m of o.memory ?? []) {
+        await insertContextItem(db, {
+          orgId: org.id,
+          kind: m.kind ?? "note",
+          scopeType: "agent",
+          scopeId: other.id,
+          agentId: other.id,
+          title: m.title,
+          content: m.content,
+          channelIds: [],
+          createdByKind: "agent",
+          createdById: other.id,
+        });
+      }
       if (conv.where === "channel") await addChannelMember(db, owner.id, org.id, channelId, { agentId: other.id });
     }
     const agentIdOf = (handle: string) =>
@@ -444,9 +561,10 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
     }
     // `agent` is the case's agent; `@handle` another agent of the case; anything else a person.
     const author = (m: CaseMessage) => {
-      if (m.author === "agent") return { type: "agent", agentId: agent.id, runId: null, hop: 0 } as const;
+      if (m.author === "agent")
+        return { type: "agent", agentId: agent.id, runId: null, hop: 0, stretchId: null } as const;
       const other = m.author.startsWith("@") ? agentIdOf(m.author.slice(1)) : undefined;
-      if (other) return { type: "agent", agentId: other, runId: null, hop: 1 } as const;
+      if (other) return { type: "agent", agentId: other, runId: null, hop: 1, stretchId: null } as const;
       return { type: "person", userId: (people.get(m.author) ?? owner).id } as const;
     };
     let threadId: string | null = null;
@@ -471,17 +589,20 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       ? { routine: { id: crypto.randomUUID(), name: conv.routine.name, runId: crypto.randomUUID() } }
       : undefined;
     let askerRunId: string | null = null;
-    if (conv.consultation) {
-      // Another agent asks this one on the person's behalf: the person's message, the asking
-      // agent's run on it, and its `ask_agent` call (the real tool: DM, question, consultation).
-      const askerId = agentIdOf(conv.consultation.from);
-      if (!askerId) throw new Error(`${c.id}: no agent ${conv.consultation.from} to ask`);
+    /** A `note` case: the row of the note the agent under test answers. */
+    let noteId: string | null = null;
+    const asking = conv.consultation ?? conv.note;
+    if (asking) {
+      // Another agent asks this one, or hands it work, on the person's behalf: the person's message, the other
+      // agent's run on it, and its `ask_agent` or `tell_agent` call (the real tool: DM, message, row).
+      const askerId = agentIdOf(asking.from);
+      if (!askerId) throw new Error(`${c.id}: no agent ${asking.from} to ask`);
       const origin = await insertMessage(db, {
         orgId: org.id,
         channelId,
         threadId,
         author: { type: "person", userId: triggerAuthor.id },
-        body: conv.consultation.origin,
+        body: asking.origin,
       });
       const [asker] = await db
         .insert(schema.agentRuns)
@@ -498,20 +619,24 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
         .returning();
       if (!asker) throw new Error(`${c.id}: could not start the asking run`);
       askerRunId = asker.id;
-      const ask = (await createAskAgentToolSource({ pubsub }).tools({} as never))[0];
-      const asked = await ask?.execute(
-        { agent: `@${agent.handle}`, question: conv.trigger.body },
-        {
-          db,
-          orgId: org.id,
-          agentId: askerId,
-          runId: asker.id,
-          channelId,
-          threadRootId: asker.threadRootId,
-          triggerMessageId: origin.id,
-        },
-      );
-      if (asked?.isError) throw new Error(`${c.id}: ask_agent refused: ${asked.content}`);
+      const [ask, tell] = await createAskAgentToolSource({ pubsub }).tools({} as never);
+      const ctx = {
+        db,
+        orgId: org.id,
+        agentId: askerId,
+        runId: asker.id,
+        channelId,
+        threadRootId: asker.threadRootId,
+        triggerMessageId: origin.id,
+      };
+      const asked = conv.note
+        ? await tell?.execute({ agent: `@${agent.handle}`, message: conv.trigger.body }, ctx)
+        : await ask?.execute({ agent: `@${agent.handle}`, question: conv.trigger.body }, ctx);
+      if (asked?.isError)
+        throw new Error(`${c.id}: ${conv.note ? "tell_agent" : "ask_agent"} refused: ${asked.content}`);
+      noteId = conv.note ? ((asked?.data?.consultation as { id?: string } | undefined)?.id ?? null) : null;
+      // It handed the work off and ended its turn: what comes of it reaches its conversation.
+      if (conv.note) await db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, asker.id));
     } else {
       // Same judge as production (apps/server/src/engine.ts): Jev, the cheap model as fallback.
       const llmJudge = createLlmJudge({ gateway, resolveModel: async () => "claude-haiku-5-5" });
@@ -582,7 +707,7 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
         }
       }
     }
-    // Other agents' runs: recorded (who the trigger started), never executed.
+    // Other agents' runs: recorded (who the trigger started), executed only for those that run.
     const otherRuns = others.size
       ? await db
           .select({ id: schema.agentRuns.id, agentId: schema.agentRuns.agentId })
@@ -592,72 +717,153 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
     const triggered = [
       ...new Set(otherRuns.filter((r) => r.id !== askerRunId).map((r) => others.get(r.agentId) ?? "")),
     ].filter(Boolean);
-    for (const r of otherRuns) {
+    for (const r of otherRuns.filter((r) => !running.has(r.agentId))) {
       await db
         .delete(schema.outbox)
         .where(and(eq(schema.outbox.kind, "agent_run.execute"), sql`${schema.outbox.payload}->>'runId' = ${r.id}`));
     }
-    await drainOutbox(db, handlers, { maxBatches: 500 });
-    // A transient model failure (overloaded, a tool input that came back as unparseable JSON) retries
-    // the run's job after a backoff, as in production: retry it now instead of grading a half-done run.
-    for (let retry = 0; retry < 3; retry++) {
-      const retried = await db
-        .update(schema.outbox)
-        .set({ nextAttemptAt: new Date() })
+    /** Runs what is queued, retrying a transient model failure now (production retries it after a backoff). */
+    const settle = async () => {
+      await drainOutbox(db, handlers, { maxBatches: 500 });
+      for (let retry = 0; retry < 3; retry++) {
+        const retried = await db
+          .update(schema.outbox)
+          .set({ nextAttemptAt: new Date() })
+          .where(
+            and(
+              eq(schema.outbox.status, "pending"),
+              eq(schema.outbox.kind, "agent_run.execute"),
+              gt(schema.outbox.attempts, 0),
+            ),
+          )
+          .returning({ id: schema.outbox.id });
+        if (retried.length === 0) break;
+        await drainOutbox(db, handlers, { maxBatches: 500 });
+      }
+    };
+    /** Whose model call it is: the agent under test's prompt says so. */
+    const ownTurn = (t: { request: ModelRequest }) =>
+      systemText(t.request.system).includes(`You are ${agent.name} (@${agent.handle})`);
+
+    /** What the agent under test did in its runs started since `since` (all of them without), and its turns from `fromTurn`. */
+    const observe = async (since: Date | null, fromTurn = 0) => {
+      const runs = await db
+        .select()
+        .from(schema.agentRuns)
         .where(
           and(
-            eq(schema.outbox.status, "pending"),
-            eq(schema.outbox.kind, "agent_run.execute"),
-            gt(schema.outbox.attempts, 0),
+            eq(schema.agentRuns.orgId, org.id),
+            eq(schema.agentRuns.agentId, agent.id),
+            since ? gte(schema.agentRuns.createdAt, since) : undefined,
           ),
         )
-        .returning({ id: schema.outbox.id });
-      if (retried.length === 0) break;
-      await drainOutbox(db, handlers, { maxBatches: 500 });
+        .orderBy(asc(schema.agentRuns.createdAt));
+      const runIds = runs.map((r) => r.id);
+      const steps = runIds.length
+        ? await db
+            .select()
+            .from(schema.agentRunSteps)
+            .where(inArray(schema.agentRunSteps.runId, runIds))
+            .orderBy(asc(schema.agentRunSteps.createdAt), asc(schema.agentRunSteps.seq))
+        : [];
+      const results = new Map(
+        steps.filter((s) => s.kind === "tool_result").map((s) => [String(s.data.toolUseId), s.data] as const),
+      );
+      const calls: EvalToolCall[] = steps
+        .filter((s) => s.kind === "tool_call")
+        .map((s) => {
+          const r = results.get(String(s.data.toolUseId)) as { isError?: boolean; content?: string } | undefined;
+          const refused = r?.isError && /^(Not allowed|Invalid input|Unknown tool)/.test(r.content ?? "");
+          return {
+            name: String(s.data.name),
+            input: (s.data.input ?? {}) as Record<string, unknown>,
+            executed: Boolean(r) && !refused,
+            isError: r?.isError === true,
+            result: r?.content,
+          };
+        });
+      const approvalRows = runIds.length
+        ? await db
+            .select({
+              tool: schema.approvals.tool,
+              title: schema.approvals.title,
+              detail: schema.approvals.detail,
+              why: schema.approvals.why,
+            })
+            .from(schema.approvals)
+            .where(inArray(schema.approvals.runId, runIds))
+            .orderBy(asc(schema.approvals.createdAt))
+        : [];
+      const posted = runIds.length
+        ? await db
+            .select({ body: schema.messages.body })
+            .from(schema.messages)
+            .innerJoin(schema.agentRuns, eq(schema.agentRuns.id, schema.messages.agentRunId))
+            .where(
+              and(
+                eq(schema.messages.orgId, org.id),
+                // Where each run answers: not a question or a note it sent another agent (a DM).
+                eq(schema.messages.channelId, schema.agentRuns.channelId),
+                inArray(schema.messages.agentRunId, runIds),
+              ),
+            )
+            .orderBy(asc(schema.messages.createdAt))
+        : [];
+      const turns = recorder.turns
+        .slice(fromTurn)
+        .filter(ownTurn)
+        .map(({ text, toolCalls }) => ({ text, toolCalls }));
+      return { runs, runIds, steps, calls, approvalRows, posted, turns };
+    };
+
+    // Holds before anything else happens apply to the trigger already: those agents wait from the start.
+    const stepList = conv.steps ?? [];
+    const leading = stepList.findIndex((step) => !("hold" in step) || step.expect);
+    const begin = leading < 0 ? stepList.length : leading;
+    for (const step of stepList.slice(0, begin))
+      if ("hold" in step) for (const h of step.hold) held.add(agentIdOf(h) ?? h);
+    await settle();
+    // The steps after the trigger, each checked on what the agent under test did in it.
+    const stepChecks: CheckResult[] = [];
+    for (const [i, step] of stepList.entries()) {
+      if (i < begin) continue;
+      const since = new Date();
+      const fromTurn = recorder.turns.length;
+      if ("hold" in step) for (const h of step.hold) held.add(agentIdOf(h) ?? h);
+      if ("release" in step) {
+        for (const h of step.release) held.delete(agentIdOf(h) ?? h);
+        for (const runId of [...waiting]) {
+          waiting.delete(runId);
+          await enqueue(db, {
+            orgId: org.id,
+            kind: "agent_run.execute",
+            payload: { runId },
+            dedupeKey: `eval:release:${runId}`,
+          });
+        }
+      }
+      if ("say" in step) {
+        await postPersonMessage({ db, pubsub }, triggerAuthor.id, org.id, channelId, {
+          body: lineIn(step.say, options.lang),
+          threadId,
+        });
+      }
+      await settle();
+      if (!step.expect) continue;
+      const seen = await observe(since, fromTurn);
+      const reply = seen.posted.map((m) => m.body).join("\n\n");
+      for (const k of deterministicChecks(step.expect, {
+        turns: seen.turns,
+        calls: seen.calls,
+        reply,
+        noReply: false,
+        approvals: seen.approvalRows.map((r) => r.tool),
+      }))
+        stepChecks.push({ ...k, id: `step${i + 1}:${k.id}` });
     }
 
     // What happened.
-    const runs = await db
-      .select()
-      .from(schema.agentRuns)
-      .where(and(eq(schema.agentRuns.orgId, org.id), eq(schema.agentRuns.agentId, agent.id)))
-      .orderBy(asc(schema.agentRuns.createdAt));
-    const runIds = runs.map((r) => r.id);
-    const steps = runIds.length
-      ? await db
-          .select()
-          .from(schema.agentRunSteps)
-          .where(inArray(schema.agentRunSteps.runId, runIds))
-          .orderBy(asc(schema.agentRunSteps.createdAt), asc(schema.agentRunSteps.seq))
-      : [];
-    const results = new Map(
-      steps.filter((s) => s.kind === "tool_result").map((s) => [String(s.data.toolUseId), s.data] as const),
-    );
-    const calls: EvalToolCall[] = steps
-      .filter((s) => s.kind === "tool_call")
-      .map((s) => {
-        const r = results.get(String(s.data.toolUseId)) as { isError?: boolean; content?: string } | undefined;
-        const refused = r?.isError && /^(Not allowed|Invalid input|Unknown tool)/.test(r.content ?? "");
-        return {
-          name: String(s.data.name),
-          input: (s.data.input ?? {}) as Record<string, unknown>,
-          executed: Boolean(r) && !refused,
-          isError: r?.isError === true,
-          result: r?.content,
-        };
-      });
-    const approvalRows = runIds.length
-      ? await db
-          .select({
-            tool: schema.approvals.tool,
-            title: schema.approvals.title,
-            detail: schema.approvals.detail,
-            why: schema.approvals.why,
-          })
-          .from(schema.approvals)
-          .where(inArray(schema.approvals.runId, runIds))
-          .orderBy(asc(schema.approvals.createdAt))
-      : [];
+    const { runs, runIds, steps, calls, approvalRows, posted, turns } = await observe(null);
     const approvals = approvalRows.map((r) => r.tool);
     // A routine's ledger row: a report every time (`always`) can arrive without a hand_off (`auto_report`).
     const [routineRun] = routine
@@ -666,27 +872,12 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
           .from(schema.routineRuns)
           .where(eq(schema.routineRuns.id, routine.routine.runId))
       : [];
-    const posted = runIds.length
-      ? await db
-          .select({ body: schema.messages.body })
-          .from(schema.messages)
-          .innerJoin(schema.agentRuns, eq(schema.agentRuns.id, schema.messages.agentRunId))
-          .where(
-            and(
-              eq(schema.messages.orgId, org.id),
-              // Where each run answers: not a question it sent another agent (`ask_agent`, a DM).
-              eq(schema.messages.channelId, schema.agentRuns.channelId),
-              inArray(schema.messages.agentRunId, runIds),
-            ),
-          )
-          .orderBy(asc(schema.messages.createdAt))
-      : [];
     const u = schema.usageRecords;
     const [usage] = await db
       .select({ cost: sql<number>`coalesce(sum(${u.costNanoUsd}), 0)::bigint` })
       .from(u)
       .where(eq(u.orgId, org.id));
-    // The agent's own model calls (tools on demand: what each call carries).
+    // The agents' model calls (tools on demand: what each call carries).
     const [tokens] = await db
       .select({
         calls: sql<number>`count(*)::int`,
@@ -707,7 +898,6 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
             .where(and(inArray(schema.agentActions.runId, runIds), sql`${schema.agentActions.messageId} is not null`))
         ).map((r) => r.kind)
       : [];
-    const turns = recorder.turns.map(({ text, toolCalls }) => ({ text, toolCalls }));
     const cards = [
       ...calls.filter((t) => t.name === "propose_mission" && t.executed && !t.isError).map((t) => missionCard(t.input)),
       // An approval's card: the action, its parameters and the agent's reason (ADR 0053 §8).
@@ -715,7 +905,49 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
         (r) => `Approval card (waits for a person): ${r.title}${r.detail ? ` (${r.detail})` : ""}\nWhy: ${r.why}`,
       ),
     ].join("\n\n");
+    const handleOf = (id: string) => (id === agent.id ? agent.handle : (others.get(id) ?? "?"));
+    // Hand-offs, what the person saw where the case happens, and every agent's runs (ADR 0095).
+    const handOffs: Record<string, number> = {};
+    for (const n of await db
+      .select()
+      .from(schema.agentConsultations)
+      .where(and(eq(schema.agentConsultations.orgId, org.id), eq(schema.agentConsultations.kind, "note")))) {
+      const pair = `${handleOf(n.askerAgentId)}>${handleOf(n.targetAgentId)}`;
+      handOffs[pair] = (handOffs[pair] ?? 0) + 1;
+    }
+    const here = await db
+      .select()
+      .from(schema.messages)
+      .where(and(eq(schema.messages.orgId, org.id), eq(schema.messages.channelId, channelId)))
+      .orderBy(asc(schema.messages.createdAt), asc(schema.messages.id));
+    const notice = (m: { meta: Record<string, unknown> }) =>
+      m.meta.notice as { kind?: string; refs?: Record<string, string> } | undefined;
+    const agentRuns: Record<string, number> = { all: 0 };
+    for (const r of await db.select().from(schema.agentRuns).where(eq(schema.agentRuns.orgId, org.id))) {
+      if (r.id === askerRunId) continue;
+      agentRuns.all = (agentRuns.all ?? 0) + 1;
+      agentRuns[handleOf(r.agentId)] = (agentRuns[handleOf(r.agentId)] ?? 0) + 1;
+    }
+    const triggerAt = here.findIndex((m) => m.authorType === "person" && m.body === conv.trigger.body);
+    const transcript =
+      conv.steps?.length || running.size
+        ? here
+            .slice(Math.max(0, triggerAt))
+            .map((m) => {
+              const who = m.authorUserId
+                ? ([...people].find(([, p]) => p.id === m.authorUserId)?.[0] ?? "someone")
+                : m.authorAgentId
+                  ? handleOf(m.authorAgentId)
+                  : "?";
+              const n = notice(m);
+              return n
+                ? `[notice for @${who}: ${n.kind}${n.refs?.kind ? ` (${n.refs.kind})` : ""}]`
+                : `[${m.authorUserId ? who : `@${who}`}]: ${m.body}`;
+            })
+            .join("\n")
+        : undefined;
     const last = turns.at(-1);
+    const first = recorder.turns.find(ownTurn);
     return {
       turns,
       calls,
@@ -731,12 +963,12 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       approvalReasons: approvalRows.map((r) => ({ tool: r.tool, why: r.why })),
       status: runs.map((r) => (r.error ? `${r.status} (${r.error})` : r.status)),
       ...(routineRun ? { routineRun } : {}),
-      system: recorder.turns[0] ? systemText(recorder.turns[0].request.system) : "",
+      system: first ? systemText(first.request.system) : "",
       costNanoUsd: Number(usage?.cost ?? 0),
       triggered,
       receipts,
       ...(cards ? { cards } : {}),
-      tools: (recorder.turns[0]?.request.tools ?? []).map((t) => t.name),
+      tools: (first?.request.tools ?? []).map((t) => t.name),
       tokens: {
         calls: Number(tokens?.calls ?? 0),
         input: Number(tokens?.input ?? 0),
@@ -746,6 +978,21 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       },
       ...(contextStep?.data.toolGroups ? { toolGroups: contextStep.data.toolGroups } : {}),
       ...(recorder.structured.length ? { classifier: [...recorder.structured] } : {}),
+      ...(stepChecks.length ? { stepChecks } : {}),
+      ...(transcript ? { transcript } : {}),
+      handOffs,
+      personSaw: {
+        agentMessages: here.filter((m) => m.authorType === "agent" && !notice(m) && !stretchCardOf(m.meta)).length,
+        noteLines: here.filter((m) => notice(m)?.kind === "agent_note").length,
+      },
+      agentRuns,
+      ...(noteId
+        ? {
+            reported: here.some(
+              (m) => notice(m)?.kind === "consult_reply" && notice(m)?.refs?.consultationId === noteId,
+            ),
+          }
+        : {}),
     };
   } finally {
     await close();
@@ -790,6 +1037,8 @@ export interface JudgeOptions {
   provider: ModelProvider;
   model: string;
   agentModel?: string;
+  /** The language of the people's lines given per language. */
+  lang?: string;
   /** Grade with Jev (TypeSafe): a calibrated probability per criterion, no written reason. */
   jev?: { apiKey: string; fetch?: typeof fetch };
 }
@@ -810,8 +1059,13 @@ export async function judge(c: BehaviorCase, run: CaseRun, options: JudgeOptions
   for (const [i, text] of (c.expect.rubric ?? []).entries()) criteria.push({ id: `case_${i + 1}`, text });
   if (criteria.length === 0) return { checks: [] as CheckResult[], costNanoUsd: 0 };
   const a = agentOf(c, options.agentModel);
-  const conv = c.conversation;
+  const conv = inLanguage(c.conversation, options.lang);
   const line = (m: CaseMessage) => `[${m.author === "agent" ? a.name : m.author}]: ${m.body}`;
+  // Another agent's question or hand-off for that person, in the two agents' private DM.
+  const asking = conv.consultation ?? conv.note;
+  const triggerLine = asking
+    ? `[${asking.from}, another agent, ${conv.note ? "handing work" : "asking"} for ${conv.trigger.author}, who wrote it: "${asking.origin}"]: ${conv.trigger.body}`
+    : line(conv.trigger);
   // A routine run starts from its instructions in its own room; the conversation is where its report goes.
   const prior = (conv.prior ?? []).map(line);
   const conversation = conv.routine
@@ -819,7 +1073,7 @@ export async function judge(c: BehaviorCase, run: CaseRun, options: JudgeOptions
         `# What was said lately where the routine reports (the run read it)\n${prior.join("\n") || "(nothing yet)"}`,
         `# The routine's instructions (set up by ${conv.trigger.author}; this run started from them)\n${conv.trigger.body}`,
       ].join("\n\n")
-    : `# Conversation (last line is the message the agent answered)\n${[...prior, line(conv.trigger)].join("\n")}`;
+    : `# Conversation (last line is the message the agent answered)\n${[...prior, triggerLine].join("\n")}`;
   const routineSettings = conv.routine
     ? ` (routine run: "${conv.routine.name}"; ${
         conv.routine.access === "act" ? "it may act" : "it may only look and report"
@@ -855,6 +1109,11 @@ export async function judge(c: BehaviorCase, run: CaseRun, options: JudgeOptions
     `# What a good answer does\n${c.expect.behavior}`,
     `# The agent's tool calls, in order\n${toolLines}`,
     `# The agent's reply in the chat\n${run.noReply ? "(stayed silent: nothing handed off, nothing posted)" : run.reply.trim() || "(nothing posted)"}`,
+    ...(run.transcript
+      ? [
+          `# The conversation after it, as the person saw it (their later lines, every agent's messages, and notices that reached an agent there)\n${run.transcript}`,
+        ]
+      : []),
     ...(run.cards ? [`# Cards posted with the reply (the person sees them under it)\n${run.cards}`] : []),
   ];
   if (options.jev) return judgeWithJev(c, criteria, prompt.join("\n\n"), options.jev);

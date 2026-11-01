@@ -272,6 +272,13 @@ export function openTarget(n: AppNotification): OpenTarget | null {
   if (n.kind === "approval") return { to: "/org/$orgId/approvals" };
   // Requests to join are answered in Members (ADR 0068).
   if (n.kind === "join_request") return { to: "/org/$orgId/settings/$section", params: { section: "members" } };
+  // Someone accepted an invitation (ADR 0090): a conversation with them, to say hi.
+  if (n.kind === "invitation_accepted") {
+    const who = n.actors[0];
+    return who?.type === "user"
+      ? { to: "/org/$orgId/dm/person/$userId", params: { userId: who.id } }
+      : { to: "/org/$orgId/settings/$section", params: { section: "members" } };
+  }
   if (n.kind === "machine_connected" || n.kind === "computer_ready")
     return s.machineId
       ? { to: "/org/$orgId/settings/computers/$machineId", params: { machineId: s.machineId } }

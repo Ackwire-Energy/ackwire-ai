@@ -440,20 +440,24 @@ p {
   /* Soft edges where the list runs under the top card or the foot (Sidebar.tsx sets the flags). */
   --sidebar-fade-top: 0px;
   --sidebar-fade-bottom: 0px;
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    #000 var(--sidebar-fade-top),
-    #000 calc(100% - var(--sidebar-fade-bottom)),
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    #000 var(--sidebar-fade-top),
-    #000 calc(100% - var(--sidebar-fade-bottom)),
-    transparent 100%
-  );
+  -webkit-mask-image:
+    linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 var(--sidebar-fade-top),
+      #000 calc(100% - var(--sidebar-fade-bottom)),
+      transparent 100%
+    ),
+    var(--scroll-strip);
+  mask-image:
+    linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 var(--sidebar-fade-top),
+      #000 calc(100% - var(--sidebar-fade-bottom)),
+      transparent 100%
+    ),
+    var(--scroll-strip);
 }
 .sidebar__scroll[data-fade-top="true"] {
   --sidebar-fade-top: 24px;
@@ -476,6 +480,22 @@ p {
     transition:
       --sidebar-fade-top 0.2s var(--out),
       --sidebar-fade-bottom 0.2s var(--out);
+  }
+}
+/* Its thumb shows only while the pointer is on the list or the keyboard moves through it. Through the token: Chrome
+   repaints a scrollbar when its element's style changes, never for a `:hover` that only its pseudo-elements read. */
+.sidebar__scroll:not(:hover, :has(:focus-visible)) {
+  --scroll-thumb: transparent;
+}
+/* The kit's 8px scrollbar sits at the sidebar's edge, in room kept whether the list scrolls or not, and the 4px of the
+   list's 12px side padding left beside it hold a row's focus ring: the rows end where the header's and the foot's do,
+   and keep their width when opening a category makes the list scroll. */
+@media (hover: hover) and (pointer: fine) {
+  @supports selector(::-webkit-scrollbar) {
+    .sidebar:not([data-rail="true"]) .sidebar__scroll {
+      scrollbar-gutter: stable;
+      padding-right: 4px;
+    }
   }
 }
 .sidebar__org {
@@ -546,7 +566,7 @@ p {
 .sidebar__item:hover {
   background: var(--surface);
 }
-.sidebar__item:focus-visible {
+html:not([data-pointer]) .sidebar__item:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -574,7 +594,8 @@ p {
 .sidebar__channel-icon {
   color: var(--ink-muted);
 }
-/* The icon rail: a channel's initials stand in for its "#" (Sidebar.tsx, channelInitials). */
+/* The icon rail: a channel's initials stand in for its "#" (Sidebar.tsx, channelInitials), on a tile as big as the
+   faces under it, so they read as its mark and not as a cut name. */
 .sidebar__channel-abbr {
   display: none;
 }
@@ -582,14 +603,19 @@ p {
   display: none;
 }
 .sidebar[data-rail="true"] .sidebar__channel-abbr {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 30%;
+  background: var(--plate);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: 11px;
+  font-weight: 650;
   line-height: 1;
-  letter-spacing: -0.01em;
   color: var(--ink-muted);
 }
-.sidebar[data-rail="true"] .sidebar__item[data-status="active"] .sidebar__channel-abbr {
+.sidebar[data-rail="true"] .sidebar__item:is([data-status="active"], [data-unread="true"]) .sidebar__channel-abbr {
   color: var(--ink);
 }
 .sidebar__foot {
@@ -611,18 +637,18 @@ p {
   text-align: left;
   cursor: pointer;
 }
-/* A name alone centres on the face; with the status line under it the card is an `.ac-faceline`. */
+/* A name alone centres on the face; with your line under it the card is an `.ac-faceline`. */
 .sidebar__user:not(.ac-faceline) {
   align-items: center;
 }
 .sidebar__user:hover {
   background: var(--surface);
 }
-.sidebar__user:focus-visible {
+html:not([data-pointer]) .sidebar__user:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-/* Two tight lines, as in the workspace header above: the name, then the status line. */
+/* Two lines: the name, on the page's 22px line, then your line. */
 .sidebar__user-text {
   flex: 1;
   min-width: 0;
@@ -632,7 +658,7 @@ p {
 .sidebar__user-name {
   font-size: 14px;
   font-weight: 600;
-  line-height: 18px;
+  line-height: 22px;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -806,7 +832,7 @@ p {
 .channel__header > .ac-avatar + div:has(> .ac-captop) {
   align-self: flex-start;
 }
-/* Who thinks, after the owner: "Claude Code · Sonnet no mac" with its mark. */
+/* Who thinks, after the owner: "Sonnet pelo plano do Claude" with its mark. */
 /* The engine line (an `.ac-iconline`) inside a line of text. */
 .channel__brain,
 .profile-card__brain {
@@ -849,8 +875,8 @@ p {
 /* Messages fade out at the list's bottom edge, above the composer: a mask on the list itself, so a hovered
    (lifted) row, its reactions and any background fade too. The padding keeps the newest line clear of it. */
 .channel__messages {
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent), var(--scroll-strip);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent), var(--scroll-strip);
 }
 .channel__status {
   margin: 0 24px;
@@ -945,7 +971,7 @@ p {
 .ac-dialog__list:has(> .member-row--add:last-child) {
   padding-bottom: 16px;
 }
-.member-row--add:focus-visible {
+html:not([data-pointer]) .member-row--add:focus-visible {
   outline: none;
   box-shadow: var(--field-ring);
 }
@@ -1222,7 +1248,7 @@ p {
 .artifact-card:hover {
   border-color: var(--ink-muted);
 }
-.artifact-card:has(.artifact-card__open:focus-visible) {
+html:not([data-pointer]) .artifact-card:has(.artifact-card__open:focus-visible) {
   box-shadow: var(--focus-ring);
 }
 .artifact-card--loading {
@@ -1245,7 +1271,7 @@ p {
   text-align: left;
   cursor: pointer;
 }
-.artifact-card__open:focus-visible {
+html:not([data-pointer]) .artifact-card__open:focus-visible {
   outline: none;
 }
 /* The whole card opens the viewer. */
@@ -1481,7 +1507,7 @@ p {
   color: inherit;
   cursor: pointer;
 }
-.artifact-table__sort:focus-visible {
+html:not([data-pointer]) .artifact-table__sort:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: 4px;
@@ -1660,6 +1686,11 @@ p {
 }
 .code-viewer__preview {
   padding: 0 20px;
+}
+/* The rest of a longer block scrolls into its 420px in a message too, where the kit keeps code from scrolling up and
+   down. */
+.ac-msg__text .code-card__code {
+  overflow-y: auto;
 }
 .md .code-card code,
 .md .code-viewer code {
@@ -2566,7 +2597,7 @@ p {
   cursor: pointer;
   border-radius: var(--radius-sm);
 }
-.profile-trigger:focus-visible {
+html:not([data-pointer]) .profile-trigger:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -2630,6 +2661,11 @@ p {
 }
 .profile-menu__line {
   margin: 0 4px 6px;
+}
+/* A plan near its limit: a long name gives way to its state. */
+.profile-menu__plan {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* "Ada não está no canal" after an @ pick */
@@ -2768,7 +2804,7 @@ p {
   width: 14px;
   height: 14px;
 }
-.level-pill:focus-visible {
+html:not([data-pointer]) .level-pill:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -2806,7 +2842,17 @@ p {
 }
 
 /* Skills: library rows, detail sheet, file viewer, picker */
+/*
+ * A library row stacks the name, its source line (pill, default chip, version and usage) and what the skill is for,
+ * so a long description runs the row's whole width instead of a column beside the marks.
+ */
+.skill-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+}
 .skill-row__name {
+  align-self: flex-start;
   padding: 0;
   border: 0;
   background: none;
@@ -2819,14 +2865,17 @@ p {
 .skill-row__name:hover {
   text-decoration: underline;
 }
-.skill-row__name:focus-visible,
-.skill-file--open:focus-visible {
+html:not([data-pointer]) .skill-row__name:focus-visible,
+html:not([data-pointer]) .skill-file--open:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: 4px;
 }
-.skill-row .ac-chip {
-  margin-left: 0;
+.skill-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
 }
 .skill-picks {
   margin: 12px 0 0;
@@ -2943,7 +2992,7 @@ p {
 .sidebar__org-button:hover {
   background: var(--surface-raised);
 }
-.sidebar__org-button:focus-visible {
+html:not([data-pointer]) .sidebar__org-button:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -2959,19 +3008,23 @@ p {
   align-items: center;
   gap: 4px;
 }
-/* The same insets and gap as the workspace header's button, so both cards line up. */
+/*
+ * The workspace header's side insets and gap, so both cards line up, and as much room over the face and the name's
+ * capitals as under the face and the last line's baseline.
+ */
 .sidebar__me > .sidebar__user {
   flex: 1;
   min-width: 0;
   gap: var(--space-2);
-  padding: 4px 10px 4px 8px;
+  padding: 8px 10px 8px 8px;
   border-radius: inherit;
 }
-/* The person's face about as tall as its two lines (32px). */
+/* The face as tall as the two lines from the name's capitals to the last baseline (28px, as the workspace's mark
+   above), so the face and the words fill the card's middle together. */
 .sidebar__me > .sidebar__user > .ac-avatar {
-  width: 32px;
-  height: 32px;
-  font-size: 13px;
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
 }
 
 /* Settings: a grouped left sub-nav + one section. */
@@ -3069,7 +3122,7 @@ p {
 .settings__link[aria-current="page"] > .ac-icon {
   color: var(--ink);
 }
-.settings__link:focus-visible {
+html:not([data-pointer]) .settings__link:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -3199,7 +3252,7 @@ p {
   color: var(--ink-muted);
   font-size: 13px;
 }
-.settings-tile:focus-visible {
+html:not([data-pointer]) .settings-tile:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring), var(--card-shadow);
 }
@@ -3226,6 +3279,10 @@ p {
     padding: 2px 16px 6px;
     overflow-x: auto;
     overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .settings__groups::-webkit-scrollbar {
+    display: none;
   }
   .settings__group-label {
     display: none;
@@ -3316,7 +3373,7 @@ p {
 .catalog__cat:hover {
   background: var(--plate-soft);
 }
-.catalog__cat:focus-visible {
+html:not([data-pointer]) .catalog__cat:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -3420,8 +3477,8 @@ p {
 .catalog-tile:active {
   transform: scale(0.98);
 }
-.catalog-feat__card:focus-visible,
-.catalog-tile:focus-visible {
+html:not([data-pointer]) .catalog-feat__card:focus-visible,
+html:not([data-pointer]) .catalog-tile:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -3879,7 +3936,7 @@ p {
   width: fit-content;
   border-radius: var(--radius-sm);
 }
-.cflow__more summary:focus-visible {
+html:not([data-pointer]) .cflow__more summary:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -4113,7 +4170,7 @@ p {
   color: var(--ink2);
   border-radius: var(--radius-sm);
 }
-.mail-rules > summary:focus-visible {
+html:not([data-pointer]) .mail-rules > summary:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -4243,9 +4300,9 @@ p {
 .tr-subj__h:hover {
   background: var(--plate-soft);
 }
-.tr-subj__h:focus-visible,
-.tr-link:focus-visible,
-.tr-ok:focus-visible {
+html:not([data-pointer]) .tr-subj__h:focus-visible,
+html:not([data-pointer]) .tr-link:focus-visible,
+html:not([data-pointer]) .tr-ok:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -4759,6 +4816,13 @@ p {
 .sidebar__item:hover {
   background: var(--plate);
 }
+/* A row that failed to draw (Sidebar.tsx, UnshownRow): quiet, and nothing to open. */
+.sidebar__item--unshown,
+.sidebar__item--unshown:hover {
+  background: transparent;
+  color: var(--faint);
+  cursor: default;
+}
 /* The chosen item: a frame of dithered sky rising from the right (an agent's row in its color) around one
    plate of the item's own white, 3px in with the item's corner less 3px, so the frame keeps an even width round
    the corners and the role, lock or state at the end sits on the plate like the label. A hairline outside keeps
@@ -4854,7 +4918,7 @@ p {
   box-shadow: inset 0 0 0 1px var(--line-strong);
   color: var(--muted);
 }
-.sidebar__jump:focus-visible {
+html:not([data-pointer]) .sidebar__jump:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -4964,7 +5028,7 @@ p {
 .live-code-toggle__btn:hover {
   background: var(--plate);
 }
-.live-code-toggle__btn:focus-visible {
+html:not([data-pointer]) .live-code-toggle__btn:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5045,7 +5109,7 @@ p {
   border-color: var(--line-strong);
   background: var(--raised);
 }
-.photo-drop:focus-visible {
+html:not([data-pointer]) .photo-drop:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5104,7 +5168,7 @@ p {
 .wiki-link:hover {
   background: var(--plate);
 }
-.wiki-link:focus-visible {
+html:not([data-pointer]) .wiki-link:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5257,7 +5321,7 @@ p {
 .save-wiki__page:hover {
   background: var(--plate);
 }
-.save-wiki__page:focus-visible {
+html:not([data-pointer]) .save-wiki__page:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5287,7 +5351,7 @@ p {
   background: var(--plate);
   color: var(--ink);
 }
-.composer-reply__close:focus-visible {
+html:not([data-pointer]) .composer-reply__close:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5342,7 +5406,7 @@ p {
 .msg-quote:hover {
   color: var(--ink2);
 }
-.msg-quote:focus-visible {
+html:not([data-pointer]) .msg-quote:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5454,7 +5518,7 @@ p {
   background: color-mix(in srgb, var(--danger) 12%, transparent);
   color: var(--danger);
 }
-.stop-run:focus-visible {
+html:not([data-pointer]) .stop-run:focus-visible {
   outline: none;
   box-shadow: var(--field-ring);
 }
@@ -5495,7 +5559,7 @@ p {
 .run-continue:hover:not(:disabled) {
   transform: translateY(-1px);
 }
-.run-continue:focus-visible {
+html:not([data-pointer]) .run-continue:focus-visible {
   outline: none;
   box-shadow: var(--card-shadow), var(--focus-ring);
 }
@@ -5698,6 +5762,11 @@ p {
   font-size: 10px;
   line-height: 16px;
 }
+/* Over a tile's or a face's corner a bare number reads as an exponent: the rail's other counts' plate. */
+.sidebar[data-rail="true"] .sidebar__unread {
+  background: var(--sunken);
+  color: var(--ink2);
+}
 .sidebar[data-rail="true"] .sidebar__top,
 .sidebar[data-rail="true"] .sidebar__scroll,
 .sidebar[data-rail="true"] .sidebar__foot {
@@ -5708,9 +5777,20 @@ p {
 .sidebar[data-rail="true"] .sidebar__scroll {
   gap: 14px;
 }
+/* One 48px column (a 40px item and its focus ring) from the rail's padding, so the items stay on the rail's middle as
+   the header and the foot do, whatever room the scrollbar takes at the edge. Not `scrollbar-gutter: stable
+   both-edges`: WebKit keeps both gutters on the scrollbar's side. Never sideways: Firefox's thin scrollbar is 11px
+   with classic scrollbars on macOS, 1px more than the room beside the column. */
 .sidebar[data-rail="true"] .sidebar__scroll {
+  display: grid;
+  grid-template-columns: 48px;
+  align-content: start;
+  justify-items: center;
+  align-self: stretch;
+  width: auto;
   margin: -4px -10px;
-  padding: 4px 10px;
+  padding: 4px 0 4px 10px;
+  overflow-x: hidden;
 }
 .sidebar[data-rail="true"] .sidebar__jump-row {
   flex-direction: column;
@@ -5741,9 +5821,10 @@ p {
   gap: 6px;
   padding: 0;
 }
+/* As tall as the workspace's button above it: the face as big as its mark, the same room around. */
 .sidebar[data-rail="true"] .sidebar__user {
   justify-content: center;
-  padding: 4px;
+  padding: 6px;
 }
 /* A routine's "when": Horário / Evento / Email, then one quiet panel with the
    sentence, "Ajustar" and the next runs; the picker opens inside it. */
@@ -5858,7 +5939,7 @@ p {
   padding-right: var(--ghost-plate);
   margin-right: calc(-1 * var(--ghost-plate));
 }
-.members-stack:focus-visible {
+html:not([data-pointer]) .members-stack:focus-visible {
   outline: none;
   box-shadow: var(--field-ring);
 }
@@ -5894,7 +5975,7 @@ p {
   text-align: left;
 }
 .members-pop__row.profile-trigger:hover,
-.members-pop__row.profile-trigger:focus-visible {
+html:not([data-pointer]) .members-pop__row.profile-trigger:focus-visible {
   background: var(--plate);
   outline: none;
 }
@@ -6040,7 +6121,8 @@ p {
   cursor: pointer;
   box-shadow: 0 0 0 1px var(--sky-line);
 }
-.sky-welcome__close:focus-visible {
+/* The sky's own ink on its light sky, in both themes. */
+html:not([data-pointer]) .sky-welcome__close:focus-visible {
   outline: none;
   box-shadow:
     0 0 0 2px #fff,
@@ -6304,7 +6386,7 @@ p {
   white-space: nowrap;
   font-weight: 600;
 }
-.file-thumb:focus-visible {
+html:not([data-pointer]) .file-thumb:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -6339,7 +6421,7 @@ p {
 .file-row:hover {
   box-shadow: var(--e2), var(--top);
 }
-.file-row:has(.file-row__open:focus-visible) {
+html:not([data-pointer]) .file-row:has(.file-row__open:focus-visible) {
   box-shadow: var(--focus-ring);
 }
 .file-row__open {
@@ -6353,7 +6435,7 @@ p {
   text-align: left;
   cursor: pointer;
 }
-.file-row__open:focus-visible {
+html:not([data-pointer]) .file-row__open:focus-visible {
   outline: none;
 }
 .file-row .file-summary__icon {
@@ -6485,7 +6567,6 @@ p {
   font-size: 12px;
   line-height: 18px;
   white-space: pre;
-  scrollbar-width: thin;
 }
 .machine-command__copy {
   flex: none;
@@ -6583,7 +6664,7 @@ a.machine-row__name:hover {
 .machine-connect__toggle:hover {
   color: var(--ink);
 }
-.machine-connect__toggle:focus-visible {
+html:not([data-pointer]) .machine-connect__toggle:focus-visible {
   outline: none;
   border-radius: 4px;
   box-shadow: var(--focus-ring);
@@ -7074,7 +7155,7 @@ a.machine-row__name:hover {
   color: var(--ink);
   box-shadow: var(--card-shadow);
 }
-.onb__step:focus-visible {
+html:not([data-pointer]) .onb__step:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -7193,6 +7274,10 @@ a.machine-row__name:hover {
     gap: 4px;
     overflow-x: auto;
     overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .onb__steps::-webkit-scrollbar {
+    display: none;
   }
   .onb__step {
     width: auto;
@@ -7469,13 +7554,13 @@ a.machine-row__name:hover {
   box-shadow: var(--chosen-shadow);
   transform: var(--chosen-lift);
 }
-.newag__role:focus-visible,
-.newag__model:focus-visible,
-.newag__tip:focus-visible,
-.newag__opt:focus-visible,
-.newag__swatch:focus-visible,
-.newag__tog:focus-visible,
-.newag__addrow:focus-visible {
+html:not([data-pointer]) .newag__role:focus-visible,
+html:not([data-pointer]) .newag__model:focus-visible,
+html:not([data-pointer]) .newag__tip:focus-visible,
+html:not([data-pointer]) .newag__opt:focus-visible,
+html:not([data-pointer]) .newag__swatch:focus-visible,
+html:not([data-pointer]) .newag__tog:focus-visible,
+html:not([data-pointer]) .newag__addrow:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -7758,7 +7843,7 @@ a.machine-row__name:hover {
   background: var(--sunken);
   box-shadow: inset 0 0 0 1px var(--line);
 }
-.newag__sel .ac-select__trigger:focus-visible {
+html:not([data-pointer]) .newag__sel .ac-select__trigger:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -7973,6 +8058,9 @@ a.machine-row__name:hover {
     scrollbar-width: none;
     padding: 2px;
   }
+  .newag .onb__steps::-webkit-scrollbar {
+    display: none;
+  }
   .newag .onb__steps li {
     flex: none;
   }
@@ -8016,6 +8104,9 @@ a.machine-row__name:hover {
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
+  }
+  .newag__tips::-webkit-scrollbar {
+    display: none;
   }
   .newag__tip {
     flex: none;
@@ -8071,14 +8162,7 @@ a.machine-row__name:hover {
   margin: 0;
 }
 
-/* Secrets (ADR 0027): the card's private field and the agent page's list. */
-.secret-card__form {
-  display: grid;
-  gap: var(--space-2);
-}
-.secret-card__form .ac-approval__actions {
-  align-items: center;
-}
+/* Secrets (ADR 0027): the agent page's list. */
 .agent-secrets {
   list-style: none;
   margin: 0;
@@ -8244,7 +8328,7 @@ a.machine-row__name:hover {
 .agp-cell:hover:not(.agp-cell--ro) {
   background: color-mix(in srgb, var(--sunken) 80%, transparent);
 }
-.agp-cell:focus-visible {
+html:not([data-pointer]) .agp-cell:focus-visible {
   outline: none;
   box-shadow: var(--field-ring);
 }
@@ -8376,16 +8460,7 @@ a.machine-row__name:hover {
 .agp-number .ac-planmeter__line {
   color: inherit;
 }
-/* The sentence's dialogs: the note by the buttons (the plan, or what the choice does). */
-.agp-wdlg__note {
-  color: var(--muted);
-  font-size: 12.5px;
-  line-height: 1.4;
-}
-.agp-wdlg__note b {
-  color: var(--ink);
-  font-weight: 600;
-}
+/* The sentence's dialogs: the link by the buttons ("Conectar outro computador"). */
 .agp-wdlg__link {
   display: inline-flex;
   align-items: center;
@@ -8407,13 +8482,7 @@ a.machine-row__name:hover {
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink2);
 }
-/* "Quem pensa": the opened brain's settings full width, a small label above each. */
-/* The brain's card: model, account and "Configuração avançada", one stack of pickers. */
-.agp-brainpicks {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
+/* "Quem pensa": the opened card's settings full width, a small label above each. */
 .agp-advrow .ac-select__trigger {
   cursor: pointer;
 }
@@ -8917,7 +8986,7 @@ a.machine-row__name:hover {
   color: var(--ink);
   text-decoration: underline;
 }
-.agp-asks__see:focus-visible {
+html:not([data-pointer]) .agp-asks__see:focus-visible {
   box-shadow: var(--focus-ring);
 }
 .agp-tools {
@@ -9132,7 +9201,7 @@ a.machine-row__name:hover {
 .agp-chipbtn:hover {
   color: var(--ink);
 }
-.agp-chipbtn:focus-visible {
+html:not([data-pointer]) .agp-chipbtn:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -9147,12 +9216,15 @@ a.machine-row__name:hover {
 .agp-repogroup .scope-row {
   align-items: center;
 }
-.agp-repogroup .scope-row[data-off] {
+.agp-repogroup .scope-row[data-off],
+.agp-copydialog .scope-row[data-off],
+.agp-copydialog__all[data-off] {
   cursor: default;
   opacity: 0.55;
 }
-/* "Todos os repositórios" on top of the list. */
-.agp-repodialog__all {
+/* "Todos os repositórios" on top of the list, and "Levar a autonomia" and "Todos" over the agents a setup is used on. */
+.agp-repodialog__all,
+.agp-copydialog__all {
   flex: 1;
   display: flex;
   align-items: center;
@@ -9458,7 +9530,7 @@ a.machine-row__name:hover {
 .agp-subnav__item[data-danger] {
   color: var(--danger);
 }
-.agp-subnav__item:focus-visible {
+html:not([data-pointer]) .agp-subnav__item:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -9664,7 +9736,7 @@ a.machine-row__name:hover {
   text-align: left;
   cursor: pointer;
 }
-.agp-changes__jump:focus-visible {
+html:not([data-pointer]) .agp-changes__jump:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -9758,7 +9830,7 @@ a.machine-row__name:hover {
     inset 0 0 0 1px var(--line),
     0 4px 10px -4px rgba(0, 0, 0, 0.18);
 }
-.msg-mem:focus-visible {
+html:not([data-pointer]) .msg-mem:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -9876,6 +9948,15 @@ a.machine-row__name:hover {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+/* "Coordena o time", after the look and its same hairline. */
+.agp-coord {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   margin-top: 4px;
   padding-top: 16px;
   border-top: 1px solid var(--line);
@@ -10040,7 +10121,7 @@ html[data-menu-overlay] .shell {
   text-align: left;
   cursor: pointer;
 }
-.sidebar__section-toggle:focus-visible {
+html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -10227,7 +10308,7 @@ html[data-menu-overlay] .shell {
   text-align: left;
   cursor: pointer;
 }
-.sidebar__more:focus-visible {
+html:not([data-pointer]) .sidebar__more:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -10375,7 +10456,7 @@ html[data-menu-overlay] .shell {
   opacity: 1;
   pointer-events: auto;
 }
-.channel__newpill:focus-visible {
+html:not([data-pointer]) .channel__newpill:focus-visible {
   outline: none;
   box-shadow: var(--card-shadow), var(--focus-ring);
 }
@@ -10443,7 +10524,7 @@ html[data-menu-overlay] .shell {
   text-decoration-color: var(--line2);
   cursor: pointer;
 }
-.ac-typing__see:focus-visible {
+html:not([data-pointer]) .ac-typing__see:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: 4px;
@@ -11037,8 +11118,8 @@ html[data-menu-overlay] .shell {
     var(--top);
   font-size: 14px;
 }
-/* A face brings its own tile. */
-.settings-row__icon:has(> .ac-avatar) {
+/* A face, or a plan maker's mark, brings its own tile. */
+.settings-row__icon:has(> .ac-avatar, > .ac-brand) {
   background: none;
   box-shadow: none;
 }
@@ -11078,7 +11159,7 @@ html[data-menu-overlay] .shell {
 .settings-row--open:hover {
   background: color-mix(in srgb, var(--ink) 3%, transparent);
 }
-.settings-row--open:focus-visible {
+html:not([data-pointer]) .settings-row--open:focus-visible {
   outline: none;
   box-shadow: inset var(--focus-ring);
 }
