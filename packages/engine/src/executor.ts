@@ -181,7 +181,7 @@ import { archivedAgentsPrompt, FIND_AGENT_TOOL } from "./team";
 import { linkRunChecks, runChecksForReply } from "./team-actions";
 import { carriesCredential, maskCredentials } from "./tool-detail";
 import { chooseToolGroups, keptToolGroups, recentForJudge, type ToolGroupChoice } from "./tool-loading";
-import { presentTools, toolGroupKey } from "./tools/directory";
+import { ON_DEMAND_FIND, ON_DEMAND_USE, presentTools, toolGroupKey } from "./tools/directory";
 import { type Approval, type InvokeResult, isSensitive, type ToolGateway } from "./tools/gateway";
 import type { ToolContext, ToolDefinition } from "./tools/types";
 import { recordWikiReads, retrieveWikiForRun } from "./wiki";
@@ -205,6 +205,8 @@ const ASKED_GRACE_MS = 250;
 const DECIDED_LINE_MAX = 2000;
 /** How many apps a reply's `meta.work.calls` names: its closed block stacks only a few logos. */
 const WORK_CALLS = 12;
+/** The calls a reply's `meta.work` never counts, by name: a reaction, and looking a tool up. */
+const UNCOUNTED_TOOLS = `^(${REACT_TOOL}|${ON_DEMAND_FIND}|${ON_DEMAND_USE})$|_${ON_DEMAND_FIND}$`;
 
 /**
  * What the agent engine needs (ADR 0032). The engine is this file: it owns the
@@ -927,8 +929,9 @@ async function executeRunInner(
     // "Ver o que ele fez" under the reply: how many tool calls so far, so the apps leave it out at 0, and one call
     // per logo of the closed block, in order of first use: per service, else app, else screen, else tool (a
     // connector's dozens of tools would push the next apps past the few kept). A reaction already shows on the
-    // message it reacts to, and the runner asking again about a command waiting on a person is that command's line
-    // (`promptPoll`): neither is counted, as the apps leave them out of the opened block.
+    // message it reacts to, looking a tool up is how our tools load (`find_tools`, a big connector's own, a
+    // `use_tool` that named none), and the runner asking again about a command waiting on a person is that command's
+    // line (`promptPoll`): none is counted, as the apps leave them out of the opened block (`UNLISTED`).
     const name = sql<string>`${agentRunSteps.data}->>'name'`;
     const screen = sql`substring(${name} from '^(?:mcp__agentes__)?(browser|desktop)_')`;
     const app = sql`coalesce(${agentRunSteps.data}->>'service', ${agentRunSteps.data}->>'connector', ${screen}, ${name})`;
@@ -945,7 +948,7 @@ async function executeRunInner(
         and(
           eq(agentRunSteps.runId, run.id),
           eq(agentRunSteps.kind, "tool_call"),
-          sql`${name} is distinct from ${REACT_TOOL}`,
+          sql`coalesce(${name}, '') !~ ${UNCOUNTED_TOOLS}`,
           sql`(${agentRunSteps.data}->>'name' is distinct from ${PERMISSION_TOOL} or ${agentRunSteps.data}->'input'->>'request_id' is null)`,
         ),
       )

@@ -157,9 +157,9 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
     leastThinking: "off",
     tier: "small",
   },
-  // OpenAI, Standard tier, checked on developers.openai.com/api/docs/pricing (2026-10-20); cache writes
-  // at the 30-minute rate. Above 272K prompt tokens, input, cached input and cache writes cost 2×, output 1.5×.
-  // Context windows from each model's page (2026-10-26).
+  // OpenAI, Standard tier, checked on developers.openai.com/api/docs/pricing (2026-10-20, GPT-6.1 Terra
+  // 2026-10-31); cache writes at the 30-minute rate. Above 272K prompt tokens, input, cached input and cache
+  // writes cost 2×, output 1.5×. Context windows from each model's page (2026-10-26, Terra's 2026-10-31).
   "gpt-6.1-sol": {
     provider: "openai",
     label: "GPT-6.1 Sol",
@@ -173,6 +173,19 @@ export const MODEL_CATALOG: Record<string, ModelInfo> = {
     reasoning: true,
     recommended: true,
     tier: "medium",
+  },
+  // No tier and no pick for routing or system tasks: "Automático" never chooses it, people do.
+  "gpt-6.1-terra": {
+    provider: "openai",
+    label: "GPT-6.1 Terra",
+    prices: { input: 1000, output: 5000, cacheRead: 50, cacheWrite: 1250 },
+    longContext: {
+      aboveInputTokens: 272_000,
+      prices: { input: 2000, output: 7500, cacheRead: 100, cacheWrite: 2500 },
+    },
+    contextWindow: 1_050_000,
+    serverSideFallback: false,
+    reasoning: true,
   },
   "gpt-6-sol": {
     provider: "openai",

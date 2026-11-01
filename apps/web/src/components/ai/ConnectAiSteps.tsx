@@ -880,6 +880,7 @@ function PlanSteps({
       machines.data?.find((m) => m.id === view?.computer?.machineId),
       kind,
     );
+    const program = t(`brain.card.${kind}`);
     wait = (
       <>
         <SettingNote icon="alert">
@@ -888,8 +889,8 @@ function PlanSteps({
             : gate.reason === "keys"
               ? t("aiAccounts.connect.needs.keys")
               : gate.reason === "tool_off"
-                ? t(off.key, { computer, command: off.command })
-                : t(`brain.reasons.${gate.reason}`, { computer })}
+                ? t(off.key, { computer, command: off.command, program })
+                : t(`brain.reasons.${gate.reason}`, { computer, program })}
         </SettingNote>
         {useKey}
       </>

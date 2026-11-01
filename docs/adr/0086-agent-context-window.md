@@ -1,6 +1,6 @@
 # 0086. An agent's context window
 
-- Status: Accepted (built: the server, the runner, the web and the phone app). Amended 2026-10-31: §4 (the phone's model on a screen of its own), Consequences (a coding plan's window)
+- Status: Accepted (built: the server, the runner, the web and the phone app). Amended 2026-10-31: §4 (the phone's model on a screen of its own), Consequences (a coding plan's window); 2026-10-31 by ADR 0094: §4 ("Usar em outros agentes" under "Configuração avançada")
 - Date: 2026-10-30
 - Extends: ADR 0041 (an agent's account and effort on its computer), the context budget (`fitContextWindow`, ADR 0051)
 - Code: `packages/providers/src/context-limits.ts`, `packages/engine/src/brain-settings.ts`, `packages/engine/src/context-budget.ts`, `packages/engine/src/brains/claude-code.ts` (`contextFields`), migration `0131_agent_context_tokens`, `apps/server/runner/brain.ts`, `apps/server/runner/brain-codex.ts`, `apps/server/runner/brain-codex-app.ts`, `packages/client/src/lib/brain-advanced.ts`, `apps/web/src/pages/agent/Work.tsx`, `apps/mobile/src/features/ai/AgentAiScreen.tsx`, `apps/mobile/src/features/ai/AgentAdvancedScreen.tsx`, `apps/mobile/app/(app)/agent-model/[id].tsx`
@@ -17,6 +17,8 @@ Most models an agent thinks with read up to a million tokens. Every turn resends
 4. **In the apps it is advanced.** "Quem pensa" keeps the model, the account and a "Configuração avançada" row that says "Tudo no padrão" or only what differs; the row opens a smaller dialog with how it thinks (effort, context window) and who it answers ("Atende outras pessoas", answering through the API while the computer is away), saved with the rest on "Usar". Sizes are written `200K`, `400K`, `1M` in every language. On the phone "Pensa com" follows the same pattern: the model as a list, the account, and the row, which opens a screen of its own with the same groups (effort, context window, "Atende outras pessoas", the API when away) and "Voltar ao padrão", each choice saved at once like the rest of that screen.
 
    *Amended 2026-10-31:* on the phone the model is not a list on "Pensa com" but one "Modelo" row, first, with its model. It opens a screen of its own (`AgentModelScreen`): Automático, then the brain's models or every model of its coding plan, one list per maker on OpenCode Go, each tap saved at once.
+
+   *Amended 2026-10-31 (ADR 0094):* under "Configuração avançada", on the web and the phone, a row "Usar em outros agentes" gives the same setup to the other agents picked.
 
 ## Consequences
 

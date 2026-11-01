@@ -102,7 +102,7 @@
 .wiki-row:hover {
   background: var(--plate);
 }
-.wiki-row:focus-visible {
+html:not([data-pointer]) .wiki-row:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -185,7 +185,7 @@
   color: var(--bg);
   box-shadow: none;
 }
-.wiki-tag:focus-visible {
+html:not([data-pointer]) .wiki-tag:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -213,7 +213,7 @@
 .wiki-import-card:active {
   transform: scale(0.98);
 }
-.wiki-import-card:focus-visible {
+html:not([data-pointer]) .wiki-import-card:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -302,7 +302,7 @@
   box-shadow: var(--e2), var(--top);
   transform: translateY(-2px);
 }
-.wiki-card:focus-visible {
+html:not([data-pointer]) .wiki-card:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -384,7 +384,7 @@
 .wiki-read:hover {
   background: var(--plate);
 }
-.wiki-read:focus-visible {
+html:not([data-pointer]) .wiki-read:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -478,7 +478,7 @@
   overflow: hidden;
   cursor: pointer;
 }
-.wiki-minigraph:focus-visible {
+html:not([data-pointer]) .wiki-minigraph:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -954,7 +954,7 @@ a.wiki-embed:hover {
 .wiki-backlink:hover {
   box-shadow: var(--e2), var(--top);
 }
-.wiki-backlink:focus-visible {
+html:not([data-pointer]) .wiki-backlink:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -1152,7 +1152,7 @@ a.wiki-embed:hover {
   fill: var(--ink);
   font-weight: 650;
 }
-.wiki-graph__node:focus-visible {
+html:not([data-pointer]) .wiki-graph__node:focus-visible {
   outline: none;
 }
 .wiki-graph__node:focus-visible circle {

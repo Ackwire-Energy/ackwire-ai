@@ -111,11 +111,11 @@
   inset: 0;
   border-radius: inherit;
 }
-.drive-hit:focus-visible {
+html:not([data-pointer]) .drive-hit:focus-visible {
   outline: none;
 }
-.drive-card:has(.drive-hit:focus-visible),
-.drive-row:has(.drive-hit:focus-visible) {
+html:not([data-pointer]) .drive-card:has(.drive-hit:focus-visible),
+html:not([data-pointer]) .drive-row:has(.drive-hit:focus-visible) {
   box-shadow: var(--focus-ring);
 }
 
@@ -445,7 +445,7 @@ button.drive-where {
 button.drive-where:hover {
   background: color-mix(in srgb, var(--sunken) 70%, var(--plate));
 }
-button.drive-where:focus-visible {
+html:not([data-pointer]) button.drive-where:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
