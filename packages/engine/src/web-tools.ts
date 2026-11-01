@@ -3,6 +3,9 @@ import { cutText } from "./format";
 import { assertPublicHttpsUrl, type ResolveHost } from "./net-guard";
 import type { ToolContext, ToolDefinition, ToolSource } from "./tools/types";
 
+/** The usage rows of web calls (no tokens, no model): readers of model calls leave them out. */
+export const WEB_USAGE_PROVIDER = "web";
+
 /**
  * Reading the public web, for every agent and every run (ADR 0109): `web_search` and `web_fetch`, no scope (like
  * `ask_user`), so API brains get them as tools and computer brains through the engine's MCP bridge. A person can
@@ -152,7 +155,7 @@ export function createWebToolSource(deps: WebToolDeps = {}): ToolSource {
         agentId: ctx.agentId,
         runId: ctx.runId,
         kind: "agent",
-        provider: "web",
+        provider: WEB_USAGE_PROVIDER,
         model,
         inputTokens: 0,
         outputTokens: 0,

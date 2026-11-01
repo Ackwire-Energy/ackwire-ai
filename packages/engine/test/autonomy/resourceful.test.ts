@@ -1,5 +1,13 @@
 import { afterEach, expect } from "bun:test";
-import { createRoutine, createWebToolSource, executeRoutineRun, queueRoutineRun } from "../../src";
+import {
+  createRoutine,
+  createWebToolSource,
+  executeRoutineRun,
+  listMessages,
+  queueRoutineRun,
+  usageSummary,
+  WEB_USAGE_PROVIDER,
+} from "../../src";
 import { routineDeps, routineRow, routineRunRow } from "../routine-fixtures";
 import { closeWorlds, type World, world } from "./harness";
 import { assertInvariants } from "./invariants";
@@ -149,6 +157,25 @@ scenario("S56", "a 'couldn't' with one empty attempt is told its means once, the
     "O Banco Azul lançou um cartão sem anuidade nesta semana.",
   ]);
   expect(await untriedSteps(w)).toHaveLength(1);
+  // A web call's usage row is no model call: the reply still names the model, the summary counts model calls only.
+  const [run] = await w.runs();
+  const before = await usageSummary(w.f.db, w.owner.id, w.org.id);
+  await w.f.gateway.recordExternalUsage({
+    orgId: w.org.id,
+    agentId: run?.agentId,
+    runId: run?.id,
+    kind: "agent",
+    provider: WEB_USAGE_PROVIDER,
+    model: "fetch",
+    inputTokens: 0,
+    outputTokens: 0,
+    costNanoUsd: 0,
+  });
+  const answer = (await listMessages(w.f.db, w.owner.id, w.org.id, w.channelId)).find(
+    (m) => m.agentRunId === run?.id,
+  );
+  expect(answer?.usage?.model).toStartWith("claude-");
+  expect(await usageSummary(w.f.db, w.owner.id, w.org.id)).toEqual(before);
   await assertInvariants(w);
 });
 
