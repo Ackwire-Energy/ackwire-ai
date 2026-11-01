@@ -171,7 +171,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { tokenizeBody } from "@/chat/body";
 import { ChatMedia } from "@/chat/ChatMedia";
@@ -261,6 +261,16 @@ import { useOrg } from "@/components/org-context";
 import { AuthorStatus } from "@/components/Presence";
 import { ProfileTrigger } from "@/components/ProfileCard";
 import { MessageReactions, useEmojiLabels } from "@/components/Reactions";
+import {
+  type AskRegistry,
+  AskRegistryProvider,
+  createAskRegistry,
+  type PendingAsk,
+  sameAsk,
+  showRequest,
+  useExpired,
+  WaitMark,
+} from "@/components/RequestCard";
 import { ActivitySky, ChannelWelcome, colorOf } from "@/components/Sky";
 import { isStoppable, StopButton, useContinueRun, useStopRun, useWasContinued } from "@/components/StopRun";
 import { TeamChecks } from "@/components/TeamChecks";
@@ -281,6 +291,7 @@ import { BarPhrase, ConsultClock, WorkingStack } from "@/components/WorkingLine"
 import { useDirectory } from "@/hooks/useDirectory";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
+import { TYPED_VALUES } from "@/i18n";
 import { onChannelDetails, takeChannelDetails } from "@/lib/channel-details";
 import { desktopPlatform, useDocumentTitle } from "@/lib/desktop";
 import { reportPainted } from "@/lib/perf";
@@ -1131,6 +1142,11 @@ function ChannelView({
   // By run: a "pensando…" hands its block (same key) to the real run, and that run must count as in view.
   const inView = useBlocksInView(scroller, slots.map((x) => x.runId).join(" "));
   const outOfView = useMemo(() => (runId: string) => !inView.has(runId), [inView]);
+  // Requests waiting for you that scrolled out of view: the same line says so first (waiting beats working).
+  // Their cards register with this view's scroller (`AskRegistryProvider` around it, not around the panels).
+  const [askRegistry] = useState(createAskRegistry);
+  const asksOut = useAsksOutOfView(scroller, askRegistry, isMember);
+  const seeAsk = (id: string) => showRequest(scroller.current, id, !reducedMotion);
   /** "Ver" on that line: back to the agent's block. */
   const seeRun = (runId: string) => {
     const row = Array.from(scroller.current?.querySelectorAll<HTMLElement>("[data-run-id]") ?? []).find(
@@ -1770,121 +1786,126 @@ function ChannelView({
                     </span>
                   </div>
                 )}
-                <section
-                  ref={scroller}
-                  className="channel__messages"
-                  data-fresh={fresh || undefined}
-                  aria-label={t("channel.messages")}
-                  aria-live="polite"
-                  aria-relevant="additions"
-                  onWheel={(e) => {
-                    markGesture();
-                    if (e.deltaY < 0) letGo();
-                  }}
-                  onTouchMove={markGesture}
-                  onPointerDown={markGesture}
-                  onKeyDown={markGesture}
-                  onScroll={(e) => {
-                    const previousTop = lastScrollTop.current;
-                    lastScrollTop.current = e.currentTarget.scrollTop;
-                    // Only the person scrolling unpins (or loads older pages); layout changes never do.
-                    const byPerson = Date.now() - lastGesture.current < GESTURE_MS;
-                    if (byPerson && e.currentTarget.scrollTop < 240) loadOlder();
-                    if (byPerson && previousTop !== null && e.currentTarget.scrollTop < previousTop) {
-                      letGo();
-                      return;
-                    }
-                    const near = nearBottom(e.currentTarget);
-                    if (!near && (!byPerson || Date.now() < autoScrollUntil.current)) return;
-                    // Pinned again only when the person comes back down, not by layout.
-                    const movedDown = previousTop !== null && e.currentTarget.scrollTop > previousTop;
-                    if (near && !stick.current && !(byPerson && movedDown)) return;
-                    stick.current = near;
-                    if (near) clearUnseen();
-                    // The person reached the end by themselves: the answer was read, the hold is over.
-                    if (near && byPerson) {
-                      markRead();
-                      if (holdingRef.current) setHold(false);
-                    }
-                  }}
-                >
-                  {/* Pushes short channels down, next to the composer. */}
-                  <div className="channel__spacer" aria-hidden="true" />
-                  {chrome?.top}
-                  {messages.isLoading && <LoadingConversation />}
-                  {messages.isError && !messages.data && (
-                    <ErrorState error={messages.error} onRetry={() => void messages.refetch()} />
-                  )}
-                  {messages.isSuccess && timeline.length === 0 && slots.length === 0 && !thread && !adjusting && (
-                    <div className="channel__empty">
-                      <EmptyState
-                        icon="message"
-                        // A DM with an agent: the light sky, like the other empty screens about agents.
-                        sky={Boolean(chrome?.dmAgentId)}
-                        title={chrome?.emptyTitle ?? t("chat.sayHiChannel", { channel: channel.name })}
-                        actions={
-                          emptySuggestions.length > 0 ? (
-                            <fieldset className="channel__suggestions">
-                              <legend className="ac-visually-hidden">{t("chat.suggestions")}</legend>
-                              {emptySuggestions.map((s) => (
-                                <Button
-                                  key={s.text}
-                                  size="sm"
-                                  onClick={() => {
-                                    setDraft(s.text);
-                                    composer.current?.focus();
-                                  }}
-                                >
-                                  {s.label}
-                                </Button>
-                              ))}
-                            </fieldset>
-                          ) : undefined
-                        }
-                      >
-                        {chrome?.emptyText}
-                      </EmptyState>
-                    </div>
-                  )}
-                  {adjustThreadId ? (
-                    <RangeRows
-                      adjust={adjust}
-                      scroller={scroller}
-                      renderMessage={(m) => (
-                        <ErrorBoundary resetKey={m} fallback={unshownLine}>
-                          <TimelineMessage message={m} grouped={false} entering={false} modelLabels={NO_LABELS} />
-                        </ErrorBoundary>
-                      )}
-                    />
-                  ) : (
-                    <>
-                      <Timeline
-                        items={timeline}
-                        ready={messages.isSuccess}
-                        slots={slots}
-                        runKeys={runKeys.current}
-                        divider={divider}
-                        channelId={channel.id}
-                        runVisible={runVisible}
-                        dmPersonId={thread ? undefined : chrome?.dmPersonId}
-                        consultGroups={consultGroups}
-                        seenId={thread ? null : seenId}
+                <AskRegistryProvider value={askRegistry}>
+                  <section
+                    ref={scroller}
+                    className="channel__messages"
+                    data-fresh={fresh || undefined}
+                    aria-label={t("channel.messages")}
+                    aria-live="polite"
+                    aria-relevant="additions"
+                    onWheel={(e) => {
+                      markGesture();
+                      if (e.deltaY < 0) letGo();
+                    }}
+                    onTouchMove={markGesture}
+                    onPointerDown={markGesture}
+                    onKeyDown={markGesture}
+                    onScroll={(e) => {
+                      const previousTop = lastScrollTop.current;
+                      lastScrollTop.current = e.currentTarget.scrollTop;
+                      // Only the person scrolling unpins (or loads older pages); layout changes never do.
+                      const byPerson = Date.now() - lastGesture.current < GESTURE_MS;
+                      if (byPerson && e.currentTarget.scrollTop < 240) loadOlder();
+                      if (byPerson && previousTop !== null && e.currentTarget.scrollTop < previousTop) {
+                        letGo();
+                        return;
+                      }
+                      const near = nearBottom(e.currentTarget);
+                      if (!near && (!byPerson || Date.now() < autoScrollUntil.current)) return;
+                      // Pinned again only when the person comes back down, not by layout.
+                      const movedDown = previousTop !== null && e.currentTarget.scrollTop > previousTop;
+                      if (near && !stick.current && !(byPerson && movedDown)) return;
+                      stick.current = near;
+                      if (near) clearUnseen();
+                      // The person reached the end by themselves: the answer was read, the hold is over.
+                      if (near && byPerson) {
+                        markRead();
+                        if (holdingRef.current) setHold(false);
+                      }
+                    }}
+                  >
+                    {/* Pushes short channels down, next to the composer. */}
+                    <div className="channel__spacer" aria-hidden="true" />
+                    {chrome?.top}
+                    {messages.isLoading && <LoadingConversation />}
+                    {messages.isError && !messages.data && (
+                      <ErrorState error={messages.error} onRetry={() => void messages.refetch()} />
+                    )}
+                    {messages.isSuccess && timeline.length === 0 && slots.length === 0 && !thread && !adjusting && (
+                      <div className="channel__empty">
+                        <EmptyState
+                          icon="message"
+                          // A DM with an agent: the light sky, like the other empty screens about agents.
+                          sky={Boolean(chrome?.dmAgentId)}
+                          title={chrome?.emptyTitle ?? t("chat.sayHiChannel", { channel: channel.name })}
+                          actions={
+                            emptySuggestions.length > 0 ? (
+                              <fieldset className="channel__suggestions">
+                                <legend className="ac-visually-hidden">{t("chat.suggestions")}</legend>
+                                {emptySuggestions.map((s) => (
+                                  <Button
+                                    key={s.text}
+                                    size="sm"
+                                    onClick={() => {
+                                      setDraft(s.text);
+                                      composer.current?.focus();
+                                    }}
+                                  >
+                                    {s.label}
+                                  </Button>
+                                ))}
+                              </fieldset>
+                            ) : undefined
+                          }
+                        >
+                          {chrome?.emptyText}
+                        </EmptyState>
+                      </div>
+                    )}
+                    {adjustThreadId ? (
+                      <RangeRows
+                        adjust={adjust}
+                        scroller={scroller}
+                        renderMessage={(m) => (
+                          <ErrorBoundary resetKey={m} fallback={unshownLine}>
+                            <TimelineMessage message={m} grouped={false} entering={false} modelLabels={NO_LABELS} />
+                          </ErrorBoundary>
+                        )}
                       />
-                      {!thread && (
-                        <ArchivedThreadsNote channelId={channel.id} count={archivedThreads.data?.threads.length ?? 0} />
-                      )}
-                    </>
-                  )}
-                  {ephemeral && (
-                    <MissionEphemeral
-                      kind={ephemeral.kind}
-                      missionId={ephemeral.missionId}
-                      onClose={() => setEphemeral(null)}
-                    />
-                  )}
-                  <LiveMemoryCards channelId={channel.id} />
-                  <LiveNotices channelId={channel.id} />
-                </section>
+                    ) : (
+                      <>
+                        <Timeline
+                          items={timeline}
+                          ready={messages.isSuccess}
+                          slots={slots}
+                          runKeys={runKeys.current}
+                          divider={divider}
+                          channelId={channel.id}
+                          runVisible={runVisible}
+                          dmPersonId={thread ? undefined : chrome?.dmPersonId}
+                          consultGroups={consultGroups}
+                          seenId={thread ? null : seenId}
+                        />
+                        {!thread && (
+                          <ArchivedThreadsNote
+                            channelId={channel.id}
+                            count={archivedThreads.data?.threads.length ?? 0}
+                          />
+                        )}
+                      </>
+                    )}
+                    {ephemeral && (
+                      <MissionEphemeral
+                        kind={ephemeral.kind}
+                        missionId={ephemeral.missionId}
+                        onClose={() => setEphemeral(null)}
+                      />
+                    )}
+                    <LiveMemoryCards channelId={channel.id} />
+                    <LiveNotices channelId={channel.id} />
+                  </section>
+                </AskRegistryProvider>
                 {holding && (
                   <div className="channel__pill">
                     <Button size="sm" className="ac-new-messages" onClick={() => toBottom(true)}>
@@ -1935,6 +1956,8 @@ function ChannelView({
                     visible={runVisible}
                     outOfView={outOfView}
                     onSee={seeRun}
+                    asks={asksOut}
+                    onSeeAsk={seeAsk}
                     stoppable={stopTarget?.runId}
                     consultBlocks={consultGroups.nearEnd}
                   />
@@ -2786,6 +2809,69 @@ function useBlocksInView(scroller: { current: HTMLElement | null }, key: string)
   return inView;
 }
 
+const sameAsks = (a: PendingAsk[], b: PendingAsk[]) => a.length === b.length && a.every((x, i) => sameAsk(x, b[i]));
+
+/** Earlier in the conversation first. */
+const byPlace = (a: HTMLElement, b: HTMLElement) =>
+  a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+
+/**
+ * The requests waiting for the viewer whose cards are out of the scroller's view, in the conversation's order.
+ * A card counts as on screen once 40px of it show at the top or 60px at the bottom (the composer's fade).
+ * The cards register themselves (`AskRegistry`) and one IntersectionObserver watches them, so nothing scans the
+ * rows while an agent writes; the list is published only when it changes.
+ */
+function useAsksOutOfView(scroller: { current: HTMLElement | null }, registry: AskRegistry, on: boolean) {
+  const [out, setOut] = useState<PendingAsk[]>([]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the list only exists for members; re-attach when it appears
+  useEffect(() => {
+    const root = scroller.current;
+    setOut((prev) => (prev.length === 0 ? prev : []));
+    if (!root || typeof IntersectionObserver === "undefined") return;
+    // Each card: on screen (true), off (false), or not measured yet (null: not said, so no flash in the bar).
+    const seen = new Map<HTMLElement, boolean | null>();
+    const publish = () => {
+      const next = [...registry.cards]
+        .filter(([el]) => seen.get(el) === false)
+        .sort(([a], [b]) => byPlace(a, b))
+        .map(([, ask]) => ask);
+      setOut((prev) => (sameAsks(prev, next) ? prev : next));
+    };
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          const el = e.target as HTMLElement;
+          if (seen.has(el)) seen.set(el, e.isIntersecting);
+        }
+        publish();
+      },
+      { root, rootMargin: "-40px 0px -60px 0px", threshold: 0 },
+    );
+    // A card came, changed or left: watch the new ones, let go of the gone, say what changed.
+    const sync = () => {
+      for (const el of [...seen.keys()]) {
+        if (registry.cards.has(el)) continue;
+        io.unobserve(el);
+        seen.delete(el);
+      }
+      for (const el of registry.cards.keys()) {
+        // Only cards inside this scroller: anywhere else they would never read as in view.
+        if (seen.has(el) || !root.contains(el)) continue;
+        seen.set(el, null);
+        io.observe(el);
+      }
+      publish();
+    };
+    const unsubscribe = registry.subscribe(sync);
+    sync();
+    return () => {
+      unsubscribe();
+      io.disconnect();
+    };
+  }, [registry, on]);
+  return out;
+}
+
 /**
  * The bar right above the composer, one for everyone at work here and always one width: a glass pill (in
  * the first agent's color while agents work) with the orbit, or the typing dots when only people type, their
@@ -2798,6 +2884,8 @@ function ActivityBar({
   visible,
   outOfView,
   onSee,
+  asks,
+  onSeeAsk,
   stoppable,
   consultBlocks,
 }: {
@@ -2810,6 +2898,10 @@ function ActivityBar({
   outOfView: (runId: string) => boolean;
   /** "Ver": back to that block. */
   onSee: (runId: string) => void;
+  /** Requests waiting for the viewer out of view: the bar says the first one instead of who works. */
+  asks: PendingAsk[];
+  /** "Ver" on a request: scrolls to it and lights it up. */
+  onSeeAsk: (id: string) => void;
   /** The run Esc stops (the pill shows its stop). */
   stoppable?: string;
   /** Runs whose questions a block near the end shows (`ConsultGroup`): the line doesn't say them again. */
@@ -2856,6 +2948,10 @@ function ActivityBar({
   // An agent working in its browser: the bar says so, and a click opens its browser card in the conversation.
   const browsing = runs.find((r) => !isWriting(r) && usesBrowser(r));
   const openBrowser = browsing ? () => requestBrowserCard({ agentId: browsing.agentId }) : undefined;
+  // A request waiting for you, out of view: the bar says that instead (waiting beats working).
+  const ask = asks[0];
+  const askName = ask ? (dir.anyAgent(ask.agentId)?.name ?? t("channel.unknownAgent")) : "";
+  const pill = !ask && active;
   return (
     <>
       {coding.map((r) =>
@@ -2873,10 +2969,11 @@ function ActivityBar({
       <div
         className="ac-typing"
         aria-live="polite"
-        data-active={active}
-        data-browser={active && openBrowser ? true : undefined}
+        data-active={active || Boolean(ask)}
+        data-ask={ask ? true : undefined}
+        data-browser={pill && openBrowser ? true : undefined}
         onClick={
-          openBrowser
+          pill && openBrowser
             ? (e) => {
                 // Its own buttons (Ver) keep their job.
                 if ((e.target as HTMLElement).closest("button, [role=dialog]")) return;
@@ -2885,7 +2982,36 @@ function ActivityBar({
             : undefined
         }
       >
-        {active && (
+        {ask && (
+          <>
+            <ActivitySky color={colorOf(dir.anyAgent(ask.agentId))} />
+            <span className="ac-typing__avatars" aria-hidden="true">
+              <span className="ac-typing__tok">
+                <AgentAvatar agentId={ask.agentId} size="xs" name={askName} state="waiting" />
+              </span>
+            </span>
+            <WaitMark />
+            <span className="ac-typing__text">
+              {/* What it asks is the agent's or a person's own text: shown as written, never read as markup. */}
+              <Trans
+                i18nKey={`ask.bar.${ask.kind}` as const}
+                values={{ name: askName, what: ask.what }}
+                components={{ b: <b /> }}
+                {...TYPED_VALUES}
+              />
+            </span>
+            {asks.length > 1 && (
+              <span className="ac-typing__more">{t("ask.bar.more", { count: asks.length - 1 })}</span>
+            )}
+            <span className="ac-typing__sep" aria-hidden="true" />
+            <button type="button" className="ac-typing__see" onClick={() => onSeeAsk(ask.id)}>
+              {t("ask.bar.see")}
+            </button>
+            {/* An agent still at work keeps its stop at the end; the line stays the request. */}
+            {soloRun && stoppable === soloRun.runId && <StopButton run={soloRun} onStop={stop} place="bar" />}
+          </>
+        )}
+        {pill && (
           <>
             {firstAgent && <ActivitySky color={colorOf(dir.agentById.get(firstAgent.id))} />}
             {/* Agents at work: the pixel orbit in the first one's color; people only typing: the dots. */}
@@ -3610,10 +3736,19 @@ function MessageApproval({
   const listed: Approval | undefined = approvals.data?.find((a) => a.id === approvalId);
   const one = useApproval(org.id, approvalId, !listed && approvals.isSuccess);
   const approval = listed ?? one.data;
+  // Past its deadline it has expired, even before the server's event says so.
+  const expired = useExpired(approval?.status === "pending" ? approval.expiresAt : null);
   if (!approval) return null;
-  // Waiting: the agent asking, in the conversation; decided: one line.
-  if (approval.status === "pending") return <ApprovalAsk approval={approval} agent={agent} members={members} />;
-  return <InlineApproval approval={approval} agent={agent} members={members} />;
+  // Waiting: the agent asking, in the conversation; decided or expired: one line.
+  if (approval.status === "pending" && !expired)
+    return <ApprovalAsk approval={approval} agent={agent} members={members} />;
+  return (
+    <InlineApproval
+      approval={expired ? { ...approval, status: "expired" } : approval}
+      agent={agent}
+      members={members}
+    />
+  );
 }
 
 /** Above this many members the channel details list gets a search field. */

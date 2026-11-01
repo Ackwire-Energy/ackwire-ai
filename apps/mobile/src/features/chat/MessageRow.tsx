@@ -50,6 +50,7 @@ import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
 import { ReceiptMark } from "./AgentReceipts";
 import { VoiceMessage } from "../voice/VoiceMessage";
+import { secretRequestOf } from "./ask-store";
 import { ChatMedia } from "./ChatMedia";
 import { ConsultGroup } from "./ConsultGroup";
 import { ApprovalInline, ConsultationCard, QuestionCard, ThreadLink } from "./cards";
@@ -71,6 +72,7 @@ import {
 import { MemoryMarks } from "./MemoryMark";
 import { MessageText } from "./MessageText";
 import { Receipts } from "./Receipts";
+import { SecretCard } from "./SecretCard";
 import { TeamChecks } from "./TeamChecks";
 import { SavedTools, TurnTools } from "./ToolCalls";
 import { recentTurn, stepLimitOf, stoppedOf, turnOpener } from "./turn";
@@ -190,6 +192,9 @@ export const MessageRow = memo(function MessageRow({
   const link = missionLinkOf(meta);
   const files = artifactsOf(meta);
   const question = isAgent ? questionOf(meta) : null;
+  // An agent asks a person for a secret for its computer (ADR 0027).
+  const secret = isAgent ? secretRequestOf(meta) : null;
+  // An agent proposes a change to the workspace's context or to an agent's instructions: decided right here.
   // The agent needs a person in its browser (ADR 0040): the request, live.
   const handoff = isAgent ? browserHandoffOf(meta) : null;
   // Where it browsed, or what it did on its desktop, after the run (as on the web): the steps' card.
@@ -462,6 +467,7 @@ export const MessageRow = memo(function MessageRow({
           />
         ) : null}
         {question ? <QuestionCard key={`${question.id}:${question.status}`} question={question} /> : null}
+        {secret ? <SecretCard key={`${secret.id}:${secret.status}`} request={secret} /> : null}
         {cards}
       </View>
     </Pressable>
