@@ -124,8 +124,27 @@ export const arrivedAgents = (report: readonly ImportItemResult[]) =>
  * Where the person lands: one agent's page in place of the create screen, or back down to the agents tab for
  * several (or none).
  */
-export const landingOf = (agentIds: readonly string[]): { href: string; how: "replace" | "dismissTo" } =>
-  agentIds.length === 1 ? { href: `/agent/${agentIds[0]}`, how: "replace" } : { href: "/agents", how: "dismissTo" };
+export const landingOf = (
+  agentIds: readonly string[],
+  { left = false }: { left?: boolean } = {},
+): { href: string; how: "replace" | "dismissTo" } | null =>
+  // Once the person left the screen mid-apply, moving them would replace wherever they are now.
+  left
+    ? null
+    : agentIds.length === 1
+      ? { href: `/agent/${agentIds[0]}`, how: "replace" }
+      : { href: "/agents", how: "dismissTo" };
+
+/** A plan is shown and applied only in the workspace it was planned for (a push can switch workspaces under it). */
+export const planIn = <P extends { orgId: string }>(planned: P | null, orgId: string): P | null =>
+  planned?.orgId === orgId ? planned : null;
+
+/**
+ * What the Paste button does with the clipboard: a link goes in the field to read; anything else is read right away,
+ * never shown (an export can run to megabytes, too much for a text field), as the web does.
+ */
+export const pasteAction = (text: string): "field" | "read" | null =>
+  !text.trim() ? null : /^\s*https?:\/\//i.test(text) ? "field" : "read";
 
 /** A request that never got an answer: fetch's "Network request failed" is a `TypeError` on the phone. */
 export const phoneOffline = (e: unknown) => e instanceof TypeError;

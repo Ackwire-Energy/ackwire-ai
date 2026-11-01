@@ -20,7 +20,7 @@ import { AgentAvatar, Button, Card, Icon, LogoMark, Text, Toggle, useTheme } fro
 import { tapHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { fullLook } from "./edit";
-import { agentRows, isRequestCard, kindGroups, phoneOffline, phonePicks } from "./import";
+import { agentRows, isRequestCard, kindGroups, pasteAction, phoneOffline, phonePicks } from "./import";
 import { IMPORT_LOGO } from "./import-logos";
 import type { AgentImport } from "./useAgentImport";
 
@@ -28,8 +28,8 @@ import type { AgentImport } from "./useAgentImport";
  * "Trazer agentes de outro app" as a step of Criar agente: pick the app (its short how-to under it), then choose its
  * files or paste its reply; the plan shows the agents found and what comes with them. The footer's button imports.
  */
-export function ImportAgents({ imp, orgId, applyError }: { imp: AgentImport; orgId: string; applyError: unknown }) {
-  return imp.planned ? <Preview imp={imp} orgId={orgId} applyError={applyError} /> : <Picker imp={imp} />;
+export function ImportAgents({ imp, orgId }: { imp: AgentImport; orgId: string }) {
+  return imp.planned ? <Preview imp={imp} orgId={orgId} /> : <Picker imp={imp} />;
 }
 
 /** A source's logo on a neutral tile: our own mark for our export, an icon for any other app. */
@@ -154,7 +154,7 @@ function Picker({ imp }: { imp: AgentImport }) {
         placeholder={t("onboarding.import.pastePlaceholder")}
         accessibilityLabel={t("mobile.newAgent.import.pasteTitle")}
         minHeight={160}
-        scrollEnabled={false}
+        style={styles.paste}
       />
       <View style={styles.actions}>
         <Button
@@ -167,7 +167,13 @@ function Picker({ imp }: { imp: AgentImport }) {
             void Clipboard.getStringAsync()
               .catch(() => "")
               .then((v) => {
-                if (v.trim()) setText(v);
+                const how = pasteAction(v);
+                if (how === "field") setText(v.trim());
+                else if (how === "read") {
+                  setText("");
+                  setArchive(false);
+                  void imp.read({ text: v });
+                }
               })
           }
         />
@@ -237,7 +243,7 @@ function RequestSteps({ card }: { card: "grok-bot" | "chatgpt-dots" | "other" })
 }
 
 /** The plan: the agents found, each to check or uncheck, then what comes with them and what stays behind. */
-function Preview({ imp, orgId, applyError }: { imp: AgentImport; orgId: string; applyError: unknown }) {
+function Preview({ imp, orgId }: { imp: AgentImport; orgId: string }) {
   const { t } = useTranslation();
   const { colors: c } = useTheme();
   const planned = imp.planned;
@@ -385,7 +391,7 @@ function Preview({ imp, orgId, applyError }: { imp: AgentImport; orgId: string; 
           {t("onboarding.import.applying", imp.progress)}
         </Text>
       ) : null}
-      {applyError ? <ErrorText text={importApplyErrorText(t, applyError, phoneOffline)} /> : null}
+      {imp.applyError ? <ErrorText text={importApplyErrorText(t, imp.applyError, phoneOffline)} /> : null}
       {!items.some((i) => i.action === "create" || i.action === "update") ? (
         <Note icon={items.every((i) => i.action === "unchanged") ? "check" : "info"}>
           {items.every((i) => i.action === "unchanged")
@@ -420,6 +426,7 @@ function ErrorText({ text }: { text: string }) {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  paste: { maxHeight: 320 },
   bold: { fontWeight: "600" },
   gapTop: { marginTop: 14 },
   tile: { borderRadius: 11, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center" },

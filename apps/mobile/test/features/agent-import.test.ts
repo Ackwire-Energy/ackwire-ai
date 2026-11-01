@@ -8,8 +8,10 @@ import {
   isRequestCard,
   kindGroups,
   landingOf,
+  pasteAction,
   phoneOffline,
   phonePicks,
+  planIn,
   reportCounts,
 } from "../../src/features/agents/import";
 import { featureKeysEn } from "../../src/features/i18n/keys.en";
@@ -139,6 +141,8 @@ describe("Importar agentes on the phone: after the import", () => {
     expect(landingOf(["a1"])).toEqual({ href: "/agent/a1", how: "replace" });
     expect(landingOf(["a1", "a2"])).toEqual({ href: "/agents", how: "dismissTo" });
     expect(landingOf([])).toEqual({ href: "/agents", how: "dismissTo" });
+    expect(landingOf(["a1"], { left: true })).toBeNull();
+    expect(landingOf(["a1", "a2"], { left: true })).toBeNull();
   });
 
   test("the agents that arrived, and whether everything did", () => {
@@ -155,5 +159,23 @@ describe("Importar agentes on the phone: after the import", () => {
   test("offline is a request that never got an answer", () => {
     expect(phoneOffline(new TypeError("Network request failed"))).toBe(true);
     expect(phoneOffline(new Error("500"))).toBe(false);
+  });
+});
+
+describe("planIn", () => {
+  test("a plan shows and applies only in the workspace it was planned for", () => {
+    const plan = { orgId: "org-a", items: [] };
+    expect(planIn(plan, "org-a")).toBe(plan);
+    expect(planIn(plan, "org-b")).toBeNull();
+    expect(planIn(null, "org-a")).toBeNull();
+  });
+});
+
+describe("pasteAction", () => {
+  test("a link goes in the field, anything else is read without showing it", () => {
+    expect(pasteAction("  https://github.com/acme/agents ")).toBe("field");
+    expect(pasteAction('{"format":"agenteschat.bundle"}')).toBe("read");
+    expect(pasteAction("x".repeat(3_000_000))).toBe("read");
+    expect(pasteAction("  \n ")).toBeNull();
   });
 });

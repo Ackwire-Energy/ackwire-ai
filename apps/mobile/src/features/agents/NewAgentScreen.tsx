@@ -36,7 +36,7 @@ import {
 import { can } from "@agenteschat/client/lib/permissions";
 import { modelChoices, usableModels } from "@agenteschat/client/lib/providers";
 import { router, usePreventRemove } from "expo-router";
-import { type ReactNode, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Pressable, ScrollView, type ScrollViewInstance, StyleSheet, TextInput, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
@@ -177,8 +177,14 @@ function NewAgentForm({
   const denied = useRef(false);
   // Bringing agents from another app, in place of the role cards (the web's create-agent import step).
   const imp = useAgentImport(orgId);
+  const left = useRef(false);
+  useEffect(() => {
+    left.current = false;
+    return () => {
+      left.current = true;
+    };
+  }, []);
   const [importing, setImporting] = useState(startImport && mayImport && !proposed);
-  const [applyError, setApplyError] = useState<unknown>(null);
   const deny = useDenyAgentProposal(orgId);
 
   const step: PhoneStep = NEW_AGENT_PHONE_STEPS[index] ?? "role";
@@ -343,9 +349,9 @@ function NewAgentForm({
   const runImport = async () => {
     if (busy) return;
     setBusy(true);
-    setApplyError(null);
     try {
       const report = await imp.apply();
+      if (!report) return;
       const ids = arrivedAgents(report);
       const counts = reportCounts(report, imp.picks.length);
       created.current = true;
@@ -359,17 +365,14 @@ function NewAgentForm({
             : t("onboarding.import.report.title"),
         ...(ids.length === 1 ? { agentId: ids[0] } : {}),
       });
-      const land = landingOf(ids);
-      if (land.how === "replace") router.replace(land.href as never);
-      else router.dismissTo(land.href as never);
-    } catch (e) {
-      setApplyError(e);
+      const land = landingOf(ids, { left: left.current });
+      if (land?.how === "replace") router.replace(land.href as never);
+      else if (land) router.dismissTo(land.href as never);
     } finally {
       setBusy(false);
     }
   };
   const closeImport = () => {
-    setApplyError(null);
     if (imp.planned) imp.reset();
     else setImporting(false);
     scroll.current?.scrollTo({ y: 0, animated: false });
@@ -703,7 +706,7 @@ function NewAgentForm({
           {importing ? (
             <>
               {head(t("shell.importAgents"), t("onboarding.import.lead"))}
-              <ImportAgents imp={imp} orgId={orgId} applyError={applyError} />
+              <ImportAgents imp={imp} orgId={orgId} />
             </>
           ) : (
             <>
