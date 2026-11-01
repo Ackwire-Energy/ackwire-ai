@@ -259,6 +259,7 @@ describe("the card in the message", () => {
     pointerId,
     pointerType,
     button: 0,
+    buttons: 1,
     clientX: x,
     clientY: y,
   });
@@ -325,6 +326,24 @@ describe("the card in the message", () => {
       expect(sent.some((m) => m.startsWith("wheel"))).toBe(false);
     });
   }
+
+  test("no scroll hint while the mouse is held; it shows once the press lifts", async () => {
+    const { card, page } = await inControlOfPage();
+    await act(async () => fireEvent.pointerDown(page, pointer(1, 50, 100)));
+    await act(async () => fireEvent.pointerMove(page, pointer(1, 90, 100)));
+    expect(card.querySelector(".brw-ac__capture")).toBeNull();
+    await act(async () => fireEvent.pointerUp(page, pointer(1, 90, 100)));
+    expect(card.querySelector(".brw-ac__capture")?.textContent).toBe("Rolar agora move a página. Esc para sair");
+  });
+
+  test("a release lost elsewhere: the next move with no button down lets go, never drags", async () => {
+    const { page, sentToPage, flushed } = await inControlOfPage();
+    await act(async () => fireEvent.pointerDown(page, pointer(1, 50, 100)));
+    await act(async () => fireEvent.pointerMove(page, { ...pointer(1, 80, 100), buttons: 0 }));
+    await act(async () => fireEvent.pointerMove(page, { ...pointer(1, 120, 100), buttons: 0 }));
+    await flushed();
+    expect(sentToPage()).toEqual(["moved+none@100,200", "pressed@100,200", "released@160,200"]);
+  });
 
   test("on a touch screen a finger that moves drags, two fingers scroll the page, and the hint says so", async () => {
     const { card, page, sentToPage, flushed } = await inControlOfPage();
