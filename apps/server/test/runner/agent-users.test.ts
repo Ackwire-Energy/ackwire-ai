@@ -8,6 +8,7 @@ import {
   adbServerPort,
   agentGid,
   agentUserName,
+  denySchedulers,
   readAgentUsers,
   systemLauncher,
 } from "../../runner/agent-users";
@@ -320,6 +321,9 @@ test("an agent's user can't schedule cron or at jobs, which would run outside it
   new AgentUsers({ home, range: RANGE, run: os.run, etc: home }).ensure(ANA);
   expect(os.calls).toEqual(["getent passwd"]);
   expect(readFileSync(cron, "utf8")).toBe("ag-a1b2c3d4\n");
+  // The runner's start denies each agent it lists, before any request.
+  denySchedulers("ag-b2c3d4e5", home);
+  expect(readFileSync(cron, "utf8")).toBe("ag-a1b2c3d4\nag-b2c3d4e5\n");
 });
 
 test("adb's server port: one per agent, outside every band and Linux's ephemeral range", () => {

@@ -191,42 +191,9 @@ export class AgentUsers {
       this.run("usermod", ["--comment", name, user.user]);
       comment = name;
     }
-    if (!known) this.denySchedulers(user.user);
+    if (!known) denySchedulers(user.user, this.opts.etc);
     this.ready.set(agent.id, { user, comment });
     return user;
-  }
-
-  /**
-   * cron and at would start the agent's jobs outside its launcher: in no slice of its own, with the computer's
-   * shared /tmp. Its user goes in their deny files: `cron.deny` made where missing (without it or `cron.allow`,
-   * cron takes everyone's jobs), `at.deny` only where it is (without it or `at.allow`, at takes root's alone). An
-   * allow file, where one is, already leaves agents out.
-   */
-  private denySchedulers(user: string) {
-    for (const [name, make] of [
-      ["cron.deny", true],
-      ["at.deny", false],
-    ] as const) {
-      const file = path.join(this.opts.etc ?? "/etc", name);
-      let text: string | null = null;
-      try {
-        text = readFileSync(file, "utf8");
-      } catch {
-        // missing
-      }
-      if (text === null && !make) continue;
-      if (text?.split("\n").some((line) => line.trim() === user)) continue;
-      try {
-        appendFileSync(file, `${text && !text.endsWith("\n") ? "\n" : ""}${user}\n`);
-        // crontab reads it as the person who runs it: a file it can't read would deny no one.
-        if (text === null) chmodSync(file, 0o644);
-      } catch (err) {
-        throw new RunnerError(
-          "internal",
-          `Couldn't keep ${user} from scheduling cron and at jobs (${file}): ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
-    }
   }
 
   /** The agent's row in agents.json, added (before its user exists) when it has none. */
@@ -255,6 +222,39 @@ export class AgentUsers {
     const r = (this.opts.run ?? runSync)(file, args);
     if (r.code !== 0) throw new RunnerError("internal", `${file} failed (${r.code}): ${r.output.slice(0, 500)}`);
     return r.output;
+  }
+}
+
+/**
+ * cron and at would start the agent's jobs outside its launcher: in no slice of its own, with the computer's
+ * shared /tmp. Its user goes in their deny files: `cron.deny` made where missing (without it or `cron.allow`,
+ * cron takes everyone's jobs), `at.deny` only where it is (without it or `at.allow`, at takes root's alone). An
+ * allow file, where one is, already leaves agents out.
+ */
+export function denySchedulers(user: string, etc = "/etc") {
+  for (const [name, make] of [
+    ["cron.deny", true],
+    ["at.deny", false],
+  ] as const) {
+    const file = path.join(etc, name);
+    let text: string | null = null;
+    try {
+      text = readFileSync(file, "utf8");
+    } catch {
+      // missing
+    }
+    if (text === null && !make) continue;
+    if (text?.split("\n").some((line) => line.trim() === user)) continue;
+    try {
+      appendFileSync(file, `${text && !text.endsWith("\n") ? "\n" : ""}${user}\n`);
+      // crontab reads it as the person who runs it: a file it can't read would deny no one.
+      if (text === null) chmodSync(file, 0o644);
+    } catch (err) {
+      throw new RunnerError(
+        "internal",
+        `Couldn't keep ${user} from scheduling cron and at jobs (${file}): ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 }
 

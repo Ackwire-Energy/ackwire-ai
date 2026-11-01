@@ -22,7 +22,7 @@ import {
   setTool,
   TOOL_NAMES,
 } from "./access";
-import { AgentUsers, agentGid, systemLauncher } from "./agent-users";
+import { type AgentUser, AgentUsers, agentGid, denySchedulers, systemLauncher } from "./agent-users";
 import {
   POLICY_NOT_IN_FORCE_EXIT,
   PolicyNotInForce,
@@ -565,7 +565,11 @@ async function host(p: Parsed): Promise<number> {
     guard?.start();
     if (system) {
       const policy = { uidRange: DEFAULT_AGENT_UID_RANGE, refresh: () => void guard?.reconcile() };
-      prepareAgents(computer.agentUsers(), (user) => ensureBrowserBindPolicy(user, thisRunner(), policy), policy, log);
+      const prepare = (user: AgentUser) => {
+        denySchedulers(user.user);
+        ensureBrowserBindPolicy(user, thisRunner(), policy);
+      };
+      prepareAgents(computer.agentUsers(), prepare, policy, log);
     }
     await computer.run();
     log("stopped");

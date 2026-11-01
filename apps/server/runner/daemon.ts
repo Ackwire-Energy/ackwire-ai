@@ -49,7 +49,7 @@ import {
 } from "./access";
 import { AccountManager, lchownTree, SYSTEM_ACCOUNTS_ROOT } from "./accounts";
 import { ActivityLog } from "./activity";
-import { type AgentUser, AgentUsers, agentGid, readAgentUsers, systemLauncher } from "./agent-users";
+import { type AgentUser, AgentUsers, agentGid, denySchedulers, readAgentUsers, systemLauncher } from "./agent-users";
 import { BrainManager } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager } from "./browser";
@@ -869,6 +869,8 @@ export class RunnerDaemon implements RequestObserver {
       const prepared = new Set<number>();
       const prepare = (user: AgentUser) => {
         if (prepared.has(user.uid)) return;
+        // At the start too: a task that outlived the runner's restart could schedule jobs before its agent's next request.
+        denySchedulers(user.user);
         ensureBrowserBindPolicy(user, this.self.command, policy);
         prepared.add(user.uid);
       };
