@@ -132,7 +132,7 @@ describe("route guards", () => {
     expect(nav.textContent).toContain("Acme");
     expect(nav.textContent).toContain("2 membros · 2 agentes");
     expect(screen().getByLabelText("2 aprovações pendentes").textContent).toBe("2");
-    for (const name of ["eng", "general", "Ada", "Atlas", "João", "Criar agente"]) {
+    for (const name of ["Canais", "eng", "general", "Agentes", "Ada", "Atlas", "João"]) {
       expect(nav.textContent).toContain(name);
     }
     // Money never shows in the sidebar (US$ 15,40 of US$ 60); the budget's use is the account menu's.

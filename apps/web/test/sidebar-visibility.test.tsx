@@ -63,7 +63,7 @@ describe("what a member's sidebar lists", () => {
 
   test("no category whose channels are all private ones they're not in", async () => {
     await go(acme("member"));
-    expect(sections()).toEqual(["Engenharia", "Agentes", "Mensagens diretas"]);
+    expect(sections()).toEqual(["Canais", "Engenharia", "Agentes", "Mensagens diretas"]);
   });
 
   test("@ offers only the agents that answer them", async () => {
@@ -106,7 +106,7 @@ describe("what a member's sidebar lists", () => {
 
   test("owners and admins see every agent, locked ones with the lock, and every group and category", async () => {
     await go(acme("owner"));
-    expect(sections()).toEqual(["Engenharia", "Diretoria", "Agentes", "Integrations", "Mensagens diretas"]);
+    expect(sections()).toEqual(["Canais", "Engenharia", "Diretoria", "Agentes", "Integrations", "Mensagens diretas"]);
     expect(agentRows()).toEqual(["Atlas", "Ada"]);
     const ada = within(nav()).getByRole("link", { name: /^Ada/ });
     expect(within(ada).getByRole("img", { name: "Pessoal" })).toBeTruthy();
@@ -126,7 +126,7 @@ describe("Equipe on the Agentes header", () => {
     const team = within(agentsHead()).getByRole("link", { name: "Equipe" });
     expect(team.getAttribute("href")).toBe(`/org/${ORG_ID}/team`);
     expect(team.getAttribute("title")).toBe("Equipe");
-    expect(within(agentsHead()).getByRole("button", { name: "Novo grupo" })).toBeTruthy();
+    expect(within(agentsHead()).getByRole("button", { name: "Criar agente ou grupo" })).toBeTruthy();
     expect(within(nav()).getAllByRole("link", { name: "Equipe" })).toHaveLength(1);
     expect(team.getAttribute("data-status")).toBeNull();
     cleanup();

@@ -81,7 +81,6 @@ import {
   InfoHint,
   Input,
   Menu,
-  MenuItem,
   RecurrencePicker,
   type RecurrenceRule,
   RunKey,
@@ -102,6 +101,7 @@ import { useTranslation } from "react-i18next";
 import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { CancelAhead } from "@/components/ApprovalItem";
 import { useActors } from "@/components/actors";
+import { MenuEntries } from "@/components/DesktopMenus";
 import { DetailsLink } from "@/components/details-link";
 import { cleanFilter, type EmailTriggerDraft, EmailTriggerFields, emailWhen, INBOX } from "@/components/EmailTrigger";
 import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
@@ -112,6 +112,8 @@ import { useOrg } from "@/components/org-context";
 import { RoutineReachWarnings } from "@/components/RoutineReachWarnings";
 import { useComputerEdition, useNamesComputers } from "@/components/WorkspaceComputer";
 import { ZoneSelect } from "@/components/ZoneSelect";
+import { copyText, type MenuEntry } from "@/lib/context-menu";
+import { entityMenu } from "@/lib/entity-menu";
 import { lookOf } from "@/lib/look";
 import { useOpenParam } from "@/lib/open-param";
 import { defaultRule, fromApiRule, recurrenceLabels, ruleSentence, toApiRule, upcomingLabels } from "@/lib/recurrence";
@@ -636,6 +638,74 @@ function RoutineRow({
   // Something needs a look (a reason it paused, failures, waiting for a computer or a person): a chip says it.
   const needsLook = !done && routineStateWords(r).tone === "waiting";
   const fix = r.canManage && needsLook ? pausedFix(r) : null;
+  // Its "…" and its right click: run or stop, pause or resume, then what the "…" always had.
+  const entries = (): MenuEntry[] => [
+    ...(r.canManage && !reminder && (running || !fired)
+      ? ([
+          running
+            ? { kind: "item", id: "stop", label: t("routines.stop"), icon: "stop", run: controls.stop }
+            : { kind: "item", id: "run", label: t("routines.runNow"), icon: "play", run: controls.run },
+        ] satisfies MenuEntry[])
+      : []),
+    ...(r.canManage && !fired
+      ? ([
+          r.active
+            ? {
+                kind: "item",
+                id: "pause",
+                label: t("routines.pause"),
+                icon: "pause",
+                run: () => controls.setActive(false),
+              }
+            : {
+                kind: "item",
+                id: "resume",
+                label: t("routines.resume"),
+                icon: "play",
+                run: () => controls.setActive(true),
+              },
+          { kind: "separator" },
+        ] satisfies MenuEntry[])
+      : []),
+    ...(r.canManage
+      ? ([{ kind: "item", id: "edit", label: t("routines.edit"), icon: "edit", run: onEdit }] satisfies MenuEntry[])
+      : []),
+    { kind: "item", id: "runs", label: t("routines.runs"), icon: "waiting", run: () => !selected && onOpen() },
+    ...(r.canManage
+      ? ([
+          {
+            kind: "item",
+            id: "duplicate",
+            label: t("routines.duplicate"),
+            icon: "copy",
+            run: () =>
+              action.mutate(
+                { type: "duplicate", id: r.id, name: t("routines.copyName", { name: r.name }) },
+                {
+                  onSuccess: (copy) =>
+                    toast.show(t("routines.duplicated", { name: (copy as Routine | undefined)?.name ?? r.name })),
+                },
+              ),
+          },
+        ] satisfies MenuEntry[])
+      : []),
+    ...(r.canManage && routineHookUrl(r)
+      ? ([
+          {
+            kind: "item",
+            id: "webhook",
+            label: t("routines.copyWebhook"),
+            icon: "link",
+            run: () => void copyText(routineHookUrl(r) ?? "", () => toast.show(t("routines.webhookCopied"))),
+          },
+        ] satisfies MenuEntry[])
+      : []),
+    ...(r.canManage
+      ? ([
+          { kind: "item", id: "delete", label: t("routines.delete"), icon: "trash", run: () => setDeleting(true) },
+        ] satisfies MenuEntry[])
+      : []),
+  ];
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: a mouse shortcut; the title is the keyboard way to the details
     <article
@@ -646,6 +716,7 @@ function RoutineRow({
       data-done={done || undefined}
       data-running={running || undefined}
       data-state={r.state}
+      {...entityMenu(() => [{ kind: "header", label: title }, ...entries()])}
       onClick={(e) => {
         // The row opens the details; its own controls don't.
         if ((e.target as HTMLElement).closest("button, a, [role=switch], [role=menu]")) return;
@@ -749,46 +820,7 @@ function RoutineRow({
           label={more}
           trigger={<Button variant="ghost" size="sm" iconOnly icon="more" aria-label={more} />}
         >
-          {r.canManage && (
-            <MenuItem icon="edit" onSelect={onEdit}>
-              {t("routines.edit")}
-            </MenuItem>
-          )}
-          <MenuItem icon="waiting" onSelect={() => !selected && onOpen()}>
-            {t("routines.runs")}
-          </MenuItem>
-          {r.canManage && (
-            <MenuItem
-              icon="copy"
-              onSelect={() =>
-                action.mutate(
-                  { type: "duplicate", id: r.id, name: t("routines.copyName", { name: r.name }) },
-                  {
-                    onSuccess: (copy) =>
-                      toast.show(t("routines.duplicated", { name: (copy as Routine | undefined)?.name ?? r.name })),
-                  },
-                )
-              }
-            >
-              {t("routines.duplicate")}
-            </MenuItem>
-          )}
-          {r.canManage && routineHookUrl(r) && (
-            <MenuItem
-              icon="link"
-              onSelect={async () => {
-                await navigator.clipboard?.writeText(routineHookUrl(r) ?? "");
-                toast.show(t("routines.webhookCopied"));
-              }}
-            >
-              {t("routines.copyWebhook")}
-            </MenuItem>
-          )}
-          {r.canManage && (
-            <MenuItem icon="trash" onSelect={() => setDeleting(true)}>
-              {t("routines.delete")}
-            </MenuItem>
-          )}
+          <MenuEntries entries={entries()} />
         </Menu>
       </div>
       <Dialog

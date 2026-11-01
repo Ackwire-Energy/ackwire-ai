@@ -28,7 +28,7 @@ import {
 import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
 import { withRead } from "../lib/seen";
-import { SIDEBAR_DEFAULTS, withSidebarPlace } from "../lib/sidebar-items";
+import { SIDEBAR_DEFAULTS, SIDEBAR_SECTIONS, withSidebarPlace } from "../lib/sidebar-items";
 import { playSound } from "../lib/sounds";
 import { upsertMessage, withLocalCopies } from "../lib/timeline";
 import type { RealtimeConnection } from "../realtime/connection";
@@ -114,6 +114,7 @@ import type {
   SidebarItem,
   SidebarItems,
   SidebarPlace,
+  SidebarSection,
   SkillInput,
   SkillPatch,
   StartChoice,
@@ -3755,6 +3756,36 @@ export function useSetSidebarItem(orgId: string) {
     onSuccess: (items) => {
       if (qc.isMutating({ mutationKey }) <= 1) qc.setQueryData(keys.sidebarItems(orgId), items);
     },
+  });
+}
+
+/** The sidebar's sections in my order in this workspace (the default until it loads). */
+export const useSidebarOrder = (orgId: string): SidebarSection[] => {
+  const api = useApi();
+  return (
+    useQuery({
+      queryKey: keys.sidebarOrder(orgId),
+      queryFn: () => api.orgs.sidebarOrder(orgId),
+      staleTime: 60_000,
+    }).data ?? [...SIDEBAR_SECTIONS]
+  );
+};
+
+/** Saves my section order (`null`: the default): the sidebar changes at once and goes back if the server refuses. */
+export function useSetSidebarOrder(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    scope: { id: `sidebar-order:${orgId}` },
+    mutationFn: (order: SidebarSection[] | null) => api.orgs.setSidebarOrder(orgId, order),
+    onMutate: async (order) => {
+      await qc.cancelQueries({ queryKey: keys.sidebarOrder(orgId) });
+      const before = qc.getQueryData<SidebarSection[]>(keys.sidebarOrder(orgId));
+      qc.setQueryData<SidebarSection[]>(keys.sidebarOrder(orgId), order ?? [...SIDEBAR_SECTIONS]);
+      return { before };
+    },
+    onError: (_error, _order, context) => qc.setQueryData(keys.sidebarOrder(orgId), context?.before),
+    onSuccess: (order) => qc.setQueryData(keys.sidebarOrder(orgId), order),
   });
 }
 

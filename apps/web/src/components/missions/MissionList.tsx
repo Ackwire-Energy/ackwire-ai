@@ -2,14 +2,17 @@ import type { Mission } from "@agenteschat/client";
 import { useChannels, useMissionList } from "@agenteschat/client";
 import { formatShortDate, relativeTime } from "@agenteschat/client/lib/format";
 import { isOpenMission, missionCells, missionCellTitles, waitingText } from "@agenteschat/client/lib/missions";
-import { Button, EmptyState, Icon, Menu, MenuItem } from "@agenteschat/ui";
+import { Button, EmptyState, Icon, Menu } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentSpinner } from "@/components/AgentAvatar";
+import { MenuEntries } from "@/components/DesktopMenus";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import type { MenuEntry } from "@/lib/context-menu";
+import { entityMenu } from "@/lib/entity-menu";
 import { ExecutorChip, MachineChip, MissionHead, MissionStatusChip, MissionStrip } from "./MissionBits";
 import { CloseMissionDialog } from "./MissionDialogs";
 
@@ -114,8 +117,27 @@ function MissionCard({ mission: m }: { mission: Mission }) {
   const open = isOpenMission(m);
   const threadLink = { to: "/org/$orgId/threads/$threadId" as const, params: { orgId: org.id, threadId: m.threadId } };
   const more = t("missions.list.more", { title: m.title });
+  // Its "…" and its right click.
+  const entries: MenuEntry[] = [
+    {
+      kind: "item",
+      id: "thread",
+      label: t("missions.list.openThread"),
+      icon: "thread",
+      run: () => void navigate(threadLink),
+    },
+    ...(open && m.canManage
+      ? ([
+          { kind: "item", id: "close", label: t("missions.actions.close"), icon: "check", run: () => setClosing(true) },
+        ] satisfies MenuEntry[])
+      : []),
+  ];
   return (
-    <article className="mi-mc" aria-label={t("missions.list.card", { title: m.title })}>
+    <article
+      className="mi-mc"
+      aria-label={t("missions.list.card", { title: m.title })}
+      {...entityMenu(() => [{ kind: "header", label: m.title }, ...entries])}
+    >
       <MissionHead
         agentId={m.agentId}
         agentName={agent?.name ?? ""}
@@ -137,14 +159,7 @@ function MissionCard({ mission: m }: { mission: Mission }) {
               label={more}
               trigger={<Button size="sm" variant="ghost" iconOnly icon="more" aria-label={more} />}
             >
-              <MenuItem icon="thread" onSelect={() => void navigate(threadLink)}>
-                {t("missions.list.openThread")}
-              </MenuItem>
-              {open && m.canManage && (
-                <MenuItem icon="check" onSelect={() => setClosing(true)}>
-                  {t("missions.actions.close")}
-                </MenuItem>
-              )}
+              <MenuEntries entries={entries} />
             </Menu>
           </>
         }

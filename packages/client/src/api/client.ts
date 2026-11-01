@@ -212,6 +212,7 @@ import type {
   SidebarItem,
   SidebarItems,
   SidebarPlace,
+  SidebarSection,
   SignInOptions,
   Skill,
   SkillDetail,
@@ -361,6 +362,10 @@ export interface ApiClient {
     setSidebarItem(orgId: string, item: SidebarItem, place: SidebarPlace | null): Promise<SidebarItems>;
     /** Replaces my choices (`{}`: every tool back on its default). */
     setSidebarItems(orgId: string, items: SidebarItems): Promise<SidebarItems>;
+    /** The sidebar's sections in my order here. */
+    sidebarOrder(orgId: string): Promise<SidebarSection[]>;
+    /** Saves my section order here (`null`: the default). */
+    setSidebarOrder(orgId: string, order: SidebarSection[] | null): Promise<SidebarSection[]>;
     /** My profile photo: a square image (JSON only: base64), already cropped. */
     setAvatar(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ avatarUrl: string }>;
     removeAvatar(orgId: string): Promise<void>;

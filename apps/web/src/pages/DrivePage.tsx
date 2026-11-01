@@ -576,7 +576,7 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
                     {sectionHead(s)}
                     <div className="drive-grid">
                       {s.items.map((a) => (
-                        <DriveCard key={a.id} {...itemProps(a)} />
+                        <DriveCard key={a.id} {...itemProps(a)} onDelete={(x) => remover.ask(x)} />
                       ))}
                     </div>
                   </section>

@@ -5122,6 +5122,8 @@ export type SidebarItem = "approvals" | "threads" | "issues" | "wiki" | "drive" 
 export type SidebarPlace = "always" | "more" | "auto";
 /** Where I put each tool I moved, in one workspace (`GET …/me/sidebar`); the others keep their default. */
 export type SidebarItems = Partial<Record<SidebarItem, SidebarPlace>>;
+/** A section of the sidebar, in the order I put them (`SIDEBAR_SECTIONS` in packages/engine/src/sidebar-items.ts). */
+export type SidebarSection = "tools" | "channels" | "agents" | "people";
 
 export interface NotificationCount {
   unread: number;
