@@ -67,6 +67,7 @@ import { useConnectAi } from "@/components/ConnectAi";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useNotificationOpener } from "@/components/NotificationOpen";
 import { useOrg } from "@/components/org-context";
+import { AllowTalkButton } from "@/components/ReachLines";
 import { colorOf, prepareBurst } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useWraps } from "@/hooks/useWraps";
@@ -642,6 +643,18 @@ function RowActions({ n, h }: { n: AppNotification; h: RowHandlers }) {
   );
 }
 
+/** `agent_unreached`: let the routine's creator talk to the agent, from the inbox (its report may be out of reach). */
+function UnreachedAllow({ agentId, userId }: { agentId: string; userId: string }) {
+  const { org } = useOrg();
+  const agent = useDirectory(org.id).agentById.get(agentId);
+  if (!agent) return null;
+  return (
+    <div className="nt-steprow">
+      <AllowTalkButton agent={agent} userId={userId} className="ag-rc__btn" />
+    </div>
+  );
+}
+
 /** One item in a day group. */
 function Row({
   n,
@@ -694,6 +707,7 @@ function Row({
       : (n.kind === "mission_finished" ||
             n.kind === "mission_stopped" ||
             n.kind.startsWith("routine_") ||
+            n.kind === "agent_unreached" ||
             n.kind === "forum_synthesis") &&
           n.source.label
         ? n.source.label
@@ -808,6 +822,9 @@ function Row({
                   {stepWords}
                 </Chip>
               </div>
+            )}
+            {n.kind === "agent_unreached" && n.source.agentId && n.source.userId && (
+              <UnreachedAllow agentId={n.source.agentId} userId={n.source.userId} />
             )}
             {expandable && (
               <>

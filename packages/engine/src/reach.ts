@@ -1,5 +1,6 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { type AiStatusDeps, agentAiState } from "./ai-status";
 import { canTalkTo, talksToAgents } from "./audience";
 import { fedByRoutine, personOfMessage, runAuthorityById } from "./authority";
 import { chainOfRun, sendNote } from "./consultations";
@@ -31,6 +32,10 @@ export interface ReachEntry {
   reason: ReachReason;
   consultationId?: string;
   outside?: true;
+  /** `not_in_channel` from a private conversation: not forwarded, so what's said there stays there. */
+  private?: true;
+  /** `not_in_channel` to an agent with no AI connected: nothing could answer it. */
+  noAi?: true;
   userId?: string;
   routine?: { id: string; name: string; creatorUserId: string | null; access: RoutineBrief["access"] };
 }
@@ -54,6 +59,10 @@ export function reachNote(entries: ReachEntry[]): string {
     .map((e) => {
       if (e.consultationId)
         return `[Delivered as a note]: @${e.handle} isn't in this conversation, so your mention went to it as a note (tell_agent); what comes of it reaches you here. To reach it next time, use tell_agent or ask_agent.`;
+      if (e.noAi)
+        return `[Not delivered]: @${e.handle} isn't in this conversation and has no AI connected, so nothing could answer it. The people here can see that.`;
+      if (e.private)
+        return `[Not delivered]: @${e.handle} isn't in this private conversation, so your mention wasn't forwarded (what's said here stays here). If it needs something, hand it with tell_agent in a note you write yourself, with only what it may know.`;
       const why =
         e.reason === "routine_creator_reach"
           ? e.routine?.access === "read"
@@ -86,7 +95,7 @@ export async function reachOfMessage(db: Database, message: Pick<Message, "orgId
  * `routing_decisions`, and, when a routine's creator couldn't reach an agent, told to that agent's owner.
  */
 export async function settleReach(
-  deps: { db: Database; pubsub?: PubSub },
+  deps: { db: Database; pubsub?: PubSub } & Partial<Pick<AiStatusDeps, "gateway" | "machines">>,
   message: Message,
   input: { outside: string[]; blocked: string[] },
 ): Promise<ReachEntry[]> {
@@ -118,7 +127,7 @@ export async function settleReach(
   const outside = rows.filter((r) => input.outside.includes(r.id) && !input.blocked.includes(r.id));
   if (outside.length > 0) {
     const [where] = await db
-      .select({ name: channels.name, kind: channels.kind })
+      .select({ name: channels.name, kind: channels.kind, visibility: channels.visibility })
       .from(channels)
       .where(and(eq(channels.orgId, message.orgId), eq(channels.id, message.channelId)));
     const [author] = message.authorAgentId
@@ -128,6 +137,8 @@ export async function settleReach(
       ? [...(await chainOfRun(db, message.orgId, message.agentRunId)), message.authorAgentId as string]
       : [];
     const place = where?.kind === "channel" ? `#${where.name}` : "a conversation";
+    // Only a public channel's words go on whole: a private channel's or a DM's stay there (the author may tell_agent).
+    const open = where?.kind === "channel" && where.visibility === "public";
     for (const a of outside) {
       // A routine set to only look and tell reaches no other agent; one set to act, only its creator's.
       const may =
@@ -140,8 +151,19 @@ export async function settleReach(
         entries.push(blockedOf(a, true));
         continue;
       }
+      if (!open) {
+        entries.push({ agentId: a.id, handle: a.handle, reason: "not_in_channel", private: true });
+        continue;
+      }
+      if (
+        deps.gateway &&
+        (await agentAiState({ db, gateway: deps.gateway, machines: deps.machines }, a)).state === "no_ai"
+      ) {
+        entries.push({ agentId: a.id, handle: a.handle, reason: "not_in_channel", noAi: true });
+        continue;
+      }
       // Already handed to it by this run (its own tell_agent): that note is the delivery.
-      const [open] = await db
+      const [handed] = await db
         .select({ id: agentConsultations.id })
         .from(agentConsultations)
         .where(
@@ -152,8 +174,8 @@ export async function settleReach(
           ),
         )
         .limit(1);
-      const sent = open
-        ? { consultationId: open.id }
+      const sent = handed
+        ? { consultationId: handed.id }
         : await sendNote(db, {
             orgId: message.orgId,
             agentId: message.authorAgentId as string,
@@ -162,10 +184,11 @@ export async function settleReach(
             targetAgentId: a.id,
             body: `[@${author?.handle ?? "an agent"} mentioned you in ${place}, where you aren't a member, so it reaches you here]\n\n${message.body}`,
             chain,
+            fromMention: true,
           });
       if (!sent) continue;
       entries.push({ agentId: a.id, handle: a.handle, reason: "not_in_channel", consultationId: sent.consultationId });
-      if (!open && deps.pubsub && message.agentRunId) {
+      if (!handed && deps.pubsub && message.agentRunId) {
         await publishChannelEvent(deps.pubsub, {
           type: "agent.consulting",
           channelId: message.channelId,
@@ -194,6 +217,7 @@ export async function settleReach(
       agentId: e.agentId,
       routineId: e.routine.id,
       routineName: e.routine.name,
+      creatorUserId: e.routine.creatorUserId,
       channelId: message.channelId,
       threadId: message.threadId,
       messageId: message.id,

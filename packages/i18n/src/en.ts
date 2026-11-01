@@ -1616,10 +1616,14 @@ export const en: Translations = {
   },
   reach: {
     group: "Who the message didn't call directly",
-    handed: "Handed to <b>{{name}}</b> by direct message, {{she}} isn't in {{place}}",
+    handed: "Handed to <b>{{name}}</b> by direct message, {{she}} isn't {{place}}",
+    private: "Didn't pass this on to <b>{{name}}</b>: {{she}} isn't {{place}}, and what's said here stays here",
+    noAi: "Couldn't hand this to <b>{{name}}</b>: {{she}} isn't {{place}} and has no AI connected yet",
+    inChannel: "in #{{name}}",
+    inHere: "in this conversation",
     blocked: "Couldn't call <b>{{name}}</b>: only the people who look after {{pronoun}} can",
     routineRead: "Couldn't call <b>{{name}}</b>: this routine only looks and tells",
-    outside: "Not in {{place}}",
+    outside: "Not {{place}}",
     routine: "Routine {{name}}",
     see: "See",
     add: "Add to channel",
@@ -4129,7 +4133,6 @@ export const en: Translations = {
       blocked:
         "This routine won't be able to call <b>{{name}}</b>: only the people who look after {{pronoun}} can. The rest of the routine runs as usual.",
       read: "This routine only looks and tells, so it won't call <b>{{name}}</b>. To call it, pick Can act.",
-      allow: "Let {{person}} talk to {{pronoun}}",
     },
     access: {
       read: "Only look and tell",

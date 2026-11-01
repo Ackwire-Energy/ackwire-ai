@@ -121,6 +121,8 @@ export interface NotificationSource {
   handoffId?: string;
   /** Which of the agent's screens it is on, when not its browser (ADR 0058). */
   screen?: ScreenKind;
+  /** `agent_unreached`: the routine's creator, whom the agent's owner may let talk to `agentId`. */
+  userId?: string;
   /** The agent held on agentes.chat Cloud (`org_standing` to `agent_hold`, its name in `label`). */
   agentId?: string;
   /** Channel name, thread title, issue title, topic title, mission or routine name. */

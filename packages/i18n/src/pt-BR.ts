@@ -1632,10 +1632,14 @@ export const ptBR = {
   },
   reach: {
     group: "Quem a mensagem não chamou direto",
-    handed: "Entregue {{to}} <b>{{name}}</b> por mensagem direta, {{she}} não está em {{place}}",
+    handed: "Entregue {{to}} <b>{{name}}</b> por mensagem direta, {{she}} não está {{place}}",
+    private: "Não repassei {{to}} <b>{{name}}</b>: {{she}} não está {{place}}, e o que se fala aqui fica aqui",
+    noAi: "Não consegui entregar {{to}} <b>{{name}}</b>: {{she}} não está {{place}} e ainda não tem IA conectada",
+    inChannel: "em #{{name}}",
+    inHere: "nesta conversa",
     blocked: "Não consegui chamar {{article}} <b>{{name}}</b>: só quem cuida {{hers}} pode",
     routineRead: "Não consegui chamar {{article}} <b>{{name}}</b>: esta rotina só olha e conta",
-    outside: "Não está em {{place}}",
+    outside: "Não está {{place}}",
     routine: "Rotina {{name}}",
     see: "Ver",
     add: "Adicionar ao canal",
@@ -4167,7 +4171,6 @@ export const ptBR = {
       blocked:
         "Esta rotina não vai conseguir chamar {{article}} <b>{{name}}</b>: só quem cuida {{hers}} pode. O resto da rotina roda normalmente.",
       read: "Esta rotina só olha e conta, então não chama {{article}} <b>{{name}}</b>. Para chamar, escolha Pode agir.",
-      allow: "Deixar {{person}} falar com {{pronoun}}",
     },
     access: {
       read: "Só olhar e contar",

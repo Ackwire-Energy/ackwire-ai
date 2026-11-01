@@ -28,7 +28,8 @@ import { cutText } from "./format";
 import type { Judge } from "./judge";
 import { getMessage, insertMessage, type MessageView, withMessageDetails } from "./messages";
 import type { Notice } from "./notices";
-import { personBehindCall, routineCreatorOfCall } from "./requester";
+import { notifyAgentUnreached } from "./notification-producers";
+import { actingRoutineOfCall, personBehindCall } from "./requester";
 import { isRoutineRoomKey } from "./routine-brief";
 import { deliverNoticeToRun, resumeRunWithResult } from "./run-resume";
 import { type AgentRun, isTerminal, type RunStatus, replyThreadOf } from "./runs";
@@ -71,7 +72,7 @@ type AiCheck = Omit<AiStatusDeps, "db">;
  * so no answer would come). The asking run comes along: its hop and stretch
  * go on to the other agent.
  */
-async function reachableAgent(ctx: ToolContext, input: unknown, ai?: AiCheck) {
+async function reachableAgent(ctx: ToolContext, input: unknown, ai?: AiCheck, pubsub?: PubSub) {
   const { db } = ctx;
   const [handle = ""] = await currentHandles(db, ctx.orgId, [String(input).trim().replace(/^@/, "").toLowerCase()]);
   const [target] = await db
@@ -80,10 +81,34 @@ async function reachableAgent(ctx: ToolContext, input: unknown, ai?: AiCheck) {
     .where(and(eq(agents.orgId, ctx.orgId), eq(agents.handle, handle), isNull(agents.archivedAt)));
   if (!target) return { refused: refuse(await noAgentText(ctx, [handle])) };
   if (target.id === ctx.agentId) return { refused: refuse("That is you: answer it yourself.") };
-  const person = (await personBehindCall(ctx)) ?? (await routineCreatorOfCall(ctx));
+  const behind = await personBehindCall(ctx);
+  const routine = behind ? null : await actingRoutineOfCall(ctx);
+  const person = behind ?? routine?.creatorUserId ?? null;
   if (!canTalkTo(target, person, await talksToAgents(db, ctx.orgId, person))) {
+    if (!routine?.creatorUserId) {
+      return {
+        refused: refuse(`@${handle} only works with some people, and the person you are helping isn't one of them.`),
+      };
+    }
+    // Never silent: the agent's owner hears it now, and the run's next message shows the line (`settleReach`).
+    await notifyAgentUnreached(
+      { db, pubsub },
+      {
+        orgId: ctx.orgId,
+        agentId: target.id,
+        routineId: routine.routineId,
+        routineName: routine.name,
+        creatorUserId: routine.creatorUserId,
+        channelId: ctx.channelId,
+      },
+    ).catch(() => {});
     return {
-      refused: refuse(`@${handle} only works with some people, and the person you are helping isn't one of them.`),
+      refused: {
+        ...refuse(
+          `@${handle} only works with some people, and the person who set up the routine behind this isn't one of them. Its owner was told and may let them in; say in your reply that @${handle} couldn't be reached and what you needed from it.`,
+        ),
+        data: { reach: { agentId: target.id, reason: "routine_creator_reach" } },
+      },
     };
   }
   if (ai && (await agentAiState({ ...ai, db }, target)).state === "no_ai") {
@@ -138,7 +163,7 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub; ai?: AiCheck }
       const question = String(input.question).trim();
       if (!question) return refuse("Write the question.");
       const { db } = ctx;
-      const reached = await reachableAgent(ctx, input.agent, deps.ai);
+      const reached = await reachableAgent(ctx, input.agent, deps.ai, deps.pubsub);
       if (reached.refused) return reached.refused;
       const { target, handle } = reached;
       const between = await inAgentsDm(db, ctx);
@@ -255,9 +280,17 @@ function createTellAgentTool(deps: { pubsub?: PubSub; ai?: AiCheck }): ToolDefin
       const body = String(input.message).trim();
       if (!body) return refuse("Write the note.");
       const { db } = ctx;
-      const reached = await reachableAgent(ctx, input.agent, deps.ai);
+      const reached = await reachableAgent(ctx, input.agent, deps.ai, deps.pubsub);
       if (reached.refused) return reached.refused;
       const { target, handle } = reached;
+      // This run's mention already handed it a note (`settleReach`): that one is the delivery.
+      const mentioned = await mentionNoteOpen(db, ctx, target.id);
+      if (mentioned) {
+        return {
+          content: `@${handle} already has it: your mention of it was handed to it as a note, so nothing was sent again. What comes of it reaches you here. Carry on.`,
+          data: { agentNote: { duplicate: true, agentId: target.id } },
+        };
+      }
       // Answering that agent already (its question or note, in your private conversation): your reply goes back.
       const [here] = await db
         .select({ kind: channels.kind, dmKey: channels.dmKey })
@@ -328,6 +361,8 @@ export async function sendNote(
     targetAgentId: string;
     body: string;
     chain: string[];
+    /** An @mention of an agent outside the conversation (`settleReach`), not a tell_agent call. */
+    fromMention?: boolean;
   },
 ) {
   const consultationId = Bun.randomUUIDv7();
@@ -340,7 +375,10 @@ export async function sendNote(
       author: { type: "agent", agentId: input.agentId, runId: input.runId, hop: input.hop },
       body: input.body,
       // `agentNote`: the run it came from (the same-note check, `peopleRun`); `consultation`: its row.
-      meta: { agentNote: { runId: input.runId }, consultation: { id: consultationId } },
+      meta: {
+        agentNote: { runId: input.runId, ...(input.fromMention ? { mention: true } : {}) },
+        consultation: { id: consultationId },
+      },
     });
     // A run of the other agent at work in this DM for the same person takes it: the row waits on that run.
     const started = await startOrJoinRun(tx, message, input.targetAgentId, "dm");
@@ -361,6 +399,25 @@ export async function sendNote(
     });
     return { message, consultationId };
   });
+}
+
+/** An open note this run's mention handed `targetAgentId` (`sendNote` with `fromMention`). */
+async function mentionNoteOpen(db: Executor, ctx: Pick<ToolContext, "orgId" | "runId">, targetAgentId: string) {
+  const [row] = await db
+    .select({ id: agentConsultations.id })
+    .from(agentConsultations)
+    .innerJoin(messages, eq(messages.id, agentConsultations.messageId))
+    .where(
+      and(
+        eq(agentConsultations.orgId, ctx.orgId),
+        eq(agentConsultations.askerRunId, ctx.runId),
+        eq(agentConsultations.targetAgentId, targetAgentId),
+        eq(agentConsultations.status, "open"),
+        sql`${messages.meta} -> 'agentNote' ->> 'mention' = 'true'`,
+      ),
+    )
+    .limit(1);
+  return row ?? null;
 }
 
 /** The agents already in the chain of consultations a run answers, for a note sent from outside a tool call. */

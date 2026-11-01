@@ -1743,7 +1743,12 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
               options={(["read", "act"] as const).map((v) => ({ value: v, label: t(`routines.access.${v}`) }))}
             />
           </div>
-          <RoutineReachWarnings prompt={prompt} access={access} agentId={agentId || null} />
+          <RoutineReachWarnings
+            prompt={prompt}
+            access={access}
+            agentId={agentId || null}
+            creatorUserId={routine?.createdByUserId}
+          />
           {editing && !(routine && isDoneOnce(routine)) && (
             <label className="routine-active" htmlFor="nr-active">
               <Switch id="nr-active" checked={active} onCheckedChange={setActive} />

@@ -252,6 +252,10 @@ const Routine = z
       }),
     canSeeDetails: z.boolean().openapi({ description: "You read its prompt, records and reports." }),
     canManage: z.boolean().openapi({ description: "You may change, pause, stop or delete it." }),
+    createdByUserId: z
+      .string()
+      .nullable()
+      .openapi({ description: "Its creator, whose reach it has (kept on edit); null once they left." }),
     lastRun: RoutineRun.nullable(),
     recentRuns: z.array(RoutineRun).openapi({ description: "The last runs, newest first (at most 14)." }),
     usage: z

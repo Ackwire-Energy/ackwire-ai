@@ -246,6 +246,7 @@ export type OpenTarget =
   | { to: "/org/$orgId/threads/$threadId"; params: { threadId: string } }
   | { to: "/org/$orgId/c/$channelId"; params: { channelId: string }; search?: { m: string } }
   | { to: "/org/$orgId/dm/agent/$agentId"; params: { agentId: string } }
+  | { to: "/org/$orgId/agents/$agentId"; params: { agentId: string } }
   | { to: "/org/$orgId/dm/person/$userId"; params: { userId: string } }
   | { to: "/org/$orgId/issues/$number"; params: { number: string } }
   | { to: "/org/$orgId/forum/$topicId"; params: { topicId: string } }
@@ -283,6 +284,9 @@ export function openTarget(n: AppNotification): OpenTarget | null {
     return s.machineId
       ? { to: "/org/$orgId/settings/computers/$machineId", params: { machineId: s.machineId } }
       : { to: "/org/$orgId/settings/$section", params: { section: "computers" } };
+  // A routine couldn't call the agent: its page, where who talks to it is set (the report's room may be private).
+  if (n.kind === "agent_unreached" && s.agentId)
+    return { to: "/org/$orgId/agents/$agentId", params: { agentId: s.agentId } };
   if (s.topicId) return { to: "/org/$orgId/forum/$topicId", params: { topicId: s.topicId } };
   if (s.issueNumber != null) return { to: "/org/$orgId/issues/$number", params: { number: String(s.issueNumber) } };
   // A routine that failed, paused or waits for its computer: the routine in Rotinas (its state and fix).

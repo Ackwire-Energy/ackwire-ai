@@ -8,11 +8,12 @@ import type {
   SearchKind,
   WebPushSender,
 } from "@agenteschat/adapters";
-import { and, count, eq, inArray, isNull, queryTrace, schema } from "@agenteschat/db";
+import { and, count, eq, inArray, isNull, ne, queryTrace, schema, sql } from "@agenteschat/db";
 import { AGENT_MEDIA_JOB, enqueueAgentMedia, maybeSendAgentMedia } from "./agent-media";
 import { aiConnectIntent, type ConnectIntent } from "./ai-intent";
 import { orgHasAi } from "./ai-status";
 import type { ArtifactDeps } from "./artifacts";
+import { runAuthorityById } from "./authority";
 import { AUTONOMY_REPORT_JOB, queueAutonomyEmail } from "./autonomy-report";
 import type { ConnectorDeps } from "./connectors/connections";
 import { getChannelCached } from "./context";
@@ -53,7 +54,7 @@ import { notifyMessage } from "./notification-producers";
 import { ORG_FILES_PURGE_ATTEMPTS, ORG_FILES_PURGE_JOB, USER_FILES_PURGE_JOB } from "./organizations";
 import { enqueue, type JobHandlers, type OutboxJob, PermanentJobError } from "./outbox";
 import { checkPushReceipts, deliverPush, pushTicketsOf } from "./push";
-import { settleReach } from "./reach";
+import { reachOf, settleReach } from "./reach";
 import {
   createLlmRouterStrategy,
   DEFAULT_ROUTER_POLICY,
@@ -229,7 +230,11 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
    * fails, only a message that opens with "@handle" wakes that agent. Each decision goes in
    * `routing_decisions`, its score the chance the message needs the agent (1 − the judge's "nothing").
    */
-  async function delegatedAgents(message: NonNullable<Awaited<ReturnType<typeof getMessage>>>, outside: string[] = []) {
+  async function delegatedAgents(
+    message: NonNullable<Awaited<ReturnType<typeof getMessage>>>,
+    outside: string[] = [],
+    options: { record?: boolean } = {},
+  ) {
     const ids = [...message.mentionedAgentIds, ...outside];
     const targets = ids.length
       ? await deps.db
@@ -276,22 +281,24 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     // every agent named would let two agents thank each other in a loop while the judge is down.
     if (!judge || error !== null) for (const t of others) if (opensWith(message.body, t.handle)) scores.set(t.id, 1);
     const allowed = others.filter((t) => (scores.get(t.id) ?? 0) >= mentionThreshold).map((t) => t.id);
-    await deps.db
-      .insert(schema.routingDecisions)
-      .values({
-        orgId: message.orgId,
-        channelId: message.channelId,
-        messageId: message.id,
-        strategy,
-        candidates: others.map((t) => ({ agentId: t.id, score: scores.get(t.id) ?? 0 })),
-        selectedAgentIds: allowed,
-        reason: others
-          .map((t) => `@${t.handle}: ${(scores.get(t.id) ?? 0).toFixed(2)}`)
-          .join(", ")
-          .slice(0, 500),
-        error,
-      })
-      .onConflictDoNothing();
+    // Not when the router still decides this message: its decision row is what it reads to skip (`already_routed`).
+    if (options.record !== false)
+      await deps.db
+        .insert(schema.routingDecisions)
+        .values({
+          orgId: message.orgId,
+          channelId: message.channelId,
+          messageId: message.id,
+          strategy,
+          candidates: others.map((t) => ({ agentId: t.id, score: scores.get(t.id) ?? 0 })),
+          selectedAgentIds: allowed,
+          reason: others
+            .map((t) => `@${t.handle}: ${(scores.get(t.id) ?? 0).toFixed(2)}`)
+            .join(", ")
+            .slice(0, 500),
+          error,
+        })
+        .onConflictDoNothing();
     return {
       allowed,
       referenced: others.filter((t) => !allowed.includes(t.id) && !outside.includes(t.id)).map((t) => t.id),
@@ -318,6 +325,52 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         ),
       );
     return rows.map((r) => r.id).filter((id) => id !== message.authorAgentId);
+  }
+
+  /**
+   * Agents the run behind an agent's message tried to reach with tell_agent or ask_agent and couldn't, its routine's
+   * creator being out of their audience (the refusal's `data.reach`), not yet shown under an earlier message of it.
+   * A routine's report is told by another run than the routine's own: that one's refusals show under it too.
+   */
+  async function refusedReach(message: NonNullable<Awaited<ReturnType<typeof getMessage>>>) {
+    if (!message.agentRunId) return [];
+    const authority = await runAuthorityById(deps.db, message.orgId, message.agentRunId);
+    const brief = authority.kind !== "person" ? (authority.brief ?? null) : null;
+    const [routineRun] = brief
+      ? await deps.db
+          .select({ agentRunId: schema.routineRuns.agentRunId })
+          .from(schema.routineRuns)
+          .where(and(eq(schema.routineRuns.orgId, message.orgId), eq(schema.routineRuns.id, brief.routineRunId)))
+      : [];
+    const runIds = [...new Set([message.agentRunId, routineRun?.agentRunId].filter((id): id is string => !!id))];
+    const steps = schema.agentRunSteps;
+    const [tried, shown] = await Promise.all([
+      deps.db
+        .select({ agentId: sql<string>`${steps.data} -> 'data' -> 'reach' ->> 'agentId'` })
+        .from(steps)
+        .where(
+          and(
+            eq(steps.orgId, message.orgId),
+            inArray(steps.runId, runIds),
+            eq(steps.kind, "tool_result"),
+            sql`${steps.data} -> 'data' ? 'reach'`,
+          ),
+        ),
+      deps.db
+        .select({ meta: schema.messages.meta })
+        .from(schema.messages)
+        .where(
+          and(
+            eq(schema.messages.orgId, message.orgId),
+            eq(schema.messages.channelId, message.channelId),
+            inArray(schema.messages.agentRunId, runIds),
+            ne(schema.messages.id, message.id),
+            sql`${schema.messages.meta} ? 'reach'`,
+          ),
+        ),
+    ]);
+    const done = new Set(shown.flatMap((m) => reachOf(m.meta).map((e) => e.agentId)));
+    return [...new Set(tried.map((t) => t.agentId))].filter((id) => !!id && !done.has(id));
   }
 
   /** The message an agent's message answers: the trigger of the run that wrote it (its start), for the judge. */
@@ -405,12 +458,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         if (message.meta.notice || message.meta.noAi || message.meta.actionCard) return;
         // Agents' mentions go through the hop limit here; a person's mentions and DMs already
         // started their runs in the same statement as the message (postPersonMessage).
-        const outside = await outsideAgents(message);
-        if (message.mentionedAgentIds.length === 0 && outside.length > 0) {
-          // Only agents outside the conversation named: a note to the ones it needs, then the router as usual.
-          const handed = await delegatedAgents(message, outside);
-          await settleReach(deps, message, { outside: handed.allowed, blocked: [] });
-        }
+        const [outside, refused] = await Promise.all([outsideAgents(message), refusedReach(message)]);
         if (message.mentionedAgentIds.length > 0) {
           // No cap on hand-offs between agents: the stretch's limits hold a run agents start (`startOrJoinRun`).
           const handed = await delegatedAgents(message, outside);
@@ -435,7 +483,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           // Never silent: who its mention didn't reach hears it as a note, or the people here read why not.
           await settleReach(deps, message, {
             outside: handed.allowed.filter((id) => outside.includes(id)),
-            blocked: "blocked" in res ? (res.blocked ?? []) : [],
+            blocked: [...new Set([...("blocked" in res ? (res.blocked ?? []) : []), ...refused])],
           });
           await publishRouted(deps.pubsub, message, {
             strategy: "mention",
@@ -446,17 +494,26 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           });
           return;
         }
-        // No mention: another agent may chime in when it clearly should (ADR 0034). Only in
-        // channels, never in a mission's thread (the mission's own turns run it). Once that is settled, a
-        // light reply may get the agent's sticker or a GIF after it (ADR 0091): judged in a job of its own.
-        if (!routing || where?.kind !== "channel") return enqueueAgentMedia(deps.db, message, where);
-        if (message.threadId && (await missionOfThread(deps.db, message.orgId, message.threadId))) return;
-        const res = await routeMessage(routing, input);
-        // Receipts only when someone answers: an agent's message isn't waiting for anyone.
-        if (res.runs.length > 0)
-          await routed("router", res.seenBy ?? [], res.runs, res.reason, undefined, res.decidedBy);
-        await enqueueAgentMedia(deps.db, message, where);
-        return;
+        // Only agents outside the conversation named: a note to the ones it needs, settled once the router decided.
+        const reach = {
+          outside: outside.length > 0 ? (await delegatedAgents(message, outside, { record: false })).allowed : [],
+          blocked: refused,
+        };
+        try {
+          // No mention: another agent may chime in when it clearly should (ADR 0034). Only in
+          // channels, never in a mission's thread (the mission's own turns run it). Once that is settled, a
+          // light reply may get the agent's sticker or a GIF after it (ADR 0091): judged in a job of its own.
+          if (!routing || where?.kind !== "channel") return await enqueueAgentMedia(deps.db, message, where);
+          if (message.threadId && (await missionOfThread(deps.db, message.orgId, message.threadId))) return;
+          const res = await routeMessage(routing, input);
+          // Receipts only when someone answers: an agent's message isn't waiting for anyone.
+          if (res.runs.length > 0)
+            await routed("router", res.seenBy ?? [], res.runs, res.reason, undefined, res.decidedBy);
+          await enqueueAgentMedia(deps.db, message, where);
+          return;
+        } finally {
+          await settleReach(deps, message, reach);
+        }
       }
       if (message.mentionedAgentIds.length > 0) {
         // No-op unless inserted elsewhere; never the agents the person only referenced, nor the ones whose

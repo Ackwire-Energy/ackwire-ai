@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Agent } from "../src/api/types";
-import { reachByAccess, reachOf, routineReachWarnings } from "../src/lib/reach";
+import { audienceWith } from "../src/lib/audience";
+import { reachByAccess, reachKey, reachOf, routineReachWarnings } from "../src/lib/reach";
 
 const agent = (id: string, handle: string, extra: Partial<Agent> = {}) => ({ id, handle, ...extra }) as Agent;
 const gil = agent("a-gil", "gil", { canTalk: false, audience: { mode: "owner", userIds: [] } });
@@ -35,5 +36,45 @@ describe("reachOf", () => {
     const base = { agentId: "a", handle: "gil", reason: "routine_creator_reach" as const };
     expect(reachByAccess({ ...base, routine: { id: "r", name: "R", creatorUserId: "u", access: "read" } })).toBe(true);
     expect(reachByAccess({ ...base, routine: { id: "r", name: "R", creatorUserId: "u", access: "act" } })).toBe(false);
+  });
+});
+
+describe("someone else's routine, being edited", () => {
+  test("its creator's reach counts, not the editor's", () => {
+    const owned = agent("a-gil", "gil", {
+      canTalk: true,
+      ownerUserId: "u-carla",
+      audience: { mode: "people", userIds: ["u-bob"] },
+    });
+    const prompt = "Cobre o @gil";
+    expect(routineReachWarnings(prompt, [owned], { access: "act", agentId: null })).toEqual([]);
+    expect(
+      routineReachWarnings(prompt, [owned], { access: "act", agentId: null, creatorUserId: "u-ana" }).map(
+        (w) => w.kind,
+      ),
+    ).toEqual(["blocked"]);
+    expect(routineReachWarnings(prompt, [owned], { access: "act", agentId: null, creatorUserId: "u-bob" })).toEqual([]);
+  });
+});
+
+describe("audienceWith", () => {
+  test("adds the person to its people, and never saves over a list it wasn't sent", () => {
+    const owned = agent("a-gil", "gil", { audience: { mode: "people", userIds: ["u-bob"] } });
+    expect(audienceWith(owned, "u-ana")).toEqual({ mode: "people", userIds: ["u-bob", "u-ana"] });
+    expect(audienceWith(agent("a-x", "x", { audienceMode: "people" }), "u-ana")).toBeNull();
+    expect(audienceWith(agent("a-y", "y", { audienceMode: "owner" }), "u-ana")).toEqual({
+      mode: "people",
+      userIds: ["u-ana"],
+    });
+  });
+});
+
+describe("reachKey", () => {
+  test("says which line each entry is", () => {
+    const base = { agentId: "a", handle: "ivo", reason: "not_in_channel" as const };
+    expect(reachKey({ ...base, consultationId: "c" })).toBe("reach.handed");
+    expect(reachKey({ ...base, private: true })).toBe("reach.private");
+    expect(reachKey({ ...base, noAi: true })).toBe("reach.noAi");
+    expect(reachKey({ ...base, reason: "audience" })).toBe("reach.blocked");
   });
 });

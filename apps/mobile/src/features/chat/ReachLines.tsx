@@ -1,7 +1,7 @@
-import { type Message, useChannels, useUpdateAgent } from "@agenteschat/client";
-import { audienceOf, canEditAudience, modeOf } from "@agenteschat/client/lib/audience";
+import { type Agent, type Message, useChannels, useUpdateAgent } from "@agenteschat/client";
+import { audienceWith, canEditAudience, modeOf } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { type ReachEntry, reachByAccess, reachOf } from "@agenteschat/client/lib/reach";
+import { type ReachEntry, reachKey, reachOf } from "@agenteschat/client/lib/reach";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
@@ -33,29 +33,16 @@ function Row({ entry: e, channelId }: { entry: ReachEntry; channelId: string }) 
   const { t } = useTranslation();
   const { colors } = useTheme();
   const orgId = useOrgId();
-  const { org } = useOrg();
-  const me = useMeId();
   const dir = useDirectory();
-  const toast = useToast();
-  const update = useUpdateAgent(orgId, e.agentId);
   const channel = useChannels(orgId).data?.find((c) => c.id === channelId);
-  const place = channel ? `#${channel.name}` : "";
+  // A DM isn't in the channel list: "in this conversation".
+  const place = channel ? t("reach.inChannel", { name: channel.name }) : t("reach.inHere");
   const agent = dir.agentById.get(e.agentId);
   const g = agentGrammar(t, agent?.name ?? `@${e.handle}`);
   const handed = Boolean(e.consultationId);
-  const key = handed ? "reach.handed" : reachByAccess(e) ? "reach.routineRead" : "reach.blocked";
-  const runs = boldRuns(t(key as "reach.handed", { ...g, place }) as string);
-  const person = e.userId ? dir.memberById.get(e.userId)?.name : undefined;
-  const mayAllow =
-    !handed &&
-    !!agent &&
-    !!e.userId &&
-    !!person &&
-    !!me &&
-    modeOf(agent) !== "everyone" &&
-    canEditAudience(org ?? undefined, agent, me);
+  const runs = boldRuns(t(reachKey(e) as "reach.handed", { ...g, place }) as string);
   const detail = [
-    !handed && e.outside && place ? t("reach.outside", { place }) : null,
+    !handed && e.outside ? t("reach.outside", { place }) : null,
     e.routine ? t("reach.routine", { name: e.routine.name }) : null,
   ]
     .filter(Boolean)
@@ -93,22 +80,40 @@ function Row({ entry: e, channelId }: { entry: ReachEntry; channelId: string }) 
           }}
         />
       ) : null}
-      {mayAllow && agent && e.userId ? (
-        <PillButton
-          label={t("reach.allow", { person, pronoun: g.pronoun })}
-          onPress={() => {
-            if (update.isPending || update.isSuccess) return;
-            tapHaptic();
-            const a = audienceOf(agent);
-            const userIds = [...new Set([...(a.mode === "people" ? a.userIds : []), e.userId as string])];
-            update.mutate(
-              { audience: { mode: "people", userIds } },
-              { onSuccess: () => toast({ title: t("reach.allowed", { person, name: g.name }) }) },
-            );
-          }}
-        />
-      ) : null}
+      {!handed && agent && e.userId ? <AllowTalkPill agent={agent} userId={e.userId} /> : null}
     </View>
+  );
+}
+
+/**
+ * "Deixar Ana falar com ele": lets `userId` talk to the agent, for its owner and who manages agents, when its
+ * audience keeps them out (a routine's creator it couldn't reach). Nothing otherwise.
+ */
+export function AllowTalkPill({ agent, userId }: { agent: Agent; userId: string }) {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const { org } = useOrg();
+  const me = useMeId();
+  const dir = useDirectory();
+  const toast = useToast();
+  const update = useUpdateAgent(orgId, agent.id);
+  const person = dir.memberById.get(userId)?.name;
+  const audience = audienceWith(agent, userId);
+  if (!person || !audience || !me || modeOf(agent) === "everyone" || !canEditAudience(org ?? undefined, agent, me))
+    return null;
+  const g = agentGrammar(t, agent.name);
+  return (
+    <PillButton
+      label={t("reach.allow", { person, pronoun: g.pronoun })}
+      onPress={() => {
+        if (update.isPending || update.isSuccess) return;
+        tapHaptic();
+        update.mutate(
+          { audience },
+          { onSuccess: () => toast({ title: t("reach.allowed", { person, name: g.name }) }) },
+        );
+      }}
+    />
   );
 }
 

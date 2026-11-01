@@ -3525,7 +3525,7 @@ export const TimelineMessage = memo(function TimelineMessage({
           )}
           {m.author.type === "agent" && !m.local && <AgentActionReceipts message={m} />}
           {m.author.type === "agent" && !m.local && <TeamChecks message={m} />}
-          {m.author.type === "agent" && !m.local && <ReachLines message={m} channelName={channelName ?? ""} />}
+          {m.author.type === "agent" && !m.local && <ReachLines message={m} />}
           {approvalId && <MessageApproval approvalId={approvalId} agent={agent} members={dir.memberById} />}
           {proposalId && <InlineProposal proposalId={proposalId} />}
           {agent &&
