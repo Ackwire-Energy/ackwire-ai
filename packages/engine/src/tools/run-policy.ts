@@ -10,12 +10,15 @@ import type { ToolDefinition } from "./types";
  * `approve` into an approval card whatever the agent's own settings say.
  *
  * - `person`: unchanged (scopes and the tools' own approvals decide).
- * - `routine`, any access: nothing that speaks for someone or reaches beyond its room (posting, DMs,
- *   reactions, questions, reminders, routines, other agents, forum, channels, secrets, permissions).
- *   It speaks only through `hand_off`; the people decide.
+ * - `routine`, any access: no reactions or questions (nobody is in its room) and nothing that speaks for
+ *   someone (reminders, routines, events, forum, channels, secrets, permissions); its report goes
+ *   through `hand_off`.
  * - `routine`, access `read`: reads only, plus `hand_off`.
  * - `routine`, access `act`: also internal changes people can undo (issues, memory, wiki, Drive, its
- *   own branches and pull requests, its computer); every write to a connected app asks a person.
+ *   own branches and pull requests, its computer); every write to a connected app asks a person. It
+ *   reaches other agents (`ask_agent`, `tell_agent`) and posts where its creator can post (`post_message`,
+ *   `send_dm` to its creator): the tools hold it to its creator's rooms and agents (ADR 0053 §2, amended
+ *   2026-10-31).
  * - `unattended`: reads, the reply where it is (`react`, `pass`, questions, cards), issues, memory and
  *   Drive files with receipts; writes to a connected app ask a person; nothing elsewhere. Woken by the
  *   report of a routine that only reads (`routineAccess: "read"`): no change of its own either, it
@@ -85,6 +88,9 @@ const ELSEWHERE = new Set([
   "request_folder_access",
   "propose_event",
 ]);
+
+/** What a routine set to act may use of `ELSEWHERE`, by name. */
+const ROUTINE_REACH = new Set(["post_message", "send_dm", "ask_agent", "tell_agent"]);
 
 /** Speaks in the run's own conversation, by name. */
 const HERE = new Set([
@@ -186,7 +192,9 @@ const UNATTENDED_INTERNAL: ReadonlySet<InternalArea> = new Set(["issues", "memor
 
 export const REFUSALS = {
   routineElsewhere:
-    "This is a routine's background work: it can't post, message people, ask or tell other agents, manage routines or reminders, or ask for secrets or permissions. Put it in hand_off; the people decide.",
+    "This is a routine's background work: it can't manage routines or reminders, propose events, open forum topics, change channels, or ask for secrets or permissions. Put it in hand_off; the people decide.",
+  routineReachReadOnly:
+    "This routine only looks and tells, as its creator set it: it can't post, send DMs, or ask or tell other agents. Say in hand_off what you'd send and to whom; a person can set the routine to act so it does that itself.",
   routineAskUser:
     "This is a routine's background work: nobody is here to answer. Decide with your best judgement; if a person must decide, say so in hand_off.",
   routineReact: "This is a routine's background work: there is no message to react to. Just finish, or use hand_off.",
@@ -235,7 +243,8 @@ export function toolPolicy(authority: RunAuthority, tool: PolicyTool): PolicyDec
       case "read":
         return ALLOW;
       case "elsewhere":
-        return refuse(REFUSALS.routineElsewhere);
+        if (!ROUTINE_REACH.has(tool.name)) return refuse(REFUSALS.routineElsewhere);
+        return authority.brief?.access === "act" ? ALLOW : refuse(REFUSALS.routineReachReadOnly);
       case "here":
         return refuse(
           tool.name === "ask_user"

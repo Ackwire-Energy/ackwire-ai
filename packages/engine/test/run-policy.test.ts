@@ -85,14 +85,15 @@ describe("run policy table", () => {
     });
     expect(decide(r, app("github_create_issue", "github:issues.write"))).toBe("refuse");
     expect(decide(r, builtIn("remember", "memory:write"))).toBe("refuse");
-    expect(toolPolicy(r, builtIn("post_message"))).toEqual({ action: "refuse", reason: REFUSALS.routineElsewhere });
-    const elsewhere = ["send_dm", "ask_agent", "tell_agent", "schedule_reminder", "create_routine", "request_secret"];
-    for (const name of elsewhere) expect(decide(r, builtIn(name))).toBe("refuse");
+    for (const name of ["post_message", "send_dm", "ask_agent", "tell_agent"])
+      expect(toolPolicy(r, builtIn(name))).toEqual({ action: "refuse", reason: REFUSALS.routineReachReadOnly });
+    for (const name of ["schedule_reminder", "create_routine", "request_secret"])
+      expect(toolPolicy(r, builtIn(name))).toEqual({ action: "refuse", reason: REFUSALS.routineElsewhere });
     expect(toolPolicy(r, builtIn("ask_user"))).toEqual({ action: "refuse", reason: REFUSALS.routineAskUser });
     expect(toolPolicy(r, builtIn("react"))).toEqual({ action: "refuse", reason: REFUSALS.routineReact });
   });
 
-  test("routine, act: internal changes run, connected apps ask a person, speaking elsewhere stays refused", () => {
+  test("routine, act: internal changes run, connected apps ask a person, other agents and posts are reached, routines never", () => {
     const r = routine("act");
     expect(decide(r, builtIn("create_issue", "issues:write"))).toBe("allow");
     expect(decide(r, builtIn("update_wiki_page", "wiki:write"))).toBe("allow");
@@ -100,8 +101,15 @@ describe("run policy table", () => {
     expect(decide(r, app("github_create_issue", "github:issues.write"))).toBe("approve");
     expect(decide(r, app("github_merge_pr", "github:pr.merge", true))).toBe("approve");
     expect(decide(r, app("mail_support_send", "mail:send"))).toBe("approve");
-    expect(decide(r, builtIn("post_message"))).toBe("refuse");
-    expect(decide(r, builtIn("update_routine", "schedule:write"))).toBe("refuse");
+    for (const name of ["post_message", "send_dm", "ask_agent", "tell_agent"])
+      expect(decide(r, builtIn(name))).toBe("allow");
+    // A routine never starts or changes routines, so routines can't feed each other.
+    const never = ["create_routine", "update_routine", "run_routine_now", "schedule_reminder", "open_forum_topic"];
+    for (const name of never)
+      expect(toolPolicy(r, builtIn(name, "schedule:write"))).toEqual({
+        action: "refuse",
+        reason: REFUSALS.routineElsewhere,
+      });
   });
 
   test("unattended: reads, the reply here, issues and memory; elsewhere refused; connected apps ask", () => {
@@ -386,7 +394,7 @@ describe("the gateway applies the run policy", () => {
     }
     expect(await call(ctx, "post_message", { channel: "general", text: "oi" })).toMatchObject({
       type: "result",
-      output: { isError: true, content: REFUSALS.routineElsewhere },
+      output: { isError: true, content: REFUSALS.routineReachReadOnly },
     });
     expect(await call(ctx, "shop_refund_order", { order: "7", why: WHY })).toMatchObject({
       output: { isError: true, content: REFUSALS.routineReadOnly },
@@ -407,7 +415,9 @@ describe("the gateway applies the run policy", () => {
     const refund = names.get("shop_refund_order");
     expect(refund?.sensitive).toBe(true);
     expect(requiresWhy(refund)).toBe(true);
-    expect(names.has("post_message")).toBe(false);
+    expect(names.has("post_message")).toBe(true);
+    expect(names.has("tell_agent")).toBe(true);
+    expect(names.has("create_routine")).toBe(false);
 
     const result = await call(ctx, "shop_refund_order", { order: "7", why: WHY });
     if (result.type !== "approval") throw new Error(`expected an approval, got ${JSON.stringify(result)}`);

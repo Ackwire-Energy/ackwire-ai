@@ -1,5 +1,5 @@
 import { and, type Executor, eq, schema } from "@agenteschat/db";
-import { personOfMessage, runAuthority } from "./authority";
+import { personOfMessage, type RunAuthority, runAuthority, runAuthorityById } from "./authority";
 import type { ToolContext } from "./tools/types";
 
 const { agentRuns } = schema;
@@ -32,3 +32,16 @@ export async function personBehindCall(
 /** The person behind a message (`personOfMessage`): its author, or the person behind the run that wrote it. */
 export const personBehindRun = (db: Executor, orgId: string, triggerMessageId: string): Promise<string | null> =>
   personOfMessage(db, orgId, triggerMessageId);
+
+/**
+ * Whose rooms and agents a routine set to act reaches (ADR 0053 §2, amended 2026-10-31): its creator's. It posts
+ * only where they can post and wakes only agents they can talk to, and still never acts as them (no files of
+ * theirs, nothing in their name). Null for any other run and for a routine that only looks.
+ */
+export const routineCreatorOf = (authority: RunAuthority): string | null =>
+  authority.kind === "routine" && authority.brief?.access === "act" ? authority.brief.creatorUserId : null;
+
+/** `routineCreatorOf` for a call's run. */
+export async function routineCreatorOfCall(ctx: Pick<ToolContext, "orgId" | "runId"> & { db: Executor }) {
+  return ctx.runId ? routineCreatorOf(await runAuthorityById(ctx.db, ctx.orgId, ctx.runId)) : null;
+}

@@ -395,7 +395,7 @@ describe("Rotinas: the form's two plain questions", () => {
     const about = within(dialog).getByRole("button", { name: "Sobre O que pode fazer sozinha" });
     const hint = document.getElementById(about.getAttribute("aria-describedby") ?? "");
     expect(hint?.textContent).toBe(
-      "Só olhar e contar: ela lê e conta o que achou. Para mudar alguma coisa, pede a alguém. Pode agir: também pode criar e mudar tarefas, a memória, a wiki e arquivos do Drive, e trabalhar no próprio código. Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.",
+      "Só olhar e contar: ela lê e conta o que achou. Para mudar alguma coisa, pede a alguém. Pode agir: também pode criar e mudar tarefas, a memória, a wiki e arquivos do Drive, trabalhar no próprio código, falar com outros agentes e postar onde quem a criou posta. Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.",
     );
     await click(within(dialog).getByRole("radio", { name: "Toda vez" }));
     await click(within(dialog).getByRole("radio", { name: "Pode agir" }));
