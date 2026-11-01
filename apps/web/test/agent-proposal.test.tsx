@@ -275,9 +275,11 @@ describe("one request, one card: what it gets, created in one click", () => {
     await click(within(card).getByRole("button", { name: "Criar Nina" }), 8);
     expect(state.calls.find((c) => c.method === "agents.createProposed")?.args).toEqual([ORG_ID, "p-1"]);
     expect(state.calls.some((c) => c.method === "agents.create")).toBe(false);
-    const [made] = cardOf("@nina");
+    const [made] = cardOf("Nina");
     if (!made) throw new Error("no card");
     expect(made.textContent).toContain("Criado");
+    // What it got is behind "Ver detalhes", with the way to the agent.
+    await click(within(made).getByRole("button", { name: "Ver detalhes" }));
     expect(within(made).getByRole("link", { name: "Abrir perfil" })).toBeTruthy();
     // What it got takes a check; João's mailbox waits for him.
     const given = [...made.querySelectorAll(".waitcard__lines > li")].map((li) => li.getAttribute("data-given"));
@@ -302,14 +304,15 @@ describe("one request, one card: what it gets, created in one click", () => {
     );
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(6);
-    const [card] = cardOf("@nina");
+    const [card] = cardOf("Nina");
     if (!card) throw new Error("no card");
+    await click(within(card).getByRole("button", { name: "Ver detalhes" }));
     expect(lines(card).at(-1)).toBe(
       "E-mails do dia · Todos os dias, às 12:00 (horário de Brasília) · Só olhar e contar · um admin libera · não criada",
     );
     await click(within(card).getByRole("button", { name: "Criar a rotina E-mails do dia" }), 6);
     expect(state.calls.find((c) => c.method === "agents.proposalRoutine")?.args).toEqual([ORG_ID, "p-1"]);
-    const [made] = cardOf("@nina");
+    const [made] = cardOf("Nina");
     expect(within(made as HTMLElement).queryByRole("button", { name: "Criar a rotina E-mails do dia" })).toBeNull();
   });
 
