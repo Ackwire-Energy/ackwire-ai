@@ -79,10 +79,10 @@ describe("secret requests (ADR 0027)", () => {
     const aad = secretAad({ requestId: secretRequest.id, orgId: ORG_ID, name: "NPM_TOKEN", target: { kind: "env" } });
     expect(await openSecret(pair.privateKey, box, aad)).toBe("npm_live_abc123");
 
-    // Once sent, the settled card takes its place (another element): look it up again.
+    // Once sent, one line takes its place (another element): look it up again.
     const done = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
-    expect(done.querySelector(".ac-chip--done")?.textContent).toBe("Entregue");
-    expect(done.textContent).toContain("Você entregou às");
+    expect(done.querySelector(".rq-done__mark[data-done]")).not.toBeNull();
+    expect(done.textContent).toContain("Entregue por você: NPM_TOKEN");
     expect(within(done).queryByLabelText("Valor de NPM_TOKEN")).toBeNull();
     expect(done.hasAttribute("data-ask-id")).toBe(false);
   });
@@ -107,7 +107,8 @@ describe("secret requests (ADR 0027)", () => {
     await settle(4);
     expect(state.calls.some((c) => c.method === "secrets.decline")).toBe(true);
     const done = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
-    expect(done.textContent).toContain("Recusado. O agente segue sem ele.");
+    expect(done.textContent).toContain("Recusado: NPM_TOKEN");
+    expect(done.querySelector(".rq-done__mark[data-done]")).toBeNull();
   });
 
   // Real time passes in it (the request's own timer), so it gets more than the default 5 s.
@@ -123,6 +124,6 @@ describe("secret requests (ADR 0027)", () => {
     const done = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
     expect(done.hasAttribute("data-ask-id")).toBe(false);
     expect(within(done).queryByLabelText("Valor de NPM_TOKEN")).toBeNull();
-    expect(done.textContent).toContain("Ninguém respondeu a tempo.");
+    expect(done.textContent).toContain("Expirou: NPM_TOKEN");
   }, 15_000);
 });
