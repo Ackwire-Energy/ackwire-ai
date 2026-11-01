@@ -1489,7 +1489,7 @@ html:not([data-pointer]) .brw-trail__ext:focus-visible {
   line-height: 1;
   text-transform: uppercase;
 }
-.brw-mf__top canvas {
+.brw-mf__top .ac-pixspin {
   filter: brightness(0) invert(1);
 }
 .brw-mf__now {
@@ -1610,7 +1610,7 @@ html:not([data-pointer]) .brw-mf__now:focus-visible {
   font-size: 11.5px;
   font-variant-numeric: tabular-nums;
 }
-.brw-mf__hist canvas {
+.brw-mf__hist .ac-pixspin {
   filter: none;
 }
 /* "Parar a Ada?": its words start where a small button's label would, never on the toolbar's edge. */

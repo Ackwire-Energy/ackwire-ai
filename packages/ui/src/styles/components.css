@@ -3883,6 +3883,9 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
 .ac-on-dark .ac-btn--ghost {
   color: var(--on-dark-soft);
 }
+.ac-on-dark .ac-who > b {
+  color: inherit;
+}
 .ac-on-dark .ac-btn--ghost:hover,
 .ac-on-dark .ac-btn--ghost[aria-pressed="true"] {
   color: var(--on-dark);

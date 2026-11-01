@@ -543,4 +543,14 @@ describe("ghost buttons on a dark or agent-colored surface", () => {
     expect(value(css, ".brw-mf__now:hover .brw-mf__hist", "opacity")).toBe("1");
     expect(value(css, ".brw-stopask", "padding-left")).toBe("var(--space-3)");
   });
+
+  test("an agent's face and name in the frame's live line keep the line's white, not the page's ink or a silhouette", async () => {
+    const ui = await sheet("packages/ui/src/styles/components.css");
+    expect(value(ui, ".ac-on-dark .ac-who > b", "color")).toBe("inherit");
+    const css = await sheet("apps/web/src/components/browser/browser.css");
+    // Only the pixel spinner is whitened: the face's own canvas keeps its colors.
+    expect(declarations(css, ".brw-mf__top canvas")).toEqual([]);
+    expect(value(css, ".brw-mf__top .ac-pixspin", "filter")).toBe("brightness(0) invert(1)");
+    expect(value(css, ".brw-mf__hist .ac-pixspin", "filter")).toBe("none");
+  });
 });
