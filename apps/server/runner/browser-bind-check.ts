@@ -9,21 +9,30 @@ import { connect, createServer, type Server } from "node:net";
  * the agent's own.
  */
 export interface BindCheck {
-  /** A port of another agent's pair: binding it must be refused. */
-  forbidden: number;
-  /** The agent's own pair (0: already listening, skipped) and a development port: they must bind. */
-  allowed: [cdp: number, stream: number, dev: number];
+  /** Ports of other agents' pairs at each end of the band: binding them must be refused. */
+  forbidden: [first: number, last: number];
+  /** The agent's own pair (0: already listening, skipped), a port below the band and one above it: they must bind. */
+  allowed: [cdp: number, stream: number, below: number, above: number];
   /** The browser pairs of the computer's uid range: bind(0) must land outside them. */
   band: [number, number];
   /** Root's listeners on 127.0.0.1 and ::1, which must refuse the agent. */
   decoys: [number, number];
 }
 
+/**
+ * The probe's exit code when a bind came out other than the slice's policy says: the kernel still enforces an
+ * older policy there (`ensureBrowserBindPolicy`).
+ */
+export const POLICY_NOT_IN_FORCE_EXIT = 3;
+
+/** A bind the slice's policy would have decided otherwise. */
+export class PolicyNotInForce extends Error {}
+
 const isPort = (n: number, min = 1) => Number.isInteger(n) && n >= min && n <= 65_535;
 
 /** The probe's command-line words. */
 export const bindCheckArgs = (c: BindCheck) => [
-  String(c.forbidden),
+  ...c.forbidden.map(String),
   ...c.allowed.map(String),
   `${c.band[0]}-${c.band[1]}`,
   ...c.decoys.map(String),
@@ -31,17 +40,17 @@ export const bindCheckArgs = (c: BindCheck) => [
 
 /** The probe's words back into a check; null when they aren't one. */
 export function parseBindCheck(args: string[]): BindCheck | null {
-  if (args.length !== 7) return null;
-  const [forbidden, cdp, stream, dev, band = "", v4, v6] = args;
-  const [first, last] = band.split("-").map(Number);
+  if (args.length !== 9) return null;
+  const [first, last, cdp, stream, below, above, band = "", v4, v6] = args;
+  const [bandFirst, bandLast] = band.split("-").map(Number);
   const c: BindCheck = {
-    forbidden: Number(forbidden),
-    allowed: [Number(cdp), Number(stream), Number(dev)],
-    band: [Number(first), Number(last)],
+    forbidden: [Number(first), Number(last)],
+    allowed: [Number(cdp), Number(stream), Number(below), Number(above)],
+    band: [Number(bandFirst), Number(bandLast)],
     decoys: [Number(v4), Number(v6)],
   };
   const ok =
-    isPort(c.forbidden) &&
+    c.forbidden.every((p) => isPort(p)) &&
     c.allowed.every((p) => isPort(p, 0)) &&
     c.band.every((p) => isPort(p)) &&
     c.band[0] <= c.band[1] &&
@@ -122,21 +131,31 @@ const OWN_MS = 5000;
 /** A refusal in drop mode is a connection that never comes. */
 const DECOY_MS = 2000;
 
-/** The checks, on 127.0.0.1 and ::1; throws on the first that fails. Returns this process's /tmp. */
+const refused = (result: string) => result === "EPERM" || result === "EACCES";
+
+/**
+ * The checks, on 127.0.0.1 and ::1; throws on the first that fails, `PolicyNotInForce` when a bind came out other
+ * than the policy says (a refusal for a taken port is no proof either way). Returns this process's /tmp.
+ */
 export async function verifyBrowserBindPolicy(c: BindCheck, probes: BindProbes = kernelProbes): Promise<string> {
   for (const host of ["127.0.0.1", "::1"]) {
-    const denied = await probes.bind(host, c.forbidden);
-    if (denied.result !== "EPERM" && denied.result !== "EACCES") {
-      throw new Error(`Browser bind isolation failed for ${host}:${c.forbidden}: ${denied.result}`);
+    for (const port of c.forbidden) {
+      const { result } = await probes.bind(host, port);
+      if (refused(result)) continue;
+      const message = `Browser bind isolation failed for ${host}:${port}: ${result}`;
+      throw result === "bound" ? new PolicyNotInForce(message) : new Error(message);
     }
     for (const port of c.allowed) {
       if (port === 0) continue; // An already-running browser owns this port.
       const { result } = await probes.bind(host, port);
-      if (result !== "bound") throw new Error(`Browser bind allow failed for ${host}:${port}: ${result}`);
+      if (result === "bound") continue;
+      const message = `Browser bind allow failed for ${host}:${port}: ${result}`;
+      throw refused(result) ? new PolicyNotInForce(message) : new Error(message);
     }
     const any = await probes.bind(host, 0);
     if (any.result !== "bound" || any.port === undefined) {
-      throw new Error(`An agent's bind(0) failed on ${host}: ${any.result}`);
+      const message = `An agent's bind(0) failed on ${host}: ${any.result}`;
+      throw refused(any.result) ? new PolicyNotInForce(message) : new Error(message);
     }
     if (any.port >= c.band[0] && any.port <= c.band[1]) {
       throw new Error(`bind(0) gave ${host}:${any.port}, a reserved browser port`);

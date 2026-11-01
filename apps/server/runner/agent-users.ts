@@ -1,10 +1,19 @@
+import { appendFileSync, chmodSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { AgentScope } from "@agenteschat/adapters/machine-protocol";
 import { isAgentUid } from "./config";
 import { RunnerError } from "./errors";
 import { readJson, writeJson } from "./json-file";
 import { agentId8 } from "./paths";
-import { AGENT_TMP_ROOT, agentSlice, agentTmp, type RunCommand, runSync, systemdBooted } from "./service";
+import {
+  AGENT_RAM_ROOT,
+  AGENT_TMP_ROOT,
+  agentSlice,
+  agentTmp,
+  type RunCommand,
+  runSync,
+  systemdBooted,
+} from "./service";
 
 /**
  * System mode: every agent works as its own OS user, `ag-<first 8 of its id>`,
@@ -34,14 +43,32 @@ export interface Launcher {
 }
 
 /**
+ * Runs as root on the computer, before the agent's own mount namespace (`$1` its uid): the agent's tmpfs, so its
+ * /tmp, /dev/shm and /run/lock are in memory as the computer's are, each with its own room. Mounted at its first
+ * launch after the computer starts, under a lock: two first launches at once would stack two mounts.
+ */
+const AGENT_RAM = [
+  "set -e",
+  `r=${AGENT_RAM_ROOT}`,
+  'mkdir -p "$r"',
+  'chmod 0700 "$r"',
+  'd="$r/$1"',
+  "shift",
+  'mkdir -p "$d"',
+  `flock "$r/.lock" sh -c 'mountpoint -q "$1" || mount -t tmpfs -o mode=0700,size=50%,nr_inodes=1m agentes-runner-tmp "$1"' sh "$d"`,
+  'exec "$@"',
+].join("\n");
+
+/**
  * Runs as root in the agent's new mount namespace, before it becomes the agent (`$1` its uid): its own temporary
  * folders over the shared ones, so nothing another agent leaves there (a Postgres socket on trust, a name it
- * squats) is in its reach. They live under a folder only root reaches, so no agent can swap them; in the agent's
+ * squats) is in its reach. They live under folders only root reaches, so no agent can swap them; in the agent's
  * own /tmp only `mkdir` runs, never `chmod`, since the agent may have put a link there. Every launch of the agent
  * binds the same folders, so its processes see one /tmp.
  */
 const PRIVATE_TMP = [
   "set -e",
+  `m=${AGENT_RAM_ROOT}/$1`,
   `r=${AGENT_TMP_ROOT}`,
   'mkdir -p "$r"',
   'chmod 0700 "$r"',
@@ -49,11 +76,13 @@ const PRIVATE_TMP = [
   "shift",
   'mkdir -p "$d"',
   'chmod 0700 "$d"',
-  'for f in tmp var-tmp shm lock; do mkdir -p "$d/$f"; chmod 1777 "$d/$f"; done',
-  'mount --bind "$d/tmp" /tmp',
+  'mkdir -p "$d/var-tmp"',
+  'chmod 1777 "$d/var-tmp"',
+  'for f in tmp shm lock; do mkdir -p "$m/$f"; chmod 1777 "$m/$f"; done',
+  'mount --bind "$m/tmp" /tmp',
   'mount --bind "$d/var-tmp" /var/tmp',
-  'mount --bind "$d/shm" /dev/shm',
-  'if [ "$(stat -c %a /run/lock 2>/dev/null)" = 1777 ]; then mount --bind "$d/lock" /run/lock; fi',
+  'mount --bind "$m/shm" /dev/shm',
+  'if [ "$(stat -c %a /run/lock 2>/dev/null)" = 1777 ]; then mount --bind "$m/lock" /run/lock; fi',
   "mkdir -m 1777 /tmp/.X11-unix 2>/dev/null || :",
   "mkdir -m 1777 /tmp/.ICE-unix 2>/dev/null || :",
   'exec "$@"',
@@ -120,7 +149,7 @@ export class AgentUsers {
   /** Agents already checked by this process, with their user's comment. */
   private readonly ready = new Map<string, { user: AgentUser; comment: string }>();
 
-  constructor(private readonly opts: { home: string; range: [number, number]; run?: RunCommand }) {}
+  constructor(private readonly opts: { home: string; range: [number, number]; run?: RunCommand; etc?: string }) {}
 
   /**
    * The agent's user, made on its first request. After that, a request only
@@ -162,8 +191,42 @@ export class AgentUsers {
       this.run("usermod", ["--comment", name, user.user]);
       comment = name;
     }
+    if (!known) this.denySchedulers(user.user);
     this.ready.set(agent.id, { user, comment });
     return user;
+  }
+
+  /**
+   * cron and at would start the agent's jobs outside its launcher: in no slice of its own, with the computer's
+   * shared /tmp. Its user goes in their deny files: `cron.deny` made where missing (without it or `cron.allow`,
+   * cron takes everyone's jobs), `at.deny` only where it is (without it or `at.allow`, at takes root's alone). An
+   * allow file, where one is, already leaves agents out.
+   */
+  private denySchedulers(user: string) {
+    for (const [name, make] of [
+      ["cron.deny", true],
+      ["at.deny", false],
+    ] as const) {
+      const file = path.join(this.opts.etc ?? "/etc", name);
+      let text: string | null = null;
+      try {
+        text = readFileSync(file, "utf8");
+      } catch {
+        // missing
+      }
+      if (text === null && !make) continue;
+      if (text?.split("\n").some((line) => line.trim() === user)) continue;
+      try {
+        appendFileSync(file, `${text && !text.endsWith("\n") ? "\n" : ""}${user}\n`);
+        // crontab reads it as the person who runs it: a file it can't read would deny no one.
+        if (text === null) chmodSync(file, 0o644);
+      } catch (err) {
+        throw new RunnerError(
+          "internal",
+          `Couldn't keep ${user} from scheduling cron and at jobs (${file}): ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
   }
 
   /** The agent's row in agents.json, added (before its user exists) when it has none. */
@@ -197,12 +260,12 @@ export class AgentUsers {
 
 /**
  * Runs a command as the agent's user inside its slice (whose limits then
- * hold), with its own temporary folders (`PRIVATE_TMP`), or with runuser alone
- * where systemd isn't PID 1 (a container). Absolute paths: root never looks
- * these up on a PATH. `--collect`: a scope the OOM killer ended doesn't stay
- * behind as a failed unit. unshare and sh each become the next program (no
- * fork), so runuser still passes SIGTERM on; with slave propagation, what the
- * computer unmounts leaves the agent's namespace too.
+ * hold), with its own temporary folders (`AGENT_RAM`, `PRIVATE_TMP`), or with
+ * runuser alone where systemd isn't PID 1 (a container). Absolute paths: root
+ * never looks these up on a PATH. `--collect`: a scope the OOM killer ended
+ * doesn't stay behind as a failed unit. sh, unshare and sh each become the next
+ * program (no fork), so runuser still passes SIGTERM on; with slave
+ * propagation, what the computer unmounts leaves the agent's namespace too.
  */
 export function systemLauncher(u: AgentUser, systemd = systemdBooted()): Launcher {
   const home = agentHome(u.user);
@@ -225,6 +288,11 @@ export function systemLauncher(u: AgentUser, systemd = systemdBooted()): Launche
       "--collect",
       `--slice=${agentSlice(u.uid)}`,
       "--",
+      "/bin/sh",
+      "-c",
+      AGENT_RAM,
+      "sh",
+      String(u.uid),
       "/usr/bin/unshare",
       "--mount",
       "--propagation",

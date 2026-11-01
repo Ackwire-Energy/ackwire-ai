@@ -336,10 +336,10 @@ jobs:
         run: bun run check:boundaries
 
   # System mode's isolation on real kernels, as root (apps/server/test/runner/isolation.root.test.ts): real
-  # agent users, slices, the loopback table and the bind policy, then what each agent reaches. Ubuntu runs on
-  # GitHub's own kernel, with real Gradle, Kotlin and adb as two agents at once; its systemd lacks
-  # BPF_FRAMEWORK, so the bind policy is left out there. Debian 13 (the Cloud's release: its own kernel and
-  # systemd, built with BPF_FRAMEWORK) boots in QEMU, with KVM where the runner has it.
+  # agent users, slices, the loopback table and the bind policy, then what each agent reaches, with real Gradle,
+  # Kotlin, adb and Xtigervnc as two agents at once. Ubuntu runs on GitHub's own kernel (and its Chrome); its
+  # systemd lacks BPF_FRAMEWORK, so the bind policy is left out there. Debian 13 (the Cloud's release: its own
+  # kernel and systemd, built with BPF_FRAMEWORK) boots in QEMU, with KVM where the runner has it.
   isolation-root:
     name: Isolation as root (${{ matrix.leg }})
     needs: changes
@@ -363,7 +363,7 @@ jobs:
         timeout-minutes: 30
         run: |
           sudo apt-get -qq update
-          sudo apt-get -qq install -y nftables > /dev/null
+          sudo apt-get -qq install -y nftables tigervnc-standalone-server xauth at > /dev/null
           uname -r
           systemctl --version | head -2
           sudo -E env "PATH=$PATH" AGENTES_ROOT_TESTS=1 AGENTES_TEST_RUNNER="$RUNNER_TEMP/agentes-runner.mjs" \

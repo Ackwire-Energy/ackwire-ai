@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync, statSync } from "node:fs";
 import { type AgentUser, systemLauncher } from "./agent-users";
-import { bindCheckArgs } from "./browser-bind-check";
+import { bindCheckArgs, POLICY_NOT_IN_FORCE_EXIT, PolicyNotInForce } from "./browser-bind-check";
 import { browserBand, browserPortsForUid, checkEphemeralRange, EPHEMERAL_RANGE_FILE } from "./browser-ports";
 import { agentSlice, agentTmp, type RunCommand, systemdBooted } from "./service";
 
@@ -84,19 +84,16 @@ const folderId = (dir: string) => {
   }
 };
 
+/** Without it systemd ignores `SocketBindAllow=`/`SocketBindDeny=`, and an agent could bind any browser port. */
+const BPF_FRAMEWORK = /\+BPF_FRAMEWORK\b/;
+
 /**
- * Must run as root before this agent's worker can start or restart: the bind policy on its slice, then a probe in
- * it (`bind-check`, launched as every agent process is) that proves on this kernel what the agent may bind and
- * reach, and that its /tmp is its own.
+ * The agent's slice and its policy, before any of its processes starts: only the band is denied, its own pair
+ * excepted. bind(0) matches no rule with ports, so it binds (outside the band, by the ephemeral range).
  */
-export function ensureBrowserBindPolicy(user: AgentUser, runner: string[], opts: BindPolicyOptions) {
-  if (!(opts.systemd ?? systemdBooted())) {
-    throw new Error("System agent browsers require systemd cgroup socket-bind enforcement");
-  }
+export function applyBindPolicy(user: AgentUser, opts: BindPolicyOptions) {
   const run = opts.run ?? runBounded;
   const band = browserBand(opts.uidRange);
-  // Read again each time: bind(0) must never land in the band, which the bind policy can't see.
-  checkEphemeralRange((opts.ephemeralRange ?? (() => readFileSync(EPHEMERAL_RANGE_FILE, "utf8")))(), band);
   const { cdp, stream } = browserPortsForUid(user.uid);
   const slice = agentSlice(user.uid);
   // A newly allocated agent has no active slice yet. Start the empty slice as
@@ -107,9 +104,7 @@ export function ensureBrowserBindPolicy(user: AgentUser, runner: string[], opts:
   }
   // A slice made now is a new cgroup: mapped at once, so the agent's connections are its own from the probe on.
   opts.refresh?.();
-  // Only the band is denied, its own pair excepted: bind(0) matches no rule with ports, so it binds (outside the
-  // band, by the ephemeral range). Clearing and replacing the lists in one call avoids duplicates on restarts;
-  // systemd commits the cgroup change after every property of the call.
+  // Clearing and replacing the lists in one call avoids duplicates on restarts.
   const configured = run("systemctl", [
     "set-property",
     "--runtime",
@@ -122,7 +117,30 @@ export function ensureBrowserBindPolicy(user: AgentUser, runner: string[], opts:
   if (configured.code !== 0) {
     throw new Error(`Cannot set ${slice} browser bind policy: ${configured.output.slice(0, 200)}`);
   }
-  // Pick a currently unused reserved port. EADDRINUSE is not proof of
+}
+
+/**
+ * Must run as root before this agent's worker can start or restart: the bind policy on its slice, then a probe in
+ * it (`bind-check`, launched as every agent process is) that proves on this kernel what the agent may bind and
+ * reach, and that its /tmp is its own. `PolicyNotInForce` when the kernel still enforces another policy there.
+ */
+export function ensureBrowserBindPolicy(user: AgentUser, runner: string[], opts: BindPolicyOptions) {
+  if (!(opts.systemd ?? systemdBooted())) {
+    throw new Error("System agent browsers require systemd cgroup socket-bind enforcement");
+  }
+  const run = opts.run ?? runBounded;
+  if (!BPF_FRAMEWORK.test(run("systemctl", ["--version"]).output)) {
+    throw new Error(
+      "System mode needs systemd built with BPF_FRAMEWORK (systemctl --version shows +BPF_FRAMEWORK, as on Debian 13; Ubuntu's isn't): without it an agent could bind another agent's browser ports",
+    );
+  }
+  const band = browserBand(opts.uidRange);
+  // Read again each time: bind(0) must never land in the band, which the bind policy can't see.
+  checkEphemeralRange((opts.ephemeralRange ?? (() => readFileSync(EPHEMERAL_RANGE_FILE, "utf8")))(), band);
+  const { cdp, stream } = browserPortsForUid(user.uid);
+  const slice = agentSlice(user.uid);
+  applyBindPolicy(user, opts);
+  // Pick currently unused ports. EADDRINUSE is not proof of
   // enforcement, and the child only succeeds for EPERM/EACCES on IPv4+6.
   const sockets = run("ss", ["-Htln", "-e"]);
   if (sockets.code !== 0) throw new Error(`Cannot inspect browser bind test ports: ${sockets.output.slice(0, 200)}`);
@@ -137,12 +155,20 @@ export function ensureBrowserBindPolicy(user: AgentUser, runner: string[], opts:
       if (Number.isInteger(port)) occupied.add(port);
     }
   }
-  let forbidden = band[0];
-  while (forbidden <= band[1] && (forbidden === cdp || forbidden === stream || occupied.has(forbidden))) forbidden++;
-  if (forbidden > band[1]) throw new Error("No free reserved port for browser bind policy self-check");
-  let dev = 3000;
-  while (dev < band[0] && occupied.has(dev)) dev++;
-  if (dev >= band[0]) throw new Error("No free development port for browser bind policy self-check");
+  // Another agent's port at each end of the band, and one on each side of it: a policy left from before a change
+  // of the band (wider, narrower, or the earlier runner's deny of every port) gets one of them wrong.
+  const freeOther = (port: number) => port !== cdp && port !== stream && !occupied.has(port);
+  let first = band[0];
+  while (first <= band[1] && !freeOther(first)) first++;
+  let last = band[1];
+  while (last >= band[0] && !freeOther(last)) last--;
+  if (first > band[1]) throw new Error("No free reserved port for browser bind policy self-check");
+  let below = 3000;
+  while (below < band[0] && occupied.has(below)) below++;
+  if (below >= band[0]) throw new Error("No free development port for browser bind policy self-check");
+  let above = band[1] + 1;
+  while (above <= 65_535 && occupied.has(above)) above++;
+  if (above > 65_535) throw new Error("No free port above the band for browser bind policy self-check");
   // As every agent process starts: its slice, its private temporary folders, its user.
   const [launch = "", ...prefix] = systemLauncher(user, true).prefix;
   const decoys = (opts.decoys ?? rootDecoys)();
@@ -153,14 +179,19 @@ export function ensureBrowserBindPolicy(user: AgentUser, runner: string[], opts:
       ...runner,
       "bind-check",
       ...bindCheckArgs({
-        forbidden,
-        allowed: [occupied.has(cdp) ? 0 : cdp, occupied.has(stream) ? 0 : stream, dev],
+        forbidden: [first, last],
+        allowed: [occupied.has(cdp) ? 0 : cdp, occupied.has(stream) ? 0 : stream, below, above],
         band,
         decoys: decoys.ports,
       }),
     ]);
   } finally {
     decoys.close();
+  }
+  if (verified.code === POLICY_NOT_IN_FORCE_EXIT) {
+    throw new PolicyNotInForce(
+      `Agent ${user.uid}'s isolation doesn't hold in ${slice}: ${verified.output.slice(0, 300)} (systemd still enforces an earlier bind policy there, until systemctl daemon-reexec or a restart)`,
+    );
   }
   if (verified.code !== 0) {
     throw new Error(`Agent ${user.uid}'s isolation doesn't hold in ${slice}: ${verified.output.slice(0, 300)}`);
@@ -176,5 +207,55 @@ export function ensureBrowserBindPolicy(user: AgentUser, runner: string[], opts:
   const finalWrongOwner = conflictingBrowserPorts(finalSockets.output, [user.uid, user.uid]);
   if (finalWrongOwner.length) {
     throw new Error(`Agent ${user.uid}'s browser ports have the wrong listener owner: ${finalWrongOwner.join(", ")}`);
+  }
+}
+
+/**
+ * At the runner's start, the listed agents: every policy first, then each agent's `prepare` (its
+ * `ensureBrowserBindPolicy`). An agent that fails is logged and left out, and the others serve; its processes stay
+ * refused, since each of them proves its isolation again before it starts.
+ *
+ * systemd up to v258 neither re-attaches an active slice's bind programs when its policy changes nor detaches the
+ * ones it replaces when it realizes the slice again (fixed upstream after v258): a slice with processes keeps the
+ * earlier policy, and copies of it, all enforced. Re-executing systemd closes the copies (on exec) and attaches each
+ * slice's program anew from its policy, stopping nothing; a reload keeps the copies. With every policy set first,
+ * the agents whose probe found an older one share one re-execution.
+ */
+export function prepareAgents(
+  users: AgentUser[],
+  prepare: (user: AgentUser) => void,
+  opts: BindPolicyOptions,
+  log: (line: string) => void,
+) {
+  const failed = (user: AgentUser, err: unknown) =>
+    log(`couldn't prepare ${user.user}: ${err instanceof Error ? err.message : String(err)}`);
+  const applied = users.filter((user) => {
+    try {
+      applyBindPolicy(user, opts);
+      return true;
+    } catch (err) {
+      failed(user, err);
+      return false;
+    }
+  });
+  const stale = applied.filter((user) => {
+    try {
+      prepare(user);
+    } catch (err) {
+      if (err instanceof PolicyNotInForce) return true;
+      failed(user, err);
+    }
+    return false;
+  });
+  if (!stale.length) return;
+  log(`systemd still enforces an earlier bind policy for ${stale.map((u) => u.user).join(", ")}: re-executing it`);
+  const reexec = (opts.run ?? runBounded)("systemctl", ["daemon-reexec"]);
+  if (reexec.code !== 0) log(`systemctl daemon-reexec failed: ${reexec.output.slice(0, 200)}`);
+  for (const user of stale) {
+    try {
+      prepare(user);
+    } catch (err) {
+      failed(user, err);
+    }
   }
 }

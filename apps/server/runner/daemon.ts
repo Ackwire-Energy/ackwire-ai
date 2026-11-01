@@ -53,7 +53,7 @@ import { type AgentUser, AgentUsers, agentGid, readAgentUsers, systemLauncher } 
 import { BrainManager } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager } from "./browser";
-import { ensureBrowserBindPolicy } from "./browser-bind-policy";
+import { ensureBrowserBindPolicy, prepareAgents } from "./browser-bind-policy";
 import {
   configPath,
   connectUrl,
@@ -889,9 +889,7 @@ export class RunnerDaemon implements RequestObserver {
         ...(this.opts.workers || config.managedBy === "host"
           ? {}
           : {
-              prepareExisting: (existing: AgentUser[]) => {
-                for (const user of existing) prepare(user);
-              },
+              prepareExisting: (existing: AgentUser[]) => prepareAgents(existing, prepare, policy, log),
             }),
         lend: (kind, accountId, uid) => this.accounts.lendTo(kind, accountId, uid),
         grant: (kind, accountId) => this.accounts.grant(kind, accountId),

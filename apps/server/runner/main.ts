@@ -23,8 +23,13 @@ import {
   TOOL_NAMES,
 } from "./access";
 import { AgentUsers, agentGid, systemLauncher } from "./agent-users";
-import { parseBindCheck, verifyBrowserBindPolicy } from "./browser-bind-check";
-import { ensureBrowserBindPolicy } from "./browser-bind-policy";
+import {
+  POLICY_NOT_IN_FORCE_EXIT,
+  PolicyNotInForce,
+  parseBindCheck,
+  verifyBrowserBindPolicy,
+} from "./browser-bind-check";
+import { ensureBrowserBindPolicy, prepareAgents } from "./browser-bind-policy";
 import { browserPortsForUid } from "./browser-ports";
 import {
   configPath,
@@ -471,7 +476,7 @@ async function bindCheck(args: string[]): Promise<number> {
     return 0;
   } catch (err) {
     console.error(err instanceof Error ? err.message : String(err));
-    return 1;
+    return err instanceof PolicyNotInForce ? POLICY_NOT_IN_FORCE_EXIT : 1;
   }
 }
 
@@ -559,12 +564,8 @@ async function host(p: Parsed): Promise<number> {
   try {
     guard?.start();
     if (system) {
-      for (const user of computer.agentUsers()) {
-        ensureBrowserBindPolicy(user, thisRunner(), {
-          uidRange: DEFAULT_AGENT_UID_RANGE,
-          refresh: () => guard?.reconcile(),
-        });
-      }
+      const policy = { uidRange: DEFAULT_AGENT_UID_RANGE, refresh: () => void guard?.reconcile() };
+      prepareAgents(computer.agentUsers(), (user) => ensureBrowserBindPolicy(user, thisRunner(), policy), policy, log);
     }
     await computer.run();
     log("stopped");

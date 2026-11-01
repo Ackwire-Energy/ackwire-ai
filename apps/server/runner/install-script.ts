@@ -526,6 +526,10 @@ install_system() {
   [ "$(id -u)" -eq 0 ] ||
     die "--system installs the runner for the whole computer: run it as root (curl -fsSL $SERVER/api/machines/install.sh | sudo sh -s -- --system)"
   [ "$(uname -s)" = Linux ] || die "--system is for Linux"
+  # Each agent's slice keeps it off the others' browser ports with systemd's BPF programs: without them no agent's
+  # process starts.
+  systemctl --version 2>/dev/null | grep -q '+BPF_FRAMEWORK' ||
+    die "--system needs systemd built with BPF_FRAMEWORK (systemctl --version shows +BPF_FRAMEWORK), as on Debian 13; Ubuntu's isn't, so agents can't work on this computer as users of their own"
   SYSTEM_DIR=${shQuote(SYSTEM_RUNNER_DIR)}
   BROWSER_DIR=${shQuote(SYSTEM_BROWSER_DIR)}
   RUNNER_HOME=${shQuote(SYSTEM_RUNNER_HOME)}

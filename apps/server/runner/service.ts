@@ -61,11 +61,16 @@ export const allAgentsLimitsPath = (unitPath = SYSTEM_UNIT_PATH) =>
 /** `agents.slice` in the cgroup tree (cgroup v2), where its counters are (`memory.events`). */
 export const AGENTS_CGROUP = "/sys/fs/cgroup/agents.slice";
 export const agentCgroup = (uid: number) => path.join(AGENTS_CGROUP, agentSlice(uid));
-/** Each agent's own /tmp, /var/tmp, /dev/shm and /run/lock (`<uid>/tmp`…), in a folder only root can reach. */
+/**
+ * Each agent's own /tmp, /dev/shm and /run/lock (`<uid>/tmp`, `shm`, `lock`): in memory as the computer's are, on a
+ * tmpfs of the agent's own at `<uid>`, in a folder only root can reach.
+ */
+export const AGENT_RAM_ROOT = "/run/agentes-runner-tmp";
+/** Each agent's own /var/tmp (`<uid>/var-tmp`): on disk as the computer's is, in a folder only root can reach. */
 export const AGENT_TMP_ROOT = "/var/lib/agentes-runner-tmp";
-export const agentTmp = (uid: number) => path.join(AGENT_TMP_ROOT, String(uid), "tmp");
-/** systemd-tmpfiles' line for them: what agents leave there goes after 10 days, as in a stock /tmp. */
-export const AGENT_TMP_CLEANUP = `# agentes.chat runner: each agent's own temporary folders\ne ${AGENT_TMP_ROOT}/*/* - - - 10d\n`;
+export const agentTmp = (uid: number) => path.join(AGENT_RAM_ROOT, String(uid), "tmp");
+/** systemd-tmpfiles' lines for them: what agents leave goes after 10 days, 30 in /var/tmp, as in a stock system. */
+export const AGENT_TMP_CLEANUP = `# agentes.chat runner: each agent's own temporary folders\ne ${AGENT_RAM_ROOT}/*/* - - - 10d\ne ${AGENT_TMP_ROOT}/*/* - - - 30d\n`;
 /** In `/etc/tmpfiles.d`, two folders up from the unit's (`/etc/systemd/system`). */
 export const agentTmpCleanupPath = (unitPath = SYSTEM_UNIT_PATH) =>
   path.join(path.dirname(unitPath), "..", "..", "tmpfiles.d", `${SERVICE_NAME}.conf`);

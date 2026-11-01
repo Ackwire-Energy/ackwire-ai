@@ -1,7 +1,18 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import type { EventEmitter } from "node:events";
-import { chmodSync, copyFileSync, existsSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  readlinkSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import {
   type AgentUser,
@@ -11,18 +22,31 @@ import {
   readAgentUsers,
   systemLauncher,
 } from "../../runner/agent-users";
-import { type BindPolicyOptions, ensureBrowserBindPolicy } from "../../runner/browser-bind-policy";
+import {
+  applyBindPolicy,
+  type BindPolicyOptions,
+  ensureBrowserBindPolicy,
+  prepareAgents,
+} from "../../runner/browser-bind-policy";
 import { browserBand, browserPortsForUid } from "../../runner/browser-ports";
 import { LoopbackGuard, RUNNER_NFT_TABLE } from "../../runner/loopback-guard";
-import { AGENT_TMP_CLEANUP, AGENT_TMP_ROOT, agentSlice, agentTmp, runSync } from "../../runner/service";
+import {
+  AGENT_RAM_ROOT,
+  AGENT_TMP_CLEANUP,
+  AGENT_TMP_ROOT,
+  agentCgroup,
+  agentSlice,
+  agentTmp,
+  runSync,
+} from "../../runner/service";
 
 /**
  * System mode's isolation on a real Linux computer, as root: real agent users and slices, the runner's loopback
  * table and bind policy, and what each agent's processes reach, on 127.0.0.1 and ::1. It changes the computer it
- * runs on (users, slices, nftables, a bridge and a network namespace), so it runs only with AGENTES_ROOT_TESTS=1: in
- * CI's isolation-root job, or on a disposable VM. AGENTES_TEST_RUNNER is the runner bundle the agents' bind check
- * runs. Where Gradle, Kotlin and adb are installed (GitHub's Ubuntu image), two agents also build and run them at
- * once.
+ * runs on (users, slices, nftables, a bridge and a network namespace, systemd re-executed), so it runs only with
+ * AGENTES_ROOT_TESTS=1: in CI's isolation-root job, or on a disposable VM. AGENTES_TEST_RUNNER is the runner bundle
+ * the agents' bind check runs. Where Gradle, Kotlin, adb, Chrome and Xtigervnc are installed, two agents also run
+ * them at once, and the abstract Unix sockets they hold are looked at.
  */
 const ROOT = process.platform === "linux" && process.getuid?.() === 0 && process.env.AGENTES_ROOT_TESTS === "1";
 
@@ -42,7 +66,7 @@ const GUEST = { ns: "agentes-guest", bridge: "agentes-br", veth: "agentes-veth",
 
 /** One socket operation, as whoever runs it; prints its outcome (an errno's name on failure). */
 const PY = `
-import errno, os, socket, sys
+import errno, os, socket, struct, sys
 def err(e):
     return errno.errorcode.get(e.errno, type(e).__name__) if isinstance(e, OSError) and e.errno else type(e).__name__
 mode = sys.argv[1]
@@ -115,16 +139,50 @@ elif mode == "unix-connect":
         print("connected")
     except OSError as e:
         print(err(e))
+elif mode == "abstract-listen":
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        s.bind("\\0" + sys.argv[2])
+        s.listen(8)
+    except OSError as e:
+        print(err(e), flush=True)
+        sys.exit(1)
+    print(0, flush=True)
+    while True:
+        c, _ = s.accept()
+        c.close()
+elif mode == "x11":
+    # An X11 connection setup on the abstract socket, with a cookie or none: the server's first byte says.
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.settimeout(5)
+    try:
+        s.connect("\\0" + sys.argv[2])
+    except OSError as e:
+        print(err(e))
+        sys.exit(0)
+    name = b"MIT-MAGIC-COOKIE-1" if len(sys.argv) > 3 else b""
+    data = bytes.fromhex(sys.argv[3]) if len(sys.argv) > 3 else b""
+    pad = lambda b: b + b"\\0" * (-len(b) % 4)
+    s.sendall(struct.pack("<cxHHHHxx", b"l", 11, 0, len(name), len(data)) + pad(name) + pad(data))
+    reply = s.recv(8)
+    print({0: "failed", 1: "success", 2: "authenticate"}.get(reply[0] if reply else -1, "closed"))
 `;
 
 /** systemd here can enforce the bind policy (`SocketBindDeny=`); Ubuntu's can't. */
 const BPF = ROOT && /\+BPF_FRAMEWORK/.test(runSync("systemctl", ["--version"]).output);
 const has = (file: string) => ROOT && existsSync(file);
-const ADB = "/usr/local/lib/android/sdk/platform-tools/adb";
+/** GitHub's Android SDK, or Debian's package. */
+const ADB = ["/usr/local/lib/android/sdk/platform-tools/adb", "/usr/bin/adb"].find(has) ?? "/usr/bin/adb";
 const GRADLE = "/usr/bin/gradle";
+const CHROME = "/usr/bin/google-chrome";
+const XVNC = "/usr/bin/Xtigervnc";
+const XAUTH = "/usr/bin/xauth";
 
+let users: AgentUsers;
 let A: AgentUser;
 let B: AgentUser;
+/** The third agent: the in-place upgrade's. */
+let C: AgentUser | undefined;
 let guard: LoopbackGuard;
 let policy: BindPolicyOptions;
 const running: ChildProcess[] = [];
@@ -221,6 +279,40 @@ const nft = (text: string) => {
 /** Root's own address on its way out (the runner's eth0, the VM's NIC). */
 const hostAddress = () => /\bsrc (\S+)/.exec(must("ip", ["-4", "route", "get", "1.1.1.1"]))?.[1] ?? "";
 
+/** How many socket-bind programs (IPv4's) are attached to `user`'s slice; null without bpftool. */
+function bindPrograms(user: AgentUser): number | null {
+  const r = runSync("bpftool", ["cgroup", "show", agentCgroup(user.uid)]);
+  return r.code === 0 ? r.output.split("\n").filter((line) => /\bcgroup_inet4_bind\b/.test(line)).length : null;
+}
+
+/**
+ * The abstract Unix socket names (`@…`) the processes in `user`'s slice listen on, each with the program that
+ * holds it: abstract names belong to the network namespace, so every agent reaches them.
+ */
+function abstractListeners(user: AgentUser): string[] {
+  const names = new Map<string, string>();
+  for (const line of readFileSync("/proc/net/unix", "utf8").split("\n").slice(1)) {
+    const [, , , flags, , , inode, name] = line.trim().split(/\s+/);
+    // __SO_ACCEPTCON: listening.
+    if (flags === "00010000" && inode && name?.startsWith("@")) names.set(inode, name);
+  }
+  const held = new Set<string>();
+  for (const pid of readdirSync("/proc").filter((p) => /^\d+$/.test(p))) {
+    try {
+      if (!readFileSync(`/proc/${pid}/cgroup`, "utf8").includes(`/${agentSlice(user.uid)}/`)) continue;
+      const comm = readFileSync(`/proc/${pid}/comm`, "utf8").trim();
+      for (const fd of readdirSync(`/proc/${pid}/fd`)) {
+        const inode = /^socket:\[(\d+)\]$/.exec(readlinkSync(`/proc/${pid}/fd/${fd}`))?.[1];
+        const name = inode && names.get(inode);
+        if (name) held.add(`${name} (${comm})`);
+      }
+    } catch {
+      // gone meanwhile
+    }
+  }
+  return [...held].sort();
+}
+
 describe.if(ROOT)("the agents' isolation on this computer, as root", () => {
   beforeAll(() => {
     rmSync(HOME, { recursive: true, force: true });
@@ -231,7 +323,7 @@ describe.if(ROOT)("the agents' isolation on this computer, as root", () => {
     chmodSync(RUNNER[0] as string, 0o755);
     copyFileSync(process.env.AGENTES_TEST_RUNNER ?? "", RUNNER[1] as string);
     chmodSync(RUNNER[1] as string, 0o644);
-    const users = new AgentUsers({ home: HOME, range: RANGE });
+    users = new AgentUsers({ home: HOME, range: RANGE });
     A = users.ensure({ id: "a0000000-0000-4000-8000-000000000001", handle: "a", name: "Agent A" });
     B = users.ensure({ id: "b0000000-0000-4000-8000-000000000002", handle: "b", name: "Agent B" });
     guard = new LoopbackGuard({
@@ -257,10 +349,12 @@ describe.if(ROOT)("the agents' isolation on this computer, as root", () => {
     runSync("ip", ["link", "del", GUEST.bridge]);
     runSync("ip", ["link", "del", GUEST.veth]);
     runSync("ip", ["netns", "del", GUEST.ns]);
-    for (const u of [A, B]) {
+    for (const u of [A, B, C]) {
       if (!u) continue;
       runSync("systemctl", ["stop", agentSlice(u.uid)]);
       runSync("userdel", ["-r", u.user]);
+      runSync("umount", ["-l", path.join(AGENT_RAM_ROOT, String(u.uid))]);
+      rmSync(path.join(AGENT_RAM_ROOT, String(u.uid)), { recursive: true, force: true });
       rmSync(path.join(AGENT_TMP_ROOT, String(u.uid)), { recursive: true, force: true });
     }
     rmSync(HOME, { recursive: true, force: true });
@@ -479,6 +573,111 @@ describe.if(ROOT)("the agents' isolation on this computer, as root", () => {
     }
     expect(existsSync(path.join(agentTmp(A.uid), "agentes-isolation-a.sock"))).toBe(true);
     expect(runAs(B, ["/bin/ls", "-a", "/tmp"]).out).not.toContain("agentes-isolation-a.sock");
+    // In memory as the computer's are, on a tmpfs of the agent's own; /var/tmp on disk as the computer's is.
+    expect(runSync("findmnt", ["-n", "-o", "FSTYPE", path.join(AGENT_RAM_ROOT, String(A.uid))]).output).toBe("tmpfs");
+    expect(runAs(A, ["/usr/bin/stat", "-f", "-c", "%T", "/tmp", "/dev/shm", "/run/lock"]).out.split("\n")).toEqual([
+      "tmpfs",
+      "tmpfs",
+      "tmpfs",
+    ]);
+    expect(runAs(A, ["/usr/bin/stat", "-f", "-c", "%T", "/var/tmp"]).out).toBe(
+      runSync("stat", ["-f", "-c", "%T", "/var/tmp"]).output,
+    );
+  });
+
+  test.if(BPF)(
+    "18. an in-place upgrade: a running slice under the earlier runner's policy takes the new one at the runner's start",
+    async () => {
+      C = users.ensure({ id: "c0000000-0000-4000-8000-000000000003", handle: "c", name: "Agent C" });
+      const agent = C;
+      const slice = agentSlice(agent.uid);
+      const { cdp, stream } = browserPortsForUid(agent.uid);
+      // The earlier runner's policy: every TCP port denied but 1-9999, 30000-65535 and its own pair, port 0 too.
+      const earlier = () =>
+        must("systemctl", [
+          "set-property",
+          "--runtime",
+          slice,
+          "SocketBindAllow=",
+          "SocketBindAllow=tcp:1-9999",
+          "SocketBindAllow=tcp:30000-65535",
+          `SocketBindAllow=tcp:${cdp}-${stream}`,
+          "SocketBindDeny=",
+          "SocketBindDeny=tcp",
+        ]);
+      // Its processes come and go, each time realizing the slice again, then one keeps running (a task).
+      const busy = async () => {
+        for (let i = 0; i < 2; i++) runAs(agent, ["/bin/true"]);
+        await hold(agent, ["/bin/sh", "-c", "echo ready; exec sleep 600"], (lines) => lines.includes("ready"));
+        return running.at(-1) as ChildProcess;
+      };
+      const start = () => {
+        const logs: string[] = [];
+        prepareAgents(
+          [agent],
+          (u) => ensureBrowserBindPolicy(u, RUNNER, policy),
+          policy,
+          (line) => logs.push(line),
+        );
+        console.log(`upgrade: the runner's start said ${JSON.stringify(logs)}; ${bindPrograms(agent)} programs`);
+        return logs;
+      };
+      must("systemctl", ["start", slice]);
+      guard.reconcile();
+      earlier();
+      let task = await busy();
+      expect(probe(agent, "bind", "127.0.0.1", "0")).toBe("EPERM");
+      console.log(`upgrade: ${bindPrograms(agent)} bind programs on ${slice} under the earlier policy`);
+
+      expect(start().filter((line) => line.startsWith("couldn't"))).toEqual([]);
+      for (const host of HOSTS) {
+        expect(probe(agent, "bind", host, "0")).toMatch(/^bound \d+$/);
+        // The earlier policy's whole 10000-29999 is gone: the Kotlin daemon's ports bind.
+        expect(probe(agent, "bind", host, "17001")).toBe("bound 17001");
+      }
+      if (bindPrograms(agent) !== null) expect(bindPrograms(agent)).toBe(1);
+
+      // Rolled back: the earlier runner's set-property alone leaves the new programs in force, so its bind check
+      // (which wants bind(0) refused) fails until a reload; its policy is the stricter, so a reload is enough.
+      earlier();
+      expect(probe(agent, "bind", "127.0.0.1", "0")).toMatch(/^bound \d+$/);
+      must("systemctl", ["daemon-reload"]);
+      expect(probe(agent, "bind", "127.0.0.1", "0")).toBe("EPERM");
+
+      // Forward again, after the earlier runner ran a while: its programs pile up as the slice is realized again,
+      // and a reload replaces only the latest of them.
+      task.kill("SIGTERM");
+      await until(() => task.exitCode !== null || task.signalCode !== null, 10_000);
+      task = await busy();
+      applyBindPolicy(agent, policy);
+      must("systemctl", ["daemon-reload"]);
+      console.log(
+        `upgrade: with the new policy set and a reload, bind(0) ${probe(agent, "bind", "127.0.0.1", "0")}; ${bindPrograms(agent)} programs`,
+      );
+      expect(start().filter((line) => line.startsWith("couldn't"))).toEqual([]);
+      expect(probe(agent, "bind", "127.0.0.1", "0")).toMatch(/^bound \d+$/);
+      expect(probe(agent, "bind", "::1", "17001")).toBe("bound 17001");
+      if (bindPrograms(agent) !== null) expect(bindPrograms(agent)).toBe(1);
+      task.kill("SIGTERM");
+    },
+    300_000,
+  );
+
+  test("19. an agent's user can't schedule cron or at jobs, which would run outside its slice and its own /tmp", () => {
+    const as = (argv: string[]) => {
+      const r = spawnSync("/usr/sbin/runuser", ["-u", A.user, "--", ...argv], { cwd: "/", encoding: "utf8" });
+      return { code: r.status, out: `${r.stdout}${r.stderr}` };
+    };
+    if (has("/usr/bin/crontab")) {
+      const cron = as(["/usr/bin/crontab", "-l"]);
+      expect(cron.out).toContain("not allowed");
+      expect(cron.code).not.toBe(0);
+    } else console.log("no cron here");
+    if (has("/usr/bin/at")) {
+      const at = as(["/usr/bin/at", "-l"]);
+      expect(at.out).toMatch(/permission|not allowed/i);
+      expect(at.code).not.toBe(0);
+    } else console.log("no at here");
   });
 
   test("systemd-tmpfiles takes the cleanup line for the agents' own folders, and keeps what is fresh", () => {
@@ -501,6 +700,8 @@ describe.if(ROOT)("the agents' isolation on this computer, as root", () => {
         expect(devices.code).toBe(0);
         expect(devices.out).toContain("List of devices attached");
         expect(probe(u, "connect", "127.0.0.1", String(adbServerPort(u.uid)))).toBe("connected");
+        // Its server listens on TCP alone.
+        expect(abstractListeners(u)).toEqual([]);
       }
       expect(probe(B, "connect", "127.0.0.1", String(adbServerPort(A.uid)))).toBe("ECONNREFUSED");
     } finally {
@@ -554,8 +755,85 @@ describe.if(ROOT)("the agents' isolation on this computer, as root", () => {
         expect(r.out).not.toMatch(/fallback strategy|Could not connect to Kotlin compile daemon/i);
         const status = runAs([A, B][i] as AgentUser, [GRADLE, "--status"], 60_000).out;
         expect(status).toMatch(/\d+\s+(IDLE|BUSY)/);
+        // The Gradle and Kotlin daemons, still running, listen on TCP alone.
+        expect(abstractListeners([A, B][i] as AgentUser)).toEqual([]);
       }
     },
     600_000,
+  );
+
+  test.if(has(CHROME))("Chrome as an agent holds no abstract Unix socket", async () => {
+    const profile = path.join(systemLauncher(A).home, "chrome-abstract");
+    // Without its sandbox its renderers share the computer's network namespace too: the most it could hold.
+    await hold(
+      A,
+      [
+        CHROME,
+        "--headless=new",
+        "--no-sandbox",
+        "--no-first-run",
+        `--user-data-dir=${profile}`,
+        `--remote-debugging-port=${browserPortsForUid(A.uid).cdp}`,
+        "about:blank",
+      ],
+      (lines) => lines.some((line) => line.includes("DevTools listening")),
+    );
+    const chrome = running.at(-1) as ChildProcess;
+    try {
+      await Bun.sleep(2000);
+      expect(abstractListeners(A)).toEqual([]);
+    } finally {
+      chrome.kill("SIGTERM");
+    }
+  });
+
+  test.if(has(XVNC) && has(XAUTH))(
+    "an agent's X server: its abstract socket refuses another agent without the cookie; a name another agent holds keeps that display from starting",
+    async () => {
+      const cookie = "0123456789abcdef0123456789abcdef";
+      const auth = path.join(systemLauncher(A).home, "x-abstract-auth");
+      expect(runAs(A, [XAUTH, "-f", auth, "add", ":61", "MIT-MAGIC-COOKIE-1", cookie]).code).toBe(0);
+      const xvnc = (display: number) => [
+        XVNC,
+        `:${display}`,
+        "-auth",
+        auth,
+        "-nolisten",
+        "tcp",
+        "-rfbport",
+        "-1",
+        "-SecurityTypes",
+        "None",
+        "-geometry",
+        "800x600",
+        "-s",
+        "0",
+      ];
+      const held = (display: number) => readFileSync("/proc/net/unix", "utf8").includes(`@/tmp/.X11-unix/X${display}`);
+      await hold(A, xvnc(61), () => held(61));
+      const x61 = running.at(-1) as ChildProcess;
+      const squatter: ChildProcess[] = [];
+      try {
+        console.log(`abstract sockets of an agent running Xtigervnc: ${JSON.stringify(abstractListeners(A))}`);
+        expect(abstractListeners(A)).toContain("@/tmp/.X11-unix/X61 (Xtigervnc)");
+        expect(probe(B, "x11", "/tmp/.X11-unix/X61")).toBe("failed");
+        expect(probe(B, "x11", "/tmp/.X11-unix/X61", "ffffffffffffffffffffffffffffffff")).toBe("failed");
+        expect(probe(A, "x11", "/tmp/.X11-unix/X61", cookie)).toBe("success");
+        // Another agent takes display 62's name first: A's X server there can't start (no listener of B's is
+        // reached by A's X clients, since that server never runs).
+        await serve(B, "abstract-listen", "/tmp/.X11-unix/X62");
+        squatter.push(running.at(-1) as ChildProcess);
+        expect(abstractListeners(B)).toEqual([expect.stringMatching(/^@\/tmp\/\.X11-unix\/X62 \(python3/)]);
+        const refused = runAs(A, xvnc(62), 30_000);
+        console.log(
+          `X server on a display whose name another agent holds: exit ${refused.code}: ${refused.out.slice(-300)}`,
+        );
+        expect(refused.code).not.toBe(0);
+        expect(refused.out).toMatch(/already running|already active|listening sockets/i);
+      } finally {
+        x61.kill("SIGTERM");
+        for (const child of squatter) child.kill("SIGTERM");
+      }
+    },
   );
 });

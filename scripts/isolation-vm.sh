@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # CI's isolation-root job, Debian 13 leg: boots the agentes.chat Cloud's release (Debian's own kernel, and systemd
-# built with BPF_FRAMEWORK, which the agents' bind policy needs) in QEMU and runs the isolation test there as root.
-# The guest's second serial port is this job's log (its console, where a getty starts, goes to a file), and the
-# test's exit code comes back on it.
+# built with BPF_FRAMEWORK, which the agents' bind policy needs) in QEMU and runs the isolation test there as root,
+# with the toolchain the owner's Android build needs under that policy (Debian's JDK and adb, Gradle, and the
+# Kotlin compile daemon Gradle fetches), Xtigervnc as the agents' desktops run it, cron and at, and bpftool to
+# count the bind programs on a slice. The guest's second serial port is this job's log (its console, where a getty starts, goes to
+# a file), and the test's exit code comes back on it.
 # Usage: scripts/isolation-vm.sh <bundled test> <runner bundle> <image folder (kept between runs)>
 set -euo pipefail
 test_js=$1 runner=$2 images=$3
@@ -10,13 +12,22 @@ test_js=$1 runner=$2 images=$3
 # published beside it.
 image_url=https://cloud.debian.org/images/cloud/trixie/20261026-2643/debian-13-generic-amd64-20261026-2643.qcow2
 image_sha512=5bd891c6e62d01639f52a5587b72a4607421e445732214be787dba6043cf9797a6ff90bed982aada6a6c7e619f1f956d961c4fad76757171abd607920aac098a
+# Gradle's distribution, checked against the SHA-256 Gradle publishes beside it (services.gradle.org).
+gradle_version=8.14.3
+gradle_url=https://services.gradle.org/distributions/gradle-$gradle_version-bin.zip
+gradle_sha256=bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f3531
 work=${RUNNER_TEMP:-/tmp}/isolation-vm
 image=$images/debian-13.qcow2
+gradle=$images/gradle-$gradle_version-bin.zip
 
 mkdir -p "$images"
 if ! echo "$image_sha512  $image" | sha512sum -c --quiet - > /dev/null 2>&1; then
   curl -fsSL --retry 3 -o "$image" "$image_url"
   echo "$image_sha512  $image" | sha512sum -c --quiet -
+fi
+if ! echo "$gradle_sha256  $gradle" | sha256sum -c --quiet - > /dev/null 2>&1; then
+  curl -fsSL --retry 3 -o "$gradle" "$gradle_url"
+  echo "$gradle_sha256  $gradle" | sha256sum -c --quiet -
 fi
 rm -rf "$work"
 mkdir -p "$work/seed"
@@ -27,6 +38,7 @@ seed=$work/seed
 cp "$test_js" "$seed/isolation.root.test.js"
 cp "$runner" "$seed/agentes-runner.mjs"
 cp "$(command -v bun)" "$seed/bun"
+cp "$gradle" "$seed/gradle.zip"
 printf 'instance-id: isolation\nlocal-hostname: isolation\n' > "$seed/meta-data"
 cat > "$seed/user-data" << 'EOF'
 #cloud-config
@@ -50,7 +62,14 @@ echo "== Linux $(uname -r)"
 systemctl --version | head -2
 systemctl --version | grep -q '+BPF_FRAMEWORK' || { echo "This systemd has no BPF_FRAMEWORK"; exit 1; }
 apt-get -qq update
-apt-get -qq install -y --no-install-recommends nftables > /dev/null
+apt-get -qq install -y --no-install-recommends nftables bpftool default-jdk-headless adb unzip cron at \
+  tigervnc-standalone-server xauth x11-xkb-utils xkb-data > /dev/null
+# Gradle where the agents' users run it, as GitHub's image has it.
+unzip -q /mnt/seed/gradle.zip -d /opt
+ln -sf /opt/gradle-*/bin/gradle /usr/bin/gradle
+java -version 2>&1 | head -1
+gradle --version | grep -E '^(Gradle|Kotlin)'
+adb version | head -1
 mkdir -p /root/isolation
 cp /mnt/seed/bun /mnt/seed/isolation.root.test.js /root/isolation/
 chmod 755 /root/isolation/bun
@@ -65,7 +84,7 @@ if [ -e /dev/kvm ]; then
   accel=kvm cpu=host
 fi
 echo "QEMU with $accel"
-timeout 40m qemu-system-x86_64 -machine "q35,accel=$accel" -cpu "$cpu" -smp 2 -m 3072 \
+timeout 40m qemu-system-x86_64 -machine "q35,accel=$accel" -cpu "$cpu" -smp 4 -m 8192 \
   -drive "file=$work/disk.qcow2,if=virtio" \
   -drive "file=$work/seed.iso,media=cdrom,readonly=on" \
   -netdev user,id=net0 -device virtio-net-pci,netdev=net0 \

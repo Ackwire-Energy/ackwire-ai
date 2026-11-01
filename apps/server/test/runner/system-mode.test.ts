@@ -189,11 +189,12 @@ test.if(posix)("service install --system: a system home, and it starts only when
   // Where their counters are read (memory.events).
   expect(AGENTS_CGROUP).toBe("/sys/fs/cgroup/agents.slice");
   expect(agentCgroup(21003)).toBe("/sys/fs/cgroup/agents.slice/agents-21003.slice");
-  // Each agent's own temporary folders: what it leaves there goes after 10 days, as in a stock /tmp.
+  // Each agent's own temporary folders: /tmp, /dev/shm and /run/lock in memory, /var/tmp on disk; what it leaves
+  // goes after 10 days, 30 in /var/tmp, as in a stock system.
   expect(agentTmpCleanupPath()).toBe("/etc/tmpfiles.d/agentes-runner.conf");
-  expect(agentTmp(21003)).toBe("/var/lib/agentes-runner-tmp/21003/tmp");
+  expect(agentTmp(21003)).toBe("/run/agentes-runner-tmp/21003/tmp");
   expect(readFileSync(agentTmpCleanupPath(unitPath), "utf8")).toBe(
-    "# agentes.chat runner: each agent's own temporary folders\ne /var/lib/agentes-runner-tmp/*/* - - - 10d\n",
+    "# agentes.chat runner: each agent's own temporary folders\ne /run/agentes-runner-tmp/*/* - - - 10d\ne /var/lib/agentes-runner-tmp/*/* - - - 30d\n",
   );
 
   // Not connected yet: an unpaired runner would only restart in a loop.
@@ -506,9 +507,14 @@ test.if(posix)(
     const tools = home();
     for (const tool of ["xargs", "sed", "grep", "dirname"])
       symlinkSync(Bun.which(tool) as string, path.join(tools, tool));
-    // Root on Linux, as far as the script can tell.
+    // Root on Linux, as far as the script can tell, with Debian's systemd.
     writeFileSync(path.join(tools, "id"), "#!/bin/sh\necho 0\n", { mode: 0o755 });
     writeFileSync(path.join(tools, "uname"), "#!/bin/sh\necho Linux\n", { mode: 0o755 });
+    const systemctl = (features: string) =>
+      writeFileSync(path.join(tools, "systemctl"), `#!/bin/sh\necho "systemd 257 (257.9)"\necho "${features}"\n`, {
+        mode: 0o755,
+      });
+    systemctl("+PAM +AUDIT +SECCOMP +BPF_FRAMEWORK +TPM2");
     // apt-get notes its calls (and has none of the packages in $MISSING); apt-cache knows the packages in $KNOWN
     // once apt-get update has fetched the lists.
     writeFileSync(
@@ -546,10 +552,18 @@ test.if(posix)(
     const install = (packages: readonly string[]) =>
       `apt-get -qq -o DPkg::Lock::Timeout=600 install -y --no-install-recommends ${packages.join(" ")}\n`;
 
-    // --system alone, on Debian 12 or Ubuntu 22.04: the names as they are.
+    // Ubuntu's systemd has no BPF_FRAMEWORK: no agent's process could start, so nothing is installed.
+    systemctl("+PAM +AUDIT +SECCOMP -BPF_FRAMEWORK +TPM2");
+    let r = step(false);
+    expect(r.status).toBe(1);
+    expect(r.out).toContain("--system needs systemd built with BPF_FRAMEWORK");
+    expect(r.calls).toBe("");
+    systemctl("+PAM +AUDIT +SECCOMP +BPF_FRAMEWORK +TPM2");
+
+    // --system alone, on Debian 12: the names as they are.
     // Without a terminal: the title, then each wait once and its line, whole.
     const head = "agentes.chat connect this computer\n";
-    let r = step(false);
+    r = step(false);
     expect(r.status).toBe(0);
     expect(r.out).toBe(
       `${head}◒  Installing the packages for the agents' isolation and browser\n◇  The packages for the agents' isolation and browser\n`,

@@ -726,7 +726,7 @@ test("system mode's desktop user: the agent's launcher and home; the cookie and 
     dir: "/home/ag-01a142cb/.agentes/desktop",
     ids: { uid: 21001, gid: 21004 },
     // Its X server's lock is in its own /tmp, where root looks for it.
-    tmp: "/var/lib/agentes-runner-tmp/21001/tmp",
+    tmp: "/run/agentes-runner-tmp/21001/tmp",
   });
   expect(launcher.prefix.at(-2)).toBe("ag-01a142cb");
   expect(launcher.env.HOME).toBe("/home/ag-01a142cb");

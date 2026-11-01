@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { writeAgents } from "../../runner/access";
 import {
@@ -67,7 +67,7 @@ function setup(users?: OsUser[]) {
   const home = tempDir("agent-users-");
   dirs.push(home);
   const os = fakeOs(users);
-  return { home, os, users: new AgentUsers({ home, range: RANGE, run: os.run }) };
+  return { home, os, users: new AgentUsers({ home, range: RANGE, run: os.run, etc: home }) };
 }
 
 const listed = (home: string) => JSON.parse(readFileSync(path.join(home, AGENT_USERS_FILE), "utf8")) as unknown;
@@ -109,7 +109,7 @@ test("idempotent: the same agent again runs nothing; a new process only looks it
   expect(os.calls).toEqual([]);
 
   const before = readFileSync(path.join(home, AGENT_USERS_FILE), "utf8");
-  const again = new AgentUsers({ home, range: RANGE, run: os.run });
+  const again = new AgentUsers({ home, range: RANGE, run: os.run, etc: home });
   expect(again.ensure(ANA)).toEqual(first);
   expect(os.calls).toEqual(["getent passwd"]);
   expect(readFileSync(path.join(home, AGENT_USERS_FILE), "utf8")).toBe(before);
@@ -158,7 +158,7 @@ test("a listed user whose uid changed on the computer is refused", async () => {
   users.ensure(ANA);
   const u = os.users.find((x) => x.name === "ag-a1b2c3d4");
   if (u) u.uid = 21050;
-  const again = new AgentUsers({ home, range: RANGE, run: os.run });
+  const again = new AgentUsers({ home, range: RANGE, run: os.run, etc: home });
   expect(await errorCode(() => again.ensure(ANA))).toBe("internal");
 });
 
@@ -192,7 +192,7 @@ test("no uid left in the range: refused", async () => {
     { name: "a", uid: 21000, comment: "" },
     { name: "b", uid: 21001, comment: "" },
   ]);
-  const users = new AgentUsers({ home, range: [21000, 21001], run: os.run });
+  const users = new AgentUsers({ home, range: [21000, 21001], run: os.run, etc: home });
   expect(await errorCode(() => users.ensure(ANA))).toBe("internal");
   expect(readAgentUsers(home)).toEqual([]);
 });
@@ -231,13 +231,20 @@ test("the launcher: the agent's slice, its own temporary folders, its user, abso
     ANDROID_ADB_SERVER_PORT: "31627",
   };
   const launcher = systemLauncher(user, true);
-  expect(launcher.prefix.slice(0, 13)).toEqual([
+  const p = launcher.prefix;
+  expect(p.slice(0, 8)).toEqual([
     "/usr/bin/systemd-run",
     "--quiet",
     "--scope",
     "--collect",
     "--slice=agents-21003.slice",
     "--",
+    "/bin/sh",
+    "-c",
+  ]);
+  expect(p.slice(9, 18)).toEqual([
+    "sh",
+    "21003",
     "/usr/bin/unshare",
     "--mount",
     "--propagation",
@@ -246,13 +253,26 @@ test("the launcher: the agent's slice, its own temporary folders, its user, abso
     "/bin/sh",
     "-c",
   ]);
-  expect(launcher.prefix.slice(14)).toEqual(["sh", "21003", "/usr/sbin/runuser", "-u", "ag-a1b2c3d4", "--"]);
-  expect(launcher).toMatchObject({ env, home: "/home/ag-a1b2c3d4", tmp: "/var/lib/agentes-runner-tmp/21003/tmp" });
-  // Root, in the agent's own mount namespace, before it becomes the agent: its folders under a root-only one, bound
-  // over the shared ones; in its own /tmp only mkdir, never a chmod an agent's link could aim.
-  const script = launcher.prefix[13] ?? "";
-  expect(script.split("\n")).toEqual([
+  expect(p.slice(19)).toEqual(["sh", "21003", "/usr/sbin/runuser", "-u", "ag-a1b2c3d4", "--"]);
+  expect(launcher).toMatchObject({ env, home: "/home/ag-a1b2c3d4", tmp: "/run/agentes-runner-tmp/21003/tmp" });
+  // Root on the computer: the agent's own tmpfs, mounted once (a lock, so two first launches don't stack two).
+  expect((p[8] ?? "").split("\n")).toEqual([
     "set -e",
+    "r=/run/agentes-runner-tmp",
+    'mkdir -p "$r"',
+    'chmod 0700 "$r"',
+    'd="$r/$1"',
+    "shift",
+    'mkdir -p "$d"',
+    `flock "$r/.lock" sh -c 'mountpoint -q "$1" || mount -t tmpfs -o mode=0700,size=50%,nr_inodes=1m agentes-runner-tmp "$1"' sh "$d"`,
+    'exec "$@"',
+  ]);
+  // Root, in the agent's own mount namespace, before it becomes the agent: its folders under root-only ones, bound
+  // over the shared ones (/tmp, /dev/shm and /run/lock from its tmpfs, /var/tmp from the disk); in its own /tmp only
+  // mkdir, never a chmod an agent's link could aim.
+  expect((p[18] ?? "").split("\n")).toEqual([
+    "set -e",
+    "m=/run/agentes-runner-tmp/$1",
     "r=/var/lib/agentes-runner-tmp",
     'mkdir -p "$r"',
     'chmod 0700 "$r"',
@@ -260,11 +280,13 @@ test("the launcher: the agent's slice, its own temporary folders, its user, abso
     "shift",
     'mkdir -p "$d"',
     'chmod 0700 "$d"',
-    'for f in tmp var-tmp shm lock; do mkdir -p "$d/$f"; chmod 1777 "$d/$f"; done',
-    'mount --bind "$d/tmp" /tmp',
+    'mkdir -p "$d/var-tmp"',
+    'chmod 1777 "$d/var-tmp"',
+    'for f in tmp shm lock; do mkdir -p "$m/$f"; chmod 1777 "$m/$f"; done',
+    'mount --bind "$m/tmp" /tmp',
     'mount --bind "$d/var-tmp" /var/tmp',
-    'mount --bind "$d/shm" /dev/shm',
-    'if [ "$(stat -c %a /run/lock 2>/dev/null)" = 1777 ]; then mount --bind "$d/lock" /run/lock; fi',
+    'mount --bind "$m/shm" /dev/shm',
+    'if [ "$(stat -c %a /run/lock 2>/dev/null)" = 1777 ]; then mount --bind "$m/lock" /run/lock; fi',
     "mkdir -m 1777 /tmp/.X11-unix 2>/dev/null || :",
     "mkdir -m 1777 /tmp/.ICE-unix 2>/dev/null || :",
     'exec "$@"',
@@ -275,6 +297,29 @@ test("the launcher: the agent's slice, its own temporary folders, its user, abso
     env,
     home: "/home/ag-a1b2c3d4",
   });
+});
+
+test("an agent's user can't schedule cron or at jobs, which would run outside its launcher", () => {
+  const { home, users } = setup();
+  const cron = path.join(home, "cron.deny");
+  const at = path.join(home, "at.deny");
+  // No at.deny: at takes root's jobs alone, so it isn't made.
+  users.ensure(ANA);
+  expect(readFileSync(cron, "utf8")).toBe("ag-a1b2c3d4\n");
+  expect(statSync(cron).mode & 0o777).toBe(0o644);
+  expect(existsSync(at)).toBe(false);
+  // An at.deny of the distribution's, without a last newline; an agent already listed isn't again.
+  writeFileSync(at, "daemon\nnobody");
+  writeFileSync(cron, "ag-a1b2c3d4\n");
+  users.ensure(BIA);
+  expect(readFileSync(cron, "utf8")).toBe("ag-a1b2c3d4\nag-b2c3d4e5\n");
+  expect(readFileSync(at, "utf8")).toBe("daemon\nnobody\nag-b2c3d4e5\n");
+  // A new process looks again at its first request for each agent: one listed before this runner is too.
+  writeFileSync(cron, "");
+  const os = fakeOs([{ name: "ag-a1b2c3d4", uid: 21000, comment: "Ana Ção" }]);
+  new AgentUsers({ home, range: RANGE, run: os.run, etc: home }).ensure(ANA);
+  expect(os.calls).toEqual(["getent passwd"]);
+  expect(readFileSync(cron, "utf8")).toBe("ag-a1b2c3d4\n");
 });
 
 test("adb's server port: one per agent, outside every band and Linux's ephemeral range", () => {
