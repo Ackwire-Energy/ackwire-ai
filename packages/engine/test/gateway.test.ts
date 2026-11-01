@@ -63,6 +63,69 @@ test("budget is checked BEFORE the call: an exhausted agent never reaches the pr
   expect(await f.db.select().from(schema.usageRecords)).toHaveLength(0);
 });
 
+test("a refused call tells the owner the budget ran out, once per agent and month", async () => {
+  f = await setup({ budgetNanoUsd: 1 });
+  const heard: { level: string; agentId: string }[] = [];
+  const gateway = createModelGateway({
+    db: f.db,
+    keyWrappers: [f.keyWrapper],
+    platformCredentials: noPlatformCredentials,
+    providers: { anthropic: f.provider },
+    onBudgetThreshold: async (e) => {
+      heard.push({ level: e.level, agentId: e.agent.id });
+    },
+  });
+  const once = () =>
+    gateway.stream({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      system: "sys",
+      messages: [{ role: "user", content: "hello" }],
+      maxTokens: 100,
+      onDelta: () => {},
+    });
+  await expect(once()).rejects.toBeInstanceOf(BudgetExceededError);
+  await expect(once()).rejects.toBeInstanceOf(BudgetExceededError);
+  expect(heard).toEqual([{ level: "exhausted", agentId: f.agent.id }]);
+});
+
+test("a refusal made only of other calls' reservations says so and tells nobody the budget ran out", async () => {
+  f = await setup({ budgetNanoUsd: 1_000_000_000 });
+  const heard: string[] = [];
+  const gateway = createModelGateway({
+    db: f.db,
+    keyWrappers: [f.keyWrapper],
+    platformCredentials: noPlatformCredentials,
+    providers: { anthropic: f.provider },
+    onBudgetThreshold: async (e) => {
+      heard.push(e.level);
+    },
+  });
+  const once = () =>
+    gateway.stream({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      system: "sys",
+      messages: [{ role: "user", content: "hello" }],
+      maxTokens: 100,
+      onDelta: () => {},
+    });
+  await once();
+  // Another run's live reservation takes all the room that is left.
+  await f.db.insert(schema.budgetReservations).values({
+    orgId: f.org.id,
+    agentId: f.agent.id,
+    periodStart: `${new Date().toISOString().slice(0, 8)}01`,
+    amountNanoUsd: 999_900_000,
+    expiresAt: new Date(Date.now() + 60_000),
+  });
+  await f.db.update(schema.agentBudgetPeriods).set({ reservedNanoUsd: 999_900_000 });
+  const refused = await once().catch((e: unknown) => e);
+  expect(refused).toBeInstanceOf(BudgetExceededError);
+  expect((refused as BudgetExceededError).byReservations).toBe(true);
+  expect(heard).toEqual([]);
+});
+
 test("concurrent calls reserve the worst case atomically and can't overshoot the budget", async () => {
   // Each call may cost at most this (prompt at the cache-write rate, 300 output tokens).
   const prompt = Math.ceil(promptChars({ system: "sys", messages: [{ role: "user", content: "hello" }] }) / 3);

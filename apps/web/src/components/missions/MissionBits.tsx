@@ -16,6 +16,7 @@ import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { MachineIcon } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
+import { useNamesComputers } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { MissionFilesPanel } from "./MissionFiles";
 import "./missions.css";
@@ -44,7 +45,10 @@ export function ExecutorMark({
   return <AgentAvatar agentId={agentId} name={agentName ?? ""} size="xs" />;
 }
 
-/** "[mark] Claude Code no mac": who programs and where, one quiet chip (offline says so). */
+/**
+ * "[mark] Claude Code no mac": who programs and where, one quiet chip (offline says so). The computer only where
+ * the workspace has more than one (`useNamesComputers`): else "[mark] Claude Code".
+ */
 export function ExecutorChip({
   mission,
   agentName,
@@ -53,10 +57,12 @@ export function ExecutorChip({
   agentName: string;
 }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
+  const names = useNamesComputers(org.id);
   return (
     <span className="mi-pill mi-exec">
       <ExecutorMark executor={mission.executor} agentId={mission.agentId} agentName={agentName} />
-      {executorOnText(t, mission.executor, agentName, mission.machine?.name)}
+      {executorOnText(t, mission.executor, agentName, names ? mission.machine?.name : null)}
       {mission.machine && !mission.machine.online && <small>{t("missions.offline")}</small>}
     </span>
   );

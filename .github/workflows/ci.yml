@@ -147,8 +147,23 @@ jobs:
         if: success() || failure()
         run: bun run typecheck 2>&1 | tee typecheck.log
       - name: Build web and server
+        id: build
         if: success() || failure()
         run: bun run build
+      # Mermaid's bundle and mermaid-frame.js are files of their own, which only the sandboxed frame loads
+      # (apps/web/src/lib/mermaid.ts): the app's chunks name both, and none of mermaid's code is in them.
+      # Only those two files are left out of that check, not every name starting with mermaid: a chunk
+      # such as mermaid.core-*.js would be mermaid running in the page. An `if` rather than `!`: bash -e
+      # ignores a failure under `!`.
+      - name: Mermaid ships as the frame's own files
+        if: (success() || failure()) && steps.build.outcome == 'success'
+        working-directory: apps/web/dist
+        run: |
+          refs=$(grep -ohE 'assets/mermaid(\.min|-frame)-[A-Za-z0-9_-]+\.js' assets/*.js | sort -u)
+          echo "$refs"
+          test "$(wc -l <<<"$refs")" -eq 2
+          for f in $refs; do test -f "$f"; done
+          if grep -l mermaidAPI $(ls assets/*.js | grep -vxF "$refs"); then exit 1; fi
       # A schema change without its migration fails here (drizzle-kit only diffs, no database). The
       # timeout covers drizzle-kit asking whether a column was renamed, which it can't in CI.
       - name: Migrations are up to date with the schema

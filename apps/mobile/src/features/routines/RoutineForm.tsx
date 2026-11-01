@@ -8,7 +8,9 @@ import {
   useRuleDescribe,
   useRuleParse,
 } from "@agenteschat/client";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { splitAddresses } from "@agenteschat/client/lib/mail";
+import { routineReachWarnings } from "@agenteschat/client/lib/reach";
 import { busyOnComputer, runsPerDay } from "@agenteschat/client/lib/routine-view";
 import { timezoneName, zoneDisplayName } from "@agenteschat/client/lib/routines";
 import { router } from "expo-router";
@@ -30,9 +32,11 @@ import {
   Text,
   useToast,
 } from "@/ui";
+import { boldRuns } from "../chat/actions";
+import { AllowTalkPill } from "../chat/ReachLines";
 import { ZoneList } from "../me/AccountPage";
 import { AgentFace } from "../shared/Face";
-import { useColors, useDirectory, useOrgId } from "../shared/hooks";
+import { useColors, useDirectory, useEdition, useMeId, useNamesComputers, useOrgId } from "../shared/hooks";
 import { goBack, PushedHeader, successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { useFailed, useMyZone, useSay, useTargetLabel } from "./hooks";
@@ -82,7 +86,7 @@ const zoneLabel = (zone: string, locale: string) =>
  * delivers (a channel, the DM, a Drive document, a forum topic with its agents and rounds; a routine made in the
  * chat keeps its conversation), what to do, a name, and when: a phrase the server reads ("toda segunda às 9h")
  * shown back as a sentence with the next runs and its time zone (a screen of its own), an event, or an email.
- * Then when it speaks and what it may do on its own. Editing saves only what changed.
+ * Then when it posts and what it may do on its own. Editing saves only what changed.
  */
 export function RoutineForm({ editId }: { editId: string | null }) {
   const { t } = useTranslation();
@@ -117,6 +121,9 @@ function Form({ routine }: { routine: Routine | undefined }) {
   const failed = useFailed();
   const say = useSay();
   const dir = useDirectory();
+  const me = useMeId();
+  // Whose reach the routine has: its creator (kept on edit), else whoever creates it now.
+  const creator = routine?.createdByUserId ?? me;
   const channels = useChannels(orgId);
   const mailboxes = useMailAccounts(orgId);
   const targetLabel = useTargetLabel();
@@ -245,9 +252,14 @@ function Form({ routine }: { routine: Routine | undefined }) {
 
   // A routine on someone's computer that runs hourly or more often: how often it wakes that computer.
   const brain = dir.agentById.get(d.agentId)?.brain;
+  const selfHost = useEdition() === "selfhost";
+  const namesComputer = useNamesComputers();
   const busy =
     schedule && !once && brain
-      ? busyOnComputer({ kind: brain.kind, machineName: brain.computer ?? null }, runsPerDay(toApiRule(d.rule)))
+      ? busyOnComputer({ kind: brain.kind, machineName: brain.computer ?? null }, runsPerDay(toApiRule(d.rule)), {
+          selfHost,
+          namesComputer,
+        })
       : null;
 
   const promptHidden = routine !== undefined && routine.prompt === null;
@@ -659,6 +671,7 @@ function Form({ routine }: { routine: Routine | undefined }) {
             />
           ))}
         </GroupedList>
+        <GroupedFooter>{t("routines.report.hint")}</GroupedFooter>
         <GroupedHeader>{t("routines.form.access")}</GroupedHeader>
         <GroupedList>
           {(["read", "act"] as const).map((v) => (
@@ -671,6 +684,30 @@ function Form({ routine }: { routine: Routine | undefined }) {
           ))}
         </GroupedList>
         <GroupedFooter>{t("routines.access.hint")}</GroupedFooter>
+        {routineReachWarnings(d.prompt, dir.agents, {
+          access: d.access,
+          agentId: d.agentId || null,
+          creatorUserId: creator === me ? null : creator,
+        }).map((w) => (
+          <View key={w.agent.id} style={styles.warning}>
+            <Text variant="footnote" tone="ink2" accessibilityLiveRegion="polite">
+              {boldRuns(
+                t(w.kind === "read" ? "routines.reachWarning.read" : "routines.reachWarning.blocked", {
+                  ...agentGrammar(t, w.agent.name),
+                }) as string,
+              ).map((r, i) =>
+                r.bold ? (
+                  <Text key={String(i)} variant="footnote" tone="ink" style={styles.bold}>
+                    {r.text}
+                  </Text>
+                ) : (
+                  r.text
+                ),
+              )}
+            </Text>
+            {w.kind === "blocked" && creator ? <AllowTalkPill agent={w.agent} userId={creator} /> : null}
+          </View>
+        ))}
         {routine && !isDoneOnce(routine) ? (
           <>
             <View style={styles.gap} />
@@ -728,5 +765,7 @@ const styles = StyleSheet.create({
   utc: { paddingTop: 7, paddingHorizontal: 16, gap: 4 },
   link: { fontWeight: "600", textDecorationLine: "underline" },
   error: { paddingTop: 7, paddingHorizontal: 16 },
+  bold: { fontWeight: "600" },
+  warning: { paddingTop: 7, paddingHorizontal: 16, gap: 8, alignItems: "flex-start" },
   noMail: { paddingTop: 10, paddingHorizontal: 16, gap: 10, alignItems: "flex-start" },
 });

@@ -287,7 +287,7 @@ describe("the author's own plan", () => {
     expect(await decisionOf(m.id)).toMatchObject({ error: "plan: every sign-in is busy" });
   });
 
-  test("a plan that doesn't answer in time leaves it to the rules", async () => {
+  test("a plan that doesn't answer in time leaves it to the rules, and a failure is never silence (R5)", async () => {
     const hub = fakeHub({
       reply: () => new MachineRequestError("timeout", "the computer MacBook did not answer within 30 s"),
     });
@@ -296,9 +296,14 @@ describe("the author's own plan", () => {
     await drain(handlers);
     expect(hub.calls).toHaveLength(1);
     expect(await decisionOf(m.id)).toMatchObject({
-      strategy: "none",
+      strategy: "rule:default",
+      selectedAgentIds: [f.agent.id],
       error: "plan: the computer MacBook did not answer within 30 s",
     });
+    // People talking among themselves still get nobody.
+    const lunch = await post(f.owner.id, "boa tarde Bruna, vamos almoçar?");
+    await drain(handlers);
+    expect(await decisionOf(lunch.id)).toMatchObject({ strategy: "none", selectedAgentIds: [] });
   });
 
   test("a reply to an agent, quoted or in its thread, goes by the rule, and the plan isn't asked", async () => {

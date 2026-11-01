@@ -359,7 +359,7 @@ describe("models by provider and the default key", () => {
 });
 
 describe("agent questions (ask_user)", () => {
-  test("choices answer it; 'Responder' focuses the composer; the receipt waits for your answer", async () => {
+  test("choices answer it; 'Outra resposta' opens a field in the card; the receipt waits for your answer", async () => {
     const state = seedState();
     const question = {
       id: "q1",
@@ -422,20 +422,74 @@ describe("agent questions (ask_user)", () => {
     // A request card: what kind of request and that it waits for you; the choices in its footer.
     expect(card.getAttribute("data-ask-kind")).toBe("question");
     expect(card.querySelector(".rq__head")?.textContent).toBe("Perguntaesperando você");
-    // With choices, writing another answer is "Outra resposta": it goes to the composer.
+    // With choices, writing another answer is "Outra resposta": a field opens in the card, focused.
     await click(within(card).getByRole("button", { name: "Outra resposta" }));
-    expect(document.activeElement).toBe(screen().getByRole("combobox", { name: /Mensagem para/ }));
+    expect(document.activeElement).toBe(within(card).getByRole("textbox", { name: "Sua resposta" }));
     await click(within(card).getByRole("button", { name: "Depois das 18h" }));
     await settle(4);
-    // Answered: the settled card takes its place (another element).
+    // Answered: one line takes its place (another element), the answer bold, the question still in the open.
     const done = screen().getByRole("group", { name: "Pergunta de Ada" });
     expect(done.textContent).toContain("Você respondeu: Depois das 18h");
-    expect(done.querySelector(".ac-chip--done")?.textContent).toBe("Respondida");
+    expect(done.querySelector(".rq-done__mark[data-done]")).not.toBeNull();
+    expect(done.querySelector("b")?.textContent).toBe("Depois das 18h");
+    expect(done.closest("article")?.textContent).toContain("Faço o deploy agora ou depois das 18h?");
     expect(state.calls.find((c) => c.method === "questions.answer")?.args).toEqual([
       ORG_ID,
       "q1",
       { choice: "Depois das 18h" },
     ]);
+  });
+
+  test("'Responder' on a question without choices opens a field; its text answers the question", async () => {
+    const state = seedState();
+    const question = {
+      id: "q4",
+      agentId: ADA_ID,
+      channelId: ENG_ID,
+      threadId: null,
+      messageId: "msg-q4",
+      text: "Qual é o endereço da API do serviço de cobrança?",
+      choices: null,
+      status: "open",
+      answer: null,
+      answeredByUserId: null,
+    };
+    state.messages.push({
+      id: "msg-q4",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ADA_ID },
+      body: "",
+      mentionedAgentIds: [],
+      agentRunId: "r-q4",
+      meta: { question },
+      createdAt: new Date().toISOString(),
+    });
+    await go(`c/${ENG_ID}`, state);
+    await settle();
+    const card = screen().getByRole("group", { name: "Pergunta de Ada" });
+    expect(within(card).queryByRole("textbox")).toBeNull();
+    await click(within(card).getByRole("button", { name: "Responder" }));
+    const field = within(card).getByRole("textbox", { name: "Sua resposta" });
+    expect(document.activeElement).toBe(field);
+    await type(field, "https://api.example.test/v1");
+    // Enter twice while the first answer is on its way sends it once.
+    let release = () => {};
+    state.answerHold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await act(async () => fireEvent.keyDown(field, { key: "Enter" }));
+    await act(async () => fireEvent.keyDown(field, { key: "Enter" }));
+    release();
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "questions.answer")).toHaveLength(1);
+    expect(state.calls.find((c) => c.method === "questions.answer")?.args).toEqual([
+      ORG_ID,
+      "q4",
+      { text: "https://api.example.test/v1" },
+    ]);
+    const done = screen().getByRole("group", { name: "Pergunta de Ada" });
+    expect(done.textContent).toContain("Você respondeu: https://api.example.test/v1");
   });
 
   test("the question shows once: its card, not its text above it too", async () => {
@@ -503,7 +557,39 @@ describe("agent questions (ask_user)", () => {
     await click(within(card).getByRole("button", { name: "staging" }));
     await settle(4);
     const after = screen().getByRole("group", { name: "Pergunta de Ada" });
-    expect(within(after).getByRole("alert").textContent).toBe("Alguém já respondeu esta pergunta.");
+    expect(within(after).getByRole("alert").textContent).toBe("Esta pergunta já foi respondida ou encerrada.");
+  });
+
+  test("a question closed without an answer (its run stopped) says so, not who answered", async () => {
+    const state = seedState();
+    const question = {
+      id: "q5",
+      agentId: ADA_ID,
+      channelId: ENG_ID,
+      threadId: null,
+      messageId: "msg-q5",
+      text: "Qual conta eu uso?",
+      choices: null,
+      status: "answered",
+      answer: null,
+      answeredByUserId: null,
+    };
+    state.messages.push({
+      id: "msg-q5",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ADA_ID },
+      body: "",
+      mentionedAgentIds: [],
+      agentRunId: "r-q5",
+      meta: { question },
+      createdAt: new Date().toISOString(),
+    });
+    await go(`c/${ENG_ID}`, state);
+    const card = screen().getByRole("group", { name: "Pergunta de Ada" });
+    expect(card.textContent).toContain("Encerrada sem resposta.");
+    expect(card.textContent).not.toContain("Você respondeu");
+    expect(within(card).queryByRole("button", { name: "Responder" })).toBeNull();
   });
 });
 

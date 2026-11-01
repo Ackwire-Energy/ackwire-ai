@@ -9,6 +9,9 @@ import {
   createAgent,
   createAgentFromProposal,
   createChannel,
+  createProposedAgent,
+  createProposedRoutine,
+  createRole,
   createSetupToolSource,
   createToolGateway,
   denyAgentProposal,
@@ -17,8 +20,10 @@ import {
   insertMessage,
   NEW_AGENT_DEFAULTS,
   openPersonAgentDm,
+  setMemberRoles,
   suggestAgentAi,
   type ToolContext,
+  updateAgent,
 } from "../src";
 import { addMember, type Fixture, makeAdmin, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
@@ -119,7 +124,9 @@ describe("propose_agent", () => {
     const scopes = (await f.db.select().from(schema.agentScopes)).length;
     const out = await propose(f, ctx, { ...ADA, access: [{ connector: "github", level: "write" }] });
     expect(out.isError).toBeUndefined();
-    expect(out.content).toContain("nothing exists until they create it");
+    expect(out.content).toContain(
+      "A person creates it from the card, in one click or after reviewing it: nothing exists until they do",
+    );
     const [card] = await proposals(f);
     expect(card).toMatchObject({
       authorType: "agent",
@@ -169,8 +176,13 @@ describe("propose_agent", () => {
     await refused({ handle: "dev" }, "@dev is already taken");
     await refused({ handle: "Ada Lovelace" }, "handle");
     await refused({ name: "   " }, "name");
-    await refused({ channels: ["board"] }, "No public channel #board. Public channels: #general");
-    await refused({ access: [{ connector: "jira", level: "read" }] }, 'No connected app "jira"');
+    // A private channel's name never goes on a card in a public conversation.
+    await refused(
+      { channels: ["board"] },
+      "No channel #board you can name here. Channels you can name here: #general.",
+    );
+    await refused({ access: [{ connector: "jira", level: "read" }] }, 'No connected app or mailbox "jira"');
+    await refused({ role: "a".repeat(201) }, "input.role: too long (at most 200 characters)");
     await refused({ look: { color: "gold", eyes: "round" } }, "color");
     await refused({ why: "  " }, "why");
     expect(await proposals(f)).toHaveLength(0);
@@ -412,5 +424,337 @@ describe("deciding", () => {
       ),
     ).rejects.toMatchObject({ code: "agent_proposal.expired" });
     expect((await cardOf(f, id)).state).toBe("pending");
+  });
+});
+
+/** A Gmail mailbox `ownerId` connected (ADR 0038). */
+const mailbox = async (fx: Fixture, ownerId: string, address: string) => {
+  const [row] = await fx.db
+    .insert(schema.mailAccounts)
+    .values({
+      orgId: fx.org.id,
+      provider: "gmail",
+      via: "composio",
+      address,
+      label: address,
+      status: "active",
+      createdByUserId: ownerId,
+    })
+    .returning();
+  if (!row) throw new Error("no mailbox");
+  return row;
+};
+const NOON = {
+  schedule: "0 12 * * *",
+  prompt: "Lê a caixa de entrada e me resume o que chegou.",
+  title: "E-mails do dia",
+};
+const CAIO = {
+  name: "Caio",
+  handle: "caio",
+  role: "E-mail",
+  instructions: "Cuida dos e-mails da Ana.",
+  look: { color: "teal", eyes: "round" },
+  why: "Você pediu alguém para checar seus e-mails todo dia ao meio-dia.",
+};
+
+describe("one request, one card: channels, mailboxes and a routine", () => {
+  test("a private channel of the asker's that everyone here is in, their own mailbox, a routine read now", async () => {
+    f = await setup();
+    const github = await connect(f, "github", "GitHub");
+    const inbox = await mailbox(f, f.owner.id, "ana@acme.com");
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await mailbox(f, bia.id, "bia@acme.com");
+    // Ana's private channel, where she asked.
+    const priv = await createChannel(f.db, f.owner.id, f.org.id, { name: "private", visibility: "private" });
+    const ctx = await runFor(f, f.owner.id, "cria um agente que checa meus emails todo dia meio dia", priv.id);
+    // As the agent first tried in production: its mailbox as "mail", and the channel by name.
+    const out = await propose(f, ctx, {
+      ...CAIO,
+      channels: ["#private"],
+      access: [
+        { connector: "mail", level: "read" },
+        { connector: "github", level: "read" },
+      ],
+      routine: NOON,
+    });
+    expect(out.isError).toBeUndefined();
+    expect(out.content).toContain("Its routine «E-mails do dia» runs: Every day, at 12:00 (UTC).");
+    const id = (out.data as { agentProposal: { messageId: string } }).agentProposal.messageId;
+    expect((await cardOf(f, id)).params.draft).toMatchObject({
+      channelIds: [priv.id],
+      access: [{ connectionId: github.id, level: "read" }],
+      mail: [{ accountId: inbox.id, address: "ana@acme.com", level: "read", ownerUserId: f.owner.id }],
+      routine: {
+        name: "E-mails do dia",
+        prompt: NOON.prompt,
+        schedule: "0 12 * * *",
+        rule: { freq: "daily", times: ["12:00"] },
+        report: "when_new",
+        access: "read",
+      },
+    });
+  });
+
+  test("what it can't name is refused with everything it can, so the next call is right", async () => {
+    f = await setup();
+    await connect(f, "github", "GitHub");
+    await mailbox(f, f.owner.id, "ana@acme.com");
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await mailbox(f, bia.id, "bia@acme.com");
+    const priv = await createChannel(f.db, f.owner.id, f.org.id, { name: "private", visibility: "private" });
+    const OFFER = "Connected apps: github. Mailboxes of the person who asked (in access, by address): ana@acme.com.";
+    // In #general (anyone reads it), Ana's private channel can't be named.
+    const general = await runFor(f, f.owner.id, "cria um agente");
+    const there = await propose(f, general, { ...CAIO, channels: ["private"] });
+    expect(there.content).toBe(
+      `Failed: No channel #private you can name here. Channels you can name here: #general. ${OFFER}`,
+    );
+    // In her DM with @dev, only she reads the card: her private channel can be.
+    const dm = await openPersonAgentDm(f.db, f.org.id, f.owner.id, f.agent.id);
+    expect(
+      (await propose(f, await runFor(f, f.owner.id, "cria um agente", dm.id), { ...CAIO, channels: ["private"] }))
+        .isError,
+    ).toBeUndefined();
+    // With Bia in #private too, still only Ana's own mailboxes: Bia's isn't hers to give.
+    await addChannelMember(f.db, f.owner.id, f.org.id, priv.id, { userId: bia.id });
+    const here = await runFor(f, f.owner.id, "cria um agente", priv.id);
+    const others = await propose(f, here, { ...CAIO, access: [{ connector: "bia@acme.com", level: "read" }] });
+    expect(others.content).toBe(
+      `Failed: No connected app or mailbox "bia@acme.com". Channels you can name here: #general, #private. ${OFFER}`,
+    );
+    const bad = await propose(f, here, { ...CAIO, routine: { ...NOON, schedule: "quando der" } });
+    expect(bad.isError).toBe(true);
+    expect(bad.content).toContain('Write it as the person said it ("todo dia ao meio-dia") or as cron ("0 12 * * *")');
+    // One createRoutine would refuse is refused now, so the agent proposes one that can be made.
+    const often = await propose(f, here, { ...CAIO, routine: { ...NOON, schedule: "*/5 * * * *" } });
+    expect(often.isError).toBe(true);
+    expect(often.content).toContain("at most every 15 minutes");
+    expect(await proposals(f)).toHaveLength(1);
+  });
+
+  test("Criar in one click: every line the person may give, the rest on the card for who may; the agent hears both", async () => {
+    f = await setup();
+    const github = await connect(f, "github", "GitHub");
+    const inbox = await mailbox(f, f.owner.id, "ana@acme.com");
+    const priv = await createChannel(f.db, f.owner.id, f.org.id, { name: "private", visibility: "private" });
+    const ctx = await runFor(f, f.owner.id, "cria um agente que checa meus emails todo dia meio dia", priv.id);
+    const out = await propose(f, ctx, {
+      ...CAIO,
+      access: [
+        { connector: "ana@acme.com", level: "read" },
+        { connector: "github", level: "read" },
+      ],
+      routine: NOON,
+    });
+    const id = (out.data as { agentProposal: { messageId: string } }).agentProposal.messageId;
+    // Its routine reports here: #private comes with it.
+    expect((await cardOf(f, id)).params.draft.channelIds).toEqual([priv.id]);
+    expect((await cardOf(f, id)).params.draft.routine?.reportsIn).toBe(priv.id);
+
+    const events = f.listen(priv.id);
+    const made = await createProposedAgent(
+      { db: f.db, pubsub: f.pubsub, gateway: f.gateway },
+      f.owner.id,
+      f.org.id,
+      id,
+    );
+    const agent = made.agent;
+    expect(agent).toMatchObject({ name: "Caio", handle: "caio", role: "E-mail", ownerUserId: f.owner.id });
+    expect(agent.appearance).toMatchObject({ color: "teal", eyes: "round" });
+    const inPrivate = await f.db
+      .select()
+      .from(schema.channelMembers)
+      .where(and(eq(schema.channelMembers.channelId, priv.id), eq(schema.channelMembers.agentId, agent.id)));
+    expect(inPrivate).toHaveLength(1);
+    const scopes = await f.db.select().from(schema.agentScopes).where(eq(schema.agentScopes.agentId, agent.id));
+    expect(scopes.filter((s) => s.connectionId === inbox.id).map((s) => s.scope)).toEqual(["mail:read"]);
+    expect(scopes.some((s) => s.connectionId === github.id && s.scope === "github:repo.read")).toBe(true);
+    const [routine] = await f.db.select().from(schema.routines).where(eq(schema.routines.agentId, agent.id));
+    expect(routine).toMatchObject({
+      name: "E-mails do dia",
+      prompt: NOON.prompt,
+      createdByUserId: f.owner.id,
+      target: { type: "conversation", channelId: priv.id },
+      triggerType: "schedule",
+      active: true,
+    });
+    expect(await cardOf(f, id)).toMatchObject({
+      state: "created",
+      agentId: agent.id,
+      applied: { channelIds: [priv.id], connectionIds: [github.id], mailAccountIds: [inbox.id] },
+      routineId: routine?.id,
+    });
+    expect(events.find((e) => e.type === "agent.proposal.updated")).toMatchObject({
+      state: "created",
+      applied: { channelIds: [priv.id], mailAccountIds: [inbox.id] },
+      routineId: routine?.id,
+    });
+    const [notice] = (
+      await f.db
+        .select()
+        .from(schema.messages)
+        .where(sql`${schema.messages.meta}->'notice'->>'kind' = 'proposal_result'`)
+    ).map((m) => m.meta.notice as { text: string });
+    expect(notice?.text).toBe(
+      `ana created it: @caio (Caio). It is on the team now. It joined #private, reads GitHub, reads the mailbox ana@acme.com, has its routine «E-mails do dia» (${routine?.description}).`,
+    );
+  });
+
+  test("an admin who doesn't own the mailbox, a member who can't give apps: what waits, and for whom", async () => {
+    f = await setup();
+    const github = await connect(f, "github", "GitHub");
+    await mailbox(f, f.owner.id, "ana@acme.com");
+    const ctx = await runFor(f, f.owner.id, "cria um agente que lê meus emails");
+    const card = async () => {
+      const out = await propose(f, ctx, {
+        ...CAIO,
+        handle: `caio-${crypto.randomUUID().slice(0, 4)}`,
+        channels: ["general"],
+        access: [
+          { connector: "ana@acme.com", level: "read" },
+          { connector: "github", level: "write" },
+        ],
+      });
+      return (out.data as { agentProposal: { messageId: string } }).agentProposal.messageId;
+    };
+    const deps = { db: f.db, pubsub: f.pubsub, gateway: f.gateway };
+    // Caio, an admin: the apps and #general, never Ana's mailbox.
+    const caio = await addMember(f.db, f.org.id, "admin", "caio");
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: caio.id });
+    const first = await card();
+    const byAdmin = await createProposedAgent(deps, caio.id, f.org.id, first);
+    expect((await cardOf(f, first)).applied).toEqual({
+      channelIds: [f.general.id],
+      connectionIds: [github.id],
+      mailAccountIds: [],
+    });
+    const mail = await f.db
+      .select()
+      .from(schema.agentScopes)
+      .where(and(eq(schema.agentScopes.agentId, byAdmin.agent.id), sql`${schema.agentScopes.scope} like 'mail:%'`));
+    expect(mail).toHaveLength(0);
+    // Bia may create agents and nothing more: giving apps waits for an admin.
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: bia.id });
+    const makers = await createRole(f.db, f.owner.id, f.org.id, { name: "Makers", permissions: ["create_agents"] });
+    await setMemberRoles(f.db, f.owner.id, f.org.id, bia.id, [makers.id]);
+    const second = await card();
+    await createProposedAgent(deps, bia.id, f.org.id, second);
+    expect((await cardOf(f, second)).applied?.connectionIds).toEqual([]);
+    const texts = (
+      await f.db
+        .select()
+        .from(schema.messages)
+        .where(sql`${schema.messages.meta}->'notice'->>'kind' = 'proposal_result'`)
+        .orderBy(schema.messages.createdAt)
+    ).map((m) => (m.meta.notice as { text: string }).text);
+    expect(texts[0]).toContain("Not given yet: the mailbox ana@acme.com (only ana gives it).");
+    expect(texts[1]).toContain("GitHub (an admin)");
+    // Caio's own plan account thinks for the next one, which then answers only Caio: Ana gives it once it answers her.
+    const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, caio.id, f.org.id, {
+      name: "MacBook",
+      exec: true,
+    });
+    await f.db
+      .update(schema.machines)
+      .set({
+        protocol: 8,
+        executors: { claude: { version: "2.1.300", loggedIn: true }, detectedAt: new Date().toISOString() },
+      })
+      .where(eq(schema.machines.id, machineId));
+    await f.db.insert(schema.machineAccounts).values({
+      id: "0193aaaa-0000-4000-8000-000000000009",
+      orgId: f.org.id,
+      machineId,
+      kind: "claude_code",
+      label: "Claude do Caio",
+      status: "active",
+      createdBy: caio.id,
+    });
+    const third = await card();
+    const onPlan = await createProposedAgent(deps, caio.id, f.org.id, third);
+    expect(onPlan.ai).toBe("account");
+    const said = await f.db
+      .select()
+      .from(schema.messages)
+      .where(sql`${schema.messages.meta}->'notice'->>'kind' = 'proposal_result'`)
+      .orderBy(schema.messages.createdAt);
+    expect(JSON.stringify(said.at(-1)?.meta.notice)).toContain(
+      "the mailbox ana@acme.com (only ana gives it, once it answers ana:",
+    );
+  });
+
+  test("a member who only creates agents gives the new agent her own mailbox in one click", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: bia.id });
+    const makers = await createRole(f.db, f.owner.id, f.org.id, { name: "Makers", permissions: ["create_agents"] });
+    await setMemberRoles(f.db, f.owner.id, f.org.id, bia.id, [makers.id]);
+    const inbox = await mailbox(f, bia.id, "bia@acme.com");
+    const ctx = await runFor(f, bia.id, "cria um agente que lê meus emails");
+    const out = await propose(f, ctx, { ...CAIO, access: [{ connector: "bia@acme.com", level: "read" }] });
+    const id = (out.data as { agentProposal: { messageId: string } }).agentProposal.messageId;
+    await createProposedAgent({ db: f.db, pubsub: f.pubsub, gateway: f.gateway }, bia.id, f.org.id, id);
+    expect((await cardOf(f, id)).applied?.mailAccountIds).toEqual([inbox.id]);
+  });
+
+  test("created from the review, its routine comes once it is where it reports: once", async () => {
+    f = await setup();
+    const ctx = await runFor(f, f.owner.id, "cria um agente que resume o dia");
+    const out = await propose(f, ctx, { ...CAIO, routine: NOON });
+    const id = (out.data as { agentProposal: { messageId: string } }).agentProposal.messageId;
+    const deps = { db: f.db, pubsub: f.pubsub };
+    await expect(createProposedRoutine(deps, f.owner.id, f.org.id, id)).rejects.toMatchObject({
+      code: "agent_proposal.no_routine",
+    });
+    const agent = await createAgentFromProposal(deps, f.owner.id, f.org.id, id, () =>
+      createAgent(f.db, f.owner.id, f.org.id, { name: "Caio", handle: "caio" }, NEW_AGENT_DEFAULTS),
+    );
+    // Not in #general yet: the routine can't report there, and the card lets go of it.
+    await expect(createProposedRoutine(deps, f.owner.id, f.org.id, id)).rejects.toMatchObject({
+      code: "routine.agent_not_in_channel",
+    });
+    await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: agent.id });
+    const view = await createProposedRoutine(deps, f.owner.id, f.org.id, id);
+    const [routine] = await f.db.select().from(schema.routines).where(eq(schema.routines.agentId, agent.id));
+    expect(view.routineId).toBe(routine?.id);
+    expect((await cardOf(f, id)).routineId).toBe(routine?.id);
+    await expect(createProposedRoutine(deps, f.owner.id, f.org.id, id)).rejects.toMatchObject({
+      code: "agent_proposal.routine_made",
+    });
+  });
+});
+
+describe("an agent's role says what it does, in as many words as it takes", () => {
+  const LONG_ROLE = "Assistente de e-mails, agenda e reuniões";
+
+  test("a 40-character role is taken when it is set or changed", async () => {
+    f = await setup();
+    expect(LONG_ROLE).toHaveLength(40);
+    const caio = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Caio", handle: "caio", role: LONG_ROLE },
+      NEW_AGENT_DEFAULTS,
+    );
+    expect(caio.role).toBe(LONG_ROLE);
+    const edited = await updateAgent(f.db, f.owner.id, f.org.id, caio.id, { role: `${LONG_ROLE.slice(0, 39)}!` });
+    expect(edited.role).toBe(`${LONG_ROLE.slice(0, 39)}!`);
+  });
+
+  test("propose_agent takes a 40-character role, and the agent made from the card has it", async () => {
+    f = await setup();
+    const out = await propose(f, await runFor(f, f.owner.id, "cria um agente"), { ...CAIO, role: LONG_ROLE });
+    expect(out.isError).toBeUndefined();
+    const id = (out.data as { agentProposal: { messageId: string } }).agentProposal.messageId;
+    const made = await createProposedAgent(
+      { db: f.db, pubsub: f.pubsub, gateway: f.gateway },
+      f.owner.id,
+      f.org.id,
+      id,
+    );
+    expect(made.agent.role).toBe(LONG_ROLE);
   });
 });

@@ -8,7 +8,7 @@ import { missingConnectors, type ServerCatalog } from "../connectors/listing";
 import { consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
-import { cutText } from "../format";
+import { cutText, pgSafeJson, pgSafeText } from "../format";
 import { addRunStep } from "../runs";
 import {
   callTargets,
@@ -365,13 +365,15 @@ export function createToolGateway(deps: {
           ...output.outcome,
         }).catch(() => {});
       }
-      const capped =
-        output.content.length > MAX_RESULT_CHARS
-          ? { ...output, content: `${cutText(output.content, MAX_RESULT_CHARS)}\n[truncated]` }
-          : output;
+      // A NUL or a lone surrogate (a binary printed by a command) would make every save of this result fail.
+      const text = pgSafeText(output.content);
+      const capped = {
+        ...output,
+        content: text.length > MAX_RESULT_CHARS ? `${cutText(text, MAX_RESULT_CHARS)}\n[truncated]` : text,
+      };
       return tool.external ? { ...capped, content: wrapExternal(tool.name, capped.content) } : capped;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = pgSafeText(error instanceof Error ? error.message : String(error));
       // An MCP server's error text is its own words too.
       return { content: `Tool failed: ${tool.external ? wrapExternal(tool.name, message) : message}`, isError: true };
     }
@@ -381,7 +383,9 @@ export function createToolGateway(deps: {
     list,
     granted,
 
-    async invoke(ctx: ToolContext, requested: ToolCall): Promise<InvokeResult> {
+    async invoke(ctx: ToolContext, raw: ToolCall): Promise<InvokeResult> {
+      // The model's arguments land in jsonb and text columns (steps, approvals, the audit): a NUL would fail them.
+      const requested = { ...raw, input: pgSafeJson(raw.input) };
       // Who is behind the run decides what it may do: listing already hid refused tools, this is the call.
       const [all, authority] = await Promise.all([allTools(ctx), authorityOf(ctx)]);
       // A directory (tools/directory.ts): `use_tool` runs the tool it names by that tool's own name, so everything

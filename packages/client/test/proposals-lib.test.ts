@@ -4,6 +4,7 @@ import type { Proposal } from "../src/api/types";
 import {
   appLabel,
   cardHead,
+  cardOutcome,
   cardProposalIds,
   changedLines,
   chosenRows,
@@ -132,5 +133,26 @@ describe("a card of proposals", () => {
     const one = cardHead(t, [row("1"), role("1"), access("1")], "Theo", name, "Acme");
     expect(one.key).toBe("proposals.proposes");
     expect(String(one.values.target)).toContain('proposals.targetChanges {"name":"Ada"');
+  });
+});
+
+describe("how a decided card ended", () => {
+  const accepted = { status: "accepted" } as const;
+  const refused = { status: "refused" } as const;
+
+  test("rows that agree say their status", () => {
+    expect(cardOutcome(t, [row("1", accepted), row("2", accepted)])).toEqual({
+      accepted: true,
+      label: "proposals.accepted",
+    });
+    expect(cardOutcome(t, [row("1", refused)])).toEqual({ accepted: false, label: "proposals.refused" });
+    expect(cardOutcome(t, [row("1", { stale: true })])).toEqual({ accepted: false, label: "proposals.stale" });
+  });
+
+  test("rows that differ say how many were accepted", () => {
+    expect(cardOutcome(t, [row("1", accepted), row("2", { stale: true })])).toEqual({
+      accepted: true,
+      label: 'proposals.acceptedSome {"done":1,"total":2}',
+    });
   });
 });

@@ -265,7 +265,12 @@ test("a run lists what the judge expects it to need, keeps it for the whole run,
     .from(schema.agentRunSteps)
     .where(eq(schema.agentRunSteps.kind, "context"))
     .orderBy(asc(schema.agentRunSteps.createdAt));
-  expect(contexts.at(-1)?.data.toolGroups).toMatchObject({ groups: ["issues"], kept: ["issues"], source: "none" });
+  // The last run's opening context (a later `context` step records how its turn ended, ADR 0097).
+  expect(contexts.filter((c) => c.data.toolGroups).at(-1)?.data.toolGroups).toMatchObject({
+    groups: ["issues"],
+    kept: ["issues"],
+    source: "none",
+  });
 });
 
 test("a reply counts its tools without the lookups: lookups alone leave no tools under it", async () => {

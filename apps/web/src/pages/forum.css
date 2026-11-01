@@ -26,7 +26,7 @@
   padding-bottom: 120px;
 }
 .forum {
-  max-width: 1120px;
+  max-width: none;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -635,7 +635,7 @@ html:not([data-pointer]) .forum-pickrow button:focus-visible {
 
 /* ── Topic page ─────────────────────────────────────────────────────────── */
 .forum-topic {
-  max-width: 1540px;
+  max-width: none;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 380px;
   align-items: start;
@@ -643,9 +643,6 @@ html:not([data-pointer]) .forum-pickrow button:focus-visible {
 }
 .forum-topic__main {
   min-width: 0;
-  max-width: 1040px;
-  width: 100%;
-  margin: 0 auto;
 }
 .forum-topic__side {
   position: sticky;
@@ -673,7 +670,6 @@ html:not([data-pointer]) .forum-pickrow button:focus-visible {
 }
 .forum-th__goal {
   margin: 8px 0 0;
-  max-width: 64ch;
   font-size: 15px;
   color: var(--ink2);
 }

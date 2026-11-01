@@ -7,6 +7,7 @@ import { consultedFor } from "./consultations";
 import { isAgentOnlyDm } from "./dms";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
+import { notifySecretRequest, resolveSecretRequestNotifications } from "./notification-producers";
 import { enqueue } from "./outbox";
 import { personBehindCall } from "./requester";
 import {
@@ -51,8 +52,12 @@ export interface SecretRequestView {
   removed: boolean;
 }
 
-const targetOf = (row: Pick<SecretRequestRow, "targetKind" | "targetPath">): SecretTarget =>
-  row.targetKind === "file" && row.targetPath ? { kind: "file", path: row.targetPath } : { kind: "env" };
+const targetOf = (row: Pick<SecretRequestRow, "targetKind" | "targetPath" | "site">): SecretTarget =>
+  row.targetKind === "file" && row.targetPath
+    ? { kind: "file", path: row.targetPath }
+    : row.targetKind === "site" && row.site
+      ? { kind: "site", site: row.site }
+      : { kind: "env" };
 
 /** Pending but past its deadline counts as expired (the worker closes it within a minute). */
 function statusOf(row: SecretRequestRow, now = new Date()): SecretRequestView["status"] {
@@ -90,14 +95,20 @@ export function secretResult(row: SecretRequestRow | undefined): { content: stri
       content: `${row.name} was replaced or removed before this run could use it. Ask the person for it again if needed.`,
       isError: true,
     };
-  const where =
-    row.targetKind === "file"
-      ? `written to ${row.targetPath} (mode 600)`
-      : `available as the environment variable ${row.name} in your commands`;
+  const target = targetOf(row);
   switch (row.status) {
     case "delivered":
+      if (target.kind === "site") {
+        return {
+          content: `${row.name} was delivered to your computer for ${new URL(target.site).host}: your browser types it there (browser_type_secret, or a type_secret step), only into a password or code field on that site. It isn't in your commands' environment; for a command, ask for it again without \`site\`.`,
+        };
+      }
       return {
-        content: `${row.name} was delivered to your computer: ${where}. Use it by name; never print, echo or show its value (outputs show it as [secret:${row.name}]).`,
+        content: `${row.name} was delivered to your computer: ${
+          target.kind === "file"
+            ? `written to ${target.path} (mode 600)`
+            : `available as the environment variable ${row.name} in your commands`
+        }. Use it by name; never print, echo or show its value (outputs show it as [secret:${row.name}]).`,
       };
     case "declined":
       return {
@@ -122,17 +133,24 @@ export async function syncSecretMessage(db: Executor, row: SecretRequestRow) {
     .where(and(eq(schema.messages.id, row.messageId), eq(schema.messages.orgId, row.orgId)));
 }
 
+/**
+ * A request was asked or changed: its card, wherever it shows. The person asked hears a new one where they wait for
+ * things (`notifySecretRequest`), and once it is closed it leaves there.
+ */
 export async function publishSecret(
-  pubsub: PubSub | undefined,
+  deps: { db: Database; pubsub?: PubSub },
   row: SecretRequestRow,
   type: "secret.requested" | "secret.updated",
 ) {
-  await publishChannelEvent(pubsub, {
+  await publishChannelEvent(deps.pubsub, {
     type,
     channelId: row.channelId,
     threadId: row.threadId,
     secretRequest: secretRequestView(row),
   });
+  if (type === "secret.requested") await notifySecretRequest(deps, row).catch(() => undefined);
+  else if (statusOf(row) !== "pending")
+    await resolveSecretRequestNotifications(deps, row.orgId, row.id).catch(() => undefined);
 }
 
 const resumeJob = (row: SecretRequestRow) => ({
@@ -153,7 +171,7 @@ const deliveryOrder = (row: SecretRequestRow) => {
 export async function secretOnComputer(
   computer: ComputerHandle,
   request: SecretRequest,
-): Promise<{ publicKey?: string; size?: number; superseded?: boolean }> {
+): Promise<{ publicKey?: string; sites?: boolean; size?: number; superseded?: boolean }> {
   return computer.provider.secret(computer.id, request);
 }
 
@@ -383,7 +401,7 @@ export async function deliverSecret(
     await activateDeliveredSecret(deps, orgId, row.id);
   } catch (error) {
     // The row stays visible and removable even if the activation reply is lost.
-    await publishSecret(deps.pubsub, delivered, "secret.updated").catch(() => undefined);
+    await publishSecret(deps, delivered, "secret.updated").catch(() => undefined);
     throw error;
   }
   const [latest] = await deps.db.select().from(secretRequests).where(eq(secretRequests.id, row.id));
@@ -487,8 +505,8 @@ export async function activateDeliveredSecret(
     ).catch(() => undefined);
   }
   if (finalized) {
-    await publishSecret(deps.pubsub, finalized.finished, "secret.updated");
-    for (const replaced of finalized.old) await publishSecret(deps.pubsub, replaced, "secret.updated");
+    await publishSecret(deps, finalized.finished, "secret.updated");
+    for (const replaced of finalized.old) await publishSecret(deps, replaced, "secret.updated");
   }
 }
 
@@ -526,7 +544,7 @@ export async function declineSecret(
     return updated;
   });
   if (!declined) throw new ConflictError("This request was already answered or expired");
-  await publishSecret(deps.pubsub, declined, "secret.updated");
+  await publishSecret(deps, declined, "secret.updated");
   const sandbox = deps.sandbox;
   if (sandbox) {
     await onRequestComputer(
@@ -561,7 +579,7 @@ export async function expireSecretRequests(deps: { db: Database; pubsub?: PubSub
     }
     return rows;
   });
-  for (const row of expired) await publishSecret(deps.pubsub, row, "secret.updated");
+  for (const row of expired) await publishSecret(deps, row, "secret.updated");
   return expired.length;
 }
 

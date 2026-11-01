@@ -4,12 +4,15 @@ import { and, eq, inArray, schema, sql } from "@agenteschat/db";
 import {
   applyAgentSetup,
   createAgent,
+  createSetupToolSource,
   ForbiddenError,
   getNewAgentSetup,
   NEW_AGENT_DEFAULTS,
+  PROPOSE_AGENT_TOOL,
   releaseAgents,
   type SetupResult,
   setAgentBrain,
+  type ToolContext,
   updateAgent,
   ValidationError,
 } from "../src";
@@ -539,4 +542,13 @@ describe("the Autonomia goes with the setup", () => {
     // Created on a model picked, it is the last setup, with its Autonomia.
     expect(await w.stored()).toMatchObject({ model: "claude-haiku-5-5", autonomy: "never" });
   });
+});
+
+test("a proposed agent's role may say what it does in full, not a word or two", async () => {
+  const tools = await createSetupToolSource({}).tools({} as ToolContext);
+  const props = tools.find((t) => t.name === PROPOSE_AGENT_TOOL)?.inputSchema.properties as
+    | Record<string, { maxLength?: number; description?: string }>
+    | undefined;
+  expect(props?.role?.maxLength).toBe(200);
+  expect(props?.role?.description).not.toMatch(/few words|Designer\)/);
 });

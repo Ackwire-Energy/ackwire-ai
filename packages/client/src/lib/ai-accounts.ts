@@ -133,6 +133,10 @@ export const accountTitle = (a: Pick<MachineAccount, "label" | "plan">) =>
     ? `${a.label} · ${planName(a.plan)}`
     : a.label;
 
+/** Whether the accounts sit on more than one computer: only then does a row say on which ("no MacBook"). */
+export const onSeveralComputers = (accounts: readonly { machineId: string }[]) =>
+  new Set(accounts.map((a) => a.machineId)).size > 1;
+
 /**
  * The line under an account in an agent's account choice (Quem pensa and Connect an AI, web and phone): whose it is
  * when it isn't the viewer's, the agents on it where choosing it signs this agent in to it too, signed out, the

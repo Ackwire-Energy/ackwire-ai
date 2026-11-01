@@ -1,10 +1,13 @@
 import { describe, expect, test } from "bun:test";
+import type { TFunction } from "i18next";
 import { ApiError, createHttpApi } from "../src/index";
+import { knownErrorText } from "../src/lib/errors";
 import {
   canSendWithoutAsking,
   choiceOf,
   defaultPolicy,
   loginOf,
+  mailAccessOf,
   mailErrorOf,
   normalizePolicy,
   notIcloudMail,
@@ -139,4 +142,34 @@ describe("mail rules", () => {
       expect(notIcloudMail(address)).toBeNull();
     }
   });
+});
+
+test("only who connected a mailbox gives access to it; whoever manages the agent takes it away", () => {
+  const box = { ownerUserId: "u-ana" };
+  expect(mailAccessOf(box, { userId: "u-ana", talks: true, managesAgent: false })).toEqual({
+    gives: true,
+    removes: true,
+  });
+  // Theirs, but the agent doesn't answer them: nothing to give it.
+  expect(mailAccessOf(box, { userId: "u-ana", talks: false, managesAgent: false }).gives).toBe(false);
+  // An admin (or the agent's owner) on someone else's mailbox: read-only, with a way to remove it.
+  expect(mailAccessOf(box, { userId: "u-admin", talks: true, managesAgent: true })).toEqual({
+    gives: false,
+    removes: true,
+  });
+  expect(mailAccessOf(box, { userId: "u-bia", talks: true, managesAgent: false })).toEqual({
+    gives: false,
+    removes: false,
+  });
+  expect(mailAccessOf({ ownerUserId: null }, { userId: null, talks: true, managesAgent: true }).gives).toBe(false);
+});
+
+test("the owner-only refusal names who connected the mailbox, or says so without a blank name", () => {
+  const t = ((key: string, o?: Record<string, unknown>) => `${key} ${JSON.stringify(o)}`) as unknown as TFunction;
+  const refusal = (ownerName: string) =>
+    new ApiError(403, "mail.owner_only", "Only", { address: "x@y.com", ownerUserId: "", ownerName });
+  expect(knownErrorText(t, refusal("Ana"))).toStartWith("errors.mail.ownerOnly {");
+  expect(knownErrorText(t, refusal(""))).toBe(
+    'errors.mail.ownerOnlyUnknown {"address":"x@y.com","ownerUserId":"","ownerName":""}',
+  );
 });

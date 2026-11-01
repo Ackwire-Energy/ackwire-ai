@@ -125,8 +125,22 @@ export function approvalReadsOnly(approval: Pick<Approval, "tool" | "scope" | "p
  */
 export function approvalValues(
   approval: Pick<Approval, "params" | "connector" | "email">,
-  { max = Number.POSITIVE_INFINITY, long = false }: { max?: number; long?: boolean } = {},
+  {
+    max = Number.POSITIVE_INFINITY,
+    long = false,
+    locale,
+  }: {
+    max?: number;
+    long?: boolean;
+    /** Numbers in the locale's format ("97.000"); grouped from five digits, so a year or an id stays as is. */
+    locale?: string;
+  } = {},
 ): [string, string][] {
+  // Grouped from five digits by hand: Hermes reads `useGrouping` as a boolean, so "min2" would group a year.
+  const formatNumber = locale
+    ? (v: number) =>
+        new Intl.NumberFormat(locale, { maximumFractionDigits: 4, useGrouping: Math.abs(v) >= 10000 }).format(v)
+    : null;
   // An email is said by its sentence and its letter; its fields aren't values.
   if (approval.email) return [];
   const skip = innerTool(approval) ? "name" : null;
@@ -136,7 +150,7 @@ export function approvalValues(
     for (const [k, v] of Object.entries(obj)) {
       if (top && k === skip) continue;
       if (plain(v)) {
-        const text = String(v).trim();
+        const text = typeof v === "number" && formatNumber ? formatNumber(v) : String(v).trim();
         if (text && (long || text.length <= 60)) out.push([humanize(k), text]);
       } else if (Array.isArray(v) && v.length > 0 && v.every(plain)) {
         // A list of names (the branches to delete) is one value; on a card it is cut, never left out.
@@ -148,6 +162,15 @@ export function approvalValues(
   walk(approval.params ?? {}, true);
   return out.slice(0, max);
 }
+
+/**
+ * Its values on one line ("Role: seller · Month: 2026-10 · Revenue: 97.000"): what tells apart two requests
+ * for the same tool, on the card while it waits and on the line once decided. The raw call stays in the details.
+ */
+export const approvalSummary = (approval: Pick<Approval, "params" | "connector" | "email">, locale: string, max = 4) =>
+  approvalValues(approval, { max, locale })
+    .map(([label, value]) => `${label}: ${value}`)
+    .join(" · ");
 
 /** Articles in an action's slug (`GITHUB_CREATE_AN_ISSUE_COMMENT`) that only make its words longer. */
 const SLUG_ARTICLES = new Set(["a", "an", "the"]);
@@ -195,3 +218,22 @@ export const approvalRuleWords = (t: TFunction, rule: Pick<ApprovalRule, "tool" 
     : rule.action
       ? actionName(t, rule.action)
       : rule.toolLabel;
+
+/**
+ * How a decided approval ended, as the line that takes its card's place says it, the same on the web and the
+ * phone: "Aprovado por você", "Recusado por Ana", "Expirou", "Cancelado".
+ */
+export function decisionOutcome(
+  t: TFunction,
+  a: Pick<Approval, "status" | "decidedByUserId">,
+  meId: string | null,
+  nameOf: (userId: string) => string | undefined,
+): string {
+  if (a.status === "expired" || a.status === "canceled") return t(`approvals.status.${a.status}`);
+  const approved = a.status === "approved";
+  const by = a.decidedByUserId;
+  if (by && by === meId) return t(approved ? "approval.outcomeApprovedByYou" : "approval.outcomeRefusedByYou");
+  const name = by ? nameOf(by) : undefined;
+  if (name) return t(approved ? "approval.outcomeApprovedBy" : "approval.outcomeRefusedBy", { name });
+  return t(approved ? "approvals.status.approved" : "approvals.status.refused");
+}

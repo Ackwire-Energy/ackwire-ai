@@ -21,7 +21,16 @@ import {
 
 const tags = ["Secrets"];
 
-const Target = z.union([z.object({ kind: z.literal("env") }), z.object({ kind: z.literal("file"), path: z.string() })]);
+const Target = z
+  .union([
+    z.object({ kind: z.literal("env") }),
+    z.object({ kind: z.literal("file"), path: z.string() }),
+    z.object({ kind: z.literal("site"), site: z.string() }),
+  ])
+  .openapi({
+    description:
+      "Where it goes on the computer: an environment variable of the agent's commands, a file in its folder, or `site`: only the agent's browser types it, on that site, never its commands.",
+  });
 
 const SecretRequest = z
   .object({

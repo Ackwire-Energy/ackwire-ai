@@ -20,6 +20,7 @@ import {
   makeDefaultCredential,
   memberPresence,
   memberStatus,
+  mySidebarItems,
   orgOverview,
   pickerModels,
   queueInvitationEmail,
@@ -27,11 +28,17 @@ import {
   resendInvitation,
   rotateCredential,
   runErrorDetail,
+  SIDEBAR_ITEMS,
+  SIDEBAR_PLACES,
+  type SidebarItem,
   STATUS_EMOJI_MAX,
   STATUS_TEXT_MAX,
   setAgentChannels,
   setInvitationRoles,
+  setMySidebarItem,
+  setMySidebarItems,
   setMyStatus,
+  sidebarPlaceAllowed,
   talksToAgents,
   updateMyProfile,
   updateOrgSettings,
@@ -44,6 +51,16 @@ import { AgentAppearance, AgentAudience, Credential, ModelTier, ProviderId, Role
 
 const usd = (nano: number | null) => (nano === null ? null : nanoUsdToUsd(nano));
 const ModelId = z.string().max(100);
+
+const SidebarItems = z
+  .partialRecord(z.enum(SIDEBAR_ITEMS), z.enum(SIDEBAR_PLACES))
+  .refine((items) => Object.entries(items).every(([item, place]) => sidebarPlaceAllowed(item as SidebarItem, place)), {
+    message: "Only approvals and threads have a count, so only they can be `auto`",
+  })
+  .openapi("SidebarItems", {
+    description:
+      "Where each tool at the top of the sidebar goes: `always` in the list, `more` only in the More menu, `auto` in the list while its count is above zero (approvals and threads). A tool left out keeps the app's default.",
+  });
 
 const Settings = z
   .object({
@@ -450,6 +467,69 @@ export function managementRoutes(deps: AppDeps) {
       const me = (await listMembers(db, orgId)).find((m) => m.userId === userId);
       if (!me) return c.json({ error: { code: "not_found", message: "Not a member" } }, 404);
       return c.json(personView(me, new Set(await adapters.presence.online(orgId)), userId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/me/sidebar",
+      tags: ["Members"],
+      security,
+      summary: "Where you put the tools at the top of your sidebar in this workspace",
+      description: "Only the tools you moved. Yours alone, on every device you sign in on.",
+      request: { params: OrgParams },
+      responses: { 200: json(z.object({ items: SidebarItems })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ items: await mySidebarItems(db, orgId, c.get("user").id) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "patch",
+      path: "/organizations/{orgId}/me/sidebar",
+      tags: ["Members"],
+      security,
+      summary: "Put one tool at the top of your sidebar where you want it in this workspace",
+      description:
+        "Your other choices stay as the server has them, so one made on another device in the meantime is kept. `place: null` puts the tool back on the app's default.",
+      request: {
+        params: OrgParams,
+        body: body(
+          z
+            .object({ item: z.enum(SIDEBAR_ITEMS), place: z.enum(SIDEBAR_PLACES).nullable() })
+            .refine(({ item, place }) => place === null || sidebarPlaceAllowed(item, place), {
+              message: "Only approvals and threads have a count, so only they can be `auto`",
+            }),
+        ),
+      },
+      responses: { 200: json(z.object({ items: SidebarItems })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const { item, place } = c.req.valid("json");
+      return c.json({ items: await setMySidebarItem(db, orgId, c.get("user").id, item, place) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/me/sidebar",
+      tags: ["Members"],
+      security,
+      summary: "Put the tools at the top of your sidebar where you want them in this workspace",
+      description:
+        "Replaces your choices: `{}` puts every tool back on the app's default. To move one tool, `PATCH` keeps the others as the server has them.",
+      request: { params: OrgParams, body: body(z.object({ items: SidebarItems })) },
+      responses: { 200: json(z.object({ items: SidebarItems })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ items: await setMySidebarItems(db, orgId, c.get("user").id, c.req.valid("json").items) }, 200);
     },
   );
 
@@ -865,6 +945,8 @@ export function managementRoutes(deps: AppDeps) {
       tags: ["Agents"],
       security,
       summary: "Set the agent's channels (and whether it answers without a mention in each)",
+      description:
+        "Its owner, or who may manage agents, in the channels they're in and may post in, or that they manage (its creator, `manage_channels`). The list replaces the channels `GET` shows the caller: private channels they can't see, DMs and archived channels stay.",
       request: {
         params: AgentParams,
         body: body(

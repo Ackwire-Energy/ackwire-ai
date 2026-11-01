@@ -73,6 +73,10 @@ describe("provider marks", () => {
     expect(markOf("moonshot")).toBe("kimi");
     expect(markOf("zai")).toBe("zai");
     expect(markOf("gemini")).toBe("gemini");
+    // A plan names the makers it resells as written.
+    expect(
+      ["OpenCode", "xAI", "Alibaba", "Meituan", "Tencent", "StepFun", "Meta", "Reflection", "Xiaomi"].map(markOf),
+    ).toEqual(["opencode", "xai", "alibaba", "meituan", "tencent", "stepfun", "meta", "reflection", "xiaomi"]);
     for (const id of ["model", "agent", "mistral", "", null, undefined, "constructor", "__proto__", "toString"])
       expect(markOf(id)).toBeNull();
   });

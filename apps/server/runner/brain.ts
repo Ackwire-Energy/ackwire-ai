@@ -168,8 +168,14 @@ const OUR_TOOL_PREFIX = "mcp__agentes__";
 
 // ── Stream parsing ───────────────────────────────────────────────────────────
 
-/** Claude Code says the plan's usage is exhausted (a result text, older and newer wordings). */
-export const LIMIT_TEXT = /usage limit|hit your limit|limit reached|out of extra usage|rate limit/i;
+/**
+ * Claude Code says the plan's usage is exhausted (a result text, older and newer wordings: "You've hit your
+ * session limit", "…weekly limit", "…Opus limit", "…Sonnet limit", "monthly spend limit").
+ */
+export const LIMIT_TEXT =
+  /usage limit|hit your (?:[\w-]+ )?limit|limit reached|out of extra usage|spend limit|rate limit/i;
+/** The server throttling everyone, which it says is no plan limit. */
+export const NOT_LIMIT_TEXT = /not your usage limit/i;
 /** Claude Code can't authenticate (not logged in, a revoked token, a bad key). */
 export const AUTH_TEXT = /not logged in|\/login|invalid api key|authentication[_ ]failed|oauth token|credentials/i;
 
@@ -260,16 +266,25 @@ export class ClaudeStreamParser {
 
   private tools = new Map<string, { name: string; input: unknown }>();
   private sawDelta = false;
+  /** The API message whose text streamed (`message_start`): Claude Code says it in one `assistant` per block. */
+  private streamedMessage: string | null = null;
   private limited = false;
+  /** A `rate_limit_event` said `rejected`: the plan itself refused, whatever the result's text. */
+  private rejected = false;
   private limitSent = false;
+  /** The turn used a tool (ours or Claude Code's own): a cut now loses work the API couldn't see. */
+  private worked = false;
   private resetsAt?: string;
   private authFailed = false;
 
   beginTurn() {
     this.tools.clear();
     this.sawDelta = false;
+    this.streamedMessage = null;
     this.limited = false;
+    this.rejected = false;
     this.limitSent = false;
+    this.worked = false;
     this.resetsAt = undefined;
     this.authFailed = false;
   }
@@ -305,6 +320,8 @@ export class ClaudeStreamParser {
       case "stream_event": {
         const e = isObj(ev.event) ? ev.event : {};
         const delta = isObj(e.delta) ? e.delta : {};
+        if (main && e.type === "message_start")
+          this.streamedMessage = isObj(e.message) ? str(e.message.id) || null : null;
         if (main && e.type === "content_block_delta" && delta.type === "text_delta" && str(delta.text)) {
           this.sawDelta = true;
           return { events: [{ type: "text_delta", text: str(delta.text) }] };
@@ -316,12 +333,15 @@ export class ClaudeStreamParser {
         if (ev.error === "authentication_failed") this.authFailed = true;
         if (ev.error === "rate_limit") this.limited = true;
         const content = isObj(ev.message) && Array.isArray(ev.message.content) ? ev.message.content : [];
+        const messageId = isObj(ev.message) ? str(ev.message.id) : "";
+        const streamed = this.sawDelta || (messageId !== "" && messageId === this.streamedMessage);
         const events: WireBrainEvent[] = [];
         // A turn's first reply names the messages that started it (a steered one the CLI read after a result).
         const read = readUuids(ev);
         if (read.length) events.push({ type: "steer_read", uuids: read });
         for (const block of content) {
           if (!isObj(block)) continue;
+          if (block.type === "tool_use") this.worked = true;
           if (
             block.type === "tool_use" &&
             str(block.id) &&
@@ -329,7 +349,7 @@ export class ClaudeStreamParser {
             (this.localTools || str(block.name).startsWith(OUR_TOOL_PREFIX))
           ) {
             this.tools.set(str(block.id), { name: str(block.name), input: block.input ?? {} });
-          } else if (block.type === "text" && str(block.text) && !this.sawDelta) {
+          } else if (block.type === "text" && str(block.text) && !streamed) {
             // No partial messages (an older Claude Code): the whole text block at once.
             events.push({ type: "text_delta", text: str(block.text) });
           }
@@ -367,6 +387,7 @@ export class ClaudeStreamParser {
         const info = isObj(ev.rate_limit_info) ? ev.rate_limit_info : {};
         if (info.status !== "rejected") return { events: [], rateLimit: info };
         this.limited = true;
+        this.rejected = true;
         this.resetsAt = resetIso(info.resetsAt);
         if (this.limitSent) return { events: [], rateLimit: info };
         this.limitSent = true;
@@ -410,7 +431,7 @@ export class ClaudeStreamParser {
     const session = str(ev.session_id) || this.session;
     const text = str(ev.result) || (Array.isArray(ev.errors) ? ev.errors.map(str).join("\n") : "");
     if (ev.is_error === true || (typeof ev.subtype === "string" && ev.subtype !== "success")) {
-      if (this.limited || LIMIT_TEXT.test(text)) {
+      if (this.rejected || ((this.limited || LIMIT_TEXT.test(text)) && !NOT_LIMIT_TEXT.test(text))) {
         const legacy = /\|(\d{10})\b/.exec(text)?.[1];
         const resetsAt = this.resetsAt ?? (legacy ? resetIso(Number(legacy)) : undefined);
         if (!this.limitSent) events.push({ type: "limit", ...(resetsAt ? { resetsAt } : {}) });
@@ -422,7 +443,10 @@ export class ClaudeStreamParser {
             code: "plan_limit",
             message: (text || "The plan's usage limit was reached.").slice(0, BRAIN_LIMITS.message),
             retryable: true,
+            worked: this.worked,
           },
+          // Known only from its words (no `rate_limit_event` said so): the stored usage says limited too.
+          ...(this.rejected ? {} : { rateLimit: { status: "rejected" } }),
         };
       }
       if (this.authFailed || AUTH_TEXT.test(text)) {

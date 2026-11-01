@@ -814,7 +814,7 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
     await settle(8);
     const section = document.querySelector("[data-agent-folders]") as HTMLElement;
     expect(section.textContent).toContain("Pastas no computador");
-    expect(section.textContent).toContain("Além da própria pasta, usa estas no MacBook do Walter:");
+    expect(section.textContent).toContain("Além da própria pasta, usa estas:");
     expect(section.textContent).toContain("loja-v5");
     expect(section.querySelector("code")?.textContent).toBe(LOJA);
     // Allowed on the machine but not for Ada.

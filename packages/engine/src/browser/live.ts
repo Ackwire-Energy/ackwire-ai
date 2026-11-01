@@ -543,20 +543,29 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
   }
   /** Input being gathered, per person and agent. */
   const batches = new Map<string, InputBatch>();
+  /** The last batch sent per person and agent: the next waits for it, so a drag's press, moves and release reach the runner in order. */
+  const sending = new Map<string, Promise<unknown>>();
 
   function flushInput(key: string, batch: InputBatch) {
     if (batches.get(key) === batch) batches.delete(key);
     if (batch.timer) clearTimeout(batch.timer);
     batch.timer = null;
     const events = coalesceInput(batch.events);
-    api.sendInput(batch.userId, batch.orgId, batch.agentId, events).then(
-      (r) => {
-        for (const w of batch.waiters) w.resolve(r);
-      },
-      (error) => {
-        for (const w of batch.waiters) w.reject(error);
-      },
-    );
+    const sent = (sending.get(key) ?? Promise.resolve())
+      .catch(() => {})
+      .then(() => api.sendInput(batch.userId, batch.orgId, batch.agentId, events))
+      .then(
+        (r) => {
+          for (const w of batch.waiters) w.resolve(r);
+        },
+        (error) => {
+          for (const w of batch.waiters) w.reject(error);
+        },
+      );
+    sending.set(key, sent);
+    void sent.finally(() => {
+      if (sending.get(key) === sent) sending.delete(key);
+    });
   }
 
   const api = {

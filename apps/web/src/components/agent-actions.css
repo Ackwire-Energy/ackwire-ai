@@ -1,8 +1,9 @@
 /*
  * Receipts under an agent's reply: one
- * change is a quiet sunken row (A); several are a sunken group with
- * "N mudanças · há X" and Desfazer tudo (B). Neutral surfaces, icon tiles,
- * the countdown in tabular figures. Undone rows are struck through and dimmed.
+ * change is a quiet row (A); several are a group with
+ * "N mudanças · há X" and Desfazer tudo (B). Cards like the reply's tools (the card face, its hairline and cut
+ * corner, the same width), icon tiles, the countdown in tabular figures. The sentence wraps, whole; the icon and the
+ * button sit on its first line. Undone rows are struck through and dimmed.
  */
 .ag-rcs {
   margin-top: 8px;
@@ -15,12 +16,13 @@
 }
 .ag-rc {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
-  max-width: 420px;
-  padding: 7px 8px 7px 8px;
-  border-radius: 14px;
-  background: var(--sunken);
+  max-width: var(--msg-card-w);
+  padding: 7px 8px;
+  border-radius: var(--radius-item) var(--radius-item) var(--radius-item) 4px;
+  background: var(--surface-raised);
+  box-shadow: var(--card-shadow);
   font-size: 14px;
   color: var(--muted);
 }
@@ -30,6 +32,8 @@
   place-items: center;
   width: 24px;
   height: 24px;
+  /* On the first line's middle, which is the 32px button's. */
+  margin-block: 4px;
   border-radius: 8px;
   background: var(--raised);
   color: var(--ink2);
@@ -40,11 +44,11 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
+  padding-block: 6px;
+  line-height: 20px;
 }
 .ag-rc__sentence {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .ag-rc__target {
   color: var(--ink);
@@ -100,6 +104,22 @@ html:not([data-pointer]) .ag-rc__btn:focus-visible {
   font-size: 12px;
   color: var(--faint);
 }
+/* The button's room: as wide as the widest it can be (Desfazer and its time, Refazer), whether it shows or not. */
+.ag-rc__act {
+  flex: none;
+  display: grid;
+  justify-items: end;
+}
+.ag-rc__act > *,
+.ag-rc__room > * {
+  grid-area: 1 / 1;
+}
+.ag-rc__room {
+  display: contents;
+}
+.ag-rc__room > * {
+  visibility: hidden;
+}
 .is-undone .ag-rc__sentence {
   text-decoration: line-through;
   text-decoration-color: color-mix(in srgb, var(--ink) 35%, transparent);
@@ -114,10 +134,11 @@ html:not([data-pointer]) .ag-rc__btn:focus-visible {
 
 /* B: several changes */
 .ag-rcg {
-  max-width: 420px;
+  max-width: var(--msg-card-w);
   margin-top: 8px;
-  border-radius: 16px;
-  background: var(--sunken);
+  border-radius: var(--radius-item) var(--radius-item) var(--radius-item) 4px;
+  background: var(--surface-raised);
+  box-shadow: var(--card-shadow);
   overflow: hidden;
 }
 .ag-rcg__hd {
@@ -138,7 +159,7 @@ html:not([data-pointer]) .ag-rc__btn:focus-visible {
 }
 .ag-rcg__it {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   min-height: 38px;
   padding: 3px 6px 3px 12px;
@@ -148,6 +169,7 @@ html:not([data-pointer]) .ag-rc__btn:focus-visible {
 }
 .ag-rcg__ic {
   flex: none;
+  margin-block: 9px;
   color: var(--muted);
 }
 .ag-rcg__it .ag-rc__btn {

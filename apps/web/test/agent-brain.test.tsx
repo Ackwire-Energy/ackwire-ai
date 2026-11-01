@@ -1293,7 +1293,7 @@ describe("Quem pensa: a coding plan's models", () => {
     const options = screen()
       .getAllByRole("option")
       .map((o) => o.textContent);
-    expect(options).toHaveLength(25);
+    expect(options).toHaveLength(29);
     expect(options.slice(0, 4)).toEqual([
       "AutomáticoEscolhe o modelo e o esforço para cada tarefa",
       "MiniMax M3",
@@ -1317,17 +1317,55 @@ describe("Quem pensa: a coding plan's models", () => {
       "Meituan",
       "Tencent",
       "StepFun",
+      "Meta",
+      "Reflection",
+      "OpenCode",
     ]);
-    expect(list.querySelectorAll(".ac-menu__leading")).toHaveLength(25);
-    // DeepSeek's answer only once the OpenCode workspace allows the Global region.
+    expect(list.querySelectorAll(".ac-menu__leading")).toHaveLength(29);
+    // Every maker's own mark, never its initial.
+    expect(list.querySelectorAll(".ac-brand__initial")).toHaveLength(0);
     expect(
-      within(within(list).getByRole("group", { name: "DeepSeek" }))
-        .getAllByRole("option")
-        .map((o) => o.textContent),
-    ).toEqual([
-      "DeepSeek V4 ProPrecisa da região Global no OpenCode",
-      "DeepSeek V4.1 FlashEconômico · Precisa da região Global no OpenCode",
+      within(list).getByRole("group", { name: "Tencent" }).querySelector(".ac-brand")?.getAttribute("data-mark"),
+    ).toBe("tencent");
+    // DeepSeek's answer only once the OpenCode workspace allows the Global region: said behind the ⓘ at the row's
+    // end, the row's description, never a line of the row.
+    const deepseek = within(within(list).getByRole("group", { name: "DeepSeek" })).getAllByRole("option");
+    expect(deepseek.map((o) => o.querySelector(".ac-menu__desc")?.textContent ?? null)).toEqual([null, "Econômico"]);
+    const described = (o: HTMLElement) =>
+      document.getElementById(o.getAttribute("aria-describedby") ?? "")?.textContent;
+    expect(deepseek.map(described)).toEqual([
+      "Precisa da região Global no OpenCode.",
+      "Precisa da região Global no OpenCode.",
     ]);
+    // A model that trains on what it's sent: its provider does, never agentes.chat.
+    const beam = screen().getByRole("option", { name: "Beam Free" });
+    expect(described(beam)).toBe(
+      "Grátis. O provedor pode usar os pedidos para treinar o modelo. Ligue a permissão no OpenCode.",
+    );
+    const tip = () => document.querySelector(".ac-menu__tip")?.textContent ?? null;
+    const info = beam.querySelector(".ac-menu__hint") as HTMLElement;
+    // The pointer resting on the ⓘ shows the note; a click on it shows it too, and never picks the model.
+    await act(async () => fireEvent.pointerEnter(info, { pointerType: "mouse" }));
+    expect(tip()).toBe(described(beam) ?? "");
+    await act(async () => fireEvent.pointerLeave(info, { pointerType: "mouse" }));
+    expect(tip()).toBeNull();
+    await act(async () => fireEvent.click(info));
+    expect(tip()).toBe(described(beam) ?? "");
+    expect(screen().queryByRole("listbox")).not.toBeNull();
+    await act(async () => fireEvent.pointerLeave(info, { pointerType: "mouse" }));
+    // A real mouse enters before it clicks: the click keeps the note the hover showed.
+    await act(async () => fireEvent.pointerEnter(info, { pointerType: "mouse" }));
+    await act(async () => fireEvent.click(info));
+    expect(tip()).toBe(described(beam) ?? "");
+    await act(async () => fireEvent.pointerLeave(info, { pointerType: "mouse" }));
+    expect(tip()).toBeNull();
+    // The keys reaching the option show it as well.
+    await act(async () => {
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: "ArrowDown" });
+      (deepseek[0] as HTMLElement).focus();
+      fireEvent.keyUp(document.activeElement ?? document.body, { key: "ArrowDown" });
+    });
+    expect(tip()).toBe("Precisa da região Global no OpenCode.");
     await click(screen().getByRole("option", { name: /^DeepSeek V4\.1 Flash/ }));
     // Chosen, what it needs is said once: under it, how to give it, with the plan's page.
     expect(within(d).getByRole("combobox", { name: "Modelo" }).textContent).toBe("DeepSeek V4.1 FlashEconômico");
@@ -1634,6 +1672,7 @@ describe("Onde trabalha and the browser (their dialogs)", () => {
 describe("Quem pensa: the draft", () => {
   const saved: Saved = {
     name: "Ada",
+    handle: "ada",
     role: "",
     look: { color: "sky", eyes: "round", accessory: "none" },
     instructions: "",

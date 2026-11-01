@@ -2,7 +2,7 @@ import type { WikiGraph } from "@agenteschat/client";
 import { useWikiGraph } from "@agenteschat/client";
 import { appearanceStyle, Segmented } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
@@ -86,6 +86,18 @@ export function layoutGraph(graph: WikiGraph, width = 720, height = 460, steps =
   return pos.map(({ slug, x, y }) => ({ slug, x: Math.round(x), y: Math.round(y) }));
 }
 
+const GRAPH_H = 560;
+
+/**
+ * The full graph's drawing width for a box of `width` x `height` px: the
+ * viewBox takes the box's shape, so the drawing fills it instead of sitting
+ * letterboxed in a wide window, and the layout spreads into the extra width.
+ */
+export function graphWidth(width: number, height: number) {
+  if (!(width > 0 && height > 0)) return 960;
+  return Math.round(Math.min(4, Math.max(1, width / height)) * GRAPH_H);
+}
+
 /** Pages linked to `slug` (both directions). */
 export const neighborsOf = (graph: WikiGraph, slug: string) =>
   new Set(graph.edges.flatMap((e) => (e.from === slug ? [e.to] : e.to === slug ? [e.from] : [])));
@@ -125,8 +137,18 @@ export function WikiGraphView({ onOpen, mini = false }: { onOpen?: () => void; m
       edges: data.edges.filter((e) => keep.has(e.from) && keep.has(e.to)),
     };
   }, [data, filter]);
-  const W = mini ? 520 : 960;
-  const H = mini ? 200 : 560;
+  const [el, setEl] = useState<SVGSVGElement | null>(null);
+  const [fullW, setFullW] = useState(960);
+  useEffect(() => {
+    if (mini || !el || typeof ResizeObserver === "undefined") return;
+    const measure = () => setFullW(graphWidth(el.clientWidth, el.clientHeight));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [mini, el]);
+  const W = mini ? 520 : fullW;
+  const H = mini ? 200 : GRAPH_H;
   const placed = useMemo(() => (filtered ? layoutGraph(filtered, W, H) : []), [filtered, W, H]);
   if (graph.isLoading) return mini ? null : <LoadingCards count={2} />;
   if (!data || !filtered) return mini ? null : <ErrorState error={graph.error} onRetry={() => void graph.refetch()} />;
@@ -146,6 +168,7 @@ export function WikiGraphView({ onOpen, mini = false }: { onOpen?: () => void; m
   };
   const svg = (
     <svg
+      ref={setEl}
       className="wiki-graph__svg"
       viewBox={`0 0 ${W} ${H}`}
       role={mini ? "presentation" : "img"}

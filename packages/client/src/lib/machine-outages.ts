@@ -240,6 +240,13 @@ export function brainUnavailableOf(meta: Record<string, unknown> | null | undefi
 }
 
 /**
+ * The note waits for its computer to come back (the waiting card), not for room on one that is there (`busy`) nor
+ * for a plan's limit to reset: those stay the agent's own words, never "the computer is back".
+ */
+export const waitsForComputer = (info: Pick<BrainUnavailableInfo, "machineId" | "code"> | null) =>
+  Boolean(info?.machineId) && info?.code !== "busy" && info?.code !== "plan_limit";
+
+/**
  * Where the card stands: still waiting (the computer is in the outages and lists the agent), moved (the
  * computer is still out but the agent no longer waits for it), or back (the computer left the outages).
  * Unknown when the outages aren't loaded or the message doesn't say which computer.

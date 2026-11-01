@@ -1,9 +1,10 @@
 import { type SignInProvider, useAuthConfig } from "@agenteschat/client";
+import { jwtEmail } from "@agenteschat/client/lib/text";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Platform, View } from "react-native";
-import { socialRefusalText } from "@/features/auth/human-check";
+import { earlyAccessRequests, socialRefusalText } from "@/features/auth/human-check";
 import { authClient } from "@/lib/auth";
 import { readValueSync, writeValue } from "@/lib/storage";
 import { Button } from "../Button";
@@ -34,7 +35,8 @@ export function useSocialProviders(only?: SignInProvider[]): SignInProvider[] {
  * "Continue with Apple/Google/GitHub" for the given providers with their marks (as on the web), the last one
  * used marked.
  * On iOS, Apple uses the system button (Apple's rules) and a native sign-in sent to the server as an
- * ID token; the others go through the system browser and back on `agenteschat://`.
+ * ID token; the others go through the system browser and back on `agenteschat://`. A refusal there shows on the
+ * server's sign-in page in that browser (apps/server auth.ts `onAPIError`).
  */
 export function SocialButtons({
   providers,
@@ -42,16 +44,22 @@ export function SocialButtons({
   onError,
   callbackURL = "/",
   onSignedIn,
+  earlyAccess,
 }: {
   providers: SignInProvider[];
   divider?: boolean;
-  onError: (message: string) => void;
+  /** `email`: the address Apple's native sign-in was refused for (its ID token's), which the field may not hold. */
+  onError: (message: string, email?: string) => void;
   /** Where the browser's sign-in comes back to: a screen that asked for it again stays open. */
   callbackURL?: string;
   /** Signed in, for a screen that asked for a new sign-in while signed in already. */
   onSignedIn?: () => void;
+  /** An early-access link's token, for the sign-up it opens (as the web's). */
+  earlyAccess?: string;
 }) {
   const { t } = useTranslation();
+  const emails = useAuthConfig().data?.passwordReset === true;
+  const requests = earlyAccessRequests(earlyAccess);
   const { scheme } = useTheme();
   const [nativeApple, setNativeApple] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -70,8 +78,8 @@ export function SocialButtons({
     setBusy(true);
     rememberSignIn(provider);
     try {
-      const res = await authClient().signIn.social({ provider, callbackURL });
-      if (res.error) onError(socialRefusalText(t, res.error));
+      const res = await authClient().signIn.social(requests.browser(provider, callbackURL));
+      if (res.error) onError(socialRefusalText(t, res.error, emails));
       else onSignedIn?.();
     } catch {
       onError(t("mobile.auth.errors.network"));
@@ -91,11 +99,8 @@ export function SocialButtons({
       if (!credential.identityToken) return onError(t("mobile.auth.social.failed"));
       setBusy(true);
       rememberSignIn("apple");
-      const res = await authClient().signIn.social({
-        provider: "apple",
-        idToken: { token: credential.identityToken },
-      });
-      if (res.error) onError(socialRefusalText(t, res.error));
+      const res = await authClient().signIn.social(requests.apple(credential.identityToken));
+      if (res.error) onError(socialRefusalText(t, res.error, emails), jwtEmail(credential.identityToken));
       else onSignedIn?.();
     } catch (e) {
       // Closing Apple's sheet is not an error.

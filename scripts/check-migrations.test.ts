@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { unsafeStatements } from "./check-migrations";
+import { outOfOrderEntries, unsafeStatements } from "./check-migrations";
 
 const read = (path: string) => readFileSync(join(import.meta.dir, "..", path), "utf8");
 
@@ -36,4 +36,16 @@ test("migrations from before the check: the ones that dropped would have been ca
     "13: drops",
   ]);
   expect(unsafeStatements(read("packages/db/migrations/0119_agent_audit.sql"))).toEqual([]);
+});
+
+test("journal entries must be newer than the one before them, as drizzle skips an older one after a newer was applied", () => {
+  const entries = [
+    { tag: "0001_a", when: 10 },
+    { tag: "0002_b", when: 30 },
+    { tag: "0003_c", when: 20 },
+    { tag: "0004_d", when: 20 },
+    { tag: "0005_e", when: 40 },
+  ];
+  expect(outOfOrderEntries(entries)).toEqual(["0003_c", "0004_d"]);
+  expect(outOfOrderEntries(JSON.parse(read("packages/db/migrations/meta/_journal.json")).entries)).toEqual([]);
 });

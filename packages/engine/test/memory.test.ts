@@ -27,6 +27,7 @@ import {
   ensureThreadSummary,
   ForbiddenError,
   grantScopes,
+  holdsSecret,
   insertMessage,
   isVerified,
   listAgentMemoryRows,
@@ -94,6 +95,32 @@ describe("guardrails", () => {
     expect(looksLikeSecret("token: ghp_abcdefghijklmnopqrstuvwxyz0123")).toBe(true);
     expect(looksLikeSecret("senha = hunter22secret")).toBe(true);
     expect(looksLikeSecret("we use tokens to price calls")).toBe(false);
+    // A placeholder in a doc or a skill is not a key.
+    expect(looksLikeSecret("export OPENAI_API_KEY=your-key-here")).toBe(false);
+    expect(looksLikeSecret('{ "api_key": "YOUR_API_KEY" }')).toBe(false);
+  });
+
+  test("a file holds a key when one is set in it, whatever its type; never a placeholder or code", () => {
+    const file = (text: string) => holdsSecret(new TextEncoder().encode(text));
+    for (const text of [
+      '{"gmail":{"password":"hunter22-fixture"}}',
+      "#!/bin/sh\nDB_PASSWORD=fixture-never-stored ./run",
+      "users:\n- name: ci\n  user:\n    token: fixture-never-stored\n",
+      "use sk-ant-api03-abcdefghijklmnopqrstuvwxyz",
+    ]) {
+      expect([text, file(text)]).toEqual([text, true]);
+    }
+    for (const text of [
+      "export OPENAI_API_KEY=your-key-here",
+      '{ "api_key": "YOUR_API_KEY" }',
+      "token = get_token()",
+      'password = input("Senha: ")',
+      'token = os.environ["NORTHWIND_TOKEN"]',
+      `export API_KEY=${"$"}{NORTHWIND_KEY}`,
+      "password: <your password>",
+    ]) {
+      expect([text, file(text)]).toEqual([text, false]);
+    }
   });
 
   test("permission-bending text is the judge's call (any language); a failing judge never blocks memory", async () => {
@@ -1137,6 +1164,22 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
     );
   });
 
+  test("an agent named by the handle it had before a rename gets the change", async () => {
+    f = await setup();
+    const ada = await teammate("ada");
+    await updateAgent(f.db, f.owner.id, f.org.id, ada.id, { name: "Claudio", handle: "claudio" });
+    const out = await propose(await runOn("person"), {
+      target: "agents",
+      agents: ["@ada"],
+      change: "Responder em português.",
+      roles: [{ agent: "@ada", role: "Revisora" }],
+    });
+    expect(out.isError).toBeUndefined();
+    const made = await rows();
+    expect(made.length).toBeGreaterThan(0);
+    expect(made.every((r) => r.agentId === ada.id)).toBe(true);
+  });
+
   test("only agents the person who asked can talk to: one out of their reach refuses the card, naming it", async () => {
     f = await setup();
     const bia = await addMember(f.db, f.org.id, "member", "bia");
@@ -1292,6 +1335,21 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
       decideProposal(f.db, f.owner.id, f.org.id, again.proposals[0]?.id ?? "", "accept"),
     ).rejects.toBeInstanceOf(ConflictError);
     expect((await agentRow(ada.id))?.role).toBe("Designer");
+  });
+
+  test("a new role of 40 characters goes on the card whole", async () => {
+    f = await setup();
+    const ada = await teammate("ada");
+    const { proposals, skipped } = await proposeFor({
+      target: "agent_instructions",
+      agentIds: [],
+      change: "",
+      roles: [{ agentId: ada.id, role: "Assistente de e-mails, agenda e reuniões" }],
+    });
+    expect(skipped).toEqual([]);
+    expect(proposals.map((p) => [p.target, p.agentId, p.proposedText])).toEqual([
+      ["agent_role", ada.id, "Assistente de e-mails, agenda e reuniões"],
+    ]);
   });
 
   test("apps on or off: the owner only takes them away, as on the Access tab; applied as the person; never the proposer's own", async () => {

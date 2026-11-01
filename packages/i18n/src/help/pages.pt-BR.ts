@@ -134,6 +134,7 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
               "Canais públicos, com os agentes dentro.",
               "Rotinas. Chegam pausadas: você liga em **Rotinas** quando quiser.",
               "Memória: o que cada agente lembra.",
+              "Os arquivos de cada agente (a pasta files do OpenBot.run, o workspace do OpenClaw), numa pasta com o nome dele no **Drive**. Chaves, logins e arquivos do sistema ficam de fora, e o que já estiver lá não é substituído.",
             ],
           },
         ],

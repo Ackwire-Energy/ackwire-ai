@@ -9,6 +9,7 @@ import {
   sameBrain,
   sameList,
 } from "@agenteschat/client/lib/agent-edit";
+import { handleAfterRename } from "@agenteschat/client/lib/new-agent";
 import { type RepoChoice, sameRepoChoice } from "@agenteschat/client/lib/repos";
 import type { AgentAppearance } from "@agenteschat/ui";
 
@@ -26,6 +27,8 @@ export type Look = Required<AgentAppearance>;
 /** What can be edited, as the server has it now. Parts not loaded yet are absent. */
 export interface Saved {
   name: string;
+  /** Its @ now. */
+  handle: string;
   role: string;
   look: Look;
   instructions: string;
@@ -58,6 +61,8 @@ export interface Saved {
 /** What the person changed. `budget` is the text typed; `levels` only the resources touched. */
 export interface Edits {
   name?: string;
+  /** The @ typed in Menções (or the saved one, to keep it); absent, it follows the name (`handleAfterRename`). */
+  handle?: string;
   role?: string;
   look?: Look;
   instructions?: string;
@@ -79,17 +84,19 @@ export interface Edits {
 export type Field = Exclude<keyof Edits, "levels"> | "levels";
 
 /**
- * Who edits what (the server's rules): admins everything; the agent's owner its look, audience, computer and
- * who thinks. Access and repositories are admins' like its scopes: giving an agent more is an admin's call.
+ * Who edits what (the server's rules): admins everything; the agent's owner its look, audience, channels, computer
+ * and who thinks. Channels, for both, only the ones they may put an agent in (`addsAgentsTo`). Access and
+ * repositories are admins' like its scopes: giving an agent more is an admin's call.
  */
 export type Viewer = "admin" | "owner" | "member";
-export const OWNER_EDITS: ReadonlySet<Field> = new Set<Field>(["look", "audience", "machine", "brain"]);
+export const OWNER_EDITS: ReadonlySet<Field> = new Set<Field>(["look", "audience", "channels", "machine", "brain"]);
 export const canEdit = (viewer: Viewer, field: Field) =>
   viewer === "admin" || (viewer === "owner" && OWNER_EDITS.has(field));
 
 /** Where each field lives: its tab, and its section in Configurações. */
 export const FIELD_PLACE: Record<Field, { tab: AgentTab; sec?: AgentSection }> = {
   name: { tab: "settings", sec: "identity" },
+  handle: { tab: "settings", sec: "identity" },
   role: { tab: "settings", sec: "identity" },
   look: { tab: "settings", sec: "identity" },
   instructions: { tab: "instructions" },
@@ -123,6 +130,7 @@ export function changedKeys(saved: Saved, edits: Edits): ChangeKey[] {
   const out: ChangeKey[] = [];
   const add = (field: Field) => out.push({ key: field, field });
   if (edits.name !== undefined && edits.name !== saved.name) add("name");
+  if (handleAfterRename(saved, edits.name ?? saved.name, edits.handle) !== saved.handle) add("handle");
   if (edits.role !== undefined && edits.role !== saved.role) add("role");
   if (edits.look && !sameLook(edits.look, saved.look)) add("look");
   if (edits.instructions !== undefined && edits.instructions !== saved.instructions) add("instructions");

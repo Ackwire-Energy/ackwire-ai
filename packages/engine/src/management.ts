@@ -3,7 +3,7 @@ import { MODEL_TIERS, type ModelTier } from "@agenteschat/providers";
 import { getAgent } from "./agents";
 import type { AutoModels } from "./auto-model";
 import { caches } from "./cache";
-import { CHANNEL_NAME_PATTERN } from "./channels";
+import { CHANNEL_NAME_PATTERN, placesAgentsIn } from "./channels";
 import { invalidateDefaults, modelInfoFor } from "./credentials";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { agentBudgetState } from "./gateway";
@@ -26,6 +26,7 @@ import {
   orgDefaultAgentBudget,
   workspaceBudgetPercent,
 } from "./usage";
+import { resumeBudgetWaits } from "./usage-pause";
 
 const {
   organizations,
@@ -218,6 +219,8 @@ export async function updateOrgSettings(
   });
   caches.orgs.delete(`${orgId}:`);
   caches.orgs.delete(`${orgId}:agent-budget`);
+  // Agents on the default budget whose runs wait for it look again now (the rest park again quietly).
+  if (input.defaultAgentBudgetNanoUsd !== undefined) await resumeBudgetWaits(db, orgId, null);
   caches.orgs.delete(`${orgId}:action-check`);
   caches.orgs.delete(`${orgId}:auto-models`);
   caches.orgs.delete(mediaSettingsCacheKey(orgId));
@@ -360,8 +363,11 @@ export async function listAgentChannels(db: Database, actorId: string, orgId: st
 }
 
 /**
- * Sets where an agent works: the channels it belongs to and, per channel,
- * whether the router may pick it without a mention. Admins (`manage_agents`).
+ * Sets where an agent works: the channels it belongs to and, per channel, whether the router may pick it without a
+ * mention. Its owner or who may manage every agent (`manage_agents`) sets it, and puts it in or takes it out of a
+ * channel only where they're a member who may post, or that they manage (`placesAgentsIn`, the rule a channel's
+ * members follow too). The list replaces the channels `listAgentChannels` shows them: a private channel they can't
+ * see, a DM or an archived channel stays as it is.
  */
 export async function setAgentChannels(
   db: Database,
@@ -370,40 +376,77 @@ export async function setAgentChannels(
   agentId: string,
   input: { channelId: string; autoReply?: boolean }[],
 ) {
-  await requirePermission(db, actorId, orgId, "manage_agents");
+  const membership = await requireActiveMembership(db, actorId, orgId);
   const agent = await getAgent(db, orgId, agentId);
   if (!agent || agent.archivedAt) throw new NotFoundError("Agent not found");
-  const ids = [...new Set(input.map((c) => c.channelId))];
-  if (ids.length > 0) {
-    const found = await db
-      .select({ id: channels.id, kind: channels.kind })
-      .from(channels)
-      .where(and(eq(channels.orgId, orgId), inArray(channels.id, ids), isNull(channels.archivedAt)));
-    if (found.length !== ids.length) throw new ValidationError("Every channel must belong to this organization");
-    if (found.some((channel) => channel.kind === "dm")) {
-      throw new ValidationError("A direct conversation keeps its participants");
-    }
+  const admin = can(membership, "manage_agents");
+  if (!admin && agent.ownerUserId !== actorId) {
+    throw new ForbiddenError("Only an admin or the agent's owner can change where it works");
   }
+  const wanted = new Map(input.map((c) => [c.channelId, c.autoReply]));
+  const ids = [...wanted.keys()];
+  const columns = {
+    id: channels.id,
+    kind: channels.kind,
+    visibility: channels.visibility,
+    createdByUserId: channels.createdByUserId,
+  };
+  const [current, found, mine] = await Promise.all([
+    db
+      .select({ ...columns, autoReply: channelMembers.autoReply })
+      .from(channelMembers)
+      .innerJoin(channels, eq(channels.id, channelMembers.channelId))
+      .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.agentId, agentId), isNull(channels.archivedAt))),
+    ids.length > 0
+      ? db
+          .select(columns)
+          .from(channels)
+          .where(and(eq(channels.orgId, orgId), inArray(channels.id, ids), isNull(channels.archivedAt)))
+      : [],
+    db
+      .select({ id: channelMembers.channelId })
+      .from(channelMembers)
+      .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.userId, actorId))),
+  ]);
+  if (found.length !== ids.length) throw new ValidationError("Every channel must belong to this organization");
+  const inIt = new Set(current.map((c) => c.id));
+  const adding = found.filter((c) => !inIt.has(c.id));
+  if (adding.some((c) => c.kind === "dm")) throw new ValidationError("A direct conversation keeps its participants");
+  const actorIn = new Set(mine.map((c) => c.id));
+  const removing = current.filter(
+    (c) => c.kind === "channel" && !wanted.has(c.id) && (actorIn.has(c.id) || c.visibility === "public" || admin),
+  );
+  if ([...adding, ...removing].some((c) => !placesAgentsIn(membership, actorId, c, actorIn.has(c.id)))) {
+    throw new ForbiddenError("An agent joins or leaves only the channels you're in or manage");
+  }
+  const retuned = current.flatMap((c) => {
+    const autoReply = wanted.get(c.id);
+    return c.kind !== "dm" && autoReply !== undefined && autoReply !== c.autoReply ? [{ id: c.id, autoReply }] : [];
+  });
   await db.transaction(async (tx) => {
-    // Bulk management changes ordinary channels only; DM participants are fixed by the DM flow.
-    const ordinaryChannels = db
-      .select({ id: channels.id })
-      .from(channels)
-      .where(and(eq(channels.orgId, orgId), eq(channels.kind, "channel")));
-    await tx
-      .delete(channelMembers)
-      .where(
+    if (removing.length > 0) {
+      await tx.delete(channelMembers).where(
         and(
           eq(channelMembers.orgId, orgId),
           eq(channelMembers.agentId, agentId),
-          inArray(channelMembers.channelId, ordinaryChannels),
+          inArray(
+            channelMembers.channelId,
+            removing.map((c) => c.id),
+          ),
         ),
       );
-    for (const c of input) {
+    }
+    for (const c of adding) {
       await tx
         .insert(channelMembers)
-        .values({ orgId, channelId: c.channelId, agentId, autoReply: c.autoReply ?? true })
+        .values({ orgId, channelId: c.id, agentId, autoReply: wanted.get(c.id) ?? true })
         .onConflictDoNothing();
+    }
+    for (const c of retuned) {
+      await tx
+        .update(channelMembers)
+        .set({ autoReply: c.autoReply })
+        .where(and(eq(channelMembers.channelId, c.id), eq(channelMembers.agentId, agentId)));
     }
   });
   caches.channelMembers.deletePrefix(`${orgId}:`);

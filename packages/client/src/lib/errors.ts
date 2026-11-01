@@ -16,11 +16,15 @@ export const REAUTH_PASSWORD = "reauth.password";
  * own message is English). Anything else falls back to that message.
  */
 const KNOWN = {
+  "agent.handle_taken": "newAgent.errors.handleTaken",
   "agent_proposal.decided": "errors.agentProposal.decided",
   "approval.always_unavailable": "errors.approval.alwaysUnavailable",
   "agent_proposal.expired": "errors.agentProposal.expired",
+  "agent_proposal.routine_made": "errors.agentProposal.routineMade",
+  "agent_proposal.no_routine": "errors.agentProposal.noRoutine",
   "mail.account_not_found": "errors.mail.accountNotFound",
   "mail.from_not_mailbox": "errors.mail.fromNotMailbox",
+  "mail.owner_only": "errors.mail.ownerOnly",
   send_without_recipients: "mail.agent.saveError.send_without_recipients",
   "artifact.file_too_large": "errors.artifact.fileTooLarge",
   "artifact.file_required": "errors.artifact.fileRequired",
@@ -88,6 +92,9 @@ const KNOWN = {
   "routine.act_take_over": "errors.routine.actTakeOver",
   "routine.agent_not_in_channel": "errors.routine.agentNotInChannel",
   "audience.plan_owner_only": "aiAccounts.errors.planOwnerOnly",
+  "wiki.no_access": "errors.wiki.noAccess",
+  "wiki.audience_forbidden": "errors.wiki.audienceForbidden",
+  "wiki.audience_excludes_you": "errors.wiki.audienceExcludesYou",
   "role.name_required": "errors.role.nameRequired",
   "role.name_long": "errors.role.nameLong",
   "role.too_many": "errors.role.tooMany",
@@ -129,6 +136,9 @@ const KNOWN = {
   EARLY_ACCESS_EMAIL_UNVERIFIED: "auth.earlyAccess.unverified",
   // A provider's sign-up on a closed server comes back to /login with this code.
   SIGNUP_CLOSED: "auth.flow.closedLead",
+  account_not_linked: "auth.unconfirmed",
+  // A provider that hasn't confirmed its own address, to a confirmed account here (apps/server auth.ts `authHandler`).
+  provider_email_unverified: "auth.providerUnverified",
   human_check: "errors.humanCheck",
   human_check_blocked: "errors.humanCheckBlocked",
   // TypeSafe refused the key pasted for Jev: said under its field, nothing kept.
@@ -161,6 +171,12 @@ export const ACCOUNT_BLOCKED = "ACCOUNT_BLOCKED";
 
 /** Better Auth's code when an early-access link signs up another address than the one it was sent to. */
 export const EARLY_ACCESS_OTHER_EMAIL = "EARLY_ACCESS_OTHER_EMAIL";
+
+/**
+ * Better Auth's refusal of a provider sign-in to an address whose password account isn't confirmed yet: it links none,
+ * since whoever made that account may not own the address (mirrors apps/server auth.ts).
+ */
+export const ACCOUNT_NOT_LINKED = "account_not_linked";
 
 /** Where a restriction on agentes.chat Cloud is contested. */
 export const LEGAL_EMAIL = "legal@agentes.chat";
@@ -305,6 +321,9 @@ export function knownErrorText(t: TFunction, error: unknown, locale = "en"): str
   if (restriction) return restriction;
   const limit = limitRefusalText(t, locale, error.code, error.params);
   if (limit) return limit;
+  // The person who connected the mailbox is gone or unnamed: no blank name in the sentence.
+  if (error.code === "mail.owner_only" && !error.params?.ownerName)
+    return t("errors.mail.ownerOnlyUnknown", error.params);
   const key = KNOWN[error.code as keyof typeof KNOWN];
   if (key) return t(key, { max: MAX_UPLOAD_MB, ...error.params });
   return error.status === 429 || error.code === "rate_limited" ? t("common.tooMany") : null;
@@ -329,6 +348,16 @@ export function authErrorText(
   const { kind, cloud } = refusal;
   const known = knownErrorText(t, new ApiError(refusal.status, refusal.code ?? "", refusal.message, { kind, cloud }));
   return known ?? (refusal.message || t("common.unknownError"));
+}
+
+/**
+ * A provider sign-in the server refused (its code on `/login?error=`), in the person's words, or null for a code the
+ * apps don't know. `emails`: the server sends email, so an unconfirmed account can be confirmed (else only its password
+ * signs in).
+ */
+export function providerRefusalText(t: TFunction, code: string, emails: boolean): string | null {
+  if (code === ACCOUNT_NOT_LINKED && !emails) return t("auth.unconfirmedNoEmail");
+  return knownErrorText(t, new ApiError(403, code, ""));
 }
 
 /** Translated text for a failed request. */
