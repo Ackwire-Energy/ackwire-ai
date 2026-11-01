@@ -5,6 +5,7 @@ import {
   choiceOf,
   defaultPolicy,
   loginOf,
+  mailAccessOf,
   mailErrorOf,
   normalizePolicy,
   notIcloudMail,
@@ -139,4 +140,24 @@ describe("mail rules", () => {
       expect(notIcloudMail(address)).toBeNull();
     }
   });
+});
+
+test("only who connected a mailbox gives access to it; whoever manages the agent takes it away", () => {
+  const box = { ownerUserId: "u-ana" };
+  expect(mailAccessOf(box, { userId: "u-ana", talks: true, managesAgent: false })).toEqual({
+    gives: true,
+    removes: true,
+  });
+  // Theirs, but the agent doesn't answer them: nothing to give it.
+  expect(mailAccessOf(box, { userId: "u-ana", talks: false, managesAgent: false }).gives).toBe(false);
+  // An admin (or the agent's owner) on someone else's mailbox: read-only, with a way to remove it.
+  expect(mailAccessOf(box, { userId: "u-admin", talks: true, managesAgent: true })).toEqual({
+    gives: false,
+    removes: true,
+  });
+  expect(mailAccessOf(box, { userId: "u-bia", talks: true, managesAgent: false })).toEqual({
+    gives: false,
+    removes: false,
+  });
+  expect(mailAccessOf({ ownerUserId: null }, { userId: null, talks: true, managesAgent: true }).gives).toBe(false);
 });

@@ -24,6 +24,7 @@ const KNOWN = {
   "agent.role_too_long": "errors.agent.roleTooLong",
   "mail.account_not_found": "errors.mail.accountNotFound",
   "mail.from_not_mailbox": "errors.mail.fromNotMailbox",
+  "mail.owner_only": "errors.mail.ownerOnly",
   send_without_recipients: "mail.agent.saveError.send_without_recipients",
   "artifact.file_too_large": "errors.artifact.fileTooLarge",
   "artifact.file_required": "errors.artifact.fileRequired",

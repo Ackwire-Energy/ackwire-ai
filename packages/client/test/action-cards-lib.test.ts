@@ -106,11 +106,11 @@ test("what a proposed agent gets, a line each: who gives what the viewer can't, 
     ["routine", null, null],
   ]);
   // A member who isn't an admin: the channel and the app wait for one, and so does the routine reporting in that
-  // channel; her own mailbox too (the mailbox API is an admin's), so the card promises nothing Criar can't give.
+  // channel; her own mailbox is hers to give, admin or not.
   expect(at(proposalLines(open, { userId: "u-ana", admin: false }))).toEqual([
     ["channel:ch-private", null, { who: "admin" }],
     ["app:c-github", null, { who: "admin" }],
-    ["mail:mb-ana", null, { who: "person", userId: "u-ana" }],
+    ["mail:mb-ana", null, null],
     ["mail:mb-bia", null, { who: "person", userId: "u-bia" }],
     ["routine", null, { who: "admin" }],
   ]);

@@ -7836,6 +7836,10 @@ export const en: Translations = {
       warning: "Reads email from anyone and sends without asking: a malicious email may try to trick the agent.",
       pending: "It hasn't finished connecting.",
       needsReconnect: "Agents can't use it until it's reconnected.",
+      ownerOnly: "Only {{name}} can give access: they connected this mailbox.",
+      ownerOnlyUnknown: "Only the person who connected this mailbox can give access.",
+      remove: "Remove access",
+      removed: "{{name}} no longer has access to {{address}}.",
       saveError: {
         send_without_recipients: "To send without asking, fill in “Only send to”.",
         unknown: "Couldn't save. Try again.",
@@ -7949,6 +7953,7 @@ export const en: Translations = {
     mail: {
       accountNotFound: "This mailbox is no longer connected. Connect it again in Connectors.",
       fromNotMailbox: "“Send as” must be one of this mailbox's addresses. Pick another one.",
+      ownerOnly: "Only {{ownerName}} can give an agent access to {{address}}: they connected it.",
     },
     join: {
       linkClosed: "This link no longer works. Ask whoever sent it for a new one.",

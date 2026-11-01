@@ -2757,7 +2757,11 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     (method, ...args) => state.calls.push({ method, args }),
     (orgId) => customConnectors.list(orgId),
   );
-  const mail = createFakeMail((method, ...args) => state.calls.push({ method, args }), ctx.now);
+  const mail = createFakeMail(
+    (method, ...args) => state.calls.push({ method, args }),
+    ctx.now,
+    () => state.me?.user.id ?? null,
+  );
   const databases = createFakeDatabases((method, ...args) => state.calls.push({ method, args }), ctx.now);
   const browser = createFakeBrowser((method, ...args) => state.calls.push({ method, args }), ctx.now);
   const client: ApiClient = {

@@ -122,3 +122,16 @@ KMS is not a prerequisite for email. Gmail and Outlook through Composio store no
 - IMAP host names are resolved and refused when they point to private, loopback or metadata addresses. They are checked once before connecting, not pinned against DNS rebinding.
 - Presets: iCloud, Yahoo, Zoho (and Zoho custom domains), Fastmail, Locaweb, Hostinger, GoDaddy, Titan and IONOS. KingHost and UOL Host are left out because no official settings page was found; those mailboxes use "Outro servidor".
 - Outlook has no brand icon (Simple Icons removed it at Microsoft's request); the card shows a letter tile.
+
+## Addendum (2026-11-01): only the mailbox's owner gives access
+
+Product decision: a mailbox is personal to whoever connected it, so only that person gives an agent access to it.
+
+- **Giving or widening** (any scope the agent doesn't already hold, or any rule change, since a looser rule is access too) is only for the person who connected the mailbox (`mail_accounts.created_by_user_id`), and only for an agent they can talk to (`canTalkTo`, ADR 0085). It doesn't need `manage_agents`. Anyone else gets 403 `mail.owner_only`, with the owner's name in its params. An admin is refused too.
+- **Taking away** stays open: the mailbox's owner, admins and the agent's owner may lower or remove an agent's access to any mailbox. When someone other than the owner lowers it, the saved rules stay as they were and the rules they sent are ignored.
+- An agent's mailbox rules need the mailbox's folders, so its owner may list them too (`listMailFolders`: the owner or `manage_agents`).
+- `MailAccount.ownerUserId` says who connected each mailbox. On the agent page (web and phone), someone else's mailbox is read-only and says who gives it, with "Remover acesso" for admins and the agent's owner. The shared rule is `mailAccessOf` in `packages/client/src/lib/mail.ts`. In Conectores, the mailbox's "Quem usa" step offers anyone else only the levels below what each agent has.
+- `propose_agent` (ADR 0081): the card's mailbox line is the viewer's to give only when it's their own mailbox, admin or not. Otherwise it says who must give it. One click gives only the clicker's own mailboxes.
+- `request_permission` and teammate change cards (ADR 0092) never name mailboxes, and `setAgentScopes` and `setAgentAccess` keep mail grants as they are, so `setAgentMail` is the only way a mail grant is made.
+- Grants made before this stay as they are. No data is rewritten.
+- If the owner's account is deleted (`created_by_user_id` becomes null), nobody can give access to that mailbox. It has to be connected again by someone.

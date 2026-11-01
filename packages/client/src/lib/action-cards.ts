@@ -173,8 +173,8 @@ export function proposalLines(card: AgentProposalCard, viewer: { userId: string;
         m.accountId,
         applied?.mailAccountIds,
         { who: "person", userId: m.ownerUserId },
-        // Its owner gives it, under the mailbox API's own rule (who may manage agents).
-        m.ownerUserId === viewer.userId && viewer.admin,
+        // Only its owner gives it, admin or not; an admin who isn't sees who must.
+        m.ownerUserId === viewer.userId,
         m.level,
       ),
     ),

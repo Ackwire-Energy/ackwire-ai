@@ -8,6 +8,8 @@ import {
   useMailSuggestedAddresses,
 } from "@agenteschat/client";
 import { LEVELS, type Level } from "@agenteschat/client/lib/access-levels";
+import { canTalk } from "@agenteschat/client/lib/audience";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import {
   CUSTOM_PRESET,
@@ -17,6 +19,7 @@ import {
   MAIL_ACTIONS,
   MAIL_BRANDS,
   type MailChoice,
+  mailAccessOf,
   mailActionsFrom,
   mailErrorOf,
   mailReviewTools,
@@ -25,6 +28,7 @@ import {
   splitEmails,
   toMailLevel,
 } from "@agenteschat/client/lib/mail";
+import { can } from "@agenteschat/client/lib/permissions";
 import {
   Alert,
   AvatarStack,
@@ -52,6 +56,7 @@ import { LoadingList, useStepText } from "@/components/Loading";
 import { MailRulesPanel } from "@/components/MailRules";
 import { useOrg } from "@/components/org-context";
 import { reviewNote, ToolReview, type ToolReviewState } from "@/components/ToolReview";
+import { useDirectory } from "@/hooks/useDirectory";
 import { takesConnectorReturn } from "@/lib/desktop";
 import { navigateAway } from "@/lib/navigate";
 import { useToast } from "@/lib/toast";
@@ -627,7 +632,10 @@ function ActionsStep({ account, onNext, onClose }: { account: MailAccount; onNex
 const toLevel = (l: "none" | "read" | "read_write" | undefined): Level =>
   l === "read_write" ? "write" : l === "read" ? "read" : "none";
 
-/** Step 3: one level per agent; each saves that agent's access to this mailbox (rules kept). Then the rules. */
+/**
+ * Step 3: one level per agent; each saves that agent's access to this mailbox (rules kept). Then the rules. Only who
+ * connected the mailbox gives access (to agents that talk to them); anyone else here may only lower it.
+ */
 function WhoStep({
   account,
   onBack,
@@ -641,13 +649,24 @@ function WhoStep({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
   const api = useApi();
   const qc = useQueryClient();
   const toast = useToast();
   const agents = useAgents(org.id);
   const list = agents.data ?? [];
   const current = (agentId: string) => toLevel(account.agents.find((a) => a.agentId === agentId)?.level);
+  const levelsFor = (a: Agent): Level[] => {
+    const may = mailAccessOf(account, {
+      userId: me.user.id,
+      talks: canTalk(a),
+      managesAgent: can(org, "manage_agents") || a.ownerUserId === me.user.id,
+    });
+    if (may.gives) return LEVELS;
+    return may.removes ? LEVELS.slice(0, LEVELS.indexOf(current(a.id)) + 1) : [current(a.id)];
+  };
+  const owner = account.ownerUserId === me.user.id ? null : dir.memberById.get(account.ownerUserId ?? "")?.name;
   const [who, setWho] = useState<Record<string, Level>>({});
   const levelOf = (agentId: string) => who[agentId] ?? current(agentId);
   const levelLabel = (l: Level) => t(`access.level.${l}`);
@@ -691,7 +710,9 @@ function WhoStep({
                   size="sm"
                   variant="ghost"
                   aria-label={t("connectFlow.allLevel", { level: levelLabel(l) })}
-                  onClick={() => setWho(Object.fromEntries(list.map((a) => [a.id, l])))}
+                  onClick={() =>
+                    setWho(Object.fromEntries(list.filter((a) => levelsFor(a).includes(l)).map((a) => [a.id, l])))
+                  }
                 >
                   {levelLabel(l)}
                 </Button>
@@ -710,7 +731,7 @@ function WhoStep({
                     label={t("connectFlow.levelOf", { name: a.name })}
                     value={levelOf(a.id)}
                     onValueChange={(l) => setWho((w) => ({ ...w, [a.id]: l }))}
-                    options={LEVELS.map((l) => ({ value: l, label: levelLabel(l) }))}
+                    options={levelsFor(a).map((l) => ({ value: l, label: levelLabel(l) }))}
                   />
                 </li>
               ))}
@@ -722,6 +743,12 @@ function WhoStep({
           {t("connectFlow.asksCount", { count: MAIL_ACTIONS.approval.length })}
         </p>
         <p className="small muted cflow__text">{t("mail.whoLead")}</p>
+        {account.ownerUserId !== me.user.id && (
+          <p className="small muted cflow__text">
+            {owner ? t("mail.agent.ownerOnly", { name: owner }) : t("mail.agent.ownerOnlyUnknown")}
+          </p>
+        )}
+        {grant.isError && <Alert>{errorText(t, grant.error)}</Alert>}
       </DialogBody>
       <DialogFooter bar>
         <Button onClick={onBack}>{t("connectFlow.back")}</Button>

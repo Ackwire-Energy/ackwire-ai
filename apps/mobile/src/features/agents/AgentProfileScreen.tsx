@@ -65,6 +65,7 @@ import { StatusCard } from "../status/StatusCard";
 import { PlanMeter } from "../usage/parts";
 import { openAgentUsage } from "../usage/UsageScreen";
 import { openAgentEdit } from "./AgentEditScreen";
+import { AgentMailSection } from "./AgentMailSection";
 import {
   canEditMemories,
   type DidLine,
@@ -520,6 +521,8 @@ function Profile({ id }: { id: string }) {
             ) : null}
           </Section>
         ) : null}
+
+        <AgentMailSection agentId={id} />
 
         <AlwaysApproved agentId={id} name={name} mayRemove={mine || can(org, "approve_actions")} />
 
