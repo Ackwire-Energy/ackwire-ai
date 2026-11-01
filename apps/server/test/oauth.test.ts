@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
-import { CURSOR_CALLBACK, pinnedLookup, resetAppDocumentFailures, sha256 } from "@agenteschat/engine";
+import { CURSOR_CALLBACK, pinnedLookup, purgeApps, resetAppDocumentFailures, sha256 } from "@agenteschat/engine";
 import { authorize, connectApp, LOOPBACK, mcp, pkce, registerClient, requestIdOf, token } from "./ai-apps";
 import { browser, createTestServer, joinByInvitation, ORIGIN, seedOrg, signUp, type TestServer } from "./harness";
 
@@ -601,4 +601,23 @@ describe("what ends a connection", () => {
     expect(await t.db.select().from(schema.appGrants)).toEqual([]);
     expect(await t.db.select().from(schema.appTokens)).toEqual([]);
   });
+});
+
+test("the hourly cleanup: old requests, unused registrations, grants unused for 90 days", async () => {
+  const { b, orgId } = await owner();
+  await connectApp(t, b, orgId);
+  const unused = await registerClient(t, { client_name: "Nobody", redirect_uris: [LOOPBACK] });
+  const unusedId = ((await unused.json()) as { client_id: string }).client_id;
+  const day = 86_400_000;
+  await t.db.update(schema.oauthAppRequests).set({ expiresAt: new Date(Date.now() - 2 * day) });
+  await t.db
+    .update(schema.oauthAppClients)
+    .set({ createdAt: new Date(Date.now() - 8 * day) })
+    .where(eq(schema.oauthAppClients.id, unusedId));
+  await t.db.update(schema.appGrants).set({ lastUsedAt: new Date(Date.now() - 91 * day) });
+  await purgeApps(t.db);
+  expect(await t.db.select().from(schema.oauthAppRequests)).toEqual([]);
+  expect((await t.db.select().from(schema.oauthAppClients)).map((c) => c.id)).not.toContain(unusedId);
+  expect((await t.db.select().from(schema.oauthAppClients)).length).toBe(1);
+  expect((await t.db.select().from(schema.appGrants)).map((g) => g.revokedAt === null)).toEqual([false]);
 });
