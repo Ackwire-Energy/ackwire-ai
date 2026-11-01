@@ -247,7 +247,7 @@ describe("routines", () => {
     expect(await listRoutineRuns(f.db, f.owner.id, f.org.id, routine.id)).toHaveLength(2);
   });
 
-  test("budgets apply: an agent over budget fails the run with a clear summary", async () => {
+  test("budgets apply: an agent over budget waits quietly and the next slot replaces it (waiting_budget)", async () => {
     f = await setup({ budgetNanoUsd: 1, reply: () => ({ chunks: ["x"] }) });
     const routine = await createRoutine(routineDeps(), f.owner.id, f.org.id, {
       agentId: f.agent.id,
@@ -257,8 +257,15 @@ describe("routines", () => {
     });
     await runRoutineNow(routineDeps(), f.owner.id, f.org.id, routine.id);
     await drainOutbox(f.db, f.handlers);
-    const [run] = await listRoutineRuns(f.db, f.owner.id, f.org.id, routine.id);
-    expect(run).toMatchObject({ status: "failed", code: "budget_exceeded" });
+    const [agentRun] = await f.db.select().from(schema.agentRuns);
+    expect(agentRun?.status).toBe("waiting_input");
+    // A routine's run never says it in the conversation.
+    const posted = await f.db.select().from(schema.messages).where(eq(schema.messages.authorAgentId, f.agent.id));
+    expect(posted.filter((m) => (m.meta as { bodyCode?: string }).bodyCode === "budget_wait")).toHaveLength(0);
+    await runRoutineNow(routineDeps(), f.owner.id, f.org.id, routine.id);
+    await drainOutbox(f.db, f.handlers);
+    const ledger = await listRoutineRuns(f.db, f.owner.id, f.org.id, routine.id);
+    expect(ledger.find((r) => r.status === "superseded")?.code).toBe("waiting_budget");
   });
 
   test("silent by default: no hand_off posts nothing, the record is kept and the next run reads it", async () => {

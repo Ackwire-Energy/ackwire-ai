@@ -1893,6 +1893,8 @@ export const en: Translations = {
       waiting_approval: "Waiting for approval",
       waiting_answer: "Waiting for an answer",
       waiting_computer: "Waiting for the computer",
+      waiting_plan: "Waiting for the plan to reset",
+      waiting_budget: "Waiting for the budget to reset",
     },
     agentWhy: {
       online: "Active now",
@@ -2189,6 +2191,7 @@ export const en: Translations = {
       routineFailed: "<b>{{name}}</b> couldn't run a routine",
       routinePaused: "A routine of <b>{{name}}</b> was paused",
       routineStalled: "<b>{{name}}</b> is waiting for the computer to run a routine",
+      planResetUnknown: "{{plan}} didn't say when its limit resets. <b>{{name}}</b>'s work is still waiting.",
       machineConnected: "<b>{{name}}</b> connected the computer <b>{{label}}</b>",
       machineConnectedAny: "<b>{{name}}</b> connected a computer",
       browserHandoff: "<b>{{name}}</b> needs you in the browser",
@@ -4105,6 +4108,8 @@ export const en: Translations = {
       previous_running: "Skipped: the previous one was still running",
       previous_waiting: "Skipped: the previous one was still waiting for someone",
       waiting_computer: "Skipped: waiting for the agent's computer",
+      waiting_plan: "Skipped: waiting for the plan to reset",
+      waiting_budget: "Skipped: waiting for the budget to reset",
       superseded: "Gave way to the next run",
       stale: "Missed its time: the computer came back too late",
       stopped: "Stopped by someone",
@@ -8763,7 +8768,7 @@ export const en: Translations = {
   },
   budget: {
     warning: "{{name}} used {{percent}} of this month's budget.",
-    exhausted: "{{name}} reached this month's budget and stopped. An admin can raise it to continue.",
+    exhausted: "{{name}} reached its budget for the month and paused. It goes on {{when}} or when an admin raises it.",
   },
   gallery: {
     title: "Component gallery",
@@ -8803,6 +8808,8 @@ export const en: Translations = {
     hersM: "his",
   },
   chat: {
+    /** When a waiting agent goes on (`usageWhen`). */
+    usageWhen: { at: "at {{time}}", on: "{{day}} at {{time}}", date: "on {{date}}" },
     doing_one: "{{names}} is {{doing}}",
     doing_other: "{{names}} are {{doing}}",
     /** "Theo and 2 more" (3 or more names in the working line). */
@@ -9154,6 +9161,12 @@ export const en: Translations = {
       brain_unavailable: "{{brain}} can't answer right now. I'll answer when it's back.",
       brain_busy: "My computer is busy with other tasks right now. I'll answer as soon as it's free.",
       brain_interrupted: "{{brain}} stopped before finishing. Already done, not repeated: {{tools}}.",
+      plan_limit_cut: "I stopped at the {{plan}} plan's limit. I'll pick up where I left off {{when}}, when it resets.",
+      plan_limit_cut_unknown:
+        "I stopped at the {{plan}} plan's limit. I'll pick up where I left off as soon as it resets.",
+      plan_limit_wait: "The {{plan}} plan hit its limit. I'll answer {{when}}, when it resets.",
+      plan_limit_wait_unknown: "The {{plan}} plan hit its limit. I'll answer as soon as it resets.",
+      budget_wait: "My budget for the month ran out. I'll go on {{when}}, or sooner if an admin raises it.",
       no_ai: "I can't answer yet: I have no AI connected.",
       no_ai_signed_out: "I can't answer yet: my AI is signed out.",
       no_ai_not_signed_in: "I can't answer yet: {{brain}} isn't signed in on my computer.",

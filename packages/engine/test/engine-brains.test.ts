@@ -650,7 +650,7 @@ test("a plan limit falls back to the model brain; the reply carries a quiet note
   const machineId = await computerAgent(f);
   const { brain, seen } = scriptedComputerBrain(() => [
     { type: "limit", resetsAt: new Date(Date.now() + 2 * 3600_000).toISOString() },
-    { type: "error", code: "plan_limit", message: "You've hit your limit." },
+    { type: "error", code: "plan_limit", message: "You've hit your limit.", worked: false },
   ]);
   const handlers = createJobHandlers({
     ...f.jobDeps,

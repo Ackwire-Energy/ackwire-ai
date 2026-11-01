@@ -63,6 +63,32 @@ test("budget is checked BEFORE the call: an exhausted agent never reaches the pr
   expect(await f.db.select().from(schema.usageRecords)).toHaveLength(0);
 });
 
+test("a refused call tells the owner the budget ran out, once per agent and month", async () => {
+  f = await setup({ budgetNanoUsd: 1 });
+  const heard: { level: string; agentId: string }[] = [];
+  const gateway = createModelGateway({
+    db: f.db,
+    keyWrappers: [f.keyWrapper],
+    platformCredentials: noPlatformCredentials,
+    providers: { anthropic: f.provider },
+    onBudgetThreshold: async (e) => {
+      heard.push({ level: e.level, agentId: e.agent.id });
+    },
+  });
+  const once = () =>
+    gateway.stream({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      system: "sys",
+      messages: [{ role: "user", content: "hello" }],
+      maxTokens: 100,
+      onDelta: () => {},
+    });
+  await expect(once()).rejects.toBeInstanceOf(BudgetExceededError);
+  await expect(once()).rejects.toBeInstanceOf(BudgetExceededError);
+  expect(heard).toEqual([{ level: "exhausted", agentId: f.agent.id }]);
+});
+
 test("concurrent calls reserve the worst case atomically and can't overshoot the budget", async () => {
   // Each call may cost at most this (prompt at the cache-write rate, 300 output tokens).
   const prompt = Math.ceil(promptChars({ system: "sys", messages: [{ role: "user", content: "hello" }] }) / 3);

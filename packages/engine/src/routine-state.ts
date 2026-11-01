@@ -41,6 +41,8 @@ export const ROUTINE_CODE_TEXT: Record<string, string> = {
   previous_running: "Skipped: the previous run was still working",
   previous_waiting: "Skipped: the previous run is waiting for a person",
   waiting_computer: "Replaced: it was waiting for the agent's computer",
+  waiting_plan: "Replaced: it was waiting for the agent's plan to reset",
+  waiting_budget: "Replaced: it was waiting for the agent's budget to renew",
   superseded: "Replaced by the next run",
   stale: "Missed: the computer came back too late",
   stopped: "Stopped",

@@ -30,7 +30,7 @@ export const NOTICE_KINDS: Record<NoticeCategory, readonly NotificationKind[]> =
   threads: ["thread_reply"],
   tasks: ["issue_assigned", "issue_comment", "issue_status"],
   routines: ["mission_stopped", "routine_failed", "routine_paused", "routine_stalled"],
-  computers: ["machine_connected", "computer_ready"],
+  computers: ["machine_connected", "computer_ready", "plan_reset_unknown"],
   reactions: ["reaction"],
 };
 

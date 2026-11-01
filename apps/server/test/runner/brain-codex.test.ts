@@ -165,6 +165,12 @@ test("turn end: failed turns, usage limits, a stream error with a bad exit, last
     { type: "limit" },
     { type: "error", code: "plan_limit" },
   ]);
+  // A workspace out of credits or at its spend cap is the plan's limit too.
+  for (const message of ["Your workspace is out of credits.", "You've reached your workspace's spend cap."]) {
+    const m = new CodexEventMapper();
+    m.line(JSON.stringify({ type: "turn.failed", error: { message } }));
+    expect(m.finish({ exitCode: 1, sessionId: SESSION })).toMatchObject([{ type: "limit" }, { code: "plan_limit" }]);
+  }
   // An `error` event alone doesn't end a completed turn.
   const retried = new CodexEventMapper();
   retried.line('{"type":"error","message":"Reconnecting... 1/5"}');

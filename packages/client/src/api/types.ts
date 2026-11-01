@@ -1549,7 +1549,9 @@ export type AgentStatusKind =
   | "computer"
   | "waiting_approval"
   | "waiting_answer"
-  | "waiting_computer";
+  | "waiting_computer"
+  | "waiting_plan"
+  | "waiting_budget";
 
 /** An agent's line: its own words (`by: "self"`, `text`), or one the server picked for the run (`kind` + `subject`). */
 export interface AgentStatusLine {
@@ -4591,6 +4593,7 @@ export type NotificationKind =
   | "routine_paused"
   /** A routine waits for its computer (once per outage; `source.machineId`). Opens it in Rotinas. */
   | "routine_stalled"
+  | "plan_reset_unknown"
   | "reaction"
   /** ADR 0036 §5: a new computer joined the organization (admins). `source.machineId`; `source.label` = its name. */
   | "machine_connected"

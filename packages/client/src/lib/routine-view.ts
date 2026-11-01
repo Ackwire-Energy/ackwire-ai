@@ -60,6 +60,8 @@ export const RUN_CODES = [
   "previous_running",
   "previous_waiting",
   "waiting_computer",
+  "waiting_plan",
+  "waiting_budget",
   "superseded",
   "stale",
   "stopped",

@@ -516,15 +516,32 @@ export function createModelGateway(deps: ModelGatewayDeps) {
     const budget = agent.monthlyBudgetNanoUsd;
     if (budget === null || budget <= 0 || !deps.onBudgetThreshold) return;
     const before = spent - actual;
-    for (const [level, ratio] of [
-      ["exhausted", 1],
-      ["warning", BUDGET_WARNING_RATIO],
-    ] as const) {
-      if (before < budget * ratio && spent >= budget * ratio) {
-        await deps.onBudgetThreshold({ agent, level, spentNanoUsd: spent, budgetNanoUsd: budget });
-        return;
-      }
+    if (before < budget && spent >= budget) return budgetExhausted(agent, spent);
+    if (before < budget * BUDGET_WARNING_RATIO && spent >= budget * BUDGET_WARNING_RATIO) {
+      await deps.onBudgetThreshold({ agent, level: "warning", spentNanoUsd: spent, budgetNanoUsd: budget });
     }
+  }
+
+  /**
+   * `budget.exhausted` once per agent and month, whether spend crossed the budget or a call was refused: the first
+   * one inserts a finished outbox row whose dedupe key says so (never a job to run).
+   */
+  async function budgetExhausted(agent: Agent, spent: number) {
+    const budget = agent.monthlyBudgetNanoUsd;
+    if (budget === null || budget <= 0 || !deps.onBudgetThreshold) return;
+    const [first] = await db
+      .insert(schema.outbox)
+      .values({
+        orgId: agent.orgId,
+        kind: "budget.exhausted",
+        payload: { agentId: agent.id },
+        status: "done",
+        completedAt: now(),
+        dedupeKey: `budget.exhausted:${agent.id}:${periodOf(now())}`,
+      })
+      .onConflictDoNothing()
+      .returning({ id: schema.outbox.id });
+    if (first) await deps.onBudgetThreshold({ agent, level: "exhausted", spentNanoUsd: spent, budgetNanoUsd: budget });
   }
 
   return {
@@ -583,7 +600,13 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       };
       // Conservative prompt estimate (3 chars/token) so the reservation is an upper bound in practice.
       const promptTokens = Math.ceil(promptChars(request) / 3);
-      const { reservation, maxTokens } = await reserve(agent, agent.model, promptTokens, request.maxTokens);
+      const { reservation, maxTokens } = await reserve(agent, agent.model, promptTokens, request.maxTokens).catch(
+        async (error: unknown) => {
+          // The refusal itself is when the budget ran out for the owner (spend rarely crosses it on a call).
+          if (error instanceof BudgetExceededError) await budgetExhausted(agent, error.spentNanoUsd).catch(() => {});
+          throw error;
+        },
+      );
       request.maxTokens = maxTokens;
 
       let result: ModelResult;

@@ -677,6 +677,37 @@ export async function notifyRoutineStalled(
 }
 
 /**
+ * An agent's work has waited `UNKNOWN_RESET_NOTICE_MS` on its plan's limit and the plan never said when it resets:
+ * the agent's owner hears it once per wait, opening the conversation the work waits in.
+ */
+export async function notifyPlanResetUnknown(
+  deps: NotificationDeps,
+  input: {
+    orgId: string;
+    agentId: string;
+    agentName: string;
+    plan: string;
+    runId: string;
+    channelId: string;
+    threadId: string | null;
+  },
+) {
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: [await agentOwner(deps, input.agentId)],
+    kind: "plan_reset_unknown",
+    groupKey: `plan_reset_unknown:${input.runId}`,
+    actor: agent(input.agentId),
+    source: {
+      channelId: input.channelId,
+      ...(input.threadId ? { threadId: input.threadId } : {}),
+      label: input.agentName,
+    },
+    latest: { title: input.plan },
+  });
+}
+
+/**
  * The agent told people what a routine found (the message its report woke, §7): its creator hears
  * it, opening that message, unless they are a member of that conversation (they see it there).
  */

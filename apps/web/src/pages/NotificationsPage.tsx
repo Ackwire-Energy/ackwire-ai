@@ -284,6 +284,7 @@ type WhatKey =
   | "routineFailed"
   | "routinePaused"
   | "routineStalled"
+  | "planResetUnknown"
   | "machineConnected"
   | "machineConnectedAny"
   | "browserHandoff"
@@ -350,6 +351,8 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
       return k("routinePaused", { name });
     case "routine_stalled":
       return k("routineStalled", { name });
+    case "plan_reset_unknown":
+      return k("planResetUnknown", { name, plan: n.latest.title ?? "" });
     case "machine_connected":
       return n.source.label
         ? k("machineConnected", { name, label: n.source.label })

@@ -377,7 +377,7 @@ test.skipIf(!posix)("a usage limit is limit + plan_limit, as exec's", async () =
   await turn.done;
   expect(notDeltas(turn.events)).toEqual([
     { type: "limit" },
-    { type: "error", code: "plan_limit", message: "You've hit your usage limit. Try again later." },
+    { type: "error", code: "plan_limit", message: "You've hit your usage limit. Try again later.", worked: false },
   ]);
 });
 

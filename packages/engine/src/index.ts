@@ -219,6 +219,7 @@ export * from "./ttf";
 export * from "./untrusted";
 export * from "./uploads";
 export * from "./usage";
+export * from "./usage-pause";
 export * from "./waitlist";
 export * from "./web-push";
 export * from "./webhooks";

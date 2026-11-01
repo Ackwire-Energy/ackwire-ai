@@ -12,6 +12,7 @@ import { recordOperatorEvent } from "./operator-events";
 import { getMembership, requirePermission } from "./organizations";
 import { DEFAULT_AGENT_SCOPES, grantScopes } from "./tools/scopes";
 import { resyncBudgetCounter } from "./usage";
+import { resumeBudgetWaits } from "./usage-pause";
 
 const { agents, machines, providerCredentials } = schema;
 
@@ -243,7 +244,11 @@ export async function updateAgent(
       details: { name: agent.name, changed, ...shown },
     });
   }
-  if (input.monthlyBudgetNanoUsd !== undefined) await resyncBudgetCounter(db, orgId, agentId);
+  if (input.monthlyBudgetNanoUsd !== undefined) {
+    await resyncBudgetCounter(db, orgId, agentId);
+    // Its runs that wait for the budget look again now: one that still doesn't fit parks again quietly.
+    await resumeBudgetWaits(db, orgId, agentId);
+  }
   return agent;
 }
 

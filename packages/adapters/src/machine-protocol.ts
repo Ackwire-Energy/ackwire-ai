@@ -1003,7 +1003,11 @@ export type WireBrainEvent =
     }
   | { type: "limit"; resetsAt?: string }
   | { type: "done"; text: string; session?: { id: string } }
-  | { type: "error"; code: string; message: string; retryable?: boolean }
+  /**
+   * `worked`: on a `plan_limit`, whether the turn used any tool before it was cut (an older runner leaves it out:
+   * the engine counts that as worked).
+   */
+  | { type: "error"; code: string; message: string; retryable?: boolean; worked?: boolean }
   /** Protocol 15: messages handed with `brain.steer` that the turn read (their `uuid`s). */
   | { type: "steer_read"; uuids: string[] };
 
@@ -1974,6 +1978,7 @@ export function parseBrainEvent(v: unknown): WireBrainEvent | null {
         code: v.code.slice(0, 64),
         message: (isString(v.message) ? v.message : "").slice(0, BRAIN_LIMITS.message),
         ...(typeof v.retryable === "boolean" ? { retryable: v.retryable } : {}),
+        ...(typeof v.worked === "boolean" ? { worked: v.worked } : {}),
       };
     case "steer_read": {
       if (!Array.isArray(v.uuids)) return null;

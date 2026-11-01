@@ -87,7 +87,7 @@ export type CodexBrainEvent =
     }
   | { type: "limit"; resetsAt?: string }
   | { type: "done"; text: string; session?: { id: string } }
-  | { type: "error"; code: string; message: string; retryable?: boolean }
+  | { type: "error"; code: string; message: string; retryable?: boolean; worked?: boolean }
   /** Protocol 15 (app-server only): messages handed with `brain.steer` that the turn read. */
   | { type: "steer_read"; uuids: string[] };
 
@@ -278,7 +278,7 @@ export function unwrapShell(command: string) {
   return (m ? (m[2] ?? "") : command).replace(/\s+/g, " ").trim();
 }
 
-const USAGE_LIMIT = /hit your usage limit|usage limit reached|usage_limit/i;
+const USAGE_LIMIT = /hit your usage limit|usage limit reached|usage_limit|workspace is out of credits|spend cap/i;
 /** Codex can't authenticate (signed out, a revoked or expired sign-in). */
 const CODEX_AUTH =
   /not logged in|codex login|401 unauthorized|refresh token (?:was )?(?:expired|revoked|already used)|access token could not be refreshed/i;
