@@ -1084,8 +1084,8 @@ interface Session {
   url?: string;
   /** Its last Chrome ran on the agent's desktop. */
   headed?: boolean;
-  /** When the sweep last kept `agent-browser` up for a help request or a viewer. */
-  touchedAt?: number;
+  /** When `agent-browser` last got a command: its own idle timeout counts from there, not from frames or input. */
+  commandAt?: number;
   /** For the desktop app: the page's host, what the agent did last, and the conversation it was for. */
   host?: string;
   doing?: ControlBrowserDoing;
@@ -2142,8 +2142,7 @@ export class BrowserManager {
       if (s.stream || s.streamOpening || this.held(agentId)) {
         // `agent-browser` stops on its own idle timeout: a command keeps it up for whoever is still on the page.
         // Not a use: once nobody holds it, its idle time counts from the last real one.
-        if (s.chrome && this.now() - Math.max(s.lastUsed, s.touchedAt ?? 0) >= this.idleMs - 2 * SWEEP_MS) {
-          s.touchedAt = this.now();
+        if (s.chrome && this.now() - (s.commandAt ?? 0) >= this.idleMs - 2 * SWEEP_MS) {
           await this.enqueue(s, () =>
             this.run(s, ["stream", "status"], { timeoutMs: QUICK_TIMEOUT_MS, notUse: true }),
           ).catch(() => undefined);
@@ -2278,6 +2277,7 @@ export class BrowserManager {
     // Never without our Chrome: `agent-browser` would launch its own, with the automation markers.
     const chrome = session.chrome;
     if (!chrome) return { success: false, data: null, error: "The browser isn't open: open a page first" };
+    session.commandAt = this.now();
     const out = await this.spawn(command, [...this.sessionFlags(session, chrome), ...args], {
       timeoutMs: opts.timeoutMs,
       cwd: session.folder,
@@ -2671,14 +2671,27 @@ export class BrowserManager {
 
   private async openStream(agent: AgentScope, session: Session, mode: BrowserStreamMode): Promise<void> {
     const port = await this.enqueue(session, async () => {
-      // Closed anyway while a person's help is asked for (it crashed, someone quit it): open again where it was.
-      if (!session.chrome && session.url && this.held(session.agentId)) {
+      // Closed anyway while a person's help is asked for (Chrome crashed or was quit, or `agent-browser` let go of
+      // it): open again where it was.
+      const held = this.held(session.agentId);
+      let reopened = false;
+      const reopen = async () => {
+        reopened = true;
+        await this.run(session, ["open", session.url ?? "about:blank"], { timeoutMs: QUICK_TIMEOUT_MS * 4 });
+      };
+      if (!session.chrome && session.url && held) {
         await this.ensureOwnChrome(agent, session, session.headed === true, []);
-        await this.run(session, ["open", session.url], { timeoutMs: QUICK_TIMEOUT_MS * 4 });
+        await reopen();
       }
       if (!session.chrome) return null;
+      const disconnected = (a: BrowserAnswer) => isRecord(a.data) && a.data.connected !== true;
       let status = await this.run(session, ["stream", "status"], { timeoutMs: QUICK_TIMEOUT_MS });
-      if (isRecord(status.data) && status.data.connected !== true) return null;
+      if (disconnected(status)) {
+        if (!held || reopened) return null;
+        await reopen();
+        status = await this.run(session, ["stream", "status"], { timeoutMs: QUICK_TIMEOUT_MS });
+        if (disconnected(status)) return null;
+      }
       if (!isRecord(status.data) || status.data.enabled !== true) {
         await this.run(session, ["stream", "enable"], { timeoutMs: QUICK_TIMEOUT_MS });
         status = await this.run(session, ["stream", "status"], { timeoutMs: QUICK_TIMEOUT_MS });

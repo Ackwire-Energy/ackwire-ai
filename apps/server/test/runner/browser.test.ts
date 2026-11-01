@@ -1345,6 +1345,47 @@ test.if(posix)("while a help request is open, agent-browser's own idle timeout n
 });
 
 test.if(posix)(
+  "a watched page's frames don't hold off agent-browser's own idle timeout under a help request",
+  async () => {
+    let now = 1_000_000;
+    const t = setup({ now: () => now, idleMs: 300_000 });
+    await t.act("open", ["https://b.example"]);
+    t.manager.setHandoff(dev.id, { status: "pending" });
+    await t.manager.streamStart(dev, "watch");
+    const touches = () => t.logged().filter((c) => c.args.slice(-2).join(" ") === "stream status").length;
+    const before = touches();
+    const frame = (seq: number) =>
+      t.sockets[0]?.push({ type: "frame", seq, data: "/9j/A", metadata: { deviceWidth: 1280, deviceHeight: 720 } });
+    now += 150_000;
+    frame(1);
+    await t.manager.sweep();
+    expect(touches()).toBe(before);
+    // Frames kept coming (a spinner), but agent-browser got no command for nearly its timeout.
+    now += 100_000;
+    frame(2);
+    await t.manager.sweep();
+    expect(touches()).toBe(before + 1);
+  },
+);
+
+test.if(posix)(
+  "under an open help request, a view after agent-browser let go of Chrome opens the page again",
+  async () => {
+    const t = setup();
+    await t.act("open", ["https://shop.example.com/login"], { allowedDomains: ["shop.example.com"] });
+    t.manager.setHandoff(dev.id, { status: "pending", request: "Sign in" });
+    t.page({ open: false });
+    expect(await t.manager.streamStart(dev, "watch")).toEqual({ mode: "watch" });
+    expect(t.logged().some((c) => c.args.slice(-2).join(" ") === "open https://shop.example.com/login")).toBe(true);
+    await t.manager.streamStop(dev);
+    // No request open: it says the browser is closed.
+    t.manager.setHandoff(dev.id, null);
+    t.page({ open: false });
+    expect(await errorCode(() => t.manager.streamStart(dev, "watch"))).toBe("browser_closed");
+  },
+);
+
+test.if(posix)(
   "a browser that closed under an open help request opens again on its last page for the view",
   async () => {
     const t = setup();
