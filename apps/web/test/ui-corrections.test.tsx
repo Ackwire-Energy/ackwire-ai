@@ -17,7 +17,7 @@ import { InlineApproval } from "@/components/ApprovalItem";
 import { SidebarHorizon } from "@/components/Sky";
 import { boldNames } from "@/components/WorkingLine";
 import { createI18n } from "@/i18n";
-import { declarations, topLevel } from "./built-css";
+import { atRule, declarations, topLevel } from "./built-css";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, renderPage, screen, settle } from "./render";
 
@@ -552,5 +552,17 @@ describe("ghost buttons on a dark or agent-colored surface", () => {
     expect(declarations(css, ".brw-mf__top canvas")).toEqual([]);
     expect(value(css, ".brw-mf__top .ac-pixspin", "filter")).toBe("brightness(0) invert(1)");
     expect(value(css, ".brw-mf__hist .ac-pixspin", "filter")).toBe("none");
+  });
+
+  test("the steps list and the toolbar never open together: held open, the toolbar wins; on touch, a tapped chip wins", async () => {
+    const css = await sheet("apps/web/src/components/browser/browser.css");
+    const held = ".brw-mf:has(.brw-mf__over.is-pinned, .brw-mf__over:focus-within) .brw-mf__hist";
+    expect(value(css, held, "visibility")).toBe("hidden");
+    expect(value(css, held, "opacity")).toBe("0");
+    const raw = await Bun.file(join(ROOT, "apps/web/src/components/browser/browser.css")).text();
+    const touch = atRule(raw, "@media (hover: none)");
+    const tapped = ".brw-mf:has(.brw-mf__now:hover > .brw-mf__hist) .brw-mf__over:not(.is-pinned)";
+    expect(value(touch, tapped, "visibility")).toBe("hidden");
+    expect(value(touch, tapped, "opacity")).toBe("0");
   });
 });
