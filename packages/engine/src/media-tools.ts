@@ -49,7 +49,7 @@ const WEEK_MS = 7 * 24 * 3600_000;
 
 /** When to send one, as both descriptions say it. */
 const WHEN =
-  "when someone asks for one, or when the moment clearly invites a playful touch in a light conversation (a greeting, a celebration, thanks). Never in serious work (a problem, an error, a decision to make, a report). Usually one per turn; more only when asked.";
+  "when someone asks for one, or when the moment clearly invites a playful touch in a light conversation (a greeting, a celebration, thanks). Never in serious work (a problem, an error, a decision to make, a report). Usually one per turn, a GIF or a sticker and not both; more only when asked.";
 /** What happens, and what to write after it. */
 const AFTER =
   "It is posted at once, as a message of its own: after it, write text only if there is something to add; otherwise end your turn with an empty reply.";
