@@ -20,6 +20,7 @@ import { type Executor, rowsOf, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import { publishMessageCreated, publishUserEvent } from "./events";
+import { cutText } from "./format";
 import type { MachineTaskRow } from "./machine-tasks";
 import { messageView } from "./messages";
 import { addMissionAllowRules, blockedOfTask, missionAllowRules } from "./mission-command-rules";
@@ -117,8 +118,8 @@ export async function commandLowRisk(
     kind: "mission_command_risk",
     state: {
       tool: call.tool,
-      command: call.command.slice(0, 2000),
-      mission_goal: mission.goal.slice(0, 2000),
+      command: cutText(call.command, 2000),
+      mission_goal: cutText(mission.goal, 2000),
       current_plan_item: current?.title ?? null,
     },
     questions: {
@@ -158,7 +159,7 @@ async function autoApproved(
   reason: "low_risk" | "never",
   probability: number | null,
 ) {
-  const shown = noMentions(call.command).slice(0, TASK_LIMITS.denial * 2);
+  const shown = cutText(noMentions(call.command), TASK_LIMITS.denial * 2);
   const rules = rulesFor(call.tool, call.tool === "Bash" ? { command: call.command } : {});
   await recordMissionEvent(deps.db, mission, "command_auto", {
     taskId: task.id,
@@ -172,7 +173,7 @@ async function autoApproved(
     actor: { type: "agent", id: mission.agentId },
     action: "mission.command_auto",
     target: { type: "mission", id: mission.id },
-    details: { taskId: task.id, command: shown.slice(0, 300), reason, probability },
+    details: { taskId: task.id, command: cutText(shown, 300), reason, probability },
   });
   await postMissionMessage(
     deps,
@@ -352,7 +353,7 @@ export async function handlePermissionPrompt(
   }
   const promptId = crypto.randomUUID();
   const rules = rulesFor(tool, input);
-  const shown = noMentions(command).slice(0, TASK_LIMITS.denial * 2);
+  const shown = cutText(noMentions(command), TASK_LIMITS.denial * 2);
   const message = await deps.db.transaction(async (tx) => {
     await recordMissionEvent(tx, mission, "command_prompt", {
       promptId,
@@ -421,7 +422,7 @@ export async function decideCommand(
     actor: { type: "person", id: userId },
     action: `mission.command_${decision}`,
     target: { type: "mission", id: mission.id },
-    details: { promptId, command: p.command.slice(0, 300), ...(decision === "always" ? { rules: p.rules } : {}) },
+    details: { promptId, command: cutText(p.command, 300), ...(decision === "always" ? { rules: p.rules } : {}) },
   });
   await publishMissionEvent(deps, mission, "command", { promptId });
   await notifyCommand(deps, mission, promptId);
@@ -470,7 +471,7 @@ export async function retryBlockedCommand(
       actor: { type: "person", id: userId },
       action: "mission.command_retry",
       target: { type: "mission", id: mission.id },
-      details: { taskId: input.taskId, command: denial.command.slice(0, 300), rules },
+      details: { taskId: input.taskId, command: cutText(denial.command, 300), rules },
     });
   }
   const list = (denials as { command: string }[]).map((d) => d.command);

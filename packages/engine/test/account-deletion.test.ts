@@ -218,11 +218,12 @@ describe("deleting an account", () => {
     expect((await orgRow())?.deletionDueAt).toBeNull();
   });
 
-  test("the only owner of a workspace being deleted goes, the others stay in it; the server's owner too: the Jev key goes, the pin stays", async () => {
+  test("the only owner of a workspace being deleted goes, the others stay in it; the server's owner too: the Jev and GIPHY keys go, the pin stays", async () => {
     f = await setup();
     const bia = await addMember(f.db, f.org.id, "member", "bia");
     const sealed = await sealSecret(createLocalKeyWrapper(SECRET), "ts_saved_key_1", "jev");
     await f.db.insert(schema.instanceSecrets).values({ name: "typesafe", ...sealed, keyHint: "ey_1" });
+    await f.db.insert(schema.instanceSecrets).values({ name: "giphy", ...sealed, keyHint: "ey_1" });
     const { dueAt } = await scheduleDeletion({ db: f.db }, f.owner.id, f.org.id, "owner");
 
     await deleteAccount(f.db, f.owner.id);

@@ -1,4 +1,5 @@
 import { and, type Database, desc, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { cutText, cutTextEnd } from "../format";
 import { announceMessageMemories } from "../message-memories";
 import {
   type ConsolidateResult,
@@ -176,7 +177,7 @@ export async function reflectThread(
     const reacted = r.length
       ? ` (${r.map((x) => `${x.reaction === "+1" ? "👍" : "👎"} by ${thread.names.get(x.userId ?? "") ?? "someone"}`).join(", ")})`
       : "";
-    return `m${i + 1} ${isTrustedMessage(m) ? "" : "[untrusted] "}[${authorOf(thread, m)}]: ${m.body.slice(0, 1500)}${reacted}`;
+    return `m${i + 1} ${isTrustedMessage(m) ? "" : "[untrusted] "}[${authorOf(thread, m)}]: ${cutText(m.body, 1500)}${reacted}`;
   });
   outcomeRows.forEach((o, i) => {
     refs.set(`o${i + 1}`, { outcome: o });
@@ -190,7 +191,7 @@ export async function reflectThread(
     kind: "summary",
     model: await resolveSummaryModel(deps, input.orgId),
     system: REFLECT_SYSTEM,
-    messages: [{ role: "user", content: `<thread>\n${lines.join("\n").slice(-60_000)}\n</thread>` }],
+    messages: [{ role: "user", content: `<thread>\n${cutTextEnd(lines.join("\n"), 60_000)}\n</thread>` }],
     maxTokens: 8000,
     effort: "low",
     outputSchema: OUTPUT_SCHEMA,

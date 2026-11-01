@@ -4,6 +4,7 @@ import type { BrainKind, BrainSession, BrainTurn, ToolResult } from "./brains/ty
 import { abortLocalRun, RUN_CANCEL_TOPIC } from "./cancel";
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import type { RunIdentity } from "./executor";
+import { cutText } from "./format";
 import { insertMessage, messageView } from "./messages";
 import { MISSION_LIMITS } from "./mission-limits";
 import { enqueueRunJob } from "./mission-runs";
@@ -239,7 +240,7 @@ export async function tellMainSession(
   text: string,
   options: TellOptions = {},
 ): Promise<{ delivered: boolean; runId?: string; resumed?: boolean }> {
-  const body = text.slice(0, MISSION_LIMITS.sendText);
+  const body = cutText(text, MISSION_LIMITS.sendText);
   let fresh = (await getMissionRow(deps.db, mission.id)) ?? mission;
   if (!OPEN_MISSION_STATUSES.includes(fresh.status)) return { delivered: false };
   const kind = options.kind ?? (options.requestedBy ? "person" : "system");

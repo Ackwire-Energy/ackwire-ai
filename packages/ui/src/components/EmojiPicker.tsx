@@ -1,5 +1,5 @@
-import { Popover as RPopover } from "radix-ui";
-import { type KeyboardEvent, type ReactNode, useId, useMemo, useRef, useState } from "react";
+import { Popover as RPopover, Tabs as RTabs } from "radix-ui";
+import { type KeyboardEvent, type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
 import { cx } from "../cx";
 import {
   EMOJI_CATEGORIES,
@@ -10,6 +10,7 @@ import {
   searchEmoji,
 } from "../emoji-data";
 import { Icon } from "../icons/Icon";
+import { Tabs } from "./Tabs";
 
 export interface EmojiPickerLabels {
   /** Accessible name of the picker ("Emojis"). */
@@ -68,10 +69,13 @@ const chunk = <T,>(list: T[], size: number) =>
 export function EmojiPicker({
   labels,
   onPick,
+  autoFocus = true,
   className,
 }: {
   labels: EmojiPickerLabels;
   onPick: (emoji: string) => void;
+  /** The search box takes the focus as it shows (not when its tab was chosen with the keyboard). */
+  autoFocus?: boolean;
   className?: string;
 }) {
   const id = useId();
@@ -169,7 +173,7 @@ export function EmojiPicker({
           placeholder={labels.search}
           value={query}
           // biome-ignore lint/a11y/noAutofocus: the picker opens to search
-          autoFocus
+          autoFocus={autoFocus}
           onChange={(e) => {
             setQuery(e.target.value);
             setActive(0);
@@ -252,9 +256,92 @@ export function EmojiPicker({
 }
 
 /**
+ * Another tab of the picker beside Emojis (the composer's GIFs and stickers, ADR 0091). `render` draws its panel:
+ * `close` closes the picker (a pick that sends), `autoFocus` says the picker just opened on it.
+ */
+export interface PickerTab {
+  id: string;
+  label: string;
+  render: (ctx: { close: () => void; autoFocus: boolean }) => ReactNode;
+}
+
+const TAB_KEY = "agentes:picker-tab";
+
+/** The picker's tab last used in this browser, when it is still one of `ids` (else Emojis). */
+function readPickerTab(ids: string[]): string {
+  try {
+    const saved = globalThis.localStorage?.getItem(TAB_KEY);
+    return saved && ids.includes(saved) ? saved : "emoji";
+  } catch {
+    return "emoji";
+  }
+}
+
+function rememberPickerTab(id: string) {
+  try {
+    globalThis.localStorage?.setItem(TAB_KEY, id);
+  } catch {
+    // Private mode or storage blocked: it opens on Emojis.
+  }
+}
+
+/**
+ * One picker with tabs: Emojis first (today's picker), then `tabs`. It opens on the tab last used here. Only the
+ * panel it opens on takes the focus; a tab chosen with the arrows keeps it on the tabs.
+ */
+function TabbedPicker({
+  labels,
+  tabs,
+  tabsLabel,
+  onPick,
+  close,
+}: {
+  labels: EmojiPickerLabels;
+  tabs: PickerTab[];
+  tabsLabel: string;
+  onPick: (emoji: string) => void;
+  close: () => void;
+}) {
+  const ids = ["emoji", ...tabs.map((t) => t.id)];
+  const [tab, setTab] = useState(() => readPickerTab(ids));
+  // True while the first panel mounts: the panel of a tab chosen later leaves the focus on the tabs.
+  const [autoFocus, setAutoFocus] = useState(true);
+  useEffect(() => setAutoFocus(false), []);
+  return (
+    <Tabs
+      value={tab}
+      onValueChange={(next) => {
+        setTab(next);
+        rememberPickerTab(next);
+      }}
+      items={[{ value: "emoji", label: labels.dialog }, ...tabs.map((t) => ({ value: t.id, label: t.label }))]}
+      label={tabsLabel}
+      variant="segmented"
+    >
+      <RTabs.Content value="emoji" className="ac-picker__panel">
+        <EmojiPicker
+          labels={labels}
+          autoFocus={autoFocus}
+          onPick={(emoji) => {
+            onPick(emoji);
+            close();
+          }}
+        />
+      </RTabs.Content>
+      {tabs.map((t) => (
+        <RTabs.Content key={t.id} value={t.id} className="ac-picker__panel">
+          {t.render({ close, autoFocus })}
+        </RTabs.Content>
+      ))}
+    </Tabs>
+  );
+}
+
+/**
  * The picker in a glass popover from `trigger` (Radix: Esc closes, focus
  * returns to the trigger unless `onCloseAutoFocus` takes it elsewhere).
- * Closes after a pick.
+ * Closes after a pick. With `tabs` it is one picker with tabs (Emojis first)
+ * and `tabLabels` name it; without, the emoji picker alone (reactions).
  */
 export function EmojiPickerPopover({
   trigger,
@@ -265,6 +352,8 @@ export function EmojiPickerPopover({
   open: controlled,
   onOpenChange,
   onCloseAutoFocus,
+  tabs,
+  tabLabels,
 }: {
   /** A focusable element with an accessible name ("Reagir"). */
   trigger: ReactNode;
@@ -275,6 +364,10 @@ export function EmojiPickerPopover({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onCloseAutoFocus?: (event: Event) => void;
+  /** More tabs after Emojis (the composer's GIFs and stickers). */
+  tabs?: PickerTab[];
+  /** With `tabs`: the picker's name ("Emojis, GIFs e figurinhas") and its tab list's. */
+  tabLabels?: { dialog: string; tabs: string };
 }) {
   const [own, setOwn] = useState(false);
   const open = controlled ?? own;
@@ -282,29 +375,39 @@ export function EmojiPickerPopover({
     setOwn(o);
     onOpenChange?.(o);
   };
+  const tabbed = Boolean(tabs?.length);
   return (
     <RPopover.Root open={open} onOpenChange={setOpen}>
       <RPopover.Trigger asChild>{trigger}</RPopover.Trigger>
       <RPopover.Portal>
         <RPopover.Content
-          className="ac-menu ac-emoji-popover"
+          className={cx("ac-menu ac-emoji-popover", tabbed && "ac-picker")}
           side={side}
           align={align}
           sideOffset={6}
           collisionPadding={16}
           role="dialog"
-          aria-label={labels.dialog}
+          aria-label={tabbed ? (tabLabels?.dialog ?? labels.dialog) : labels.dialog}
           onCloseAutoFocus={onCloseAutoFocus}
         >
-          {open && (
-            <EmojiPicker
-              labels={labels}
-              onPick={(emoji) => {
-                onPick(emoji);
-                setOpen(false);
-              }}
-            />
-          )}
+          {open &&
+            (tabs && tabbed ? (
+              <TabbedPicker
+                labels={labels}
+                tabs={tabs}
+                tabsLabel={tabLabels?.tabs ?? labels.dialog}
+                onPick={onPick}
+                close={() => setOpen(false)}
+              />
+            ) : (
+              <EmojiPicker
+                labels={labels}
+                onPick={(emoji) => {
+                  onPick(emoji);
+                  setOpen(false);
+                }}
+              />
+            ))}
         </RPopover.Content>
       </RPopover.Portal>
     </RPopover.Root>

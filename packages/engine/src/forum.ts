@@ -53,6 +53,8 @@ export {
   splitStance,
 } from "./forum-synthesis";
 
+import { cutText } from "./format";
+
 const { forumTopics, forumParticipants, forumTurns, channels, channelMembers, messages, agentRuns, agents } = schema;
 
 export type ForumStatus = "open" | "stalled" | "done" | "canceled";
@@ -1804,7 +1806,7 @@ async function finalizeSynthesis(deps: ForumDeps, topic: TopicRow, runId: string
     afterRound: Math.max(1, topic.round),
     createdAt: new Date().toISOString(),
     structured,
-    markdown: markdown.slice(0, 100_000),
+    markdown: cutText(markdown, 100_000),
   };
   const suggested = structured.suggestedIssues;
   await db.transaction(async (tx) => {
@@ -1871,7 +1873,7 @@ async function finalizeSynthesis(deps: ForumDeps, topic: TopicRow, runId: string
             suggestedIssues: suggested.length,
             format,
             revision,
-            summary: synthesisSummary(structured).slice(0, 500),
+            summary: cutText(synthesisSummary(structured), 500),
           },
           bodyCode: suggested.length ? "forum_concluded_issues" : "forum_concluded",
           bodyParams: { title: topic.title, count: String(suggested.length) },

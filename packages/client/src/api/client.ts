@@ -86,6 +86,9 @@ import type {
   ForumTopic,
   ForumTopicDetail,
   ForumTopicInput,
+  GifKey,
+  GifPage,
+  GifQuery,
   GitHubAppInstallation,
   GitHubRepositories,
   Health,
@@ -96,7 +99,9 @@ import type {
   Instance,
   Invitation,
   InvitationPreview,
+  InvitationState,
   InvitationWithStatus,
+  InviteBatch,
   InviteLink,
   Issue,
   IssueActivity,
@@ -106,6 +111,7 @@ import type {
   IssueStatus,
   JevKey,
   JoinApproval,
+  JoinClaim,
   JoinRequest,
   Machine,
   MachineAccess,
@@ -148,6 +154,7 @@ import type {
   ModelTier,
   MoveAgentsInput,
   MoveAgentsResult,
+  MySuggestion,
   NoticeCategory,
   NoticePrefs,
   NotificationCount,
@@ -160,9 +167,11 @@ import type {
   OrgSettings,
   Person,
   PhoneSignIn,
+  PostMedia,
   Proposal,
   PushDeviceInput,
   ReactionCount,
+  ReadOnlyOrgSettings,
   Reminder,
   ReminderInput,
   Role,
@@ -242,6 +251,11 @@ export interface ApiClient {
     saveJev(apiKey: string): Promise<JevKey>;
     checkJev(): Promise<JevKey>;
     removeJev(): Promise<JevKey>;
+    /** The GIPHY key (ADR 0091): `null` unless I am the installation's owner on a self-hosted server. */
+    gifKey(): Promise<GifKey | null>;
+    /** Checked with GIPHY first: `gif_key_invalid` (422) when it refuses, `gif_key_env` (409) with an env key. */
+    saveGifKey(apiKey: string): Promise<GifKey>;
+    removeGifKey(): Promise<GifKey>;
   };
   account: {
     authConfig(): Promise<AuthConfig>;
@@ -346,11 +360,14 @@ export interface ApiClient {
     revokeInvitation(orgId: string, invitationId: string): Promise<void>;
     /** `null` when invalid or expired. */
     previewInvitation(token: string): Promise<InvitationPreview | null>;
-    acceptInvitation(token: string): Promise<{ orgId: string }>;
+    /** An email invitation that no longer opens: accepted or expired (ADR 0090); null for any other token. */
+    invitationState(token: string): Promise<InvitationState | null>;
+    /** `mail`: the proof on its own email's link (ADR 0090); accepted with it, the address counts as confirmed. */
+    acceptInvitation(token: string, mail?: string): Promise<{ orgId: string }>;
     settings(orgId: string): Promise<OrgSettings>;
     updateSettings(
       orgId: string,
-      input: Partial<Omit<OrgSettings, "name" | "autoModels">> & {
+      input: Partial<Omit<OrgSettings, "name" | "autoModels" | ReadOnlyOrgSettings>> & {
         name?: string;
         /** Per provider and tier, one of its models; null puts the tier back on its default. */
         autoModels?: Partial<Record<string, Partial<Record<ModelTier, string | null>>>>;
@@ -361,9 +378,11 @@ export interface ApiClient {
     people(orgId: string): Promise<Person[]>;
     /** Invitations not accepted yet, pending or expired. */
     allInvitations(orgId: string): Promise<InvitationWithStatus[]>;
-    inviteMany(orgId: string, input: { emails: string[]; roleIds?: string[] }): Promise<BatchInviteResult[]>;
-    /** New link (the old one stops working), 7 more days. */
+    inviteMany(orgId: string, input: InviteBatch): Promise<BatchInviteResult[]>;
+    /** The same link (ADR 0090; a new one for an invitation sent before that), 7 more days. */
     resendInvitation(orgId: string, invitationId: string): Promise<{ url: string; expiresAt: string }>;
+    /** The roles a pending invitation gives (ADR 0090): the same link, nothing is sent. */
+    setInvitationRoles(orgId: string, invitationId: string, roleIds: string[]): Promise<{ roleIds: string[] }>;
     usageReport(orgId: string, since?: string): Promise<UsageReport>;
     /** Every plan account by computer and the API per agent, this month (ADR 0063). */
     planUsage(orgId: string): Promise<OrgPlanUsage>;
@@ -527,6 +546,8 @@ export interface ApiClient {
     members(orgId: string, channelId: string): Promise<ChannelMember[]>;
     addMember(orgId: string, channelId: string, member: { userId: string } | { agentId: string }): Promise<void>;
     removeMember(orgId: string, channelId: string, member: { userId: string } | { agentId: string }): Promise<void>;
+    /** "Quando responde" for an agent in this channel (its creator, an admin or the agent's owner). */
+    setAutoReply(orgId: string, channelId: string, agentId: string, autoReply: boolean): Promise<void>;
     messages(
       orgId: string,
       channelId: string,
@@ -547,6 +568,11 @@ export interface ApiClient {
         openThread?: boolean;
         /** "Parar e mandar": an agent working here stops its current step and reads this now. */
         steer?: "now";
+        /**
+         * A GIF or a sticker (ADR 0091): `body` may then be empty. The server stores `meta.media`. 422
+         * `message.media_off` (GIFs or stickers off here) or `message.media_not_found`.
+         */
+        media?: PostMedia;
       },
     ): Promise<Message>;
     reactions(orgId: string, messageId: string): Promise<ReactionCount[]>;
@@ -717,7 +743,8 @@ export interface ApiClient {
     revert(orgId: string, memoryId: string): Promise<void>;
   };
   proposals: {
-    list(orgId: string): Promise<Proposal[]>;
+    /** The newest 200, pending ones first; with `ids`, only those (a chat card's rows). */
+    list(orgId: string, filter?: { ids?: string[] }): Promise<Proposal[]>;
     accept(orgId: string, proposalId: string, finalText?: string): Promise<Proposal>;
     refuse(orgId: string, proposalId: string): Promise<Proposal>;
   };
@@ -1127,6 +1154,8 @@ export interface ApiClient {
     links(orgId: string): Promise<InviteLink[]>;
     /** Nobody new can ask with it; the requests made through it close without emails. */
     turnOff(orgId: string, linkId: string): Promise<void>;
+    /** 30 more days for the same link (ADR 0090). */
+    renewLink(orgId: string, linkId: string): Promise<{ expiresAt: string }>;
     /**
      * Emails a code that proves the address (ADR 0072): signed out the one typed, signed in the account's own.
      * `join.code_wait` (429) with `retryIn` seconds right after another. `humanCheck`: the bot check's token.
@@ -1140,8 +1169,10 @@ export interface ApiClient {
      */
     ask(
       token: string,
-      input: { name?: string; email?: string; note?: string; code?: string },
+      input: { name?: string; email?: string; note?: string; code?: string; password?: string },
     ): Promise<AskToJoinResult>;
+    /** Where the request this page made stands, by its `key` (ADR 0090); null when the key matches nothing. */
+    claim(token: string, key: string): Promise<JoinClaim | null>;
     /** Expired email invitation: ask the inviter for a new one. */
     requestNew(token: string): Promise<void>;
   };
@@ -1153,6 +1184,12 @@ export interface ApiClient {
     approve(orgId: string, requestId: string, roleIds?: string[]): Promise<JoinApproval>;
     /** `reason` is told to the person by email. */
     deny(orgId: string, requestId: string, reason?: string): Promise<void>;
+    /** A member suggests someone to the people who may invite (ADR 0090). */
+    suggest(orgId: string, input: { email: string; note?: string }): Promise<{ id: string }>;
+    /** This member's suggestions that still wait. */
+    mine(orgId: string): Promise<MySuggestion[]>;
+    /** Takes back one of this member's suggestions. */
+    cancel(orgId: string, requestId: string): Promise<void>;
   };
   /**
    * Phone app additions. Optional so older fakes and clients still type-check;
@@ -1281,6 +1318,15 @@ export interface ApiClient {
    */
   desktop: {
     status(orgId: string, agentId: string): Promise<DesktopStatus>;
+  };
+  /**
+   * GIF search (ADR 0091), through our server: the browser and the phone never talk to the provider. Every member;
+   * rate limited per person (429). 404 `gifs.off` when this server has no GIF search or the workspace turned GIFs
+   * off. A GIF's file is `gifMediaUrl` (`lib/media.ts`).
+   */
+  gifs?: {
+    /** Free text (`q`), a category, or neither (what is trending), at the workspace's rating. */
+    search(orgId: string, query: GifQuery): Promise<GifPage>;
   };
   /** "Lembrar": one-off reminders in conversations (also routines in Rotinas). */
   reminders?: {

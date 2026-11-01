@@ -25,6 +25,7 @@ export {
   type SendHow,
 } from "./Composer";
 export { Count, type CountProps } from "./Count";
+export { DiffView } from "./DiffView";
 export { EmptyState, type EmptyStateProps } from "./EmptyState";
 export { type FilterItem, Filters, type FiltersProps } from "./Filters";
 export { Glass, type GlassProps } from "./Glass";

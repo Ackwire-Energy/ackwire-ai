@@ -10,6 +10,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { users } from "./auth";
@@ -144,6 +145,11 @@ export const agents = pgTable(
     /** How hard its computer brain thinks (`low`…`max`, ADR 0041); null = the CLI's default. */
     brainEffort: text(),
     /**
+     * It may follow a light reply with a sticker or a GIF of its own (ADR 0091), as often as the workspace's
+     * `organization_settings.agent_media` allows. Off: never.
+     */
+    mediaReplies: boolean().notNull().default(true),
+    /**
      * The most context its model reads, in tokens (`200000`, `400000`, `1000000`; validated in code): the API
      * brain compacts past it, Claude Code and Codex compact there too. Null = the model's own window.
      */
@@ -165,6 +171,11 @@ export const agents = pgTable(
     groupId: uuid().references(() => agentGroups.id, { onDelete: "set null" }),
     /** Order inside its group. */
     groupPosition: integer().notNull().default(0),
+    /**
+     * It coordinates the team (ADR 0093): a person's message that needs an agent and that no other agent took goes
+     * to it. One per workspace among its active agents (the index below).
+     */
+    coordinator: boolean().notNull().default(false),
     /**
      * What it says it is doing (`set_status`, ADR 0084): a line, an optional emoji, and whether it asks not
      * to be interrupted. Tied to the run that wrote it (gone once that run ends) unless it set an end time.
@@ -195,6 +206,7 @@ export const agents = pgTable(
   (t) => [
     unique().on(t.orgId, t.handle),
     unique().on(t.orgId, t.id),
+    uniqueIndex("agents_one_coordinator").on(t.orgId).where(sql`${t.coordinator} and ${t.archivedAt} is null`),
     // Machines are only soft-deleted (and `deleteMachine` clears this column first).
     foreignKey({ columns: [t.orgId, t.machineId], foreignColumns: [machines.orgId, machines.id] }),
     // No action (a composite SET NULL would null `org_id` too): code clears it before an account row goes.
@@ -242,5 +254,13 @@ export const organizationSettings = pgTable("organization_settings", {
    * (`{ openrouter: { small, medium, large } }`); a tier left out is the provider's default (ADR 0087).
    */
   autoModels: jsonb().$type<Partial<Record<string, Partial<Record<string, string>>>>>().notNull().default({}),
+  /** People can send GIFs in chat (ADR 0091): needs the server's `GIPHY_API_KEY` too. */
+  gifs: boolean().notNull().default(true),
+  /** The most a GIF may be rated: `g` (any age) or `pg` (ADR 0091). */
+  gifRating: text().$type<"g" | "pg">().notNull().default("g"),
+  /** The agents' own stickers, drawn from each agent's look (ADR 0091). */
+  agentStickers: boolean().notNull().default(true),
+  /** How often agents follow a light reply with a sticker or a GIF: `never`, `sometimes` or `often` (ADR 0091). */
+  agentMedia: text().$type<"never" | "sometimes" | "often">().notNull().default("sometimes"),
   updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });

@@ -1,4 +1,5 @@
 import { and, type Database, desc, eq, gt, isNull, ne, or, schema, sql } from "@agenteschat/db";
+import { cutText } from "./format";
 import type { Judge } from "./judge";
 import { deferrableGroups, type ToolGroup, toolGroupKey } from "./tools/directory";
 import type { ToolDefinition } from "./tools/types";
@@ -98,10 +99,10 @@ export async function chooseToolGroups(
           agent: {
             name: input.agent.name,
             role: input.agent.role,
-            instructions: input.agent.instructions.slice(0, 1500),
+            instructions: cutText(input.agent.instructions, 1500),
           },
-          message: input.message.slice(0, 2000),
-          recent: input.recent.map((m) => m.slice(0, 400)).join("\n"),
+          message: cutText(input.message, 2000),
+          recent: input.recent.map((m) => cutText(m, 400)).join("\n"),
         },
         questions,
       }),

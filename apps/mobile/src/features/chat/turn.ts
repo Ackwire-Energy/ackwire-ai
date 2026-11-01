@@ -198,14 +198,16 @@ export function stoppedOf(
 }
 
 /**
- * `meta.stepLimit` of the reply of a run that reached its step limit: the run that continued it ("Continuar"
- * goes away then). Null for any other reply.
+ * `meta.stepLimit` of the reply of a run that reached its step limit, or stopped because it got stuck (`stuck`):
+ * the run that continued it ("Continuar" goes away then). Null for any other reply.
  */
-export function stepLimitOf(meta: Record<string, unknown> | undefined): { continuedRunId: string | null } | null {
+export function stepLimitOf(
+  meta: Record<string, unknown> | undefined,
+): { continuedRunId: string | null; stuck: boolean } | null {
   const c = meta?.stepLimit;
   if (!c || typeof c !== "object") return null;
-  const id = (c as Record<string, unknown>).continuedRunId;
-  return { continuedRunId: typeof id === "string" ? id : null };
+  const { continuedRunId: id, stuck } = c as Record<string, unknown>;
+  return { continuedRunId: typeof id === "string" ? id : null, stuck: stuck === true };
 }
 
 /**

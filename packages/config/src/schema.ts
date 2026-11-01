@@ -24,6 +24,7 @@ export interface EnvVarDefinition {
     | "Agents"
     | "Connectors"
     | "Search"
+    | "Chat"
     | "Storage"
     | "Sandbox"
     | "Email"
@@ -327,9 +328,9 @@ export const envVars = {
     section: "Agents",
   },
   AGENT_MAX_TOOL_TURNS: {
-    schema: z.coerce.number().int().min(1).max(200).default(25),
+    schema: z.coerce.number().int().min(1).max(200).default(200),
     description:
-      "Maximum model calls in one agent run (each tool round trip is one), plus up to twice as many browser or desktop steps that worked. Stops runaway tool loops: near it the agent wraps up, and a conversation run ends with Continuar.",
+      "Maximum model calls in one agent run (each tool round trip is one, browser and desktop steps included). A backstop for runaway runs: a run that goes in circles stops long before it. Near it the agent wraps up, and a conversation run ends with Continuar.",
     section: "Agents",
   },
   AGENT_CONTEXT_MESSAGES: {
@@ -393,6 +394,13 @@ export const envVars = {
     schema: z.string().default("voyage-3.5"),
     description: "Embedding model (1024 dimensions). After changing it, reindex (`search.reindex`).",
     section: "Search",
+  },
+  GIPHY_API_KEY: {
+    schema: z.string().optional(),
+    description:
+      "GIPHY API key (https://developers.giphy.com), optional. With it, people search and send GIFs in chat and agents may follow a light reply with one; each workspace can turn GIFs off and pick their rating in Settings › GIFs and stickers. The installation's owner can also add it there, on a server that isn't agentes.chat's own. This variable wins over that one. This server searches GIPHY and serves every GIF itself, so browsers and the phone app never talk to GIPHY and the key never leaves the server. With no key: no GIFs anywhere; the agents' own stickers still work.",
+    section: "Chat",
+    secret: true,
   },
   CONNECTOR_GITHUB_CLIENT_ID: {
     schema: z.string().optional(),

@@ -8,6 +8,7 @@ import { missingConnectors, type ServerCatalog } from "../connectors/listing";
 import { consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
+import { cutText } from "../format";
 import { addRunStep } from "../runs";
 import {
   callTargets,
@@ -127,7 +128,7 @@ const serverGitTool = (tool: ToolDefinition) =>
 export const wrapExternal = (source: string, text: string) => untrustedBlock(source, text, MAX_RESULT_CHARS + 100);
 /** What run steps and approvals keep: the text people see, without the model's envelope. */
 const shown = (text: string) =>
-  text.replace(/^<external_data source="[^"]*">\n([\s\S]*)\n<\/external_data>$/, "$1").slice(0, 4000);
+  cutText(text.replace(/^<external_data source="[^"]*">\n([\s\S]*)\n<\/external_data>$/, "$1"), 4000);
 
 /**
  * An approved action already claimed (it runs at most once): what it returned, or, with nothing recorded
@@ -347,7 +348,7 @@ export function createToolGateway(deps: {
       }
       const capped =
         output.content.length > MAX_RESULT_CHARS
-          ? { ...output, content: `${output.content.slice(0, MAX_RESULT_CHARS)}\n[truncated]` }
+          ? { ...output, content: `${cutText(output.content, MAX_RESULT_CHARS)}\n[truncated]` }
           : output;
       return tool.external ? { ...capped, content: wrapExternal(tool.name, capped.content) } : capped;
     } catch (error) {

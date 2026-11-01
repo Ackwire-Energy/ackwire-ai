@@ -1,4 +1,5 @@
 import type { RunAuthority } from "../authority";
+import { cutText } from "../format";
 import { directoryRole } from "./directory";
 import type { JsonSchema } from "./json-schema";
 import type { ToolDefinition } from "./types";
@@ -13,8 +14,8 @@ import type { ToolDefinition } from "./types";
  *   `hand_off`; scopes and the tools' own approvals decide. A tool that needs a person's request
  *   refuses on its own when nobody is behind the run.
  * - `routine`, any access: nothing that speaks for someone or reaches beyond its room (posting, DMs,
- *   reactions, questions, reminders, routines, other agents, forum, channels, secrets, permissions).
- *   It speaks only through `hand_off`; the people decide.
+ *   reactions, GIFs and stickers, questions, reminders, routines, other agents, forum, channels, secrets,
+ *   permissions). It speaks only through `hand_off`; the people decide.
  * - `routine`, access `read`: reads only, plus `hand_off`.
  * - `routine`, access `act`: also internal changes people can undo (issues, memory, wiki, Drive, its
  *   own branches and pull requests, its computer); every write to a connected app asks a person.
@@ -87,6 +88,8 @@ const ELSEWHERE = new Set([
 /** Speaks in the run's own conversation, by name. */
 const HERE = new Set([
   "react",
+  "send_gif",
+  "send_sticker",
   "ask_user",
   "share_artifact",
   "suggest_forum_topic",
@@ -187,6 +190,8 @@ export const REFUSALS = {
   routineAskUser:
     "This is a routine's background work: nobody is here to answer. Decide with your best judgement; if a person must decide, say so in hand_off.",
   routineReact: "This is a routine's background work: there is no message to react to. Just finish, or use hand_off.",
+  routineMedia:
+    "This is a routine's background work: nobody is in its room to send a GIF or a sticker to. Just finish, or use hand_off.",
   routineHere: "This is a routine's background work in a room nobody reads: put it in hand_off; the people decide.",
   routineReadOnly: "This routine only reads and reports: put what you'd do in hand_off; the people decide.",
   routineBrowserReadOnly:
@@ -205,6 +210,14 @@ const READ_ONLY_REFUSAL: Partial<Record<InternalArea, string>> = {
   desktop: REFUSALS.routineDesktopReadOnly,
 };
 
+/** Tools that speak here whose refusal in a routine says what it does instead, by name; any other: `routineHere`. */
+const ROUTINE_HERE_REFUSAL: Readonly<Record<string, string>> = {
+  ask_user: REFUSALS.routineAskUser,
+  react: REFUSALS.routineReact,
+  send_gif: REFUSALS.routineMedia,
+  send_sticker: REFUSALS.routineMedia,
+};
+
 /** The table (see the file's comment): what `authority` may do with `tool`. */
 export function toolPolicy(authority: RunAuthority, tool: PolicyTool): PolicyDecision {
   const what = toolKind(tool);
@@ -221,13 +234,7 @@ export function toolPolicy(authority: RunAuthority, tool: PolicyTool): PolicyDec
     case "elsewhere":
       return refuse(REFUSALS.routineElsewhere);
     case "here":
-      return refuse(
-        tool.name === "ask_user"
-          ? REFUSALS.routineAskUser
-          : tool.name === "react"
-            ? REFUSALS.routineReact
-            : REFUSALS.routineHere,
-      );
+      return refuse(ROUTINE_HERE_REFUSAL[tool.name] ?? REFUSALS.routineHere);
     case "internal":
       if (authority.brief?.access === "act") return ALLOW;
       return refuse(READ_ONLY_REFUSAL[what.area] ?? REFUSALS.routineReadOnly);
@@ -294,9 +301,9 @@ export function takeWhy(
 ): { why: string | null; input: Record<string, unknown> } {
   if (ownsWhy(schema)) {
     const own = typeof input.why === "string" ? input.why.trim() : "";
-    return { why: own.length >= WHY_MIN_CHARS ? own.slice(0, WHY_MAX_CHARS) : null, input };
+    return { why: own.length >= WHY_MIN_CHARS ? cutText(own, WHY_MAX_CHARS) : null, input };
   }
   const { why, ...rest } = input;
   const text = typeof why === "string" ? why.trim() : "";
-  return { why: text.length >= WHY_MIN_CHARS ? text.slice(0, WHY_MAX_CHARS) : null, input: rest };
+  return { why: text.length >= WHY_MIN_CHARS ? cutText(text, WHY_MAX_CHARS) : null, input: rest };
 }

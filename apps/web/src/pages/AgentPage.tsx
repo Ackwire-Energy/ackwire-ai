@@ -189,6 +189,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
       channels:
         d && visible.ready ? sortIds(d.channels.map((c) => c.id).filter((id) => visibleIds.has(id))) : undefined,
       group: groups.data ? (groupOf(groups.data, agent.id)?.id ?? NO_GROUP) : undefined,
+      coordinator: agent.coordinator === true,
     };
   }, [agent, admin, detail.data, settings.data, access.data, repos.data, library.data, visible, groups.data]);
 
@@ -213,6 +214,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
     skills: edits.skills ?? saved.skills,
     channels: edits.channels ?? saved.channels,
     group: edits.group ?? saved.group,
+    coordinator: edits.coordinator ?? saved.coordinator,
   };
 
   /* ---------- What changed, said in words ---------- */
@@ -336,6 +338,13 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
         };
       case "group":
         return { ...base, label: label("group"), was: groupText(saved.group), now: groupText(draft.group) };
+      case "coordinator":
+        return {
+          ...base,
+          label: label("coordinator"),
+          was: t(saved.coordinator ? "coordinator.yes" : "coordinator.no"),
+          now: t(draft.coordinator ? "coordinator.yes" : "coordinator.no"),
+        };
       default:
         // The computer and who thinks are saved by their own dialogs (the sentence under the name).
         return { ...base, label: label(field), was: "", now: "" };
@@ -420,12 +429,15 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
       });
     }
     if (fields.has("look")) put("look", "appearance", normalizeAppearance(draft.look));
+    if (fields.has("coordinator")) put("coordinator", "coordinator", draft.coordinator);
     if (patchFields.length > 0) {
       try {
         const next = await update.mutateAsync(patch);
-        // Show the saved values at once (the lists refetch behind).
+        // Show the saved values at once (the lists refetch behind); one agent coordinates at a time.
         qc.setQueryData<Agent[]>(keys.agents(org.id), (list) =>
-          list?.map((a) => (a.id === agent.id ? { ...a, ...next } : a)),
+          list?.map((a) =>
+            a.id === agent.id ? { ...a, ...next } : next.coordinator ? { ...a, coordinator: false } : a,
+          ),
         );
         if (patch.credentialId !== undefined || patch.monthlyBudgetUsd !== undefined) {
           qc.setQueryData<AgentDetail>(keys.agentDetail(org.id, agent.id), (old) =>
@@ -737,7 +749,11 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
         open={archiving}
         onOpenChange={setArchiving}
         title={t("agentPage.archive.title", g)}
-        description={t("agentPage.archive.text", g)}
+        description={
+          agent.coordinator
+            ? `${t("agentPage.archive.text", g)} ${t("coordinator.archive", g)}`
+            : t("agentPage.archive.text", g)
+        }
         closeLabel={t("common.close")}
         width={440}
       >

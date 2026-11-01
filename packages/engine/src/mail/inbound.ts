@@ -1,6 +1,7 @@
 import { MailAuthError, type MailSummary } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, lt, or, schema, sql } from "@agenteschat/db";
 import { NotFoundError } from "../errors";
+import { cutText } from "../format";
 import { type EventMerge, holdForNextRun, queueEventRun, type RoutineEventPayload } from "../routine-events";
 import {
   accountRef,
@@ -45,7 +46,7 @@ function mailSummary(address: string, folder: string, readTool: string, messages
   const lines = messages.map((m) => {
     const base = `- ${m.date} · ${m.from} · "${m.subject}" · id ${m.id}`;
     const snippetRoom = room - base.length - 3;
-    return snippetRoom > 20 ? `${base} · ${oneLine(m.snippet, snippetRoom)}` : base.slice(0, Math.max(40, room));
+    return snippetRoom > 20 ? `${base} · ${oneLine(m.snippet, snippetRoom)}` : cutText(base, Math.max(40, room));
   });
   const more = extra > 0 ? [`(and ${extra} more not listed)`] : [];
   return neutralizeMarkers([head, ...lines, ...more].join("\n"));

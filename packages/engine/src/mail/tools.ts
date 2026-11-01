@@ -10,6 +10,7 @@ import { and, type Database, eq, gte, schema, sql } from "@agenteschat/db";
 import { type ArtifactDeps, createFileArtifact } from "../artifacts";
 import { recordAudit } from "../audit";
 import { runAuthorityById } from "../authority";
+import { cutText } from "../format";
 import { recordOperatorEvent } from "../operator-events";
 import { replyThreadOf } from "../runs";
 import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
@@ -662,7 +663,7 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
             actor: { type: "agent", id: ctx.agentId },
             action: "mail.sent",
             target: { type: "mail_account", id: account.id },
-            details: { kind: verb, recipients, subject: p.subject.slice(0, 200), runId: ctx.runId },
+            details: { kind: verb, recipients, subject: cutText(p.subject, 200), runId: ctx.runId },
           });
           await recordOperatorEvent(ctx.db, {
             type: "mail.sent",
