@@ -46,7 +46,7 @@ const YAML_ANCHOR_OR_ALIAS = /(?:^|[\s:?,[{-])[&*]\S/;
  *
  * - At most 5,000 characters, 200 lines and 500 characters a line. Some of mermaid's parsers take time that grows with
  *   the square of the source (50,000 characters of `;` in an xychart: 5 s, 4,800 lines of `<a` in an architecture
- *   diagram: 4.7 s), and its layouts a millisecond or more a node.
+ *   diagram: 4.7 s), and some of its layouts a millisecond or more a node.
  * - At most 100 lines in a mindmap, and 30 sets and unions in a venn diagram: their layouts grow much faster than their
  *   size (a mindmap of 1,000 nodes: 21 s, a venn diagram of 200 sets: 100 s).
  * - No more `style` and `classDef` than mermaid's entity regexes read in a moment. `style.*:\S*#.*;` (the same with
