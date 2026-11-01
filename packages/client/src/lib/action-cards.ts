@@ -109,10 +109,6 @@ export const suggestedAiText = (t: TFunction, ai: SuggestedAi) =>
     ? t("actionCard.agentProposal.aiAccount", { account: ai.label })
     : t(ai.kind === "model" ? "actionCard.agentProposal.aiModel" : "actionCard.agentProposal.aiNone");
 
-/** "Pode agir", "Só olhar e contar": what a proposed routine may do on its own. */
-export const routineAccessText = (t: TFunction, routine: ProposedRoutine) =>
-  t(routine.access === "act" ? "routines.access.act" : "routines.access.read");
-
 /** A created proposal's routine nobody made yet (its agent wasn't where it reports): it can still be made. */
 export const routineLeft = (card: AgentProposalCard) =>
   card.state === "created" && !!card.agentId && !!card.params.draft.routine && !card.routineId;

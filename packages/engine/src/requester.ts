@@ -34,19 +34,18 @@ export const personBehindRun = (db: Executor, orgId: string, triggerMessageId: s
   personOfMessage(db, orgId, triggerMessageId);
 
 /**
- * Whose rooms and agents a routine set to act reaches (ADR 0053 §2, amended 2026-10-31): its creator's. It posts
+ * Whose rooms and agents a routine reaches (ADR 0053 §2, amended 2026-10-31): its creator's. It posts
  * only where they can post and wakes only agents they can talk to, and still never acts as them (no files of
  * theirs, nothing in their name). The same for a run its work or report woke (`fedByRoutine`: a tell_agent's
- * run in the agents' DM, the run its report wakes), so one hop never reaches further. Null for any other run and
- * for a routine that only looks.
+ * run in the agents' DM, the run its report wakes), so one hop never reaches further. Null for any other run.
  */
 export const routineCreatorOf = (authority: RunAuthority): string | null =>
   actingRoutineOf(authority)?.creatorUserId ?? null;
 
-/** The brief of a routine set to act whose creator is still there (whose reach it has); null otherwise. */
+/** The brief of a routine whose creator is still there (whose reach it has); null otherwise. */
 const actingRoutineOf = (authority: RunAuthority) => {
   const brief = authority.kind !== "person" && fedByRoutine(authority) ? (authority.brief ?? null) : null;
-  return brief?.access === "act" && brief.creatorUserId ? brief : null;
+  return brief?.creatorUserId ? brief : null;
 };
 
 /** `actingRoutineOf` for a call's run. */

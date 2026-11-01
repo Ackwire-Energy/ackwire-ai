@@ -60,7 +60,7 @@ const brief = (over: Partial<RoutineBrief> = {}): RoutineBrief => ({
   name: "Vigiar e-mails",
   creatorUserId: f.owner.id,
   deliverTo: { channelId: f.general.id, threadId: null },
-  access: "read",
+  access: "act",
   report: "when_new",
   trigger: "schedule",
   dueAt: new Date().toISOString(),

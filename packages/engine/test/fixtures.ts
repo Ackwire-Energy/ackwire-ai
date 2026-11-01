@@ -58,6 +58,7 @@ import {
   type SandboxDeps,
   type ServerCatalog,
   type StorageDeps,
+  type ToolGateway,
   type ToolSource,
   zonedParts,
 } from "../src";
@@ -312,7 +313,9 @@ export async function setup(
   };
   const sources = [
     ...(options.missionTools && machineHub ? [createMissionToolSource(missionDeps)] : []),
-    ...(options.askUser ? [createAskUserToolSource()] : []),
+    ...(options.askUser
+      ? [createAskUserToolSource({ judge: context.judge, tools: (): ToolGateway | undefined => tools })]
+      : []),
     ...(options.permissionTools ? [createPermissionToolSource()] : []),
     ...(options.askAgent
       ? [
@@ -323,7 +326,9 @@ export async function setup(
     ...(options.react ? [createReactToolSource({ pubsub })] : []),
     ...(options.mediaTools ? [createMediaToolSource({ pubsub, gifs: options.gifs ?? null })] : []),
     ...(options.followUps ? [createFollowUpToolSource({ pubsub })] : []),
-    ...(options.handOff ? [createHandOffToolSource({ pubsub })] : []),
+    ...(options.handOff
+      ? [createHandOffToolSource({ pubsub, judge: context.judge, tools: (): ToolGateway | undefined => tools })]
+      : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
     ...(options.chatTools ? [createChatToolSource({ pubsub, artifacts: artifactDeps })] : []),
     ...(options.issueTools ? [createIssueToolSource({ db, pubsub })] : []),
@@ -345,7 +350,8 @@ export async function setup(
       : []),
     ...(options.toolSources ?? []),
   ];
-  const tools = sources.length > 0 ? createToolGateway({ sources, catalog: options.catalog }) : undefined;
+  const tools: ToolGateway | undefined =
+    sources.length > 0 ? createToolGateway({ sources, catalog: options.catalog }) : undefined;
   machineHub?.setMissionHooks(createMissionHooks({ db, ...missionDeps, tools }));
   const jobDeps = {
     db,

@@ -19,6 +19,7 @@ import { artifactRoutes } from "./routes/app/artifacts";
 import { auditRoutes } from "./routes/app/audit";
 import { billingRoutes } from "./routes/app/billing";
 import { browserRoutes } from "./routes/app/browser";
+import { browserProfileRoutes } from "./routes/app/browser-profiles";
 import { calendarRoutes } from "./routes/app/calendar";
 import { channelRoutes } from "./routes/app/channels";
 import { chatRoutes } from "./routes/app/chat";
@@ -162,6 +163,7 @@ export function createApp(options: AppOptions) {
     api.route("/app", dmRoutes(deps));
     api.route("/app", questionRoutes(deps));
     api.route("/app", browserRoutes(deps));
+    api.route("/app", browserProfileRoutes(deps));
     api.route("/app", desktopRoutes(deps));
     api.route("/app", notificationRoutes(deps));
     api.route("/app", pushRoutes(deps));

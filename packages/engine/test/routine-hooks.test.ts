@@ -293,7 +293,7 @@ describe("routine webhooks", () => {
     expect(await runsOf(routine.id)).toHaveLength(0);
   });
 
-  test("Testar sends a sample down the same path; its run only looks, and a routine turned off refuses it", async () => {
+  test("Testar sends a sample down the same path; the agent is told not to act on it, and a routine turned off refuses it", async () => {
     f = await setup();
     const routine = await webhookRoutine("act");
     const ref = await managedWebhookRoutine(f.db, f.owner.id, f.org.id, routine.id);
@@ -303,10 +303,10 @@ describe("routine webhooks", () => {
     expect(hook.calls).toMatchObject([{ outcome: "accepted", test: true, runId }]);
     const event = (await routineRunRow(f, runId ?? "")).event ?? {};
     expect(webhookEventText(event)).toStartWith(
-      "A person pressed Testar on this routine's page: the call below is a sample, not a real event, so this run only looks.",
+      "A person pressed Testar on this routine's page: the call below is a sample, not a real event, so don't act on it: change nothing and reach no one for it.",
     );
-    // The routine may act, but nothing real came: its tools that change things are refused.
-    expect(await runText(runId ?? "")).toContain("What it may do: look and tell.");
+    // One permission model (ADR 0109): the run keeps the agent's own permissions; only the prompt says it's a sample.
+    expect(await runText(runId ?? "")).toContain("What it may do: what you can do in any other run.");
 
     await setRoutineActive(deps(), f.owner.id, f.org.id, routine.id, false);
     const off = await managedWebhookRoutine(f.db, f.owner.id, f.org.id, routine.id);

@@ -100,7 +100,7 @@ function profile(dir: string, d: Draft) {
   const mcpJson = read("mcp.json");
   const servers = { ...obj(config.mcp_servers), ...obj(mcpJson ? jsonOf(mcpJson)?.mcpServers : undefined) };
   for (const [server, spec] of Object.entries(servers)) {
-    d.connection(server, str(obj(spec).url), Object.keys(obj(obj(spec).headers)), [key]);
+    d.connection(server, str(obj(spec).url), [key]);
   }
   for (const env of list(dist.env_requires).map(obj)) d.need("secret", str(env.name), [key]);
 

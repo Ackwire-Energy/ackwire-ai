@@ -278,12 +278,11 @@ describe("the form", () => {
       timezone: SP,
       start: "2026-10-28",
     });
-    expect([d.kind, d.event, d.active, d.report, d.access, d.forumRounds]).toEqual([
+    expect([d.kind, d.event, d.active, d.report, d.forumRounds]).toEqual([
       "schedule",
       "sentry.issue_created",
       true,
       "when_new",
-      "read",
       "3",
     ]);
     const input = draftInput({ ...d, agentId: "dev", target: "c1", prompt: "  Resuma o dia  ", name: " " });
@@ -292,7 +291,6 @@ describe("the form", () => {
       prompt: "Resuma o dia",
       target: { type: "channel", channelId: "c1" },
       trigger: { type: "schedule", rule: toApiRule(d.rule) },
-      access: "read",
       report: "when_new",
     });
     expect(draftInput({ ...d, agentId: "dev", target: "dm", prompt: "x", name: " Bom dia " }).name).toBe("Bom dia");
@@ -326,10 +324,9 @@ describe("the form", () => {
     expect(draftChanges(r, d, saved)).toEqual({});
     expect(draftChanges(r, { ...d, name: "  Novo nome " }, saved)).toEqual({ name: "Novo nome" });
     expect(draftChanges(r, { ...d, target: "dm" }, saved)).toEqual({ target: { type: "dm" } });
-    expect(draftChanges(r, { ...d, active: false, report: "always", access: "act" }, saved)).toEqual({
+    expect(draftChanges(r, { ...d, active: false, report: "always" }, saved)).toEqual({
       active: false,
       report: "always",
-      access: "act",
     });
     const later10 = { ...d.rule, times: ["10:00"] };
     expect(draftChanges(r, { ...d, rule: later10 }, saved)).toEqual({

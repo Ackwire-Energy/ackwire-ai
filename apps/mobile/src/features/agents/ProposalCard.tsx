@@ -14,7 +14,6 @@ import {
   type ProposalLine,
   proposalLines,
   proposalStatus,
-  routineAccessText,
   routineLeft,
   suggestedAiText,
 } from "@agenteschat/client/lib/action-cards";
@@ -243,10 +242,7 @@ function Lines({ lines, draft }: { lines: ProposalLine[]; draft: AgentDraft }) {
     const routine = draft.routine;
     return {
       icon: <Icon name="clock" size={14} color={colors.muted} />,
-      // What it may do on its own shows: one tap makes it under the tapper's name.
-      text: routine
-        ? [routine.name, proposedRoutineWhen(t, i18n.language, routine), routineAccessText(t, routine)].join(" · ")
-        : l.id,
+      text: routine ? [routine.name, proposedRoutineWhen(t, i18n.language, routine)].join(" · ") : l.id,
     };
   };
   const needs = (l: ProposalLine) =>

@@ -111,6 +111,11 @@ export const extraIcons = {
     ["circle", { cx: "8", cy: "7", r: "2.8" }],
     ["path", { d: "M3 16c.6-2.6 2.5-4 5-4s4.4 1.4 5 4" }],
   ],
+  /** "Adicionar pessoas ou agentes" (a channel row's hover): a person and a plus. */
+  personAdd: [
+    ["circle", { cx: "8", cy: "7", r: "2.8" }],
+    ["path", { d: "M3 16c.6-2.6 2.5-4 5-4s4.4 1.4 5 4M15 7.5v5M12.5 10h5" }],
+  ],
   /** Memory: "Sempre no contexto". */
   pin: [["path", { d: "M7 3h6l-1 5 3 3H5l3-3zM10 11v6" }]],
   /** Memory, proposals: back link. */

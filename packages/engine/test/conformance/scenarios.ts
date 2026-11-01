@@ -8,7 +8,6 @@ import {
   createChannel,
   insertMessage,
   queueOnRun,
-  REFUSALS,
   stopRoutineRun,
 } from "../../src";
 import { deliverNotice } from "../../src/delivery";
@@ -286,13 +285,13 @@ export const SCENARIOS: Scenario[] = [
   },
 
   {
-    name: "9a. a routine that only reads: a write is refused with the policy's reason",
+    name: "9a. a routine works as its agent (ADR 0109): an internal write runs, nothing asks anyone",
     runs: [
       {
         background: true,
         steps: [
           { calls: [{ name: "file_issue", input: { title: "Checkout lento" } }] },
-          { text: "O checkout está lento; esta rotina só olha, não registrei nada." },
+          { text: "O checkout está lento; registrei a issue #7." },
         ],
       },
     ],
@@ -302,18 +301,16 @@ export const SCENARIOS: Scenario[] = [
     async end(h) {
       const run = await onlyRun(h);
       expect(run.status).toBe("done");
-      expect(h.counts.file).toBe(0);
+      expect(h.counts.file).toBe(1);
       expect(await stepsOf(h, run.id, "tool_result")).toEqual([
-        expect.objectContaining({ name: "file_issue", isError: true, content: REFUSALS.routineReadOnly }),
+        expect.objectContaining({ name: "file_issue", isError: false, content: "Issue #7 created." }),
       ]);
-      expect(await routineRunOf(h)).toMatchObject({ status: "silent" });
       expect(await h.f.db.select().from(schema.approvals)).toEqual([]);
-      await nothingPosted(h);
     },
   },
 
   {
-    name: "9b. a routine that may act: a connected app's write becomes a card where it reports, from the routine",
+    name: "9b. a routine: a connected app's write becomes a card where it reports, from the routine",
     runs: [
       {
         background: true,

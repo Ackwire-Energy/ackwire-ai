@@ -21,10 +21,12 @@ const go = async (state = seedState(), { api = createFakeApi(state), channel = G
   return state;
 };
 const nav = () => screen().getByRole("navigation", { name: "Navegação do workspace" });
-/** "Canais", the only channel section of a workspace with no categories. */
+/** "Canais", the sidebar's part with the channels in no category (all of them, with no categories). */
 const canais = () => within(nav()).getByRole("button", { name: "Canais" }).closest(".sidebar__section") as HTMLElement;
 const names = () =>
-  [...canais().querySelectorAll(".sidebar__section-body > a .sidebar__item-label")].map((l) => l.textContent);
+  [...canais().querySelectorAll(".sidebar__section-body a.sidebar__item > .sidebar__item-label")].map(
+    (l) => l.textContent,
+  );
 const row = (name: string) => within(canais()).getByRole("link", { name });
 const dataTransfer = { setData: () => {}, getData: () => "" };
 /** Drags `from` over the top or bottom half of `to` (a 0-tall box here) and drops it there. */
@@ -99,7 +101,21 @@ describe("Criar canal in a category made there (ADR 0080)", () => {
 
   test("the new channel lands in the category made from its picker, not before it exists", async () => {
     const state = await go();
-    await click(within(nav()).getByRole("button", { name: "Criar canal" }));
+    // Canais' +: Novo canal or Nova categoria.
+    const plus = within(nav()).getByRole("button", { name: "Novo canal ou categoria" });
+    await act(async () => {
+      fireEvent.keyDown(plus, { key: "Enter" });
+      fireEvent.keyUp(plus, { key: "Enter" });
+    });
+    await settle(2);
+    const menu = screen().getByRole("menu", { name: "Novo canal ou categoria" });
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((i) => i.textContent),
+    ).toEqual(["Novo canal", "Nova categoria"]);
+    await click(within(menu).getByRole("menuitem", { name: "Novo canal" }));
+    await settle(2);
     const dialog = screen().getByRole("dialog", { name: "Criar canal" });
     await type(within(dialog).getByLabelText("Nome"), "vendas");
     await pick(within(dialog).getByRole("combobox", { name: "Categoria" }), "Nova categoria…");
@@ -177,7 +193,12 @@ const channel = (name: string) => {
   if (!row) throw new Error(`no #${name} in the sidebar`);
   return row;
 };
-const shown = (el: Element) => window.getComputedStyle(el).display !== "none";
+/** In sight: neither it nor a box around it (a row with its hover buttons, a section) is hidden. */
+const shown = (el: Element) => {
+  for (let e: Element | null = el; e; e = e.parentElement)
+    if (window.getComputedStyle(e).display === "none") return false;
+  return true;
+};
 
 describe("a category in the sidebar (ADR 0080)", () => {
   test("its channels line up with the ones in none, under its header; a channel in none stays where it was", async () => {
@@ -185,8 +206,10 @@ describe("a category in the sidebar (ADR 0080)", () => {
     await go(withCategory());
     const { body } = category("Engenharia");
     expect(body.contains(channel("eng"))).toBe(true);
-    const loose = channel("general").parentElement as HTMLElement;
-    expect(loose.closest(".sidebar__section")).toBeNull();
+    // Under the Canais part, not in the category.
+    const loose = category("Canais").body;
+    expect(loose.contains(channel("general"))).toBe(true);
+    expect(body.contains(channel("general"))).toBe(false);
     // No step in: a channel's # sits in its header's chevron column, as the ones in no category (sidebar-css.test.ts).
     expect(window.getComputedStyle(body).paddingLeft).toBe(window.getComputedStyle(loose).paddingLeft);
     expect(window.getComputedStyle(body).paddingLeft).not.toBe("19px");

@@ -174,7 +174,7 @@ test("parser: partial deltas, our tool calls with results, usage, and the final 
       },
     }),
   );
-  // Only our bridge's tools are the engine's to record; Claude Code's own stay on the machine.
+  // Claude Code's own tools come too, by their names: the engine keeps them as what the turn tried.
   expect(results.events).toEqual([
     {
       type: "tool_call",
@@ -183,6 +183,7 @@ test("parser: partial deltas, our tool calls with results, usage, and the final 
       input: { query: "q" },
       executed: { content: "found", isError: true },
     },
+    { type: "tool_call", id: "t2", name: "Bash", input: { command: "ls" }, executed: { content: "a.txt" } },
   ]);
   const end = p.push(
     line({
@@ -375,7 +376,7 @@ test("profiles (ADR 0053 §3): plan has our tools only, no settings files, no ed
   expect(plan).toContain("--strict-mcp-config");
   expect(at(plan, "--setting-sources")).toBe("");
   expect(at(plan, "--permission-mode")).toBe("default");
-  expect(at(plan, "--tools")).toBe("Bash,Read,Glob,Grep");
+  expect(at(plan, "--tools")).toBe("Bash,Read,Glob,Grep,WebFetch,WebSearch");
   expect(at(plan, "--permission-prompt-tool")).toBe("mcp__agentes__permission_prompt");
   const work = claudeBrainArgs({ ...base, ...brainProfileLaunch("work", false) });
   expect(at(work, "--permission-mode")).toBe("acceptEdits");
@@ -478,23 +479,27 @@ test.if(posix)(
   },
 );
 
-test.if(posix)("our tool calls arrive executed; the bridge relays them for the run that is thinking now", async () => {
-  const { m, spawns, turn } = setup();
-  const pending = turn(1, "SLOW TOOL");
-  await waitFor(() => spawns().length === 1);
-  const args = spawns()[0]?.args ?? [];
-  const config = JSON.parse(readFileSync(args[args.indexOf("--mcp-config") + 1] as string, "utf8")) as {
-    mcpServers: { agentes: { args: string[] } };
-  };
-  const bridgeId = config.mcpServers.agentes.args.at(-1) as string;
-  expect(m.mcpTask(bridgeId)).toMatchObject({ running: true, runId: RUN(1), serverToken: `agr_${"t".repeat(24)}1` });
-  const { events } = await pending;
-  expect(events.filter((e) => e.type === "tool_call")).toEqual([
-    { type: "tool_call", id: "t1", name: "search_context", input: { query: "x" }, executed: { content: "found it" } },
-  ]);
-  expect(m.mcpTask(bridgeId)).toMatchObject({ running: false });
-  expect(m.mcpTask(bridgeId)?.runId).toBeUndefined();
-});
+test.if(posix)(
+  "tool calls arrive executed, Claude Code's own too; the bridge relays ours for the run thinking now",
+  async () => {
+    const { m, spawns, turn } = setup();
+    const pending = turn(1, "SLOW TOOL");
+    await waitFor(() => spawns().length === 1);
+    const args = spawns()[0]?.args ?? [];
+    const config = JSON.parse(readFileSync(args[args.indexOf("--mcp-config") + 1] as string, "utf8")) as {
+      mcpServers: { agentes: { args: string[] } };
+    };
+    const bridgeId = config.mcpServers.agentes.args.at(-1) as string;
+    expect(m.mcpTask(bridgeId)).toMatchObject({ running: true, runId: RUN(1), serverToken: `agr_${"t".repeat(24)}1` });
+    const { events } = await pending;
+    expect(events.filter((e) => e.type === "tool_call")).toEqual([
+      { type: "tool_call", id: "t1", name: "search_context", input: { query: "x" }, executed: { content: "found it" } },
+      { type: "tool_call", id: "t2", name: "Bash", input: { command: "ls" }, executed: { content: "a.txt" } },
+    ]);
+    expect(m.mcpTask(bridgeId)).toMatchObject({ running: false });
+    expect(m.mcpTask(bridgeId)?.runId).toBeUndefined();
+  },
+);
 
 test.if(posix)(
   "two turns on one process: each turn's calls carry its own run and token; between turns the list waits quietly",
@@ -637,7 +642,7 @@ test.if(posix)("keepAlive false: one-shot, the process ends with the turn", asyn
 });
 
 test.if(posix)(
-  "a plan turn launches Claude Code read-only: our tools only, no settings files; edits, web and secrets denied",
+  "a plan turn launches Claude Code read-only: our tools only, no settings files; edits and secrets denied, the web allowed",
   async () => {
     const { spawns, turn } = setup();
     // Even when the agent opted into the owner's MCP servers.
@@ -648,21 +653,18 @@ test.if(posix)(
     expect(args).toContain("--strict-mcp-config");
     expect(at("--setting-sources")).toBe("");
     expect(at("--permission-mode")).toBe("default");
-    expect(at("--tools")).toBe("Bash,Read,Glob,Grep");
+    expect(at("--tools")).toBe("Bash,Read,Glob,Grep,WebFetch,WebSearch");
     expect(at("--permission-prompt-tool")).toBe("mcp__agentes__permission_prompt");
     const settings = JSON.parse(readFileSync(at("--settings") as string, "utf8")) as {
       permissions: { allow: string[]; deny: string[] };
     };
-    const denied = [
-      "Edit",
-      "Write",
-      "WebFetch",
-      "WebSearch",
-      "Read(~/.ssh/**)",
-      "Bash(node -e*)",
-      "Bash(gh pr merge *)",
-    ];
+    const denied = ["Edit", "Write", "Read(~/.ssh/**)", "Bash(node -e*)", "Bash(gh pr merge *)"];
     for (const rule of denied) expect(settings.permissions.deny).toContain(rule);
+    // Reading the web is a read (ADR 0109).
+    for (const tool of ["WebFetch", "WebSearch"]) {
+      expect(settings.permissions.deny).not.toContain(tool);
+      expect(settings.permissions.allow).toContain(tool);
+    }
     // Shell reads aren't allow rules: our prompt tool decides them (and refuses secrets).
     expect(settings.permissions.allow.some((r) => r.startsWith("Bash("))).toBe(false);
     // Its MCP process answers the prompts itself, reads only.

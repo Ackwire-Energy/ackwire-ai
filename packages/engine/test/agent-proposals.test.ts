@@ -519,7 +519,8 @@ describe("one request, one card: channels, mailboxes and a routine", () => {
         schedule: "0 12 * * *",
         rule: { freq: "daily", times: ["12:00"] },
         report: "when_new",
-        access: "read",
+        // Every routine does what its agent can (ADR 0109).
+        access: "act",
       },
     });
   });

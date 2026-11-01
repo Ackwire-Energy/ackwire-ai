@@ -159,7 +159,7 @@ test("export: what everyone may see, never keys; imported into another workspace
       { db, blobs: f.artifactDeps.blobs, pubsub: f.pubsub },
       other.id,
       orgB.id,
-      { bundle, dryRun: false, enableSkills: bundle.skills.map((s) => `skill:${s.key}`), ...input },
+      { bundle, dryRun: false, ...input },
       { model: "claude-haiku-5-5" },
     );
   const applied = await into();

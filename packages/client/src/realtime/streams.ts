@@ -1,4 +1,4 @@
-import type { ActiveRun, ChannelEvent, Message, RunStatus } from "../api/types";
+import type { ActiveRun, BrowserProfileWait, ChannelEvent, Message, RunStatus } from "../api/types";
 import { isMediaAfterReply } from "../lib/media";
 import { NO_AI } from "../lib/no-ai";
 
@@ -146,6 +146,8 @@ export interface LiveRun {
   toolDetail?: string | null;
   /** "Parar" was pressed and the server hasn't confirmed yet. */
   stopping?: boolean;
+  /** Its browser command waits for a shared profile someone else has (ADR 0110). */
+  browserWait?: BrowserProfileWait | null;
   /** Who stopped it (user id). */
   canceledBy?: string | null;
   /** The code the agent is running (`run_code`, a skill script), from `agent.tool`. */
@@ -648,6 +650,10 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
       if (event.runId === null) return expectReply(state, event);
       const s = reopen(state, event.runId);
       return upsert(s, { ...event, runId: event.runId }, { status: "thinking" });
+    }
+    case "agent.browser.waiting": {
+      if (!state.runs[event.runId]) return state;
+      return upsert(state, event, { browserWait: event.wait });
     }
     case "agent.typing": {
       const s = reopen(state, event.runId);

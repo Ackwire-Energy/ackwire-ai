@@ -38,7 +38,8 @@ export const MAX_WATCHED_BROWSERS = 4;
 /** Input frames per second from one socket (a drag sends many moves). */
 export const BROWSER_INPUT_PER_SECOND = 60;
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** An agent's id, or a browser profile's live-view key (`profile:<id>`, ADR 0110). */
+const UUID = /^(profile:)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** A browser frame of the live view, checked; null when the frame isn't one (or is malformed). */
 export function parseBrowserClientFrame(raw: string | Buffer): BrowserClientFrame | null {

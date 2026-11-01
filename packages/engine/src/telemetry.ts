@@ -2,6 +2,7 @@ import type { BrowserTraffic, MachineLoad, MachineSize } from "@agenteschat/adap
 import { type CombinedTraffic, combineLoads, combineTraffic, type LoadSample } from "@agenteschat/adapters/host-stats";
 import { type Database, eq, rowsOf, schema, sql } from "@agenteschat/db";
 import { catalogModelOf } from "@agenteschat/providers";
+import { WEB_USAGE_PROVIDER } from "./web-tools";
 
 const { instanceTelemetry } = schema;
 
@@ -251,7 +252,7 @@ export async function buildTelemetryReport(
       select provider, model, count(*) as calls,
         sum(input_tokens + cache_read_tokens + cache_write_tokens) as input_tokens, sum(output_tokens) as output_tokens
       from usage_records
-      where created_at >= ${day}
+      where created_at >= ${day} and provider <> ${WEB_USAGE_PROVIDER}
       group by provider, model`),
   );
   const byModel = new Map<string, TelemetryReport["lastDay"]["models"][number]>();

@@ -169,6 +169,7 @@ const ImportPlan = z
             "channel_not_picked",
             "invalid",
             "failed",
+            "too_many_routines",
           ])
           .optional()
           .openapi({
@@ -288,7 +289,7 @@ export function agentImportRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Plan (dryRun) or apply an import (admins)",
-      description: `Every item comes back as create, update (made by an earlier import of this package and changed), unchanged or skip with the reason. Applying never brings chat history; routines land paused and skills off (unless in \`enableSkills\`). One apply creates or updates at most ${IMPORT_LIMITS.perApply} items (\`import.too_many_items\`): apply a big import in chunks of \`pick\`, in the plan's order; each call is safe to repeat.`,
+      description: `Every item comes back as create, update (made by an earlier import of this package and changed), unchanged or skip with the reason. Applying never brings chat history; routines arrive active (with their next run) and skills on for the agents that had them. One apply creates or updates at most ${IMPORT_LIMITS.perApply} items (\`import.too_many_items\`): apply a big import in chunks of \`pick\`, in the plan's order; each call is safe to repeat.`,
       request: {
         params: OrgParams,
         body: body(
@@ -300,11 +301,6 @@ export function agentImportRoutes(deps: AppDeps) {
               .max(20_000)
               .optional()
               .openapi({ description: "`kind:key` of the items to apply; default every item." }),
-            enableSkills: z
-              .array(z.string().max(300))
-              .max(IMPORT_LIMITS.skills)
-              .optional()
-              .openapi({ description: "`skill:key` of the skills to turn on for the agents that had them." }),
           }),
         ),
       },

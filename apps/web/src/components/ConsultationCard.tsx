@@ -6,7 +6,7 @@ import { cx, Icon } from "@agenteschat/ui";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MessageBody } from "@/chat/MessageBody";
-import { AgentAvatar } from "@/components/AgentAvatar";
+import { AgentAvatar, withAgentFace } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 
@@ -65,7 +65,7 @@ export function ConsultationCard({
       </button>
       {open && (
         <div className="ac-consult__body" id={bodyId}>
-          <small>{t(consultAskedKey(c), { name: from.name })}</small>
+          <small>{withAgentFace(t(consultAskedKey(c), { name: from.name }), from.name, askerId)}</small>
           <div className="ac-consult__text ac-consult__text--q">
             <MessageBody body={c.question} resolveMention={dir.mentionName} />
           </div>

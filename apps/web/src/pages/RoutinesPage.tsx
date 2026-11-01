@@ -1,6 +1,5 @@
 import type {
   Routine,
-  RoutineAccess,
   RoutineEvent,
   RoutineHookCall,
   RoutineInput,
@@ -82,7 +81,6 @@ import {
   InfoHint,
   Input,
   Menu,
-  MenuItem,
   RecurrencePicker,
   type RecurrenceRule,
   RunKey,
@@ -103,6 +101,7 @@ import { useTranslation } from "react-i18next";
 import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { CancelAhead } from "@/components/ApprovalItem";
 import { useActors } from "@/components/actors";
+import { MenuEntries } from "@/components/DesktopMenus";
 import { DetailsLink } from "@/components/details-link";
 import { cleanFilter, type EmailTriggerDraft, EmailTriggerFields, emailWhen, INBOX } from "@/components/EmailTrigger";
 import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
@@ -113,6 +112,8 @@ import { useOrg } from "@/components/org-context";
 import { RoutineReachWarnings } from "@/components/RoutineReachWarnings";
 import { useComputerEdition, useNamesComputers } from "@/components/WorkspaceComputer";
 import { ZoneSelect } from "@/components/ZoneSelect";
+import { copyText, type MenuEntry } from "@/lib/context-menu";
+import { entityMenu } from "@/lib/entity-menu";
 import { lookOf } from "@/lib/look";
 import { useOpenParam } from "@/lib/open-param";
 import { defaultRule, fromApiRule, recurrenceLabels, ruleSentence, toApiRule, upcomingLabels } from "@/lib/recurrence";
@@ -637,6 +638,74 @@ function RoutineRow({
   // Something needs a look (a reason it paused, failures, waiting for a computer or a person): a chip says it.
   const needsLook = !done && routineStateWords(r).tone === "waiting";
   const fix = r.canManage && needsLook ? pausedFix(r) : null;
+  // Its "…" and its right click: run or stop, pause or resume, then what the "…" always had.
+  const entries = (): MenuEntry[] => [
+    ...(r.canManage && !reminder && (running || !fired)
+      ? ([
+          running
+            ? { kind: "item", id: "stop", label: t("routines.stop"), icon: "stop", run: controls.stop }
+            : { kind: "item", id: "run", label: t("routines.runNow"), icon: "play", run: controls.run },
+        ] satisfies MenuEntry[])
+      : []),
+    ...(r.canManage && !fired
+      ? ([
+          r.active
+            ? {
+                kind: "item",
+                id: "pause",
+                label: t("routines.pause"),
+                icon: "pause",
+                run: () => controls.setActive(false),
+              }
+            : {
+                kind: "item",
+                id: "resume",
+                label: t("routines.resume"),
+                icon: "play",
+                run: () => controls.setActive(true),
+              },
+          { kind: "separator" },
+        ] satisfies MenuEntry[])
+      : []),
+    ...(r.canManage
+      ? ([{ kind: "item", id: "edit", label: t("routines.edit"), icon: "edit", run: onEdit }] satisfies MenuEntry[])
+      : []),
+    { kind: "item", id: "runs", label: t("routines.runs"), icon: "waiting", run: () => !selected && onOpen() },
+    ...(r.canManage
+      ? ([
+          {
+            kind: "item",
+            id: "duplicate",
+            label: t("routines.duplicate"),
+            icon: "copy",
+            run: () =>
+              action.mutate(
+                { type: "duplicate", id: r.id, name: t("routines.copyName", { name: r.name }) },
+                {
+                  onSuccess: (copy) =>
+                    toast.show(t("routines.duplicated", { name: (copy as Routine | undefined)?.name ?? r.name })),
+                },
+              ),
+          },
+        ] satisfies MenuEntry[])
+      : []),
+    ...(r.canManage && routineHookUrl(r)
+      ? ([
+          {
+            kind: "item",
+            id: "webhook",
+            label: t("routines.copyWebhook"),
+            icon: "link",
+            run: () => void copyText(routineHookUrl(r) ?? "", () => toast.show(t("routines.webhookCopied"))),
+          },
+        ] satisfies MenuEntry[])
+      : []),
+    ...(r.canManage
+      ? ([
+          { kind: "item", id: "delete", label: t("routines.delete"), icon: "trash", run: () => setDeleting(true) },
+        ] satisfies MenuEntry[])
+      : []),
+  ];
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: a mouse shortcut; the title is the keyboard way to the details
     <article
@@ -647,6 +716,7 @@ function RoutineRow({
       data-done={done || undefined}
       data-running={running || undefined}
       data-state={r.state}
+      {...entityMenu(() => [{ kind: "header", label: title }, ...entries()])}
       onClick={(e) => {
         // The row opens the details; its own controls don't.
         if ((e.target as HTMLElement).closest("button, a, [role=switch], [role=menu]")) return;
@@ -750,46 +820,7 @@ function RoutineRow({
           label={more}
           trigger={<Button variant="ghost" size="sm" iconOnly icon="more" aria-label={more} />}
         >
-          {r.canManage && (
-            <MenuItem icon="edit" onSelect={onEdit}>
-              {t("routines.edit")}
-            </MenuItem>
-          )}
-          <MenuItem icon="waiting" onSelect={() => !selected && onOpen()}>
-            {t("routines.runs")}
-          </MenuItem>
-          {r.canManage && (
-            <MenuItem
-              icon="copy"
-              onSelect={() =>
-                action.mutate(
-                  { type: "duplicate", id: r.id, name: t("routines.copyName", { name: r.name }) },
-                  {
-                    onSuccess: (copy) =>
-                      toast.show(t("routines.duplicated", { name: (copy as Routine | undefined)?.name ?? r.name })),
-                  },
-                )
-              }
-            >
-              {t("routines.duplicate")}
-            </MenuItem>
-          )}
-          {r.canManage && routineHookUrl(r) && (
-            <MenuItem
-              icon="link"
-              onSelect={async () => {
-                await navigator.clipboard?.writeText(routineHookUrl(r) ?? "");
-                toast.show(t("routines.webhookCopied"));
-              }}
-            >
-              {t("routines.copyWebhook")}
-            </MenuItem>
-          )}
-          {r.canManage && (
-            <MenuItem icon="trash" onSelect={() => setDeleting(true)}>
-              {t("routines.delete")}
-            </MenuItem>
-          )}
+          <MenuEntries entries={entries()} />
         </Menu>
       </div>
       <Dialog
@@ -1225,28 +1256,16 @@ function RoutineDetails({
           <p className="small muted">{t("routines.ahead.hint")}</p>
         </DetailsSection>
       )}
-      <div className="routine-details__pair">
-        <DetailsSection title={t("routines.panel.access")}>
-          <p className="routine-details__sentence">
-            <span className="ac-hintline">
-              {t(`routines.access.${r.access}`)}
-              <InfoHint name={t("common.about", { label: t("routines.panel.access") })}>
-                {t("routines.access.hint")}
-              </InfoHint>
-            </span>
-          </p>
-        </DetailsSection>
-        <DetailsSection title={t("routines.panel.report")}>
-          <p className="routine-details__sentence">
-            <span className="ac-hintline">
-              {t(`routines.report.${r.report}`)}
-              <InfoHint name={t("common.about", { label: t("routines.panel.report") })}>
-                {t("routines.report.hint")}
-              </InfoHint>
-            </span>
-          </p>
-        </DetailsSection>
-      </div>
+      <DetailsSection title={t("routines.panel.report")}>
+        <p className="routine-details__sentence">
+          <span className="ac-hintline">
+            {t(`routines.report.${r.report}`)}
+            <InfoHint name={t("common.about", { label: t("routines.panel.report") })}>
+              {t("routines.report.hint")}
+            </InfoHint>
+          </span>
+        </p>
+      </DetailsSection>
       <DetailsSection title={t("routines.panel.runs")}>
         {runs.isLoading && list.length === 0 && <LoadingList count={3} avatar={false} />}
         {list.length > 0 && (
@@ -1620,9 +1639,8 @@ function RoutineDialog({
     routine?.trigger.type === "event" ? routine.trigger.event : "sentry.issue_created",
   );
   const [active, setActive] = useState(routine?.active ?? true);
-  // The two plain questions: when it posts, and what it may do on its own.
+  // When it posts.
   const [report, setReport] = useState<RoutineReport>(routine?.report ?? "when_new");
-  const [access, setAccess] = useState<RoutineAccess>(routine?.access ?? "read");
   const say = useSay();
   const [touched, setTouched] = useState(false);
   // One source of truth for "when": the rule (the picker), with the phrase kept in step.
@@ -1740,7 +1758,6 @@ function RoutineDialog({
     if (triggerChanged) patch.trigger = trigger();
     if (active !== r.active) patch.active = active;
     if (report !== r.report) patch.report = report;
-    if (access !== r.access) patch.access = access;
     return patch;
   };
   // A routine on someone's computer that runs hourly or more often: say how often it wakes that computer.
@@ -1811,7 +1828,6 @@ function RoutineDialog({
           prompt: prompt.trim(),
           target: targetValue(),
           trigger: trigger(),
-          access,
           report,
         },
       },
@@ -2068,26 +2084,7 @@ function RoutineDialog({
               options={(["always", "when_new"] as const).map((v) => ({ value: v, label: t(`routines.report.${v}`) }))}
             />
           </div>
-          <div className="routine-kind">
-            <span className="ac-hintline">
-              <span className="ac-field__label">{t("routines.form.access")}</span>
-              <InfoHint name={t("common.about", { label: t("routines.form.access") })}>
-                {t("routines.access.hint")}
-              </InfoHint>
-            </span>
-            <Segmented
-              label={t("routines.form.access")}
-              value={access}
-              onValueChange={setAccess}
-              options={(["read", "act"] as const).map((v) => ({ value: v, label: t(`routines.access.${v}`) }))}
-            />
-          </div>
-          <RoutineReachWarnings
-            prompt={prompt}
-            access={access}
-            agentId={agentId || null}
-            creatorUserId={routine?.createdByUserId}
-          />
+          <RoutineReachWarnings prompt={prompt} agentId={agentId || null} creatorUserId={routine?.createdByUserId} />
           {editing && !(routine && isDoneOnce(routine)) && (
             <label className="routine-active" htmlFor="nr-active">
               <Switch id="nr-active" checked={active} onCheckedChange={setActive} />

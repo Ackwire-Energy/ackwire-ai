@@ -167,6 +167,8 @@ export const agents = pgTable(
      * or its own. The live view, take over and Stop follow it.
      */
     browserMachineId: uuid(),
+    /** Its default browser (ADR 0110): a profile it is granted; null = its own browser. */
+    browserProfileId: uuid(),
     /**
      * Held by the people who run this server (operator API, ADR 0056): it starts nothing, the rest of the
      * workspace works (`standing.ts`). The reason is theirs: the workspace only reads that it is paused.

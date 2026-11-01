@@ -226,6 +226,22 @@ export type ChannelEvent =
       stream: "stdout" | "stderr";
       text: string;
     }
+  /**
+   * A browser command of the agent waits for a profile another agent or a person holds (ADR 0110): its card says
+   * who has it. `wait: null` once it got the turn or gave up.
+   */
+  | {
+      type: "agent.browser.waiting";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      wait: {
+        profileId: string;
+        name: string;
+        holder: { type: "agent"; agentId: string; since: string } | { type: "person"; userId: string; since: string };
+      } | null;
+    }
   /** The agent's first words arrived (switch "thinking" to "typing"). */
   | { type: "agent.typing"; channelId: string; threadId: string | null; agentId: string; runId: string }
   /** The agent stopped (done, failed or waiting for approval). */

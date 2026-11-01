@@ -306,6 +306,7 @@ type WhatKey =
   | "secretRequest"
   | "joinRequest"
   | "joinRequestMany"
+  | "browserProfileRequest"
   | "joinSuggestion"
   | "invitationAccepted"
   | "invitationAcceptedAny"
@@ -378,6 +379,8 @@ export function Headline({
       return k("routineStalled", { name });
     case "agent_unreached":
       return k("agentUnreached", { name });
+    case "browser_profile_request":
+      return k("browserProfileRequest", { name, agent: n.source.label ?? "" });
     case "routine_waiting_plan":
       return k("routineWaitingPlan", { name });
     case "plan_reset_unknown":

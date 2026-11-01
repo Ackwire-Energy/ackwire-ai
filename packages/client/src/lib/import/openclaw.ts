@@ -164,7 +164,7 @@ export function parse(files: ImportFile[], d: Draft) {
 
   const agents = d.agents.map((a) => a.key);
   for (const [name, server] of Object.entries(obj(obj(cfg.mcp).servers))) {
-    d.connection(name, str(obj(server).url), Object.keys(obj(obj(server).headers)), agents);
+    d.connection(name, str(obj(server).url), agents);
   }
   // Chat apps (WhatsApp, Telegram, Slack…) reach the agent through OpenClaw's gateway; we have no bridge.
   for (const platform of Object.keys(obj(cfg.channels))) d.left("messaging", platform);
@@ -281,7 +281,7 @@ function fromClaw(claw: NonNullable<ReturnType<typeof clawOf>>, d: Draft) {
     else d.left("file", str(f.path) || str(f.source));
   }
   for (const [server, spec] of Object.entries(obj(manifest.mcpServers))) {
-    d.connection(server, str(obj(spec).url), [], [id]);
+    d.connection(server, str(obj(spec).url), [id]);
   }
   for (const job of list(manifest.cronJobs).map(obj)) {
     const schedule = obj(job.schedule);

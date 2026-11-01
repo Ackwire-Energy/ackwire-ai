@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ApiError, type Me } from "@agenteschat/client";
+import { ApiError, handoffTimeLeft, type Me } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import {
   dayLabel,
@@ -92,6 +92,24 @@ describe("format (pt-BR, machine numbers precise)", () => {
     expect(timeLeft(t, new Date(now.getTime() + 23 * 3_600_000).toISOString(), now)).toBe("23 h");
     expect(timeLeft(t, new Date(now.getTime() + 5 * 86_400_000).toISOString(), now)).toBe("5 dias");
     expect(timeLeft(t, at(1), now)).toBeNull();
+  });
+  test("a request for help counts down in hours, then minutes, in both languages", () => {
+    const english = createI18n("en");
+    const te = english.t.bind(english) as TFunction;
+    const left = (ms: number) => ({ expiresAt: new Date(now.getTime() + ms).toISOString() });
+    // Just asked: the whole day, not "23 h".
+    expect(handoffTimeLeft(t, left(24 * 3_600_000 - 1000), now.getTime())).toBe("24 h");
+    expect(handoffTimeLeft(t, left(3 * 3_600_000 + 10 * 60_000), now.getTime())).toBe("3 h");
+    expect(handoffTimeLeft(t, left(45 * 60_000), now.getTime())).toBe("45 min");
+    expect(handoffTimeLeft(t, left(20_000), now.getTime())).toBe("1 min");
+    expect(handoffTimeLeft(t, left(-1000), now.getTime())).toBeNull();
+    expect(handoffTimeLeft(t, { expiresAt: null }, now.getTime())).toBeNull();
+    expect(t("browser.card.left", { time: handoffTimeLeft(t, left(24 * 3_600_000), now.getTime()) })).toBe(
+      "24 h restantes",
+    );
+    expect(te("browser.card.left", { time: handoffTimeLeft(te, left(45 * 60_000), now.getTime()) })).toBe(
+      "45 min left",
+    );
   });
   test("names and models", () => {
     expect(joinNames(["Ada"], " e ")).toBe("Ada");

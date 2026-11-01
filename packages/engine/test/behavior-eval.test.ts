@@ -144,7 +144,7 @@ test("a routine run: background work from its brief, the conversation it reports
   expect(deterministicChecks(c.expect, run).filter((k) => !k.pass)).toEqual([]);
 });
 
-test("a routine that only reads: posting, DMs, routine changes and mail sends aren't even listed", async () => {
+test("a routine (ADR 0109: every routine acts): routine changes aren't listed, a mail send asks a person", async () => {
   const provider = script([
     { chunks: [], toolUses: [{ name: "mail_suporte_read", input: { id: "m_102" } }] },
     { chunks: ["Nada para reportar."] },
@@ -153,8 +153,8 @@ test("a routine that only reads: posting, DMs, routine changes and mail sends ar
   const run = await runCase(c, { apiKey: "sk-ant-fake-key-1234", provider, maxToolTurns: 4 });
   expect(run.tools).toContain("mail_suporte_read");
   expect(run.tools).toContain("hand_off");
-  const refused = ["update_routine", "post_message", "send_dm", "ask_agent", "mail_suporte_send"];
-  for (const name of refused) expect(run.tools, name).not.toContain(name);
+  expect(run.tools).not.toContain("update_routine");
+  expect(run.tools).toContain("mail_suporte_send");
   // Mail reaches the model as untrusted email content, as the real mailbox tools give it.
   expect(run.calls[0]?.result).toContain('<email_content untrusted="true">');
 });

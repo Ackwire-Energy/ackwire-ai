@@ -4,7 +4,7 @@ import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
 import { brainLine } from "@agenteschat/client/lib/brain";
 import { greetingSuggestions } from "@agenteschat/client/lib/chat";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { isAuto } from "@agenteschat/client/lib/providers";
+import { apiProviderOf, isAuto } from "@agenteschat/client/lib/providers";
 import { Avatar, BrainIcon, Button, ProviderLogo } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -64,6 +64,8 @@ export function DmPage({ target }: { target: DmTarget }) {
   const thinks = agent
     ? brainLine(t, agent.brain, model, { owner: owner?.name.split(" ")[0], agents: dir.agents })
     : null;
+  // The API's maker when it thinks through a key.
+  const thinksMark = thinks?.mark ?? (agent ? apiProviderOf(agent.model, models.data?.models ?? []) : undefined);
   const role = agent ? agent.role || `@${agent.handle}` : "";
   const header = (
     <header className="channel__header">
@@ -81,11 +83,7 @@ export function DmPage({ target }: { target: DmTarget }) {
               <>
                 {" · "}
                 <span className="channel__brain ac-iconline">
-                  {thinks.mark ? (
-                    <ProviderLogo id={thinks.mark} size="xs" />
-                  ) : (
-                    <BrainIcon kind={thinks.kind} size={14} />
-                  )}
+                  {thinksMark ? <ProviderLogo id={thinksMark} size="xs" /> : <BrainIcon kind={thinks.kind} size={14} />}
                   {thinks.text}
                 </span>
               </>

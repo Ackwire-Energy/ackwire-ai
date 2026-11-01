@@ -171,5 +171,15 @@ export const isAuto = (value: string | null | undefined) => value === AUTO;
 export const keyRuns = (key: Pick<Credential, "provider">, model: string | undefined, models: readonly Model[]) =>
   isAuto(model) || models.some((m) => m.id === model && m.provider === key.provider);
 
+/**
+ * Whose API an agent's model runs on: the model's provider; for Automático, the one provider the workspace can use
+ * (undefined when it can use several, or the model is unknown).
+ */
+export function apiProviderOf(model: string | null | undefined, models: readonly Model[]): string | undefined {
+  if (!isAuto(model)) return models.find((m) => m.id === model)?.provider;
+  const usable = new Set(models.filter((m) => m.available).map((m) => m.provider));
+  return usable.size === 1 ? [...usable][0] : undefined;
+}
+
 /** Automático's sizes and the server's own tier rule (`modelForTier`): a tier's default reads as the one that runs. */
 export { MODEL_TIERS, nearestTier } from "@agenteschat/providers/catalog";

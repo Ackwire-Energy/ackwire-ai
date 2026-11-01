@@ -144,6 +144,38 @@ export function around(text: string, part: string): [before: string, after: stri
   return at < 0 ? null : [text.slice(0, at), text.slice(at + part.length)];
 }
 
+const WORD_CHAR = /[\p{L}\p{N}]/u;
+/** Where `word` first stands as a whole word in `text` ("Max" in "Max está", not in "Maximizando"), or -1. */
+export function wordIndex(text: string, word: string): number {
+  if (!word) return -1;
+  for (let at = text.indexOf(word); at >= 0; at = text.indexOf(word, at + 1)) {
+    if (!WORD_CHAR.test(text[at - 1] ?? "") && !WORD_CHAR.test(text[at + word.length] ?? "")) return at;
+  }
+  return -1;
+}
+
+/**
+ * `text` cut where each of `names` first stands as a word (`wordIndex`), in order of where they stand: the plain
+ * pieces as strings, each name found as its index in `names` (where a face goes before it). A name already used, or
+ * inside an earlier one, is left as text.
+ */
+export function splitAtNames(text: string, names: readonly string[]): (string | number)[] {
+  const found = names
+    .map((name, i) => ({ i, at: wordIndex(text, name), len: name.length }))
+    .filter((f) => f.at >= 0 && names.indexOf(names[f.i] ?? "") === f.i)
+    .sort((a, b) => a.at - b.at || b.len - a.len);
+  const out: (string | number)[] = [];
+  let at = 0;
+  for (const f of found) {
+    if (f.at < at) continue;
+    if (f.at > at) out.push(text.slice(at, f.at));
+    out.push(f.i);
+    at = f.at + f.len;
+  }
+  if (at < text.length) out.push(text.slice(at));
+  return out;
+}
+
 /** Where a shortened text may stop with nothing added: a sentence's end, or a line's. */
 const STOPS = /[.!?…](?=\s)|\n/g;
 
@@ -185,3 +217,18 @@ export const matchesName = (typed: string, name: string) => typedForm(typed) ===
 
 /** Text made safe inside HTML, as text or as an attribute value (quoted either way). */
 export const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+const oneSpaced = (text: string) => text.replace(/\s+/g, " ").trim();
+
+/**
+ * Whether `whole` already holds `part` word for word (line breaks and extra spaces aside), as whole words: "Ok" is
+ * not in "Okay", "Vou ver." is not in "Vou verificar".
+ */
+export function holdsText(whole: string, part: string) {
+  const w = oneSpaced(whole);
+  const p = oneSpaced(part);
+  for (let at = w.indexOf(p); at >= 0; at = w.indexOf(p, at + 1)) {
+    if (!WORD_CHAR.test(w[at - 1] ?? "") && !WORD_CHAR.test(w[at + p.length] ?? "")) return true;
+  }
+  return false;
+}

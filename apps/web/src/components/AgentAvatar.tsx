@@ -1,5 +1,6 @@
 import type { AgentPresence } from "@agenteschat/client";
 import { agentStateIn } from "@agenteschat/client";
+import { splitAtNames } from "@agenteschat/client/lib/text";
 import {
   type AgentAppearance,
   type AgentState,
@@ -8,6 +9,7 @@ import {
   PixelSpinner,
   type PixelSpinnerSize,
 } from "@agenteschat/ui";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
@@ -54,6 +56,40 @@ export function AgentAvatar(props: AgentAvatarProps) {
       presence={given}
       {...rest}
     />
+  );
+}
+
+/** An agent named in a line of text: its face at the text's size, then its name (`.ac-who`). */
+export function AgentWho({ agentId, name }: { agentId?: string; name: string }) {
+  return (
+    <span className="ac-who">
+      <AgentAvatar agentId={agentId} size="xs" name={name} />
+      <b>{name}</b>
+    </span>
+  );
+}
+
+/** `text` with the agent's name, where it first stands as a word, drawn as `AgentWho`. */
+export function withAgentFace(text: string, name: string, agentId?: string): ReactNode {
+  return withAgentFaces(text, [{ name, agentId }]);
+}
+
+/** `text` with each agent's name, where it first stands as a word, drawn as `AgentWho` ("Atlas respondeu à Ada"). */
+export function withAgentFaces(text: string, who: { name: string; agentId?: string }[]): ReactNode {
+  const parts = splitAtNames(
+    text,
+    who.map((w) => w.name),
+  );
+  if (parts.every((p) => typeof p === "string")) return text;
+  return (
+    <>
+      {parts.map((p, i) => {
+        if (typeof p === "string") return p;
+        const w = who[p];
+        // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
+        return <AgentWho key={i} agentId={w?.agentId} name={w?.name ?? ""} />;
+      })}
+    </>
   );
 }
 
