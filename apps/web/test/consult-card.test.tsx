@@ -211,7 +211,8 @@ describe("the working line while an agent asks another", () => {
     const clock = typingBar().querySelector(".ac-typing__clock") as HTMLElement;
     expect(clock.className).toContain("ac-num");
     expect(clock.textContent).toMatch(/^\d+:\d\d$/);
-    expect(typingBar().querySelector(".ac-pixspin")).not.toBeNull();
+    // Both faces open the pill: no pixel orbit beside them.
+    expect(typingBar().querySelector(".ac-pixspin")).toBeNull();
     await push(socket, { type: "agent.consulted", ...run, consultedAgentId: ATLAS_ID, status: "answered" });
     await push(socket, { type: "agent.thinking", ...run });
     await settle();
