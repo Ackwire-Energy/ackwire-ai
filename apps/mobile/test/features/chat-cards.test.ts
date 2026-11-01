@@ -21,10 +21,11 @@ describe("a reply's tools sit last, live and saved", () => {
         at(row, [
           "body ? (\n          <MessageText body={body}",
           "<Receipts message={m} />",
-          "{cards}\n        {/* Its tools last",
+          "{cards}\n        {/* Its tools after",
           "<ConsultGroup message={m} color={color} />",
           "<TurnTools",
           "<SavedTools",
+          "<NoAiCard message={m} />",
           "{foot}\n      </View>\n    </Pressable>\n  );\n});",
         ]),
       ),
@@ -33,17 +34,28 @@ describe("a reply's tools sit last, live and saved", () => {
     const [cardsAt, footAt, endAt] = at(row, ["const cards = (", "const foot = (", "\n  if (mine) {"]);
     const cards = row.slice(cardsAt, footAt);
     const foot = row.slice(footAt, endAt);
-    for (const card of [
-      "<IssueWorkCard",
-      "<MissionCard",
-      "<PlanCard",
-      "<ReviewCard",
-      "<DecisionCard",
-      "<SetupFailedCard",
-    ])
+    for (const card of ["<IssueWorkCard", "<MissionCard", "<PlanCard", "<ReviewCard", "<SetupFailedCard"])
       expect([card, cards.includes(card)]).toEqual([card, true]);
     for (const part of ["<ThreadLink", "<Reactions", "<Sending"])
       expect([part, foot.includes(part)]).toEqual([part, true]);
+  });
+
+  test("what waits for a person's click comes after the tools, the thread and reactions under it", () => {
+    const row = source("MessageRow.tsx");
+    const [toolsAt, footAt] = at(row, ["<SavedTools\n", "{foot}\n      </View>\n    </Pressable>\n  );\n});"]);
+    const last = row.slice(toolsAt, footAt);
+    for (const card of [
+      "<NoAiCard",
+      "<StretchCard",
+      "<ProposalCard",
+      "<InstructionProposals",
+      "<ApprovalInline",
+      "<HandoffCard",
+      "<QuestionCard",
+      "<SecretCard",
+      "{missionDecision}",
+    ])
+      expect([card, last.includes(card)]).toEqual([card, true]);
   });
 
   test("live: the words stream above its tools, where the saved reply keeps them", () => {

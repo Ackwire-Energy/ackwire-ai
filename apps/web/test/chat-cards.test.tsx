@@ -218,6 +218,47 @@ describe("the tools sit last, live, right after and once reloaded", () => {
   });
 });
 
+describe("what waits for a person's click comes last", () => {
+  test("a question the reply asks sits under the tools it kept from watching it work", async () => {
+    const { socket, routine } = await openChannel(() => []);
+    const ids = { threadId: null, runId: "r-answer", agentId: ADA_ID };
+    const ev = (event: Record<string, unknown>) =>
+      act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { channelId: ENG_ID, ...event } }));
+    await ev({ type: "agent.run", ...ids, status: "running" });
+    await ev({ type: "agent.tool", ...ids, tool: "create_routine", toolUseId: "t1" });
+    await ev({ type: "agent.tool", ...ids, tool: null, toolUseId: "t1" });
+    await ev({ type: "agent.delta", ...ids, seq: 0, text: ANSWER });
+    await settle(3);
+    const m = answer(routine.id, []);
+    const asking = {
+      ...m,
+      meta: {
+        ...m.meta,
+        question: {
+          id: "q-1",
+          agentId: ADA_ID,
+          channelId: ENG_ID,
+          threadId: null,
+          messageId: "m-answer",
+          text: "Posto às 9h ou às 10h?",
+          choices: ["9h", "10h"],
+          status: "open",
+          answer: null,
+          answeredByUserId: null,
+        },
+      },
+    } as Message;
+    await ev({ type: "message.created", messageId: asking.id, message: asking });
+    await ev({ type: "run.finished", ...ids, status: "done" });
+    await settle(6);
+    const row = document.querySelector('[data-message-id="m-answer"]') as HTMLElement;
+    const parts = [...row.querySelectorAll(".ac-msg__text, .ac-tools, .rq")].map((el) =>
+      el.classList.contains("rq") ? "card" : el.classList.contains("ac-tools") ? "tools" : "text",
+    );
+    expect(parts).toEqual(["text", "tools", "card"]);
+  });
+});
+
 describe("a receipt's words stay whole", () => {
   test("Desfazer leaving with its time keeps its room: the sentence never rewraps", async () => {
     await openChannel((id) => [answer(id, [{ undoableUntil: inMs(1_200) }])]);

@@ -227,7 +227,6 @@ export const MessageRow = memo(function MessageRow({
       {link ? <MissionCard missionId={link.missionId} /> : null}
       {plan ? <PlanCard missionId={plan.missionId} goal={plan.goal} /> : null}
       {review ? <ReviewCard missionId={review.missionId} reviewId={review.id} /> : null}
-      {decision ? <DecisionCard missionId={decision.missionId} decisionId={decision.id} /> : null}
       {setup ? (
         <SetupFailedCard
           {...(setup.missionId ? { missionId: setup.missionId } : {})}
@@ -238,6 +237,7 @@ export const MessageRow = memo(function MessageRow({
       ) : null}
     </>
   );
+  const missionDecision = decision ? <DecisionCard missionId={decision.missionId} decisionId={decision.id} /> : null;
   // Under everything: the thread it started, its reactions and whether it went out.
   const foot = (
     <>
@@ -314,6 +314,7 @@ export const MessageRow = memo(function MessageRow({
         ) : null}
         <View style={styles.meCards}>
           {cards}
+          {missionDecision}
           {foot}
         </View>
       </Pressable>
@@ -423,13 +424,7 @@ export const MessageRow = memo(function MessageRow({
         ) : null}
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
         {isAgent ? <TeamChecks message={m} /> : null}
-        {isAgent ? <NoAiCard message={m} /> : null}
-        {isAgent ? <StretchCard message={m} /> : null}
-        {isAgent ? <ProposalCard message={m} /> : null}
-        {isAgent ? <InstructionProposals message={m} /> : null}
         {files.length > 0 ? <MessageFiles files={files} /> : null}
-        {approvalId ? <ApprovalInline approvalId={approvalId} /> : null}
-        {handoff ? <HandoffCard handoff={handoff} /> : null}
         {trails && m.author.id && trails.browser.length > 0 ? (
           <TrailCard
             agentId={m.author.id}
@@ -448,10 +443,8 @@ export const MessageRow = memo(function MessageRow({
             screen="desktop"
           />
         ) : null}
-        {question ? <QuestionCard key={`${question.id}:${question.status}`} question={question} /> : null}
-        {secret ? <SecretCard key={`${secret.id}:${secret.status}`} request={secret} /> : null}
         {cards}
-        {/* Its tools last, after its words, what it changed and its cards: the same place live, kept and saved. */}
+        {/* Its tools after its words, what it changed and its cards: the same place live, kept and saved. */}
         {isAgent && m.agentRunId && !m.local && !readOnly && !mediaAfter && consulted.length === 0 ? (
           <ConsultGroup message={m} color={color} />
         ) : null}
@@ -473,6 +466,16 @@ export const MessageRow = memo(function MessageRow({
             skipScreens={onCards}
           />
         ) : null}
+        {/* What waits for a person's click comes last, after the words and the tools. */}
+        {isAgent ? <NoAiCard message={m} /> : null}
+        {isAgent ? <StretchCard message={m} /> : null}
+        {isAgent ? <ProposalCard message={m} /> : null}
+        {isAgent ? <InstructionProposals message={m} /> : null}
+        {approvalId ? <ApprovalInline approvalId={approvalId} /> : null}
+        {handoff ? <HandoffCard handoff={handoff} /> : null}
+        {question ? <QuestionCard key={`${question.id}:${question.status}`} question={question} /> : null}
+        {secret ? <SecretCard key={`${secret.id}:${secret.status}`} request={secret} /> : null}
+        {missionDecision}
         {foot}
       </View>
     </Pressable>

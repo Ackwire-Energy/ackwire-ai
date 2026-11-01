@@ -3450,12 +3450,10 @@ export const TimelineMessage = memo(function TimelineMessage({
           ) : (
             !liveFailed && <LiveRunStatus run={live} />
           )}
-          {/* Also on a failed or stopped run, for the person still in control (they hand back from it). */}
-          <RunBrowserCard run={live} name={name} />
           {m.author.id && m.agentRunId && (
             <ConsultGroup runId={m.agentRunId} askerId={m.author.id} color={colorOf(agent)} />
           )}
-          {/* Its tools last, as on its saved message: one line (what it does now) opening into each call. */}
+          {/* Its tools, as on its saved message: one line (what it does now) opening into each call. */}
           <LiveTools
             work={opening.work}
             agentName={name}
@@ -3463,6 +3461,8 @@ export const TimelineMessage = memo(function TimelineMessage({
             steerNote={steerNote}
             stopped={liveStopped}
           />
+          {/* Last, after its tools; also on a failed or stopped run, for the person still in control (they hand back from it). */}
+          <RunBrowserCard run={live} name={name} />
           {!liveFailed && !liveWaiting && !liveStopped && (
             <span className="ac-visually-hidden">{t("channel.writing")}</span>
           )}
@@ -3528,18 +3528,10 @@ export const TimelineMessage = memo(function TimelineMessage({
           )}
           {m.author.type === "agent" && !m.local && <AgentActionReceipts message={m} />}
           {m.author.type === "agent" && !m.local && <TeamChecks message={m} />}
-          {approvalId && <MessageApproval approvalId={approvalId} agent={agent} members={dir.memberById} />}
-          {proposalId && <InlineProposal proposalId={proposalId} />}
           {agent &&
-            memoryUpdates.map((u) => (
-              <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />
-            ))}
-          {waitNotice && <WaitingCard notice={waitNotice} agentId={m.author.id ?? null} />}
-          {noAi && <NoAiCard message={m} />}
-          {actionCard && <ActionCard message={m} />}
-          {question && <QuestionCard question={question} />}
-          {secretRequest && <SecretCard request={secretRequest} />}
-          {browserHandoff && <BrowserHandoffCard handoff={browserHandoff} />}
+            memoryUpdates
+              .filter((u) => u.action !== "proposed")
+              .map((u) => <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />)}
           {browserTrail.length > 0 && m.author.id && !m.local && (
             <BrowserTrailCard
               agentId={m.author.id}
@@ -3569,15 +3561,10 @@ export const TimelineMessage = memo(function TimelineMessage({
             />
           )}
           {forumTopicId && !forumSuggestion && <ForumMessageCard topicId={forumTopicId} />}
-          {forumSuggestion && <ForumSuggestionCard message={m} suggestion={forumSuggestion} />}
           {missionPlan && <MissionPlanCard plan={missionPlan} />}
-          {missionDecision && <MissionDecisionCard message={missionDecision} />}
           {missionReview && <MissionReviewCard message={missionReview} />}
-          {missionDelivery && <MissionDeliveryCard message={missionDelivery} />}
-          {missionCommand && <MissionCommandCard command={missionCommand} />}
           {missionSetup && <MissionSetupCard setup={missionSetup} threadId={m.threadId ?? null} />}
           {missionReport && <MissionReportExtras report={missionReport} message={m} />}
-          {missionSuggestion && <MissionSuggestionBar message={m} suggestion={missionSuggestion} />}
           {missionStart && <MissionStartLink message={m} />}
           {missionLink && <MissionLinkCard link={missionLink} />}
           {issueWork && (
@@ -3590,15 +3577,10 @@ export const TimelineMessage = memo(function TimelineMessage({
               ))}
             </div>
           )}
-          {/* Its tools last, after its words and what it changed: the same place live, kept and saved. */}
-          {lastOfRun &&
-            m.author.type === "agent" &&
-            m.author.id &&
-            replyRun &&
-            !m.local &&
-            consulted.length === 0 && (
-              <ConsultGroup runId={replyRun} askerId={m.author.id} color={colorOf(agent)} saved />
-            )}
+          {/* Its tools after its words and what it changed: the same place live, kept and saved. */}
+          {lastOfRun && m.author.type === "agent" && m.author.id && replyRun && !m.local && consulted.length === 0 && (
+            <ConsultGroup runId={replyRun} askerId={m.author.id} color={colorOf(agent)} saved />
+          )}
           {keptSteps?.length && seenLive ? (
             <LiveTools
               work={keptSteps}
@@ -3619,6 +3601,24 @@ export const TimelineMessage = memo(function TimelineMessage({
               skipScreens={onCards}
             />
           )}
+          {/* What waits for a person's click comes last, after the words and the tools. */}
+          {approvalId && <MessageApproval approvalId={approvalId} agent={agent} members={dir.memberById} />}
+          {proposalId && <InlineProposal proposalId={proposalId} />}
+          {agent &&
+            memoryUpdates
+              .filter((u) => u.action === "proposed")
+              .map((u) => <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />)}
+          {waitNotice && <WaitingCard notice={waitNotice} agentId={m.author.id ?? null} />}
+          {noAi && <NoAiCard message={m} />}
+          {actionCard && <ActionCard message={m} />}
+          {question && <QuestionCard question={question} />}
+          {secretRequest && <SecretCard request={secretRequest} />}
+          {browserHandoff && <BrowserHandoffCard handoff={browserHandoff} />}
+          {forumSuggestion && <ForumSuggestionCard message={m} suggestion={forumSuggestion} />}
+          {missionDecision && <MissionDecisionCard message={missionDecision} />}
+          {missionDelivery && <MissionDeliveryCard message={missionDelivery} />}
+          {missionCommand && <MissionCommandCard command={missionCommand} />}
+          {missionSuggestion && <MissionSuggestionBar message={m} suggestion={missionSuggestion} />}
           {/* Everyone's reactions (👍/👎 on an agent's reply are its feedback, in the same pills). */}
           {!m.local && !readOnly && (
             <MessageReactions
