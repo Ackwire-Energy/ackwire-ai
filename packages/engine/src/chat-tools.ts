@@ -7,7 +7,7 @@ import { openPersonAgentDm } from "./dms";
 import { publishMessageCreated } from "./events";
 import { getMessage, insertMessage, MAX_MESSAGE_LENGTH, messageView } from "./messages";
 import { enqueue } from "./outbox";
-import { personBehindCall, routineCreatorOfCall } from "./requester";
+import { actingRoutineOfCall, personBehindCall } from "./requester";
 import { isRoutineRoomKey } from "./routine-brief";
 import { personCanPost } from "./routine-state";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
@@ -100,7 +100,8 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
         try {
           const requester = await personBehindCall(ctx);
           // A routine set to act posts where its creator can post, as itself: never with their files.
-          const creator = requester ? null : await routineCreatorOfCall(ctx);
+          const routine = requester ? null : await actingRoutineOfCall(ctx);
+          const creator = routine?.creatorUserId ?? null;
           if (!requester && !creator)
             return { content: "Only a person's request can post in another channel.", isError: true };
           const name = str(input.channel).trim().replace(/^#/, "").toLowerCase();
@@ -154,7 +155,11 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
           };
           const files: string[] = [];
           for (const id of ids) {
-            const shared = await shareArtifact(deps.artifacts, actor, ctx.orgId, id, { requesterUserId: requester });
+            // A routine's own files live in its room, which only its run reads.
+            const shared = await shareArtifact(deps.artifacts, actor, ctx.orgId, id, {
+              requesterUserId: requester,
+              alsoFrom: routine ? ctx.channelId : null,
+            });
             files.push(shared.artifact.id);
           }
           const [run] = await ctx.db
@@ -179,6 +184,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
               toChannelId: channel.id,
               requesterUserId: requester,
               artifactIds: files,
+              ...(routine ? { routineId: routine.routineId, creatorUserId: creator } : {}),
             },
           });
           if (deps.pubsub) {
@@ -216,7 +222,8 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
         try {
           const requester = await personBehindCall(ctx);
           // A routine set to act writes in its creator's DM with the agent, and no one else's.
-          const creator = requester ? null : await routineCreatorOfCall(ctx);
+          const routine = requester ? null : await actingRoutineOfCall(ctx);
+          const creator = routine?.creatorUserId ?? null;
           if (!requester && !creator) return { content: "Only a person's request can send a DM.", isError: true };
           const text = str(input.text).trim();
           if (!text) return { content: "Give the text to send.", isError: true };
@@ -273,7 +280,12 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             actor: { type: "agent", id: ctx.agentId },
             action: "message.sent_dm",
             target: { type: "message", id: message.id },
-            details: { toUserId: to.userId, fromChannelId: ctx.channelId, requesterUserId: requester },
+            details: {
+              toUserId: to.userId,
+              fromChannelId: ctx.channelId,
+              requesterUserId: requester,
+              ...(routine ? { routineId: routine.routineId, creatorUserId: creator } : {}),
+            },
           });
           if (deps.pubsub) {
             const [view] = await withWikiLinks(ctx.db, ctx.orgId, [messageView(message)]);

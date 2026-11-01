@@ -39,9 +39,20 @@ export const personBehindRun = (db: Executor, orgId: string, triggerMessageId: s
  * theirs, nothing in their name). Null for any other run and for a routine that only looks.
  */
 export const routineCreatorOf = (authority: RunAuthority): string | null =>
-  authority.kind === "routine" && authority.brief?.access === "act" ? authority.brief.creatorUserId : null;
+  actingRoutineOf(authority)?.creatorUserId ?? null;
+
+/** The brief of a routine set to act whose creator is still there (whose reach it has); null otherwise. */
+const actingRoutineOf = (authority: RunAuthority) =>
+  authority.kind === "routine" && authority.brief?.access === "act" && authority.brief.creatorUserId
+    ? authority.brief
+    : null;
+
+/** `actingRoutineOf` for a call's run. */
+export async function actingRoutineOfCall(ctx: Pick<ToolContext, "orgId" | "runId"> & { db: Executor }) {
+  return ctx.runId ? actingRoutineOf(await runAuthorityById(ctx.db, ctx.orgId, ctx.runId)) : null;
+}
 
 /** `routineCreatorOf` for a call's run. */
 export async function routineCreatorOfCall(ctx: Pick<ToolContext, "orgId" | "runId"> & { db: Executor }) {
-  return ctx.runId ? routineCreatorOf(await runAuthorityById(ctx.db, ctx.orgId, ctx.runId)) : null;
+  return (await actingRoutineOfCall(ctx))?.creatorUserId ?? null;
 }

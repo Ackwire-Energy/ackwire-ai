@@ -4,6 +4,7 @@ import { type ModelRequest, systemText } from "@agenteschat/providers";
 import {
   addChannelMember,
   createAgent,
+  createArtifact,
   createChannel,
   drainOutbox,
   grantScopes,
@@ -14,6 +15,7 @@ import {
   stretchCardOf,
   updateRoutine,
 } from "../src";
+import { openRoutineRoom } from "../src/routine-room";
 import { REFUSALS } from "../src/tools/run-policy";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { briefs, channelRoutine, fire, messagesIn, routineDeps } from "./routine-fixtures";
@@ -396,4 +398,41 @@ test("only its creator sets what a routine does as it acts: anyone else takes it
   // The rest stays hers to change, and so does turning it back to only looking.
   expect((await edit(f.owner.id, { name: "PR #42", prompt: "Veja o PR #42." })).name).toBe("PR #42");
   expect((await edit(f.owner.id, { access: "read" })).access).toBe("read");
+});
+
+test("a routine set to act posts the file its run made, and the post's audit names the routine", async () => {
+  let fileId = "";
+  f = await setup({
+    handOff: true,
+    chatTools: true,
+    reply: (req) => {
+      if (!isRoutine(req)) return { chunks: ["ok"] };
+      return routineTurn(
+        req,
+        [{ name: "post_message", input: { channel: "general", text: "Relatório do dia.", artifact_ids: [fileId] } }],
+        "Postei o relatório no #general.",
+      );
+    },
+  });
+  const routine = await channelRoutine(f, { access: "act", prompt: "Poste o relatório no #general." });
+  // What its run makes lives in its room, where nobody else reads.
+  const room = await openRoutineRoom(f.db, f.org.id, f.agent.id, routine.id);
+  const file = await createArtifact(
+    f.artifactDeps,
+    { type: "agent", agentId: f.agent.id, channelId: room.id },
+    f.org.id,
+    { title: "Relatório", content: { kind: "document", markdown: "# Relatório" } },
+  );
+  fileId = file.id;
+  await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);
+  await drainOutbox(f.db, f.handlers);
+
+  const [post] = await messagesIn(f, f.general.id);
+  expect(post?.body).toBe("Relatório do dia.");
+  expect((post?.meta.artifacts as string[] | undefined)?.length).toBe(1);
+  const [audit] = await f.db
+    .select()
+    .from(schema.auditLog)
+    .where(eq(schema.auditLog.action, "message.posted_elsewhere"));
+  expect(audit?.details).toMatchObject({ requesterUserId: null, routineId: routine.id, creatorUserId: f.owner.id });
 });
