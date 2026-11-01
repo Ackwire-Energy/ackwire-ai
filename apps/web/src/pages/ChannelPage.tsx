@@ -77,6 +77,7 @@ import { channelRefsOf } from "@agenteschat/client/lib/channel-refs";
 import {
   entersWithMotion,
   greetingSuggestions,
+  isScrollUpKey,
   messageUsage,
   nearBottom,
   usageLine,
@@ -291,6 +292,7 @@ import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
 import { TYPED_VALUES } from "@/i18n";
 import { onChannelDetails, takeChannelDetails } from "@/lib/channel-details";
+import { selectingIn } from "@/lib/context-menu";
 import { useDocumentTitle } from "@/lib/desktop";
 import { reportPainted } from "@/lib/perf";
 import { useToast } from "@/lib/toast";
@@ -931,6 +933,19 @@ function ChannelView({
   const markGesture = () => {
     lastGesture.current = Date.now();
   };
+  // The last gesture that can move the list up (wheel up, an up key, a finger, the scrollbar). Only a scroll up
+  // right after one of these lets go of the bottom: content at the end shrinking clamps scrollTop lower too, and
+  // right after a wheel down or a click on a row (a tools block folding) that read as "the person scrolled up".
+  const lastUpGesture = useRef(0);
+  const markUpGesture = () => {
+    lastGesture.current = Date.now();
+    lastUpGesture.current = lastGesture.current;
+  };
+  // The last wheel or finger: a window without focus is still being read while these come (a click doesn't count).
+  const lastScrollGesture = useRef(0);
+  const markScrollGesture = () => {
+    lastScrollGesture.current = Date.now();
+  };
   // Scrolling up always lets go at once: no waiting to leave the "near bottom" band or for a glide to end.
   const letGo = () => {
     stick.current = false;
@@ -1012,9 +1027,11 @@ function ChannelView({
   const catchUp = useRef(false);
   /** Scrolled up but not reading: no gesture on the list for a while, or the window elsewhere; never mid-selection. */
   const idleAway = () => {
-    const selection = typeof window.getSelection === "function" ? window.getSelection() : null;
-    if (selection && !selection.isCollapsed && scroller.current?.contains(selection.anchorNode)) return false;
-    if (document.hidden || (typeof document.hasFocus === "function" && !document.hasFocus())) return true;
+    if (selectingIn(scroller.current)) return false;
+    if (document.hidden) return true;
+    // A wheel still scrolls a window without focus: whoever does that is reading, not away.
+    if (typeof document.hasFocus === "function" && !document.hasFocus())
+      return Date.now() - lastScrollGesture.current > IDLE_CATCH_UP_MS;
     // Right after opening, the same grace as a fresh scroll.
     return Date.now() - Math.max(lastGesture.current, openedAt.current) > IDLE_CATCH_UP_MS;
   };
@@ -1745,19 +1762,29 @@ function ChannelView({
                     aria-live="polite"
                     aria-relevant="additions"
                     onWheel={(e) => {
-                      markGesture();
-                      if (e.deltaY < 0) letGo();
+                      markScrollGesture();
+                      if (e.deltaY < 0) {
+                        markUpGesture();
+                        letGo();
+                      } else markGesture();
                     }}
-                    onTouchMove={markGesture}
-                    onPointerDown={markGesture}
-                    onKeyDown={markGesture}
+                    onTouchMove={() => {
+                      markScrollGesture();
+                      markUpGesture();
+                    }}
+                    // On the list itself, not on a row: its scrollbar.
+                    onPointerDown={(e) => (e.target === e.currentTarget ? markUpGesture() : markGesture())}
+                    onKeyDown={(e) => (isScrollUpKey(e) ? markUpGesture() : markGesture())}
                     onScroll={(e) => {
                       const previousTop = lastScrollTop.current;
                       lastScrollTop.current = e.currentTarget.scrollTop;
                       // Only the person scrolling unpins (or loads older pages); layout changes never do.
                       const byPerson = Date.now() - lastGesture.current < GESTURE_MS;
+                      // A drag selecting text past the top edge scrolls up too: the person is reading.
+                      const upByPerson =
+                        Date.now() - lastUpGesture.current < GESTURE_MS || (byPerson && selectingIn(e.currentTarget));
                       if (byPerson && e.currentTarget.scrollTop < 240) loadOlder();
-                      if (byPerson && previousTop !== null && e.currentTarget.scrollTop < previousTop) {
+                      if (upByPerson && previousTop !== null && e.currentTarget.scrollTop < previousTop) {
                         letGo();
                         return;
                       }
