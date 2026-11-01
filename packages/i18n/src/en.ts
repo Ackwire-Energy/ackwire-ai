@@ -6743,20 +6743,20 @@ export const en: Translations = {
     modelLabel: "Model",
     /** What a coding plan's model is sold as, beside its name. */
     modelTag: { cheap: "Cheap", fast: "Fast", smart: "Flagship" },
-    /** What a coding plan's model needs from its account before it answers. */
+    /** What a coding plan's model needs from its account before it answers, behind the ⓘ on its option. */
     modelNeeds: {
-      globalRegion: "Needs the Global region in OpenCode",
-      paidTraining: "Trains on what it's sent. Needs OpenCode's permission",
-      freeTraining: "Free. Trains on what it's sent. Needs OpenCode's permission",
+      globalRegion: "Needs the Global region in OpenCode.",
+      paidTraining: "The provider may use requests to train the model. Turn on the permission in OpenCode.",
+      freeTraining: "Free. The provider may use requests to train the model. Turn on the permission in OpenCode.",
     },
     /** Under the model chosen that needs it: how to give it. */
     modelHow: {
       globalRegion:
         "Turn on the Global region in OpenCode, under Settings › Privacy. Without it, this model doesn't answer.",
       paidTraining:
-        "In OpenCode, under Settings › Privacy, turn on paid endpoints that train on request data. Without it, this model doesn't answer.",
+        "This model's provider may use requests to train it. In OpenCode, under Settings › Privacy, turn on the permission for paid models. Without it, this model doesn't answer.",
       freeTraining:
-        "In OpenCode, under Settings › Privacy, turn on free endpoints that train on request data. Without it, this model doesn't answer.",
+        "This model's provider may use requests to train it. In OpenCode, under Settings › Privacy, turn on the permission for free models. Without it, this model doesn't answer.",
     },
     recommended: "Recommended",
     modelHelp: "Bigger models think more and use up the plan faster.",

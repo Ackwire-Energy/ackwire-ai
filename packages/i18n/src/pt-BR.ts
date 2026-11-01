@@ -6794,19 +6794,19 @@ export const ptBR = {
     modelLabel: "Modelo",
     /** What a coding plan's model is sold as, beside its name. */
     modelTag: { cheap: "Econômico", fast: "Rápido", smart: "Topo de linha" },
-    /** What a coding plan's model needs from its account before it answers. */
+    /** What a coding plan's model needs from its account before it answers, behind the ⓘ on its option. */
     modelNeeds: {
-      globalRegion: "Precisa da região Global no OpenCode",
-      paidTraining: "Treina com o que recebe. Precisa da permissão no OpenCode",
-      freeTraining: "Grátis. Treina com o que recebe. Precisa da permissão no OpenCode",
+      globalRegion: "Precisa da região Global no OpenCode.",
+      paidTraining: "O provedor pode usar os pedidos para treinar o modelo. Ligue a permissão no OpenCode.",
+      freeTraining: "Grátis. O provedor pode usar os pedidos para treinar o modelo. Ligue a permissão no OpenCode.",
     },
     /** Under the model chosen that needs it: how to give it. */
     modelHow: {
       globalRegion: "Ligue a região Global no OpenCode, em Settings › Privacy. Sem ela, este modelo não responde.",
       paidTraining:
-        "No OpenCode, em Settings › Privacy, ligue os modelos pagos que treinam com os pedidos. Sem isso, este modelo não responde.",
+        "O provedor deste modelo pode usar os pedidos para treiná-lo. No OpenCode, em Settings › Privacy, ligue a permissão para os modelos pagos. Sem ela, este modelo não responde.",
       freeTraining:
-        "No OpenCode, em Settings › Privacy, ligue os modelos grátis que treinam com os pedidos. Sem isso, este modelo não responde.",
+        "O provedor deste modelo pode usar os pedidos para treiná-lo. No OpenCode, em Settings › Privacy, ligue a permissão para os modelos grátis. Sem ela, este modelo não responde.",
     },
     recommended: "Recomendado",
     modelHelp: "Os modelos maiores pensam mais e gastam o plano mais rápido.",

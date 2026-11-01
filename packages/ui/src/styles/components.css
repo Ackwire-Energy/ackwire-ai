@@ -4463,6 +4463,19 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   text-align: start;
 }
 
+/* A select option's ⓘ, at the row's end; its note is drawn over the page (the list clips), above the ⓘ. */
+.ac-hint.ac-menu__hint {
+  align-self: center;
+  margin: -5px -5px -5px auto;
+  translate: none;
+}
+.ac-menu__tip {
+  position: fixed;
+  z-index: calc(var(--z-floating) + 1);
+  translate: 0 -100%;
+  pointer-events: none;
+}
+
 /* Checkbox: the mark pops in; switch: the thumb springs */
 .ac-check {
   border-radius: 6px;
