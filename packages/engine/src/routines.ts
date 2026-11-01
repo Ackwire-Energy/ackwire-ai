@@ -256,6 +256,8 @@ export interface RoutineView {
   canSeeDetails: boolean;
   /** The viewer may change, pause, stop or delete it (its creator, admins, the agent's owner). */
   canManage: boolean;
+  /** Whose reach it has (ADR 0053 §2): its creator, kept on edit; null once they left. */
+  createdByUserId: string | null;
   lastRun: RoutineRunView | null;
   /** The last runs, newest first (at most RECENT_RUNS). */
   recentRuns: RoutineRunView[];
@@ -790,6 +792,7 @@ async function views(
       health: { ...health, total: health.ok + health.silent + health.failed + health.skipped + health.missed },
       canSeeDetails: right.reads,
       canManage: right.manages,
+      createdByUserId: r.createdByUserId,
       lastRun: runs[0] ?? null,
       recentRuns: runs,
       usage: {

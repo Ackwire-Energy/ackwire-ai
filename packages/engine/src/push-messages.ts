@@ -64,6 +64,8 @@ interface Strings {
   routineFailedBody: string;
   routinePausedTitle: string;
   routinePausedBody: string;
+  agentUnreachedTitle: (agent: string) => string;
+  agentUnreachedBody: string;
   routineStalledTitle: string;
   routineStalledBody: (computer: string) => string;
   machineConnectedTitle: string;
@@ -103,6 +105,8 @@ export const PUSH_STRINGS: Record<PushLocale, Strings> = {
     routineFailedBody: "Toque para ver o que aconteceu.",
     routinePausedTitle: "Uma rotina foi pausada",
     routinePausedBody: "Toque para ver o motivo.",
+    agentUnreachedTitle: (agent) => `Uma rotina não conseguiu chamar ${agent}`,
+    agentUnreachedBody: "Só quem cuida do agente pode falar com ele. Toque para deixar.",
     routineStalledTitle: "Uma rotina está esperando o computador",
     routineStalledBody: (c) => `Ela roda quando ${c} voltar.`,
     machineConnectedTitle: "Um computador novo entrou no workspace",
@@ -139,6 +143,8 @@ export const PUSH_STRINGS: Record<PushLocale, Strings> = {
     routineFailedBody: "Tap to see what happened.",
     routinePausedTitle: "A routine was paused",
     routinePausedBody: "Tap to see why.",
+    agentUnreachedTitle: (agent) => `A routine couldn't call ${agent}`,
+    agentUnreachedBody: "Only the people the agent works with can talk to it. Tap to let it.",
     routineStalledTitle: "A routine is waiting for its computer",
     routineStalledBody: (c) => `It runs when ${c} is back.`,
     machineConnectedTitle: "A new computer joined the workspace",
@@ -205,6 +211,8 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
     case "routine_paused":
       // Its name only: the app says why, in the person's words.
       return out(s.routinePausedTitle, what || s.routinePausedBody);
+    case "agent_unreached":
+      return out(s.agentUnreachedTitle(actor), what || s.agentUnreachedBody);
     case "routine_stalled":
       // The computer's name (what the person calls it), else the routine's.
       return out(s.routineStalledTitle, text ? s.routineStalledBody(text) : what || s.openBody);

@@ -1632,6 +1632,23 @@ export const ptBR = {
     undone: "Desfeito",
     group: "Memória atualizada por {{name}}",
   },
+  reach: {
+    group: "Quem a mensagem não chamou direto",
+    handed: "Entregue {{to}} <b>{{name}}</b> por mensagem direta, {{she}} não está {{place}}",
+    private: "Não repassei {{to}} <b>{{name}}</b>: {{she}} não está {{place}}, e o que se fala aqui fica aqui",
+    noAi: "Não consegui entregar {{to}} <b>{{name}}</b>: {{she}} não está {{place}} e ainda não tem IA conectada",
+    inChannel: "em #{{name}}",
+    inHere: "nesta conversa",
+    blocked: "Não consegui chamar {{article}} <b>{{name}}</b>: só quem cuida {{hers}} pode",
+    routineRead: "Não consegui chamar {{article}} <b>{{name}}</b>: esta rotina só olha e conta",
+    outside: "Não está {{place}}",
+    routine: "Rotina {{name}}",
+    see: "Ver",
+    add: "Adicionar ao canal",
+    added: "{{name}} entrou no canal.",
+    allow: "Deixar {{person}} falar com {{pronoun}}",
+    allowed: "Pronto: {{person}} já pode falar com {{name}}.",
+  },
   teamChecks: {
     group: "O que o agente não repetiu",
     teammate: "Não repeti: <b>{{who}}</b> já tinha feito isso com {{target}} {{when}}",
@@ -2202,6 +2219,7 @@ export const ptBR = {
       runFailed: "<b>{{name}}</b> não conseguiu terminar",
       routinePaused: "Uma rotina de <b>{{name}}</b> foi pausada",
       routineStalled: "<b>{{name}}</b> espera o computador para rodar uma rotina",
+      agentUnreached: "Uma rotina não conseguiu chamar <b>{{name}}</b>",
       machineConnected: "<b>{{name}}</b> conectou o computador <b>{{label}}</b>",
       machineConnectedAny: "<b>{{name}}</b> conectou um computador",
       browserHandoff: "<b>{{name}}</b> precisa de você no navegador",
@@ -4151,6 +4169,11 @@ export const ptBR = {
       runs_other: "{{count}} execuções",
       tokens: "{{tokens}} tokens do plano",
       cost: "{{cost}} na API",
+    },
+    reachWarning: {
+      blocked:
+        "Esta rotina não vai conseguir chamar {{article}} <b>{{name}}</b>: só quem cuida {{hers}} pode. O resto da rotina roda normalmente.",
+      read: "Esta rotina só olha e conta, então não chama {{article}} <b>{{name}}</b>. Para chamar, escolha Pode agir.",
     },
     access: {
       read: "Só olhar e contar",

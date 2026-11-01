@@ -23,7 +23,7 @@ export interface DispatchResult {
    * Mentioned agents dispatch couldn't wake (I5, I7): no longer in the conversation, archived, or only certain
    * people may talk to them and the person behind the message (nobody, for a run with none) isn't one.
    */
-  dropped?: { agentId: string; handle: string; reason: "not_here" | "audience" }[];
+  dropped?: { agentId: string; handle: string; reason: "not_in_channel" | "audience" }[];
 }
 
 /** What starting a run on a message reads of it. */
@@ -289,7 +289,7 @@ export async function dispatchMentions(
   const dropped = missing.map((agentId) => ({
     agentId,
     handle: handles.get(agentId) ?? agentId,
-    reason: present.has(agentId) ? ("audience" as const) : ("not_here" as const),
+    reason: present.has(agentId) ? ("audience" as const) : ("not_in_channel" as const),
   }));
   return { runs, dropped };
 }

@@ -646,6 +646,45 @@ export async function notifyRoutineFailed(
 }
 
 /**
+ * A routine set to act couldn't call an agent its creator can't talk to (`reach.ts`, and its own tell_agent or
+ * ask_agent, `consultations.ts`): the agent's owner hears it once per routine and agent, or who manages agents when
+ * it has none. It opens the agent's page (who talks to it), the place they may not otherwise reach being private;
+ * `source.userId` is the routine's creator, whom its one-click action lets talk to the agent.
+ */
+export async function notifyAgentUnreached(
+  deps: NotificationDeps,
+  input: {
+    orgId: string;
+    agentId: string;
+    routineId: string;
+    routineName: string;
+    creatorUserId: string;
+    channelId: string;
+    threadId?: string | null;
+    messageId?: string;
+  },
+) {
+  const owner = await agentOwner(deps, input.agentId);
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: owner ? [owner] : await adminsOf(deps, input.orgId, "manage_agents"),
+    kind: "agent_unreached",
+    groupKey: `agent_unreached:${input.routineId}:${input.agentId}`,
+    actor: agent(input.agentId),
+    source: {
+      routineId: input.routineId,
+      agentId: input.agentId,
+      userId: input.creatorUserId,
+      channelId: input.channelId,
+      ...(input.threadId ? { threadId: input.threadId } : {}),
+      ...(input.messageId ? { messageId: input.messageId } : {}),
+      label: input.routineName,
+    },
+    latest: { title: input.routineName, reason: "routine_creator_reach" },
+  });
+}
+
+/**
  * A routine paused itself (§6.2, §6.6): its creator and the agent's owner hear it once per pause
  * (`key`), with the coded reason (`latest.reason`, the app translates it) and its English fallback.
  */

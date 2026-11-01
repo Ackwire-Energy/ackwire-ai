@@ -2588,6 +2588,8 @@ export interface Routine {
   canSeeDetails: boolean;
   /** The viewer may change, pause, run, stop or delete it. */
   canManage: boolean;
+  /** Its creator, whose reach it has (kept on edit); null once they left. Absent from older servers. */
+  createdByUserId?: string | null;
   lastRun: RoutineRun | null;
   /** The last runs, newest first (at most 14): the row's pixel strip and the horizon. */
   recentRuns: RoutineRun[];
@@ -4687,6 +4689,11 @@ export type NotificationKind =
   | "routine_paused"
   /** A routine waits for its computer (once per outage; `source.machineId`). Opens it in Rotinas. */
   | "routine_stalled"
+  /**
+   * A routine set to act couldn't call an agent its creator can't talk to (the agent's owner, else who manages
+   * agents). Opens the agent's page; `source.userId` is the creator, whom its action lets talk to it.
+   */
+  | "agent_unreached"
   | "reaction"
   /** ADR 0036 §5: a new computer joined the organization (admins). `source.machineId`; `source.label` = its name. */
   | "machine_connected"
@@ -4735,6 +4742,8 @@ export interface NotificationSource {
   handoffId?: string;
   /** `browser_handoff`: the agent's screen it is on, when not its browser (ADR 0058: `desktop`). */
   screen?: ScreenKind;
+  /** `agent_unreached`: the routine's creator, whom the agent's owner may let talk to `agentId`. */
+  userId?: string;
   /** `org_standing` to `agent_hold`: the agent held (its name in `label`). */
   agentId?: string;
   /** Channel name, thread title, issue title, topic title, mission or routine name (or the computer's name). */

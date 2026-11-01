@@ -315,7 +315,7 @@ scenario("S43", "a mention dispatch can't wake is recorded and told to the agent
   const [first] = await w.posts("ada");
   const decision = (await w.decisions()).find((d) => d.messageId === first?.id);
   expect(decision?.picked).toEqual(["otto"]);
-  expect(decision?.reason).toContain("skipped @otto: audience");
+  expect(decision?.reason).toContain("audience: @otto");
   const notices = (await w.db.select().from(schema.messages)).filter(
     (m) => (m.meta.notice as { kind?: string } | undefined)?.kind === "wake_skipped",
   );

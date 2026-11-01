@@ -253,21 +253,27 @@ const handedOffRun = async (db: Database, run: AgentRun) =>
 /**
  * Agents an agent's @mention selected that dispatch couldn't wake because only certain people may talk to them and
  * the person behind the message isn't one (nobody, for a run with no requester): the skip goes in the message's
- * routing decision, and the author hears it once, as a line people see too, so it hands the work another way or
+ * routing decision (`settleReach` records the audience ones), and the author hears it once, as a line people see too, so it hands the work another way or
  * tells the person (I5, I7). Agents not in the conversation are told by `unreachedNote` already. Never throws.
  */
 export async function reportDroppedMentions(
   deps: { db: Database; pubsub?: PubSub },
   message: { id: string; orgId: string; agentRunId: string | null },
-  dropped: { agentId: string; handle: string; reason: "not_here" | "audience" }[],
+  dropped: { agentId: string; handle: string; reason: "not_in_channel" | "audience" }[],
 ) {
   if (dropped.length === 0) return;
   try {
-    const why = dropped.map((d) => `skipped @${d.handle}: ${d.reason}`).join(", ");
-    await deps.db
-      .update(schema.routingDecisions)
-      .set({ reason: sql`left(concat_ws(' · ', ${schema.routingDecisions.reason}, ${why}::text), 1000)` })
-      .where(and(eq(schema.routingDecisions.orgId, message.orgId), eq(schema.routingDecisions.messageId, message.id)));
+    // `settleReach` records the audience skips; the ones that left the conversation are recorded here, same words.
+    const gone = dropped.filter((d) => d.reason === "not_in_channel");
+    if (gone.length > 0) {
+      const why = gone.map((d) => `${d.reason}: @${d.handle}`).join(", ");
+      await deps.db
+        .update(schema.routingDecisions)
+        .set({ reason: sql`left(concat_ws('; ', ${schema.routingDecisions.reason}, ${why}::text), 1000)` })
+        .where(
+          and(eq(schema.routingDecisions.orgId, message.orgId), eq(schema.routingDecisions.messageId, message.id)),
+        );
+    }
     const audience = dropped.filter((d) => d.reason === "audience");
     if (audience.length === 0 || !message.agentRunId) return;
     const [sender] = await deps.db

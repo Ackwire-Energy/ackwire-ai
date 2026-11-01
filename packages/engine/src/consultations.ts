@@ -28,7 +28,8 @@ import { cutText } from "./format";
 import type { Judge } from "./judge";
 import { getMessage, insertMessage, type MessageView, withMessageDetails } from "./messages";
 import type { Notice } from "./notices";
-import { personBehindCall, routineCreatorOfCall } from "./requester";
+import { notifyAgentUnreached } from "./notification-producers";
+import { actingRoutineOfCall, personBehindCall } from "./requester";
 import { isRoutineRoomKey } from "./routine-brief";
 import { deliverNoticeToRun, resumeRunWithResult } from "./run-resume";
 import { type AgentRun, isTerminal, outageParkedSql, type RunStatus, replyThreadOf } from "./runs";
@@ -75,7 +76,7 @@ type AiCheck = Omit<AiStatusDeps, "db">;
  * so no answer would come). The asking run comes along: its hop and stretch
  * go on to the other agent.
  */
-async function reachableAgent(ctx: ToolContext, input: unknown, ai?: AiCheck) {
+async function reachableAgent(ctx: ToolContext, input: unknown, ai?: AiCheck, pubsub?: PubSub) {
   const { db } = ctx;
   const [handle = ""] = await currentHandles(db, ctx.orgId, [String(input).trim().replace(/^@/, "").toLowerCase()]);
   const [target] = await db
@@ -84,10 +85,34 @@ async function reachableAgent(ctx: ToolContext, input: unknown, ai?: AiCheck) {
     .where(and(eq(agents.orgId, ctx.orgId), eq(agents.handle, handle), isNull(agents.archivedAt)));
   if (!target) return { refused: refuse(await noAgentText(ctx, [handle])) };
   if (target.id === ctx.agentId) return { refused: refuse("That is you: answer it yourself.") };
-  const person = (await personBehindCall(ctx)) ?? (await routineCreatorOfCall(ctx));
+  const behind = await personBehindCall(ctx);
+  const routine = behind ? null : await actingRoutineOfCall(ctx);
+  const person = behind ?? routine?.creatorUserId ?? null;
   if (!canTalkTo(target, person, await talksToAgents(db, ctx.orgId, person))) {
+    if (!routine?.creatorUserId) {
+      return {
+        refused: refuse(`@${handle} only works with some people, and the person you are helping isn't one of them.`),
+      };
+    }
+    // Never silent: the agent's owner hears it now, and the run's next message shows the line (`settleReach`).
+    await notifyAgentUnreached(
+      { db, pubsub },
+      {
+        orgId: ctx.orgId,
+        agentId: target.id,
+        routineId: routine.routineId,
+        routineName: routine.name,
+        creatorUserId: routine.creatorUserId,
+        channelId: ctx.channelId,
+      },
+    ).catch(() => {});
     return {
-      refused: refuse(`@${handle} only works with some people, and the person you are helping isn't one of them.`),
+      refused: {
+        ...refuse(
+          `@${handle} only works with some people, and the person who set up the routine behind this isn't one of them. Its owner was told and may let them in; say in your reply that @${handle} couldn't be reached and what you needed from it.`,
+        ),
+        data: { reach: { agentId: target.id, reason: "routine_creator_reach" } },
+      },
     };
   }
   if (ai && (await agentAiState({ ...ai, db }, target)).state === "no_ai") {
@@ -142,7 +167,7 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub; ai?: AiCheck }
       const question = String(input.question).trim();
       if (!question) return refuse("Write the question.");
       const { db } = ctx;
-      const reached = await reachableAgent(ctx, input.agent, deps.ai);
+      const reached = await reachableAgent(ctx, input.agent, deps.ai, deps.pubsub);
       if (reached.refused) return reached.refused;
       const { target, handle } = reached;
       const between = await inAgentsDm(db, ctx);
@@ -259,9 +284,17 @@ function createTellAgentTool(deps: { pubsub?: PubSub; ai?: AiCheck }): ToolDefin
       const body = String(input.message).trim();
       if (!body) return refuse("Write the note.");
       const { db } = ctx;
-      const reached = await reachableAgent(ctx, input.agent, deps.ai);
+      const reached = await reachableAgent(ctx, input.agent, deps.ai, deps.pubsub);
       if (reached.refused) return reached.refused;
       const { target, handle } = reached;
+      // This run's mention already handed it a note (`settleReach`): that one is the delivery.
+      const mentioned = await mentionNoteOpen(db, ctx, target.id);
+      if (mentioned) {
+        return {
+          content: `@${handle} already has it: your mention of it was handed to it as a note, so nothing was sent again. What comes of it reaches you here. Carry on.`,
+          data: { agentNote: { duplicate: true, agentId: target.id } },
+        };
+      }
       // Answering that agent already (its question or note, in your private conversation): your reply goes back.
       const [here] = await db
         .select({ kind: channels.kind, dmKey: channels.dmKey })
@@ -277,36 +310,14 @@ function createTellAgentTool(deps: { pubsub?: PubSub; ai?: AiCheck }): ToolDefin
       if (same) return same;
       const atLimit = await refusedAtLimit(db, reached.run, target.id);
       if (atLimit) return atLimit;
-      const consultationId = Bun.randomUUIDv7();
-      const sent = await db.transaction(async (tx) => {
-        const channel = await openAgentDm(tx, ctx.orgId, ctx.agentId, target.id);
-        if (await sameNoteSent(tx, ctx, channel.id, body)) return null;
-        const message = await insertMessage(tx, {
-          orgId: ctx.orgId,
-          channelId: channel.id,
-          author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: reached.hop },
-          body,
-          // `agentNote`: the run it came from (the same-note check, `peopleRun`); `consultation`: its row.
-          meta: { agentNote: { runId: ctx.runId }, consultation: { id: consultationId } },
-        });
-        // A run of the other agent at work in this DM for the same person takes it: the row waits on that run.
-        const started = await startOrJoinRun(tx, message, target.id, "dm");
-        await tx.insert(agentConsultations).values({
-          id: consultationId,
-          orgId: ctx.orgId,
-          kind: "note",
-          askerRunId: ctx.runId,
-          askerAgentId: ctx.agentId,
-          targetAgentId: target.id,
-          channelId: channel.id,
-          messageId: message.id,
-          targetRunId: started ? ("created" in started ? started.created.id : started.joined) : null,
-          waitId: `${ASYNC_WAIT}${Bun.randomUUIDv7()}`,
-          question: body,
-          chain,
-          expiresAt: new Date(Date.now() + CONSULTATION_TTL_MS),
-        });
-        return message;
+      const sent = await sendNote(db, {
+        orgId: ctx.orgId,
+        agentId: ctx.agentId,
+        runId: ctx.runId,
+        hop: reached.hop,
+        targetAgentId: target.id,
+        body,
+        chain,
       });
       if (!sent) {
         return {
@@ -330,13 +341,91 @@ function createTellAgentTool(deps: { pubsub?: PubSub; ai?: AiCheck }): ToolDefin
             ? `Handed to @${handle}. Your answer goes back once @${handle} is done, together with what came of it: do your own part now, then end your turn saying what you handed on.`
             : `Handed to @${handle}; it's on it, and the people here can see that. What comes of it reaches you here by itself once everything you handed off this turn is back. Tell the people in a line who has it, without promising a time, then do your own part or end your turn.`,
         data: {
-          agentNote: { messageId: sent.id, agentId: target.id },
-          consultation: { id: consultationId, agentId: target.id },
+          agentNote: { messageId: sent.message.id, agentId: target.id },
+          consultation: { id: sent.consultationId, agentId: target.id },
         },
       };
     },
   };
 }
+
+/**
+ * A note from a run to another agent (`tell_agent`'s delivery, also an @mention of an agent outside the
+ * conversation, `reach.ts`): into the two agents' private DM, taken by the other agent's run at work there for the
+ * same person or starting one, tracked as a `note` row whose result comes back to the sending run's conversation
+ * (`reportHandOffs`). The caller checked who may be reached. Null: the same note went out within the hour.
+ */
+export async function sendNote(
+  db: Database,
+  input: {
+    orgId: string;
+    agentId: string;
+    runId: string;
+    hop: number;
+    targetAgentId: string;
+    body: string;
+    chain: string[];
+    /** An @mention of an agent outside the conversation (`settleReach`), not a tell_agent call. */
+    fromMention?: boolean;
+  },
+) {
+  const consultationId = Bun.randomUUIDv7();
+  return db.transaction(async (tx) => {
+    const channel = await openAgentDm(tx, input.orgId, input.agentId, input.targetAgentId);
+    if (await sameNoteSent(tx, input, channel.id, input.body)) return null;
+    const message = await insertMessage(tx, {
+      orgId: input.orgId,
+      channelId: channel.id,
+      author: { type: "agent", agentId: input.agentId, runId: input.runId, hop: input.hop },
+      body: input.body,
+      // `agentNote`: the run it came from (the same-note check, `peopleRun`); `consultation`: its row.
+      meta: {
+        agentNote: { runId: input.runId, ...(input.fromMention ? { mention: true } : {}) },
+        consultation: { id: consultationId },
+      },
+    });
+    // A run of the other agent at work in this DM for the same person takes it: the row waits on that run.
+    const started = await startOrJoinRun(tx, message, input.targetAgentId, "dm");
+    await tx.insert(agentConsultations).values({
+      id: consultationId,
+      orgId: input.orgId,
+      kind: "note",
+      askerRunId: input.runId,
+      askerAgentId: input.agentId,
+      targetAgentId: input.targetAgentId,
+      channelId: channel.id,
+      messageId: message.id,
+      targetRunId: started ? ("created" in started ? started.created.id : started.joined) : null,
+      waitId: `${ASYNC_WAIT}${Bun.randomUUIDv7()}`,
+      question: input.body,
+      chain: input.chain,
+      expiresAt: new Date(Date.now() + CONSULTATION_TTL_MS),
+    });
+    return { message, consultationId };
+  });
+}
+
+/** An open note this run's mention handed `targetAgentId` (`sendNote` with `fromMention`). */
+async function mentionNoteOpen(db: Executor, ctx: Pick<ToolContext, "orgId" | "runId">, targetAgentId: string) {
+  const [row] = await db
+    .select({ id: agentConsultations.id })
+    .from(agentConsultations)
+    .innerJoin(messages, eq(messages.id, agentConsultations.messageId))
+    .where(
+      and(
+        eq(agentConsultations.orgId, ctx.orgId),
+        eq(agentConsultations.askerRunId, ctx.runId),
+        eq(agentConsultations.targetAgentId, targetAgentId),
+        eq(agentConsultations.status, "open"),
+        sql`${messages.meta} -> 'agentNote' ->> 'mention' = 'true'`,
+      ),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
+/** The agents already in the chain of consultations a run answers, for a note sent from outside a tool call. */
+export const chainOfRun = (db: Executor, orgId: string, runId: string) => chainOf(db, { orgId, runId });
 
 /** A note with the same text to the same agent within this long is dropped (a loop, or a routine's repeats). */
 export const NOTE_DEDUPE_MS = 3600_000;

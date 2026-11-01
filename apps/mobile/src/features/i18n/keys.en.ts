@@ -738,6 +738,8 @@ export const featureKeysEn: FeatureTranslations = {
       routine_paused_other: "Routine paused",
       routine_stalled_one: "Routine waiting for the computer",
       routine_stalled_other: "Routine waiting for the computer",
+      agent_unreached_one: "A routine couldn't call an agent",
+      agent_unreached_other: "A routine couldn't call an agent",
       reaction_one: "{{names}} reacted",
       reaction_other: "{{names}} reacted",
       browser_handoff_one: "{{names}} needs you in the browser",

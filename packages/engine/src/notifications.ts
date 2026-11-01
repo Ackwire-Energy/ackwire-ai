@@ -70,6 +70,11 @@ export const NOTIFICATION_KINDS = [
   "routine_paused",
   /** A routine waits for its computer (once per outage), ADR 0053. */
   "routine_stalled",
+  /**
+   * A routine set to act named an agent its creator can't talk to (`reach.ts`): the agent's owner, once per routine
+   * and agent, `source.agentId` the agent, opening the message.
+   */
+  "agent_unreached",
   "reaction",
   "machine_connected",
   /** An agent needs a person in its browser (ADR 0040 §6). */
@@ -121,6 +126,8 @@ export interface NotificationSource {
   handoffId?: string;
   /** Which of the agent's screens it is on, when not its browser (ADR 0058). */
   screen?: ScreenKind;
+  /** `agent_unreached`: the routine's creator, whom the agent's owner may let talk to `agentId`. */
+  userId?: string;
   /** The agent held on agentes.chat Cloud (`org_standing` to `agent_hold`, its name in `label`). */
   agentId?: string;
   /** Channel name, thread title, issue title, topic title, mission or routine name. */

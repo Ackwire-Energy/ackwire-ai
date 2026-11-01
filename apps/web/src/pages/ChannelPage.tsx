@@ -254,6 +254,7 @@ import { KeyGuardDialog, NoAiBanner, NoAiCard, useNoAiAutoOpen } from "@/compone
 import { useOrg } from "@/components/org-context";
 import { AuthorStatus } from "@/components/Presence";
 import { ProfileTrigger } from "@/components/ProfileCard";
+import { ReachLines } from "@/components/ReachLines";
 import { MessageReactions, useEmojiLabels } from "@/components/Reactions";
 import {
   type AskRegistry,
@@ -3524,6 +3525,7 @@ export const TimelineMessage = memo(function TimelineMessage({
           )}
           {m.author.type === "agent" && !m.local && <AgentActionReceipts message={m} />}
           {m.author.type === "agent" && !m.local && <TeamChecks message={m} />}
+          {m.author.type === "agent" && !m.local && <ReachLines message={m} />}
           {approvalId && <MessageApproval approvalId={approvalId} agent={agent} members={dir.memberById} />}
           {proposalId && <InlineProposal proposalId={proposalId} />}
           {agent &&

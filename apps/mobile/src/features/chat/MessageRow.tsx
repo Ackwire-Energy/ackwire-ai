@@ -69,6 +69,7 @@ import {
 } from "./logic";
 import { MemoryMarks } from "./MemoryMark";
 import { MessageText } from "./MessageText";
+import { ReachLines } from "./ReachLines";
 import { Receipts } from "./Receipts";
 import { SecretCard } from "./SecretCard";
 import { TeamChecks } from "./TeamChecks";
@@ -434,6 +435,7 @@ export const MessageRow = memo(function MessageRow({
         ) : null}
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
         {isAgent ? <TeamChecks message={m} /> : null}
+        {isAgent ? <ReachLines message={m} /> : null}
         {isAgent ? <NoAiCard message={m} /> : null}
         {isAgent ? <StretchCard message={m} /> : null}
         {isAgent ? <ProposalCard message={m} /> : null}
