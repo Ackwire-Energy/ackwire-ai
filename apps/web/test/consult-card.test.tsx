@@ -234,6 +234,9 @@ describe("the working line while an agent asks another", () => {
     await push(socket, { type: "agent.idle", threadId: null, runId: "r-b", agentId: ATLAS_ID });
     await settle();
     expect(bar()).toBe("Ada");
+    // Alone, with its row not in the conversation yet: the bar keeps its face until the row shows.
+    expect(typingBar().querySelectorAll(".ac-typing__tok")).toHaveLength(1);
+    await act(() => new Promise((r) => setTimeout(r, 2100)));
     expect(typingBar().querySelectorAll(".ac-typing__tok")).toHaveLength(0);
   });
 });
