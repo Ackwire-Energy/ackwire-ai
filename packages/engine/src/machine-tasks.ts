@@ -17,6 +17,7 @@ import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { createAgentRuns, eligibleChannelAgents } from "./dispatch";
 import { publishChannelEvent, publishMessageCreated } from "./events";
+import { cutText } from "./format";
 import {
   getMachineById,
   MachineDroppedError,
@@ -1272,7 +1273,7 @@ export function taskEndNotice(row: MachineTaskRow, computer: string) {
         ...(row.branch ? { branch: row.branch } : {}),
         ...(row.lastLine ? { lastLine: row.lastLine } : {}),
         ...(files.length ? { files: files.slice(0, 20) } : {}),
-        ...(row.result ? { result: row.result.slice(0, TASK_TEXT_LIMITS.wakeResult) } : {}),
+        ...(row.result ? { result: cutText(row.result, TASK_TEXT_LIMITS.wakeResult) } : {}),
       },
       bodyCode: `machine_task_${row.status}`,
       bodyParams: {

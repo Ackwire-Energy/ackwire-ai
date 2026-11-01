@@ -142,19 +142,6 @@ export function Composer({
   const token = focused && mention && mentionAt ? mentionAt(text, caret) : null;
   const stopMode = Boolean(working?.stop) && !has;
   const button = has || stopMode;
-  // The send arrow and the stop square swap in place (one turns away as the other turns in).
-  const mode = useSharedValue(stopMode ? 1 : 0);
-  useEffect(() => {
-    mode.value = reducedMotion ? (stopMode ? 1 : 0) : withSpring(stopMode ? 1 : 0, { damping: 16, stiffness: 320 });
-  }, [stopMode, reducedMotion, mode]);
-  const sendGlyph = useAnimatedStyle(() => ({
-    opacity: 1 - mode.value,
-    transform: [{ scale: 1 - 0.6 * mode.value }, { rotate: `${45 * mode.value}deg` }],
-  }));
-  const stopGlyph = useAnimatedStyle(() => ({
-    opacity: mode.value,
-    transform: [{ scale: 0.4 + 0.6 * mode.value }, { rotate: `${-45 * (1 - mode.value)}deg` }],
-  }));
   // The choice is per message: back to "join" when the agent is done.
   const isWorking = Boolean(working);
   useEffect(() => {
@@ -297,32 +284,62 @@ export function Composer({
             style={[inputText, { color: colors.ink }]}
           />
           {button ? (
-            <Animated.View
-              entering={reducedMotion ? undefined : ZoomIn.springify().damping(14).stiffness(320)}
-              exiting={reducedMotion ? undefined : ZoomOut.duration(120)}
-              style={styles.sendBox}
-            >
-              <PressScale
-                to={0.9}
-                haptic={false}
-                onPress={press}
-                accessibilityRole="button"
-                accessibilityLabel={stopMode && working?.stop ? working.stop.label : t("mobile.a11y.send")}
-                hitSlop={6}
-                style={[styles.send, { backgroundColor: colors.ink }]}
-              >
-                <Animated.View style={[styles.glyph, sendGlyph]}>
-                  <Icon name="send" size={18} color={colors.bg} />
-                </Animated.View>
-                <Animated.View style={[styles.glyph, stopGlyph]}>
-                  <PixelStop size={13} color={colors.bg} moving={stopMode} />
-                </Animated.View>
-              </PressScale>
-            </Animated.View>
+            <SendButton
+              stop={stopMode}
+              label={stopMode && working?.stop ? working.stop.label : t("mobile.a11y.send")}
+              onPress={press}
+            />
           ) : null}
         </View>
       </View>
     </View>
+  );
+}
+
+/**
+ * The field's round button: the send arrow, or the stop square. It pops in (ZoomIn) on the glyph it shows, its value
+ * born with it: iOS draws a glyph still turning inside that pop blurry. On a button already there the two swap in
+ * place, one turning away as the other turns in.
+ */
+function SendButton({ stop, label, onPress }: { stop: boolean; label: string; onPress: () => void }) {
+  const { colors, reducedMotion } = useTheme();
+  const mode = useSharedValue(stop ? 1 : 0);
+  useEffect(() => {
+    const to = stop ? 1 : 0;
+    // Both springs give their mass: with Reanimated 4's default of 4 they overshoot by half and take seconds to settle.
+    mode.value = reducedMotion ? to : withSpring(to, { damping: 16, stiffness: 320, mass: 1 });
+  }, [stop, reducedMotion, mode]);
+  const sendGlyph = useAnimatedStyle(() => ({
+    opacity: 1 - mode.value,
+    transform: [{ scale: 1 - 0.6 * mode.value }, { rotate: `${45 * mode.value}deg` }],
+  }));
+  const stopGlyph = useAnimatedStyle(() => ({
+    opacity: mode.value,
+    transform: [{ scale: 0.4 + 0.6 * mode.value }, { rotate: `${-45 * (1 - mode.value)}deg` }],
+  }));
+  return (
+    <Animated.View
+      entering={reducedMotion ? undefined : ZoomIn.springify().damping(14).stiffness(320).mass(1)}
+      exiting={reducedMotion ? undefined : ZoomOut.duration(120)}
+      style={styles.sendBox}
+    >
+      <PressScale
+        to={0.9}
+        haptic={false}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        hitSlop={6}
+        style={[styles.send, { backgroundColor: colors.ink }]}
+      >
+        <Animated.View style={[styles.glyph, sendGlyph]}>
+          <Icon name="send" size={18} color={colors.bg} />
+        </Animated.View>
+        <Animated.View style={[styles.glyph, stopGlyph]}>
+          <PixelStop size={13} color={colors.bg} moving={stop} />
+        </Animated.View>
+      </PressScale>
+    </Animated.View>
   );
 }
 

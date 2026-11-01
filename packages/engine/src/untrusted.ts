@@ -1,3 +1,5 @@
+import { cutText } from "./format";
+
 /**
  * One envelope for outside content (ADR 0053): an MCP server's answer, an email, a webhook's event,
  * a routine run's own record. The model sees it inside `<external_data source="…">` (the system
@@ -26,6 +28,6 @@ export const neutralizeUntrusted = (text: string) => text.replace(MARKERS, "[mar
 export function untrustedBlock(source: string, text: string, maxChars = UNTRUSTED_MAX_CHARS): string {
   const clean = neutralizeUntrusted(text);
   const body =
-    clean.length > maxChars ? `${clean.slice(0, maxChars)}\n[… ${clean.length - maxChars} more characters cut]` : clean;
+    clean.length > maxChars ? `${cutText(clean, maxChars)}\n[… ${clean.length - maxChars} more characters cut]` : clean;
   return `<external_data source="${sourceLabel(source)}">\n${body}\n</external_data>`;
 }

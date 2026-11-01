@@ -1,3 +1,4 @@
+import { cutText } from "../format";
 import type { Judge, JudgeQuestion } from "../judge";
 import { ALWAYS_SENSITIVE } from "../tools/gateway";
 
@@ -307,7 +308,7 @@ export async function judgeTools(
             tools: batch.map((t, i) => ({
               id: `t${i}`,
               name: t.name,
-              description: (t.description ?? "").slice(0, 600),
+              description: cutText(t.description ?? "", 600),
             })),
           },
           questions,

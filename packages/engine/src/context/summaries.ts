@@ -1,5 +1,6 @@
 import type { PubSub, SearchIndexResolver } from "@agenteschat/adapters";
 import { and, type Database, desc, eq, gte, inArray, isNull, lt, schema } from "@agenteschat/db";
+import { cutText, cutTextEnd } from "../format";
 import type { ModelGateway } from "../gateway";
 import { createLlmJudge, type Judge } from "../judge";
 import type { Message } from "../messages";
@@ -164,14 +165,14 @@ export async function ensureThreadSummary(
   let content = options.text;
   if (!content) {
     const body = thread.messages
-      .map((m) => `${isTrustedMessage(m) ? "" : "[untrusted] "}[${authorOf(thread, m)}]: ${m.body.slice(0, 2000)}`)
+      .map((m) => `${isTrustedMessage(m) ? "" : "[untrusted] "}[${authorOf(thread, m)}]: ${cutText(m.body, 2000)}`)
       .join("\n");
     const result = await deps.gateway.complete({
       orgId,
       kind: "summary",
       model: await resolveSummaryModel(deps, orgId),
       system: SUMMARY_SYSTEM,
-      messages: [{ role: "user", content: `<thread>\n${body.slice(-60_000)}\n</thread>` }],
+      messages: [{ role: "user", content: `<thread>\n${cutTextEnd(body, 60_000)}\n</thread>` }],
       maxTokens: 4096,
       effort: "low",
     });
@@ -245,10 +246,10 @@ export async function ensurePeriodSummary(
     messages: [
       {
         role: "user",
-        content: `<thread>\n${rows
-          .map((m) => `${isTrustedMessage(m) ? "" : "[untrusted] "}${m.body.slice(0, 500)}`)
-          .join("\n")
-          .slice(-60_000)}\n</thread>`,
+        content: `<thread>\n${cutTextEnd(
+          rows.map((m) => `${isTrustedMessage(m) ? "" : "[untrusted] "}${cutText(m.body, 500)}`).join("\n"),
+          60_000,
+        )}\n</thread>`,
       },
     ],
     maxTokens: 4096,

@@ -25,7 +25,7 @@ import {
 } from "./artifacts";
 import { recordAudit } from "./audit";
 import { publishChannelEvent } from "./events";
-import { formatBytes } from "./format";
+import { cutText, formatBytes } from "./format";
 import { isAbsoluteMachinePath, requestFolderAccess } from "./machine-access";
 import { MachineRequestError } from "./machine-hub";
 import { notAllowedMessage } from "./machine-provider";
@@ -453,7 +453,7 @@ export function createSandboxToolSource(
       action: "machine.exec",
       target: { type: "machine", id: computer.machineId },
       details: {
-        command: maskSecrets(command.slice(0, 200)),
+        command: maskSecrets(cutText(command, 200)),
         exitCode: r.exitCode,
         timedOut: r.timedOut,
         runId: ctx.runId ?? null,
@@ -925,7 +925,7 @@ export function createSandboxToolSource(
               taskId: row.id,
               title: row.title,
               executor: row.executor,
-              command: maskSecrets(row.command.slice(0, 200)),
+              command: maskSecrets(cutText(row.command, 200)),
               branch: row.branch,
               runId: ctx.runId ?? null,
             },

@@ -5,6 +5,7 @@ import { recordAudit } from "./audit";
 import { runAuthorityById } from "./authority";
 import { ConflictError } from "./errors";
 import { publishUserEvent } from "./events";
+import { cutTextEnd } from "./format";
 import { MachineRequestError } from "./machine-hub";
 import {
   claimQueuedTask,
@@ -327,7 +328,7 @@ export const worktreeFailReasonOf = (v: unknown): WorktreeFailReason | null =>
  * card (`meta.missionSetup`) with "Tentar de novo" for the owner and deciders.
  */
 async function failWorktree(deps: MissionDeps, mission: MissionRow, reason: WorktreeFailReason, error: string) {
-  const text = error.slice(-SETUP_ERROR_CHARS);
+  const text = cutTextEnd(error, SETUP_ERROR_CHARS);
   let row = await setWorktree(deps, mission, {
     worktreeState: "failed",
     worktreeError: text,
@@ -380,7 +381,7 @@ async function failWorktree(deps: MissionDeps, mission: MissionRow, reason: Work
 function setupError(task: MachineTaskRow) {
   const lines = Array.isArray(task.recentLines) ? task.recentLines.slice(-SETUP_ERROR_LINES) : [];
   const text = lines.length ? lines.join("\n") : (task.result ?? task.lastLine ?? "");
-  return (text || `exit code ${task.exitCode ?? "none"}`).slice(-SETUP_ERROR_CHARS);
+  return cutTextEnd(text || `exit code ${task.exitCode ?? "none"}`, SETUP_ERROR_CHARS);
 }
 
 /**
