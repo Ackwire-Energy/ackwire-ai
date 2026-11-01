@@ -8,7 +8,7 @@
 
 People want to hand an agent work that takes days: "build our mobile app with Claude Code on my Mac". That work is many steps, many decisions, prototypes and PRs, and several iterations with the person. Today it doesn't fit:
 
-- **A run is short.** At most `AGENT_MAX_TOOL_TURNS` (25) model calls; a multi-hour task ends in `too_many_tool_calls`.
+- **A run is short.** At most `AGENT_MAX_TOOL_TURNS` (25 then, a backstop of 200 since the ADR 0015 addendum of 2026-10-31) model calls; a multi-hour task ends in `too_many_tool_calls`.
 - **Tool calls are sequential and blocking.** `run_code` on a connected machine can run an hour (`machineMaxTimeoutSeconds`), but the run waits on it; three Claude Code sessions can't run side by side, and nothing wakes the agent when one finishes.
 - **A long command is tied to the socket.** If the connection drops or the machine sleeps, the result is lost.
 - **No place for decisions.** `ask_user` asks one question at a time; nothing collects provisional decisions, reviews or what was decided and why.

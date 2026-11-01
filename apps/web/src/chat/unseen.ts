@@ -1,12 +1,14 @@
 import type { Message } from "@agenteschat/client";
 import { joinNames } from "@agenteschat/client/lib/format";
+import { isMediaAfterReply } from "@agenteschat/client/lib/media";
 import type { TimelineItem } from "@agenteschat/client/lib/timeline";
 import type { TFunction } from "i18next";
 
 /**
  * Scrolled up while things arrive: a "Novas"
  * divider before the first unseen message, and the pill says who spoke ("↓ 2 novas · Marina e Ada ·
- * Theo escrevendo"). A click lands on the divider when it is far, else at the end.
+ * Theo escrevendo"). A click lands on the divider when it is far, else at the end. The sticker or GIF an agent adds
+ * after its reply (ADR 0091) is never news of its own: it neither counts nor opens the divider.
  */
 
 /** The messages from `fromKey` to the end that someone else wrote, and their authors in order. */
@@ -17,7 +19,7 @@ export function unseenOf(items: TimelineItem[], fromKey: string | null, meId: st
   const at = items.findIndex((i) => i.key === fromKey);
   if (at < 0) return { count, authors };
   for (const item of items.slice(at)) {
-    if (item.kind !== "message") continue;
+    if (item.kind !== "message" || isMediaAfterReply(item.message.meta)) continue;
     const a = item.message.author;
     if (a.type === "person" && a.id === meId) continue;
     count++;
@@ -30,7 +32,7 @@ export function unseenOf(items: TimelineItem[], fromKey: string | null, meId: st
 export function firstNewKey(items: TimelineItem[], previousLastKey: string | undefined) {
   if (previousLastKey === undefined) return null;
   const at = items.findIndex((i) => i.key === previousLastKey);
-  const next = items.slice(at + 1).find((i) => i.kind === "message");
+  const next = items.slice(at + 1).find((i) => i.kind === "message" && !isMediaAfterReply(i.message.meta));
   return at < 0 ? null : (next?.key ?? null);
 }
 

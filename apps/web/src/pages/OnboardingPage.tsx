@@ -70,7 +70,6 @@ import { browserTimezone, timezoneName } from "@agenteschat/client/lib/routines"
 import { handleFrom } from "@agenteschat/client/lib/text";
 import {
   type AgentAppearance,
-  Avatar,
   Button,
   Card,
   CardHeader,
@@ -85,22 +84,12 @@ import {
   normalizeAppearance,
   OptionCard,
   onScreenKeyboard,
-  Select,
   Spinner,
   Textarea,
 } from "@agenteschat/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import {
-  type ClipboardEvent,
-  type KeyboardEvent,
-  type ReactNode,
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useAuth } from "@/auth/context";
@@ -121,15 +110,17 @@ import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { DeleteAccountEntry } from "@/components/DeleteAccount";
 import { DeleteWorkspaceDialog } from "@/components/DeleteWorkspace";
 import { ImportedSummary, ImportFlow, ImportReport, useImportFlow } from "@/components/ImportFlow";
+import { ChipNote, ChipRole, EmailChips } from "@/components/invite/EmailChips";
 import { MembersFull } from "@/components/Limits";
 import { ErrorState } from "@/components/Loading";
 import { ConnectComputer, osOf, PAIR_POLL_MS } from "@/components/Machines";
 import { COMPACT_QUERY, useMediaQuery } from "@/components/NavDrawer";
 import { OrgProvider } from "@/components/org-context";
 import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
-import { BootSplash, OnboardingHorizon, OnboardingOfferSky, OnboardingProgress, WelcomeSky } from "@/components/Sky";
+import { BootSplash, OnboardingHorizon, OnboardingOfferSky, OnboardingProgress } from "@/components/Sky";
 import { StepRail } from "@/components/StepRail";
 import { OpenPrefsButton, useAgentsHere, useOrgName } from "@/components/ThisMac";
+import { WelcomeCard } from "@/components/WelcomeCard";
 import { ComputerTitle, SetupWait, useSetupWait, type WaitReader } from "@/components/WorkspaceComputer";
 import { VaultCard } from "@/components/wiki/VaultCard";
 import { useVaultReader } from "@/components/wiki/WikiImport";
@@ -2415,9 +2406,7 @@ function TeamStep({
   const { t } = useTranslation();
   const api = useApi();
   const toast = useToast();
-  const [draft, setDraft] = useState("");
   const [copied, setCopied] = useState(false);
-  const input = useRef<HTMLInputElement>(null);
   const link = useQuery({
     queryKey: ["onboarding", "invite-link", orgId],
     queryFn: () => api.invites.createLink(orgId),
@@ -2429,26 +2418,6 @@ function TeamStep({
     { value: "member" as const, label: t("roles.member"), description: t("roles.memberDesc") },
     { value: "admin" as const, label: t("roles.admin"), description: t("roles.adminDesc") },
   ];
-  const commit = (text: string) => {
-    if (!text.trim()) return;
-    onChange(addInvites(invites, text));
-    setDraft("");
-  };
-  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" || e.key === "," || e.key === ";") {
-      e.preventDefault();
-      commit(draft);
-    } else if (e.key === "Backspace" && !draft && invites.length > 0) {
-      const last = invites[invites.length - 1];
-      if (last && !sent.has(last.email)) onChange(invites.slice(0, -1));
-    }
-  };
-  const onPaste = (e: ClipboardEvent<HTMLInputElement>) => {
-    const text = e.clipboardData.getData("text");
-    if (!/[\s,;]/.test(text.trim())) return;
-    e.preventDefault();
-    commit(`${draft} ${text}`);
-  };
   const copy = async () => {
     if (!link.data) return;
     try {
@@ -2470,61 +2439,30 @@ function TeamStep({
               {t("onboarding.team.emailsHint")}
             </InfoHint>
           </span>
-          {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: a click on the box focuses its input */}
-          <div
-            className="onb__emails"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) input.current?.focus();
-            }}
-          >
-            {invites.map((i) => (
-              <span key={i.email} className="onb__chip" data-invalid={!i.valid || undefined}>
-                <Avatar name={i.email} initials={i.email.slice(0, 2).toUpperCase()} size="sm" />
-                <span className="onb__chip-email">{i.email}</span>
-                {!i.valid ? (
-                  <span className="onb__chip-bad">{t("onboarding.team.invalid")}</span>
-                ) : sent.has(i.email) ? (
-                  <span className="small muted">{t("onboarding.team.sent")}</span>
-                ) : (
-                  <Select
-                    size="sm"
-                    value={i.admin ? "admin" : "member"}
-                    aria-label={t("onboarding.team.roleOf", { email: i.email })}
-                    options={roleOptions}
-                    onValueChange={(v) =>
-                      onChange(invites.map((x) => (x.email === i.email ? { ...x, admin: v === "admin" } : x)))
-                    }
-                  />
-                )}
-                {!sent.has(i.email) && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    iconOnly
-                    icon="close"
-                    aria-label={t("onboarding.removeInvite", { email: i.email })}
-                    onClick={() => onChange(invites.filter((x) => x.email !== i.email))}
-                  />
-                )}
-              </span>
-            ))}
-            <input
-              ref={input}
-              id="invite-emails"
-              className="onb__emails-input"
-              type="text"
-              inputMode="email"
-              autoComplete="off"
-              value={draft}
-              placeholder={invites.length ? t("onboarding.team.more") : t("onboarding.team.placeholder")}
-              aria-describedby={invalid ? "invite-emails-hint invite-emails-help" : "invite-emails-hint"}
-              aria-invalid={invalid || undefined}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={onKeyDown}
-              onPaste={onPaste}
-              onBlur={() => commit(draft)}
-            />
-          </div>
+          <EmailChips
+            id="invite-emails"
+            chips={invites}
+            onAdd={(text) => onChange(addInvites(invites, text))}
+            onRemove={(chip) => onChange(invites.filter((x) => x.email !== chip.email))}
+            removable={(chip) => !sent.has(chip.email)}
+            placeholder={t("onboarding.team.placeholder")}
+            morePlaceholder={t("onboarding.team.more")}
+            describedBy={invalid ? "invite-emails-hint invite-emails-help" : "invite-emails-hint"}
+            aside={(chip) =>
+              sent.has(chip.email) ? (
+                <ChipNote>{t("onboarding.team.sent")}</ChipNote>
+              ) : (
+                <ChipRole
+                  email={chip.email}
+                  value={chip.admin ? "admin" : "member"}
+                  options={roleOptions}
+                  onChange={(v) =>
+                    onChange(invites.map((x) => (x.email === chip.email ? { ...x, admin: v === "admin" } : x)))
+                  }
+                />
+              )
+            }
+          />
           {invalid && (
             <span id="invite-emails-help" className="small onb__error">
               {t("onboarding.team.invalidHelp")}
@@ -2585,8 +2523,6 @@ function DoneStep({
   wiki?: number | null;
 }) {
   const { t } = useTranslation();
-  const text = useRef<HTMLDivElement>(null);
-  const crew = useRef<HTMLDivElement>(null);
   const names = namesText(
     t,
     agents.map((a) => a.name),
@@ -2604,35 +2540,33 @@ function DoneStep({
     .filter(Boolean)
     .join(" ");
   return (
-    <section className="onb__welcome" aria-labelledby="onb-welcome-title">
-      <WelcomeSky calm={() => [text.current]} clear={() => [crew.current]} />
-      <div className="onb__welcome-text" ref={text}>
-        <h1 id="onb-welcome-title" className="onb__welcome-title">
-          {t("onboarding.done.title", { org: orgName })}
-        </h1>
-        <p className="onb__welcome-lead">{lead}</p>
-      </div>
-      {agents.length > 0 && (
+    <WelcomeCard
+      titleId="onb-welcome-title"
+      title={t("onboarding.done.title", { org: orgName })}
+      lead={lead}
+      crew={
         // The faces are hidden from screen readers (the lead names them); the computer says what it is.
-        <div className="onb__crew" ref={crew}>
-          {agents.map((a) => (
-            <AgentAvatar
-              key={a.key}
-              name={a.name}
-              initials={a.initials}
-              appearance={a.appearance}
-              size="lg"
-              title={a.role ? `${a.name} · ${a.role}` : a.name}
-            />
-          ))}
-          {computer && (
-            <span className="onb__crew-computer" title={computer.label}>
-              <ComputerPortrait kind={computer.kind} state={computer.state} label={computer.label} />
-            </span>
-          )}
-        </div>
-      )}
-    </section>
+        agents.length > 0 ? (
+          <>
+            {agents.map((a) => (
+              <AgentAvatar
+                key={a.key}
+                name={a.name}
+                initials={a.initials}
+                appearance={a.appearance}
+                size="lg"
+                title={a.role ? `${a.name} · ${a.role}` : a.name}
+              />
+            ))}
+            {computer && (
+              <span className="onb__crew-computer" title={computer.label}>
+                <ComputerPortrait kind={computer.kind} state={computer.state} label={computer.label} />
+              </span>
+            )}
+          </>
+        ) : undefined
+      }
+    />
   );
 }
 

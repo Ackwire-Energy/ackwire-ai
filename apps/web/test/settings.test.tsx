@@ -525,6 +525,8 @@ describe("Configurações do workspace", () => {
       "Membros e convites",
       // Every member reads what each role allows (ADR 0085).
       "Papéis e permissões",
+      // Every member reads the workspace's GIF and sticker switches (ADR 0091).
+      "GIFs e figurinhas",
       "Conectores",
       "Computadores",
       "Orçamento e uso",

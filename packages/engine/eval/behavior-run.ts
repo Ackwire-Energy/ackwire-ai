@@ -5,6 +5,7 @@
  * provider is passed in, so tests drive it with the fake provider (no network).
  */
 import {
+  createFakeGifs,
   createMemoryBlobStore,
   createMemoryPubSub,
   createPostgresSearchResolver,
@@ -41,6 +42,7 @@ import {
   createJobHandlers,
   createLlmJudge,
   createLocalKeyWrapper,
+  createMediaToolSource,
   createModelGateway,
   createOrganization,
   createPassToolSource,
@@ -124,6 +126,8 @@ export interface BehaviorCase {
   routines?: { agent: string; name: string; prompt: string; schedule: string }[];
   /** The scheduling tools (list_routines, update_routine…) and `ask_agent`. */
   schedule?: boolean;
+  /** The server has no GIF search: agents get only `send_sticker` (ADR 0091). */
+  noGifs?: boolean;
   /** Who a person's message with several mentions is for: the org's cheap model decides (real call). */
   addressees?: boolean;
   /** Fake connectors granted to the agent (all their scopes). */
@@ -329,6 +333,7 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       createAskUserToolSource(),
       ...(c.schedule ? [createAskAgentToolSource({ pubsub }), createScheduleToolSource({ pubsub, context })] : []),
       createReactToolSource({ pubsub }),
+      createMediaToolSource({ pubsub, gifs: c.noGifs ? null : createFakeGifs() }),
       // Routine cases run in the background and speak through it.
       createHandOffToolSource({ pubsub }),
       // Runs nobody called by name may pass (offered only to them, as in production).

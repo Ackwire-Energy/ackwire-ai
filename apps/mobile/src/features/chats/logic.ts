@@ -3,6 +3,7 @@ import type {
   AppNotification,
   Channel,
   DirectMessage,
+  MediaKind,
   Mission,
   MissionStatus,
   OrgSummary,
@@ -26,6 +27,8 @@ export interface LastLine {
   text: string;
   /** A body the server wrote: the row shows it in the reader's language (`previewBody`). */
   meta?: PreviewMeta | null;
+  /** A GIF or a sticker with no text (ADR 0091): the row says which ("GIF", "Figurinha"). */
+  mediaKind?: MediaKind | null;
 }
 
 export type ConversationRow =
@@ -139,6 +142,7 @@ export function buildConversations(input: {
             author: t.lastMessage.author,
             text: previewOf(t.lastMessage.excerpt),
             ...(t.lastMessage.meta ? { meta: t.lastMessage.meta } : {}),
+            ...(t.lastMessage.mediaKind ? { mediaKind: t.lastMessage.mediaKind } : {}),
           }
         : null,
       at: t.lastActivityAt,
@@ -167,6 +171,7 @@ export function buildConversations(input: {
             author: d.lastMessage.authorType === "agent" ? { type: "agent", id: d.with.id } : null,
             text: previewOf(d.lastMessage.body),
             ...(d.lastMessage.meta ? { meta: d.lastMessage.meta } : {}),
+            ...(d.lastMessage.mediaKind ? { mediaKind: d.lastMessage.mediaKind } : {}),
           }
         : null,
       at: d.lastMessage?.createdAt ?? null,
@@ -190,6 +195,7 @@ export function buildConversations(input: {
             name: last.authorName,
             text: previewOf(last.preview),
             ...(last.meta ? { meta: last.meta } : {}),
+            ...(last.mediaKind ? { mediaKind: last.mediaKind } : {}),
           }
         : null,
       at: last?.createdAt ?? null,

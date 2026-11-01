@@ -12,7 +12,7 @@ export type ButtonVariant = "primary" | "secondary" | "ghost";
 
 export interface ButtonProps {
   variant: ButtonVariant;
-  size?: "md" | "sm";
+  size?: ButtonSize;
   icon?: IconName;
   /** Drawn before the label instead of an icon (a brand's mark), given the label's color. */
   leading?: (color: string) => ReactNode;
@@ -27,8 +27,12 @@ export interface ButtonProps {
 
 export const BUTTON_SIZES = {
   md: { height: 48, radius: 15, padding: 20, text: "headline", icon: 18 },
+  // A request's footer in the conversation: wide enough to hit, short enough that the card stays a message.
+  card: { height: 40, radius: 12, padding: 14, text: "subhead", icon: 16 },
   sm: { height: 36, radius: 12, padding: 14, text: "subhead", icon: 16 },
 } as const;
+
+export type ButtonSize = keyof typeof BUTTON_SIZES;
 
 /** Primary's tonal gradient (ink 82% → ink) and its shadow, as on the web (`.b1`). */
 export function primaryLook(theme: Pick<Theme, "colors">) {

@@ -1,4 +1,5 @@
 import type { DatabaseRows } from "@agenteschat/adapters";
+import { cutText } from "../format";
 
 /**
  * Database rows are untrusted (ADR 0039): end users write into these tables,
@@ -25,10 +26,10 @@ export function cellValue(v: unknown): unknown {
   if (v instanceof Uint8Array || (typeof Buffer !== "undefined" && Buffer.isBuffer(v))) return "[binary data omitted]";
   if (v instanceof Date) return Number.isNaN(v.getTime()) ? String(v) : v.toISOString();
   if (typeof v === "bigint") return v.toString();
-  if (typeof v === "string") return v.length > MAX_VALUE ? `${v.slice(0, MAX_VALUE)}…[cut]` : v;
+  if (typeof v === "string") return v.length > MAX_VALUE ? `${cutText(v, MAX_VALUE)}…[cut]` : v;
   if (typeof v === "object") {
     const json = JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? x.toString() : x));
-    return json.length > MAX_VALUE ? `${json.slice(0, MAX_VALUE)}…[cut]` : JSON.parse(json);
+    return json.length > MAX_VALUE ? `${cutText(json, MAX_VALUE)}…[cut]` : JSON.parse(json);
   }
   return v;
 }

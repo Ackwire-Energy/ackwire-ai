@@ -58,8 +58,33 @@ export function deletingOf<O extends Pick<OrgSummary, "id" | "deletion" | "stand
   return { org, others: orgs.filter((o) => o.id !== org.id && o.standing?.state !== "suspended") };
 }
 
+/**
+ * Whether "Entrando…" covers the app (pure): for a moment after signing in, and for as long as a signed-in person has
+ * nothing to look at. The splash leaves on the sign-in screen, so after it nothing else covers the empty screens under
+ * a workspace still loading. Never signed out: over the sign-in it would have nothing to end it.
+ */
+export const enteringShown = (s: {
+  signedIn: boolean;
+  /** The launch splash is up (it goes on top, and it says when the server is down). */
+  launching: boolean;
+  /** The moment after signing in. */
+  welcoming: boolean;
+  /** The organization is known. */
+  ready: boolean;
+  /** An invitation is being accepted (the first run waits for it). */
+  accepting: boolean;
+}) => s.signedIn && (s.welcoming || (!s.launching && (!s.ready || s.accepting)));
+
+/**
+ * Whether the account failed with nothing to show (pure): `null` is the answer from before signing in, as empty as no
+ * answer at all. Read as cached, a failed load right after signing in left nobody to ask again.
+ */
+export const accountFailed = (isError: boolean, account: unknown) => isError && account == null;
+
 /** How long the account may load before the app asks the server itself whether it is there. */
 export const SERVER_STUCK_MS = 10_000;
+/** How long it may load, even with the server answering, before the person gets a way out (a hung request, say). */
+export const SERVER_GIVE_UP_MS = 30_000;
 
 /**
  * Why the app can't open its server, or null while it can (pure). `unreachable`: the account failed to load with

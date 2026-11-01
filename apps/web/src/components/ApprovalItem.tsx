@@ -17,6 +17,7 @@ import type { TFunction } from "i18next";
 import { Trans, useTranslation } from "react-i18next";
 import { EmailLetter } from "@/components/EmailLetter";
 import { CardSky, colorOf, prepareBurst } from "@/components/Sky";
+import { TYPED_VALUES } from "@/i18n";
 import { useToast } from "@/lib/toast";
 import { useOrg } from "./org-context";
 
@@ -38,7 +39,9 @@ export function decisionLabel(
   members: Map<string, Member>,
   now = new Date(),
 ) {
-  const when = approval.decidedAt ? whenAt(t, locale, approval.decidedAt, now) : t("common.now");
+  // No one decided one that ran out: it expired at its deadline.
+  const at = approval.decidedAt ?? (approval.status === "expired" ? approval.expiresAt : null);
+  const when = at ? whenAt(t, locale, at, now) : t("common.now");
   if (approval.status === "expired") return t("approval.expiredChip", { when });
   const mine = approval.decidedByUserId === meId;
   const name = members.get(approval.decidedByUserId ?? "")?.name ?? "";
@@ -161,12 +164,21 @@ export function InlineApproval({
       <ApprovalCard
         compact
         status={approval.status === "approved" ? "approved" : "refused"}
-        aria-label={approval.status === "approved" ? t("approval.groupDone") : t("approval.groupRefused")}
+        aria-label={t(
+          approval.status === "approved"
+            ? "approval.groupDone"
+            : approval.status === "expired"
+              ? "approval.groupExpired"
+              : approval.status === "canceled"
+                ? "approval.groupCanceled"
+                : "approval.groupRefused",
+        )}
         who={
           <Trans
             i18nKey="approval.doneWho"
             values={{ agent: name, title: lowerFirst(approvalTitle(t, approval)) }}
             components={{ b: <b /> }}
+            {...TYPED_VALUES}
           />
         }
         statusLabel={decisionLabel(t, i18n.language, approval, me.user.id, members)}
@@ -184,13 +196,17 @@ export function InlineApproval({
       status="waiting"
       aria-label={t("approval.group")}
       sky={<CardSky color={colorOf(agent)} />}
-      who={<Trans i18nKey="approval.asks" values={{ agent: name }} components={{ b: <b /> }} />}
+      who={<Trans i18nKey="approval.asks" values={{ agent: name }} components={{ b: <b /> }} {...TYPED_VALUES} />}
       statusLabel={approval.canDecide ? t("approval.waitingYou") : waitingFor(t, agent, members)}
       origin={origin ? tt(origin.key, origin.values) : undefined}
       title={approvalTitle(t, approval)}
       action={approval.email ? <EmailLetter email={approval.email} /> : undefined}
       detail={approval.email ? expires || undefined : `${approval.detail}${expires ? ` · ${expires}` : ""}`}
-      why={why ? <Trans i18nKey="approval.said" values={{ name, text: why }} components={{ b: <b /> }} /> : undefined}
+      why={
+        why ? (
+          <Trans i18nKey="approval.said" values={{ name, text: why }} components={{ b: <b /> }} {...TYPED_VALUES} />
+        ) : undefined
+      }
       actions={approval.canDecide && <Actions approval={approval} />}
     />
   );

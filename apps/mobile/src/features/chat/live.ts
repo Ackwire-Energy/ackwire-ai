@@ -14,6 +14,7 @@ import {
   cacheMessage,
   cacheMessageActions,
   cacheMessageMemories,
+  cacheMessageMeta,
   catchUpChannel,
   consultSeeds,
   consultsIn,
@@ -34,6 +35,7 @@ import {
   reconcileConsults,
   reconcileRuns,
   runsInChannel,
+  type SecretRequest,
   type StreamsState,
   seedReceipt,
   staleProvisional,
@@ -43,6 +45,7 @@ import {
   unmarkStopping,
   useApi,
 } from "@agenteschat/client";
+import { isMediaAfterReply } from "@agenteschat/client/lib/media";
 import { playSound } from "@agenteschat/client/lib/sounds";
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
@@ -52,7 +55,7 @@ import { withContinued } from "./turn";
 /**
  * A conversation, live: subscribes to its channel while the screen is open,
  * keeps the message caches current (new messages, reactions, approvals,
- * agents' questions, threads, missions) and holds the runs in progress (streaming text, who is
+ * agents' questions and secret requests, threads, missions) and holds the runs in progress (streaming text, who is
  * working, agents asking agents), who is typing, and the agents' receipts on people's messages (who saw it,
  * who answers; `receipts.ts`, as on the web). The database stays the truth: on open and after a reconnect the
  * active runs come from the server, and the lists' receipts seed the rest.
@@ -205,6 +208,16 @@ function cacheQuestion(qc: QueryClient, orgId: string, channelId: string, questi
   });
 }
 
+/**
+ * A secret was asked for, or the request closed (delivered, declined, expired, canceled; ADR 0027): its card
+ * (`meta.secretRequest`) in every loaded list of the channel, threads included, so the card and the line above the
+ * composer follow an answer given elsewhere.
+ */
+function cacheSecret(qc: QueryClient, orgId: string, channelId: string, secretRequest: SecretRequest) {
+  if (!secretRequest.messageId) return;
+  cacheMessageMeta(qc, orgId, channelId, secretRequest.messageId, () => ({ secretRequest }));
+}
+
 /** What each event changes in the caches (the run rows are the reducer's). */
 function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: ChannelEvent) {
   switch (event.type) {
@@ -220,8 +233,9 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
       // A new top-level message may get agent replies in its thread: start that list.
       if (event.message && !event.message.threadId)
         qc.setQueryData(keys.thread(orgId, channelId, event.message.id), (list: unknown) => list ?? []);
-      // A reply: its root's "2 respostas" link comes from the channel's thread list, which counts it.
-      if (event.message?.threadId)
+      // A reply: its root's "2 respostas" link comes from the channel's thread list, which counts it. An agent's
+      // sticker or GIF after its reply (ADR 0091) changes none of them.
+      if (event.message?.threadId && !isMediaAfterReply(event.message.meta))
         void qc.invalidateQueries({ queryKey: ["org", orgId, "threads", "channel", channelId] });
       // The conversation list's last line and unread.
       void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
@@ -270,14 +284,24 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
     case "question.answered":
       cacheQuestion(qc, orgId, channelId, event.question);
       break;
+    case "secret.requested":
+    case "secret.updated":
+      cacheSecret(qc, orgId, channelId, event.secretRequest);
+      break;
     case "agent.proposal.updated":
       // An agent's proposal of a new agent was created or denied (by anyone): its card.
       cacheAgentProposal(qc, orgId, event, event);
       break;
-    case "browser.handoff.updated":
+    case "browser.handoff.updated": {
+      const { handoff } = event;
       // An agent's browser request changed (ADR 0040): its card, the live view, the agent's open request.
-      applyBrowserHandoff(qc, orgId, event.handoff, { channelId: event.channelId, threadId: event.threadId });
+      applyBrowserHandoff(qc, orgId, handoff, { channelId: event.channelId, threadId: event.threadId });
+      // The card's own copy too (`meta.browserHandoff`, as the server keeps it): one that ended is no longer asked
+      // about. Its message has the request's id; a take over has no card.
+      if (handoff.kind === "ask")
+        cacheMessageMeta(qc, orgId, channelId, handoff.id, () => ({ browserHandoff: handoff }));
       break;
+    }
     case "machine.task":
       if (event.task.threadId) void qc.invalidateQueries({ queryKey: keys.threadTasks(orgId, event.task.threadId) });
       if (event.task.missionId) void qc.invalidateQueries({ queryKey: keys.mission(orgId, event.task.missionId) });

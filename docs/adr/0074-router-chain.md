@@ -37,3 +37,7 @@ A message that @mentions nobody went to one strategy: Jev when the installation 
 ## Addendum (2026-10-30): the rules read a person's messages in a row
 
 A run of a person's messages, each within 2.5 s of the one before and each one the router decides on itself, is decided once, on its last message (ADR 0013, addendum of 2026-10-30, §2), so the rules see it as one message too. R3 reads whom the person speaks to: it stays out when the message, or the same person's messages right before it, name a person of the workspace ("boa tarde walter", then "como esta hoje"). R1 holds for a quote reply to an agent followed by more messages of the same person.
+
+## Addendum (2026-10-31): R4, the team's coordinator
+
+After R1 to R3, R4 sends a person's message nobody could read to the team's coordinator (ADR 0093), only when the person is alone in the channel with the agents and the message names no person. When a step could read it and the policy picked nobody, the coordinator takes it too, if it needs an agent or the person is alone with the agents. Both are stored as `rule:coordinator`.

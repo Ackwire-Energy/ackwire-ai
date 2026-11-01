@@ -75,6 +75,11 @@ describe("invitations", () => {
     ]);
     const again = await inviteMany(f.db, f.owner.id, f.org.id, { emails: ["joao@example.com"] });
     expect(again[0]?.status).toBe("already_invited");
+    // As mail apps copy an address: never an invitation nobody could accept.
+    const wrapped = await inviteMany(f.db, f.owner.id, f.org.id, {
+      emails: ["<ana@example.com>", '"bia@example.com"', "mailto:caio@example.com"],
+    });
+    expect(wrapped.map((r) => r.status)).toEqual(["invalid_email", "invalid_email", "invalid_email"]);
     const joaoInvite = results[0];
     if (joaoInvite?.status !== "invited") throw new Error("expected invite");
 

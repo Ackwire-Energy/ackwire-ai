@@ -10,7 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { View } from "react-native";
 import { signOut } from "@/features/account";
-import { SERVER_STUCK_MS, serverDownOf } from "@/lib/org-choice";
+import { SERVER_GIVE_UP_MS, SERVER_STUCK_MS, serverDownOf } from "@/lib/org-choice";
 import { serverUrl } from "@/lib/server";
 import { useOrgGate } from "@/providers/org";
 import { AuthLink } from "@/ui/auth/AuthLink";
@@ -33,20 +33,28 @@ export interface ServerDown {
 /**
  * Whether the server the app is signed in to can't be opened (`serverDownOf`): the account failed to load with
  * nothing cached, or it is still loading after `SERVER_STUCK_MS` and the server doesn't answer. Without this a
- * failed load read as "no organization" and opened the first run. `active`: signed in, the session read.
+ * failed load read as "no organization" and opened the first run. Past `SERVER_GIVE_UP_MS` it counts as failed
+ * whatever the server says, and from `SERVER_STUCK_MS` on the account is asked for again, which replaces a request
+ * that hung: nobody waits on a screen with no way out. `active`: signed in, the session read.
  */
 export function useServerDown(active: boolean): ServerDown | null {
   const org = useOrgGate();
   const [stuck, setStuck] = useState(false);
+  const [gaveUp, setGaveUp] = useState(false);
   const [check, setCheck] = useState<ServerCheck | null>(null);
   const [checking, setChecking] = useState(false);
 
   const waiting = active && org.loading;
   useEffect(() => {
     setStuck(false);
+    setGaveUp(false);
     if (!waiting) return;
-    const timer = setTimeout(() => setStuck(true), SERVER_STUCK_MS);
-    return () => clearTimeout(timer);
+    const asks = setTimeout(() => setStuck(true), SERVER_STUCK_MS);
+    const ends = setTimeout(() => setGaveUp(true), SERVER_GIVE_UP_MS);
+    return () => {
+      clearTimeout(asks);
+      clearTimeout(ends);
+    };
   }, [waiting]);
 
   // Asks the server itself once something looks wrong: its answer says why (Tailscale, a certificate, a version).
@@ -63,7 +71,7 @@ export function useServerDown(active: boolean): ServerDown | null {
     };
   }, [asking]);
 
-  const problem = active ? serverDownOf(org.unreachable, stuck, check) : null;
+  const problem = active ? serverDownOf(org.unreachable || gaveUp, stuck, check) : null;
   const orgRetry = org.retry;
   const retry = useCallback(() => {
     setChecking(true);
@@ -74,10 +82,10 @@ export function useServerDown(active: boolean): ServerDown | null {
   }, [orgRetry]);
 
   useEffect(() => {
-    if (!problem) return;
+    if (!problem && !stuck) return;
     const timer = setInterval(() => void orgRetry(), RETRY_EVERY_MS);
     return () => clearInterval(timer);
-  }, [problem, orgRetry]);
+  }, [problem, stuck, orgRetry]);
 
   if (!problem) return null;
   return { problem, server: check?.server ?? serverUrl(), checking, retry };

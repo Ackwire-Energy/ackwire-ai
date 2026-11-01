@@ -36,6 +36,15 @@ export {
   reactionPose,
   setGaze,
 } from "./agent/live";
+export { addLiveSticker, liveStickerCount } from "./agent/sticker-live";
+export {
+  drawSticker,
+  STICKER_MOODS,
+  STICKER_STILL_T,
+  type StickerLook,
+  type StickerMood,
+  stickerSeed,
+} from "./agent/stickers";
 export {
   BRAIN_GRID,
   BRAIN_KINDS,
@@ -56,6 +65,7 @@ export {
   normalizeAppearance,
   randomAppearance,
 } from "./components/AgentLook";
+export { AgentSticker, type AgentStickerProps } from "./components/AgentSticker";
 export { ApprovalCard, type ApprovalCardProps, type ApprovalStatus } from "./components/ApprovalCard";
 export { type AutonomyKind, AutonomyPixels, drawAutonomy } from "./components/AutonomyPixels";
 export {
@@ -76,6 +86,7 @@ export {
 } from "./components/Brain";
 export { Button, type ButtonProps, type ButtonVariant } from "./components/Button";
 export { Carousel, type CarouselProps } from "./components/Carousel";
+export { CHAT_GIF_MAX, ChatGif, type ChatGifProps } from "./components/ChatGif";
 export {
   Checkbox,
   CheckboxPill,
@@ -125,6 +136,7 @@ export {
   EmojiPicker,
   type EmojiPickerLabels,
   EmojiPickerPopover,
+  type PickerTab,
   readRecentEmoji,
   rememberEmoji,
 } from "./components/EmojiPicker";
@@ -153,6 +165,16 @@ export {
 export { InfoHint, type InfoHintProps } from "./components/InfoHint";
 export { isApple, Kbd, modKey, shortcut } from "./components/Kbd";
 export { Logo, LogoMark, type LogoProps } from "./components/Logo";
+export {
+  GifPicker,
+  type GifPickerLabels,
+  masonryColumns,
+  type PickerAgent,
+  type PickerGif,
+  StickerPicker,
+  type StickerPickerLabels,
+  stickerMoodsFor,
+} from "./components/MediaPicker";
 export { AgentReadingBook } from "./components/MemoryPixels";
 export { Mention } from "./components/Mention";
 export {

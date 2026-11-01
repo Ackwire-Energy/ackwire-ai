@@ -42,6 +42,21 @@ export function webUrl(value: unknown): string | undefined {
 /** The password sign-up's header with an early-access link's token (mirrors `packages/engine/src/early-access.ts`). */
 export const EARLY_ACCESS_HEADER = "x-early-access";
 
+/**
+ * The password sign-up's headers from an email invitation's page (mirror `packages/engine/src/organizations.ts`): its
+ * token, and the proof on the link of its own email (`?mail=`, `INVITATION_MAIL_PARAM`). With both, the address is
+ * proved, so the server sends no "confirm your email" (ADR 0090 §6); a copied link carries no proof.
+ */
+export const INVITATION_TOKEN_HEADER = "x-invitation-token";
+export const INVITATION_MAIL_HEADER = "x-invitation-mail";
+
+/** The query parameter an invitation's own email puts its proof in (mirrors `packages/engine/src/email.ts`). */
+export const INVITATION_MAIL_PARAM = "mail";
+
+/** The proof from an invitation link's `?mail=`, only in the shape the server makes: 43 base64url characters. */
+export const invitationMailProof = (value: unknown): string | undefined =>
+  typeof value === "string" && /^[A-Za-z0-9_-]{43}$/.test(value) ? value : undefined;
+
 /** An early-access link's token (`/signup?access=`), only in the shape the server makes: 43 base64url characters. */
 export const earlyAccessToken = (value: unknown): string | undefined =>
   typeof value === "string" && /^[A-Za-z0-9_-]{43}$/.test(value) ? value : undefined;

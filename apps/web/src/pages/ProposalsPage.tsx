@@ -2,12 +2,13 @@ import type { Proposal } from "@agenteschat/client";
 import { ApiError, useDecideProposal, useProposals } from "@agenteschat/client";
 import { relativeTime, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { proposalTarget, proposalTitle, proposerOf } from "@agenteschat/client/lib/proposals";
 import { Alert, Button, Card, Chip, Diff, diffLines, EmptyState, Field, Icon, Textarea } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import type { TFunction } from "i18next";
 import { useEffect, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { isText, SettingChange } from "@/components/ChatCards";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
@@ -34,7 +35,8 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
   const [staleError, setStaleError] = useState<string | null>(null);
   const toast = useToast();
   const onDecideError = (error: unknown) => {
-    if (error instanceof ApiError && error.status === 409) setStaleError(t("proposals.staleError"));
+    if (error instanceof ApiError && error.status === 409)
+      setStaleError(t(current && !isText(current) ? "proposals.staleErrorAgent" : "proposals.staleError"));
     else toast.show(error instanceof Error ? error.message : t("common.unknownError"), "error");
   };
 
@@ -54,10 +56,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
 
   const backAgent = agentId ? dir.agentById.get(agentId) : undefined;
   const agentName = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
-  const targetLabel = (p: Proposal) =>
-    p.target.type === "org_context"
-      ? t("proposals.targetContext", { org: org.name })
-      : t("proposals.targetInstructions", agentGrammar(t, agentName(p.target.agentId)));
+  const targetLabel = (p: Proposal) => proposalTarget(t, p, agentName, org.name);
   const tt = t as unknown as (key: string, options: Record<string, string>) => string;
   const titleOf = (p: Proposal) => proposalTitle(t, p, org.name, agentName);
   const whereOf = (e: Proposal["evidence"][number]) =>
@@ -114,8 +113,8 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
                 onClick={() => setSelected(p.id)}
               >
                 <span className="row">
-                  <AgentAvatar agentId={p.agentId} size="sm" name={agentName(p.agentId)} />
-                  <span style={{ fontWeight: 600 }}>{agentName(p.agentId)}</span>
+                  <AgentAvatar agentId={proposerOf(p)} size="sm" name={agentName(proposerOf(p))} />
+                  <span style={{ fontWeight: 600 }}>{agentName(proposerOf(p))}</span>
                   <span className="small muted" style={{ marginLeft: "auto", fontSize: 12 }}>
                     {relativeTime(t, i18n.language, p.createdAt)}
                   </span>
@@ -130,11 +129,11 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
 
           <Card as="article" className="proposals__detail" aria-labelledby="prop-title">
             <div className="row">
-              <AgentAvatar agentId={current.agentId} size="sm" name={agentName(current.agentId)} />
+              <AgentAvatar agentId={proposerOf(current)} size="sm" name={agentName(proposerOf(current))} />
               <span className="small muted">
                 <Trans
                   i18nKey="proposals.proposes"
-                  values={{ agent: agentName(current.agentId), target: targetLabel(current) }}
+                  values={{ agent: agentName(proposerOf(current)), target: targetLabel(current) }}
                   components={{ b: <b style={{ color: "var(--ink)" }} /> }}
                 />
               </span>
@@ -174,13 +173,15 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
             <section aria-label={t("proposals.changeLabel")} className="section section--tight">
               <div className="row">
                 <span className="ac-eyebrow spacer">{t("proposals.change", { target: targetLabel(current) })}</span>
-                {current.status === "pending" && current.canDecide && (
+                {current.status === "pending" && current.canDecide && isText(current) && (
                   <Button variant="ghost" size="sm" onClick={() => setEditing((v) => !v)}>
                     {editing ? t("proposals.viewDiff") : t("proposals.editFirst")}
                   </Button>
                 )}
               </div>
-              {editing && current.status === "pending" ? (
+              {!isText(current) ? (
+                <SettingChange p={current} />
+              ) : editing && current.status === "pending" ? (
                 <Field
                   label={
                     current.target.type === "org_context" ? t("proposals.finalTextContext") : t("proposals.finalText")
@@ -202,14 +203,14 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
             {staleError && <Alert>{staleError}</Alert>}
             {current.stale && (
               <p className="small muted" style={{ margin: 0 }}>
-                {t("proposals.staleNote")}
+                {t(isText(current) ? "proposals.staleNote" : "proposals.staleNoteAgent")}
               </p>
             )}
             {current.status === "pending" && current.canDecide && !current.stale && (
               <div className="proposals__actions">
                 <Button
                   variant="primary"
-                  disabled={decide.isPending || !draft.trim()}
+                  disabled={decide.isPending || (isText(current) && !draft.trim())}
                   onClick={() =>
                     decide.mutate(
                       {
@@ -231,7 +232,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
                   {t("proposals.refuse")}
                 </Button>
                 <span className="small muted" style={{ flex: "1 1 200px" }}>
-                  {t("proposals.refuseNote", agentGrammar(t, agentName(current.agentId)))}
+                  {t("proposals.refuseNote", agentGrammar(t, agentName(proposerOf(current))))}
                 </span>
               </div>
             )}
@@ -240,11 +241,4 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
       )}
     </div>
   );
-}
-
-/** The server's title is English; the app says it in its own language. */
-export function proposalTitle(t: TFunction, p: Proposal, orgName: string, agentName: (id: string) => string) {
-  const tt = t as unknown as (key: string, options: Record<string, string>) => string;
-  if (p.target.type === "org_context") return tt("proposals.titleContext", { org: orgName, defaultValue: p.title });
-  return tt("proposals.titleInstructions", { ...agentGrammar(t, agentName(p.target.agentId)), defaultValue: p.title });
 }
