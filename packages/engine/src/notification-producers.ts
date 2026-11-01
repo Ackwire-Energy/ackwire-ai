@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, isNotNull, schema } from "@agenteschat/db";
-import { approvalCardThreads, approvalOriginOf } from "./approvals";
+import { approvalCardThreads, approvalOriginOf, approverIds } from "./approvals";
 import { accountablePerson, runAuthorityById } from "./authority";
 import { threadFollowChoices } from "./follows";
 import { isMediaAfterReply } from "./media";
@@ -11,6 +11,7 @@ import {
   notificationSnippet,
   notify,
   resolveNotifications,
+  retargetNotifications,
 } from "./notifications";
 import { maySql, type RolePermission } from "./permissions";
 import { stretchCardOf } from "./stretch";
@@ -389,7 +390,13 @@ export async function notifyApproval(deps: NotificationDeps, approval: ApprovalR
       ? deps.db
           .select({ id: approvals.id })
           .from(approvals)
-          .where(and(eq(approvals.orgId, approval.orgId), eq(approvals.messageId, approval.messageId)))
+          .where(
+            and(
+              eq(approvals.orgId, approval.orgId),
+              eq(approvals.messageId, approval.messageId),
+              eq(approvals.status, "pending"),
+            ),
+          )
           .orderBy(asc(approvals.createdAt))
           .limit(1)
       : Promise.resolve([]),
@@ -404,7 +411,7 @@ export async function notifyApproval(deps: NotificationDeps, approval: ApprovalR
     waiting: true,
     actor: agent(approval.agentId),
     source: {
-      // The card's first request: the notification opens the card, which lists the rest.
+      // The card's oldest waiting request: the notification opens the card, which lists the rest.
       approvalId: first?.id ?? approval.id,
       channelId: approval.channelId,
       ...(threadId ? { threadId } : {}),
@@ -412,35 +419,45 @@ export async function notifyApproval(deps: NotificationDeps, approval: ApprovalR
       ...(approval.missionId ? { missionId: approval.missionId } : {}),
       ...(channel?.kind === "channel" ? { label: channel.name } : {}),
     },
-    latest: {
-      title: notificationSnippet(approval.title, 200),
-      text: notificationSnippet(approval.why, 200),
-      origin: approvalOriginOf(approval.origin) ?? undefined,
-      expiresAt: approval.expiresAt.toISOString(),
-    },
+    latest: approvalLatest(approval),
   });
 }
 
-/** Out of the inbox once nothing on its card waits any more. */
+const approvalLatest = (approval: ApprovalRow) => ({
+  title: notificationSnippet(approval.title, 200),
+  text: notificationSnippet(approval.why, 200),
+  origin: approvalOriginOf(approval.origin) ?? undefined,
+  expiresAt: approval.expiresAt.toISOString(),
+});
+
+/**
+ * Out of the inbox once nothing on its card waits any more. Until then each person's entry describes the
+ * card's oldest request still waiting that they may decide, and leaves the inbox of whoever has none left.
+ */
 export async function resolveApprovalNotifications(
   deps: NotificationDeps,
   approval: Pick<ApprovalRow, "id" | "orgId" | "messageId">,
 ) {
-  if (approval.messageId) {
-    const [waiting] = await deps.db
-      .select({ id: approvals.id })
-      .from(approvals)
-      .where(
-        and(
-          eq(approvals.orgId, approval.orgId),
-          eq(approvals.messageId, approval.messageId),
-          eq(approvals.status, "pending"),
-        ),
-      )
-      .limit(1);
-    if (waiting) return;
-  }
-  await resolveNotifications(deps, approval.orgId, { groupKey: approvalGroupKey(approval) });
+  const groupKey = approvalGroupKey(approval);
+  const waiting = approval.messageId
+    ? await deps.db
+        .select()
+        .from(approvals)
+        .where(
+          and(
+            eq(approvals.orgId, approval.orgId),
+            eq(approvals.messageId, approval.messageId),
+            eq(approvals.status, "pending"),
+          ),
+        )
+        .orderBy(asc(approvals.createdAt))
+    : [];
+  if (waiting.length === 0) return resolveNotifications(deps, approval.orgId, { groupKey });
+  const deciders = await Promise.all(waiting.map(async (a) => new Set(await approverIds(deps.db, a))));
+  await retargetNotifications(deps, approval.orgId, groupKey, (userId) => {
+    const next = waiting.find((_, i) => deciders[i]?.has(userId));
+    return next ? { source: { approvalId: next.id }, latest: approvalLatest(next) } : null;
+  });
 }
 
 // ── Issues ────────────────────────────────────────────────────────────────────

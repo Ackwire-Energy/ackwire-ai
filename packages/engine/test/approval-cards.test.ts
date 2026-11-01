@@ -245,3 +245,40 @@ test("every brain is told to ask for several approvals together, in one turn", a
   expect(forComputerBrain(text)).toContain(ASK_APPROVALS_TOGETHER);
   expect(ASK_APPROVALS_TOGETHER).toContain("call them all in the same response");
 });
+
+test("the card's notification follows its oldest waiting request, and leaves whoever has nothing left to decide", async () => {
+  f = await setup({ toolSources: [goals], reply: fourAtOnce });
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  await f.db.update(schema.agents).set({ ownerUserId: bia.id }).where(eq(schema.agents.id, f.agent.id));
+  const { rows } = await askFour();
+  const [a, b, , d] = rows.map((r) => r.id);
+  await f.db
+    .update(schema.approvals)
+    .set({ tool: REQUEST_PERMISSION_TOOL })
+    .where(eq(schema.approvals.id, d ?? ""));
+  const entry = async (userId: string) =>
+    (
+      await f.db
+        .select()
+        .from(schema.notifications)
+        .where(and(eq(schema.notifications.kind, "approval"), eq(schema.notifications.userId, userId)))
+    )[0];
+  const decide = (ids: (string | undefined)[]) =>
+    decideApprovals({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, {
+      ids: ids.map((id) => id ?? ""),
+      decision: "approve",
+    });
+
+  await decide([a]);
+  const ownerEntry = await entry(f.owner.id);
+  expect((ownerEntry?.source as { approvalId?: string } | undefined)?.approvalId).toBe(b);
+  expect((ownerEntry?.latest as { title?: string } | undefined)?.title).toBe(rows[1]?.title);
+  expect(ownerEntry?.doneAt).toBeNull();
+
+  // Only the admin-only request waits: the agent's owner has nothing left there, the admin still does.
+  await decide([b, rows[2]?.id]);
+  expect((await entry(bia.id))?.doneAt).not.toBeNull();
+  const adminEntry = await entry(f.owner.id);
+  expect(adminEntry?.doneAt).toBeNull();
+  expect((adminEntry?.source as { approvalId?: string } | undefined)?.approvalId).toBe(d);
+});

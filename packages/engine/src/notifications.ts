@@ -447,6 +447,42 @@ export async function resolveNotifications(
   return rows.length;
 }
 
+/**
+ * A group's open notifications describe something else now (an approval card whose first waiting request was
+ * decided): each person's row gets what `pick` says for them, in place (no new count, no push, same order), or
+ * is resolved when `pick` has nothing left for them.
+ */
+export async function retargetNotifications(
+  deps: NotificationDeps,
+  orgId: string,
+  groupKey: string,
+  pick: (userId: string) => { source: Partial<NotificationSource>; latest: NotificationLatest } | null,
+): Promise<void> {
+  const rows = await deps.db
+    .select()
+    .from(notifications)
+    .where(and(eq(notifications.orgId, orgId), eq(notifications.groupKey, groupKey), isNull(notifications.doneAt)));
+  const done: string[] = [];
+  for (const r of rows) {
+    const next = pick(r.userId);
+    if (!next) {
+      done.push(r.userId);
+      continue;
+    }
+    const [row] = await deps.db
+      .update(notifications)
+      .set({ source: { ...r.source, ...next.source }, latest: compact({ ...r.latest, ...next.latest }) })
+      .where(eq(notifications.id, r.id))
+      .returning();
+    if (row)
+      await publishUserEvent(deps.pubsub, orgId, r.userId, {
+        type: "notification.upserted",
+        notification: notificationView(row),
+      });
+  }
+  if (done.length) await resolveNotifications(deps, orgId, { groupKey, userIds: done });
+}
+
 const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
 
 /** Snoozed notifications whose time came: back in the inbox, on top (worker, every 30 s). */
