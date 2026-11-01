@@ -1,6 +1,6 @@
 import { afterEach, expect } from "bun:test";
 import { schema } from "@agenteschat/db";
-import { decideApproval, runAuthority } from "../../src";
+import { addChannelMember, createChannel, decideApproval, postPersonMessage, runAuthority } from "../../src";
 import { ALL_GITHUB_SCOPES, fakeGithub } from "../tool-fixtures";
 import { closeWorlds, type World, world } from "./harness";
 import { assertInvariants } from "./invariants";
@@ -270,5 +270,35 @@ scenario("S53", "a person's 'don't do that again' becomes a lasting lesson the a
   // A later run reads the lesson in its prompt.
   expect(w.prompts("otto").at(-1)).toContain(lesson);
   expect((await w.posts("otto")).at(-1)?.body).toContain("relatório");
+  await assertInvariants(w);
+});
+
+scenario("S53b", "a 'don't do that again' said in a DM holds in the agent's runs in other channels", async () => {
+  const lesson = "Não encaminhar pedidos a outros agentes sem a pessoa pedir; resolver eu mesmo ou perguntar.";
+  const w = await world({
+    agents: ["otto"],
+    dmWith: "otto",
+    setup: { contextTools: true },
+    script: {
+      otto: [
+        { calls: [{ name: "remember", input: { content: lesson, kind: "preference", everywhere: true } }] },
+        { text: "Combinado: não encaminho mais pedidos a outros agentes." },
+        { text: "O relatório de vendas de outubro está pronto." },
+      ],
+    },
+  });
+  await w.say("@otto não encaminhe isso para outros agentes, não faça mais isso.");
+  await w.settle();
+  const offered = w.f.provider.calls[0]?.request.tools?.find((t) => t.name === "remember");
+  expect(offered?.description).toContain("everywhere: true");
+
+  const other = await createChannel(w.db, w.owner.id, w.org.id, { name: "suporte" });
+  await addChannelMember(w.db, w.owner.id, w.org.id, other.id, { agentId: w.agents.otto?.id ?? "" });
+  await postPersonMessage({ db: w.db, pubsub: w.f.pubsub, judge: w.f.context.judge }, w.owner.id, w.org.id, other.id, {
+    body: "@otto me manda o relatório de vendas de outubro.",
+    threadId: null,
+  });
+  await w.settle();
+  expect(w.prompts("otto").at(-1)).toContain(lesson);
   await assertInvariants(w);
 });
