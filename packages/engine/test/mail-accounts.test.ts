@@ -451,4 +451,34 @@ test("only who connected a mailbox gives an agent access to it; admins and the a
   // Its owner can't give it to an agent that doesn't answer them.
   await db.update(schema.agents).set({ audienceMode: "owner" }).where(eq(schema.agents.id, agent.id));
   await expect(giveMail(as(ana), account.id, "read")).rejects.toMatchObject({ code: "audience.only" });
+  // …but they can still lower what it has there, keeping the rules it had.
+  await db.update(schema.agents).set({ audienceMode: "everyone" }).where(eq(schema.agents.id, agent.id));
+  await giveMail(as(ana), account.id, "read_write", { dailySendCap: 9 });
+  await db.update(schema.agents).set({ audienceMode: "owner" }).where(eq(schema.agents.id, agent.id));
+  const down = await giveMail(as(ana), account.id, "read", { dailySendCap: 1000 });
+  expect([down.level, down.policy.dailySendCap]).toEqual(["read", 9]);
+});
+
+test("only who connected a mailbox loosens its actions or adds addresses; admins only tighten them", async () => {
+  m = await mailSetup();
+  const { f, deps } = m;
+  const account = await imapAccount(m);
+  const ana = await addMember(f.db, f.org.id, "admin", "Ana Mock");
+  await f.db.update(schema.mailAccounts).set({ createdByUserId: ana.id }).where(eq(schema.mailAccounts.id, account.id));
+  await updateMailAccount(deps, ana.id, f.org.id, account.id, {
+    offActions: ["delete"],
+    askActions: ["organize"],
+    aliases: ["sales@acme.com"],
+  });
+  const admin = await addMember(f.db, f.org.id, "admin");
+  const update = (input: Parameters<typeof updateMailAccount>[4]) =>
+    updateMailAccount(deps, admin.id, f.org.id, account.id, input);
+  for (const widen of [{ offActions: [] }, { askActions: [] }, { aliases: ["sales@acme.com", "ceo@acme.com"] }]) {
+    await expect(update(widen)).rejects.toMatchObject({ code: "mail.owner_only", params: { ownerName: "Ana Mock" } });
+  }
+  // Tightening, and the label, stay open to admins: organizing moves from asking to off.
+  const r = await update({ offActions: ["delete", "organize"], askActions: [], aliases: [], label: "Vendas" });
+  expect(r).toMatchObject({
+    account: { offActions: ["delete", "organize"], askActions: [], aliases: [], label: "Vendas" },
+  });
 });

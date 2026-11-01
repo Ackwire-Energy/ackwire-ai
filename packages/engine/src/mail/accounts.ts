@@ -13,14 +13,14 @@ import { and, asc, type Database, eq, inArray, isNull, like, ne, notInArray, sch
 import { recordAudit } from "../audit";
 import { caches } from "../cache";
 import { openSecret, sealSecret, sha256 } from "../crypto";
-import { ConflictError, NotFoundError, ValidationError } from "../errors";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { isBlockedAddress, type ResolveHost, resolveHostDns } from "../net-guard";
 import { requirePermission } from "../organizations";
 import { closedRefusal, orgStanding } from "../standing";
 import { isEmailAddress, normalizeAddress } from "./text";
 import { restartMailWatches } from "./watches";
 
-const { mailAccounts, mailAgentPolicies, mailWatches, agentScopes } = schema;
+const { mailAccounts, mailAgentPolicies, mailWatches, agentScopes, users } = schema;
 
 export type MailAccountRow = typeof mailAccounts.$inferSelect;
 
@@ -194,6 +194,18 @@ export async function listMailAccounts(db: Database, actorId: string, orgId: str
     rows.map((r) => r.id),
   );
   return rows.map((r) => mailAccountView(r, grants.get(r.id)));
+}
+
+/** The refusal when someone other than who connected a mailbox would widen what agents do with it (ADR 0038). */
+export async function mailOwnerOnlyError(db: Database, account: { address: string; createdByUserId: string | null }) {
+  const [owner] = account.createdByUserId
+    ? await db.select({ name: users.name }).from(users).where(eq(users.id, account.createdByUserId))
+    : [];
+  return new ForbiddenError(
+    `Only ${owner?.name ?? "the person who connected it"} can give an agent access to ${account.address}`,
+    "mail.owner_only",
+    { address: account.address, ownerUserId: account.createdByUserId ?? "", ownerName: owner?.name ?? "" },
+  );
 }
 
 async function loadAccount(db: Database, orgId: string, id: string) {
@@ -626,6 +638,16 @@ export async function updateMailAccount(
     if (wrong.length > 0)
       throw new ValidationError(`These actions can't be made to ask: ${wrong.join(", ")}`, "mail.action");
     set.askActions = [...new Set(input.askActions)];
+  }
+  if (row.createdByUserId !== actorId) {
+    // Narrowing (more off, more asking, fewer aliases) is anyone's; widening is giving access.
+    const off = set.offActions ?? row.offActions;
+    const ask = set.askActions ?? row.askActions;
+    const widens =
+      row.offActions.some((a) => !off.includes(a)) ||
+      row.askActions.some((a) => !ask.includes(a) && !off.includes(a)) ||
+      aliases.some((a) => !row.aliases.includes(a));
+    if (widens) throw await mailOwnerOnlyError(deps.db, row);
   }
   if (input.password !== undefined) {
     if (row.via !== "imap") throw new ValidationError("Only IMAP mailboxes have a password", "mail.no_password");

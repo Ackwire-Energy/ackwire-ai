@@ -3,12 +3,12 @@ import { type Agent, getAgent } from "../agents";
 import { audienceError, canTalkTo, talksToAgents } from "../audience";
 import { recordAudit } from "../audit";
 import { caches } from "../cache";
-import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
+import { NotFoundError, ValidationError } from "../errors";
 import { requirePermission } from "../organizations";
-import { levelOf, MAIL_SCOPES, mailboxAddresses, mailGrants, orgMailAccounts } from "./accounts";
+import { levelOf, MAIL_SCOPES, mailboxAddresses, mailGrants, mailOwnerOnlyError, orgMailAccounts } from "./accounts";
 import { isEmailAddress, normalizeAddress, normalizeAddressRule } from "./text";
 
-const { mailAccounts, mailAgentPolicies, agentScopes, users } = schema;
+const { mailAccounts, mailAgentPolicies, agentScopes } = schema;
 
 /** What one agent may do with one mailbox beyond its scopes (checked per call). Empty lists = no limit. */
 export interface MailPolicy {
@@ -168,6 +168,7 @@ export function scopesFor(level: MailLevel, canDelete: boolean): string[] {
  * Only the person who connected a mailbox gives an agent access to it, to an agent they can talk to (ADR 0038,
  * addendum). Anyone else who manages the agent (admins, its owner) may only take access away.
  */
+/** Throws unless `actorId` may set these scopes; true when their policy input applies too. */
 async function mayChangeMail(
   db: Database,
   actorId: string,
@@ -176,25 +177,17 @@ async function mayChangeMail(
   account: { address: string; createdByUserId: string | null },
   scopes: string[],
   held: Set<string>,
-) {
+): Promise<boolean> {
+  const lowering = scopes.every((s) => held.has(s));
   if (account.createdByUserId === actorId) {
-    // Its rules can loosen at any level: anything but removing it is giving.
-    if (scopes.length === 0 || canTalkTo(agent, actorId, await talksToAgents(db, orgId, actorId))) return;
+    // Its rules can loosen at any level, for an agent that answers them; otherwise they may only lower it.
+    if (canTalkTo(agent, actorId, await talksToAgents(db, orgId, actorId))) return true;
+    if (lowering) return false;
     throw await audienceError(db, agent);
   }
-  if (scopes.every((s) => held.has(s))) {
-    if (agent.ownerUserId === actorId) return;
-    await requirePermission(db, actorId, orgId, "manage_agents");
-    return;
-  }
-  const [owner] = account.createdByUserId
-    ? await db.select({ name: users.name }).from(users).where(eq(users.id, account.createdByUserId))
-    : [];
-  throw new ForbiddenError(
-    `Only ${owner?.name ?? "the person who connected it"} can give an agent access to ${account.address}`,
-    "mail.owner_only",
-    { address: account.address, ownerUserId: account.createdByUserId ?? "", ownerName: owner?.name ?? "" },
-  );
+  if (!lowering) throw await mailOwnerOnlyError(db, account);
+  if (agent.ownerUserId !== actorId) await requirePermission(db, actorId, orgId, "manage_agents");
+  return false;
 }
 
 /**
@@ -217,11 +210,9 @@ export async function setAgentMail(
   if (!account) throw new NotFoundError("Mailbox not found", "mail.account_not_found");
   const scopes = scopesFor(input.level, input.canDelete);
   const held = (await mailGrants(db, orgId, [accountId])).get(accountId)?.get(agentId) ?? new Set<string>();
-  await mayChangeMail(db, actorId, orgId, agent, account, scopes, held);
-  const policy =
-    account.createdByUserId === actorId
-      ? normalizeMailPolicy(input.policy)
-      : await agentMailPolicy(db, orgId, agentId, accountId);
+  const policy = (await mayChangeMail(db, actorId, orgId, agent, account, scopes, held))
+    ? normalizeMailPolicy(input.policy)
+    : await agentMailPolicy(db, orgId, agentId, accountId);
   if (policy.fromAddress && !mailboxAddresses(account).includes(policy.fromAddress)) {
     throw new ValidationError("fromAddress must be one of the mailbox's addresses", "mail.from_not_mailbox");
   }
