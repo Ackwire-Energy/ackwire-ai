@@ -113,6 +113,46 @@ describe("what a member's sidebar lists", () => {
   });
 });
 
+describe("Equipe on the Agentes header", () => {
+  const agentsHead = () => {
+    const toggle = [...nav().querySelectorAll(".sidebar__section-toggle")].find((b) => b.textContent === "Agentes");
+    const head = toggle?.closest(".sidebar__section-head");
+    if (!(head instanceof HTMLElement)) throw new Error("no Agentes header");
+    return head;
+  };
+
+  test("a button beside the +, not a row of its own, marked while the page is open", async () => {
+    await go(acme("owner"));
+    const team = within(agentsHead()).getByRole("link", { name: "Equipe" });
+    expect(team.getAttribute("href")).toBe(`/org/${ORG_ID}/team`);
+    expect(team.getAttribute("title")).toBe("Equipe");
+    expect(within(agentsHead()).getByRole("button", { name: "Novo grupo" })).toBeTruthy();
+    expect(within(nav()).getAllByRole("link", { name: "Equipe" })).toHaveLength(1);
+    expect(team.getAttribute("data-status")).toBeNull();
+    cleanup();
+    await go(acme("owner"), "team");
+    expect(within(agentsHead()).getByRole("link", { name: "Equipe" }).getAttribute("data-status")).toBe("active");
+  });
+
+  test("the icon rail, which hides the headers, keeps it as a tile", async () => {
+    await go(acme("owner"));
+    const teamTiles = () =>
+      [...nav().querySelectorAll(".sidebar__section-body > a.sidebar__item")].filter(
+        (a) => a.getAttribute("href") === `/org/${ORG_ID}/team`,
+      );
+    expect(teamTiles()).toHaveLength(0);
+    const toggle = () => within(nav()).getByRole("button", { name: /barra lateral$/ });
+    await act(async () => fireEvent.click(toggle()));
+    try {
+      expect(nav().getAttribute("data-rail")).toBe("true");
+      expect(teamTiles()).toHaveLength(1);
+    } finally {
+      // The rail is kept for the whole page, not per render: back to the full sidebar for the other tests.
+      await act(async () => fireEvent.click(toggle()));
+    }
+  });
+});
+
 describe("bringing agents from another app, where agents are made", () => {
   const toImport = () => screen().queryByRole("link", { name: "Trazer agentes de outro app" });
 
@@ -131,5 +171,24 @@ describe("bringing agents from another app, where agents are made", () => {
     await go(as("member"), "agents/new");
     expect(screen().getByText(/Só admins e donos criam agentes/)).toBeTruthy();
     expect(toImport()).toBeNull();
+  });
+});
+
+describe("an agent's row", () => {
+  test("the role on its own line under the name, and the lock alone at the row's end", async () => {
+    const state = acme("owner");
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.role = "Assistente de e-mails e agenda da diretoria";
+    await go(state);
+    const row = nav().querySelector(`[data-agent-row="${ADA_ID}"] .sidebar__item`);
+    const text = row?.querySelector(":scope > .sidebar__item-text");
+    expect([...(text?.children ?? [])].map((el) => [el.className, el.textContent])).toEqual([
+      ["sidebar__item-label", "Ada"],
+      ["sidebar__item-role", "Assistente de e-mails e agenda da diretoria"],
+    ]);
+    // Nothing at the row's end shares the name's line with the role: only the lock.
+    const end = row?.querySelector(":scope > .sidebar__item-meta");
+    expect(end?.textContent).toBe("");
+    expect(end?.querySelector(".sidebar__lock")).not.toBeNull();
   });
 });

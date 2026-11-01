@@ -302,7 +302,12 @@ export function createSetupToolSource(deps: {
             pattern: "^@?[a-z0-9][a-z0-9_-]{1,31}$",
             description: "Its @handle: 2–32 lower-case letters, digits, - or _ (e.g. ada).",
           },
-          role: { type: "string", maxLength: 200, description: "What it is, in a few words (e.g. Designer)." },
+          role: {
+            type: "string",
+            maxLength: 200,
+            description:
+              "What it does for the team, said plainly in the person's language (e.g. Email and calendar assistant).",
+          },
           instructions: {
             type: "string",
             minLength: 1,
