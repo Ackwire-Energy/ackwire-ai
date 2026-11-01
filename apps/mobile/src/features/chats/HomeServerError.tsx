@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
-import { Button, EmptyState, Icon, Text } from "@/ui";
+import { Button, EmptyState, LineIcon, Text } from "@/ui";
 import { problemText } from "../server";
 import { useColors } from "../shared/hooks";
 import { useSurface } from "../shared/parts";
@@ -100,7 +100,7 @@ export function HomeServerNotice({ retry }: { retry: () => Promise<unknown> }) {
     <View style={styles.list}>
       <View style={[styles.card, surface]} accessibilityLiveRegion="polite">
         <View style={styles.line} accessible accessibilityRole="summary">
-          <Icon name="wifi" size={22} color={c.amber} />
+          <LineIcon name="wifi" variant="callout" size={22} color={c.amber} />
           <View style={styles.tx}>
             <Text variant="callout" tone="ink" style={styles.bold} numberOfLines={3}>
               {trouble.title}
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
   full: { paddingTop: 48, paddingHorizontal: 24 },
   list: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
   card: { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
-  line: { flexDirection: "row", alignItems: "center", gap: 10 },
+  line: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   tx: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
 });

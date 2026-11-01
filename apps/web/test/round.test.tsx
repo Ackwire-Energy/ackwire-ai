@@ -427,10 +427,12 @@ describe("agent questions (ask_user)", () => {
     expect(document.activeElement).toBe(screen().getByRole("combobox", { name: /Mensagem para/ }));
     await click(within(card).getByRole("button", { name: "Depois das 18h" }));
     await settle(4);
-    // Answered: the settled card takes its place (another element).
+    // Answered: one line takes its place (another element), the answer bold, the question still in the open.
     const done = screen().getByRole("group", { name: "Pergunta de Ada" });
     expect(done.textContent).toContain("Você respondeu: Depois das 18h");
-    expect(done.querySelector(".ac-chip--done")?.textContent).toBe("Respondida");
+    expect(done.querySelector(".rq-done__mark[data-done]")).not.toBeNull();
+    expect(done.querySelector("b")?.textContent).toBe("Depois das 18h");
+    expect(done.closest("article")?.textContent).toContain("Faço o deploy agora ou depois das 18h?");
     expect(state.calls.find((c) => c.method === "questions.answer")?.args).toEqual([
       ORG_ID,
       "q1",

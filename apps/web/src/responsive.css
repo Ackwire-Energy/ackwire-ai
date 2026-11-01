@@ -475,16 +475,34 @@
   }
 }
 
-/* ── Offline computer notice on phones: the words, then the buttons sharing the width ── */
+/* ── The notices on phones: the lead and the × on the title's line, the buttons under the words ── */
 @media (max-width: 640px) {
   .outage {
-    flex-wrap: wrap;
-    padding: 10px 12px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 2px 10px;
+    padding: 11px 12px;
+  }
+  /* The lead's middle on the first line's capitals' middle, however many lines the words take. */
+  .outage > :first-child {
+    translate: 0 calc(11px - var(--cap-mid) - 50%);
+  }
+  @supports (top: 1lh) {
+    .outage > :first-child {
+      translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+    }
   }
   .outage__text {
+    grid-column: 2;
+    grid-row: 1;
     flex-direction: column;
     gap: 0;
     white-space: normal;
+  }
+  /* Without a ×, the words take its column too. */
+  .outage:not(:has(.outage__close)) .outage__text {
+    grid-column: 2 / -1;
   }
   .outage__text b {
     max-width: none;
@@ -492,18 +510,31 @@
   .outage__crew {
     display: none;
   }
-  /* The setup notice names no one: its faces are who waits for the computer. */
+  /* The setup notice names no one: its faces are who waits for the computer, across from its button. */
   .setup-notice .outage__crew {
     display: inline-flex;
+    grid-column: 2 / -1;
+    grid-row: 2;
+    justify-self: end;
+    align-self: center;
+  }
+  /* In the middle of the title's line, the × itself on the notice's padding. */
+  .outage__close {
+    grid-column: 3;
+    grid-row: 1;
+    margin: calc(11px - var(--cap-mid) - var(--control-h-sm) / 2) -12px 0 0;
   }
   .outage__acts {
-    flex-basis: 100%;
+    grid-column: 2 / -1;
+    grid-row: 2;
+    flex-wrap: wrap;
   }
   /* A hold's button has a row of its own here: it takes its whole height. */
   .hold-banner > .outage__acts {
     margin-block: 0;
   }
-  .outage__acts > .ac-btn:not(.ac-btn--icon) {
-    flex: 1;
+  /* A ghost shows only its words: they start where the words above start. */
+  .outage__acts > .ac-btn--ghost:first-child {
+    margin-left: -12px;
   }
 }

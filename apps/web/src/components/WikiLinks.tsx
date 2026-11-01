@@ -26,7 +26,7 @@ function PreviewCard({ slug }: { slug: string }) {
       <span className="wiki-preview__title">{page.data.title}</span>
       {page.data.folder && <span className="small muted">{page.data.folder}</span>}
       <div className="wiki-preview__body">
-        <Markdown source={previewOf(page.data.body)} variant="message" />
+        <Markdown source={previewOf(page.data.body)} variant="message" excerpt />
       </div>
     </div>
   );

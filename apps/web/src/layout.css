@@ -315,6 +315,11 @@ p {
   align-items: center;
   gap: 4px;
 }
+/* On the strip it follows the buttons at their own gap; on phones it goes up to the title's line (responsive.css). */
+.outage__close {
+  flex: none;
+  margin-left: -6px;
+}
 
 /* "Trocar o computador" */
 .outage-dialog__h {
@@ -1388,9 +1393,12 @@ html:not([data-pointer]) .artifact-card__open:focus-visible {
   transform-origin: top left;
   background: #fff;
 }
+/* A diagram taller than the box scrolls inside it, at its own proportions (not stretched to the box's height). */
 .artifact-diagram {
   display: flex;
   justify-content: center;
+  align-items: flex-start;
+  max-height: 70vh;
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -1664,6 +1672,25 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   padding: 0 16px 14px;
   overflow-x: auto;
   max-height: 420px;
+}
+/* A block drawn in place of its code (a ```mermaid diagram), centered: shrunk to fit its box but never below 60% of
+   its own size (`--w`), so its labels stay readable; a wider or taller one scrolls inside the card, as code does. */
+.code-card__preview {
+  padding: 2px 12px 14px;
+  overflow-x: auto;
+  max-height: 420px;
+}
+.code-card__preview img,
+.code-viewer__preview img {
+  display: block;
+  width: 100%;
+  max-width: var(--w, 100%);
+  min-width: calc(var(--w, 0px) * 0.6);
+  height: auto;
+  margin: 0 auto;
+}
+.code-viewer__preview {
+  padding: 0 20px;
 }
 /* The rest of a longer block scrolls into its 420px in a message too, where the kit keeps code from scrolling up and
    down. */
