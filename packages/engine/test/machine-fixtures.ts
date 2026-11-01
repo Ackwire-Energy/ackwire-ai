@@ -116,6 +116,8 @@ export interface FakeRunnerOptions {
   onSecretActivate?: (requestId: string) => Promise<void>;
   /** Pause after the runner stores the value, before its reply reaches the server. */
   onSecretActivated?: (requestId: string) => Promise<void>;
+  /** Keeps a site's password for its browser alone, as runners do from then on (`keypair` says `sites`). */
+  sites?: boolean;
 }
 
 /**
@@ -143,7 +145,7 @@ export function fakeRunner(hub: MachineHub, options: FakeRunnerOptions = {}) {
         if (req.action === "keypair") {
           const pair = await generateSecretKeyPair();
           keys.set(req.requestId, pair.privateKey);
-          return ok({ publicKey: pair.publicKey });
+          return ok({ publicKey: pair.publicKey, ...(options.sites ? { sites: true } : {}) });
         }
         if (req.action === "deliver") {
           const key = keys.get(req.requestId);

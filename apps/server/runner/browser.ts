@@ -910,8 +910,8 @@ export interface BrowserManagerOptions {
   log: (line: string) => void;
   /** Sends a frame on the current connection; false when it is down. */
   send: (frame: RunnerFrame) => boolean;
-  /** A secret delivered to the agent (ADR 0027), by name, or null. */
-  secret: (agent: AgentScope, name: string) => Promise<string | null>;
+  /** A secret delivered to the agent (ADR 0027), by name, with the one site it was sealed to, or null. */
+  secret: (agent: AgentScope, name: string) => Promise<{ value: string; site: string | null } | null>;
   /** System mode: root preguards this UID's fixed CDP and stream listener ports. */
   fixedPorts?: BrowserPorts;
   /** Tests: how to start `agent-browser` (default: the sidecar or the downloaded binary). */
@@ -2238,14 +2238,23 @@ export class BrowserManager {
     if (!site) {
       throw new RunnerError("bad_request", "agentes:type_secret needs the site the secret is for (https://host)");
     }
-    const value = await this.opts.secret(agent, name);
-    if (value === null) {
+    const held = await this.opts.secret(agent, name);
+    if (held === null) {
       return {
         success: false,
         data: null,
         error: `No secret named ${name} was delivered to this agent; ask for it with request_secret first`,
       };
     }
+    // The site the person sealed it to, on this computer, wins over the one the request names.
+    if (held.site && held.site !== site) {
+      return {
+        success: false,
+        data: null,
+        error: `${name} is only for ${new URL(held.site).host}, not ${new URL(site).host}; it wasn't typed`,
+      };
+    }
+    const { value } = held;
     if (!(await this.browserOpen(session, signal))) {
       return { success: false, data: null, error: "The browser isn't open: open a page first" };
     }

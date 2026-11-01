@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { SecretBox } from "@agenteschat/client";
+import type { SecretBox, SecretTarget } from "@agenteschat/client";
 import { secretAad } from "@agenteschat/client/lib/secret-box";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 // The computer's side, from the server code: what the card seals must open there.
@@ -16,7 +16,12 @@ afterEach(() => cleanup());
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
 
-async function withRequest(requestedForUserId: string, publicKey: string) {
+async function withRequest(
+  requestedForUserId: string,
+  publicKey: string,
+  target: SecretTarget = { kind: "env" },
+  name = "NPM_TOKEN",
+) {
   const state = seedState();
   const secretRequest = {
     id: "00000000-0000-4000-8000-0000000000e1",
@@ -25,9 +30,9 @@ async function withRequest(requestedForUserId: string, publicKey: string) {
     threadId: null,
     messageId: "msg-s",
     requestedForUserId,
-    name: "NPM_TOKEN",
+    name,
     purpose: "publicar o pacote no npm",
-    target: { kind: "env" as const },
+    target,
     machineId: null,
     publicKey,
     status: "pending" as const,
@@ -40,7 +45,7 @@ async function withRequest(requestedForUserId: string, publicKey: string) {
     channelId: ENG_ID,
     threadId: null,
     author: { type: "agent", id: ADA_ID },
-    body: "Pedido de segredo: NPM_TOKEN",
+    body: `Pedido de segredo: ${name}`,
     mentionedAgentIds: [],
     agentRunId: "r-s",
     meta: { secretRequestId: secretRequest.id, secretRequest },
@@ -78,6 +83,25 @@ describe("secret requests (ADR 0027)", () => {
     expect(card.querySelector(".ac-chip--done")?.textContent).toBe("Entregue");
     expect(card.textContent).toContain("Você entregou às");
     expect(within(card).queryByLabelText("Valor de NPM_TOKEN")).toBeNull();
+  });
+
+  test("a site's password: only the agent's browser types it, on its site, and it is sealed to that site", async () => {
+    const pair = await generateSecretKeyPair();
+    const site = { kind: "site" as const, site: "https://shop.example.com" };
+    const { state, secretRequest } = await withRequest("u-walter", pair.publicKey, site, "SHOP_PASSWORD");
+    const card = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
+    expect(card.textContent).toContain(
+      "Só o navegador de Ada digita, em shop.example.com. Fica fora dos comandos de Ada.",
+    );
+    expect(card.textContent).not.toContain("variável");
+    await type(within(card).getByLabelText("Valor de SHOP_PASSWORD"), "hunter2-for-real");
+    await click(within(card).getByRole("button", { name: "Enviar" }));
+    await settle(6);
+    const box = state.calls.find((c) => c.method === "secrets.deliver")?.args[2] as SecretBox;
+    const aad = (target: SecretTarget) =>
+      secretAad({ requestId: secretRequest.id, orgId: ORG_ID, name: "SHOP_PASSWORD", target });
+    expect(await openSecret(pair.privateKey, box, aad(site))).toBe("hunter2-for-real");
+    await expect(openSecret(pair.privateKey, box, aad({ kind: "env" }))).rejects.toThrow();
   });
 
   test("someone else sees who was asked, and no field", async () => {

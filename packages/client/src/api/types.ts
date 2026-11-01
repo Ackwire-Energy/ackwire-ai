@@ -1905,8 +1905,11 @@ export interface AgentQuestion {
   answeredByUserId: string | null;
 }
 
-/** Where a secret goes on the agent's computer (ADR 0027). */
-export type SecretTarget = { kind: "env" } | { kind: "file"; path: string };
+/**
+ * Where a secret goes on the agent's computer (ADR 0027): a variable of its commands, a file in its folder, or
+ * (`site`) only its browser's typing on that site (`https://host`), never its commands.
+ */
+export type SecretTarget = { kind: "env" } | { kind: "file"; path: string } | { kind: "site"; site: string };
 
 /**
  * An agent asked a person for a secret for its computer (`request_secret`,

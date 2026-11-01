@@ -51,8 +51,12 @@ export interface SecretRequestView {
   removed: boolean;
 }
 
-const targetOf = (row: Pick<SecretRequestRow, "targetKind" | "targetPath">): SecretTarget =>
-  row.targetKind === "file" && row.targetPath ? { kind: "file", path: row.targetPath } : { kind: "env" };
+const targetOf = (row: Pick<SecretRequestRow, "targetKind" | "targetPath" | "site">): SecretTarget =>
+  row.targetKind === "file" && row.targetPath
+    ? { kind: "file", path: row.targetPath }
+    : row.targetKind === "site" && row.site
+      ? { kind: "site", site: row.site }
+      : { kind: "env" };
 
 /** Pending but past its deadline counts as expired (the worker closes it within a minute). */
 function statusOf(row: SecretRequestRow, now = new Date()): SecretRequestView["status"] {
@@ -90,14 +94,20 @@ export function secretResult(row: SecretRequestRow | undefined): { content: stri
       content: `${row.name} was replaced or removed before this run could use it. Ask the person for it again if needed.`,
       isError: true,
     };
-  const where =
-    row.targetKind === "file"
-      ? `written to ${row.targetPath} (mode 600)`
-      : `available as the environment variable ${row.name} in your commands`;
+  const target = targetOf(row);
   switch (row.status) {
     case "delivered":
+      if (target.kind === "site") {
+        return {
+          content: `${row.name} was delivered to your computer for ${new URL(target.site).host}: your browser types it there (browser_type_secret, or a type_secret step), only into a password or code field on that site. It isn't in your commands' environment; for a command, ask for it again without \`site\`.`,
+        };
+      }
       return {
-        content: `${row.name} was delivered to your computer: ${where}. Use it by name; never print, echo or show its value (outputs show it as [secret:${row.name}]).`,
+        content: `${row.name} was delivered to your computer: ${
+          target.kind === "file"
+            ? `written to ${target.path} (mode 600)`
+            : `available as the environment variable ${row.name} in your commands`
+        }. Use it by name; never print, echo or show its value (outputs show it as [secret:${row.name}]).`,
       };
     case "declined":
       return {
@@ -153,7 +163,7 @@ const deliveryOrder = (row: SecretRequestRow) => {
 export async function secretOnComputer(
   computer: ComputerHandle,
   request: SecretRequest,
-): Promise<{ publicKey?: string; size?: number; superseded?: boolean }> {
+): Promise<{ publicKey?: string; sites?: boolean; size?: number; superseded?: boolean }> {
   return computer.provider.secret(computer.id, request);
 }
 

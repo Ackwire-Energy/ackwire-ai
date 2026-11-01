@@ -1,6 +1,7 @@
 import type { Agent } from "@agenteschat/client";
 import { keys } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
+import { siteHost } from "@agenteschat/client/lib/secret-requests";
 import { Button } from "@agenteschat/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -53,7 +54,11 @@ export function AgentSecretsList({ agent, editable }: { agent: Agent; editable: 
               <span className="agent-secrets__name">
                 <code>{s.name}</code>
                 <span className="small muted">
-                  {s.target.kind === "file" ? t("agentSecrets.file", { path: s.target.path }) : t("agentSecrets.env")}
+                  {s.target.kind === "file"
+                    ? t("agentSecrets.file", { path: s.target.path })
+                    : s.target.kind === "site"
+                      ? t("agentSecrets.site", { host: siteHost(s.target.site) })
+                      : t("agentSecrets.env")}
                   {" · "}
                   {t("agentSecrets.by", {
                     person: dir.memberById.get(s.deliveredByUserId)?.name ?? t("channel.unknownPerson"),

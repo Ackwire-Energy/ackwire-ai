@@ -2,7 +2,8 @@ import type { AgentQuestion, MemoryUpdate, SecretRequest } from "@agenteschat/cl
 import { keys, useDecideProposal, useProposals } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { MAX_SECRET_BYTES, sealSecret, secretAad } from "@agenteschat/client/lib/secret-box";
+import { sealSecret, secretAad } from "@agenteschat/client/lib/secret-box";
+import { secretPending, secretValueProblem, secretWhere } from "@agenteschat/client/lib/secret-requests";
 import { Button, Chip, Diff, diffLines, Field, Input, Textarea } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -274,7 +275,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
   const agentName = agent?.name ?? t("channel.unknownAgent");
   const mine = current.requestedForUserId === me.user.id;
   const person = dir.memberById.get(current.requestedForUserId)?.name ?? t("channel.unknownPerson");
-  const pending = current.status === "pending" && new Date(current.expiresAt).getTime() > Date.now();
+  const pending = secretPending(current);
   const failed = (err: unknown) => {
     const status = (err as { status?: number }).status;
     setError(status === 409 ? t("secret.alreadyAnswered") : t("secret.failed"));
@@ -301,8 +302,8 @@ export function SecretCard({ request }: { request: SecretRequest }) {
     onError: failed,
   });
   const submit = () => {
-    if (!value) return setError(t("secret.empty"));
-    if (new TextEncoder().encode(value).byteLength > MAX_SECRET_BYTES) return setError(t("secret.tooLarge"));
+    const problem = secretValueProblem(value);
+    if (problem) return setError(t(problem));
     deliver.mutate(value);
   };
   const closed: Record<Exclude<SecretRequest["status"], "pending">, { chip: string; line: string }> = {
@@ -319,10 +320,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
     canceled: { chip: t("secret.chipCanceled"), line: t("secret.canceled") },
   };
   const status = pending ? null : closed[current.status === "pending" ? "expired" : current.status];
-  const where =
-    current.target.kind === "file"
-      ? t("secret.targetFile", { path: current.target.path, agent: agentName })
-      : t("secret.targetEnv", { name: current.name, agent: agentName });
+  const where = secretWhere(t, current, agentName);
   return (
     // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
     <div

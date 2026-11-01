@@ -15,6 +15,7 @@ import {
   type RunnerAccess,
   type RunnerFrame,
 } from "@agenteschat/adapters/machine-protocol";
+import { sealSecret, secretAad } from "@agenteschat/adapters/secret-box";
 import { browserErrorText, formatPlanReport, runPlan } from "@agenteschat/engine";
 import { type BrowserLink, type BrowserReply, browserSurface } from "../../../../packages/engine/src/browser/surface";
 import { reduceAccess, setTool, TOOL_NAMES, widens } from "../../runner/access";
@@ -44,6 +45,7 @@ import {
 } from "../../runner/browser";
 import { handleRequest, type RequestScope } from "../../runner/handlers";
 import { agentWorkspace } from "../../runner/paths";
+import { handleSecret, secretValue } from "../../runner/secrets";
 import { errorCode, removeDirs, tempDir, waitFor } from "./helpers";
 
 const dirs: string[] = [];
@@ -108,7 +110,7 @@ function setup(over: Partial<BrowserManagerOptions> = {}, secrets: Record<string
       frames.push(f);
       return true;
     },
-    secret: async (_agent, name) => secrets[name] ?? null,
+    secret: async (_agent, name) => (name in secrets ? { value: secrets[name] as string, site: null } : null),
     command: [process.execPath, FAKE],
     chrome: () => "/fake/browsers/chrome-155.0.8059.84/chrome-linux64/chrome",
     userHome: home,
@@ -1091,6 +1093,65 @@ test.if(posix)("a secret is typed through stdin into a password field only, and 
   expect(await errorCode(() => t.act("agentes:type_secret", ["e4", "SHOP_PASSWORD"]))).toBe("bad_request");
   expect(t.logged().filter((c) => c.args.includes("batch")).length).toBe(typedBefore);
 });
+
+test.if(posix)(
+  "a site's password: out of every command's environment, typed only by the browser and only on its site",
+  async () => {
+    const secretsDir = path.join(tempDir("secrets-"), "secrets");
+    dirs.push(path.dirname(secretsDir));
+    const t = setup({ secret: (agent, name) => secretValue(secretsDir, agent, name) });
+    const value = "hunter2-signed-in-for-real";
+    // Delivered as the server does: sealed to the computer's key, bound to its site, then activated.
+    const requestId = "req-site-0001";
+    const target = { kind: "site" as const, site: "https://shop.example.com" };
+    const keypair = await handleSecret(secretsDir, dev, t.ws, { action: "keypair", requestId });
+    expect(keypair.sites).toBe(true);
+    const aad = secretAad({ requestId, orgId: "org-1", name: "SHOP_PASSWORD", target });
+    const box = await sealSecret(keypair.publicKey ?? "", value, aad);
+    await handleSecret(secretsDir, dev, t.ws, {
+      action: "deliver",
+      requestId,
+      name: "SHOP_PASSWORD",
+      target,
+      aad,
+      box,
+    });
+    await handleSecret(secretsDir, dev, t.ws, {
+      action: "activate",
+      requestId,
+      order: `2026-10-31T12:00:00.000Z|${requestId}`,
+    });
+
+    // The agent's commands never see it, by name or in their whole environment.
+    const ctx = { workspaceReal: t.ws, exec: true, token: "agm_x", secretsDir };
+    const scope: RequestScope = { signal: new AbortController().signal, output: () => {} };
+    const ran = (await handleRequest(
+      ctx,
+      { agent: dev, op: "exec", command: 'echo "[$SHOP_PASSWORD]"; env', timeoutSeconds: 10, stream: false },
+      scope,
+    )) as { stdout: string };
+    expect(ran.stdout.split("\n")[0]).toBe("[]");
+    expect(ran.stdout).not.toContain(value);
+    expect(ran.stdout).not.toContain("SHOP_PASSWORD");
+
+    // The browser types it on its site.
+    await t.act("open", ["https://shop.example.com/login"]);
+    t.page({ attrs: { "@e4": { type: "password" } } });
+    expect(await t.act("agentes:type_secret", ["e4", "SHOP_PASSWORD", "https://shop.example.com"])).toEqual({
+      success: true,
+      data: { typed: "SHOP_PASSWORD", into: "@e4" },
+    });
+    const batch = t.logged().find((c) => c.args.includes("batch"));
+    expect(JSON.parse(batch?.stdin ?? "[]")).toEqual([["fill", "@e4", value]]);
+    // A request naming another site never gets it, even with the page there: the person sealed it to this one.
+    await t.act("open", ["https://bank.example/login"]);
+    expect(await t.act("agentes:type_secret", ["e4", "SHOP_PASSWORD", "https://bank.example"])).toMatchObject({
+      success: false,
+      error: expect.stringContaining("only for shop.example.com"),
+    });
+    expect(t.logged().filter((c) => c.args.includes("batch"))).toHaveLength(1);
+  },
+);
 
 test.if(posix)("stop closes the agent's browser and its Chrome; a second stop finds nothing", async () => {
   const t = setup();

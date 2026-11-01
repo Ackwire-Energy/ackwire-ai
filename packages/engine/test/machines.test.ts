@@ -1541,10 +1541,43 @@ describe("secrets for a connected machine (ADR 0027)", () => {
   test("a browser password names its site: kept as the origin, shown to the person in the purpose", async () => {
     const { row } = await asking({ target: "env", site: "dashboard.stripe.com/login" });
     expect(row.site).toBe("https://dashboard.stripe.com");
+    // A runner from before keeps every secret in its commands' environment: so does the request (and its card).
+    expect(row.targetKind).toBe("env");
     expect(row.purpose).toBe("publicar o pacote no npm (dashboard.stripe.com)");
     expect(secretSite("https://a.example:8443/x")).toBe("https://a.example:8443");
     expect(secretSite("file:///etc/passwd")).toBeNull();
     expect(secretSite("not a site")).toBeNull();
+  });
+
+  test("a site's password is the browser's alone where the runner keeps it so: its card, its box and the agent say so", async () => {
+    const SITE = "https://dashboard.stripe.com";
+    const { runner, row } = await asking({ target: "env", site: "dashboard.stripe.com/login" }, { sites: true });
+    expect(row).toMatchObject({ targetKind: "site", site: SITE });
+    const [card] = await f.db
+      .select()
+      .from(schema.messages)
+      .where(eq(schema.messages.id, row.messageId as string));
+    const target = { kind: "site" as const, site: SITE };
+    expect((card?.meta as { secretRequest?: SecretRequestView } | undefined)?.secretRequest?.target).toEqual(target);
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const view = { id: row.id, publicKey: row.publicKey, name: row.name, target };
+    // Sealed to its site: a box made for a variable doesn't open.
+    await expect(
+      deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal({ ...view, target: { kind: "env" } })),
+    ).rejects.toThrow("couldn't be opened");
+    await deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal(view));
+    expect(runner.sent.find((x) => x.type === "request" && x.op === "secret" && x.action === "deliver")).toMatchObject({
+      target,
+    });
+    expect(runner.secrets.get("NPM_TOKEN")).toBe(VALUE);
+    await drainOutbox(f.db, f.handlers);
+    const steps = await f.db.select().from(schema.agentRunSteps);
+    const result = (steps.find((x) => x.kind === "tool_result")?.data as { content?: string } | undefined)?.content;
+    expect(result).toContain("your browser types it there (browser_type_secret");
+    expect(result).toContain("It isn't in your commands' environment");
+    expect(await listAgentSecrets(f.db, f.owner.id, f.org.id, f.agent.id)).toEqual([
+      expect.objectContaining({ name: "NPM_TOKEN", target }),
+    ]);
   });
 
   test("owner removes a mixed browser and command secret from its original machine after code is disabled", async () => {
