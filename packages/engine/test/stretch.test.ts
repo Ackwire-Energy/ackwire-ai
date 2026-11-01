@@ -10,6 +10,7 @@ import {
   FOLLOW_UP_TOOL,
   getMessage,
   insertMessage,
+  openAgentDm,
   postPersonMessage,
   postStretchCard,
   receiptsFor,
@@ -495,6 +496,51 @@ test("a tool refused for the spend of the agent it would wake: the card names th
   });
   const go = await answerNow({ db: f.db, pubsub: f.pubsub, gateway: f.gateway }, f.owner.id, f.org.id, card.id);
   expect(go.runs.map((r) => r.agentId)).toEqual([f.agent.id]);
+});
+
+test("a wake-up held inside the agents' DM: its card goes where the person asked, and Continuar starts it in the DM", async () => {
+  f = await setup({ reply: lines({ theo: [], ada: [] }) });
+  const { theo } = await team(f);
+  const asked = await ask(f, "@dev investiga o deploy de staging");
+  const [dev] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, asked.id));
+  if (!dev) throw new Error("no run");
+  await fillStretch(f, theo.id, asked.id, asked.id);
+  const dm = await openAgentDm(f.db, f.org.id, f.agent.id, theo.id);
+  // Dev's note to Theo in their private DM, past Ana's stretch.
+  const note = await f.db.transaction(async (tx) => {
+    const m = await insertMessage(tx, {
+      orgId: f.org.id,
+      channelId: dm.id,
+      author: { type: "agent", agentId: f.agent.id, runId: dev.id, hop: dev.hop },
+      body: "Theo, confere o deploy de staging.",
+      meta: { agentNote: { runId: dev.id } },
+    });
+    expect(await startOrJoinRun(tx, m, theo.id, "dm")).toBeNull();
+    return m;
+  });
+  await drain(f);
+  const [card, ...more] = await cardsOf(f);
+  expect(more).toEqual([]);
+  if (!card) throw new Error("no card");
+  // Where Ana reads, written as Dev's run there: nobody reads the agents' DM.
+  expect(card).toMatchObject({
+    channelId: f.general.id,
+    threadId: null,
+    authorAgentId: f.agent.id,
+    agentRunId: dev.id,
+  });
+  expect(card.meta.actionCard).toMatchObject({
+    forUserId: f.owner.id,
+    agentIds: [theo.id],
+    held: [{ agentId: theo.id, messageId: note.id, trigger: "dm" }],
+  });
+  const go = await answerNow({ db: f.db, pubsub: f.pubsub, gateway: f.gateway }, f.owner.id, f.org.id, card.id);
+  expect(go.runs.map((r) => r.agentId)).toEqual([theo.id]);
+  const [held] = await f.db
+    .select()
+    .from(schema.agentRuns)
+    .where(eq(schema.agentRuns.id, go.runs[0]?.runId ?? ""));
+  expect(held).toMatchObject({ channelId: dm.id, hop: 1, triggerMessageId: note.id });
 });
 
 test("Continuar starts every wake-up the card holds, also one held there after the card was read", async () => {

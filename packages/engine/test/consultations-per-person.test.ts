@@ -108,7 +108,7 @@ describe("tell_agent", () => {
         .where(sql`${schema.messages.meta} ? 'agentNote'`);
 
     expect(await invoke(ctx, "tell_agent", { agent: "@infra", message: "Deploy finished on staging." })).toMatchObject({
-      output: { content: expect.stringContaining("Told @infra") },
+      output: { content: expect.stringContaining("Handed to @infra; it's on it, and the people here can see that.") },
     });
     const again = await invoke(ctx, "tell_agent", { agent: "@infra", message: "deploy  finished on Staging!" });
     expect(again).toMatchObject({
@@ -120,6 +120,25 @@ describe("tell_agent", () => {
     expect(await notes()).toHaveLength(1);
     await invoke(ctx, "tell_agent", { agent: "@infra", message: "Deploy finished on production." });
     expect(await notes()).toHaveLength(2);
+  });
+
+  test("the same note again after it couldn't be done or was never worked on goes out; one still out doesn't", async () => {
+    f = await setup({ askAgent: true });
+    await addInfra();
+    const ctx = await devRunFor(f.owner.id, "@dev pede ao infra para limpar a fila");
+    const tell = () => invoke(ctx, "tell_agent", { agent: "@infra", message: "Limpa a fila de jobs." });
+    const sent = { output: { content: expect.stringContaining("Handed to @infra") } };
+    expect(await tell()).toMatchObject(sent);
+    for (const status of ["failed", "expired"] as const) {
+      await f.db
+        .update(schema.agentConsultations)
+        .set({ status, answeredAt: new Date() })
+        .where(eq(schema.agentConsultations.status, "open"));
+      expect(await tell()).toMatchObject(sent);
+    }
+    expect(await tell()).toMatchObject({ output: { data: { agentNote: { duplicate: true } } } });
+    const rows = await f.db.select().from(schema.agentConsultations).orderBy(asc(schema.agentConsultations.createdAt));
+    expect(rows.map((r) => r.status)).toEqual(["failed", "expired", "open"]);
   });
 
   test("notes compare without case, accents, spacing or trailing punctuation", () => {

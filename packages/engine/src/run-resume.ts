@@ -145,8 +145,9 @@ const ACTIVE: AgentRun["status"][] = ["queued", "running", "waiting_approval", "
  * its conversation); once it ended (or while it is held by a decision), the notice goes to its conversation and
  * joins the agent's run there or starts one, in the run's stretch: past its limits the run is held for the pause
  * card (ADR 0089), and the notice is still read by the agent's next run there. A routine's run that ended hears
- * it where the routine reports, like its approval cards: nobody reads its room. In the caller's transaction;
- * publish with `publishDelivery` after the commit.
+ * it where the routine reports, like its approval cards: nobody reads its room. `wake: false`: only written there,
+ * for a notice that wakes the agent right after it (`reportHandOffs`) or that no run should read. In the caller's
+ * transaction; publish with `publishDelivery` after the commit.
  */
 export async function deliverNoticeToRun(
   tx: Executor,
@@ -164,17 +165,22 @@ export async function deliverNoticeToRun(
     | "background"
   >,
   notice: Notice,
+  options: { wake?: boolean } = {},
 ): Promise<{ message: Message; runs: AgentRun[] }> {
-  const [current] = await tx
-    .select({ id: agentRuns.id, orgId: agentRuns.orgId, status: agentRuns.status })
-    .from(agentRuns)
-    .where(eq(agentRuns.id, run.id))
-    .for("update");
-  // A run held by a decision (an approval, a secret, a mission's) reads nothing new until it comes: the
-  // notice wakes the agent in a run of its own instead.
-  const active = Boolean(current && ACTIVE.includes(current.status) && !(await holdsMessages(tx, current)));
+  const wake = options.wake !== false;
+  let active = false;
+  if (wake) {
+    const [current] = await tx
+      .select({ id: agentRuns.id, orgId: agentRuns.orgId, status: agentRuns.status })
+      .from(agentRuns)
+      .where(eq(agentRuns.id, run.id))
+      .for("update");
+    // A run held by a decision (an approval, a secret, a mission's) reads nothing new until it comes: the
+    // notice wakes the agent in a run of its own instead.
+    active = Boolean(current && ACTIVE.includes(current.status) && !(await holdsMessages(tx, current)));
+  }
   const report = !active && run.background ? (await routineBriefOfRun(tx, run))?.deliverTo : undefined;
-  const delivered = await deliverNotice(tx, {
+  const into = {
     orgId: run.orgId,
     agentId: run.agentId,
     channelId: report?.channelId ?? run.channelId,
@@ -183,9 +189,10 @@ export async function deliverNoticeToRun(
     stretchId: runStretchOf(run),
     notice,
     body: forPeople(notice),
-    wake: !active,
-    trigger: run.trigger === "dm" ? "dm" : "mention",
-  });
+    trigger: run.trigger === "dm" ? ("dm" as const) : ("mention" as const),
+  };
+  if (!wake) return deliverNotice(tx, { ...into, wake: false });
+  const delivered = await deliverNotice(tx, { ...into, wake: !active });
   if (active) {
     await tx
       .update(agentRuns)

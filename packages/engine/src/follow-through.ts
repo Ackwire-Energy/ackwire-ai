@@ -2,6 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, gt, gte, isNotNull, isNull, schema, sql } from "@agenteschat/db";
 import { runAuthority } from "./authority";
 import { requireChannelAccess } from "./channels";
+import { handOffsFrom, sentOpen } from "./consultations";
 import { getChannelCached } from "./context";
 import { publishDelivery } from "./delivery";
 import { eligibleChannelAgents } from "./dispatch";
@@ -27,7 +28,7 @@ import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tool
  * that conversation (`wakeFollowUp`).
  */
 
-const { agentConsultations, agentRuns, messages, routines } = schema;
+const { agentRuns, messages, routines } = schema;
 
 export const FOLLOW_UP_TOOL = "follow_up";
 export const CANCEL_FOLLOW_UP_TOOL = "cancel_follow_up";
@@ -98,6 +99,13 @@ export async function followThroughVerdict(
 export const FOLLOW_THROUGH_NUDGE =
   "You ended saying you would do more, and nothing you set up brings you back to it. Do it now with your tools and tell them what came of it. If it has to wait (a build, a deploy, a job still running), set a follow_up to come back to it and say when, in one line.";
 
+/**
+ * The same, for a run in an agents' DM answering another agent (ADR 0095): its last message goes back as the
+ * answer, and nothing wakes it there again.
+ */
+export const FOLLOW_THROUGH_NUDGE_DM =
+  "You ended saying you would do more, and nothing brings you back here: your answer goes back as it is. Do it now with your tools, then answer with what came of it. If a part needs another agent, hand it on with tell_agent: what comes of it goes back with your answer.";
+
 // ── Coming back by itself (`follow_up`) ──────────────────────────────────────
 
 /** A follow-up notice's refs: the run that set it, when, the people's words for it, and its state. */
@@ -141,16 +149,19 @@ async function pendingFollowUps(
 }
 
 /**
- * Whether something this run set up brings the agent back here by itself, keeping its promise: a follow-up still
- * to come, an agent it asked that hasn't answered (`ask_agent`), a wait it stopped waiting on whose result hasn't
- * come, or a reminder it set to do the work then (`schedule_reminder` with `ask_agent`).
+ * Whether something brings the agent back here by itself, keeping its promise: a follow-up this run set still to
+ * come, a question or work it or an earlier run of it asked or handed off from this conversation that is still out
+ * (`ask_agent`, `tell_agent`, the last day: what comes of it wakes the agent here), a wait it stopped waiting on
+ * whose result hasn't come, or a reminder it set to do the work then (`schedule_reminder` with `ask_agent`). In an
+ * agents' DM only what this run handed on counts: what another run there handed on goes back with that run's answer.
  */
 export async function wakesLater(
   db: Executor,
-  run: Pick<AgentRun, "id" | "orgId" | "agentId" | "channelId" | "createdAt">,
+  run: Pick<AgentRun, "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId" | "createdAt">,
   detachedWaits: { waitId: string }[] = [],
 ) {
-  const [followUp, consultation, reminder] = await Promise.all([
+  const channel = await getChannelCached(db, run.orgId, run.channelId);
+  const [followUp, handedOff, reminder] = await Promise.all([
     db
       .select({ id: messages.id })
       .from(messages)
@@ -167,17 +178,9 @@ export async function wakesLater(
         ),
       )
       .limit(1),
-    db
-      .select({ id: agentConsultations.id })
-      .from(agentConsultations)
-      .where(
-        and(
-          eq(agentConsultations.orgId, run.orgId),
-          eq(agentConsultations.askerRunId, run.id),
-          eq(agentConsultations.status, "open"),
-        ),
-      )
-      .limit(1),
+    channel && isAgentOnlyDm(channel)
+      ? sentOpen(db, run)
+      : handOffsFrom(db, run, { openOnly: true }).then((rows) => rows.length > 0),
     db
       .select({ id: routines.id })
       .from(routines)
@@ -196,7 +199,7 @@ export async function wakesLater(
       )
       .limit(1),
   ]);
-  if (followUp.length > 0 || consultation.length > 0 || reminder.length > 0) return true;
+  if (followUp.length > 0 || handedOff || reminder.length > 0) return true;
   for (const d of detachedWaits) if (!(await lateNoticeSent(db, run, d.waitId))) return true;
   return false;
 }

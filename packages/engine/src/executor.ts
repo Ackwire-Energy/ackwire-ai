@@ -73,7 +73,7 @@ import {
 } from "./cancel";
 import { describeCapabilities, forComputerBrain } from "./capabilities";
 import { REACT_TOOL } from "./chat-tools";
-import { announceConsultationChange, onConsultedRunFinished } from "./consultations";
+import { announceConsultationChange, answersOpen, onConsultedRunFinished } from "./consultations";
 import {
   buildRunContext,
   type ContextBlock,
@@ -95,6 +95,7 @@ import { type ChannelEvent, type MemoryUpdate, publishChannelEvent, publishMessa
 import {
   decisionNudge,
   FOLLOW_THROUGH_NUDGE,
+  FOLLOW_THROUGH_NUDGE_DM,
   FOLLOW_UP_TOOL,
   followThroughVerdict,
   wakesLater,
@@ -703,15 +704,16 @@ async function executeRunInner(
     if (channelRow?.kind === "forum" && status !== "waiting_approval") {
       await onForumRunFinished({ db, pubsub: deps.pubsub }, run.orgId, run.channelId, run.id).catch(() => {});
     }
+    // Paused on a decision (an approval, a secret, a mission's): what came in during this turn and wasn't
+    // read gets a run of its own; nothing sent to the agent waits behind the decision. Before the consultation hook:
+    // a hand-off among them is being worked on again, not waiting on a person (`reportHandOffs`).
+    if ((status === "waiting_approval" || status === "waiting_input") && !run.background)
+      await releaseHeldInbox(db, deps.pubsub, run.id).catch(() => null);
     // It answered another agent's question (ADR 0034): the asking run resumes with the reply.
     if (channelRow && isAgentOnlyDm(channelRow))
       await onConsultedRunFinished({ db, pubsub: deps.pubsub, judge: deps.context?.judge }, run, status, error).catch(
         () => {},
       );
-    // Paused on a decision (an approval, a secret, a mission's): what came in during this turn and wasn't
-    // read gets a run of its own; nothing sent to the agent waits behind the decision.
-    if ((status === "waiting_approval" || status === "waiting_input") && !run.background)
-      await releaseHeldInbox(db, deps.pubsub, run.id).catch(() => null);
     // A routine's run is heard through its ledger (`closeRoutineRun`, on every ending), never from here.
   };
 
@@ -2551,17 +2553,18 @@ async function executeRunInner(
       if (!text && !anythingPosted && !silent) return fail("empty_reply");
       const t = transcript;
       // Work it said it would do still undone, in any language: one judge call, once per run (ADR 0089). When
-      // nothing it set up brings it back (`wakesLater`, read only then), this answer is posted and the run goes on,
-      // told to do it now or come back with a follow-up. Not in the agents' DM: there the last message is the whole
-      // answer another agent reads (`onConsultedRunFinished`), and nobody waits on a follow-up.
+      // nothing brings it back (`wakesLater`, read only then), this answer is posted and the run goes on, told to do
+      // it now or come back with a follow-up. In an agents' DM only a run that still owes another agent its answer
+      // is read (ADR 0095): its last message is that answer, and nothing wakes it there again.
       let keep: string | null = null;
+      const betweenAgents = Boolean(channelRow && isAgentOnlyDm(channelRow));
       if (
         judge &&
         said &&
         !silent &&
         !t.followThroughChecked &&
         run.turns + 1 < maxTurns &&
-        !(channelRow && isAgentOnlyDm(channelRow))
+        (!betweenAgents || (await answersOpen(db, run).catch(() => false)))
       ) {
         t.followThroughChecked = true;
         const detached = (t as { detachedWaits?: { waitId: string }[] }).detachedWaits;
@@ -2573,7 +2576,7 @@ async function executeRunInner(
           reply: said,
         }).catch(() => "done" as const);
         if (verdict === "unkept" && !(await wakesLater(db, run, detached).catch(() => false))) {
-          keep = FOLLOW_THROUGH_NUDGE;
+          keep = betweenAgents ? FOLLOW_THROUGH_NUDGE_DM : FOLLOW_THROUGH_NUDGE;
           appendUserText(t, keep);
           if (plan.kind !== "model") nextPrompt = keep;
           later(() => addRunStep(db, run, "context", { nudged: "promise" }));

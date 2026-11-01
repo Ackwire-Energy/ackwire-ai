@@ -21,6 +21,7 @@ import { talksToAgents } from "./audience";
 import { personOfMessage, runAuthority } from "./authority";
 import { caches } from "./cache";
 import { summarizeScopes } from "./capabilities";
+import { type HandOff, handOffsFrom } from "./consultations";
 import { isAgentOnlyDm } from "./dms";
 import { cutText } from "./format";
 import { issueWorkBrief, issueWorkOf } from "./issue-work";
@@ -59,7 +60,7 @@ export const HOW_YOU_WORK = [
   "- Internal changes you can undo need no permission: do them and say what you did. That is creating or updating issues (status, priority, assignee, labels, due date), assigning work, saving or changing memories you were asked to keep, creating or changing routines, adding an agent to a channel, writing the wiki when asked, renaming or closing a thread. The person sees each change under your reply with an Undo button. If work you were asked about has no owner, don't just say someone must take it: assign it (to the agent or person whose role fits, or yourself) or do it.",
   "- Ask only for decisions that are really the person's (product choices, priorities) or before actions that are external or can't be undone: merge, deploy, rollback, anything sent outside the organization (email, messages, payments), deleting what can't be restored. Never ask permission to look, and never ask for information your tools can find. When you recommend a sensitive action nobody asked for (a rollback, a deploy), say it in your reply with what and why; don't call its tool or `ask_user` for it. For a product choice, lay out the data and the trade-off, then ask the one question that decides it.",
   "- State only what your tools or your context returned; when a search finds nothing, say so instead of filling the gap. Never claim you lack access to something a tool just returned.",
-  "- When you have no access to something, say so plainly and who has it (a person or another agent here); never say you haven't looked yet or that you will check later.",
+  "- When a way is closed (no access, a refusal, nothing found), take another that still gets the people what they need: another tool, the colleague whose role covers it, a document or a copy instead of a move. Only when none works, say so plainly: what you tried, who has the access (a person or another agent here) and the one thing a person must do. Never say you haven't looked yet or that you will check later.",
   "- Lead with the answer. When asked why you couldn't do something, skip the why and the apology: do it now and give the answer. Match the length asked for; when the person asked for an internal change (an issue created, a routine changed), confirm it in one or two lines: the details show under your reply. A change you made on your own doesn't shorten the answer to the question asked, and findings you also recorded somewhere (an issue, a comment, memory) are still said in the reply: the numbers, ids and times, with the link as an extra, never instead. A thanks or an ok asks nothing: answer in a line or react, without looking anything up.",
   "- Work in one go: chain tool calls in the same turn until you can give a real answer.",
   "- Say a proposal, a recommendation or a question once. If you already made it in this conversation and nobody took it up, don't bring it up again: no reminders, no 'still waiting for your ok', no new card about it. The people saw it; silence is their answer for now. Raise it again only when something new changes it, and then lead with what changed.",
@@ -324,6 +325,9 @@ export async function buildRunContext(
       : openTasksBrief(db, run.orgId, agent.id, run.channelId, options.issueTools === true).catch(() => null);
   const trigger = triggerRows[0];
   if (!org || !channel || !trigger) throw new Error("run context is incomplete (org, channel or trigger missing)");
+  // Like the open tasks: not for a routine's own task, and not between agents (that run answers one agent).
+  const handOffs =
+    options.routine || run.background || isAgentOnlyDm(channel) ? null : handOffsFrom(db, run).catch(() => null);
 
   const upToTrigger = lte(messages.createdAt, trigger.createdAt);
   const rootIsTrigger = run.threadRootId === trigger.id;
@@ -723,16 +727,23 @@ export async function buildRunContext(
         : channel.kind === "forum"
           ? `# Where you are\nThe forum topic "${channel.topic}": an asynchronous discussion in rounds among ${memberList}. You speak once per round, when it's your turn (the latest "[Forum]" message says the round and the goal). Bring your own view and data from your tools; agree or disagree with reasons, and address the others with @ (they answer in their turn; mentions start nobody). Don't repeat what was already said; if you have nothing new, say so in one line. Write your post as the reply text.`
           : agentsDm
-            ? `# Where you are\nA private conversation between agents: ${memberList}. Another agent is asking you for help (\`ask_agent\`) or leaving you a note (\`tell_agent\`) about work it is doing ${behindName ? `for ${behindName}` : "on its own, for no person"}; your reply goes back to it, and no person reads this conversation. You see only the exchanges here made for ${behindName ?? "no person"}. Answer its question directly and completely with your own knowledge and tools, as one agent briefing another (facts, values, steps; no greetings); for a note, do what it asks within your own permissions and reply only with what matters. Don't ask questions back: if something is missing, say what in your answer. ${
+            ? [
+                "# Where you are",
+                `A private conversation between agents: ${memberList}. Another agent asked you something (\`ask_agent\`) or handed you work or news (\`tell_agent\`) ${behindName ? `for ${behindName}` : "on its own, for no person"}. Your last message is your answer: it goes back to that agent, and no person reads this conversation. You see only the exchanges here made for ${behindName ?? "no person"}.`,
+                "- A question: answer it directly and completely with your own knowledge and tools, as one agent briefing another (facts, values, steps; no greetings).",
+                "- Work: do all of it now with your tools and check that it worked, then answer with what came of it: what you did, where it is, what is left and why.",
+                "- A part only another agent can do: hand it on yourself (tell_agent) and end your turn saying what you handed on. What comes of it goes back with your answer.",
+                "- News that something will come from someone else: don't look for it now and don't report it missing; answer in one line that you'll take it when it comes.",
+                "- Don't ask the other agent questions back: if something is missing, say what in your answer.",
                 behindName
                   ? "You act for the person behind the request: tools that need a person's request (routines, reminders) accept it, within your own permissions. Anything sensitive still needs a person's approval."
-                  : "Nobody is behind it: do it as yourself, within your own permissions; what needs a person's request (routines, reminders) is refused, and anything sensitive needs a person's approval."
-              }`
+                  : "Nobody is behind it: do it as yourself, within your own permissions; what needs a person's request (routines, reminders) is refused, and anything sensitive needs a person's approval.",
+              ].join("\n")
             : channel.kind === "dm"
               ? `# Where you are\nA direct conversation. Participants: ${memberList}. Answer every message here; you don't need to be mentioned.`
               : `# Where you are\nChannel #${channel.name}${channel.topic ? ` (topic: ${channel.topic})` : ""}, replying ${flat ? "in the channel" : "in a thread"}. Members: ${memberList}.${
                   otherAgents
-                    ? `\nOther agents here and what they can do: ${otherAgents}. Never answer for another agent or guess its permissions: say what this list shows, or ask it yourself (ask_agent) when you need its help for the task, or leave it a note without waiting for an answer (tell_agent) when it should know or do something. Never relay to another agent what the person asked that agent directly: it got the message and answers it itself. An @mention of an agent wakes it: mention one only to hand it work or ask it something, never to thank or confirm${options.followUp ? ", and to wait for something use follow_up, not a mention" : ""}. Never name your tools to people.`
+                    ? `\nOther agents here and what they can do: ${otherAgents}. Never answer for another agent or guess its permissions: say what this list shows, or ask it yourself (ask_agent) when you need its answer, or hand it work or news (tell_agent): what comes of either reaches you here by itself. Never relay to another agent what the person asked that agent directly: it got the message and answers it itself. An @mention of an agent wakes it: mention one only to hand it work or ask it something, never to thank or confirm${options.followUp ? ", and to wait for something use follow_up, not a mention" : ""}. Never name your tools to people.`
                     : ""
                 }${
                   // The team's coordinator (ADR 0093): what nobody else took comes to it.
@@ -761,6 +772,12 @@ export async function buildRunContext(
     // Per turn and read whole, like memory: it changes between runs, and a live computer session keeps the
     // system prompt it started with.
     ...(openTasks ? await openTasks.then((text) => (text ? [{ turn: true, found: true, text }] : [])) : []),
+    ...(handOffs
+      ? await handOffs.then((rows) => {
+          const text = rows && handOffsBlock(rows, zone);
+          return text ? [{ turn: true, found: true, text }] : [];
+        })
+      : []),
   ];
   const systemChars = system.reduce((n, b) => n + b.text.length, 0);
 
@@ -770,6 +787,54 @@ export async function buildRunContext(
     stats: { historyMessages: history.length, systemChars, truncated: thread.length >= options.maxMessages },
     issueId: workIssueId ?? (typeof trigger.meta?.issueId === "string" ? trigger.meta.issueId : null),
   };
+}
+
+/** A quote of another agent's words or the agent's own note, short and with no @mention to copy into a reply. */
+function handOffQuote(text: string) {
+  const plain = text.replace(/@/g, "").replace(/\s+/g, " ").trim();
+  return plain.length > 140 ? `${plain.slice(0, 140)}…` : plain;
+}
+
+/** Where the colleague of a hand-off still out is, from its run. */
+function handOffState(h: HandOff) {
+  const t = h.target;
+  if (!t) return "not started: the agents reached what they may do on their own; a person can let it go on (Continuar)";
+  if (t.status === "queued") return "starting";
+  if (t.status === "waiting_approval") return "waiting for a person's approval";
+  if (t.status === "waiting_input")
+    return t.waitingMachineId ? "waiting for its computer to come back" : "waiting for a person's answer";
+  if (t.status !== "running" && t.handedOn) return "did its part and waits for agents it handed some to";
+  return "working on it";
+}
+
+/**
+ * "# Work you handed off here" (ADR 0095): what the agents this one handed work to or asked from this conversation
+ * are doing, read every turn, so it says who has what and since when instead of checking again or saying nothing
+ * happened. An answer's start shows only until the agent has heard it. Null with none.
+ */
+export function handOffsBlock(rows: HandOff[], zone: string, now = new Date()): string | null {
+  if (rows.length === 0) return null;
+  const timeZone = safeZone(zone);
+  const at = (d: Date) => clockTime(d, timeZone, now);
+  const lines = rows.map((h) => {
+    const since = `@${h.handle}, since ${at(h.createdAt)}`;
+    if (h.status === "open")
+      return `- ${since} (${ago(h.createdAt, now.getTime())}): ${handOffState(h)}. ${
+        h.kind === "note" ? "You handed it" : "You asked"
+      }: "${handOffQuote(h.question)}"`;
+    const when = at(h.answeredAt ?? now);
+    if (h.status === "answered")
+      return `- ${since}: done at ${when}${!h.reportedAt && h.answer ? `: "${handOffQuote(h.answer)}"` : ""}`;
+    if (h.status === "failed")
+      return `- ${since}: couldn't finish at ${when}: ${handOffQuote(h.answer ?? "its run failed")}`;
+    return `- ${since}: no answer by ${when}`;
+  });
+  return [
+    "# Work you handed off here",
+    `What the agents you handed work to or asked from here are doing, as of this turn (${timeZone}):`,
+    ...lines,
+    "Each outcome reaches you here by itself, even after your turn ends; what you handed off in one turn comes back together. Until then don't check on it, send it again or do its part. If someone asks, say who has what and since when; never say a colleague hasn't answered or that nothing happened while its part is open.",
+  ].join("\n");
 }
 
 /** The root of a thread made from a range carries only its title: say what it is. */

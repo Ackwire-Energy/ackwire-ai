@@ -48,6 +48,10 @@ test("a big team is only a count with a pointer to find_agent", () => {
   const text = teamPrompt(team, "a0", null, new Set());
   expect(text).toContain("19 other agents work in this organization.");
   expect(text).not.toContain("@a1");
+  // Who to ask and who to hand work to, and that what comes of either comes back by itself (ADR 0095).
+  expect(text).toContain(
+    "When you need another agent's answer for the task, ask it with `ask_agent`; to hand one work, use `tell_agent`, giving the whole job to the agent that owns it with everything it needs. Do this instead of saying you can't or sending the person to it. Either way the call returns at once and what comes of it reaches you here by itself.",
+  );
 });
 
 test("an agent knows the org's other agents it can work with, even outside its channels", async () => {

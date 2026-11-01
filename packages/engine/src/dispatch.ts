@@ -133,7 +133,7 @@ export async function startOrJoinRun(
   if (!options.granted && trigger !== "forum" && !options.background && message.hop >= 1) {
     const stop = await stretchStop(tx, message.orgId, stretchOf(message), agentId, message.id);
     if (stop) {
-      await pauseStretch(tx, message.orgId, holdOf(message, agentId, trigger, stop));
+      await pauseStretch(tx, message.orgId, await holdOf(tx, message, agentId, trigger, stop));
       return null;
     }
   }

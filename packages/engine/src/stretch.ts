@@ -32,6 +32,12 @@ const { agentConsultations, agentRuns, agents, channels, messages, usageRecords 
  */
 export const STRETCH = { runs: 50, unattendedRuns: 10, budgetShare: 0.2 } as const;
 
+/**
+ * How many links up a chain of questions and hand-offs between agents the walks to where people read go
+ * (`peopleRun`, `consultationOrigin`): notes have no depth cap of their own, the stretch bounds them.
+ */
+export const MAX_HANDOFF_LINKS = 10;
+
 /** The outbox job that posts (or extends) a stretch's pause card. */
 export const STRETCH_JOB = "stretch.paused";
 
@@ -122,24 +128,55 @@ export async function pauseStretch(tx: Executor, orgId: string, hold: StretchHol
   });
 }
 
-/** What `startOrJoinRun` holds: `agentId` woken by `message` (an agent's, at hop 1 or more) past its stretch. */
-export const holdOf = (
-  message: Pick<Message, "id" | "channelId" | "threadId" | "hop" | "stretchId" | "authorAgentId" | "agentRunId">,
+/**
+ * What `startOrJoinRun` holds: `agentId` woken by `message` (an agent's, at hop 1 or more) past its stretch. Held
+ * inside the agents' private DM, its card goes where the people of this work read: with the run that wrote the
+ * message, up the chain (`peopleRun`). Continuar still starts the held run in that DM.
+ */
+export async function holdOf(
+  tx: Executor,
+  message: Pick<
+    Message,
+    "id" | "orgId" | "channelId" | "threadId" | "hop" | "stretchId" | "authorAgentId" | "agentRunId"
+  >,
   agentId: string,
   trigger: RunTrigger,
   stop: StretchStop,
-): StretchHold => ({
-  stretchId: stretchOf(message),
-  channelId: message.channelId,
-  threadId: message.threadId,
-  authorAgentId: message.authorAgentId ?? agentId,
-  runId: message.agentRunId,
-  hop: message.hop,
-  agentId,
-  messageId: message.id,
-  trigger,
-  stop,
-});
+): Promise<StretchHold> {
+  const hold: StretchHold = {
+    stretchId: stretchOf(message),
+    channelId: message.channelId,
+    threadId: message.threadId,
+    authorAgentId: message.authorAgentId ?? agentId,
+    runId: message.agentRunId,
+    hop: message.hop,
+    agentId,
+    messageId: message.id,
+    trigger,
+    stop,
+  };
+  const [channel] = await tx
+    .select({ kind: channels.kind, dmKey: channels.dmKey })
+    .from(channels)
+    .where(and(eq(channels.orgId, message.orgId), eq(channels.id, message.channelId)));
+  const [writer] =
+    channel && isAgentOnlyDm(channel) && message.agentRunId
+      ? await tx
+          .select()
+          .from(agentRuns)
+          .where(and(eq(agentRuns.orgId, message.orgId), eq(agentRuns.id, message.agentRunId)))
+      : [];
+  if (!writer) return hold;
+  const at = await peopleRun(tx, writer);
+  return {
+    ...hold,
+    channelId: at.channelId,
+    threadId: replyThreadOf(at),
+    authorAgentId: at.agentId,
+    runId: at.id,
+    hop: at.hop,
+  };
+}
 
 type ToolRun = Pick<
   AgentRun,
@@ -177,9 +214,9 @@ export async function refusedAtLimit(db: Database, run: ToolRun, wakes: string):
  * The run whose conversation people read: this one, or for a run in the agents' private DM (answering another
  * agent's question or note) the run that asked, up the chain.
  */
-async function peopleRun(db: Database, run: ToolRun): Promise<ToolRun> {
+async function peopleRun(db: Executor, run: ToolRun): Promise<ToolRun> {
   let at = run;
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < MAX_HANDOFF_LINKS; i++) {
     const [channel] = await db
       .select({ kind: channels.kind, dmKey: channels.dmKey })
       .from(channels)
@@ -440,6 +477,18 @@ export async function continueStretch(
       if (!active) continue;
       const out = await startOrJoinRun(tx, trigger, h.agentId, h.trigger, { granted: stretchId });
       if (!out) continue;
+      // A question or a note the stretch held is answered by the run that takes it now (ADR 0095).
+      await tx
+        .update(agentConsultations)
+        .set({ targetRunId: "created" in out ? out.created.id : out.joined })
+        .where(
+          and(
+            eq(agentConsultations.orgId, message.orgId),
+            eq(agentConsultations.messageId, trigger.id),
+            eq(agentConsultations.status, "open"),
+            isNull(agentConsultations.targetRunId),
+          ),
+        );
       if ("joined" in out) {
         await rerootRun(tx, { id: out.joined }, stretchId);
         // Should that run end before reading it, the run it is handed on to counts in the new stretch, not in the

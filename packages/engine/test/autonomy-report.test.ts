@@ -745,7 +745,7 @@ describe("rows as the server writes them", () => {
     const held = await message({ at: said, by: ops, body: "@dev sobe o staging", mentions: [f.agent.id] });
     await message({ at: new Date(said.getTime() + 1000), by: ops, body: "@dev e a produção", mentions: [f.agent.id] });
     const stop = { reason: "runs", limit: STRETCH.unattendedRuns } as const;
-    await postStretchCard({ db: f.db, pubsub: f.pubsub }, f.org.id, holdOf(held, f.agent.id, "mention", stop));
+    await postStretchCard({ db: f.db, pubsub: f.pubsub }, f.org.id, await holdOf(f.db, held, f.agent.id, "mention", stop));
     const [day] = await autonomyRows(f.db, { from: said.toISOString().slice(0, 10), days: 1 });
     expect(day).toMatchObject({ mentionNoRun: 1, limitStops: 1, stalls: 2 });
   });
