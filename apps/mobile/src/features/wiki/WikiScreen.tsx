@@ -473,9 +473,10 @@ function WikiPage({ slug }: { slug: string }) {
     );
   };
 
+  const person = p?.updatedBy.onBehalfOf ? dir.memberById.get(p.updatedBy.onBehalfOf)?.name : undefined;
   const by = p
-    ? p.updatedBy.onBehalfOf
-      ? t("wiki.byFor", { name: dir.nameOf(p.updatedBy), person: p.updatedBy.onBehalfOf })
+    ? person
+      ? t("wiki.byFor", { name: dir.nameOf(p.updatedBy), person })
       : t("wiki.by", { name: dir.nameOf(p.updatedBy) })
     : "";
   return (
@@ -676,9 +677,8 @@ export function WikiHistoryScreen({ slug }: { slug: string }) {
       </Text>
       {history.isLoading ? <ActivityIndicator color={c.muted} style={styles.loading} /> : null}
       {(history.data ?? []).map((v, i) => {
-        const who = v.author.onBehalfOf
-          ? t("wiki.byFor", { name: dir.nameOf(v.author), person: v.author.onBehalfOf })
-          : dir.nameOf(v.author);
+        const person = v.author.onBehalfOf ? dir.memberById.get(v.author.onBehalfOf)?.name : undefined;
+        const who = person ? t("wiki.byFor", { name: dir.nameOf(v.author), person }) : dir.nameOf(v.author);
         const note = noteOf(v);
         return (
           <View key={v.version}>

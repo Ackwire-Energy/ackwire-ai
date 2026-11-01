@@ -178,6 +178,25 @@ export function pixelsAlong(a: Point, b: Point): Point[] {
   return out;
 }
 
+/** The selected star's ring: twelve small squares around it. */
+export function ringAround(at: Point, radius: number): Point[] {
+  return Array.from({ length: 12 }, (_, i) => {
+    const angle = (i / 12) * Math.PI * 2;
+    return { x: Math.round(at.x + Math.cos(angle) * radius) - 1, y: Math.round(at.y + Math.sin(angle) * radius) - 1 };
+  });
+}
+
+/** The zoom and the world's point at the middle that frame every star in a window (never closer than 1:1). */
+export function frameStars(at: Map<string, Point>, width: number, height: number) {
+  const points = [...at.values()];
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const room = 96;
+  const zoom = Math.min(1, (width - room) / Math.max(x1 - x0, 1), (height - room) / Math.max(y1 - y0, 1));
+  return { zoom, center: { x: (x0 + x1) / 2, y: (y0 + y1) / 2 } };
+}
+
 const STAR_SPRITE: readonly (readonly [number, number])[] = [
   [0, -3],
   [0, -2],

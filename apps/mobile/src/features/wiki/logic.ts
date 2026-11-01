@@ -1,3 +1,4 @@
+import { type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
 import type { WikiPageSummary } from "@agenteschat/client";
 import { parseWikiToken } from "@agenteschat/client/lib/markdown";
 import { type WikiFolder, wikiTree } from "@agenteschat/client/lib/wiki";
@@ -85,7 +86,9 @@ export type DocBlock =
   | { kind: "bullet"; runs: DocRun[]; ordinal: string | null }
   | { kind: "task"; runs: DocRun[]; done: boolean; line: number }
   | { kind: "quote"; runs: DocRun[] }
-  | { kind: "code"; text: string };
+  | { kind: "code"; text: string }
+  | { kind: "table"; header: string[]; rows: string[][]; align: TableAlign[] }
+  | { kind: "rule" };
 
 /** A line's `[[links]]` apart from its words; an embed (`![[foto.png]]`) stays as its name, in italics. */
 export function docRuns(text: string): DocRun[] {
@@ -102,7 +105,7 @@ export function docRuns(text: string): DocRun[] {
   return out;
 }
 
-/** A page's text as blocks: headings, paragraphs, lists, tasks, quotes and code (fenced). */
+/** A page's text as blocks: headings, paragraphs, lists, tasks, quotes, code (fenced), tables and rules. */
 export function docBlocks(body: string): DocBlock[] {
   const out: DocBlock[] = [];
   const lines = body.split("\n");
@@ -124,6 +127,18 @@ export function docBlocks(body: string): DocBlock[] {
     }
     if (!line.trim()) {
       flush();
+      continue;
+    }
+    const table = tableAt(lines, n);
+    if (table) {
+      flush();
+      out.push({ ...table.table, kind: "table" });
+      n = table.next - 1;
+      continue;
+    }
+    if (/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
+      flush();
+      out.push({ kind: "rule" });
       continue;
     }
     const heading = /^(#{1,6})\s+(.*)$/.exec(line);

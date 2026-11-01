@@ -4,13 +4,13 @@ import { memo, useMemo } from "react";
 import { Pressable, Text as RNText, ScrollView, StyleSheet, View } from "react-native";
 import { Icon, Text } from "@/ui";
 import { parseInline } from "../chat/logic";
-import { Spans } from "../chat/MessageSpans";
+import { Spans, Table } from "../chat/MessageSpans";
 import { useColors } from "../shared/hooks";
 import { MONO, tapHaptic } from "../shared/parts";
 import { type DocBlock, type DocRun, docBlocks } from "./logic";
 
 /**
- * A page as it reads: headings, paragraphs, lists, quotes and code, with the chat's marks; a
+ * A page as it reads: headings, paragraphs, lists, quotes, code, tables and rules, with the chat's marks; a
  * `[[link]]` to a page that exists in the accent (it opens), to one that doesn't yet dashed (it creates); tasks
  * check with a tap when the person may edit (`onToggleTask`, the task's line in the text).
  */
@@ -120,6 +120,10 @@ function Block({
           </Text>
         </ScrollView>
       );
+    case "table":
+      return <Table header={b.header} rows={b.rows} align={b.align} />;
+    case "rule":
+      return <View style={[styles.rule, { backgroundColor: c.line2 }]} />;
   }
 }
 
@@ -169,6 +173,7 @@ const styles = StyleSheet.create({
   box: { width: 20, height: 20, borderRadius: 6, marginTop: 2, alignItems: "center", justifyContent: "center" },
   quote: { borderLeftWidth: 3, paddingLeft: 12 },
   code: { borderRadius: 12, padding: 12 },
+  rule: { height: StyleSheet.hairlineWidth, marginVertical: 8 },
   mono: { fontFamily: MONO, fontSize: 14, lineHeight: 20 },
   link: { fontWeight: "500" },
   missing: { textDecorationLine: "underline", textDecorationStyle: "dashed" },

@@ -2,11 +2,13 @@ import { describe, expect, test } from "bun:test";
 import type { Memory, WikiGraph } from "@agenteschat/client";
 import {
   aroundStar,
+  frameStars,
   MAP_MEMORIES,
   memoryMap,
   namedStars,
   pixelsAlong,
   placeStars,
+  ringAround,
   wikiMap,
 } from "../../src/features/constellation/logic";
 import { agentFilters, justLearned, mostUsed, searchMemories } from "../../src/features/memory/logic";
@@ -118,6 +120,22 @@ describe("drawing it", () => {
     expect(named.has("m0")).toBe(true);
     expect(named.has("ada")).toBe(false);
     expect(named.has("m1")).toBe(true);
+  });
+
+  test("a sky only to look at frames every star", () => {
+    const at = new Map([
+      ["a", { x: 56, y: 56 }],
+      ["b", { x: 284, y: 284 }],
+    ]);
+    const { zoom, center } = frameStars(at, 343, 170);
+    expect(center).toEqual({ x: 170, y: 170 });
+    expect(228 * zoom).toBeLessThanOrEqual(170 - 96);
+  });
+
+  test("the ring has twelve squares around the star", () => {
+    const ring = ringAround({ x: 100, y: 100 }, 14);
+    expect(ring).toHaveLength(12);
+    expect(ring[0]).toEqual({ x: 113, y: 99 });
   });
 
   test("a line is small squares on a 2-point grid", () => {

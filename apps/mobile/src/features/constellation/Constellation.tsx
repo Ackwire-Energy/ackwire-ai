@@ -12,16 +12,18 @@ import Animated, {
 } from "react-native-reanimated";
 import { useLivePaused } from "@/agent/live";
 import { Dither } from "@/sky/Dither";
-import { Icon, PixelOrbit, Text } from "@/ui";
+import { Icon, Text } from "@/ui";
 import { useReducedMotion } from "@/ui/theme";
 import { Face } from "../shared/Face";
 import { useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import {
+  frameStars,
   namedStars,
   pixelsAlong,
   placeStars,
   type Point,
+  ringAround,
   type Star,
   type StarLink,
   type StarMap,
@@ -107,11 +109,6 @@ function StarSpot({
       onPress={() => onPress?.(star.id)}
       style={[styles.spot, { left: at.x - SPOT / 2, top: at.y - SPOT / 2 }]}
     >
-      {selected && !agent ? (
-        <View style={styles.ring}>
-          <PixelOrbit color="sky" size={32} />
-        </View>
-      ) : null}
       {agent ? <Face who={{ type: "agent", id: star.id }} size={body} /> : null}
       {named || selected ? (
         <View style={[styles.name, { top: SPOT / 2 + (agent ? body / 2 + 3 : 9) }]} pointerEvents="none">
@@ -157,13 +154,16 @@ export function Constellation({ map, selected, height, onSelect }: Constellation
 
   useEffect(() => {
     if (!width) return;
-    const p = (selected ? at.get(selected) : undefined) ?? { x: side / 2, y: side / 2 };
+    // Only to look at: every star in the frame. To explore: the selected star in the middle.
+    const framed = onSelect || at.size === 0 ? null : frameStars(at, width, height);
+    if (framed) zoom.value = framed.zoom;
+    const p = framed?.center ?? (selected ? at.get(selected) : undefined) ?? { x: side / 2, y: side / 2 };
     const toX = width / 2 - p.x * zoom.value;
     const toY = height / 2 - p.y * zoom.value;
     x.value = placed.current ? withTiming(toX, FOCUS) : toX;
     y.value = placed.current ? withTiming(toY, FOCUS) : toY;
     placed.current = true;
-  }, [selected, at, width, height, side, x, y, zoom]);
+  }, [selected, at, width, height, side, x, y, zoom, onSelect]);
 
   const art = useMemo(() => {
     const line = (hot: boolean) =>
@@ -183,7 +183,10 @@ export function Constellation({ map, selected, height, onSelect }: Constellation
       for (const [dx, dy] of spriteOf(s.kind)) list.push({ x: p.x + dx * cell - 1, y: p.y + dy * cell - 1 });
       if (s.kind === "memory") tinted.set(agentColor(s, dir), list);
     }
+    const chosen = map.stars.find((s) => s.id === selected);
+    const spot = chosen ? at.get(chosen.id) : undefined;
     return {
+      ring: squares(spot && chosen ? ringAround(spot, chosen.kind === "agent" ? 27 : 14) : [], 2),
       dim: squares(line(false), 1.5),
       hot: squares(line(true), 2),
       white: squares(white, 2),
@@ -220,6 +223,7 @@ export function Constellation({ map, selected, height, onSelect }: Constellation
           <Path path={art.dim} color={LINE} opacity={0.26} />
           <Path path={art.hot} color={LINE} opacity={0.85} />
           <Path path={art.white} color="#ffffff" />
+          <Path path={art.ring} color="#ffffff" />
           {art.tinted.map((t) => (
             <Path key={t.color} path={t.path} color={t.color} />
           ))}
@@ -318,7 +322,6 @@ const styles = StyleSheet.create({
   window: { overflow: "hidden", backgroundColor: NIGHT },
   world: { position: "absolute", left: 0, top: 0, transformOrigin: "left top" },
   spot: { position: "absolute", width: SPOT, height: SPOT, alignItems: "center", justifyContent: "center" },
-  ring: { position: "absolute" },
   name: {
     position: "absolute",
     width: 112,
