@@ -374,3 +374,15 @@ test("a quick run never wipes another live run's routine line; a timed own line 
   await f.db.update(schema.agentRuns).set({ heartbeatAt: later }).where(eq(schema.agentRuns.id, long.id));
   expect(await presenceOf(f, later)).toMatchObject({ presence: "busy", status: { text: "Deploy da v2" } });
 });
+
+test("an agent hidden from a member keeps its presence but not its line (it can name a routine)", async () => {
+  f = await setup();
+  const outsider = await addMember(f.db, f.org.id, "member", "caio");
+  const routine = await runOf(f, { background: true });
+  await startRunStatus({ db: f.db }, routine, [{ key: "c0", kind: "routine", subject: "Relatório", text: "x" }], null);
+  await f.db.update(schema.agents).set({ audienceMode: "owner" }).where(eq(schema.agents.id, f.agent.id));
+  const of = async (userId: string) =>
+    (await agentStatuses(f.db, userId, f.org.id)).find((s) => s.agentId === f.agent.id);
+  expect(await of(outsider.id)).toMatchObject({ presence: "busy", status: null });
+  expect((await of(f.owner.id))?.status).toMatchObject({ kind: "routine", subject: "Relatório" });
+});
