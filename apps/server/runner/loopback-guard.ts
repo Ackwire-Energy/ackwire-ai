@@ -2,8 +2,8 @@ import { readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { NETWORK_ENV } from "./accounts";
 import { browserBand, checkEphemeralRange, EPHEMERAL_RANGE_FILE, validateBrowserUidRange } from "./browser-ports";
-import { networkMarkExemption, validateNetworkMark } from "./network-mark";
 import { parseService } from "./config";
+import { networkMarkExemption, validateNetworkMark } from "./network-mark";
 import { AGENTS_CGROUP, agentCgroup, agentSlice, type RunCommand, runSync, systemdBooted } from "./service";
 
 /**

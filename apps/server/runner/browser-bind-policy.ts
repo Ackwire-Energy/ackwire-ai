@@ -143,9 +143,10 @@ export function ensureBrowserBindPolicy(user: AgentUser, runner: string[], opts:
   // Pick currently unused ports. EADDRINUSE is not proof of
   // enforcement, and the child only succeeds for EPERM/EACCES on IPv4+6.
   const network = networkPrefix(user);
-  const socketsInNetwork = () => network.length
-    ? run(network[0] as string, [...network.slice(1), "/usr/bin/ss", "-Htln", "-e"])
-    : run("ss", ["-Htln", "-e"]);
+  const socketsInNetwork = () =>
+    network.length
+      ? run(network[0] as string, [...network.slice(1), "/usr/bin/ss", "-Htln", "-e"])
+      : run("ss", ["-Htln", "-e"]);
   const sockets = socketsInNetwork();
   if (sockets.code !== 0) throw new Error(`Cannot inspect browser bind test ports: ${sockets.output.slice(0, 200)}`);
   const wrongOwner = conflictingBrowserPorts(sockets.output, [user.uid, user.uid]);
