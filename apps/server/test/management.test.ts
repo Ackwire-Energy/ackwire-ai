@@ -73,7 +73,7 @@ test("management API: settings, overview, people, invitations, credentials, agen
   const run = (await (await api(`/runs/${runs.runs[0]?.id}`)).json()) as {
     steps: { kind: string; data: Record<string, unknown> }[];
   };
-  expect(run.steps.map((s) => s.kind)).toEqual(["context", "model_call", "message"]);
+  expect(run.steps.map((s) => s.kind)).toEqual(["context", "model_call", "context", "message"]);
   expect(run.steps.find((s) => s.kind === "model_call")?.data).not.toHaveProperty("costNanoUsd");
 
   const usage = (await (await api("/usage/report")).json()) as {

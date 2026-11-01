@@ -27,6 +27,7 @@ import { recordOperatorEvent } from "./operator-events";
 import { can, getMembership, type Membership, requirePermission } from "./organizations";
 import { DEFAULT_AGENT_SCOPES, grantScopes } from "./tools/scopes";
 import { resyncBudgetCounter } from "./usage";
+import { resumeBudgetWaits } from "./usage-pause";
 
 const { agents, importItems, machines, organizationMembers, providerCredentials } = schema;
 
@@ -388,7 +389,11 @@ export async function updateAgent(
       details: { name: agent.name, changed, ...shown },
     });
   }
-  if (input.monthlyBudgetNanoUsd !== undefined) await resyncBudgetCounter(db, orgId, agentId);
+  if (input.monthlyBudgetNanoUsd !== undefined) {
+    await resyncBudgetCounter(db, orgId, agentId);
+    // Its runs that wait for the budget look again now: one that still doesn't fit parks again quietly.
+    await resumeBudgetWaits(db, orgId, agentId);
+  }
   // Its API model or key is "Quem pensa" only while it thinks through the API.
   const thinking = input.model !== undefined || input.credentialId !== undefined;
   if (thinking && options.remember !== false && !isComputerBrain(agent.brain)) {

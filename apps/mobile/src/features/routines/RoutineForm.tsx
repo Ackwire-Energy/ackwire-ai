@@ -8,7 +8,9 @@ import {
   useRuleDescribe,
   useRuleParse,
 } from "@agenteschat/client";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { splitAddresses } from "@agenteschat/client/lib/mail";
+import { routineReachWarnings } from "@agenteschat/client/lib/reach";
 import { busyOnComputer, runsPerDay } from "@agenteschat/client/lib/routine-view";
 import { timezoneName, zoneDisplayName } from "@agenteschat/client/lib/routines";
 import { router } from "expo-router";
@@ -30,9 +32,11 @@ import {
   Text,
   useToast,
 } from "@/ui";
+import { boldRuns } from "../chat/actions";
+import { AllowTalkPill } from "../chat/ReachLines";
 import { ZoneList } from "../me/AccountPage";
 import { AgentFace } from "../shared/Face";
-import { useColors, useDirectory, useEdition, useNamesComputers, useOrgId } from "../shared/hooks";
+import { useColors, useDirectory, useEdition, useMeId, useNamesComputers, useOrgId } from "../shared/hooks";
 import { goBack, PushedHeader, successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { useFailed, useMyZone, useSay, useTargetLabel } from "./hooks";
@@ -117,6 +121,9 @@ function Form({ routine }: { routine: Routine | undefined }) {
   const failed = useFailed();
   const say = useSay();
   const dir = useDirectory();
+  const me = useMeId();
+  // Whose reach the routine has: its creator (kept on edit), else whoever creates it now.
+  const creator = routine?.createdByUserId ?? me;
   const channels = useChannels(orgId);
   const mailboxes = useMailAccounts(orgId);
   const targetLabel = useTargetLabel();
@@ -677,6 +684,30 @@ function Form({ routine }: { routine: Routine | undefined }) {
           ))}
         </GroupedList>
         <GroupedFooter>{t("routines.access.hint")}</GroupedFooter>
+        {routineReachWarnings(d.prompt, dir.agents, {
+          access: d.access,
+          agentId: d.agentId || null,
+          creatorUserId: creator === me ? null : creator,
+        }).map((w) => (
+          <View key={w.agent.id} style={styles.warning}>
+            <Text variant="footnote" tone="ink2" accessibilityLiveRegion="polite">
+              {boldRuns(
+                t(w.kind === "read" ? "routines.reachWarning.read" : "routines.reachWarning.blocked", {
+                  ...agentGrammar(t, w.agent.name),
+                }) as string,
+              ).map((r, i) =>
+                r.bold ? (
+                  <Text key={String(i)} variant="footnote" tone="ink" style={styles.bold}>
+                    {r.text}
+                  </Text>
+                ) : (
+                  r.text
+                ),
+              )}
+            </Text>
+            {w.kind === "blocked" && creator ? <AllowTalkPill agent={w.agent} userId={creator} /> : null}
+          </View>
+        ))}
         {routine && !isDoneOnce(routine) ? (
           <>
             <View style={styles.gap} />
@@ -734,5 +765,7 @@ const styles = StyleSheet.create({
   utc: { paddingTop: 7, paddingHorizontal: 16, gap: 4 },
   link: { fontWeight: "600", textDecorationLine: "underline" },
   error: { paddingTop: 7, paddingHorizontal: 16 },
+  bold: { fontWeight: "600" },
+  warning: { paddingTop: 7, paddingHorizontal: 16, gap: 8, alignItems: "flex-start" },
   noMail: { paddingTop: 10, paddingHorizontal: 16, gap: 10, alignItems: "flex-start" },
 });

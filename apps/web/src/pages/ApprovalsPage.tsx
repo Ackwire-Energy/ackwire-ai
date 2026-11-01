@@ -7,9 +7,11 @@ import {
   useChannels,
   useCustomServers,
   useDecideApproval,
+  useDecideApprovals,
   usePostMessage,
   useRoles,
 } from "@agenteschat/client";
+import { approvalCards, approveAllScope } from "@agenteschat/client/lib/approval-card";
 import { approveAlwaysOffered } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import { fromServer, itemName } from "@agenteschat/client/lib/connected";
@@ -340,20 +342,50 @@ export function ApprovalsPage() {
 
         {shownOpen.length > 0 && (
           <section className="ap-cards" aria-label={t("approvals.filter.pending")}>
-            {shownOpen.map((a) => (
-              <RequestCard
-                key={a.id}
-                approval={a}
-                agent={dir.agentById.get(a.agentId)}
-                members={dir.memberById}
-                channel={channelName(a.channelId)}
-                selected={openId === a.id}
-                refusing={refusing === a.id && openId !== a.id}
-                onOpen={() => setOpenId(a.id)}
-                onRefuse={() => setRefusing(a.id)}
-                onCancelRefuse={() => setRefusing(null)}
-              />
-            ))}
+            {approvalCards(shownOpen).map((items) => {
+              const cards = items.map((a) => (
+                <RequestCard
+                  key={a.id}
+                  approval={a}
+                  agent={dir.agentById.get(a.agentId)}
+                  members={dir.memberById}
+                  channel={channelName(a.channelId)}
+                  selected={openId === a.id}
+                  refusing={refusing === a.id && openId !== a.id}
+                  onOpen={() => setOpenId(a.id)}
+                  onRefuse={() => setRefusing(a.id)}
+                  onCancelRefuse={() => setRefusing(null)}
+                />
+              ));
+              const first = items[0];
+              if (!first || items.length < 2) return cards;
+              // Requests sharing one card in the conversation: together, with "Aprovar tudo".
+              const agent = dir.agentById.get(first.agentId);
+              const partial = approveAllPartial(
+                t,
+                items,
+                dir.memberById.get(first.ownerUserId ?? agent?.ownerUserId ?? ""),
+              );
+              return (
+                <section key={first.messageId ?? first.id} className="ap-group" aria-label={agent?.name}>
+                  <div className="ap-group__head">
+                    <span>
+                      <Trans
+                        i18nKey="approvals.groupHead"
+                        count={items.length}
+                        values={{ name: agent?.name ?? t("channel.unknownAgent") }}
+                        components={{ b: <b /> }}
+                        {...TYPED_VALUES}
+                      />
+                    </span>
+                    <span className="ap-grow" />
+                    <ApproveAll items={items} />
+                  </div>
+                  {partial && <p className="ap-group__note">{partial}</p>}
+                  {cards}
+                </section>
+              );
+            })}
           </section>
         )}
 
@@ -585,17 +617,43 @@ export function expiryText(t: TFunction, a: Pick<Approval, "expiresAt">) {
 export function ApproveButton({ approval, block }: { approval: Approval; block?: boolean }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const toast = useToast();
   const decide = useDecideApproval(org.id);
+  return (
+    <HoldToApprove
+      label={t(`approval.approve.${approvalAction(approval)}`)}
+      high={approvalRisk(approval) === "high"}
+      block={block}
+      id={approval.id}
+      pending={decide.isPending}
+      onGo={(el) => {
+        // Approved: a burst of the agent's pixels from its avatar.
+        const burst = prepareBurst(el);
+        decide.mutate({ id: approval.id, decision: "approve" }, { onSuccess: burst });
+      }}
+    />
+  );
+}
+
+/** The approve button itself: one click, or held for `high` risk; `id` lets A focus it. */
+export function HoldToApprove({
+  label,
+  high,
+  block,
+  id,
+  pending,
+  onGo,
+}: {
+  label: string;
+  high: boolean;
+  block?: boolean;
+  id: string;
+  pending: boolean;
+  onGo: (el: HTMLElement) => void;
+}) {
+  const { t } = useTranslation();
+  const toast = useToast();
   const [holding, setHolding] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const label = t(`approval.approve.${approvalAction(approval)}`);
-  const high = approvalRisk(approval) === "high";
-  const go = (el: HTMLElement) => {
-    // Approved: a burst of the agent's pixels from its avatar.
-    const burst = prepareBurst(el);
-    decide.mutate({ id: approval.id, decision: "approve" }, { onSuccess: burst });
-  };
   useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current);
@@ -609,21 +667,21 @@ export function ApproveButton({ approval, block }: { approval: Approval; block?:
         size="sm"
         block={block}
         icon="check"
-        data-approve={approval.id}
-        disabled={decide.isPending}
-        loading={decide.isPending}
-        onClick={(e) => go(e.currentTarget)}
+        data-approve={id}
+        disabled={pending}
+        loading={pending}
+        onClick={(e) => onGo(e.currentTarget)}
       >
         {label}
       </Button>
     );
   const start = (el: HTMLElement) => {
-    if (timer.current || decide.isPending) return;
+    if (timer.current || pending) return;
     setHolding(true);
     timer.current = setTimeout(() => {
       timer.current = null;
       setHolding(false);
-      go(el);
+      onGo(el);
     }, 1100);
   };
   const stop = () => {
@@ -639,10 +697,10 @@ export function ApproveButton({ approval, block }: { approval: Approval; block?:
       block={block}
       icon="check"
       className={cx("ap-hold", holding && "is-holding")}
-      data-approve={approval.id}
+      data-approve={id}
       aria-label={t("approvals.holdLabel", { action: label })}
-      disabled={decide.isPending}
-      loading={decide.isPending}
+      disabled={pending}
+      loading={pending}
       onPointerDown={(e: PointerEvent<HTMLButtonElement>) => {
         if (e.button > 0) return;
         start(e.currentTarget);
@@ -661,12 +719,59 @@ export function ApproveButton({ approval, block }: { approval: Approval; block?:
       }}
       onClick={(e) => {
         // A plain click (no hold) only explains.
-        if (e.detail > 0 && !timer.current && !decide.isPending) toast.show(t("approvals.holdHint"), "info");
+        if (e.detail > 0 && !timer.current && !pending) toast.show(t("approvals.holdHint"), "info");
       }}
     >
       {holding ? t("approvals.holding") : t("approvals.hold")}
     </Button>
   );
+}
+
+/**
+ * "Aprovar tudo" / "Agora não para todos" over one card's requests: exactly the ones listed now that this person
+ * may decide (one joining during the click is never approved unseen). Held when any of them is high risk.
+ * Nothing when fewer than two are theirs: each item's own buttons do.
+ */
+export function ApproveAll({ items }: { items: Approval[] }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const decide = useDecideApprovals(org.id);
+  const { ids } = approveAllScope(items);
+  if (ids.length < 2) return null;
+  const high = items.some((a) => ids.includes(a.id) && approvalRisk(a) === "high");
+  return (
+    <>
+      <HoldToApprove
+        label={t("approval.all.approve")}
+        high={high}
+        id={`all-${ids[0]}`}
+        pending={decide.isPending}
+        onGo={(el) => {
+          const burst = prepareBurst(el);
+          decide.mutate({ ids, decision: "approve" }, { onSuccess: burst });
+        }}
+      />
+      <Button
+        size="sm"
+        disabled={decide.isPending}
+        loading={decide.isPending && decide.variables?.decision === "refuse"}
+        onClick={() => decide.mutate({ ids, decision: "refuse" })}
+      >
+        {t("approval.all.refuse")}
+      </Button>
+    </>
+  );
+}
+
+/** Said when this person may decide only some of a card's requests: "Aprovar tudo" covers only those. */
+export function approveAllPartial(t: TFunction, items: Approval[], owner: Member | undefined) {
+  const { ids, waiting, blocked } = approveAllScope(items);
+  if (blocked === 0 || ids.length === 0) return null;
+  return t("approval.all.partial", {
+    mine: ids.length,
+    count: waiting,
+    who: owner?.name ?? t("approval.all.partialAdmin"),
+  });
 }
 
 const SUGGESTIONS = ["later", "review", "tests", "smaller"] as const;

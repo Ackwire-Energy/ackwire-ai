@@ -1052,6 +1052,7 @@ export const en: Translations = {
     forum_turn: "Your turn to weigh in",
     mission_stopped: "A mission stopped",
     routine_failed: "A routine didn't finish",
+    run_failed: "An agent couldn't finish",
     routine_paused: "A routine was paused",
     browser_handoff: "An agent needs you in the browser",
     secret_request: "An agent needs a secret from you",
@@ -1453,6 +1454,8 @@ export const en: Translations = {
     failed_other: "{{names}} couldn't answer",
     asking_one: "{{names}} is waiting for your answer",
     asking_other: "{{names}} are waiting for your answer",
+    outage_one: "{{names}}: the AI provider is down · retries by itself",
+    outage_other: "{{names}}: the AI provider is down · retries by itself",
     nobody: "No agent will answer",
     status: {
       seen: "Saw it",
@@ -1460,6 +1463,7 @@ export const en: Translations = {
       claimed: "Answering",
       waiting: "Waiting for approval",
       asking: "Waiting for your answer",
+      outage: "The AI provider is down · retries by itself",
       handled: "Answered",
       failed: "Failed",
       referenced: "Only mentioned",
@@ -1481,6 +1485,7 @@ export const en: Translations = {
       only_agent: "Only {{name}} answers here without a mention",
       follow_up: "Follows the talk with {{name}}",
       coordinator: "{{name}} coordinates the team",
+      default: "Nobody was called, so {{name}} answered",
     },
   },
   coordinator: {
@@ -1672,6 +1677,24 @@ export const en: Translations = {
     undo: "Undo",
     undone: "Undone",
     group: "Memory updated by {{name}}",
+  },
+  reach: {
+    group: "Who the message didn't call directly",
+    handed: "Handed to <b>{{name}}</b> by direct message, {{she}} isn't {{place}}",
+    private: "Didn't pass this on to <b>{{name}}</b>: {{she}} isn't {{place}}, and what's said here stays here",
+    noAi: "Couldn't hand this to <b>{{name}}</b>: {{she}} isn't {{place}} and has no AI connected yet",
+    inChannel: "in #{{name}}",
+    inHere: "in this conversation",
+    blocked: "Couldn't call <b>{{name}}</b>: only the people who look after {{pronoun}} can",
+    routineRead: "Couldn't call <b>{{name}}</b>: this routine only looks and tells",
+    routinePost: "Didn't call <b>{{name}}</b>: a routine that only looks and tells wakes nobody",
+    outside: "Not {{place}}",
+    routine: "Routine {{name}}",
+    see: "See",
+    add: "Add to channel",
+    added: "{{name}} joined the channel.",
+    allow: "Let {{person}} talk to {{pronoun}}",
+    allowed: "Done: {{person}} can now talk to {{name}}.",
   },
   teamChecks: {
     group: "What the agent didn't repeat",
@@ -1953,6 +1976,9 @@ export const en: Translations = {
       waiting_approval: "Waiting for approval",
       waiting_answer: "Waiting for an answer",
       waiting_computer: "Waiting for the computer",
+      waiting_plan: "Waiting for the plan to reset",
+      waiting_budget: "Waiting for the budget to reset",
+      provider_down: "The AI provider is down · retries by itself",
     },
     agentWhy: {
       online: "Active now",
@@ -2081,6 +2107,17 @@ export const en: Translations = {
     seeEmail: "See the email",
     seeDetails: "See details",
     notNow: "Not now",
+    /** Several requests of one agent in one conversation: one card with all of them (ApprovalGroupAsk). */
+    askMany_one: "I need your OK for this to go on:",
+    askMany_other: "I need your OK for these {{count}} to go on:",
+    all: {
+      approve: "Approve all",
+      refuse: "Not now for all",
+      partial: "You can decide {{mine}} of {{count}}: Approve all covers only those. The rest wait for {{who}}.",
+      partialAdmin: "an admin",
+      waitingCount_one: "{{count}} waiting",
+      waitingCount_other: "{{count}} waiting",
+    },
     always: {
       button: "Always approve",
       hint: "Approves this one and the next ones like it from {{name}}: {{actions}}, with any values.",
@@ -2258,8 +2295,12 @@ export const en: Translations = {
       missionStopped: "<b>{{name}}</b> stopped a mission",
       routineFinished: "<b>{{name}}</b> finished a routine",
       routineFailed: "<b>{{name}}</b> couldn't run a routine",
+      runFailed: "<b>{{name}}</b> couldn't finish",
       routinePaused: "A routine of <b>{{name}}</b> was paused",
       routineStalled: "<b>{{name}}</b> is waiting for the computer to run a routine",
+      agentUnreached: "A routine couldn't call <b>{{name}}</b>",
+      routineWaitingPlan: "<b>{{name}}</b> is waiting for its plan to reset to run a routine",
+      planResetUnknown: "{{plan}} didn't say when its limit resets. <b>{{name}}</b>'s work is still waiting.",
       machineConnected: "<b>{{name}}</b> connected the computer <b>{{label}}</b>",
       machineConnectedAny: "<b>{{name}}</b> connected a computer",
       browserHandoff: "<b>{{name}}</b> needs you in the browser",
@@ -2355,6 +2396,9 @@ export const en: Translations = {
   },
   approvals: {
     title: "Approvals",
+    /** Requests sharing one card in the conversation, together here too. */
+    groupHead_one: "<b>{{name}}</b> asked for {{count}} thing in one go",
+    groupHead_other: "<b>{{name}}</b> asked for {{count}} things in one go",
     readsOnly: "Read only",
     technical: "Technical details",
     summary_one: "{{count}} request waiting for you",
@@ -4200,6 +4244,11 @@ export const en: Translations = {
       tokens: "{{tokens}} plan tokens",
       cost: "{{cost}} on the API",
     },
+    reachWarning: {
+      blocked:
+        "This routine won't be able to call <b>{{name}}</b>: only the people who look after {{pronoun}} can. The rest of the routine runs as usual.",
+      read: "This routine only looks and tells, so it won't call <b>{{name}}</b>. To call it, pick Can act.",
+    },
     access: {
       read: "Only look and tell",
       act: "Can act",
@@ -4232,8 +4281,12 @@ export const en: Translations = {
       previous_running: "Skipped: the previous one was still running",
       previous_waiting: "Skipped: the previous one was still waiting for someone",
       waiting_computer: "Skipped: waiting for the agent's computer",
+      waiting_plan: "Skipped: waiting for the plan to reset",
+      waiting_budget: "Skipped: waiting for the budget to reset",
       superseded: "Gave way to the next run",
       stale: "Missed its time: the computer came back too late",
+      waiting_plan_late: "Missed its time: the plan reset too late",
+      waiting_budget_late: "Missed its time: the budget renewed too late",
       stopped: "Stopped by someone",
       stoppedBy: "Stopped by {{name}}",
       no_report: "Finished without telling the result",
@@ -8967,7 +9020,7 @@ export const en: Translations = {
   },
   budget: {
     warning: "{{name}} used {{percent}} of this month's budget.",
-    exhausted: "{{name}} reached this month's budget and stopped. An admin can raise it to continue.",
+    exhausted: "{{name}} reached its budget for the month and paused. It goes on {{when}} or when an admin raises it.",
   },
   gallery: {
     title: "Component gallery",
@@ -9007,6 +9060,8 @@ export const en: Translations = {
     hersM: "his",
   },
   chat: {
+    /** When a waiting agent goes on (`usageWhen`). */
+    usageWhen: { at: "at {{time}}", on: "{{day}} at {{time}}", date: "on {{date}}" },
     doing_one: "{{names}} is {{doing}}",
     doing_other: "{{names}} are {{doing}}",
     /** "Theo and 2 more" (3 or more names in the working line). */
@@ -9069,8 +9124,13 @@ export const en: Translations = {
       waitingInput: "{{name}} is waiting for an answer",
       /** The consulted agent's computer is away: paused, not on a person (as the computer screen says it). */
       waitingComputer: "{{name}} is waiting for the computer",
+      /** The consulted agent's AI provider is down: its run is parked and retries by itself. */
+      waitingProvider: "{{name}}: the AI provider is down · retries by itself",
       /** Its part done, the agent waits on what it handed to other agents. */
       waitingAgents: "{{name}} handed part of it on and is waiting to hear back",
+      /** What a teammate at work posted so far in the agents' conversation, and the start of the latest. */
+      posted_one: "{{count}} message so far · {{latest}}",
+      posted_other: "{{count}} messages so far · {{latest}}",
       /** An answer whose question is in a reply farther up: one line where it arrived, "See" goes to that reply. */
       answeredFar: "{{to}} answered {{from}}'s question",
       answeredRequestFar: "{{to}} answered {{from}}'s request",
@@ -9117,6 +9177,7 @@ export const en: Translations = {
       followUpWake: "{{name}} is back to «{{about}}»",
       followUpCancel: "Cancel",
       other: "Notice for {{name}}",
+      wakeSkipped: "{{name}}'s mention didn't reach {{agents}}",
       show: "Show",
       hide: "Hide",
       talker: "while working",
@@ -9382,8 +9443,15 @@ export const en: Translations = {
         "{{computer}} is back: “{{title}}” resumes where it stopped once the project is ready.",
       machine_offline: "{{computer}} went offline.",
       brain_unavailable: "{{brain}} can't answer right now. I'll answer when it's back.",
+      provider_unavailable: "My AI provider isn't answering right now. I'll answer as soon as it's back.",
       brain_busy: "My computer is busy with other tasks right now. I'll answer as soon as it's free.",
       brain_interrupted: "{{brain}} stopped before finishing. Already done, not repeated: {{tools}}.",
+      plan_limit_cut: "I stopped at the {{plan}} plan's limit. I'll pick up where I left off {{when}}, when it resets.",
+      plan_limit_cut_unknown:
+        "I stopped at the {{plan}} plan's limit. I'll pick up where I left off as soon as it resets.",
+      plan_limit_wait: "The {{plan}} plan hit its limit. I'll answer {{when}}, when it resets.",
+      plan_limit_wait_unknown: "The {{plan}} plan hit its limit. I'll answer as soon as it resets.",
+      budget_wait: "My budget for the month ran out. I'll go on {{when}}, or sooner if an admin raises it.",
       no_ai: "I can't answer yet: I have no AI connected.",
       no_ai_signed_out: "I can't answer yet: my AI is signed out.",
       no_ai_not_signed_in: "I can't answer yet: {{brain}} isn't signed in on my computer.",

@@ -3,6 +3,7 @@ import {
   and,
   type Database,
   desc,
+  type Executor,
   eq,
   gte,
   inArray,
@@ -68,6 +69,7 @@ import {
 } from "./rrule";
 import { describeWhen, parseSchedule, readSchedule, type ScheduleParse } from "./schedule";
 import { standingRefusal } from "./standing";
+import { USAGE_WAIT_CODES } from "./usage-pause";
 
 export { startRoutineRun } from "./routine-room";
 
@@ -117,6 +119,31 @@ export const EVENT_WEBHOOK: Partial<Record<RoutineEvent, "github" | "sentry">> =
   "deploy.succeeded": "github",
   "sentry.issue_created": "sentry",
 };
+
+/**
+ * The service whose webhook an event routine would wait on when the workspace has none live (null: something can
+ * fire it). An agent's routine that could never fire is refused at creation (I7); people see `needs_webhook`.
+ */
+export async function missingEventSource(
+  db: Executor,
+  orgId: string,
+  event: RoutineEvent,
+): Promise<"github" | "sentry" | null> {
+  const provider = EVENT_WEBHOOK[event];
+  if (!provider) return null;
+  const [hook] = await db
+    .select({ id: webhookEndpoints.id })
+    .from(webhookEndpoints)
+    .where(
+      and(
+        eq(webhookEndpoints.orgId, orgId),
+        eq(webhookEndpoints.provider, provider),
+        isNull(webhookEndpoints.revokedAt),
+      ),
+    )
+    .limit(1);
+  return hook ? null : provider;
+}
 
 export type RoutineTrigger =
   | {
@@ -230,6 +257,8 @@ export interface RoutineView {
   canSeeDetails: boolean;
   /** The viewer may change, pause, stop or delete it (its creator, admins, the agent's owner). */
   canManage: boolean;
+  /** Whose reach it has (ADR 0053 §2): its creator, kept on edit; null once they left. */
+  createdByUserId: string | null;
   lastRun: RoutineRunView | null;
   /** The last runs, newest first (at most RECENT_RUNS). */
   recentRuns: RoutineRunView[];
@@ -334,6 +363,8 @@ type AgentRunInfo = {
   status: string;
   error: string | null;
   waitingMachineId: string | null;
+  /** What it waits on when that's its plan's limit or its budget (`USAGE_WAIT_CODES`). */
+  waitingCode: string | null;
   updatedAt: Date;
 };
 
@@ -343,7 +374,9 @@ const OPEN_RUN = ["queued", "starting", "started"];
 const ENDED_RUN = new Set(["reported", "silent", "failed", "canceled", "superseded", "missed", "skipped"]);
 /** An agent run still working or waiting. */
 const AGENT_ACTIVE = new Set(["queued", "running", "waiting_approval", "waiting_input"]);
-const agentWaiting = (a: AgentRunInfo | undefined) => a?.status === "waiting_approval" || a?.status === "waiting_input";
+/** Waiting for a person (an approval, an answer). A wait for the plan or the budget resumes by itself: still running. */
+const agentWaiting = (a: AgentRunInfo | undefined) =>
+  a?.status === "waiting_approval" || (a?.status === "waiting_input" && !USAGE_WAIT_CODES.has(a.waitingCode ?? ""));
 /** Waiting for its computer (ADR 0032 §5), not for a person. */
 const agentAway = (a: AgentRunInfo | undefined) => a?.status === "waiting_input" && Boolean(a.waitingMachineId);
 /**
@@ -399,6 +432,7 @@ async function runDetails(db: Database, orgId: string, runs: RunRow[]): Promise<
           status: agentRuns.status,
           error: agentRuns.error,
           waitingMachineId: agentRuns.waitingMachineId,
+          waitingCode: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'code'`,
           updatedAt: agentRuns.updatedAt,
         })
         .from(agentRuns)
@@ -764,6 +798,7 @@ async function views(
       health: { ...health, total: health.ok + health.silent + health.failed + health.skipped + health.missed },
       canSeeDetails: right.reads,
       canManage: right.manages,
+      createdByUserId: r.createdByUserId,
       lastRun: runs[0] ?? null,
       recentRuns: runs,
       usage: {
@@ -1558,7 +1593,7 @@ export async function executeRoutineRun(deps: RoutineDeps, routineRunId: string)
  * their coded reason and one notification (creator gone or unable to post where it reports, agent
  * archived, out of the agent's audience, agent not in the conversation); one run at a time
  * (`makeWayForRun`); then the work: a forum topic, a reminder (no run), or the background run in the
- * routine's room, which reports through `hand_off` to the conversation it reports to (`deliverTo`).
+ * routine's room, which posts through `hand_off` in the conversation it reports to (`deliverTo`).
  */
 async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
   const { db } = deps;

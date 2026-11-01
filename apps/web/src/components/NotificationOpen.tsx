@@ -32,6 +32,8 @@ export function goToTarget(navigate: Navigate, orgId: string, target: OpenTarget
       });
     case "/org/$orgId/dm/agent/$agentId":
       return void navigate({ to: target.to, params: { orgId, ...target.params }, replace });
+    case "/org/$orgId/agents/$agentId":
+      return void navigate({ to: target.to, params: { orgId, ...target.params }, replace });
     case "/org/$orgId/dm/person/$userId":
       return void navigate({ to: target.to, params: { orgId, ...target.params }, replace });
     case "/org/$orgId/issues/$number":

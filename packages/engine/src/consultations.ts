@@ -28,10 +28,11 @@ import { cutText } from "./format";
 import type { Judge } from "./judge";
 import { getMessage, insertMessage, type MessageView, withMessageDetails } from "./messages";
 import type { Notice } from "./notices";
-import { personBehindCall, routineCreatorOfCall } from "./requester";
+import { notifyAgentUnreached } from "./notification-producers";
+import { actingRoutineOfCall, personBehindCall } from "./requester";
 import { isRoutineRoomKey } from "./routine-brief";
 import { deliverNoticeToRun, resumeRunWithResult } from "./run-resume";
-import { type AgentRun, isTerminal, type RunStatus, replyThreadOf } from "./runs";
+import { type AgentRun, isTerminal, outageParkedSql, type RunStatus, replyThreadOf } from "./runs";
 import { MAX_HANDOFF_LINKS, refusedAtLimit } from "./stretch";
 import { noAgentText } from "./team";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
@@ -46,8 +47,12 @@ export const TELL_AGENT_TOOL = "tell_agent";
  * again, every time (`expireConsultations`).
  */
 export const CONSULTATION_TTL_MS = 15 * 60_000;
-/** Agents in one chain of consultations: Dev → Infra → one more, then no further. */
-export const MAX_CONSULTATION_CHAIN = 2;
+/**
+ * Agents already in a chain before one more may be asked (a lead → a dev → a reviewer → a specialist → one more).
+ * Real teams delegate three and four deep; cycles are refused anyway, and the stretch limits (`stretch.ts`: runs
+ * agents start on their own, per stretch and per budget) bound what a deep chain can spend.
+ */
+export const MAX_CONSULTATION_CHAIN = 4;
 /**
  * The wait id of a consultation nobody pauses on (`ask_agent` without
  * `wait`): its answer goes to the asker's conversation as a notice.
@@ -71,7 +76,7 @@ type AiCheck = Omit<AiStatusDeps, "db">;
  * so no answer would come). The asking run comes along: its hop and stretch
  * go on to the other agent.
  */
-async function reachableAgent(ctx: ToolContext, input: unknown, ai?: AiCheck) {
+async function reachableAgent(ctx: ToolContext, input: unknown, ai?: AiCheck, pubsub?: PubSub) {
   const { db } = ctx;
   const [handle = ""] = await currentHandles(db, ctx.orgId, [String(input).trim().replace(/^@/, "").toLowerCase()]);
   const [target] = await db
@@ -80,10 +85,34 @@ async function reachableAgent(ctx: ToolContext, input: unknown, ai?: AiCheck) {
     .where(and(eq(agents.orgId, ctx.orgId), eq(agents.handle, handle), isNull(agents.archivedAt)));
   if (!target) return { refused: refuse(await noAgentText(ctx, [handle])) };
   if (target.id === ctx.agentId) return { refused: refuse("That is you: answer it yourself.") };
-  const person = (await personBehindCall(ctx)) ?? (await routineCreatorOfCall(ctx));
+  const behind = await personBehindCall(ctx);
+  const routine = behind ? null : await actingRoutineOfCall(ctx);
+  const person = behind ?? routine?.creatorUserId ?? null;
   if (!canTalkTo(target, person, await talksToAgents(db, ctx.orgId, person))) {
+    if (!routine?.creatorUserId) {
+      return {
+        refused: refuse(`@${handle} only works with some people, and the person you are helping isn't one of them.`),
+      };
+    }
+    // Never silent: the agent's owner hears it now, and the run's next message shows the line (`settleReach`).
+    await notifyAgentUnreached(
+      { db, pubsub },
+      {
+        orgId: ctx.orgId,
+        agentId: target.id,
+        routineId: routine.routineId,
+        routineName: routine.name,
+        creatorUserId: routine.creatorUserId,
+        channelId: ctx.channelId,
+      },
+    ).catch(() => {});
     return {
-      refused: refuse(`@${handle} only works with some people, and the person you are helping isn't one of them.`),
+      refused: {
+        ...refuse(
+          `@${handle} only works with some people, and the person who set up the routine behind this isn't one of them. Its owner was told and may let them in; say in your reply that @${handle} couldn't be reached and what you needed from it.`,
+        ),
+        data: { reach: { agentId: target.id, reason: "routine_creator_reach" } },
+      },
     };
   }
   if (ai && (await agentAiState({ ...ai, db }, target)).state === "no_ai") {
@@ -138,7 +167,7 @@ export function createAskAgentToolSource(deps: { pubsub?: PubSub; ai?: AiCheck }
       const question = String(input.question).trim();
       if (!question) return refuse("Write the question.");
       const { db } = ctx;
-      const reached = await reachableAgent(ctx, input.agent, deps.ai);
+      const reached = await reachableAgent(ctx, input.agent, deps.ai, deps.pubsub);
       if (reached.refused) return reached.refused;
       const { target, handle } = reached;
       const between = await inAgentsDm(db, ctx);
@@ -255,9 +284,17 @@ function createTellAgentTool(deps: { pubsub?: PubSub; ai?: AiCheck }): ToolDefin
       const body = String(input.message).trim();
       if (!body) return refuse("Write the note.");
       const { db } = ctx;
-      const reached = await reachableAgent(ctx, input.agent, deps.ai);
+      const reached = await reachableAgent(ctx, input.agent, deps.ai, deps.pubsub);
       if (reached.refused) return reached.refused;
       const { target, handle } = reached;
+      // This run's mention already handed it a note (`settleReach`): that one is the delivery.
+      const mentioned = await mentionNoteOpen(db, ctx, target.id);
+      if (mentioned) {
+        return {
+          content: `@${handle} already has it: your mention of it was handed to it as a note, so nothing was sent again. What comes of it reaches you here. Carry on.`,
+          data: { agentNote: { duplicate: true, agentId: target.id } },
+        };
+      }
       // Answering that agent already (its question or note, in your private conversation): your reply goes back.
       const [here] = await db
         .select({ kind: channels.kind, dmKey: channels.dmKey })
@@ -273,36 +310,14 @@ function createTellAgentTool(deps: { pubsub?: PubSub; ai?: AiCheck }): ToolDefin
       if (same) return same;
       const atLimit = await refusedAtLimit(db, reached.run, target.id);
       if (atLimit) return atLimit;
-      const consultationId = Bun.randomUUIDv7();
-      const sent = await db.transaction(async (tx) => {
-        const channel = await openAgentDm(tx, ctx.orgId, ctx.agentId, target.id);
-        if (await sameNoteSent(tx, ctx, channel.id, body)) return null;
-        const message = await insertMessage(tx, {
-          orgId: ctx.orgId,
-          channelId: channel.id,
-          author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: reached.hop },
-          body,
-          // `agentNote`: the run it came from (the same-note check, `peopleRun`); `consultation`: its row.
-          meta: { agentNote: { runId: ctx.runId }, consultation: { id: consultationId } },
-        });
-        // A run of the other agent at work in this DM for the same person takes it: the row waits on that run.
-        const started = await startOrJoinRun(tx, message, target.id, "dm");
-        await tx.insert(agentConsultations).values({
-          id: consultationId,
-          orgId: ctx.orgId,
-          kind: "note",
-          askerRunId: ctx.runId,
-          askerAgentId: ctx.agentId,
-          targetAgentId: target.id,
-          channelId: channel.id,
-          messageId: message.id,
-          targetRunId: started ? ("created" in started ? started.created.id : started.joined) : null,
-          waitId: `${ASYNC_WAIT}${Bun.randomUUIDv7()}`,
-          question: body,
-          chain,
-          expiresAt: new Date(Date.now() + CONSULTATION_TTL_MS),
-        });
-        return message;
+      const sent = await sendNote(db, {
+        orgId: ctx.orgId,
+        agentId: ctx.agentId,
+        runId: ctx.runId,
+        hop: reached.hop,
+        targetAgentId: target.id,
+        body,
+        chain,
       });
       if (!sent) {
         return {
@@ -326,13 +341,91 @@ function createTellAgentTool(deps: { pubsub?: PubSub; ai?: AiCheck }): ToolDefin
             ? `Handed to @${handle}. Your answer goes back once @${handle} is done, together with what came of it: do your own part now, then end your turn saying what you handed on.`
             : `Handed to @${handle}; it's on it, and the people here can see that. What comes of it reaches you here by itself once everything you handed off this turn is back. Tell the people in a line who has it, without promising a time, then do your own part or end your turn.`,
         data: {
-          agentNote: { messageId: sent.id, agentId: target.id },
-          consultation: { id: consultationId, agentId: target.id },
+          agentNote: { messageId: sent.message.id, agentId: target.id },
+          consultation: { id: sent.consultationId, agentId: target.id },
         },
       };
     },
   };
 }
+
+/**
+ * A note from a run to another agent (`tell_agent`'s delivery, also an @mention of an agent outside the
+ * conversation, `reach.ts`): into the two agents' private DM, taken by the other agent's run at work there for the
+ * same person or starting one, tracked as a `note` row whose result comes back to the sending run's conversation
+ * (`reportHandOffs`). The caller checked who may be reached. Null: the same note went out within the hour.
+ */
+export async function sendNote(
+  db: Database,
+  input: {
+    orgId: string;
+    agentId: string;
+    runId: string;
+    hop: number;
+    targetAgentId: string;
+    body: string;
+    chain: string[];
+    /** An @mention of an agent outside the conversation (`settleReach`), not a tell_agent call. */
+    fromMention?: boolean;
+  },
+) {
+  const consultationId = Bun.randomUUIDv7();
+  return db.transaction(async (tx) => {
+    const channel = await openAgentDm(tx, input.orgId, input.agentId, input.targetAgentId);
+    if (await sameNoteSent(tx, input, channel.id, input.body)) return null;
+    const message = await insertMessage(tx, {
+      orgId: input.orgId,
+      channelId: channel.id,
+      author: { type: "agent", agentId: input.agentId, runId: input.runId, hop: input.hop },
+      body: input.body,
+      // `agentNote`: the run it came from (the same-note check, `peopleRun`); `consultation`: its row.
+      meta: {
+        agentNote: { runId: input.runId, ...(input.fromMention ? { mention: true } : {}) },
+        consultation: { id: consultationId },
+      },
+    });
+    // A run of the other agent at work in this DM for the same person takes it: the row waits on that run.
+    const started = await startOrJoinRun(tx, message, input.targetAgentId, "dm");
+    await tx.insert(agentConsultations).values({
+      id: consultationId,
+      orgId: input.orgId,
+      kind: "note",
+      askerRunId: input.runId,
+      askerAgentId: input.agentId,
+      targetAgentId: input.targetAgentId,
+      channelId: channel.id,
+      messageId: message.id,
+      targetRunId: started ? ("created" in started ? started.created.id : started.joined) : null,
+      waitId: `${ASYNC_WAIT}${Bun.randomUUIDv7()}`,
+      question: input.body,
+      chain: input.chain,
+      expiresAt: new Date(Date.now() + CONSULTATION_TTL_MS),
+    });
+    return { message, consultationId };
+  });
+}
+
+/** An open note this run's mention handed `targetAgentId` (`sendNote` with `fromMention`). */
+async function mentionNoteOpen(db: Executor, ctx: Pick<ToolContext, "orgId" | "runId">, targetAgentId: string) {
+  const [row] = await db
+    .select({ id: agentConsultations.id })
+    .from(agentConsultations)
+    .innerJoin(messages, eq(messages.id, agentConsultations.messageId))
+    .where(
+      and(
+        eq(agentConsultations.orgId, ctx.orgId),
+        eq(agentConsultations.askerRunId, ctx.runId),
+        eq(agentConsultations.targetAgentId, targetAgentId),
+        eq(agentConsultations.status, "open"),
+        sql`${messages.meta} -> 'agentNote' ->> 'mention' = 'true'`,
+      ),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
+/** The agents already in the chain of consultations a run answers, for a note sent from outside a tool call. */
+export const chainOfRun = (db: Executor, orgId: string, runId: string) => chainOf(db, { orgId, runId });
 
 /** A note with the same text to the same agent within this long is dropped (a loop, or a routine's repeats). */
 export const NOTE_DEDUPE_MS = 3600_000;
@@ -605,7 +698,7 @@ export interface HandOff {
   /** The sender heard what came of it. */
   reportedAt: Date | null;
   /** Null: nobody started it (the stretch held it). */
-  target: { status: RunStatus; waitingMachineId: string | null; handedOn: boolean } | null;
+  target: { status: RunStatus; waitingMachineId: string | null; handedOn: boolean; outage?: boolean } | null;
 }
 
 /** How many of them the block lists. */
@@ -638,10 +731,12 @@ export async function handOffsFrom(
     target_status: RunStatus | null;
     waiting_machine_id: string | null;
     handed_on: boolean | string | null;
+    outage: boolean | string | null;
   }>(
     await db.execute(sql`select c.id, c.kind, c.status, c.question, c.answer, a.handle, c.created_at, c.answered_at,
         c.reported_at, t.status as target_status, t.waiting_machine_id,
-        exists (select 1 from agent_consultations s where s.asker_run_id = t.id and s.status = 'open') as handed_on
+        exists (select 1 from agent_consultations s where s.asker_run_id = t.id and s.status = 'open') as handed_on,
+        (t.status = 'waiting_input' and t.transcript -> 'outage' is not null) as outage
       from agent_consultations c
       join agent_runs r on r.id = c.asker_run_id
       join channels ch on ch.id = r.channel_id
@@ -671,6 +766,7 @@ export async function handOffsFrom(
           status: r.target_status,
           waitingMachineId: r.waiting_machine_id,
           handedOn: r.handed_on === true || r.handed_on === "t",
+          outage: r.outage === true || r.outage === "t",
         }
       : null,
   }));
@@ -800,6 +896,8 @@ async function handBack(tx: Executor, asker: AgentRun, closed: AgentConsultation
           eq(agentConsultations.status, "open"),
         ),
       );
+    // It goes back inside that answer: reported (I3), whether or not this run reads it too.
+    await tx.update(agentConsultations).set({ reportedAt: new Date() }).where(eq(agentConsultations.id, closed.id));
   }
   const notice = consultationNotice(closed, handle);
   if (asker.status === "queued" || asker.status === "running") return deliverNoticeToRun(tx, asker, notice);
@@ -1152,10 +1250,10 @@ export async function openConsultationsIn(
 
 /**
  * What the consulted agent waits on before it can answer: an approval, a person's answer or secret (`input`), its
- * computer to come back (`computer`: no person can move it), or, its own run done, what it handed on to other agents
- * (`agents`, ADR 0095).
+ * computer to come back (`computer`: no person can move it), its AI provider to come back (`outage`: parked, it
+ * retries by itself), or, its own run done, what it handed on to other agents (`agents`, ADR 0095).
  */
-export type ConsultationWait = "approval" | "input" | "computer" | "agents";
+export type ConsultationWait = "approval" | "input" | "computer" | "agents" | "outage";
 
 /**
  * What a consulted run held now waits on, from its row alone (no transcript read). `waiting_machine_id` is set
@@ -1169,9 +1267,11 @@ export function consultationWait(run: {
   waitingMachineId: string | null;
   /** Something it asked or handed off is still out (`handedOnSql`). */
   handedOn?: boolean;
+  /** Parked on a provider outage (`outageParkedSql`): still on it, nobody to answer. */
+  outage?: boolean;
 }): ConsultationWait | null {
   if (run.status === "waiting_approval") return "approval";
-  if (run.status === "waiting_input") return run.waitingMachineId ? "computer" : "input";
+  if (run.status === "waiting_input") return run.waitingMachineId ? "computer" : run.outage ? "outage" : "input";
   return run.handedOn && isTerminal(run.status as AgentRun["status"]) ? "agents" : null;
 }
 
@@ -1203,6 +1303,11 @@ export interface RunConsultation {
   question: string;
   /** The answer once `answered`; the reason once `failed`; null otherwise. */
   answer: string | null;
+  /**
+   * Open: what the consulted run posted in the agents' DM so far (I7), so the conversation that handed the work sees
+   * it moving: how many messages, the start of the latest, and when. Null when it posted nothing yet.
+   */
+  progress: { posts: number; latest: string; at: Date } | null;
   createdAt: Date;
   answeredAt: Date | null;
   expiresAt: Date;
@@ -1233,6 +1338,7 @@ export async function consultationsIn(db: Executor, orgId: string, channelId: st
       createdAt: agentConsultations.createdAt,
       answeredAt: agentConsultations.answeredAt,
       expiresAt: agentConsultations.expiresAt,
+      dmId: agentConsultations.channelId,
     })
     .from(agentConsultations)
     .innerJoin(agentRuns, eq(agentRuns.id, agentConsultations.askerRunId))
@@ -1248,12 +1354,52 @@ export async function consultationsIn(db: Executor, orgId: string, channelId: st
           status: agentRuns.status,
           waitingMachineId: agentRuns.waitingMachineId,
           handedOn: handedOnSql,
+          outage: outageParkedSql,
         })
         .from(agentRuns)
         .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.id, held)))
     : [];
   const waitOf = new Map(targets.map((t) => [t.id, consultationWait(t)]));
-  return rows.map((r) => consultationView(r, waitOf));
+  const progressOf = await progressIn(
+    db,
+    orgId,
+    rows.flatMap((r) =>
+      r.status === "open" && r.targetRunId ? [{ runId: r.targetRunId, dmId: r.dmId, since: r.createdAt }] : [],
+    ),
+  );
+  return rows.map((r) => ({
+    ...consultationView(r, waitOf),
+    progress: r.status === "open" && r.targetRunId ? (progressOf.get(r.targetRunId) ?? null) : null,
+  }));
+}
+
+/**
+ * What each consulted run posted so far in its agents' DM since the consultation (its messages, not notices): how
+ * many, and its latest's start and time. Bounded by DM and time, so `(channel_id, created_at)` and the partitions
+ * of `messages` keep it to the hand-off's own rows.
+ */
+async function progressIn(db: Executor, orgId: string, targets: { runId: string; dmId: string; since: Date }[]) {
+  if (targets.length === 0) return new Map<string, NonNullable<RunConsultation["progress"]>>();
+  const since = new Date(Math.min(...targets.map((t) => t.since.getTime())));
+  const rows = rowsOf<{ run_id: string; posts: number | string; latest: string; at: string | Date }>(
+    await db.execute(sql`select distinct on (m.agent_run_id) m.agent_run_id as run_id,
+        count(*) over (partition by m.agent_run_id) as posts, left(m.body, 400) as latest, m.created_at as at
+      from ${messages} m
+      join (values ${sql.join(
+        targets.map((t) => sql`(${t.runId}::uuid, ${t.dmId}::uuid, ${t.since.toISOString()}::timestamptz)`),
+        sql`, `,
+      )}) as t(run_id, dm_id, since)
+        on m.agent_run_id = t.run_id and m.channel_id = t.dm_id and m.created_at >= t.since
+      where m.org_id = ${orgId}::uuid and m.created_at >= ${since.toISOString()}::timestamptz
+        and m.deleted_at is null and m.meta->'notice' is null
+      order by m.agent_run_id, m.created_at desc`),
+  );
+  return new Map(
+    rows.map((r) => [
+      r.run_id,
+      { posts: Number(r.posts), latest: cutText(answerForPeople(r.latest), NOTICE_ANSWER_MAX), at: new Date(r.at) },
+    ]),
+  );
 }
 
 type ConsultationRow = Pick<
@@ -1277,6 +1423,7 @@ function consultationView(r: ConsultationRow, waitOf: Map<string, ConsultationWa
     // Open (what it gathered so far is the agents'), or expired: no answer; a failed one keeps its reason.
     answer:
       open || status === "expired" || !r.answer ? null : cutText(answerForPeople(r.answer), NOTICE_ANSWER_MAX) || null,
+    progress: null,
     createdAt: r.createdAt,
     answeredAt: r.answeredAt,
     expiresAt: r.expiresAt,
@@ -1340,6 +1487,7 @@ export async function consultationConversation(
           status: agentRuns.status,
           waitingMachineId: agentRuns.waitingMachineId,
           handedOn: handedOnSql,
+          outage: outageParkedSql,
           createdAt: agentRuns.createdAt,
         })
         .from(agentRuns)

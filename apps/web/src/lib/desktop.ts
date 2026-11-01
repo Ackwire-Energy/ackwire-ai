@@ -47,6 +47,7 @@ const NOTICE_KINDS = [
   "forum_turn",
   "mission_stopped",
   "routine_failed",
+  "run_failed",
   "routine_paused",
   "browser_handoff",
   "secret_request",

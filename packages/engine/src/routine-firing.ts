@@ -1,7 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, eq, inArray, isNull, lt, ne, schema, sql } from "@agenteschat/db";
 import { stopRun } from "./cancel";
-import { notifyRoutineStalled } from "./notification-producers";
+import { notifyRoutineStalled, notifyRoutineWaitingPlan } from "./notification-producers";
 import { deferEventRun } from "./routine-events";
 import { endRoutineRun } from "./routine-ledger";
 import { endOpenRoutineRun, pauseRoutine, ROUTINE_CATCH_UP_MS, routineJobAlive } from "./routine-state";
@@ -100,18 +100,38 @@ async function agentRunOfRoutineRun(db: Database, routineRunId: string): Promise
  */
 async function stalled(deps: FiringDeps, routineId: string, orgId: string, machineId: string) {
   const [m] = await deps.db.select({ name: machines.name }).from(machines).where(eq(machines.id, machineId));
+  await notifyRoutineStalled(deps, {
+    orgId,
+    routineId,
+    machineId,
+    machineName: m?.name ?? "",
+    outageKey: await outageKey(deps, routineId),
+  }).catch(() => {});
+}
+
+/** An outage of a routine lasts until one of its runs really runs again: the last such run names it. */
+async function outageKey(deps: FiringDeps, routineId: string) {
   const [ran] = await deps.db
     .select({ id: routineRuns.id })
     .from(routineRuns)
     .where(and(eq(routineRuns.routineId, routineId), inArray(routineRuns.status, ["reported", "silent", "failed"])))
     .orderBy(desc(routineRuns.createdAt))
     .limit(1);
-  await notifyRoutineStalled(deps, {
-    orgId,
-    routineId,
-    machineId,
-    machineName: m?.name ?? "",
-    outageKey: ran?.id ?? "none",
+  return ran?.id ?? "none";
+}
+
+/** A background run started waiting for its agent's plan to reset: the routine's people hear it once per outage. */
+export async function routineRunWaitingForPlan(deps: FiringDeps, run: Pick<AgentRun, "id" | "orgId" | "background">) {
+  if (!run.background) return;
+  const [rr] = await deps.db
+    .select({ routineId: routineRuns.routineId })
+    .from(routineRuns)
+    .where(and(eq(routineRuns.orgId, run.orgId), eq(routineRuns.agentRunId, run.id)));
+  if (!rr) return;
+  await notifyRoutineWaitingPlan(deps, {
+    orgId: run.orgId,
+    routineId: rr.routineId,
+    outageKey: await outageKey(deps, rr.routineId),
   }).catch(() => {});
 }
 
@@ -175,6 +195,15 @@ export async function makeWayForRun(deps: FiringDeps, routine: RoutineRow, run: 
     if (!ar || !ACTIVE_RUN.includes(ar.status)) continue;
     if (ar.status === "queued" || ar.status === "running") return blocked("previous_running");
     if (event) return blocked("previous_running");
+    // Waiting for its plan's limit or its budget: the freshest slot runs once there's room again.
+    const usageCode = (ar.transcript as { waitingForBrain?: { code?: string } } | null)?.waitingForBrain?.code;
+    if (ar.status === "waiting_input" && (usageCode === "plan_limit" || usageCode === "budget")) {
+      await endWithRun(deps, rr, ar, {
+        status: "superseded",
+        code: usageCode === "budget" ? "waiting_budget" : "waiting_plan",
+      });
+      continue;
+    }
     if (ar.status === "waiting_input" && ar.waitingMachineId) {
       await endWithRun(deps, rr, ar, { status: "superseded", code: "waiting_computer" });
       await stalled(deps, routine.id, routine.orgId, ar.waitingMachineId);
@@ -200,7 +229,13 @@ export async function makeWayForRun(deps: FiringDeps, routine: RoutineRow, run: 
  * The computer of a waiting routine run is back (§6.4): a run whose slot is more than 12 hours old
  * no longer runs; it is `missed` (`stale`) and its agent run ends quietly. Returns whether it was.
  */
-export async function missStaleRoutineRun(deps: FiringDeps, agentRunId: string, now = new Date()): Promise<boolean> {
+export async function missStaleRoutineRun(
+  deps: FiringDeps,
+  agentRunId: string,
+  now = new Date(),
+  /** Why it came too late: its computer (`stale`), or its plan or budget (`waiting_plan_late`, `waiting_budget_late`). */
+  code = "stale",
+): Promise<boolean> {
   const [row] = await deps.db
     .select({ rr: routineRuns, ar: agentRuns })
     .from(routineRuns)
@@ -213,7 +248,7 @@ export async function missStaleRoutineRun(deps: FiringDeps, agentRunId: string, 
       ),
     );
   if (!row?.ar.background || row.rr.at.getTime() > now.getTime() - ROUTINE_CATCH_UP_MS) return false;
-  await endWithRun(deps, row.rr, row.ar, { status: "missed", code: "stale" });
+  await endWithRun(deps, row.rr, row.ar, { status: "missed", code });
   return true;
 }
 

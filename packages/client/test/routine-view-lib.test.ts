@@ -334,3 +334,12 @@ describe("the routine.created receipt", () => {
     expect(created({ name: "Bom dia", schedule: "Every day at 09:00" })).toEqual({ name: "Bom dia", context: "bare" });
   });
 });
+
+test("a routine that couldn't call an agent opens the agent's page, where who talks to it is set", () => {
+  expect(
+    openTarget({
+      kind: "agent_unreached",
+      source: { routineId: "r1", agentId: "a1", userId: "u1", channelId: "c1", messageId: "m1" },
+    } as AppNotification),
+  ).toEqual({ to: "/org/$orgId/agents/$agentId", params: { agentId: "a1" } });
+});

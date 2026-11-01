@@ -588,7 +588,9 @@ describe("last-message previews in the reader's language", () => {
     };
     const english = 'Task "Rodar os testes" finished on Computador da Acme.';
     expect(serverBody(i18n.t, english, done)).toBe("“Rodar os testes” terminou.");
-    expect(serverBody(i18n.t, english, done, true)).toBe("“Rodar os testes” terminou no Computador da Acme.");
+    expect(serverBody(i18n.t, english, done, undefined, true)).toBe(
+      "“Rodar os testes” terminou no Computador da Acme.",
+    );
     expect(previewBody(i18n.t, english, done)).toBe("“Rodar os testes” terminou.");
     const plan = { bodyCode: "mission_plan", bodyParams: { title: "App", computer: "Computador da Acme" } };
     expect(serverBody(i18n.t, 'Plan for "App"', plan)).toBe("Plano para “App”");

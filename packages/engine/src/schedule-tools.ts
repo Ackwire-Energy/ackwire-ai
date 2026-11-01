@@ -18,6 +18,7 @@ import {
   EVENT_WEBHOOK,
   listOrgRoutines,
   listReminders,
+  missingEventSource,
   ROUTINE_EVENTS,
   type RoutineDeps,
   type RoutineEvent,
@@ -232,6 +233,20 @@ function stateText(r: RoutineView) {
 /** The service whose webhook a routine waits for (`EVENT_WEBHOOK`), as people name it. */
 const hookName = (r: RoutineView) =>
   r.trigger.type === "event" && EVENT_WEBHOOK[r.trigger.event] === "sentry" ? "Sentry" : "GitHub";
+
+/**
+ * An agent's routine on an event nothing in this workspace can send is refused, with the setup step (I7): a routine
+ * that can never fire would look set up to the person. Null when something can fire it.
+ */
+async function neverFires(ctx: ToolContext, trigger: RoutineTriggerInput, what: string): Promise<ToolOutput | null> {
+  const missing = trigger.type === "event" ? await missingEventSource(ctx.db, ctx.orgId, trigger.event) : null;
+  if (!missing) return null;
+  const name = missing === "sentry" ? "Sentry" : "GitHub";
+  return {
+    content: `${what}: nothing would ever start it. No ${name} webhook sends this workspace its events. Tell the person what it needs: a workspace admin sets up a ${name} webhook for this workspace (the app can't create one yet). If they'd rather not wait, offer a schedule that checks instead.`,
+    isError: true,
+  };
+}
 
 /** What a routine that can't run yet needs (state `needs_webhook`), for the agent to tell the person; else "". */
 function needsText(r: RoutineView) {
@@ -516,6 +531,8 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           const trigger: RoutineTriggerInput = rawTrigger
             ? await triggerOf(ctx, rawTrigger)
             : { type: "schedule", phrase: str(input.schedule) };
+          const never = await neverFires(ctx, trigger, "Not created");
+          if (never) return never;
           const channel = str(input.channel).trim() ? await channelTarget(ctx, requester, str(input.channel)) : null;
           const conv =
             channel && channel.target.channelId !== ctx.channelId
@@ -689,6 +706,8 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             : str(input.schedule)
               ? { type: "schedule", phrase: str(input.schedule) }
               : undefined;
+          const never = trigger ? await neverFires(ctx, trigger, "Not changed") : null;
+          if (never) return never;
           const channel = str(input.channel).trim() ? await channelTarget(ctx, requester, str(input.channel)) : null;
           const routine = await updateRoutine(routineDeps(ctx), requester, ctx.orgId, id, {
             ...(channel ? { target: channel.target } : {}),

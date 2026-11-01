@@ -79,6 +79,8 @@ export class BudgetExceededError extends Error {
     public readonly agentId: string,
     public readonly spentNanoUsd: number,
     public readonly budgetNanoUsd: number,
+    /** Only other calls' reservations left no room: spend is under budget and there is room again soon. */
+    public readonly byReservations = false,
   ) {
     super("This agent has used its monthly budget");
     this.name = "BudgetExceededError";

@@ -1232,6 +1232,19 @@ export const useApproval = (orgId: string, approvalId: string, enabled = true) =
   });
 };
 
+/**
+ * The requests on one approval card, by its message: for a card older than the org's list reaches. Under the
+ * list's key, so whatever refreshes the list refreshes it.
+ */
+export const useCardApprovals = (orgId: string, messageId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...keys.approvals(orgId), "card", messageId],
+    queryFn: () => api.approvals.list(orgId, { messageId }),
+    enabled,
+  });
+};
+
 /** Puts a fresh approval in the caches (decision responses, WebSocket events). */
 export function cacheApproval(qc: ReturnType<typeof useQueryClient>, orgId: string, approval: Approval) {
   qc.setQueryData<Approval[]>(keys.approvals(orgId), (list) => {
@@ -1271,6 +1284,21 @@ export function useDecideApproval(orgId: string) {
       cacheApproval(qc, orgId, approval);
       void qc.invalidateQueries({ queryKey: keys.approvals(orgId) });
       if (always) void qc.invalidateQueries({ queryKey: keys.approvalRules(orgId, approval.agentId) });
+    },
+  });
+}
+
+/** A card's "Aprovar tudo" / "Agora não para todos": exactly the ids it listed at the click. */
+export function useDecideApprovals(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { ids: string[]; decision: "approve" | "refuse"; reason?: string }) =>
+      api.approvals.decideMany(orgId, input),
+    onSuccess: (result, { decision }) => {
+      playSound(decision === "approve" ? "approved" : "error");
+      for (const approval of result.approvals) cacheApproval(qc, orgId, approval);
+      void qc.invalidateQueries({ queryKey: keys.approvals(orgId) });
     },
   });
 }

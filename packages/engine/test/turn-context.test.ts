@@ -493,7 +493,7 @@ describe("a routine's background run", () => {
     expect(text.match(/<\/external_data>/g)?.length).toBe(2);
     // Where it is and where it reports.
     expect(text).toContain("# Where you are\nYour routine's own room");
-    expect(text).toContain("hand_off wakes you in #general");
+    expect(text).toContain("hand_off posts in #general");
     // The room's history is no conversation: only this run's brief.
     expect(ctx.messages).toHaveLength(1);
     expect(JSON.stringify(ctx.messages)).not.toContain("Brief de ontem");
@@ -504,7 +504,7 @@ describe("a routine's background run", () => {
     f = await setup();
     const { text } = await routineRun();
     expect(text).toContain("# Where your report goes");
-    expect(text).toContain("What was said there lately, so you know what people already know or asked (read-only");
+    expect(text).toContain("What was said there lately, so you know what people already know (read-only");
     expect(text).toMatch(/- \d+ min ago, ana: O checkout caiu de novo\?/);
     expect(text).toMatch(/- \d+ min ago, you: Vou olhar os e-mails de suporte\./);
     expect(text).not.toContain("relatório interno");

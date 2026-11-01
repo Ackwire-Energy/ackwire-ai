@@ -70,6 +70,7 @@ import {
 } from "./logic";
 import { MemoryMarks } from "./MemoryMark";
 import { MessageText } from "./MessageText";
+import { ReachLines } from "./ReachLines";
 import { Receipts } from "./Receipts";
 import { SecretCard } from "./SecretCard";
 import { TeamChecks } from "./TeamChecks";
@@ -117,7 +118,7 @@ export const MessageRow = memo(function MessageRow({
   /** Shown where the person can't act on it (two agents' conversation): no long press, reactions or block. */
   readOnly?: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   // Mine and not sent for lack of a connection: it waits and goes by itself when the connection is back.
   const offline = useWaiting(m.local === "failed" ? m.clientId : null);
   const dir = useDirectory();
@@ -151,7 +152,9 @@ export const MessageRow = memo(function MessageRow({
   // What the server wrote itself is said in the person's language; a stopped reply drops the server's note. Where a
   // task ran is said only where the workspace has more than one computer.
   const names = useNamesComputers();
-  const body = hidesBody(m) ? "" : reminderBody(splitCanceled(serverBody(t, m.body, meta, names), meta).body, meta);
+  const body = hidesBody(m)
+    ? ""
+    : reminderBody(splitCanceled(serverBody(t, m.body, meta, i18n.language, names), meta).body, meta);
   const consulted = isAgent && m.author.id ? consultationsOf(meta) : [];
   // A GIF or a sticker (ADR 0091); with no words, the message is the picture alone (no empty bubble).
   const media = messageMediaOf(meta);
@@ -447,6 +450,7 @@ export const MessageRow = memo(function MessageRow({
         ) : null}
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
         {isAgent ? <TeamChecks message={m} /> : null}
+        {isAgent ? <ReachLines message={m} /> : null}
         {files.length > 0 ? <MessageFiles files={files} /> : null}
         {trails && m.author.id && trails.browser.length > 0 ? (
           <TrailCard
@@ -494,7 +498,7 @@ export const MessageRow = memo(function MessageRow({
         {isAgent ? <StretchCard message={m} /> : null}
         {isAgent ? <ProposalCard message={m} /> : null}
         {isAgent ? <InstructionProposals message={m} /> : null}
-        {approvalId ? <ApprovalInline approvalId={approvalId} /> : null}
+        {approvalId ? <ApprovalInline approvalId={approvalId} messageId={m.id} /> : null}
         {handoff ? <HandoffCard handoff={handoff} /> : null}
         {question ? <QuestionCard key={`${question.id}:${question.status}`} question={question} /> : null}
         {secret ? <SecretCard key={`${secret.id}:${secret.status}`} request={secret} /> : null}

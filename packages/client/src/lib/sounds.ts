@@ -39,6 +39,7 @@ const BY_KIND: Partial<Record<NotificationKind, SoundName>> = {
   routine_finished: "done",
   mission_stopped: "error",
   routine_failed: "error",
+  run_failed: "error",
   routine_paused: "error",
 };
 

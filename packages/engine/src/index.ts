@@ -223,6 +223,7 @@ export * from "./ttf";
 export * from "./untrusted";
 export * from "./uploads";
 export * from "./usage";
+export * from "./usage-pause";
 export * from "./usage-tools";
 export * from "./waitlist";
 export * from "./web-push";
