@@ -327,7 +327,6 @@ export const featureKeysEn: FeatureTranslations = {
       expiredM: "{{name}} didn't answer in time",
       failedF: "{{name}} couldn't answer",
       failedM: "{{name}} couldn't answer",
-      asked: "{{name}} asked",
       answerOfF: "{{name}}'s answer",
       answerOfM: "{{name}}'s answer",
       noAnswer: "No answer.",
@@ -340,12 +339,6 @@ export const featureKeysEn: FeatureTranslations = {
     fileOpen: "Tap to open",
     fileDeleted: "File removed",
     fileFailed: "Couldn't open the file.",
-    approval: {
-      approved: "Approved: {{title}}",
-      refused: "Declined: {{title}}",
-      expired: "Expired: {{title}}",
-      canceled: "Canceled: {{title}}",
-    },
     question: {
       fromF: "Question from {{name}}",
       fromM: "Question from {{name}}",

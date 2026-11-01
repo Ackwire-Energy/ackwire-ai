@@ -272,7 +272,7 @@ export async function brainAccountFor(
  * owner, or with the computer's own sign-in the person who connected that
  * computer, must be the agent's owner, still in the organization.
  */
-async function planIsOwners(
+export async function planIsOwners(
   db: Executor,
   agent: Pick<Agent, "orgId" | "ownerUserId">,
   machineId: string,

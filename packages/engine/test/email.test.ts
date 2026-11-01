@@ -64,6 +64,8 @@ function poisoned(t: EmailTemplate, value = SENTINEL): EmailTemplate {
   for (const k of TYPED) if (typeof o[k] === "string") o[k] = value;
   if (Array.isArray(o.items)) o.items = o.items.map((i) => ({ ...i, agentName: value, title: value }));
   if (Array.isArray(o.orgNames)) o.orgNames = o.orgNames.map(() => value);
+  for (const list of ["topStalls", "topNoise"])
+    if (Array.isArray(o[list])) o[list] = (o[list] as object[]).map((w) => ({ ...w, name: value }));
   return o as EmailTemplate;
 }
 
@@ -127,6 +129,7 @@ describe("every email, in both languages", () => {
       workspace_deleting: true,
       workspace_restored: true,
       account_deleted: true,
+      autonomy_report: true,
     };
     expect(new Set<string>(Object.values(EMAIL_SAMPLES).map((t) => t.kind))).toEqual(new Set(Object.keys(kinds)));
   });

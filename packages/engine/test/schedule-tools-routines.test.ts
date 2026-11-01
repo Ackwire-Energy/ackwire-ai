@@ -2,6 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import {
   createScheduleToolSource,
+  createWebhookEndpoint,
+  getRoutineView,
   insertMessage,
   type ToolContext,
   type ToolDefinition,
@@ -107,6 +109,53 @@ describe("schedule tools: routines", () => {
       report: "when_new",
     });
     expect(receipt?.params).not.toHaveProperty("schedule");
+  });
+
+  test("an event no webhook brings here: the tools say what the routine needs, its view says it can't run yet", async () => {
+    f = await setup();
+    const call = await tools(f, await runContext(f));
+    const out = await call("create_routine", {
+      prompt: "Revise o PR novo e mande o resumo.",
+      trigger: { type: "event", event: "github.pr_opened" },
+    });
+    expect(out.isError).toBeFalsy();
+    expect(out.content).toContain("Confirm it to the person. It can't run yet: no GitHub webhook sends this workspace");
+    // In the person's words: our private app API is nothing they can call.
+    expect(out.content).toContain("a GitHub webhook for this workspace, which a workspace admin sets up");
+    expect(out.content).toContain("offer a schedule that checks instead");
+    expect(out.content).not.toContain("/api/");
+    const id = (out.data?.routine as { id: string } | undefined)?.id ?? "";
+    expect((await getRoutineView(f.db, f.owner.id, f.org.id, id)).state).toBe("needs_webhook");
+    expect((await call("list_routines", {})).content).toContain(
+      "can't run yet: no GitHub webhook sends its event here",
+    );
+    // Paused, it says so first.
+    const paused = await call("update_routine", { id, active: false });
+    expect(paused.content).not.toContain("can't run yet");
+    expect((await getRoutineView(f.db, f.owner.id, f.org.id, id)).state).toBe("paused");
+
+    // With a GitHub webhook here, the next pull request starts it.
+    await createWebhookEndpoint(
+      { db: f.db, keyWrappers: [f.keyWrapper] },
+      f.owner.id,
+      f.org.id,
+      "github",
+      "http://localhost:3000",
+    );
+    const resumed = await call("update_routine", { id, active: true });
+    expect(resumed.content).not.toContain("can't run yet");
+    expect((await getRoutineView(f.db, f.owner.id, f.org.id, id)).state).toBe("active");
+    // Sentry's events need Sentry's webhook; a task made here needs none.
+    const sentry = await call("create_routine", {
+      prompt: "Investigue o erro.",
+      trigger: { type: "event", event: "sentry.issue_created" },
+    });
+    expect(sentry.content).toContain("It can't run yet: no Sentry webhook");
+    const issues = await call("create_routine", {
+      prompt: "Triagem.",
+      trigger: { type: "event", event: "issue.created" },
+    });
+    expect(issues.content).not.toContain("can't run yet");
   });
 
   test("create_routine needs a schedule or a trigger, not both; an email trigger needs a mailbox the agent reads", async () => {

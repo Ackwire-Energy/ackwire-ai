@@ -191,12 +191,9 @@ export function RequestCard({
             {object.detail && <small>{object.detail}</small>}
           </span>
           {object.more && (details || onOpenChange) && (
-            <button type="button" className="rq__more" aria-expanded={open} onClick={toggle}>
+            <RequestMore open={open} onClick={toggle}>
               {object.more}
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                <path d="m4.5 2.5 3.5 3.5-3.5 3.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-              </svg>
-            </button>
+            </RequestMore>
           )}
         </div>
       )}
@@ -233,6 +230,57 @@ export function RequestCard({
       data-ask-mine={mine ? "" : undefined}
     >
       {inner}
+    </div>
+  );
+}
+
+/** "Ver …": opens what a request holds back; its arrow turns while it is open. */
+function RequestMore({ open, onClick, children }: { open: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button type="button" className="rq__more" aria-expanded={open} onClick={onClick}>
+      {children}
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+        <path d="m4.5 2.5 3.5 3.5-3.5 3.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      </svg>
+    </button>
+  );
+}
+
+/**
+ * A decided request: no card, one quiet line in the conversation. A pixel mark (a square when it went through, a
+ * short bar when it was refused, expired or not applied), its words, and "Ver …" opening the rest under the line.
+ */
+export function RequestDone({
+  done,
+  label,
+  more,
+  children,
+}: {
+  /** It went through. */
+  done: boolean;
+  /** The group's accessible name. */
+  label: string;
+  /** What the line leaves out, and the button that opens it. */
+  more?: { label: string; content: ReactNode };
+  /** The words: what it was, how it ended and, when the request has one, the time. */
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
+    <div className="rq-done" role="group" aria-label={label}>
+      <div className="rq-done__line">
+        <span className="rq-done__mark" data-done={done || undefined} aria-hidden="true">
+          <span />
+        </span>
+        <span className="rq-done__text">{children}</span>
+        {more && (
+          <RequestMore open={open} onClick={() => setOpen((v) => !v)}>
+            {more.label}
+          </RequestMore>
+        )}
+      </div>
+      {open && more && <div className="rq__details">{more.content}</div>}
     </div>
   );
 }

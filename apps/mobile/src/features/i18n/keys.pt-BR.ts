@@ -333,7 +333,6 @@ export const featureKeysPtBR = {
       expiredM: "O {{name}} não respondeu a tempo",
       failedF: "A {{name}} não conseguiu responder",
       failedM: "O {{name}} não conseguiu responder",
-      asked: "{{name}} perguntou",
       answerOfF: "Resposta da {{name}}",
       answerOfM: "Resposta do {{name}}",
       noAnswer: "Sem resposta.",
@@ -346,12 +345,6 @@ export const featureKeysPtBR = {
     fileOpen: "Toque para abrir",
     fileDeleted: "Arquivo removido",
     fileFailed: "Não deu para abrir o arquivo.",
-    approval: {
-      approved: "Aprovado: {{title}}",
-      refused: "Recusado: {{title}}",
-      expired: "Expirou: {{title}}",
-      canceled: "Cancelado: {{title}}",
-    },
     approvalPreview: "Pedido de aprovação",
     question: {
       fromF: "Pergunta da {{name}}",

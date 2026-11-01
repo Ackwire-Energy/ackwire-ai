@@ -775,13 +775,21 @@ export interface Message {
   createdAt: string;
 }
 
-/** How an agent's question to another agent (`ask_agent`) ended. */
+/** How an agent's question to another agent (`ask_agent`), or the work it handed it (`tell_agent`), ended. */
 export type ConsultationStatus = "answered" | "expired" | "failed";
+
+/**
+ * A question to another agent (`ask_agent`), or work handed to one (`note`, `tell_agent`). Absent from servers
+ * before notes were tracked: a question.
+ */
+export type ConsultationKind = "question" | "note";
 
 /** `message.meta.consulted` on the asking agent's reply: one entry per agent it asked. */
 export interface MessageConsultation {
   agentId: string;
   consultationId: string;
+  /** A `consult_reply` notice of work handed off carries `note`. */
+  kind?: ConsultationKind;
   status: ConsultationStatus;
   question: string;
   /** Only when answered. */
@@ -875,16 +883,18 @@ export interface OpenConsult {
 
 /**
  * What a consulted agent waits on before it can answer: an approval, or a person's answer or secret (a person);
- * `computer`: its computer coming back (no one to ask).
+ * `computer`: its computer coming back (no one to ask); `agents`: its part done, what it handed on to other agents.
  */
-export type ConsultationWait = "approval" | "input" | "computer";
+export type ConsultationWait = "approval" | "input" | "computer" | "agents";
 
 /**
- * A question an agent asked another agent from a conversation (`GET …/channels/{id}/consultations`): drawn inside
- * the reply of the run that asked ("Perguntou a 3 colegas"), each with where it is and, once closed, the answer.
+ * A question an agent asked another agent from a conversation, or work it handed one (`GET
+ * …/channels/{id}/consultations`): drawn inside the reply of the run that asked ("Perguntou a 3 colegas", "Passou
+ * para 1 colega"), each with where it is and, once closed, the answer.
  */
 export interface RunConsultation {
   id: string;
+  kind?: ConsultationKind;
   /** The asking run: its reply (`agentRunId`) shows the list. */
   runId: string;
   agentId: string;
@@ -1018,7 +1028,10 @@ export type ChannelEvent =
       /** A routine's background run: never the conversation's working indicator. */
       background?: boolean;
     }
-  /** An agent asked another agent (`ask_agent`) and waits for it: "Dev está perguntando ao Infra…". */
+  /**
+   * An agent asked another agent (`ask_agent`) and waits for it: "Dev está perguntando ao Infra…". `note`: it
+   * handed it work (`tell_agent`): the reply that handed it shows it, not the working line.
+   */
   | {
       type: "agent.consulting";
       channelId: string;
@@ -1026,8 +1039,9 @@ export type ChannelEvent =
       runId: string;
       agentId: string;
       consultedAgentId: string;
+      kind?: "note";
     }
-  /** That question came back (answered, expired or failed): the asking run resumes and writes. */
+  /** That question, or that work (`note`), came back (answered, expired or failed). */
   | {
       type: "agent.consulted";
       channelId: string;
@@ -1036,8 +1050,12 @@ export type ChannelEvent =
       agentId: string;
       consultedAgentId: string;
       status: ConsultationStatus;
+      kind?: "note";
     }
-  /** A question still out changed without closing (the consulted agent waits on a person): reload the list. */
+  /**
+   * A question or a hand-off still out changed without closing (the consulted agent waits on a person, is back at
+   * work, or got more time while still at it): reload the list.
+   */
   | {
       type: "agent.consultation";
       channelId: string;
@@ -2551,9 +2569,17 @@ export type RoutineReport = "always" | "when_new";
 /**
  * Where a routine stands (ADR 0053 §11): `paused` (with `pausedReason`), `running` (a run working now),
  * `waiting_computer` (its run waits for the agent's computer: `waitingFor`), `waiting_person` (an approval
- * or an answer), `failing` (its last runs failed: `failuresInRow`).
+ * or an answer), `failing` (its last runs failed: `failuresInRow`), `needs_webhook` (its event comes through a
+ * GitHub or Sentry webhook the workspace doesn't have: it can't run yet).
  */
-export type RoutineState = "active" | "paused" | "running" | "waiting_computer" | "waiting_person" | "failing";
+export type RoutineState =
+  | "active"
+  | "paused"
+  | "running"
+  | "waiting_computer"
+  | "waiting_person"
+  | "failing"
+  | "needs_webhook";
 
 /** Why the server paused a routine (the app says it, with its one-tap fix); null: a person paused it. */
 export type RoutinePausedReason =

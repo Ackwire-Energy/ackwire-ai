@@ -17,6 +17,7 @@ import {
 } from "@agenteschat/client/lib/wiki";
 import { readZip } from "@agenteschat/client/lib/zip";
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
+import { setMermaidRenderer } from "@/components/artifacts/Mermaid";
 import { layoutGraph, neighborsOf } from "@/components/WikiGraph";
 import { VaultCard } from "@/components/wiki/VaultCard";
 import { useVaultReader } from "@/components/wiki/WikiImport";
@@ -243,6 +244,36 @@ describe("the wiki", () => {
     await act(async () => fireEvent.pointerEnter(node));
     expect(within(graph).getByRole("link", { name: "Glossário" }).hasAttribute("data-lit")).toBe(true);
     expect(within(graph).getByRole("link", { name: "Onboarding" }).hasAttribute("data-lit")).toBe(true);
+  });
+
+  test("a link's hover card shows a page's ```mermaid as code: it has only the page's first lines", async () => {
+    const asked: string[] = [];
+    setMermaidRenderer(async (_id, source) => {
+      asked.push(source);
+      return '<svg xmlns="http://www.w3.org/2000/svg"></svg>';
+    });
+    try {
+      const api = createFakeApi(seedState());
+      const glossary = await api.wiki.get(ORG_ID, "glossario");
+      await api.wiki.update(ORG_ID, "glossario", {
+        body: "```mermaid\nflowchart LR\n  PR --> Review\n  Review --> Merge\n  Merge --> Deploy\n```",
+        baseVersion: glossary.version,
+      });
+      await renderApp(`/org/${ORG_ID}/wiki/onboarding`, { api });
+      await settle(8);
+      const body = document.querySelector(".wiki-page__body") as HTMLElement;
+      const link = within(body).getByRole("link", { name: "Glossário" });
+      await act(async () => fireEvent.pointerEnter(link, { pointerType: "mouse" }));
+      await settle(4);
+      const card = document.querySelector(".wiki-preview") as HTMLElement;
+      expect(card.querySelector(".code-card__code")?.textContent).toBe(
+        "flowchart LR\n  PR --> Review\n  Review --> Merge",
+      );
+      expect(card.querySelector("img")).toBeNull();
+      expect(asked).toEqual([]);
+    } finally {
+      setMermaidRenderer(null);
+    }
   });
 });
 

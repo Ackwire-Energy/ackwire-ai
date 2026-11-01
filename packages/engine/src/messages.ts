@@ -9,12 +9,14 @@ import {
   inArray,
   isNull,
   lt,
+  ne,
   or,
   rowsOf,
   schema,
   sql,
 } from "@agenteschat/db";
 import { type AgentActionView, actionsFor } from "./agent-actions";
+import { currentHandles } from "./agents";
 import { withDeletedArtifacts } from "./artifacts";
 import { audienceSql, notifyBlocked } from "./audience";
 import { requireChannelAccess } from "./channels";
@@ -253,7 +255,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
   const noAi = new Set(decisions.filter((d) => d.error === NO_AI).map((d) => d.messageId));
   const capped = new Set(decisions.filter((d) => d.error === PLATFORM_CAP).map((d) => d.messageId));
   const strategyOf = new Map(decisions.map((d) => [d.messageId, d.strategy]));
-  // An agent's mentions the judge read as no hand-off (`delegatedAgents`); the ones it picked that a stretch's limit
+  // An agent's mentions the judge was sure need nothing (`delegatedAgents`); the ones it woke that a stretch's limit
   // held are its pause card's to explain.
   const handedOff = new Map(
     decisions.filter((d) => d.strategy.startsWith("mention-")).map((d) => [d.messageId, d.selected]),
@@ -314,6 +316,48 @@ export function parseMentionHandles(body: string): string[] {
     if (match[2]) found.add(match[2].toLowerCase());
   }
   return [...found];
+}
+
+/**
+ * The org's agents an agent's text @mentions that aren't members of `channelId`: a mention reaches only members
+ * (`insertMessageWithRuns`), so for them it is plain text that wakes nobody. Handles, lower case; never the author,
+ * an archived agent or a handle a person holds (the @ is theirs).
+ */
+export async function unreachedAgents(
+  db: Executor,
+  input: { orgId: string; channelId: string; authorAgentId: string; body: string },
+): Promise<string[]> {
+  const handles = parseMentionHandles(input.body);
+  if (handles.length === 0) return [];
+  const rows = await db
+    .select({ handle: agents.handle })
+    .from(agents)
+    .where(
+      and(
+        eq(agents.orgId, input.orgId),
+        isNull(agents.archivedAt),
+        inArray(agents.handle, handles),
+        ne(agents.id, input.authorAgentId),
+        sql`not exists (select 1 from ${channelMembers} cm
+          where cm.channel_id = ${input.channelId}::uuid and cm.agent_id = ${agents.id})`,
+        sql`not exists (select 1 from ${schema.organizationMembers} om
+          where om.org_id = ${input.orgId}::uuid and om.handle = ${agents.handle})`,
+      ),
+    );
+  return rows.map((r) => r.handle).sort();
+}
+
+/**
+ * What the agent reads about its mentions that reached nobody (`unreachedAgents`): who, and how to reach them if it
+ * meant to (a mention may only name an agent). `canAdd`: a channel, where `add_agent_to_channel` brings an agent in
+ * with the rights of the person behind the run; a DM keeps its participants. In the past tense: the line stays under
+ * the message, also after the agent joins.
+ */
+export function unreachedNote(handles: string[], where: string, canAdd: boolean): string {
+  if (handles.length === 0) return "";
+  const one = handles.length === 1;
+  const it = one ? "it" : "them";
+  return `${handles.map((h) => `@${h}`).join(", ")} ${one ? "wasn't" : "weren't"} in ${where}, so your mention didn't reach ${it}. If you meant ${it} to act or answer, use tell_agent or ask_agent${canAdd ? `, or add ${it} to ${where} with add_agent_to_channel (it works with the rights of the person you work for)` : ""}.`;
 }
 
 /** An agent's message may bring in one more agent only up to this hop (ADR 0034); `router.ts` enforces it too. */
@@ -468,7 +512,8 @@ export async function insertMessageWithRuns(
   const silent = isMediaAfterReply(input.meta);
   if (body.length > MAX_MESSAGE_LENGTH)
     throw new ValidationError(`Message is longer than ${MAX_MESSAGE_LENGTH} characters`);
-  const handles = `{${parseMentionHandles(body).join(",")}}`; // handles match [a-z0-9_-]: safe as an array literal
+  // Handles match [a-z0-9_-]: safe as an array literal.
+  const handles = `{${(await currentHandles(tx, input.orgId, parseMentionHandles(body))).join(",")}}`;
   const id = Bun.randomUUIDv7();
   const person = input.author.type === "person";
   const userId = input.author.type === "person" ? input.author.userId : null;
@@ -588,9 +633,16 @@ export async function insertMessageWithRuns(
           and r.agent_id <> all(${referenced}::uuid[])
           and (
             (r.agent_id in (select agent_id from answering)
-              and (r.thread_root_id = coalesce(${threadId}::uuid, ${id}::uuid) or exists (
-                select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'dm')
-                or ${threadId ? sql`false` : sql`(r.status in ('queued', 'running') and ${inChannelRun(sql`r`)})`}))
+              and (r.thread_root_id = coalesce(${threadId}::uuid, ${id}::uuid)
+                -- In a DM the main timeline is one conversation; each thread (a mission's) is its own, so the
+                -- agent works in both at once instead of one taking the other's messages.
+                or ${
+                  threadId
+                    ? sql`false`
+                    : sql`(${inChannelRun(sql`r`)} and exists (
+                select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'dm'))
+                or (r.status in ('queued', 'running') and ${inChannelRun(sql`r`)})`
+                }))
             or (${threadId}::uuid is not null and r.thread_root_id = ${threadId}::uuid
               and ${audienceSql("ra", sql`${userId}::text`)})
             -- The floor (a follow-up without @ in a channel's main timeline): it goes to the agent still
@@ -1068,7 +1120,7 @@ export async function classifyAddressees(
   input: { orgId: string; channelId: string; userId: string; body: string },
   options: { timeoutMs?: number } = {},
 ): Promise<AddresseeDecision | null> {
-  const handles = parseMentionHandles(input.body);
+  const handles = await currentHandles(db, input.orgId, parseMentionHandles(input.body));
   if (handles.length < 2) return null;
   const targets = await db
     .select({ id: agents.id, handle: agents.handle, name: agents.name, role: agents.role })

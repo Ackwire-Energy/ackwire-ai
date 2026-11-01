@@ -1,17 +1,22 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { and, eq, schema } from "@agenteschat/db";
 import { type ModelRequest, systemText, textOf } from "@agenteschat/providers";
+import type { FakeReply } from "@agenteschat/providers/testing";
 import {
   askAgentToImplement,
   CANCEL_FOLLOW_UP_TOOL,
   cancelFollowUp,
+  createAgent,
+  createAgentRuns,
   createIssue,
   drainOutbox,
   FOLLOW_UP_JOB,
   FOLLOW_UP_TOOL,
+  insertMessage,
   invokeToolForRun,
   joinChannel,
   listIssueActivity,
+  openAgentDm,
   postPersonMessage,
   removeChannelMember,
   runAuthority,
@@ -474,4 +479,188 @@ test("asked to implement an issue: an answer posted before a nudge is a comment 
   await drainOutbox(f.db, f.handlers);
   const comments = (await listIssueActivity(f.db, person, f.org.id, issue.id)).filter((a) => a.kind === "comment");
   expect(comments.map((a) => a.text)).toEqual([first, second]);
+});
+
+test("a promise is kept by work handed off from this conversation still out, by any run; not another conversation's or a closed one", async () => {
+  f = await setup({
+    judge: (kind) => (kind === "follow_through" ? "unkept" : undefined),
+    reply: (request) => ({
+      chunks: [
+        lastUserText(request).includes("You ended saying")
+          ? "Ok, vou ver agora."
+          : "A Rita ainda está nisso, te aviso quando terminar.",
+      ],
+    }),
+  });
+  const fx = f;
+  const rita = await createAgent(
+    fx.db,
+    fx.owner.id,
+    fx.org.id,
+    { name: "Rita", handle: "rita", role: "Operations", credentialId: fx.credential.id },
+    { model: "claude-sonnet-5-5" },
+  );
+  /** An earlier run of Dev in #general, done: on a message of its own, or in a thread. */
+  const earlier = async (thread?: string) => {
+    const m = await insertMessage(fx.db, {
+      orgId: fx.org.id,
+      channelId: fx.general.id,
+      ...(thread ? { threadId: thread } : {}),
+      author: { type: "person", userId: fx.owner.id },
+      body: "pedido",
+    });
+    const [run] = await fx.db
+      .insert(schema.agentRuns)
+      .values({
+        orgId: fx.org.id,
+        agentId: fx.agent.id,
+        channelId: fx.general.id,
+        threadRootId: thread ?? m.id,
+        triggerMessageId: m.id,
+        trigger: "mention",
+        hop: 1,
+        status: "done",
+      })
+      .returning();
+    if (!run) throw new Error("no run");
+    return run;
+  };
+  const handedOff = (run: { id: string }, over: Partial<typeof schema.agentConsultations.$inferInsert> = {}) =>
+    fx.db.insert(schema.agentConsultations).values({
+      orgId: fx.org.id,
+      kind: "note",
+      askerRunId: run.id,
+      askerAgentId: fx.agent.id,
+      targetAgentId: rita.id,
+      channelId: fx.general.id,
+      messageId: Bun.randomUUIDv7(),
+      waitId: `async:${Bun.randomUUIDv7()}`,
+      question: "Passa a pasta ao Diogo.",
+      chain: [fx.agent.id],
+      expiresAt: new Date(Date.now() + 60_000),
+      ...over,
+    });
+  const nudges = async () =>
+    (await fx.db.select().from(schema.agentRunSteps)).filter((s) => s.data.nudged === "promise").length;
+
+  const thread = await earlier();
+  await handedOff(await earlier(thread.triggerMessageId));
+  await handedOff(await earlier(), { status: "answered", answer: "Feito.", answeredAt: new Date() });
+  await ask(fx, "@dev e a Rita?");
+  await drainOutbox(fx.db, fx.handlers);
+  expect(await nudges()).toBe(1);
+
+  // Still out from here, handed off by an earlier run: what comes of it wakes the agent here, keeping "te aviso".
+  await handedOff(await earlier());
+  await ask(fx, "@dev e agora?");
+  await drainOutbox(fx.db, fx.handlers);
+  expect(followThroughCalls(fx).length).toBe(2);
+  expect(await nudges()).toBe(1);
+});
+
+describe("between agents (ADR 0095)", () => {
+  /** Whose model call it is: its prompt says which agent it is. */
+  const youAre = (request: ModelRequest, name: string) =>
+    systemText(request.system).includes(`You are ${name} (@${name.toLowerCase()})`);
+  const addAgent = (fx: Fixture, name: string) =>
+    createAgent(
+      fx.db,
+      fx.owner.id,
+      fx.org.id,
+      { name, handle: name.toLowerCase(), role: "Operations", credentialId: fx.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+  /** Dev hands Infra the queue when Ana asks; Infra answers with `infra` (by its call), Ops with "Fila limpa.". */
+  const handing = (infra: (request: ModelRequest, call: number) => FakeReply) => {
+    let infraCalls = 0;
+    return (request: ModelRequest): FakeReply => {
+      if (youAre(request, "Infra")) return infra(request, ++infraCalls);
+      if (youAre(request, "Ops")) return { chunks: ["Fila limpa."] };
+      const last = lastUserText(request);
+      if (last.includes("did with the work you handed it") || last.includes("Note from @infra"))
+        return { chunks: ["Pronto."] };
+      if (JSON.stringify(request.messages.at(-1)?.content).includes("tool_result"))
+        return { chunks: ["Passei a fila ao Infra."] };
+      return {
+        chunks: [],
+        toolUses: [{ name: "tell_agent", input: { agent: "@infra", message: "Limpa a fila de jobs de staging." } }],
+      };
+    };
+  };
+  /** The judge reads Infra's replies as an unkept promise, and every note's reply as one the sender needs. */
+  let infraId = "";
+  const judge = (kind: string, _id: string, _state: unknown, _q: unknown, request: { agentId?: string | null }) =>
+    kind === "follow_through" && request.agentId === infraId ? "unkept" : kind === "note_reply" ? 0.9 : undefined;
+  const infraJudged = (fx: Fixture) =>
+    (fx.context.judge as unknown as { calls: { kind: string; agentId?: string }[] }).calls.filter(
+      (c) => c.kind === "follow_through" && c.agentId === infraId,
+    );
+  const dmNudges = (fx: Fixture) =>
+    fx.provider.calls.filter((c) => lastUserText(c.request).includes("your answer goes back as it is"));
+
+  test("a run that owes an answer and ends on a promise gets the DM nudge once; one answering nothing gets no check", async () => {
+    f = await setup({
+      askAgent: true,
+      judge,
+      reply: handing((_request, call) => ({
+        chunks: [call === 1 ? "Vou limpar a fila e te digo." : "Fila limpa: 0 jobs pendentes."],
+      })),
+    });
+    const fx = f;
+    const infra = await addAgent(fx, "Infra");
+    infraId = infra.id;
+    await ask(fx, "@dev pede ao infra para limpar a fila");
+    await drainOutbox(fx.db, fx.handlers);
+    expect(infraJudged(fx)).toHaveLength(1);
+    expect(dmNudges(fx)).toHaveLength(1);
+    expect(await fx.db.select().from(schema.agentConsultations)).toMatchObject([
+      { status: "answered", answer: "Fila limpa: 0 jobs pendentes." },
+    ]);
+
+    // A note from before notes were rows: its run owes no answer, and isn't read.
+    const [dev] = await fx.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.agentId, fx.agent.id));
+    if (!dev) throw new Error("no run");
+    const dm = await openAgentDm(fx.db, fx.org.id, fx.agent.id, infra.id);
+    await fx.db.transaction(async (tx) => {
+      const m = await insertMessage(tx, {
+        orgId: fx.org.id,
+        channelId: dm.id,
+        author: { type: "agent", agentId: fx.agent.id, runId: dev.id, hop: dev.hop },
+        body: "A fila voltou a encher.",
+        meta: { agentNote: { runId: dev.id } },
+      });
+      await createAgentRuns(tx, m, [infra.id], "dm");
+    });
+    await drainOutbox(fx.db, fx.handlers);
+    expect(infraJudged(fx)).toHaveLength(1);
+  });
+
+  test("a run that handed part on and ends saying it will come back gets no nudge: what it handed on goes back with its answer", async () => {
+    f = await setup({
+      askAgent: true,
+      judge,
+      reply: handing((request) =>
+        JSON.stringify(request.messages.at(-1)?.content).includes("tool_result")
+          ? { chunks: ["Passei a fila ao Ops; te digo quando ele terminar."] }
+          : {
+              chunks: [],
+              toolUses: [{ name: "tell_agent", input: { agent: "@ops", message: "Limpa a fila de staging." } }],
+            },
+      ),
+    });
+    const fx = f;
+    const infra = await addAgent(fx, "Infra");
+    infraId = infra.id;
+    await addAgent(fx, "Ops");
+    await ask(fx, "@dev pede ao infra para limpar a fila");
+    await drainOutbox(fx.db, fx.handlers);
+    expect(infraJudged(fx)).toHaveLength(1);
+    expect(dmNudges(fx)).toEqual([]);
+    const [handed] = (await fx.db.select().from(schema.agentConsultations)).filter((c) => c.targetAgentId === infra.id);
+    expect(handed).toMatchObject({
+      status: "answered",
+      answer:
+        "Passei a fila ao Ops; te digo quando ele terminar.\n\n[@ops, to whom @infra handed part of it]: Fila limpa.",
+    });
+  });
 });

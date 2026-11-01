@@ -27,7 +27,9 @@ import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { AgentAvatar, Button, Icon, Text, useTheme } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
-import { AskButtons, AskCard, AskFoot, ExpiryLine, useAskStore } from "../chat/asks";
+import { askEndedAt } from "../chat/ask-store";
+import { AskButtons, AskCard, AskDone, AskFoot, ExpiryLine, useAskStore } from "../chat/asks";
+import { markName } from "../chat/logic";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { useFailed } from "../routines/hooks";
 import { proposedRoutineWhen } from "../routines/rule";
@@ -38,7 +40,8 @@ import { fullLook } from "./edit";
  * An agent's proposal of a new agent (ADR 0081): while it is open, the request card (the agent's reason, the draft
  * in the well, the AI it would think with under "Ver a mudança", what it gets a line each with who gives a line the
  * viewer can't). Criar makes it as it is in one tap, Revisar opens "Criar agente" filled in with it, Recusar says no,
- * for who may create agents. Then what was decided, the lines it got and the new agent's page once created.
+ * for who may create agents. Then one line with what was decided; it opens the draft, the lines it got and, once
+ * created, the way to the new agent's page.
  */
 export function ProposalCard({ message: m }: { message: Message }) {
   const { t } = useTranslation();
@@ -147,59 +150,60 @@ export function ProposalCard({ message: m }: { message: Message }) {
     );
   }
   return (
-    <View style={[styles.card, { backgroundColor: colors.sunken }]}>
-      <View style={styles.row}>
-        <Icon name={status === "created" ? "check" : "agent"} size={16} color={colors.ink2} />
-        <Text variant="subhead" style={styles.title}>
-          {t("actionCard.agentProposal.title", { agent: proposer })}
-        </Text>
-      </View>
-      <View style={styles.row}>
-        <AgentAvatar agent={fullLook(draft.appearance)} size={40} name={draft.name} live={false} />
-        <View style={styles.fill}>
-          <Text variant="body" style={styles.bold}>
-            {draft.name}
-          </Text>
-          <Text variant="footnote" tone="muted">
-            {[`@${draft.handle}`, draft.role].filter(Boolean).join(" · ")}
-          </Text>
-        </View>
-      </View>
-      {why ? (
-        <Text variant="footnote" tone="ink2">
-          {why}
-        </Text>
-      ) : null}
-      {lines.length > 0 ? <Lines lines={lines} draft={draft} /> : null}
-      <Text variant="footnote" tone="muted">
-        {suggestedAiText(t, draft.ai)}
-      </Text>
-      <View style={styles.acts}>
-        {outcome ? (
-          <Text variant="footnote" tone="faint">
-            {outcome}
-          </Text>
-        ) : null}
-        {status === "created" && card.agentId ? (
-          <Button
-            variant="secondary"
-            size="sm"
-            label={t("newAgent.openProfile")}
-            onPress={() => router.push(`/agent/${encodeURIComponent(card.agentId ?? "")}` as never)}
-          />
-        ) : null}
-        {routineLeft(card) && (card.decidedByUserId === meId || can(org, "manage_routines")) ? (
-          // Not made with it (the agent wasn't where it reports yet): made from here once it is.
-          <Button
-            variant="secondary"
-            size="sm"
-            label={t("newAgent.routineKeep", { name: draft.routine?.name })}
-            disabled={makeRoutine.isPending}
-            onPress={() => makeRoutine.mutate(m.id, { onError: failed })}
-          />
-        ) : null}
-      </View>
-    </View>
+    <AskDone
+      done={status === "created"}
+      words={`${outcome}: ${markName(draft.name)}`}
+      at={askEndedAt({ ...card, status })}
+      more={{
+        label: t("ask.seeChange"),
+        content: (
+          <View style={[styles.card, { backgroundColor: colors.sunken }]}>
+            <View style={styles.row}>
+              <AgentAvatar agent={fullLook(draft.appearance)} size={40} name={draft.name} live={false} />
+              <View style={styles.fill}>
+                <Text variant="body" style={styles.bold}>
+                  {draft.name}
+                </Text>
+                <Text variant="footnote" tone="muted">
+                  {[`@${draft.handle}`, draft.role].filter(Boolean).join(" · ")}
+                </Text>
+              </View>
+            </View>
+            {why ? (
+              <Text variant="footnote" tone="ink2">
+                {why}
+              </Text>
+            ) : null}
+            {lines.length > 0 ? <Lines lines={lines} draft={draft} /> : null}
+            <Text variant="footnote" tone="muted">
+              {suggestedAiText(t, draft.ai)}
+            </Text>
+            {status === "created" && (card.agentId || routineLeft(card)) ? (
+              <View style={styles.acts}>
+                {card.agentId ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    label={t("newAgent.openProfile")}
+                    onPress={() => router.push(`/agent/${encodeURIComponent(card.agentId ?? "")}` as never)}
+                  />
+                ) : null}
+                {routineLeft(card) && (card.decidedByUserId === meId || can(org, "manage_routines")) ? (
+                  // Not made with it (the agent wasn't where it reports yet): made from here once it is.
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    label={t("newAgent.routineKeep", { name: draft.routine?.name })}
+                    disabled={makeRoutine.isPending}
+                    onPress={() => makeRoutine.mutate(m.id, { onError: failed })}
+                  />
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+        ),
+      }}
+    />
   );
 }
 
@@ -287,7 +291,6 @@ function Lines({ lines, draft }: { lines: ProposalLine[]; draft: AgentDraft }) {
 const styles = StyleSheet.create({
   card: { marginTop: 10, borderRadius: 14, padding: 12, gap: 8, alignItems: "stretch" },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
-  title: { flex: 1, fontWeight: "600" },
   fill: { flex: 1 },
   bold: { fontWeight: "600" },
   lines: { gap: 4 },

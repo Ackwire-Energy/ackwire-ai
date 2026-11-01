@@ -84,6 +84,7 @@ const {
   messages,
   organizationMembers,
   users,
+  webhookEndpoints,
 } = schema;
 
 export type RoutineTarget =
@@ -107,6 +108,15 @@ export const ROUTINE_EVENTS = [
   "email.received",
 ] as const;
 export type RoutineEvent = (typeof ROUTINE_EVENTS)[number];
+/**
+ * The webhook an event comes through (`webhooks.ts`): a routine on it never runs while the workspace has none. The
+ * GitHub App's own webhook (`github-app-installs.ts`) keeps installations in step and fires no routine.
+ */
+export const EVENT_WEBHOOK: Partial<Record<RoutineEvent, "github" | "sentry">> = {
+  "github.pr_opened": "github",
+  "deploy.succeeded": "github",
+  "sentry.issue_created": "sentry",
+};
 
 export type RoutineTrigger =
   | {
@@ -180,8 +190,15 @@ export const RECENT_RUNS = 14;
 /** The window of a routine's health and usage ("this week"). */
 export const ROUTINE_WEEK_MS = 7 * 86_400_000;
 
-/** What a routine is doing now, for its line in Rotinas. */
-export type RoutineState = "active" | "paused" | "running" | "waiting_computer" | "waiting_person" | "failing";
+/** What a routine is doing now, for its line in Rotinas (`needs_webhook`: its event has no way in, `EVENT_WEBHOOK`). */
+export type RoutineState =
+  | "active"
+  | "paused"
+  | "running"
+  | "waiting_computer"
+  | "waiting_person"
+  | "failing"
+  | "needs_webhook";
 
 export interface RoutineView {
   id: string;
@@ -595,7 +612,9 @@ async function views(
   const recent = new Map<string, RunRow[]>();
   for (const r of recentRows) recent.set(r.routineId, [...(recent.get(r.routineId) ?? []), r]);
   const inWeek = and(eq(routineRuns.orgId, orgId), inArray(routineRuns.routineId, ids), gte(routineRuns.at, since));
-  const [details, rights, watches, weekRows, usageRows, agentRows] = await Promise.all([
+  const webhookOf = (r: RoutineRow) => (r.triggerType === "event" ? EVENT_WEBHOOK[r.event as RoutineEvent] : undefined);
+  const wantedHooks = [...new Set(rows.flatMap((r) => webhookOf(r) ?? []))];
+  const [details, rights, watches, weekRows, usageRows, agentRows, hookRows] = await Promise.all([
     runDetails(db, orgId, recentRows),
     viewerRights(db, orgId, rows, viewerId),
     watchesOf(
@@ -628,7 +647,20 @@ async function views(
       .select({ id: agents.id, brain: agents.brain, machineId: agents.machineId })
       .from(agents)
       .where(and(eq(agents.orgId, orgId), inArray(agents.id, [...new Set(rows.map((r) => r.agentId))]))),
+    lookup(wantedHooks, () =>
+      db
+        .selectDistinct({ provider: webhookEndpoints.provider })
+        .from(webhookEndpoints)
+        .where(
+          and(
+            eq(webhookEndpoints.orgId, orgId),
+            isNull(webhookEndpoints.revokedAt),
+            inArray(webhookEndpoints.provider, wantedHooks),
+          ),
+        ),
+    ),
   ]);
+  const hooked = new Set(hookRows.map((h) => h.provider));
   const machineIds = [
     ...new Set([
       ...agentRows.flatMap((a) => a.machineId ?? []),
@@ -673,8 +705,9 @@ async function views(
           since: away.updatedAt.toISOString(),
         }
       : null;
+    const hook = webhookOf(r);
     // A run at work says what it does first (a manual run of a paused routine, a one-off's run after it
-    // fired: both inactive, both stoppable); paused, failing or active only when nothing is at work.
+    // fired: both inactive, both stoppable); paused, unable to run, failing or active only when nothing is at work.
     const state: RoutineState = waitingFor
       ? "waiting_computer"
       : openAgents.some(agentWaiting)
@@ -683,9 +716,11 @@ async function views(
           ? "running"
           : !r.active
             ? "paused"
-            : r.failuresInRow > 0
-              ? "failing"
-              : "active";
+            : hook && !hooked.has(hook)
+              ? "needs_webhook"
+              : r.failuresInRow > 0
+                ? "failing"
+                : "active";
     const outcomes = new Map<string, number>();
     let started = 0;
     for (const w of week.get(r.id) ?? []) {
@@ -1140,6 +1175,18 @@ export async function updateRoutine(
   }
   if (patch.access !== undefined) set.access = routineAccessOf(patch.access);
   if (patch.report !== undefined) set.report = routineReportOf(patch.report);
+  // A routine set to act reaches what its creator reaches (their rooms, the agents they talk to), so
+  // only its creator may decide what it does with that; anyone else takes it over first.
+  const access = set.access ?? current.access;
+  if (
+    actorId !== current.createdByUserId &&
+    access === "act" &&
+    (access !== current.access ||
+      (set.prompt !== undefined && set.prompt !== current.prompt) ||
+      set.agentId !== undefined)
+  ) {
+    throw new ForbiddenError("Take the routine over before setting what it does as it acts", "routine.act_take_over");
+  }
   if (patch.trigger !== undefined) {
     Object.assign(set, await resolveTrigger(deps, actorId, orgId, patch.trigger, current.timezone));
   }
@@ -1828,6 +1875,8 @@ export async function createReminder(
       prompt: message,
       target: target as unknown as Record<string, unknown>,
       triggerType: "once",
+      // Asked to do something at that time, not only to look and tell (ADR 0053, addendum of 2026-10-31).
+      ...(input.askAgent ? { access: "act" } : {}),
       timezone: input.timezone,
       description: input.description,
       nextRunAt: input.at,
