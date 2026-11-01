@@ -30,7 +30,7 @@ export const WHY_YOU_WERE_CALLED =
 
 /** The prompt block of a run another agent's @mention woke (`byAnotherAgent`): it may pass too. */
 export const WHY_AN_AGENT_CALLED =
-  "# Why you were called\nAnother agent mentioned you, not a person. Do what its message hands you: work, a question, or something to read and act on (a file, results, a summary, a verdict). If it only thanks you, acknowledges, agrees, signs off or names you, call pass at once, without looking anything up: nothing is posted, and a thanks never needs one back.";
+  '# Why you were called\nAnother agent mentioned you, not a person. Do what its message hands you: work, a question, or something to read and act on (a file, results, a summary, a verdict). When it says it will ask you to do something ("I\'ll ask @you to review it"), with no person to decide first, that is the request: do it now. If it only thanks you, acknowledges, agrees, signs off or names you, call pass at once, without looking anything up: nothing is posted, and a thanks never needs one back.';
 
 /**
  * Another agent's message that @mentions it woke the run (`dispatchMentions`), not one of its own lines (a notice, a
