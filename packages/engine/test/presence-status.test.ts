@@ -58,6 +58,7 @@ test("a written status clears itself when its time is up", () => {
   expect(memberStatus({ statusText: null, statusEmoji: null, statusUntil: null }, now)).toBeNull();
 });
 
+// This can be the shard's first database: allow the PGlite template to finish migrating.
 test("a person sets and clears their availability and line; the workspace hears it", async () => {
   f = await setup();
   const bia = await addMember(f.db, f.org.id, "member", "bia");
@@ -81,7 +82,7 @@ test("a person sets and clears their availability and line; the workspace hears 
   await expect(
     setMyStatus({ db: f.db }, bia.id, f.org.id, { status: { text: "Almoço", until: "2020-01-01T00:00:00Z" } }),
   ).rejects.toBeInstanceOf(ValidationError);
-});
+}, 15_000);
 
 test("while hidden, last seen stops moving and coming online tells nobody", async () => {
   f = await setup();

@@ -102,6 +102,7 @@ test("storage API: where this server keeps files, with the folder only outside a
   expect(storagePlatform("s3", { ...config, INSTALL_MODE: "native" })).toEqual({ kind: "bucket", folder: null });
 });
 
+// This scenario creates four database-backed servers to compare storage modes.
 test("storage API: what the workspace's files take, and the disk under this server's folder", async () => {
   const dir = await mkdtemp(join(tmpdir(), "agentes-files-"));
   // In a container: the folder's path stays hidden, its disk is still told.
@@ -160,7 +161,7 @@ test("storage API: what the workspace's files take, and the disk under this serv
     await cloud.close();
   }
   await rm(dir, { recursive: true, force: true });
-});
+}, 15_000);
 
 test("Drive API: create, new version, versions, download link, file, delete", async () => {
   const owner = browser(t);
