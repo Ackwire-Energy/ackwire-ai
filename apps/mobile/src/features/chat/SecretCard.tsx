@@ -1,14 +1,16 @@
 import { type SecretRequest, useApi } from "@agenteschat/client";
 import { MAX_SECRET_BYTES, secretAad } from "@agenteschat/client/lib/secret-box";
+import { secretEndedAt, secretOutcome } from "@agenteschat/client/lib/secret-words";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, TextInput, View } from "react-native";
 import { sealSecret } from "@/lib/secret-box";
 import { Button, Icon, Text, useToast } from "@/ui";
 import { IconTile } from "../connectors/ConnectorIcon";
-import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
+import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { successHaptic } from "../shared/parts";
 import { AskButtons, AskCard, AskDone, AskFoot, ExpiryLine, useAskStore, useExpired } from "./asks";
+import { markName } from "./logic";
 
 /**
  * An agent asks for a secret for its computer (`request_secret`, ADR 0027), as the request card. Only the
@@ -23,7 +25,6 @@ export function SecretCard({ request }: { request: SecretRequest }) {
   const dir = useDirectory();
   const c = useColors();
   const toast = useToast();
-  const when = useWhen();
   const asks = useAskStore();
   // What this phone did to it (the message's copy changes only when the server says so).
   const [answered, setAnswered] = useState<SecretRequest | null>(null);
@@ -77,26 +78,28 @@ export function SecretCard({ request }: { request: SecretRequest }) {
     }
   };
 
-  if (!pending) {
-    const line =
-      r.status === "delivered"
-        ? r.deliveredAt
-          ? mine
-            ? t("secret.deliveredByYou", { time: when.time(r.deliveredAt) })
-            : t("secret.delivered", { person, time: when.time(r.deliveredAt) })
-          : t("secret.chipDone")
-        : r.status === "declined"
-          ? t("secret.declined")
-          : r.status === "canceled"
-            ? t("secret.canceled")
-            : t("secret.expired");
-    return <AskDone done={r.status === "delivered"} words={line} />;
-  }
-
   const where =
     r.target.kind === "file"
       ? t("secret.targetFile", { path: r.target.path, agent: agentName })
       : t("secret.targetEnv", { name: r.name, agent: agentName });
+  // Closed: one line, how it ended and which secret, never its value; what it was for when asked.
+  if (!pending)
+    return (
+      <AskDone
+        done={r.status === "delivered"}
+        words={`${secretOutcome(t, r, mine, person)}: ${markName(r.name)}`}
+        at={secretEndedAt(r)}
+        more={{
+          label: t("approval.seeDetails"),
+          content: (
+            <Text variant="small" tone="muted">
+              {`${r.purpose}\n${where}`}
+            </Text>
+          ),
+        }}
+      />
+    );
+
   return (
     <AskCard
       id={r.id}

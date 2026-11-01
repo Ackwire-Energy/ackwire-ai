@@ -107,7 +107,7 @@ describe("secret requests (ADR 0027)", () => {
     await settle(4);
     expect(state.calls.some((c) => c.method === "secrets.decline")).toBe(true);
     const done = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
-    expect(done.textContent).toContain("Recusado. O agente segue sem ele.");
+    expect(done.textContent).toContain("Recusado: NPM_TOKEN");
     expect(done.querySelector(".rq-done__mark[data-done]")).toBeNull();
   });
 
@@ -124,6 +124,6 @@ describe("secret requests (ADR 0027)", () => {
     const done = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
     expect(done.hasAttribute("data-ask-id")).toBe(false);
     expect(within(done).queryByLabelText("Valor de NPM_TOKEN")).toBeNull();
-    expect(done.textContent).toContain("Ninguém respondeu a tempo.");
+    expect(done.textContent).toContain("Expirou: NPM_TOKEN");
   }, 15_000);
 });

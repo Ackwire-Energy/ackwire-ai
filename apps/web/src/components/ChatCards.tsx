@@ -18,6 +18,7 @@ import {
   staleCount,
 } from "@agenteschat/client/lib/proposals";
 import { MAX_SECRET_BYTES, sealSecret, secretAad } from "@agenteschat/client/lib/secret-box";
+import { secretEndedAt, secretOutcome } from "@agenteschat/client/lib/secret-words";
 import { Button, Chip, Diff, diffLines, Field, Icon, Input, MessageText, Switch, Textarea } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -708,21 +709,17 @@ export function SecretCard({ request }: { request: SecretRequest }) {
       />
     );
   }
-  // Closed: one line, how it ended (its message already names the secret).
-  const closed: Record<Exclude<SecretRequest["status"], "pending">, string> = {
-    delivered: current.deliveredAt
-      ? mine
-        ? t("secret.deliveredByYou", { time: formatTime(i18n.language, current.deliveredAt) })
-        : t("secret.delivered", { person, time: formatTime(i18n.language, current.deliveredAt) })
-      : t("secret.chipDone"),
-    declined: t("secret.declined"),
-    expired: t("secret.expired"),
-    canceled: t("secret.canceled"),
-  };
+  // Closed: one line, how it ended and which secret, never its value; what it was for behind "Ver detalhes".
+  const ended = secretEndedAt(current);
   return (
     <>
-      <RequestDone done={current.status === "delivered"} label={t("secret.group", { agent: agentName })}>
-        {closed[current.status === "pending" ? "expired" : current.status]}
+      <RequestDone
+        done={current.status === "delivered"}
+        label={t("secret.group", { agent: agentName })}
+        more={{ label: t("approval.seeDetails"), content: `${current.purpose}\n${where}` }}
+      >
+        {secretOutcome(t, current, mine, person)}: <b>{current.name}</b>
+        {ended && ` · ${whenAt(t, i18n.language, ended)}`}
       </RequestDone>
       {error && (
         <p className="rq__error" role="alert">
