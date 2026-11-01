@@ -214,6 +214,8 @@ import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@
 import { MenuEntries } from "@/components/DesktopMenus";
 import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
 import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
+import { ArrivalCard, useArrival } from "@/components/invite/Arrival";
+import { InviteOfferRow, useInviteOffer } from "@/components/invite/InviteDialog";
 import { useUploadFailed } from "@/components/Limits";
 import { LiveCodeToggle, type SteerNote } from "@/components/LiveCode";
 import { ErrorState, LoadingConversation } from "@/components/Loading";
@@ -563,6 +565,9 @@ function ChannelView({
   const scopedRuns = (s: StreamsState) => runsInChannel(s, channel.id).filter((r) => runVisible.current(r));
   const live = useLiveStore();
   const join = useJoinChannel(org.id, channel.id);
+  // A newcomer's first #general greets them (ADR 0090), in the place of the day's greeting.
+  const arrival = useArrival(channel);
+  const arriving = arrival.show && !thread;
   const sendTyping = useTypingSender(channel.id, thread?.id);
   // ⌘K "Pedir a um agente" leaves the text for this DM's composer.
   const draftKey = chrome?.dmAgentId ? `agent:${chrome.dmAgentId}` : null;
@@ -1652,7 +1657,10 @@ function ChannelView({
                 </div>
               </header>
             )}
-            {!chrome && isMember && (
+            {!chrome && isMember && arriving && (
+              <ArrivalCard channel={channel} onSayHi={() => composer.current?.focus()} onClose={arrival.close} />
+            )}
+            {!chrome && isMember && !arriving && (
               <ChannelWelcome channelId={channel.id} messages={messages.data} agents={channelAgents} />
             )}
 
@@ -3602,6 +3610,14 @@ function ChannelDetails({
       },
     );
   };
+  // Inviting someone from Adicionar hands over to the invite dialog (ADR 0090): the details close as well, or they
+  // would open again over it.
+  const inviteInstead = () => {
+    saveTopic();
+    saveName();
+    setAdding(false);
+    onOpenChange(false);
+  };
   const moveTo = (categoryId: string | null) =>
     place.mutate(
       { channelId: channel.id, categoryId },
@@ -3905,6 +3921,7 @@ function ChannelDetails({
       <AddMembersDialog
         open={open && adding}
         onClose={() => setAdding(false)}
+        onInvite={inviteInstead}
         channel={channel}
         exclude={inChannel}
         onAdded={refresh}
@@ -3917,12 +3934,15 @@ function ChannelDetails({
 function AddMembersDialog({
   open,
   onClose,
+  onInvite,
   channel,
   exclude,
   onAdded,
 }: {
   open: boolean;
   onClose: () => void;
+  /** An address nobody here has was picked: the invite dialog takes over, so this closes with what opened it. */
+  onInvite: () => void;
   channel: Channel;
   exclude: Set<PickKey>;
   onAdded: () => void;
@@ -3939,6 +3959,8 @@ function AddMembersDialog({
     }
   }, [open]);
   const rows = useMemberRows(q, exclude);
+  // An address nobody here has: invite them to the workspace and this channel (ADR 0090).
+  const invite = useInviteOffer(q);
   const add = useMutation({
     mutationFn: async () => {
       for (const key of selected) await api.chat.addMember(org.id, channel.id, memberOf(key));
@@ -3960,7 +3982,7 @@ function AddMembersDialog({
         onQueryChange={setQ}
         searchLabel={t("channelMembers.addSearch")}
         searchPlaceholder={t("channelMembers.addSearch")}
-        isEmpty={rows.length === 0}
+        isEmpty={rows.length === 0 && !invite}
         emptyText={t("channelMembers.addEmpty", { q })}
       >
         <MemberPickerRows
@@ -3975,6 +3997,7 @@ function AddMembersDialog({
             })
           }
         />
+        {invite && <InviteOfferRow email={invite} channel={channel} onPick={onInvite} />}
       </DialogSearchList>
       <DialogFooter bar>
         <Button onClick={onClose}>{t("common.cancel")}</Button>

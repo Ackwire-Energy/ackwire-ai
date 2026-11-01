@@ -82,6 +82,11 @@ export const NOTIFICATION_KINDS = [
    * workspace's. No actor: the person isn't a member. Never their note.
    */
   "join_request",
+  /**
+   * Someone accepted the email invitation this person sent (ADR 0090): one row per person who joined, the person as
+   * actor, `latest.title` their name, `source.label` the workspace's. Inbox only (no category, so never a push).
+   */
+  "invitation_accepted",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -148,6 +153,8 @@ export interface NotificationLatest {
    * asked: a merged row names whoever its time is from, and `count` says how many asked in all.
    */
   names?: string[];
+  /** `join_request` from a member's suggestion (ADR 0090): who suggested, so a row of one says so. */
+  suggestedBy?: string;
 }
 
 export interface NotificationView {

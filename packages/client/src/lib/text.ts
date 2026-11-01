@@ -22,19 +22,42 @@ export function handleFrom(name: string) {
   return base.length >= 2 ? base : base.padEnd(2, "0");
 }
 
-export const EMAIL = /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/;
+/** No address has what mail apps and spreadsheets wrap addresses in (`<…>`, quotes, `mailto:`). */
+export const EMAIL = /^[^\s@,;:<>()[\]"]+@[^\s@,;:<>()[\]"]+\.[^\s@,;:<>()[\]"]+$/;
 export const isEmail = (value: string) => EMAIL.test(value.trim());
 
-/** "a@x.com, b@x.com ,bad" → ["a@x.com", "b@x.com"] (deduplicated, lower case). */
-export function parseEmails(value: string) {
-  return [
-    ...new Set(
-      value
-        .split(/[,;\s]+/)
-        .map((e) => e.trim().toLowerCase())
-        .filter(isEmail),
-    ),
-  ];
+/**
+ * Addresses typed or pasted, in order, once each, in lower case, each marked valid or not. Read the way mail apps
+ * and spreadsheets copy them: `Ana Silva <ana@x.com>`, `"ana@x.com"`, `mailto:ana@x.com`. Once the text has an
+ * address in brackets, the bare words around it are names, not addresses to check; a quoted name
+ * (`"Silva, Ana" <…>`) always is.
+ */
+export function addressesIn(text: string): { email: string; valid: boolean }[] {
+  const named = /<[^<>]*@[^<>]*>/.test(text);
+  const seen = new Set<string>();
+  const out: { email: string; valid: boolean }[] = [];
+  for (const piece of text.match(/<[^<>]*>|"[^"]*"|[^\s,;<>"]+/g) ?? []) {
+    const email = piece
+      .replace(/^[<"'([]+|[>"')\].]+$/g, "")
+      .trim()
+      .replace(/^mailto:/i, "")
+      .toLowerCase();
+    const name = !email.includes("@") && (named || piece.startsWith('"'));
+    if (!email || name || seen.has(email)) continue;
+    seen.add(email);
+    out.push({ email, valid: isEmail(email) });
+  }
+  return out;
+}
+
+/** `addressesIn` split into those that look right and those that don't, leaving out the ones in `already`. */
+export function emailsFrom(text: string, already: readonly string[] = []): { valid: string[]; invalid: string[] } {
+  const known = new Set(already.map((e) => e.toLowerCase()));
+  const fresh = addressesIn(text).filter((a) => !known.has(a.email));
+  return {
+    valid: fresh.filter((a) => a.valid).map((a) => a.email),
+    invalid: fresh.filter((a) => !a.valid).map((a) => a.email),
+  };
 }
 
 /** Password rules from Better Auth (8–128 characters, nothing else). */

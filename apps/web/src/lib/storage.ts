@@ -68,4 +68,11 @@ export const STORAGE_KEYS = {
   soundTab: "agentes.sounds.tab",
   /** How many times the notifications dialog opened by itself in this browser (`WebPushAsk`, ADR 0071). */
   pushOffers: "agentes.push.offers",
+  /**
+   * Prefix (`.<invitation token>`, in `sessionStore`): the request this tab made through an invitation link, its key,
+   * name and email as JSON, so a reload keeps waiting for the answer (ADR 0090).
+   */
+  joinAsked: "agentes.join.asked",
+  /** Prefix (`.<user id>.<org id>`): "1" once a newcomer closed their welcome in #general (ADR 0090). */
+  arrivalClosed: "agentes.arrival.closed",
 } as const;

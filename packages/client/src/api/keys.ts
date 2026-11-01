@@ -14,6 +14,7 @@ export const keys = {
   webPushKey: ["push", "web-key"] as const,
   models: ["models"] as const,
   invitation: (token: string) => ["invitation", token] as const,
+  invitationState: (token: string) => ["invitation", token, "state"] as const,
   org: (orgId: string) => ["org", orgId] as const,
   members: (orgId: string) => ["org", orgId, "members"] as const,
   /** The workspace's roles (ADR 0085). */
@@ -74,6 +75,7 @@ export const keys = {
   allInvitations: (orgId: string) => ["org", orgId, "invitations", "all"] as const,
   /** Under `invitations`: an approval (which may invite) refreshes the pending list too. */
   joinRequests: (orgId: string) => ["org", orgId, "invitations", "join-requests"] as const,
+  mySuggestions: (orgId: string) => ["org", orgId, "invitations", "suggestions"] as const,
   inviteLinks: (orgId: string) => ["org", orgId, "invitations", "links"] as const,
   usageReport: (orgId: string) => ["org", orgId, "usage-report"] as const,
   audit: (orgId: string, query: object) => ["org", orgId, "audit", query] as const,

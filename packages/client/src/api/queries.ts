@@ -71,6 +71,7 @@ import type {
   ForumSuggestionOverrides,
   ForumTopicDetail,
   ForumTopicInput,
+  InviteBatch,
   IssueColumn,
   IssueInput,
   IssuePatch,
@@ -142,6 +143,13 @@ export const channelsQuery = (api: ApiClient, orgId: string) =>
 /** An invitation's preview (its page, and the sign-in that leads to it). */
 export const invitationQuery = (api: ApiClient, token: string) =>
   queryOptions({ queryKey: keys.invitation(token), queryFn: () => api.orgs.previewInvitation(token), retry: false });
+/** An email invitation that no longer opens: accepted or expired (ADR 0090). */
+export const invitationStateQuery = (api: ApiClient, token: string) =>
+  queryOptions({
+    queryKey: keys.invitationState(token),
+    queryFn: () => api.orgs.invitationState(token),
+    retry: false,
+  });
 
 // ── Account ─────────────────────────────────────────────────────────────────
 
@@ -1541,8 +1549,58 @@ export function useInviteMany(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { emails: string[]; roleIds?: string[] }) => api.orgs.inviteMany(orgId, input),
+    mutationFn: (input: InviteBatch) => api.orgs.inviteMany(orgId, input),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
+  });
+}
+
+/** The roles a pending invitation gives (ADR 0090): the same link, nothing is sent. */
+export function useSetInvitationRoles(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; roleIds: string[] }) =>
+      api.orgs.setInvitationRoles(orgId, input.id, input.roleIds),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
+  });
+}
+
+/** 30 more days for the same link (ADR 0090). */
+export function useRenewInviteLink(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (linkId: string) => api.invites.renewLink(orgId, linkId),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.inviteLinks(orgId) }),
+  });
+}
+
+/** A member's suggestions that still wait (ADR 0090). */
+export const useMySuggestions = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.mySuggestions(orgId), queryFn: () => api.joinRequests.mine(orgId), enabled });
+};
+
+/**
+ * A member suggests someone to the people who may invite (ADR 0090). Its refusals are about the person suggested
+ * (`join.member`: they're in already), so the screen says them in its own words, never the generic toast's.
+ */
+export function useSuggestPerson(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { email: string; note?: string }) => api.joinRequests.suggest(orgId, input),
+    meta: { silent: true },
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
+  });
+}
+
+export function useCancelSuggestion(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.joinRequests.cancel(orgId, id),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
   });
 }
 

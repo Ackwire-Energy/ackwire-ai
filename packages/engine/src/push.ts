@@ -333,6 +333,7 @@ export async function deliverPush(
     label: source.label,
     title: latest.title,
     text: latest.text,
+    suggestedBy: latest.suggestedBy ?? null,
     highRisk,
     routine: latest.origin?.kind === "routine" ? latest.origin.routineName : null,
     screen: source.screen ?? null,

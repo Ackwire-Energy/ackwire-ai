@@ -22,8 +22,8 @@ import {
   levelOptions,
   type PermissionAreaId,
   peopleWith,
+  roleSummary,
   sortRoles,
-  summaryKeys,
   withKey,
   withLevel,
 } from "@agenteschat/client/lib/roles";
@@ -75,19 +75,6 @@ const OWNER_ID = "owner";
 
 const listFormat = (locale: string, items: string[]) =>
   new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(items);
-
-/** The sentence that sums a role up: its own keys past what `everyone` gives, the first three, "and N more". */
-export function roleSummary(t: TFunction, locale: string, role: OrgRole, everyone: OrgRole | undefined) {
-  const keys = summaryKeys(role, everyone);
-  if (keys[0] === "administrator") return t("rolesPage.summary.admin");
-  const words = keys.slice(0, 3).map((k) => t(`permissions.${k}.say`));
-  if (keys.length > 3) words.push(t("rolesPage.summary.more", { count: keys.length - 3 }));
-  if (isEveryone(role))
-    return keys.length
-      ? t("rolesPage.summary.everyone", { list: listFormat(locale, words) })
-      : t("rolesPage.summary.everyoneNone");
-  return keys.length ? t("rolesPage.summary.extra", { list: listFormat(locale, words) }) : t("rolesPage.summary.none");
-}
 
 const roleName = (t: TFunction, r: Pick<OrgRole, "kind" | "name">) =>
   isEveryone(r) ? t("rolesPage.everyoneName") : r.name;
