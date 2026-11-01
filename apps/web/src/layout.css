@@ -315,6 +315,11 @@ p {
   align-items: center;
   gap: 4px;
 }
+/* On the strip it follows the buttons at their own gap; on phones it goes up to the title's line (responsive.css). */
+.outage__close {
+  flex: none;
+  margin-left: -6px;
+}
 
 /* "Trocar o computador" */
 .outage-dialog__h {
