@@ -144,39 +144,33 @@ function AgentProposalCardView({ message, card }: { message: Message; card: Agen
       ? t("actionCard.agentProposal.created")
       : t(status === "denied" ? "proposals.refused" : "approval.expired");
   const at = status === "expired" ? card.expiresAt : card.decidedAt;
+  const details = (
+    <>
+      <span className="ac-faceline">
+        <AgentAvatar name={draft.name} appearance={lookOf(draft)} size="md" />
+        <span className="list-col">
+          <b className="ac-captop">{draft.name}</b>
+          <span className="small muted">{[`@${draft.handle}`, draft.role].filter(Boolean).join(" · ")}</span>
+        </span>
+      </span>
+      <span className="small muted ac-iconline">
+        <Icon name="bolt" size={14} />
+        <span>{suggestedAiText(t, draft.ai)}</span>
+      </span>
+      {why && <span className="small muted">{why}</span>}
+      {status === "created" && card.agentId && (
+        <div className="ac-acts">
+          <Button asChild size="sm" variant="ghost">
+            <Link to="/org/$orgId/agents/$agentId" params={{ orgId: org.id, agentId: card.agentId }}>
+              {t("newAgent.openProfile")}
+            </Link>
+          </Button>
+        </div>
+      )}
+    </>
+  );
   return (
-    <RequestDone
-      done={status === "created"}
-      label={title}
-      more={{
-        label: t("approval.seeDetails"),
-        content: (
-          <>
-            <span className="ac-faceline">
-              <AgentAvatar name={draft.name} appearance={lookOf(draft)} size="md" />
-              <span className="list-col">
-                <b className="ac-captop">{draft.name}</b>
-                <span className="small muted">{[`@${draft.handle}`, draft.role].filter(Boolean).join(" · ")}</span>
-              </span>
-            </span>
-            <span className="small muted ac-iconline">
-              <Icon name="bolt" size={14} />
-              <span>{suggestedAiText(t, draft.ai)}</span>
-            </span>
-            {why && <span className="small muted">{why}</span>}
-            {status === "created" && card.agentId && (
-              <div className="ac-acts">
-                <Button asChild size="sm" variant="ghost">
-                  <Link to="/org/$orgId/agents/$agentId" params={{ orgId: org.id, agentId: card.agentId }}>
-                    {t("newAgent.openProfile")}
-                  </Link>
-                </Button>
-              </div>
-            )}
-          </>
-        ),
-      }}
-    >
+    <RequestDone done={status === "created"} label={title} more={{ label: t("approval.seeDetails"), content: details }}>
       {ended}: <b>{draft.name}</b>
       {at && ` · ${whenAt(t, i18n.language, at)}`}
     </RequestDone>
