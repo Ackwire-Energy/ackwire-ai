@@ -21,6 +21,8 @@ import {
   sql,
 } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
+import { isChannelMember } from "../channels";
+import { openPersonAgentDm } from "../dms";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "../errors";
 import { publishChannelEvent, publishMessageCreated } from "../events";
 import { type MachineCaller, MachineRequestError } from "../machine-hub";
@@ -730,7 +732,6 @@ export function createBrowserHandoffToolSource(
         isError: true,
       };
     }
-    const where = runWhere(run);
     // A desktop goes only to who may drive its computer (ADR 0058 §4); a browser to who asked for the work.
     const drivers = screen === "desktop" ? await computerDrivers(ctx.db, ctx.orgId, ctx.agentId) : null;
     if (drivers?.length === 0) {
@@ -744,6 +745,14 @@ export function createBrowserHandoffToolSource(
         ? (drivers[0] ?? null)
         : null
       : await browserHandoffRecipient({ db: ctx.db }, ctx.orgId, ctx.runId, ctx.agentId);
+    // The card goes where the person asked can act on it: the run's conversation when they're in it, else their DM
+    // with the agent (a run in a room between agents, or one they aren't in, would leave the request unreachable).
+    const asked = recipient ?? drivers?.[0] ?? null;
+    const runAt = runWhere(run);
+    const where =
+      asked && !(await isChannelMember(ctx.db, run.orgId, runAt.channelId, asked))
+        ? { channelId: (await openPersonAgentDm(ctx.db, run.orgId, asked, run.agentId)).id, threadId: null }
+        : runAt;
     const busy = {
       content: `A person is using your ${s.what}, or was just asked to; wait for that before asking.`,
       isError: true,

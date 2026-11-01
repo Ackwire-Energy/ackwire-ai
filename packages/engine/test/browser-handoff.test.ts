@@ -6,7 +6,7 @@ import {
   type MachineRequest,
   type RealtimeEvent,
 } from "@agenteschat/adapters";
-import { eq, schema } from "@agenteschat/db";
+import { and, eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
   BROWSER_HANDOFF_TOPIC,
@@ -379,6 +379,67 @@ describe("browser_ask_person", () => {
     await expect(finishHandoff(deps(), ana.id, f.org.id, h?.id ?? "", { result: "done" })).rejects.toBeInstanceOf(
       ConflictError,
     );
+  });
+
+  /** Asks from `run` directly, as its model would. */
+  async function askFrom(run: { runId: string }) {
+    const ctx = { db: f.db, orgId: f.org.id, agentId: f.agent.id, runId: run.runId } as never;
+    const [tool] = await askSource().tools(ctx);
+    const out = await tool?.execute({ instructions: "Sign in to Stripe" }, ctx);
+    expect(out?.isError).toBeUndefined();
+    const [h] = await handoffs();
+    const notices = await f.db
+      .select()
+      .from(schema.notifications)
+      .where(eq(schema.notifications.groupKey, `browser_handoff:${h?.id}`));
+    return { h, notices };
+  }
+  const leave = (userId: string) =>
+    f.db
+      .delete(schema.channelMembers)
+      .where(and(eq(schema.channelMembers.channelId, f.general.id), eq(schema.channelMembers.userId, userId)));
+
+  test("asked from a conversation the person isn't in: the card is in their DM with the agent, and the notification opens it there", async () => {
+    await start();
+    const run = await runFor(f.owner.id);
+    await leave(f.owner.id);
+    const { h, notices } = await askFrom(run);
+    const [card] = await f.db
+      .select({ channelId: schema.messages.channelId, threadId: schema.messages.threadId })
+      .from(schema.messages)
+      .where(eq(schema.messages.id, h?.id ?? ""));
+    expect(card?.channelId).not.toBe(f.general.id);
+    const [dm] = await f.db
+      .select()
+      .from(schema.channels)
+      .where(eq(schema.channels.id, card?.channelId ?? ""));
+    expect(dm?.kind).toBe("dm");
+    expect(dm?.dmKey).toContain(`u:${f.owner.id}`);
+    expect(dm?.dmKey).toContain(`a:${f.agent.id}`);
+    const timeline = await listMessages(f.db, f.owner.id, f.org.id, dm?.id ?? "");
+    expect(timeline.find((m) => m.id === h?.id)?.meta.browserHandoff).toMatchObject({ id: h?.id, status: "pending" });
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.source).toEqual({
+      channelId: dm?.id,
+      dmId: dm?.id,
+      messageId: h?.id,
+      handoffId: h?.id,
+      agentId: f.agent.id,
+    });
+    // Its take control works from there.
+    expect(await claimHandoff(deps(), f.owner.id, f.org.id, h?.id ?? "")).toMatchObject({ status: "active" });
+  });
+
+  test("the owner who isn't in the asker's conversation gets no link to it: the request opens on the agent's computer", async () => {
+    await start();
+    const ana = await addMember(f.db, f.org.id, "member", "ana");
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: ana.id });
+    const run = await runFor(ana.id);
+    await leave(f.owner.id);
+    const { h, notices } = await askFrom(run);
+    const of = (userId: string) => notices.find((n) => n.userId === userId)?.source;
+    expect(of(ana.id)).toMatchObject({ channelId: f.general.id, messageId: h?.id, handoffId: h?.id });
+    expect(of(f.owner.id)).toEqual({ handoffId: h?.id, agentId: f.agent.id });
   });
 
   test("pending it waits 24 hours by default; in control there's no deadline, only the grace while they're away", async () => {
