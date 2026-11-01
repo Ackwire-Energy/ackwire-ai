@@ -147,6 +147,8 @@ export const CODING_PLANS = {
       // monthly cap; `cheap`: 20,000 or more requests a month on Go by OpenCode's own estimates. Left out: the
       // free models (for a limited time) and the ones that train on what they're sent. DeepSeek's models answer
       // only once the OpenCode workspace allows the Global region (Settings › Privacy), off by default.
+      // ponytail: hand-copied list, read the live list when OpenCode adds models faster than we copy them
+      // (opencode.ai/inference/go/v1/models: 28 on 2026-10-31, these 24 and the 4 left out).
       models: [
         { id: "minimax-m3", label: "MiniMax M3", alias: "sonnet", maker: "minimax" },
         { id: "minimax-m3.1-flash", label: "MiniMax M3.1 Flash", maker: "minimax" },

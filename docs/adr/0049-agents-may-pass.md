@@ -1,6 +1,6 @@
 # 0049. Agents may pass: silence is a normal outcome in rooms
 
-- Status: Proposed
+- Status: Proposed. Amended 2026-10-31 by ADR 0089's addendum: a run another agent's @mention woke may pass too
 - Date: 2026-10-21
 - Extends: ADR 0013 (router), ADR 0034 (an agent's message may bring in one more agent)
 
@@ -41,3 +41,7 @@ Agents' replies to the same trigger already reach a running agent through `pendi
 - Rooms with several agents get fewer redundant replies.
 - A passed run still costs one model call. The router stays the cheap first filter; this is the second, better-informed one.
 - `eval:mentions` / `eval:behavior` gain: picked agent passes when another agent already answered; picked agent with something new answers; named agent never passes.
+
+## Addendum (2026-10-31): a run another agent's mention woke may pass
+
+An agent's @mention now wakes the agent it names unless the judge is sure the message needs nothing from it (ADR 0089, addendum), so some of those runs find nothing to do. A run another agent's message woke by mention (trigger `mention`, hop 2 or more, `byAnotherAgent` in `reply-policy.ts`) may pass, with its own "# Why you were called": do what the message hands you, and on a thanks, an ok, a sign-off or a name, pass at once. A person's mention, a DM, a consultation, the agent's own lines and a person's click on that message (Continuar, "Responder agora", hop 1) still answer.

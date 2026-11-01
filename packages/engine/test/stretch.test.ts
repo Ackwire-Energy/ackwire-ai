@@ -10,6 +10,7 @@ import {
   FOLLOW_UP_TOOL,
   getMessage,
   insertMessage,
+  openAgentDm,
   postPersonMessage,
   postStretchCard,
   receiptsFor,
@@ -23,7 +24,7 @@ import {
   stretchCardOf,
 } from "../src";
 import { deliverNotice } from "../src/delivery";
-import { type Fixture, setup } from "./fixtures";
+import { addMember, type Fixture, setup } from "./fixtures";
 
 /**
  * Agents keep going until the work is done (ADR 0089): no cap on hand-offs between them, a judge that reads intent
@@ -99,10 +100,10 @@ const pingPong = (req: ModelRequest) =>
     ? { chunks: ['{"needs_agent":0,"scores":[],"reason":"none"}'] }
     : { chunks: [isFor(req, "Theo", "theo") ? "@ada sua vez: revisa o PR #12?" : "@theo revisei: corrige os testes?"] };
 
-/** The mention judge's answers in order, then `rest`. */
-const inOrder = (scores: number[], rest = 0) => {
+/** The mention judge's answers in order (how sure each message needs nothing from the agent it names), then `rest`. */
+const inOrder = (scores: number[], rest = 1) => {
   let n = 0;
-  return (kind: string) => (kind === "mention_handoff" ? (scores[n++] ?? rest) : undefined);
+  return (kind: string) => (kind === "mention_needs_nothing" ? (scores[n++] ?? rest) : undefined);
 };
 
 const ask = (fx: Fixture, body: string) =>
@@ -149,8 +150,8 @@ describe("Ada's question back wakes Theo, and a thanks wakes nobody", () => {
   };
   for (const [language, flow] of Object.entries(flows)) {
     test(`in ${language}: hops 1, 2 and 3, then nothing, and Ada only mentioned on Theo's last message`, async () => {
-      // Theo asks Ada (0.9), Ada answers and asks Theo back (0.9), Theo thanks her and asks nothing (0.1).
-      f = await setup({ judge: inOrder([0.9, 0.9, 0.1]), reply: lines(flow) });
+      // Theo asks Ada (0.1: needs her), Ada answers and asks Theo back (0.1), Theo thanks her and asks nothing (0.9).
+      f = await setup({ judge: inOrder([0.1, 0.1, 0.9]), reply: lines(flow) });
       const { theo, ada } = await team(f);
       const asked = await ask(f, flow.ask);
       await drain(f);
@@ -174,7 +175,7 @@ describe("Ada's question back wakes Theo, and a thanks wakes nobody", () => {
 
 describe("the fuse: 50 runs agents start on their own, then one card with Continuar", () => {
   test("a judge that always hands off: exactly 50, one card; Continuar starts the held hand-off once", async () => {
-    f = await setup({ judge: (kind) => (kind === "mention_handoff" ? 0.9 : undefined), reply: pingPong });
+    f = await setup({ judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined), reply: pingPong });
     const { theo, ada } = await team(f);
     const asked = await ask(f, "@theo começa a revisão do PR #12");
     await drain(f);
@@ -230,7 +231,7 @@ describe("the fuse: 50 runs agents start on their own, then one card with Contin
   test("a judge that fails: a message that opens with @name still wakes, and the count still stops it", async () => {
     f = await setup({
       judge: (kind) => {
-        if (kind === "mention_handoff") throw new Error("judge down");
+        if (kind === "mention_needs_nothing") throw new Error("judge down");
         return undefined;
       },
       reply: pingPong,
@@ -247,8 +248,11 @@ describe("the fuse: 50 runs agents start on their own, then one card with Contin
   });
 
   test("work nobody asked for (a routine's report) gets 10", async () => {
-    f = await setup({ judge: (kind) => (kind === "mention_handoff" ? 0.9 : undefined), reply: pingPong });
+    f = await setup({ judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined), reply: pingPong });
     const { theo } = await team(f);
+    // The agents' owner never joined #general.
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await f.db.update(schema.agents).set({ ownerUserId: bia.id }).where(eq(schema.agents.orgId, f.org.id));
     const report = await f.db.transaction((tx) =>
       deliverNotice(tx, {
         orgId: f.org.id,
@@ -271,13 +275,16 @@ describe("the fuse: 50 runs agents start on their own, then one card with Contin
     expect(runs.every((r) => r.stretchId === report.message.id)).toBe(true);
     const [card] = await cardsOf(f);
     expect(card?.meta.actionCard).toMatchObject({ reason: "runs", limit: STRETCH.unattendedRuns, forUserId: null });
+    // Nobody is behind the work: the owner of the agent it stopped at hears of the pause, in a channel they didn't join.
+    const told = await f.db.select().from(schema.notifications);
+    expect(told.some((n) => n.userId === bia.id && n.source.messageId === card?.id)).toBe(true);
     await expectStretched(f);
   });
 });
 
 test("an agent past 20% of its monthly budget in the stretch stops; the other one still wakes", async () => {
   f = await setup({
-    judge: (kind) => (kind === "mention_handoff" ? 0.9 : undefined),
+    judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined),
     // Ada's one answer costs US$ 12 at the model's price, past 20% of the US$ 50 default budget.
     reply: (req) =>
       req.outputSchema
@@ -310,7 +317,7 @@ test("an agent past 20% of its monthly budget in the stretch stops; the other on
 
 test("a person's message read mid-run sets hop 1 and a new stretch: the count starts over", async () => {
   f = await setup({
-    judge: (kind) => (kind === "mention_handoff" ? 0.9 : undefined),
+    judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined),
     reply: lines({ theo: ["@ada pode conferir o deploy?"], ada: ["Conferi: está no ar."] }),
   });
   const { theo, ada } = await team(f);
@@ -489,6 +496,51 @@ test("a tool refused for the spend of the agent it would wake: the card names th
   });
   const go = await answerNow({ db: f.db, pubsub: f.pubsub, gateway: f.gateway }, f.owner.id, f.org.id, card.id);
   expect(go.runs.map((r) => r.agentId)).toEqual([f.agent.id]);
+});
+
+test("a wake-up held inside the agents' DM: its card goes where the person asked, and Continuar starts it in the DM", async () => {
+  f = await setup({ reply: lines({ theo: [], ada: [] }) });
+  const { theo } = await team(f);
+  const asked = await ask(f, "@dev investiga o deploy de staging");
+  const [dev] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, asked.id));
+  if (!dev) throw new Error("no run");
+  await fillStretch(f, theo.id, asked.id, asked.id);
+  const dm = await openAgentDm(f.db, f.org.id, f.agent.id, theo.id);
+  // Dev's note to Theo in their private DM, past Ana's stretch.
+  const note = await f.db.transaction(async (tx) => {
+    const m = await insertMessage(tx, {
+      orgId: f.org.id,
+      channelId: dm.id,
+      author: { type: "agent", agentId: f.agent.id, runId: dev.id, hop: dev.hop },
+      body: "Theo, confere o deploy de staging.",
+      meta: { agentNote: { runId: dev.id } },
+    });
+    expect(await startOrJoinRun(tx, m, theo.id, "dm")).toBeNull();
+    return m;
+  });
+  await drain(f);
+  const [card, ...more] = await cardsOf(f);
+  expect(more).toEqual([]);
+  if (!card) throw new Error("no card");
+  // Where Ana reads, written as Dev's run there: nobody reads the agents' DM.
+  expect(card).toMatchObject({
+    channelId: f.general.id,
+    threadId: null,
+    authorAgentId: f.agent.id,
+    agentRunId: dev.id,
+  });
+  expect(card.meta.actionCard).toMatchObject({
+    forUserId: f.owner.id,
+    agentIds: [theo.id],
+    held: [{ agentId: theo.id, messageId: note.id, trigger: "dm" }],
+  });
+  const go = await answerNow({ db: f.db, pubsub: f.pubsub, gateway: f.gateway }, f.owner.id, f.org.id, card.id);
+  expect(go.runs.map((r) => r.agentId)).toEqual([theo.id]);
+  const [held] = await f.db
+    .select()
+    .from(schema.agentRuns)
+    .where(eq(schema.agentRuns.id, go.runs[0]?.runId ?? ""));
+  expect(held).toMatchObject({ channelId: dm.id, hop: 1, triggerMessageId: note.id });
 });
 
 test("Continuar starts every wake-up the card holds, also one held there after the card was read", async () => {

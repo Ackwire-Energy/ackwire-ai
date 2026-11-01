@@ -272,6 +272,9 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     mail: { deps: engine.mail, pollSeconds: config.MAIL_POLL_SECONDS },
     browserLive: engine.browserLive,
     desktops: engine.desktops,
+    ...(config.OPS_REPORT_EMAIL?.length
+      ? { opsReport: { to: config.OPS_REPORT_EMAIL, publicUrl: config.PUBLIC_URL } }
+      : {}),
     log,
   });
   const telemetry = startTelemetry({ db: database.db, config, log });

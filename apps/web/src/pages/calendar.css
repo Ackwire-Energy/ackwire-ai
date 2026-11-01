@@ -110,7 +110,7 @@
   font: inherit;
   cursor: pointer;
 }
-.cal-week__daybtn:focus-visible {
+html:not([data-pointer]) .cal-week__daybtn:focus-visible {
   outline: none;
   box-shadow: var(--field-ring);
 }
@@ -277,7 +277,7 @@
     var(--chosen-shadow);
   transform: var(--chosen-lift);
 }
-.cal-chip:focus-visible {
+html:not([data-pointer]) .cal-chip:focus-visible {
   outline: none;
   box-shadow:
     inset 3px 0 0 var(--cal-accent),
@@ -383,7 +383,7 @@
 .cal-marks[aria-pressed="true"] {
   background: var(--plate-soft);
 }
-.cal-marks:focus-visible {
+html:not([data-pointer]) .cal-marks:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -484,7 +484,7 @@
 .cal-band[aria-pressed="true"] {
   background: color-mix(in srgb, var(--sunken) 50%, transparent);
 }
-.cal-band:focus-visible {
+html:not([data-pointer]) .cal-band:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -777,7 +777,7 @@
   background: var(--ink);
   color: var(--bg);
 }
-.cal-mini__day:focus-visible {
+html:not([data-pointer]) .cal-mini__day:focus-visible {
   outline: none;
   box-shadow: var(--field-ring);
 }

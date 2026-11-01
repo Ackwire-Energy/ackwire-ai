@@ -112,7 +112,7 @@
   background: var(--plate);
   color: var(--ink);
 }
-.invite-more:focus-visible {
+html:not([data-pointer]) .invite-more:focus-visible {
   box-shadow: var(--focus-ring);
 }
 .invite-more > .ac-icon {
@@ -186,7 +186,7 @@
 .invite-chan:disabled {
   cursor: default;
 }
-.invite-chan:focus-visible {
+html:not([data-pointer]) .invite-chan:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }

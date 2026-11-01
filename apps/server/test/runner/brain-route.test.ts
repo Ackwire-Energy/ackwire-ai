@@ -243,6 +243,12 @@ test.skipIf(!posix)("busy while that sign-in has a process open or another route
   const tasks = { runningTasks: () => [{ executor: "claude" }] };
   expect(await routeWithPlan(request({ account: undefined }), { ...deps, tasks })).toEqual({ busy: true });
   expect(await routeWithPlan(request(), { ...deps, tasks })).not.toHaveProperty("busy");
+  // One on the account (protocol 31): busy in that account, not on the computer's own sign-in.
+  const onAccount = { runningTasks: () => [{ executor: "claude", account: ACCOUNT }] };
+  expect(await routeWithPlan(request(), { ...deps, tasks: onAccount })).toEqual({ busy: true });
+  expect(await routeWithPlan(request({ account: undefined }), { ...deps, tasks: onAccount })).not.toHaveProperty(
+    "busy",
+  );
 });
 
 test.skipIf(!posix)("killed past its time, with what it started; an answer that isn't JSON fails", async () => {

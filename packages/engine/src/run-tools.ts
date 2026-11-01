@@ -25,7 +25,7 @@ import type { BridgeIdentity } from "./run-tool-tokens";
 import { type AgentRun, replyThreadOf } from "./runs";
 import { publishSecret, type SecretRequestRow, secretRequestView, syncSecretMessage } from "./secrets";
 import { artifactToolDetail, promptAnswer, promptPoll, toolCode, toolCommand, toolDetail } from "./tool-detail";
-import { directoryRole, ON_DEMAND_USE, resolveDirectoryTool } from "./tools/directory";
+import { directoryRole, HARNESS_PREFIX, ON_DEMAND_USE, resolveDirectoryTool } from "./tools/directory";
 import { type Approval, type InvokeResult, isSensitive, type ToolGateway } from "./tools/gateway";
 import { withWhy } from "./tools/run-policy";
 import type { ToolContext, ToolDefinition, ToolOutput } from "./tools/types";
@@ -148,7 +148,7 @@ const TRAIL_DATA: Record<TrailScreen, { data: string; plan: string }> = {
 
 /** A computer brain's call carries the bridge's prefix (`mcp__agentes__browser_open`); the screen whose trail it joins. */
 const screenTool = (name: string): { tool: string; screen: TrailScreen } | null => {
-  const tool = name.replace(/^mcp__agentes__/, "");
+  const tool = name.replace(HARNESS_PREFIX, "");
   if (tool.startsWith("browser_")) return { tool, screen: "browser" };
   if (tool.startsWith("desktop_")) return { tool, screen: "desktop" };
   return null;

@@ -1,6 +1,6 @@
 import { createCipheriv } from "node:crypto";
 import net from "node:net";
-import { type AgentScope, STREAM_CLOSE, STREAM_LIMITS } from "@agenteschat/adapters/machine-protocol";
+import { type AgentScope, type DesktopMode, STREAM_CLOSE, STREAM_LIMITS } from "@agenteschat/adapters/machine-protocol";
 import type { DesktopSessions } from "./desktop-session";
 import { errnoCode, RunnerError } from "./errors";
 import type { DataSocket } from "./streams";
@@ -184,69 +184,131 @@ export async function vncInit(vnc: VncConnection): Promise<{ width: number; heig
  * than `bufferedMax`. The data socket closes with 1011 when the desktop went
  * away (the viewer retries and learns whether it runs), 1000 when the viewer
  * broke the handshake. Settles once the stream ended.
+ *
+ * The server's side of the handshake goes out at once, the desktop's ServerInit
+ * right behind it, never waiting for the viewer's answers: each wait would be a
+ * round trip between the person and the computer through the server, three of
+ * them before noVNC connects. Each step is a frame of its own: noVNC reads no
+ * further than the version in the frame that brings it. The viewer's answers are
+ * checked as they come, and until they checked out the desktop gets nothing of
+ * the viewer's, so it sends no screen (an update needs a request).
+ *
+ * Protocol 30 (ADR 0058 §17): the server's `{"type":"mode","mode"}` switches
+ * the stream in place. Nothing more of the old login's desktop goes out, `login`
+ * logs in again in that mode, the same frame back marks where the old session's
+ * bytes end, and a new session's handshake follows on the same data socket. What
+ * the viewer sends from then on is the new session's: the server holds back the
+ * old one's tail until the viewer took the switch. A login that fails closes the
+ * stream with 1011, so the viewer opens it again in its new mode.
  */
 export function serveNone(
   data: DataSocket,
-  vnc: VncConnection,
-  bufferedMax: number = STREAM_LIMITS.runnerBufferedMax,
+  first: VncConnection,
+  opts: { bufferedMax?: number; login?: (mode: DesktopMode) => Promise<VncConnection> } = {},
 ): Promise<void> {
-  const { socket } = vnc;
+  const bufferedMax = opts.bufferedMax ?? STREAM_LIMITS.runnerBufferedMax;
   return new Promise((resolve) => {
-    const viewer = new ByteReader();
+    let vnc = first;
+    let viewer = new ByteReader();
     let piping = false;
     let ended = false;
     let drain: ReturnType<typeof setInterval> | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let switches = Promise.resolve();
     const end = (code?: number, reason?: string) => {
       if (ended) return;
       ended = true;
       clearTimeout(timer);
       clearInterval(drain);
       viewer.fail(new Error("the stream ended"));
-      socket.destroy();
+      vnc.socket.destroy();
       if (code !== undefined) data.close(code, reason);
       resolve();
     };
-    const timer = setTimeout(() => end(STREAM_CLOSE.normal, "no RFB handshake from the viewer in time"), HANDSHAKE_MS);
-    data.listen({
-      bytes: (chunk) => {
-        if (piping) socket.write(chunk);
-        else viewer.push(chunk);
-      },
-      closed: () => end(),
-    });
-    socket.on("close", () => end(STREAM_CLOSE.internal, "the desktop closed"));
-    if (socket.destroyed) return end(STREAM_CLOSE.internal, "the desktop closed");
-
+    const desktopClosed = () => end(STREAM_CLOSE.internal, "the desktop closed");
     const fromDesktop = (chunk: Buffer) => {
       data.send(chunk);
       if (drain || data.bufferedAmount <= bufferedMax) return;
-      socket.pause();
+      const paused = vnc.socket;
+      paused.pause();
       drain = setInterval(() => {
         if (data.bufferedAmount > bufferedMax / 4) return;
         clearInterval(drain);
         drain = undefined;
-        socket.resume();
+        paused.resume();
       }, DRAIN_POLL_MS);
     };
 
-    const handshake = async () => {
-      data.send(VERSION);
-      if (!(await viewer.read(12)).equals(VERSION)) return end(STREAM_CLOSE.normal, "RFB 3.8 only");
-      data.send(Uint8Array.of(1, SECURITY_NONE));
-      if ((await viewer.read(1))[0] !== SECURITY_NONE) return end(STREAM_CLOSE.normal, "security type None only");
-      data.send(Uint8Array.of(0, 0, 0, 0));
-      // ClientInit: the viewer's own shared flag is not passed on.
-      await viewer.read(1);
+    /** One RFB session on `conn`; `reader` may already hold what the viewer sent for it. */
+    const session = (conn: VncConnection, reader = new ByteReader()) => {
+      vnc = conn;
+      viewer = reader;
+      piping = false;
       clearTimeout(timer);
-      socket.write(Uint8Array.of(1));
-      piping = true;
-      const early = viewer.rest();
-      if (early.length > 0) socket.write(early);
-      if (vnc.leftover.length > 0) data.send(vnc.leftover);
-      socket.on("data", fromDesktop);
-      socket.resume();
+      timer = setTimeout(() => end(STREAM_CLOSE.normal, "no RFB handshake from the viewer in time"), HANDSHAKE_MS);
+      conn.socket.on("close", desktopClosed);
+      if (conn.socket.destroyed) return end(STREAM_CLOSE.internal, "the desktop closed");
+      const handshake = async () => {
+        data.send(VERSION);
+        data.send(Uint8Array.of(1, SECURITY_NONE));
+        data.send(Uint8Array.of(0, 0, 0, 0));
+        // ClientInit as shared: the viewer's own flag is not passed on.
+        conn.socket.write(Uint8Array.of(1));
+        if (conn.leftover.length > 0) data.send(conn.leftover);
+        conn.socket.on("data", fromDesktop);
+        conn.socket.resume();
+        if (!(await reader.read(12)).equals(VERSION)) return end(STREAM_CLOSE.normal, "RFB 3.8 only");
+        if ((await reader.read(1))[0] !== SECURITY_NONE) return end(STREAM_CLOSE.normal, "security type None only");
+        await reader.read(1);
+        clearTimeout(timer);
+        piping = true;
+        const early = reader.rest();
+        if (early.length > 0) conn.socket.write(early);
+      };
+      handshake().catch(() => {
+        // A session switched away from fails its reads, and the stream goes on.
+        if (reader === viewer) end();
+      });
     };
-    handshake().catch(() => end());
+
+    const switchTo = async (mode: DesktopMode, login: (mode: DesktopMode) => Promise<VncConnection>) => {
+      if (ended) return;
+      const old = vnc;
+      old.socket.off("data", fromDesktop);
+      old.socket.off("close", desktopClosed);
+      clearInterval(drain);
+      drain = undefined;
+      clearTimeout(timer);
+      piping = false;
+      const reader = new ByteReader();
+      const was = viewer;
+      viewer = reader;
+      was.fail(new Error("switched"));
+      old.socket.destroy();
+      let next: VncConnection;
+      try {
+        next = await login(mode);
+      } catch {
+        return end(STREAM_CLOSE.internal, "the desktop can't switch");
+      }
+      if (ended) return void next.socket.destroy();
+      data.send(JSON.stringify({ type: "mode", mode }));
+      session(next, reader);
+    };
+
+    data.listen({
+      bytes: (chunk) => {
+        if (piping) vnc.socket.write(chunk);
+        else viewer.push(chunk);
+      },
+      control: (frame) => {
+        const login = opts.login;
+        if (frame.type !== "mode" || !login) return;
+        switches = switches.then(() => switchTo(frame.mode, login));
+      },
+      closed: () => end(),
+    });
+    session(first);
   });
 }
 
@@ -254,13 +316,15 @@ export function serveNone(
  * `stream.open` of a desktop: the agent's running desktop logged in with the
  * password of the stream's mode, then its data socket; resolves once both are
  * up, and the bytes go on flowing. The desktop counts the stream as a viewer
- * (it isn't idle) until it ends.
+ * (it isn't idle) until it ends. A switch of its mode (protocol 30) logs in
+ * again once `may` lets that mode go now (it throws when not).
  */
 export async function openDesktopStream(
   desktops: Pick<DesktopSessions, "status" | "session" | "hold">,
   agent: AgentScope,
-  mode: "watch" | "control",
+  mode: DesktopMode,
   dial: () => Promise<DataSocket>,
+  may: (mode: DesktopMode) => void = () => undefined,
 ): Promise<void> {
   const status = desktops.status(agent);
   const session = status.running ? desktops.session(agent.id) : null;
@@ -268,6 +332,12 @@ export async function openDesktopStream(
   if (status.streams >= STREAM_LIMITS.viewersPerDesktop) {
     throw new RunnerError("too_many_streams", "The agent's desktop already has as many viewers as it takes");
   }
+  const login = async (next: DesktopMode) => {
+    may(next);
+    const now = desktops.session(agent.id);
+    if (!now) throw new RunnerError("desktop_off", "The agent's desktop isn't running");
+    return connectVnc(now.socket, next === "control" ? now.passwords.full : now.passwords.view);
+  };
   const release = desktops.hold(agent.id) ?? (() => undefined);
   try {
     const vnc = await connectVnc(session.socket, mode === "control" ? session.passwords.full : session.passwords.view);
@@ -278,7 +348,7 @@ export async function openDesktopStream(
       vnc.socket.destroy();
       throw err;
     }
-    void serveNone(data, vnc).finally(release);
+    void serveNone(data, vnc, { login }).finally(release);
   } catch (err) {
     release();
     throw err;

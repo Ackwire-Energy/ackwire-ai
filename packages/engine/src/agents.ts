@@ -1,19 +1,21 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, inArray, isNotNull, isNull, schema, sql } from "@agenteschat/db";
 import { AUTO_MODEL, isAutoModel, MODEL_CATALOG } from "@agenteschat/providers";
+import { isIdHandle } from "@agenteschat/ui/names";
 import type { AgentAppearance } from "./appearance";
 import { recordAudit } from "./audit";
 import { isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
 import { modelInfoFor } from "./credentials";
-import { ConflictError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
+import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
+import type { CommandApproval } from "./missions";
 import { recordOperatorEvent } from "./operator-events";
-import { getMembership, requirePermission } from "./organizations";
+import { can, getMembership, type Membership, requirePermission } from "./organizations";
 import { DEFAULT_AGENT_SCOPES, grantScopes } from "./tools/scopes";
 import { resyncBudgetCounter } from "./usage";
 
-const { agents, machines, providerCredentials } = schema;
+const { agents, importItems, machines, providerCredentials } = schema;
 
 export type Agent = typeof agents.$inferSelect;
 
@@ -32,7 +34,8 @@ export interface AgentInput {
   mediaReplies?: boolean;
 }
 
-async function validate(db: Database, orgId: string, input: Partial<AgentInput>) {
+/** An agent's fields as the API takes them: its handle, model, key (of the model's provider), budget and owner. */
+export async function validateAgentFields(db: Database, orgId: string, input: Partial<AgentInput>) {
   if (input.handle !== undefined && !HANDLE_PATTERN.test(input.handle)) {
     throw new ValidationError("handle must be 2–32 characters: lower-case letters, digits, - or _");
   }
@@ -72,16 +75,60 @@ async function validate(db: Database, orgId: string, input: Partial<AgentInput>)
 /** What a person's new agent thinks with when nobody picks a model: "Automático". */
 export const NEW_AGENT_DEFAULTS = { model: AUTO_MODEL } as const;
 
+/**
+ * An agent's "Quem pensa" and its Autonomia as new agents take them (ADR 0094). Who it answers stays out: a new agent
+ * on a plan answers only its owner (ADR 0059 §5).
+ */
+export function setupOfAgent(a: Agent): schema.AgentSetup {
+  const autonomy = a.missionCommandApproval;
+  if (!isComputerBrain(a.brain)) {
+    return { brain: "model", model: a.model, key: a.credentialId, contextTokens: a.contextTokens, autonomy };
+  }
+  return {
+    brain: a.brain,
+    model: a.brainModel,
+    machineId: a.machineId,
+    account: a.brainAccountId,
+    effort: a.brainEffort,
+    contextTokens: a.contextTokens,
+    fallback: a.brainFallback,
+    autonomy,
+  };
+}
+
+/**
+ * What the workspace's new agents start with from now on: the "Quem pensa" someone just saved or used on others.
+ * Only whoever creates agents sets it (they start from it), and one on the API only an admin: only admins change an
+ * agent's API model and key.
+ */
+export async function rememberAgentSetup(db: Executor, membership: Membership, setup: schema.AgentSetup) {
+  if (!can(membership, "create_agents") || (setup.brain === "model" && !can(membership, "manage_agents"))) return;
+  await db
+    .insert(schema.organizationSettings)
+    .values({ orgId: membership.orgId, agentSetup: setup })
+    .onConflictDoUpdate({
+      target: schema.organizationSettings.orgId,
+      set: { agentSetup: setup, updatedAt: new Date() },
+    });
+}
+
 export async function createAgent(
   db: Database,
   actorId: string,
   orgId: string,
-  input: AgentInput,
+  input: AgentInput & { autonomy?: CommandApproval },
   defaults: { model: string },
+  options: { remember?: boolean } = {},
 ): Promise<Agent> {
-  await requirePermission(db, actorId, orgId, "create_agents");
-  const values = { ...input, handle: input.handle.toLowerCase(), model: input.model ?? defaults.model };
-  await validate(db, orgId, values);
+  const membership = await requirePermission(db, actorId, orgId, "create_agents");
+  const { autonomy, ...fields } = input;
+  const values = { ...fields, handle: fields.handle.toLowerCase(), model: fields.model ?? defaults.model };
+  await validateAgentFields(db, orgId, values);
+  const ownerUserId = input.ownerUserId === undefined ? actorId : input.ownerUserId;
+  // The Autonomia it starts with, only from someone who may set it on the agent: an admin or its owner.
+  if (autonomy && !can(membership, "manage_agents") && ownerUserId !== actorId) {
+    throw new ForbiddenError("Only an admin or the agent's owner can choose its autonomy", "agent.not_owner");
+  }
   // An agent born on "Automático" is automatic on every brain: switched to Claude Code or Codex later, it
   // starts with the model and effort picked per run (written here, so agents made before Automático keep theirs).
   const brainAuto = isAutoModel(values.model) ? { brainModel: AUTO_MODEL, brainEffort: AUTO_MODEL } : {};
@@ -108,7 +155,8 @@ export async function createAgent(
         ...brainAuto,
         machineId: home?.id ?? null,
         orgId,
-        ownerUserId: input.ownerUserId === undefined ? actorId : input.ownerUserId,
+        ownerUserId,
+        ...(autonomy ? { missionCommandApproval: autonomy } : {}),
       })
       .returning();
     if (!agent) throw new Error("agent insert returned nothing");
@@ -166,8 +214,18 @@ export async function createAgent(
       actor: { type: "person", id: actorId },
       action: "agent.created",
       target: { type: "agent", id: agent.id },
-      details: { name: agent.name, handle: agent.handle, model: agent.model, ...(first ? { coordinator: true } : {}) },
+      details: {
+        name: agent.name,
+        handle: agent.handle,
+        model: agent.model,
+        ...(first ? { coordinator: true } : {}),
+        ...(autonomy ? { autonomy } : {}),
+      },
     });
+    // A model or key the creator picked is their latest choice; "Automático" with the default key is no choice.
+    if (options.remember && (!isAutoModel(agent.model) || agent.credentialId)) {
+      await rememberAgentSetup(db, membership, setupOfAgent(agent));
+    }
     return first ?? agent;
   } catch (error) {
     if (isUniqueViolation(error)) throw new ConflictError(`@${values.handle} is already taken`);
@@ -197,9 +255,10 @@ export async function updateAgent(
   orgId: string,
   agentId: string,
   input: Partial<Omit<AgentInput, "handle">>,
+  options: { remember?: boolean } = {},
 ): Promise<Agent> {
-  await requirePermission(db, actorId, orgId, "manage_agents");
-  await validate(db, orgId, input);
+  const membership = await requirePermission(db, actorId, orgId, "manage_agents");
+  await validateAgentFields(db, orgId, input);
   const owner = input.ownerUserId;
   const before = owner !== undefined ? await getAgent(db, orgId, agentId) : null;
   // A plan thinks only for its owner's agents (ADR 0059 §3): a new owner who doesn't own it sends the agent back
@@ -244,6 +303,11 @@ export async function updateAgent(
     });
   }
   if (input.monthlyBudgetNanoUsd !== undefined) await resyncBudgetCounter(db, orgId, agentId);
+  // Its API model or key is "Quem pensa" only while it thinks through the API.
+  const thinking = input.model !== undefined || input.credentialId !== undefined;
+  if (thinking && options.remember !== false && !isComputerBrain(agent.brain)) {
+    await rememberAgentSetup(db, membership, setupOfAgent(agent));
+  }
   return agent;
 }
 
@@ -387,9 +451,43 @@ export const agentView = (a: Agent) => ({
 /** A handle as a tool's input names it ("@Ada ") → as stored ("ada"). */
 export const handleOf = (raw: unknown) => String(raw).replace(/^@/, "").trim().toLowerCase();
 
-/** `@handles` (a tool's input) → the organization's agents that aren't archived; the missing ones by handle. */
+/**
+ * `handles` (lower case, without the @) as their agents have them now. An import gave an agent the other app's id
+ * cut to 32 characters (`agent-e9665a97-c8d5-423f-ae59-25`, OpenBot.run's) until migration 0132 named it, and
+ * routines, memory and messages written before still cite it: that handle is read again from the import's key
+ * (`import_items.key`), never stored, and names the agent while no agent here has it as its own.
+ */
+export async function currentHandles(db: Executor, orgId: string, handles: string[]): Promise<string[]> {
+  const old = handles.filter((h) => HANDLE_PATTERN.test(h) && isIdHandle(h));
+  if (old.length === 0) return handles;
+  const key = sql<string>`left(lower(${importItems.key}), 32)`;
+  const rows = await db
+    .selectDistinctOn([key], { old: key, handle: agents.handle })
+    .from(importItems)
+    .innerJoin(agents, and(eq(agents.id, importItems.targetId), eq(agents.orgId, importItems.orgId)))
+    .where(
+      and(
+        eq(importItems.orgId, orgId),
+        eq(importItems.kind, "agent"),
+        isNull(agents.archivedAt),
+        inArray(key, old),
+        sql`not exists (select 1 from ${agents} held where held.org_id = ${orgId}::uuid and held.handle = ${key})`,
+      ),
+    )
+    // Two people who imported the same file: the first import held the handle (the second got a suffix).
+    .orderBy(key, asc(importItems.createdAt));
+  const now = new Map(rows.map((r) => [r.old, r.handle]));
+  return handles.map((h) => now.get(h) ?? h);
+}
+
+/**
+ * `@handles` (a tool's input) → the organization's agents that aren't archived; the missing ones by handle. `rowOf`:
+ * the agent one of those inputs names, an old handle too (`currentHandles`).
+ */
 export async function agentsByHandle(db: Executor, orgId: string, raw: unknown) {
-  const handles = [...new Set((Array.isArray(raw) ? raw : []).map(handleOf))];
+  const asked = (Array.isArray(raw) ? raw : []).map(handleOf);
+  const now = await currentHandles(db, orgId, asked);
+  const handles = [...new Set(now)];
   const rows =
     handles.length === 0
       ? []
@@ -398,7 +496,8 @@ export async function agentsByHandle(db: Executor, orgId: string, raw: unknown) 
           .from(agents)
           .where(and(eq(agents.orgId, orgId), inArray(agents.handle, handles), isNull(agents.archivedAt)));
   const missing = handles.filter((h) => !rows.some((r) => r.handle === h));
-  return { handles, rows, missing };
+  const rowOf = (input: unknown) => rows.find((r) => r.handle === now[asked.indexOf(handleOf(input))]);
+  return { handles, rows, missing, rowOf };
 }
 
 /** `getAgent` through the per-process cache (run path). */

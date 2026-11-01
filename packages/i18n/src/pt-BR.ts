@@ -1607,7 +1607,7 @@ export const ptBR = {
       review: "Revisar",
       created: "Criado",
       aiAccount: "Pensa com {{account}}",
-      aiModel: "Pensa com o modelo do workspace",
+      aiModel: "Pensa pela API",
       aiNone: "Sem IA ainda. Conecte uma depois de criar",
     },
   },
@@ -2475,7 +2475,6 @@ export const ptBR = {
       sentenceMember: "Pensa com <brain/><end>.</end>",
       sentenceCloud: "Pensa com <brain/> na <computer/> e <browser/><end>.</end>",
       sentenceMachine: "Pensa com <brain/> no <computer/> e <browser/><end>.</end>",
-      orgModel: "o modelo do workspace",
       cell: {
         label: "Como trabalha",
         computer: "Trabalha no",
@@ -2493,7 +2492,10 @@ export const ptBR = {
       open: { brain: "Mudar quem pensa", computer: "Mudar onde trabalha", browser: "Mudar o navegador" },
       saved: {
         brain: "{{The}} {{name}} agora pensa com {{brain}}.",
-        brainMoved: "{{The}} {{name}} agora pensa com {{brain}} no {{computer}}.",
+        brainMoved: "{{The}} {{name}} agora trabalha no {{computer}} e pensa com {{brain}}.",
+        /** From the API onto a plan, it answers only its owner (ADR 0059 §5): "você", or their name. */
+        brainOwner: "{{The}} {{name}} agora pensa com {{brain}} e só atende {{owner}}.",
+        brainMovedOwner: "{{The}} {{name}} agora trabalha no {{computer}}, pensa com {{brain}} e só atende {{owner}}.",
         account: "{{The}} {{name}} agora usa a conta {{account}}.",
         computer: "{{The}} {{name}} agora trabalha no {{computer}}.",
         none: "{{The}} {{name}} agora está sem computador.",
@@ -2504,21 +2506,19 @@ export const ptBR = {
       },
       failed: "Não deu para salvar. Tente de novo.",
       use: "Usar",
-      usePlan: { claude_code: "Usar meu plano do Claude", codex: "Usar meu plano do ChatGPT" },
       brain: {
-        sub: "Vale para todas as conversas.",
-        model: "Modelo do workspace",
-        modelText: "Pela API. O uso conta no orçamento {{of}} {{name}}.",
-        claude_codeText: "Usa o seu plano do Claude",
-        codexText: "Usa o seu plano do ChatGPT",
-        on: "No {{computer}}",
+        sub: "Vale só {{for}} {{name}}, em todas as conversas.",
+        model: "Chave de API",
+        modelText: "Pago por uso. Conta no orçamento {{of}} {{name}}.",
+        /** A plan's card: `plan` is its name ("Claude", "ChatGPT", "OpenCode Go"). */
+        planText: "Usa o seu plano do {{plan}}",
+        /** To anyone but the agent's owner: whose plan it is. */
+        planTextOf: "Usa o plano do {{plan}} de {{owner}}",
         moves: "Vai para o {{computer}}",
         off: "O {{computer}} está offline",
         none: "Nenhum computador tem",
         planModel: "Modelo",
-        preview: "Pensa com <b>{{brain}}</b>.",
-        previewMoved: "Pensa com <b>{{brain}}</b> no <b>{{computer}}</b>.",
-        account: { claude_code: "Conta do Claude", codex: "Conta do ChatGPT" },
+        account: "Conta",
         accountLocked: "Só {{name}} troca",
         accountSignedOut: "Saiu da conta, entre de novo",
         thisComputer: "Conta deste {{computer}}",
@@ -2527,11 +2527,12 @@ export const ptBR = {
         accountOf: "De {{name}}",
         addAccount: "Adicionar conta",
         signInAgain: "Entrar de novo",
+        connectPlan: "Conectar outro plano",
         keyLabel: "Chave da API",
         fallbackTitle: "Se o {{computer}} parar de responder, responder pela API",
         /** The switch's ⓘ: the same in both states. */
         fallbackHint:
-          "Usa o modelo do workspace e conta no orçamento {{of}} {{name}}. Se não, {{article}} {{name}} avisa quem chamou e espera o computador voltar.",
+          "Responde pela API e conta no orçamento {{of}} {{name}}. Se não, {{article}} {{name}} avisa quem chamou e espera o computador voltar.",
         effort: "Esforço",
         efforts: { auto: "Automático", low: "Baixo", medium: "Médio", high: "Alto", max: "Máximo" },
         effortText: {
@@ -2569,6 +2570,48 @@ export const ptBR = {
           context: "Contexto de {{size}}",
           sharing: "Atende outras pessoas",
           waits: "Espera o computador voltar",
+        },
+        /** "Usar em outros agentes" (ADR 0094): the same setup on the agents picked, each by its own rules. */
+        copy: {
+          row: "Usar em outros agentes",
+          rowLine: "A mesma IA, o modelo, o esforço e a autonomia",
+          title: "Usar em outros agentes",
+          sub: "Eles passam a pensar com {{setup}}.",
+          all: "Todos",
+          allLine_one: "{{count}} agente pode usar",
+          allLine_other: "{{count}} agentes podem usar",
+          none: "Nenhum outro agente pode usar agora.",
+          now: "Hoje: {{brain}}",
+          same: "Já pensa assim",
+          keeps: "Fica com {{account}}",
+          keepsOwn: "Fica com a conta do computador",
+          autonomy: "Autonomia: {{from}} → {{to}}",
+          /** A switch over the agents: off, the setup leaves each agent's Autonomia as it is. */
+          withAutonomy: "Levar a autonomia",
+          withAutonomyLine: "{{value}}, como neste agente. Desligado, cada um fica com a sua.",
+          reasons: {
+            not_allowed: "Só admins e {{owner}} mudam",
+            not_allowedNobody: "Só admins mudam",
+            admins_only: "Só admins mudam o modelo da API",
+            account_owner: "A sua conta só pensa pelos seus agentes",
+            account_ownerOf: "Só {{owner}} escolhe essa conta",
+            account_single: "Essa conta entrou só para {{agent}}",
+            other_computer: "Trabalha no {{computer}}",
+            other_computerNone: "Está sem computador",
+            model_missing: "O {{plan}} não tem o {{model}}",
+            failed: "Não deu para mudar agora",
+          },
+          search: "Buscar agente",
+          noMatch: "Nenhum agente com “{{q}}”",
+          pick: "Escolha os agentes",
+          use_one: "Usar em {{count}} agente",
+          use_other: "Usar em {{count}} agentes",
+          done_one: "{{count}} agente agora pensa com {{setup}}.",
+          done_other: "{{count}} agentes agora pensam com {{setup}}.",
+          autonomyOnly_one: "{{count}} agente mudou só a autonomia.",
+          autonomyOnly_other: "{{count}} agentes mudaram só a autonomia.",
+          missed_one: "{{count}} agente não mudou.",
+          missed_other: "{{count}} agentes não mudaram.",
         },
         add: {
           title: { claude_code: "Adicionar conta do Claude", codex: "Adicionar conta do ChatGPT" },
@@ -2615,8 +2658,8 @@ export const ptBR = {
         offline: "Offline agora",
         browser: "Navegador",
         browserPending: "Navegador (falta ligar)",
-        onlyModel: "Só o modelo do workspace",
-        alsoBrain: "Volta para o modelo do workspace ({{brain}} não está lá)",
+        onlyModel: "Só pela API",
+        alsoBrain: "Volta a pensar pela API (o {{brain}} não está lá)",
         alsoOffline: "Está offline: até ele voltar, {{article}} {{name}} espera",
         connect: "Conectar outro computador",
         useMachine: "Usar o {{computer}}",
@@ -3278,6 +3321,10 @@ export const ptBR = {
       "No plano, {{article}} {{name}} começa atendendo só {{owner}}. Na página {{of}} {{name}}, {{owner}} pode escolher se {{she}} atende outras pessoas.",
     planNotSaved:
       "{{The}} {{name}} já existe, mas não deu para usar o {{brain}} agora. Escolha de novo em Quem pensa, na página {{of}} {{name}}.",
+    /** What a new agent starts thinking with (ADR 0094): the last setup saved or used on other agents. */
+    lastSetup: "Começa com a última escolha: {{setup}}.",
+    /** Under it, beside "Levar a autonomia": the last setup's Autonomia, and what it starts with without it. */
+    lastAutonomy: "{{value}}, como na última escolha. Desligado, começa com {{fallback}}.",
     autoCost: "O custo acompanha cada tarefa",
     noKeyFor: "Sem chave {{of}} {{provider}}",
     key: "Chave",
@@ -4073,6 +4120,7 @@ export const ptBR = {
       waitingPerson: "Esperando alguém responder",
       failing_one: "Falhando ({{count}} seguida)",
       failing_other: "Falhando ({{count}} seguidas)",
+      needsWebhook: "Ainda não roda: falta o webhook do {{provider}}",
     },
     pausedReason: {
       creator_left: "Pausada: quem criou saiu do workspace",
@@ -4111,7 +4159,7 @@ export const ptBR = {
     access: {
       read: "Só olhar e contar",
       act: "Pode agir",
-      hint: "Só olhar e contar: ela lê e conta o que achou. Para mudar alguma coisa, pede a alguém. Pode agir: também pode criar e mudar tarefas, a memória, a wiki e arquivos do Drive, e trabalhar no próprio código. Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.",
+      hint: "Só olhar e contar: ela lê e conta o que achou. Para mudar alguma coisa, pede a alguém. Pode agir: também pode criar e mudar tarefas, a memória, a wiki e arquivos do Drive, trabalhar no próprio código, falar com outros agentes e postar onde quem a criou posta. Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.",
     },
     report: {
       always: "Toda vez",
@@ -6589,14 +6637,21 @@ export const ptBR = {
       hint: "Escolhe o modelo e o esforço para cada tarefa",
     },
     sub: "Quem escreve as respostas {{of}} {{name}}. Vale para todas as conversas.",
+    /** What thinks on a plan, everywhere (`thinksWith`): the model by the plan that pays; `plan` is a coding plan's name. */
     line: {
-      claude_code: "Claude Code · {{model}} no {{computer}}",
-      claude_codeNoComputer: "Claude Code · {{model}}",
-      codex: "Codex · {{model}} no {{computer}}",
-      codexNoComputer: "Codex · {{model}}",
-      plan: "{{model}} pelo Claude Code no {{computer}}",
-      planNoComputer: "{{model}} pelo Claude Code",
-      ofOwner: "{{line}} · plano de {{owner}}",
+      claude: "{{model}} pelo plano do Claude",
+      chatgpt: "{{model}} pelo plano do ChatGPT",
+      coding: "{{model}} pelo {{plan}}",
+      claudeOf: "{{model}} pelo plano do Claude de {{owner}}",
+      chatgptOf: "{{model}} pelo plano do ChatGPT de {{owner}}",
+      codingOf: "{{model}} pelo {{plan}} de {{owner}}",
+      claudeAuto: "Plano do Claude",
+      chatgptAuto: "Plano do ChatGPT",
+      codingAuto: "{{plan}}",
+      claudeAutoOf: "Plano do Claude de {{owner}}",
+      chatgptAutoOf: "Plano do ChatGPT de {{owner}}",
+      codingAutoOf: "{{plan}} de {{owner}}",
+      on: "{{line}} no {{computer}}",
     },
     model: "Modelo (API)",
     modelText: "Um modelo de IA pela API, com uma chave do workspace.",
@@ -6615,9 +6670,12 @@ export const ptBR = {
       no_computer: "Escolha um computador conectado em Computador para usar.",
       exec_off: "O computador foi conectado sem permissão para rodar programas.",
       runner_old: "Atualize o programa do agentes.chat no computador para usar.",
-      tool_off: "Desligado no {{computer}}. Ligue lá, no app do agentes.chat: Preferências → Ferramentas.",
-      tool_offLinux: "Desligado no {{computer}}. Ligue lá, no app do agentes.chat ou com {{command}}.",
-      not_installed: "Não está instalado no {{computer}}.",
+      /** `program`: "Claude Code" or "Codex" (`brain.card`). */
+      tool_off:
+        "O {{program}} está desligado no {{computer}}. Ligue lá, no app do agentes.chat: Preferências → Ferramentas.",
+      tool_offLinux:
+        "O {{program}} está desligado no {{computer}}. Ligue lá, no app do agentes.chat ou com {{command}}.",
+      not_installed: "O {{program}} não está instalado no {{computer}}.",
       outdated: "A versão no {{computer}} é antiga. Atualize o Codex para usar.",
       no_computerCloud: "Disponível assim que o {{computer}} ficar pronto.",
     },
@@ -6628,6 +6686,10 @@ export const ptBR = {
     modelTag: { cheap: "Econômico", fast: "Rápido", smart: "Topo de linha" },
     /** What a coding plan's model needs from its account before it answers. */
     modelNeeds: { globalRegion: "Precisa da região Global no OpenCode" },
+    /** Under the model chosen that needs it: how to give it. */
+    modelHow: {
+      globalRegion: "Ligue a região Global no OpenCode, em Settings › Privacy. Sem ela, este modelo não responde.",
+    },
     recommended: "Recomendado",
     modelHelp: "Os modelos maiores pensam mais e gastam o plano mais rápido.",
     hidden: "{{owner}} ou um admin escolhe quem pensa.",
@@ -8074,6 +8136,7 @@ export const ptBR = {
       tooFrequent: "Uma rotina roda no máximo a cada 15 minutos. Escolha um intervalo maior.",
       tooMany: "Este agente já tem 20 rotinas ativas. Pause ou apague uma antes.",
       creatorCannotPost: "Quem cria a rotina precisa estar na conversa e poder escrever nela.",
+      actTakeOver: "Assuma a rotina antes de mudar o que ela faz quando pode agir.",
       takeOverNoAccess: "Entre na conversa da rotina antes de assumi-la.",
       agentNotInChannel: "Adicione o agente à conversa antes.",
     },
@@ -8896,28 +8959,45 @@ export const ptBR = {
       answered: "{{name}} respondeu",
       expired: "{{The}} {{name}} não respondeu a tempo",
       failed: "{{The}} {{name}} não conseguiu responder",
+      /** Work handed off (`tell_agent`) that its agent couldn't finish. */
+      failedNote: "{{The}} {{name}} não conseguiu terminar",
       waited: "Esperou {{minutes}} min",
       wentOn: "Seguiu sem a resposta",
       asked: "{{name}} perguntou",
+      /** Over the work an agent handed off, as it went to the other agent. */
+      wrote: "{{name}} escreveu",
       answerOf: "Resposta {{of}} {{name}}",
       answer: "Resposta",
       noAnswer: "Sem resposta em {{minutes}} min. {{theFrom}} {{from}} respondeu sem ela.",
       couldNot: "{{theTo}} {{to}} não conseguiu responder. {{theFrom}} {{from}} seguiu sem ela.",
       private: "Conversa só entre {{articleFrom}} {{from}} e {{articleTo}} {{to}}",
     },
-    /** Inside the reply that asked: the questions the agent asked other agents in that turn, one line each. */
+    /**
+     * Inside the reply that asked: the questions the agent asked other agents in that turn, and the work it handed
+     * them, one line each.
+     */
     consultGroup: {
       asked_one: "Perguntou a {{count}} colega",
       asked_other: "Perguntou a {{count}} colegas",
+      /** Only work handed off (`tell_agent`). */
+      handed_one: "Passou para {{count}} colega",
+      handed_other: "Passou para {{count}} colegas",
+      /** Questions and work handed off together. */
+      brought_one: "Chamou {{count}} colega",
+      brought_other: "Chamou {{count}} colegas",
       progress: "{{done}} de {{total}}",
       label: "Perguntas {{of}} {{name}} a outros agentes",
+      labelRequests: "Pedidos {{of}} {{name}} a outros agentes",
       working: "{{name}} está trabalhando",
       waitingApproval: "{{The}} {{name}} espera uma aprovação",
       waitingInput: "{{The}} {{name}} espera uma resposta",
       /** The consulted agent's computer is away: paused, not on a person (as the computer screen says it). */
       waitingComputer: "{{The}} {{name}} espera o computador voltar",
+      /** Its part done, the agent waits on what it handed to other agents. */
+      waitingAgents: "{{The}} {{name}} passou uma parte adiante e espera o retorno",
       /** An answer whose question is in a reply farther up: one line where it arrived, "Ver" goes to that reply. */
       answeredFar: "{{to}} respondeu à pergunta {{of}} {{from}}",
+      answeredRequestFar: "{{to}} respondeu ao pedido {{of}} {{from}}",
       see: "Ver",
     },
     /** A question opened in the panel over the conversation ("Theo ⇄ Iris"): what the two agents said, read only. */
@@ -8931,6 +9011,8 @@ export const ptBR = {
       messages_other: "{{count}} mensagens",
       origin: "{{from}} perguntou {{toArticle}} {{to}} em #{{channel}} · {{time}}",
       originDm: "{{from}} perguntou {{toArticle}} {{to}} · {{time}}",
+      originNote: "{{from}} fez um pedido {{toArticle}} {{to}} em #{{channel}} · {{time}}",
+      originNoteDm: "{{from}} fez um pedido {{toArticle}} {{to}} · {{time}}",
       readOnly: "Só leitura.",
       steer: "Para mudar o rumo, fale com {{article}} {{name}}.",
       talk: "Falar com {{article}} {{name}}",
@@ -9061,6 +9143,7 @@ export const ptBR = {
         listingReminders: "Viu os lembretes",
         listingRoutines: "Viu as rotinas",
         checkingComputer: "Conferiu o PC",
+        checkingUsage: "Conferiu o próprio uso",
         writingWiki: "Escreveu na wiki",
         readingWiki: "Leu a wiki",
         linkingWiki: "Ligou a uma página da wiki",
@@ -9141,6 +9224,7 @@ export const ptBR = {
       listingReminders: "vendo os lembretes",
       listingRoutines: "vendo as rotinas",
       checkingComputer: "conferindo o PC",
+      checkingUsage: "conferindo o próprio uso",
       writingWiki: "escrevendo na wiki",
       readingWiki: "lendo a wiki",
       linkingWiki: "ligando a uma página da wiki",

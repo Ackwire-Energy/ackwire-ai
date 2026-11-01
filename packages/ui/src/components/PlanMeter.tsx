@@ -1,15 +1,27 @@
 import { cx } from "../cx";
-import { PLAN_ALMOST, type PlanMeterText, type PlanMeterUsage, planLine, planState, planWindows } from "../plan-state";
+import {
+  PLAN_ALMOST,
+  type PlanMeterText,
+  type PlanMeterUsage,
+  planLevel,
+  planLine,
+  planState,
+  planWindows,
+} from "../plan-state";
 import { Meter } from "./Surfaces";
 
 export {
   limitOffers,
   type OfferAccount,
   PLAN_ALMOST,
+  PLAN_CRITICAL,
+  PLAN_TONE,
+  type PlanLevel,
   type PlanMeterText,
   type PlanMeterUsage,
   type PlanMeterWindow,
   type PlanState,
+  planLevel,
   planLine,
   planState,
   planWindows,
@@ -20,12 +32,13 @@ const passed = (iso: string | undefined, now: number) => iso !== undefined && Da
 /**
  * A plan's usage like the provider shows it: a bar per window, tightest first,
  * with its percentage and when it resets; "almost" from 80%, "at the limit
- * until…" at 100%, and how old the numbers are. The bars are ink; the state is
- * said in words. `compact` (lists, an agent's facts, Contas de IA): one line
- * with the tightest windows ("semana 40% · 5h 12%", after `label`), one bar for
- * the fullest, every window on hover, and only near the limit when it renews;
- * nothing while no window is known, unless the plan already refused a request
- * ("No limite").
+ * until…" at 100%, and how old the numbers are. The bars are ink until a window
+ * nears its limit (`data-level`, `planLevel`): amber from 80%, red from 90% and at
+ * the limit, the words and the percentage always beside the color. `compact`
+ * (lists, an agent's facts, Contas de IA): one line with the tightest windows
+ * ("semana 40% · 5h 12%", after `label`), one bar for the fullest, every window
+ * on hover, and only near the limit when it renews; nothing while no window is
+ * known, unless the plan already refused a request ("No limite").
  */
 export function PlanMeter({
   usage,
@@ -51,6 +64,7 @@ export function PlanMeter({
       <div
         className={cx("ac-planmeter", "ac-planmeter--compact", className)}
         data-state={shown.state}
+        data-level={planLevel(shown.top?.used ?? 0, shown.state === "limited")}
         title={shown.title}
       >
         {line && <span className="ac-planmeter__line">{line}</span>}
@@ -60,10 +74,10 @@ export function PlanMeter({
     );
   }
   const rows = planWindows(usage, now);
-  const { state, until } = planState(usage, now);
+  const { state, until, used } = planState(usage, now);
   const headline = state === "limited" ? text.limited(until) : state === "almost" ? text.almost : null;
   return (
-    <div className={cx("ac-planmeter", className)} data-state={state}>
+    <div className={cx("ac-planmeter", className)} data-state={state} data-level={planLevel(used, state === "limited")}>
       {headline && <p className="ac-planmeter__state">{headline}</p>}
       {rows.length > 0 && (
         <ul className="ac-planmeter__windows">
@@ -72,7 +86,7 @@ export function PlanMeter({
             // A window that reset is empty again: its parts were the old window's.
             const fresh = !passed(w.resetsAt, now);
             return (
-              <li key={`${w.kind}:${w.label ?? i}`} className="ac-planmeter__window">
+              <li key={`${w.kind}:${w.label ?? i}`} className="ac-planmeter__window" data-level={planLevel(w.used)}>
                 <span className="ac-planmeter__name">{name}</span>
                 <span className="ac-planmeter__pct">{w.used}%</span>
                 <Meter

@@ -8,6 +8,66 @@ export const onScreenKeyboard = () =>
 /** A pointer that can rest over something without pressing it: a mouse or a pen, never a finger. */
 export const hoverPointer = (pointerType: string) => pointerType === "mouse" || pointerType === "pen";
 
+/** Keys that can move the focus besides Tab: between radios, tabs or a menu's items. In a field they move the caret. */
+const MOVES = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"]);
+
+let byKeys = false;
+let tracked: Document | null = null;
+
+/**
+ * Whether the person moves around with the keys: the focus moved while Tab, an arrow or a page key was down, until the
+ * next press of a mouse, a finger or a pen. A key that moves nothing changes nothing (Tab that picks a mention in the
+ * box, an arrow that moves the caret or scrolls the page), nor do typing, Enter and Escape. A key held with ⌘, Ctrl or
+ * Alt is a shortcut, not a move, except Tab: by default, Safari and the macOS app reach a button only with ⌥Tab.
+ * `<html data-pointer>` says the pointer leads, so that only the keys draw focus rings: a browser also draws one on
+ * whatever a script focuses after any key, typing included (a dialog that closes on Enter gives the focus back to its
+ * button). Installed once per document, by the first caller.
+ */
+export function trackInput() {
+  if (typeof document === "undefined" || tracked === document) return;
+  tracked = document;
+  const root = document.documentElement;
+  const set = (keys: boolean) => {
+    byKeys = keys;
+    root.toggleAttribute("data-pointer", !keys);
+  };
+  set(false);
+  // While the key is down, not only during its event: Radix's roving focus (a menu's arrows) moves it in a timeout.
+  let moving = false;
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      moving = e.key === "Tab" || (MOVES.has(e.key) && !(e.metaKey || e.ctrlKey || e.altKey));
+    },
+    true,
+  );
+  document.addEventListener(
+    "keyup",
+    () => {
+      moving = false;
+    },
+    true,
+  );
+  document.addEventListener(
+    "focusin",
+    () => {
+      if (moving) set(true);
+    },
+    true,
+  );
+  document.addEventListener(
+    "pointerdown",
+    () => {
+      moving = false;
+      set(false);
+    },
+    true,
+  );
+}
+
+/** The person moves with the keys now (`trackInput`). */
+export const movesByKeys = () => byKeys;
+
 /**
  * Whether the one element an IntersectionObserver watches is on screen now (undefined: no answer). One call can
  * carry several answers for it, oldest first: hidden and shown again before the observer called (across a resize to

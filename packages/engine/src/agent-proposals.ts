@@ -415,7 +415,8 @@ async function settle(
     text: agent
       ? `${who} created it: @${agent.handle} (${agent.name}). It is on the team now.`
       : `${who} said no. Don't propose it again unless someone asks.`,
-    refs: { messageId: message.id, ...(agent ? { agentId: agent.id } : {}) },
+    // `runId`: the run that proposed it, so what comes next is that run's work, for whoever is behind it.
+    refs: { messageId: message.id, runId: run.id, ...(agent ? { agentId: agent.id } : {}) },
   };
   const delivered = await deps.db.transaction((tx) => deliverNoticeToRun(tx, run, notice));
   await publishDelivery(deps.pubsub, delivered).catch(() => {});

@@ -508,6 +508,206 @@ describe("Criar agente: what gets created", () => {
     ).toBe("true");
   });
 
+  test("the last setup (ADR 0094): a plan of mine starts chosen, said on the model step, saved with all of it", async () => {
+    const state = seedState();
+    state.brainMachines = [
+      {
+        machineId: "machine_mini",
+        name: "Mac mini",
+        online: true,
+        options: [
+          { ...plan("claude_code", true), models: [{ value: "opus", label: "Opus" }], defaultModel: "sonnet" },
+          plan("codex", false),
+        ],
+      },
+    ];
+    state.newAgentSetup = {
+      brain: "claude_code",
+      model: "opus",
+      key: null,
+      contextTokens: null,
+      computer: { machineId: "machine_mini", name: "Mac mini" },
+      account: { id: "acc-1", label: "Claude", provider: null, mine: true, free: true },
+      ownSignIn: false,
+      effort: "high",
+      fallback: true,
+    };
+    await open(state);
+    await startAs("Assistente");
+    await proceed(4);
+    expect(title()).toBe("Modelo e orçamento");
+    expect(
+      screen()
+        .getByRole("button", { name: /^Claude Code.*Mac mini/ })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(screen().getByText("Começa com a última escolha: Opus pelo plano do Claude · Esforço alto.")).toBeTruthy();
+    await proceed();
+    await click(screen().getByRole("button", { name: "Criar Eva" }));
+    await settle(8);
+    const agentId = state.agents.find((a) => a.handle === "eva")?.id;
+    expect(state.calls.find((c) => c.method === "agents.setBrain")?.args).toEqual([
+      ORG_ID,
+      agentId,
+      { brain: "claude_code", account: "acc-1", model: "opus", effort: "high", contextTokens: null, fallback: true },
+    ]);
+  });
+
+  test("the last setup still arriving when the role is picked: it starts there once it comes", async () => {
+    const state = seedState();
+    state.newAgentSetup = { brain: "model", model: "claude-opus-5-5", key: null, contextTokens: null };
+    const api = createFakeApi(state);
+    let arrive = () => {};
+    const arrived = new Promise<void>((resolve) => {
+      arrive = resolve;
+    });
+    const read = api.agents.newAgentSetup;
+    api.agents.newAgentSetup = async (orgId) => {
+      await arrived;
+      return read(orgId);
+    };
+    await open(state, api);
+    await startAs("Assistente");
+    arrive();
+    await settle(8);
+    await proceed(4);
+    expect(
+      screen()
+        .getByRole("button", { name: /^Claude Opus 5\.5/ })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+  });
+
+  test("the last setup: the API's model, key and context window; someone else's plan leaves Automático", async () => {
+    const state = seedState();
+    state.newAgentSetup = { brain: "model", model: "claude-opus-5-5", key: "cred-1", contextTokens: 400_000 };
+    await open(state);
+    await startAs("Assistente");
+    await proceed(4);
+    expect(
+      screen()
+        .getByRole("button", { name: /^Claude Opus 5\.5/ })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(screen().getByText("Começa com a última escolha: Claude Opus 5.5.")).toBeTruthy();
+    await proceed();
+    await click(screen().getByRole("button", { name: "Criar Eva" }));
+    await settle(8);
+    expect(createdWith(state)).toMatchObject({ model: "claude-opus-5-5", credentialId: "cred-1" });
+    const agentId = state.agents.find((a) => a.handle === "eva")?.id;
+    expect(state.calls.find((c) => c.method === "agents.setBrain")?.args).toEqual([
+      ORG_ID,
+      agentId,
+      { brain: "model", contextTokens: 400_000 },
+    ]);
+    cleanup();
+
+    // A plan on someone else's account can't think for my agent: it starts as before.
+    const theirs = seedState();
+    theirs.newAgentSetup = {
+      brain: "claude_code",
+      model: "opus",
+      key: null,
+      contextTokens: null,
+      computer: { machineId: "machine_mini", name: "Mac mini" },
+      account: { id: "acc-2", label: "Claude", provider: null, mine: false, free: true },
+      ownSignIn: false,
+    };
+    await open(theirs);
+    await startAs("Assistente");
+    await proceed(4);
+    expect(
+      screen()
+        .getByRole("button", { name: /^Automático/ })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(screen().queryByText(/^Começa com a última escolha/)).toBeNull();
+  });
+
+  // The "Modelo e custo" line of Revisar and of the preview.
+  const modelAndCost = () =>
+    (
+      [
+        [".newag__review .newag__rv", ".newag__rv-k", ".newag__rv-v"],
+        [".newag__pv-sec", ".newag__pv-label", ".newag__chips"],
+      ] as const
+    ).map(
+      ([rows, label, value]) =>
+        [...document.querySelectorAll(rows)]
+          .find((r) => r.querySelector(label)?.textContent === "Modelo e custo")
+          ?.querySelector(value)?.textContent,
+    );
+
+  test("the last setup's Autonomia: its switch, Revisar says it, sent at creation; another AI leaves all of it", async () => {
+    const state = seedState();
+    state.newAgentSetup = {
+      brain: "model",
+      model: "claude-opus-5-5",
+      key: null,
+      contextTokens: null,
+      autonomy: "never",
+    };
+    await open(state);
+    await startAs("Assistente");
+    await proceed(4);
+    expect(screen().getByText("Começa com a última escolha: Claude Opus 5.5.")).toBeTruthy();
+    const carry = screen().getByRole("switch", { name: "Levar a autonomia" });
+    expect(carry.getAttribute("aria-checked")).toBe("true");
+    expect(carry.closest(".ac-setrow")?.textContent).toContain(
+      "Não pergunta, como na última escolha. Desligado, começa com Só o que é arriscado.",
+    );
+    await proceed();
+    const [review, preview] = modelAndCost();
+    expect(review).toContain("Claude Opus 5.5 · Autonomia: Não pergunta");
+    expect(preview).toContain("Autonomia: Não pergunta");
+    await click(screen().getByRole("button", { name: "Criar Eva" }));
+    await settle(8);
+    expect(createdWith(state)).toMatchObject({ model: "claude-opus-5-5", autonomy: "never" });
+    cleanup();
+
+    const other = seedState();
+    other.newAgentSetup = {
+      brain: "model",
+      model: "claude-opus-5-5",
+      key: null,
+      contextTokens: null,
+      autonomy: "never",
+    };
+    await open(other);
+    await startAs("Assistente");
+    await proceed(4);
+    await click(screen().getByRole("button", { name: /^Claude Sonnet 5\.5/ }));
+    expect(screen().queryByText(/^Começa com a última escolha/)).toBeNull();
+    await proceed();
+    await click(screen().getByRole("button", { name: "Criar Eva" }));
+    await settle(8);
+    expect(createdWith(other)?.model).toBe("claude-sonnet-5-5");
+    expect(createdWith(other)).not.toHaveProperty("autonomy");
+  });
+
+  test("on an Automático last setup, Levar a autonomia off starts it on Automático with the default", async () => {
+    const state = seedState();
+    state.newAgentSetup = { brain: "model", model: "auto", key: null, contextTokens: null, autonomy: "never" };
+    await open(state);
+    await startAs("Assistente");
+    await proceed(4);
+    expect(screen().getByText("Começa com a última escolha: Automático.")).toBeTruthy();
+    // Automático picked again is still the last setup, its Autonomia too: the switch is the way out.
+    await click(screen().getByRole("button", { name: /^Automático/ }));
+    const carry = screen().getByRole("switch", { name: "Levar a autonomia" });
+    expect(carry.getAttribute("aria-checked")).toBe("true");
+    await click(carry);
+    expect(carry.getAttribute("aria-checked")).toBe("false");
+    await proceed();
+    const lines = modelAndCost();
+    expect(lines).toEqual([expect.stringContaining("Automático"), expect.stringContaining("Automático")]);
+    for (const line of lines) expect(line).not.toContain("Autonomia");
+    await click(screen().getByRole("button", { name: "Criar Eva" }));
+    await settle(8);
+    expect(createdWith(state)?.model).toBe("auto");
+    expect(createdWith(state)).not.toHaveProperty("autonomy");
+  });
+
   test("budget: empty is the workspace default; zero or text is invalid; a quick amount lights its button", async () => {
     const state = await open();
     await startAs("QA");

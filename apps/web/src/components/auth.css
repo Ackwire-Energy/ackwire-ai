@@ -171,9 +171,9 @@
   color: var(--ink);
   background: var(--plate);
 }
-.auth__who-change:focus-visible,
-.auth__fix:focus-visible,
-.auth__quiet:focus-visible {
+html:not([data-pointer]) .auth__who-change:focus-visible,
+html:not([data-pointer]) .auth__fix:focus-visible,
+html:not([data-pointer]) .auth__quiet:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
