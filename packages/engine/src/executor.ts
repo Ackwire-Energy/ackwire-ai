@@ -783,6 +783,8 @@ async function executeRunInner(
     ...(run.background ? { background: true } : {}),
   };
   const needsContext = !run.transcript;
+  /** What the run's policy refused of the tools the agent's scopes grant: who is behind it held them back. */
+  const heldBack: string[] = [];
   // Independent reads together: the agent (cached), the trigger, and the tools it may use.
   const [agent, triggerRows, granted] = await Promise.all([
     getAgentCached(db, run.orgId, run.agentId),
@@ -794,7 +796,7 @@ async function executeRunInner(
             .select()
             .from(schema.messages)
             .where(and(eq(schema.messages.orgId, run.orgId), eq(schema.messages.id, run.triggerMessageId))),
-    deps.tools ? deps.tools.granted(ctx) : Promise.resolve([]),
+    deps.tools ? deps.tools.granted(ctx, heldBack) : Promise.resolve([]),
   ]);
   let tools = presentTools(granted, isSensitive, ctx.loadedGroups);
   const trigger = triggerRows[0];
@@ -1113,6 +1115,8 @@ async function executeRunInner(
       ...(toolChoice ? { toolGroups: toolChoice } : {}),
       memoryItems: memory.itemIds,
       wikiPages: wikiPages.pageIds,
+      // The daily report counts these runs as read-only (`autonomy-report.ts`).
+      ...(heldBack.length > 0 ? { heldBack } : {}),
     };
     later(() => addRunStep(db, run, "context", stats));
     transcript = {
@@ -2202,6 +2206,10 @@ async function executeRunInner(
       // Text before tool calls is narration of the work: kept on the model call's step, not part of the answer.
       const turnText = dropSquashedEcho(textOf(result.content).trim());
       const narration = result.stopReason === "tool_use" && turnText ? turnText : "";
+      // The calls a computer turn ran itself (Codex's commands and edits; Claude Code keeps its own on the computer):
+      // the report tells action from talk by them. Ours through the bridge have steps of their own.
+      const ours = new Set(turnTools.map((t) => t.name));
+      const ranItself = executedNow.filter((c) => !ours.has(c.name)).length;
       // Independent writes in parallel (different rows).
       const [counted] = await Promise.all([
         db
@@ -2211,6 +2219,7 @@ async function executeRunInner(
           .returning(),
         addRunStep(db, run, "model_call", {
           model: result.model,
+          ...(ranItself > 0 ? { executed: ranItself } : {}),
           stopReason: result.stopReason,
           usageRecordId: result.usageRecordId,
           costNanoUsd: result.costNanoUsd,

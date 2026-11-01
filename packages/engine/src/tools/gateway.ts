@@ -275,9 +275,10 @@ export function createToolGateway(deps: {
   /**
    * Every tool this agent may call now: every source, filtered by granted scopes and by the run's
    * policy (a refused tool isn't listed), by name. Tools that ask a person carry the required `why`.
+   * `heldBack` collects the names its scopes grant that the run's policy refused.
    */
-  async function granted(ctx: ToolContext): Promise<ToolDefinition[]> {
-    return grantedFor(ctx, await authorityOf(ctx));
+  async function granted(ctx: ToolContext, heldBack?: string[]): Promise<ToolDefinition[]> {
+    return grantedFor(ctx, await authorityOf(ctx), undefined, heldBack);
   }
 
   /** `known`: this call's `allTools`, when already read. */
@@ -285,13 +286,16 @@ export function createToolGateway(deps: {
     ctx: ToolContext,
     authority: RunAuthority | null,
     known?: Map<string, ToolDefinition>,
+    heldBack?: string[],
   ): Promise<ToolDefinition[]> {
     const [keys, all] = await Promise.all([grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId), known ?? allTools(ctx)]);
     return [...all.values()]
       .filter((t) => isAllowed(accessWithNeeds(keys, t).state))
       .flatMap((t) => {
         const decision = policyFor(authority, t);
-        return decision.action === "refuse" ? [] : [asListed(t, decision)];
+        if (decision.action !== "refuse") return [asListed(t, decision)];
+        heldBack?.push(t.name);
+        return [];
       })
       .sort((a, b) => a.name.localeCompare(b.name));
   }

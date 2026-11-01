@@ -71,13 +71,13 @@ describe("Agentes: esperando você, trabalhando, livres", () => {
     const groups = [
       { id: "g1", name: "Integrations", agentIds: ["zoe", "nina", "theo"] },
       { id: "g2", name: "Produto", agentIds: ["nina"] },
-      { id: "g3", name: "Florim | Gestão e Financeiro", agentIds: ["ana"] },
+      { id: "g3", name: "Lumen | Gestão e Financeiro", agentIds: ["ana"] },
     ];
     const sections = freeSections(free, groups);
     expect(sections.map((s) => [s.group?.name ?? null, s.lines.map((l) => l.agent.id)])).toEqual([
       [null, ["iris"]],
       ["Integrations", ["zoe", "theo"]],
-      ["Florim | Gestão e Financeiro", ["ana"]],
+      ["Lumen | Gestão e Financeiro", ["ana"]],
     ]);
     // A working agent stays under "Trabalhando agora", out of its group's section.
     expect(working.map((l) => l.agent.id)).toEqual(["nina"]);

@@ -13,6 +13,7 @@ import { AGENT_MEDIA_JOB, enqueueAgentMedia, maybeSendAgentMedia } from "./agent
 import { aiConnectIntent, type ConnectIntent } from "./ai-intent";
 import { orgHasAi } from "./ai-status";
 import type { ArtifactDeps } from "./artifacts";
+import { AUTONOMY_REPORT_JOB, queueAutonomyEmail } from "./autonomy-report";
 import type { ConnectorDeps } from "./connectors/connections";
 import { getChannelCached } from "./context";
 import { consolidateOrg } from "./context/consolidate";
@@ -662,6 +663,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     "context.consolidate": async (job) => {
       if (!deps.context) return;
       await consolidateOrg(deps.context, orgOf(job));
+    },
+    // Yesterday's stall-and-noise report, to the people who run the server (`OPS_REPORT_EMAIL`).
+    [AUTONOMY_REPORT_JOB]: async (job) => {
+      await queueAutonomyEmail(deps.db, job.payload, { router: deps.router?.enabled ?? false });
     },
   };
 }

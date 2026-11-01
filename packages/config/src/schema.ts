@@ -713,6 +713,22 @@ export const envVars = {
     section: "Operator",
     example: "support@example.com",
   },
+  OPS_REPORT_EMAIL: {
+    schema: z
+      .string()
+      .optional()
+      .transform((value) =>
+        value
+          ?.split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean),
+      )
+      .pipe(z.array(z.email()).optional()),
+    description:
+      "Where the daily stall-and-noise report goes, one address or several separated by commas: for each workspace, where agents stopped although someone waited on them and where they acted for nothing, over the previous UTC day and against the 7 days before it. Workspace names and counts only, never what anyone wrote. Needs email (`MILLIONSEND_API_KEY` or `SMTP_URL`). Unset (default): no report. `bun run report:autonomy` prints the same table at any time.",
+    section: "Operator",
+    example: "ops@example.com",
+  },
   BILLING_URL: {
     schema: z.url({ protocol: /^https$/ }).optional(),
     description:
