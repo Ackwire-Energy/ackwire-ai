@@ -395,12 +395,8 @@ const usageDiff = (a: TokenUsageBreakdown, b: TokenUsageBreakdown): TokenUsageBr
 export class CodexAppMapper {
   /** The last agent message of the Codex turn running now. */
   private answer?: string;
-  /** Agent messages streamed so far (by item id): a message that came whole is sent whole. */
-  private readonly streamed = new Set<string>();
-  /** Streamed messages not completed yet: their text, by item id. */
-  private readonly open = new Map<string, string>();
-  /** Messages already sent whole (by item id): Codex may complete one twice. */
-  private readonly sentWhole = new Set<string>();
+  /** Agent messages already sent, streamed or whole (by item id): Codex may complete one twice. */
+  private readonly sent = new Set<string>();
   private lastDeltaItem: string | null = null;
   private anyText = false;
   /** The thread's totals before this `brain.turn`, and now. */
@@ -436,8 +432,7 @@ export class CodexAppMapper {
     const itemId = str(params.itemId);
     const delta = str(params.delta);
     if (!delta) return "";
-    this.streamed.add(itemId);
-    this.open.set(itemId, (this.open.get(itemId) ?? "") + delta);
+    this.sent.add(itemId);
     return this.textOf(itemId, delta);
   }
 
@@ -451,19 +446,8 @@ export class CodexAppMapper {
         const t = str(item.text);
         if (!t.trim()) return { events: [] };
         this.answer = this.clean(t);
-        if (this.streamed.has(id)) {
-          this.open.delete(id);
-          return { events: [] };
-        }
-        if (this.sentWhole.has(id)) return { events: [] };
-        // Codex runs tool calls while the reply still streams, and the message's completion can come after them
-        // under another id than its deltas': the streamed message with the same text is this one, not a new one.
-        for (const [streamedId, text] of this.open) {
-          if (text.trim() !== t.trim()) continue;
-          this.open.delete(streamedId);
-          return { events: [] };
-        }
-        this.sentWhole.add(id);
+        if (this.sent.has(id)) return { events: [] };
+        this.sent.add(id);
         return { events: [], text: this.textOf(id, t) };
       }
       case "commandExecution":

@@ -309,6 +309,8 @@ export interface Transcript {
   postedUpTo: number;
   /** Chat messages this run posted so far. */
   postedCount: number;
+  /** The words of the last message it posted (trimmed): saying exactly them again next adds nothing. */
+  lastPosted?: string;
   deltaSeq: number;
   /** Memory changes made by tools, not yet attached to a posted message (`meta.memoryUpdates`). */
   memoryUpdates?: MemoryUpdate[];
@@ -1110,8 +1112,14 @@ async function executeRunInner(
     }
     // Act with undo (ADR 0037 round 2): the changes the run made so far become this message's receipts.
     if ((await linkRunActions(tx, run.orgId, run.id, m.id)) > 0) withReceipts.push(m.id);
+    if (!note && transcript) transcript.lastPosted = body.trim();
     return m;
   };
+  /**
+   * What it says now only repeats its last message word for word: a brain sent on with a nudge (or after an
+   * answer) often opens its next turn with the same line ("Vou procurar…"), and posting it again shows it twice.
+   */
+  const repeatsLastPost = (text: string) => text.trim() !== "" && text.trim() === transcript?.lastPosted;
 
   const saveTranscript = (tx: Executor, t: Transcript) =>
     tx
@@ -1991,7 +1999,7 @@ async function executeRunInner(
       at = new Date(asked.cardAt.getTime() - 1);
     }
     // A background run never posts by itself (ADR 0053 §5): its cards speak for it.
-    if (run.background) text = "";
+    if (run.background || repeatsLastPost(text)) text = "";
     const message = text ? await post(db, replyThreadId, text, withFallback(t, takeMemoryUpdates(t)), at) : null;
     if (message) t.postedCount++;
     t.postedUpTo = t.messages.length;
@@ -2791,7 +2799,8 @@ async function executeRunInner(
           // card. Earlier narration is in the steps. A background run never posts by itself (ADR 0053 §5): its
           // cards speak for it.
           const text = stripSentinel(turnText);
-          const said = run.background ? "" : asks.length > 0 ? text : pauseLead(text);
+          const spoken = run.background ? "" : asks.length > 0 ? text : pauseLead(text);
+          const said = repeatsLastPost(spoken) ? "" : spoken;
           const lead = said ? await post(tx, replyThreadId, said, withFallback(t, takeMemoryUpdates(t))) : null;
           // The cards, the same way a computer brain's bridged call posts them (`postPauseCards`).
           const pause = await postPauseCards(tx, run, {
@@ -3050,16 +3059,17 @@ async function executeRunInner(
         .where(eq(agentRuns.id, run.id));
       // At the cap this answer ends the run instead: what came in gets a run of its own.
       if (((still?.pending.length ?? 0) > 0 && run.turns < maxTurns) || keep) {
-        const posted = text
-          ? await db.transaction(async (tx) => {
-              const m = await post(tx, replyThreadId, text, withFallback(t, withCode(takeMemoryUpdates(t), code)));
-              t.postedUpTo = t.messages.length;
-              t.postedCount++;
-              await addRunStep(tx, run, "message", { messageId: m.id });
-              await saveTranscript(tx, t);
-              return m;
-            })
-          : null;
+        const posted =
+          text && !repeatsLastPost(text)
+            ? await db.transaction(async (tx) => {
+                const m = await post(tx, replyThreadId, text, withFallback(t, withCode(takeMemoryUpdates(t), code)));
+                t.postedUpTo = t.messages.length;
+                t.postedCount++;
+                await addRunStep(tx, run, "message", { messageId: m.id });
+                await saveTranscript(tx, t);
+                return m;
+              })
+            : null;
         if (posted) {
           const [view] = await withWikiLinks(db, run.orgId, [messageView(posted)]);
           if (view) await publishMessageCreated(deps.pubsub, view);
