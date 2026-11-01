@@ -102,7 +102,7 @@ describe("an agent's proposal of a new agent, in the chat", () => {
     const who = card.querySelector(".rq__wt");
     expect(who?.querySelector(":scope > b")?.textContent).toBe("Nina");
     expect(who?.querySelector(":scope > small")?.textContent).toBe(
-      "@nina · Designer · Pensa com o modelo do workspace",
+      "@nina · Designer · Pensa pela API",
     );
     // Revisar: the review in a dialog over the conversation, which stays as it was.
     await click(within(card).getByRole("button", { name: "Revisar" }), 10);
