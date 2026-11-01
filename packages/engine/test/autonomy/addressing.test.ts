@@ -279,16 +279,22 @@ scenario("S48", "an agent outside the conversation only named in an answer costs
     agents: ["otto", "vera"],
     dmWith: "otto",
     judge: {
-      followThrough: (s) => (String(s.reply).includes("Quem cuida") ? "done" : "continue"),
+      followThrough: (s) => (String(s.reply).includes("Quem cuida") || s.reply === "Ok." ? "done" : "continue"),
       mention: { vera: { handoff: 0.05, needsNothing: 0.95 } },
     },
-    script: { otto: [{ text: "Quem cuida do deploy é a @vera." }] },
+    script: { otto: [{ text: "Quem cuida do deploy é a @vera." }, { text: "Ok." }] },
   });
   await w.say("quem cuida do deploy?");
   await w.settle();
   expect((await w.posts("otto")).map((m) => m.body)).toEqual(["Quem cuida do deploy é a @vera."]);
   expect(w.f.provider.calls.filter((c) => !c.request.outputSchema)).toHaveLength(1);
   expect(await w.runs("vera")).toHaveLength(0);
+  // Not silent for the author either: its next run reads that the mention reached nobody.
+  await w.say("valeu");
+  await w.settle();
+  expect(JSON.stringify(w.f.provider.calls.filter((c) => !c.request.outputSchema).at(-1)?.request.messages)).toContain(
+    "your mention didn't reach it",
+  );
   await assertInvariants(w);
 });
 
