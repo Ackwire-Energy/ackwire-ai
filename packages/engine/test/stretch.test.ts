@@ -271,6 +271,9 @@ describe("the fuse: 50 runs agents start on their own, then one card with Contin
     expect(runs.every((r) => r.stretchId === report.message.id)).toBe(true);
     const [card] = await cardsOf(f);
     expect(card?.meta.actionCard).toMatchObject({ reason: "runs", limit: STRETCH.unattendedRuns, forUserId: null });
+    // Nobody is behind the work: the owner of the agent it stopped at hears of the pause.
+    const told = await f.db.select().from(schema.notifications);
+    expect(told.some((n) => n.userId === f.owner.id && n.source.messageId === card?.id)).toBe(true);
     await expectStretched(f);
   });
 });

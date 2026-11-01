@@ -143,8 +143,11 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
     message.authorType === "agent" && message.agentRunId && !meta.viaRoutine && !meta.canceled && !meta.agentDm
       ? await humanBehindRun(deps, orgId, message.agentRunId)
       : null;
-  // A stretch's pause card (ADR 0089) also tells the routine's creator when nobody asked for the work.
-  const asker = behind ?? (message.authorType === "agent" ? (stretchCardOf(meta)?.forUserId ?? null) : null);
+  // A stretch's pause card (ADR 0089) also tells the routine's creator when nobody asked for the work, and when
+  // nobody is behind it at all, the owner of the agent it stopped at (ADR 0053, addendum of 2026-10-31).
+  const card = message.authorType === "agent" ? stretchCardOf(meta) : null;
+  const stoppedAt = card?.agentIds[0];
+  const asker = behind ?? card?.forUserId ?? (stoppedAt ? await agentOwner(deps, stoppedAt) : null);
   if (
     asker &&
     !message.mentionedUserIds.includes(asker) &&
