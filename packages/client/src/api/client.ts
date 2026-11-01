@@ -1222,6 +1222,8 @@ export interface ApiClient {
     trash(orgId: string): Promise<TrashedArtifact[]>;
     /** Back from the trash (409 `artifact.purged` after 30 days). */
     restore(orgId: string, id: string): Promise<ArtifactDetail | undefined>;
+    /** Out of the trash for good, now. */
+    purge(orgId: string, id: string): Promise<void>;
   };
   storage: {
     get(orgId: string): Promise<StorageConfig>;

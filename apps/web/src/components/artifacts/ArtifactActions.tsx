@@ -1,6 +1,7 @@
 import type { Artifact, ArtifactContent, ArtifactKind } from "@agenteschat/client";
 import { ApiError, keys } from "@agenteschat/client";
 import { fileName } from "@agenteschat/client/lib/artifacts";
+import { artifactPlace } from "@agenteschat/client/lib/drive";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { Button, Dialog, DialogFooter, type IconName, Menu } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -9,6 +10,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { MenuEntries } from "@/components/DesktopMenus";
+import { goToTarget } from "@/components/NotificationOpen";
 import { useOrg } from "@/components/org-context";
 import { copyText, type MenuEntry } from "@/lib/context-menu";
 import { useToast } from "@/lib/toast";
@@ -18,7 +20,7 @@ import { fileSaver } from "./fileSaver";
 type Target = Pick<Artifact, "id" | "title">;
 
 /**
- * "Apagar arquivo": a confirmation naming the file (it goes to the trash for
+ * "Mover para a lixeira": a confirmation naming the file (it goes to the trash for
  * 30 days; messages that cite it show "Arquivo removido"), then a toast with
  * "Desfazer", which restores it. Several at once (the Drive's selection): one
  * confirmation and one toast for all of them.
@@ -158,7 +160,7 @@ export function useArtifactDownload() {
 
 /**
  * A file's actions, for its "…" (viewer header, Drive rows) and its right click (Drive cards and rows): open and
- * download when given, link, channel, versions, delete.
+ * download when given, link, its conversation, versions, move to the trash.
  */
 export function useArtifactEntries() {
   const { t } = useTranslation();
@@ -166,6 +168,20 @@ export function useArtifactEntries() {
   const toast = useToast();
   const navigate = useNavigate();
   const downloads = useArtifactDownload();
+  const placeEntry = (artifact: Artifact): MenuEntry[] => {
+    const place = artifactPlace(artifact);
+    if (!place) return [];
+    const dm = artifact.audience.kind === "dm";
+    return [
+      {
+        kind: "item",
+        id: "conversation",
+        label: t(dm ? "artifacts.openInDm" : "artifacts.openInChannel"),
+        icon: dm ? "message" : place.to.includes("threads") ? "thread" : "channel",
+        run: () => goToTarget(navigate, org.id, place),
+      },
+    ];
+  };
   return (artifact: Artifact, { onOpen, onVersions, onDelete, download }: ArtifactMenuOptions): MenuEntry[] => [
     ...(onOpen
       ? ([
@@ -193,21 +209,7 @@ export function useArtifactEntries() {
           toast.show(t("artifacts.linkCopied")),
         ),
     },
-    ...(artifact.channelId
-      ? ([
-          {
-            kind: "item",
-            id: "channel",
-            label: t("artifacts.openInChannel"),
-            icon: "channel",
-            run: () =>
-              void navigate({
-                to: "/org/$orgId/c/$channelId",
-                params: { orgId: org.id, channelId: artifact.channelId ?? "" },
-              }),
-          },
-        ] satisfies MenuEntry[])
-      : []),
+    ...placeEntry(artifact),
     ...(onVersions
       ? ([
           { kind: "item", id: "versions", label: t("artifacts.seeVersions"), icon: "waiting", run: onVersions },
@@ -231,8 +233,16 @@ export interface ArtifactMenuOptions {
   download?: boolean;
 }
 
-/** "…" on a file (viewer header, Drive rows): its actions (`useArtifactEntries`). */
-export function ArtifactMoreMenu({ artifact, ...options }: { artifact: Artifact } & ArtifactMenuOptions) {
+/** "…" on a file (viewer header, Drive rows, the details): its actions (`useArtifactEntries`). */
+export function ArtifactMoreMenu({
+  artifact,
+  plain,
+  ...options
+}: {
+  artifact: Artifact;
+  /** A full-size bordered button, matching the plain buttons it sits beside (the details' actions). */
+  plain?: boolean;
+} & ArtifactMenuOptions) {
   const { t } = useTranslation();
   const entries = useArtifactEntries();
   const label = t("artifacts.more", { title: artifact.title });
@@ -241,7 +251,11 @@ export function ArtifactMoreMenu({ artifact, ...options }: { artifact: Artifact 
       align="end"
       label={label}
       trigger={
-        <Button size="sm" variant="ghost" iconOnly icon="more" aria-label={label} title={t("artifacts.moreShort")} />
+        plain ? (
+          <Button iconOnly icon="more" aria-label={label} title={t("artifacts.moreShort")} />
+        ) : (
+          <Button size="sm" variant="ghost" iconOnly icon="more" aria-label={label} title={t("artifacts.moreShort")} />
+        )
       }
     >
       <MenuEntries entries={entries(artifact, options)} />

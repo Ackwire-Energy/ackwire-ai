@@ -10,8 +10,9 @@ import {
   type DriveSort,
   type DriveView,
   type DriveWho,
-  groupArtifacts,
+  driveSections,
   isDriveView,
+  PRIVATE_SECTION,
   rangeOf,
   sortArtifacts,
 } from "@agenteschat/client/lib/drive";
@@ -32,7 +33,7 @@ import {
   Segmented,
   Toolbar,
 } from "@agenteschat/ui";
-import { type MouseEvent, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { type MouseEvent, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { useArtifactDownload, useDeleteArtifact } from "@/components/artifacts/ArtifactActions";
@@ -137,14 +138,14 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
     if (open?.id) viewer.open(open.id, open.version);
   }, [open?.id, open?.version, viewer]);
 
-  const channelName = useCallback(
-    (id: string | null) => {
-      const c = id ? channels.data?.find((x) => x.id === id) : undefined;
-      return c ? `#${c.name}` : null;
-    },
-    [channels.data],
-  );
-  const channelLabel = (id: string | null) => channelName(id) ?? t("artifacts.noChannel");
+  const channelLabel = (a: Artifact) =>
+    a.audience.kind === "channel"
+      ? `#${a.audience.name}`
+      : a.audience.kind === "dm"
+        ? a.audience.with
+          ? t("drive.dmWith", { name: authorName(a.audience.with) })
+          : t("drive.dm")
+        : t("artifacts.noChannel");
 
   /** The client-side filters (who made it, several channels or authors). */
   const matches = (a: Artifact) =>
@@ -159,7 +160,7 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
     sort,
     i18n.language,
   );
-  const sections = groupArtifacts(rows, group);
+  const sections = driveSections(rows, group);
   const shown = sections.flatMap((s) => s.items);
   const counts = new Map<ArtifactKind, number>();
   for (const a of base.data ?? []) if (matches(a)) counts.set(a.kind, (counts.get(a.kind) ?? 0) + 1);
@@ -273,13 +274,24 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
   });
 
   const sectionTitle = (s: DriveSection) => {
+    if (s.key === PRIVATE_SECTION) return t("drive.private");
     if (group === "date")
       return t(s.key === "today" ? "drive.today" : s.key === "week" ? "drive.thisWeek" : "drive.earlier");
-    if (group === "channel") return channelName(s.key || null) ?? t("drive.noChannel");
     const first = s.items[0];
+    if (group === "channel") return s.key && first ? channelLabel(first) : t("drive.noChannel");
     return first ? authorName(first.createdBy) : "";
   };
   const sectionHead = (s: DriveSection) => {
+    if (s.key === PRIVATE_SECTION) {
+      return (
+        <div className="drive-group__head">
+          <Icon name="lock" size={16} />
+          <h2 className="drive-group__title">{sectionTitle(s)}</h2>
+          <span className="drive-count ac-num">{s.items.length}</span>
+          <span className="drive-group__hint">{t("drive.privateHint")}</span>
+        </div>
+      );
+    }
     if (group === "none") return null;
     const first = s.items[0];
     const people = new Map(s.items.map((a) => [`${a.createdBy.type}:${a.createdBy.id}`, a.createdBy]));
@@ -646,7 +658,6 @@ export function DrivePage({ open }: { open?: { id: string; version?: number } })
         <DriveDetails
           key={openItem.id}
           artifact={openItem}
-          channelName={channelName}
           onClose={() => setOpenId(null)}
           onDelete={(a) => remover.ask(a)}
         />

@@ -12,6 +12,7 @@
 import type {
   ApiClient,
   Artifact,
+  ArtifactAudience,
   ArtifactAuthor,
   ArtifactContent,
   ArtifactDetail,
@@ -21,13 +22,15 @@ import { ApiError } from "@agenteschat/client";
 import { clone, type MockContext, MockNotFoundError, minutesAgo, mockId, perOrg } from "./context";
 
 interface Stored {
-  meta: Omit<Artifact, "canEdit" | "untrusted">;
+  meta: Omit<Artifact, "canEdit" | "untrusted" | "audience">;
   /** `bytes`: an uploaded file's version. */
   versions: (ArtifactVersion & { content: ArtifactContent; bytes?: Blob })[];
   /** Opened by id only (e.g. a forum synthesis), not in the Drive list. */
   unlisted?: boolean;
   /** In the trash since then (30 days to restore). */
   deletedAt?: string;
+  /** Deleted for good: gone from the trash too. */
+  purged?: boolean;
 }
 
 class MockConflictError extends Error {
@@ -165,27 +168,36 @@ export function createMockArtifacts(
     });
     return list;
   });
+  /** Like the server: the DM's other participant, the channel's name and privacy, else the whole workspace. */
+  const audienceOf = async (orgId: string, channelId: string | null): Promise<ArtifactAudience> => {
+    if (!channelId) return { kind: "workspace" };
+    const dm = (await ctx.lookup.dms?.(orgId))?.find((d) => d.channelId === channelId);
+    if (dm) return { kind: "dm", with: { type: dm.with.type, id: dm.with.id } };
+    const c = (await ctx.lookup.channels(orgId)).find((x) => x.id === channelId);
+    return c ? { kind: "channel", name: c.name, private: c.visibility !== "public" } : { kind: "workspace" };
+  };
   const find = async (orgId: string, id: string) => {
     const s = (await store(orgId)).find((a) => a.meta.id === id);
     if (!s) throw new MockNotFoundError("Arquivo não encontrado.");
     return s;
   };
-  const view = (s: Stored): Artifact => ({
+  const view = async (orgId: string, s: Stored): Promise<Artifact> => ({
+    canDelete: true,
     ...clone(s.meta),
     canEdit: editable(s.meta.kind),
     untrusted: s.meta.kind === "html" || s.meta.kind === "file",
-    canDelete: true,
+    audience: await audienceOf(orgId, s.meta.channelId),
   });
-  const detail = (s: Stored, version?: number): ArtifactDetail => {
+  const detail = async (orgId: string, s: Stored, version?: number): Promise<ArtifactDetail> => {
     const v = s.versions.find((x) => x.version === (version ?? s.meta.version));
     if (!v) throw new MockNotFoundError("Versão não encontrada.");
-    return { ...view(s), shownVersion: v.version, content: clone(v.content) };
+    return { ...(await view(orgId, s)), shownVersion: v.version, content: clone(v.content) };
   };
   const me = async (): Promise<ArtifactAuthor> => ({ type: "person", id: (await ctx.lookup.me())?.user.id ?? "me" });
   return {
     list: async (orgId, filters = {}) => {
       const q = filters.q?.trim().toLowerCase();
-      return (await store(orgId))
+      const shown = (await store(orgId))
         .filter((s) => !s.unlisted && !s.deletedAt)
         .filter((s) => !filters.kind || s.meta.kind === filters.kind)
         .filter((s) => !filters.channelId || s.meta.channelId === filters.channelId)
@@ -194,11 +206,12 @@ export function createMockArtifacts(
             !filters.author ||
             s.versions.some((v) => v.author.type === filters.author?.type && v.author.id === filters.author.id),
         )
-        .filter((s) => !q || s.meta.title.toLowerCase().includes(q))
-        .map(view)
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+        .filter((s) => !q || s.meta.title.toLowerCase().includes(q));
+      return (await Promise.all(shown.map((s) => view(orgId, s)))).sort((a, b) =>
+        b.updatedAt.localeCompare(a.updatedAt),
+      );
     },
-    get: async (orgId, id, version) => detail(await find(orgId, id), version),
+    get: async (orgId, id, version) => detail(orgId, await find(orgId, id), version),
     versions: async (orgId, id) =>
       (await find(orgId, id)).versions.map(({ content: _c, bytes: _b, ...v }) => clone(v)).reverse(),
     fileUrl: (orgId, id, options = {}) => {
@@ -209,7 +222,7 @@ export function createMockArtifacts(
       return `/api/app/organizations/${orgId}/artifacts/${id}/file${qs ? `?${qs}` : ""}`;
     },
     download: async (orgId, id, version) => {
-      const { text, type } = serializeContent(detail(await find(orgId, id), version).content);
+      const { text, type } = serializeContent((await detail(orgId, await find(orgId, id), version)).content);
       return {
         url: `data:${type};charset=utf-8,${encodeURIComponent(text)}`,
         expiresAt: new Date(ctx.now().getTime() + 5 * 60_000).toISOString(),
@@ -234,7 +247,7 @@ export function createMockArtifacts(
         versions: [{ version: 1, author, note: null, createdAt: at, content: clone(input.content) }],
       };
       (await store(orgId)).push(s);
-      return detail(s);
+      return detail(orgId, s);
     },
     upload: async (orgId, file, options = {}) => {
       record("artifacts.upload", orgId, file.name, options);
@@ -258,7 +271,7 @@ export function createMockArtifacts(
         versions: [{ version: 1, author, note: null, createdAt: at, content, bytes: file }],
       };
       (await store(orgId)).push(s);
-      return detail(s);
+      return detail(orgId, s);
     },
     uploadVersion: async (orgId, id, file, options = {}) => {
       record("artifacts.uploadVersion", orgId, id, file.name, options);
@@ -277,7 +290,7 @@ export function createMockArtifacts(
         bytes: file,
       });
       Object.assign(s.meta, { version, updatedBy: author, updatedAt: at });
-      return detail(s);
+      return detail(orgId, s);
     },
     fileBlob: async (orgId, id, version) => {
       record("artifacts.fileBlob", orgId, id, version);
@@ -303,7 +316,7 @@ export function createMockArtifacts(
         content: clone(input.content),
       });
       Object.assign(s.meta, { version, updatedBy: author, updatedAt: at, title: input.title ?? s.meta.title });
-      return detail(s);
+      return detail(orgId, s);
     },
     remove: async (orgId, id) => {
       record("artifacts.remove", id);
@@ -311,18 +324,26 @@ export function createMockArtifacts(
       s.deletedAt = ctx.now().toISOString();
     },
     trash: async (orgId) =>
-      (await store(orgId))
-        .filter((s) => s.deletedAt)
-        .map((s) => ({
-          ...view(s),
-          deletedAt: s.deletedAt as string,
-          purgeAt: new Date(new Date(s.deletedAt as string).getTime() + 30 * 86_400_000).toISOString(),
-        })),
+      Promise.all(
+        (await store(orgId))
+          .filter((s) => s.deletedAt && !s.purged)
+          .map(async (s) => ({
+            ...(await view(orgId, s)),
+            deletedAt: s.deletedAt as string,
+            purgeAt: new Date(new Date(s.deletedAt as string).getTime() + 30 * 86_400_000).toISOString(),
+          })),
+      ),
+    purge: async (orgId, id) => {
+      record("artifacts.purge", id);
+      const s = await find(orgId, id);
+      if (!s.deletedAt) throw new MockNotFoundError("Arquivo não encontrado.");
+      s.purged = true;
+    },
     restore: async (orgId, id) => {
       record("artifacts.restore", id);
       const s = await find(orgId, id);
       s.deletedAt = undefined;
-      return detail(s);
+      return detail(orgId, s);
     },
   };
 }

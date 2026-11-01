@@ -1031,6 +1031,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       },
       restore: (orgId, id) =>
         request<ArtifactDetail | undefined>(`${org(orgId)}/artifacts/${enc(id)}/restore`, { json: {} }),
+      purge: (orgId, id) => request<void>(`${org(orgId)}/artifacts-trash/${enc(id)}`, { method: "DELETE" }),
     },
     issues: {
       list: async (orgId, filters = {}) =>

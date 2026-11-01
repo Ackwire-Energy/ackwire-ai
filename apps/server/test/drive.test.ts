@@ -215,3 +215,28 @@ test("Drive API: create, new version, versions, download link, file, delete", as
   expect((await api(`/artifacts/${a.id}`, { method: "DELETE" })).status).toBe(204);
   expect((await api(`/artifacts/${a.id}`)).status).toBe(404);
 });
+
+test("Drive API: canDelete and who can see it on each file; the trash deletes for good", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+
+  const created = (await (
+    await api("/artifacts", { json: { title: "Metas", content: { kind: "document", markdown: "# Metas" } } })
+  ).json()) as { id: string; canDelete: boolean; audience: unknown };
+  expect(created.canDelete).toBe(true);
+  expect(created.audience).toEqual({ kind: "workspace" });
+  const list = (await (await api("/artifacts")).json()) as { artifacts: { canDelete: boolean; audience: unknown }[] };
+  expect(list.artifacts[0]).toEqual(expect.objectContaining({ canDelete: true, audience: { kind: "workspace" } }));
+  const one = (await (await api(`/artifacts/${created.id}`)).json()) as { canDelete: boolean };
+  expect(one.canDelete).toBe(true);
+
+  expect((await api(`/artifacts-trash/${created.id}`, { method: "DELETE" })).status).toBe(404);
+  expect((await api(`/artifacts/${created.id}`, { method: "DELETE" })).status).toBe(204);
+  expect((await api(`/artifacts-trash/${created.id}`, { method: "DELETE" })).status).toBe(204);
+  const trash = (await (await api("/artifacts-trash")).json()) as { files: unknown[] };
+  expect(trash.files).toEqual([]);
+  expect((await api(`/artifacts/${created.id}/restore`, { json: {} })).status).toBe(409);
+});

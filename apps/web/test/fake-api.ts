@@ -2930,6 +2930,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
       channels: (orgId) => http.chat.channels(orgId),
       members: (orgId) => http.orgs.members(orgId),
       messages: async () => state.messages,
+      dms: async () => state.dms,
     },
   };
   const threads = createFakeThreads(ctx, (method, ...args) => state.calls.push({ method, args }));

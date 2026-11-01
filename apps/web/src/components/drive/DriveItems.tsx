@@ -22,7 +22,8 @@ export interface ItemProps {
   /** Shown in the details panel. */
   open: boolean;
   selected: boolean;
-  channelName: (id: string | null) => string;
+  /** Where it came from: "#eng", "DM com Theo", "sem canal". */
+  channelName: (a: Artifact) => string;
   /** A click: details, or selection with Shift / ⌘ / while selecting. */
   onPick: (a: Artifact, e: MouseEvent) => void;
   onToggle: (a: Artifact) => void;
@@ -76,7 +77,7 @@ export function DriveCard({
         <span className="drive-card__meta">
           <ActorAvatar size="xs" actor={a.createdBy} name={name} />
           <span className="drive-card__name">{name}</span>
-          <span className="drive-card__where">{channelName(a.channelId)}</span>
+          <span className="drive-card__where">{channelName(a)}</span>
           <time className="drive-card__when tabular" dateTime={a.updatedAt}>
             {relativeTime(t, i18n.language, a.updatedAt)}
           </time>
@@ -153,7 +154,7 @@ export function DriveRow({
         <ActorAvatar size="xs" actor={a.createdBy} name={name} />
         <span>{name}</span>
       </span>
-      <span className="drive-row__where">{channelName(a.channelId)}</span>
+      <span className="drive-row__where">{channelName(a)}</span>
       <time className="drive-row__when tabular" dateTime={a.updatedAt}>
         {when}
       </time>
