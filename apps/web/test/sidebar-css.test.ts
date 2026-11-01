@@ -59,3 +59,10 @@ test("an owner's … on an agent's row gets its own room instead of covering the
   const twoLines = ".sidebar__row:has(> .sidebar__item .sidebar__item-role) > .sidebar__row-menu.ac-btn";
   expect([value(twoLines, "top"), value(twoLines, "translate")]).toEqual(["4px", "none"]);
 });
+
+test("Equipe on the Agentes header shows like the header's +, and stays in sight on a plate while its page is open", () => {
+  const shown = declarations(css, '.sidebar__section-add[data-status="active"]');
+  expect(shown.findLast(([p]) => p === "opacity")?.[1]).toBe("1");
+  const active = '.sidebar__section-add.ac-btn[data-status="active"]';
+  expect([value(active, "background"), value(active, "color")]).toEqual(["var(--plate)", "var(--ink)"]);
+});

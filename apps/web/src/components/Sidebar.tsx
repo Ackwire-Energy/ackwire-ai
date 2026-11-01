@@ -453,25 +453,35 @@ export function Sidebar() {
             className="sidebar__section--part"
             summary={unreadOf(byGroup.ungrouped) > 0 && <UnreadCount count={unreadOf(byGroup.ungrouped)} />}
             action={
-              organize && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  icon="plus"
-                  className="sidebar__section-add"
-                  aria-label={t("agentGroups.newGroup")}
-                  title={t("agentGroups.newGroup")}
-                  onClick={() => setGroupDialog({ mode: "create" })}
-                />
-              )
+              <>
+                <Button asChild variant="ghost" size="sm" iconOnly className="sidebar__section-add">
+                  <Link to="/org/$orgId/team" params={{ orgId }} aria-label={t("shell.team")} title={t("shell.team")}>
+                    <Icon name="agent" />
+                  </Link>
+                </Button>
+                {organize && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
+                    icon="plus"
+                    className="sidebar__section-add"
+                    aria-label={t("agentGroups.newGroup")}
+                    title={t("agentGroups.newGroup")}
+                    onClick={() => setGroupDialog({ mode: "create" })}
+                  />
+                )}
+              </>
             }
             drop={organize ? drag.zone(null) : undefined}
           >
-            <Link to="/org/$orgId/team" params={{ orgId }} className="sidebar__item" title={t("shell.team")}>
-              <Icon name="agent" />
-              <span className="sidebar__item-label">{t("shell.team")}</span>
-            </Link>
+            {/* The rail hides the headers: Equipe stays there as a tile at the top of the agents. */}
+            {rail && (
+              <Link to="/org/$orgId/team" params={{ orgId }} className="sidebar__item" title={t("shell.team")}>
+                <Icon name="agent" />
+                <span className="sidebar__item-label">{t("shell.team")}</span>
+              </Link>
+            )}
             {byGroup.ungrouped.map(agentRow)}
           </SidebarSection>
         )}

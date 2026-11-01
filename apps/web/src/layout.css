@@ -10252,8 +10252,14 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
 }
 .sidebar__section-head:hover .sidebar__section-add,
 .sidebar__section-add:focus-visible,
-.sidebar__section-add[data-state="open"] {
+.sidebar__section-add[data-state="open"],
+.sidebar__section-add[data-status="active"] {
   opacity: 1;
+}
+/* Equipe on the Agentes header: the page open, it stays in sight on the bell's plate. */
+.sidebar__section-add.ac-btn[data-status="active"] {
+  background: var(--plate);
+  color: var(--ink);
 }
 /*
  * Channel categories (ADR 0080). Closed, a category also keeps its unread channels in sight, not only the open

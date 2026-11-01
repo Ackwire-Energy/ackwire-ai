@@ -113,6 +113,46 @@ describe("what a member's sidebar lists", () => {
   });
 });
 
+describe("Equipe on the Agentes header", () => {
+  const agentsHead = () => {
+    const toggle = [...nav().querySelectorAll(".sidebar__section-toggle")].find((b) => b.textContent === "Agentes");
+    const head = toggle?.closest(".sidebar__section-head");
+    if (!(head instanceof HTMLElement)) throw new Error("no Agentes header");
+    return head;
+  };
+
+  test("a button beside the +, not a row of its own, marked while the page is open", async () => {
+    await go(acme("owner"));
+    const team = within(agentsHead()).getByRole("link", { name: "Equipe" });
+    expect(team.getAttribute("href")).toBe(`/org/${ORG_ID}/team`);
+    expect(team.getAttribute("title")).toBe("Equipe");
+    expect(within(agentsHead()).getByRole("button", { name: "Novo grupo" })).toBeTruthy();
+    expect(within(nav()).getAllByRole("link", { name: "Equipe" })).toHaveLength(1);
+    expect(team.getAttribute("data-status")).toBeNull();
+    cleanup();
+    await go(acme("owner"), "team");
+    expect(within(agentsHead()).getByRole("link", { name: "Equipe" }).getAttribute("data-status")).toBe("active");
+  });
+
+  test("the icon rail, which hides the headers, keeps it as a tile", async () => {
+    await go(acme("owner"));
+    const teamTiles = () =>
+      [...nav().querySelectorAll(".sidebar__section-body > a.sidebar__item")].filter(
+        (a) => a.getAttribute("href") === `/org/${ORG_ID}/team`,
+      );
+    expect(teamTiles()).toHaveLength(0);
+    const toggle = () => within(nav()).getByRole("button", { name: /barra lateral$/ });
+    await act(async () => fireEvent.click(toggle()));
+    try {
+      expect(nav().getAttribute("data-rail")).toBe("true");
+      expect(teamTiles()).toHaveLength(1);
+    } finally {
+      // The rail is kept for the whole page, not per render: back to the full sidebar for the other tests.
+      await act(async () => fireEvent.click(toggle()));
+    }
+  });
+});
+
 describe("bringing agents from another app, where agents are made", () => {
   const toImport = () => screen().queryByRole("link", { name: "Trazer agentes de outro app" });
 
