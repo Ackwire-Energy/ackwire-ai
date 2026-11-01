@@ -411,3 +411,26 @@ export function fakeWebFetch(web: WebFixture) {
       : new Response("Not found", { status: 404 });
   };
 }
+
+/** The computer's `request_secret` with its real input (no computer): the card is only recorded. */
+export function fakeSecretRequestSource(): ToolSource {
+  const tool: ToolDefinition = {
+    name: "request_secret",
+    description:
+      "Ask the person who asked you for a secret your computer needs: a token or password for a CLI or an API, .env values. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you. Never ask for passwords, tokens or keys in a normal message. `name` is UPPER_SNAKE_CASE; `target` is `env` or `file`. Your run pauses until they answer; you then get only whether it arrived.",
+    scope: "sandbox:run",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", pattern: "^[A-Z][A-Z0-9_]{0,63}$" },
+        purpose: { type: "string", minLength: 1, maxLength: 300 },
+        target: { enum: ["env", "file"] },
+        path: { type: "string", maxLength: 300 },
+      },
+      required: ["name", "purpose", "target"],
+      additionalProperties: false,
+    },
+    execute: async (input) => ({ content: `The person was sent a secure card for ${String(input.name)}; it arrived.` }),
+  };
+  return { name: "secret-request", tools: async () => [tool] };
+}

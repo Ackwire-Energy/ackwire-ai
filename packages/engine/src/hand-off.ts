@@ -2,11 +2,13 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { routineBriefOfRun } from "./background";
 import { deliverNotice, publishDelivery } from "./delivery";
+import { cutText } from "./format";
 import type { Judge } from "./judge";
 import { insertMessage, type Message, unreachedAgents } from "./messages";
 import type { RoutineBrief } from "./routine-brief";
 import { personCanPost } from "./routine-state";
 import { type AgentRun, addRunStep } from "./runs";
+import { REQUEST_SECRET_TOOL } from "./secrets";
 import { maskCredentials } from "./tool-detail";
 import { turnMeans } from "./tools/directory";
 import type { ToolContext, ToolDefinition, ToolSource } from "./tools/types";
@@ -150,28 +152,65 @@ const BLOCKED: Record<HandOffBlock | "stopped", string> = {
   stopped: "this run was stopped or replaced, and nobody hears it",
 };
 
-export interface HandOffDeps {
-  pubsub?: PubSub;
-  /** Judges a routine's report before it posts (`untried`, ADR 0109); none: every report posts. */
+/** What the resourcefulness checks need (ADR 0109): a routine's report and a question to a person. */
+export interface ResourcefulDeps {
+  /** Judges the call before it goes out; none: every call goes. */
   judge?: Judge | null;
-  /** The run's tools as it sees them (the gateway's `list`), for the means an untried report is reminded of. */
+  /** The run's tools as it sees them (the gateway's `list`), for the means a held call is reminded of. */
   tools?: () => { list(ctx: ToolContext): Promise<ToolDefinition[]> } | undefined;
 }
 
-/** How many times this run's report was held as untried (its `continuation` steps with `held`). */
-export async function handOffHolds(db: Executor, run: { id: string; orgId: string }) {
+export interface HandOffDeps extends ResourcefulDeps {
+  pubsub?: PubSub;
+}
+
+/** The rules of this run's calls of `tool` held so far (its `continuation` steps with `held`). */
+async function heldRules(db: Executor, run: { id: string; orgId: string }, tool: string) {
   const rows = await db
-    .select({ id: schema.agentRunSteps.id })
+    .select({ rule: sql<string | null>`${schema.agentRunSteps.data}->'continuation'->>'rule'` })
     .from(schema.agentRunSteps)
     .where(
       and(
         eq(schema.agentRunSteps.orgId, run.orgId),
         eq(schema.agentRunSteps.runId, run.id),
         eq(schema.agentRunSteps.kind, "context"),
-        sql`${schema.agentRunSteps.data}->'continuation'->>'held' = 'hand_off'`,
+        sql`${schema.agentRunSteps.data}->'continuation'->>'held' = ${tool}`,
       ),
     );
-  return rows.length;
+  return rows.map((r) => r.rule ?? "");
+}
+
+/** How many times this run's report was held as untried (its `continuation` steps with `held`). */
+export async function handOffHolds(db: Executor, run: { id: string; orgId: string }) {
+  return (await heldRules(db, run, HAND_OFF_TOOL)).length;
+}
+
+type RunRow = typeof agentRuns.$inferSelect;
+type RunTranscript = { continuation?: { count?: number }; request?: string; harnessTried?: string[] };
+
+/**
+ * What the resourcefulness judge reads of a run (ADR 0109): the task (Continuar's request, else the message or the
+ * routine's instructions that started it), its general means and every call it tried.
+ */
+async function runEvidence(deps: ResourcefulDeps, ctx: ToolContext, run: RunRow) {
+  // Loaded here: the controller and the team pull in most of the engine, which imports this file.
+  const [{ triedCalls }, { teammateMeans }] = await Promise.all([import("./continuation"), import("./team")]);
+  const t = (run.transcript ?? {}) as RunTranscript;
+  const listed = await deps
+    .tools?.()
+    ?.list(ctx)
+    .catch(() => []);
+  const names = new Set((listed ?? []).map((x) => x.name));
+  const own = ctx.bridge ? ["your computer's own tools: shell and files"] : [];
+  const means = [...turnMeans(names, await teammateMeans(ctx).catch(() => [])), ...own];
+  const tried = await triedCalls(ctx.db, run, t.harnessTried);
+  const [trigger] = t.request
+    ? []
+    : await ctx.db
+        .select({ body: schema.messages.body })
+        .from(schema.messages)
+        .where(and(eq(schema.messages.orgId, run.orgId), eq(schema.messages.id, run.triggerMessageId)));
+  return { request: t.request || (trigger?.body ?? ""), means, tried, names };
 }
 
 /**
@@ -182,41 +221,21 @@ export async function handOffHolds(db: Executor, run: { id: string; orgId: strin
  */
 async function holdUntried(deps: HandOffDeps, ctx: ToolContext, text: string): Promise<string | null> {
   if (!deps.judge) return null;
-  // Loaded here: the controller and the team pull in most of the engine, which imports this file.
-  const [{ CONTINUE, continuationVerdict, triedCalls, untriedNudge }, { teammateMeans }] = await Promise.all([
-    import("./continuation"),
-    import("./team"),
-  ]);
+  const { CONTINUE, continuationVerdict, untriedNudge } = await import("./continuation");
   const [run] = await ctx.db
     .select()
     .from(agentRuns)
     .where(and(eq(agentRuns.id, ctx.runId), eq(agentRuns.orgId, ctx.orgId)));
   if (!run?.background || run.status !== "running") return null;
-  const t = (run.transcript ?? {}) as { continuation?: { count?: number }; request?: string; harnessTried?: string[] };
+  const t = (run.transcript ?? {}) as RunTranscript;
   const used = Math.max(t.continuation?.count ?? 0, await handOffHolds(ctx.db, run));
   if (used >= CONTINUE.routineMaxPerRun) return null;
-  const listed = await deps
-    .tools?.()
-    ?.list(ctx)
-    .catch(() => []);
-  const own = ctx.bridge ? ["your computer's own tools: shell and files"] : [];
-  const means = [
-    ...turnMeans(new Set((listed ?? []).map((x) => x.name)), await teammateMeans(ctx).catch(() => [])),
-    ...own,
-  ];
-  const tried = await triedCalls(ctx.db, run, t.harnessTried);
-  // The task, as the turn-end judge reads it: Continuar's request, else the routine's trigger (its instructions).
-  const [trigger] = t.request
-    ? []
-    : await ctx.db
-        .select({ body: schema.messages.body })
-        .from(schema.messages)
-        .where(and(eq(schema.messages.orgId, run.orgId), eq(schema.messages.id, run.triggerMessageId)));
+  const { request, means, tried } = await runEvidence(deps, ctx, run);
   const verdict = await continuationVerdict(deps.judge, {
     orgId: ctx.orgId,
     agentId: ctx.agentId,
     runId: ctx.runId,
-    request: t.request || (trigger?.body ?? ""),
+    request,
     reply: text,
     means,
     tried,
@@ -224,10 +243,103 @@ async function holdUntried(deps: HandOffDeps, ctx: ToolContext, text: string): P
   }).catch(() => "done" as const);
   if (verdict !== "untried") return null;
   await addRunStep(ctx.db, run, "context", {
-    continuation: { outcome: "continue", rule: "untried", verdict, held: "hand_off", count: used + 1 },
+    continuation: { outcome: "continue", rule: "untried", verdict, held: HAND_OFF_TOOL, count: used + 1 },
     nudged: "untried",
   });
   return `Not posted yet. ${untriedNudge(means, tried)} Then call hand_off again: that one posts.`;
+}
+
+/** What a question to a person asks for (`askVerdict`): something the run could find, a secret, or a person's own. */
+export type AskVerdict = "findable" | "secret" | "person";
+
+/**
+ * One judge call on an `ask_user` question (kind `ask_check`, recorded like every judgment): `secret` at p ≥ 0.5
+ * and at least the others, `findable` at p ≥ 0.5 and at least p(person), otherwise `person`. A needless hold costs
+ * one more call of the agent; a findable question asked costs the person a wait.
+ */
+export async function askVerdict(
+  judge: Judge,
+  input: {
+    orgId: string;
+    agentId: string;
+    runId: string;
+    question: string;
+    request: string;
+    means: string[];
+    tried: string[];
+  },
+): Promise<AskVerdict> {
+  const answers = await judge.ask({
+    orgId: input.orgId,
+    agentId: input.agentId,
+    runId: input.runId,
+    kind: "ask_check",
+    state: {
+      question: cutText(input.question, 1000),
+      request: cutText(input.request, 2000),
+      means: input.means,
+      tried: input.tried.slice(-20),
+    },
+    questions: {
+      verdict: {
+        type: "choice",
+        instructions:
+          "An AI agent in a team chat was asked `request` and now wants to ask a person `question`, then wait for the answer. `means`: the general ways it has (web search, browser, terminal, tool directory, teammates). `tried`: each tool call it made in this run, with its argument and outcome. What does the question ask for?",
+        criteria: {
+          findable:
+            "Information the agent could find itself with `means` and hasn't really looked for in `tried`: an API's address or endpoints, a product's or a service's docs, what a name or a term the person used refers to (search the workspace and the web first), a public fact, something written in the workspace's messages or files.",
+          secret: "A secret typed into the chat: a password, an API key, a token, a code, a private key.",
+          person:
+            "Something only a person can give: a decision, a preference or a priority, an approval, a payment, an access or a sign-in, a test only they can run; or a request so ambiguous that what they meant can't be found anywhere; or `tried` already shows it searched where the answer would be.",
+        },
+      },
+    },
+  });
+  const a = answers.verdict;
+  const p = (k: AskVerdict) => a?.probabilities?.[k] ?? (a?.choice === k ? 1 : 0);
+  if (p("secret") >= 0.5 && p("secret") >= p("findable") && p("secret") >= p("person")) return "secret";
+  if (p("findable") >= 0.5 && p("findable") >= p("person")) return "findable";
+  return "person";
+}
+
+/** What the run reads when it asked a person for a secret in a chat question. */
+const SECRET_IN_CHAT = "Not asked: a secret typed in the chat stays in the conversation in plain text.";
+
+/**
+ * An `ask_user` question goes through the same resourcefulness check as giving up (ADR 0109 addendum): a question for
+ * something the run could find with its means is held once (the tool answers with its means and what it tried, and
+ * the next findable question is asked), and a secret asked as a chat question is turned to `request_secret`. At most
+ * `CONTINUE.maxPerRun` holds per run, then every question goes through without a judgment. Null: ask it.
+ */
+export async function holdAsk(deps: ResourcefulDeps, ctx: ToolContext, question: string): Promise<string | null> {
+  if (!deps.judge) return null;
+  const { CONTINUE, findableNudge } = await import("./continuation");
+  const [run] = await ctx.db
+    .select()
+    .from(agentRuns)
+    .where(and(eq(agentRuns.id, ctx.runId), eq(agentRuns.orgId, ctx.orgId)));
+  if (run?.status !== "running") return null;
+  const held = await heldRules(ctx.db, run, "ask_user");
+  if (held.length >= CONTINUE.maxPerRun) return null;
+  const { request, means, tried, names } = await runEvidence(deps, ctx, run);
+  const verdict = await askVerdict(deps.judge, {
+    orgId: ctx.orgId,
+    agentId: ctx.agentId,
+    runId: ctx.runId,
+    question,
+    request,
+    means,
+    tried,
+  }).catch(() => "person" as const);
+  if (verdict === "person" || (verdict === "findable" && held.includes("findable"))) return null;
+  await addRunStep(ctx.db, run, "context", {
+    continuation: { outcome: "continue", rule: verdict, held: "ask_user", count: held.length + 1 },
+    ...(verdict === "findable" ? { nudged: "untried" } : {}),
+  });
+  if (verdict === "findable") return findableNudge(means, tried);
+  return names.has(REQUEST_SECRET_TOOL)
+    ? `${SECRET_IN_CHAT} Ask for it with request_secret: the person types it into a secure card. Find everything else yourself first.`
+    : `${SECRET_IN_CHAT} You have no secure way to receive it here: say which key you need and where it is set up, without asking for it in the chat.`;
 }
 
 /**

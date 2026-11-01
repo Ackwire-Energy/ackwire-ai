@@ -61,6 +61,7 @@ import {
   insertMessage,
   isNoReply,
   type Judge,
+  type JudgeRequest,
   openDm,
   postPersonMessage,
   type RoutineBrief,
@@ -82,6 +83,7 @@ import {
   CONNECTORS,
   fakeConnectorSource,
   fakeMissionSource,
+  fakeSecretRequestSource,
   fakeWebFetch,
   type WebFixture,
 } from "./behavior-fakes";
@@ -196,6 +198,8 @@ export interface BehaviorCase {
    * routine's report) is judged as in production.
    */
   web?: WebFixture;
+  /** The computer's `request_secret` (recorded only, no computer): the secure way to ask for a key. */
+  secretRequest?: boolean;
   expect: Expectations & {
     /** What a good answer does, for the judge. */
     behavior: string;
@@ -324,7 +328,7 @@ export interface RunOptions {
 }
 
 /** The judgments of agents working together that a case where they do asks of production's judge. */
-const TOGETHER = new Set(["note_reply", "follow_through", "mention_needs_nothing"]);
+const TOGETHER = new Set(["note_reply", "follow_through", "mention_needs_nothing", "ask_check"]);
 
 /** A case's conversation with every person's line in one language. */
 function inLanguage(
@@ -388,6 +392,7 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       [
         ...(c.connectors ?? []).flatMap((id) => [...new Set(CONNECTORS[id].map((t) => t.scope))]),
         ...(c.issues ? ["issues:read", "issues:write"] : []),
+        ...(c.secretRequest ? ["sandbox:run"] : []),
       ].map((scope) => ({ connectionId: null, scope })),
     );
 
@@ -417,20 +422,18 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
         "dias úteis às 9h": { rule: { freq: "weekly", byWeekday: ["MO", "TU", "WE", "TH", "FR"], times: ["09:00"] } },
       }),
     };
+    // With a web, a give-up report and a question to a person are judged first (ADR 0109).
+    const resourceful = c.web ? { name: "eval", ask: (r: JudgeRequest) => (context.judge as Judge).ask(r) } : null;
     const sources: ToolSource[] = [
-      createAskUserToolSource(),
+      createAskUserToolSource({ judge: resourceful, tools: () => tools }),
       ...(c.schedule ? [createAskAgentToolSource({ pubsub }), createScheduleToolSource({ pubsub, context })] : []),
       // Colleagues that really run: who they are, and ask_agent and tell_agent to reach them.
       ...(together ? [createFindAgentToolSource()] : []),
       ...(together && !c.schedule ? [createAskAgentToolSource({ pubsub })] : []),
       createReactToolSource({ pubsub }),
       createMediaToolSource({ pubsub, gifs: c.noGifs ? null : createFakeGifs() }),
-      // Routine cases run in the background and speak through it; with a web, a give-up report is judged first.
-      createHandOffToolSource({
-        pubsub,
-        judge: c.web ? { name: "eval", ask: (r) => (context.judge as Judge).ask(r) } : null,
-        tools: () => tools,
-      }),
+      // Routine cases run in the background and speak through it.
+      createHandOffToolSource({ pubsub, judge: resourceful, tools: () => tools }),
       ...(c.web
         ? [createWebToolSource({ fetch: fakeWebFetch(c.web), resolveHost: async () => ["93.184.216.34"] })]
         : []),
@@ -452,6 +455,7 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
           ]
         : []),
       ...(c.missions ? [fakeMissionSource().source] : []),
+      ...(c.secretRequest ? [fakeSecretRequestSource()] : []),
       ...fakes.map((f) => f.source),
     ];
     const tools: ToolGateway = createToolGateway({ sources });

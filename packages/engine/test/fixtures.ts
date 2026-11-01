@@ -313,7 +313,9 @@ export async function setup(
   };
   const sources = [
     ...(options.missionTools && machineHub ? [createMissionToolSource(missionDeps)] : []),
-    ...(options.askUser ? [createAskUserToolSource()] : []),
+    ...(options.askUser
+      ? [createAskUserToolSource({ judge: context.judge, tools: (): ToolGateway | undefined => tools })]
+      : []),
     ...(options.permissionTools ? [createPermissionToolSource()] : []),
     ...(options.askAgent
       ? [

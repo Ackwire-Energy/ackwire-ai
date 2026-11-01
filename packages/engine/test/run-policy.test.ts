@@ -7,6 +7,7 @@ import {
   createChannel,
   createMissionRunToolSource,
   createToolGateway,
+  createWebToolSource,
   grantScopes,
   insertMessage,
   type RoutineAccess,
@@ -646,6 +647,19 @@ describe("the gateway applies the run policy", () => {
       { orgId: f.org.id, agentId: f.agent.id, runId: run.id, machineId: crypto.randomUUID() },
     );
     expect(bridged.map((t) => t.name)).toContain("permission_prompt");
+  });
+
+  test("a computer brain (Codex, Claude Code) gets the web through the bridge, beside the browser", async () => {
+    await gatewaySetup();
+    const { run } = await runAs("person");
+    const gateway = createToolGateway({
+      sources: [createWebToolSource({ fetch: async () => new Response(""), resolveHost: async () => [] })],
+    });
+    const bridged = await bridgeToolsFor(
+      { db: f.db, pubsub: f.pubsub, tools: gateway },
+      { orgId: f.org.id, agentId: f.agent.id, runId: run.id, machineId: crypto.randomUUID() },
+    );
+    expect(bridged.map((t) => t.name).sort()).toEqual(["web_fetch", "web_search"]);
   });
 
   test("the bridge lists exactly what the model loop does, why included", async () => {

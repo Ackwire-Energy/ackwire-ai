@@ -47,9 +47,19 @@ export function untriedNudge(means: string[], tried: string[]) {
   return `You ended saying you couldn't, but you still have ways to try. Your means: ${have}. Already tried: ${done}. Use the ones that fit; when a search or a page gives nothing or is blocked, change the words, the source or the tool. If none works, say what you tried and the one thing a person must give.`;
 }
 
+/**
+ * What an `ask_user` call reads when its question asks for something the run could find itself (ADR 0109
+ * addendum): held once, its means and what it already tried, and the next ask goes through.
+ */
+export function findableNudge(means: string[], tried: string[]) {
+  const have = means.length > 0 ? means.join("; ") : "your tools and find_tools";
+  const done = tried.length > 0 ? tried.slice(-8).join("; ") : "nothing yet";
+  return `Not asked yet: ask a person only for what only they can give, and this you can find. Your means: ${have}. Already tried: ${done}. Find it first: search the web for the docs and read them, try it (on your computer, or with web_fetch), search the workspace for a name the person uses. When something stays unclear, state your assumption and go on. Ask only for what only a person can give (a key through request_secret, a decision, an approval). If you still need to ask, call ask_user again: that one is asked.`;
+}
+
 /** What a run reads, once, when it described what only a person can give instead of asking for it. */
 export const ASK_NUDGE =
-  "You need something only a person can give (a credential, a decision, a test, access). Ask them now with ask_user: one direct question, with choices if it is one of a few. Do not end with a list of what's missing.";
+  "You need something only a person can give (a credential, a decision, a test, access). Ask them now with ask_user: one direct question, with choices if it is one of a few (a key or a password through request_secret). Do not end with a list of what's missing.";
 
 /** The run's last judged turn, kept for the mission's keep-going check (`keepGoingBlocker` reads `waiting`). */
 export const verdictRecord = (v: ContinuationVerdict) =>
@@ -102,10 +112,10 @@ export async function continuationVerdict(
         criteria: {
           done: "It gave the result or the answer. Or it said what it couldn't do, and either `tried` shows several different attempts (another query, another source, another tool or the browser), or what blocks it is something only a person can give (a code, a sign-in, a payment, a permission, a decision). An offer that needs someone else's decision (a sensitive or external action, a choice between their options) counts as done only when asked as one direct question.",
           untried:
-            "It said it couldn't or that it lacks a tool, or asked a person to do or connect something, while `means` has ways that fit the task it hasn't used in `tried`, or it gave up after one empty or failed attempt without varying it. Handing the work to a teammate counts as an attempt.",
+            "It said it couldn't or that it lacks a tool, or asked a person to do or connect something, or asked a person for information its means could find (an address, docs, what a name refers to), while `means` has ways that fit the task it hasn't used in `tried`, or it gave up after one empty or failed attempt without varying it. Handing the work to a teammate counts as an attempt.",
           continue:
             "It said it will do more itself (next, later, after a build), or offered reversible work inside what it was asked ('want me to create the issues?' after 'triage these'), or stopped midway, and nothing it set up brings it back. Also when `unreached` is set and the reply hands work or a question to an agent it names (that mention reached nobody); merely naming one is not that.",
-          ask: "To go on it needs something only a person can give (a credential, a decision, a test, access), but it described the need or listed what's missing instead of asking one direct question.",
+          ask: "To go on it needs something only a person can give (a credential, a decision, a test, access) that its `means` can't find, but it described the need or listed what's missing instead of asking one direct question.",
         },
       },
     },

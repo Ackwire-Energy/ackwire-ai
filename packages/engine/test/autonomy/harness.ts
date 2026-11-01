@@ -78,6 +78,8 @@ export interface JudgeTable {
   stuck?: number;
   /** `note_reply`: whether a note's reply matters to its sender (default 0.9). */
   noteReply?: number;
+  /** `ask_check`: what an `ask_user` question asks for (default: something only a person can give). */
+  ask?: (state: Record<string, unknown>) => "findable" | "secret" | "person";
 }
 
 /** Judgments the engine asks along the way that the scenarios leave at the fake's defaults. */
@@ -179,6 +181,8 @@ export async function world(options: WorldOptions) {
       }
       case "stuck_run":
         return table.stuck ?? 0;
+      case "ask_check":
+        return table.ask?.(state) ?? "person";
       case "note_reply":
       case "note_reply_matters":
         return table.noteReply ?? 0.9;

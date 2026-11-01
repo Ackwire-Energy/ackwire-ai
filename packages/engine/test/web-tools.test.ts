@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
+  askVerdict,
   createWebToolSource,
+  HOW_YOU_WORK,
+  type Judge,
   parseDuckDuckGoHtml,
   presentTools,
   type ToolContext,
@@ -203,5 +206,26 @@ describe("the controller's untried verdict", () => {
     expect(
       callLine("use_tool", { tool: "crm_find", arguments: { name: "Acme" } }, { content: "x", isError: true }),
     ).toBe("crm_find(Acme) → failed: x");
+  });
+});
+
+describe("asking a person (ADR 0109 addendum)", () => {
+  const judging = (probabilities: Record<string, number>): Judge => ({
+    name: "fake",
+    ask: async () => ({ verdict: { probabilities } }),
+  });
+  const input = { orgId: "o", agentId: "a", runId: "r", question: "q", request: "r", means: [], tried: [] };
+
+  test("findable, secret or a person's own, by the judge's probabilities", async () => {
+    expect(await askVerdict(judging({ findable: 0.7, secret: 0.1, person: 0.2 }), input)).toBe("findable");
+    expect(await askVerdict(judging({ findable: 0.3, secret: 0.6, person: 0.1 }), input)).toBe("secret");
+    // Unsure goes to the person: a needless hold is worse than a question.
+    expect(await askVerdict(judging({ findable: 0.45, secret: 0.1, person: 0.45 }), input)).toBe("person");
+    expect(await askVerdict(judging({}), input)).toBe("person");
+  });
+
+  test("the prompt says to find first, ask only what a person can give, a secret through request_secret", () => {
+    expect(HOW_YOU_WORK).toContain("Before asking a person, find what you can");
+    expect(HOW_YOU_WORK).toContain("A secret or a key always through `request_secret`");
   });
 });

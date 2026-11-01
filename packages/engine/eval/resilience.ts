@@ -34,6 +34,10 @@ type ResilienceCase = BehaviorCase & {
   /** No obstacle: a good answer takes at most this many tool calls. */
   maxCalls?: number;
   brain?: "claude_code";
+  /** Only a key is the person's: a good run asks for it with `request_secret` and asks no question in the chat. */
+  onlyKey?: boolean;
+  /** Really ambiguous: a good run asks one question (a question card that went through). */
+  oneQuestion?: boolean;
 };
 
 const arg = (name: string) => {
@@ -74,7 +78,17 @@ interface Outcome {
   why: string;
 }
 
-function grade(c: ResilienceCase, reply: string, calls: number): Pick<Outcome, "pass" | "gaveUp" | "why"> {
+/** The tool calls a grade reads: an `ask_user` held by its check answers "Not asked". */
+type Call = { name: string; executed?: boolean; result?: string };
+
+function grade(
+  c: ResilienceCase,
+  reply: string,
+  calls: number,
+  made: Call[] = [],
+): Pick<Outcome, "pass" | "gaveUp" | "why"> {
+  const asked = made.filter((x) => x.name === "ask_user" && !x.result?.startsWith("Not asked")).length;
+  const keyed = made.some((x) => x.name === "request_secret" && x.executed);
   const text = reply.toLowerCase();
   const missing = c.facts.filter((f) => !text.includes(f.toLowerCase()));
   const invented = (c.never ?? []).filter((f) => text.includes(f.toLowerCase()));
@@ -84,6 +98,9 @@ function grade(c: ResilienceCase, reply: string, calls: number): Pick<Outcome, "
     invented.length ? `invented: ${invented.join(", ")}` : "",
     c.blocker && !TRIED.test(reply) ? "doesn't say what it tried" : "",
     c.maxCalls !== undefined && calls > c.maxCalls ? `${calls} calls (max ${c.maxCalls})` : "",
+    c.onlyKey && !keyed ? "no request_secret" : "",
+    c.onlyKey && asked > 0 ? `${asked} question(s) in the chat` : "",
+    c.oneQuestion && asked !== 1 ? `${asked} questions (one expected)` : "",
   ].filter(Boolean);
   return { pass: why.length === 0, gaveUp, why: why.join("; ") };
 }
@@ -97,7 +114,7 @@ async function runApi(c: ResilienceCase, attempt: number): Promise<Outcome> {
     calls: run.calls.length,
     costUsd: run.costNanoUsd / 1e9,
     reply,
-    ...grade(c, reply, run.calls.length),
+    ...grade(c, reply, run.calls.length, run.calls),
   };
 }
 

@@ -1,10 +1,12 @@
 import { afterEach, expect } from "bun:test";
+import { eq, schema } from "@agenteschat/db";
 import {
   createRoutine,
   createWebToolSource,
   executeRoutineRun,
   listMessages,
   queueRoutineRun,
+  type ToolSource,
   usageSummary,
   WEB_USAGE_PROVIDER,
 } from "../../src";
@@ -209,5 +211,229 @@ scenario("S58", "a plain answer with nothing in the way gets no nudge and no ext
   await w.settle();
   expect(w.prompts("rui")).toHaveLength(1);
   expect(await untriedSteps(w)).toHaveLength(0);
+  await assertInvariants(w);
+});
+
+// A question to a person goes through the same check (ADR 0109 addendum): one for what the agent could find is held
+// once with its means, a secret asked in the chat is turned to the secure request, and a person's own question goes.
+
+const API_DOCS =
+  "<h1>Acme Ledger API</h1><p>Base URL: https://api.acme-ledger.example/v1</p><p>Authentication: Authorization: Bearer YOUR_KEY.</p><p>GET /usage?product=jev returns spend in USD by day for one product.</p>";
+
+/** A fake web with an API's docs: the search finds them, the docs page opens, the API itself wants a key. */
+const docsWeb = () =>
+  createWebToolSource({
+    fetch: async (url) => {
+      if (url.startsWith("https://html.duckduckgo.com/"))
+        return new Response(
+          `<html><body><div class="result results_links"><a class="result__a" href="https://docs.acme-ledger.example/api">Acme Ledger API reference</a><a class="result__snippet" href="#">Base URL, API keys and the usage endpoint.</a></div></body></html>`,
+        );
+      if (url === "https://docs.acme-ledger.example/api") return new Response(API_DOCS, { status: 200 });
+      return new Response('{"error":"missing API key"}', { status: 401 });
+    },
+    resolveHost: async () => ["93.184.216.34"],
+  });
+
+/** The computer's secure request, recorded only (the real one pauses the run on a card). */
+const secretRequests: Record<string, unknown>[] = [];
+const fakeSecretRequest: ToolSource = {
+  name: "secret-request",
+  tools: async () => [
+    {
+      name: "request_secret",
+      description: "Ask the person for a secret in a private card.",
+      scope: "",
+      inputSchema: {
+        type: "object",
+        properties: { name: { type: "string" }, purpose: { type: "string" }, target: { enum: ["env", "file"] } },
+        required: ["name", "purpose", "target"],
+        additionalProperties: false,
+      },
+      execute: async (input) => {
+        secretRequests.push(input);
+        return { content: "A secure card was sent; the key arrived." };
+      },
+    },
+  ],
+};
+
+/** What a question asks for, as a judge would read it: a key is a secret, an address or a meaning is findable. */
+const askRubric = (state: Record<string, unknown>) => {
+  const q = String(state.question);
+  if (/chave|key|senha/i.test(q)) return "secret" as const;
+  if (/endereço|o que .* identifica|address/i.test(q)) return "findable" as const;
+  return "person" as const;
+};
+
+const questions = (w: World) =>
+  w.db.select().from(schema.agentQuestions).where(eq(schema.agentQuestions.orgId, w.org.id));
+
+scenario("S59", "an external API with no connector: reads the docs and asks only for the key, securely", async () => {
+  secretRequests.length = 0;
+  const w = await world({
+    agents: ["ada"],
+    setup: { toolSources: [docsWeb(), fakeSecretRequest] },
+    judge: { ask: askRubric },
+    script: {
+      ada: [
+        {
+          calls: [
+            {
+              name: "ask_user",
+              input: {
+                question: 'Qual é o endereço da API do Acme Ledger e o que "jev" identifica nos gastos?',
+                why: "Preciso disso para seguir com o pedido da pessoa aqui.",
+              },
+            },
+          ],
+        },
+        { calls: [{ name: "web_search", input: { query: "Acme Ledger API usage endpoint" } }] },
+        { calls: [{ name: "web_fetch", input: { url: "https://docs.acme-ledger.example/api" } }] },
+        {
+          calls: [
+            {
+              name: "ask_user",
+              input: {
+                question: "Me passa a chave da API do Acme Ledger?",
+                why: "Preciso disso para seguir com o pedido da pessoa aqui.",
+              },
+            },
+          ],
+        },
+        {
+          calls: [
+            {
+              name: "request_secret",
+              input: { name: "ACME_LEDGER_KEY", purpose: "Ler seus gastos de jev na API", target: "env" },
+            },
+          ],
+        },
+        { text: "Achei a API (GET /usage?product=jev). Assim que a chave chegar no cartão seguro, puxo os gastos." },
+      ],
+    },
+  });
+  await w.say("@ada puxa meus gastos de jev na api do acme ledger por favor");
+  await w.settle();
+  const calls = await w.calls("ada");
+  expect(calls.map((c) => c.name)).toEqual(["ask_user", "web_search", "web_fetch", "ask_user", "request_secret"]);
+  // The findable question is held with its means; the key asked in the chat is turned to the secure request.
+  expect(calls[0]?.result).toStartWith("Not asked yet");
+  expect(calls[0]?.result).toContain("web_search");
+  expect(calls[2]?.result).toContain("https://api.acme-ledger.example/v1");
+  expect(calls[3]?.result).toStartWith("Not asked: a secret typed in the chat");
+  expect(calls[3]?.result).toContain("request_secret");
+  expect(secretRequests.map((r) => r.name)).toEqual(["ACME_LEDGER_KEY"]);
+  // No question reached the person, and the judge read the question, the request and what it had tried.
+  expect(await questions(w)).toHaveLength(0);
+  const [first, second] = w.judgedAs("ask_check");
+  expect(String(first?.state.request)).toContain("gastos de jev");
+  expect(((first?.state.means ?? []) as string[]).join(" ")).toContain("web_search");
+  expect(((second?.state.tried ?? []) as string[]).join(" ")).toContain(
+    "web_fetch(https://docs.acme-ledger.example/api)",
+  );
+  expect((await w.posts("ada")).map((p) => p.body)).toEqual([
+    "Achei a API (GET /usage?product=jev). Assim que a chave chegar no cartão seguro, puxo os gastos.",
+  ]);
+  await assertInvariants(w);
+});
+
+scenario("S60", "a truly ambiguous request still gets its one question", async () => {
+  const w = await world({
+    agents: ["ada"],
+    setup: { toolSources: [docsWeb()] },
+    judge: { ask: askRubric },
+    script: {
+      ada: [
+        {
+          calls: [
+            {
+              name: "ask_user",
+              input: {
+                question: "Qual resumo, e para quem?",
+                why: "Preciso disso para seguir com o pedido da pessoa aqui.",
+              },
+            },
+          ],
+        },
+      ],
+    },
+  });
+  await w.say("@ada manda aquele resumo pra ele");
+  await w.settle();
+  expect((await questions(w)).map((q) => q.text)).toEqual(["Qual resumo, e para quem?"]);
+  expect((await w.runs("ada")).map((r) => r.status)).toEqual(["waiting_input"]);
+  expect(w.judgedAs("ask_check")).toHaveLength(1);
+  await assertInvariants(w);
+});
+
+scenario("S61", "a findable question is held once: the second ask goes through", async () => {
+  const w = await world({
+    agents: ["ada"],
+    setup: { toolSources: [docsWeb()] },
+    judge: { ask: () => "findable" },
+    script: {
+      ada: [
+        {
+          calls: [
+            {
+              name: "ask_user",
+              input: {
+                question: "Qual é o endereço da API?",
+                why: "Preciso disso para seguir com o pedido da pessoa aqui.",
+              },
+            },
+          ],
+        },
+        {
+          calls: [
+            {
+              name: "ask_user",
+              input: {
+                question: "Qual é o endereço da API, já que a busca não achou?",
+                why: "Preciso disso para seguir com o pedido da pessoa aqui.",
+              },
+            },
+          ],
+        },
+      ],
+    },
+  });
+  await w.say("@ada puxa meus gastos na api do acme ledger");
+  await w.settle();
+  const calls = await w.calls("ada");
+  expect(calls[0]?.result).toStartWith("Not asked yet");
+  expect((await questions(w)).map((q) => q.text)).toEqual(["Qual é o endereço da API, já que a busca não achou?"]);
+  expect((await w.runs("ada")).map((r) => r.status)).toEqual(["waiting_input"]);
+  await assertInvariants(w);
+});
+
+scenario("S62", "a secret is never asked in the chat, even with no secure request at hand", async () => {
+  const w = await world({
+    agents: ["ada"],
+    setup: { toolSources: [docsWeb()] },
+    judge: { ask: askRubric },
+    script: {
+      ada: [
+        {
+          calls: [
+            {
+              name: "ask_user",
+              input: {
+                question: "Me passa a chave da API do Acme Ledger?",
+                why: "Preciso disso para seguir com o pedido da pessoa aqui.",
+              },
+            },
+          ],
+        },
+        { text: "Preciso da chave da API do Acme Ledger configurada no meu computador para puxar os gastos." },
+      ],
+    },
+  });
+  await w.say("@ada puxa meus gastos na api do acme ledger");
+  await w.settle();
+  const [held] = await w.calls("ada");
+  expect(held?.result).toStartWith("Not asked: a secret typed in the chat");
+  expect(held?.result).toContain("no secure way");
+  expect(await questions(w)).toHaveLength(0);
   await assertInvariants(w);
 });

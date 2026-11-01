@@ -272,7 +272,8 @@ export function buildEngine(o: EngineOptions) {
   });
   const tools = createToolGateway({
     sources: [
-      createAskUserToolSource(),
+      // A question for what the agent could find, or a secret asked in the chat, is held first (ADR 0109).
+      createAskUserToolSource({ judge: context.judge, tools: () => tools }),
       // Missing something a request needs: ask for it (an approval card) instead of failing.
       createPermissionToolSource(),
       // The agent browser asks a person for help (ADR 0040 §6).
