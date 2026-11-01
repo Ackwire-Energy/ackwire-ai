@@ -10586,7 +10586,7 @@ html:not([data-pointer]) .sidebar__more:focus-visible {
   background: var(--plate);
   color: var(--ink);
 }
-.sidebar__bell:focus-visible {
+html:not([data-pointer]) .sidebar__bell:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
