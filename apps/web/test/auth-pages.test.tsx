@@ -2813,7 +2813,7 @@ describe("Onboarding", () => {
     for (const name of ["pricing-policy", "research-brief", "objection-handling", "#deal-desk", "Daily digest"]) {
       expect(text).toContain(name);
     }
-    expect(text).not.toContain("CRM (mcp.example.com)");
+    expect(text).not.toContain("usam o CRM");
     expect(text).not.toContain("O que não vem junto");
     expect(text).toContain("Chaves, senhas e histórico de conversa nunca vêm.");
     expect(text).toContain("Chega quando você criar o time.");
@@ -2894,7 +2894,7 @@ describe("Onboarding", () => {
     expect(document.querySelectorAll(".imp-report a")).toHaveLength(0);
     // After the import, what to set up, one line each, with no link to a page of the workspace (each leads back
     // here until it's set up).
-    expect(document.querySelector(".imp-report")?.textContent).toContain("Morgan e Scout usam o CRM (mcp.example.com)");
+    expect(document.querySelector(".imp-report")?.textContent).toContain("Morgan e Scout usam o CRM.");
     expect(screen().queryByRole("link", { name: "Conectar" })).toBeNull();
 
     // Opened again: the rail says what the import brought, not that it was skipped, and so does its step.

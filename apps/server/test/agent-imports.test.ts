@@ -228,7 +228,7 @@ const BUNDLE = {
     },
   ],
   notes: [{ key: "cycle", agent: "scout", kind: "fact", content: "O ciclo de venda leva 30 dias." }],
-  todo: [{ kind: "connection", label: "CRM (mcp.example.com)", agents: ["scout"] }],
+  todo: [{ kind: "connection", label: "CRM", agents: ["scout"] }],
   leftOut: [{ kind: "picture", label: "Scout" }],
 };
 
