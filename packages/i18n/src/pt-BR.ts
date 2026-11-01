@@ -7876,6 +7876,11 @@ export const ptBR = {
     reconnected: "{{name}} reconectado.",
     rulesRead: "O que lê",
     rulesLimits: "Limites",
+    copy: {
+      label: "Usar as regras de {{name}} também em",
+      apply: "Copiar regras",
+      done: "Copiadas para {{names}}. Salve para aplicar.",
+    },
     rule: {
       tables: "Tabelas",
       tablesLoading: "Carregando as tabelas…",
@@ -8073,6 +8078,11 @@ export const ptBR = {
       addTo: "Adicionar em {{name}}",
       invalid: "Use um email ou @dominio.com.",
       placeholder: "nome@empresa.com ou @empresa.com",
+      clear: "Remover tudo",
+      clearName: "Remover tudo de {{name}}",
+      cleared_one: "{{count}} item removido.",
+      cleared_other: "{{count}} itens removidos.",
+      undo: "Desfazer",
     },
     routine: {
       mailbox: "Caixa de email",

@@ -72,6 +72,7 @@ export function DatabaseRulesPanel({
           onChange={(hiddenColumns) => set({ hiddenColumns })}
           disabled={disabled}
           split={splitColumns}
+          clearable
           inputMode="text"
           placeholder={t("database.rule.hiddenPlaceholder")}
           invalidText={t("database.rule.hiddenInvalid")}

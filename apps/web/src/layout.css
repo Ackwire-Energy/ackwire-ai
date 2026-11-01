@@ -4246,6 +4246,22 @@ html:not([data-pointer]) .cflow__more summary:focus-visible {
   flex: 1 1 auto;
   min-width: 0;
 }
+.mail-list__clear {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* A leading ghost's text lines up with the chips above, its plate reaching out (as in .ac-acts). */
+/* Empty live region out of the flex flow (no extra gap), still in the a11y tree. */
+.mail-list__status:empty {
+  position: absolute;
+}
+.mail-list__clear > .ac-btn--ghost {
+  padding-inline: var(--ghost-plate);
+}
+.mail-list__clear > .ac-btn--ghost:first-child {
+  margin-inline-start: calc(-1 * var(--ghost-plate));
+}
 .mail-agent {
   display: flex;
   flex-direction: column;
@@ -4346,6 +4362,10 @@ html:not([data-pointer]) .mail-rules > summary:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+.mail-rules-copy {
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
 }
 .mail-rules-step .mail-rules__body {
   margin-top: 0;
