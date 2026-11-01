@@ -235,7 +235,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
   async function delegatedAgents(
     message: NonNullable<Awaited<ReturnType<typeof getMessage>>>,
     outside: string[] = [],
-    /** `wakeAll`: a routine set to act was told to name only agents that must act, so each one it names wakes. */
+    /** `wakeAll`: a routine was told to name only agents that must act, so each one it names wakes. */
     options: { record?: boolean; wakeAll?: boolean } = {},
   ) {
     const ids = [...message.mentionedAgentIds, ...outside];
@@ -475,23 +475,17 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         // A notice is for its own agent (`deliverNotice` starts or joins its run), a no-AI card says why
         // its agent didn't answer, and an action card waits for a person's click: nobody else chimes in.
         if (message.meta.notice || message.meta.noAi || message.meta.actionCard) return;
-        // A routine's own message (hand_off, no run behind it, ADR 0053 addendum 2026-11-01): set to act, its
-        // mentions wake the agents it names for its creator, like any agent's (the router stays out); set to only
-        // read, it wakes nobody, since text it read must not become actions. Never silently: the agents it named
-        // and its run's tell_agent refusals show under it.
+        // A routine's own message (hand_off, no run behind it, ADR 0053 addendum 2026-11-01): its mentions wake
+        // the agents it names for its creator, like any agent's (the router stays out). With no creator left it
+        // has nobody's reach and wakes nobody. Never silently: the agents it named and its run's tell_agent
+        // refusals show under it.
         const routineRun = await routinePostRun(deps.db, message);
         const routineAuthority = routineRun ? await runAuthorityById(deps.db, message.orgId, routineRun) : null;
         const actingRoutine = routineAuthority ? routineCreatorOf(routineAuthority) : null;
         if (message.meta.routine && !message.meta.reminder && !message.agentRunId && !actingRoutine) {
           const [refused, outside] = await Promise.all([refusedReach(message), outsideAgents(message)]);
           const named = message.mentionedAgentIds.filter((id) => id !== message.authorAgentId);
-          // Set to act but with no creator left: nobody's reach to wake them with, which is not "only looks".
-          const act = !!routineAuthority && "brief" in routineAuthority && routineAuthority.brief?.access === "act";
-          await settleReach(deps, message, {
-            outside,
-            blocked: act ? [...new Set([...refused, ...named])] : refused,
-            routinePost: act ? [] : named,
-          });
+          await settleReach(deps, message, { outside, blocked: [...new Set([...refused, ...named])] });
           return;
         }
         // Agents' mentions go through the hop limit here; a person's mentions and DMs already

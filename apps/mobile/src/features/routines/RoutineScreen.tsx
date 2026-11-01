@@ -22,18 +22,7 @@ import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import {
-  Button,
-  Chip,
-  GroupedHeader,
-  GroupedList,
-  GroupedRow,
-  Icon,
-  IconButton,
-  type IconName,
-  InfoHint,
-  Text,
-} from "@/ui";
+import { Button, Chip, GroupedHeader, GroupedList, GroupedRow, Icon, IconButton, type IconName, Text } from "@/ui";
 import { chatHref } from "../links/logic";
 import { openSwitchComputer } from "../outages/OutageNotice";
 import { useMachineOutages } from "../outages/queries";
@@ -360,18 +349,6 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
                   </Text>
                 </View>
               ) : null}
-            </Block>
-          </Section>
-
-          <Section title={t("routines.panel.access")}>
-            <Block>
-              <InfoHint
-                name={t("common.about", { label: t("routines.panel.access") })}
-                text={t("routines.access.hint")}
-                variant="body"
-              >
-                <Text variant="body">{t(`routines.access.${r.access}`)}</Text>
-              </InfoHint>
             </Block>
           </Section>
 

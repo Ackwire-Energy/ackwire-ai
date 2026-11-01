@@ -71,7 +71,7 @@ export const NOTIFICATION_KINDS = [
   /** A routine waits for its computer (once per outage), ADR 0053. */
   "routine_stalled",
   /**
-   * A routine set to act named an agent its creator can't talk to (`reach.ts`): the agent's owner, once per routine
+   * A routine named an agent its creator can't talk to (`reach.ts`): the agent's owner, once per routine
    * and agent, `source.agentId` the agent, opening the message.
    */
   "agent_unreached",

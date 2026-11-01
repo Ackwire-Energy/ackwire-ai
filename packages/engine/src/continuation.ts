@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, eq, schema, sql } from "@agenteschat/db";
+import { and, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { accountablePerson, runAuthority } from "./authority";
 import { getChannelCached } from "./context";
@@ -35,19 +35,31 @@ export interface ContinuationState {
   askPending?: boolean;
 }
 
-export type ContinuationVerdict = "done" | "continue" | "ask";
+export type ContinuationVerdict = "done" | "continue" | "ask" | "untried";
+
+/**
+ * What a run reads when it ended saying it couldn't while it still had ways to try (ADR 0109): its means and what it
+ * already tried, so it varies the attempt instead of handing the problem to a person.
+ */
+export function untriedNudge(means: string[], tried: string[]) {
+  const have = means.length > 0 ? means.join("; ") : "your tools and find_tools";
+  const done = tried.length > 0 ? tried.slice(-8).join("; ") : "nothing yet";
+  return `You ended saying you couldn't, but you still have ways to try. Your means: ${have}. Already tried: ${done}. Use the ones that fit; when a search or a page gives nothing or is blocked, change the words, the source or the tool. If none works, say what you tried and the one thing a person must give.`;
+}
 
 /** What a run reads, once, when it described what only a person can give instead of asking for it. */
 export const ASK_NUDGE =
   "You need something only a person can give (a credential, a decision, a test, access). Ask them now with ask_user: one direct question, with choices if it is one of a few. Do not end with a list of what's missing.";
 
 /** The run's last judged turn, kept for the mission's keep-going check (`keepGoingBlocker` reads `waiting`). */
-export const verdictRecord = (v: ContinuationVerdict) => (v === "continue" ? "unkept" : v === "ask" ? "waiting" : v);
+export const verdictRecord = (v: ContinuationVerdict) =>
+  v === "continue" || v === "untried" ? "unkept" : v === "ask" ? "waiting" : v;
 
 /**
  * One judge call on a turn's end (kind `follow_through`, recorded on the agent's and the workspace's usage like
- * every judgment, not billed to the agent's budget). `continue` at p ≥ 0.45 and at least p(ask); `ask` at
- * p ≥ 0.45; otherwise done. A missed continuation is silent lost work, a needless one is one turn.
+ * every judgment, not billed to the agent's budget). `continue` at p ≥ 0.45 and at least p(ask); `untried` at
+ * p ≥ 0.45 and at least p(continue) and p(ask); `ask` at p ≥ 0.45; otherwise done. A missed continuation is silent
+ * lost work, a needless one is one turn.
  */
 export async function continuationVerdict(
   judge: Judge,
@@ -57,7 +69,13 @@ export async function continuationVerdict(
     runId: string;
     request: string;
     reply: string;
-    did: string[];
+    /** What the turn really has (`turnMeans`, its computer's own tools on a computer brain). */
+    means: string[];
+    /**
+     * Each tool call of the run with its argument and outcome (`triedCalls`): the gateway's run steps (API brains,
+     * and computer brains through the MCP bridge) plus a computer brain's own tools (`transcript.harnessTried`).
+     */
+    tried: string[];
     runKind: TurnKind;
     /** Agents its reply @named that aren't in the conversation (`unreachedNote`), "" none. */
     unreached?: string;
@@ -71,7 +89,8 @@ export async function continuationVerdict(
     state: {
       request: cutText(input.request, 2000),
       reply: cutTextEnd(input.reply, 3000),
-      did: input.did.slice(-20),
+      means: input.means,
+      tried: input.tried.slice(-20),
       runKind: input.runKind,
       ...(input.unreached ? { unreached: input.unreached } : {}),
     },
@@ -79,9 +98,11 @@ export async function continuationVerdict(
       verdict: {
         type: "choice",
         instructions:
-          "An AI agent in a team chat was asked `request` and ended its turn with `reply`, its last message (`did`: the tools it ran this turn). It won't act again until someone writes to it or something it set up wakes it. Is it done, should it go on by itself, or does it need something only a person can give?",
+          "An AI agent in a team chat was asked `request` and ended its turn with `reply`, its last message. `tried`: each tool call it made in this run, with its argument and outcome. `means`: the general ways it has (web search, browser, terminal, tool directory, teammates). It won't act again until someone writes to it or something it set up wakes it. Is it done, should it go on by itself, does it still have untried ways, or does it need something only a person can give?",
         criteria: {
-          done: "It gave the result or the answer, or said plainly what it couldn't do and why. An offer that needs someone else's decision (a sensitive or external action, a choice between their options) counts as done only when asked as one direct question.",
+          done: "It gave the result or the answer. Or it said what it couldn't do, and either `tried` shows several different attempts (another query, another source, another tool or the browser), or what blocks it is something only a person can give (a code, a sign-in, a payment, a permission, a decision). An offer that needs someone else's decision (a sensitive or external action, a choice between their options) counts as done only when asked as one direct question.",
+          untried:
+            "It said it couldn't or that it lacks a tool, or asked a person to do or connect something, while `means` has ways that fit the task it hasn't used in `tried`, or it gave up after one empty or failed attempt without varying it. Handing the work to a teammate counts as an attempt.",
           continue:
             "It said it will do more itself (next, later, after a build), or offered reversible work inside what it was asked ('want me to create the issues?' after 'triage these'), or stopped midway, and nothing it set up brings it back. Also when `unreached` is set and the reply hands work or a question to an agent it names (that mention reached nobody); merely naming one is not that.",
           ask: "To go on it needs something only a person can give (a credential, a decision, a test, access), but it described the need or listed what's missing instead of asking one direct question.",
@@ -91,9 +112,57 @@ export async function continuationVerdict(
   });
   const a = answers.verdict;
   const p = (k: ContinuationVerdict) => a?.probabilities?.[k] ?? (a?.choice === k ? 1 : 0);
+  if (p("untried") >= 0.45 && p("untried") >= p("continue") && p("untried") >= p("ask")) return "untried";
   if (p("continue") >= 0.45 && p("continue") >= p("ask")) return "continue";
   if (p("ask") >= 0.45) return "ask";
   return "done";
+}
+
+/** One tool call as the judge reads it: `name(argument) → outcome`, short. */
+export function callLine(name: string, input: unknown, result?: { content: string; isError?: boolean } | null) {
+  const i = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
+  // `use_tool` runs another tool: the judge reads that one.
+  if (typeof i.tool === "string" && i.arguments && typeof i.arguments === "object")
+    return callLine(i.tool, i.arguments, result);
+  const arg = ["query", "url", "command", "q", "prompt", "question", "message", "text", "path", "name"]
+    .map((k) => i[k])
+    .find((v): v is string => typeof v === "string" && v.trim() !== "");
+  const outcome = !result ? "" : ` → ${result.isError ? "failed: " : ""}${oneLineCut(result.content, 90) || "(empty)"}`;
+  return `${name}${arg ? `(${oneLineCut(arg, 80)})` : ""}${outcome}`;
+}
+
+const oneLineCut = (text: string, max: number) => cutText(text.replace(/\s+/g, " ").trim(), max);
+
+/**
+ * Every tool call of a run, oldest first (the last 20), as the judge reads them (`tried`): the gateway's run steps
+ * (every brain's calls to our tools, a computer brain's through the MCP bridge) and then `harness`, a computer
+ * brain's own tools (Claude Code's Bash, WebSearch…, Codex's commands), which the runner forwards as `brain.event`
+ * `tool_call` events with `executed` and the run keeps in `transcript.harnessTried`.
+ */
+export async function triedCalls(db: Database, run: { id: string; orgId: string }, harness: string[] = []) {
+  const steps = await db
+    .select({ kind: schema.agentRunSteps.kind, data: schema.agentRunSteps.data })
+    .from(schema.agentRunSteps)
+    .where(
+      and(
+        eq(schema.agentRunSteps.orgId, run.orgId),
+        eq(schema.agentRunSteps.runId, run.id),
+        inArray(schema.agentRunSteps.kind, ["tool_call", "tool_result"]),
+      ),
+    )
+    .orderBy(schema.agentRunSteps.seq);
+  const calls = new Map<string, { name: string; input: unknown; result?: { content: string; isError?: boolean } }>();
+  for (const { kind, data } of steps) {
+    const id = typeof data.toolUseId === "string" ? data.toolUseId : `step:${calls.size}`;
+    const name = typeof data.name === "string" ? data.name : "";
+    if (kind === "tool_call") calls.set(id, { name, input: data.input });
+    else {
+      const call = calls.get(id) ?? { name, input: undefined };
+      call.result = { content: String(data.content ?? ""), isError: data.isError === true };
+      calls.set(id, call);
+    }
+  }
+  return [...[...calls.values()].map((c) => callLine(c.name, c.input, c.result)), ...harness].slice(-20);
 }
 
 export type TurnKind = "conversation" | "agents_dm" | "routine";
@@ -123,6 +192,8 @@ export interface TurnEnd {
   wakesLater(): Promise<boolean>;
   /** The judgment; null when the workspace has no judge. */
   verdict: (() => Promise<ContinuationVerdict>) | null;
+  /** What an `untried` turn is reminded of (`untriedNudge`): its means and what it tried, filled by `verdict`. */
+  evidence?: { means: string[]; tried: string[] };
 }
 
 export type TurnEndDecision = {
@@ -173,6 +244,18 @@ export async function decideTurnEnd(t: TurnEnd): Promise<TurnEndDecision> {
       };
     // Promising again without acting: a person is asked what it needs instead.
     if (t.kind !== "conversation") return { outcome: "done", rule: "cap", verdict };
+  }
+  // It said it couldn't with ways left: once more with its means, while it still acts between nudges.
+  if (verdict === "untried") {
+    const progressed = t.state.count === 0 || t.executed > (t.state.executedAtNudge ?? 0);
+    if (canNudge && progressed)
+      return {
+        outcome: "continue",
+        rule: "untried",
+        verdict,
+        nudge: untriedNudge(t.evidence?.means ?? [], t.evidence?.tried ?? []),
+      };
+    return { outcome: "done", rule: "untried_cap", verdict };
   }
   if (verdict === "done") return { outcome: "done", rule: "judged", verdict };
   if (!t.state.askNudged)

@@ -1207,15 +1207,11 @@ export async function updateRoutine(
   }
   if (patch.access !== undefined) set.access = routineAccessOf(patch.access);
   if (patch.report !== undefined) set.report = routineReportOf(patch.report);
-  // A routine set to act reaches what its creator reaches (their rooms, the agents they talk to), so
-  // only its creator may decide what it does with that; anyone else takes it over first.
-  const access = set.access ?? current.access;
+  // A routine reaches what its creator reaches (their rooms, the agents they talk to), so only its
+  // creator may decide what it does with that; anyone else takes it over first.
   if (
     actorId !== current.createdByUserId &&
-    access === "act" &&
-    (access !== current.access ||
-      (set.prompt !== undefined && set.prompt !== current.prompt) ||
-      set.agentId !== undefined)
+    ((set.prompt !== undefined && set.prompt !== current.prompt) || set.agentId !== undefined)
   ) {
     throw new ForbiddenError("Take the routine over before setting what it does as it acts", "routine.act_take_over");
   }
@@ -1907,8 +1903,7 @@ export async function createReminder(
       prompt: message,
       target: target as unknown as Record<string, unknown>,
       triggerType: "once",
-      // Asked to do something at that time, not only to look and tell (ADR 0053, addendum of 2026-10-31).
-      ...(input.askAgent ? { access: "act" } : {}),
+      access: "act",
       timezone: input.timezone,
       description: input.description,
       nextRunAt: input.at,

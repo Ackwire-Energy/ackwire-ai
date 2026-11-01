@@ -128,7 +128,8 @@ const ScheduleRuleSchema = z
   .openapi("ScheduleRule");
 
 const Access = z.enum(ROUTINE_ACCESS).openapi({
-  description: "What it may do while nobody watches: `read` (look and report) or `act` (also change things).",
+  description:
+    "Always `act` (ADR 0109): every routine works with its agent's own permissions. `read` is accepted and ignored.",
 });
 const Report = z.enum(ROUTINE_REPORT).openapi({
   description: "When it speaks: `when_new` (only when there is something new) or `always` (a report every run).",
@@ -533,7 +534,7 @@ export function routineRoutes(deps: AppDeps) {
             prompt: z.string().min(1).max(10_000),
             target: Target,
             trigger: TriggerInput,
-            access: Access.optional().openapi({ description: "Default `read`." }),
+            access: Access.optional().openapi({ description: "Ignored: every routine acts (ADR 0109)." }),
             report: Report.optional().openapi({ description: "Default `when_new`." }),
           }),
         ),

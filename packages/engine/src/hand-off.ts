@@ -1,13 +1,15 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
+import { and, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { routineBriefOfRun } from "./background";
 import { deliverNotice, publishDelivery } from "./delivery";
+import type { Judge } from "./judge";
 import { insertMessage, type Message, unreachedAgents } from "./messages";
 import type { RoutineBrief } from "./routine-brief";
 import { personCanPost } from "./routine-state";
-import type { AgentRun } from "./runs";
+import { type AgentRun, addRunStep } from "./runs";
 import { maskCredentials } from "./tool-detail";
-import type { ToolDefinition, ToolSource } from "./tools/types";
+import { turnMeans } from "./tools/directory";
+import type { ToolContext, ToolDefinition, ToolSource } from "./tools/types";
 
 export const HAND_OFF_TOOL = "hand_off";
 /** A report, not a transcript: long enough for findings, why and what next. */
@@ -80,7 +82,7 @@ export async function deliverRoutineReport(
     .returning({ id: routineRuns.id });
   if (!open) return null;
   if (!input.wake) {
-    // Agents it names outside that conversation: a routine set to act hands it to them (`settleReach`).
+    // Agents it names outside that conversation: the routine hands it to them (`settleReach`).
     const unreached = await unreachedAgents(tx, {
       orgId: run.orgId,
       channelId: brief.deliverTo.channelId,
@@ -148,6 +150,79 @@ const BLOCKED: Record<HandOffBlock | "stopped", string> = {
   stopped: "this run was stopped or replaced, and nobody hears it",
 };
 
+export interface HandOffDeps {
+  pubsub?: PubSub;
+  /** Judges a routine's report before it posts (`untried`, ADR 0109); none: every report posts. */
+  judge?: Judge | null;
+  /** The run's tools as it sees them (the gateway's `list`), for the means an untried report is reminded of. */
+  tools?: () => { list(ctx: ToolContext): Promise<ToolDefinition[]> } | undefined;
+}
+
+/** How many times this run's report was held as untried (its `continuation` steps with `held`). */
+export async function handOffHolds(db: Executor, run: { id: string; orgId: string }) {
+  const rows = await db
+    .select({ id: schema.agentRunSteps.id })
+    .from(schema.agentRunSteps)
+    .where(
+      and(
+        eq(schema.agentRunSteps.orgId, run.orgId),
+        eq(schema.agentRunSteps.runId, run.id),
+        eq(schema.agentRunSteps.kind, "context"),
+        sql`${schema.agentRunSteps.data}->'continuation'->>'held' = 'hand_off'`,
+      ),
+    );
+  return rows.length;
+}
+
+/**
+ * A routine's report that says it couldn't while the run still had ways to try (ADR 0109): held once, before
+ * anything posts (never inside the delivery's transaction), and the nudge is the tool's answer. It uses the run's one
+ * extra turn (`CONTINUE.routineMaxPerRun`, shared with the turn-end controller), so the next report always posts.
+ * Null: post it.
+ */
+async function holdUntried(deps: HandOffDeps, ctx: ToolContext, text: string): Promise<string | null> {
+  if (!deps.judge) return null;
+  // Loaded here: the controller and the team pull in most of the engine, which imports this file.
+  const [{ CONTINUE, continuationVerdict, triedCalls, untriedNudge }, { teammateMeans }] = await Promise.all([
+    import("./continuation"),
+    import("./team"),
+  ]);
+  const [run] = await ctx.db
+    .select()
+    .from(agentRuns)
+    .where(and(eq(agentRuns.id, ctx.runId), eq(agentRuns.orgId, ctx.orgId)));
+  if (!run?.background || run.status !== "running") return null;
+  const t = (run.transcript ?? {}) as { continuation?: { count?: number }; request?: string; harnessTried?: string[] };
+  const used = Math.max(t.continuation?.count ?? 0, await handOffHolds(ctx.db, run));
+  if (used >= CONTINUE.routineMaxPerRun) return null;
+  const listed = await deps
+    .tools?.()
+    ?.list(ctx)
+    .catch(() => []);
+  const own = ctx.bridge ? ["your computer's own tools: shell and files"] : [];
+  const means = [
+    ...turnMeans(new Set((listed ?? []).map((x) => x.name)), await teammateMeans(ctx).catch(() => [])),
+    ...own,
+  ];
+  const tried = await triedCalls(ctx.db, run, t.harnessTried);
+  const verdict = await continuationVerdict(deps.judge, {
+    orgId: ctx.orgId,
+    agentId: ctx.agentId,
+    runId: ctx.runId,
+    request: t.request ?? "",
+    reply: text,
+    means,
+    tried,
+    runKind: "routine",
+  }).catch(() => "done" as const);
+  if (verdict !== "untried") return null;
+  await addRunStep(ctx.db, run, "context", {
+    continuation: { outcome: "continue", rule: "untried", verdict, held: "hand_off", count: used + 1 },
+    nudged: "untried",
+  });
+  return `Not posted yet. ${untriedNudge(means, tried)} Then call hand_off again: that one posts.`;
+}
+
 /**
  * The built-in `hand_off`, offered only to background runs (a routine's, `ctx.background`): the
  * one way such a run speaks. Its message is posted where the routine reports, or with `wake_me`
@@ -155,11 +230,11 @@ const BLOCKED: Record<HandOffBlock | "stopped", string> = {
  * after checking the routine may still speak there (`routineDeliveryBlock`); when it can't, the
  * routine run is skipped with the reason and the model is told to finish.
  */
-export function createHandOffToolSource(deps: { pubsub?: PubSub }): ToolSource {
+export function createHandOffToolSource(deps: HandOffDeps): ToolSource {
   const tool: ToolDefinition = {
     name: HAND_OFF_TOOL,
     description:
-      "Post this routine's message where it reports, once. `message` is posted as-is as your own message to the people there: write the message itself (the greeting, the digest, the reminder, what you found and what you recommend), in their language, never about this routine or its runs. When the routine may act, an agent it @mentions wakes and works on it (one outside that conversation gets it as a note); when it only looks and tells, it wakes nobody, not even the agents it @mentions. Set `wake_me` only when what you found needs you to act or decide in that conversation: then `message` is a note to you there (you'll be woken with it and tell the people yourself), not posted as-is. Without it nothing is posted.",
+      "Post this routine's message where it reports, once. `message` is posted as-is as your own message to the people there: write the message itself (the greeting, the digest, the reminder, what you found and what you recommend), in their language, never about this routine or its runs. An agent it @mentions wakes and works on it (one outside that conversation gets it as a note). Set `wake_me` only when what you found needs you to act or decide in that conversation: then `message` is a note to you there (you'll be woken with it and tell the people yourself), not posted as-is. Without it nothing is posted.",
     scope: "",
     inputSchema: {
       type: "object",
@@ -177,6 +252,8 @@ export function createHandOffToolSource(deps: { pubsub?: PubSub }): ToolSource {
     async execute(input, ctx) {
       const text = String(input.message ?? "").trim();
       if (!text) return { content: "Give the report to hand off.", isError: true };
+      const held = await holdUntried(deps, ctx, text);
+      if (held) return { content: held, data: { held: true } };
       const handed = await ctx.db.transaction(async (tx) => {
         // Locked: two calls in one turn hand off once.
         const [run] = await tx

@@ -61,7 +61,7 @@ export interface Route {
 }
 
 /** How the follow-through (or continuation) judgment reads a turn's end, in the controller's words. */
-export type Verdict = "done" | "continue" | "ask";
+export type Verdict = "done" | "continue" | "ask" | "untried";
 
 export interface JudgeTable {
   /**

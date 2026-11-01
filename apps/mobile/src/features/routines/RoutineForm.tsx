@@ -666,40 +666,24 @@ function Form({ routine }: { routine: Routine | undefined }) {
             />
           ))}
         </GroupedList>
-        <GroupedHeader>{t("routines.form.access")}</GroupedHeader>
-        <GroupedList>
-          {(["read", "act"] as const).map((v) => (
-            <GroupedRow
-              key={v}
-              label={t(`routines.access.${v}`)}
-              checked={d.access === v}
-              onPress={() => set({ access: v })}
-            />
-          ))}
-        </GroupedList>
-        <GroupedFooter>{t("routines.access.hint")}</GroupedFooter>
         {routineReachWarnings(d.prompt, dir.agents, {
-          access: d.access,
           agentId: d.agentId || null,
           creatorUserId: creator === me ? null : creator,
         }).map((w) => (
           <View key={w.agent.id} style={styles.warning}>
             <Text variant="footnote" tone="ink2" accessibilityLiveRegion="polite">
-              {boldRuns(
-                t(w.kind === "read" ? "routines.reachWarning.read" : "routines.reachWarning.blocked", {
-                  ...agentGrammar(t, w.agent.name),
-                }) as string,
-              ).map((r, i) =>
-                r.bold ? (
-                  <Text key={String(i)} variant="footnote" tone="ink" style={styles.bold}>
-                    {r.text}
-                  </Text>
-                ) : (
-                  r.text
-                ),
+              {boldRuns(t("routines.reachWarning.blocked", { ...agentGrammar(t, w.agent.name) }) as string).map(
+                (r, i) =>
+                  r.bold ? (
+                    <Text key={String(i)} variant="footnote" tone="ink" style={styles.bold}>
+                      {r.text}
+                    </Text>
+                  ) : (
+                    r.text
+                  ),
               )}
             </Text>
-            {w.kind === "blocked" && creator ? <AllowTalkPill agent={w.agent} userId={creator} /> : null}
+            {creator ? <AllowTalkPill agent={w.agent} userId={creator} /> : null}
           </View>
         ))}
         {routine && !isDoneOnce(routine) ? (

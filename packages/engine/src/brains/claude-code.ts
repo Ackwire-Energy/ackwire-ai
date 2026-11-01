@@ -12,9 +12,8 @@ import {
   STEER_PROTOCOL,
   type WireBrainEvent,
 } from "@agenteschat/adapters";
-import { type Database, type Executor, schema } from "@agenteschat/db";
+import { type Database, schema } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
-import { fedByRoutine, type RunAuthority, runAuthorityById } from "../authority";
 import { type MachineCaller, MachineRequestError, type MachineStatus } from "../machine-hub";
 import { MachineDroppedError, MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
 import { computerPrompt } from "./prompt";
@@ -51,29 +50,6 @@ import type { Brain, BrainAccount, BrainEvent, BrainIO, BrainTurn, SteerMessage,
  * `claude_failed`, `canceled`, `timeout`, `runner_error`, `bad_request` (not).
  */
 
-/**
- * The permission profile of a computer turn (ADR 0053 §3 and its addendum of
- * 2026-10-31), from who is behind its run: every run works (`work`: edits,
- * commands by the command policy and a person), whoever woke it, except a
- * routine set to only look and tell (`read`, the default, also a legacy
- * brief-less one), which reads (`plan`: no edits, read-only shell, no web, our
- * tools only; its context says why), and so does a run its report or work woke
- * (`fedByRoutine`). Missions keep their own profile
- * (`missionTurnPermissions`).
- */
-export function computerProfile(authority: RunAuthority): "plan" | "work" {
-  const bounded = authority.kind === "routine" || fedByRoutine(authority);
-  return bounded && authority.kind !== "person" && authority.brief?.access !== "act" ? "plan" : "work";
-}
-
-/** A turn's profile (`computerProfile`), from its run. */
-export async function computerTurnProfile(
-  db: Executor,
-  turn: Pick<BrainTurn, "orgId" | "runId">,
-): Promise<"plan" | "work"> {
-  return computerProfile(await runAuthorityById(db, turn.orgId, turn.runId));
-}
-
 export interface ClaudeCodeBrainDeps {
   hub: Pick<MachineCaller, "call" | "status">;
   pubsub: PubSub;
@@ -85,7 +61,7 @@ export interface ClaudeCodeBrainDeps {
   personalMcp?: (turn: BrainTurn) => boolean | Promise<boolean>;
   /**
    * The turn's permission profile (missions: their own plan/work, branch prefix and allowed rules; other
-   * runs: `computerTurnProfile`). A `plan` turn needs `BRAIN_PROFILES_PROTOCOL` (an older runner's plan
+   * runs: `work`, whoever woke them, ADR 0109). A `plan` turn needs `BRAIN_PROFILES_PROTOCOL` (an older runner's plan
    * reads secrets and loads project settings): below it the turn fails with `runner_outdated`.
    */
   permissions?: (

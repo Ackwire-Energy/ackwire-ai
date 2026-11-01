@@ -1,0 +1,551 @@
+[
+  {
+    "id": "weekly-news-routine",
+    "title": "Rotina semanal de notícias de um concorrente (o caso real, anonimizado)",
+    "source": "synthetic (ADR 0109)",
+    "agent": {
+      "name": "Rui",
+      "handle": "rui",
+      "role": "Pesquisa de mercado",
+      "instructions": "Acompanha concorrentes e resume notícias para o time."
+    },
+    "org": {
+      "name": "Vela",
+      "context": "Vela é uma fintech de pagamentos para pequenos lojistas. O time fala português. Concorrentes acompanhados: Banco Azul (também chamado de Azul Pay) e Caixa Norte."
+    },
+    "conversation": {
+      "where": "channel",
+      "channel": "mercado",
+      "trigger": {
+        "author": "Marina",
+        "body": "Todo domingo pesquise notícias sobre o Banco Azul e me dê um resumo."
+      },
+      "routine": {
+        "name": "Notícias do Banco Azul",
+        "report": "always"
+      }
+    },
+    "web": {
+      "search": [
+        {
+          "when": ["banco azul"],
+          "results": [
+            {
+              "title": "Banco Azul lança cartão sem anuidade",
+              "url": "https://news.example.com/banco-azul-cartao",
+              "snippet": "O Banco Azul anunciou um cartão sem anuidade para lojistas, com cashback de 2%."
+            },
+            {
+              "title": "Azul Pay chega a 3 milhões de clientes",
+              "url": "https://news.example.com/azul-pay-3mi",
+              "snippet": "A fintech Azul Pay passou de 3 milhões de clientes em outubro."
+            }
+          ]
+        }
+      ]
+    },
+    "facts": ["sem anuidade"],
+    "expect": {
+      "behavior": "Gets the result through its means and answers with it."
+    }
+  },
+  {
+    "id": "weekly-news-routine-en",
+    "title": "Weekly competitor news routine, in English",
+    "source": "synthetic (ADR 0109)",
+    "agent": {
+      "name": "Rui",
+      "handle": "rui",
+      "role": "Pesquisa de mercado",
+      "instructions": "Acompanha concorrentes e resume notícias para o time."
+    },
+    "org": {
+      "name": "Vela",
+      "context": "Vela é uma fintech de pagamentos para pequenos lojistas. O time fala português. Concorrentes acompanhados: Banco Azul (também chamado de Azul Pay) e Caixa Norte."
+    },
+    "conversation": {
+      "where": "channel",
+      "channel": "mercado",
+      "trigger": {
+        "author": "Marina",
+        "body": "Every Sunday research news about Banco Azul and give me a summary."
+      },
+      "routine": {
+        "name": "Banco Azul news",
+        "report": "always"
+      }
+    },
+    "web": {
+      "search": [
+        {
+          "when": ["banco azul"],
+          "results": [
+            {
+              "title": "Banco Azul lança cartão sem anuidade",
+              "url": "https://news.example.com/banco-azul-cartao",
+              "snippet": "O Banco Azul anunciou um cartão sem anuidade para lojistas, com cashback de 2%."
+            },
+            {
+              "title": "Azul Pay chega a 3 milhões de clientes",
+              "url": "https://news.example.com/azul-pay-3mi",
+              "snippet": "A fintech Azul Pay passou de 3 milhões de clientes em outubro."
+            }
+          ]
+        }
+      ]
+    },
+    "facts": ["annual fee"],
+    "expect": {
+      "behavior": "Searches the web and summarizes in English."
+    }
+  },
+  {
+    "id": "empty-first-search",
+    "title": "A primeira busca não acha nada; com outras palavras acha",
+    "source": "synthetic (ADR 0109)",
+    "agent": {
+      "name": "Rui",
+      "handle": "rui",
+      "role": "Pesquisa de mercado",
+      "instructions": "Acompanha concorrentes e resume notícias para o time."
+    },
+    "org": {
+      "name": "Vela",
+      "context": "Vela é uma fintech de pagamentos para pequenos lojistas. O time fala português. Concorrentes acompanhados: Banco Azul (também chamado de Azul Pay) e Caixa Norte."
+    },
+    "conversation": {
+      "where": "channel",
+      "channel": "mercado",
+      "trigger": {
+        "author": "Marina",
+        "body": "@rui quantos clientes a Azul Pay tem hoje?"
+      }
+    },
+    "web": {
+      "search": [
+        {
+          "when": ["azul pay"],
+          "results": [
+            {
+              "title": "Azul Pay chega a 3 milhões de clientes",
+              "url": "https://news.example.com/azul-pay-3mi",
+              "snippet": "A fintech Azul Pay passou de 3 milhões de clientes em outubro."
+            }
+          ]
+        }
+      ]
+    },
+    "facts": ["3 milhões"],
+    "expect": {
+      "behavior": "Gets the result through its means and answers with it."
+    }
+  },
+  {
+    "id": "site-blocks-fetch",
+    "title": "O site oficial bloqueia; outra fonte tem o fato",
+    "source": "synthetic (ADR 0109)",
+    "agent": {
+      "name": "Rui",
+      "handle": "rui",
+      "role": "Pesquisa de mercado",
+      "instructions": "Acompanha concorrentes e resume notícias para o time."
+    },
+    "org": {
+      "name": "Vela",
+      "context": "Vela é uma fintech de pagamentos para pequenos lojistas. O time fala português. Concorrentes acompanhados: Banco Azul (também chamado de Azul Pay) e Caixa Norte."
+    },
+    "conversation": {
+      "where": "channel",
+      "channel": "mercado",
+      "trigger": {
+        "author": "Marina",
+        "body": "@rui qual a taxa de cashback do cartão novo do Banco Azul? O anúncio está em https://bancoazul.example.com/cartao"
+      }
+    },
+    "web": {
+      "pages": {
+        "https://bancoazul.example.com/cartao": {
+          "status": 403,
+          "body": "Access denied"
+        }
+      },
+      "search": [
+        {
+          "when": ["cartão"],
+          "results": [
+            {
+              "title": "Banco Azul lança cartão sem anuidade",
+              "url": "https://news.example.com/banco-azul-cartao",
+              "snippet": "O Banco Azul anunciou um cartão sem anuidade para lojistas, com cashback de 2%."
+            }
+          ]
+        },
+        {
+          "when": ["cashback"],
+          "results": [
+            {
+              "title": "Banco Azul lança cartão sem anuidade",
+              "url": "https://news.example.com/banco-azul-cartao",
+              "snippet": "O Banco Azul anunciou um cartão sem anuidade para lojistas, com cashback de 2%."
+            }
+          ]
+        },
+        {
+          "when": ["banco azul"],
+          "results": [
+            {
+              "title": "Banco Azul lança cartão sem anuidade",
+              "url": "https://news.example.com/banco-azul-cartao",
+              "snippet": "O Banco Azul anunciou um cartão sem anuidade para lojistas, com cashback de 2%."
+            }
+          ]
+        }
+      ]
+    },
+    "facts": ["2%"],
+    "expect": {
+      "behavior": "Gets the result through its means and answers with it."
+    }
+  },
+  {
+    "id": "dead-link",
+    "title": "O link passado está morto; o fato está em outra fonte",
+    "source": "synthetic (ADR 0109)",
+    "agent": {
+      "name": "Rui",
+      "handle": "rui",
+      "role": "Pesquisa de mercado",
+      "instructions": "Acompanha concorrentes e resume notícias para o time."
+    },
+    "org": {
+      "name": "Vela",
+      "context": "Vela é uma fintech de pagamentos para pequenos lojistas. O time fala português. Concorrentes acompanhados: Banco Azul (também chamado de Azul Pay) e Caixa Norte."
+    },
+    "conversation": {
+      "where": "channel",
+      "channel": "mercado",
+      "trigger": {
+        "author": "Marina",
+        "body": "@rui resume isso pra mim: https://news.example.com/antigo/azul-pay"
+      }
+    },
+    "web": {
+      "pages": {
+        "https://news.example.com/antigo/azul-pay": {
+          "status": 404,
+          "body": "Not found"
+        },
+        "https://news.example.com/azul-pay-3mi": {
+          "body": "<h1>Azul Pay chega a 3 milhões de clientes</h1><p>A fintech passou de 3 milhões de clientes em outubro, alta de 40% no ano.</p>"
+        }
+      },
+      "search": [
+        {
+          "when": ["azul pay"],
+          "results": [
+            {
+              "title": "Azul Pay chega a 3 milhões de clientes",
+              "url": "https://news.example.com/azul-pay-3mi",
+              "snippet": "A fintech Azul Pay passou de 3 milhões de clientes em outubro."
+            }
+          ]
+        }
+      ]
+    },
+    "facts": ["3 milhões"],
+    "expect": {
+      "behavior": "Gets the result through its means and answers with it."
+    }
+  },
+  {
+    "id": "server-error-then-mirror",
+    "title": "A página dá erro 500; outra fonte responde",
+    "source": "synthetic (ADR 0109)",
+    "agent": {
+      "name": "Rui",
+      "handle": "rui",
+      "role": "Pesquisa de mercado",
+      "instructions": "Acompanha concorrentes e resume notícias para o time."
+    },
+    "org": {
+      "name": "Vela",
+      "context": "Vela é uma fintech de pagamentos para pequenos lojistas. O time fala português. Concorrentes acompanhados: Banco Azul (também chamado de Azul Pay) e Caixa Norte."
+    },
+    "conversation": {
+      "where": "channel",
+      "channel": "mercado",
+      "trigger": {
+        "author": "Marina",
+        "body": "@rui o que diz o comunicado da Caixa Norte sobre a nova taxa? https://caixanorte.example.com/comunicado"
+      }
+    },
+    "web": {
+      "pages": {
+        "https://caixanorte.example.com/comunicado": {
+          "status": 500,
+          "body": "Internal error"
+        },
+        "https://news.example.com/caixa-norte-taxa": {
+          "body": "<p>A Caixa Norte reduziu a taxa de antecipação para 1,9% ao mês.</p>"
+        }
+      },
+      "search": [
+        {
+          "when": ["caixa norte"],
+          "results": [
+            {
+              "title": "Caixa Norte reduz taxa",
+              "url": "https://news.example.com/caixa-norte-taxa",
+              "snippet": "Taxa de antecipação cai para 1,9% ao mês."
+            }
+          ]
+        }
+      ]
+    },
+    "facts": ["1,9%"],
+    "expect": {
+      "behavior": "Gets the result through its means and answers with it."
+    }
+  },
+  {
+    "id": "missing-connector",
+    "title": "Sem conector de status; a página pública de status resolve",
+    "source": "synthetic (ADR 0109)",
+    "agent": {
+      "name": "Rui",
+      "handle": "rui",
+      "role": "Pesquisa de mercado",
+      "instructions": "Acompanha concorrentes e resume notícias para o time."
+    },
+    "org": {
+      "name": "Vela",
+      "context": "Vela é uma fintech de pagamentos para pequenos lojistas. O time fala português. Concorrentes acompanhados: Banco Azul (também chamado de Azul Pay) e Caixa Norte."
+    },
+    "conversation": {
+      "where": "channel",
+      "channel": "mercado",
+      "trigger": {
+        "author": "Marina",
+        "body": "@rui o Pix do Banco Azul está fora do ar agora?"
+      }
+    },
+    "web": {
+      "search": [
+        {
+          "when": ["status"],
+          "results": [
+            {
+              "title": "Status Banco Azul",
+              "url": "https://status.bancoazul.example.com",
+              "snippet": "Pix: instabilidade desde 14h"
+            }
+          ]
+        },
+        {
+          "when": ["pix"],
+          "results": [
+            {
+              "title": "Status Banco Azul",
+              "url": "https://status.bancoazul.example.com",
+              "snippet": "Pix: instabilidade desde 14h"
+            }
+          ]
+        }
+      ],
+      "pages": {
+        "https://status.bancoazul.example.com": {
+          "body": "<p>Pix: instabilidade desde 14h. Cartões: normal.</p>"
+        }
+      }
+    },
+    "facts": ["instabilidade"],
+    "expect": {
+      "behavior": "Gets the result through its means and answers with it."
+    }
+  },
+  {
+    "id": "teammate-has-it",
+    "title": "Ele não tem a informação; uma colega tem",
+    "source": "synthetic (ADR 0109)",
+    "agent": {
+      "name": "Rui",
+      "handle": "rui",
+      "role": "Pesquisa de mercado",
+      "instructions": "Acompanha concorrentes e resume notícias para o time."
+    },
+    "org": {
+      "name": "Vela",
+      "context": "Vela é uma fintech de pagamentos para pequenos lojistas. O time fala português. Concorrentes acompanhados: Banco Azul (também chamado de Azul Pay) e Caixa Norte."
+    },
+    "conversation": {
+      "where": "channel",
+      "channel": "mercado",
+      "trigger": {
+        "author": "Marina",
+        "body": "@rui qual foi o volume de pagamentos da Vela ontem?"
+      }
+    },
+    "web": {
+      "search": []
+    },
+    "facts": ["R$ 1,2 milhão"],
+    "expect": {
+      "behavior": "Asks the teammate whose role covers it and answers with her number."
+    },
+    "otherAgents": [
+      {
+        "name": "Lia",
+        "handle": "lia",
+        "role": "Finanças: volume, receita e conciliação",
+        "runs": true,
+        "memory": [
+          {
+            "kind": "fact",
+            "title": "Volume de ontem",
+            "content": "O volume de pagamentos de ontem foi R$ 1,2 milhão."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "real-blocker-code",
+    "title": "Bloqueio de verdade: o painel pede um código que só a pessoa tem",
+    "source": "synthetic (ADR 0109)",
+    "agent": {
+      "name": "Rui",
+      "handle": "rui",
+      "role": "Pesquisa de mercado",
+      "instructions": "Acompanha concorrentes e resume notícias para o time."
+    },
+    "org": {
+      "name": "Vela",
+      "context": "Vela é uma fintech de pagamentos para pequenos lojistas. O time fala português. Concorrentes acompanhados: Banco Azul (também chamado de Azul Pay) e Caixa Norte."
+    },
+    "conversation": {
+      "where": "channel",
+      "channel": "mercado",
+      "trigger": {
+        "author": "Marina",
+        "body": "@rui pega o saldo da conta da Vela no painel https://painel.bancoazul.example.com"
+      }
+    },
+    "web": {
+      "pages": {
+        "https://painel.bancoazul.example.com": {
+          "body": "<h1>Entrar</h1><p>Digite o código de 6 dígitos enviado ao celular cadastrado.</p>"
+        }
+      }
+    },
+    "facts": [],
+    "expect": {
+      "behavior": "Says what it tried and asks for the one thing only the person can give (the code), inventing no balance."
+    },
+    "never": ["R$"],
+    "blocker": true
+  },
+  {
+    "id": "no-obstacle",
+    "title": "Pergunta que o contexto já responde: nada para buscar",
+    "source": "synthetic (ADR 0109)",
+    "agent": {
+      "name": "Rui",
+      "handle": "rui",
+      "role": "Pesquisa de mercado",
+      "instructions": "Acompanha concorrentes e resume notícias para o time."
+    },
+    "org": {
+      "name": "Vela",
+      "context": "Vela é uma fintech de pagamentos para pequenos lojistas. O time fala português. Concorrentes acompanhados: Banco Azul (também chamado de Azul Pay) e Caixa Norte."
+    },
+    "conversation": {
+      "where": "channel",
+      "channel": "mercado",
+      "trigger": {
+        "author": "Marina",
+        "body": "@rui quais concorrentes a gente acompanha?"
+      }
+    },
+    "web": {
+      "search": []
+    },
+    "facts": ["Banco Azul", "Caixa Norte"],
+    "expect": {
+      "behavior": "Answers from the workspace context, at once."
+    },
+    "maxCalls": 1
+  },
+  {
+    "id": "no-obstacle-en",
+    "title": "A plain question answered from context, in English",
+    "source": "synthetic (ADR 0109)",
+    "agent": {
+      "name": "Rui",
+      "handle": "rui",
+      "role": "Pesquisa de mercado",
+      "instructions": "Acompanha concorrentes e resume notícias para o time."
+    },
+    "org": {
+      "name": "Vela",
+      "context": "Vela é uma fintech de pagamentos para pequenos lojistas. O time fala português. Concorrentes acompanhados: Banco Azul (também chamado de Azul Pay) e Caixa Norte."
+    },
+    "conversation": {
+      "where": "channel",
+      "channel": "mercado",
+      "trigger": {
+        "author": "Marina",
+        "body": "@rui which competitors do we track?"
+      }
+    },
+    "web": {
+      "search": []
+    },
+    "facts": ["Banco Azul", "Caixa Norte"],
+    "expect": {
+      "behavior": "Answers from the workspace context, at once."
+    },
+    "maxCalls": 1
+  },
+  {
+    "id": "computer-brain-news",
+    "title": "Claude Code: o resumo semanal, a primeira busca vazia",
+    "source": "synthetic (ADR 0109)",
+    "agent": {
+      "name": "Rui",
+      "handle": "rui",
+      "role": "Pesquisa de mercado",
+      "instructions": "Acompanha concorrentes e resume notícias para o time."
+    },
+    "org": {
+      "name": "Vela",
+      "context": "Vela é uma fintech de pagamentos para pequenos lojistas. O time fala português. Concorrentes acompanhados: Banco Azul (também chamado de Azul Pay) e Caixa Norte."
+    },
+    "conversation": {
+      "where": "channel",
+      "channel": "mercado",
+      "trigger": {
+        "author": "Marina",
+        "body": "Pesquise as notícias desta semana sobre a Azul Pay e me dê um resumo em 3 linhas."
+      }
+    },
+    "web": {
+      "search": [
+        {
+          "when": ["azul pay"],
+          "results": [
+            {
+              "title": "Azul Pay chega a 3 milhões de clientes",
+              "url": "https://news.example.com/azul-pay-3mi",
+              "snippet": "A fintech Azul Pay passou de 3 milhões de clientes em outubro."
+            }
+          ]
+        }
+      ]
+    },
+    "facts": ["3 milhões"],
+    "expect": {
+      "behavior": "Gets the result through its means and answers with it."
+    },
+    "brain": "claude_code"
+  }
+]

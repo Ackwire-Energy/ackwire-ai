@@ -1,7 +1,6 @@
 import type {
   MailFolder,
   Routine,
-  RoutineAccess,
   RoutineEmailFilter,
   RoutineEvent,
   RoutineInput,
@@ -385,7 +384,6 @@ export interface RoutineDraft {
   rule: RecurrenceRule;
   active: boolean;
   report: RoutineReport;
-  access: RoutineAccess;
 }
 
 /** The form for a new routine, or starting from one (`zone`: the zone the form shows). */
@@ -403,7 +401,6 @@ export function draftOf(r: Routine | undefined, zone: string, today = new Date()
     rule: ruleOf(r, zone, today),
     active: r?.active ?? true,
     report: r?.report ?? "when_new",
-    access: r?.access ?? "read",
   };
 }
 
@@ -441,7 +438,6 @@ export function draftInput(d: RoutineDraft): RoutineInput {
     prompt: d.prompt.trim(),
     target: draftTarget(d),
     trigger: draftTrigger(d),
-    access: d.access,
     report: d.report,
   };
 }
@@ -490,7 +486,6 @@ export function draftChanges(r: Routine, d: RoutineDraft, savedRule: string, rul
   if (triggerChanged) patch.trigger = draftTrigger(d);
   if (d.active !== r.active) patch.active = d.active;
   if (d.report !== r.report) patch.report = d.report;
-  if (d.access !== r.access) patch.access = d.access;
   return patch;
 }
 

@@ -645,7 +645,7 @@ export function createMockPlanning(
           active: true,
           nextRunAt: trigger.type === "schedule" ? (nextCronRun(trigger.cron, ctx.now())?.toISOString() ?? null) : null,
           createdAt: ctx.now().toISOString(),
-          access: input.access ?? "read",
+          access: "act",
           report: input.report ?? "when_new",
         };
         s.routines.push(r);
@@ -658,7 +658,6 @@ export function createMockPlanning(
         if (patch.prompt !== undefined) r.prompt = patch.prompt;
         if (patch.agentId !== undefined) r.agentId = patch.agentId;
         if (patch.target !== undefined) r.target = patch.target;
-        if (patch.access !== undefined) r.access = patch.access;
         if (patch.report !== undefined) r.report = patch.report;
         if (patch.active !== undefined) setActive(r, patch.active);
         if (patch.trigger?.type === "schedule") r.trigger = scheduleOf(patch.trigger);

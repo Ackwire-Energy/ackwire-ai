@@ -66,7 +66,7 @@ test("a routine fires in its own room: the brief by its creator, the agent alone
       name: "Avaliações",
       creatorUserId: f.owner.id,
       deliverTo: { channelId: f.general.id, threadId: null },
-      access: "read",
+      access: "act",
       report: "when_new",
       trigger: "manual",
       dueAt: rr.at.toISOString(),

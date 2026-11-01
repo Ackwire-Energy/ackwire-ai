@@ -261,8 +261,7 @@ describe("Rotinas: a routine's details", () => {
     expect(text).toContain("Claude Code no MacBook do Walter");
     // Hourly on someone's computer: how often it wakes it.
     expect(text).toContain("Roda 24 vezes por dia no MacBook do Walter");
-    expect(text).toContain("Pode agir");
-    expect(text).toContain("Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.");
+    expect(text).not.toContain("Pode agir");
     expect(text).toContain("Toda vez");
     expect(text).toContain("Trabalhando agora");
     expect(text).toContain("Contou o que achou");
@@ -301,10 +300,8 @@ describe("Rotinas: a routine's details", () => {
     expect(panel.textContent).toContain("Só quem criou, o dono do agente, admins e quem está na conversa veem isto.");
     expect(panel.textContent).toContain("Contou o que achou");
     expect(within(panel).queryByRole("button", { name: "Editar" })).toBeNull();
-    // What it may do on its own: the answer, and its meaning behind the section's ⓘ; when it speaks: the answer alone.
-    const access = within(panel).getByRole("region", { name: "O que pode fazer sozinha" });
-    expect(within(access).getByRole("button", { name: "Sobre O que pode fazer sozinha" })).toBeTruthy();
-    expect(access.querySelector(".small.muted")).toBeNull();
+    // Every routine does what its agent can (ADR 0109): no access section; when it speaks: the answer alone.
+    expect(within(panel).queryByRole("region", { name: "O que pode fazer sozinha" })).toBeNull();
     expect(within(panel).getByRole("region", { name: "Quando falar" }).querySelectorAll("p")).toHaveLength(1);
   });
 });
@@ -379,26 +376,20 @@ describe("Rotinas: the form's two plain questions", () => {
     expect(document.querySelector(".routines-head")?.querySelectorAll("p")).toHaveLength(1);
   });
 
-  test("Quando falar and O que pode fazer sozinha, sent with the routine", async () => {
+  test("Quando falar, sent with the routine; no access choice", async () => {
     const api = createFakeApi(seedState());
     await renderApp(`/org/${ORG_ID}/routines`, { api });
     await settle(8);
     await click(screen().getByRole("button", { name: "Nova rotina" }));
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Nova rotina" });
-    // The defaults: only when there's news, only look and tell.
+    // The default: only when there's news. Every routine does what its agent can: nothing to choose there.
     expect(within(dialog).getByRole("radio", { name: "Só quando tiver novidade" }).getAttribute("aria-checked")).toBe(
       "true",
     );
-    expect(within(dialog).getByRole("radio", { name: "Só olhar e contar" }).getAttribute("aria-checked")).toBe("true");
-    // What each answer allows is one ⓘ beside "O que pode fazer sozinha"; no line under either question.
-    const about = within(dialog).getByRole("button", { name: "Sobre O que pode fazer sozinha" });
-    const hint = document.getElementById(about.getAttribute("aria-describedby") ?? "");
-    expect(hint?.textContent).toBe(
-      "Só olhar e contar: ela lê e conta o que achou. Para mudar alguma coisa, pede a alguém. Pode agir: também pode criar e mudar tarefas, a memória, a wiki e arquivos do Drive, trabalhar no próprio código, falar com outros agentes e postar onde quem a criou posta. Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.",
-    );
+    expect(within(dialog).queryByRole("radio", { name: "Só olhar e contar" })).toBeNull();
+    expect(within(dialog).queryByRole("radio", { name: "Pode agir" })).toBeNull();
     await click(within(dialog).getByRole("radio", { name: "Toda vez" }));
-    await click(within(dialog).getByRole("radio", { name: "Pode agir" }));
     expect(dialog.querySelectorAll(".routine-kind p")).toHaveLength(0);
     await act(async () =>
       fireEvent.change(within(dialog).getByLabelText("O que fazer"), { target: { value: "Revise os PRs abertos." } }),
@@ -409,7 +400,8 @@ describe("Rotinas: the form's two plain questions", () => {
     await click(within(dialog).getByRole("button", { name: "Criar rotina" }));
     await settle(6);
     const made = (await api.routines.list(ORG_ID)).find((r) => r.name === "PRs abertos");
-    expect(made).toMatchObject({ access: "act", report: "always" });
+    expect(made).toMatchObject({ report: "always" });
+    expect(made?.access).toBe("act");
   });
 });
 

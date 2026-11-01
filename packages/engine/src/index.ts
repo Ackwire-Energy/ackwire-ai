@@ -225,6 +225,7 @@ export * from "./usage-pause";
 export * from "./usage-tools";
 export * from "./waitlist";
 export * from "./web-push";
+export * from "./web-tools";
 export * from "./webhooks";
 export * from "./wiki";
 export * from "./wiki-links";

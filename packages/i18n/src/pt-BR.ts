@@ -4056,7 +4056,6 @@ export const ptBR = {
       firstRun: "A primeira é {{when}}.",
       eventEvery: "Roda cada vez que o evento chega.",
       state: { live: "No ar", paused: "Pausada", done: "Concluída", running: "Rodando" },
-      access: "O que pode fazer sozinha",
       report: "Quando falar",
       runsOn: "Onde roda",
       usage: "Uso esta semana",
@@ -4133,7 +4132,6 @@ export const ptBR = {
       required: "Diga o que o agente deve fazer.",
       noAgents: "Crie um agente antes de criar uma rotina.",
       report: "Quando falar",
-      access: "O que pode fazer sozinha",
       parseError: {
         schedule_unreadable: "Não entendi o período. Tente “a cada 2 semanas na segunda às 9h”.",
         schedule_never: "Esse período nunca acontece.",
@@ -4196,12 +4194,6 @@ export const ptBR = {
     reachWarning: {
       blocked:
         "Esta rotina não vai conseguir chamar {{article}} <b>{{name}}</b>: só quem cuida {{hers}} pode. O resto da rotina roda normalmente.",
-      read: "Esta rotina só olha e conta, então não chama {{article}} <b>{{name}}</b>. Para chamar, escolha Pode agir.",
-    },
-    access: {
-      read: "Só olhar e contar",
-      act: "Pode agir",
-      hint: "Só olhar e contar: ela lê e conta o que achou. Para mudar alguma coisa, pede a alguém. Pode agir: também pode criar e mudar tarefas, a memória, a wiki e arquivos do Drive, trabalhar no próprio código, falar com outros agentes e postar onde quem a criou posta. Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.",
     },
     report: {
       always: "Toda vez",

@@ -32,6 +32,10 @@ import { REFUSALS } from "./tools/run-policy";
  * Each event goes on one side: a message or hand-off whose woken run ended done without a word (it passed, or only
  * reacted) is that run's noise (`quietRuns`), never also an unanswered stall.
  *
+ * Untried (ADR 0109, not stalls): `untriedNudged`, runs the turn-end judge found saying they couldn't with ways left
+ * (the `nudged: untried` step, a routine's held `hand_off` too); `untriedResolved`, those that acted after the nudge
+ * and ended done (`ACTED`): how often the nudge turned a give-up into work.
+ *
  * Noise (conversation runs): `quietRuns` ended without a message (`pass`, the silence word, nothing);
  * `ackReplies` replied to a message that is only a thanks, an ok or a sign-off, and did nothing else; `idleWakes`
  * were woken by an agent's @mention and did nothing (no message, or only an acknowledgement). `noiseRuns`,
@@ -57,7 +61,12 @@ export const AUTONOMY_NOISE = [
   "noiseCostNanoUsd",
 ] as const;
 
-export type AutonomyMetric = (typeof AUTONOMY_STALLS)[number] | (typeof AUTONOMY_NOISE)[number];
+export const AUTONOMY_UNTRIED = ["untriedNudged", "untriedResolved"] as const;
+
+export type AutonomyMetric =
+  | (typeof AUTONOMY_STALLS)[number]
+  | (typeof AUTONOMY_NOISE)[number]
+  | (typeof AUTONOMY_UNTRIED)[number];
 /** Every count, plus `stalls`: the stall counts added up, each stall once (`promiseIgnored` is part of `promiseUnkept`). */
 export type AutonomyCounts = Record<AutonomyMetric | "stalls", number>;
 export interface AutonomyRow extends AutonomyCounts {
@@ -319,6 +328,7 @@ export function autonomySql(range: AutonomyRange) {
         select coalesce(bool_or(s.kind = 'message'), false) as posted,
           coalesce(bool_or(${ACTED}), false) as acted,
           min(s.seq) filter (where s.kind = 'context' and s.data->>'nudged' = 'promise') as nudged_at,
+          min(s.seq) filter (where s.kind = 'context' and s.data->>'nudged' = 'untried') as untried_at,
           coalesce(bool_or(s.kind = 'context' and s.data ? 'heldBack'), false) as held_back,
           coalesce(bool_or(s.kind = 'context' and s.data ? 'wrapUp'), false) as wrapped_up
         from agent_run_steps s where s.run_id = r.id
@@ -404,6 +414,13 @@ export function autonomySql(range: AutonomyRange) {
           and not exists (select 1 from agent_run_steps s where s.run_id = r.id and s.seq > r.nudged_at and ${ACTED})
         group by 1, 2
       union all
+      select day, org_id, 'untriedNudged', count(*) from runs where untried_at is not null group by 1, 2
+      union all
+      select r.day, r.org_id, 'untriedResolved', count(*) from runs r
+        where r.untried_at is not null and r.status = 'done'
+          and exists (select 1 from agent_run_steps s where s.run_id = r.id and s.seq > r.untried_at and ${ACTED})
+        group by 1, 2
+      union all
       select day, org_id, 'limitStops', count(*) from runs
         where wrapped_up or reply_limit
           or (status = 'failed' and error in ('too_many_tool_calls', 'budget_exceeded', ${STUCK_ERROR}))
@@ -485,7 +502,9 @@ export function autonomySql(range: AutonomyRange) {
 }
 
 const emptyCounts = (): AutonomyCounts =>
-  Object.fromEntries([...AUTONOMY_STALLS, ...AUTONOMY_NOISE, "stalls"].map((k) => [k, 0])) as AutonomyCounts;
+  Object.fromEntries(
+    [...AUTONOMY_STALLS, ...AUTONOMY_NOISE, ...AUTONOMY_UNTRIED, "stalls"].map((k) => [k, 0]),
+  ) as AutonomyCounts;
 
 const stallsOf = (c: Record<AutonomyMetric, number>) =>
   AUTONOMY_STALLS.reduce((sum, k) => (k === "promiseIgnored" ? sum : sum + c[k]), 0);
@@ -538,6 +557,12 @@ const COLUMNS: { key: keyof AutonomyCounts; head: string; means: string }[] = [
   },
   { key: "personUnanswered", head: "person", means: "people's messages for agents unanswered in 10 min" },
   { key: "taskStartFailed", head: "task", means: 'background tasks failed in their first minute ("Not logged in")' },
+  {
+    key: "untriedNudged",
+    head: "untried",
+    means: "runs told to keep trying after saying they couldn't with ways left",
+  },
+  { key: "untriedResolved", head: "tried", means: "...that acted after it and ended done" },
   { key: "noiseRuns", head: "noise", means: "runs in any noise column, once each" },
   { key: "quietRuns", head: "quiet", means: "runs that ended without a message (pass)" },
   { key: "ackReplies", head: "ack", means: "replies to only a thanks, an ok or a sign-off" },

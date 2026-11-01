@@ -511,16 +511,16 @@ export interface ClaudeLaunch {
  * and the web. Ours come through MCP. Names Claude Code doesn't know are ignored by it.
  */
 export const BRAIN_BUILTIN_TOOLS = ["Bash", "Read", "Edit", "Write", "Glob", "Grep", "WebFetch", "WebSearch"] as const;
-/** A plan turn's own tools (ADR 0053 §3): reading and a shell our prompt tool keeps read-only; no edits, no web. */
-export const PLAN_BUILTIN_TOOLS = ["Bash", "Read", "Glob", "Grep"] as const;
+/** A plan turn's own tools (ADR 0053 §3, 0109): reading, the web and a shell our prompt tool keeps read-only; no edits. */
+export const PLAN_BUILTIN_TOOLS = ["Bash", "Read", "Glob", "Grep", "WebFetch", "WebSearch"] as const;
 
 /**
  * How a brain turn's Claude Code starts for its permission profile (ADR 0053 §3).
  * `work`: edits accepted in its folders, every command through our prompt tool
  * (plain reads at once, the rest by the server's rules or a person), and with
  * the owner's own MCP servers (`personalMcp`) the owner's settings and tools too.
- * `plan` (a routine that only reads, a mission before Start): our MCP tools only,
- * no settings files of the folder or the owner, no edits and no web, and every
+ * `plan` (a mission before Start or while a write item runs): our MCP tools only,
+ * no settings files of the folder or the owner, no edits (the web stays), and every
  * command answered on the computer by `localVerdict` (reads only, never secrets);
  * nothing is ever asked of a person.
  */

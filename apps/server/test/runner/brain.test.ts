@@ -345,7 +345,7 @@ test("profiles (ADR 0053 §3): plan has our tools only, no settings files, no ed
   expect(plan).toContain("--strict-mcp-config");
   expect(at(plan, "--setting-sources")).toBe("");
   expect(at(plan, "--permission-mode")).toBe("default");
-  expect(at(plan, "--tools")).toBe("Bash,Read,Glob,Grep");
+  expect(at(plan, "--tools")).toBe("Bash,Read,Glob,Grep,WebFetch,WebSearch");
   expect(at(plan, "--permission-prompt-tool")).toBe("mcp__agentes__permission_prompt");
   const work = claudeBrainArgs({ ...base, ...brainProfileLaunch("work", false) });
   expect(at(work, "--permission-mode")).toBe("acceptEdits");
@@ -607,7 +607,7 @@ test.if(posix)("keepAlive false: one-shot, the process ends with the turn", asyn
 });
 
 test.if(posix)(
-  "a plan turn launches Claude Code read-only: our tools only, no settings files; edits, web and secrets denied",
+  "a plan turn launches Claude Code read-only: our tools only, no settings files; edits and secrets denied, the web allowed",
   async () => {
     const { spawns, turn } = setup();
     // Even when the agent opted into the owner's MCP servers.
@@ -618,21 +618,18 @@ test.if(posix)(
     expect(args).toContain("--strict-mcp-config");
     expect(at("--setting-sources")).toBe("");
     expect(at("--permission-mode")).toBe("default");
-    expect(at("--tools")).toBe("Bash,Read,Glob,Grep");
+    expect(at("--tools")).toBe("Bash,Read,Glob,Grep,WebFetch,WebSearch");
     expect(at("--permission-prompt-tool")).toBe("mcp__agentes__permission_prompt");
     const settings = JSON.parse(readFileSync(at("--settings") as string, "utf8")) as {
       permissions: { allow: string[]; deny: string[] };
     };
-    const denied = [
-      "Edit",
-      "Write",
-      "WebFetch",
-      "WebSearch",
-      "Read(~/.ssh/**)",
-      "Bash(node -e*)",
-      "Bash(gh pr merge *)",
-    ];
+    const denied = ["Edit", "Write", "Read(~/.ssh/**)", "Bash(node -e*)", "Bash(gh pr merge *)"];
     for (const rule of denied) expect(settings.permissions.deny).toContain(rule);
+    // Reading the web is a read (ADR 0109).
+    for (const tool of ["WebFetch", "WebSearch"]) {
+      expect(settings.permissions.deny).not.toContain(tool);
+      expect(settings.permissions.allow).toContain(tool);
+    }
     // Shell reads aren't allow rules: our prompt tool decides them (and refuses secrets).
     expect(settings.permissions.allow.some((r) => r.startsWith("Bash("))).toBe(false);
     // Its MCP process answers the prompts itself, reads only.

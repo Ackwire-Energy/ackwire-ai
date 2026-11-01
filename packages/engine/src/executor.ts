@@ -94,10 +94,12 @@ import { fitContextWindow } from "./context-budget";
 import {
   advance as advanceContinuation,
   type ContinuationState,
+  callLine,
   continuationVerdict,
   decideTurnEnd,
   reportRunFailure,
   type TurnEndDecision,
+  triedCalls,
   verdictRecord,
 } from "./continuation";
 import { modelInfoFor } from "./credentials";
@@ -109,6 +111,7 @@ import { cutText } from "./format";
 import { onForumRunFinished } from "./forum";
 import type { ModelGateway } from "./gateway";
 import { agentRepositoryList, repositoriesPrompt } from "./git/repos";
+import { handOffHolds } from "./hand-off";
 import { UPDATE_ISSUE_TOOL } from "./issue-tools";
 import { linkRunToIssue, mirrorReplyToIssue } from "./issues";
 import { listenLiveSteering, renderSteered } from "./live-steer";
@@ -183,11 +186,11 @@ import {
   STUCK_NOTE,
   type StuckState,
 } from "./stuck";
-import { archivedAgentsPrompt, FIND_AGENT_TOOL, renamedAgentsPrompt } from "./team";
+import { archivedAgentsPrompt, FIND_AGENT_TOOL, renamedAgentsPrompt, teammateMeans } from "./team";
 import { linkRunChecks, runChecksForReply } from "./team-actions";
 import { carriesCredential, maskCredentials } from "./tool-detail";
 import { chooseToolGroups, keptToolGroups, recentForJudge, type ToolGroupChoice } from "./tool-loading";
-import { ON_DEMAND_FIND, ON_DEMAND_USE, presentTools, toolGroupKey } from "./tools/directory";
+import { ON_DEMAND_FIND, ON_DEMAND_USE, presentTools, toolGroupKey, turnMeans } from "./tools/directory";
 import { type Approval, type InvokeResult, isSensitive, type ToolGateway } from "./tools/gateway";
 import type { ToolContext, ToolDefinition } from "./tools/types";
 import {
@@ -346,6 +349,8 @@ export interface Transcript {
   routineRecord?: string;
   /** Tool calls the run made so far, every brain and turn (the controller's progress check reads it). */
   executedCalls?: number;
+  /** A computer brain's own tool calls (not ours through the bridge), as the judge reads them (`callLine`): the last 20. */
+  harnessTried?: string[];
   /** The last judged turn end: `waiting` holds a mission from going on by itself (`keepGoingBlocker`). */
   followThroughVerdict?: "done" | "unkept" | "waiting";
   /**
@@ -1636,6 +1641,26 @@ async function executeRunInner(
   // The context budget reads the model's window: an OpenRouter model's comes with its list.
   await modelInfoFor(db, thinker.model);
   let plan: BrainPlan = brainPlan;
+  /**
+   * What the turn-end judge reads (ADR 0109), filled only when it runs: the run's general means (`turnMeans`, its
+   * computer's own tools on a computer brain) and every call it tried (`triedCalls`). An `untried` nudge names them.
+   */
+  const evidenceFor = (t: Transcript) => {
+    const evidence = { means: [] as string[], tried: [] as string[] };
+    const gather = async () => {
+      const names = new Set([...granted, ...tools].map((x) => x.name));
+      const own =
+        plan.kind === "model"
+          ? []
+          : [
+              `your computer's own tools: shell and files${plan.kind === "claude_code" ? ", WebSearch and WebFetch" : ""}`,
+            ];
+      evidence.means = [...turnMeans(names, await teammateMeans(ctx).catch(() => [])), ...own];
+      evidence.tried = await triedCalls(db, run, t.harnessTried);
+      return evidence;
+    };
+    return { evidence, gather };
+  };
   let brain = createBrain(deps, thinker, run, plan.kind, turnToken, () => transcript as Transcript);
   let triggerText = trigger?.body ?? topTrigger?.body ?? "";
   if (plan.kind !== "model" && !triggerText) {
@@ -2387,7 +2412,7 @@ async function executeRunInner(
       // Where this computer turn's steps start (the bridge records a step per tool it runs).
       const turnStepSeq = plan.kind !== "model" ? await lastStepSeq(db, run.id) : 0;
       /** Calls the computer brain said it ran in this turn (through the bridge or on its own). */
-      const executedNow: { id: string; name: string; input: unknown }[] = [];
+      const executedNow: { id: string; name: string; input: unknown; result?: ToolResult }[] = [];
       // Context budget: a request that wouldn't fit the model's window sends old tool results as a
       // placeholder (the judge picks which). Saved on the transcript, so later turns and resumes agree.
       if (turnPlan.kind === "model") {
@@ -2611,7 +2636,13 @@ async function executeRunInner(
       // The calls a computer turn ran itself (Codex's commands and edits; Claude Code keeps its own on the computer):
       // the report tells action from talk by them. Ours through the bridge have steps of their own.
       const ours = new Set(turnTools.map((t) => t.name));
-      const ranItself = executedNow.filter((c) => !ours.has(c.name)).length;
+      const own = executedNow.filter((c) => !ours.has(c.name));
+      const ranItself = own.length;
+      if (own.length > 0)
+        transcript.harnessTried = [
+          ...(transcript.harnessTried ?? []),
+          ...own.map((c) => callLine(c.name, c.input, c.result)),
+        ].slice(-20);
       // Independent writes in parallel (different rows).
       const [counted] = await Promise.all([
         db
@@ -2842,7 +2873,9 @@ async function executeRunInner(
           return fail(STUCK_ERROR, { code: STUCK_ERROR, ...(record ? { detail: record } : {}) });
         // Work it said it would do still undone: once more in the same run (ADR 0097). It never asks: its report
         // goes to a conversation whose own run can.
-        const state = transcript.continuation ?? { count: 0 };
+        // A report `hand_off` held as untried (ADR 0109) used the run's extra turn too.
+        const shared = transcript.continuation ?? { count: 0 };
+        const state = { ...shared, count: Math.max(shared.count, await handOffHolds(db, run)) };
         // Its hand_off already spoke (the routine run is `reported`): that was its last act, and it fires again on
         // its own schedule, so a "next time I'll check" in its record is no unkept promise.
         const routineRunId = routineRunIdOf(triggerMessage?.meta);
@@ -2852,6 +2885,7 @@ async function executeRunInner(
               .from(routineRuns)
               .where(and(eq(routineRuns.id, routineRunId), eq(routineRuns.orgId, run.orgId)))
           : [];
+        const judging = evidenceFor(transcript);
         const decision = await decideTurnEnd({
           state,
           kind: "routine",
@@ -2865,24 +2899,25 @@ async function executeRunInner(
           mission: false,
           wakesLater: () => wakesLater(db, run),
           verdict: judge
-            ? () =>
+            ? async () =>
                 continuationVerdict(judge, {
                   orgId: run.orgId,
                   agentId: run.agentId,
                   runId: run.id,
                   request: transcript.request ?? triggerMessage?.body ?? triggerText,
                   reply: record,
-                  did: [],
+                  ...(await judging.gather()),
                   runKind: "routine",
                 })
             : null,
+          evidence: judging.evidence,
         });
         transcript.continuation = advanceContinuation(state, decision, transcript.executedCalls ?? 0);
         const { nudge, ...recorded } = { ...decision, count: transcript.continuation.count };
         later(() =>
           addRunStep(db, run, "context", {
             continuation: recorded,
-            ...(decision.outcome === "continue" ? { nudged: "promise" } : {}),
+            ...(decision.outcome === "continue" ? { nudged: decision.rule === "untried" ? "untried" : "promise" } : {}),
           }),
         );
         const kept = [transcript.routineRecord, record].filter(Boolean).join("\n\n");
@@ -2981,6 +3016,7 @@ async function executeRunInner(
             channelRow.kind !== "dm",
           )
         : "";
+      const judging = evidenceFor(t);
       const decision = await decideTurnEnd({
         state,
         kind: betweenAgents ? "agents_dm" : "conversation",
@@ -2997,22 +3033,19 @@ async function executeRunInner(
           (plan.missionId ? await missionAsksPerson(db, plan.missionId) : false) ||
           wakesLater(db, run, (t as { detachedWaits?: { waitId: string }[] }).detachedWaits),
         verdict: judge
-          ? () =>
+          ? async () =>
               continuationVerdict(judge, {
                 orgId: run.orgId,
                 agentId: run.agentId,
                 runId: run.id,
                 request: t.request ?? triggerMessage?.body ?? triggerText,
                 reply: judged,
-                did: t.messages.flatMap((m) =>
-                  typeof m.content === "string"
-                    ? []
-                    : m.content.flatMap((b) => (b.type === "tool_use" ? [b.name] : [])),
-                ),
+                ...(await judging.gather()),
                 runKind: betweenAgents ? "agents_dm" : "conversation",
                 unreached,
               })
           : null,
+        evidence: judging.evidence,
       });
       turnEnd = decision;
       if (decision.verdict) t.followThroughVerdict = verdictRecord(decision.verdict);
@@ -3022,6 +3055,7 @@ async function executeRunInner(
         answer: sentinelOnly ? "sentinel" : "empty",
         promise: "promise",
         unreached: "unreached",
+        untried: "untried",
       }[decision.rule];
       const { nudge: _, ...recorded } = { ...decision, count: t.continuation.count };
       later(() =>
@@ -3286,7 +3320,7 @@ async function thinkOnce(
     /** How long the turn is still read after a `limit` event (`PLAN_LIMIT_GRACE_MS`). */
     limitGraceMs?: number;
     /** A call the brain already ran (through the bridge, or its own tools). */
-    onExecuted?(call: { id: string; name: string; input: unknown }): void;
+    onExecuted?(call: { id: string; name: string; input: unknown; result?: ToolResult }): void;
     /** Messages handed to the turn mid-turn that it read (live steering). */
     onSteerRead?(uuids: string[]): void;
   } = {},
@@ -3328,7 +3362,7 @@ async function thinkOnce(
       // Executed elsewhere (a computer brain through the runner bridge, which recorded its steps): shown only.
       if (event.executed) {
         executedCount++;
-        hooks.onExecuted?.({ id: event.id, name: event.name, input: event.input });
+        hooks.onExecuted?.({ id: event.id, name: event.name, input: event.input, result: event.executed });
       } else toolCalls.push({ id: event.id, name: event.name, input: (event.input ?? {}) as Record<string, unknown> });
     } else if (event.type === "usage") {
       usage = event;

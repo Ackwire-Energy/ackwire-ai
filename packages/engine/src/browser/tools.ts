@@ -41,6 +41,7 @@ import type { JsonSchema } from "../tools/json-schema";
 import { grantedScopeKeys, isAllowed, toolAccess } from "../tools/scopes";
 import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import { SHARE_HINT, SHARE_INPUT, shareSavedFile } from "../uploads";
+import type { BrowserPageReader } from "../web-tools";
 import {
   agentUsesScreen,
   browserOnDesktop,
@@ -419,7 +420,7 @@ const NO_JUDGE: Judge = {
  * are typed by the runner from what `request_secret` delivered: the value
  * never reaches the server.
  */
-export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
+export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { readPage: BrowserPageReader } {
   const hub = deps.machines?.hub;
   const judge = deps.judge ?? NO_JUDGE;
   const targets = deps.targets ?? createTargetCache();
@@ -1128,8 +1129,29 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource {
     ),
   ];
 
+  /**
+   * A page opened and read in the agent's own browser, for `web_search` when no search service answers
+   * (ADR 0109): only when the agent may use its browser (`browser:use`, its site allowlist) and its computer
+   * serves one; null otherwise.
+   */
+  async function readPage(ctx: ToolContext, url: string) {
+    if (!hub) return null;
+    const open = definitions.find((d) => d.name === "browser_open");
+    const granted = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
+    if (!open || !isAllowed(toolAccess(granted, open))) return null;
+    const linked = await linkFor(ctx);
+    if (!linked.ok) return null;
+    const [opened, look] = await linked.link.batch([
+      { command: "open", args: [url], timeoutSeconds: OPEN_SECONDS },
+      { command: "snapshot", args: [], timeoutSeconds: COMMAND_SECONDS },
+    ]);
+    if (!opened?.ok || !look?.ok) return null;
+    return { text: dataText(look.data), url: urlOf(look.data) };
+  }
+
   return {
     name: "browser",
+    readPage,
     async tools(ctx) {
       if (!hub) return [];
       // Most agents have no browser: the cached grants decide before any machine lookup. Without them the

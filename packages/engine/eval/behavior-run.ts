@@ -51,6 +51,7 @@ import {
   createRoutine,
   createScheduleToolSource,
   createToolGateway,
+  createWebToolSource,
   createWorkspaceToolSource,
   drainOutbox,
   enqueue,
@@ -65,6 +66,7 @@ import {
   type RoutineBrief,
   startRoutineRun,
   stretchCardOf,
+  type ToolGateway,
   type ToolSource,
   withJudgeFallback,
 } from "../src";
@@ -75,7 +77,14 @@ import {
   type EvalTurn,
   type Expectations,
 } from "./behavior-checks";
-import { type Canned, CONNECTORS, fakeConnectorSource, fakeMissionSource } from "./behavior-fakes";
+import {
+  type Canned,
+  CONNECTORS,
+  fakeConnectorSource,
+  fakeMissionSource,
+  fakeWebFetch,
+  type WebFixture,
+} from "./behavior-fakes";
 
 // ── Cases ────────────────────────────────────────────────────────────────────
 
@@ -182,6 +191,11 @@ export interface BehaviorCase {
   memory?: { kind?: "note" | "fact" | "decision" | "lesson"; title?: string; content: string }[];
   /** Canned results per tool: the first entry whose `when` words all appear in the input wins. */
   fixtures?: Record<string, Canned[]>;
+  /**
+   * The agent reads the web (`web_search`, `web_fetch`, ADR 0109) from this fake web, and how its turns end (and a
+   * routine's report) is judged as in production.
+   */
+  web?: WebFixture;
   expect: Expectations & {
     /** What a good answer does, for the judge. */
     behavior: string;
@@ -411,8 +425,15 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       ...(together && !c.schedule ? [createAskAgentToolSource({ pubsub })] : []),
       createReactToolSource({ pubsub }),
       createMediaToolSource({ pubsub, gifs: c.noGifs ? null : createFakeGifs() }),
-      // Routine cases run in the background and speak through it.
-      createHandOffToolSource({ pubsub }),
+      // Routine cases run in the background and speak through it; with a web, a give-up report is judged first.
+      createHandOffToolSource({
+        pubsub,
+        judge: c.web ? { name: "eval", ask: (r) => (context.judge as Judge).ask(r) } : null,
+        tools: () => tools,
+      }),
+      ...(c.web
+        ? [createWebToolSource({ fetch: fakeWebFetch(c.web), resolveHost: async () => ["93.184.216.34"] })]
+        : []),
       // Runs nobody called by name may pass (offered only to them, as in production).
       createPassToolSource(),
       createContextToolSource(context),
@@ -433,8 +454,8 @@ export async function runCase(c: BehaviorCase, options: RunOptions): Promise<Cas
       ...(c.missions ? [fakeMissionSource().source] : []),
       ...fakes.map((f) => f.source),
     ];
-    const tools = createToolGateway({ sources });
-    if (together) {
+    const tools: ToolGateway = createToolGateway({ sources });
+    if (together || c.web) {
       // How agents work together is judged as in production (ADR 0089, ADR 0095): Jev, the cheap model as fallback.
       const llmJudge = createLlmJudge({ gateway, resolveModel: async () => "claude-haiku-5-5" });
       const real =

@@ -62,7 +62,7 @@ scenario("S25", "a routine set to act hands an error to an agent, which fixes it
   await assertInvariants(w);
 });
 
-scenario("S26", "a routine set to only look says who limited it, and its report run can still ask", async () => {
+scenario("S26", "a routine says whose reach it works within, and its report run can still ask", async () => {
   const w = await world({
     agents: ["otto"],
     script: {
@@ -92,7 +92,7 @@ scenario("S26", "a routine set to only look says who limited it, and its report 
   });
   await fireRoutine(w, "otto", "Checa os erros novos do checkout.", "read");
   const background = w.prompts("otto")[0] ?? "";
-  // The run is told who set it to only look (I7), not only that it can't act.
+  // The run is told whose rooms and agents it reaches (I7).
   expect(/What it may do: [^\n]*\bana\b/i.test(background)).toBe(true);
   const asks = (await w.calls("otto")).filter((c) => c.name === "ask_user");
   expect(asks.map((c) => [c.isError, c.result])).toEqual([[false, expect.any(String)]]);
@@ -174,7 +174,8 @@ scenario(
     });
     const run = await fireRoutine(w, "otto", "Me dê um bom dia com o resumo do Sentry.", "act");
     expect(run?.status).toBe("reported");
-    expect(w.judgedAs("follow_through")).toEqual([]);
+    // Only its report was judged before it posted (ADR 0109); the turn after it isn't.
+    expect(w.judgedAs("follow_through")).toHaveLength(1);
     expect((await w.calls("otto")).map((c) => c.name)).toEqual(["hand_off"]);
     expect((await w.posts()).map((p) => p.body)).toEqual(["Bom dia! Nenhum erro novo no Sentry."]);
     await assertInvariants(w);

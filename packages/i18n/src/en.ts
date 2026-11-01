@@ -4017,7 +4017,6 @@ export const en: Translations = {
       firstRun: "The first one is {{when}}.",
       eventEvery: "Runs every time the event arrives.",
       state: { live: "Live", paused: "Paused", done: "Done", running: "Running" },
-      access: "What it can do on its own",
       report: "When to speak",
       runsOn: "Where it runs",
       usage: "Use this week",
@@ -4095,7 +4094,6 @@ export const en: Translations = {
       required: "Say what the agent should do.",
       noAgents: "Create an agent before creating a routine.",
       report: "When to speak",
-      access: "What it can do on its own",
       parseError: {
         schedule_unreadable: "Couldn't read the period. Try “every 2 weeks on Monday at 9am”.",
         schedule_never: "This schedule never happens.",
@@ -4158,12 +4156,6 @@ export const en: Translations = {
     reachWarning: {
       blocked:
         "This routine won't be able to call <b>{{name}}</b>: only the people who look after {{pronoun}} can. The rest of the routine runs as usual.",
-      read: "This routine only looks and tells, so it won't call <b>{{name}}</b>. To call it, pick Can act.",
-    },
-    access: {
-      read: "Only look and tell",
-      act: "Can act",
-      hint: "Only look and tell: it reads and reports what it found. To change anything, it asks someone. Can act: it can also create and change tasks, memory, the wiki and Drive files, work on its own code, talk to other agents and post where its creator can. Changes in connected apps, merges and deploys always ask for approval first.",
     },
     report: {
       always: "Every time",

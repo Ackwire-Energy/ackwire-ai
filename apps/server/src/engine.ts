@@ -8,7 +8,6 @@ import {
   type BrainTurn,
   CodexBrain,
   type ContextDeps,
-  computerTurnProfile,
   createArtifactToolSource,
   createAskAgentToolSource,
   createAskUserToolSource,
@@ -54,6 +53,7 @@ import {
   createTalker,
   createToolGateway,
   createUsageToolSource,
+  createWebToolSource,
   createWikiToolSource,
   createWorkspaceToolSource,
   type EmailArt,
@@ -261,6 +261,15 @@ export function buildEngine(o: EngineOptions) {
     upstream: o.github,
     app: githubApp,
   };
+  // The agent's own browser on its connected computer (ADR 0040): `browser:use`, when the machine serves it.
+  // Targets in words, checks and finds go to the judge (ADR 0054); screenshots only to Jev's vision model.
+  const browserTools = createBrowserToolSource({
+    machines: { hub: machineHub },
+    pubsub: adapters.pubsub,
+    judge: context.judge,
+    vision,
+    publicUrl: config.PUBLIC_URL,
+  });
   const tools = createToolGateway({
     sources: [
       createAskUserToolSource(),
@@ -280,7 +289,7 @@ export function buildEngine(o: EngineOptions) {
       // An agent comes back to a conversation by itself (a CI run, a deploy), instead of promising to.
       createFollowUpToolSource({ pubsub: adapters.pubsub }),
       // Background runs (routines) speak only through it.
-      createHandOffToolSource({ pubsub: adapters.pubsub }),
+      createHandOffToolSource({ pubsub: adapters.pubsub, judge: context.judge, tools: () => tools }),
       // Runs nobody called by name may stay quiet (reply-policy.ts): listed only for them.
       createPassToolSource(),
       createArtifactToolSource(artifacts),
@@ -316,14 +325,15 @@ export function buildEngine(o: EngineOptions) {
         skills: { blobs: artifacts.blobs },
         pubsub: adapters.pubsub,
       }),
-      // The agent's own browser on its connected computer (ADR 0040): `browser:use`, when the machine serves it.
-      // Targets in words, checks and finds go to the judge (ADR 0054); screenshots only to Jev's vision model.
-      createBrowserToolSource({
-        machines: { hub: machineHub },
-        pubsub: adapters.pubsub,
-        judge: context.judge,
-        vision,
-        publicUrl: config.PUBLIC_URL,
+      browserTools,
+      // Reading the web, for every agent and run (ADR 0109): a search service when configured, else the agent's
+      // own browser, else DuckDuckGo's HTML page.
+      createWebToolSource({
+        braveKey: config.BRAVE_SEARCH_API_KEY,
+        searxngUrl: config.SEARXNG_URL,
+        browser: browserTools.readPage,
+        resolveHost: o.resolveHost,
+        usage: gateway,
       }),
       // The agent's own desktop (ADR 0062): `desktop:use` with Run code, when its computer serves desktop use.
       createDesktopToolSource({
@@ -384,14 +394,13 @@ export function buildEngine(o: EngineOptions) {
   const brainLink = hubBrainLink({ hub: machineHub, pubsub: adapters.pubsub });
   /**
    * A computer turn's permission profile (ADR 0053 §3), the same for Claude Code and Codex: a mission run
-   * keeps its own (plan before Start, while a write item is live and for a routine's run that only looks,
-   * work otherwise; ADR 0044); any other run follows who is behind it, read every turn
-   * (`computerTurnProfile`: `plan` only for a routine that only looks and tells, `work` for every other run,
-   * whoever woke it). Its own branches are agentes/<handle>/… (what the git proxy accepts).
+   * keeps its own (plan before Start and while a write item is live, work otherwise; ADR 0044); every other
+   * run works, whoever woke it (ADR 0109: one permission model, the agent's own). Its own branches are
+   * agentes/<handle>/… (what the git proxy accepts).
    */
   const turnPermissions = async (turn: BrainTurn): Promise<BrainTurnRequest["permissions"]> =>
     (await missionTurnPermissions(db, turn)) ?? {
-      mode: await computerTurnProfile(db, turn),
+      mode: "work",
       branchPrefix: `agentes/${(await agentScope(turn)).handle}/`,
     };
   // Before a chat turn on a connected machine: the agent's checkouts updated through the git proxy, the turn
