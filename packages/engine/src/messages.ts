@@ -654,6 +654,25 @@ export async function insertMessageWithRuns(
       ), answering as (
         -- Who can talk to the agent: the others get no run, only a notice for the sender.
         select agent_id, trig from addressed where allowed and agent_id not in (select agent_id from muted)
+      ), floor_runs as (
+        -- The floor (a follow-up without @ in a channel's main timeline): it goes to the agent still
+        -- answering this same person there, asked within the last minutes. Deterministic, no router. Only
+        -- while one agent is at it: with two answering them (a question to each), the next message may be
+        -- for one of them or both, so the router decides.
+        select r.id, r.agent_id from ${agentRuns} r
+        join ${agents} ra on ra.id = r.agent_id
+        where ${startRuns && !threadId}::boolean and ${deliver}::boolean and not exists (select 1 from mentioned)
+          and r.org_id = ${input.orgId}::uuid and r.channel_id = ${input.channelId}::uuid
+          and r.status in ('queued', 'running') and not r.background and ${inChannelRun(sql`r`)}
+          and r.agent_id not in (select agent_id from answered)
+          and r.agent_id not in (select agent_id from muted)
+          and r.agent_id <> all(${referenced}::uuid[])
+          and r.created_at > now() - ${FLOOR_WINDOW_MS / 1000}::int * interval '1 second'
+          and ra.archived_at is null
+          and exists (select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'channel')
+          and exists (select 1 from ${messages} tm where tm.org_id = ${input.orgId}::uuid
+            and tm.id = r.trigger_message_id and tm.author_user_id = ${userId})
+          and ${audienceSql("ra", sql`${userId}::text`)}
       ), active as (
         -- One active run per agent and conversation: a new message goes to it instead of a second run.
         -- Addressed agents (mention, DM) with a run in this conversation, and, for a reply in a
@@ -686,16 +705,7 @@ export async function insertMessageWithRuns(
                 }))
             or (${threadId}::uuid is not null and r.thread_root_id = ${threadId}::uuid
               and ${audienceSql("ra", sql`${userId}::text`)})
-            -- The floor (a follow-up without @ in a channel's main timeline): it goes to the agent still
-            -- answering this same person there, asked within the last minutes. Deterministic, no router.
-            or (${startRuns && !threadId}::boolean and not exists (select 1 from mentioned)
-              and r.status in ('queued', 'running') and ${inChannelRun(sql`r`)}
-              and r.created_at > now() - ${FLOOR_WINDOW_MS / 1000}::int * interval '1 second'
-              and ra.archived_at is null
-              and exists (select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'channel')
-              and exists (select 1 from ${messages} tm where tm.org_id = ${input.orgId}::uuid
-                and tm.id = r.trigger_message_id and tm.author_user_id = ${userId})
-              and ${audienceSql("ra", sql`${userId}::text`)})
+            or (r.id in (select id from floor_runs) and (select count(distinct agent_id) from floor_runs) = 1)
           )
         order by r.agent_id, r.created_at desc
       ), held as (

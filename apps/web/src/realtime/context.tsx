@@ -550,7 +550,15 @@ export function RealtimeProvider({
     });
     conn.start();
     setConnection(conn);
+    // Back from a sleep or a network change, the socket may be dead while it still says open: check it now.
+    const wake = () => {
+      if (document.visibilityState === "visible") conn.checkAlive();
+    };
+    document.addEventListener("visibilitychange", wake);
+    window.addEventListener("online", wake);
     return () => {
+      document.removeEventListener("visibilitychange", wake);
+      window.removeEventListener("online", wake);
       offReconnect();
       offOpen();
       offUser();
