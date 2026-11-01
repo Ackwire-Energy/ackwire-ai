@@ -1,12 +1,14 @@
 import type { Artifact, ArtifactContent, ArtifactKind } from "@agenteschat/client";
 import { ApiError, keys } from "@agenteschat/client";
 import { fileName } from "@agenteschat/client/lib/artifacts";
+import { artifactPlace } from "@agenteschat/client/lib/drive";
 import { Button, Dialog, DialogFooter, type IconName, Menu, MenuItem, MenuSeparator } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
+import { goToTarget } from "@/components/NotificationOpen";
 import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
 import { artifactLink } from "./ArtifactViewer";
@@ -15,7 +17,7 @@ import { fileSaver } from "./fileSaver";
 type Target = Pick<Artifact, "id" | "title">;
 
 /**
- * "Apagar arquivo": a confirmation naming the file (it goes to the trash for
+ * "Mover para a lixeira": a confirmation naming the file (it goes to the trash for
  * 30 days; messages that cite it show "Arquivo removido"), then a toast with
  * "Desfazer", which restores it. Several at once (the Drive's selection): one
  * confirmation and one toast for all of them.
@@ -155,30 +157,38 @@ export function useArtifactDownload() {
   return { save, formats };
 }
 
-/** "…" on a file (viewer header, Drive rows): link, channel, versions, delete. */
+/** "…" on a file (viewer header, Drive rows): link, its conversation, versions, move to the trash. */
 export function ArtifactMoreMenu({
   artifact,
   onVersions,
   onDelete,
   extra,
+  plain,
 }: {
   artifact: Artifact;
   onVersions?: () => void;
   onDelete: () => void;
   /** Items before the separator (Drive adds "Abrir"). */
   extra?: React.ReactNode;
+  /** A full-size bordered button, matching the plain buttons it sits beside (the details' actions). */
+  plain?: boolean;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
   const navigate = useNavigate();
   const label = t("artifacts.more", { title: artifact.title });
+  const place = artifactPlace(artifact);
   return (
     <Menu
       align="end"
       label={label}
       trigger={
-        <Button size="sm" variant="ghost" iconOnly icon="more" aria-label={label} title={t("artifacts.moreShort")} />
+        plain ? (
+          <Button iconOnly icon="more" aria-label={label} title={t("artifacts.moreShort")} />
+        ) : (
+          <Button size="sm" variant="ghost" iconOnly icon="more" aria-label={label} title={t("artifacts.moreShort")} />
+        )
       }
     >
       {extra}
@@ -191,17 +201,12 @@ export function ArtifactMoreMenu({
       >
         {t("artifacts.copyLink")}
       </MenuItem>
-      {artifact.channelId && (
+      {place && (
         <MenuItem
-          icon="channel"
-          onSelect={() =>
-            void navigate({
-              to: "/org/$orgId/c/$channelId",
-              params: { orgId: org.id, channelId: artifact.channelId ?? "" },
-            })
-          }
+          icon={artifact.audience.kind === "dm" ? "message" : place.to.includes("threads") ? "thread" : "channel"}
+          onSelect={() => goToTarget(navigate, org.id, place)}
         >
-          {t("artifacts.openInChannel")}
+          {t(artifact.audience.kind === "dm" ? "artifacts.openInDm" : "artifacts.openInChannel")}
         </MenuItem>
       )}
       {onVersions && (

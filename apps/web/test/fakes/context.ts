@@ -16,6 +16,8 @@ export interface MockContext {
     members(orgId: string): Promise<Member[]>;
     /** Every message (any channel), as the chat fake holds them. */
     messages?(orgId: string): Promise<Message[]>;
+    /** Direct conversations: their channel and the other participant. */
+    dms?(orgId: string): Promise<{ channelId: string; with: { type: "person" | "agent"; id: string } }[]>;
   };
 }
 

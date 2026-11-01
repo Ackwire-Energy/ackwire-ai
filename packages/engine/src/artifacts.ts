@@ -1018,34 +1018,126 @@ export async function shareArtifact(
   return { artifact: shared, copied, from: { channelId: a.channelId, kind: origin?.kind ?? null } };
 }
 
-/** Deletes an artifact (its creator or an admin). Stored versions stay until purged. */
 /** Deleted files can be restored for this long; then the purge job removes their contents (all versions). */
 export const ARTIFACT_TRASH_DAYS = 30;
 
+type Ownable = Pick<ArtifactRow, "id" | "createdByType" | "createdById">;
+
 /**
- * Who may delete (and restore) a file: whoever created it; for files an
- * agent made, the person who asked it and the agent's owner; admins always.
+ * Which of these files this person may delete (and restore): whoever created
+ * it; for files an agent made, the person who asked it and the agent's owner;
+ * admins always.
  */
-async function canDeleteArtifact(db: Database, userId: string, orgId: string, a: ArtifactRow) {
+async function deletableIds(db: Database, userId: string, orgId: string, list: Ownable[]): Promise<Set<string>> {
   const membership = await requireActiveMembership(db, userId, orgId);
-  if (can(membership, "configure")) return true;
-  if (a.createdByType === "person") return a.createdById === userId;
-  const [agent] = await db
-    .select({ ownerUserId: schema.agents.ownerUserId })
-    .from(schema.agents)
-    .where(and(eq(schema.agents.id, a.createdById), eq(schema.agents.orgId, orgId)));
-  if (agent?.ownerUserId === userId) return true;
-  // The person behind the run that made the first version.
-  const [asked] = await db
-    .select({ userId: schema.messages.authorUserId })
-    .from(artifactVersions)
-    .innerJoin(schema.agentRuns, eq(schema.agentRuns.id, artifactVersions.runId))
-    .innerJoin(
-      schema.messages,
-      and(eq(schema.messages.id, schema.agentRuns.triggerMessageId), eq(schema.messages.orgId, orgId)),
-    )
-    .where(and(eq(artifactVersions.artifactId, a.id), eq(artifactVersions.version, 1)));
-  return asked?.userId === userId;
+  if (can(membership, "configure")) return new Set(list.map((a) => a.id));
+  const out = new Set(list.filter((a) => a.createdByType === "person" && a.createdById === userId).map((a) => a.id));
+  const byAgent = list.filter((a) => a.createdByType === "agent");
+  if (byAgent.length === 0) return out;
+  const [owned, asked] = await Promise.all([
+    db
+      .select({ id: schema.agents.id })
+      .from(schema.agents)
+      .where(
+        and(
+          eq(schema.agents.orgId, orgId),
+          eq(schema.agents.ownerUserId, userId),
+          inArray(schema.agents.id, [...new Set(byAgent.map((a) => a.createdById))]),
+        ),
+      ),
+    // The person behind the run that made the first version.
+    db
+      .select({ artifactId: artifactVersions.artifactId })
+      .from(artifactVersions)
+      .innerJoin(schema.agentRuns, eq(schema.agentRuns.id, artifactVersions.runId))
+      .innerJoin(
+        schema.messages,
+        and(eq(schema.messages.id, schema.agentRuns.triggerMessageId), eq(schema.messages.orgId, orgId)),
+      )
+      .where(
+        and(
+          inArray(
+            artifactVersions.artifactId,
+            byAgent.map((a) => a.id),
+          ),
+          eq(artifactVersions.version, 1),
+          eq(schema.messages.authorUserId, userId),
+        ),
+      ),
+  ]);
+  const ownedAgents = new Set(owned.map((r) => r.id));
+  for (const a of byAgent) if (ownedAgents.has(a.createdById)) out.add(a.id);
+  for (const r of asked) out.add(r.artifactId);
+  return out;
+}
+
+const canDeleteArtifact = async (db: Database, userId: string, orgId: string, a: Ownable) =>
+  (await deletableIds(db, userId, orgId, [a])).has(a.id);
+
+/**
+ * Who can see a file, as the person looking at it reads it (ADR 0111). A
+ * file follows the conversation it came from: no conversation = the whole
+ * workspace; a public channel = the whole workspace too (anyone may open
+ * it), a private channel = its members; a DM = its two participants. Agents
+ * follow the same rules, narrower (`agentSearchChannels`).
+ */
+export type ArtifactAudience =
+  | { kind: "workspace" }
+  | { kind: "channel"; name: string; private: boolean }
+  | { kind: "dm"; with: ArtifactAuthor | null };
+
+/** What the app adds for the person viewing: may they delete it, and who can see it. */
+export interface PersonArtifactFacts {
+  canDelete: boolean;
+  audience: ArtifactAudience;
+}
+
+export async function withPersonFacts<T extends Pick<ArtifactView, "id" | "channelId" | "createdBy">>(
+  db: Database,
+  userId: string,
+  orgId: string,
+  list: T[],
+): Promise<(T & PersonArtifactFacts)[]> {
+  if (list.length === 0) return [];
+  const channelIds = [...new Set(list.flatMap((a) => (a.channelId ? [a.channelId] : [])))];
+  const [deletable, chans] = await Promise.all([
+    deletableIds(
+      db,
+      userId,
+      orgId,
+      list.map((a) => ({ id: a.id, createdByType: a.createdBy.type, createdById: a.createdBy.id })),
+    ),
+    channelIds.length
+      ? db
+          .select({ id: channels.id, kind: channels.kind, name: channels.name, visibility: channels.visibility })
+          .from(channels)
+          .where(and(eq(channels.orgId, orgId), inArray(channels.id, channelIds)))
+      : Promise.resolve([]),
+  ]);
+  const dmIds = chans.filter((c) => c.kind === "dm").map((c) => c.id);
+  const dmMembers = dmIds.length
+    ? await db
+        .select({ channelId: channelMembers.channelId, userId: channelMembers.userId, agentId: channelMembers.agentId })
+        .from(channelMembers)
+        .where(inArray(channelMembers.channelId, dmIds))
+    : [];
+  const audience = new Map<string, ArtifactAudience>(
+    chans.map((c): [string, ArtifactAudience] => {
+      if (c.kind !== "dm") return [c.id, { kind: "channel", name: c.name, private: c.visibility !== "public" }];
+      const other = dmMembers.find((m) => m.channelId === c.id && m.userId !== userId);
+      const who: ArtifactAuthor | null = other?.agentId
+        ? { type: "agent", id: other.agentId }
+        : other?.userId
+          ? { type: "person", id: other.userId }
+          : null;
+      return [c.id, { kind: "dm", with: who }];
+    }),
+  );
+  return list.map((a) => ({
+    ...a,
+    canDelete: deletable.has(a.id),
+    audience: a.channelId ? (audience.get(a.channelId) ?? { kind: "dm", with: null }) : { kind: "workspace" },
+  }));
 }
 
 /**
@@ -1114,9 +1206,10 @@ export async function listDeletedArtifacts(
     .where(and(eq(artifacts.orgId, orgId), sql`${artifacts.deletedAt} > ${since.toISOString()}::timestamptz`))
     .orderBy(desc(artifacts.deletedAt))
     .limit(500);
+  const deletable = await deletableIds(db, userId, orgId, rows);
   const out: TrashedArtifactView[] = [];
   for (const a of rows) {
-    if (!(await canDeleteArtifact(db, userId, orgId, a))) continue;
+    if (!deletable.has(a.id)) continue;
     out.push({
       id: a.id,
       title: a.title,
@@ -1165,6 +1258,16 @@ export async function restoreArtifact(deps: ArtifactDeps, userId: string, orgId:
   return view(row, true);
 }
 
+/** Removes these versions' blobs and rows (the artifact row stays as a tombstone). */
+async function dropVersions(deps: ArtifactDeps, list: { version: VersionRow; orgId: string }[]) {
+  for (const { version: v, orgId } of list) {
+    const store = await deps.blobs.forConfig(orgId, v.storageConfigId).catch(() => null);
+    await store?.delete(v.blobKey).catch(() => undefined);
+    await deps.db.delete(artifactVersions).where(eq(artifactVersions.id, v.id));
+  }
+  return list.length;
+}
+
 /**
  * Job: files deleted more than 30 days ago lose their contents (every
  * version's blob and row). The artifact row stays as a tombstone, so old
@@ -1178,14 +1281,40 @@ export async function purgeDeletedArtifacts(deps: ArtifactDeps, now = new Date()
     .innerJoin(artifacts, eq(artifacts.id, artifactVersions.artifactId))
     .where(sql`${artifacts.deletedAt} is not null and ${artifacts.deletedAt} < ${cutoff.toISOString()}::timestamptz`)
     .limit(500);
-  let purged = 0;
-  for (const { version: v, orgId } of versions) {
-    const store = await deps.blobs.forConfig(orgId, v.storageConfigId).catch(() => null);
-    await store?.delete(v.blobKey).catch(() => undefined);
-    await deps.db.delete(artifactVersions).where(eq(artifactVersions.id, v.id));
-    purged++;
+  return dropVersions(deps, versions);
+}
+
+/**
+ * "Apagar para sempre" in the trash: its contents go now, as the purge job
+ * would take them after 30 days. The same people who may restore it.
+ */
+export async function purgeArtifactNow(deps: ArtifactDeps, userId: string, orgId: string, artifactId: string) {
+  const a = await deletedRow(deps.db, orgId, artifactId);
+  if (!a?.deletedAt || purgeAt(a.deletedAt).getTime() <= Date.now()) {
+    throw new NotFoundError("Artifact not found", "artifact.not_found");
   }
-  return purged;
+  if (!(await canDeleteArtifact(deps.db, userId, orgId, a))) {
+    throw new ForbiddenError("Only who could delete it can delete it for good", "artifact.delete_forbidden");
+  }
+  // A tombstone is a row deleted longer ago than the trash keeps it: backdating takes it out of the trash
+  // (and out of restore) with no column of its own.
+  const gone = new Date(Date.now() - ARTIFACT_TRASH_DAYS * 86_400_000 - 1000);
+  await deps.db.transaction(async (tx) => {
+    await tx.update(artifacts).set({ deletedAt: gone }).where(eq(artifacts.id, a.id));
+    await recordAudit(tx, {
+      orgId,
+      actor: { type: "person", id: userId },
+      action: "artifact.purged",
+      target: { type: "artifact", id: a.id },
+      details: { title: a.title },
+    });
+  });
+  const versions = await deps.db
+    .select({ version: artifactVersions, orgId: artifacts.orgId })
+    .from(artifactVersions)
+    .innerJoin(artifacts, eq(artifacts.id, artifactVersions.artifactId))
+    .where(eq(artifactVersions.artifactId, a.id));
+  await dropVersions(deps, versions);
 }
 
 /** Message attachments (`meta.artifacts`) of deleted files, as `{ id, deleted: true, title }`. */

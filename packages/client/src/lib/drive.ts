@@ -1,6 +1,7 @@
 import type { Artifact, ArtifactKind } from "../api/types";
 import { ARTIFACT_KINDS } from "./artifacts";
 import { daysBetween } from "./format";
+import type { OpenTarget } from "./notifications";
 
 /** The Drive's arrangement. */
 export type DriveView = "grid" | "list";
@@ -60,6 +61,39 @@ export function groupArtifacts(list: Artifact[], group: DriveGroup, now = new Da
   }
   const order = group === "date" ? ["today", "week", "earlier"] : [...map.keys()];
   return order.filter((k) => map.has(k)).map((key) => ({ key, items: map.get(key) ?? [] }));
+}
+
+/** The Drive's section of files only a DM's two sides or a private channel's members can see. */
+export const PRIVATE_SECTION = "private";
+
+/** Not open to the whole workspace: from a DM or a private channel (ADR 0111). */
+export const isPrivateArtifact = (a: Pick<Artifact, "audience">) =>
+  a.audience.kind === "dm" || (a.audience.kind === "channel" && a.audience.private);
+
+/** `groupArtifacts` over the files the team can see, then the private ones in a section of their own, last. */
+export function driveSections(list: Artifact[], group: DriveGroup, now = new Date()): DriveSection[] {
+  const own = list.filter(isPrivateArtifact);
+  const sections = groupArtifacts(
+    list.filter((a) => !isPrivateArtifact(a)),
+    group,
+    now,
+  );
+  return own.length ? [...sections, { key: PRIVATE_SECTION, items: own }] : sections;
+}
+
+/**
+ * Where "Abrir na conversa" goes: its thread, else its DM (by the other side) or channel. Null for a file
+ * of no conversation, or a DM whose other side is gone.
+ */
+export function artifactPlace(a: Pick<Artifact, "channelId" | "threadId" | "audience">): OpenTarget | null {
+  if (!a.channelId) return null;
+  if (a.threadId) return { to: "/org/$orgId/threads/$threadId", params: { threadId: a.threadId } };
+  if (a.audience.kind !== "dm") return { to: "/org/$orgId/c/$channelId", params: { channelId: a.channelId } };
+  const other = a.audience.with;
+  if (!other) return null;
+  return other.type === "agent"
+    ? { to: "/org/$orgId/dm/agent/$agentId", params: { agentId: other.id } }
+    : { to: "/org/$orgId/dm/person/$userId", params: { userId: other.id } };
 }
 
 /** Shift-click: everything between the last clicked item and this one (inclusive), in the shown order. */

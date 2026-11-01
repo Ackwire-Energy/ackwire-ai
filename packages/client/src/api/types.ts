@@ -2355,7 +2355,16 @@ export interface Artifact {
   untrusted: boolean;
   /** The creator, who asked the agent, the agent's owner and admins may delete it. */
   canDelete?: boolean;
+  /** Who can see it, from the conversation it came from (ADR 0111). */
+  audience: ArtifactAudience;
 }
+
+export type ArtifactAudience =
+  | { kind: "workspace" }
+  /** A public channel's files: anyone in the workspace may open them. */
+  | { kind: "channel"; name: string; private: boolean }
+  /** `with`: the other participant of the DM. */
+  | { kind: "dm"; with: ArtifactAuthor | null };
 
 /** `GET …/artifacts-trash`: deleted files, kept for 30 days. */
 export interface TrashedArtifact extends Artifact {
