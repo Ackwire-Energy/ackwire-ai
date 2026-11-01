@@ -12,6 +12,7 @@ import {
   createJevRouterStrategy,
   createJobHandlers,
   createLlmJudge,
+  DEFAULT_PICKS_PER_HOUR,
   DEFAULT_ROUTER_POLICY,
   drainOutbox,
   insertMessage,
@@ -32,7 +33,7 @@ import {
   standingJudge,
   withJudgeFallback,
 } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import { addMember, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
 afterEach(() => f?.close());
@@ -681,10 +682,10 @@ describe("the agent a person last talked to", () => {
     expect(greeted.selected).toEqual([t.ada.id]);
   });
 
-  test("with a coordinator, a message nobody picked goes to the agent last talked to when it could answer", async () => {
+  test("with a coordinator, a message nobody picked goes to the agent last talked to", async () => {
     const t = await privateRoom();
     await f.db.update(schema.agents).set({ coordinator: true }).where(eq(schema.agents.id, t.theo.id));
-    // Nobody picked, 23 minutes after a talk with Ada: she gets it, as a run she may pass, not the coordinator.
+    // Nobody picked, 23 minutes after a talk with Ada: she gets it (R5), addressed, not the coordinator.
     const nobody = await t.talk(
       [
         [null, "ada quanto ta seu limite de uso?", 23.4, [t.ada]],
@@ -699,8 +700,8 @@ describe("the agent a person last talked to", () => {
       }),
     );
     expect(nobody.selected).toEqual([t.ada.id]);
-    expect(nobody.decision?.strategy).toBe("jev");
-    expect(nobody.decision?.reason).toBe("last talked to; jev: best @theo (confidence 0.83)");
+    expect(nobody.decision?.strategy).toBe("rule:default");
+    expect(nobody.decision?.reason).toBe("follow-up; default; talking to; jev: best @theo (confidence 0.83)");
   });
 
   test("with no pick between agents to settle, nothing changes", async () => {
@@ -1061,5 +1062,226 @@ describe("Jev strategy end to end", () => {
     );
     await drainOutbox(f.db, handlers);
     expect(jev.requests).toEqual([]);
+  });
+});
+
+describe("a message for the agents always gets one (R5)", () => {
+  /** Who wrote a line: Ana, Bruno or an agent; `routedTo` with the `strategy` that sent it there (jev by default). */
+  type Line = [
+    by: "ana" | "bruno" | { id: string },
+    text: string,
+    minutesAgo: number,
+    routedTo?: string[],
+    strategy?: string,
+  ];
+
+  /** #engenharia with Ana and Bruno, and Quirino (Dev) and Ada (Design); Theo (PM) coordinates when `coordinator`. */
+  async function room(options: { coordinator?: boolean } = {}) {
+    f = await setup();
+    const bruno = await addMember(f.db, f.org.id, "member", "Bruno");
+    const make = (name: string, role: string) =>
+      createAgent(
+        f.db,
+        f.owner.id,
+        f.org.id,
+        { name, handle: name.toLowerCase(), role, credentialId: f.credential.id },
+        { model: "claude-sonnet-5-5" },
+      );
+    const lauro = await make("Quirino", "Dev");
+    const ada = await make("Ada", "Design");
+    const theo = await make("Theo", "PM");
+    await f.db.update(schema.agents).set({ coordinator: false });
+    if (options.coordinator)
+      await f.db.update(schema.agents).set({ coordinator: true }).where(eq(schema.agents.id, theo.id));
+    let n = 0;
+    async function talk(before: Line[], body: string, answer: Parameters<typeof fakeJev>[0], by: Line[0] = "ana") {
+      n += 1;
+      const now = Date.now();
+      const channel = await createChannel(f.db, f.owner.id, f.org.id, { name: `engenharia-${n}` });
+      await addChannelMember(f.db, f.owner.id, f.org.id, channel.id, { userId: bruno.id });
+      for (const a of options.coordinator ? [lauro, ada, theo] : [lauro, ada])
+        await addChannelMember(f.db, f.owner.id, f.org.id, channel.id, { agentId: a.id });
+      const say = async ([author, text, minutesAgo, routedTo, strategy]: Line) => {
+        const m = await insertMessage(f.db, {
+          orgId: f.org.id,
+          channelId: channel.id,
+          author:
+            typeof author === "object"
+              ? { type: "agent", agentId: author.id, runId: null, hop: 1, stretchId: null }
+              : { type: "person", userId: author === "bruno" ? bruno.id : f.owner.id },
+          body: text,
+          createdAt: new Date(now - minutesAgo * 60_000),
+        });
+        if (routedTo) {
+          await f.db.insert(schema.routingDecisions).values({
+            orgId: f.org.id,
+            channelId: channel.id,
+            messageId: m.id,
+            strategy: strategy ?? "jev",
+            candidates: [],
+            selectedAgentIds: routedTo,
+            createdAt: new Date(now - minutesAgo * 60_000),
+          });
+        }
+        return m;
+      };
+      for (const line of before) await say(line);
+      const m = await say([by, body, 0]);
+      const strategy = createJevRouterStrategy({
+        key: "k",
+        recordUsage: async () => {},
+        fetch: fakeJev(answer).fetcher,
+      });
+      const routed = await routeMessage(
+        { db: f.db, strategy, policy: { ...DEFAULT_ROUTER_POLICY, maxHops: 3 } },
+        { orgId: f.org.id, messageId: m.id },
+      );
+      const [decision] = await f.db
+        .select()
+        .from(schema.routingDecisions)
+        .where(eq(schema.routingDecisions.messageId, m.id));
+      return { ...routed, decision };
+    }
+    return { lauro, ada, theo, talk };
+  }
+
+  /** Low need, every agent under the bar: what Jev said for "vocês se enrolaram muito". */
+  const low =
+    (needs: number, best = "none", confidence = 0.46) =>
+    () => ({
+      nouls: { "@lauro": 0.25, "@ada": 0.2, "@theo": 0.15 },
+      needs,
+      best,
+      choice: { [best]: confidence },
+    });
+
+  test("a complaint to the agents and a short 'Entenderam?' go to the agent the person talks with", async () => {
+    const r = await room();
+    const talk: Line[] = [
+      ["ana", "lauro, olha o build que quebrou", 6, [r.lauro.id]],
+      [{ id: r.lauro.id }, "Olhei, é o teste de login.", 5],
+    ];
+    const complaint = await r.talk(
+      talk,
+      "Eu mesmo peguei e fiz tudo no meu computador, vocês se enrolaram muito.",
+      low(0.3, "lauro"),
+    );
+    expect(complaint.selected).toEqual([r.lauro.id]);
+    expect(complaint.decidedBy).toEqual({ step: "rule", rule: "default" });
+    expect(complaint.decision?.strategy).toBe("rule:default");
+    expect(complaint.decision?.reason).toStartWith("follow-up; default; talking to; jev:");
+    // Right after it, with a pick of nobody and a need under the bar: the question mark keeps it out of the ack guard.
+    const asked = await r.talk(
+      [...talk, ["ana", "Eu mesmo fiz tudo, vocês se enrolaram muito.", 1, [r.lauro.id], "rule:default"]],
+      "Entenderam?",
+      low(0.2),
+    );
+    expect(asked.selected).toEqual([r.lauro.id]);
+    expect(asked.decision?.reason).toStartWith("follow-up; default; talking to");
+  });
+
+  test("a thank-you after the answer gets nobody (the ack guard)", async () => {
+    const r = await room();
+    const thanks = await r.talk(
+      [
+        ["ana", "lauro, olha o build que quebrou", 6, [r.lauro.id]],
+        [{ id: r.lauro.id }, "Corrigi, já está verde.", 1],
+      ],
+      "valeu",
+      low(0.1),
+    );
+    expect(thanks.selected).toEqual([]);
+    expect(thanks.runs).toEqual([]);
+  });
+
+  test("people talking among themselves get nobody: an answer right after a colleague, or a message to a person", async () => {
+    const r = await room();
+    const answer = await r.talk([["ana", "bruno, consegue revisar até amanhã?", 1]], "consigo sim", low(0.3), "bruno");
+    expect(answer.selected).toEqual([]);
+    // The same words with no colleague before them are for the agents: the best placed answers.
+    expect((await r.talk([], "consigo sim", low(0.3), "bruno")).selected).toEqual([r.lauro.id]);
+    expect((await r.talk([], "boa tarde bruno", low(0.3))).selected).toEqual([]);
+  });
+
+  test("'vocês viram o erro?' right after a colleague: nobody, unless Jev hears it said to every agent", async () => {
+    const r = await room();
+    const before: Line[] = [["bruno", "o deploy quebrou de novo", 1]];
+    const said = (everyone: number) => () => ({ ...low(0.4)(), everyone });
+    expect((await r.talk(before, "vocês viram o erro no deploy?", said(0.2))).selected).toEqual([]);
+    const toAll = await r.talk(before, "vocês viram o erro no deploy?", said(0.6));
+    expect(toAll.selected).toEqual([r.lauro.id]);
+    expect(toAll.decision?.reason).toStartWith("default; best");
+  });
+
+  test("no talk: the coordinator, else the best placed agent; a talk with an agent comes before the coordinator", async () => {
+    const coordinated = await room({ coordinator: true });
+    const toTheo = await coordinated.talk([], "alguém consegue olhar a tela de login?", low(0.3, "ada", 0.4));
+    expect(toTheo.selected).toEqual([coordinated.theo.id]);
+    expect(toTheo.decidedBy).toEqual({ step: "rule", rule: "coordinator" });
+    expect(toTheo.decision?.strategy).toBe("rule:coordinator");
+    expect(toTheo.decision?.reason).toStartWith("coordinator; default");
+    const backToAda = await coordinated.talk(
+      [
+        ["ana", "ada, revisa o layout da tela de login", 12.4, [coordinated.ada.id]],
+        [{ id: coordinated.ada.id }, "Revisei, mandei os ajustes.", 12],
+      ],
+      "e a tela de cadastro, consegue olhar também?",
+      low(0.3),
+    );
+    expect(backToAda.selected).toEqual([coordinated.ada.id]);
+    expect(backToAda.decision?.reason).toStartWith("follow-up; default; talking to");
+
+    await f.close();
+    const r = await room();
+    const toAda = await r.talk([], "alguém consegue olhar a tela de login?", low(0.3, "ada", 0.4));
+    expect(toAda.selected).toEqual([r.ada.id]);
+    expect(toAda.decidedBy).toEqual({ step: "rule", rule: "default" });
+    expect(toAda.decision?.reason).toStartWith("default; best; jev:");
+  });
+
+  test("a default pick is no talk: the next message is picked again, not kept with that agent", async () => {
+    const r = await room();
+    const next = await r.talk(
+      [
+        ["ana", "alguém consegue olhar a tela de login?", 15, [r.ada.id], "rule:default"],
+        [{ id: r.ada.id }, "Olhei, está ok.", 14],
+      ],
+      "e o build de ontem passou?",
+      low(0.3, "lauro", 0.4),
+    );
+    expect(next.selected).toEqual([r.lauro.id]);
+    expect(next.decision?.reason).toStartWith("default; best");
+  });
+
+  test("at most a few default picks a channel an hour; past them, nobody", async () => {
+    const r = await room();
+    const picks = (count: number): Line[] =>
+      Array.from({ length: count }, (_, i) => ["ana", `pergunta ${i}`, 59 - i, [r.ada.id], "rule:default"] as Line);
+    const asked = "alguém consegue olhar a tela de login?";
+    expect((await r.talk(picks(DEFAULT_PICKS_PER_HOUR - 1), asked, low(0.3, "ada"))).selected).toEqual([r.ada.id]);
+    expect((await r.talk(picks(DEFAULT_PICKS_PER_HOUR), asked, low(0.3, "ada"))).selected).toEqual([]);
+  });
+
+  test("an agent's message never gets a default pick; a router failure is never silence for a person", async () => {
+    const r = await room();
+    const byAgent = await r.talk([], "alguém de infra saberia dizer?", low(0.9, "ada"), { id: r.lauro.id });
+    expect(byAgent.selected).toEqual([]);
+    const down = () => new Error("down");
+    // Nothing could read it: the best placed agent, with no scores the oldest.
+    const failed = await r.talk([], "alguém viu o relatório?", down);
+    expect(failed).toMatchObject({ selected: [r.lauro.id], decidedBy: { step: "rule", rule: "default" } });
+    expect(failed.decision?.strategy).toBe("rule:default");
+    expect(failed.decision?.error).toContain("jev:");
+    // ...or the one that spoke here last.
+    const spoke = await r.talk([[{ id: r.ada.id }, "Subi o novo layout.", 3]], "alguém viu o relatório?", down);
+    expect(spoke.selected).toEqual([r.ada.id]);
+    // Still nobody for a person, a colleague's talk or an ack.
+    expect((await r.talk([], "boa tarde bruno", down)).selected).toEqual([]);
+    expect((await r.talk([["bruno", "bora almoçar?", 1]], "bora sim", down)).selected).toEqual([]);
+    expect((await r.talk([], "ok", down)).selected).toEqual([]);
+    await f.close();
+    const coordinated = await room({ coordinator: true });
+    const toTheo = await coordinated.talk([], "alguém viu o relatório?", down);
+    expect(toTheo).toMatchObject({ selected: [coordinated.theo.id], decidedBy: { step: "rule", rule: "coordinator" } });
   });
 });

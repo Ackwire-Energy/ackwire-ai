@@ -968,7 +968,7 @@ describe("the team's coordinator (ADR 0093)", () => {
     expect(decision).toMatchObject({
       strategy: "rule:coordinator",
       selectedAgentIds: [theo.id],
-      reason: "coordinator; fixed: no clear fit",
+      reason: "coordinator; default; fixed: no clear fit",
     });
     // The receipt reads it back after a reload.
     expect(decidedByOf(decision?.strategy ?? "", f.owner.id)).toEqual(COORDINATES);
@@ -984,15 +984,16 @@ describe("the team's coordinator (ADR 0093)", () => {
     expect(await route(low, greeting.id)).toMatchObject({ selected: [theo.id], decidedBy: COORDINATES });
   });
 
-  test("a specialist's pick still answers and a short follow-up stays with it; what nobody took goes to the coordinator", async () => {
+  test("a specialist's pick still answers and a short follow-up stays with it, and so does what nobody took next", async () => {
     const { theo, ada } = await coordinated({ people: true });
     const bug = await post("o checkout está dando 500");
     expect((await route(scored({ ada: 0.9 }, { needsAgent: 0.9 }), bug.id)).selected).toEqual([ada.id]);
     await byAgent(ada.id, "Achei: o deploy de ontem quebrou o checkout.");
     const more = await post("e os testes?");
     expect((await route(scored({ ada: 0.4 }, { needsAgent: 0.6 }), more.id)).selected).toEqual([ada.id]);
+    // Still talking with Ada (R5): she comes before the coordinator, and may hand it to whoever knows.
     const other = await post("alguém sabe onde ficou o contrato novo?");
-    expect((await route(scored({}, { needsAgent: 0.8 }), other.id)).selected).toEqual([theo.id]);
+    expect((await route(scored({}, { needsAgent: 0.8 }), other.id)).selected).toEqual([ada.id]);
   });
 
   test("what nobody took but speaks to one agent goes to that agent, as the step's pick, not to the coordinator", async () => {
@@ -1061,28 +1062,34 @@ describe("the team's coordinator (ADR 0093)", () => {
     const { theo, walter } = await coordinated();
     const ask = async () =>
       (await route(scored({}, { needsAgent: 0.9 }), (await post("alguém pode ver isso?")).id)).selected;
+    // Without the coordinator, a message that needs an agent still gets one: another agent (R5).
+    const another = async () => {
+      const selected = await ask();
+      expect(selected).toHaveLength(1);
+      expect(selected).not.toContain(theo.id);
+    };
     const membership = and(
       eq(schema.channelMembers.channelId, f.general.id),
       eq(schema.channelMembers.agentId, theo.id),
     );
     await f.db.update(schema.channelMembers).set({ autoReply: false }).where(membership);
-    expect(await ask()).toEqual([]);
+    await another();
     await f.db.update(schema.channelMembers).set({ autoReply: true }).where(membership);
     await f.db.update(schema.agents).set({ operatorHoldAt: new Date() }).where(eq(schema.agents.id, theo.id));
-    expect(await ask()).toEqual([]);
+    await another();
     await f.db.update(schema.agents).set({ operatorHoldAt: null }).where(eq(schema.agents.id, theo.id));
     await f.db
       .update(schema.agents)
       .set({ ownerUserId: walter.id, audienceMode: "owner" })
       .where(eq(schema.agents.id, theo.id));
-    expect(await ask()).toEqual([]);
+    await another();
     await f.db
       .update(schema.agents)
       .set({ ownerUserId: f.owner.id, audienceMode: "everyone" })
       .where(eq(schema.agents.id, theo.id));
     expect(await ask()).toEqual([theo.id]);
     await archiveAgent(f.db, f.owner.id, f.org.id, theo.id);
-    expect(await ask()).toEqual([]);
+    await another();
   });
 
   test("an agent's message never falls back to the coordinator", async () => {
@@ -1108,7 +1115,7 @@ describe("the team's coordinator (ADR 0093)", () => {
     const maybe = await post("isso aqui está certo?");
     expect((await route(scored({}, { needsAgent: 0.4 }), maybe.id)).selected).toEqual([theo.id]);
     const chat = await post("vou almoçar");
-    expect((await route(scored({}, { needsAgent: 0.3 }), chat.id)).selected).toEqual([]);
+    expect((await route(scored({}, { needsAgent: 0.2 }), chat.id)).selected).toEqual([]);
   });
 
   test("a person alone with the coordinator as the channel's only agent: the strategy was told so, and its nobody stands", async () => {
@@ -1127,10 +1134,10 @@ describe("the team's coordinator (ADR 0093)", () => {
     expect(told).toEqual(["dev"]);
   });
 
-  test("when no step can read it: a reply and a talk with an agent first, then the coordinator only for a person alone here", async () => {
+  test("when no step can read it: a reply and a talk with an agent first, then the coordinator, also with other people here", async () => {
     const { theo, ada, walter } = await coordinated({ people: true });
     const crowded = await post("alguém viu o relatório?");
-    expect(await route(failing, crowded.id)).toMatchObject({ selected: [], reason: "mention_needed" });
+    expect(await route(failing, crowded.id)).toMatchObject({ selected: [theo.id], decidedBy: COORDINATES });
     await f.db.delete(schema.channelMembers).where(eq(schema.channelMembers.userId, walter.id));
     const alone = await post("alguém viu o relatório?");
     expect(await route(failing, alone.id)).toMatchObject({ selected: [theo.id], decidedBy: COORDINATES });
