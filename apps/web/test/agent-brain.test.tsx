@@ -1352,7 +1352,12 @@ describe("Quem pensa: a coding plan's models", () => {
     await act(async () => fireEvent.click(info));
     expect(tip()).toBe(described(beam) ?? "");
     expect(screen().queryByRole("listbox")).not.toBeNull();
+    await act(async () => fireEvent.pointerLeave(info, { pointerType: "mouse" }));
+    // A real mouse enters before it clicks: the click keeps the note the hover showed.
+    await act(async () => fireEvent.pointerEnter(info, { pointerType: "mouse" }));
     await act(async () => fireEvent.click(info));
+    expect(tip()).toBe(described(beam) ?? "");
+    await act(async () => fireEvent.pointerLeave(info, { pointerType: "mouse" }));
     expect(tip()).toBeNull();
     // The keys reaching the option show it as well.
     await act(async () => {

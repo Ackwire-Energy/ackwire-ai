@@ -94,10 +94,10 @@ function SelectItem<V extends string>({ option: o }: { option: SelectOption<V> }
           onPointerLeave={hide}
           onPointerDown={keep}
           onPointerUp={keep}
+          // Only shows: a mouse enters before it clicks, so a toggle would hide what the hover just showed.
           onClick={(e) => {
             keep(e);
-            if (at) hide();
-            else show();
+            show();
           }}
         >
           <Icon name="info" size={14} />
