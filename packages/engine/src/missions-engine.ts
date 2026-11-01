@@ -5,6 +5,7 @@ import { abortLocalRun, RUN_CANCEL_TOPIC } from "./cancel";
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import type { RunIdentity } from "./executor";
 import { cutText } from "./format";
+import { wakesLater } from "./follow-through";
 import { insertMessage, messageView } from "./messages";
 import { MISSION_LIMITS } from "./mission-limits";
 import { enqueueRunJob } from "./mission-runs";
@@ -41,6 +42,7 @@ const {
   missionDecisions,
   missionReviews,
   missionDeliveries,
+  agentConsultations,
 } = schema;
 
 /**
@@ -429,44 +431,60 @@ export async function scheduleKeepGoing(db: Executor, mission: { id: string; org
   });
 }
 
+/** Whether a card in the mission waits on a person: a decision, a review or a delivery (its answer wakes the agent). */
+export async function missionAsksPerson(db: Executor, missionId: string): Promise<boolean> {
+  const [row] = rowsOf<{ asks: boolean | string }>(
+    await db.execute(sql`select
+      exists (select 1 from ${missionDecisions} d where d.mission_id = ${missionId}::uuid and d.status = 'pending')
+        or exists (select 1 from ${missionReviews} v where v.mission_id = ${missionId}::uuid and v.status = 'pending')
+        or exists (select 1 from ${missionDeliveries} l where l.mission_id = ${missionId}::uuid and l.status = 'pending')
+        as asks`),
+  );
+  return row?.asks === true || row?.asks === "t";
+}
+
 /**
  * Why the mission doesn't go on by itself now, or null when it should: it isn't active or can't work, no plan item
- * is open (todo or doing), the agent works or waits in the thread, a decision, review or delivery waits on a person,
- * an item runs on the computer (its end wakes the session), a follow-up of the agent is due there, or its last run
- * ended waiting on a person (the follow-through verdict).
+ * is open (todo or doing), the agent works or waits in the thread, a card waits on a person, its last run ended
+ * waiting on a person (the follow-through verdict), something already wakes it (a follow-up there, another agent's
+ * answer it asked for, a reminder, a detached wait: `wakesLater`), or an item runs on the computer.
  */
 export async function keepGoingBlocker(db: Executor, mission: MissionRow): Promise<string | null> {
   if (mission.status !== "active" || !canWork(mission)) return "not_working";
   const plan = await latestPlan(db, mission.id);
   const items = Array.isArray(plan?.items) ? (plan.items as { status?: string }[]) : [];
   if (!items.some((i) => i.status === "todo" || i.status === "doing")) return "no_open_items";
-  const [row] = rowsOf<{
-    run: boolean | string;
-    asks: boolean | string;
-    follow: boolean | string;
-    last: string | null;
-  }>(
+  const inThread = and(
+    eq(agentRuns.orgId, mission.orgId),
+    eq(agentRuns.agentId, mission.agentId),
+    eq(agentRuns.channelId, mission.channelId),
+    eq(agentRuns.threadRootId, mission.threadRootId),
+  );
+  const [active] = await db
+    .select({ id: agentRuns.id })
+    .from(agentRuns)
+    .where(and(inThread, inArray(agentRuns.status, ["queued", "running", "waiting_input", "waiting_approval"])))
+    .limit(1);
+  if (active) return "run_active";
+  if (await missionAsksPerson(db, mission.id)) return "waiting_person";
+  const [last] = await db.select().from(agentRuns).where(inThread).orderBy(desc(agentRuns.createdAt)).limit(1);
+  const transcript = (last?.transcript ?? {}) as {
+    followThroughVerdict?: string;
+    detachedWaits?: { waitId: string }[];
+  };
+  if (transcript.followThroughVerdict === "waiting") return "asked_person";
+  const [row] = rowsOf<{ wakes: boolean | string }>(
     await db.execute(sql`select
-      exists (select 1 from ${agentRuns} r where r.org_id = ${mission.orgId}::uuid and r.agent_id = ${mission.agentId}::uuid
-        and r.channel_id = ${mission.channelId}::uuid and r.thread_root_id = ${mission.threadRootId}::uuid
-        and r.status in ('queued', 'running', 'waiting_input', 'waiting_approval')) as run,
-      (exists (select 1 from ${missionDecisions} d where d.mission_id = ${mission.id}::uuid and d.status = 'pending')
-        or exists (select 1 from ${missionReviews} v where v.mission_id = ${mission.id}::uuid and v.status = 'pending')
-        or exists (select 1 from ${missionDeliveries} l where l.mission_id = ${mission.id}::uuid and l.status = 'pending'))
-        as asks,
       exists (select 1 from ${messages} m where m.org_id = ${mission.orgId}::uuid and m.channel_id = ${mission.channelId}::uuid
         and m.thread_id = ${mission.threadRootId}::uuid and m.author_agent_id = ${mission.agentId}::uuid
         and m.deleted_at is null and m.meta->'notice'->>'kind' = 'follow_up'
-        and m.meta->'notice'->'refs'->>'state' = 'pending') as follow,
-      (select r.transcript->>'followThroughVerdict' from ${agentRuns} r where r.org_id = ${mission.orgId}::uuid
-        and r.agent_id = ${mission.agentId}::uuid and r.channel_id = ${mission.channelId}::uuid
-        and r.thread_root_id = ${mission.threadRootId}::uuid order by r.created_at desc limit 1) as last`),
+        and m.meta->'notice'->'refs'->>'state' = 'pending')
+      or exists (select 1 from ${agentConsultations} c join ${agentRuns} r on r.id = c.asker_run_id
+        where c.org_id = ${mission.orgId}::uuid and c.status = 'open' and r.agent_id = ${mission.agentId}::uuid
+          and r.channel_id = ${mission.channelId}::uuid and r.thread_root_id = ${mission.threadRootId}::uuid) as wakes`),
   );
-  const yes = (v: unknown) => v === true || v === "t";
-  if (yes(row?.run)) return "run_active";
-  if (yes(row?.asks)) return "waiting_person";
-  if (row?.last === "waiting") return "asked_person";
-  if (yes(row?.follow)) return "follow_up";
+  if (row?.wakes === true || row?.wakes === "t") return "wakes_later";
+  if (last && (await wakesLater(db, last, transcript.detachedWaits))) return "wakes_later";
   if (await hasLiveTasks(db, mission.id)) return "task_running";
   return null;
 }

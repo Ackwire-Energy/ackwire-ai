@@ -146,6 +146,26 @@ describe("a mission keeps going between people's messages", () => {
     expect(await keepGoingBlocker(f.db, mission)).toBe("waiting_person");
     await f.db.delete(schema.missionDecisions);
 
+    // It asked another agent for something an item needs: that answer wakes it, so nothing else does meanwhile.
+    const [asker] = await f.db
+      .select()
+      .from(schema.agentRuns)
+      .where(eq(schema.agentRuns.threadRootId, mission.threadRootId));
+    await f.db.insert(schema.agentConsultations).values({
+      orgId: f.org.id,
+      askerRunId: asker?.id as string,
+      askerAgentId: f.agent.id,
+      targetAgentId: f.agent.id,
+      channelId: f.general.id,
+      messageId: mission.threadRootId,
+      waitId: "consult-1",
+      question: "Qual é o formato do relatório?",
+      chain: [f.agent.id],
+      expiresAt: new Date(Date.now() + 600_000),
+    });
+    expect(await keepGoingBlocker(f.db, mission)).toBe("wakes_later");
+    await f.db.delete(schema.agentConsultations);
+
     expect(await keepGoingBlocker(f.db, mission)).toBeNull();
     // Woken and not drained: its run is queued, so the next check holds.
     expect(await keepMissionGoing(md(), view.id)).toBe(true);
