@@ -580,9 +580,11 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
       <AskDone
         done
         words={
-          who
-            ? t("mobile.chat.question.answered", { name: who, answer: said })
-            : t("mobile.chat.question.answeredByYou", { answer: said })
+          q.answer === null
+            ? t("mobile.chat.question.closed")
+            : who
+              ? t("mobile.chat.question.answered", { name: who, answer: said })
+              : t("mobile.chat.question.answeredByYou", { answer: said })
         }
       />
     );

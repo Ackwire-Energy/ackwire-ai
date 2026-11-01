@@ -266,6 +266,8 @@ export class ClaudeStreamParser {
 
   private tools = new Map<string, { name: string; input: unknown }>();
   private sawDelta = false;
+  /** The API message whose text streamed (`message_start`): Claude Code says it in one `assistant` per block. */
+  private streamedMessage: string | null = null;
   private limited = false;
   /** A `rate_limit_event` said `rejected`: the plan itself refused, whatever the result's text. */
   private rejected = false;
@@ -278,6 +280,7 @@ export class ClaudeStreamParser {
   beginTurn() {
     this.tools.clear();
     this.sawDelta = false;
+    this.streamedMessage = null;
     this.limited = false;
     this.rejected = false;
     this.limitSent = false;
@@ -317,6 +320,8 @@ export class ClaudeStreamParser {
       case "stream_event": {
         const e = isObj(ev.event) ? ev.event : {};
         const delta = isObj(e.delta) ? e.delta : {};
+        if (main && e.type === "message_start")
+          this.streamedMessage = isObj(e.message) ? str(e.message.id) || null : null;
         if (main && e.type === "content_block_delta" && delta.type === "text_delta" && str(delta.text)) {
           this.sawDelta = true;
           return { events: [{ type: "text_delta", text: str(delta.text) }] };
@@ -328,6 +333,8 @@ export class ClaudeStreamParser {
         if (ev.error === "authentication_failed") this.authFailed = true;
         if (ev.error === "rate_limit") this.limited = true;
         const content = isObj(ev.message) && Array.isArray(ev.message.content) ? ev.message.content : [];
+        const messageId = isObj(ev.message) ? str(ev.message.id) : "";
+        const streamed = this.sawDelta || (messageId !== "" && messageId === this.streamedMessage);
         const events: WireBrainEvent[] = [];
         // A turn's first reply names the messages that started it (a steered one the CLI read after a result).
         const read = readUuids(ev);
@@ -342,7 +349,7 @@ export class ClaudeStreamParser {
             (this.localTools || str(block.name).startsWith(OUR_TOOL_PREFIX))
           ) {
             this.tools.set(str(block.id), { name: str(block.name), input: block.input ?? {} });
-          } else if (block.type === "text" && str(block.text) && !this.sawDelta) {
+          } else if (block.type === "text" && str(block.text) && !streamed) {
             // No partial messages (an older Claude Code): the whole text block at once.
             events.push({ type: "text_delta", text: str(block.text) });
           }
