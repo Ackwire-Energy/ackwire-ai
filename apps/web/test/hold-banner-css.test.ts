@@ -38,7 +38,10 @@ test("what ships wraps a hold from its top, its lead on the first line and its b
   expect(last(phone, ".outage", "display")).toBe("grid");
   expect(last(phone, ".outage", "align-items")).toBe("start");
   expect(last(phone, ".outage", "padding")).toBe("11px 12px");
-  expect(last(phone, ".outage>:first-child", "translate")).toBe("0 calc(11px - var(--cap-mid) - 50%)");
+  expect(declarations(phone, ".outage>:first-child").map(([, value]) => value)).toEqual([
+    "0 calc(11px - var(--cap-mid) - 50%)",
+    "0 calc(.5lh - var(--cap-mid) - 50%)",
+  ]);
   expect(last(phone, ".outage__close", "margin")).toBe(
     "calc(11px - var(--cap-mid) - var(--control-h-sm) / 2) -12px 0 0",
   );
