@@ -16,6 +16,7 @@ import {
 } from "@agenteschat/db";
 import type { ModelMessage, SystemBlock } from "@agenteschat/providers";
 import type { Agent } from "./agents";
+import type { AiStatusDeps } from "./ai-status";
 import { talksToAgents } from "./audience";
 import { personOfMessage, runAuthority } from "./authority";
 import { caches } from "./cache";
@@ -33,7 +34,7 @@ import { WHY_YOU_WERE_CALLED } from "./reply-policy";
 import { isRoutineRoomKey, type RoutineBrief, routineAccessOf, routineBriefOf, routineReportOf } from "./routine-brief";
 import { type AgentRun, replyThreadOf } from "./runs";
 import { stretchCardOf } from "./stretch";
-import { loadTeam, rosterScopeNames, teamPrompt } from "./team";
+import { loadTeam, rosterScopeNames, TEAM_IN_PROMPT, teammatesFor, teammatesNowPrompt, teamPrompt } from "./team";
 import { rangeStillVisible, threadRunInfo } from "./threads";
 import { untrustedBlock } from "./untrusted";
 
@@ -173,6 +174,8 @@ export interface ContextBlock extends SystemBlock {
   found?: boolean;
   /** The "# Now" block's inputs, so each turn renders the time it runs at (`gapMs`: since the message before). */
   now?: { zone: string; who: string | null; gapMs: number | null };
+  /** The agents "# Your teammates now" lists, so a run that resumes reads how they are then (`teammatesNowAgain`). */
+  teammates?: { id: string; handle: string }[];
 }
 
 export const isTurnBlock = (block: SystemBlock) => (block as ContextBlock).turn === true;
@@ -221,6 +224,21 @@ export function thisTurnText(
   return [clipped, ...found.map((b) => level(b.text))].join("\n\n");
 }
 
+/**
+ * A run's system blocks with "# Your teammates now" read again (`ContextBlock.teammates`), for a run that resumes:
+ * how they are after its wait, not before. Without it when none of them is left.
+ */
+export async function teammatesNowAgain(
+  deps: Omit<AiStatusDeps, "db"> & { db: Database },
+  orgId: string,
+  system: ContextBlock[],
+): Promise<ContextBlock[]> {
+  const block = system.find((b) => b.teammates);
+  if (!block?.teammates) return system;
+  const text = await teammatesNowPrompt(deps, orgId, block.teammates);
+  return text ? system.map((b) => (b === block ? { ...b, text } : b)) : system.filter((b) => b !== block);
+}
+
 export interface RunContext {
   system: ContextBlock[];
   messages: ModelMessage[];
@@ -264,6 +282,8 @@ export async function buildRunContext(
     mayPass?: boolean;
     /** Computers' status (the machine hub): what the other agents' computers serve them (`rosterScopeNames`). */
     machines?: Pick<MachineCaller, "status"> | null;
+    /** What tells whether an agent has an AI: with it, the agents listed get their state now (`teammatesNowPrompt`). */
+    ai?: Omit<AiStatusDeps, "db">;
   },
 ): Promise<RunContext> {
   // Independent lookups go out together (the database may be remote); org,
@@ -513,12 +533,18 @@ export async function buildRunContext(
   );
   // What the other agents here can do, so this one never answers for them.
   const others = members.filter((m) => m.agentId && m.agentId !== agent.id);
-  const otherScopes = await rosterScopeNames(
-    db,
-    options.machines,
-    run.orgId,
-    others.map((m) => m.agentId as string),
-  );
+  const here = new Set(others.map((m) => m.agentId as string));
+  const teamRows = listsTeam ? await loadTeam(db, run.orgId) : [];
+  // Who "# Your team" names (past TEAM_IN_PROMPT, only how many).
+  const named = teammatesFor(teamRows, agent.id, requester, here, talks);
+  const listed = [
+    ...others.map((m) => ({ id: m.agentId as string, handle: m.agentHandle as string })),
+    ...(named.length > TEAM_IN_PROMPT ? [] : named.map((a) => ({ id: a.id, handle: a.handle }))),
+  ];
+  const [otherScopes, teammatesNow] = await Promise.all([
+    rosterScopeNames(db, options.machines, run.orgId, [...here]),
+    options.ai ? teammatesNowPrompt({ db, ...options.ai }, run.orgId, listed) : "",
+  ]);
   const otherAgents = others
     .map((m) => {
       const scopes = otherScopes.filter((s) => s.agentId === m.agentId).map((s) => s.scope);
@@ -548,15 +574,7 @@ export async function buildRunContext(
     .filter((m) => m.agentId && referencedIds.includes(m.agentId))
     .map((m) => `@${m.agentHandle}`);
   // The rest of the org's agents: channel members are described in "Where you are".
-  const team = listsTeam
-    ? teamPrompt(
-        await loadTeam(db, run.orgId),
-        agent.id,
-        requester,
-        new Set(others.map((m) => m.agentId as string)),
-        talks,
-      )
-    : "";
+  const team = listsTeam ? teamPrompt(teamRows, agent.id, requester, here, talks) : "";
   const memberList = members
     .map((m) => (m.agentHandle ? `${m.agentName} (@${m.agentHandle}, agent)` : `${m.userName ?? "unknown"} (person)`))
     .join(", ");
@@ -735,6 +753,9 @@ export async function buildRunContext(
                     : ""
                 }`,
     },
+    // Per turn and read whole (after "Where you are" it would be the first thing clipped), and read again when the
+    // run resumes (`teammatesNowAgain`): how they are changes while it waits.
+    ...(teammatesNow ? [{ turn: true, found: true, text: teammatesNow, teammates: listed }] : []),
     // Per turn and read whole, like memory: it changes between runs, and a live computer session keeps the
     // system prompt it started with.
     ...(openTasks ? await openTasks.then((text) => (text ? [{ turn: true, found: true, text }] : [])) : []),

@@ -47,7 +47,7 @@ import {
   withAuto,
 } from "./auto-model";
 import { brainOf } from "./brain-settings";
-import { recordPlanUsage } from "./brains/claude-code";
+import { missingTurnFolder, recordPlanUsage } from "./brains/claude-code";
 import { ModelBrain } from "./brains/model";
 import type { ComputerTurn } from "./brains/prompt";
 import {
@@ -81,6 +81,7 @@ import {
   isTurnBlock,
   restatesReaction,
   stableFirst,
+  teammatesNowAgain,
   thisTurnText,
 } from "./context";
 import { recordContextUse } from "./context/feedback";
@@ -174,7 +175,7 @@ import {
   STUCK_NOTE,
   type StuckState,
 } from "./stuck";
-import { archivedAgentsPrompt, FIND_AGENT_TOOL } from "./team";
+import { archivedAgentsPrompt, FIND_AGENT_TOOL, renamedAgentsPrompt } from "./team";
 import { linkRunChecks, runChecksForReply } from "./team-actions";
 import { carriesCredential, maskCredentials } from "./tool-detail";
 import { chooseToolGroups, keptToolGroups, recentForJudge, type ToolGroupChoice } from "./tool-loading";
@@ -366,6 +367,11 @@ export interface Transcript {
   /** What the computer brain's turn under way was asked: a turn cut by a crash is sent again with it. */
   turnPrompt?: string;
   /**
+   * The folder its computer session worked in wasn't on the computer anymore (`missingTurnFolder`): the run went
+   * on in a fresh session in the agent's own folder, whose first turn is told so (`sessionLostNote`).
+   */
+  sessionLost?: string;
+  /**
    * This run continues one a person stopped ("Continuar"): the line a computer brain reads first
    * (the model brain reads it at the end of `messages`). Taken by the first turn.
    */
@@ -417,6 +423,10 @@ export class BrainFailure extends Error {
     this.name = "BrainFailure";
   }
 }
+
+/** What a computer brain reads when its session's folder was gone and a fresh session took the turn. */
+export const sessionLostNote = (folder: string) =>
+  `# Your session\nYour previous session on the computer was lost: the folder it worked in (${folder}) isn't there anymore. This is a fresh session in your own folder: it knows this conversation, not what you ran before. Look at what is on disk before you go on, and tell the person if work was lost.`;
 
 /** How long a run whose computer dropped mid-turn waits quietly for it before saying it is unavailable. */
 export const COMPUTER_DROP_GRACE_MS = 2 * 60_000;
@@ -993,6 +1003,11 @@ async function executeRunInner(
   let transcript = run.transcript as unknown as Transcript | null;
   // What the bridge kept stays on the row until taken (`takeBridgeEffects`); this copy never carries it.
   if (transcript) delete (transcript as unknown as Record<string, unknown>).bridgeEffects;
+  // Resumed (its computer back, a decision, an answer): its teammates as they are after the wait.
+  if (transcript) {
+    const ai = { db, gateway: deps.gateway, machines: deps.machines };
+    transcript.system = await teammatesNowAgain(ai, run.orgId, transcript.system);
+  }
   if (!transcript) {
     const contextDeps = deps.context;
     const pending: { label: string; reason: string }[] = deps.tools
@@ -1021,6 +1036,7 @@ async function executeRunInner(
         routine: Boolean(viaRoutine),
         mayPass: policy.mayPass,
         machines: deps.machines,
+        ai: { gateway: deps.gateway, machines: deps.machines },
       }),
       contextDeps
         ? retrieveForRun(contextDeps, {
@@ -1082,12 +1098,17 @@ async function executeRunInner(
         text: '# Writing to the wiki\nOnly write to the wiki (create_wiki_page, update_wiki_page, link_to_wiki) when a person asks for it in the current message ("save this to the wiki", "document…", "update page X"; in Portuguese "salva isso na wiki", "documenta…", "atualiza a página X"). Never on your own: if you think something is worth documenting, offer and wait for the person to ask. Each edit stays in the history with your name and the name of whoever asked.',
       });
     }
-    const archived = await archivedAgentsPrompt(db, run.orgId, [
+    const read = [
       ...system.map((b) => b.text),
       ...context.messages.map((m) => (typeof m.content === "string" ? m.content : "")),
+    ];
+    const [archived, renamed] = await Promise.all([
+      archivedAgentsPrompt(db, run.orgId, read),
+      renamedAgentsPrompt(db, run.orgId, read),
     ]);
     // Per turn, like memory: a live computer session reads "# This turn", never a later system prompt.
     if (archived) system.push({ turn: true, found: true, text: archived });
+    if (renamed) system.push({ turn: true, found: true, text: renamed });
     const stats = {
       ...context.stats,
       model: agent.model,
@@ -2138,6 +2159,19 @@ async function executeRunInner(
             const labels = executed.map((c) => c.label);
             return waitForDroppedComputer(turnPlan.kind, machineId, prompt, labels, error.serverStop);
           }
+          // The folder its session works in isn't on the computer anymore: every later turn would be refused the
+          // same way. A fresh session takes the turn in the agent's own folder, told the one before was lost. A
+          // mission's folder is the mission's to make again.
+          const gone = error instanceof BrainFailure ? missingTurnFolder(error.message) : null;
+          if (gone && executed.length === 0 && plan.session && !plan.missionId && !transcript.sessionLost) {
+            const fresh = Bun.randomUUIDv7();
+            await db.update(agentRuns).set({ brainSessionId: fresh }).where(eq(agentRuns.id, run.id));
+            plan = { ...plan, session: { ...plan.session, id: fresh, resume: false } };
+            transcript.sessionLost = gone;
+            await saveTranscript(db, transcript);
+            later(() => addRunStep(db, run, "context", { sessionLost: gone }));
+            continue;
+          }
           if (executed.length > 0) {
             const failure =
               error instanceof BrainFailure
@@ -2674,14 +2708,20 @@ function brainTurnOf(
         .join("\n\n");
     },
     get thisTurn() {
-      return plan.kind === "model" ? undefined : thisTurnText(t.system, new Date(), options) || undefined;
+      if (plan.kind === "model") return undefined;
+      // The turn that starts the session taking over from a lost one reads why, whole; its later turns don't.
+      const lost: ContextBlock[] =
+        t.sessionLost && !plan.session?.resume
+          ? [{ turn: true, found: true, text: sessionLostNote(t.sessionLost) }]
+          : [];
+      return thisTurnText([...t.system, ...lost], new Date(), options) || undefined;
     },
     get messages() {
       return t.messages.map((m) => ({ role: m.role, content: flattenContent(m.content) }));
     },
     tools: tools.map(brainToolOf),
     ...(model ? { model } : {}),
-    ...(plan.session ? { session: plan.session } : {}),
+    ...(plan.session ? { session: t.sessionLost ? { ...plan.session, ownFolder: true } : plan.session } : {}),
     ...(plan.account ? { account: plan.account } : {}),
     ...(plan.effort ? { effort: plan.effort } : {}),
     ...(agent.contextTokens ? { contextTokens: agent.contextTokens } : {}),

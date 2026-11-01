@@ -1,6 +1,6 @@
 # 0032. One agent engine, swappable brains (model, Claude Code, Codex)
 
-- Status: Accepted (built; computer brains are chosen per agent; missions run only on the engine, no flag). Superseded in part by ADR 0059 (§5: the plan warning shows when a plan would answer other people, not when it is chosen). Superseded in part by ADR 0077 (2026-10-28): §2's git on cloud computers (connected computers use the git proxy through the runner). Amended 2026-10-30: §3 (a decision that comes while the turn that asked still runs, and a turn that ends on a decision without a word; ADR 0037, round 3); 2026-10-31: §5 (Quem pensa lists what pays, and says the computer only where it changes something).
+- Status: Accepted (built; computer brains are chosen per agent; missions run only on the engine, no flag). Superseded in part by ADR 0059 (§5: the plan warning shows when a plan would answer other people, not when it is chosen). Superseded in part by ADR 0077 (2026-10-28): §2's git on cloud computers (connected computers use the git proxy through the runner). Amended 2026-10-30: §3 (a decision that comes while the turn that asked still runs, and a turn that ends on a decision without a word; ADR 0037, round 3); 2026-10-31: §5 (Quem pensa lists what pays, and says the computer only where it changes something). Addendum 2026-10-31: a Codex turn starts in the agent's own folder (runner protocol 30), and a session whose folder is gone starts fresh there.
 - Date: 2026-10-17
 - Extends: ADR 0008 (agent runs), ADR 0015 (Tool Gateway and approvals), ADR 0025 (connected computers and the runner), ADR 0029 (missions), ADR 0030 (runner isolation)
 
@@ -168,3 +168,11 @@ A mission's main session is simply the agent's run in the mission thread with th
 
 - ~~A decision that arrives while a computer brain is still finishing the turn that paused can start the resume while the first execution is still closing the turn.~~ Fixed 2026-10-30 (§3).
 - `personalMcp` has no setting yet (always off); the quiet fallback note and the "unavailable" note are in `meta` (the web shows the body; a dedicated chip is to do).
+
+## Addendum (2026-10-31): a Codex turn starts in the agent's own folder, and a session whose folder is gone starts fresh there
+
+A Codex turn the runner's handler dispatched ran in a folder nested in the agent's own: `handleRequest` makes the agent's folder the request's workspace before it dispatches, and the Codex branch looked it up again. A turn `prepareAgentCode` starts in a checkout was refused before it started ("The folder repos/owner/name doesn't exist"), and so was every later turn of that agent. The Codex branch now takes the folder the handler resolved (`CodexBrainContext.folder`); Claude Code turns already did.
+
+A runner keeps the nested folder until it is updated, and nothing updates it by itself: from protocol 30 on (`CODEX_FOLDER_PROTOCOL`) the runner has the fix, and the Codex brain sends an older runner's turns to the agent's own folder, never a checkout (`prepareAgentCode` isn't asked), so they keep their session and nothing is refused.
+
+For a folder that is really gone (a checkout removed between `git.sync` and the turn, a computer set up again), the engine no longer repeats the refusal. When the runner says the turn's folder doesn't exist (`missingTurnFolder`: the same words in every runner version, `not_found` from Codex, `bad_request` from Claude Code) and no tool ran, the run starts a fresh session (a new id on the run, so a resume continues it) in the agent's own folder (`BrainSession.ownFolder`: `prepareAgentCode` stays out of its checkouts). That session's first turn reads, whole after the clipped part of "# This turn" (`sessionLostNote`), that its previous session was lost, that it knows only the conversation, and to look at what is on disk before it goes on; its later turns don't, and the model brain never does. Once per run, and never for a mission, whose folder is the mission's to make again.

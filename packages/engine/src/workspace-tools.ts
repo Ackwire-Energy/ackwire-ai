@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, eq, isNull, schema, sql } from "@agenteschat/db";
 import { type ActionRecord, actWithUndo } from "./agent-actions";
+import { currentHandles } from "./agents";
 import { addChannelMember } from "./channels";
 import { getChannelCached } from "./context";
 import { personBehindCall } from "./requester";
@@ -57,7 +58,9 @@ export function createWorkspaceToolSource(deps: { pubsub?: PubSub }): ToolSource
         try {
           const requester = await requesterOf(ctx);
           if (!requester) return noRequester;
-          const handle = str(input.agent).trim().replace(/^@/, "").toLowerCase();
+          const [handle = ""] = await currentHandles(ctx.db, ctx.orgId, [
+            str(input.agent).trim().replace(/^@/, "").toLowerCase(),
+          ]);
           const [agent] = await ctx.db
             .select({ id: schema.agents.id, name: schema.agents.name, handle: schema.agents.handle })
             .from(schema.agents)

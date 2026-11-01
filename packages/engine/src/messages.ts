@@ -15,6 +15,7 @@ import {
   sql,
 } from "@agenteschat/db";
 import { type AgentActionView, actionsFor } from "./agent-actions";
+import { currentHandles } from "./agents";
 import { withDeletedArtifacts } from "./artifacts";
 import { audienceSql, notifyBlocked } from "./audience";
 import { requireChannelAccess } from "./channels";
@@ -467,7 +468,8 @@ export async function insertMessageWithRuns(
   const silent = isMediaAfterReply(input.meta);
   if (body.length > MAX_MESSAGE_LENGTH)
     throw new ValidationError(`Message is longer than ${MAX_MESSAGE_LENGTH} characters`);
-  const handles = `{${parseMentionHandles(body).join(",")}}`; // handles match [a-z0-9_-]: safe as an array literal
+  // Handles match [a-z0-9_-]: safe as an array literal.
+  const handles = `{${(await currentHandles(tx, input.orgId, parseMentionHandles(body))).join(",")}}`;
   const id = Bun.randomUUIDv7();
   const person = input.author.type === "person";
   const userId = input.author.type === "person" ? input.author.userId : null;
@@ -1067,7 +1069,7 @@ export async function classifyAddressees(
   input: { orgId: string; channelId: string; userId: string; body: string },
   options: { timeoutMs?: number } = {},
 ): Promise<AddresseeDecision | null> {
-  const handles = parseMentionHandles(input.body);
+  const handles = await currentHandles(db, input.orgId, parseMentionHandles(input.body));
   if (handles.length < 2) return null;
   const targets = await db
     .select({ id: agents.id, handle: agents.handle, name: agents.name, role: agents.role })

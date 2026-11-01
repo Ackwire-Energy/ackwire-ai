@@ -1,6 +1,6 @@
 # 0053. Routines and unattended work: safe and dependable on every brain
 
-- Status: Accepted. Amended 2026-10-30: §3 (one command policy on every path that runs a command on a computer; where a push goes is read with git there). Amended 2026-10-31: §3 (through our git proxy, what it refuses never runs from the computer); by ADR 0089 §9 (a chain stays a person's for 1000 links, each message's root remembered)
+- Status: Accepted. Amended 2026-10-30: §3 (one command policy on every path that runs a command on a computer; where a push goes is read with git there). Amended 2026-10-31: §3 (through our git proxy, what it refuses never runs from the computer); by ADR 0089 §9 (a chain stays a person's for 1000 links, each message's root remembered). Addendum 2026-10-31: a routine whose event has no webhook here says it can't run yet (`needs_webhook`)
 - Date: 2026-10-23
 - Builds on: ADR 0032 (one engine, swappable brains), ADR 0034 (agents consult each other), ADR 0037 (agents investigate first, act with undo), the chat-delivery work (background runs, `hand_off`, run inbox)
 - Evaluates: ADRs 0045–0052 and the `feat/agent-runtime` branch (taken where they fit, see the end)
@@ -140,3 +140,9 @@ From OpenMausBot and OpenBot: one catch-up within 12 hours, approvals giving way
 - A routine on a sleeping computer waits instead of running on the API; Rotinas and one notification say so.
 - Runners older than protocol 16 run no Codex turn and no Claude Code `plan` turn (`runner_outdated`): routines that only read, unattended runs and a mission's planning wait for the updated runner (the desktop app's next release) instead of reading with more power.
 - On Codex a secret file can be read in `plan` (its sandbox can't deny reads yet); it can't leave through our tools or posts (see §3).
+
+## Addendum (2026-10-31): a routine whose event never comes says so
+
+GitHub's and Sentry's events reach routines only through the workspace's own webhook (`webhook_endpoints`, `webhooks.ts`); the GitHub App's webhook keeps installations in step and fires no routine. A routine on `github.pr_opened`, `deploy.succeeded` or `sentry.issue_created` in a workspace without one never ran, and the chat tools took it silently.
+
+Its state is `needs_webhook` (`EVENT_WEBHOOK`), after a run at work and a pause, before failing. Rotinas says "Ainda não roda: falta o webhook do GitHub", `list_routines` says it can't run yet, and `create_routine` and `update_routine` tell the agent what it needs, for the person, in their terms: a GitHub (or Sentry) webhook for this workspace, which a workspace admin sets up (the app can't create one yet), or a schedule that checks instead. The tools never name our app API: it is private to our own apps, and nobody can call it from a terminal. The routine is still made: the webhook may come after. `issue.created` needs none; an email trigger keeps its mailbox's own state.

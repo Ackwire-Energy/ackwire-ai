@@ -871,8 +871,9 @@ async function doCodexTurn(
   let final: CodexBrainEvent = { type: "error", code: "codex_failed", message: "Codex ended without an answer." };
   let ended = false;
   const token = req.mcp?.token;
+  // `handleRequest` made the workspace the agent's own folder already.
+  const folder = ctx.workspaceReal;
   if (req.agent && typeof token === "string" && token) {
-    const folder = await agentWorkspace(ctx.workspaceReal, req.agent);
     codex.runs.set(runId, {
       token,
       missionId: "",
@@ -886,7 +887,7 @@ async function doCodexTurn(
   try {
     await handleCodexBrainTurn(
       {
-        workspaceReal: ctx.workspaceReal,
+        folder,
         exec: toolOn(ctx, "codex"),
         runnerHome: codex.runnerHome,
         ...(ctx.secretsDir ? { secretsDir: ctx.secretsDir } : {}),

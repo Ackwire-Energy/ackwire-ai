@@ -389,6 +389,12 @@ export function browserSetupOf(v: unknown): BrowserSetup | null {
  * sends `shared` to an older runner.
  */
 export const SHARED_ACCOUNTS_PROTOCOL = 29;
+/**
+ * From this protocol on, a Codex turn's `cwd` is read in the agent's own folder. An older runner read it in a
+ * folder nested there, so a turn sent into one of the agent's checkouts was refused ("The folder … doesn't
+ * exist"): the server sends an older runner's Codex turns to the agent's own folder, never a checkout.
+ */
+export const CODEX_FOLDER_PROTOCOL = 30;
 
 /**
  * From this protocol on (ADR 0058 §17): a desktop stream changes mode in place, on its own data socket, when its

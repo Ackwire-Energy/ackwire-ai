@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
 import { type AgentActionParams, recordAgentActions } from "./agent-actions";
 import { routineRow, routineSnapshot } from "./agent-undo";
+import { currentHandles } from "./agents";
 import { canTalkTo, talksToAgents } from "./audience";
 import { runAuthorityById } from "./authority";
 import { consultationOrigin } from "./consultations";
@@ -14,6 +15,7 @@ import {
   createReminder,
   createRoutine,
   deleteRoutine,
+  EVENT_WEBHOOK,
   listOrgRoutines,
   listReminders,
   ROUTINE_EVENTS,
@@ -220,9 +222,22 @@ function stateText(r: RoutineView) {
       return "waiting for a person (an approval or an answer)";
     case "failing":
       return `failing (${r.failuresInRow} in a row)`;
+    case "needs_webhook":
+      return `can't run yet: no ${hookName(r)} webhook sends its event here`;
     default:
       return "active";
   }
+}
+
+/** The service whose webhook a routine waits for (`EVENT_WEBHOOK`), as people name it. */
+const hookName = (r: RoutineView) =>
+  r.trigger.type === "event" && EVENT_WEBHOOK[r.trigger.event] === "sentry" ? "Sentry" : "GitHub";
+
+/** What a routine that can't run yet needs (state `needs_webhook`), for the agent to tell the person; else "". */
+function needsText(r: RoutineView) {
+  if (r.state !== "needs_webhook") return "";
+  const name = hookName(r);
+  return ` It can't run yet: no ${name} webhook sends this workspace its events, so nothing starts it. Tell the person what it needs: a ${name} webhook for this workspace, which a workspace admin sets up (the app can't create one yet). Until then it never runs; if they'd rather not wait, offer a schedule that checks instead.`;
 }
 
 /** One run, coded: "2026-10-20 09:00 failed (provider_error)". */
@@ -545,7 +560,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             ]);
           }
           return {
-            content: `Created routine ${routine.id} ${await summaryOf(ctx, routine)}. Confirm it to the person.`,
+            content: `Created routine ${routine.id} ${await summaryOf(ctx, routine)}. Confirm it to the person.${needsText(routine)}`,
             data: { routine: { id: routine.id } },
           };
         } catch (error) {
@@ -569,7 +584,9 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
       async execute(input, ctx) {
         try {
           const person = await requesterOf(ctx);
-          const handle = str(input.agent).trim().replace(/^@/, "").toLowerCase();
+          const [handle = ""] = await currentHandles(ctx.db, ctx.orgId, [
+            str(input.agent).trim().replace(/^@/, "").toLowerCase(),
+          ]);
           const { agents } = schema;
           const team = await ctx.db
             .select({
@@ -717,7 +734,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             }
           }
           return {
-            content: `Updated routine ${routine.id} ${await summaryOf(ctx, routine)}. Tell the person what changed.`,
+            content: `Updated routine ${routine.id} ${await summaryOf(ctx, routine)}. Tell the person what changed.${needsText(routine)}`,
             data: { routine: { id: routine.id } },
           };
         } catch (error) {

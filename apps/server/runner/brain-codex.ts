@@ -17,7 +17,7 @@ import { RunnerError } from "./errors";
 import { killTree } from "./exec";
 import { cachedExecutors, resolveCommand } from "./executors";
 import { CODEX_MCP_ENV, CODEX_MCP_SERVER, codexWritableRoots } from "./mcp";
-import { agentWorkspace, isInside, resolveForAgent } from "./paths";
+import { isInside, resolveForAgent } from "./paths";
 import type { Spawn } from "./scope-gate";
 import { agentSecrets } from "./secrets";
 
@@ -661,7 +661,8 @@ async function runCodexExec(input: CodexTurnInput, opts: CodexTurnOptions): Prom
 
 /** What the runner's `brain.turn` handler hands the Codex branch. */
 export interface CodexBrainContext {
-  workspaceReal: string;
+  /** The agent's own folder (real path), as `handleRequest` resolved it for the request. */
+  folder: string;
   /** `false`: started with `--no-exec`. */
   exec: boolean;
   /** The runner home (threads file, per-turn scratch, bridge env). */
@@ -684,9 +685,10 @@ export interface CodexBrainContext {
 const threadStores = new Map<string, CodexThreads>();
 
 /**
- * The dispatch hook: `brain.turn` with `kind: "codex"` → resolves the folder
- * in the agent's workspace, loads its secrets and runs the turn, emitting
- * each event (the caller wraps them in `brain.event` and sends `brain.done`).
+ * The dispatch hook: `brain.turn` with `kind: "codex"` → resolves the turn's
+ * folder in the agent's own folder, loads its secrets and runs the turn,
+ * emitting each event (the caller wraps them in `brain.event` and sends
+ * `brain.done`).
  */
 export async function handleCodexBrainTurn(
   ctx: CodexBrainContext,
@@ -708,7 +710,7 @@ export async function handleCodexBrainTurn(
   }
   if (typeof req.mcp?.token !== "string" || !req.mcp.token)
     throw new RunnerError("bad_request", "mcp.token is required");
-  const folder = await agentWorkspace(ctx.workspaceReal, req.agent);
+  const folder = ctx.folder;
   let cwd = folder;
   if (typeof req.cwd === "string" && req.cwd.trim() !== "") {
     const resolved = await resolveForAgent(folder, ctx.grants, req.cwd);

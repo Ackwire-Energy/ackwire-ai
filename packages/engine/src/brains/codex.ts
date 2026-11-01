@@ -4,6 +4,7 @@ import {
   BRAIN_PROTOCOL,
   type BrainTurnRequest,
   brainTopic,
+  CODEX_FOLDER_PROTOCOL,
   type PubSub,
   parseBrainEvent,
   STEER_PROTOCOL,
@@ -209,10 +210,13 @@ export class CodexBrain implements Brain {
       return;
     }
 
+    // An older runner never finds the agent's checkouts from a Codex turn: it stays in the agent's folder, and in
+    // its session, instead of being refused there.
+    const checkouts = status.protocol === undefined || status.protocol >= CODEX_FOLDER_PROTOCOL;
     const [mcp, agent, code] = await Promise.all([
       this.deps.mcp(turn),
       this.deps.agent?.(turn),
-      this.deps.prepare?.(turn, io.signal).catch(() => null),
+      checkouts ? this.deps.prepare?.(turn, io.signal).catch(() => null) : null,
     ]);
     const request: BrainTurnRequest & { agent?: AgentScope } = {
       runId: turn.runId,
