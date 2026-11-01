@@ -5897,6 +5897,8 @@ export const ptBR = {
     },
     people: "Pessoas",
     ownerAlways: "{{name}} sempre pode, como responsável.",
+    onlyYouForNow: "Só você, por enquanto",
+    onlyOwnerForNow: "Só {{name}}, por enquanto",
     search: "Buscar pessoas",
     noMatch: "Ninguém com esse nome.",
     pickSomeone: "Escolha pelo menos uma pessoa.",

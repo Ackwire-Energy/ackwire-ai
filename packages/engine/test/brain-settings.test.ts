@@ -282,6 +282,18 @@ describe("a plan answers its owner until it answers other people (Atende outras 
     expect(await audits("agent.audience_changed")).toHaveLength(changes);
   });
 
+  test("restricted with nobody picked yet stays restricted when it answers other people: never everyone", async () => {
+    const { fx, deps, bia, row } = await world();
+    await setAgentAudience(fx.db, fx.owner.id, fx.org.id, fx.agent.id, { mode: "people", userIds: [] });
+    // Moved onto a plan with "Atende outras pessoas" on (a sign-in for a new agent): its owner alone, as before.
+    await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { brain: "claude_code", onlyOwner: false });
+    const moved = await row();
+    expect(moved).toMatchObject({ audienceMode: "people", audienceUserIds: [] });
+    expect([canTalkTo(moved, fx.owner.id), canTalkTo(moved, bia.id)]).toEqual([true, false]);
+    await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { onlyOwner: false });
+    expect(await row()).toMatchObject({ audienceMode: "people", audienceUserIds: [] });
+  });
+
   test("only the plan's owner lets more people in; an admin only narrows; a member can't touch it", async () => {
     const { fx, deps, bia, caio, row } = await world();
     await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { brain: "claude_code" });

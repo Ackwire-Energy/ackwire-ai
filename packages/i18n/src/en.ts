@@ -5847,6 +5847,8 @@ export const en: Translations = {
     },
     people: "People",
     ownerAlways: "{{name}} always can, as the owner.",
+    onlyYouForNow: "Only you, for now",
+    onlyOwnerForNow: "Only {{name}}, for now",
     search: "Search people",
     noMatch: "No one with that name.",
     pickSomeone: "Pick at least one person.",

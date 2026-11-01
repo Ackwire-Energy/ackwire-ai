@@ -436,8 +436,9 @@ function nextAudience(
   if (onlyOwner === undefined) return { base, to: base };
   if (onlyOwner) return { base, to: OWNER_ONLY };
   if (answersOthers(base, agent.ownerUserId)) return { base, to: base };
-  // Its "who can talk" list decides who comes back: it stays while the agent is its owner's only.
-  const kept = agent.audienceUserIds.length > 0;
+  // Its "who can talk" list decides who comes back: it stays while the agent is its owner's only. One a person
+  // restricted ("Só algumas pessoas", even with nobody picked yet) stays restricted: never everyone.
+  const kept = agent.audienceUserIds.length > 0 || agent.audienceMode === "people";
   return { base, to: kept ? { mode: "people", userIds: agent.audienceUserIds } : EVERYONE };
 }
 

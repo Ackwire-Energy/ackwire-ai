@@ -784,6 +784,8 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
     if (audience.mode === "everyone") return t("audience.summary.everyone");
     if (audience.mode === "owner")
       return ownerFirst ? t("audience.summary.owner", { name: ownerFirst }) : t("audience.summary.nobody");
+    if (audience.userIds.length === 0 && ownerFirst)
+      return ownerId === me.user.id ? t("audience.onlyYouForNow") : t("audience.onlyOwnerForNow", { name: ownerFirst });
     const names = (members.data ?? [])
       .filter((m) => m.userId === ownerId || audience.userIds.includes(m.userId))
       .map((m) => m.name.split(/\s+/)[0] ?? m.name);
