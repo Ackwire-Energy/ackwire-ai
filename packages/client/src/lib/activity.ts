@@ -349,7 +349,8 @@ const BAR_STATUSES: ReadonlySet<string> = new Set(["thinking", "queued", "runnin
  * row (face, dots, step line), with no name or time until words arrive.
  */
 export const waitsForWords = (r: Pick<LiveRun, "status" | "text" | "work">) =>
-  BAR_STATUSES.has(r.status) &&
+  // Waiting on an approval keeps the waiting row: a header for that moment would jump in and out again.
+  (BAR_STATUSES.has(r.status) || r.status === "waiting_approval") &&
   r.text.length === 0 &&
   !(r.work ?? []).some((w) => w.kind === "say" || w.kind === "steer");
 

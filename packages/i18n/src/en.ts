@@ -9067,7 +9067,7 @@ export const en: Translations = {
     namesMore: "{{first}} and {{count}} more",
     /** The card above the box turns its phrase. */
     /** The waiting row's step line before its first step (`waitStep`). */
-    wait: { thinking: "Thinking…" },
+    wait: { thinking: "Thinking…", held: "Waiting for approval…" },
     /** The working line while an agent asks another one (names come in bold). */
     consult: {
       asking: "{{from}} is asking {{to}}",

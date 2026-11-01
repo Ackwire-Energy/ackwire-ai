@@ -311,6 +311,22 @@ describe("live row in the timeline", () => {
     expect(row().querySelector(".ac-msg__head")?.textContent).toContain("Ada");
   });
 
+  test("a call that waits for approval keeps the waiting row, and its step line says so", async () => {
+    const { ev } = await open();
+    await ev({ type: "agent.run", ...ids, status: "running" });
+    await act(() => new Promise((r) => setTimeout(r, 2100)));
+    const waiting = row();
+    const step = () => shownText(row().querySelector(".ac-wait__step") as Element);
+    await ev({ type: "agent.tool", ...ids, tool: "github_merge_pull_request", toolUseId: "t1" });
+    await ev({ type: "agent.tool", ...ids, tool: null, toolUseId: "t1", held: true });
+    await ev({ type: "agent.run", ...ids, status: "waiting_approval" });
+    await settle(2);
+    expect(row()).toBe(waiting);
+    expect(row().classList.contains("ac-msg--waiting")).toBe(true);
+    expect(row().querySelector(".ac-msg__head")).toBeNull();
+    expect(step()).toBe("Esperando aprovação…");
+  });
+
   test("two agents: each has its own waiting row, last; one that answers goes above; the bar says both", async () => {
     const { ev } = await open();
     const atlas = { threadId: null, runId: "r-atlas", agentId: ATLAS_ID };

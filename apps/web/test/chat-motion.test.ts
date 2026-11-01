@@ -137,8 +137,9 @@ describe("the card's phrase and the waiting row's step line", () => {
     expect(waitsForWords({ ...run, text: "Olá" })).toBe(false);
     expect(waitsForWords({ ...run, work: [{ kind: "say", text: "Vou olhar o login." }] })).toBe(false);
     expect(waitsForWords({ ...run, work: [{ kind: "steer", messageId: "m1" }] })).toBe(false);
-    for (const status of ["canceled", "failed", "waiting_approval"] as const)
-      expect(waitsForWords({ ...run, status })).toBe(false);
+    // Waiting on an approval keeps the waiting row (no header in and out again).
+    expect(waitsForWords({ ...run, status: "waiting_approval" })).toBe(true);
+    for (const status of ["canceled", "failed"] as const) expect(waitsForWords({ ...run, status })).toBe(false);
   });
 
   test("the step line: 'Pensando…', then the step running now, verb first, its target cut to what names it", () => {
@@ -154,6 +155,8 @@ describe("the card's phrase and the waiting row's step line", () => {
     expect(waitStep(t, [call({ running: false })])).toBe("Pensando…");
     expect(waitStep(t, [call({ detail: null })])).toBe("Usando o navegador…");
     expect(waitStep(tEn, [])).toBe("Thinking…");
+    expect(waitStep(t, [call({ running: false, held: true })])).toBe("Esperando aprovação…");
+    expect(waitStep(tEn, [call({ running: false, held: true })])).toBe("Waiting for approval…");
     // Two of the same step in a row fold into one tool line; the step line names the one running now.
     const site = (id: string, detail: string, running: boolean) => call({ id, detail, running });
     expect(

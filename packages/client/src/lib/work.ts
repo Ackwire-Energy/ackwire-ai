@@ -598,15 +598,16 @@ const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
 /**
  * The waiting row's step line: what the agent does right now, verb first ("Usando o navegador · console.example.com…",
  * "Mexendo nos arquivos do PC · refresh.ts…"), from the same live work as its tool block; "Pensando…" while no step
- * runs.
+ * runs; "Esperando aprovação…" while its last call waits on a person.
  */
 export function waitStep(t: TFunction, work: LiveWork[] | undefined): string {
+  const last = (work ?? []).findLast((w) => w.kind === "call");
+  if (last?.kind === "call" && last.held) return t("chat.wait.held");
   const now = toolNow(toolItemsLive(work ?? []));
   if (now?.state !== "run") return t("chat.wait.thinking");
   const verb = capitalize(activityVerb(t, now));
   // The folded line keeps its first call's hint; the step line names the call running now.
-  const last = (work ?? []).findLast((w) => w.kind === "call" && w.running);
-  const hint = last?.kind === "call" ? toolHint(last.tool, now, last.detail) : now.hint;
+  const hint = last?.kind === "call" && last.running ? toolHint(last.tool, now, last.detail) : now.hint;
   const target = hint ? shortTarget(hint) : "";
   return target ? `${verb} · ${target}…` : `${verb}…`;
 }
