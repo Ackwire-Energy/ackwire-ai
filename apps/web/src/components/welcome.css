@@ -77,8 +77,8 @@
 .welcome-card__close.ac-btn:hover {
   background: rgba(255, 255, 255, 0.86);
 }
-.welcome-card__acts > .ac-btn:focus-visible,
-.welcome-card__close.ac-btn:focus-visible {
+html:not([data-pointer]) .welcome-card__acts > .ac-btn:focus-visible,
+html:not([data-pointer]) .welcome-card__close.ac-btn:focus-visible {
   outline: none;
   box-shadow:
     0 0 0 2px #fff,

@@ -5454,7 +5454,7 @@ html:not([data-pointer]) .ac-emoji__cell:focus-visible {
   min-height: 0;
   border-radius: var(--radius-item);
 }
-.ac-picker__panel:focus-visible {
+html:not([data-pointer]) .ac-picker__panel:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5554,7 +5554,7 @@ html:not([data-pointer]) .ac-emoji__cell:focus-visible {
   object-fit: cover;
 }
 .ac-gifs__cell:hover,
-.ac-gifs__cell:focus-visible {
+html:not([data-pointer]) .ac-gifs__cell:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5597,7 +5597,7 @@ html:not([data-pointer]) .ac-emoji__cell:focus-visible {
 .ac-stickers__cell:hover {
   background: rgba(127, 127, 127, 0.12);
 }
-.ac-stickers__cell:focus-visible {
+html:not([data-pointer]) .ac-stickers__cell:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5643,7 +5643,7 @@ html:not([data-pointer]) .ac-emoji__cell:focus-visible {
   height: 100%;
   object-fit: cover;
 }
-.ac-gif:focus-visible {
+html:not([data-pointer]) .ac-gif:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }

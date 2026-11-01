@@ -7,7 +7,7 @@ const KEYS_ONLY = "html:not([data-pointer]) ";
 /** Ink, or a color of its own, where the design system's gray ring belongs. */
 const OWN_COLOR = /var\(--(ink|ink2|frame-ink|sky-ink)\)|#[0-9a-f]{3,8}\b|rgba?\(/i;
 /** Drawn on a surface of their own (the welcome sky, an agent's colored frame), where gray wouldn't show. */
-const OWN_SURFACES = [".sky-welcome__close", ".brw-mf__now"];
+const OWN_SURFACES = [".sky-welcome__close", ".welcome-card__", ".brw-mf__now"];
 
 /** A selector list's selectors, split at the commas outside parentheses. */
 function selectors(list: string) {
