@@ -165,9 +165,14 @@ test("through the directory the real tool runs with its own scope, schema, steps
     type: "result",
     output: { content: 'tiktok_campaign_get ok: {"advertiser_id":"a1"}' },
   });
-  // A tool it doesn't hold is unknown here, as if called directly.
+  // A tool it doesn't hold is refused as its direct call is: it exists, its access doesn't cover it.
   expect(await call("tiktok_use_tool", { tool: "tiktok_campaign_create", arguments: {} })).toMatchObject({
-    output: { isError: true, content: expect.stringContaining('No TikTok tool named "tiktok_campaign_create"') },
+    output: {
+      isError: true,
+      content: expect.stringContaining(
+        "Not allowed: tiktok_campaign_create exists, but this agent's access to TikTok doesn't cover it (it needs the scope tiktok:write). Only an admin can change that",
+      ),
+    },
   });
   // Bad input shows the schema the model never saw.
   expect(await call("tiktok_use_tool", { tool: "tiktok_ad_get", arguments: {} })).toMatchObject({
@@ -189,7 +194,7 @@ test("through the directory the real tool runs with its own scope, schema, steps
   expect(called).toEqual([
     "tiktok_find_tools",
     "tiktok_campaign_get",
-    "tiktok_use_tool",
+    "tiktok_campaign_create",
     "tiktok_ad_get",
     "tiktok_ad_create",
   ]);
@@ -204,4 +209,125 @@ test("the prompt names a big connector in one line, with how to find its tools a
   expect(text).toContain("48 TikTok tools (its search marks them)");
   expect(text).not.toContain("tiktok_ad_create");
   expect(text.length).toBeLessThan(2_000);
+});
+
+// ── A custom connector named after its label (the Vega CRM case) ──────────────
+
+const VEGA = "6b3c1f0e-2a4d-4e8f-9b7a-1c2d3e4f5a6b";
+const VEGA_READ = ["listar", "buscar", "obter", "contar", "exportar", "consultar"];
+const VEGA_WRITE = ["criar", "atualizar"];
+const VEGA_OF = ["atendimentos", "tickets", "departamentos", "contatos", "usuarios", "etiquetas", "mensagens"];
+
+/** As a custom server's tools come: `vega_crm_` (its label) before each name; 56, 42 of them reads: a directory. */
+function vegaTools(executed: string[]): ToolDefinition[] {
+  return [...VEGA_READ, ...VEGA_WRITE].flatMap((verb) =>
+    VEGA_OF.map((what): ToolDefinition => {
+      const name = `vega_crm_${verb}_${what}`;
+      const read = VEGA_READ.includes(verb);
+      return {
+        name,
+        description: `[Vega CRM] ${verb} ${what}: ${read ? "Reads" : "Changes"} ${what} in the CRM.`,
+        inputSchema: { type: "object", properties: { filtro: { type: "string" } } },
+        scope: `custom:${VEGA}:${read ? "read" : "write"}`,
+        connectionId: VEGA,
+        connectorLabel: "Vega CRM",
+        execute: async () => {
+          executed.push(name);
+          return { content: `${name} ok` };
+        },
+      };
+    }),
+  );
+}
+
+async function vegaGateway(executed: string[]) {
+  f = await setup();
+  const tools = createToolGateway({
+    sources: [{ name: "fake", tools: async () => [builtIn, ...vegaTools(executed)] }],
+  });
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: VEGA, scope: `custom:${VEGA}:read` }]);
+  const ctx = await ctxOf(f);
+  const call = async (name: string, input: Record<string, unknown>, at = ctx) => {
+    const r = await tools.invoke(at, { toolUseId: `tu_${Math.random()}`, name, input });
+    return r.type === "result" ? r.output : { content: r.type, isError: false };
+  };
+  return { tools, ctx, call };
+}
+
+test("a big connector's directory takes the prefix its tools have; the names it had before still run", async () => {
+  const shown = presentTools(vegaTools([]));
+  expect(shown.map((t) => t.name)).toEqual(["vega_crm_find_tools", "vega_crm_use_tool"]);
+  // Its areas are its tools' own words, not the label's second one.
+  expect(shown[0]?.description).toContain("56 in all, about: atualizar, buscar, consultar, contar");
+
+  const executed: string[] = [];
+  const { call } = await vegaGateway(executed);
+  // The names of before (the first word of the tools' names) for an agent in the middle of a conversation.
+  expect((await call("vega_find_tools", { query: "listar departamentos" })).content).toContain(
+    "- vega_crm_listar_departamentos:",
+  );
+  expect(await call("vega_use_tool", { tool: "crm_listar_departamentos", arguments: {} })).toMatchObject({
+    content: "vega_crm_listar_departamentos ok",
+  });
+  // A harness's own name for a tool is that tool's, called directly or named to a use_tool.
+  expect(await call("mcp__agentes__vega_crm_find_tools", { query: "obter tickets" })).toMatchObject({
+    content: expect.stringContaining("- vega_crm_obter_tickets:"),
+  });
+  expect(
+    await call("vega_crm_use_tool", { tool: "mcp__agentes__vega_crm_obter_tickets", arguments: {} }),
+  ).toMatchObject({ content: "vega_crm_obter_tickets ok" });
+  // A use_tool named to another runs what that one names.
+  expect(
+    await call("vega_use_tool", { tool: "vega_crm_use_tool", arguments: { tool: "obter_contatos", arguments: {} } }),
+  ).toMatchObject({ content: "vega_crm_obter_contatos ok" });
+  expect(executed).toEqual(["vega_crm_listar_departamentos", "vega_crm_obter_tickets", "vega_crm_obter_contatos"]);
+  // No tools on demand here, so no use_tool of its own: the closest name is the connector's.
+  expect(await call("use_tool", { tool: "vega_crm_obter_tickets", arguments: {} })).toEqual({
+    content: "Unknown tool use_tool. The exact name is vega_crm_use_tool.",
+    isError: true,
+  });
+});
+
+test("a name one word away gets the exact one, and what runs it", async () => {
+  const { call } = await vegaGateway([]);
+  expect(await call("vega_listar_departamentos", {})).toEqual({
+    content:
+      "Unknown tool vega_listar_departamentos. The exact name is vega_crm_listar_departamentos (run it with vega_crm_use_tool).",
+    isError: true,
+  });
+  expect(await call("vega_crm_use_tool", { tool: "vega_listar_departamentos", arguments: {} })).toEqual({
+    content:
+      'No Vega CRM tool named "vega_listar_departamentos". The exact name is vega_crm_listar_departamentos (run it with vega_crm_use_tool).',
+    isError: true,
+  });
+  // Nothing close: where to look.
+  expect(await call("vega_crm_use_tool", { tool: "pausar", arguments: {} })).toEqual({
+    content: 'No Vega CRM tool named "pausar". Find the exact name with vega_crm_find_tools.',
+    isError: true,
+  });
+  expect(await call("rm_rf", {})).toEqual({ content: "Unknown tool rm_rf", isError: true });
+});
+
+test("a write tool with read access is refused plainly: it exists, who can change the access", async () => {
+  const executed: string[] = [];
+  const { call, ctx } = await vegaGateway(executed);
+  const refusal =
+    "Not allowed: vega_crm_criar_tickets exists, but this agent's access to Vega CRM doesn't cover it (it needs write access). Only an admin can change that, on the agent's page in Tools and access (in Portuguese, Ferramentas e acesso): say so, never that the tool doesn't exist";
+  // By its name, through the connector's directory and through the one of tools on demand: the same answer.
+  expect(await call("vega_crm_criar_tickets", {})).toEqual({ content: refusal, isError: true });
+  expect(await call("vega_crm_use_tool", { tool: "criar_tickets", arguments: {} })).toEqual({
+    content: refusal,
+    isError: true,
+  });
+  const onDemand = { ...ctx, loadedGroups: [] };
+  expect(await call("use_tool", { tool: "vega_crm_criar_tickets", arguments: {} }, onDemand)).toEqual({
+    content: refusal,
+    isError: true,
+  });
+  // The search names it too, as beyond its access (never as missing).
+  const found = (await call("find_tools", { query: "criar tickets" }, onDemand)).content;
+  expect(found).toContain(
+    "Beyond your access to their connector; only an admin can change it, on your page in Tools and access (in Portuguese, Ferramentas e acesso):\n- vega_crm_criar_tickets: [Vega CRM] criar tickets: Changes tickets in the CRM.",
+  );
+  expect(executed).toEqual([]);
 });

@@ -1055,8 +1055,11 @@ export interface BrainTurnRequest {
   system: string;
   /** What this turn says (the new user message). */
   prompt: string;
-  /** The MCP bridge for this run: `token` identifies the run to the server (per run). */
-  mcp: { token: string; url?: string };
+  /**
+   * The MCP bridge for this run: `token` identifies the run to the server (per run). `tools`: the names of the run's
+   * tools, space-separated; a kept-alive Codex, which lists them once when its thread opens, starts again when one is new.
+   */
+  mcp: { token: string; url?: string; tools?: string };
   /** Keep one process per (agent, session) alive between turns (default true; false for a background turn). Codex: protocol 16. */
   keepAlive?: boolean;
   /** Also load the machine owner's own MCP servers (default false: `--strict-mcp-config`; never in a `plan` turn). */

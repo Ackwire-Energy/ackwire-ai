@@ -23,14 +23,7 @@ import {
 import { carriesCredential, promptAnswer, toolCommand, toolDetail } from "../tool-detail";
 import { untrustedBlock } from "../untrusted";
 import { checkToolCall } from "./checks";
-import {
-  type BlockedTool,
-  compactSchema,
-  directoryRole,
-  ON_DEMAND_FIND,
-  presentTools,
-  resolveDirectoryTool,
-} from "./directory";
+import { type BlockedTool, compactSchema, presentTools, resolveCall } from "./directory";
 import { canonicalJson, validateJson } from "./json-schema";
 import { missingPermissions, REQUEST_PERMISSION_TOOL } from "./permission";
 import { approvalOrigin, type PolicyDecision, takeWhy, toolKind, toolPolicy, WHY_REFUSAL, withWhy } from "./run-policy";
@@ -39,6 +32,7 @@ import {
   BUILTIN_SCOPES,
   freshGrantedKeys,
   grantedScopeKeys,
+  holdsConnection,
   isAllowed,
   NOT_IN_ALL,
   toolAccess,
@@ -160,6 +154,23 @@ const asksWithWhy = (tool: ToolDefinition, input: Record<string, unknown>) =>
 
 /** A check that failed for any reason never stops the action (ADR 0064): it only misses a notice. */
 const UNCHECKED: TeamCheck = { proceed: true, reason: null };
+
+/**
+ * Why the agent may not call a tool that exists, in words it can pass on: turned off by name, a connector it holds
+ * with less access than the tool needs (`request_permission` only offers what it has none of), or a permission it
+ * can ask for. Each says who can change it.
+ */
+function refusalOf(tool: ToolDefinition, access: ReturnType<typeof accessWithNeeds>, granted: Set<string>) {
+  const of = access.of;
+  if (access.state === "denied") {
+    return `${of === tool ? "this tool" : of.name} is turned off for this agent; only an admin can turn it back on`;
+  }
+  if (of === tool && holdsConnection(granted, tool.connectionId)) {
+    const level = /^custom:[^:]+:(read|write)$/.exec(tool.scope)?.[1];
+    return `${tool.name} exists, but this agent's access to ${tool.connectorLabel ?? "its connector"} doesn't cover it (it needs ${level ? `${level} access` : `the scope ${tool.scope}`}). Only an admin can change that, on the agent's page in Tools and access (in Portuguese, Ferramentas e acesso): say so, never that the tool doesn't exist`;
+  }
+  return `this agent lacks the scope ${of.scope}. If the request needs it, ask for it with request_permission`;
+}
 
 /** `permission_prompt`'s question (Claude Code and Codex commands): a new command, or the state of one asked. */
 function promptQuestion(input: Record<string, unknown>) {
@@ -289,8 +300,9 @@ export function createToolGateway(deps: {
    * What `find_tools` names as not allowed yet: every tool of this server's sources the agent may not use
    * (and the run could, once allowed), with each permission `request_permission` offers for it (its own,
    * and the one of a tool it `needs`), so the card can grant what the agent asks for; or none when an admin
-   * turned that tool, or the one it needs, off by name. A tool with a permission `request_permission` doesn't
-   * offer (a mailbox's or a database's, one more scope of a connector the agent already has some of) isn't named.
+   * turned that tool, or the one it needs, off by name; or an empty list for one more scope of a connector the
+   * agent already has some of, which only an admin gives. Any other permission `request_permission` doesn't offer
+   * (a mailbox's or a database's the agent has nothing of) isn't named.
    */
   async function notAllowed(
     ctx: ToolContext,
@@ -312,7 +324,10 @@ export function createToolGateway(deps: {
       if (lacks.length === 0 || policyFor(authority, tool).action === "refuse") return [];
       if (own === "denied" || needs?.state === "denied") return [{ tool, permissions: null }];
       const asked = lacks.flatMap((id) => offered.get(id) ?? []);
-      if (asked.length < lacks.length) return [];
+      // A connector the agent holds with less access than this tool needs: only an admin changes that.
+      if (asked.length < lacks.length) {
+        return !isAllowed(own) && holdsConnection(keys, tool.connectionId) ? [{ tool, permissions: [] }] : [];
+      }
       // The computer's scopes ("all tools" never covers them) say what they give, for the person approving.
       const permissions = asked.map((m) => {
         const plain = NOT_IN_ALL.has(m.scope) ? BUILTIN_SCOPES[m.scope]?.description : undefined;
@@ -365,8 +380,10 @@ export function createToolGateway(deps: {
     async invoke(ctx: ToolContext, requested: ToolCall): Promise<InvokeResult> {
       // Who is behind the run decides what it may do: listing already hid refused tools, this is the call.
       const [all, authority] = await Promise.all([allTools(ctx), authorityOf(ctx)]);
-      // A big connector's directory (tools/directory.ts): `use_tool` runs the real tool by its own name, so
-      // everything below (steps, policy, scope, schema, checks, approval) is that tool's; `find_tools` runs as is.
+      // A directory (tools/directory.ts): `use_tool` runs the tool it names by that tool's own name, so everything
+      // below (steps, policy, scope, schema, checks, approval) is that tool's; `find_tools` runs as is. Any tool goes
+      // through any `use_tool`, a directory's own and one already listed too: a computer brain's harness may still
+      // list what it had when it started, and one the agent may not use is refused below, saying why.
       let call = requested;
       let directoryTool: ToolDefinition | undefined;
       let unknownInDirectory: string | null = null;
@@ -382,25 +399,11 @@ export function createToolGateway(deps: {
           const ask = usable.some((t) => t.name === REQUEST_PERMISSION_TOOL) ? REQUEST_PERMISSION_TOOL : null;
           return { tools, ask, connectors };
         };
-        const listed = presentTools(usable, isSensitive, ctx.loadedGroups, blocked).find((t) => t.name === call.name);
-        const role = directoryRole(listed);
-        if (role?.kind === "find") directoryTool = listed;
-        else if (role?.kind === "use") {
-          const name = typeof call.input.tool === "string" ? call.input.tool : "";
-          // `find_tools` also names tools the agent may not use: through its `use_tool` they run as a direct call
-          // would, refused saying why. A big connector's search names only the tools the agent holds.
-          const real = resolveDirectoryTool(role, name) ?? (role.prefix ? undefined : all.get(name.trim()));
-          const args = call.input.arguments;
-          if (real) {
-            call = {
-              ...call,
-              name: real.name,
-              input: args && typeof args === "object" && !Array.isArray(args) ? (args as Record<string, unknown>) : {},
-            };
-          } else {
-            const find = role.prefix ? `${role.prefix}_find_tools` : ON_DEMAND_FIND;
-            unknownInDirectory = `No ${role.label} tool named "${name}". Find the exact name with ${find}.`;
-          }
+        const resolved = resolveCall(presentTools(usable, isSensitive, ctx.loadedGroups, blocked), all, call);
+        if ("error" in resolved) unknownInDirectory = resolved.error;
+        else {
+          call = resolved.call;
+          directoryTool = resolved.find;
         }
       }
       const viaDirectory = call !== requested;
@@ -489,13 +492,10 @@ export function createToolGateway(deps: {
       }
       // A directory's search lists only tools the agent already holds; each real tool is checked on its own.
       if (tool !== directoryTool) {
-        const access = accessWithNeeds(await freshGrantedKeys(ctx.db, ctx.orgId, ctx.agentId), tool);
+        const granted = await freshGrantedKeys(ctx.db, ctx.orgId, ctx.agentId);
+        const access = accessWithNeeds(granted, tool);
         if (!isAllowed(access.state)) {
-          const reason =
-            access.state === "denied"
-              ? `${access.of === tool ? "this tool" : access.of.name} is turned off for this agent`
-              : `this agent lacks the scope ${access.of.scope}. If the request needs it, ask for it with request_permission`;
-          return finish({ content: `Not allowed: ${reason}`, isError: true }, "refused");
+          return finish({ content: `Not allowed: ${refusalOf(tool, access, granted)}`, isError: true }, "refused");
         }
       }
       // A call that asks a person says why (shown on its card); the tool itself never sees it. It is

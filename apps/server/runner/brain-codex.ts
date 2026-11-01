@@ -101,7 +101,7 @@ export interface CodexBrainTurnRequest {
   model?: string;
   system: string;
   prompt: string;
-  mcp: { token: string; url?: string };
+  mcp: { token: string; url?: string; tools?: string };
   agent?: AgentScope;
   /** Protocol 13: the account folder to run in (`accounts/codex/<id>`); absent: the machine's own sign-in. */
   account?: string;
@@ -501,7 +501,8 @@ export interface CodexTurnInput {
   model?: string;
   system: string;
   prompt: string;
-  mcp: { token: string; url?: string };
+  /** `tools`: the run's tool names, space-separated (`BrainTurnRequest.mcp.tools`). */
+  mcp: { token: string; url?: string; tools?: string };
   /** Protocol 10: folders allowed for the agent besides its own. */
   writableRoots?: string[];
   /** Protocol 13: the account (its threads are its own) and its folder (`CODEX_HOME`). */
@@ -741,7 +742,11 @@ export async function handleCodexBrainTurn(
       ...(typeof req.model === "string" && req.model ? { model: req.model } : {}),
       system: typeof req.system === "string" ? req.system : "",
       prompt: typeof req.prompt === "string" ? req.prompt : "",
-      mcp: { token: req.mcp.token, ...(typeof req.mcp.url === "string" && req.mcp.url ? { url: req.mcp.url } : {}) },
+      mcp: {
+        token: req.mcp.token,
+        ...(typeof req.mcp.url === "string" && req.mcp.url ? { url: req.mcp.url } : {}),
+        ...(typeof req.mcp.tools === "string" && req.mcp.tools ? { tools: req.mcp.tools.slice(0, 64_000) } : {}),
+      },
       ...(writableRoots.length ? { writableRoots } : {}),
       ...(account ? { account } : {}),
       ...(isBrainEffort(req.effort) ? { effort: req.effort } : {}),
