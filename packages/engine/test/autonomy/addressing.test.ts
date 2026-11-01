@@ -195,6 +195,21 @@ scenario("S10b", "a thanks the judge is unsure of wakes the agent once, it passe
   await assertInvariants(w);
 });
 
+scenario("S10c", "polite agents whose mention judge is down don't thank each other in a loop", async () => {
+  const w = await world({
+    agents: ["ada", "theo"],
+    judge: { mention: { ada: "fail", theo: "fail" } },
+    script: {
+      ada: ({ n }) => ({ text: n === 1 ? "Revisou sim. valeu @theo, ficou ótimo" : "👍 @theo" }),
+      theo: () => ({ text: "De nada, @ada!" }),
+    },
+  });
+  await w.say("@ada o theo já revisou?");
+  await w.settle();
+  expect((await w.runs("theo")).length).toBeLessThanOrEqual(1);
+  await assertInvariants(w);
+});
+
 scenario(
   "S11",
   "a verdict handed back by mention wakes the agent for the person, and the hand-off closes",

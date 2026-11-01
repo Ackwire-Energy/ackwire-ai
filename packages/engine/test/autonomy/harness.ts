@@ -69,9 +69,9 @@ export interface JudgeTable {
   followThrough?: (state: Record<string, unknown>) => Verdict | { main: Verdict; controller: Verdict };
   /**
    * An agent's @mention of `handle`: main asks "is it a hand-off?" (`handoff`), wake-by-default asks "does it need
-   * nothing?" (`needsNothing`). Default: a plain hand-off (0.9 / 0.05).
+   * nothing?" (`needsNothing`). Default: a plain hand-off (0.9 / 0.05). `"fail"`: the judge errors.
    */
-  mention?: Record<string, { handoff: number; needsNothing: number }>;
+  mention?: Record<string, { handoff: number; needsNothing: number } | "fail">;
   /** `stuck_run`: probability the run goes in circles. */
   stuck?: number;
   /** `note_reply`: whether a note's reply matters to its sender (default 0.9). */
@@ -170,9 +170,11 @@ export async function world(options: WorldOptions) {
         return picked === "continue" ? "unkept" : picked === "ask" ? "waiting" : "done";
       }
       case "mention_handoff":
-        return table.mention?.[handleOf() ?? ""]?.handoff ?? 0.9;
-      case "mention_needs_nothing":
-        return table.mention?.[handleOf() ?? ""]?.needsNothing ?? 0.05;
+      case "mention_needs_nothing": {
+        const m = table.mention?.[handleOf() ?? ""];
+        if (m === "fail") throw new Error("judge unavailable");
+        return kind === "mention_handoff" ? (m?.handoff ?? 0.9) : (m?.needsNothing ?? 0.05);
+      }
       case "stuck_run":
         return table.stuck ?? 0;
       case "note_reply":

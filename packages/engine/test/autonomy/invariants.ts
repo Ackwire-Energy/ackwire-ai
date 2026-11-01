@@ -1,6 +1,6 @@
 import { expect } from "bun:test";
 import { and, eq, inArray, lte, schema } from "@agenteschat/db";
-import { REFUSALS } from "../../src";
+import { REFUSALS, runAuthority } from "../../src";
 import type { World } from "./harness";
 import { merged } from "./known";
 
@@ -102,13 +102,48 @@ export async function violations(w: World): Promise<string[]> {
     if (!told) out.push(`I5: ${who(r.agentId)}'s run failed (${r.error}) and nobody was told`);
   }
 
+  // I4: every scenario starts from a person or a routine, so a run whose chain lost its root (nobody behind it, no
+  // routine either) is the read-only class whether or not its script happens to call a refused tool.
+  for (const r of runs.filter((r) => !r.background)) {
+    const a = await runAuthority(w.db, r);
+    if (a.kind === "unattended" && !a.reason.startsWith("routine"))
+      out.push(`I4: ${who(r.agentId)}'s run has nobody behind it (${a.reason})`);
+  }
+
   // I6: nothing worked that nobody scripted, and no run was nudged past the bound.
   for (const u of w.unscripted)
     out.push(`I6: @${u.handle} made an unscripted model call after "${u.last.slice(0, 80)}"`);
   for (const r of runs) {
-    const nudges = steps.filter((s) => s.runId === r.id && s.data.nudged !== undefined).length;
+    const own = steps.filter((s) => s.runId === r.id);
+    const nudges = own.filter((s) => s.data.nudged !== undefined).length;
     if (nudges > 3) out.push(`I6: ${who(r.agentId)}'s run was nudged ${nudges} times`);
+    // Whatever names the continuation steps get: the worst bounded case (answer nudge, 2 continues, ask nudge) is 5
+    // model calls in a row that execute nothing.
+    let idle = 0;
+    for (const s of own) {
+      if (s.kind === "tool_call") idle = 0;
+      else if (s.kind === "model_call" && ++idle === 6) out.push(`I6: ${who(r.agentId)} took 6 turns doing nothing`);
+    }
   }
+  // Thanks loops: agents waking each other back and forth. One hand-off and its answer is two wakes; a third
+  // between the same pair is a loop (thanks, "de nada", 👍…) unless the scenario scripts a longer exchange.
+  const authors = new Map(
+    (
+      await w.db
+        .select({ id: schema.messages.id, agentId: schema.messages.authorAgentId })
+        .from(schema.messages)
+        .where(eq(schema.messages.orgId, w.org.id))
+    ).map((m) => [m.id, m.agentId]),
+  );
+  const pairs = new Map<string, number>();
+  for (const r of runs) {
+    const from = authors.get(r.triggerMessageId);
+    if (!from || from === r.agentId) continue;
+    const key = [from, r.agentId].sort().join(" ↔ ");
+    pairs.set(key, (pairs.get(key) ?? 0) + 1);
+  }
+  for (const [key, n] of pairs)
+    if (n > 2) out.push(`I6: ${key.split(" ↔ ").map(who).join(" ↔ ")} woke each other ${n} times`);
 
   // The harness itself: a judgment no table answers would pass silently.
   for (const k of new Set(w.unknownJudgments)) out.push(`harness: unknown judgment kind ${k}`);
