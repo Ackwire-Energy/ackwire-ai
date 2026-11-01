@@ -13,7 +13,7 @@ import { markLaunched } from "@/features/launch/launched";
 import { OnboardingFlow } from "@/features/onboarding/OnboardingFlow";
 import { ServerDownPanel, useServerDown } from "@/features/server/ServerDown";
 import { keepLastCrash } from "@/lib/last-crash";
-import { deletingOf, firstRunMounted, suspendedOf } from "@/lib/org-choice";
+import { deletingOf, enteringShown, firstRunMounted, suspendedOf } from "@/lib/org-choice";
 import { AppProviders } from "@/providers/AppProviders";
 import { useAppFonts } from "@/providers/fonts";
 import { useOrgGate } from "@/providers/org";
@@ -84,19 +84,21 @@ function Gate() {
     if (isDown && !launching) setLaunching(true);
   }, [isDown, launching]);
 
-  // Just signed in (not a cold start already signed in): "Entrando…" for a moment while the app fills in.
-  const [entering, setEntering] = useState(false);
+  // Just signed in (not a cold start already signed in): "Entrando…" for a moment while the app fills in. The timer
+  // outlives this effect: the session flipping within that moment reruns it past the sign-in check, and clearing the
+  // timer there left the screen up for good.
+  const [welcoming, setWelcoming] = useState(false);
   const wasSignedIn = useRef<boolean | null>(null);
   useEffect(() => {
     if (session.pending) return;
     const before = wasSignedIn.current;
     wasSignedIn.current = signedIn;
     if (before !== false || !signedIn) return;
-    setEntering(true);
-    const timer = setTimeout(() => setEntering(false), 1400);
-    return () => clearTimeout(timer);
+    setWelcoming(true);
+    setTimeout(() => setWelcoming(false), 1400);
   }, [signedIn, session.pending]);
   const accepting = useAcceptPendingInvite(signedIn && !session.pending);
+  const entering = enteringShown({ signedIn, launching, welcoming, ready, accepting });
   useResumeAsk(!signedIn && !session.pending, pathname);
   // An invitation's own screen stays in front of the first run: someone with no workspace yet may be joining one.
   const onInvite = pathname.startsWith("/invite/");

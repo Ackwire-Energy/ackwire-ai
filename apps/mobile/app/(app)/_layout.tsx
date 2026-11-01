@@ -35,7 +35,7 @@ export function ErrorBoundary(props: ErrorBoundaryProps) {
 export default function AppLayout() {
   const { colors } = useTheme();
   const org = useOrgGate();
-  // Signed in, the organization not known yet (the splash covers this) or none (the first run, `OnboardingFlow`, covers it):
+  // Signed in, the organization not known yet (the splash or `Entering` covers this) or none (the first run, `OnboardingFlow`, covers it):
   // the screens need one, so they mount once it's chosen, at the URL the app opened with.
   if (!org.state) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
   return <AppStack />;
