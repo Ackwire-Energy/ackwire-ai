@@ -938,8 +938,9 @@ describe("tasks sign in with their agent's own account (ADR 0041 §5.1, protocol
     expect(runner.started).toEqual([expect.objectContaining({ executor: "claude", account: ACCOUNT })]);
     // A runner before protocol 31 would start it on a sign-in that computer doesn't have.
     await machine({ protocol: TASK_ACCOUNTS_PROTOCOL - 1 });
-    expect(await refused(dev, "claude")).toStartWith(
-      "The runner on MacBook is too old to sign tasks in with your Claude account.",
+    // Nobody connected it, so nobody there can run an update command: the agent hears to try again later.
+    expect(await refused(dev, "claude")).toBe(
+      "The runner on MacBook is too old to sign tasks in with your Claude account. Tell the person: the computer's runner needs an update before tasks can use your account, so try again later (until then do this work with run_code or a shell task).",
     );
     await machine({ protocol: MACHINE_PROTOCOL_VERSION });
     // His account signed out.
@@ -968,10 +969,15 @@ describe("tasks sign in with their agent's own account (ADR 0041 §5.1, protocol
     expect(await refused("claude")).toStartWith("Claude Code isn't signed in on MacBook.");
     const bruna = await addMember(f.db, f.org.id, "member", "Bruna");
     await f.db.update(schema.agents).set({ ownerUserId: bruna.id }).where(eq(schema.agents.id, bia.id));
+    // Bia thinks with the platform model: her Codex task keeps the computer's own sign-in, as before.
+    await start(bia, "codex");
+    expect(runner.started.map((s) => [s.executor, s.account])).toEqual([["codex", undefined]]);
+    // Once she thinks with Codex, its sign-in there is the owner's plan, which never thinks for her.
+    await f.db.update(schema.agents).set({ brain: "codex" }).where(eq(schema.agents.id, bia.id));
     expect(await refused("codex")).toStartWith(
       "Codex on MacBook would think with a plan that isn't your owner's (a plan thinks only for its owner's agents).",
     );
-    expect(runner.started).toHaveLength(0);
+    expect(runner.started).toHaveLength(1);
   });
 
   test("start_task says it didn't start, and why, in the agent's own turn", async () => {

@@ -81,7 +81,7 @@ Background tasks (`start_task`, mission items, resumes) ran their Claude Code or
   - Sessions and Codex threads live in the CLI's home: on an account, a task resumes only one in that account's folder, and Codex threads are kept per account, as turns keep them.
 - **Refused at once, by the turns' rules** (`computerBrainUnavailable`). Before anything reaches the runner, a task with nothing to sign in with doesn't start, and the agent reads why and what it can do (`TaskSignInError`: "Not started: …", `task.no_sign_in`):
   - on a computer nobody connected, no account of its own for that CLI (it hears which executor to use when it has an account for the other CLI there), or an account there on a runner before protocol 31, which would start the task on a sign-in that computer doesn't have;
-  - a plan that isn't its owner's (ADR 0059 §3, now checked for tasks too): on a computer someone connected, the computer's own sign-in (no account of its own, or a runner there before protocol 31) runs tasks only for that person's own agents, as it does their turns;
+  - a plan that isn't its owner's (ADR 0059 §3), where turns already check it: a task on an account of the agent's own, or of an agent that thinks with that CLI, on a computer someone connected whose own sign-in would think for another person's agent. An agent that thinks with something else (the platform model, the other CLI) keeps running tasks on that computer's own sign-in, as before;
   - its account signed out, or no account where `claude auth status` said the computer's own Claude Code is signed out.
 
   The refused start stays as a failed task saying why. A mission's queued item refused this way fails as any refused start does, and the mission hears it.

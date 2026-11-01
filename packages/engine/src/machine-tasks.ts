@@ -325,7 +325,7 @@ export async function taskSignIn(
     if (own) {
       throw refuse(
         `The runner on ${machine.name} is too old to sign tasks in with your ${plan} account.`,
-        "its owner should update it with `agentes-runner update`",
+        "the computer's runner needs an update before tasks can use your account, so try again later",
       );
     }
     const other = input.executor === "codex" ? "claude" : "codex";
@@ -335,7 +335,10 @@ export async function taskSignIn(
       `your owner can connect a ${plan} account on your page`,
     );
   }
-  if (!(await planIsOwners(db, agent, machine.id, account))) {
+  // The owner-only plan rule binds where turns already apply it: an account, or an agent that thinks with this CLI.
+  // Other agents' tasks keep the computer's own sign-in, as before this rule reached tasks.
+  const thinksWithIt = account || agent.brain === kind;
+  if (thinksWithIt && !(await planIsOwners(db, agent, machine.id, account))) {
     throw refuse(
       `${cli} on ${machine.name} would think with a plan that isn't your owner's (a plan thinks only for its owner's agents).`,
       `your owner can connect a ${plan} account of their own on your page`,
