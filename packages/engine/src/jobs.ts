@@ -285,7 +285,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     }
     // No judge, or it failed: only a message that opens by addressing an agent ("@ada já postei…") wakes it. Waking
     // every agent named would let two agents thank each other in a loop while the judge is down.
-    if (!options.wakeAll && (!judge || error !== null)) for (const t of others) if (opensWith(message.body, t.handle)) scores.set(t.id, 1);
+    if (!options.wakeAll && (!judge || error !== null))
+      for (const t of others) if (opensWith(message.body, t.handle)) scores.set(t.id, 1);
     const allowed = others.filter((t) => (scores.get(t.id) ?? 0) >= mentionThreshold).map((t) => t.id);
     // Not when the router still decides this message: its decision row is what it reads to skip (`already_routed`).
     if (options.record !== false)
@@ -539,7 +540,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         }
         // Only agents outside the conversation named: a note to the ones it needs, settled once the router decided.
         const reach = {
-          outside: outside.length > 0 ? (await delegatedAgents(message, outside, { record: false, wakeAll: Boolean(actingRoutine) })).allowed : [],
+          outside:
+            outside.length > 0
+              ? (await delegatedAgents(message, outside, { record: false, wakeAll: Boolean(actingRoutine) })).allowed
+              : [],
           blocked: refused,
         };
         try {
