@@ -512,9 +512,11 @@ export async function oldHandlesByAgent(db: Executor, orgId: string): Promise<Ma
   return out;
 }
 
-/** `@handles` (a tool's input) → the organization's agents that aren't archived; the missing ones by handle. */
+/** `@handles` (a tool's input, old ones too) → the organization's agents that aren't archived; the missing ones by handle. */
 export async function agentsByHandle(db: Executor, orgId: string, raw: unknown) {
-  const handles = [...new Set(await currentHandles(db, orgId, (Array.isArray(raw) ? raw : []).map(handleOf)))];
+  const written = (Array.isArray(raw) ? raw : []).map(handleOf);
+  const current = await currentHandles(db, orgId, written);
+  const handles = [...new Set(current)];
   const rows =
     handles.length === 0
       ? []
@@ -523,7 +525,12 @@ export async function agentsByHandle(db: Executor, orgId: string, raw: unknown) 
           .from(agents)
           .where(and(eq(agents.orgId, orgId), inArray(agents.handle, handles), isNull(agents.archivedAt)));
   const missing = handles.filter((h) => !rows.some((r) => r.handle === h));
-  return { handles, rows, missing };
+  /** The row a handle as written names, an old one included. */
+  const rowOf = (h: unknown) => {
+    const now = current[written.indexOf(handleOf(h))] ?? handleOf(h);
+    return rows.find((r) => r.handle === now);
+  };
+  return { handles, rows, missing, rowOf };
 }
 
 /** `getAgent` through the per-process cache (run path). */
