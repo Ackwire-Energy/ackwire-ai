@@ -2677,7 +2677,7 @@ export type RoutineTarget =
   | RoutineTargetInput
   | { type: "conversation"; channelId: string; threadId: string | null; reminder?: boolean; forUserId?: string };
 
-/** What a routine may do while nobody watches: look and tell (`read`), or also change things (`act`). */
+/** Every routine acts with its agent's own permissions (ADR 0109); `read` is an old stored value the server reads as `act`. */
 export type RoutineAccess = "read" | "act";
 /** When a routine speaks: on every run (`always`), or only when there is news (`when_new`). */
 export type RoutineReport = "always" | "when_new";
@@ -2814,7 +2814,7 @@ export interface RoutineInput {
     | { type: "once"; at: string; timezone?: string }
     | Omit<RoutineEmailTrigger, "status">
     | { type: "webhook" };
-  /** Default `read` ("Só olhar e contar"). */
+  /** Ignored: every routine acts (ADR 0109). */
   access?: RoutineAccess;
   /** Default `when_new` ("Só quando tiver novidade"). */
   report?: RoutineReport;

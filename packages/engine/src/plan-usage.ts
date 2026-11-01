@@ -11,6 +11,7 @@ import { NotFoundError } from "./errors";
 import { LISTED_ACCOUNT_STATUSES } from "./machine-accounts";
 import { requirePermission } from "./organizations";
 import { agentBudgetsThisMonth, budgetPercent, canViewCost, monthStartUtc } from "./usage";
+import { WEB_USAGE_PROVIDER } from "./web-tools";
 
 const { usageRecords, agents, machines, machineAccounts, users } = schema;
 
@@ -158,6 +159,7 @@ async function readUsage(
         // A plan's rows, the router's too (they spend its limits), and the agent's own calls: Jev's and the router's
         // on a key are recorded with its id but are no API use of its own (`agentBudgetsThisMonth`).
         or(eq(usageRecords.billedTo, "plan"), eq(usageRecords.kind, "agent")),
+        sql`${usageRecords.provider} <> ${WEB_USAGE_PROVIDER}`,
         ...(opts.agentId ? [eq(usageRecords.agentId, opts.agentId)] : []),
         ...(opts.planOnly ? [eq(usageRecords.billedTo, "plan")] : []),
       ),

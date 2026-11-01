@@ -219,14 +219,17 @@ test("use_tool with the name of a tool not allowed yet answers as a direct call 
   );
 });
 
-test("a tool the run's policy refuses anyway is never named as not allowed yet", async () => {
+test("a routine's run is told the browser a person can turn on, never to ask for it itself (ADR 0109)", async () => {
   await browserAgent();
   const ctx = await nothingLoaded();
-  // A routine's background run, which only reads: the browser is refused whatever its grants.
+  // A routine's background run: the browser is the agent's like in any run; asking for permissions is not a routine's.
   await f.db.update(schema.agentRuns).set({ background: true }).where(eq(schema.agentRuns.id, ctx.runId));
   const text = await findTools(ctx, "open a web page");
-  expect(text).toStartWith('No other tool matches "open a web page".');
-  expect(text).not.toContain("browser_open");
+  expect(text).toStartWith(
+    "Not allowed for you yet: a person can turn these on for you; you can't ask for them from here.",
+  );
+  expect(text).toContain("browser_open");
+  expect(text).not.toContain("request_permission");
 });
 
 test("a run that can't call request_permission is never told to", async () => {

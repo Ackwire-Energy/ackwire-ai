@@ -1,6 +1,5 @@
 import type {
   Routine,
-  RoutineAccess,
   RoutineEvent,
   RoutineHookCall,
   RoutineInput,
@@ -1225,28 +1224,16 @@ function RoutineDetails({
           <p className="small muted">{t("routines.ahead.hint")}</p>
         </DetailsSection>
       )}
-      <div className="routine-details__pair">
-        <DetailsSection title={t("routines.panel.access")}>
-          <p className="routine-details__sentence">
-            <span className="ac-hintline">
-              {t(`routines.access.${r.access}`)}
-              <InfoHint name={t("common.about", { label: t("routines.panel.access") })}>
-                {t("routines.access.hint")}
-              </InfoHint>
-            </span>
-          </p>
-        </DetailsSection>
-        <DetailsSection title={t("routines.panel.report")}>
-          <p className="routine-details__sentence">
-            <span className="ac-hintline">
-              {t(`routines.report.${r.report}`)}
-              <InfoHint name={t("common.about", { label: t("routines.panel.report") })}>
-                {t("routines.report.hint")}
-              </InfoHint>
-            </span>
-          </p>
-        </DetailsSection>
-      </div>
+      <DetailsSection title={t("routines.panel.report")}>
+        <p className="routine-details__sentence">
+          <span className="ac-hintline">
+            {t(`routines.report.${r.report}`)}
+            <InfoHint name={t("common.about", { label: t("routines.panel.report") })}>
+              {t("routines.report.hint")}
+            </InfoHint>
+          </span>
+        </p>
+      </DetailsSection>
       <DetailsSection title={t("routines.panel.runs")}>
         {runs.isLoading && list.length === 0 && <LoadingList count={3} avatar={false} />}
         {list.length > 0 && (
@@ -1620,9 +1607,8 @@ function RoutineDialog({
     routine?.trigger.type === "event" ? routine.trigger.event : "sentry.issue_created",
   );
   const [active, setActive] = useState(routine?.active ?? true);
-  // The two plain questions: when it posts, and what it may do on its own.
+  // When it posts.
   const [report, setReport] = useState<RoutineReport>(routine?.report ?? "when_new");
-  const [access, setAccess] = useState<RoutineAccess>(routine?.access ?? "read");
   const say = useSay();
   const [touched, setTouched] = useState(false);
   // One source of truth for "when": the rule (the picker), with the phrase kept in step.
@@ -1740,7 +1726,6 @@ function RoutineDialog({
     if (triggerChanged) patch.trigger = trigger();
     if (active !== r.active) patch.active = active;
     if (report !== r.report) patch.report = report;
-    if (access !== r.access) patch.access = access;
     return patch;
   };
   // A routine on someone's computer that runs hourly or more often: say how often it wakes that computer.
@@ -1811,7 +1796,6 @@ function RoutineDialog({
           prompt: prompt.trim(),
           target: targetValue(),
           trigger: trigger(),
-          access,
           report,
         },
       },
@@ -2068,26 +2052,7 @@ function RoutineDialog({
               options={(["always", "when_new"] as const).map((v) => ({ value: v, label: t(`routines.report.${v}`) }))}
             />
           </div>
-          <div className="routine-kind">
-            <span className="ac-hintline">
-              <span className="ac-field__label">{t("routines.form.access")}</span>
-              <InfoHint name={t("common.about", { label: t("routines.form.access") })}>
-                {t("routines.access.hint")}
-              </InfoHint>
-            </span>
-            <Segmented
-              label={t("routines.form.access")}
-              value={access}
-              onValueChange={setAccess}
-              options={(["read", "act"] as const).map((v) => ({ value: v, label: t(`routines.access.${v}`) }))}
-            />
-          </div>
-          <RoutineReachWarnings
-            prompt={prompt}
-            access={access}
-            agentId={agentId || null}
-            creatorUserId={routine?.createdByUserId}
-          />
+          <RoutineReachWarnings prompt={prompt} agentId={agentId || null} creatorUserId={routine?.createdByUserId} />
           {editing && !(routine && isDoneOnce(routine)) && (
             <label className="routine-active" htmlFor="nr-active">
               <Switch id="nr-active" checked={active} onCheckedChange={setActive} />

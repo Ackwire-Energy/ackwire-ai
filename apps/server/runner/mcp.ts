@@ -1098,15 +1098,15 @@ export const ALWAYS_DENY_RULES: readonly string[] = [
   ...INLINE_CODE_DENY_RULES,
 ];
 
-/** What a `plan` turn never gets: edits and the web. */
-const PLAN_DENY = ["Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch"];
+/** What a `plan` turn never gets: edits. Reading the web is a read (ADR 0109). */
+const PLAN_DENY = ["Edit", "Write", "NotebookEdit"];
 
 /**
  * The `--settings` file of a Claude Code turn or task (protocol 7): what it
  * may run without asking (anything else reaches our prompt tool).
- * `plan`: read only: our tools, reading files and read-only shell commands
- * (`ls`, `cat`, `head`, `git status`, also `git -C <path> …`; Claude Code
- * checks each part of a pipeline). `work`: edits (`acceptEdits`), the same
+ * `plan`: read only: our tools, reading files, the web (`WebSearch`,
+ * `WebFetch`) and read-only shell commands (`ls`, `cat`, `head`, `git status`,
+ * also `git -C <path> …`; Claude Code checks each part of a pipeline). `work`: edits (`acceptEdits`), the same
  * read-only commands, plain file work, git work, pull requests, tests and
  * builds. Merges, deploys and publishing are denied (deny rules win over
  * allow rules); every push is `ask` (`PUSH_ASK_RULES`, which outranks allow
@@ -1139,6 +1139,8 @@ export function claudePermissionSettings(
           "Glob",
           "Grep",
           "LS",
+          "WebSearch",
+          "WebFetch",
           ...shellReads,
           ...(opts.promptReads ? [] : gitC(GIT_READ.flatMap((c) => [`Bash(git ${c})`, `Bash(git ${c} *)`]))),
           ...missionFolderRules(missionFolder, ["Read"]),

@@ -7,6 +7,7 @@ import {
   createChannel,
   createMissionRunToolSource,
   createToolGateway,
+  createWebToolSource,
   grantScopes,
   insertMessage,
   type RoutineAccess,
@@ -85,24 +86,22 @@ describe("run policy table", () => {
     expect(toolKind(builtIn("brand_new_tool")).kind).toBe("unknown");
   });
 
-  test("routine, read: reads and hand_off only; writes refused with a reason for the model", () => {
-    const r = routine("read");
-    expect(decide(r, builtIn("list_issues", "issues:read"))).toBe("allow");
-    expect(decide(r, builtIn("search_context", "context:read"))).toBe("allow");
-    expect(decide(r, app("github_get_issue", "github:issues.read"))).toBe("allow");
-    expect(decide(r, builtIn("hand_off"))).toBe("allow");
-    expect(toolPolicy(r, builtIn("create_issue", "issues:write"))).toEqual({
-      action: "refuse",
-      reason: REFUSALS.routineReadOnly,
-    });
-    expect(decide(r, app("github_create_issue", "github:issues.write"))).toBe("refuse");
-    expect(decide(r, builtIn("remember", "memory:write"))).toBe("refuse");
-    for (const name of ["post_message", "send_dm", "ask_agent", "tell_agent"])
-      expect(toolPolicy(r, builtIn(name))).toEqual({ action: "refuse", reason: REFUSALS.routineReachReadOnly });
-    for (const name of ["schedule_reminder", "create_routine", "request_secret"])
-      expect(toolPolicy(r, builtIn(name))).toEqual({ action: "refuse", reason: REFUSALS.routineElsewhere });
-    expect(toolPolicy(r, builtIn("ask_user"))).toEqual({ action: "refuse", reason: REFUSALS.routineAskUser });
-    expect(toolPolicy(r, builtIn("react"))).toEqual({ action: "refuse", reason: REFUSALS.routineReact });
+  test("routine stored as read (ADR 0109): the same as act, the web and the browser included", () => {
+    for (const r of [routine("read"), { kind: "routine", personId: null, brief: null } as RunAuthority]) {
+      expect(decide(r, builtIn("web_search"))).toBe("allow");
+      expect(decide(r, builtIn("web_fetch"))).toBe("allow");
+      expect(decide(r, builtIn("browser_open", "browser:use"))).toBe("allow");
+      expect(decide(r, builtIn("browser_fill", "browser:use"))).toBe("allow");
+      expect(decide(r, builtIn("create_issue", "issues:write"))).toBe("allow");
+      expect(decide(r, app("github_create_issue", "github:issues.write"))).toBe("approve");
+      expect(decide(r, builtIn("hand_off"))).toBe("allow");
+      for (const name of ["post_message", "send_dm", "ask_agent", "tell_agent"])
+        expect(decide(r, builtIn(name))).toBe("allow");
+      for (const name of ["schedule_reminder", "create_routine", "request_secret"])
+        expect(toolPolicy(r, builtIn(name))).toEqual({ action: "refuse", reason: REFUSALS.routineElsewhere });
+      expect(toolPolicy(r, builtIn("ask_user"))).toEqual({ action: "refuse", reason: REFUSALS.routineAskUser });
+      expect(toolPolicy(r, builtIn("react"))).toEqual({ action: "refuse", reason: REFUSALS.routineReact });
+    }
   });
 
   test("routine, act: internal changes run, connected apps ask a person, other agents and posts are reached, routines never", () => {
@@ -152,21 +151,18 @@ describe("run policy table", () => {
     for (const reason of ["routine_report", "routine"] as const) {
       const looks: RunAuthority = { kind: "unattended", personId: null, reason, brief: briefOf("read") };
       const acts: RunAuthority = { kind: "unattended", personId: null, reason, brief: briefOf("act") };
-      // Set to only look and tell (or unknown): reads and the reply here, nothing that changes or reaches further.
+      // Stored as only looking, or unknown: the same as acting now (ADR 0109).
       for (const who of [looks, { ...looks, brief: null }, { kind: "unattended", personId: null, reason } as const]) {
-        for (const tool of [builtIn("list_issues", "issues:read"), builtIn("react"), builtIn("ask_user")])
-          expect(decide(who, tool)).toBe("allow");
         for (const tool of [
+          builtIn("list_issues", "issues:read"),
+          builtIn("react"),
+          builtIn("ask_user"),
           builtIn("browser_open", "browser:use"),
-          builtIn("desktop_do", "desktop:use"),
-          builtIn("start_task", "sandbox:run"),
+          builtIn("web_search"),
           builtIn("create_issue", "issues:write"),
-          builtIn("post_message"),
-          builtIn("send_dm"),
           builtIn("tell_agent"),
-          builtIn("ask_agent"),
         ])
-          expect(toolPolicy(who, tool)).toEqual({ action: "refuse", reason: REFUSALS.fedReadOnly });
+          expect(decide(who, tool)).toBe("allow");
         expect(decide(who, app("github_create_issue", "github:issues.write"))).toBe("approve");
       }
       // Set to act: what the routine itself may do, its writes to connected apps asking a person.
@@ -202,7 +198,7 @@ describe("run policy table", () => {
     }
     // The computer's own background task: code work, so a routine that may act starts one.
     expect(decide(routine("act"), builtIn("start_task", "sandbox:run"))).toBe("allow");
-    expect(decide(routine("read"), builtIn("start_task", "sandbox:run"))).toBe("refuse");
+    expect(decide(routine("read"), builtIn("start_task", "sandbox:run"))).toBe("allow");
   });
 
   test("connected tools with built-in names keep their external policy", () => {
@@ -211,7 +207,7 @@ describe("run policy table", () => {
     for (const name of ["permission_prompt", "start_task", "hand_off", "post_message", "git_clone"]) {
       const connected = app(name, "custom:conn_1:write");
       expect(toolKind(connected)).toEqual({ kind: "external" });
-      expect(decide(routine("read"), connected)).toBe("refuse");
+      expect(decide(routine("read"), connected)).toBe("approve");
       expect(decide(routine("act"), connected)).toBe("approve");
       // Nobody behind the run: the connector's own approvals decide, as for a person's run.
       expect(decide(unattended, connected)).toBe("allow");
@@ -438,22 +434,23 @@ describe("the gateway applies the run policy", () => {
     expect(names.get("request_branch_push")).toBe("Server request_branch_push");
   });
 
-  test("routine, read: refused tools aren't listed, and a call is refused anyway with the reason", async () => {
+  test("routine stored as read: listed like one that acts; what speaks for someone is refused with the reason", async () => {
     await gatewaySetup();
     const { ctx } = await runAs("read");
     const names = await listed(ctx);
-    for (const name of ["post_message", "send_dm", "react", "ask_user", "create_issue", "shop_refund_order"]) {
-      expect(names.has(name)).toBe(false);
-    }
-    for (const name of ["list_issues", "shop_list_orders", "hand_off", "list_routines"]) {
+    for (const name of ["react", "ask_user", "create_routine"]) expect(names.has(name)).toBe(false);
+    for (const name of [
+      "list_issues",
+      "shop_list_orders",
+      "hand_off",
+      "create_issue",
+      "post_message",
+      "shop_refund_order",
+    ])
       expect(names.has(name)).toBe(true);
-    }
-    expect(await call(ctx, "post_message", { channel: "general", text: "oi" })).toMatchObject({
+    expect(await call(ctx, "react", { emoji: "👍" })).toMatchObject({
       type: "result",
-      output: { isError: true, content: REFUSALS.routineReachReadOnly },
-    });
-    expect(await call(ctx, "shop_refund_order", { order: "7", why: WHY })).toMatchObject({
-      output: { isError: true, content: REFUSALS.routineReadOnly },
+      output: { isError: true, content: REFUSALS.routineReact },
     });
     expect(await call(ctx, "shop_list_orders", {})).toMatchObject({
       type: "result",
@@ -537,12 +534,9 @@ describe("the gateway applies the run policy", () => {
     expect(ran).toEqual([{ input: { code: "git push origin main" }, approved: false }]);
     await gateway.executeApproved(ctx, { ...result.approval, status: "approved" });
     expect(ran.at(-1)).toEqual({ input: { code: "git push origin main", why: WHY }, approved: true });
-    // A routine that only reads runs no command at all.
+    // A routine stored as only reading runs commands too (ADR 0109).
     const read = await runAs("read");
-    expect(await push(read.ctx, WHY)).toMatchObject({
-      type: "result",
-      output: { isError: true, content: REFUSALS.routineReadOnly },
-    });
+    expect(await push(read.ctx)).toMatchObject({ type: "result", output: { content: "ran" } });
   });
 
   test("unattended: it lists what a person's run lists and works as the agent itself", async () => {
@@ -655,6 +649,19 @@ describe("the gateway applies the run policy", () => {
     expect(bridged.map((t) => t.name)).toContain("permission_prompt");
   });
 
+  test("a computer brain (Codex, Claude Code) gets the web through the bridge, beside the browser", async () => {
+    await gatewaySetup();
+    const { run } = await runAs("person");
+    const gateway = createToolGateway({
+      sources: [createWebToolSource({ fetch: async () => new Response(""), resolveHost: async () => [] })],
+    });
+    const bridged = await bridgeToolsFor(
+      { db: f.db, pubsub: f.pubsub, tools: gateway },
+      { orgId: f.org.id, agentId: f.agent.id, runId: run.id, machineId: crypto.randomUUID() },
+    );
+    expect(bridged.map((t) => t.name).sort()).toEqual(["web_fetch", "web_search"]);
+  });
+
   test("the bridge lists exactly what the model loop does, why included", async () => {
     await gatewaySetup();
     for (const kind of ["read", "act", "unattended", "person"] as const) {
@@ -666,9 +673,10 @@ describe("the gateway applies the run policy", () => {
       );
       expect(bridged.map((t) => t.name).sort()).toEqual(loop.map((t) => t.name).sort());
       const refund = bridged.find((t) => t.name === "shop_refund_order");
-      if (kind === "read") expect(refund).toBeUndefined();
       // Only a routine's write to a connected app is made to ask a person; the others follow the tool's own rule.
-      else expect(((refund?.inputSchema.required ?? []) as string[]).includes("why")).toBe(kind === "act");
+      expect(((refund?.inputSchema.required ?? []) as string[]).includes("why")).toBe(
+        kind === "act" || kind === "read",
+      );
     }
   });
 });

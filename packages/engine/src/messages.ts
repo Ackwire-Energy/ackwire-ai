@@ -42,6 +42,7 @@ import { inChannelRun } from "./run-scope";
 import { NO_AI, outageParkedSql } from "./runs";
 import { afterSteered } from "./steering";
 import type { Talker } from "./talker";
+import { WEB_USAGE_PROVIDER } from "./web-tools";
 import { syncWikiLinks, withWikiLinks } from "./wiki-links";
 
 export { stopChecksSettled } from "./steering";
@@ -1459,7 +1460,14 @@ async function usageFor(db: Database, orgId: string, list: Message[]) {
       output: sql<number>`coalesce(sum(${u.outputTokens}), 0)::int`,
     })
     .from(u)
-    .where(and(eq(u.orgId, orgId), inArray(u.runId, runIds), eq(u.kind, "agent")))
+    .where(
+      and(
+        eq(u.orgId, orgId),
+        inArray(u.runId, runIds),
+        eq(u.kind, "agent"),
+        sql`${u.provider} <> ${WEB_USAGE_PROVIDER}`,
+      ),
+    )
     .groupBy(u.runId);
   for (const r of rows) {
     if (!r.runId) continue;

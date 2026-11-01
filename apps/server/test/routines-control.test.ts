@@ -29,7 +29,7 @@ async function withRoutine(extra: Record<string, unknown> = {}) {
   return { api, routine, orgId };
 }
 
-test("create and edit access and report; resuming clears the pause reason and the failure streak", async () => {
+test("create and edit the report, every routine acting; resuming clears the pause reason and the failure streak", async () => {
   const { api, routine } = await withRoutine({ access: "act", report: "always" });
   expect(routine).toMatchObject({
     access: "act",
@@ -46,7 +46,8 @@ test("create and edit access and report; resuming clears the pause reason and th
     json: { access: "read", report: "when_new" },
   });
   expect(edited.status).toBe(200);
-  expect(await edited.json()).toMatchObject({ access: "read", report: "when_new" });
+  // An old client may still send `read`: every routine acts (ADR 0109).
+  expect(await edited.json()).toMatchObject({ access: "act", report: "when_new" });
 
   // It paused itself after failing; a person resumes it.
   await t.db

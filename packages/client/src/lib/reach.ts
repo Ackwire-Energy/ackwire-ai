@@ -1,5 +1,5 @@
 import type { Agent, RoutineAccess } from "../api/types";
-import { audienceAdmits, canTalk, modeOf } from "./audience";
+import { audienceAdmits, canTalk } from "./audience";
 import { MENTION } from "./markdown";
 
 /**
@@ -21,7 +21,7 @@ export interface ReachEntry {
   private?: true;
   /** `not_in_channel` to an agent with no AI connected: nothing could answer it. */
   noAi?: true;
-  /** The own message of a routine set to only look and tell named it: such a message wakes nobody. */
+  /** Old messages: the own message of a routine then set to only look and tell named it, which woke nobody. */
   routinePost?: true;
   /** Whose reach fell short: the agent's owner may let them talk to it. */
   userId?: string;
@@ -38,7 +38,7 @@ export function reachOf(meta: Record<string, unknown> | null | undefined): Reach
   );
 }
 
-/** The routine only looks and tells: its access, not anyone's audience, keeps the agent out. */
+/** Old messages: the routine then only looked and told, so its access, not anyone's audience, kept the agent out. */
 export const reachByAccess = (e: ReachEntry) => e.reason === "routine_creator_reach" && e.routine?.access === "read";
 
 /** The line's text key: handed, a routine's message, no AI, kept private, the routine only looks, or who couldn't call it. */
@@ -56,21 +56,19 @@ export const reachKey = (e: ReachEntry) =>
             : ("reach.blocked" as const);
 
 /**
- * The agents a routine's prompt names that it won't be able to call, for its dialog (a warning, never a block): set to
- * act, the ones its creator can't talk to (`creatorUserId` when someone else's routine is being edited, else the
- * viewer); set to only look and tell, the ones not open to everyone. Never the routine's own agent.
+ * The agents a routine's prompt names that it won't be able to call, for its dialog (a warning, never a block): the
+ * ones its creator can't talk to (`creatorUserId` when someone else's routine is being edited, else the viewer).
+ * Never the routine's own agent.
  */
 export function routineReachWarnings(
   prompt: string,
   agents: readonly Agent[],
-  options: { access: RoutineAccess; agentId: string | null; creatorUserId?: string | null },
-): { agent: Agent; kind: "blocked" | "read" }[] {
+  options: { agentId: string | null; creatorUserId?: string | null },
+): { agent: Agent }[] {
   const handles = new Set([...prompt.matchAll(MENTION)].map((m) => (m[2] ?? "").toLowerCase()));
-  // ponytail: "read" ignores agents outside the report channel (their note is refused too); add once the dialog knows members.
-  return agents.flatMap((agent): { agent: Agent; kind: "blocked" | "read" }[] => {
+  return agents.flatMap((agent) => {
     if (agent.id === options.agentId || !handles.has(agent.handle.toLowerCase())) return [];
-    if (options.access === "read") return modeOf(agent) === "everyone" ? [] : [{ agent, kind: "read" }];
     const reaches = options.creatorUserId ? audienceAdmits(agent, options.creatorUserId) : canTalk(agent);
-    return reaches ? [] : [{ agent, kind: "blocked" }];
+    return reaches ? [] : [{ agent }];
   });
 }

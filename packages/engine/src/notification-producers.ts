@@ -753,7 +753,7 @@ export async function notifyRoutineFailed(
 }
 
 /**
- * A routine set to act couldn't call an agent its creator can't talk to (`reach.ts`, and its own tell_agent or
+ * A routine couldn't call an agent its creator can't talk to (`reach.ts`, and its own tell_agent or
  * ask_agent, `consultations.ts`): the agent's owner hears it once per routine and agent, or who manages agents when
  * it has none. It opens the agent's page (who talks to it), the place they may not otherwise reach being private;
  * `source.userId` is the routine's creator, whom its one-click action lets talk to the agent.
