@@ -6,6 +6,7 @@ import type { FakeReply } from "@agenteschat/providers/testing";
 import {
   addChannelMember,
   archiveAgent,
+  assignHandle,
   consolidateItem,
   createAgent,
   currentHandles,
@@ -19,7 +20,7 @@ import {
   updateAgent,
   updateMyProfile,
 } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import { addMember, type Fixture, setup } from "./fixtures";
 import { channelRoutine, fire } from "./routine-fixtures";
 
 let f: Fixture;
@@ -94,7 +95,7 @@ describe("a renamed agent's handle", () => {
     const claudio = await renamedAda();
     const atlas = await addAgent("Atlas", "atlas", "Ops");
     await rename(atlas.id, "Zeus", "zeus");
-    // People's handles don't check agents' (a member who joins gets one from their name).
+    // A person's handle set directly, as a workspace from before old handles were kept may have.
     await f.db
       .update(schema.organizationMembers)
       .set({ handle: "ada" })
@@ -137,6 +138,18 @@ describe("a renamed agent's handle", () => {
     const [row] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, claudio.id));
     expect(row?.handle).toBe("claudio");
     expect(row?.previousHandles).toEqual(["ada"]);
+  });
+
+  test("a person who joins doesn't get an agent's handle, now or before; the old one still reaches the agent", async () => {
+    f = await setup();
+    const claudio = await renamedAda();
+    const adaSouza = await addMember(f.db, f.org.id, "member", "Ada Souza");
+    const claudioLima = await addMember(f.db, f.org.id, "member", "Claudio Lima");
+
+    expect(await assignHandle(f.db, f.org.id, adaSouza.id)).toBe("ada-2");
+    expect(await assignHandle(f.db, f.org.id, claudioLima.id)).toBe("claudio-2");
+    expect(await currentHandles(f.db, f.org.id, ["ada"])).toEqual(["claudio"]);
+    expect(await post("@ada oi")).toMatchObject({ mentionedAgentIds: [claudio.id] });
   });
 
   test("deleting the agent frees the handles it had", async () => {

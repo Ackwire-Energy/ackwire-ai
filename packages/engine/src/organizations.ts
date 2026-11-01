@@ -13,6 +13,7 @@ import {
   ne,
   not,
   or,
+  rowsOf,
   schema,
   sql,
 } from "@agenteschat/db";
@@ -623,12 +624,15 @@ export async function assignHandle(db: Executor, orgId: string, userId: string) 
     .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
   if (!row || row.handle) return row?.handle ?? null;
   const base = handleBase(row.name, row.email);
+  const like = `${base}%`;
+  // Agents' handles too, the ones they had before a rename included: those still reach the agent.
   const taken = new Set(
-    (
-      await db
-        .select({ handle: organizationMembers.handle })
-        .from(organizationMembers)
-        .where(and(eq(organizationMembers.orgId, orgId), sql`${organizationMembers.handle} like ${`${base}%`}`))
+    rowsOf<{ handle: string }>(
+      await db.execute(sql`select handle from ${organizationMembers}
+          where org_id = ${orgId}::uuid and handle like ${like}
+        union select handle from ${agents} where org_id = ${orgId}::uuid and handle like ${like}
+        union select h from ${agents} cross join unnest(previous_handles) as u(h)
+          where org_id = ${orgId}::uuid and h like ${like}`),
     ).map((r) => r.handle),
   );
   let handle = base;
