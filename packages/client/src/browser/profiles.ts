@@ -8,12 +8,14 @@ export const profileLiveKey = (profileId: string) => `profile:${profileId}`;
 
 /**
  * Browser profiles exist only on a single-mode computer (ADR 0110 phase 1): on a system-mode one, as the Cloud's
- * computers run, nothing about them shows. Unknown computer: hidden too.
+ * computers run, nothing about them shows. Unknown computer: hidden too. A managed computer is the Cloud's, system
+ * mode even while it is prepared and its runner hasn't reported a mode yet.
  */
-export const profilesApply = (m: Pick<Machine, "mode"> | null | undefined) => Boolean(m) && m?.mode !== "system";
+export const profilesApply = (m: Pick<Machine, "mode" | "kind"> | null | undefined) =>
+  Boolean(m) && m?.mode !== "system" && m?.kind !== "managed";
 
 /** The profiles a computer's page lists: its own, and none at all on a system-mode computer. */
-export const machineProfiles = (profiles: BrowserProfile[] | undefined, m: Pick<Machine, "id" | "mode">) =>
+export const machineProfiles = (profiles: BrowserProfile[] | undefined, m: Pick<Machine, "id" | "mode" | "kind">) =>
   profilesApply(m) ? (profiles ?? []).filter((p) => p.machineId === m.id) : [];
 
 /** The workspace's browser profiles (every member sees names and who may use them); none on a server without them. */

@@ -222,9 +222,13 @@ test("a system-mode computer (the Cloud's) has no Perfis do navegador, not even 
   expect(document.body.textContent).not.toContain("Atualize o computador para usar perfis do navegador.");
 });
 
-test("the agent's browser on a system-mode computer: no profile choice and no asking for one", async () => {
+test.each([
+  ["a system-mode computer", { mode: "system" as const }],
+  // The Cloud's computer still being prepared: no hello yet, so it reads single mode, but it's managed.
+  ["the Cloud's computer before its first hello", { mode: "single" as const, kind: "managed" as const }],
+])("the agent's browser on %s: no profile choice and no asking for one", async (_, machine) => {
   const s = withProfiles("member");
-  fakeMachinesOf.get(s.api)?.patch(s.machine.id, { mode: "system" });
+  fakeMachinesOf.get(s.api)?.patch(s.machine.id, machine);
   // The server lists no profile of a system-mode computer.
   if (s.api.browserProfiles) s.api.browserProfiles.list = async () => [];
   await s.api.sandbox.setTarget(ORG_ID, ADA_ID, s.machine.id);

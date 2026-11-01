@@ -463,6 +463,27 @@ test("request_permission offers profiles apart from 'all tools'; approving grant
   expect((await missingPermissions(ctx)).map((m) => m.id)).not.toContain(`browser-profile:${p.id}`);
 });
 
+test("the Cloud's computer before its first hello, or an old system-mode one, is refused as system mode", async () => {
+  const b = await profilesSetup();
+  const p = await b.profile([f.agent.id]);
+  // Managed and never connected: no mode reported yet.
+  await f.db.update(schema.machines).set({ kind: "managed", executors: {} }).where(eq(schema.machines.id, b.machineId));
+  const refused = { code: "browser_profile.system_mode" };
+  await expect(b.profile([], "Other")).rejects.toMatchObject(refused);
+  await expect(setAgentBrowserProfile(f.db, f.owner.id, f.org.id, f.agent.id, p.id)).rejects.toMatchObject(refused);
+  expect(await listBrowserProfiles(f.db, f.owner.id, f.org.id)).toEqual([]);
+  expect(await b.names(await runOf(f.agent.id))).not.toContain("browser_profile");
+  await f.db.update(schema.agents).set({ browserMachineId: b.machineId }).where(eq(schema.agents.id, f.agent.id));
+  await expect(requestBrowserProfile({ db: f.db }, f.owner.id, f.org.id, f.agent.id)).rejects.toMatchObject(refused);
+  // A system-mode computer whose runner is too old for profiles: still system mode, never "update this computer".
+  await f.db
+    .update(schema.machines)
+    .set({ kind: "connected", executors: { mode: "system", browser: { available: true } } })
+    .where(eq(schema.machines.id, b.machineId));
+  b.s.status = { protocol: BROWSER_PROFILE_PROTOCOL - 1 };
+  await expect(b.profile([], "Older")).rejects.toMatchObject(refused);
+});
+
 test("an agent's owner asks the people who grant profiles; the inbox says so", async () => {
   await profilesSetup();
   const owner = await addMember(f.db, f.org.id, "member", "Owner");

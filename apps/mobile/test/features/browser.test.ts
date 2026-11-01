@@ -333,4 +333,6 @@ test("the computer's screen lists its browser profiles only on a single-mode com
   // An older server says no mode: single.
   expect(machineProfiles(profiles, { id: "m2" }).map((x) => x.name)).toEqual(["Empresa B"]);
   expect(machineProfiles(profiles, { id: "m1", mode: "system" })).toEqual([]);
+  // The Cloud's computer still being prepared: no hello yet, so its view says single, but it's managed.
+  expect(machineProfiles(profiles, { id: "m1", mode: "single", kind: "managed" })).toEqual([]);
 });

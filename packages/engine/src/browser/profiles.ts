@@ -81,17 +81,18 @@ export async function getBrowserProfile(db: Executor, orgId: string, profileId: 
 
 /**
  * Phase 1 (ADR 0110) holds profiles only on single-mode computers: on a system-mode one (each agent its own OS user,
- * as the Cloud's computers run) the feature doesn't exist, so its profiles are never listed or offered.
+ * as the Cloud's computers run) the feature doesn't exist, so its profiles are never listed or offered. A managed
+ * computer counts as system mode even before its runner's first hello reports it.
  */
-export const onSingleModeMachine = sql`not exists (select 1 from ${machines} m where m.id = ${browserProfiles.machineId} and m.executors->>'mode' = 'system')`;
+export const onSingleModeMachine = sql`not exists (select 1 from ${machines} m where m.id = ${browserProfiles.machineId} and (m.executors->>'mode' = 'system' or m.kind = 'managed'))`;
 
 /** The API's guard behind the hidden UI: anything about profiles on a system-mode computer is refused. */
 async function requireSingleMode(db: Executor, orgId: string, machineId: string) {
   const [m] = await db
-    .select({ executors: machines.executors })
+    .select({ executors: machines.executors, kind: machines.kind })
     .from(machines)
     .where(and(eq(machines.id, machineId), eq(machines.orgId, orgId)));
-  if (m?.executors?.mode === "system") {
+  if (m?.executors?.mode === "system" || m?.kind === "managed") {
     throw new ValidationError(
       "Browser profiles work only on a computer where every agent runs as one user",
       "browser_profile.system_mode",
@@ -224,9 +225,9 @@ export async function createBrowserProfile(
   const name = cleanName(input.name);
   const agentIds = [...new Set(input.agentIds ?? [])];
   await requireEditableAgents(db, membership, orgId, actorId, agentIds);
+  await requireSingleMode(db, orgId, input.machineId);
   const problem = await profileMachineProblem(db, deps.hub, orgId, input.machineId);
   if (problem) throw new ValidationError(problem, "browser_profile.machine");
-  await requireSingleMode(db, orgId, input.machineId);
   return db.transaction(async (tx) => {
     await requireFreeName(tx, orgId, name);
     const [row] = await tx
@@ -481,13 +482,19 @@ export async function agentBrowserProfiles(db: Executor, orgId: string, agentId:
 export async function requestBrowserProfile(deps: NotificationDeps, actorId: string, orgId: string, agentId: string) {
   const membership = await requireActiveMembership(deps.db, actorId, orgId);
   const [agent] = await deps.db
-    .select({ name: agents.name, handle: agents.handle, ownerUserId: agents.ownerUserId })
+    .select({
+      name: agents.name,
+      handle: agents.handle,
+      ownerUserId: agents.ownerUserId,
+      machineId: sql<string | null>`coalesce(${agents.browserMachineId}, ${agents.machineId})`,
+    })
     .from(agents)
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
   if (!agent) throw new NotFoundError("Agent not found");
   if (!can(membership, "manage_agents") && agent.ownerUserId !== actorId) {
     throw new ForbiddenError("Only an admin or the agent's owner can ask for a profile");
   }
+  if (agent.machineId) await requireSingleMode(deps.db, orgId, agent.machineId);
   const members = await deps.db
     .select({ userId: organizationMembers.userId, role: organizationMembers.role })
     .from(organizationMembers)
