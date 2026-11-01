@@ -178,6 +178,37 @@ describe("Quem pensa (its dialog)", () => {
     expect((within(d).getByRole("button", { name: "Usar" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
+  test("on its own computer, a brain says where only where the workspace has another (the Cloud has one)", async () => {
+    const sides = (d: HTMLElement) =>
+      within(within(d).getByRole("radiogroup", { name: "Quem pensa" }))
+        .getAllByRole("radio")
+        .map((r) => r.querySelector(".ac-optrow__side")?.textContent);
+    const state = seedState();
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.pair({ id: "machine_1", name: "Computador da Acme", kind: "managed" });
+    fakeMachinesOf.get(api)?.setSetup({ state: "ready", machineId: "machine_1" });
+    await api.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
+    api.agents.brain = async () =>
+      fakeAgentBrain(ADA_ID, {
+        ownSignIn: false,
+        computer: { machineId: "machine_1", name: "Computador da Acme", online: true },
+      });
+    await open(state, api);
+    const d = await brainDialog();
+    expect(sides(d)).toEqual([undefined, undefined, undefined]);
+    expect(d.textContent).not.toContain("Computador da Acme");
+    cleanup();
+
+    // Two computers: staying on hers says which.
+    const two = seedState();
+    const twoApi = createFakeApi(two);
+    pairMac(twoApi, false);
+    fakeMachinesOf.get(twoApi)?.pair({ name: "Mac mini" });
+    await twoApi.sandbox.setTarget(ORG_ID, ADA_ID, "machine_1");
+    await open(two, twoApi);
+    expect(sides(await brainDialog())).toEqual([undefined, "No MacBook", "No MacBook"]);
+  });
+
   test("Claude Code: the agent moves to the MacBook first, then thinks there; the button says whose plan", async () => {
     const { state } = await open();
     const d = await brainDialog();

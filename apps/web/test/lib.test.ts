@@ -191,7 +191,7 @@ describe("grammar", () => {
       "Browses websites in his own browser, on his computer. Logins are kept per agent.",
     );
     // Settings › Computers names each agent's own folder as her page does.
-    expect(te("agentPage.computer.foldersOwn", { ...ada, machine: "Mac" })).toBe("Only uses her own folder on Mac.");
+    expect(te("agentPage.computer.foldersOwn", ada)).toBe("Only uses her own folder.");
     expect(te("machines.page.agentOwnFolder", ada)).toBe("Only her own folder");
     expect(te("machines.page.agentFolders", { ...theo, folders: "Desktop" })).toBe("Uses Desktop and his own folder");
     // Portuguese says each one's own words, articles and forms too.

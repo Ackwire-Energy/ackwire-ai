@@ -115,7 +115,7 @@ import {
   useIsThisMac,
   useThisMac,
 } from "@/components/ThisMac";
-import { useComputerEdition } from "@/components/WorkspaceComputer";
+import { useComputerEdition, useNamesComputers } from "@/components/WorkspaceComputer";
 import { inDesktopApp } from "@/lib/desktop";
 import { limitOffers, planMeterText, planWord } from "@/lib/plan-usage";
 import { useToast } from "@/lib/toast";
@@ -626,6 +626,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const edition = useComputerEdition(org.id);
+  const names = useNamesComputers(org.id);
   const api = useApi();
   const toast = useToast();
   const refresh = useRefresh();
@@ -894,10 +895,13 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             : t("agentPage.work.brain.off", { computer: where.name })}
         </>
       );
+    // Staying on its own computer says where only where there is another; moving there always does.
+    const stays = where.machineId === work.machineId;
+    if (stays && !names) return null;
     return (
       <>
         <Icon name="computer" size={14} />
-        {where.machineId === work.machineId
+        {stays
           ? t("agentPage.work.brain.on", { computer: where.name })
           : t("agentPage.work.brain.moves", { computer: where.name })}
       </>
