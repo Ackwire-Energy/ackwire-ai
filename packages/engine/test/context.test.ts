@@ -154,6 +154,7 @@ test("every brain reads that it carries one conversation on: no name up front, n
     expect(text).toContain(CONTINUE_THE_CONVERSATION);
     // A computer brain (Claude Code, Codex) gets the same system text, with its own tools added.
     expect(forComputerBrain(text)).toContain(CONTINUE_THE_CONVERSATION);
+    expect(text).toContain("- Keep it as short as the news: a report with nothing for the person to decide");
   }
   expect(CONTINUE_THE_CONVERSATION).toContain("Don't open with the person's name");
   expect(CONTINUE_THE_CONVERSATION).toContain("don't repeat what you or others already said here");
