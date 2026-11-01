@@ -146,6 +146,7 @@ import {
   stripSentinel,
   visibleText,
 } from "./reply-policy";
+import { routineCreatorOf } from "./requester";
 import { routineBriefOf } from "./routine-brief";
 import { missStaleRoutineRun, routineRunWaitingForComputer, routineRunWaitingForPlan } from "./routine-firing";
 import { closeRoutineRun, type RoutineRunEnd, recordRoutineReportMessage, routineFailureEnd } from "./routine-ledger";
@@ -199,7 +200,14 @@ import { archivedAgentsPrompt, FIND_AGENT_TOOL, renamedAgentsPrompt, teammateMea
 import { linkRunChecks, runChecksForReply } from "./team-actions";
 import { carriesCredential, maskCredentials } from "./tool-detail";
 import { chooseToolGroups, keptToolGroups, recentForJudge, type ToolGroupChoice } from "./tool-loading";
-import { ON_DEMAND_FIND, ON_DEMAND_USE, presentTools, toolGroupKey, turnMeans } from "./tools/directory";
+import {
+  ON_DEMAND_FIND,
+  ON_DEMAND_USE,
+  presentTools,
+  reachesTeammates,
+  toolGroupKey,
+  turnMeans,
+} from "./tools/directory";
 import { type Approval, type InvokeResult, isSensitive, type ToolGateway } from "./tools/gateway";
 import type { ToolContext, ToolDefinition } from "./tools/types";
 import {
@@ -1711,8 +1719,15 @@ async function executeRunInner(
           : [
               `your computer's own tools: shell and files${plan.kind === "claude_code" ? ", WebSearch and WebFetch" : ""}`,
             ];
-      evidence.means = [...turnMeans(names, await teammateMeans(ctx).catch(() => [])), ...own];
-      evidence.tried = await triedCalls(db, run, t.harnessTried);
+      // Whose teammates, from the run in memory: the Tool Gateway read its row already.
+      const teammates = reachesTeammates(names)
+        ? await runAuthority(db, { ...run, transcript: t as unknown as Record<string, unknown> })
+            .then((a) => teammateMeans(ctx, a.personId ?? routineCreatorOf(a)))
+            .catch(() => [])
+        : [];
+      evidence.means = [...turnMeans(names, teammates), ...own];
+      // No call executed in this run: no tool step to read.
+      evidence.tried = t.executedCalls ? await triedCalls(db, run, t.harnessTried) : (t.harnessTried ?? []);
       return evidence;
     };
     return { evidence, gather };
