@@ -835,6 +835,8 @@ const DISCRETE_KEYS = new Set([
   " ",
 ]);
 const MODIFIER_KEYS = new Set(["Alt", "Control", "Meta", "Shift"]);
+/** CDP's bit for each mouse button in `buttons`. */
+const BUTTON_BITS = { none: 0, left: 1, right: 2, middle: 4 } as const;
 /** CDP's modifier bits, as `press` spells a chord (`Control+a`). */
 const CHORD = [
   [1, "Alt"],
@@ -843,10 +845,48 @@ const CHORD = [
   [8, "Shift"],
 ] as const;
 
-/** Where a person's pointer is and which modifier keys they hold, per stream. */
+/** Where a person's pointer is, and which mouse buttons and modifier keys they hold, per stream. */
 export interface InputState {
   pointer?: { x: number; y: number };
+  /** The mouse buttons down, as CDP's mask (left 1, right 2, middle 4). */
+  buttons?: number;
   held: Set<string>;
+  /** While the person drags: when they made its last event (`at`, their clock) and when it went to the page. */
+  drag?: { at: number; sent: number };
+}
+
+/** The longest gap a drag keeps between two of its events: a pause longer than this plays shorter. */
+export const DRAG_GAP_MAX_MS = 100;
+/** The furthest a drag's gaps may put an event behind the time its batch reached the computer. */
+export const DRAG_LAG_MAX_MS = 1000;
+
+/**
+ * How long to wait before `e` goes to the page so a drag keeps the gaps the person made between its
+ * events: the server sends input in batches and a slow link bunches them, and a slider handed a whole
+ * drag at once jumps to its end. Never past `until`: the sender writes `at`, and 100 ms gaps alone would
+ * let one batch hold the queue for seconds. Notes `e` as sent once that wait is over. Clicks and anything
+ * else go at once.
+ */
+export function dragDelay(
+  e: BrowserInputEvent,
+  state: InputState,
+  now: number,
+  until = Number.POSITIVE_INFINITY,
+): number {
+  if (e.kind !== "mouse" || e.type === "mouseWheel") return 0;
+  const drag = state.drag;
+  const wait = Math.min(
+    drag && e.at !== undefined && e.type !== "mousePressed"
+      ? Math.max(0, drag.sent + Math.min(Math.max(e.at - drag.at, 0), DRAG_GAP_MAX_MS) - now)
+      : 0,
+    Math.max(0, until - now),
+  );
+  // A press starts a drag and a release ends it; a move with no press before it is the pointer hovering.
+  state.drag =
+    e.at === undefined || e.type === "mouseReleased" || (e.type === "mouseMoved" && !drag)
+      ? undefined
+      : { at: e.at, sent: now + wait };
+  return wait;
 }
 
 /**
@@ -855,43 +895,61 @@ export interface InputState {
  * active tab and answers once Chrome has it, unlike the stream socket, whose
  * input goes to the tab it attached to and is never confirmed. Keys go
  * through `press` (it fills in codes and text); a modifier held on its own is
- * a raw key-down/up pair; a tap from the phone is a left click.
+ * a raw key-down/up pair; a tap from the phone is a left click. Every mouse
+ * command says which buttons are down (`buttons`, which the daemon passes to
+ * Chrome as given), so a move after a press reaches the page as a drag.
  */
 export function relayCommands(e: BrowserInputEvent, state: InputState): Record<string, unknown>[] {
   switch (e.kind) {
-    case "mouse":
+    case "mouse": {
+      const button = e.button ?? (e.type === "mouseMoved" || e.type === "mouseWheel" ? "none" : "left");
+      // A release that never came (dropped on the way, or control that ended mid-press) is sent first, where the
+      // pointer was: before a new press of that button, or a move that says no button is down.
+      const lost =
+        (state.buttons ?? 0) &
+        (e.type === "mousePressed" ? BUTTON_BITS[button] : e.type === "mouseMoved" && e.button === "none" ? ~0 : 0);
+      if (lost) return [...releaseHeld(state, lost), ...relayCommands(e, state)];
       state.pointer = { x: e.x, y: e.y };
+      if (e.type === "mousePressed") state.buttons = (state.buttons ?? 0) | BUTTON_BITS[button];
+      else if (e.type === "mouseReleased") state.buttons = (state.buttons ?? 0) & ~BUTTON_BITS[button];
       return [
         {
           action: "input_mouse",
           type: e.type,
           x: e.x,
           y: e.y,
-          button: e.button ?? (e.type === "mouseMoved" || e.type === "mouseWheel" ? "none" : "left"),
+          button,
+          buttons: state.buttons ?? 0,
           clickCount: e.clickCount ?? (e.type === "mousePressed" || e.type === "mouseReleased" ? 1 : 0),
           deltaX: e.deltaX ?? 0,
           deltaY: e.deltaY ?? 0,
           modifiers: e.modifiers ?? 0,
         },
       ];
+    }
     case "touch": {
       const at = e.touchPoints[0] ?? state.pointer;
       if (!at) return [];
-      state.pointer = { x: at.x, y: at.y };
-      const mouse = (type: string, button: string, clickCount: number) => ({
-        action: "input_mouse",
-        type,
-        x: at.x,
-        y: at.y,
-        button,
-        clickCount,
-        deltaX: 0,
-        deltaY: 0,
-        modifiers: e.modifiers ?? 0,
-      });
-      if (e.type === "touchStart") return [mouse("mouseMoved", "none", 0), mouse("mousePressed", "left", 1)];
-      if (e.type === "touchMove") return [mouse("mouseMoved", "left", 0)];
-      return [mouse("mouseReleased", "left", 1)];
+      const mouse = (
+        type: "mouseMoved" | "mousePressed" | "mouseReleased",
+        button: "none" | "left",
+        clickCount: number,
+      ) =>
+        relayCommands(
+          {
+            kind: "mouse",
+            type,
+            x: at.x,
+            y: at.y,
+            button,
+            clickCount,
+            ...(e.modifiers ? { modifiers: e.modifiers } : {}),
+          },
+          state,
+        );
+      if (e.type === "touchStart") return [...mouse("mouseMoved", "none", 0), ...mouse("mousePressed", "left", 1)];
+      if (e.type === "touchMove") return mouse("mouseMoved", "left", 0);
+      return mouse("mouseReleased", "left", 1);
     }
     case "key": {
       if (e.type === "char") return e.text ? [{ action: "keyboard", subaction: "insertText", text: e.text }] : [];
@@ -911,6 +969,15 @@ export function relayCommands(e: BrowserInputEvent, state: InputState): Record<s
     case "text":
       return [{ action: "keyboard", subaction: "insertText", text: e.text }];
   }
+}
+
+/** The mouse buttons in `mask` that `state` still holds, let go where the pointer is. */
+function releaseHeld(state: InputState, mask = ~0): Record<string, unknown>[] {
+  const at = state.pointer;
+  if (!at) return [];
+  return (["left", "right", "middle"] as const)
+    .filter((b) => (state.buttons ?? 0) & mask & BUTTON_BITS[b])
+    .flatMap((button) => relayCommands({ kind: "mouse", type: "mouseReleased", x: at.x, y: at.y, button }, state));
 }
 
 /** The subset of a WebSocket the stream relay uses (a fake in tests). */
@@ -2552,6 +2619,7 @@ export class BrowserManager {
     while (session.streamOpening) await session.streamOpening.catch(() => undefined);
     if (session.stream) {
       if (session.stream.mode !== mode) {
+        if (mode === "watch") this.letGo(session.stream);
         session.stream.mode = mode;
         session.stream.socket.send(JSON.stringify({ type: "config", maxFps: STREAM_FPS[mode] }));
         this.changed();
@@ -2749,6 +2817,7 @@ export class BrowserManager {
     const session = this.sessions.get(String(agent.id ?? ""));
     while (session?.streamOpening) await session.streamOpening.catch(() => undefined);
     if (!session?.stream) return { stopped: false };
+    this.letGo(session.stream);
     this.endStream(session, "stopped");
     return { stopped: true };
   }
@@ -2781,7 +2850,8 @@ export class BrowserManager {
   /**
    * `browser.input`: a person's input during a take over, in order, through
    * the daemon's command relay (the active tab, each one confirmed before the
-   * next). The stream socket only carries frames.
+   * next), a drag with the gaps the person made (`dragDelay`), never more
+   * than `DRAG_LAG_MAX_MS` behind. The stream socket only carries frames.
    */
   async input(agent: AgentScope, events: unknown[]): Promise<MachineReplies["browser.input"]> {
     const session = this.sessions.get(String(agent.id ?? ""));
@@ -2791,13 +2861,18 @@ export class BrowserManager {
       throw new RunnerError("bad_request", `At most ${BROWSER_LIMITS.inputEvents} events at once`);
     }
     session.lastUsed = this.now();
+    const until = this.now() + DRAG_LAG_MAX_MS;
     const parsed = events.map((raw) => parseBrowserInputEvent(raw)).filter((e) => e !== null);
+    // Nothing queued reaches the page once the stream ended (the browser closed under it) or is back to watching:
+    // the person's control ended, and the server checks control only as it forwards a batch.
+    const driving = () => session.stream === stream && stream.mode === "control";
     const run = stream.inputQueue.then(async () => {
       let accepted = 0;
       let failed = 0;
       for (const e of parsed) {
-        // The stream ended (the browser closed under it): nothing is sent to a browser that isn't there.
-        if (session.stream !== stream) {
+        const wait = driving() ? dragDelay(e, stream.input, this.now(), until) : 0;
+        if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+        if (!driving()) {
           failed += 1;
           continue;
         }
@@ -2812,6 +2887,16 @@ export class BrowserManager {
     });
     stream.inputQueue = run.catch(() => undefined);
     return run;
+  }
+
+  /**
+   * The person's control ended (back to watching, or nobody watches): a button they still hold lets go where their
+   * pointer was, after the input queued before, so the agent doesn't go on with it held.
+   */
+  private letGo(stream: Stream) {
+    stream.inputQueue = stream.inputQueue.then(async () => {
+      for (const command of releaseHeld(stream.input)) await this.relay(stream.port, command);
+    });
   }
 
   /** One command on the daemon's relay (`POST /api/command` on the stream port); true when it ran. */

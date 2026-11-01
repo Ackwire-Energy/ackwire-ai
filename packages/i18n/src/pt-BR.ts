@@ -9999,7 +9999,8 @@ export const ptBR = {
       noSite: "Antes de abrir uma página",
     },
     inCard: {
-      scrollHint: "Rolando a página · Esc para sair",
+      scrollHint: "Rolar agora move a página. Esc para sair",
+      touchHint: "Arraste com um dedo. Role com dois",
       targetMarked: "Campo marcado",
       targetNone: "Clique num campo",
       typePlaceholder: "Digite no campo marcado",
