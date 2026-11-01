@@ -205,7 +205,7 @@ describe("the frame mermaid draws in", () => {
     expect(el.querySelector(".code-card__preview img")?.getAttribute("alt")).toBe("Fluxo");
   });
 
-  test("a diagram longer than mermaid draws stays code, in Drive too, and never reaches the frame", async () => {
+  test("a diagram longer than the page sends mermaid stays code, in Drive too, and never reaches the frame", async () => {
     const long = `flowchart LR\n  A[${"x".repeat(50_000)}] --> B`;
     const el = render(<MermaidDiagram source={long} label="Diagrama: Fluxo" />).container;
     await settle();
@@ -480,29 +480,90 @@ describe("inside the frame, mermaid-frame.js", () => {
     }
   });
 
-  test("runs of whitespace as long as the page sends are drawn in a moment; longer ones stay code", async () => {
-    // Safari and Firefox draw on the page's thread, and these took them seconds: mermaid's own regexes backtrack over
-    // long runs of whitespace (front matter that never closes, blank lines, a label of spaces).
+  // Safari, Firefox and the desktop app draw on the page's thread. Past the page's bounds each family below held WebKit
+  // or Firefox for seconds, and at them mermaid answers in a moment.
+  const repeated = (header: string, line: string, count: number) => `${header}\n${Array(count).fill(line).join("\n")}`;
+  async function answersQuickly(source: string) {
+    expect(mermaidDrawable(source)).toBe(true);
+    const start = performance.now();
+    expect(await frameScript().ask({ id: "bound", source, dark: false })).toBeDefined();
+    expect(performance.now() - start).toBeLessThan(1000);
+  }
+
+  test("a source over 5,000 characters or 200 lines stays code, and one at the bounds is answered in a moment", async () => {
     for (const source of [
-      `---${"\n".repeat(39_960)}x`,
-      `---${"\n".repeat(49_990)}`,
+      `architecture-beta\n  ${"<a\n  ".repeat(4800)}`,
+      `pie\n  ${":\n  ".repeat(6000)}`,
+      `gitGraph\n  ${":\n  ".repeat(6000)}`,
+      `xychart-beta\n${`  ${";".repeat(498)}\n`.repeat(99)}`,
       `flowchart LR\n${"\n".repeat(40_000)}  A --> B`,
-      `flowchart LR\n  A[a${" ".repeat(40_000)}b] --> B`,
+      repeated("flowchart LR", `  A[${"x".repeat(452)}] --> B`, 11),
+      repeated("flowchart LR", "  A --> B", 200),
     ])
       expect(mermaidDrawable(source)).toBe(false);
-    const fill = (unit: string) => unit.repeat(Math.floor(47_000 / unit.length));
-    const blankLines = fill(`${"\n".repeat(1000)}A --> B`);
-    const frame = frameScript();
+    await answersQuickly(repeated("architecture-beta", `  ${"<a".repeat(24)}`, 97));
+    await answersQuickly(repeated("architecture-beta", "  <a", 199));
+    await answersQuickly(repeated("xychart-beta", `  ${";".repeat(48)}`, 97));
+    await answersQuickly(repeated("pie", "  :", 199));
+    await answersQuickly(`${repeated("flowchart LR", " ".repeat(499), 9)}\n  A --> B`);
+  });
+
+  test("a line over 500 characters, or style lines mermaid's entity regexes take long over, stays code", async () => {
+    const styles = `${"style".repeat(25)}${":".repeat(125)}${"#".repeat(240)}`;
     for (const source of [
-      `flowchart LR${blankLines}`,
-      `flowchart LR\n${fill(`  A[a${" ".repeat(1000)}b] --> B\n`)}`,
-      `---${"\n".repeat(1000)}title: Fluxo\n---\nflowchart LR${blankLines}`,
-    ]) {
-      expect(mermaidDrawable(source)).toBe(true);
-      const start = performance.now();
-      expect(await frame.ask({ id: "long", source, dark: false })).toHaveProperty("svg");
-      expect(performance.now() - start).toBeLessThan(1000);
-    }
+      `flowchart LR\n  A --> B\n  ${"style:".repeat(1600)}`,
+      `flowchart LR\n  A --> B\n  ${"classDef:".repeat(1200)}`,
+      `flowchart LR\n  A[${"x".repeat(496)}] --> B`,
+      repeated("flowchart LR", `  ${styles}`, 2),
+      // Mermaid takes its directives out before its regexes read the lines, which can join two into one.
+      `flowchart LR\n  ${"sty%%{x}%%le".repeat(10)}${":".repeat(130)}${"#".repeat(240)}`,
+      `flowchart LR\n  ${styles.slice(0, 125)}%%{x\n}%%${styles.slice(125)}`,
+      `flowchart LR\n  A[${"x".repeat(480)}%%{x\n}%%${"y".repeat(480)}] --> B`,
+    ])
+      expect(mermaidDrawable(source)).toBe(false);
+    await answersQuickly(repeated("flowchart LR", `  style${":".repeat(165)}${"#".repeat(328)}`, 3));
+  });
+
+  test("front matter with a YAML anchor or alias stays code, though mermaid reads it", async () => {
+    const flow = "flowchart LR\n  A --> B";
+    // Each level repeats the one before ten times: mermaid walks the config as a tree, 13 s in WebKit at 7 levels.
+    const chain = (levels: number) => {
+      const lines = ["---", `l0: &l0 [${Array(10).fill(1)}]`];
+      for (let i = 1; i <= levels; i++) lines.push(`l${i}: &l${i} [${Array(10).fill(`*l${i - 1}`)}]`);
+      return [...lines, "config:", `  flowchart: [*l${levels}]`, "---", flow].join("\n");
+    };
+    for (const source of [
+      chain(7),
+      chain(1),
+      `---\nbase: &b {theme: dark}\nconfig: *b\n---\n${flow}`,
+      `---\nconfig: &c\n  theme: dark\n---\n${flow}`,
+      `---\n&k title: x\n---\n${flow}`,
+    ])
+      expect(mermaidDrawable(source)).toBe(false);
+    for (const title of ["Q&A", "R & D", "2 * 3", "'*x'", "a&b*c"])
+      expect(mermaidDrawable(`---\ntitle: ${title}\n---\n${flow}`)).toBe(true);
+    expect(await mermaid.parse(chain(1))).toBeTruthy();
+  });
+
+  test("a mindmap over 100 lines or a venn diagram over 30 sets and unions stays code, its keyword split or not", async () => {
+    const mindmap = (header: string, nodes: number) =>
+      `${header}\n  root\n${Array.from({ length: nodes }, (_, i) => `    c${i}`).join("\n")}`;
+    const venn = (header: string, sets: number, before = "") =>
+      `${header}\n${Array.from({ length: sets }, (_, i) => `  ${before}set S${i}`).join("\n")}`;
+    for (const source of [
+      mindmap("mindmap", 99),
+      mindmap("mind%%{x}%%map", 99),
+      venn("venn-beta", 31),
+      venn("venn%%{x}%%-beta", 31),
+      venn("venn-beta", 31, "%%{x}%%"),
+      `${venn("venn-beta", 20)}\n${Array.from({ length: 11 }, (_, i) => `  union S${i},S${i + 1}`).join("\n")}`,
+    ])
+      expect(mermaidDrawable(source)).toBe(false);
+    expect(mermaidDrawable(mindmap("mindmap", 98))).toBe(true);
+    // Mermaid finds the keyword once its directives are out.
+    expect((await mermaid.parse(mindmap("mind%%{x}%%map", 3)))?.diagramType).toBe("mindmap");
+    expect((await mermaid.parse(venn("venn%%{x}%%-beta", 3)))?.diagramType).toBe("venn");
+    await answersQuickly(venn("venn-beta", 30));
   });
 
   test("a gantt is drawn 720px wide, which a card fits, not as wide as the frame", async () => {

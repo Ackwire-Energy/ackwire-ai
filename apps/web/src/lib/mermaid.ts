@@ -21,30 +21,72 @@ import frameScript from "./mermaid-frame.js?url&no-inline";
  * - Mermaid's own settings in mermaid-frame.js (strict, no HTML labels, its sanitizer) are a second layer.
  *
  * Desktop Chrome and Edge give the frame a process of its own, where a drawing that takes long only holds up the next
- * one. Safari and Firefox draw on the page's own thread, where it holds up the page: see `mermaidDrawable`.
+ * one. Safari, Firefox and the desktop app (WebKit) run the frame on the page's own thread: there every drawing holds
+ * up the page, and the timeout below can't fire until mermaid lets go. `mermaidDrawable` bounds what goes to mermaid
+ * and says what a drawing within the bounds still costs.
  */
 
-/** Mermaid's own `maxTextSize`: past it mermaid draws a red "Maximum text size" box instead of the diagram. */
-const MERMAID_MAX_TEXT = 50_000;
-/** More whitespace in a row than a diagram's indentation and blank lines ever take. */
-const MERMAID_MAX_SPACE = 1000;
+const MERMAID_MAX_TEXT = 5000;
+const MERMAID_MAX_LINES = 200;
+const MERMAID_MAX_LINE = 500;
+const MERMAID_MAX_MINDMAP_LINES = 100;
+/** A venn diagram's `set` and `union` lines. */
+const MERMAID_MAX_VENN_AREAS = 30;
+/** Characters mermaid's entity regexes may read over the `style` and `classDef` lines: about 25 ms of them. */
+const MERMAID_MAX_STYLE_WORK = 100_000_000;
+/** Mermaid's directive regex, as 11.17.2 has it: the source its parsers read is the one without these. */
+const MERMAID_DIRECTIVE = /%{2}{\s*(?:(\w+)\s*:|(\w+))\s*(?:(\w+)|((?:(?!}%{2}).|\r?\n)*))?\s*(?:}%{2})?/gi;
+/** A YAML anchor (`&a`) or alias (`*a`): an `&` or `*` that starts a key or a value and names something. */
+const YAML_ANCHOR_OR_ALIAS = /(?:^|[\s:?,[{-])[&*]\S/;
 
 /**
- * Whether a source goes to mermaid, checked in linear time. Not past mermaid's size, nor with front matter mermaid
- * refuses, nor with a longer run of whitespace: mermaid's comment regexes try each place in a run over the rest of
- * it, and its front matter regex each line break after the opening `---` over the rest of the source, so 40,000 blank
- * lines take them seconds.
+ * Whether a source goes to mermaid, checked before anything reaches the frame, in time linear in the source. Safari,
+ * Firefox and the desktop app wait out every drawing on the page's thread, and past these bounds one fence held
+ * WebKit 26 or Firefox 144 for seconds:
+ *
+ * - At most 5,000 characters, 200 lines and 500 characters a line. Some of mermaid's parsers take time that grows with
+ *   the square of the source (50,000 characters of `;` in an xychart: 5 s, 4,800 lines of `<a` in an architecture
+ *   diagram: 4.7 s), and its layouts a millisecond or more a node.
+ * - At most 100 lines in a mindmap, and 30 sets and unions in a venn diagram: their layouts grow much faster than their
+ *   size (a mindmap of 1,000 nodes: 21 s, a venn diagram of 200 sets: 100 s).
+ * - No more `style` and `classDef` than mermaid's entity regexes read in a moment. `style.*:\S*#.*;` (the same with
+ *   classDef) tries, on a line with no `;` after its last `#`, each style there with each `:` after it and each `#`
+ *   after that, reading the rest of the line each time.
+ * - Front matter that mermaid reads, without YAML anchors or aliases: mermaid walks the config as a tree, so aliases of
+ *   aliases take it exponential time (437 characters: 13 s).
+ *
+ * What's left is what drawing a big diagram costs. The slowest fence measured within the bounds, a block diagram that
+ * packs 1,000 blocks into 5,000 characters, holds the page 1.4 s in WebKit and 1.3 s in Firefox, and the largest of
+ * every other kind tried less than 0.8 s. Chrome and Edge on a desktop draw in the frame's own process instead.
  */
 export function mermaidDrawable(source: string): boolean {
-  if (source.length > MERMAID_MAX_TEXT || source.match(/\s+/g)?.some((run) => run.length > MERMAID_MAX_SPACE))
-    return false;
+  if (source.length > MERMAID_MAX_TEXT) return false;
+  const lines = source.split(/\r\n?|\n/);
+  if (lines.length > MERMAID_MAX_LINES || lines.some((line) => line.length > MERMAID_MAX_LINE)) return false;
   // Front matter ends at a `---` line in the opening one's indent, from the third line on and followed by a line break
   // (mermaid's regex, once mermaid has made every `\r\n` a `\n`). Without one mermaid refuses the diagram.
-  const lines = source.split(/\r\n?|\n/);
+  let body = lines;
   const first = lines[0] ?? "";
-  if (first.trim() !== "---") return true;
-  const closing = `${first.slice(0, first.indexOf("-"))}---`;
-  return lines.slice(2, -1).some((line) => line.startsWith(closing) && !line.slice(closing.length).trim());
+  if (first.trim() === "---") {
+    const closing = `${first.slice(0, first.indexOf("-"))}---`;
+    const end = lines.findIndex(
+      (line, i) => i >= 2 && i < lines.length - 1 && line.startsWith(closing) && !line.slice(closing.length).trim(),
+    );
+    if (end < 0 || YAML_ANCHOR_OR_ALIAS.test(lines.slice(1, end).join("\n"))) return false;
+    body = lines.slice(end + 1);
+  }
+  // What mermaid's parsers read: the rest without its directives, which can join the lines around them into one.
+  const text = body.join("\n").replace(MERMAID_DIRECTIVE, "");
+  const read = text.split("\n");
+  let styleWork = 0;
+  for (const line of read) {
+    if (line.length > MERMAID_MAX_LINE) return false;
+    const styles = line.match(/style|classDef/g)?.length ?? 0;
+    styleWork += styles * line.split(":").length * line.split("#").length * line.length;
+  }
+  if (styleWork > MERMAID_MAX_STYLE_WORK) return false;
+  if (/^\s*mindmap/m.test(text) && read.length > MERMAID_MAX_MINDMAP_LINES) return false;
+  return !/^\s*venn-beta/m.test(text) || (text.match(/^\s*(?:set|union)\b/gim)?.length ?? 0) <= MERMAID_MAX_VENN_AREAS;
 }
 
 /** Both frames' sandbox. Not the agent pages' (HtmlFrame): what those may be allowed must never reach this one. */

@@ -397,7 +397,7 @@ describe("```mermaid fences", () => {
     expect(el.querySelectorAll(".code-card__preview img")).toHaveLength(sources.length);
   });
 
-  test("one longer than mermaid draws, with front matter it refuses or a longer run of whitespace stays code", async () => {
+  test("one longer than the page sends mermaid, with front matter mermaid refuses or too many lines stays code", async () => {
     const sources = [
       `flowchart LR\n  A[${"x".repeat(50_000)}] --> B`,
       // Front matter that never closes.
