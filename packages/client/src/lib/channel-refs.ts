@@ -6,6 +6,8 @@
  */
 
 import { CHANNEL_REF } from "@agenteschat/ui/channel-refs";
+import type { TFunction } from "i18next";
+import type { ChannelCard } from "../api/types";
 
 export { CHANNEL_REF, channelQuery, insertChannelRef } from "@agenteschat/ui/channel-refs";
 
@@ -78,4 +80,13 @@ export function channelOptions<C extends { name: string; isMember: boolean }>(
       .sort((a, b) => rank(a) - rank(b) || Number(b.isMember) - Number(a.isMember) || a.name.localeCompare(b.name))
       .slice(0, limit)
   );
+}
+
+/** A channel card's line of facts (web hover card and phone sheet): "2 pessoas · 1 agente · você participa". */
+export function channelCardFacts(t: TFunction, card: Pick<ChannelCard, "people" | "agents" | "isMember">): string {
+  return [
+    t("channelRefs.people", { count: card.people }),
+    t("channelRefs.agents", { count: card.agents }),
+    card.isMember ? t("channelRefs.member") : t("channelRefs.notMember"),
+  ].join(" · ");
 }

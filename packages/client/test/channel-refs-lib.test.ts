@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test";
+import type { TFunction } from "i18next";
 import {
+  channelCardFacts,
   channelOptions,
   channelQuery,
   channelRefsOf,
@@ -55,4 +57,11 @@ test("one rule for the composers, the renderer and the server", async () => {
   expect(lib.CHANNEL_REF).toBe(shared.CHANNEL_REF);
   expect([lib.channelQuery, lib.insertChannelRef]).toEqual([shared.channelQuery, shared.insertChannelRef]);
   expect([ui.channelQuery, ui.insertChannelRef]).toEqual([shared.channelQuery, shared.insertChannelRef]);
+});
+
+test("a channel card's facts: people, agents, and whether I'm in it (web card and phone sheet)", () => {
+  const t = ((key: string, v?: { count?: number }) => (v ? `${key}=${v.count}` : key)) as unknown as TFunction;
+  expect(channelCardFacts(t, { people: 2, agents: 1, isMember: false })).toBe(
+    "channelRefs.people=2 · channelRefs.agents=1 · channelRefs.notMember",
+  );
 });

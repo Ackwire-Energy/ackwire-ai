@@ -1,8 +1,8 @@
 import { useChannelCard, useChannels, useJoinChannel } from "@agenteschat/client";
-import { resolveChannelRef } from "@agenteschat/client/lib/channel-refs";
+import { channelCardFacts, resolveChannelRef } from "@agenteschat/client/lib/channel-refs";
 import { Button, Chip, hoverPointer, Icon, Popover } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { type FocusEvent, type PointerEvent, useEffect, useRef, useState } from "react";
+import { type FocusEvent, type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { HOVER_OPEN_MS } from "@/components/ProfileCard";
@@ -11,7 +11,8 @@ const HOVER_CLOSE_MS = 200;
 
 /**
  * `#name` in a message: a link to the channel it means (`resolveChannelRef`), with its card on hover or keyboard
- * focus. A channel the viewer can't see stays the text as written; an archived one opens only its card.
+ * focus. A channel the viewer can't see stays the text as written; an archived one opens only its card. From the
+ * keyboard, Enter opens the channel and ArrowDown or Space moves into the card (Join, Open).
  */
 export function ChannelRef({ name, text, refs }: { name: string; text: string; refs?: Record<string, string> }) {
   const { t } = useTranslation();
@@ -22,6 +23,8 @@ export function ChannelRef({ name, text, refs }: { name: string; text: string; r
   const lookup = useChannelCard(org.id, ref?.id ?? "", Boolean(ref && !ref.known));
   const [open, setOpen] = useState<false | "hover" | "press">(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const body = useRef<HTMLDivElement>(null);
+  const [intoCard, setIntoCard] = useState(false);
   const clear = () => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
@@ -32,6 +35,12 @@ export function ChannelRef({ name, text, refs }: { name: string; text: string; r
     },
     [],
   );
+  // The card may already be open from the focus (without taking it): move in once it shows.
+  useEffect(() => {
+    if (!intoCard || open !== "press") return;
+    setIntoCard(false);
+    (body.current?.querySelector<HTMLElement>("button") ?? body.current)?.focus();
+  });
   const later = (next: boolean, ms: number) => {
     clear();
     timer.current = setTimeout(() => {
@@ -86,6 +95,14 @@ export function ChannelRef({ name, text, refs }: { name: string; text: string; r
             params={{ orgId: org.id, channelId: ref.id }}
             className={className}
             aria-label={label}
+            aria-keyshortcuts="ArrowDown Space"
+            onKeyDown={(e: KeyboardEvent) => {
+              if (e.key !== "ArrowDown" && e.key !== " ") return;
+              e.preventDefault();
+              clear();
+              setOpen("press");
+              setIntoCard(true);
+            }}
             {...hover}
           >
             #{shown}
@@ -93,7 +110,11 @@ export function ChannelRef({ name, text, refs }: { name: string; text: string; r
         )
       }
     >
-      {open && <ChannelCardBody channelId={ref.id} onDone={() => setOpen(false)} />}
+      {open && (
+        <div ref={body} tabIndex={-1}>
+          <ChannelCardBody channelId={ref.id} onDone={() => setOpen(false)} />
+        </div>
+      )}
     </Popover>
   );
 }
@@ -118,13 +139,7 @@ function ChannelCardBody({ channelId, onDone }: { channelId: string; onDone: () 
         {c.archived && <Chip>{t("channelRefs.archived")}</Chip>}
       </div>
       {c.topic && <p className="channel-card__topic">{c.topic}</p>}
-      <p className="small muted channel-card__facts">
-        {[
-          t("channelRefs.people", { count: c.people }),
-          t("channelRefs.agents", { count: c.agents }),
-          c.isMember ? t("channelRefs.member") : t("channelRefs.notMember"),
-        ].join(" · ")}
-      </p>
+      <p className="small muted channel-card__facts">{channelCardFacts(t, c)}</p>
       {!c.archived && (
         <div className="profile-card__actions">
           {!c.isMember && c.visibility === "public" && (

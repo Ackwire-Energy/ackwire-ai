@@ -115,4 +115,17 @@ describe("#channel links in messages", () => {
     expect(within(card).getByRole("button", { name: "Abrir" })).toBeTruthy();
     expect(within(card).queryByRole("button", { name: "Entrar" })).toBeNull();
   });
+
+  test("from the keyboard: focus shows the card, ArrowDown moves into it and Tab reaches Open", async () => {
+    await go(`c/${GENERAL_ID}`, withMessage("veja #eng"));
+    const link = screen().getByRole("link", { name: "Canal #eng" });
+    await act(async () => link.focus());
+    await keyDown(link, "ArrowDown");
+    await settle(4);
+    const card = screen().getByRole("dialog", { name: "Sobre #eng" });
+    expect(card.contains(document.activeElement)).toBe(true);
+    await wait(250);
+    expect(screen().getByRole("dialog", { name: "Sobre #eng" })).toBeTruthy();
+    expect(document.activeElement?.textContent).toBe("Abrir");
+  });
 });
