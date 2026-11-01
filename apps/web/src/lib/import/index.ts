@@ -1,4 +1,5 @@
 import type { MigrationBundle } from "@agenteschat/client";
+import { MAX_UPLOAD_BYTES } from "@agenteschat/client/lib/files";
 import { excerpt } from "@agenteschat/client/lib/text";
 import * as agenteschat from "./agenteschat";
 import * as hermes from "./hermes";
@@ -119,8 +120,24 @@ const LABEL_MAX = 500;
 const NOISE = /(^|\/)(\.[^/]*|__MACOSX\/.*|(README|LICEN[CS]E|NOTICE|CHANGELOG|CONTRIBUTING)(\.[a-z]+)?)$/i;
 
 const prepare = (files: ImportFile[]) =>
-  files.map((f) => ({ name: normalizePath(f.name), text: f.text.replace(/^\uFEFF/, "") }));
+  files.map((f) => ({ ...f, name: normalizePath(f.name), text: f.text.replace(/^\uFEFF/, "") }));
 const readable = (files: ImportFile[]) => files.filter((f) => !isSecretPath(f.name) && f.text.trim());
+
+/** Why one of an agent's files doesn't go to the Drive. */
+export type AgentFileSkip = "secret" | "junk" | "too_large" | "unreadable";
+
+/** A file of an agent's own (OpenBot.run's `files/`, an OpenClaw workspace), for its folder in the Drive. */
+export interface AgentFile {
+  /** The agent's key in the bundle. */
+  agent: string;
+  /** Where it goes in the agent's folder, keeping the source's folders. */
+  path: string;
+  /** Bytes (0 for a system file the reader dropped). */
+  size: number;
+  /** Why it stays behind; without one it is copied. */
+  skip?: AgentFileSkip;
+  read?: () => Promise<Blob>;
+}
 
 /** The source these files come from, or null. Throws `ImportError("newerVersion")` for a newer format. */
 export function detectSource(files: ImportFile[]): ImportSource | null {
@@ -129,7 +146,14 @@ export function detectSource(files: ImportFile[]): ImportSource | null {
 }
 
 /** Reads the files into a bundle. Throws `ImportError` when they are none of the sources, or carry no agent. */
-export function parseImport(files: ImportFile[], options: ParseOptions = {}): MigrationBundle {
+export const parseImport = (files: ImportFile[], options: ParseOptions = {}): MigrationBundle =>
+  parsePackage(files, options).bundle;
+
+/** `parseImport`, with the agents' own files beside the bundle (they never travel in it). */
+export function parsePackage(
+  files: ImportFile[],
+  options: ParseOptions = {},
+): { bundle: MigrationBundle; files: AgentFile[] } {
   const all = prepare(files);
   if (
     all.some((f) => f.text.length > IMPORT_MAX_BYTES || new TextEncoder().encode(f.text).byteLength > IMPORT_MAX_BYTES)
@@ -145,8 +169,40 @@ export function parseImport(files: ImportFile[], options: ParseOptions = {}): Mi
   return finish(d, source, all);
 }
 
+/**
+ * Whose own files each path is: the deepest folder a parser gave an agent wins (a workspace inside another),
+ * and a subfolder that isn't the agent's (its skills) is no one's.
+ */
+function ownerOf(d: Draft, path: string): { agent: string; path: string } | null {
+  let best: Draft["fileDirs"][number] | undefined;
+  for (const x of d.fileDirs) {
+    if ((!x.dir || path.startsWith(`${x.dir}/`)) && (!best || x.dir.length > best.dir.length)) best = x;
+  }
+  if (!best) return null;
+  const rest = best.dir ? path.slice(best.dir.length + 1) : path;
+  return best.skip.some((s) => rest.startsWith(`${s}/`)) ? null : { agent: best.agent, path: rest };
+}
+
+/**
+ * One of an agent's files: copied unless it is a credential store (by its name, or a text that has a key in it), has
+ * no bytes we can read, or is over the Drive's limit.
+ */
+function agentFile(agent: string, path: string, f: ImportFile): AgentFile {
+  const size = f.size ?? new TextEncoder().encode(f.text).byteLength;
+  const read = f.read ?? (f.text ? async () => new Blob([f.text]) : undefined);
+  const skip: AgentFileSkip | undefined =
+    isSecretPath(f.name) || isSecretPath(path) || scrubSecrets(f.text).redacted
+      ? "secret"
+      : !read
+        ? "unreadable"
+        : size > MAX_UPLOAD_BYTES
+          ? "too_large"
+          : undefined;
+  return skip ? { agent, path, size, skip } : { agent, path, size, read };
+}
+
 /** Checks references, scrubs every text, splits long notes and lists what was not read. */
-function finish(d: Draft, app: ImportSource, files: ImportFile[]): MigrationBundle {
+function finish(d: Draft, app: ImportSource, files: ImportFile[]): { bundle: MigrationBundle; files: AgentFile[] } {
   const leftOut: LeftOut[] = [...d.leftOut];
   const left = (kind: LeftOutKind, label: string) => {
     if (label) leftOut.push({ kind, label });
@@ -232,6 +288,25 @@ function finish(d: Draft, app: ImportSource, files: ImportFile[]): MigrationBund
     agents: t.agents.filter((k) => agentKeys.has(k)),
   }));
 
+  // The agents' own files go beside the bundle, for their folders in the Drive.
+  const agentFiles: AgentFile[] = [];
+  const own = new Set<string>();
+  for (const f of files) {
+    const owner = d.used.has(f.name) ? null : ownerOf(d, f.name);
+    if (!owner || !agentKeys.has(owner.agent)) continue;
+    agentFiles.push(agentFile(owner.agent, owner.path, f));
+    own.add(f.name);
+  }
+  for (const x of d.agentFiles) {
+    const f = files.find((file) => file.name === x.from);
+    if (f && agentKeys.has(x.agent)) agentFiles.push(agentFile(x.agent, x.to, f));
+    else if (!f) left("file", x.to);
+  }
+  for (const path of d.options.junk ?? []) {
+    const owner = ownerOf(d, path);
+    if (owner && agentKeys.has(owner.agent)) agentFiles.push({ ...owner, size: 0, skip: "junk" });
+  }
+
   // Credential stores were never read; other files nobody used are listed by folder.
   const unread = new Map<string, number>();
   for (const f of files) {
@@ -240,7 +315,7 @@ function finish(d: Draft, app: ImportSource, files: ImportFile[]): MigrationBund
       left("secret", f.name);
       continue;
     }
-    if (NOISE.test(f.name)) continue;
+    if (NOISE.test(f.name) || own.has(f.name)) continue;
     const top = f.name.includes("/") ? `${f.name.split("/")[0]}/` : f.name;
     unread.set(top, (unread.get(top) ?? 0) + 1);
   }
@@ -249,7 +324,7 @@ function finish(d: Draft, app: ImportSource, files: ImportFile[]): MigrationBund
   if (agents.length === 0) throw new ImportError("noAgents");
   const used = files.filter((f) => d.used.has(f.name));
   const seen = new Set<string>();
-  return {
+  const bundle: MigrationBundle = {
     format: "agenteschat.bundle",
     version: 1,
     source: {
@@ -280,6 +355,7 @@ function finish(d: Draft, app: ImportSource, files: ImportFile[]): MigrationBund
         return true;
       }),
   };
+  return { bundle, files: agentFiles };
 }
 
 /** The model an imported agent is created with: its own when it's in the catalog, else the suggestion. */

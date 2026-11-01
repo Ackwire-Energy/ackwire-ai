@@ -73,6 +73,7 @@ import { moveInGroups } from "@agenteschat/client/lib/agent-groups";
 import { answersOthers, audienceOf } from "@agenteschat/client/lib/audience";
 import { stepIndex } from "@agenteschat/client/lib/onboarding";
 import { grants, SUMMARY_ORDER } from "@agenteschat/client/lib/roles";
+import { driveFolder, isSecretPath } from "@agenteschat/ui/names";
 import { createFakeAccess } from "./fakes/access";
 import { createMockArtifacts } from "./fakes/artifacts";
 import { createFakeBrowser, type FakeBrowser } from "./fakes/browser";
@@ -232,6 +233,8 @@ export interface FakeState {
   actionErrors?: Record<string, ApiError>;
   /** Set by `createFakeApi`: `chat.post` with `openThread` marks the thread (the threads fake). */
   openThread?: (orgId: string, threadId: string, at: string) => Promise<void>;
+  /** Set by `createFakeApi`: the Drive an import copies the agents' files into (the artifacts fake). */
+  drive?: ApiClient["artifacts"];
   /** Make `chat.post` fail (optimistic send tests): `true` is the server refusing it, or this error. */
   failPosts?: boolean | ApiError;
   /** `chat.post` waits for this (to see the pending state). */
@@ -1931,6 +1934,20 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return sources;
       },
       exportUrl: (orgId) => `/api/app/organizations/${orgId}/export`,
+      // Like the backend: `<agent's name>/<path>` in the Drive, never over a name already there, never a key file.
+      copyFile: async (orgId, { file, ...input }) => {
+        log("imports.copyFile", orgId, input);
+        if (isSecretPath(input.path)) throw new ApiError(400, "import.secret_file", "Never copied to the Drive");
+        const agent = state.agents.find((a) => a.id === input.agentId);
+        const drive = state.drive;
+        if (!agent || !drive) throw new ApiError(404, "not_found", "Agent not found");
+        const folder = driveFolder(agent.name);
+        const title = `${folder}/${input.path}`;
+        const there = (await drive.list(orgId)).find((a) => a.title === title && a.channelId === null);
+        if (there) return { status: "exists", artifactId: there.id, title, folder };
+        const created = await drive.upload(orgId, new File([file], input.name), { title });
+        return { status: "created", artifactId: created.id, title, folder };
+      },
     },
     chat: {
       channels: async () => state.channels,
@@ -2590,6 +2607,8 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
   const mail = createFakeMail((method, ...args) => state.calls.push({ method, args }), ctx.now);
   const databases = createFakeDatabases((method, ...args) => state.calls.push({ method, args }), ctx.now);
   const browser = createFakeBrowser((method, ...args) => state.calls.push({ method, args }), ctx.now);
+  const artifacts = createMockArtifacts(ctx, (method, ...args) => state.calls.push({ method, args }));
+  state.drive = artifacts;
   const client: ApiClient = {
     ...http,
     sandbox: createFakeSandbox(ctx, (method, ...args) => state.calls.push({ method, args }), machines),
@@ -2709,7 +2728,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
       () => state.storagePlatform,
       () => state.storageUsage,
     ),
-    artifacts: createMockArtifacts(ctx, (method, ...args) => state.calls.push({ method, args })),
+    artifacts,
     ...createMockPlanning(ctx, (method, ...args) => state.calls.push({ method, args })),
     customConnectors,
     mail: mail.client,

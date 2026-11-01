@@ -5,11 +5,12 @@ setupDom();
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join, relative } from "node:path";
-import type { ApiClient, ImportInput, ImportItemResult, ImportPlan } from "@agenteschat/client";
+import type { ApiClient, ImportFileInput, ImportInput, ImportItemResult, ImportPlan } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { fileSaver } from "@/components/artifacts/fileSaver";
 import { EXPORT_PROMPT } from "@/lib/import";
+import { zip } from "./archives";
 import { createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -716,5 +717,117 @@ describe("Configurações → Importar e exportar", () => {
     expect(screen().getByRole("heading", { name: "Chegou tudo" })).toBeTruthy();
     expect(text()).toContain("3 agentes");
     expect(text()).toContain("Chegaram pausadas: ligue em Rotinas quando quiser.");
+  });
+
+  describe("an OpenBot.run export with the agents' own files", () => {
+    const openbot = (name: string) => readFileSync(join(FIXTURES, "openbot-run", name), "utf8");
+    /** As the OpenBot.run export comes: a .zip with its folder inside, made on a Mac. */
+    const exported = () =>
+      new File(
+        [
+          zip({
+            "openbot-export/openbot-import.json": openbot("openbot-import.json"),
+            "openbot-export/agents/scout/skills/price-watch/SKILL.md": openbot(
+              "agents/scout/skills/price-watch/SKILL.md",
+            ),
+            "openbot-export/agents/scout/files/INSTRUCTIONS.md": openbot("agents/scout/files/INSTRUCTIONS.md"),
+            "openbot-export/agents/scout/files/rivals.txt": "northwind.example\ncontoso.example\n",
+            "openbot-export/agents/scout/files/notes/pricing.md": "# Pricing",
+            "openbot-export/agents/scout/files/charts/q3.png": new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]),
+            "openbot-export/agents/scout/files/.env": "NORTHWIND_TOKEN=fixture-never-read",
+            "openbot-export/agents/scout/files/.DS_Store": "junk",
+            "__MACOSX/openbot-export/agents/scout/files/._rivals.txt": "junk",
+          }).slice(),
+        ],
+        "openbot-export-2026-10-18.zip",
+      );
+    const copies = (state: State) =>
+      calls(state, "imports.copyFile").map((c) => c.args[1] as Omit<ImportFileInput, "file">);
+    const driveTitles = async (api: ApiClient) =>
+      (await api.artifacts.list(ORG_ID, { q: "Scout/" })).map((a) => a.title).sort();
+    const importIt = async () => {
+      const go = screen()
+        .getAllByRole("button")
+        .find((b) => /^Importar \d+ itens$/.test(b.textContent ?? ""));
+      if (!go) throw new Error("no Importar");
+      await click(go, 30);
+    };
+
+    test("the preview says how many and how big, copying on; Importar puts them in the agent's folder, says what stayed behind, and the agent knows where they are", async () => {
+      const { state, api } = await go();
+      await pick("Arquivos para importar", [exported()]);
+      const files = screen().getByRole("region", { name: "Copiar os arquivos para o Drive" });
+      expect(
+        within(files).getByRole("switch", { name: "Copiar os arquivos para o Drive" }).getAttribute("aria-checked"),
+      ).toBe("true");
+      expect(files.textContent).toContain("Drive\u00a0›\u00a0Scout");
+      expect(files.textContent).toContain("3 arquivos · 51 bytes");
+      // What stays behind: system files here, keys with what never comes.
+      expect(files.textContent).toContain("Arquivos do sistema");
+      expect(files.textContent).toContain(".DS_Store, ._rivals.txt");
+      expect(screen().getByRole("region", { name: "O que não vem junto" }).textContent).toContain(
+        "agents/scout/files/.env",
+      );
+      expect(copies(state)).toEqual([]);
+
+      await importIt();
+      const scout = state.agents.find((a) => a.name === "Scout");
+      if (!scout) throw new Error("Scout didn't come");
+      expect(copies(state)).toEqual([
+        { agentId: scout.id, path: "rivals.txt", name: "rivals.txt", note: "Trazido do OpenBot.run" },
+        { agentId: scout.id, path: "notes/pricing.md", name: "pricing.md", note: "Trazido do OpenBot.run" },
+        { agentId: scout.id, path: "charts/q3.png", name: "q3.png", note: "Trazido do OpenBot.run" },
+      ]);
+      expect(await driveTitles(api)).toEqual(["Scout/charts/q3.png", "Scout/notes/pricing.md", "Scout/rivals.txt"]);
+      const report = screen().getByRole("region", { name: "Chegou tudo" });
+      expect(report.textContent).toContain("3 arquivos no Drive");
+      expect(within(report).getByRole("link", { name: "Drive › Scout" }).getAttribute("href")).toBe(
+        `/org/${ORG_ID}/agents/${scout.id}?tab=files`,
+      );
+      const left = screen().getByRole("region", { name: "Arquivos que ficaram de fora" });
+      expect(left.textContent).toContain("Chaves e logins nunca vão para o Drive.env");
+      expect(left.textContent).toContain("Arquivos do sistema.DS_Store, ._rivals.txt");
+      expect(text()).toContain("3 arquivos copiados para o Drive.");
+      // One line in Scout's memory says where its files are.
+      const pointer = applies(state).find((i) => i.pick?.[0] === "note:scout/drive-files");
+      expect(pointer?.pick).toEqual(["note:scout/drive-files"]);
+      expect(pointer?.bundle.notes).toEqual([
+        {
+          key: "scout/drive-files",
+          agent: "scout",
+          kind: "fact",
+          content: "Seus arquivos do OpenBot.run estão em Drive\u00a0›\u00a0Scout.",
+        },
+      ]);
+
+      // The same export again: what the folder has stays as it was.
+      await click(button("Importar outro arquivo"), 2);
+      await pick("Arquivos para importar", [exported()]);
+      await importIt();
+      expect(copies(state)).toHaveLength(6);
+      expect(await driveTitles(api)).toEqual(["Scout/charts/q3.png", "Scout/notes/pricing.md", "Scout/rivals.txt"]);
+      expect(screen().getByRole("region", { name: "Chegou tudo" }).textContent).toContain(
+        "Nenhum arquivo novo no Drive",
+      );
+      expect(screen().getByRole("region", { name: "Arquivos que ficaram de fora" }).textContent).toContain(
+        "Já estavam no Driverivals.txt, notes/pricing.md, charts/q3.png",
+      );
+    });
+
+    test("turned off, nothing is copied", async () => {
+      const { state, api } = await go();
+      await pick("Arquivos para importar", [exported()]);
+      await click(screen().getByRole("switch", { name: "Copiar os arquivos para o Drive" }), 2);
+      expect(
+        screen().getByRole("switch", { name: "Copiar os arquivos para o Drive" }).getAttribute("aria-checked"),
+      ).toBe("false");
+      await importIt();
+      expect(screen().getByRole("heading", { name: "Chegou tudo" })).toBeTruthy();
+      expect(copies(state)).toEqual([]);
+      expect(await driveTitles(api)).toEqual([]);
+      expect(text()).not.toContain("arquivos no Drive");
+      expect(text()).not.toContain("Copiando os arquivos");
+      expect(applies(state).some((i) => i.pick?.[0] === "note:scout/drive-files")).toBe(false);
+    });
   });
 });

@@ -6,7 +6,10 @@ import { IMPORT_MAX_BYTES, ImportError, type ImportFile, isSecretPath, normalize
  * its relative paths), or one archive (.zip, .tar.gz, .tgz, .tar) unpacked in
  * the browser. Only text files the formats use are read; a credential store,
  * a binary or a file over 4 MB comes back with empty text, so it can be
- * listed without being read.
+ * listed without being read. Every file keeps its size and a way to read its
+ * bytes later, when it goes to the Drive; system files (`.DS_Store`,
+ * `__MACOSX`, `Thumbs.db`, `.git`) are dropped and only their paths come
+ * back, as `junk`.
  */
 
 export const ARCHIVE_LIMITS = {
@@ -23,15 +26,21 @@ export const ARCHIVE_LIMITS = {
 
 const ARCHIVE = /\.(zip|tar\.gz|tgz|tar)$/i;
 const TEXT = /\.(md|markdown|json|json5|yaml|yml|txt)$/i;
-const JUNK = /(^|\/)(__MACOSX\/|\.DS_Store$|\._[^/]*$|\.git\/|node_modules\/)/;
+const JUNK = /(^|\/)(__MACOSX\/|\.DS_Store$|\._[^/]*$|Thumbs\.db$|desktop\.ini$|\.git\/|node_modules\/|__pycache__\/)/;
 /** Folders a format itself has at its root: an archive with only one of them is not wrapped in a folder. */
 const LAYOUT = new Set(["agents", "skills", "memory", "memories", "cron", "tasks", "projects", "teams", "profiles"]);
 
 export type PickedFile = File | { path: string; file: Blob };
 
+/** What a reader found: the files, and the paths of the system files it dropped. */
+interface Read {
+  files: ImportFile[];
+  junk: string[];
+}
+
 export async function readImportFiles(
   picked: readonly PickedFile[],
-): Promise<{ files: ImportFile[]; root: string | null }> {
+): Promise<{ files: ImportFile[]; root: string | null; junk: string[] }> {
   const items = picked.map((p) =>
     "file" in p
       ? { path: normalizePath(p.path), blob: p.file }
@@ -40,15 +49,19 @@ export async function readImportFiles(
   const [only] = items;
   if (items.length === 1 && only && ARCHIVE.test(only.path)) return readArchive(only.blob, only.path);
   const wants = budget();
-  const files: ImportFile[] = [];
+  const read: Read = { files: [], junk: [] };
   for (const { path, blob } of items) {
-    if (!JUNK.test(path)) files.push({ name: path, text: wants(path, blob.size) ? await blob.text() : "" });
+    if (JUNK.test(path)) read.junk.push(path);
+    else {
+      const text = wants(path, blob.size) ? await blob.text() : "";
+      read.files.push({ name: path, text, size: blob.size, read: async () => blob });
+    }
   }
   // A dropped folder: every path starts with its name.
-  return unwrap(files, true);
+  return unwrap(read, true);
 }
 
-async function readArchive(blob: Blob, path: string): Promise<{ files: ImportFile[]; root: string | null }> {
+async function readArchive(blob: Blob, path: string) {
   if (blob.size > ARCHIVE_LIMITS.bytes) throw new ImportError("tooLarge");
   const head = new Uint8Array(await blob.slice(0, 2).arrayBuffer());
   const zip = head[0] === 0x50 && head[1] === 0x4b;
@@ -77,17 +90,23 @@ function safePath(raw: string): string {
   return normalizePath(path);
 }
 
-/** Paths relative to the single folder everything is in (its name is `root`). */
-function unwrap(files: ImportFile[], folder: boolean): { files: ImportFile[]; root: string | null } {
+/** Paths relative to the single folder everything is in (its name is `root`); macOS's copies of it too. */
+function unwrap({ files, junk }: Read, folder: boolean) {
   const tops = new Set(files.map((f) => (f.name.includes("/") ? f.name.split("/")[0] : "")));
   const [top] = tops;
-  if (tops.size !== 1 || !top || (!folder && LAYOUT.has(top))) return { files, root: null };
-  return { files: files.map((f) => ({ ...f, name: f.name.slice(top.length + 1) })), root: top };
+  const system = junk.map((p) => p.replace(/^__MACOSX\//, ""));
+  if (tops.size !== 1 || !top || (!folder && LAYOUT.has(top))) return { files, root: null, junk: system };
+  const inside = (p: string) => (p.startsWith(`${top}/`) ? p.slice(top.length + 1) : p);
+  return {
+    files: files.map((f) => ({ ...f, name: inside(f.name) })),
+    root: top,
+    junk: system.map(inside),
+  };
 }
 
 const decoder = new TextDecoder();
 
-async function fromZip(blob: Blob): Promise<ImportFile[]> {
+async function fromZip(blob: Blob): Promise<Read> {
   const entries = await readZip(blob).catch(() => {
     throw new ImportError("corrupt");
   });
@@ -100,22 +119,30 @@ async function fromZip(blob: Blob): Promise<ImportFile[]> {
     throw new ImportError("tooLarge");
   }
   const wants = budget();
-  const out: ImportFile[] = [];
+  const out: Read = { files: [], junk: [] };
   for (const entry of entries) {
     const path = safePath(entry.name);
-    if (JUNK.test(path)) continue;
+    if (JUNK.test(path)) {
+      out.junk.push(path);
+      continue;
+    }
+    // An entry larger than its declared size is a zip bomb or a broken archive.
+    const bytes = async () => {
+      const data = await entry.read();
+      if (data.length > entry.size) throw new ImportError("tooLarge");
+      return data;
+    };
     let text = "";
     if (wants(path, entry.size)) {
       // An encrypted entry, or one packed in a way the reader doesn't know, is listed without being read.
-      const data = await entry.read().catch((error: unknown) => {
+      const data = await bytes().catch((error: unknown) => {
+        if (error instanceof ImportError) throw error;
         if (error instanceof ZipError && (error.code === "encrypted" || error.code === "method")) return null;
         throw new ImportError("corrupt");
       });
-      // An entry larger than its declared size is a zip bomb or a broken archive.
-      if (data && data.length > entry.size) throw new ImportError("tooLarge");
       text = data ? decoder.decode(data) : "";
     }
-    out.push({ name: path, text });
+    out.files.push({ name: path, text, size: entry.size, read: async () => new Blob([(await bytes()).slice()]) });
   }
   return out;
 }
@@ -130,6 +157,11 @@ class Bytes {
     private readonly reader: ReadableStreamDefaultReader<Uint8Array>,
     private readonly packed: number,
   ) {}
+
+  /** How many bytes were taken or skipped so far: where the next one sits in the (unpacked) stream. */
+  get position() {
+    return this.total - this.queued;
+  }
 
   private async pull(): Promise<boolean> {
     const { done, value } = await this.reader.read();
@@ -196,12 +228,23 @@ function numeric(block: Uint8Array, at: number, length: number): number {
   return n;
 }
 
-/** A ustar archive (GNU long names and pax paths too), streamed: only the text files read are kept. */
-async function fromTar(blob: Blob, gzip: boolean): Promise<ImportFile[]> {
-  const stream = gzip ? blob.stream().pipeThrough(new DecompressionStream("gzip")) : blob.stream();
+/**
+ * A ustar archive (GNU long names and pax paths too), streamed: only the text files read are kept. A file's bytes
+ * are read later as a slice of the archive, unpacked whole the first time a file of a .tar.gz is asked for (the
+ * stream here already held it to the size limits).
+ */
+async function fromTar(blob: Blob, gzip: boolean): Promise<Read> {
+  const unpack = () => blob.stream().pipeThrough(new DecompressionStream("gzip"));
+  const stream = gzip ? unpack() : blob.stream();
   const bytes = new Bytes(stream.getReader(), blob.size);
+  let unpacked: Promise<Blob> | undefined;
+  const tar = () => {
+    if (!gzip) return Promise.resolve(blob);
+    unpacked ??= new Response(unpack()).blob();
+    return unpacked;
+  };
   const wants = budget();
-  const out: ImportFile[] = [];
+  const out: Read = { files: [], junk: [] };
   let longName = "";
   try {
     for (let count = 0; ; count++) {
@@ -227,16 +270,19 @@ async function fromTar(blob: Blob, gzip: boolean): Promise<ImportFile[]> {
       longName = "";
       const path = safePath(name);
       const regular = type === "0" || type === "\0" || type === "7";
+      const at = bytes.position;
+      const file = { name: path, size, read: async () => (await tar()).slice(at, at + size) };
+      if (regular && JUNK.test(path)) out.junk.push(path);
       if (regular && !JUNK.test(path) && !path.endsWith("/") && wants(path, size)) {
         const data = await bytes.take(padded);
         if (!data) throw new ImportError("corrupt");
-        out.push({ name: path, text: decoder.decode(data.subarray(0, size)) });
+        out.files.push({ ...file, text: decoder.decode(data.subarray(0, size)) });
         continue;
       }
       await bytes.skip(padded);
-      // A link is listed, never followed; directories and devices are not files.
+      // A link is listed, never followed (nor copied); directories and devices are not files.
       if ((regular || type === "1" || type === "2") && !JUNK.test(path) && !path.endsWith("/")) {
-        out.push({ name: path, text: "" });
+        out.files.push(regular ? { ...file, text: "" } : { name: path, text: "" });
       }
     }
   } catch (error) {

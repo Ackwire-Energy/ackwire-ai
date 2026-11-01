@@ -1,5 +1,6 @@
 import type {
   ApiClient,
+  BundleNote,
   ImportItemKind,
   ImportItemResult,
   ImportSkipReason,
@@ -7,7 +8,16 @@ import type {
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import type { TFunction } from "i18next";
-import { IMPORT_SOURCES, ImportError, type ImportSource, type PickedFile, SOURCE_NAME } from "@/lib/import";
+import {
+  type AgentFile,
+  type AgentFileSkip,
+  IMPORT_SOURCES,
+  ImportError,
+  type ImportSource,
+  type PickedFile,
+  SOURCE_NAME,
+} from "@/lib/import";
+import { baseName } from "@/lib/import/shared";
 import { filesFromDrop } from "@/lib/obsidian";
 
 /**
@@ -231,3 +241,83 @@ export async function droppedFiles(dt: DataTransfer): Promise<PickedFile[]> {
   const files = await filesFromDrop(dt);
   return Promise.all(files.map(async (f) => ({ path: f.path, file: await f.blob() })));
 }
+
+/** Why one of an agent's files isn't in its Drive folder after the import. */
+export type FileLeft = AgentFileSkip | "exists" | "storage_full" | "daily_full" | "failed";
+
+/** The agents' files after the copy. */
+export interface FilesCopy {
+  /** Copied now. */
+  copied: number;
+  /** Agent key → its folder in the Drive, for each agent whose files are there (copied now or before). */
+  folders: Map<string, string>;
+  /** What isn't there, and why. */
+  left: { file: AgentFile; why: FileLeft }[];
+}
+
+/** Files sent at a time. */
+const PARALLEL_COPIES = 4;
+
+/**
+ * Copies the agents' own files into their folders in the Drive, a few at a time, for the agents the import brought
+ * (`agentIds`: key → id). What `parsePackage` set aside stays behind with its reason; a name the folder already has
+ * stays as it was (`exists`); once the workspace's storage or today's uploads are full, so does the rest.
+ */
+export async function copyAgentFiles(
+  api: ApiClient,
+  orgId: string,
+  input: { files: AgentFile[]; agentIds: ReadonlyMap<string, string>; note: string },
+  onProgress?: (done: number, total: number) => void,
+): Promise<FilesCopy> {
+  const out: FilesCopy = { copied: 0, folders: new Map(), left: [] };
+  const theirs = input.files.filter((f) => input.agentIds.has(f.agent));
+  for (const file of theirs) if (file.skip) out.left.push({ file, why: file.skip });
+  const todo = theirs.filter((f) => !f.skip && f.read);
+  let full: "storage_full" | "daily_full" | null = null;
+  const copy = async (file: AgentFile): Promise<FileLeft | null> => {
+    if (full) return full;
+    try {
+      const copied = await api.imports.copyFile(orgId, {
+        file: await (file.read as () => Promise<Blob>)(),
+        name: baseName(file.path),
+        agentId: input.agentIds.get(file.agent) as string,
+        path: file.path,
+        note: input.note,
+      });
+      out.folders.set(file.agent, copied.folder);
+      if (copied.status === "exists") return "exists";
+      out.copied++;
+      return null;
+    } catch (error) {
+      const code = error instanceof ApiError ? error.code : "";
+      if (code === "storage.full" || code === "storage.daily_full") {
+        full ??= code === "storage.full" ? "storage_full" : "daily_full";
+        return full;
+      }
+      if (code === "artifact.file_too_large") return "too_large";
+      if (code === "import.secret_file") return "secret";
+      return "failed";
+    }
+  };
+  let next = 0;
+  let done = 0;
+  const worker = async () => {
+    while (next < todo.length) {
+      const file = todo[next++] as AgentFile;
+      const why = await copy(file);
+      if (why) out.left.push({ file, why });
+      onProgress?.(++done, todo.length);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(PARALLEL_COPIES, todo.length) }, worker));
+  return out;
+}
+
+/** The line each agent keeps in its memory about where its files are: a note the import brings (once). */
+export const filesNotes = (folders: ReadonlyMap<string, string>, line: (folder: string) => string): BundleNote[] =>
+  [...folders].map(([agent, folder]) => ({
+    key: `${agent}/drive-files`,
+    agent,
+    kind: "fact" as const,
+    content: line(folder),
+  }));

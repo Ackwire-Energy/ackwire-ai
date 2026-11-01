@@ -9,6 +9,7 @@ import type {
 } from "@agenteschat/client";
 import { handleFrom } from "@agenteschat/client/lib/text";
 import { AGENT_ACCESSORIES, AGENT_COLORS, AGENT_EYES, type AgentAppearance, type AgentColor } from "@agenteschat/ui";
+import { isSecretPath } from "@agenteschat/ui/names";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 /** A file to read: `name` is its path relative to the dropped folder, the archive root or the GitHub link. */
@@ -16,6 +17,10 @@ export interface ImportFile {
   name: string;
   /** "" for a file that was not read (binary, too large, or a credential store). */
   text: string;
+  /** Bytes, when the reader knows them. */
+  size?: number;
+  /** Its bytes as they are, read only when the file is copied to the Drive (a link's files have none). */
+  read?: () => Promise<Blob>;
 }
 
 export type ImportErrorCode = "empty" | "tooLarge" | "unknown" | "newerVersion" | "noAgents" | "unsafe" | "corrupt";
@@ -32,6 +37,8 @@ export interface ParseOptions {
   models?: string[];
   /** Name of the dropped folder or of the archive's root folder (Hermes names the profile after it). */
   root?: string | null;
+  /** System files the reader dropped (`.DS_Store`, `__MACOSX`…), relative to the root like the files. */
+  junk?: string[];
 }
 
 /** OpenMausBot's limit for a package (PACKAGE_MAX_BYTES); no file we read is larger. */
@@ -124,31 +131,11 @@ export function resolvePath(dir: string, path: string): string | null {
 }
 
 /**
- * Credential stores an import never reads, whatever the format: env files,
- * auth and token files, keys, credential folders and browser profiles. Only
- * their names are listed. (Databases and other binaries are never read
- * either: no format keeps what we bring in them.)
+ * Credential stores (`isSecretPath`, shared with the server, which refuses them in the Drive too): an import never
+ * reads them, only lists their names. (Databases and other binaries are never read either: no format keeps what we
+ * bring in them.)
  */
-const SECRET_PATH = new RegExp(
-  [
-    "(?:^|/)\\.env(?:[./][^/]*)?$",
-    "(?:^|/)\\.envrc$",
-    "(?:^|/)\\.op\\.env$",
-    "(?:^|/)auth[^/]*\\.json$",
-    "(?:^|/)(?![^/]*\\.(?:md|markdown)$)[^/]*(?:token|oauth|secret|credential|password|cookie)[^/]*$",
-    "(?:^|/)[^/]*private[^/]*key[^/]*$",
-    "\\.(?:pem|key|p12|pfx|jks|keystore|kdbx|gpg|asc)$",
-    "(?:^|/)id_(?:rsa|dsa|ecdsa|ed25519)[^/]*$",
-    "(?:^|/)\\.?npmrc$",
-    "(?:^|/)(?:honcho|mem0|cursor-session|mcp-oauth|teams_pipeline_store)\\.json$",
-    "(?:^|/)(?:credentials|mcp-tokens|vault|secrets|proxy|\\.ssh|\\.aws|\\.gnupg|\\.kube|\\.docker|\\.azure)/",
-    "(?:^|/)\\.config/(?:gh|gcloud)/",
-    "(?:^|/)(?:chrome-debug|bot-desktop|browser-profiles?|chromium|playwright|[^/]*-profile)/",
-    "(?:^|/)(?:Cookies|Login Data|Local State|Web Data)$",
-  ].join("|"),
-  "i",
-);
-export const isSecretPath = (path: string) => SECRET_PATH.test(normalizePath(path));
+export { isSecretPath };
 
 // ── Reading text ──────────────────────────────────────────────────────────────
 
@@ -551,6 +538,10 @@ export class Draft {
   readonly leftOut: LeftOut[] = [];
   /** Files a parser read, or dropped on purpose (an unchanged template). */
   readonly used = new Set<string>();
+  /** Folders of an agent's own files (`skip`: its subfolders that aren't, like its skills). */
+  readonly fileDirs: { agent: string; dir: string; skip: string[] }[] = [];
+  /** Single files of an agent, and where they go in its folder. */
+  readonly agentFiles: { agent: string; from: string; to: string }[] = [];
   name = "";
   ref = "";
 
@@ -575,6 +566,17 @@ export class Draft {
 
   left(kind: LeftOutKind, label: string) {
     if (label.trim()) this.leftOut.push({ kind, label: label.trim() });
+  }
+
+  /** What is under `dir` and nothing else reads is the agent's own (`finish` decides, once every file is read). */
+  filesIn(agent: string, dir: string, skip: string[] = []) {
+    this.fileDirs.push({ agent, dir, skip });
+  }
+
+  /** One file of the agent's own, at `to` in its folder. */
+  fileAt(agent: string, from: string, to: string) {
+    this.used.add(from);
+    this.agentFiles.push({ agent, from, to });
   }
 
   need(kind: BundleTodo["kind"], label: string, agents: string[] = [], url?: string) {

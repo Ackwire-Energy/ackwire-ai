@@ -1,12 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { ImportError, parseImport, readImportFiles } from "@/lib/import";
+import { MAX_UPLOAD_BYTES } from "@agenteschat/client/lib/files";
+import { ImportError, parseImport, parsePackage, readImportFiles } from "@/lib/import";
 import { ARCHIVE_LIMITS } from "@/lib/import/archive";
+import { paxPath, type TarEntry, tar, zip } from "./archives";
 
 /** Archives built here from the fixture folders (fixtures/agent-import/NOTICE.md). */
 const DIR = join(import.meta.dir, "fixtures", "agent-import");
-const enc = new TextEncoder();
 const folderFiles = (name: string): Record<string, string> =>
   Object.fromEntries(
     (readdirSync(join(DIR, name), { recursive: true }) as string[])
@@ -14,122 +15,6 @@ const folderFiles = (name: string): Record<string, string> =>
       .sort()
       .map((p) => [p.replace(/\\/g, "/"), readFileSync(join(DIR, name, p), "utf8")]),
   );
-
-const concat = (parts: Uint8Array[]) => {
-  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
-  let at = 0;
-  for (const p of parts) {
-    out.set(p, at);
-    at += p.length;
-  }
-  return out;
-};
-
-interface TarEntry {
-  name: string;
-  data?: string | Uint8Array;
-  /** ustar type flag: "0" file, "2" symlink, "5" folder, "x" pax header. */
-  type?: string;
-  link?: string;
-}
-
-/** A ustar archive, as `tar` and Python's `tarfile` write it. */
-function tar(entries: TarEntry[], { checksum = true } = {}) {
-  const blocks: Uint8Array[] = [];
-  for (const e of entries) {
-    const data = typeof e.data === "string" ? enc.encode(e.data) : (e.data ?? new Uint8Array());
-    const h = new Uint8Array(512);
-    const put = (at: number, s: string) => h.set(enc.encode(s), at);
-    put(0, e.name);
-    put(100, "0000644\0");
-    put(108, "0000000\0");
-    put(116, "0000000\0");
-    put(124, `${data.length.toString(8).padStart(11, "0")}\0`);
-    put(136, "00000000000\0");
-    put(148, "        ");
-    put(156, e.type ?? "0");
-    if (e.link) put(157, e.link);
-    put(257, "ustar\0");
-    put(263, "00");
-    const sum = h.reduce((a, b) => a + b, 0) + (checksum ? 0 : 1);
-    put(148, `${sum.toString(8).padStart(6, "0")}\0 `);
-    blocks.push(h, data, new Uint8Array((512 - (data.length % 512)) % 512));
-  }
-  blocks.push(new Uint8Array(1024));
-  return concat(blocks);
-}
-
-/** A pax header record for a path longer than the 100 bytes of a ustar name. */
-function paxPath(path: string): TarEntry {
-  const body = ` path=${path}\n`;
-  let length = body.length + 1;
-  while (String(length).length + body.length !== length) length++;
-  return { name: "PaxHeader/long", type: "x", data: `${length}${body}` };
-}
-
-/** A .zip with stored entries; `sizes` can lie about an entry's unpacked size, as a zip bomb does. */
-function zip(files: Record<string, string | Uint8Array>, sizes: Record<string, number> = {}) {
-  const parts: Uint8Array[] = [];
-  const central: Uint8Array[] = [];
-  let offset = 0;
-  const u16 = (v: number) => [v & 255, (v >> 8) & 255];
-  const u32 = (v: number) => [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255];
-  for (const [name, content] of Object.entries(files)) {
-    const n = enc.encode(name);
-    const d = typeof content === "string" ? enc.encode(content) : content;
-    const size = sizes[name] ?? d.length;
-    const local = new Uint8Array([
-      ...u32(0x04034b50),
-      ...u16(20),
-      ...u16(0x800),
-      ...u16(0),
-      ...u16(0),
-      ...u16(0),
-      ...u32(0),
-      ...u32(d.length),
-      ...u32(size),
-      ...u16(n.length),
-      ...u16(0),
-    ]);
-    parts.push(local, n, d);
-    central.push(
-      new Uint8Array([
-        ...u32(0x02014b50),
-        ...u16(20),
-        ...u16(20),
-        ...u16(0x800),
-        ...u16(0),
-        ...u16(0),
-        ...u16(0),
-        ...u32(0),
-        ...u32(d.length),
-        ...u32(size),
-        ...u16(n.length),
-        ...u16(0),
-        ...u16(0),
-        ...u16(0),
-        ...u16(0),
-        ...u32(0),
-        ...u32(offset),
-      ]),
-      n,
-    );
-    offset += local.length + n.length + d.length;
-  }
-  const cd = concat(central);
-  const count = Object.keys(files).length;
-  const end = new Uint8Array([
-    ...u32(0x06054b50),
-    ...u16(0),
-    ...u16(0),
-    ...u16(count),
-    ...u16(count),
-    ...u32(cd.length),
-    ...u32(offset),
-    ...u16(0),
-  ]);
-  return concat([...parts, cd, end]);
-}
 
 const archive = (bytes: Uint8Array, name: string) => new File([bytes.slice()], name);
 const failure = async (run: () => Promise<unknown>) => {
@@ -286,5 +171,129 @@ describe("picked files", () => {
       ["huge.md", false],
     ]);
     expect(parseImport(files).leftOut).toContainEqual({ kind: "file", label: "huge.md" });
+  });
+});
+
+describe("the agents' own files", () => {
+  const manifest = readFileSync(join(DIR, "openbot-run/openbot-import.json"), "utf8");
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 255]);
+  const bytesOf = async (read: (() => Promise<Blob>) | undefined) =>
+    new Uint8Array(await ((await read?.()) ?? new Blob()).arrayBuffer());
+
+  test("an OpenBot.run export (.zip): its files folder is the agent's, for the Drive; system files and keys stay behind", async () => {
+    const exported = {
+      "openbot-export/openbot-import.json": manifest,
+      "openbot-export/agents/scout/files/INSTRUCTIONS.md": readFileSync(
+        join(DIR, "openbot-run/agents/scout/files/INSTRUCTIONS.md"),
+        "utf8",
+      ),
+      "openbot-export/agents/scout/files/rivals.txt": "northwind.example\n",
+      "openbot-export/agents/scout/files/notes/pricing.md": "# Pricing",
+      "openbot-export/agents/scout/files/charts/q3.png": png,
+      "openbot-export/agents/scout/files/.env": "NORTHWIND_TOKEN=fixture-never-read",
+      "openbot-export/agents/scout/files/.DS_Store": "junk",
+      "openbot-export/agents/scout/files/charts/Thumbs.db": "junk",
+      "__MACOSX/openbot-export/agents/scout/files/._rivals.txt": "junk",
+    };
+    const read = await readImportFiles([archive(zip(exported), "openbot-export-2026-10-18.zip")]);
+    expect(read.root).toBe("openbot-export");
+    expect(read.junk).toEqual([
+      "agents/scout/files/.DS_Store",
+      "agents/scout/files/charts/Thumbs.db",
+      "agents/scout/files/._rivals.txt",
+    ]);
+
+    const { bundle, files } = parsePackage(read.files, { root: read.root, junk: read.junk });
+    expect(files.map((f) => [f.agent, f.path, f.size, f.skip ?? "copy"])).toEqual([
+      ["scout", "rivals.txt", 18, "copy"],
+      ["scout", "notes/pricing.md", 9, "copy"],
+      ["scout", "charts/q3.png", 10, "copy"],
+      ["scout", ".env", 34, "secret"],
+      ["scout", ".DS_Store", 0, "junk"],
+      ["scout", "charts/Thumbs.db", 0, "junk"],
+      ["scout", "._rivals.txt", 0, "junk"],
+    ]);
+    // The bytes as the archive has them, a binary's too; what stays behind can't be read at all.
+    expect(await bytesOf(files[2]?.read)).toEqual(png);
+    expect(new TextDecoder().decode(await bytesOf(files[0]?.read))).toBe("northwind.example\n");
+    expect(files.filter((f) => f.skip).every((f) => f.read === undefined)).toBe(true);
+    // INSTRUCTIONS.md is the agent's instructions, not one of its files; the folder is no longer "other files".
+    expect(bundle.agents[0]?.instructions).toStartWith("You watch three competitors");
+    expect(bundle.leftOut.filter((l) => l.kind === "file")).toEqual([]);
+    expect(bundle.leftOut).toContainEqual({ kind: "secret", label: "agents/scout/files/.env" });
+    expect(JSON.stringify(bundle)).not.toContain("fixture-never-read");
+  });
+
+  test("over the Drive's limit, no bytes to read, or a password inside: listed with why; a text a link brought is copied from its text", () => {
+    const { files } = parsePackage([
+      { name: "openbot-import.json", text: manifest },
+      { name: "agents/scout/files/demo.mp4", text: "", size: MAX_UPLOAD_BYTES + 1, read: async () => new Blob() },
+      { name: "agents/scout/files/escape.md", text: "" },
+      { name: "agents/scout/files/servers.md", text: "Deploy box\npassword: fixture-never-stored" },
+      { name: "agents/scout/files/plan.md", text: "# Plan" },
+    ]);
+    expect(files.map((f) => [f.path, f.size, f.skip ?? "copy", typeof f.read])).toEqual([
+      ["demo.mp4", MAX_UPLOAD_BYTES + 1, "too_large", "undefined"],
+      ["escape.md", 0, "unreadable", "undefined"],
+      ["servers.md", 41, "secret", "undefined"],
+      ["plan.md", 6, "copy", "function"],
+    ]);
+  });
+
+  test("an OpenClaw state folder (.tar.gz): each workspace's own files, never its skills; read back from the archive", async () => {
+    const report = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 1, 2, 3, 4]);
+    const entries: TarEntry[] = [
+      { name: ".openclaw/openclaw.json", data: '{ agents: { list: [{ id: "main" }, { id: "ops" }] } }' },
+      { name: ".openclaw/workspace/SOUL.md", data: "You are Pinch." },
+      { name: ".openclaw/workspace/IDENTITY.md", data: "- Name: Pinch" },
+      { name: ".openclaw/workspace/notes/ideas.md", data: "Ideas." },
+      {
+        name: ".openclaw/workspace/skills/grocery/SKILL.md",
+        data: "---\nname: grocery\ndescription: Lists.\n---\nList.",
+      },
+      { name: ".openclaw/workspace/skills/grocery/merge.py", data: "print(1)" },
+      { name: ".openclaw/workspace-ops/SOUL.md", data: "You keep the servers up." },
+      { name: ".openclaw/workspace-ops/AGENTS.md", data: "Page the on-call." },
+      { name: ".openclaw/workspace-ops/reports/uptime.pdf", data: report },
+      { name: ".openclaw/workspace-ops/.git/HEAD", data: "ref: refs/heads/main" },
+      { name: ".openclaw/agents/ops/sessions/1.jsonl", data: "{}" },
+    ];
+    const read = await readImportFiles([archive(Bun.gzipSync(tar(entries)), "openclaw.tgz")]);
+    const { files } = parsePackage(read.files, { root: read.root, junk: read.junk });
+    expect(files.map((f) => [f.agent, f.path, f.skip ?? "copy"])).toEqual([
+      ["main", "notes/ideas.md", "copy"],
+      ["ops", "reports/uptime.pdf", "copy"],
+      ["ops", ".git/HEAD", "junk"],
+    ]);
+    expect(await bytesOf(files[1]?.read)).toEqual(report);
+    expect(new TextDecoder().decode(await bytesOf(files[0]?.read))).toBe("Ideas.");
+  });
+
+  test("a Claw package: the files it puts in the workspace, at their place there", () => {
+    const { bundle, files } = parsePackage([
+      {
+        name: "CLAW.md",
+        text: [
+          "---",
+          "schemaVersion: 1",
+          "agent:",
+          "  id: researcher",
+          "  name: Researcher",
+          "workspace:",
+          "  files:",
+          "    - path: templates/brief.md",
+          "      source: assets/brief-template.md",
+          "    - path: missing.md",
+          "      source: assets/missing.md",
+          "---",
+          "Be curious.",
+        ].join("\n"),
+      },
+      { name: "assets/brief-template.md", text: "# Brief" },
+    ]);
+    expect(files.map((f) => [f.agent, f.path, f.skip ?? "copy"])).toEqual([
+      ["researcher", "templates/brief.md", "copy"],
+    ]);
+    expect(bundle.leftOut).toContainEqual({ kind: "file", label: "missing.md" });
   });
 });
