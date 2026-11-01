@@ -223,8 +223,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
   /**
    * Which agents an agent's @mentions wake (ADR 0089): the judge asks, per mentioned agent, whether the message
    * needs nothing from it, in any language, reading the message being answered too; it wakes unless the judge is
-   * sure (`MENTION_WAKE_THRESHOLD`). Thanks, an "ok", a sign-off or a quote need nothing. Only without a judge, or
-   * when it fails, does a message that opens with "@handle" count by itself. Each decision goes in
+   * sure (`MENTION_WAKE_THRESHOLD`). Thanks, an "ok", a sign-off or a quote need nothing. When the judge fails, every
+   * agent it names wakes; only with no judge at all does a message that opens with "@handle" count by itself. Each decision goes in
    * `routing_decisions`, its score the chance the message needs the agent (1 − the judge's "nothing").
    */
   async function delegatedAgents(message: NonNullable<Awaited<ReturnType<typeof getMessage>>>) {
@@ -241,7 +241,6 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     const scores = new Map<string, number>();
     let strategy = "mention-judge";
     let error: string | null = null;
-    let judged = false;
     const judge = deps.context ? judgeOf(deps.context) : null;
     if (judge && others.length > 0) {
       const [[author], answering] = await Promise.all([
@@ -264,13 +263,14 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         });
         for (const [id, nothing] of out) scores.set(id, 1 - nothing);
         strategy = `mention-${judge.name}`;
-        judged = true;
       } catch (e) {
         error = e instanceof Error ? e.message.slice(0, 300) : String(e);
+        // Nobody could say it needs nothing: every agent it names wakes, and one woken for nothing passes.
+        for (const t of others) scores.set(t.id, 1);
       }
     }
-    // Nobody could read it: a message that opens by addressing an agent ("@ada já postei…") is a reply to it.
-    if (!judged) for (const t of others) if (opensWith(message.body, t.handle)) scores.set(t.id, 1);
+    // No judge at all: a message that opens by addressing an agent ("@ada já postei…") is a reply to it.
+    if (!judge) for (const t of others) if (opensWith(message.body, t.handle)) scores.set(t.id, 1);
     const allowed = others.filter((t) => (scores.get(t.id) ?? 0) >= mentionThreshold).map((t) => t.id);
     await deps.db
       .insert(schema.routingDecisions)
