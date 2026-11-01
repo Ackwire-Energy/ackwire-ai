@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import {
   type AgentScope,
+  type DesktopMode,
   type MachineRequest,
   parseStreamControl,
   parseStreamHello,
@@ -31,6 +32,8 @@ export interface StreamInput {
   request: StreamRequest;
   /** The person's session behind the viewer socket (its token): the recheck ends the stream once it is gone. */
   sessionToken?: string;
+  /** Its viewer takes a desktop's mode changing in place (ADR 0058 §17): `{"type":"mode"}` frames, a new session. */
+  switches?: boolean;
 }
 
 /**
@@ -38,7 +41,7 @@ export interface StreamInput {
  * the agent or its workspace is held, so a desktop that runs may be watched but none is started for it.
  */
 export type StreamTarget =
-  | { machineId: string; agent: AgentScope; held?: boolean }
+  | { machineId: string; agent: AgentScope; held?: boolean; switches?: boolean }
   | { refused: number; reason: string };
 
 export interface Stream extends StreamInput {
@@ -78,6 +81,8 @@ export interface StreamBrokerDeps {
   authorize(input: StreamInput): Promise<StreamTarget>;
   /** Every `accessRecheckMs` while it is open: whether the person may still have it (null), else its close. */
   recheck?(stream: Stream): Promise<{ refused: number; reason: string } | null>;
+  /** Whether a desktop stream may go on in `mode` (`switchWhere`): null, else its close. */
+  reauthorize?(stream: Stream, mode: DesktopMode): Promise<{ refused: number; reason: string } | null>;
   /** A stream got its data socket (session screening starts), once. */
   onReady?(stream: Stream): unknown;
   /** A stream that got its data socket ended (the audit). */
@@ -88,6 +93,13 @@ export interface StreamBrokerDeps {
 }
 
 interface OpenStream extends Stream {
+  /** A desktop whose viewer and computer both take its mode changing in place (ADR 0058 §17). */
+  switches: boolean;
+  /** The mode it is to have; `switchWhere` sets it, and a switch under way goes on until the stream has it. */
+  wanted: DesktopMode | null;
+  switching: boolean;
+  /** A switch sent to the computer: the viewer's bytes are its old session's until it says it took this mode. */
+  discarding: DesktopMode | null;
   /** The person's frames before the data socket is ready, sent once it is. */
   queue: (string | Uint8Array)[];
   queued: number;
@@ -197,6 +209,7 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
     if ("refused" in target) return close(s, target.refused, target.reason);
     if (full(s, target.machineId)) return close(s, STREAM_CLOSE.tooMany, "too_many_streams");
     s.machineId = target.machineId;
+    s.switches = s.request.kind === "desktop" && s.switches && target.switches === true;
     const { machineId, agent } = target;
     const held = target.held === true;
     const starts = s.request.kind === "desktop" && !held ? { start: true } : {};
@@ -271,11 +284,59 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
       }, limits.accessRecheckMs);
     }
     quietly(() => link.socket.send(JSON.stringify({ type: "stream.ready" })));
+    // Before any of the computer's bytes: the viewer keeps this socket when the mode changes.
+    const request = s.request;
+    if (s.switches && request.kind === "desktop") {
+      quietly(() => s.viewer.send(JSON.stringify({ type: "mode", mode: request.mode })));
+    }
     const queue = s.queue;
     s.queue = [];
     s.queued = 0;
     for (const frame of queue) if (!s.closed) relay(s, link.socket, frame, limits.runnerBufferedMax);
     if (!s.closed) later(deps.onReady, s, "stream start hook failed");
+    // Its handoff changed while it opened (taken right after the screen opened).
+    if (s.switches && s.wanted && request.kind === "desktop" && s.wanted !== request.mode) void switchMode(s);
+  }
+
+  /**
+   * A desktop stream goes on in `s.wanted` on the same sockets (ADR 0058 §17), once `reauthorize` lets it: what ran
+   * so far ends for the hooks (its audit; a control session's screening and grace) and the new mode starts for them,
+   * the computer logs in again, and the viewer's bytes are dropped until it took the switch (`discarding`).
+   * Switches asked meanwhile wait for this one; the last one asked wins. Control refused leaves it watching (the
+   * recheck closes it if the person may not even watch now); watching refused closes it.
+   */
+  async function switchMode(s: OpenStream) {
+    if (s.switching) return;
+    s.switching = true;
+    try {
+      while (!s.closed && s.runner && s.request.kind === "desktop" && s.wanted && s.wanted !== s.request.mode) {
+        const mode = s.wanted;
+        let lost: { refused: number; reason: string } | null = null;
+        try {
+          lost = (await deps.reauthorize?.(s, mode)) ?? null;
+        } catch (error) {
+          deps.log?.warn("stream switch check failed", { agentId: s.agentId, error: String(error) });
+          lost = { refused: STREAM_CLOSE.internal, reason: "access unavailable" };
+        }
+        if (s.closed || !s.runner) return;
+        if (lost && mode === "control") {
+          if (s.wanted === mode) s.wanted = null;
+          continue;
+        }
+        if (lost) return close(s, lost.refused, lost.reason);
+        if (s.wanted !== mode) continue;
+        if (s.readyAt !== null) later(deps.onClosed, { ...s }, "stream audit failed");
+        s.request = { kind: "desktop", mode };
+        s.readyAt = Date.now();
+        s.bytesIn = 0;
+        s.bytesOut = 0;
+        s.discarding = mode;
+        relay(s, s.runner, JSON.stringify({ type: "mode", mode }), limits.runnerBufferedMax);
+        if (!s.closed) later(deps.onReady, s, "stream start hook failed");
+      }
+    } finally {
+      s.switching = false;
+    }
   }
 
   return {
@@ -291,6 +352,10 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
         agentId: input.agentId,
         request: input.request,
         sessionToken: input.sessionToken,
+        switches: input.switches === true,
+        wanted: null,
+        switching: false,
+        discarding: null,
         id: randomBytes(32).toString("base64url"),
         viewer,
         machineId: null,
@@ -325,10 +390,18 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
       }
       let frame = data;
       if (typeof data === "string") {
-        const control = s.request.kind === "terminal" ? parseStreamControl(data) : null;
-        if (control?.type !== "resize") return close(s, STREAM_CLOSE.badRequest, "bad frame");
+        const control = s.request.kind === "terminal" || s.switches ? parseStreamControl(data) : null;
+        // The viewer took the switch: what it sends from here is the new session's.
+        if (s.switches && control?.type === "mode") {
+          if (s.discarding === control.mode) s.discarding = null;
+          return;
+        }
+        if (s.request.kind !== "terminal" || control?.type !== "resize") {
+          return close(s, STREAM_CLOSE.badRequest, "bad frame");
+        }
         frame = JSON.stringify(control);
       }
+      if (s.discarding) return;
       s.bytesIn += size;
       if (s.runner) return relay(s, s.runner, frame, limits.runnerBufferedMax);
       s.queued += size;
@@ -355,6 +428,8 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
           if (control?.type === "exit" && s.request.kind === "terminal") {
             quietly(() => s.viewer.send(JSON.stringify(control)));
           }
+          // Where the computer's old session ends: the viewer starts noVNC again on the bytes after it.
+          if (control?.type === "mode" && s.switches) quietly(() => s.viewer.send(JSON.stringify(control)));
           return;
         }
         s.bytesOut += data.byteLength;
@@ -384,6 +459,24 @@ export function createStreamBroker(deps: StreamBrokerDeps) {
 
     /** Ends a stream, both sides with `code` (the viewer leaving: normal). */
     close,
+
+    /**
+     * Turns every desktop stream `match` picks whose viewer takes it to `mode` in place (`switchMode`): one that is
+     * ready at once, one still opening once it is (where its computer can). The others are left as they are.
+     */
+    switchWhere(match: (stream: Stream) => boolean, mode: DesktopMode) {
+      for (const s of streams.values()) {
+        if (!s.switches || s.request.kind !== "desktop" || !match(s)) continue;
+        s.wanted = mode;
+        if (s.runner) void switchMode(s);
+      }
+    },
+
+    /** Whether a stream is ready and changes mode in place (its viewer and its computer both can). */
+    switches(stream: Stream) {
+      const s = streams.get(stream.id);
+      return s?.switches === true && s.runner !== null;
+    },
 
     /** Ends every stream `match` picks (someone took control: the others' views go). */
     closeWhere(match: (stream: Stream) => boolean, code: number, reason = "") {

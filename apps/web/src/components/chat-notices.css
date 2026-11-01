@@ -33,7 +33,7 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-.cn-line__toggle:focus-visible {
+html:not([data-pointer]) .cn-line__toggle:focus-visible {
   outline: none;
   border-radius: 2px;
   box-shadow: var(--focus-ring);

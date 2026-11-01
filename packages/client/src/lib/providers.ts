@@ -156,6 +156,10 @@ export function modelChoices(models: Model[], credentials: Credential[], platfor
   return [...groups.entries()];
 }
 
+/** The ids of the models `modelChoices` marks usable. */
+export const usableModels = (choices: ReturnType<typeof modelChoices>) =>
+  new Set(choices.flatMap(([, list]) => list.filter((c) => c.available).map((c) => c.model.id)));
+
 /**
  * "Automático": the value an agent's model, a computer brain's model or
  * its effort holds when each run picks them (the server's `auto-model.ts`).

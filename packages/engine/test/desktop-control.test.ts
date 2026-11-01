@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { DESKTOP_PROTOCOL, type MachineRequest, STREAM_CLOSE, type StreamRequest } from "@agenteschat/adapters";
+import {
+  DESKTOP_PROTOCOL,
+  DESKTOP_SWITCH_PROTOCOL,
+  type MachineRequest,
+  STREAM_CLOSE,
+  type StreamRequest,
+} from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
@@ -23,18 +29,22 @@ import {
   type MachineHub,
   type MachineStatus,
   postPersonMessage,
+  type RunnerLink,
+  reauthorizeStream,
   recheckStream,
   renderPush,
   requireComputerDriver,
+  type Stream,
   type StreamBroker,
   setAgentHold,
   setOrgStanding,
   startTakeover,
+  streamClosed,
   waitIfPersonInControl,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
-import { fakeSocket, until } from "./stream-fixtures";
+import { type FakeSocket, fakeSocket, until } from "./stream-fixtures";
 
 let f: Fixture;
 let broker: StreamBroker | undefined;
@@ -98,6 +108,10 @@ const toolHub: MachineCaller = {
  * `stream.open` dials a data socket and says hello; `desktop.session.*` answers as a running desktop.
  */
 async function start(options: { recheckMs?: number; agent?: boolean } = {}) {
+  /** What the hooks saw: each stream part's mode as it started (`ready`) and ended (`closed`). */
+  const hooks = { ready: [] as string[], closed: [] as string[] };
+  /** The computer's side of each stream: its data socket and what the broker sent there. */
+  const runners: { socket: FakeSocket; link: RunnerLink }[] = [];
   f = await setup({
     machines: true,
     reply,
@@ -132,6 +146,7 @@ async function start(options: { recheckMs?: number; agent?: boolean } = {}) {
       if (request.op !== "stream.open") return {};
       const socket = fakeSocket();
       const link = created.accept(socket.socket);
+      runners.push({ socket, link });
       await created.fromRunner(
         link,
         JSON.stringify({ type: "stream.hello", token: machine.token, streamId: request.streamId }),
@@ -144,17 +159,30 @@ async function start(options: { recheckMs?: number; agent?: boolean } = {}) {
     hub,
     authorize: (input) => authorizeStream({ db: f.db, hub }, input),
     recheck: (stream) => recheckStream(f.db, stream),
+    reauthorize: (stream, mode) => reauthorizeStream(f.db, stream, mode),
+    onReady: (stream) => hooks.ready.push(modeOf(stream)),
+    onClosed: async (stream) => {
+      hooks.closed.push(modeOf(stream));
+      await streamClosed(f.db, stream);
+    },
     ...(options.recheckMs ? { limits: { accessRecheckMs: options.recheckMs } } : {}),
   });
   broker = created;
   control = createDesktopControl({ db: f.db, pubsub: f.pubsub, hub, streams: created });
-  /** A person's viewer, once its stream is ready or refused. */
-  const open = async (userId: string, request: StreamRequest) => {
+  /** A person's viewer, once its stream is ready or refused; `switches`: one that takes its mode changing in place. */
+  const opened = async (userId: string, request: StreamRequest, switches = false) => {
     const viewer = fakeSocket();
-    const stream = created.open(viewer.socket, { userId, orgId: f.org.id, agentId: f.agent.id, request });
+    const stream = created.open(viewer.socket, {
+      userId,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      request,
+      ...(switches ? { switches } : {}),
+    });
     await until(() => stream.runner !== null || viewer.closed !== null, "the stream");
-    return viewer;
+    return { viewer, stream };
   };
+  const open = async (userId: string, request: StreamRequest) => (await opened(userId, request)).viewer;
   const setMachine = (values: Partial<typeof schema.machines.$inferInsert>) =>
     f.db.update(schema.machines).set(values).where(eq(schema.machines.id, machine.machineId));
   const systemMode = () =>
@@ -166,8 +194,10 @@ async function start(options: { recheckMs?: number; agent?: boolean } = {}) {
         mode: "system",
       },
     });
-  return { machine, hub, requests, open, setMachine, systemMode };
+  return { machine, hub, requests, open, opened, setMachine, systemMode, hooks, runners, broker: created };
 }
+
+const modeOf = (stream: Stream) => (stream.request.kind === "desktop" ? stream.request.mode : "terminal");
 
 /** A member of the workspace in #general who just asked the agent for work (its run is queued, live). */
 async function asker(name: string, body = "@dev look at the dashboard") {
@@ -305,6 +335,109 @@ describe("one person in control of the desktop", () => {
       (await f.db.select().from(handoff).where(eq(handoff.id, taken.id)))[0]?.expiresAt.getTime() ?? 0;
     await until(async () => (await deadline()) > Date.now() + 60_000, "the controller's presence");
     expect(driving.closed).toBeNull();
+  });
+});
+
+describe("a desktop stream's mode changes in place (ADR 0058 §17)", () => {
+  const sentText = (s: FakeSocket) => s.sent.filter((x): x is string => typeof x === "string");
+  const MODE = (mode: string) => JSON.stringify({ type: "mode", mode });
+
+  test("taking control turns the holder's own watching stream into control on the same sockets, handing back turns it back; each part is a stream of its own for the hooks", async () => {
+    const { opened, setMachine, runners, hooks, broker: b } = await start();
+    await setMachine({ protocol: DESKTOP_SWITCH_PROTOCOL });
+    const { viewer, stream } = await opened(f.owner.id, WATCH, true);
+    // Before any of the computer's bytes, the viewer hears that this socket stays when the mode changes.
+    expect(viewer.sent).toEqual([MODE("watch")]);
+    const runner = runners[0] as (typeof runners)[number];
+    await until(() => hooks.ready.length === 1, "the watching part");
+
+    const taken = await startTakeover(deps(), f.owner.id, f.org.id, f.agent.id, null, "desktop");
+    await until(() => sentText(runner.socket).includes(MODE("control")), "the switch to the computer");
+    expect(stream.request).toEqual(CONTROL);
+    expect([viewer.closed, runner.socket.closed]).toEqual([null, null]);
+    // Until the viewer took it, what it sends is its old session's: none of it reaches the computer.
+    const before = runner.socket.sent.length;
+    b.fromViewer(stream, Uint8Array.of(3, 1, 0, 0, 0, 0, 5, 0, 3, 32));
+    expect(runner.socket.sent.length).toBe(before);
+    // The computer marks where its old session ends; the viewer gets the mark, takes it, and its bytes flow again.
+    await b.fromRunner(runner.link, MODE("control"));
+    expect(viewer.sent.at(-1)).toBe(MODE("control"));
+    b.fromViewer(stream, MODE("control"));
+    b.fromViewer(stream, Uint8Array.of(82, 70, 66));
+    expect(runner.socket.sent.at(-1)).toEqual(Uint8Array.of(82, 70, 66));
+    // The watching part ended for the hooks (its audit), and control started (screening, where it is on).
+    await until(() => hooks.ready.length === 2, "the control part");
+    expect(hooks).toEqual({ ready: ["watch", "control"], closed: ["watch"] });
+
+    await finishHandoff(deps(), f.owner.id, f.org.id, taken.id, { result: "done", note: "signed in" });
+    await until(() => sentText(runner.socket).includes(MODE("watch")), "the switch back");
+    expect(stream.request).toEqual(WATCH);
+    expect(viewer.closed).toBeNull();
+    await until(() => hooks.ready.length === 3, "the watching part again");
+    expect(hooks).toEqual({ ready: ["watch", "control", "watch"], closed: ["watch", "control"] });
+    const streamed = async () =>
+      (await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.targetId, f.agent.id)))
+        .map((a) => a.action)
+        .filter((action) => action.startsWith("desktop."))
+        .sort();
+    await until(async () => (await streamed()).length === 2, "the audit");
+    expect(await streamed()).toEqual(["desktop.controlled", "desktop.watched"]);
+  });
+
+  test("an older computer (protocol 29) or a viewer that didn't ask: control ends with 4410 and the panel opens again, as before; nothing changes mode", async () => {
+    const { opened, setMachine, runners } = await start();
+    const old = await opened(f.owner.id, WATCH, true);
+    expect(old.viewer.sent).toEqual([]);
+    const taken = await startTakeover(deps(), f.owner.id, f.org.id, f.agent.id, null, "desktop");
+    const driving = await opened(f.owner.id, CONTROL, true);
+    await finishHandoff(deps(), f.owner.id, f.org.id, taken.id, { result: "done" });
+    await until(() => driving.viewer.closed !== null, "the end of control");
+    expect(driving.viewer.closed?.code).toBe(STREAM_CLOSE.controlEnded);
+    expect(old.stream.request).toEqual(WATCH);
+
+    await setMachine({ protocol: DESKTOP_SWITCH_PROTOCOL });
+    const plain = await opened(f.owner.id, WATCH);
+    await startTakeover(deps(), f.owner.id, f.org.id, f.agent.id, null, "desktop");
+    await Bun.sleep(50);
+    expect(plain.viewer.sent).toEqual([]);
+    expect(plain.stream.request).toEqual(WATCH);
+    expect(runners.flatMap((r) => sentText(r.socket))).toEqual(runners.map(() => '{"type":"stream.ready"}'));
+  });
+
+  test("someone else taking control still hides the view (4409); a switch the person may not have now is refused", async () => {
+    const { opened, setMachine, systemMode } = await start();
+    await setMachine({ protocol: DESKTOP_SWITCH_PROTOCOL });
+    await systemMode();
+    const bia = await addMember(f.db, f.org.id, "admin", "bia");
+    const hers = await opened(bia.id, WATCH, true);
+    const mine = await opened(f.owner.id, WATCH, true);
+    await startTakeover(deps(), f.owner.id, f.org.id, f.agent.id, null, "desktop");
+    await until(() => hers.viewer.closed !== null, "the hidden view");
+    expect(hers.viewer.closed?.code).toBe(STREAM_CLOSE.hidden);
+    await until(() => mine.stream.request.kind === "desktop" && mine.stream.request.mode === "control", "control");
+
+    // Control is new work: never for a held agent, nor without the desktop's own handoff in the person's name.
+    const stream = mine.stream;
+    await setAgentHold(f.db, f.org.id, f.agent.id, { held: true, reason: "Review" });
+    expect(await reauthorizeStream(f.db, stream, "control")).toEqual({ refused: STREAM_CLOSE.refused, reason: "held" });
+    await setAgentHold(f.db, f.org.id, f.agent.id, { held: false, reason: null });
+    expect(await reauthorizeStream(f.db, { ...stream, userId: bia.id }, "control")).toEqual({
+      refused: STREAM_CLOSE.hidden,
+      reason: "someone_in_control",
+    });
+    expect(await reauthorizeStream(f.db, stream, "watch")).toBeNull();
+  });
+
+  test("control refused for a switch leaves the stream watching; the panel opens again by itself if it still thinks so", async () => {
+    const { opened, setMachine, runners, broker: b } = await start();
+    await setMachine({ protocol: DESKTOP_SWITCH_PROTOCOL });
+    const { viewer, stream } = await opened(f.owner.id, WATCH, true);
+    // No handoff in the person's name: nothing to control.
+    b.switchWhere((s) => s.id === stream.id, "control");
+    await Bun.sleep(50);
+    expect(stream.request).toEqual(WATCH);
+    expect(viewer.closed).toBeNull();
+    expect(sentText((runners[0] as (typeof runners)[number]).socket)).toEqual(['{"type":"stream.ready"}']);
   });
 });
 

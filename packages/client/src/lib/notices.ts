@@ -106,8 +106,8 @@ const CONSULTATION_STATUSES: ReadonlySet<string> = new Set<ConsultationStatus>([
 
 /**
  * Another agent's answer that carries its consultation (`consult_reply` refs: who asked whom, the question and
- * the answer apart): the app shows it as the consultation card, not the text written for the asking agent.
- * Null for older notices without them.
+ * the answer apart, and `kind` `note` for work handed off): the app shows it as the consultation card, not the
+ * text written for the asking agent. Null for older notices without them.
  */
 export function consultationOfNotice(meta: Meta): { askerId: string; consultation: MessageConsultation } | null {
   const notice = noticeOf(meta);
@@ -118,6 +118,7 @@ export function consultationOfNotice(meta: Meta): { askerId: string; consultatio
     consultation: {
       agentId: r.agentId,
       consultationId: r.consultationId ?? "",
+      ...(r.kind === "note" ? { kind: "note" as const } : {}),
       status: r.status as ConsultationStatus,
       question: r.question,
       answer: r.answer ?? null,

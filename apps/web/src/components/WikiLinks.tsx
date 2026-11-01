@@ -26,7 +26,7 @@ function PreviewCard({ slug }: { slug: string }) {
       <span className="wiki-preview__title">{page.data.title}</span>
       {page.data.folder && <span className="small muted">{page.data.folder}</span>}
       <div className="wiki-preview__body">
-        <Markdown source={previewOf(page.data.body)} variant="message" />
+        <Markdown source={previewOf(page.data.body)} variant="message" excerpt />
       </div>
     </div>
   );
@@ -66,6 +66,8 @@ export function WikiLinkChip({ title, label, pages }: { title: string; label: st
     <Popover
       open={open}
       onOpenChange={setOpen}
+      // Nothing in it to reach: the focus stays in the box or on the link, whose blur closes it.
+      moveFocus={false}
       label={t("wiki.previewOf", { title: page.title })}
       side="top"
       className="wiki-preview-pop"

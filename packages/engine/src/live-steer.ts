@@ -99,7 +99,8 @@ export async function renderSteered(db: Executor, orgId: string, ids: string[]):
     .leftJoin(users, eq(users.id, messages.authorUserId))
     .leftJoin(agents, eq(agents.id, messages.authorAgentId))
     .where(and(eq(messages.orgId, orgId), inArray(messages.id, ids), isNull(messages.deletedAt)));
-  rows.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  // Messages written in one transaction share its time (a report's notices): their ids keep the order.
+  rows.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : 1));
   return rows.map((m) => ({
     id: m.id,
     // A background task that ended while it worked: the notice with its result.

@@ -403,7 +403,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             ...access.map((a) => a.agent),
           ]);
           if (named.missing.length > 0) return fail(await noAgentText(ctx, named.missing));
-          const idOf = (raw: unknown) => named.rows.find((r) => r.handle === handleOf(raw))?.id ?? "";
+          const idOf = (raw: unknown) => named.rowOf(raw)?.id ?? "";
           const apps = await resolveApps(
             ctx.db,
             ctx.orgId,

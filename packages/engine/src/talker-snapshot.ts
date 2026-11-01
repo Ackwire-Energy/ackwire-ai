@@ -100,7 +100,7 @@ async function waitsOf(db: Database, run: AgentRun): Promise<string[]> {
       .from(browserHandoffs)
       .where(and(eq(browserHandoffs.runId, run.id), inArray(browserHandoffs.status, ["pending", "active"]))),
     db
-      .select({ question: agentConsultations.question, name: agents.name })
+      .select({ kind: agentConsultations.kind, question: agentConsultations.question, name: agents.name })
       .from(agentConsultations)
       .innerJoin(agents, eq(agents.id, agentConsultations.targetAgentId))
       .where(and(eq(agentConsultations.askerRunId, run.id), eq(agentConsultations.status, "open"))),
@@ -111,7 +111,12 @@ async function waitsOf(db: Database, run: AgentRun): Promise<string[]> {
       `a person to help in its browser: "${clip(h.instructions, 200)}" (${h.status === "active" ? "a person has control now" : "nobody opened it yet"})`,
     );
   }
-  for (const c of consults) out.push(`an answer from ${c.name}, whom it asked: "${clip(c.question, 200)}"`);
+  for (const c of consults)
+    out.push(
+      c.kind === "note"
+        ? `${c.name} to finish the work it handed over: "${clip(c.question, 200)}"`
+        : `an answer from ${c.name}, whom it asked: "${clip(c.question, 200)}"`,
+    );
   return out;
 }
 

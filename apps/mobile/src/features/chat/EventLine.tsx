@@ -1,5 +1,5 @@
 import type { Message } from "@agenteschat/client";
-import type { ConsultNoticeFold } from "@agenteschat/client/lib/consult-group";
+import { type ConsultNoticeFold, consultFarKey } from "@agenteschat/client/lib/consult-group";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { consultationOfNotice } from "@agenteschat/client/lib/notices";
 import { useState } from "react";
@@ -43,7 +43,7 @@ export function EventLine({
         <View style={styles.head}>
           <LineIcon name="agent" size={13} color={c.faint} variant="caption" />
           <Text variant="caption" tone="faint" style={styles.grow}>
-            {t("chat.consultGroup.answeredFar", { to, from: asker.name, of: asker.of })} ·{" "}
+            {t(consultFarKey(far.consultation), { to, from: asker.name, of: asker.of })} ·{" "}
             {when.time(message.createdAt)}
             {" · "}
             <Text

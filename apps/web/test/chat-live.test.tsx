@@ -751,24 +751,24 @@ describe("direct messages with an agent", () => {
     expect(document.activeElement).toBe(composer());
   });
 
-  test("a computer brain thinks for the agent: the DM header says Claude Code · Sonnet no MacBook, with its mark", async () => {
+  test("a plan thinks for the agent: the DM header says its model by that plan, with its mark", async () => {
     const state = seedState();
     const ada = state.agents.find((a) => a.id === ADA_ID);
     if (ada) ada.brain = { kind: "claude_code", model: "Sonnet", computer: "MacBook" };
     await open(state, `dm/agent/${ADA_ID}`);
     await settle(4);
-    expect(document.body.textContent).toContain("Dev · de João · Claude Code · Sonnet no MacBook");
+    expect(document.body.textContent).toContain("Dev · de João · Sonnet pelo plano do Claude");
     expect(document.body.textContent).not.toContain("Claude Sonnet 5.5");
     const brain = document.querySelector(".channel__brain") as HTMLElement;
     expect(brain.querySelector(".ac-brand[data-mark='claude']")).not.toBeNull();
     cleanup();
-    // Without the computer's name (a member): just the brain and its model.
+    // Who doesn't see its computer (a member) reads whose plan it is.
     const member = seedState();
     const codex = member.agents.find((a) => a.id === ADA_ID);
     if (codex) codex.brain = { kind: "codex", model: "GPT-6 Sol" };
     await open(member, `dm/agent/${ADA_ID}`);
     await settle(4);
-    expect(document.body.textContent).toContain("Dev · de João · Codex · GPT-6 Sol");
+    expect(document.body.textContent).toContain("Dev · de João · GPT-6 Sol pelo plano do ChatGPT de João");
   });
 
   test("sidebar agent → DM via POST /dms: header with role, owner and model; empty state; the agent answers without a mention", async () => {

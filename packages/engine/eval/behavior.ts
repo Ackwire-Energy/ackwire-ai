@@ -9,7 +9,7 @@
  * Manual, never in CI (it calls the real model and costs a little):
  *
  *   bun run eval:behavior [--only id,id] [--model claude-sonnet-5-5] [--judge jev|llm] [--judge-model claude-haiku-5-5]
- *                         [--no-judge] [--max-turns 12] [--concurrency 5] [--tools-on-demand] [--repeat 3]
+ *                         [--no-judge] [--max-turns 12] [--concurrency 5] [--tools-on-demand] [--repeat 3] [--lang en]
  *
  * `--repeat N` runs every case N times; a case passes when most of its runs pass, and each check is reported
  * by its own majority (a model and a judge both vary from run to run: one run alone can't tell a regression
@@ -56,6 +56,8 @@ const agreement = { same: 0, total: 0 };
 const maxToolTurns = Number(arg("max-turns") ?? 12);
 const concurrency = Math.max(1, Number(arg("concurrency") ?? process.env.EVAL_CONCURRENCY ?? 5));
 const repeat = Math.max(1, Math.floor(Number(arg("repeat") ?? 1)));
+/** The people's lines of cases that give them per language (default: each case's first). */
+const lang = arg("lang");
 
 const apiKey = process.env.ANTHROPIC_API_KEY;
 if (!apiKey) {
@@ -72,7 +74,7 @@ const local = await load("behavior-cases.local.json");
 const cases = [...(await load("behavior-cases.json")), ...local].filter((c) => !only || only.includes(c.id));
 const judgeLabel = !useJudge ? "off" : gradeWithJev ? "jev" : judgeModel;
 console.log(
-  `${cases.length} cases (${local.length} local)${repeat > 1 ? ` × ${repeat} runs` : ""} · agent model ${agentModel ?? "per case"} · judge ${judgeLabel} · addressees ${jevKey ? "jev" : "llm"} · max ${maxToolTurns} turns · ${concurrency} at a time`,
+  `${cases.length} cases (${local.length} local)${repeat > 1 ? ` × ${repeat} runs` : ""}${lang ? ` · lines in ${lang}` : ""} · agent model ${agentModel ?? "per case"} · judge ${judgeLabel} · addressees ${jevKey ? "jev" : "llm"} · max ${maxToolTurns} turns · ${concurrency} at a time`,
 );
 if (!jevKey)
   console.log(
@@ -125,22 +127,31 @@ async function evalCase(c: BehaviorCase, attempt: number): Promise<CaseReport> {
   let checks: CheckResult[] = [];
   let nano = 0;
   try {
-    run = await runCase(c, { apiKey: apiKey as string, provider, maxToolTurns, agentModel, jevKey, toolsOnDemand });
+    run = await runCase(c, {
+      apiKey: apiKey as string,
+      provider,
+      maxToolTurns,
+      agentModel,
+      jevKey,
+      toolsOnDemand,
+      lang,
+    });
     nano += run.costNanoUsd;
-    checks = deterministicChecks(c.expect, run);
+    checks = [...deterministicChecks(c.expect, run), ...(run.stepChecks ?? [])];
     if (useJudge) {
       const j = await judge(c, run, {
         apiKey: apiKey as string,
         provider,
         model: judgeModel,
         agentModel,
+        lang,
         ...(gradeWithJev && jevKey ? { jev: { apiKey: jevKey } } : {}),
       });
       checks.push(...j.checks);
       nano += j.costNanoUsd;
       judgeNano += j.costNanoUsd;
       if (compareLlm) {
-        const l = await judge(c, run, { apiKey: apiKey as string, provider, model: judgeModel, agentModel });
+        const l = await judge(c, run, { apiKey: apiKey as string, provider, model: judgeModel, agentModel, lang });
         llmNano += l.costNanoUsd;
         for (const k of l.checks) {
           const mine = j.checks.find((x) => x.id === k.id);
