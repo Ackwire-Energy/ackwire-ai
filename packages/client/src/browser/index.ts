@@ -376,7 +376,10 @@ export function useBrowserHandoffActions(orgId: string) {
     done: (handoffId: string, note?: string) => m.done.mutateAsync(note ? { handoffId, note } : handoffId),
     failed: (handoffId: string, note?: string) => m.failed.mutateAsync({ handoffId, ...(note ? { note } : {}) }),
     cancel: (handoffId: string) => m.cancel.mutateAsync(handoffId),
-    takeover: (agentId: string, runId?: string) => m.takeover.mutateAsync(runId ? { agentId, runId } : agentId),
+    takeover: (agentId: string, runId?: string, screen?: ScreenKind) =>
+      m.takeover.mutateAsync(
+        runId || screen ? { agentId, ...(runId ? { runId } : {}), ...(screen ? { screen } : {}) } : agentId,
+      ),
     stop: (agentId: string) => m.stop.mutateAsync(agentId),
     /** Not in `pending`, as `open`: the browser may take a while to come back. */
     restart: (agentId: string) => m.restart.mutateAsync(agentId),

@@ -10509,8 +10509,10 @@ export const en: Translations = {
     closeAsk: "{{name}} waits 2 min for you to come back.",
     openAccess: "Open Tools and access",
     phone: {
-      otherApp: "{{name}} is using another app on {{hers}} screen",
-      fromComputer: "To watch the screen, open agentes.chat on a laptop",
+      now: "Now",
+      trackpad: "Trackpad",
+      trackpadHint: "Drag to move · Tap to click · Hold to drag · Two fingers to scroll",
+      message: "Message {{name}}",
       chooseOnWeb: "Choose it on agentes.chat, in Settings\u00a0›\u00a0Computers.",
     },
   },

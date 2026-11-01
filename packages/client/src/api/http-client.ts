@@ -764,6 +764,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         ).hits,
     },
     memory: {
+      listAll: async (orgId) => (await request<{ memories: Memory[] }>(`${org(orgId)}/memories`)).memories,
       list: async (orgId, agentId, filter) =>
         (
           await request<{ memories: Memory[] }>(`${org(orgId)}/agents/${enc(agentId)}/memories`, {

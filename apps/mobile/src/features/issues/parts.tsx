@@ -1,15 +1,16 @@
 import type { Issue, IssueColumn } from "@agenteschat/client";
 import { dueLabel } from "@agenteschat/client/lib/format";
 import { stepPhrase } from "@agenteschat/client/lib/work";
+import { AGENT_GRADIENTS, type AgentColorName } from "@agenteschat/ui/agent/engine";
 import { router } from "expo-router";
 import { memo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Chip, Count, Icon, type IconName, PixelOrbit, Text } from "@/ui";
+import { Chip, Icon, type IconName, PixelOrbit, Text } from "@/ui";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import { Tile } from "../shared/parts";
+import { Tile, useSurface } from "../shared/parts";
 import { criteriaProgress, currentStep, type IssueState, isLate, issueState, latestPr, listState } from "./logic";
 
 /** An agent's step in the person's words ("Mexeu nos arquivos do PC · trips.service.ts"), as the web says it. */
@@ -83,24 +84,37 @@ export function PriorityMark({ issue }: { issue: Pick<Issue, "priority"> }) {
   );
 }
 
-/** Criteria checked of all, in Doto: "2/4". */
-export function CriteriaCount({ issue }: { issue: Issue }) {
+/** The criteria as a pixel track in the agent's colors, with "2/4": the one being worked on blinks. */
+export function CriteriaTrack({ issue, color, going }: { issue: Issue; color: AgentColorName; going: boolean }) {
   const { t } = useTranslation();
   const c = useColors();
   const p = criteriaProgress(issue);
   if (!p) return null;
+  const [top, bottom] = AGENT_GRADIENTS[color];
   return (
     <View
-      style={styles.inline}
+      style={styles.track}
       accessible
       accessibilityLabel={t("issues.criteriaLabel", { done: p.done, total: p.total })}
     >
-      <Icon name="checkc" size={12} color={c.faint} />
-      <Count value={p.done} size={13} color={c.faint} />
+      <View style={styles.cells}>
+        {Array.from({ length: p.total }, (_, k) => (
+          <View
+            // biome-ignore lint/suspicious/noArrayIndexKey: the cells have no identity, only a position
+            key={`cell-${k + 1}`}
+            style={[
+              styles.cell,
+              {
+                backgroundColor:
+                  k < p.done ? (k === p.done - 1 ? top : bottom) : going && k === p.done ? `${top}66` : c.sunken,
+              },
+            ]}
+          />
+        ))}
+      </View>
       <Text variant="caption" tone="faint">
-        /
+        {p.done}/{p.total}
       </Text>
-      <Count value={p.total} size={13} color={c.faint} />
     </View>
   );
 }
@@ -147,29 +161,20 @@ function StateLine({ issue }: { issue: Issue }) {
   );
 }
 
-/** The row's avatar: smaller than a conversation's, its top on the title's first line. */
-const ROW_AVATAR = 40;
-const ROW_GUTTER = 20;
-const ROW_GAP = 12;
-
 /**
- * One task in the list: who has it, the title in two lines, then one line under it with
- * "#134 · Alta · até sex", the criteria and, when the section doesn't say it, the state; the
- * agent's current step while it works. Everything starts on the title's edge.
+ * One task on the board: why it stands out, the title, the agent's current step while it works, its criteria, then
+ * the number, priority and date with who has it on the far side.
  */
-export const IssueRow = memo(function IssueRow({
-  issue: i,
-  divider,
-  live,
-}: {
-  issue: Issue;
-  divider: boolean;
-  live: boolean;
-}) {
+export const BoardCard = memo(function BoardCard({ issue: i, live }: { issue: Issue; live: boolean }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
+  const dir = useDirectory();
+  const surface = useSurface();
   const stepText = useStepText();
-  const step = issueState(i) === "running" ? stepText(currentStep(i.work)) : "";
+  const state = issueState(i);
+  const agent = i.assignee?.type === "agent" ? dir.agentById.get(i.assignee.id) : undefined;
+  const color = agentLook(agent).color;
+  const step = state === "running" ? stepText(currentStep(i.work)) : "";
   const late = isLate(i);
   const due = i.dueDate && i.status !== "done" && i.status !== "canceled";
   return (
@@ -177,68 +182,56 @@ export const IssueRow = memo(function IssueRow({
       onPress={() => router.push(`/issues/${i.number}`)}
       accessibilityRole="button"
       accessibilityLabel={t("issues.open", { number: i.number, title: i.title })}
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }]}
+      style={({ pressed }) => [styles.card, surface, pressed && styles.pressed]}
     >
-      {divider ? <View style={[styles.divider, { backgroundColor: c.line }]} /> : null}
-      <View style={styles.lead}>
-        <AssigneeFace issue={i} size={ROW_AVATAR} live={live} />
-      </View>
-      <View style={styles.text}>
-        <Text variant="body" numberOfLines={2} style={styles.title}>
-          {i.title}
-        </Text>
-        <View style={styles.meta}>
-          <Text variant="caption" tone="faint">
-            #{i.number}
+      <StateLine issue={i} />
+      <Text variant="callout" numberOfLines={3} style={styles.title}>
+        {i.title}
+      </Text>
+      {state === "running" ? (
+        <View style={styles.inline}>
+          <PixelOrbit color={color} size={12} />
+          <Text variant="small" tone="muted" numberOfLines={1} style={styles.step}>
+            {step || t("mobile.issues.state.running")}
           </Text>
-          <PriorityMark issue={i} />
-          {due ? (
-            <Text variant="caption" style={{ color: late ? c.warn : c.faint }}>
-              {t("mobile.issues.until", { date: dueLabel(t, i18n.language, i.dueDate as string) })}
-            </Text>
-          ) : null}
-          <CriteriaCount issue={i} />
-          <StateLine issue={i} />
         </View>
-        {step ? (
-          <Text variant="small" tone="muted" numberOfLines={1}>
-            {step}
+      ) : null}
+      <CriteriaTrack issue={i} color={color} going={state === "running"} />
+      <View style={styles.meta}>
+        <Text variant="caption" tone="faint">
+          #{i.number}
+        </Text>
+        <PriorityMark issue={i} />
+        {due ? (
+          <Text variant="caption" style={{ color: late ? c.warn : c.faint }}>
+            {t("mobile.issues.until", { date: dueLabel(t, i18n.language, i.dueDate as string) })}
           </Text>
         ) : null}
+        <View style={styles.step} />
+        <AssigneeFace issue={i} size={26} live={live} />
       </View>
     </Pressable>
   );
 });
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: ROW_GAP,
-    paddingVertical: 14,
-    paddingLeft: ROW_GUTTER,
-    paddingRight: ROW_GUTTER,
-  },
-  divider: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    left: ROW_GUTTER + ROW_AVATAR + ROW_GAP,
-    height: StyleSheet.hairlineWidth,
-  },
-  lead: { width: ROW_AVATAR, height: ROW_AVATAR, alignItems: "center", justifyContent: "center" },
-  text: { flex: 1, minWidth: 0, gap: 4, minHeight: ROW_AVATAR, justifyContent: "center" },
-  inline: { flexDirection: "row", alignItems: "center", gap: 4 },
+  card: { borderRadius: 16, paddingHorizontal: 13, paddingVertical: 12, gap: 8 },
+  pressed: { opacity: 0.85 },
+  inline: { flexDirection: "row", alignItems: "center", gap: 6 },
   bold: { fontWeight: "600" },
   title: { fontWeight: "600" },
-  meta: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 10, rowGap: 2 },
+  step: { flex: 1, minWidth: 0 },
+  meta: { flexDirection: "row", alignItems: "center", columnGap: 8 },
+  track: { flexDirection: "row", alignItems: "center", gap: 8 },
+  cells: { flex: 1, flexDirection: "row", gap: 3 },
+  cell: { flex: 1, height: 7 },
   column: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     paddingTop: 6,
-    paddingBottom: 4,
-    paddingHorizontal: 20,
+    paddingBottom: 2,
+    paddingHorizontal: 4,
   },
   columnName: { fontWeight: "600", flexShrink: 1 },
 });
