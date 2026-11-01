@@ -12,6 +12,7 @@ import {
   listChannels,
   listDms,
   listMembers,
+  listMessages,
   listNotifications,
   markAllNotificationsRead,
   markChannelRead,
@@ -424,7 +425,13 @@ test("a notice only its agent reads notifies nobody, counts for nobody and is no
   expect(general?.unreadCount).toBe(1);
   // Its author follows the thread: nothing in it is unread for her, and it has no reply.
   expect((await listChannels(f.db, f.owner.id, f.org.id)).find((c) => c.id === f.general.id)?.unreadCount).toBe(0);
-  expect((await getThread(f.db, f.owner.id, f.org.id, root.id)).replyCount).toBe(0);
+  const thread = await getThread(f.db, f.owner.id, f.org.id, root.id);
+  expect(thread.replyCount).toBe(0);
+  // Nor the thread's last line or a participant in it, here or in the channel's replies.
+  expect(thread.lastMessage).toBeNull();
+  expect(thread.participants.map((a) => a.id)).toEqual([f.owner.id]);
+  const [listed] = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { includeReplies: true });
+  expect(listed?.replies).toEqual({ count: 0, lastAt: null, latest: [] });
   // A DM with the agent: the same.
   const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
   await f.db.transaction((tx) =>

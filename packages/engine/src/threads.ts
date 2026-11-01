@@ -1098,7 +1098,12 @@ async function queryThreads(
 async function threadExtras(db: Database, orgId: string, rows: ThreadSqlRow[]) {
   const ids = rows.map((r) => r.id);
   if (ids.length === 0) return { authors: new Map<string, Actor[]>(), latest: new Map<string, Message>() };
-  const scope = and(eq(messages.orgId, orgId), inArray(messages.threadId, ids), isNull(messages.deletedAt));
+  const scope = and(
+    eq(messages.orgId, orgId),
+    inArray(messages.threadId, ids),
+    isNull(messages.deletedAt),
+    sql`not ${agentOnlyNoticeSql(sql`${messages.meta}`)}`,
+  );
   const [authorRows, latestRows] = await Promise.all([
     db
       .selectDistinct({
