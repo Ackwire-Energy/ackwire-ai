@@ -4180,7 +4180,7 @@ export const ptBR = {
       example: "Exemplo",
       exampleCopied: "Exemplo copiado.",
       test: "Testar",
-      tested: "Teste enviado. O agente recebe um exemplo e só conta o que faria, sem mudar nada.",
+      tested: "Teste enviado. O agente recebe um exemplo e conta o que faria com uma chamada de verdade.",
       calls: "Últimas chamadas",
       noCalls: "Nenhuma chamada ainda.",
       callTest: "Teste",

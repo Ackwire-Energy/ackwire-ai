@@ -844,7 +844,8 @@ export function routineRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/routines/{routineId}/hook/test",
       tags,
       security,
-      summary: "Testar: a sample call, as a real one would come (the agent knows it is a test, and its run only reads)",
+      summary:
+        "Testar: a sample call, as a real one would come (the agent knows it is a test and reports what it would do)",
       description:
         "Refused: `routine.webhook_paused` (409) while the routine is turned off, `routine.webhook_rate_limited` (429) past the routine's calls per minute.",
       request: { params: RoutineParams },

@@ -4138,7 +4138,7 @@ export const en: Translations = {
       example: "Example",
       exampleCopied: "Example copied.",
       test: "Test",
-      tested: "Test sent. The agent gets a sample and only says what it would do, changing nothing.",
+      tested: "Test sent. The agent gets a sample and says what it would do with a real call.",
       calls: "Latest calls",
       noCalls: "No calls yet.",
       callTest: "Test",

@@ -60,7 +60,6 @@ import {
   liveHookUrl,
   type RoutineHookConfig,
   routineHookKeys,
-  testOnlyEvent,
   WEBHOOK_EVENT,
 } from "./routine-hooks";
 import { afterRoutineRunEnded, endRoutineRun } from "./routine-ledger";
@@ -1349,10 +1348,10 @@ export async function updateRoutine(
     .where(and(eq(routines.id, current.id), eq(routines.orgId, orgId)))
     .returning();
   if (!row) throw new NotFoundError("Routine not found");
-  // What was approved ahead covered its next run at that time, for that agent, while it may act: a run moved or
-  // gone (paused: a one-off resumed never fires again), another agent or only looking needs a new approval.
+  // What was approved ahead covered its next run at that time, for that agent: a run moved or gone (paused: a
+  // one-off resumed never fires again) or another agent needs a new approval.
   const moved = current.nextRunAt?.getTime() !== row.nextRunAt?.getTime();
-  if (moved || row.agentId !== current.agentId || (row.access !== "act" && current.access === "act")) {
+  if (moved || row.agentId !== current.agentId) {
     await cancelRoutineAhead(deps, orgId, row.id, actorId);
   }
   if (mailTrigger || watched.has(current.id)) {
@@ -1835,7 +1834,7 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
     name: routine.name,
     creatorUserId: creator,
     deliverTo,
-    access: testOnlyEvent(run.event) ? "read" : routineAccessOf(routine.access),
+    access: routineAccessOf(routine.access),
     report: routineReportOf(routine.report),
     trigger: run.trigger,
     dueAt: run.at.toISOString(),
