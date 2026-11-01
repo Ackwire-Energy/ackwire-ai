@@ -23,7 +23,7 @@ import {
   setAgentAccess,
   withAccessLines,
 } from "../access";
-import { type Agent, getAgent, updateAgent } from "../agents";
+import { type Agent, getAgent, ROLE_MAX, updateAgent } from "../agents";
 import { audienceNotice, canTalkTo, talksToAgents } from "../audience";
 import { recordAudit } from "../audit";
 import { caches } from "../cache";
@@ -687,6 +687,8 @@ export async function proposeChange(
         .at(-1)
         ?.role.trim();
       if (role === agent.role) skipped.push(`${who}'s role is already "${role}".`);
+      else if (role && role.length > ROLE_MAX)
+        skipped.push(`A role is a short label of up to ${ROLE_MAX} characters (PM, Dev, Design): "${role}" is longer.`);
       else if (role)
         rows.push({
           ...base,

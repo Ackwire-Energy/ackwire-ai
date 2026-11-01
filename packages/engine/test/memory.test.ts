@@ -1256,13 +1256,13 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
       target: "agent_instructions",
       agentIds: [],
       change: "",
-      roles: [{ agentId: ada.id, role: "Revisora de código" }],
+      roles: [{ agentId: ada.id, role: "Code review" }],
     });
     expect(row).toMatchObject({
       target: "agent_role",
       agentId: ada.id,
       proposedByAgentId: f.agent.id,
-      proposedText: "Revisora de código",
+      proposedText: "Code review",
     });
     expect(permissionAsks()).toBe(1);
     // Her owner isn't an admin: on her page she can't change the role either.
@@ -1273,7 +1273,7 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
       decideProposal(f.db, f.owner.id, f.org.id, row?.id ?? "", "accept", { finalText: "Outra" }),
     ).rejects.toBeInstanceOf(ValidationError);
     await decideProposal(f.db, f.owner.id, f.org.id, row?.id ?? "", "accept");
-    expect((await agentRow(ada.id))?.role).toBe("Revisora de código");
+    expect((await agentRow(ada.id))?.role).toBe("Code review");
     expect(await auditOf(ada.id)).toEqual(
       expect.arrayContaining([
         ["agent.updated", f.owner.id],
@@ -1292,6 +1292,19 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
       decideProposal(f.db, f.owner.id, f.org.id, again.proposals[0]?.id ?? "", "accept"),
     ).rejects.toBeInstanceOf(ConflictError);
     expect((await agentRow(ada.id))?.role).toBe("Designer");
+  });
+
+  test("a new role is a short label: a longer one is left off the card, saying why", async () => {
+    f = await setup();
+    const ada = await teammate("ada");
+    const { proposals, skipped } = await proposeFor({
+      target: "agent_instructions",
+      agentIds: [],
+      change: "",
+      roles: [{ agentId: ada.id, role: "Assistente de e-mails" }],
+    });
+    expect(proposals).toEqual([]);
+    expect(skipped.join(" ")).toContain("up to 16 characters");
   });
 
   test("apps on or off: the owner only takes them away, as on the Access tab; applied as the person; never the proposer's own", async () => {
