@@ -1282,7 +1282,6 @@ export const featureKeysEn: FeatureTranslations = {
       failedNote: "Couldn't: {{note}}",
       expired: "Nobody opened it in time: {{title}}",
       cancelled: "Canceled: {{title}}",
-      computer: "Help from a laptop: {{title}}",
     },
     live: {
       inControl: "You're in control",

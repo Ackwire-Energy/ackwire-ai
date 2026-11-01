@@ -75,21 +75,28 @@ const KEYCAP: Record<LiveKey, string> = { Tab: "⇥", Enter: "↵", Backspace: "
  * the page's focused field (tap it on the page first). The lock hides it and makes it a password field,
  * so the phone offers the saved passwords; the keyboard button shows the special keys; send is round.
  */
-export function TypeBar({ onInput }: { onInput: (events: BrowserInputEvent[]) => void }) {
+export function TypeBar({
+  onText,
+  onKey,
+  autoFocus,
+}: {
+  onText: (text: string) => void;
+  onKey: (key: LiveKey) => void;
+  autoFocus?: boolean;
+}) {
   const { t } = useTranslation();
   const c = useColors();
   const [text, setText] = useState("");
   const [secret, setSecret] = useState(false);
   const [keys, setKeys] = useState(false);
   const send = () => {
-    const event = textEvent(text);
-    if (!event) return;
-    onInput([event]);
+    if (!text) return;
+    onText(text);
     setText("");
   };
   const key = (k: LiveKey) => {
     tapHaptic();
-    onInput(keyEvents(k));
+    onKey(k);
   };
   const tool = (on: boolean) => [styles.tool, { backgroundColor: on ? c.sunken : "transparent" }];
   return (
@@ -115,6 +122,7 @@ export function TypeBar({ onInput }: { onInput: (events: BrowserInputEvent[]) =>
         <TextInput
           value={text}
           onChangeText={setText}
+          autoFocus={autoFocus}
           placeholder={secret ? t("mobile.browser.live.typeMarkedSecret") : t("mobile.browser.live.typeMarked")}
           placeholderTextColor={c.faint}
           style={[styles.input, { color: c.ink }]}
@@ -160,6 +168,15 @@ export function TypeBar({ onInput }: { onInput: (events: BrowserInputEvent[]) =>
     </View>
   );
 }
+
+/** `TypeBar` on the agent's page: its text and keys as the page's input events. */
+export const browserTyping = (send: (events: BrowserInputEvent[]) => void) => ({
+  onText: (text: string) => {
+    const event = textEvent(text);
+    if (event) send([event]);
+  },
+  onKey: (key: LiveKey) => send(keyEvents(key)),
+});
 
 /**
  * The address of the agent's browser while a person is in control of its page full screen: the site

@@ -1,9 +1,9 @@
 # 0096. The agent's screen on the phone
 
-- Status: Proposed (nothing built; how a person controls the screen is still to be picked, and §2 needs a test on a real phone)
+- Status: Accepted (built: the server's page, the phone app; §2's session in a WebView still needs a test on a real phone)
 - Date: 2026-11-01
 - Amends: ADR 0058 §13 (a request on the agent's desktop is never taken from the phone), ADR 0065 (what the phone's computer view shows)
-- Code: none yet. It would touch `apps/mobile/src/features/computer/*`, `apps/mobile/src/features/browser/{logic.ts,HandoffCard.tsx}`, a new page in `apps/web/public`, `packages/client/src/browser/index.ts` (`takeover` with a screen)
+- Code: `apps/web/screen.html`, `apps/web/src/screen/*` (`ScreenSession`), `apps/mobile/src/features/computer/AgentScreen.tsx`, `screen-page.ts`, `screen-view.ts`, `pixel-cursor.ts`, `apps/mobile/src/features/browser/useFinishHandoff.tsx`, `packages/client/src/browser/index.ts` (`takeover` with a screen)
 
 ## Context
 
@@ -35,7 +35,7 @@ The desktop is 1280×900 (`DESKTOP_SIZE`). At a phone's 336 pt it is drawn at 0.
 
 ### 2. noVNC in a WebView, on a page of the server's
 
-The app shows `/screen.html`, a static page in `apps/web/public` next to `/human-check.html`, the precedent: a WebView on the server's own origin. It holds noVNC 1.7.0 and `DesktopLink`, and takes commands from the app (pointer, keys, paste, zoom) and sends its state back. The web's code is the only implementation of the protocol, a self-hosted server serves the page that matches it, and a fix to it needs no app release.
+The app shows `/screen.html`, a second entry of the web app's build, the precedent being `/human-check.html`: a WebView on the server's own origin. It holds noVNC 1.7.0 and `DesktopLink`, takes commands from the app (pointer, keys, text) and sends its state back. noVNC only draws, at the desktop's own size: the WebView is as large as the desktop, in points, and the UI thread moves and scales it, so pinching and following the cursor never cross the bridge. The pointer goes straight onto the session's channel as an RFB message, since noVNC reads one only from a mouse over its canvas. The web's code is the only implementation of the protocol, a self-hosted server serves the page that matches it, and a fix to it needs no app release.
 
 The page's origin is `PUBLIC_URL`, which `allowedOrigins` already accepts, so its socket opens directly, with no bridge through React Native. What it lacks is the session: the app sets its cookie in a WebView with no persistent storage (`incognito`), which only ever loads this page and leaves with it. The cookie is readable by the page there, unlike the browser's `HttpOnly` one, which is why nothing else may load in that WebView.
 
@@ -46,19 +46,17 @@ Rejected:
 - **An RFB client in React Native, drawn with Skia.** No WebView, and gestures and drawing in one place. But it is a second implementation of the protocol, and Tight's zlib streams in the app's JavaScript engine, which has no JIT, are the risky part. If the WebView is too slow, this is the next thing to measure.
 - **A picture stream from the runner, as the browser has.** It would need a new protocol version and capture on the computer, for what RFB already does with its own flow control.
 
-### 3. How a person controls it (to be picked)
+### 3. A trackpad under the screen
 
-Three candidates, the same in everything else here:
+Swipe moves a cursor, tap clicks, hold drags, two fingers scroll, and the view follows the cursor near its edges. A slow swipe aims and a fast one travels (`cursorGain`). Touch on the screen itself (tap to click, as the browser card) and a landscape view were tried against it; the trackpad was picked as the friendlier of the three, and it never covers what it points at.
 
-- **A. A trackpad under the screen.** Swipe to move a cursor, tap to click, hold to drag; the view follows the cursor. The finest aim, but it is a laptop's idea: someone who never used one has to learn it.
-- **B. Touch on the screen itself.** Tap where to click, drag to move the view, pinch to zoom, hold to aim with a loupe. The same gesture as the browser card, with nothing to learn. Less precise until zoomed.
-- **C. Lying down.** The whole screen with light controls over it, touching it directly. It can be what rotating the phone does in A or B, rather than an alternative to them.
+On the screen, pinch zooms and a drag moves the view, and a tap brings the cursor there without clicking. The view starts by filling its space in control, and shows the whole desktop while watching.
 
-In every case the view starts by filling its space, with no empty bands around the picture. Pinch and pan are the app's, so nothing in the WebView competes for gestures, and the app draws the cursor over the screen, since a remote pointer doesn't show under a finger.
+The app draws the cursor over the screen, since a remote pointer doesn't show under a finger, or at all where a desktop draws none. It is ours rather than a circle or the system's: a pixel arrow in the brand's dither, with a light rim and a soft shadow so it reads on any window, whose tip is where a click lands. It shrinks a little on a click and grows while dragging.
 
 ### 4. Typing
 
-The app's `TypeBar`, not key by key: a whole text goes to the field in focus, the same words and password mode as the browser, so the system's autofill and passwords work and a password never lands in the conversation. A key row has Esc, Tab, Enter, Delete and Paste. Text goes as on the web (ADR 0058 §16): typed as characters where noVNC can, pasted otherwise.
+The app's `TypeBar`, not key by key: a whole text goes to the field in focus, the same words and password mode as the browser, so the system's autofill and passwords work and a password never lands in the conversation. A key row has Esc, Tab, Enter and Delete, and the field takes the phone's own paste. Text goes as on the web (ADR 0058 §16): typed as characters where noVNC can, pasted otherwise.
 
 ### 5. Watching
 
@@ -81,14 +79,9 @@ To answer on a real phone before building past the test:
 - Data per minute watching and in control: a person on a phone pays for it.
 - Memory and heat over ten minutes in control.
 
-Later, if it's wanted: a request that says where on the screen it is, so the view opens on it. The handoff doesn't carry that today, though the agent's screen layer knows its windows and regions (ADR 0062).
+- A phone that reaches a self-hosted server by another address than `PUBLIC_URL`: the page's Origin is refused. It reads as a screen that doesn't open (30 s, then "Tentar de novo"), and the fallback in §2 is what would fix it.
 
-## Order
-
-1. The page and the WebView, watching only, on a real phone with a connected Linux computer. This answers §2's questions.
-2. The view's stages and entries (§1), watching (§5).
-3. Control, as picked in §3; typing (§4); leaving (§6).
-4. Take the laptop words out, in both languages. Tests for the stages, the gesture math and the request card. Check on real phones.
+Later, if it's wanted: a request that says where on the screen it is, so the view opens on it (the handoff doesn't carry that today, though the agent's screen layer knows its windows and regions, ADR 0062); the computer's clipboard on the phone; right click.
 
 ## Consequences
 
