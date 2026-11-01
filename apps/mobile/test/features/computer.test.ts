@@ -29,7 +29,7 @@ import {
 } from "../../src/features/computer/logic";
 import { featureKeysEn } from "../../src/features/i18n/keys.en";
 import { featureKeysPtBR } from "../../src/features/i18n/keys.pt-BR";
-import { missionComputerKey } from "../../src/features/missions/logic";
+import { missionComputerKey, missionComputerText } from "../../src/features/missions/logic";
 import { translator } from "./fixtures";
 
 /** The phone's own words a Cloud workspace shows where its computer is named. */
@@ -43,6 +43,7 @@ const CLOUD_KEYS = [
   "outage.cloudSub",
   "mission.computerOn",
   "mission.computerNotAnswering",
+  "mission.computerNotAnsweringPlain",
 ] as const;
 
 const at = (strings: object, path: string) =>
@@ -73,6 +74,20 @@ describe("the agent's computer on the phone: its words by edition", () => {
     );
     const en = await translator("en");
     expect(en(missionComputerKey(false, true), { name: "Acme's computer" })).toBe("Acme's computer · not answering");
+  });
+
+  test("a mission's computer by name only where the workspace has more than one; else only when it isn't working", async () => {
+    const t = await translator("pt-BR");
+    const acme = { name: "Computador da Acme", online: true };
+    const mac = { name: "MacBook do Walter", online: false };
+    expect(missionComputerText(t, mac, { cloud: false, names: true })).toBe("MacBook do Walter · desligado");
+    expect(missionComputerText(t, acme, { cloud: true, names: false })).toBeNull();
+    expect(missionComputerText(t, { ...acme, online: false }, { cloud: true, names: false })).toBe(
+      "Computador sem resposta",
+    );
+    expect(missionComputerText(t, mac, { cloud: false, names: false })).toBe("Computador desligado");
+    const en = await translator("en");
+    expect(missionComputerText(en, mac, { cloud: false, names: false })).toBe("Computer off");
   });
 
   test("a closed browser keeps its sign-ins and promises no reopening", async () => {

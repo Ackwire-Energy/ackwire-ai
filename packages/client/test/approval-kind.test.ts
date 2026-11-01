@@ -3,7 +3,13 @@ import type { TFunction } from "i18next";
 import { ApiError, type ApprovalEmail } from "../src/index";
 import { emailTitleWords } from "../src/lib/approval-kind";
 import { approvalOriginShort } from "../src/lib/approval-origin";
-import { actionName, approvalRuleWords, approvalValues, approveAlwaysWords } from "../src/lib/approval-words";
+import {
+  actionName,
+  approvalRuleWords,
+  approvalSummary,
+  approvalValues,
+  approveAlwaysWords,
+} from "../src/lib/approval-words";
 import { knownErrorText } from "../src/lib/errors";
 
 const email = (over: Partial<ApprovalEmail> = {}): ApprovalEmail => ({
@@ -84,6 +90,38 @@ describe("Aprovar sempre in words", () => {
 });
 
 describe("an approval's values", () => {
+  test("its summary tells two requests for one tool apart: labeled values, numbers in the locale's format", () => {
+    const goal = (month: string) => ({
+      params: { role: "seller", month, revenue_goal: 97000.5, year: 2026 },
+      connector: "panel",
+      email: null,
+    });
+    expect(approvalSummary(goal("2026-10"), "pt-BR")).toBe(
+      "Role: seller · Month: 2026-10 · Revenue goal: 97.000,5 · Year: 2026",
+    );
+    expect(approvalSummary(goal("2026-11"), "en")).toBe(
+      "Role: seller · Month: 2026-11 · Revenue goal: 97,000.5 · Year: 2026",
+    );
+    expect(approvalSummary({ params: { a: 1, b: 2, c: 3, d: 4, e: 5 }, connector: "x" }, "en")).toBe(
+      "A: 1 · B: 2 · C: 3 · D: 4",
+    );
+  });
+
+  test("on an engine whose Intl takes useGrouping as a boolean (Hermes), a year still reads as is", () => {
+    const Real = Intl.NumberFormat;
+    function hermes(locale?: string | string[], options?: Intl.NumberFormatOptions) {
+      return new Real(locale, options && { ...options, useGrouping: Boolean(options.useGrouping ?? true) });
+    }
+    Intl.NumberFormat = hermes as unknown as typeof Intl.NumberFormat;
+    try {
+      expect(approvalSummary({ params: { year: 2026, revenue: 97000 }, connector: "x" }, "pt-BR")).toBe(
+        "Year: 2026 · Revenue: 97.000",
+      );
+    } finally {
+      Intl.NumberFormat = Real;
+    }
+  });
+
   test("a list of names is one value: whole in the details, cut on a card, never left out", () => {
     const branches = ["feat/login-google", "fix/old-header", "chore/bump-deps", "spike/x", "feat/y", "old-1", "old-2"];
     const a = { params: { repo: "acme/app", branches }, connector: "github", email: null };

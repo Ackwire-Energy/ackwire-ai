@@ -1,15 +1,11 @@
 import type { BrowserFrameMetadata, BrowserInputEvent, BrowserModifiers } from "./live";
 
 /**
- * A person's input on the live view (ADR 0040 §7): where a click or tap on
- * the shown frame lands on the page, and the key and text events to send.
+ * A person's input on the live view (ADR 0040 §7, §14): where a click, a drag
+ * or a finger on the shown frame lands on the page, and the key and text
+ * events to send.
  */
 
-/**
- * A point on the shown frame (relative to the element showing it, any size)
- * → page coordinates (CSS pixels of the viewport the frame was taken at).
- * Null when the point is outside the frame or the frame has no size.
- */
 /** A JPEG's pixel size from its base64 data (the start of the file is enough), or null. */
 export function jpegSize(base64: string): { width: number; height: number } | null {
   let bytes: Uint8Array;
@@ -53,16 +49,25 @@ export function frameMetadata(frame: { data: string; metadata: BrowserFrameMetad
   };
 }
 
+/**
+ * A point on the shown frame (relative to the element showing it, any size)
+ * → page coordinates (CSS pixels of the viewport the frame was taken at).
+ * Null when the point is outside the frame or the frame has no size; with
+ * `clamp`, a point outside lands on the frame's nearest edge (a drag that left it).
+ */
 export function framePoint(
   point: { x: number; y: number },
   shown: { width: number; height: number },
   meta: Pick<BrowserFrameMetadata, "deviceWidth" | "deviceHeight">,
+  clamp = false,
 ): { x: number; y: number } | null {
   if (shown.width <= 0 || shown.height <= 0 || meta.deviceWidth <= 0 || meta.deviceHeight <= 0) return null;
-  if (point.x < 0 || point.y < 0 || point.x > shown.width || point.y > shown.height) return null;
+  const x = clamp ? Math.min(Math.max(point.x, 0), shown.width) : point.x;
+  const y = clamp ? Math.min(Math.max(point.y, 0), shown.height) : point.y;
+  if (x < 0 || y < 0 || x > shown.width || y > shown.height) return null;
   return {
-    x: Math.round((point.x / shown.width) * meta.deviceWidth),
-    y: Math.round((point.y / shown.height) * meta.deviceHeight),
+    x: Math.round((x / shown.width) * meta.deviceWidth),
+    y: Math.round((y / shown.height) * meta.deviceHeight),
   };
 }
 
@@ -86,45 +91,145 @@ export function fitFrame(
 /**
  * Where a point on an element showing the frame lands on the page. `box` is the element's
  * client rect; with `contain` the frame is drawn letterboxed inside it (object-fit: contain),
- * so the bands around the image are outside the page (null).
+ * so the bands around the image are outside the page (null, or its edge with `clamp`).
  */
 export function pagePoint(
   client: { x: number; y: number },
   box: { left: number; top: number; width: number; height: number },
   meta: Pick<BrowserFrameMetadata, "deviceWidth" | "deviceHeight">,
   fit: "fill" | "contain" = "contain",
+  clamp = false,
 ): { x: number; y: number } | null {
   const drawn = fit === "contain" ? fitFrame(box, meta) : { width: box.width, height: box.height, left: 0, top: 0 };
   return framePoint(
     { x: client.x - box.left - drawn.left, y: client.y - box.top - drawn.top },
     { width: drawn.width, height: drawn.height },
     meta,
+    clamp,
   );
 }
 
+type Point = { x: number; y: number };
+
 /**
- * A click at a page point: the pointer moves there first, then presses and releases, as a
- * real mouse does, so pages that react to the pointer arriving take the click too.
+ * The left button going down at a page point: the pointer moves there first, as a real mouse
+ * does, so pages that react to the pointer arriving take it too. It stays down until `releaseEvent`.
  */
-export function clickEvents(at: { x: number; y: number }, modifiers?: BrowserModifiers): BrowserInputEvent[] {
-  const base = { kind: "mouse" as const, x: at.x, y: at.y, button: "left" as const, clickCount: 1 };
+export function pressEvents(at: Point, modifiers?: BrowserModifiers): BrowserInputEvent[] {
   const mods = modifiers ? { modifiers } : {};
   return [
     { kind: "mouse", type: "mouseMoved", x: at.x, y: at.y, button: "none", ...mods },
-    { ...base, type: "mousePressed", ...mods },
-    { ...base, type: "mouseReleased", ...mods },
+    { kind: "mouse", type: "mousePressed", x: at.x, y: at.y, button: "left", clickCount: 1, ...mods },
   ];
 }
 
-/** A tap from the phone (touch start and end). */
-export function tapEvents(at: { x: number; y: number }): BrowserInputEvent[] {
-  return [
-    { kind: "touch", type: "touchStart", touchPoints: [{ x: at.x, y: at.y }] },
-    { kind: "touch", type: "touchEnd", touchPoints: [] },
-  ];
+/** The pointer moving with the left button down: a drag, which a slider or a map follows. */
+export function dragEvent(at: Point, modifiers?: BrowserModifiers): BrowserInputEvent {
+  return { kind: "mouse", type: "mouseMoved", x: at.x, y: at.y, button: "left", ...(modifiers ? { modifiers } : {}) };
 }
 
-/** Scrolling over the page (the wheel, or a drag on the phone). */
+/** The left button let go at a page point. */
+export function releaseEvent(at: Point, modifiers?: BrowserModifiers): BrowserInputEvent {
+  const mods = modifiers ? { modifiers } : {};
+  return { kind: "mouse", type: "mouseReleased", x: at.x, y: at.y, button: "left", clickCount: 1, ...mods };
+}
+
+/** A click at a page point: pressed and let go there. */
+export function clickEvents(at: Point, modifiers?: BrowserModifiers): BrowserInputEvent[] {
+  return [...pressEvents(at, modifiers), releaseEvent(at, modifiers)];
+}
+
+/** A finger that moves this far (pixels of the shown frame) before it lifts drags; one that doesn't taps. */
+const TOUCH_DRAG_SLOP = 8;
+
+/** What the fingers on the frame are doing: `over` waits for the rest of them to lift. */
+export type TouchMode = "idle" | "pending" | "drag" | "scroll" | "over";
+
+/**
+ * Fingers on the shown frame, while the person is in control, as the page's mouse takes them: a
+ * tap clicks where the finger landed; a finger that moves drags from there (pressed where it
+ * landed, let go where it lifts); two fingers scroll the page. Points are on the shown frame;
+ * `toPage` maps one to the page (null outside it, its nearest edge with `clamp`). A first finger
+ * outside the page starts nothing.
+ */
+export function createTouchInput(toPage: (p: Point, clamp: boolean) => Point | null) {
+  const fingers = new Map<number, Point>();
+  let mode: TouchMode = "idle";
+  let lead = -1;
+  let landed: Point = { x: 0, y: 0 };
+  let pressed: Point | null = null;
+  let last: Point | null = null;
+  const same = (a: Point, b: Point) => a.x === b.x && a.y === b.y;
+  const middle = () => {
+    let x = 0;
+    let y = 0;
+    for (const p of fingers.values()) {
+      x += p.x;
+      y += p.y;
+    }
+    return { x: x / fingers.size, y: y / fingers.size };
+  };
+  return {
+    get mode() {
+      return mode;
+    },
+    down(id: number, p: Point): BrowserInputEvent[] {
+      fingers.set(id, p);
+      if (mode === "idle") {
+        pressed = toPage(p, false);
+        mode = pressed ? "pending" : "over";
+        lead = id;
+        landed = p;
+      } else if (mode === "pending") mode = "scroll";
+      return [];
+    },
+    move(id: number, p: Point): BrowserInputEvent[] {
+      if (!fingers.has(id)) return [];
+      const before = middle();
+      fingers.set(id, p);
+      if (mode === "scroll") {
+        const from = toPage(before, true);
+        const to = toPage(middle(), true);
+        // The page follows the fingers: moving them up scrolls down.
+        return from && to && !same(from, to) ? [wheelEvent(to, from.x - to.x, from.y - to.y)] : [];
+      }
+      if (id !== lead || !pressed) return [];
+      if (mode === "pending" && Math.hypot(p.x - landed.x, p.y - landed.y) <= TOUCH_DRAG_SLOP) return [];
+      if (mode !== "pending" && mode !== "drag") return [];
+      const at = toPage(p, true);
+      if (!at || (last && same(at, last))) return [];
+      const start = mode === "pending" ? pressEvents(pressed) : [];
+      mode = "drag";
+      last = at;
+      return [...start, dragEvent(at)];
+    },
+    up(id: number, p: Point): BrowserInputEvent[] {
+      if (!fingers.delete(id)) return [];
+      let out: BrowserInputEvent[] = [];
+      if (id === lead && mode === "pending" && pressed) out = clickEvents(pressed);
+      else if (id === lead && mode === "drag" && last) {
+        const at = toPage(p, true) ?? last;
+        out = same(at, last) ? [releaseEvent(at)] : [dragEvent(at), releaseEvent(at)];
+      }
+      if (id === lead || mode === "scroll") mode = "over";
+      if (fingers.size === 0) {
+        mode = "idle";
+        last = null;
+      }
+      return out;
+    },
+    /** The touch was taken away (the system's gesture, the view going): a drag is let go where it was. */
+    cancel(): BrowserInputEvent[] {
+      const out = mode === "drag" && last ? [releaseEvent(last)] : [];
+      fingers.clear();
+      mode = "idle";
+      last = null;
+      return out;
+    },
+  };
+}
+
+/** Scrolling over the page (the wheel, or two fingers). */
 export function wheelEvent(at: { x: number; y: number }, deltaX: number, deltaY: number): BrowserInputEvent {
   return { kind: "mouse", type: "mouseWheel", x: at.x, y: at.y, deltaX, deltaY };
 }

@@ -1,5 +1,5 @@
 /*
- * The camera over the agent's screen and the cursor on it (ADR 0096): in the desktop's own pixels, with `s` the scale
+ * The camera over the agent's screen and the cursor on it (ADR 0098): in the desktop's own pixels, with `s` the scale
  * from those to points on the phone. Worklets, run on the UI thread by the gestures, and plain functions in the tests.
  */
 

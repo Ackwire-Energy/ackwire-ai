@@ -8,7 +8,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { Button, Chip, Icon, PixelOrbit, Text } from "@/ui";
 import { routineHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
-import { useColors, useDirectory } from "../shared/hooks";
+import { useColors, useDirectory, useNamesComputers } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import {
   useNextText,
@@ -38,8 +38,9 @@ export function StateChip({ routine: r }: { routine: Routine }) {
   const { t, i18n } = useTranslation();
   const say = useSay();
   const dir = useDirectory();
+  const names = useNamesComputers();
   const since = r.waitingFor ? whenAt(t, i18n.language, r.waitingFor.since) : "";
-  const state = routineStateWords(r, since);
+  const state = routineStateWords(r, since, names);
   if (r.state === "running")
     return (
       <Chip

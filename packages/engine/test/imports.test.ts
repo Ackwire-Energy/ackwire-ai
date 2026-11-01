@@ -307,6 +307,26 @@ describe("planning and applying an import", () => {
     expect(closer?.name).toHaveLength(80);
   });
 
+  test("a 40-character role comes whole, nothing reported as cut; past 200 it is cut and reported", async () => {
+    f = await setup();
+    const b = bundle();
+    (b.agents[0] as MigrationBundle["agents"][number]).role = "Assistente de e-mails, agenda e reuniões";
+    (b.agents[1] as MigrationBundle["agents"][number]).role = "r".repeat(201);
+    const plan = await run({ bundle: b, pick: ["agent:scout", "agent:closer"] });
+    expect(plan.items.map((i) => [i.key, i.action, i.trimmed])).toEqual([
+      ["scout", "create", undefined],
+      ["closer", "create", ["role"]],
+    ]);
+    const made = await f.db
+      .select()
+      .from(schema.agents)
+      .where(inArray(schema.agents.handle, ["scout", "closer"]));
+    expect(Object.fromEntries(made.map((a) => [a.handle, a.role]))).toEqual({
+      scout: "Assistente de e-mails, agenda e reuniões",
+      closer: "r".repeat(200),
+    });
+  });
+
   test("schedules: a one-off and the picker's once land as one-time rules (paused, still fire once on); the past and nonsense are skipped", async () => {
     f = await setup();
     const soon = new Date(Date.now() + 3 * 86_400_000);

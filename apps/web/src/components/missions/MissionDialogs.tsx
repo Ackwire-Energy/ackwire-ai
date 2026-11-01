@@ -43,7 +43,7 @@ import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { MachineIcon } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { ThisMacButton } from "@/components/ThisMac";
-import { useComputerEdition } from "@/components/WorkspaceComputer";
+import { useComputerEdition, useNamesComputers } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { CommandApprovalSelect, executorOptions } from "./MissionBits";
@@ -51,7 +51,7 @@ import "./missions.css";
 
 /**
  * The mission dialogs: "Nova missão" (objective, agent, where
- * it lives, the computer it runs on), closing it (Concluída / Cancelada,
+ * it lives, the computer it runs on where the workspace has more than one), closing it (Concluída / Cancelada,
  * "Salvar decisões e lições na wiki"), and "Compartilhar" (who can decide or
  * comment, handing it over; the computer never moves by itself).
  */
@@ -79,6 +79,8 @@ export function NewMissionDialog({
   // On the Cloud every agent works on the workspace's own computer: missions wait for it, nobody connects one.
   const cloud = useComputerEdition(org.id) === "cloud";
   const waitWords = t("missions.waitingCloud", { computer: t("computerSetup.title", { org: org.name }) });
+  // Its computer by name only where there are two to tell apart; else only one that is offline says so.
+  const names = useNamesComputers(org.id);
   const api = useApi();
   const dir = useDirectory(org.id);
   const toast = useToast();
@@ -206,7 +208,7 @@ export function NewMissionDialog({
             )}
           </div>
         ) : (
-          <div className="mi-grid2">
+          <div className={names ? "mi-grid2" : undefined}>
             <div className="mi-field">
               <span className="mi-field__label">{t("missions.new.agent")}</span>
               <Select
@@ -220,10 +222,14 @@ export function NewMissionDialog({
                   disabled: !a.eligible,
                   description:
                     a.eligible && a.machine
-                      ? t("missions.new.agentOn", {
-                          computer: a.machine.name,
-                          state: a.machine.online ? t("missions.online") : t("missions.offline"),
-                        })
+                      ? names
+                        ? t("missions.new.agentOn", {
+                            computer: a.machine.name,
+                            state: a.machine.online ? t("missions.online") : t("missions.offline"),
+                          })
+                        : a.machine.online
+                          ? undefined
+                          : t("missions.computerOffline")
                       : cloud && (a.reason ?? "no_computer") === "no_computer"
                         ? waitWords
                         : t(`missions.new.reason.${a.reason ?? "no_computer"}`, { computer: a.machine?.name ?? "" }),
@@ -231,14 +237,16 @@ export function NewMissionDialog({
                 }))}
               />
             </div>
-            <div className="mi-field">
-              <span className="mi-field__label">{t("missions.new.computer")}</span>
-              <span className="mi-pill mi-pill--field">
-                <MachineIcon machineId={machine?.id} />
-                {machine ? machine.name : eligible.isPending ? "…" : t("missions.new.noMachine")}
-                {machine && <small>{machine.online ? t("missions.online") : t("missions.offline")}</small>}
-              </span>
-            </div>
+            {names && (
+              <div className="mi-field">
+                <span className="mi-field__label">{t("missions.new.computer")}</span>
+                <span className="mi-pill mi-pill--field">
+                  <MachineIcon machineId={machine?.id} />
+                  {machine ? machine.name : eligible.isPending ? "…" : t("missions.new.noMachine")}
+                  {machine && <small>{machine.online ? t("missions.online") : t("missions.offline")}</small>}
+                </span>
+              </div>
+            )}
           </div>
         )}
         {!none && blocked.some((a) => a.canManage) && (
@@ -379,6 +387,7 @@ export function CloseMissionDialog({
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const names = useNamesComputers(org.id);
   const dir = useDirectory(org.id);
   const toast = useToast();
   const close = useCloseMission(org.id);
@@ -478,10 +487,9 @@ export function CloseMissionDialog({
           <div className="mi-notes ac-iconline">
             <Icon name="stop" size={14} />
             <span>
-              {t("missions.close.running", {
-                count: mission.runningTasks,
-                computer: mission.machine?.name ?? "",
-              })}
+              {names
+                ? t("missions.close.running", { count: mission.runningTasks, computer: mission.machine?.name ?? "" })
+                : t("missions.close.runningNoComputer", { count: mission.runningTasks })}
             </span>
           </div>
         )}

@@ -37,6 +37,7 @@ export const keys = {
   aiStatus: (orgId: string) => ["org", orgId, "credentials", "ai-status"] as const,
   usage: (orgId: string) => ["org", orgId, "usage"] as const,
   channels: (orgId: string) => ["org", orgId, "channels"] as const,
+  channelCard: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "card"] as const,
   channelCategories: (orgId: string) => ["org", orgId, "channel-categories"] as const,
   channelMembers: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "members"] as const,
   messages: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "messages"] as const,
@@ -86,6 +87,8 @@ export const keys = {
   agentPlanUsage: (orgId: string, agentId: string) => ["org", orgId, "plan-usage", "agent", agentId] as const,
   platformKey: (orgId: string) => ["org", orgId, "platform-key"] as const,
   roster: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "roster"] as const,
+  /** All the agents' memories, for the workspace's map. */
+  orgMemories: (orgId: string) => ["org", orgId, "memories"] as const,
   memory: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "memory"] as const,
   /** Under `memory`: invalidating an agent's memories also refreshes "O que sabe sobre você". */
   memoryAboutMe: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "memory", "me"] as const,
@@ -164,6 +167,7 @@ export const keys = {
   notificationList: (orgId: string, filter: string) => ["org", orgId, "notifications", "list", filter] as const,
   notificationCount: (orgId: string) => ["org", orgId, "notifications", "count"] as const,
   noticePrefs: (orgId: string) => ["org", orgId, "notice-prefs"] as const,
+  sidebarItems: (orgId: string) => ["org", orgId, "sidebar-items"] as const,
   forum: (orgId: string) => ["org", orgId, "forum"] as const,
   forumTopic: (orgId: string, topicId: string) => ["org", orgId, "forum", topicId] as const,
   wiki: (orgId: string) => ["org", orgId, "wiki"] as const,

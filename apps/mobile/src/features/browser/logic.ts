@@ -1,9 +1,11 @@
 import {
   type AgentAccess,
   BROWSER_TOOL_SCOPE,
+  type BrowserFrameMetadata,
   type BrowserHandoff,
   type BrowserLiveUnavailable,
   type BrowserStep,
+  pagePoint,
   type ScreenKind,
 } from "@agenteschat/client";
 import type { TFunction } from "i18next";
@@ -16,7 +18,7 @@ import type { TFunction } from "i18next";
 
 /**
  * What the card shows: waiting for someone, me in control, someone else helping, or how it ended. On the agent's
- * desktop the same states open its computer's view (ADR 0096).
+ * desktop the same states open its computer's view (ADR 0098).
  */
 export type CardState = "waiting" | "mine" | "helping" | "done" | "failed" | "expired" | "cancelled";
 
@@ -66,6 +68,17 @@ export function siteLetter(host: string): string {
   const name = host.replace(/^www\./, "");
   return name ? name.charAt(0).toUpperCase() : "";
 }
+
+/**
+ * Where a finger on the page's box lands on the page (`createTouchInput`'s `toPage`): the picture is
+ * drawn "contain", so the letterbox around it is off the page, or its nearest edge with `clamp`.
+ */
+export const touchOnPage = (
+  p: { x: number; y: number },
+  box: { width: number; height: number },
+  meta: Pick<BrowserFrameMetadata, "deviceWidth" | "deviceHeight">,
+  clamp: boolean,
+) => pagePoint(p, { left: 0, top: 0, ...box }, meta, "contain", clamp);
 
 /** The live view's key row: Tab, Enter, Apagar, Esc. */
 export const LIVE_KEYS = ["Tab", "Enter", "Backspace", "Escape"] as const;

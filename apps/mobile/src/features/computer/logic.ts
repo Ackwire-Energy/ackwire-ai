@@ -19,7 +19,7 @@ export type PhoneStage =
   | "held"
   /** The workspace's computer on its way: the wait. */
   | "preparing"
-  /** The agent's screen, live: watch, take control (ADR 0096). */
+  /** The agent's screen, live: watch, take control (ADR 0098). */
   | "screen"
   /** The agent's page, live, where its computer serves no screen, or for a person helping in its browser. */
   | "page"

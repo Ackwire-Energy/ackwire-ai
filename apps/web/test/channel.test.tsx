@@ -152,6 +152,158 @@ describe("Canal", () => {
     expect(screen().getByRole("alert").textContent).toContain("Atlas não conseguiu responder: budget_exceeded");
   });
 
+  test("a connector's request says its values in words, waiting and decided, so two calls of one tool differ", async () => {
+    const state = seedState();
+    const [first] = state.approvals;
+    if (!first) throw new Error("no approval");
+    Object.assign(first, {
+      tool: "goal_upsert",
+      title: "Painel: Goal upsert",
+      detail: "panel.goal_upsert · role=seller · month=2026-10 · revenue_goal=97000",
+      connector: "panel",
+      params: { role: "seller", month: "2026-10", revenue_goal: 97000 },
+    });
+    await open(state);
+    const card = screen().getByRole("group", { name: "Pedido de aprovação" });
+    expect(card.textContent).toContain("Role: seller · Month: 2026-10 · Revenue goal: 97.000");
+    // The raw call stays under "Ver detalhes" only.
+    expect(card.textContent).not.toContain("role=seller");
+    const approve = within(card)
+      .getAllByRole("button")
+      .find((b) => /^Aprovar/.test(b.textContent ?? "") && !/sempre/.test(b.textContent ?? ""));
+    if (!approve) throw new Error("no approve button");
+    await act(async () => fireEvent.click(approve));
+    await settle(4);
+    const done = screen().getByRole("group", { name: "Aprovação concluída" });
+    expect(done.textContent).toContain("Aprovado por você");
+    expect(done.textContent).toContain("Month: 2026-10");
+  });
+
+  test("several requests on one card: each item, 'Aprovar tudo' for exactly those listed, a new one joining live", async () => {
+    const state = seedState();
+    const [merge] = state.approvals;
+    if (!merge) throw new Error("no approval");
+    const goal = (id: string, month: string, minutes: number) => ({
+      ...merge,
+      id,
+      tool: "goal_upsert",
+      title: "Painel: Goal upsert",
+      detail: `panel.goal_upsert · month=${month}`,
+      connector: "panel",
+      params: { month },
+      createdAt: new Date(Date.now() - minutes * 60_000).toISOString(),
+    });
+    state.approvals.splice(0, 1, goal("ap-g1", "2026-11", 4), goal("ap-g2", "2026-12", 3), goal("ap-g3", "2027-01", 2));
+    const cardMessage = state.messages.find((m) => m.id === "msg-card");
+    if (cardMessage) cardMessage.meta = { ...cardMessage.meta, approvalId: "ap-g1" };
+    const { socket } = await open(state);
+    const card = screen().getByRole("group", { name: "Pedido de aprovação" });
+    expect(screen().getAllByRole("group", { name: "Pedido de aprovação" })).toHaveLength(1);
+    expect(card.querySelectorAll(".rq__item")).toHaveLength(3);
+    expect(card.textContent).toContain("Month: 2026-12");
+    // A fourth joins the open card over realtime, not a card of its own.
+    const fourth = { ...goal("ap-g4", "2027-02", 0), canDecide: false };
+    state.approvals.push(fourth);
+    await act(async () =>
+      socket.push({
+        type: "event",
+        channelId: ENG_ID,
+        event: { type: "approval.created", channelId: ENG_ID, approval: fourth },
+      }),
+    );
+    await settle();
+    expect(card.querySelectorAll(".rq__item")).toHaveLength(4);
+    expect(card.textContent).toContain("Month: 2027-02");
+    // Ana may decide three of the four (only an admin decides the new one): it says so.
+    expect(card.textContent).toContain("Você pode decidir 3 de 4");
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Aprovar tudo" })));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "approvals.decideMany")?.args).toEqual([
+      ORG_ID,
+      ["ap-g1", "ap-g2", "ap-g3"],
+      "approve",
+    ]);
+    // Decided ones fold into the card with how they ended; the one still waiting keeps it open.
+    const after = screen().getByRole("group", { name: "Pedido de aprovação" });
+    expect(after.querySelectorAll(".rq__item--done")).toHaveLength(3);
+    expect(after.textContent).toContain("Aprovado por você");
+  });
+
+  test("a shared card: a joined request keeps its own why, and 'Aprovar sempre' is offered once per kind", async () => {
+    const state = seedState();
+    const [merge] = state.approvals;
+    if (!merge) throw new Error("no approval");
+    const goal = (id: string, month: string, why: string, minutes: number) => ({
+      ...merge,
+      id,
+      tool: "goal_upsert",
+      scope: "",
+      title: "Painel: Goal upsert",
+      detail: `panel.goal_upsert · month=${month}`,
+      connector: "panel",
+      params: { month },
+      why,
+      approveAlways: { tool: "goal_upsert", actions: [] },
+      createdAt: new Date(Date.now() - minutes * 60_000).toISOString(),
+    });
+    state.approvals.splice(
+      0,
+      1,
+      goal("ap-g1", "2026-11", "Pedido do time de vendas.", 4),
+      goal("ap-g2", "2026-12", "Pedido do time de vendas.", 3),
+      goal("ap-g3", "2027-01", "Branch velha, já mergeada.", 2),
+    );
+    const cardMessage = state.messages.find((m) => m.id === "msg-card");
+    if (cardMessage) cardMessage.meta = { ...cardMessage.meta, approvalId: "ap-g1" };
+    await open(state);
+    const card = screen().getByRole("group", { name: "Pedido de aprovação" });
+    const items = [...card.querySelectorAll(".rq__item")] as HTMLElement[];
+    expect(items).toHaveLength(3);
+    // The lead's why is the card's; the one asked for another reason says its own on its line.
+    expect(items[1]?.querySelector(".rq__item-why")).toBeNull();
+    expect(items[2]?.querySelector(".rq__item-why")?.textContent).toBe("Branch velha, já mergeada.");
+    for (const item of items) {
+      const more = within(item).getByRole("button", { name: "Ver detalhes" });
+      await act(async () => fireEvent.click(more));
+    }
+    expect(within(items[0] as HTMLElement).queryByRole("button", { name: /Aprovar sempre/ })).not.toBeNull();
+    expect(within(items[1] as HTMLElement).queryByRole("button", { name: /Aprovar sempre/ })).toBeNull();
+  });
+
+  test("a card older than the approvals list reaches still lists all its requests, fetched by the card", async () => {
+    const state = seedState();
+    const [merge] = state.approvals;
+    if (!merge) throw new Error("no approval");
+    const goal = (id: string, month: string, days: number) => ({
+      ...merge,
+      id,
+      status: "approved" as const,
+      canDecide: false,
+      decidedByUserId: state.me?.user.id ?? null,
+      decidedAt: new Date(Date.now() - days * 86_400_000).toISOString(),
+      tool: "goal_upsert",
+      title: "Painel: Goal upsert",
+      detail: `panel.goal_upsert · month=${month}`,
+      connector: "panel",
+      params: { month },
+      createdAt: new Date(Date.now() - days * 86_400_000).toISOString(),
+    });
+    // A newer request elsewhere fills the list's window: the card's own fall outside it.
+    const newer = { ...merge, id: "ap-newer", messageId: null, createdAt: new Date().toISOString() };
+    state.approvals.splice(0, 1, goal("ap-g1", "2026-11", 3), goal("ap-g2", "2026-12", 2.9), newer);
+    state.approvalsWindow = 1;
+    const cardMessage = state.messages.find((m) => m.id === "msg-card");
+    if (cardMessage) cardMessage.meta = { ...cardMessage.meta, approvalId: "ap-g1" };
+    await open(state);
+    await settle(4);
+    expect(state.calls.some((c) => c.method === "approvals.list" && JSON.stringify(c.args).includes("msg-card"))).toBe(
+      true,
+    );
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("Month: 2026-11");
+    expect(text).toContain("Month: 2026-12");
+  });
+
   test("a request in the conversation: approve calls the API, shrinks to one line; events update it", async () => {
     const r0 = await open();
     const { state, socket } = r0;

@@ -2,7 +2,7 @@ import type { DesktopMode, DesktopViewState } from "@agenteschat/client";
 import { originOf } from "@agenteschat/client/lib/server";
 
 /*
- * The agent's screen on the phone (ADR 0096): the app's side of the server's `/screen.html`, in a WebView. The page
+ * The agent's screen on the phone (ADR 0098): the app's side of the server's `/screen.html`, in a WebView. The page
  * holds the stream and draws it; the app holds every touch and tells it what to do. Pure, so it is unit-tested.
  */
 

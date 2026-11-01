@@ -105,7 +105,7 @@ function useAppActive() {
 }
 
 /**
- * The agent's screen on the phone (ADR 0096), as the web's `DesktopView`: live, watched, or in this person's control.
+ * The agent's screen on the phone (ADR 0098), as the web's `DesktopView`: live, watched, or in this person's control.
  * The server's page draws it in a WebView as large as the desktop, moved and zoomed by the UI thread; no touch ever
  * reaches the page. In control the trackpad moves a cursor the app draws, and the view follows it. Leaving the app
  * lets go of the stream and the control's 2 minutes run, as for any person who drops; coming back opens it again.

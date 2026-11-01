@@ -2,28 +2,32 @@ import {
   ApiError,
   type BrowserFrame,
   type BrowserInputEvent,
-  clickEvents,
   createBrowserLiveConnection,
-  fitFrame,
+  createTouchInput,
   frameMetadata,
-  framePoint,
   keyEvents,
   textEvent,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { openRefusalKey } from "@agenteschat/client/lib/sites";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Image, type LayoutChangeEvent, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { GestureDetector, GestureStateManager, type TouchData, useManualGesture } from "react-native-gesture-handler";
+import { scheduleOnRN } from "react-native-worklets";
 import { Icon, Text } from "@/ui";
 import { useColors, useConnection } from "../shared/hooks";
-import { tapHaptic } from "../shared/parts";
-import { LIVE_KEYS, type LiveKey, type PageGap } from "./logic";
+import { tapHaptic, useSurface } from "../shared/parts";
+import { LIVE_KEYS, type LiveKey, type PageGap, touchOnPage } from "./logic";
 
 /** Why the page can't be shown: the server's reason, or the stream ended / not allowed. */
 export type Unavailable = PageGap | null;
 
-/** The page as a picture; a tap on it clicks the page (only for the person in control). */
+/**
+ * The page as a picture. For the person in control, fingers on it are the page's mouse
+ * (`createTouchInput`): a tap clicks, a finger that moves drags (a slider follows it), two fingers
+ * scroll, with a line saying so while they move.
+ */
 export function FrameView({
   frame,
   enabled,
@@ -34,36 +38,83 @@ export function FrameView({
   onInput: (events: BrowserInputEvent[]) => void;
 }) {
   const { t } = useTranslation();
+  const raised = useSurface("e2");
   const [view, setView] = useState({ width: 0, height: 0 });
+  const [sliding, setSliding] = useState(false);
+  const meta = useMemo(() => frameMetadata(frame), [frame]);
+  const now = useRef({ meta, view, enabled, onInput });
+  now.current = { meta, view, enabled, onInput };
+  const [{ down, move, up, cancel }] = useState(() => {
+    const fingers = createTouchInput((p, clamp) => touchOnPage(p, now.current.view, now.current.meta, clamp));
+    const send = (events: BrowserInputEvent[]) => {
+      if (events.length > 0 && now.current.enabled) now.current.onInput(events);
+      setSliding(fingers.mode === "drag" || fingers.mode === "scroll");
+    };
+    return {
+      down: (touches: TouchData[]) => {
+        for (const p of touches) send(fingers.down(p.id, p));
+      },
+      move: (touches: TouchData[]) => {
+        for (const p of touches) send(fingers.move(p.id, p));
+      },
+      up: (touches: TouchData[]) => {
+        for (const p of touches) {
+          const tap = fingers.mode === "pending";
+          const events = fingers.up(p.id, p);
+          if (tap && events.length > 0) tapHaptic();
+          send(events);
+        }
+      },
+      cancel: () => send(fingers.cancel()),
+    };
+  });
+  useEffect(() => {
+    if (!enabled) cancel();
+  }, [enabled, cancel]);
+  const gesture = useManualGesture({
+    enabled,
+    onTouchesDown: (e) => {
+      "worklet";
+      // Taken at once, on the UI thread: the conversation never scrolls under a finger on the page.
+      GestureStateManager.activate(e.handlerTag);
+      scheduleOnRN(down, e.changedTouches);
+    },
+    onTouchesMove: (e) => {
+      "worklet";
+      scheduleOnRN(move, e.changedTouches);
+    },
+    onTouchesUp: (e) => {
+      "worklet";
+      if (e.numberOfTouches === 0) GestureStateManager.deactivate(e.handlerTag);
+      scheduleOnRN(up, e.changedTouches);
+    },
+    onTouchesCancel: () => {
+      "worklet";
+      scheduleOnRN(cancel);
+    },
+  });
   const onLayout = (e: LayoutChangeEvent) =>
     setView({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height });
   return (
-    <Pressable
-      style={styles.frame}
-      onLayout={onLayout}
-      disabled={!enabled}
-      accessibilityLabel={t("mobile.browser.live.page")}
-      onPress={(e) => {
-        // The picture is drawn "contain": a tap on the letterbox around it is ignored.
-        const meta = frameMetadata(frame);
-        const fit = fitFrame(view, meta);
-        const p = framePoint(
-          { x: e.nativeEvent.locationX - fit.left, y: e.nativeEvent.locationY - fit.top },
-          fit,
-          meta,
-        );
-        if (!p) return;
-        tapHaptic();
-        onInput(clickEvents(p));
-      }}
-    >
-      <Image
-        source={{ uri: `data:image/jpeg;base64,${frame.data}` }}
-        style={StyleSheet.absoluteFill}
-        resizeMode="contain"
-        fadeDuration={0}
-      />
-    </Pressable>
+    <GestureDetector gesture={gesture}>
+      <View style={styles.frame} onLayout={onLayout} accessible accessibilityLabel={t("mobile.browser.live.page")}>
+        <Image
+          source={{ uri: `data:image/jpeg;base64,${frame.data}` }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="contain"
+          fadeDuration={0}
+        />
+        {sliding ? (
+          <View pointerEvents="none" style={styles.hintRow}>
+            <View style={[styles.hint, raised]}>
+              <Text variant="caption" tone="ink2" numberOfLines={1} style={styles.semibold}>
+                {t("browser.inCard.touchHint")}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+      </View>
+    </GestureDetector>
   );
 }
 
@@ -348,7 +399,10 @@ export function useLiveConnection(agentId: string, enabled: boolean): LiveState 
 
 const styles = StyleSheet.create({
   frame: { flex: 1 },
+  hintRow: { position: "absolute", top: 8, left: 8, right: 8, alignItems: "center" },
+  hint: { maxWidth: "100%", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
   medium: { fontWeight: "500" },
+  semibold: { fontWeight: "600" },
   typeWrap: { gap: 8 },
   field: {
     flexDirection: "row",

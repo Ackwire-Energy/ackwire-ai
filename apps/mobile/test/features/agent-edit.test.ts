@@ -1,6 +1,17 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { coordinatorNote } from "@agenteschat/client/lib/coordinator";
-import { presetChannels, presetLevels, ROLE_DEFAULTS, ROLE_IDS } from "@agenteschat/client/lib/new-agent";
+import { agentsByAnyHandle } from "@agenteschat/client/lib/directory";
+import {
+  handleAfterRename,
+  handleProblemText,
+  presetChannels,
+  presetLevels,
+  ROLE_DEFAULTS,
+  ROLE_IDS,
+  takenHandles,
+} from "@agenteschat/client/lib/new-agent";
 import {
   type AgentDraft,
   agentChanges,
@@ -58,6 +69,7 @@ describe("an agent's look", () => {
 describe("editing an agent", () => {
   const saved: AgentDraft = {
     name: "Nina",
+    handle: "nina",
     role: "Atendimento",
     instructions: "Responde clientes.",
     look: { color: "teal", eyes: "happy", accessory: "headset" },
@@ -104,6 +116,60 @@ describe("editing an agent", () => {
     );
     expect(coordinatorNote(pt, team, "theo", true)).toBeNull();
     expect(coordinatorNote(pt, [nina], "nina", false)).toBe("Ninguém coordena o time agora.");
+  });
+
+  test("Editar hints the role the way Criar agente does, not with a one-word example", () => {
+    const src = (f: string) => readFileSync(join(import.meta.dir, "..", "..", "src", "features", "agents", f), "utf8");
+    for (const screen of ["AgentEditScreen.tsx", "NewAgentScreen.tsx"]) {
+      expect(src(screen).match(/<RoleInput[\s\S]*?\/>/)?.[0]).toContain('placeholder={t("agent.roleHelp")}');
+    }
+  });
+});
+
+describe("renaming an agent on the phone", () => {
+  const saved: AgentDraft = { name: "Ada", handle: "ada", role: "Dev", instructions: "", look: fullLook(undefined) };
+  const all = editableFields({ admin: true, owner: false });
+
+  test("its @ follows the new name until one is typed in Menções; Salvar sends both", () => {
+    const draft = { ...saved, name: "Claudio", handle: handleAfterRename(saved, "Claudio") };
+    expect(draft.handle).toBe("claudio");
+    expect(agentChanges(saved, draft, all)).toEqual({ name: "Claudio", handle: "claudio" });
+    expect(agentChanges(saved, { ...saved, handle: handleAfterRename(saved, "Ada", "dra") }, all)).toEqual({
+      handle: "dra",
+    });
+    expect(handleAfterRename(saved, "Claudio", "clau")).toBe("clau");
+    // The agent's own person changes its look only: never its @.
+    expect(agentChanges(saved, draft, editableFields({ admin: false, owner: true }))).toBeNull();
+  });
+
+  test("Menções says why a taken @ can't be used and offers a free one; its own old @ comes back", async () => {
+    const t = await translator("pt-BR");
+    const agents = [
+      { id: "a1", handle: "ada", previousHandles: ["dra"] },
+      { id: "a2", handle: "atlas", previousHandles: ["zeus"] },
+    ];
+    const taken = takenHandles(agents, [{ handle: "walter" }, { handle: null }], "a1");
+    expect(handleProblemText(t, "atlas", taken)).toBe("@atlas já é de outro agente ou pessoa. Que tal @atlas-2?");
+    expect(handleProblemText(t, "zeus", taken)).toBe("@zeus já é de outro agente ou pessoa. Que tal @zeus-2?");
+    expect(handleProblemText(t, "walter", taken)).toBe("@walter já é de outro agente ou pessoa. Que tal @walter-2?");
+    expect(handleProblemText(t, "dra", taken)).toBeNull();
+    expect(handleProblemText(t, "x", taken)).toBe(
+      "Use de 2 a 32 letras minúsculas, números, hífen ou _, começando por letra ou número.",
+    );
+    expect(t("agent.handleMoves", { handle: "claudio", old: "ada" })).toBe(
+      "As menções passam a ser por @claudio. @ada continua funcionando.",
+    );
+    expect(t("agent.identityHelp")).toBe("É como todo mundo vê o agente. O @ acompanha o nome.");
+  });
+
+  test("a notice that names an old @ shows the agent now called by another", () => {
+    const byHandle = agentsByAnyHandle([
+      { id: "a1", name: "Claudio", handle: "claudio", previousHandles: ["ada"] },
+      { id: "a2", name: "Atlas", handle: "atlas" },
+    ]);
+    expect(byHandle.get("ada")?.name).toBe("Claudio");
+    expect(byHandle.get("claudio")?.name).toBe("Claudio");
+    expect(byHandle.get("atlas")?.name).toBe("Atlas");
   });
 });
 

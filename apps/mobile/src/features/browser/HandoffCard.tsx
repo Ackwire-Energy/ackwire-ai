@@ -29,7 +29,7 @@ import { FrameView, useLiveConnection } from "./parts";
  * request card: what the agent needs, "Ver a tela" showing its page as it is now, Abrir (takes the control
  * right here: the card becomes the agent's browser card) and "Agora não" (tells the agent, with an optional
  * reason). A request on the agent's desktop is the same card, Abrir taking it into the computer's full view (the
- * screen needs its room, ADR 0096), and one line that opens that view once someone helps there. Once someone is
+ * screen needs its room, ADR 0098), and one line that opens that view once someone helps there. Once someone is
  * in control of the browser it is the agent's browser card; once
  * it ends, one line with how. The state comes from the message (`meta.browserHandoff`) and is refreshed
  * from the server. A push or the inbox opens this card.

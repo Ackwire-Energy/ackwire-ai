@@ -69,6 +69,10 @@ const MailAccount = z
     askActions: z.array(MailActionName),
     aliases: z.array(z.string()).openapi({ description: "Other addresses of this mailbox (lowercase)." }),
     defaultFrom: z.string().nullable().openapi({ description: "What new mail goes out from; null = `address`." }),
+    ownerUserId: z
+      .string()
+      .nullable()
+      .openapi({ description: "Who connected it: the only person who gives agents access to it." }),
     agents: z.array(z.object({ agentId: z.uuid(), level: z.enum(["read", "read_write"]), canDelete: z.boolean() })),
   })
   .openapi("MailAccount");
@@ -371,9 +375,9 @@ export function mailRoutes(deps: AppDeps, log: Logger) {
       path: "/organizations/{orgId}/agents/{agentId}/mail/{accountId}",
       tags,
       security,
-      summary: "Set an agent's access to a mailbox: level, delete, and its policy (admins)",
+      summary: "Set an agent's access to a mailbox: level, delete, and its policy",
       description:
-        "`sendWithoutAsking` needs a non-empty `allowedRecipients` (422 otherwise). Addresses and domains are lowercased.",
+        "Only the person who connected the mailbox gives access, to an agent they can talk to; admins and the agent's owner may only lower or remove it (403 `mail.owner_only` otherwise). `sendWithoutAsking` needs a non-empty `allowedRecipients` (422 otherwise). Addresses and domains are lowercased.",
       request: {
         params: AgentParams.extend({ accountId: z.uuid() }),
         body: body(

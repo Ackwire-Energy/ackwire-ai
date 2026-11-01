@@ -44,6 +44,7 @@ import {
   useApproval,
   useApprovals,
   useArchiveChannel,
+  useCardApprovals,
   useChannelCategories,
   useChannelMembers,
   useChannels,
@@ -69,12 +70,16 @@ import {
 } from "@agenteschat/client";
 import { actionCardOf } from "@agenteschat/client/lib/action-cards";
 import { activityVerb, barElapsed, barEntries, isWriting, toolActivity } from "@agenteschat/client/lib/activity";
+import type { AgentTab } from "@agenteschat/client/lib/agent-edit";
 import { looksLikeApiKey } from "@agenteschat/client/lib/api-key-text";
+import { approvalCardItems, asOfNow, cardDeadline } from "@agenteschat/client/lib/approval-card";
 import { artifactRefs } from "@agenteschat/client/lib/artifacts";
 import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
+import { channelRefsOf } from "@agenteschat/client/lib/channel-refs";
 import {
   entersWithMotion,
   greetingSuggestions,
+  isScrollUpKey,
   messageUsage,
   nearBottom,
   usageLine,
@@ -189,7 +194,7 @@ import { ActionCard } from "@/components/ActionCard";
 import { AgentActionReceipts } from "@/components/AgentActions";
 import { ActorAvatar, AgentAvatar, AgentSpinner, PersonAvatar } from "@/components/AgentAvatar";
 import { AgentPanel } from "@/components/AgentPanel";
-import { ApprovalAsk } from "@/components/ApprovalAsk";
+import { ApprovalAsk, ApprovalGroupAsk } from "@/components/ApprovalAsk";
 import { InlineApproval } from "@/components/ApprovalItem";
 import { AgentPanelContext, useOpenAgentPanel } from "@/components/agent-panel-context";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
@@ -216,6 +221,7 @@ import { CorrectionAsk } from "@/components/CorrectionAsk";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
+import { InPlaceProvider } from "@/components/InPlace";
 import { IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
 import { ArrivalCard, useArrival } from "@/components/invite/Arrival";
 import { InviteOfferRow, useInviteOffer } from "@/components/invite/InviteDialog";
@@ -254,6 +260,7 @@ import { KeyGuardDialog, NoAiBanner, NoAiCard, useNoAiAutoOpen } from "@/compone
 import { useOrg } from "@/components/org-context";
 import { AuthorStatus } from "@/components/Presence";
 import { ProfileTrigger } from "@/components/ProfileCard";
+import { ReachLines } from "@/components/ReachLines";
 import { MessageReactions, useEmojiLabels } from "@/components/Reactions";
 import {
   type AskRegistry,
@@ -282,11 +289,13 @@ import {
 } from "@/components/threads/ThreadLines";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import { BarPhrase, ConsultClock, WorkingStack } from "@/components/WorkingLine";
+import { useChannelSearch } from "@/hooks/useChannelSearch";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
 import { TYPED_VALUES } from "@/i18n";
 import { onChannelDetails, takeChannelDetails } from "@/lib/channel-details";
+import { selectingIn } from "@/lib/context-menu";
 import { useDocumentTitle } from "@/lib/desktop";
 import { reportPainted } from "@/lib/perf";
 import { useToast } from "@/lib/toast";
@@ -483,14 +492,16 @@ export function ChannelPage({
   return (
     // "Arquivos", "Ver plano", "Ver no arquivo": any mission card here opens the same files panel.
     <MissionPanelProvider>
-      <ChannelView
-        key={`${channel.id}:${thread?.id ?? ""}:${adjustThreadId ?? ""}`}
-        channel={channel}
-        chrome={chrome}
-        focusMessageId={focusMessageId}
-        adjustThreadId={adjustThreadId}
-        thread={thread}
-      />
+      {/* A routine or a task an agent names here opens in its dialog over the conversation; leaving it closes it. */}
+      <InPlaceProvider key={`${channel.id}:${thread?.id ?? ""}:${adjustThreadId ?? ""}`}>
+        <ChannelView
+          channel={channel}
+          chrome={chrome}
+          focusMessageId={focusMessageId}
+          adjustThreadId={adjustThreadId}
+          thread={thread}
+        />
+      </InPlaceProvider>
     </MissionPanelProvider>
   );
 }
@@ -624,15 +635,16 @@ function ChannelView({
   });
   // The thread open in the panel beside the channel ("Responder", a thread's line); `reply`: to its composer.
   const [panel, setPanel] = useState<{ id: string; reply: boolean } | null>(null);
-  // "Ver perfil" (a DM's header, the profile card): the agent's page in the same place; one panel at a time.
-  const [profileId, setProfileId] = useState<string | null>(null);
+  // "Ver perfil" (a DM's header, the profile card): the agent's page in the same place, at a tab when a card asks
+  // (its memory); one panel at a time.
+  const [profile, setProfile] = useState<{ agentId: string; tab?: AgentTab } | null>(null);
   // A question an agent asked another from here, opened from its line in the reply ("Theo ⇄ Iris"): one panel too.
   const [consultId, setConsultId] = useState<string | null>(null);
   const outerPanel = useOpenAgentPanel();
-  const openAgentPanel = useCallback((agentId: string) => {
+  const openAgentPanel = useCallback((agentId: string, tab?: AgentTab) => {
     setPanel(null);
     setConsultId(null);
-    setProfileId(agentId);
+    setProfile({ agentId, tab });
   }, []);
   // "Mudar algo" on a mission's plan: the next message goes to its executor ("Respondendo: Plano").
   const [missionReply, setMissionReply] = useState<{ missionId: string; label: string } | null>(null);
@@ -657,6 +669,7 @@ function ChannelView({
   // An agent mentioned from outside the channel: offer to add it.
   const [offer, setOffer] = useState<string | null>(null);
   const mentionSearch = useMentionSearch(members.data);
+  const channelSearch = useChannelSearch();
   const composer = useRef<HTMLTextAreaElement>(null);
   const emojiPicker = useEmojiLabels();
   const emojiLabels = useMemo(() => ({ ...emojiPicker, button: t("channel.emoji") }), [emojiPicker, t]);
@@ -923,6 +936,19 @@ function ChannelView({
   const markGesture = () => {
     lastGesture.current = Date.now();
   };
+  // The last gesture that can move the list up (wheel up, an up key, a finger, the scrollbar). Only a scroll up
+  // right after one of these lets go of the bottom: content at the end shrinking clamps scrollTop lower too, and
+  // right after a wheel down or a click on a row (a tools block folding) that read as "the person scrolled up".
+  const lastUpGesture = useRef(0);
+  const markUpGesture = () => {
+    lastGesture.current = Date.now();
+    lastUpGesture.current = lastGesture.current;
+  };
+  // The last wheel or finger: a window without focus is still being read while these come (a click doesn't count).
+  const lastScrollGesture = useRef(0);
+  const markScrollGesture = () => {
+    lastScrollGesture.current = Date.now();
+  };
   // Scrolling up always lets go at once: no waiting to leave the "near bottom" band or for a glide to end.
   const letGo = () => {
     stick.current = false;
@@ -1004,9 +1030,11 @@ function ChannelView({
   const catchUp = useRef(false);
   /** Scrolled up but not reading: no gesture on the list for a while, or the window elsewhere; never mid-selection. */
   const idleAway = () => {
-    const selection = typeof window.getSelection === "function" ? window.getSelection() : null;
-    if (selection && !selection.isCollapsed && scroller.current?.contains(selection.anchorNode)) return false;
-    if (document.hidden || (typeof document.hasFocus === "function" && !document.hasFocus())) return true;
+    if (selectingIn(scroller.current)) return false;
+    if (document.hidden) return true;
+    // A wheel still scrolls a window without focus: whoever does that is reading, not away.
+    if (typeof document.hasFocus === "function" && !document.hasFocus())
+      return Date.now() - lastScrollGesture.current > IDLE_CATCH_UP_MS;
     // Right after opening, the same grace as a fresh scroll.
     return Date.now() - Math.max(lastGesture.current, openedAt.current) > IDLE_CATCH_UP_MS;
   };
@@ -1601,17 +1629,17 @@ function ChannelView({
     reply: thread
       ? () => composer.current?.focus()
       : (message) => {
-          setProfileId(null);
+          setProfile(null);
           setConsultId(null);
           setPanel({ id: message.threadId ?? message.id, reply: true });
         },
     openThread: (id) => {
-      setProfileId(null);
+      setProfile(null);
       setConsultId(null);
       setPanel({ id, reply: false });
     },
     openConsultation: (id) => {
-      setProfileId(null);
+      setProfile(null);
       setPanel(null);
       setConsultId(id);
     },
@@ -1737,19 +1765,29 @@ function ChannelView({
                     aria-live="polite"
                     aria-relevant="additions"
                     onWheel={(e) => {
-                      markGesture();
-                      if (e.deltaY < 0) letGo();
+                      markScrollGesture();
+                      if (e.deltaY < 0) {
+                        markUpGesture();
+                        letGo();
+                      } else markGesture();
                     }}
-                    onTouchMove={markGesture}
-                    onPointerDown={markGesture}
-                    onKeyDown={markGesture}
+                    onTouchMove={() => {
+                      markScrollGesture();
+                      markUpGesture();
+                    }}
+                    // On the list itself, not on a row: its scrollbar.
+                    onPointerDown={(e) => (e.target === e.currentTarget ? markUpGesture() : markGesture())}
+                    onKeyDown={(e) => (isScrollUpKey(e) ? markUpGesture() : markGesture())}
                     onScroll={(e) => {
                       const previousTop = lastScrollTop.current;
                       lastScrollTop.current = e.currentTarget.scrollTop;
                       // Only the person scrolling unpins (or loads older pages); layout changes never do.
                       const byPerson = Date.now() - lastGesture.current < GESTURE_MS;
+                      // A drag selecting text past the top edge scrolls up too: the person is reading.
+                      const upByPerson =
+                        Date.now() - lastUpGesture.current < GESTURE_MS || (byPerson && selectingIn(e.currentTarget));
                       if (byPerson && e.currentTarget.scrollTop < 240) loadOlder();
-                      if (byPerson && previousTop !== null && e.currentTarget.scrollTop < previousTop) {
+                      if (upByPerson && previousTop !== null && e.currentTarget.scrollTop < previousTop) {
                         letGo();
                         return;
                       }
@@ -1986,6 +2024,7 @@ function ChannelView({
                         commands={
                           commands.length > 0 ? { listLabel: t("composer.commands"), list: commands } : undefined
                         }
+                        channels={{ search: channelSearch, listLabel: t("channelRefs.list") }}
                         mentions={{
                           search: mentionSearch,
                           listLabel: t("mentions.list"),
@@ -2045,7 +2084,14 @@ function ChannelView({
               <ThreadPage key={panel.id} threadId={panel.id} reply={panel.reply} onClose={() => setPanel(null)} />
             </aside>
           )}
-          {profileId && <AgentPanel key={profileId} agentId={profileId} onClose={() => setProfileId(null)} />}
+          {profile && (
+            <AgentPanel
+              key={`${profile.agentId}:${profile.tab ?? ""}`}
+              agentId={profile.agentId}
+              tab={profile.tab}
+              onClose={() => setProfile(null)}
+            />
+          )}
           {consultId && (
             <ConsultationPanel
               key={consultId}
@@ -3116,7 +3162,10 @@ export const TimelineMessage = memo(function TimelineMessage({
   };
   // A stopped run's message (`meta.canceled`): the text so far, and "Interrompido por Walter" as a note.
   // A text the server wrote (`meta.bodyCode`, a deploy's notice) is shown in the person's language.
-  const stopped = useMemo(() => splitCanceled(serverBody(t, m.body, m.meta), m.meta), [t, m.body, m.meta]);
+  const stopped = useMemo(
+    () => splitCanceled(serverBody(t, m.body, m.meta, i18n.language), m.meta),
+    [t, m.body, m.meta, i18n.language],
+  );
   const body = reminderBody(stopped.body, m.meta);
   // The reply of a run that reached its step limit, or that stopped because it got stuck: Continuar under it too.
   const ended = stopped.canceled ? undefined : (m.meta?.stepLimit as { stuck?: unknown } | undefined);
@@ -3399,16 +3448,16 @@ export const TimelineMessage = memo(function TimelineMessage({
               </MessageText>
             )
           )}
-          {/* Its tools in one line (what it does now), opening into each call; the messages it read under it. */}
-          <LiveTools
-            work={opening.work}
-            agentName={name}
-            color={colorOf(agent)}
-            steerNote={steerNote}
-            stopped={liveStopped}
-          />
-          {m.author.id && m.agentRunId && (
-            <ConsultGroup runId={m.agentRunId} askerId={m.author.id} color={colorOf(agent)} />
+          {/* The answer streams under the line it opened with, above its tools (where its saved message has it). */}
+          {!liveFailed && revealed && !wordsOnTop && (
+            <MessageText>
+              <MessageBody
+                body={revealed}
+                resolveMention={dir.mentionName}
+                live={!liveStopped}
+                accent={colorOf(agent)}
+              />
+            </MessageText>
           )}
           {liveFailed && (
             <p className="ac-msg__error" role="alert">
@@ -3418,9 +3467,11 @@ export const TimelineMessage = memo(function TimelineMessage({
                   ? t("channel.runRefused", { agent: name, reason: refusal })
                   : live.errorCode === "run.computer_busy"
                     ? t("channel.runBusy", { agent: name })
-                    : live.error
-                      ? t("channel.runFailed", { agent: name, reason: live.error })
-                      : t("channel.runFailedNoReason", { agent: name })}
+                    : live.errorCode === "run.budget_exceeded"
+                      ? t("channel.runFailed", { agent: name, reason: t("agentPage.activity.errors.budget_exceeded") })
+                      : live.error
+                        ? t("channel.runFailed", { agent: name, reason: live.error })
+                        : t("channel.runFailedNoReason", { agent: name })}
               </span>
               <Button
                 variant="ghost"
@@ -3432,23 +3483,24 @@ export const TimelineMessage = memo(function TimelineMessage({
               />
             </p>
           )}
-          {/* Also on a failed or stopped run, for the person still in control (they hand back from it). */}
-          <RunBrowserCard run={live} name={name} />
-          {!liveFailed && revealed && !wordsOnTop && (
-            <MessageText>
-              <MessageBody
-                body={revealed}
-                resolveMention={dir.mentionName}
-                live={!liveStopped}
-                accent={colorOf(agent)}
-              />
-            </MessageText>
-          )}
           {liveStopped ? (
             <StoppedLine runId={live.runId} byUserId={live.canceledBy} owner={live} />
           ) : (
             !liveFailed && <LiveRunStatus run={live} />
           )}
+          {m.author.id && m.agentRunId && (
+            <ConsultGroup runId={m.agentRunId} askerId={m.author.id} color={colorOf(agent)} />
+          )}
+          {/* Its tools, as on its saved message: one line (what it does now) opening into each call. */}
+          <LiveTools
+            work={opening.work}
+            agentName={name}
+            color={colorOf(agent)}
+            steerNote={steerNote}
+            stopped={liveStopped}
+          />
+          {/* Last, after its tools; also on a failed or stopped run, for the person still in control (they hand back from it). */}
+          <RunBrowserCard run={live} name={name} />
           {!liveFailed && !liveWaiting && !liveStopped && (
             <span className="ac-visually-hidden">{t("channel.writing")}</span>
           )}
@@ -3460,16 +3512,6 @@ export const TimelineMessage = memo(function TimelineMessage({
               <MessageBody body={keptSaid.text} resolveMention={dir.mentionName} />
             </MessageText>
           )}
-          {keptSteps?.length && seenLive ? (
-            <LiveTools
-              work={keptSteps}
-              agentName={name}
-              color={colorOf(agent)}
-              steerNote={steerNote}
-              done
-              stopped={stopped.canceled}
-            />
-          ) : null}
           {routine && report && reportOpen && <RoutineReport text={report} />}
           {quoted && <QuotedMessage reply={quoted} />}
           {m.author.id &&
@@ -3493,6 +3535,7 @@ export const TimelineMessage = memo(function TimelineMessage({
                   resolveMention={dir.mentionName}
                   renderMention={renderMention}
                   wikiLink={wikiLink}
+                  channelRefs={channelRefsOf(m.meta)}
                   accent={colorOf(agent)}
                 />
               </MessageText>
@@ -3524,18 +3567,11 @@ export const TimelineMessage = memo(function TimelineMessage({
           )}
           {m.author.type === "agent" && !m.local && <AgentActionReceipts message={m} />}
           {m.author.type === "agent" && !m.local && <TeamChecks message={m} />}
-          {approvalId && <MessageApproval approvalId={approvalId} agent={agent} members={dir.memberById} />}
-          {proposalId && <InlineProposal proposalId={proposalId} />}
+          {m.author.type === "agent" && !m.local && <ReachLines message={m} />}
           {agent &&
-            memoryUpdates.map((u) => (
-              <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />
-            ))}
-          {waitNotice && <WaitingCard notice={waitNotice} agentId={m.author.id ?? null} />}
-          {noAi && <NoAiCard message={m} />}
-          {actionCard && <ActionCard message={m} />}
-          {question && <QuestionCard question={question} />}
-          {secretRequest && <SecretCard request={secretRequest} />}
-          {browserHandoff && <BrowserHandoffCard handoff={browserHandoff} />}
+            memoryUpdates
+              .filter((u) => u.action !== "proposed")
+              .map((u) => <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />)}
           {browserTrail.length > 0 && m.author.id && !m.local && (
             <BrowserTrailCard
               agentId={m.author.id}
@@ -3564,29 +3600,11 @@ export const TimelineMessage = memo(function TimelineMessage({
               enabled={Date.now() - Date.parse(m.createdAt) < HELD_RECENT_MS}
             />
           )}
-          {lastOfRun && m.author.type === "agent" && m.author.id && replyRun && !m.local && consulted.length === 0 && (
-            <ConsultGroup runId={replyRun} askerId={m.author.id} color={colorOf(agent)} saved />
-          )}
-          {/* A question to another agent (in their DM) carries the asking run: its work shows on that run's reply. */}
-          {m.author.type === "agent" && replyRun && !card && !m.local && !keptAll && !m.meta?.consultation && (
-            <SavedTools
-              runId={replyRun}
-              meta={m.meta}
-              agentName={agent?.name ?? name}
-              color={colorOf(agent)}
-              skipScreens={onCards}
-            />
-          )}
           {forumTopicId && !forumSuggestion && <ForumMessageCard topicId={forumTopicId} />}
-          {forumSuggestion && <ForumSuggestionCard message={m} suggestion={forumSuggestion} />}
           {missionPlan && <MissionPlanCard plan={missionPlan} />}
-          {missionDecision && <MissionDecisionCard message={missionDecision} />}
           {missionReview && <MissionReviewCard message={missionReview} />}
-          {missionDelivery && <MissionDeliveryCard message={missionDelivery} />}
-          {missionCommand && <MissionCommandCard command={missionCommand} />}
           {missionSetup && <MissionSetupCard setup={missionSetup} threadId={m.threadId ?? null} />}
           {missionReport && <MissionReportExtras report={missionReport} message={m} />}
-          {missionSuggestion && <MissionSuggestionBar message={m} suggestion={missionSuggestion} />}
           {missionStart && <MissionStartLink message={m} />}
           {missionLink && <MissionLinkCard link={missionLink} />}
           {issueWork && (
@@ -3599,6 +3617,50 @@ export const TimelineMessage = memo(function TimelineMessage({
               ))}
             </div>
           )}
+          {/* Its tools after its words and what it changed: the same place live, kept and saved. */}
+          {lastOfRun && m.author.type === "agent" && m.author.id && replyRun && !m.local && consulted.length === 0 && (
+            <ConsultGroup runId={replyRun} askerId={m.author.id} color={colorOf(agent)} saved />
+          )}
+          {keptSteps?.length && seenLive ? (
+            <LiveTools
+              work={keptSteps}
+              agentName={name}
+              color={colorOf(agent)}
+              steerNote={steerNote}
+              done
+              stopped={stopped.canceled}
+            />
+          ) : null}
+          {/* A question to another agent (in their DM) carries the asking run: its work shows on that run's reply. */}
+          {m.author.type === "agent" && replyRun && !card && !m.local && !keptAll && !m.meta?.consultation && (
+            <SavedTools
+              runId={replyRun}
+              meta={m.meta}
+              agentName={agent?.name ?? name}
+              color={colorOf(agent)}
+              skipScreens={onCards}
+            />
+          )}
+          {/* What waits for a person's click comes last, after the words and the tools. */}
+          {approvalId && (
+            <MessageApproval messageId={m.id} approvalId={approvalId} agent={agent} members={dir.memberById} />
+          )}
+          {proposalId && <InlineProposal proposalId={proposalId} />}
+          {agent &&
+            memoryUpdates
+              .filter((u) => u.action === "proposed")
+              .map((u) => <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />)}
+          {waitNotice && <WaitingCard notice={waitNotice} agentId={m.author.id ?? null} />}
+          {noAi && <NoAiCard message={m} />}
+          {actionCard && <ActionCard message={m} />}
+          {question && <QuestionCard question={question} />}
+          {secretRequest && <SecretCard request={secretRequest} />}
+          {browserHandoff && <BrowserHandoffCard handoff={browserHandoff} />}
+          {forumSuggestion && <ForumSuggestionCard message={m} suggestion={forumSuggestion} />}
+          {missionDecision && <MissionDecisionCard message={missionDecision} />}
+          {missionDelivery && <MissionDeliveryCard message={missionDelivery} />}
+          {missionCommand && <MissionCommandCard command={missionCommand} />}
+          {missionSuggestion && <MissionSuggestionBar message={m} suggestion={missionSuggestion} />}
           {/* Everyone's reactions (👍/👎 on an agent's reply are its feedback, in the same pills). */}
           {!m.local && !readOnly && (
             <MessageReactions
@@ -3658,12 +3720,17 @@ const inlineButton = {
   color: "inherit",
 };
 
-/** The request of a message with `meta.approvalId`: from the approvals list, or fetched by id. */
+/**
+ * The request of a message with `meta.approvalId`: from the approvals list, or fetched by id. Requests the agent
+ * asked later in this conversation join the same card (`messageId`): then one card lists them all.
+ */
 function MessageApproval({
+  messageId,
   approvalId,
   agent,
   members,
 }: {
+  messageId: string;
   approvalId: string;
   agent: Agent | undefined;
   members: Map<string, Member>;
@@ -3672,10 +3739,27 @@ function MessageApproval({
   const approvals = useApprovals(org.id);
   const listed: Approval | undefined = approvals.data?.find((a) => a.id === approvalId);
   const one = useApproval(org.id, approvalId, !listed && approvals.isSuccess);
+  // Older than the list reaches: its card's requests by the card (the list holds everything newer than the first).
+  const card = useCardApprovals(org.id, messageId, !listed && approvals.isSuccess);
   const approval = listed ?? one.data;
+  const items = approvalCardItems([...(approvals.data ?? []), ...(card.data ?? [])], messageId, approval);
   // Past its deadline it has expired, even before the server's event says so.
   const expired = useExpired(approval?.status === "pending" ? approval.expiresAt : null);
+  // Drawn again when the card's earliest deadline passes.
+  useExpired(cardDeadline(items));
   if (!approval) return null;
+  if (items.length > 1) {
+    const now = items.map((a) => asOfNow(a));
+    if (now.some((a) => a.status === "pending"))
+      return <ApprovalGroupAsk items={now} agent={agent} members={members} />;
+    return (
+      <>
+        {now.map((a) => (
+          <InlineApproval key={a.id} approval={a} agent={agent} members={members} />
+        ))}
+      </>
+    );
+  }
   // Waiting: the agent asking, in the conversation; decided or expired: one line.
   if (approval.status === "pending" && !expired)
     return <ApprovalAsk approval={approval} agent={agent} members={members} />;

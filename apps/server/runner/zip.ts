@@ -1,6 +1,7 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { deflateRawSync } from "node:zlib";
+import { inBrowserProfile } from "@agenteschat/adapters/command-policy";
 import { RunnerError } from "./errors";
 import { isInside } from "./paths";
 
@@ -190,7 +191,8 @@ export class ZipWriter {
 }
 
 /**
- * Zips a folder (its contents under `<prefix>/`). Symlinks are skipped.
+ * Zips a folder (its contents under `<prefix>/`). Symlinks are skipped, and so
+ * is an agent browser's profile (its logins never leave the computer).
  * Stops with `too_large` once the archive passes `maxBytes`, and refuses to
  * read more than `maxReadBytes` of uncompressed data.
  */
@@ -212,6 +214,7 @@ export async function zipFolder(
       const childRel = rel ? `${rel}/${item.name}` : item.name;
       const name = prefix ? `${prefix}/${childRel}` : childRel;
       if (item.isDirectory()) {
+        if (inBrowserProfile(childAbs)) continue;
         const st = await stat(childAbs);
         zip.addDirectory(name, st.mtime);
         await walk(childAbs, childRel);

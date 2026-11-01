@@ -202,6 +202,45 @@ describe("live agent runs (streaming)", () => {
     expect(runningAgents(s).size).toBe(0);
   });
 
+  test("what a run posts inside a call (a tool's card, a DM) doesn't end it: the call's end and the reply still come", () => {
+    const tool = (name: string | null, id: string) =>
+      ({ type: "agent.tool", ...base, tool: name, toolUseId: id }) as unknown as ChannelEvent;
+    const posted = (id: string, channelId: string, meta: Record<string, unknown>) =>
+      ({
+        type: "message.created",
+        channelId,
+        messageId: id,
+        message: {
+          id,
+          agentRunId: "r1",
+          channelId,
+          threadId: channelId === "c1" ? "m1" : null,
+          author: { type: "agent", id: "atlas" },
+          meta,
+        } as unknown as Message,
+      }) as ChannelEvent;
+    let s = applyChannelEvent(emptyStreams, { type: "agent.run", ...base, status: "running" });
+    // As in production: the card propose_agent posts, while its call runs.
+    s = applyChannelEvent(s, tool("propose_agent", "tu1"));
+    s = applyChannelEvent(s, posted("m8", "c1", { actionCard: { kind: "agent_proposal" } }));
+    s = applyChannelEvent(s, tool(null, "tu1"));
+    // Any tool's post: a forum topic's card here, a DM to another agent.
+    s = applyChannelEvent(s, tool("suggest_forum_topic", "tu2"));
+    s = applyChannelEvent(s, posted("m7", "c1", { forumSuggestion: { title: "Rotinas" } }));
+    s = applyChannelEvent(s, posted("m6", "dm1", { agentNote: { runId: "r1" } }));
+    s = applyChannelEvent(s, tool(null, "tu2"));
+    s = applyChannelEvent(s, delta(1, "Propus o Caio."));
+    const [row] = runsInChannel(s, "c1");
+    expect(row?.work).toMatchObject([
+      { kind: "call", tool: "propose_agent", running: false },
+      { kind: "call", tool: "suggest_forum_topic", running: false },
+    ]);
+    expect(row?.text).toBe("Propus o Caio.");
+    // Its reply, with no call running, ends it.
+    s = applyChannelEvent(s, posted("m9", "c1", {}));
+    expect(runsInChannel(s, "c1")).toEqual([]);
+  });
+
   test("a new run of the same agent in the channel clears its failed row", () => {
     let s = applyChannelEvent(emptyStreams, { type: "agent.run", ...base, status: "failed", error: "budget_exceeded" });
     // Another agent's run leaves it.

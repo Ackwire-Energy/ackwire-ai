@@ -1,5 +1,6 @@
 import { and, type Executor, eq, type SQL, schema, sql } from "@agenteschat/db";
 import { PROVIDERS } from "@agenteschat/providers";
+import { pgSafeJson } from "./format";
 import { recordRunFinished } from "./operator-events";
 import { standingErrorDetail } from "./standing";
 
@@ -7,6 +8,9 @@ const { agentRuns, agentRunSteps } = schema;
 
 export type AgentRun = typeof agentRuns.$inferSelect;
 export type RunStatus = AgentRun["status"];
+
+/** For a select over `agent_runs`: parked on a provider outage (`transcript.outage`), it resumes by itself. */
+export const outageParkedSql = sql<boolean>`(${agentRuns.status} = 'waiting_input' and ${agentRuns.transcript} -> 'outage' is not null)`;
 
 /**
  * Where a run's replies go: asked in the main timeline (a channel, a DM
@@ -175,7 +179,7 @@ export async function addRunStep(
     orgId: run.orgId,
     runId: run.id,
     kind,
-    data,
+    data: pgSafeJson(data),
     seq: sql`(select coalesce(max(${agentRunSteps.seq}), 0) + 1 from ${agentRunSteps} where ${agentRunSteps.runId} = ${run.id})`,
   });
 }

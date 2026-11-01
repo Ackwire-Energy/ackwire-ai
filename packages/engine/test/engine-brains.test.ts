@@ -264,6 +264,41 @@ test("a computer-brain turn ends after the tools it ran through the bridge (neve
   expect(tokens[0]?.revokedAt).not.toBeNull();
 });
 
+test("a computer brain that keeps doing real work between promises gets both continues, never the ask nudge", async () => {
+  f = await setup({
+    judge: (kind, _id, state) =>
+      kind === "follow_through" ? (String(state.reply).includes("vou ") ? "continue" : "done") : undefined,
+  });
+  await computerAgent(f);
+  const ran = (id: string): BrainEvent => ({
+    type: "tool_call",
+    id,
+    name: "Bash",
+    input: { command: "bun run lint" },
+    executed: { content: "ok" },
+  });
+  const turns: BrainEvent[][] = [
+    [ran("t1"), { type: "done", text: "Rodei os testes; vou corrigir o lint." }],
+    [ran("t2"), { type: "done", text: "Corrigi o lint; vou rodar os testes de novo." }],
+    [ran("t3"), { type: "done", text: "Tudo verde." }],
+  ];
+  const { brain, seen } = scriptedComputerBrain((n) => turns[n] ?? [{ type: "done", text: "EXTRA" }]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev arruma o lint e os testes");
+  await drainOutbox(f.db, handlers);
+
+  expect(seen.length).toBe(3);
+  const nudged = (await f.db.select().from(schema.agentRunSteps)).flatMap((s) =>
+    typeof s.data.nudged === "string" ? [s.data.nudged] : [],
+  );
+  expect(nudged).toEqual(["promise", "promise"]);
+  expect((await timeline(f)).at(-1)?.body).toBe("Tudo verde.");
+});
+
 test("computer sessions: the conversation's session goes on while recent and small; a big, idle or routine one starts fresh", async () => {
   f = await setup();
   const machineId = await computerAgent(f);
@@ -650,12 +685,52 @@ test("a question asked through the bridge: the text written before it comes firs
   expect(main.some((m) => m.body.includes("você me passa a ida e a volta"))).toBe(false);
 });
 
+test("sent on after its turn, a computer brain that opens again with the same line and asks posts that line once", async () => {
+  const opening = 'Vou procurar a integração do serviço de cobrança e consultar os gastos de "acme".';
+  f = await setup({ askUser: true, judge: (kind) => (kind === "follow_through" ? "continue" : undefined) });
+  const machineId = await computerAgent(f);
+  const { brain } = scriptedComputerBrain(async function* (n, turn) {
+    // Turn 1 ends on its opening line (Codex's last message of the turn); the judge sends it on.
+    yield { type: "text_delta", text: opening };
+    if (n === 0) {
+      yield { type: "done", text: opening };
+      return;
+    }
+    // Turn 2 opens with the same line, then asks.
+    const result = await executeToolForRun(
+      f.jobDeps,
+      { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId },
+      {
+        id: "ask-2",
+        name: "ask_user",
+        input: {
+          why: "I need a person's answer before I go on: only they have it.",
+          question: "Qual é o endereço da API?",
+        },
+      },
+    );
+    yield { type: "tool_call", id: "ask-2", name: "ask_user", input: {}, executed: result };
+    yield { type: "done", text: opening };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev quanto o acme gastou este mês?");
+  await drainOutbox(f.db, handlers);
+
+  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("waiting_input");
+  const fromAgent = (await timeline(f)).filter((m) => m.author.type === "agent");
+  expect(fromAgent.map((m) => (m.meta.question ? "card" : m.body))).toEqual([opening, "card"]);
+});
+
 test("a plan limit falls back to the model brain; the reply carries a quiet note", async () => {
   f = await setup({ reply: () => ({ chunks: ["Respondi pela API."] }) });
   const machineId = await computerAgent(f);
   const { brain, seen } = scriptedComputerBrain(() => [
     { type: "limit", resetsAt: new Date(Date.now() + 2 * 3600_000).toISOString() },
-    { type: "error", code: "plan_limit", message: "You've hit your limit." },
+    { type: "error", code: "plan_limit", message: "You've hit your limit.", worked: false },
   ]);
   const handlers = createJobHandlers({
     ...f.jobDeps,
@@ -1986,8 +2061,11 @@ test("two gated bridged calls in one turn both wait; a gated call for a run that
   const pending =
     (after?.transcript as { pending?: { calls: { toolUseId: string }[] } } | undefined)?.pending?.calls ?? [];
   expect(pending.map((c) => c.toolUseId).sort()).toEqual(["m-1", "m-2"]);
+  // Both requests share one card, each its own row.
   const cards = (await f.db.select().from(schema.messages)).filter((m) => typeof m.meta.approvalId === "string");
-  expect(cards.length).toBe(2);
+  expect(cards.length).toBe(1);
+  const asked = await f.db.select().from(schema.approvals).where(eq(schema.approvals.runId, run.id));
+  expect(asked.map((a) => a.messageId)).toEqual([cards[0]?.id ?? "", cards[0]?.id ?? ""]);
 
   // The run ended: the gated call is refused before anything is posted, and its request canceled.
   await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, run.id));
@@ -1999,7 +2077,7 @@ test("two gated bridged calls in one turn both wait; a gated call for a run that
   expect(late).toMatchObject({ code: "bridge.run_not_running", result: { isError: true } });
   expect(late.result.pause).toBeUndefined();
   const all = (await f.db.select().from(schema.messages)).filter((m) => typeof m.meta.approvalId === "string");
-  expect(all.length).toBe(2);
+  expect(all.length).toBe(1);
   const [third] = await f.db.select().from(schema.approvals).where(eq(schema.approvals.toolUseId, "m-3"));
   expect(third?.status).toBe("canceled");
   expect(gh.executed).toEqual([]);

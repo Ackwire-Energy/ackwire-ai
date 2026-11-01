@@ -1,4 +1,4 @@
-# 0096. The agent's screen on the phone
+# 0098. The agent's screen on the phone
 
 - Status: Accepted (built: the server's page, the phone app; §2's session in a WebView still needs a test on a real phone)
 - Date: 2026-11-01

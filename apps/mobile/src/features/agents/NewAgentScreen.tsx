@@ -18,10 +18,11 @@ import {
   useSkills,
 } from "@agenteschat/client";
 import { LEVELS, type Level, nextLevel, saveLevels } from "@agenteschat/client/lib/access-levels";
-import { draftLevels, suggestedAiText } from "@agenteschat/client/lib/action-cards";
+import { draftLevels, draftMailLevels, suggestedAiText } from "@agenteschat/client/lib/action-cards";
 import { newAgentStart, newAgentStartText } from "@agenteschat/client/lib/agent-setup";
 import { connectedItems, itemName } from "@agenteschat/client/lib/connected";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { defaultPolicy, toMailLevel } from "@agenteschat/client/lib/mail";
 import {
   cleanHandle,
   freeHandle,
@@ -32,30 +33,38 @@ import {
   ROLE_DEFAULTS,
   ROLE_GROUPS,
   type RoleId,
+  savePart,
+  takenHandles,
 } from "@agenteschat/client/lib/new-agent";
-import { can } from "@agenteschat/client/lib/permissions";
+import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
 import { modelChoices, usableModels } from "@agenteschat/client/lib/providers";
 import { router, usePreventRemove } from "expo-router";
-import { type ReactNode, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Pressable, ScrollView, type ScrollViewInstance, StyleSheet, TextInput, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import { AgentAvatar, Button, Card, fieldText, Icon, Row, Text, Toggle, useToast } from "@/ui";
+import { AgentAvatar, Button, Card, fieldText, Icon, InfoHint, Row, Text, Toggle, useToast } from "@/ui";
 import { newAgentAi } from "../ai/logic";
 import { openConnectAi } from "../ai/NoAiCard";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { suggestAgentName } from "../new/logic";
 import { useOpenDm } from "../new/useOpenDm";
 import { useFailed } from "../routines/hooks";
+import { proposedRoutineWhen } from "../routines/rule";
 import { chooseAction } from "../settings/parts";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { PushedHeader, successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { type FullLook, fullLook } from "./edit";
+import { ErrorLine, HandleInput } from "./HandleInput";
+import { ImportAgents } from "./ImportAgents";
+import { arrivedAgents, landingOf, reportCounts } from "./import";
 import { LookPicker } from "./LookPicker";
 import { firstBlockedStep, NEW_AGENT_PHONE_STEPS, type PhoneStep, stepBlocked } from "./new-agent";
+import { RoleInput } from "./RoleInput";
+import { useAgentImport } from "./useAgentImport";
 
 /**
  * "Criar agente" on the phone, the web's steps for a thumb: Papel (the presets, grouped), Quem é
@@ -69,9 +78,12 @@ import { firstBlockedStep, NEW_AGENT_PHONE_STEPS, type PhoneStep, stepBlocked } 
 export function NewAgentScreen({
   initialWhat = "",
   proposalId = null,
+  startImport = false,
 }: {
   initialWhat?: string;
   proposalId?: string | null;
+  /** Opens on bringing agents from another app (Configurações › Importar e exportar). */
+  startImport?: boolean;
 }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -99,10 +111,18 @@ export function NewAgentScreen({
       </View>
     );
   }
-  return <NewAgentForm initialWhat={initialWhat} from={opened.current ?? undefined} />;
+  return <NewAgentForm initialWhat={initialWhat} from={opened.current ?? undefined} startImport={startImport} />;
 }
 
-function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: AgentProposal }) {
+function NewAgentForm({
+  initialWhat,
+  from,
+  startImport,
+}: {
+  initialWhat: string;
+  from?: AgentProposal;
+  startImport: boolean;
+}) {
   const { t, i18n } = useTranslation();
   const c = useColors();
   const toast = useToast();
@@ -112,6 +132,8 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
   const orgId = useOrgId();
   const { org } = useOrg();
   const mayImport = can(org, "create_agents");
+  // Giving a new agent apps is for who edits any agent: anyone else's starts without them (ADR 0085 §5).
+  const managesAgents = can(org, "manage_agents");
   const meId = useMeId();
   const dir = useDirectory();
   const create = useCreateAgent(orgId);
@@ -144,8 +166,13 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
   const [channelIds, setChannelIds] = useState<Set<string>>(new Set(proposed?.channelIds));
   // A proposal's levels are the reviewer's to change in Revisar; otherwise they come with the role.
   const [proposedLevels, setProposedLevels] = useState<Record<string, Level>>(() =>
-    proposed ? draftLevels(proposed) : {},
+    proposed && managesAgents ? draftLevels(proposed) : {},
   );
+  // My own mailboxes it asked for, at its level (only a mailbox's owner gives an agent access to it), and its routine.
+  const [mailLevels, setMailLevels] = useState<Record<string, Level>>(() =>
+    proposed && meId ? draftMailLevels(proposed, meId) : {},
+  );
+  const [withRoutine, setWithRoutine] = useState(Boolean(proposed?.routine));
   // Who thinks (ADR 0094): the workspace's last setup where it can think for an agent of mine, unless a proposal says.
   const keys = credentials.data ?? [];
   const usable = usableModels(modelChoices(models.data?.models ?? [], keys, platform.data ?? false));
@@ -161,6 +188,16 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
     : "";
   const created = useRef(false);
   const denied = useRef(false);
+  // Bringing agents from another app, in place of the role cards (the web's create-agent import step).
+  const imp = useAgentImport(orgId);
+  const left = useRef(false);
+  useEffect(() => {
+    left.current = false;
+    return () => {
+      left.current = true;
+    };
+  }, []);
+  const [importing, setImporting] = useState(startImport && mayImport && !proposed);
   const deny = useDenyAgentProposal(orgId);
 
   const step: PhoneStep = NEW_AGENT_PHONE_STEPS[index] ?? "role";
@@ -170,27 +207,21 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
     [connections.data, servers.data, catalog.data],
   );
   const levels = useMemo(
-    () => (proposed ? proposedLevels : presetLevels(role ?? "custom", items)),
-    [proposed, proposedLevels, role, items],
+    () => (proposed ? proposedLevels : managesAgents ? presetLevels(role ?? "custom", items) : {}),
+    [proposed, proposedLevels, role, items, managesAgents],
   );
   const granted = items.filter((i) => (levels[i.id] ?? "none") !== "none");
+  const myMail = (proposed?.mail ?? []).filter((m) => m.accountId in mailLevels);
   // Revisar lists what a proposal asked for at any level, so a change can be taken back.
   const listedApps = proposed ? items.filter((i) => i.id in proposedLevels) : granted;
-  // Mine, and the public ones a proposal names that I'm not in: whoever may create agents adds one to any of them.
+  // Mine, and the ones a proposal names: only where I may put an agent (in it and posting, or managing it).
   const myChannels = useMemo(() => {
     const dmIds = new Set((dms.data ?? []).map((d) => d.channelId));
     return (channels.data ?? []).filter(
-      (ch) => (ch.isMember || proposed?.channelIds.includes(ch.id)) && !dmIds.has(ch.id),
+      (ch) => (ch.isMember || proposed?.channelIds.includes(ch.id)) && !dmIds.has(ch.id) && addsAgentsTo(ch, meId, org),
     );
-  }, [channels.data, dms.data, proposed]);
-  const taken = useMemo(
-    () =>
-      new Set([
-        ...dir.agents.map((a) => a.handle.toLowerCase()),
-        ...[...dir.memberById.values()].map((m) => m.handle.toLowerCase()).filter(Boolean),
-      ]),
-    [dir.agents, dir.memberById],
-  );
+  }, [channels.data, dms.data, proposed, meId, org]);
+  const taken = useMemo(() => takenHandles(dir.agents, [...dir.memberById.values()]), [dir.agents, dir.memberById]);
   const draft = { role, name, handle, taken };
   const shownName = name.trim() || t("newAgent.previewName");
   const g = agentGrammar(t, name.trim() || t("newAgent.defaultName"));
@@ -277,50 +308,114 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
         ...(thinks.autonomy ? { autonomy: thinks.autonomy } : {}),
       });
       created.current = true;
-      // What the role brings, as the web's last step: its channels, its apps' levels, the default skills.
+      // What the role brings, as the web's last step: its channels, its apps' levels, the default skills. One part
+      // at a time, so a refused one doesn't keep the rest (the AI below too) from saving.
+      const failures: unknown[] = [];
       const joined = myChannels.filter((ch) => channelIds.has(ch.id));
       if (joined.length > 0)
-        await api.agents.setChannels(
-          orgId,
-          agent.id,
-          joined.map((ch) => ({ channelId: ch.id })),
+        await savePart(failures, () =>
+          api.agents.setChannels(
+            orgId,
+            agent.id,
+            joined.map((ch) => ({ channelId: ch.id })),
+          ),
         );
       const chosen = Object.fromEntries(granted.map((i) => [`connector:${i.id}`, levels[i.id] as Level]));
-      if (Object.keys(chosen).length > 0) await saveLevels(api, orgId, agent.id, chosen);
+      if (Object.keys(chosen).length > 0) await savePart(failures, () => saveLevels(api, orgId, agent.id, chosen));
       const list = library.data ?? [];
       if (list.length > 0)
-        await api.skills.setForAgent(
-          orgId,
-          agent.id,
-          list.map((s) => ({ skillId: s.id, enabled: s.defaultForNewAgents })),
+        await savePart(failures, () =>
+          api.skills.setForAgent(
+            orgId,
+            agent.id,
+            list.map((s) => ({ skillId: s.id, enabled: s.defaultForNewAgents })),
+          ),
         );
       // The AI the server suggests for me: an account of mine on its computer; the workspace's model needs nothing.
       const ai = proposed?.ai;
       if (ai?.kind === "account") {
-        await api.sandbox.setTarget(orgId, agent.id, ai.machineId);
-        await api.agents.setBrain(orgId, agent.id, { brain: ai.brain, account: ai.accountId });
+        await savePart(failures, async () => {
+          await api.sandbox.setTarget(orgId, agent.id, ai.machineId);
+          await api.agents.setBrain(orgId, agent.id, { brain: ai.brain, account: ai.accountId });
+        });
       }
       // Or the last setup's plan, with its model, effort and the rest; on the API, its context window.
-      if (thinks.plan) {
-        await api.sandbox.setTarget(orgId, agent.id, thinks.plan.machineId);
-        await api.agents.setBrain(orgId, agent.id, thinks.plan.input);
+      const plan = thinks.plan;
+      if (plan) {
+        await savePart(failures, async () => {
+          await api.sandbox.setTarget(orgId, agent.id, plan.machineId);
+          await api.agents.setBrain(orgId, agent.id, plan.input);
+        });
       } else if (thinks.contextTokens !== null) {
-        await api.agents.setBrain(orgId, agent.id, { brain: "model", contextTokens: thinks.contextTokens });
+        await savePart(failures, () =>
+          api.agents.setBrain(orgId, agent.id, { brain: "model", contextTokens: thinks.contextTokens }),
+        );
       }
-      successHaptic();
-      toast({ title: t("mobile.agents.created", { name: agent.name }), agentId: agent.id });
-      // Nothing to think with yet: Connect opens for it over its conversation.
+      // My own mailboxes at the level chosen here (every send asks), then its routine, now that it is where it reports.
+      for (const [accountId, level] of Object.entries(mailLevels)) {
+        if (level === "none") continue;
+        await savePart(failures, () =>
+          api.mail.setAgent(orgId, agent.id, accountId, {
+            level: toMailLevel(level),
+            canDelete: false,
+            policy: defaultPolicy(),
+          }),
+        );
+      }
+      if (from && proposed?.routine && withRoutine)
+        await savePart(failures, () => api.agents.proposalRoutine(orgId, from.messageId));
+      if (failures.length > 0) toast({ title: t("mobile.newAgent.partly"), icon: "x" });
+      else {
+        successHaptic();
+        toast({ title: t("mobile.agents.created", { name: agent.name }), agentId: agent.id });
+      }
+      if (from) {
+        // From its card: back to that conversation as it was, Connect over it when it has nothing to think with.
+        router.back();
+        if (ai?.kind === "none") openConnectAi({ agentId: agent.id });
+        return;
+      }
+      // It exists either way (Criar again would only find its @ taken): on to its conversation, where Connect opens
+      // when it has nothing to think with yet.
       void openDm({ agentId: agent.id }).then(() => {
         if (ai?.kind === "none") openConnectAi({ agentId: agent.id });
       });
     } catch (e) {
-      if (created.current) {
-        // The agent exists; only part of what the role brings didn't go through.
-        toast({ title: t("mobile.newAgent.partly"), icon: "x" });
-      } else failed(e);
+      failed(e);
     } finally {
       setBusy(false);
     }
+  };
+  const runImport = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const report = await imp.apply();
+      if (!report) return;
+      const ids = arrivedAgents(report);
+      const counts = reportCounts(report, imp.picks.length);
+      created.current = true;
+      successHaptic();
+      const first = report.find((i) => i.kind === "agent" && i.targetId === ids[0]);
+      toast({
+        title: counts.partial
+          ? t("mobile.newAgent.import.partial", counts)
+          : ids.length > 0
+            ? t("mobile.newAgent.import.arrived", { count: ids.length, name: first?.label ?? "" })
+            : t("onboarding.import.report.title"),
+        ...(ids.length === 1 ? { agentId: ids[0] } : {}),
+      });
+      const land = landingOf(ids, { left: left.current });
+      if (land?.how === "replace") router.replace(land.href as never);
+      else if (land) router.dismissTo(land.href as never);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const closeImport = () => {
+    if (imp.planned) imp.reset();
+    else setImporting(false);
+    scroll.current?.scrollTo({ y: 0, animated: false });
   };
   const next = () => {
     if (busy) return;
@@ -345,6 +440,11 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
     </View>
   );
   const input = [styles.input, fieldText("body"), { backgroundColor: c.raised, color: c.ink, borderColor: c.line }];
+  const usesTitle = (
+    <Text variant="title" accessibilityRole="header">
+      {t("newAgent.preview.uses")}
+    </Text>
+  );
 
   const views: Record<PhoneStep, () => ReactNode> = {
     role: () => (
@@ -356,27 +456,12 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
             size="sm"
             icon="archive"
             label={t("shell.importAgents")}
-            onPress={() => router.push("/settings/import")}
+            onPress={() => {
+              setImporting(true);
+              scroll.current?.scrollTo({ y: 0, animated: false });
+            }}
           />
         ) : null}
-        {ROLE_GROUPS.map((group) => (
-          <View key={group.id} style={styles.group}>
-            <Text variant="footnote" tone="faint" style={styles.groupTitle}>
-              {t(`newAgent.roleGroups.${group.id}`)}
-            </Text>
-            {group.roles.map((id) => (
-              <RoleCard
-                key={id}
-                on={role === id}
-                onPress={() => pickRole(id)}
-                leading={<AgentAvatar agent={fullLook(ROLE_DEFAULTS[id].look)} size={48} live={false} />}
-                title={t(`newAgent.roles.${id}.name`)}
-                caption={t("newAgent.startsAs", { name: t(`newAgent.roles.${id}.agent`) })}
-                desc={t(`newAgent.roles.${id}.desc`)}
-              />
-            ))}
-          </View>
-        ))}
         <View style={styles.group}>
           <RoleCard
             on={role === "custom"}
@@ -390,22 +475,27 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
             desc={t("newAgent.roles.custom.desc")}
           />
           {role === "custom" ? (
-            <>
-              <Text variant="footnote" tone="faint" style={styles.gapTop}>
-                {t("agent.roleLabel")}
-              </Text>
-              <TextInput
-                value={roleText}
-                onChangeText={setRoleText}
-                maxLength={200}
-                placeholder={t("agent.roleHelp")}
-                placeholderTextColor={c.faint}
-                accessibilityLabel={t("agent.roleLabel")}
-                style={input}
-              />
-            </>
+            <RoleInput value={roleText} onChangeText={setRoleText} placeholder={t("agent.roleHelp")} />
           ) : null}
         </View>
+        {ROLE_GROUPS.map((group) => (
+          <View key={group.id} style={styles.group}>
+            <Text variant="footnote" tone="faint" style={styles.groupTitle}>
+              {t(`newAgent.roleGroups.${group.id}`)}
+            </Text>
+            {group.roles.map((id) => (
+              <RoleCard
+                key={id}
+                on={role === id}
+                onPress={() => pickRole(id)}
+                leading={<AgentAvatar agent={fullLook(ROLE_DEFAULTS[id].look)} size={44} live={false} />}
+                title={t(`newAgent.roles.${id}.name`)}
+                caption={t("newAgent.startsAs", { name: t(`newAgent.roles.${id}.agent`) })}
+                desc={t(`newAgent.roles.${id}.desc`)}
+              />
+            ))}
+          </View>
+        ))}
         {tried && !role ? <ErrorLine text={t("newAgent.errors.roleRequired")} /> : null}
       </>
     ),
@@ -432,25 +522,15 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
         <Text variant="footnote" tone="faint" style={styles.gapTop}>
           {t("newAgent.handle")}
         </Text>
-        <View style={[styles.affix, { backgroundColor: c.raised, borderColor: c.line }]}>
-          <Text variant="body" tone="faint">
-            @
-          </Text>
-          <TextInput
-            value={handle}
-            onChangeText={(v) => {
-              setHandleTouched(true);
-              setHandle(cleanHandle(v));
-            }}
-            maxLength={32}
-            autoCapitalize="none"
-            autoCorrect={false}
-            placeholder={t("newAgent.handlePlaceholder")}
-            placeholderTextColor={c.faint}
-            accessibilityLabel={t("newAgent.handle")}
-            style={[styles.affixInput, fieldText("body"), { color: c.ink }]}
-          />
-        </View>
+        <HandleInput
+          value={handle}
+          onChangeText={(v) => {
+            setHandleTouched(true);
+            setHandle(cleanHandle(v));
+          }}
+          label={t("newAgent.handle")}
+          placeholder={t("newAgent.handlePlaceholder")}
+        />
         {handleIssue ? (
           <ErrorLine text={handleText} />
         ) : (
@@ -554,9 +634,17 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
         ) : null}
 
         <View style={styles.section}>
-          <Text variant="title" accessibilityRole="header">
-            {t("newAgent.preview.uses")}
-          </Text>
+          {managesAgents ? (
+            usesTitle
+          ) : (
+            <InfoHint
+              name={t("common.about", { label: t("newAgent.preview.uses") })}
+              text={t("newAgent.accessAdmins")}
+              variant="title"
+            >
+              {usesTitle}
+            </InfoHint>
+          )}
           {listedApps.length > 0 ? (
             <Card>
               {listedApps.map((i) => {
@@ -585,17 +673,58 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
                 );
               })}
             </Card>
-          ) : (
+          ) : myMail.length === 0 ? (
             <Text variant="footnote" tone="faint">
               {t("newAgent.preview.onlyTalks")}
             </Text>
-          )}
+          ) : null}
+          {myMail.length > 0 ? (
+            <Card>
+              {myMail.map((box) => {
+                const level = mailLevels[box.accountId] ?? "none";
+                return (
+                  <Row
+                    key={box.accountId}
+                    leading={<Icon name="mail" size={20} color={c.muted} />}
+                    title={box.address}
+                    meta={
+                      <Text variant="small" tone="muted">
+                        {t(`access.level.${level}`)}
+                      </Text>
+                    }
+                    onPress={() => {
+                      tapHaptic();
+                      setMailLevels((p) => ({ ...p, [box.accountId]: nextLevel({ levels: LEVELS }, level) }));
+                    }}
+                  />
+                );
+              })}
+            </Card>
+          ) : null}
           <Text variant="footnote" tone="faint">
-            {proposed && listedApps.length > 0
+            {proposed && listedApps.length + myMail.length > 0
               ? `${t("mobile.settings.access.how")} ${t("newAgent.approvalsNote")}`
               : t("newAgent.approvalsNote")}
           </Text>
         </View>
+
+        {proposed?.routine ? (
+          <View style={styles.section}>
+            <Text variant="title" accessibilityRole="header">
+              {t("newAgent.routine")}
+            </Text>
+            <Card>
+              <Toggle
+                label={`${proposed.routine.name} · ${proposedRoutineWhen(t, i18n.language, proposed.routine)}`}
+                value={withRoutine}
+                onChange={setWithRoutine}
+              />
+            </Card>
+            <Text variant="footnote" tone="faint">
+              {proposed.routine.prompt}
+            </Text>
+          </View>
+        ) : null}
 
         <View style={styles.section}>
           <Text variant="title" accessibilityRole="header">
@@ -635,7 +764,7 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
     <View style={[styles.fill, { backgroundColor: c.bg }]}>
       <PushedHeader
         title={t("newAgent.title")}
-        subtitle={t("newAgent.stepOf", { n: index + 1, total })}
+        subtitle={importing ? undefined : t("newAgent.stepOf", { n: index + 1, total })}
         solid={false}
       />
       <KeyboardAvoidingView behavior="padding" style={styles.fill}>
@@ -645,12 +774,40 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.body}
         >
-          <Steps index={index} total={total} />
-          {views[step]()}
+          {importing ? (
+            <>
+              {head(t("shell.importAgents"), t("onboarding.import.lead"))}
+              <ImportAgents imp={imp} orgId={orgId} />
+            </>
+          ) : (
+            <>
+              <Steps index={index} total={total} />
+              {views[step]()}
+            </>
+          )}
         </ScrollView>
         <View style={[styles.footer, { borderTopColor: c.line, paddingBottom: Math.max(insets.bottom, 12) }]}>
-          {index > 0 ? <Button variant="secondary" label={t("common.back")} onPress={() => goTo(index - 1)} /> : null}
-          {step !== "role" || role ? (
+          {importing ? (
+            <>
+              <Button variant="secondary" label={t("common.back")} disabled={busy} onPress={closeImport} />
+              {imp.planned && imp.picks.length > 0 ? (
+                <View style={styles.fill}>
+                  <Button
+                    variant="primary"
+                    wide
+                    label={t("onboarding.import.go", { count: imp.picks.length })}
+                    loading={busy}
+                    disabled={busy}
+                    onPress={() => void runImport()}
+                  />
+                </View>
+              ) : null}
+            </>
+          ) : null}
+          {!importing && index > 0 ? (
+            <Button variant="secondary" label={t("common.back")} onPress={() => goTo(index - 1)} />
+          ) : null}
+          {!importing && (step !== "role" || role) ? (
             <View style={styles.fill}>
               <Button
                 variant="primary"
@@ -734,15 +891,6 @@ function RoleCard({
   );
 }
 
-function ErrorLine({ text }: { text: string }) {
-  const c = useColors();
-  return (
-    <Text variant="footnote" style={{ color: c.danger }} accessibilityLiveRegion="polite">
-      {text}
-    </Text>
-  );
-}
-
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   body: { paddingHorizontal: 18, paddingBottom: 32, gap: 8 },
@@ -758,8 +906,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   blank: {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
     borderRadius: 15,
     borderWidth: 1.5,
     borderStyle: "dashed",
@@ -771,15 +919,6 @@ const styles = StyleSheet.create({
   pressed: { transform: [{ scale: 0.98 }] },
   hero: { alignItems: "center", paddingVertical: 8 },
   input: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, paddingVertical: 12 },
-  affix: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 14,
-  },
-  affixInput: { flex: 1, paddingVertical: 12 },
   gapTop: { marginTop: 10 },
   section: { marginTop: 22, gap: 10 },
   restore: { flexDirection: "row", alignItems: "center", gap: 10 },

@@ -12,6 +12,7 @@ import {
 } from "../../runner/brain-codex";
 import {
   approvalCalls,
+  CodexAppMapper,
   CodexAppServers,
   type CodexAppServersOptions,
   codexAppServerArgs,
@@ -377,7 +378,7 @@ test.skipIf(!posix)("a usage limit is limit + plan_limit, as exec's", async () =
   await turn.done;
   expect(notDeltas(turn.events)).toEqual([
     { type: "limit" },
-    { type: "error", code: "plan_limit", message: "You've hit your usage limit. Try again later." },
+    { type: "error", code: "plan_limit", message: "You've hit your usage limit. Try again later.", worked: false },
   ]);
 });
 
@@ -602,3 +603,34 @@ test.skipIf(!posix)(
   },
   20_000,
 );
+
+test("a refusal known by its words after a command says the turn worked", () => {
+  const m = new CodexAppMapper({ cwd: "" });
+  m.completed({ id: "c", type: "commandExecution", command: "git push", aggregatedOutput: "", status: "completed" });
+  const message = "Your workspace is out of credits.";
+  expect(m.end({ id: "t", status: "failed", error: { message } } as never, SESSION, []).at(-1)).toEqual({
+    type: "error",
+    code: "plan_limit",
+    message,
+    worked: true,
+  });
+});
+
+test("an agent message completed twice is sent once", () => {
+  const m = new CodexAppMapper({ cwd: "" });
+  const sent: string[] = [];
+  const text = (t: string | undefined) => t && sent.push(t);
+  text(m.completed({ id: "msg_b", type: "agentMessage", text: "Achei a chave." }).text);
+  text(m.completed({ id: "msg_b", type: "agentMessage", text: "Achei a chave." }).text);
+  expect(sent).toEqual(["Achei a chave."]);
+});
+
+test("two different messages that read alike are both sent", () => {
+  const m = new CodexAppMapper({ cwd: "" });
+  const sent: string[] = [];
+  for (const id of ["msg_1", "msg_2"]) {
+    sent.push(m.delta({ itemId: id, delta: "Feito." }));
+    expect(m.completed({ id, type: "agentMessage", text: "Feito." }).text).toBeUndefined();
+  }
+  expect(sent.join("")).toBe("Feito.\n\nFeito.");
+});

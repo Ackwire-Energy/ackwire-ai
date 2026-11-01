@@ -1,4 +1,4 @@
-import type { ActiveRun, ChannelEvent, RunStatus } from "../api/types";
+import type { ActiveRun, ChannelEvent, Message, RunStatus } from "../api/types";
 import { isMediaAfterReply } from "../lib/media";
 import { NO_AI } from "../lib/no-ai";
 
@@ -601,9 +601,9 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
     }
     case "message.created": {
       const m = event.message;
-      // A fast reply while the task works (`meta.talker`): the task's row goes on. The sticker or GIF an agent adds
-      // after its reply (ADR 0091) ends nothing: its reply already did, and a new "pensando…" stays.
-      if (!m?.agentRunId || m.meta?.talker || isMediaAfterReply(m.meta)) return state;
+      // The sticker or GIF an agent adds after its reply (ADR 0091) ends nothing: its reply already did, and a new
+      // "pensando…" stays.
+      if (!m?.agentRunId || postedOnTheWay(state, m) || isMediaAfterReply(m.meta)) return state;
       const next = finish(state, m.agentRunId);
       if (m.author?.type !== "agent" || !m.author.id) return next;
       if (m.threadId) return settleProvisional(next, m.author.id, m.threadId);
@@ -714,6 +714,17 @@ function finish(state: StreamsState, runId: string): StreamsState {
   const { [runId]: _done, ...runs } = state.runs;
   return { ...state, runs, finished: { ...state.finished, [runId]: true } };
 }
+
+/**
+ * A message its run posts while it goes on working, never its reply: a fast reply (`meta.talker`), and anything posted
+ * while one of its calls runs, since a tool posts inside its call (`invokeWithChip` sends the call's start before the
+ * tool runs, on every brain): a card (an agent's proposal, Connect, a forum topic, an event), a DM, a post in another
+ * channel. Taken for the run's end, it froze the row with that call still running, and dropped every later event of the
+ * run. A pause (an approval, a question) ends the row with its own event.
+ */
+const postedOnTheWay = (state: StreamsState, m: Message) =>
+  Boolean(m.meta?.talker) ||
+  Boolean(m.agentRunId && state.runs[m.agentRunId]?.work?.some((w) => w.kind === "call" && w.running));
 
 /** No event for this long: the row says "sem notícias há 3 min · Atualizar". */
 export const QUIET_AFTER_MS = 3 * 60_000;

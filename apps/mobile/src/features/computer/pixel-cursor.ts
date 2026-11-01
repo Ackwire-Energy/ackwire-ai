@@ -1,5 +1,5 @@
 /*
- * The person's pointer on the agent's screen (ADR 0096): a pixel arrow, in the brand's dither. Its tip, the first cell,
+ * The person's pointer on the agent's screen (ADR 0098): a pixel arrow, in the brand's dither. Its tip, the first cell,
  * is where a click lands. Rows of cells: `#` the light rim, `.` the body, a space nothing.
  */
 const ROWS = [

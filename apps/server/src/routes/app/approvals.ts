@@ -1,5 +1,6 @@
 import {
   decideApproval,
+  decideApprovals,
   getApproval,
   listApprovalRules,
   listApprovals,
@@ -149,6 +150,7 @@ export function approvalRoutes(deps: AppDeps) {
         query: z.object({
           status: z.enum(["pending", "decided"]).optional(),
           agentId: z.uuid().optional(),
+          messageId: z.uuid().optional().openapi({ description: "The requests on one approval card." }),
           limit: z.coerce.number().int().min(1).max(500).optional(),
         }),
       },
@@ -173,6 +175,52 @@ export function approvalRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, approvalId } = c.req.valid("param");
       return c.json(await getApproval(db, c.get("user").id, orgId, approvalId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/approvals/decide",
+      tags,
+      security,
+      summary: 'Decide several at once (a card\'s "Aprovar tudo"): exactly these ids, the ones you may decide',
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            ids: z.array(z.uuid()).min(1).max(50),
+            decision: z.enum(["approve", "refuse"]),
+            reason: z.string().max(1000).optional(),
+          }),
+        ),
+      },
+      responses: {
+        200: json(
+          z.object({
+            approvals: z.array(Approval),
+            skipped: z
+              .array(z.uuid())
+              .openapi({ description: "Not decided: already decided, not found, or not yours to decide." }),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const result = await decideApprovals(
+        {
+          db,
+          pubsub: adapters.pubsub,
+          memory: deps.extras?.context ? memoryJudging(deps.extras.context) : undefined,
+        },
+        c.get("user").id,
+        orgId,
+        c.req.valid("json"),
+      );
+      deps.wakeWorkers?.();
+      return c.json(result, 200);
     },
   );
 

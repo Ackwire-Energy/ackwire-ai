@@ -1,4 +1,4 @@
-import type { Message, SecretRequest } from "@agenteschat/client";
+import type { Message } from "@agenteschat/client";
 
 /**
  * The requests waiting in a conversation, without React Native, so they are unit-tested: which wait on the person,
@@ -176,13 +176,7 @@ export function mayAsk(m: Pick<Message, "author" | "meta">): boolean {
   return m.author.type === "agent" && meta !== undefined && ASK_KEYS.some((key) => Boolean(meta[key]));
 }
 
-/** `meta.secretRequest`, when it is one. */
-export function secretRequestOf(meta: Message["meta"]): SecretRequest | null {
-  const s = meta?.secretRequest as Partial<SecretRequest> | undefined;
-  return s && typeof s === "object" && typeof s.id === "string" && typeof s.status === "string" && s.target
-    ? (s as SecretRequest)
-    : null;
-}
+export { secretRequestOf } from "@agenteschat/client/lib/secret-requests";
 
 /**
  * How long an approval waits before it expires: the engine's `APPROVAL_TTL_MS`

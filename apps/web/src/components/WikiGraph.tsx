@@ -1,89 +1,27 @@
 import type { WikiGraph } from "@agenteschat/client";
 import { useWikiGraph } from "@agenteschat/client";
+import { layoutGraph, type Placed } from "@agenteschat/client/lib/wiki";
 import { appearanceStyle, Segmented } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
 
-export interface Placed {
-  slug: string;
-  x: number;
-  y: number;
-}
+export { layoutGraph, type Placed };
+
+const GRAPH_H = 560;
 
 /**
- * A small force-directed layout (no library): nodes repel, links pull,
- * everything drifts to the center. Deterministic (starts on a circle), so
- * the same graph always lands the same way.
+ * The full graph's drawing width for a box of `width` x `height` px: the
+ * viewBox takes the box's shape, so the drawing fills it instead of sitting
+ * letterboxed in a wide window, and the layout spreads into the extra width.
  */
-export function layoutGraph(graph: WikiGraph, width = 720, height = 460, steps = 240): Placed[] {
-  const n = graph.nodes.length;
-  if (n === 0) return [];
-  const pos = graph.nodes.map((node, i) => {
-    const a = (2 * Math.PI * i) / n;
-    return {
-      slug: node.slug,
-      x: width / 2 + Math.cos(a) * width * 0.3,
-      y: height / 2 + Math.sin(a) * height * 0.3,
-      vx: 0,
-      vy: 0,
-    };
-  });
-  const index = new Map(pos.map((p, i) => [p.slug, i]));
-  const edges = graph.edges
-    .map((e) => [index.get(e.from), index.get(e.to)] as const)
-    .filter((e): e is readonly [number, number] => e[0] !== undefined && e[1] !== undefined && e[0] !== e[1]);
-  const k = Math.sqrt((width * height) / n) * 0.6;
-  for (let step = 0; step < steps; step++) {
-    const cool = 1 - step / steps;
-    for (let i = 0; i < n; i++) {
-      const a = pos[i] as (typeof pos)[number];
-      for (let j = i + 1; j < n; j++) {
-        const b = pos[j] as (typeof pos)[number];
-        let dx = a.x - b.x;
-        let dy = a.y - b.y;
-        let d2 = dx * dx + dy * dy;
-        if (d2 < 0.01) {
-          dx = 0.1 * (i - j);
-          dy = 0.1;
-          d2 = dx * dx + dy * dy;
-        }
-        const f = (k * k) / d2;
-        a.vx += dx * f * 0.02;
-        a.vy += dy * f * 0.02;
-        b.vx -= dx * f * 0.02;
-        b.vy -= dy * f * 0.02;
-      }
-    }
-    for (const [i, j] of edges) {
-      const a = pos[i] as (typeof pos)[number];
-      const b = pos[j] as (typeof pos)[number];
-      const dx = b.x - a.x;
-      const dy = b.y - a.y;
-      const d = Math.sqrt(dx * dx + dy * dy) || 1;
-      const f = ((d - k) / d) * 0.06;
-      a.vx += dx * f;
-      a.vy += dy * f;
-      b.vx -= dx * f;
-      b.vy -= dy * f;
-    }
-    for (const p of pos) {
-      p.vx += (width / 2 - p.x) * 0.004;
-      p.vy += (height / 2 - p.y) * 0.004;
-      const max = 12 * cool + 1;
-      p.x += Math.max(-max, Math.min(max, p.vx));
-      p.y += Math.max(-max, Math.min(max, p.vy));
-      p.vx *= 0.6;
-      p.vy *= 0.6;
-      p.x = Math.max(24, Math.min(width - 24, p.x));
-      p.y = Math.max(24, Math.min(height - 24, p.y));
-    }
-  }
-  return pos.map(({ slug, x, y }) => ({ slug, x: Math.round(x), y: Math.round(y) }));
+export function graphWidth(width: number, height: number) {
+  if (!(width > 0 && height > 0)) return 960;
+  return Math.round(Math.min(4, Math.max(1, width / height)) * GRAPH_H);
 }
 
 /** Pages linked to `slug` (both directions). */
@@ -125,8 +63,18 @@ export function WikiGraphView({ onOpen, mini = false }: { onOpen?: () => void; m
       edges: data.edges.filter((e) => keep.has(e.from) && keep.has(e.to)),
     };
   }, [data, filter]);
-  const W = mini ? 520 : 960;
-  const H = mini ? 200 : 560;
+  const [el, setEl] = useState<SVGSVGElement | null>(null);
+  const [fullW, setFullW] = useState(960);
+  useEffect(() => {
+    if (mini || !el || typeof ResizeObserver === "undefined") return;
+    const measure = () => setFullW(graphWidth(el.clientWidth, el.clientHeight));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [mini, el]);
+  const W = mini ? 520 : fullW;
+  const H = mini ? 200 : GRAPH_H;
   const placed = useMemo(() => (filtered ? layoutGraph(filtered, W, H) : []), [filtered, W, H]);
   if (graph.isLoading) return mini ? null : <LoadingCards count={2} />;
   if (!data || !filtered) return mini ? null : <ErrorState error={graph.error} onRetry={() => void graph.refetch()} />;
@@ -146,6 +94,7 @@ export function WikiGraphView({ onOpen, mini = false }: { onOpen?: () => void; m
   };
   const svg = (
     <svg
+      ref={setEl}
       className="wiki-graph__svg"
       viewBox={`0 0 ${W} ${H}`}
       role={mini ? "presentation" : "img"}

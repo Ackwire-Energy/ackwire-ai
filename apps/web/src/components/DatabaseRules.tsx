@@ -1,6 +1,6 @@
 import type { DatabasePolicy } from "@agenteschat/client";
 import { useDatabaseTables } from "@agenteschat/client";
-import { DATABASE_TIMEOUTS, splitColumns } from "@agenteschat/client/lib/databases";
+import { DATABASE_TIMEOUTS, splitColumns, tableRuleNames } from "@agenteschat/client/lib/databases";
 import { CheckboxPill, Field, Input, Segmented } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
 import { AddressList } from "@/components/AddressList";
@@ -45,18 +45,18 @@ export function DatabaseRulesPanel({
           ) : (
             <div className="newag__pills">
               {(tables.data ?? []).map((table) => {
-                const name = `${table.schema}.${table.name}`.toLowerCase();
+                const names = tableRuleNames(table.schema, table.name);
+                const name = names[0] ?? "";
+                const others = policy.tables.filter((x) => !names.includes(x));
                 return (
                   <CheckboxPill
                     key={name}
                     id={id(`table-${name}`)}
                     disabled={disabled}
-                    checked={policy.tables.includes(name)}
-                    onCheckedChange={(on) =>
-                      set({ tables: on ? [...policy.tables, name] : policy.tables.filter((x) => x !== name) })
-                    }
+                    checked={others.length < policy.tables.length}
+                    onCheckedChange={(on) => set({ tables: on ? [...others, name] : others })}
                   >
-                    {table.schema === "public" ? table.name : name}
+                    {table.schema === "public" ? table.name : `${table.schema}.${table.name}`}
                   </CheckboxPill>
                 );
               })}
@@ -72,6 +72,7 @@ export function DatabaseRulesPanel({
           onChange={(hiddenColumns) => set({ hiddenColumns })}
           disabled={disabled}
           split={splitColumns}
+          clearable
           inputMode="text"
           placeholder={t("database.rule.hiddenPlaceholder")}
           invalidText={t("database.rule.hiddenInvalid")}

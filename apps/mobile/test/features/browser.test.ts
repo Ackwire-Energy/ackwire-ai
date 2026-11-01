@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import {
   type BrowserHandoff,
+  type BrowserInputEvent,
   browserHandoffOf,
   controlledBy,
+  createTouchInput,
   handoffIsMine,
   heldTakeoversHere,
 } from "@agenteschat/client";
@@ -16,6 +18,7 @@ import {
   siteLetter,
   siteOf,
   skyBehind,
+  touchOnPage,
   waitsForPage,
 } from "../../src/features/browser/logic";
 import { featureKeysEn } from "../../src/features/i18n/keys.en";
@@ -266,5 +269,49 @@ describe("a take over held in the conversation (the card outlives the run's live
     expect(controlledBy(takeover, "u1")).toBe(true);
     expect(controlledBy(takeover, "u2")).toBe(false);
     expect(controlledBy({ ...takeover, status: "pending" }, "u1")).toBe(false);
+  });
+});
+
+describe("fingers on the page in control (ADR 0040 §14)", () => {
+  // A 1280×720 page in the card's 16:10 box (320×200): drawn 320×180, with 10 px of band above and below.
+  const meta = { deviceWidth: 1280, deviceHeight: 720 };
+  const box = { width: 320, height: 200 };
+  const said = (events: BrowserInputEvent[]) =>
+    events.map((e) =>
+      e.kind !== "mouse"
+        ? e.kind
+        : e.type === "mouseWheel"
+          ? `wheel@${e.x},${e.y}:${e.deltaX},${e.deltaY}`
+          : `${e.type}${e.type === "mouseMoved" ? `+${e.button}` : ""}@${e.x},${e.y}`,
+    );
+
+  test("where a finger lands on the page: the band around the picture is off it, a drag past it stays at its edge", () => {
+    expect(touchOnPage({ x: 160, y: 100 }, box, meta, false)).toEqual({ x: 640, y: 360 });
+    expect(touchOnPage({ x: 160, y: 5 }, box, meta, false)).toBeNull();
+    expect(touchOnPage({ x: 160, y: 5 }, box, meta, true)).toEqual({ x: 640, y: 0 });
+    expect(touchOnPage({ x: 400, y: 195 }, box, meta, true)).toEqual({ x: 1280, y: 720 });
+  });
+
+  test("a tap clicks; a finger that moves drags a slider from where it landed; two fingers scroll", () => {
+    const touch = createTouchInput((p, clamp) => touchOnPage(p, box, meta, clamp));
+    touch.down(1, { x: 40, y: 100 });
+    expect(said(touch.up(1, { x: 42, y: 101 }))).toEqual([
+      "mouseMoved+none@160,360",
+      "mousePressed@160,360",
+      "mouseReleased@160,360",
+    ]);
+
+    touch.down(2, { x: 40, y: 100 });
+    expect(said(touch.move(2, { x: 60, y: 100 }))).toEqual([
+      "mouseMoved+none@160,360",
+      "mousePressed@160,360",
+      "mouseMoved+left@240,360",
+    ]);
+    expect(said(touch.move(2, { x: 300, y: 100 }))).toEqual(["mouseMoved+left@1200,360"]);
+    expect(said(touch.up(2, { x: 330, y: 100 }))).toEqual(["mouseMoved+left@1280,360", "mouseReleased@1280,360"]);
+
+    touch.down(3, { x: 100, y: 100 });
+    touch.down(4, { x: 200, y: 100 });
+    expect(said(touch.move(3, { x: 100, y: 80 }))).toEqual(["wheel@600,320:0,40"]);
   });
 });

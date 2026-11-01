@@ -28,6 +28,7 @@ import {
 import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
 import { withRead } from "../lib/seen";
+import { SIDEBAR_DEFAULTS, withSidebarPlace } from "../lib/sidebar-items";
 import { playSound } from "../lib/sounds";
 import { upsertMessage, withLocalCopies } from "../lib/timeline";
 import type { RealtimeConnection } from "../realtime/connection";
@@ -107,6 +108,9 @@ import type {
   SandboxSettingsInput,
   SearchKind,
   SeriesScope,
+  SidebarItem,
+  SidebarItems,
+  SidebarPlace,
   SkillInput,
   SkillPatch,
   StatusInput,
@@ -117,6 +121,7 @@ import type {
   ThreadInfo,
   ThreadPatch,
   ToolDecision,
+  WikiAudience,
   WikiPage,
   WikiPageInput,
   WikiUpdateInput,
@@ -539,6 +544,36 @@ export function useAgentProposal(orgId: string, messageId: string | null) {
   });
 }
 
+/**
+ * "Criar" on an agent's proposal: the agent as proposed, in one click. The card shows it at once, with what it got;
+ * the agents, channels and routines lists take it in.
+ */
+export function useCreateProposedAgent(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (messageId: string) => api.agents.createProposed(orgId, messageId),
+    onSuccess: ({ proposal }) => {
+      cacheAgentProposal(qc, orgId, proposal, proposal);
+      for (const key of [keys.agents(orgId), keys.channels(orgId), keys.routines(orgId)])
+        void qc.invalidateQueries({ queryKey: key });
+    },
+  });
+}
+
+/** The routine a proposal came with, once its agent is where it reports (the card's "Criar a rotina"). */
+export function useCreateProposedRoutine(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (messageId: string) => api.agents.proposalRoutine(orgId, messageId),
+    onSuccess: (proposal) => {
+      cacheAgentProposal(qc, orgId, proposal, proposal);
+      void qc.invalidateQueries({ queryKey: keys.routines(orgId) });
+    },
+  });
+}
+
 /** "Recusar" on an agent's proposal: the card shows it at once. */
 export function useDenyAgentProposal(orgId: string) {
   const api = useApi();
@@ -553,7 +588,7 @@ export function useUpdateAgent(orgId: string, agentId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: Partial<Omit<AgentInput, "handle">>) => api.agents.update(orgId, agentId, input),
+    mutationFn: (input: Partial<AgentInput>) => api.agents.update(orgId, agentId, input),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
       void qc.invalidateQueries({ queryKey: keys.agentDetail(orgId, agentId) });
@@ -788,6 +823,18 @@ export function usePrefetchRecent(orgId: string, count = RECENT_PREFETCH) {
   }, [ready, orgId, count, api, qc]);
 }
 
+/** A `#channel` link's card, when it opens (or when the link names a channel the list doesn't have). */
+export const useChannelCard = (orgId: string, channelId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.channelCard(orgId, channelId),
+    queryFn: () => api.chat.card(orgId, channelId),
+    enabled,
+    staleTime: 30_000,
+    retry: false,
+  });
+};
+
 export function useJoinChannel(orgId: string, channelId: string) {
   const api = useApi();
   const qc = useQueryClient();
@@ -922,7 +969,7 @@ export function cacheAgentProposal(
   qc: ReturnType<typeof useQueryClient>,
   orgId: string,
   where: { channelId: string; messageId: string },
-  { state, agentId, decidedByUserId, decidedAt }: AgentProposalDecision,
+  { state, agentId, decidedByUserId, decidedAt, applied, routineId }: AgentProposalDecision,
 ) {
   cacheMessageMeta(qc, orgId, where.channelId, where.messageId, (meta) => ({
     actionCard: {
@@ -931,6 +978,8 @@ export function cacheAgentProposal(
       agentId,
       decidedByUserId,
       decidedAt,
+      ...(applied ? { applied } : {}),
+      ...(routineId ? { routineId } : {}),
     },
   }));
   void qc.invalidateQueries({ queryKey: keys.agentProposal(orgId, where.messageId) });
@@ -1183,6 +1232,19 @@ export const useApproval = (orgId: string, approvalId: string, enabled = true) =
   });
 };
 
+/**
+ * The requests on one approval card, by its message: for a card older than the org's list reaches. Under the
+ * list's key, so whatever refreshes the list refreshes it.
+ */
+export const useCardApprovals = (orgId: string, messageId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...keys.approvals(orgId), "card", messageId],
+    queryFn: () => api.approvals.list(orgId, { messageId }),
+    enabled,
+  });
+};
+
 /** Puts a fresh approval in the caches (decision responses, WebSocket events). */
 export function cacheApproval(qc: ReturnType<typeof useQueryClient>, orgId: string, approval: Approval) {
   qc.setQueryData<Approval[]>(keys.approvals(orgId), (list) => {
@@ -1222,6 +1284,21 @@ export function useDecideApproval(orgId: string) {
       cacheApproval(qc, orgId, approval);
       void qc.invalidateQueries({ queryKey: keys.approvals(orgId) });
       if (always) void qc.invalidateQueries({ queryKey: keys.approvalRules(orgId, approval.agentId) });
+    },
+  });
+}
+
+/** A card's "Aprovar tudo" / "Agora não para todos": exactly the ids it listed at the click. */
+export function useDecideApprovals(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { ids: string[]; decision: "approve" | "refuse"; reason?: string }) =>
+      api.approvals.decideMany(orgId, input),
+    onSuccess: (result, { decision }) => {
+      playSound(decision === "approve" ? "approved" : "error");
+      for (const approval of result.approvals) cacheApproval(qc, orgId, approval);
+      void qc.invalidateQueries({ queryKey: keys.approvals(orgId) });
     },
   });
 }
@@ -2130,6 +2207,12 @@ export const useMemory = (orgId: string, agentId: string) => {
   return useQuery({ queryKey: keys.memory(orgId, agentId), queryFn: () => api.memory.list(orgId, agentId) });
 };
 
+/** What all the agents know (the viewer's share of it), for the map of the workspace's memory. */
+export const useOrgMemories = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.orgMemories(orgId), queryFn: () => api.memory.listAll(orgId) });
+};
+
 /** "O que sabe sobre você": the agent's memories that came from the viewer, each with the message. */
 export const useMemoryAboutMe = (orgId: string, agentId: string, enabled = true) => {
   const api = useApi();
@@ -2165,7 +2248,11 @@ export function useMemoryAction(orgId: string, agentId: string) {
       if (action.type === "pin") return api.memory.setPinned(orgId, action.id, action.pinned);
       return api.memory.setArchived(orgId, action.id, action.archived);
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.memory(orgId, agentId) }),
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: keys.memory(orgId, agentId) }),
+        qc.invalidateQueries({ queryKey: keys.orgMemories(orgId) }),
+      ]),
   });
 }
 
@@ -3196,6 +3283,7 @@ export function useWikiAction(orgId: string) {
         | { type: "move"; slug: string; folder: string }
         | { type: "lock"; slug: string; locked: boolean }
         | { type: "pin"; slug: string; pinned: boolean }
+        | { type: "audience"; slug: string; audience: WikiAudience | null }
         | {
             type: "append";
             slug: string;
@@ -3216,6 +3304,8 @@ export function useWikiAction(orgId: string) {
           return api.wiki.lock(orgId, action.slug, action.locked);
         case "pin":
           return api.wiki.pin(orgId, action.slug, action.pinned);
+        case "audience":
+          return api.wiki.audience(orgId, action.slug, action.audience);
         case "append":
           return api.wiki.append(orgId, action.slug, { text: action.text, source: action.source });
       }
@@ -3423,6 +3513,55 @@ export function useSetNoticePref(orgId: string) {
     },
     onError: (_error, _input, context) => qc.setQueryData(keys.noticePrefs(orgId), context?.before),
     onSuccess: (prefs) => qc.setQueryData(keys.noticePrefs(orgId), prefs),
+  });
+}
+
+/** Where I put the tools at the top of my sidebar in this workspace (only the ones I moved). */
+export const useSidebarItems = (orgId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.sidebarItems(orgId),
+    queryFn: () => api.orgs.sidebarItems(orgId),
+    staleTime: 60_000,
+  });
+};
+
+/**
+ * Moves one tool, or with `null` puts every tool back on its default: the sidebar changes at once and goes back if the
+ * server refuses. The server keeps my other choices as it has them, so one made on another device stays, and answers
+ * with every choice it keeps. The requests go one at a time, so the last answer is what stays (`onMutate` still runs
+ * at once for one that waits its turn).
+ */
+export function useSetSidebarItem(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const mutationKey = ["sidebar-items", orgId];
+  return useMutation({
+    mutationKey,
+    scope: { id: `sidebar-items:${orgId}` },
+    mutationFn: (move: { item: SidebarItem; place: SidebarPlace } | null) =>
+      move
+        ? api.orgs.setSidebarItem(orgId, move.item, move.place === SIDEBAR_DEFAULTS[move.item] ? null : move.place)
+        : api.orgs.setSidebarItems(orgId, {}),
+    onMutate: async (move) => {
+      await qc.cancelQueries({ queryKey: keys.sidebarItems(orgId) });
+      const before = qc.getQueryData<SidebarItems>(keys.sidebarItems(orgId));
+      qc.setQueryData<SidebarItems>(keys.sidebarItems(orgId), (items) =>
+        move ? withSidebarPlace(items, move.item, move.place) : {},
+      );
+      return { before };
+    },
+    onError: (_error, _move, context) => {
+      // A later choice still on its way answers with every choice the server keeps: its answer decides.
+      if (qc.isMutating({ mutationKey }) > 1) return;
+      qc.setQueryData(keys.sidebarItems(orgId), context?.before);
+      // `before` can hold an earlier choice the server refused as well: it says what stays.
+      void qc.invalidateQueries({ queryKey: keys.sidebarItems(orgId) });
+    },
+    // A later choice still on its way keeps the screen until its own answer.
+    onSuccess: (items) => {
+      if (qc.isMutating({ mutationKey }) <= 1) qc.setQueryData(keys.sidebarItems(orgId), items);
+    },
   });
 }
 

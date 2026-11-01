@@ -154,8 +154,9 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
             message: `${branch} isn't a branch name. Name the branch only (fix/login), never refs/… or a tag.`,
           };
         }
-        const handle = (await getAgentCached(c.db, c.orgId, c.agentId))?.handle ?? "";
-        if (branch.startsWith(`agentes/${handle}/`)) {
+        const self = await getAgentCached(c.db, c.orgId, c.agentId);
+        const handle = self?.handle ?? "";
+        if ([handle, ...(self?.previousHandles ?? [])].some((h) => branch.startsWith(`agentes/${h}/`))) {
           return { ok: false, message: `${branch} is your own branch: just push to it, nothing to ask.` };
         }
         const facts = await factsOf(c, repo, [branch]);

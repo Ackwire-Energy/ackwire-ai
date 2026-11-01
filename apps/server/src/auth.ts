@@ -1,7 +1,8 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { randomBytes, sign as signWithKey } from "node:crypto";
 import type { HumanAction, HumanCheck, RateLimiter } from "@agenteschat/adapters";
 import type { Config } from "@agenteschat/config";
-import { type Database, schema } from "@agenteschat/db";
+import { type Database, eq, schema } from "@agenteschat/db";
 import {
   accountBlock,
   countUsers,
@@ -116,6 +117,10 @@ export function createAuth(deps: {
     secret: deriveSecret(config.AGENTES_SECRET, "sessions"),
     // Apple posts the sign-in result back from its own origin (`response_mode=form_post`).
     trustedOrigins: [config.PUBLIC_URL, ...devOrigins, ...appOrigins, ...(apple ? [APPLE_ORIGIN] : [])],
+    // A provider's refusal lands on the sign-in page, which says why, when the sign-in named no page for it: the web's
+    // and the Mac app's name it, the phone's browser sign-in doesn't. Without this, Better Auth's error page sends a
+    // production server to `/?error=`, which drops the code on its way to the sign-in page (its HTML page is dev-only).
+    onAPIError: { errorURL: "/login" },
     plugins: [
       expo(),
       phoneSignIn,
@@ -175,6 +180,11 @@ export function createAuth(deps: {
                 template: { kind: "password_reset", locale, url },
               });
             },
+            // The link reached the mailbox, as a confirmation link would, and the password nobody proved is gone with
+            // every session: the address counts as confirmed, so a provider can join the account (ADR 0006).
+            onPasswordReset: async ({ user }: { user: { id: string } }) => {
+              await db.update(schema.users).set({ emailVerified: true }).where(eq(schema.users.id, user.id));
+            },
           }
         : {}),
     },
@@ -219,12 +229,24 @@ export function createAuth(deps: {
       : {}),
     socialProviders: {
       ...(config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET
-        ? { google: { clientId: config.GOOGLE_CLIENT_ID, clientSecret: config.GOOGLE_CLIENT_SECRET } }
+        ? {
+            google: {
+              clientId: config.GOOGLE_CLIENT_ID,
+              clientSecret: config.GOOGLE_CLIENT_SECRET,
+              mapProfileToUser: noteProviderEmail,
+            },
+          }
         : {}),
       ...(config.GITHUB_CLIENT_ID && config.GITHUB_CLIENT_SECRET
-        ? { github: { clientId: config.GITHUB_CLIENT_ID, clientSecret: config.GITHUB_CLIENT_SECRET } }
+        ? {
+            github: {
+              clientId: config.GITHUB_CLIENT_ID,
+              clientSecret: config.GITHUB_CLIENT_SECRET,
+              mapProfileToUser: noteProviderEmail,
+            },
+          }
         : {}),
-      ...(apple ? { apple } : {}),
+      ...(apple ? { apple: { ...apple, mapProfileToUser: noteProviderEmail } } : {}),
     },
     rateLimit: {
       enabled: config.NODE_ENV !== "test",
@@ -341,6 +363,44 @@ export function createAuth(deps: {
 }
 
 export type Auth = ReturnType<typeof createAuth>;
+
+/** The address a provider gave during this request's sign-in (`noteProviderEmail`), read by `authHandler`. */
+const providerEmail = new AsyncLocalStorage<{ email?: string }>();
+
+/** Every provider's `mapProfileToUser`: notes the address, changes nothing. */
+function noteProviderEmail(profile: { email?: unknown }) {
+  const seen = providerEmail.getStore();
+  if (seen && typeof profile.email === "string") seen.email = profile.email;
+  return {};
+}
+
+/**
+ * Better Auth's handler. Better Auth refuses a provider sign-in to an existing account as `ACCOUNT_NOT_LINKED` when
+ * that account's address isn't confirmed, and also when the provider hasn't confirmed its own. The first comes back to
+ * the sign-in page with the provider's address, so the page can offer that account a new password by email; the
+ * second as `PROVIDER_EMAIL_UNVERIFIED`, since a new password changes nothing there.
+ */
+export function authHandler(auth: Auth, db: Database) {
+  return (request: Request) => {
+    const seen: { email?: string } = {};
+    return providerEmail.run(seen, async () => {
+      const res = await auth.handler(request);
+      const location = res.headers.get("location");
+      if (!seen.email || !location) return res;
+      const back = new URL(location, "http://localhost");
+      if (back.searchParams.get("error") !== ACCOUNT_NOT_LINKED) return res;
+      const [account] = await db
+        .select({ emailVerified: schema.users.emailVerified })
+        .from(schema.users)
+        .where(eq(schema.users.email, seen.email.toLowerCase()));
+      if (account && !account.emailVerified) back.searchParams.set("email", seen.email);
+      else back.searchParams.set("error", PROVIDER_EMAIL_UNVERIFIED);
+      const headers = new Headers(res.headers);
+      headers.set("location", location.startsWith("/") ? `${back.pathname}${back.search}${back.hash}` : back.href);
+      return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+    });
+  };
+}
 
 export type SessionUser = { id: string; name: string; email: string; image?: string | null };
 
@@ -469,6 +529,16 @@ export const SIGNUP_CLOSED = "SIGNUP_CLOSED";
 export const EARLY_ACCESS_OTHER_EMAIL = "EARLY_ACCESS_OTHER_EMAIL";
 /** An early-access sign-up through a provider that hasn't confirmed the address (ADR 0078). */
 export const EARLY_ACCESS_EMAIL_UNVERIFIED = "EARLY_ACCESS_EMAIL_UNVERIFIED";
+/**
+ * Better Auth's refusal of a provider sign-in to an address whose password account isn't confirmed yet: it links
+ * none, since whoever made that account may not own the address (mirrored in packages/client errors.ts).
+ */
+export const ACCOUNT_NOT_LINKED = "account_not_linked";
+/**
+ * Ours for Better Auth's `ACCOUNT_NOT_LINKED` when the account here is confirmed: the provider hasn't confirmed its own
+ * address, so it joins no account (`authHandler`, mirrored in packages/client errors.ts).
+ */
+export const PROVIDER_EMAIL_UNVERIFIED = "provider_email_unverified";
 
 /** Every sign-up but the password form's is through a provider (the redirect's callback, or the phone's id token). */
 const isSocial = (context: { path?: string } | null | undefined) => context?.path !== "/sign-up/email";

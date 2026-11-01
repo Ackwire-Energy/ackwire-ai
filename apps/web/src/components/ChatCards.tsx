@@ -17,7 +17,8 @@ import {
   rowStatus,
   staleCount,
 } from "@agenteschat/client/lib/proposals";
-import { MAX_SECRET_BYTES, sealSecret, secretAad } from "@agenteschat/client/lib/secret-box";
+import { sealSecret, secretAad } from "@agenteschat/client/lib/secret-box";
+import { secretValueProblem, secretWhere } from "@agenteschat/client/lib/secret-requests";
 import { secretEndedAt, secretOutcome } from "@agenteschat/client/lib/secret-words";
 import { Button, Chip, Diff, diffLines, Field, Icon, Input, MessageText, Switch, Textarea } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -27,11 +28,12 @@ import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { TYPED_VALUES } from "@/i18n";
+import { inPlaceClick } from "@/lib/navigate";
 import { useToast } from "@/lib/toast";
 import { useLive, useLiveStore } from "@/realtime/context";
 import { AgentAvatar } from "./AgentAvatar";
+import { useOpenAgentPanel } from "./agent-panel-context";
 import { SiteIcon } from "./browser/SiteIcon";
-import { useChannelActions } from "./channel-actions";
 import { useOrg } from "./org-context";
 import { RequestCard, RequestDone, RequestTile, useExpired } from "./RequestCard";
 import "./proposals.css";
@@ -49,8 +51,8 @@ const hostOf = (site: string | null | undefined) => {
 /**
  * "Memória atualizada" in the chat (`memory.updated`): what the agent
  * remembered, forgot or updated because a person asked, a link to what it
- * knows, and "Desfazer" (`POST …/memories/{id}/revert`). A proposed change
- * shows the proposal inline instead.
+ * knows (its page's Memória tab in the panel beside the conversation), and "Desfazer"
+ * (`POST …/memories/{id}/revert`). A proposed change shows the proposal inline instead.
  */
 export function MemoryChangeCard({ update, agentId }: { update: MemoryUpdate; agentId: string }) {
   const { t } = useTranslation();
@@ -58,6 +60,7 @@ export function MemoryChangeCard({ update, agentId }: { update: MemoryUpdate; ag
   const api = useApi();
   const qc = useQueryClient();
   const dir = useDirectory(org.id);
+  const openPanel = useOpenAgentPanel();
   const [undone, setUndone] = useState(false);
   const revert = useMutation({
     mutationFn: () => api.memory.revert(org.id, update.itemId),
@@ -95,7 +98,11 @@ export function MemoryChangeCard({ update, agentId }: { update: MemoryUpdate; ag
       )}
       <div className="ac-approval__actions ac-acts">
         <Button asChild variant="ghost" size="sm">
-          <Link to="/org/$orgId/agents/$agentId/memory" params={{ orgId: org.id, agentId }}>
+          <Link
+            to="/org/$orgId/agents/$agentId/memory"
+            params={{ orgId: org.id, agentId }}
+            onClick={openPanel ? (e) => inPlaceClick(e, () => openPanel(agentId, "memory")) : undefined}
+          >
             {t("memoryCard.open", g)}
           </Link>
         </Button>
@@ -481,7 +488,10 @@ export function ProposalGroup({ proposalIds }: { proposalIds: string[] }) {
 
 /**
  * An agent's question (`ask_user`): neutral card in the thread with the
- * choices as buttons, or "Responder" to answer in the composer.
+ * choices as buttons, and "Responder" (or "Outra resposta") opening a field in
+ * the card. The field answers this question wherever the card shows (a thread
+ * in the panel, a consultation, a channel whose composer posts elsewhere), so
+ * it never depends on which composer is on screen.
  */
 export function QuestionCard({ question }: { question: AgentQuestion }) {
   const { t } = useTranslation();
@@ -489,15 +499,17 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
   const api = useApi();
   const dir = useDirectory(org.id);
   const live = useLiveStore();
-  const actions = useChannelActions();
   const current = useLive((s) => s.questions[question.id]) ?? question;
   const [error, setError] = useState<string | null>(null);
+  const [writing, setWriting] = useState(false);
+  const [text, setText] = useState("");
   const answer = useMutation({
-    mutationFn: (choice: string) => api.questions.answer(org.id, question.id, { choice }),
+    mutationFn: (input: { choice: string } | { text: string }) => api.questions.answer(org.id, question.id, input),
     // Errors are explained on the card.
     meta: { silent: true },
     onMutate: () => setError(null),
-    onSuccess: (res, choice) => live.answered({ ...res, answer: res.answer ?? choice }),
+    onSuccess: (res, input) =>
+      live.answered({ ...res, answer: res.answer ?? ("choice" in input ? input.choice : input.text) }),
     onError: (err) =>
       setError((err as { status?: number }).status === 409 ? t("question.alreadyAnswered") : t("question.failed")),
   });
@@ -505,9 +517,17 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
   const name = agent?.name ?? t("channel.unknownAgent");
   const done = current.status === "answered";
   const who = current.answeredByUserId === me.user.id ? null : dir.memberById.get(current.answeredByUserId ?? "")?.name;
-  // Open: a request card, the choices in its footer and "Outra resposta" to write one in the composer.
+  // Open: a request card, the choices in its footer and "Outra resposta" opening a field to write one.
   if (!done) {
     const choices = current.choices ?? [];
+    const send = () => {
+      if (text.trim() && !answer.isPending) answer.mutate({ text: text.trim() });
+    };
+    const errorLine = error ? (
+      <p className="rq__error" role="alert">
+        {error}
+      </p>
+    ) : null;
     return (
       <RequestCard
         id={question.id}
@@ -517,11 +537,30 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
         mine
         lead={current.text}
         body={
-          error ? (
-            <p className="rq__error" role="alert">
-              {error}
-            </p>
-          ) : undefined
+          writing ? (
+            <>
+              <div className="rq__field">
+                <Textarea
+                  rows={2}
+                  autoGrow
+                  autoFocus
+                  value={text}
+                  placeholder={t("question.placeholder")}
+                  aria-label={t("question.placeholder")}
+                  onChange={(e) => setText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                      e.preventDefault();
+                      send();
+                    }
+                  }}
+                />
+              </div>
+              {errorLine}
+            </>
+          ) : (
+            (errorLine ?? undefined)
+          )
         }
         actions={
           <>
@@ -531,32 +570,44 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
                 size="sm"
                 data-choice=""
                 disabled={answer.isPending}
-                loading={answer.isPending && answer.variables === choice}
-                onClick={() => answer.mutate(choice)}
+                loading={answer.isPending && "choice" in answer.variables && answer.variables.choice === choice}
+                onClick={() => answer.mutate({ choice })}
               >
                 {choice}
               </Button>
             ))}
-            <Button
-              variant={choices.length > 0 ? "ghost" : "primary"}
-              size="sm"
-              onClick={() => actions?.focusComposer()}
-            >
-              {choices.length > 0 ? t("ask.otherAnswer") : t("question.answer")}
-            </Button>
+            {writing ? (
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                disabled={!text.trim() || (answer.isPending && !("text" in answer.variables))}
+                loading={answer.isPending && "text" in answer.variables}
+              >
+                {t("channel.send")}
+              </Button>
+            ) : (
+              <Button variant={choices.length > 0 ? "ghost" : "primary"} size="sm" onClick={() => setWriting(true)}>
+                {choices.length > 0 ? t("ask.otherAnswer") : t("question.answer")}
+              </Button>
+            )}
           </>
         }
         what={current.text}
+        onSubmit={writing ? send : undefined}
       />
     );
   }
-  // Answered: the question stays in the open as the agent's words; one line says who answered and what.
+  // Answered: the question stays in the open as the agent's words; one line says who answered and what. Closed
+  // with no answer (its run stopped, or it expired): it says so instead.
   const answerText = current.answer ?? "";
   return (
     <>
       <MessageText>{current.text}</MessageText>
       <RequestDone done label={t("question.group", { agent: name })}>
-        {who ? (
+        {current.answer === null ? (
+          t("question.closed")
+        ) : who ? (
           <Trans
             i18nKey="question.answered"
             values={{ name: who, answer: answerText }}
@@ -624,14 +675,11 @@ export function SecretCard({ request }: { request: SecretRequest }) {
     onError: failed,
   });
   const submit = () => {
-    if (!value) return setError(t("secret.empty"));
-    if (new TextEncoder().encode(value).byteLength > MAX_SECRET_BYTES) return setError(t("secret.tooLarge"));
+    const problem = secretValueProblem(value);
+    if (problem) return setError(t(problem));
     deliver.mutate(value);
   };
-  const where =
-    current.target.kind === "file"
-      ? t("secret.targetFile", { path: current.target.path, agent: agentName })
-      : t("secret.targetEnv", { name: current.name, agent: agentName });
+  const where = secretWhere(t, current, agentName);
   const until = t("secret.until", { time: formatTime(i18n.language, current.expiresAt) });
   // Waiting: a request card; only the person asked gets the field (the whole card is its form).
   if (pending) {

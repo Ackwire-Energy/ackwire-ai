@@ -40,7 +40,7 @@ export interface ScreenDeps {
 }
 
 /**
- * The agent's screen on a page of its own, for the phone app's WebView (ADR 0096): what the web's `DesktopView` does
+ * The agent's screen on a page of its own, for the phone app's WebView (ADR 0098): what the web's `DesktopView` does
  * with a socket and noVNC, without its screen around it. The app holds every touch: noVNC here only draws, at the
  * desktop's own size, and the app moves and zooms the whole page. The pointer goes straight onto the session's
  * channel as an RFB message, since noVNC would read it from a mouse over a canvas the app transforms.

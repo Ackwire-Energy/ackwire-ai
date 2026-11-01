@@ -79,6 +79,11 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
       });
     }
     let live = false;
+    /** Parked waiting for its computer brain, its plan or its budget (`waitingForBrain`). */
+    const brainWait =
+      active.status === "waiting_input"
+        ? ((active.transcript as { waitingForBrain?: { waitId?: string } } | null)?.waitingForBrain ?? null)
+        : null;
     // Its model call stops and the loop reads the message at once (a running tool finishes first).
     // A computer brain (Claude Code, Codex) can't drop its turn halfway: one whose turn takes messages
     // gets it live and urgent (Claude Code reads it now or at its next tool boundary; Codex's app-server
@@ -95,10 +100,10 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
     } else if (active.status === "running") {
       live = await deliverLive(deps, active, { messageId: message.id, urgent: false }).catch(() => false);
     }
-    // Parked waiting for its computer: look again now. Back (or never really away): the run resumes
-    // and reads this message with the rest; still away: it parks again quietly (one answer later).
-    else if (active.status === "waiting_input" && active.waitingMachineId) {
-      const wait = (active.transcript as { waitingForBrain?: { waitId?: string } } | null)?.waitingForBrain?.waitId;
+    // Parked waiting for its computer, its plan or its budget: look again now. Back (or never really away): the
+    // run resumes and reads this message with the rest; still away: it parks again quietly (one answer later).
+    else if (active.status === "waiting_input" && (active.waitingMachineId || brainWait)) {
+      const wait = brainWait?.waitId;
       await enqueue(deps.db, {
         orgId,
         kind: "agent_run.execute",
@@ -109,7 +114,9 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
     }
     // What it does to a wait, then the fast reply: after the response (the judge may take a moment), in order.
     const waiting =
-      !active.waitingMachineId && (active.status === "waiting_input" || active.status === "waiting_approval");
+      !active.waitingMachineId &&
+      !brainWait &&
+      (active.status === "waiting_input" || active.status === "waiting_approval");
     // Waiting on something the message can't move (a secret, a mission's decision; an approval never takes
     // it): the agent doesn't keep it waiting behind the decision, it answers in a run of its own. Gone from the
     // inbox already (the run handed it on as it paused, or read it first): the run that has it answers, so

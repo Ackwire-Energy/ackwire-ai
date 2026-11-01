@@ -4,7 +4,9 @@ import { systemText } from "@agenteschat/providers";
 import {
   type AgentRun,
   buildRunContext,
+  CONTINUE_THE_CONVERSATION,
   createAgent,
+  forComputerBrain,
   type HandOff,
   handOffsBlock,
   insertMessage,
@@ -107,6 +109,8 @@ test("system prompt carries org context, agent instructions and channel; history
   expect(systemText(ctx.system)).toContain("Answer briefly.");
   expect(systemText(ctx.system)).toContain("#general");
   expect(systemText(ctx.system)).toContain("Dev (@dev, agent)");
+  // A #name links the channel: agents may point people to one.
+  expect(systemText(ctx.system)).toContain("write its name with # (#engineering): it shows as a link to it");
   // No tools: nothing to investigate with, so no "How you work".
   expect(systemText(ctx.system)).not.toContain("# How you work");
   const withTools = systemText(
@@ -139,6 +143,24 @@ test("system prompt carries org context, agent instructions and channel; history
     },
   ]);
   expect(ctx.stats.historyMessages).toBe(3);
+});
+
+test("every brain reads that it carries one conversation on: no name up front, no status restated", async () => {
+  const ask = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev grava as metas de outubro e novembro",
+  });
+  const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, ask.id));
+  if (!run) throw new Error("no run");
+  for (const toolsAvailable of [false, true]) {
+    const text = systemText((await buildRunContext(f.db, run, f.agent, { maxMessages: 10, toolsAvailable })).system);
+    expect(text).toContain(CONTINUE_THE_CONVERSATION);
+    // A computer brain (Claude Code, Codex) gets the same system text, with its own tools added.
+    expect(forComputerBrain(text)).toContain(CONTINUE_THE_CONVERSATION);
+    expect(text).toContain("- Keep it as short as the news: a report with nothing for the person to decide");
+  }
+  expect(CONTINUE_THE_CONVERSATION).toContain("Don't open with the person's name");
+  expect(CONTINUE_THE_CONVERSATION).toContain("don't repeat what you or others already said here");
+  expect(CONTINUE_THE_CONVERSATION).toContain("say only what changed");
 });
 
 test("a new top-level message reads the replies shown under earlier messages, not only the top level", async () => {
@@ -266,6 +288,7 @@ test("the hand-offs block: where each colleague is, an answer's start until it w
       { ...base, target: run("waiting_approval") },
       { ...base, target: run("waiting_input") },
       { ...base, target: run("waiting_input", { waitingMachineId: "m1" }) },
+      { ...base, target: run("waiting_input", { outage: true }) },
       { ...base, target: run("done", { handedOn: true }) },
       { ...base, target: null },
       { ...base, kind: "question", question: "Como o staging sobe?", target: run("running") },
@@ -281,6 +304,7 @@ test("the hand-offs block: where each colleague is, an answer's start until it w
     '- @rita, since 16:58 (2 min ago): waiting for a person\'s approval. You handed it: "Rita vai ser apagada. Passa ao diogo a tua pasta e tudo o que sabes."',
     '- @rita, since 16:58 (2 min ago): waiting for a person\'s answer. You handed it: "Rita vai ser apagada. Passa ao diogo a tua pasta e tudo o que sabes."',
     '- @rita, since 16:58 (2 min ago): waiting for its computer to come back. You handed it: "Rita vai ser apagada. Passa ao diogo a tua pasta e tudo o que sabes."',
+    '- @rita, since 16:58 (2 min ago): its AI provider isn\'t answering; it picks the work up again by itself. You handed it: "Rita vai ser apagada. Passa ao diogo a tua pasta e tudo o que sabes."',
     '- @rita, since 16:58 (2 min ago): did its part and waits for agents it handed some to. You handed it: "Rita vai ser apagada. Passa ao diogo a tua pasta e tudo o que sabes."',
     '- @rita, since 16:58 (2 min ago): not started: the agents reached what they may do on their own; a person can let it go on (Continuar). You handed it: "Rita vai ser apagada. Passa ao diogo a tua pasta e tudo o que sabes."',
     '- @rita, since 16:58 (2 min ago): working on it. You asked: "Como o staging sobe?"',

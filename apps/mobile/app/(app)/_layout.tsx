@@ -92,10 +92,13 @@ function AppStack() {
       <Stack.Screen name="issues/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="issues/new" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="drive/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="memory/index" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="memory/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki/[slug]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki-history" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki-move" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="wiki-audience" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki-write" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/[id]" options={{ ...pushed, ...scrollUnder }} />

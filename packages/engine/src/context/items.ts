@@ -11,6 +11,7 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import { setsCredential } from "@agenteschat/ui/names";
 import { getAgent } from "../agents";
 import { caches } from "../cache";
 import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
@@ -19,7 +20,7 @@ import { can, requirePermission } from "../organizations";
 import { enqueueIndex, userVisibleChannels } from "../search";
 import { type Plan, planConsolidation } from "./judgments";
 
-const { contextItems } = schema;
+const { agents, contextItems } = schema;
 
 export type ContextItem = typeof contextItems.$inferSelect;
 export type ContextKind = ContextItem["kind"];
@@ -27,19 +28,43 @@ export type Evidence = ContextItem["evidence"][number];
 
 // ── Guardrails ───────────────────────────────────────────────────────────────
 
-const SECRET_PATTERNS = [
+/** Keys by their format. */
+const KEY_FORMATS = [
   /\bsk-[a-z0-9_-]{16,}/i, // Anthropic/OpenAI-style keys
   /\bgh[pousr]_[a-z0-9]{20,}/i, // GitHub tokens
   /\bAKIA[0-9A-Z]{16}\b/, // AWS access keys
   /\bxox[abprs]-[a-z0-9-]{10,}/i, // Slack tokens
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
   /\b(bearer)\s+[a-z0-9._-]{20,}/i,
-  /\b(password|senha|passwd|secret|api[_ -]?key|token)\s*[:=]\s*\S{6,}/i,
   /\beyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}/, // JWTs
 ];
+const SECRET_PATTERNS = [...KEY_FORMATS, /\b(password|senha|passwd|secret|api[_ -]?key|token)\s*[:=]\s*\S{6,}/i];
 
 /** Memories and context never carry credentials (docs/adr/0017). */
 export const looksLikeSecret = (text: string) => SECRET_PATTERNS.some((p) => p.test(text));
+
+/** How much of a file is read as text for credentials; past it, only a private key's header is looked for. */
+const FILE_SCAN_BYTES = 8 * 1024 * 1024;
+const PRIVATE_KEY = /^-----BEGIN [A-Z0-9 ]*PRIVATE KEY/;
+const utf8 = new TextDecoder("utf-8", { fatal: true });
+
+/**
+ * A file that holds credentials, whatever its name or type: a private key's header anywhere in its bytes (PEM, PGP),
+ * or a key or a password set in what reads as UTF-8 text (`setsCredential`: never a placeholder or code).
+ */
+export function holdsSecret(bytes: Uint8Array): boolean {
+  const buf = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  for (let at = buf.indexOf("-----BEGIN "); at >= 0; at = buf.indexOf("-----BEGIN ", at + 1)) {
+    if (PRIVATE_KEY.test(buf.toString("latin1", at, at + 64))) return true;
+  }
+  if (bytes.byteLength > FILE_SCAN_BYTES) return false;
+  try {
+    const text = utf8.decode(bytes);
+    return KEY_FORMATS.some((p) => p.test(text)) || setsCredential(text);
+  } catch {
+    return false;
+  }
+}
 
 /** Refuses content that must never become context: credentials (by their format). */
 export function checkContent(text: string) {
@@ -397,6 +422,30 @@ export async function listAgentMemoryRows(db: Database, actorId: string, orgId: 
       ),
     );
   return { items, visible };
+}
+
+/**
+ * What all the agents know, for a map of the workspace's memory: the current items of agents still here, under the
+ * same rule as `listAgentMemoryRows`, most recently changed first.
+ */
+export async function listOrgMemoryRows(db: Database, actorId: string, orgId: string, limit = 300) {
+  await requirePermission(db, actorId, orgId, "read");
+  const visible = await userVisibleChannels(db, orgId, actorId);
+  const rows = await db
+    .select({ item: contextItems })
+    .from(contextItems)
+    .innerJoin(agents, and(eq(agents.id, contextItems.agentId), isNull(agents.archivedAt)))
+    .where(
+      and(
+        eq(contextItems.orgId, orgId),
+        eq(contextItems.status, "active"),
+        isNull(contextItems.supersededBy),
+        arrayContained(contextItems.channelIds, visible),
+      ),
+    )
+    .orderBy(desc(contextItems.updatedAt))
+    .limit(limit);
+  return { items: rows.map((r) => r.item), visible };
 }
 
 /**
