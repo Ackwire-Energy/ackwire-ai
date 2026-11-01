@@ -14,6 +14,7 @@
       "types": "./src/agent/engine.d.ts",
       "default": "./src/agent/engine.js"
     },
+    "./agent/look": "./src/components/AgentLook.ts",
     "./agent/stickers": "./src/agent/stickers.ts",
     "./brain/portrait": {
       "types": "./src/brain/portrait.d.ts",

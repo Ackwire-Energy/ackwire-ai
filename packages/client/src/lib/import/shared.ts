@@ -1,3 +1,11 @@
+import {
+  AGENT_ACCESSORIES,
+  AGENT_COLORS,
+  AGENT_EYES,
+  type AgentAppearance,
+  type AgentColor,
+} from "@agenteschat/ui/agent/look";
+import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import type {
   ApiRule,
   BundleAgent,
@@ -6,10 +14,8 @@ import type {
   BundleRoutine,
   BundleSkill,
   BundleTodo,
-} from "@agenteschat/client";
-import { handleFrom } from "@agenteschat/client/lib/text";
-import { AGENT_ACCESSORIES, AGENT_COLORS, AGENT_EYES, type AgentAppearance, type AgentColor } from "@agenteschat/ui";
-import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
+} from "../../api/types";
+import { handleFrom } from "../text";
 
 /** A file to read: `name` is its path relative to the dropped folder, the archive root or the GitHub link. */
 export interface ImportFile {

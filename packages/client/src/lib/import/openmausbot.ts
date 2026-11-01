@@ -1,4 +1,4 @@
-import type { AgentColor } from "@agenteschat/ui";
+import type { AgentColor } from "@agenteschat/ui/agent/look";
 import {
   atTime,
   baseName,

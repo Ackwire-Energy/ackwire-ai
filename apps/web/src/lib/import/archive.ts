@@ -1,5 +1,11 @@
+import {
+  IMPORT_MAX_BYTES,
+  ImportError,
+  type ImportFile,
+  isSecretPath,
+  normalizePath,
+} from "@agenteschat/client/lib/import/shared";
 import { readZip, ZipError } from "@agenteschat/client/lib/zip";
-import { IMPORT_MAX_BYTES, ImportError, type ImportFile, isSecretPath, normalizePath } from "./shared";
 
 /**
  * The async step before `parseImport`: picked or dropped files (a folder keeps

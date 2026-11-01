@@ -9,6 +9,7 @@ import type {
 } from "@agenteschat/client";
 import { ApiError, keys } from "@agenteschat/client";
 import { joinNames } from "@agenteschat/client/lib/format";
+import { frontmatter } from "@agenteschat/client/lib/import/shared";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   Alert,
@@ -54,7 +55,6 @@ import {
   readImportFiles,
   SOURCE_NAME,
 } from "@/lib/import";
-import { frontmatter } from "@/lib/import/shared";
 import {
   applyInChunks,
   blockedItems,
