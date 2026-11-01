@@ -685,6 +685,46 @@ test("a question asked through the bridge: the text written before it comes firs
   expect(main.some((m) => m.body.includes("você me passa a ida e a volta"))).toBe(false);
 });
 
+test("sent on after its turn, a computer brain that opens again with the same line and asks posts that line once", async () => {
+  const opening = 'Vou procurar a integração do serviço de cobrança e consultar os gastos de "acme".';
+  f = await setup({ askUser: true, judge: (kind) => (kind === "follow_through" ? "continue" : undefined) });
+  const machineId = await computerAgent(f);
+  const { brain } = scriptedComputerBrain(async function* (n, turn) {
+    // Turn 1 ends on its opening line (Codex's last message of the turn); the judge sends it on.
+    yield { type: "text_delta", text: opening };
+    if (n === 0) {
+      yield { type: "done", text: opening };
+      return;
+    }
+    // Turn 2 opens with the same line, then asks.
+    const result = await executeToolForRun(
+      f.jobDeps,
+      { orgId: turn.orgId, agentId: turn.agentId, runId: turn.runId, machineId },
+      {
+        id: "ask-2",
+        name: "ask_user",
+        input: {
+          why: "I need a person's answer before I go on: only they have it.",
+          question: "Qual é o endereço da API?",
+        },
+      },
+    );
+    yield { type: "tool_call", id: "ask-2", name: "ask_user", input: {}, executed: result };
+    yield { type: "done", text: opening };
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev quanto o acme gastou este mês?");
+  await drainOutbox(f.db, handlers);
+
+  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("waiting_input");
+  const fromAgent = (await timeline(f)).filter((m) => m.author.type === "agent");
+  expect(fromAgent.map((m) => (m.meta.question ? "card" : m.body))).toEqual([opening, "card"]);
+});
+
 test("a plan limit falls back to the model brain; the reply carries a quiet note", async () => {
   f = await setup({ reply: () => ({ chunks: ["Respondi pela API."] }) });
   const machineId = await computerAgent(f);

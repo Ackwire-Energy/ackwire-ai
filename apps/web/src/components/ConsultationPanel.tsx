@@ -63,7 +63,7 @@ export function ConsultationPanel({
     articleTo: to.article,
   });
   const state = c ? consultLineState(c, now) : null;
-  // The cards keep their buttons ("Responder" on a question goes to the conversation's composer); nothing else acts
+  // The cards keep their buttons (a question answers in its own field); nothing else acts
   // here: no reply, no thread, no quote (the messages live in the agents' DM). Stable: rows don't redraw for it.
   const latest = useRef({ onTalk, onAnswer });
   latest.current = { onTalk, onAnswer };
