@@ -256,6 +256,11 @@ describe("the agents' own files", () => {
       "credentials.md": "the logins",
       "hello.sh": "#!/bin/sh\necho hi\n",
       "fetch.py": 'token = get_token()\npassword = input("Senha: ")\n# export OPENAI_API_KEY=your-key-here\n',
+      "server.key": pem,
+      "Apresentação Q3.key": "PK deck",
+      "cookie-recipes.pdf": "%PDF recipes",
+      "password-policy.pdf": "%PDF policy",
+      "notes/kubeconfig-guide.md": "# How we set up kubeconfig",
     };
     const files: Record<string, string> = { "openbot-import.json": manifest };
     for (const [path, text] of Object.entries(own)) files[`agents/scout/files/${path}`] = text;
@@ -266,7 +271,12 @@ describe("the agents' own files", () => {
       picked: await readImportFiles(entries.map((e) => ({ path: `export/${e.name}`, file: new Blob([e.data]) }))),
     };
     for (const [how, read] of Object.entries(reads)) {
-      const skips = parsePackage(read.files, { root: read.root }).files.map((f) => [f.path, f.skip ?? "copy"]);
+      const parsed = parsePackage(read.files, { root: read.root });
+      // Each one held back is named with what never comes, before Importar.
+      const named = parsed.bundle.leftOut.filter((l) => l.kind === "secret").map((l) => l.label.split("/files/")[1]);
+      const held = parsed.files.filter((f) => f.skip === "secret").map((f) => f.path);
+      expect([how, named.sort()]).toEqual([how, held.sort()]);
+      const skips = parsed.files.map((f) => [f.path, f.skip ?? "copy"]);
       expect([how, Object.fromEntries(skips)]).toEqual([
         how,
         {
@@ -282,6 +292,11 @@ describe("the agents' own files", () => {
           "credentials.md": "secret",
           "hello.sh": "copy",
           "fetch.py": "copy",
+          "server.key": "secret",
+          "Apresentação Q3.key": "copy",
+          "cookie-recipes.pdf": "copy",
+          "password-policy.pdf": "copy",
+          "notes/kubeconfig-guide.md": "copy",
         },
       ]);
     }

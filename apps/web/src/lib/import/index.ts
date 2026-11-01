@@ -290,20 +290,27 @@ function finish(d: Draft, app: ImportSource, files: ImportFile[]): { bundle: Mig
     agents: t.agents.filter((k) => agentKeys.has(k)),
   }));
 
-  // The agents' own files go beside the bundle, for their folders in the Drive.
+  // The agents' own files go beside the bundle, for their folders in the Drive. Keys and sign-ins among them are
+  // named with what never comes, before Importar.
   const agentFiles: AgentFile[] = [];
   const own = new Set<string>();
+  const add = (agent: string, path: string, f: ImportFile) => {
+    const file = agentFile(agent, path, f);
+    agentFiles.push(file);
+    if (file.skip === "secret") left("secret", f.name);
+  };
   for (const f of files) {
     const owner = d.used.has(f.name) ? null : ownerOf(d, f.name);
     if (!owner || !agentKeys.has(owner.agent)) continue;
-    agentFiles.push(agentFile(owner.agent, owner.path, f));
+    add(owner.agent, owner.path, f);
     own.add(f.name);
   }
   for (const x of d.agentFiles) {
     const f = files.find((file) => file.name === x.from);
-    if (f && agentKeys.has(x.agent)) agentFiles.push(agentFile(x.agent, x.to, f));
+    if (f && agentKeys.has(x.agent)) add(x.agent, x.to, f);
     else if (!f) left("file", x.to);
   }
+
   for (const path of d.options.junk ?? []) {
     const owner = ownerOf(d, path);
     if (owner && agentKeys.has(owner.agent)) agentFiles.push({ ...owner, size: 0, skip: "junk" });
@@ -312,12 +319,12 @@ function finish(d: Draft, app: ImportSource, files: ImportFile[]): { bundle: Mig
   // Credential stores were never read; other files nobody used are listed by folder.
   const unread = new Map<string, number>();
   for (const f of files) {
-    if (d.used.has(f.name)) continue;
+    if (d.used.has(f.name) || own.has(f.name)) continue;
     if (isSecretPath(f.name)) {
       left("secret", f.name);
       continue;
     }
-    if (NOISE.test(f.name) || own.has(f.name)) continue;
+    if (NOISE.test(f.name)) continue;
     const top = f.name.includes("/") ? `${f.name.split("/")[0]}/` : f.name;
     unread.set(top, (unread.get(top) ?? 0) + 1);
   }

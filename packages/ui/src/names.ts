@@ -16,18 +16,23 @@ export function initialsOf(name: string): string {
  * Where apps keep keys and sign-ins, whatever the format: env files, auth and token files, keys, the config files of
  * tools that keep a token, credential folders and browser profiles. An import never reads these, only lists them.
  */
+const WORDS = "(?:token|oauth|secret|credential|password|cookie)";
 const SECRET_PATH = new RegExp(
   [
     "(?:^|/)\\.env(?:[./][^/]*)?$",
     "(?:^|/)[^/]+\\.env$",
     "(?:^|/)\\.envrc$",
     "(?:^|/)auth[^/]*\\.json$",
-    "(?:^|/)(?![^/]*\\.(?:md|markdown)$)[^/]*(?:token|oauth|secret|credential|password|cookie)[^/]*$",
+    // Credential words only in the names such stores have: a data file (`cookies.txt`, `client_secret.json`) or no
+    // type at all, never a document (`password-policy.pdf`, `secret-santa.xlsx`, `tokens.md`).
+    `(?:^|/)[^/]*${WORDS}[^/]*\\.(?:json|txt|ya?ml|ini|cfg|conf|toml|csv|xml|plist|db|sqlite3?|dat)$`,
+    `(?:^|/)[^/.]*${WORDS}[^/.]*$`,
     "(?:^|/)[^/]*private[^/]*key[^/]*$",
-    "\\.(?:pem|key|p8|p12|pfx|ppk|jks|keystore|kdbx|gpg|asc|ovpn|tfvars(?:\\.json)?)$",
+    // Not `.key`: a Keynote deck too; a private key in one is found by what it holds.
+    "\\.(?:pem|p8|p12|pfx|ppk|jks|keystore|kdbx|gpg|asc|ovpn|tfvars(?:\\.json)?)$",
     "(?:^|/)id_(?:rsa|dsa|ecdsa|ed25519)[^/]*$",
     "(?:^|/)\\.?npmrc$",
-    "(?:^|/)(?:[._]netrc|\\.pgpass|\\.htpasswd|\\.pypirc|\\.s3cfg|\\.boto|kubeconfig[^/]*)$",
+    "(?:^|/)(?:[._]netrc|\\.pgpass|\\.htpasswd|\\.pypirc|\\.s3cfg|\\.boto|kubeconfig(?:\\.ya?ml)?)$",
     "(?:^|/)(?:honcho|mem0|cursor-session|mcp-oauth|teams_pipeline_store)\\.json$",
     "(?:^|/)(?:credentials|mcp-tokens|vault|secrets|proxy|\\.ssh|\\.aws|\\.gnupg|\\.kube|\\.docker|\\.azure)/",
     "(?:^|/)\\.config/(?:gh|gcloud)/",
@@ -38,8 +43,8 @@ const SECRET_PATH = new RegExp(
 );
 export const isSecretPath = (path: string) => SECRET_PATH.test(path.replace(/\\/g, "/"));
 
-/** A note named like a list of logins (`passwords.md`, `credentials.md`): read by an import, never copied. */
-const SECRET_NOTE = /(?:^|\/)[^/]*(?:password|credential|secret)[^/]*\.(?:md|markdown)$/i;
+/** A note that is a list of logins by its name (`passwords.md`, `credentials.md`): read by an import, never copied. */
+const SECRET_NOTE = /(?:^|\/)(?:my[-_ ]?)?(?:passwords?|credentials?|secrets?|logins?|senhas?)\.(?:md|markdown|txt)$/i;
 /** Never copied into the Drive, by its name: a credential store, or a note named like one. */
 export const isSecretFile = (path: string) => isSecretPath(path) || SECRET_NOTE.test(path.replace(/\\/g, "/"));
 
