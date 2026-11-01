@@ -197,10 +197,11 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  # The backend suite (PGlite, servers) on two runners at once. packages/engine is four fifths of it
-  # (731 of 935 s on a runner, 2026-10-20), split by file name; the globs together cover every file.
+  # The backend suite (PGlite, servers) on three runners at once: packages/engine split by file name, and
+  # apps/server on its own. Together they ran past the step's 20 minutes on one runner (2026-11-01: 683 s for
+  # 70 of engine's 82 files from n, 529 s for 97 of apps/server's 147). The globs together cover every file.
   test-backend:
-    name: Test (backend ${{ matrix.shard }}/2)
+    name: Test (backend ${{ matrix.shard }}/3)
     needs: changes
     if: needs.changes.outputs.shared == 'true' || needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
@@ -215,13 +216,13 @@ jobs:
             paths: >-
               packages/engine/test/[!a-m]*.test.ts packages/adapters packages/config packages/db
               packages/modules packages/providers packages/client packages/i18n packages/tokens packages/setup
-              apps/server
+          - shard: 3
+            paths: apps/server
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - *setup-bun
       - *cache-bun
       - *install
-      # About 9 minutes for shard 1 and 7 for shard 2 on a private-repo runner (2026-10-20), and growing.
       - name: Test
         timeout-minutes: 20
         run: bun test ${{ matrix.paths }} 2>&1 | tee test.log
