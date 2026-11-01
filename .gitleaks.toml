@@ -63,3 +63,11 @@ targetRules = ["generic-api-key"]
 condition = "AND"
 paths = ['''^apps/server/runner/assets/start/manifest\.json\.txt$''']
 regexes = ['''^MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnhHkuBQUoz\+h1CDNDjKFRN6qmKBiey0bQXO4ala21CVMUbnDKeeaBpdxdpizXTti7He9go8\+XKN/pX\+dxPlvLmwCrx38awhaA0j3SFSYpN2HoSUuV22wZNKUPjthrVQeQQPUrzv/tuXrU5NlGEBkaGyH6Zp2Jc6P2acX7e9DiKnQJj6G1nfGVo3WXCC2Om1WwGPVzgM\+dBzi7yiigB2sI6EYWIXMB\+eNIb3vcxv4KNjk7BuldvLzBt9EwYyUVlVxkVSxnpvohUhicoMVZvqH1O6WHZCYsoQ2HF1tQQtr9QTgWx5asALgGtMkeKHWiKRiCuoUpG5/7SkZpyUban7ZUQIDAQAB$''']
+
+# S78 feeds this exact made-up curl token to a failing tool to verify that judge evidence masks it.
+[[allowlists]]
+description = "Synthetic curl token in the autonomy error-masking test"
+targetRules = ["curl-auth-header"]
+condition = "AND"
+paths = ['''^packages/engine/test/autonomy/turn-end\.test\.ts$''']
+regexes = ['''^abcdef0123456789$''']
