@@ -22,7 +22,9 @@ import {
   ListRow,
   Logo,
   Menu,
+  MenuCheckboxItem,
   MenuItem,
+  MenuRadioGroup,
   MenuReactions,
   Message,
   MessageText,
@@ -550,6 +552,42 @@ describe("Menu", () => {
     await act(async () => fireEvent.click(items[1] as HTMLElement));
     expect(picked).toBe("out");
     expect(body().queryByRole("menu")).toBeNull();
+  });
+
+  test("checkable items keep their check at the row's end, after the label and the hint", async () => {
+    render(
+      <Menu trigger={<Button>Filtros</Button>} label="Filtros">
+        <MenuCheckboxItem checked={false} onCheckedChange={() => {}} hint={3}>
+          Mostrar canceladas
+        </MenuCheckboxItem>
+        <MenuRadioGroup
+          label="Ordem"
+          value="new"
+          onValueChange={() => {}}
+          options={[
+            { value: "new", label: "Mais novas", leading: <span>•</span> },
+            { value: "old", label: "Mais antigas" },
+          ]}
+        />
+      </Menu>,
+    );
+    const trigger = body().getByRole("button", { name: "Filtros" });
+    trigger.focus();
+    await act(async () => fireEvent.keyDown(trigger, { key: "Enter" }));
+    const menu = body().getByRole("menu");
+    const box = within(menu).getByRole("menuitemcheckbox");
+    expect(box.getAttribute("aria-checked")).toBe("false");
+    expect([...box.children].map((c) => c.getAttribute("class"))).toEqual([
+      "ac-menu__label",
+      "ac-menu__hint",
+      "ac-menu__check",
+    ]);
+    const radios = within(menu).getAllByRole("menuitemradio");
+    expect(radios.map((r) => r.getAttribute("aria-checked"))).toEqual(["true", "false"]);
+    expect(radios.map((r) => [...r.children].map((c) => c.getAttribute("class")))).toEqual([
+      ["ac-menu__leading", "ac-menu__label", "ac-menu__check"],
+      ["ac-menu__label", "ac-menu__check"],
+    ]);
   });
 
   test("quick reactions end with a cell that opens every emoji", async () => {

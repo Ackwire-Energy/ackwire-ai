@@ -1649,11 +1649,13 @@ html:not([data-pointer]) .ac-menu__item:focus-visible,
   height: 16px;
   margin-top: 2px;
 }
+/* At the row's end, so icons and names start at one edge checked or not; hidden (not absent) so nothing shifts. */
 .ac-menu__check {
   width: 16px;
   height: 16px;
   flex: none;
   margin-top: 2px;
+  margin-left: auto;
   visibility: hidden;
   fill: none;
   stroke: currentColor;
@@ -7475,6 +7477,9 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
   font-size: 12.5px;
   color: var(--faint);
   white-space: nowrap;
+}
+.ac-menu__hint + .ac-menu__check {
+  margin-left: 0;
 }
 
 /* ---------- Choice rows (OptionList.tsx): full width, one left edge, neutral selection ---------- */
