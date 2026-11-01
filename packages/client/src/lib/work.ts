@@ -604,7 +604,10 @@ export function waitStep(t: TFunction, work: LiveWork[] | undefined): string {
   const now = toolNow(toolItemsLive(work ?? []));
   if (now?.state !== "run") return t("chat.wait.thinking");
   const verb = capitalize(activityVerb(t, now));
-  const target = now.hint ? shortTarget(now.hint) : "";
+  // The folded line keeps its first call's hint; the step line names the call running now.
+  const last = (work ?? []).findLast((w) => w.kind === "call" && w.running);
+  const hint = last?.kind === "call" ? toolHint(last.tool, now, last.detail) : now.hint;
+  const target = hint ? shortTarget(hint) : "";
   return target ? `${verb} · ${target}…` : `${verb}…`;
 }
 

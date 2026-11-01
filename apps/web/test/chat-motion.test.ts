@@ -154,12 +154,27 @@ describe("the card's phrase and the waiting row's step line", () => {
     expect(waitStep(t, [call({ running: false })])).toBe("Pensando…");
     expect(waitStep(t, [call({ detail: null })])).toBe("Usando o navegador…");
     expect(waitStep(tEn, [])).toBe("Thinking…");
+    // Two of the same step in a row fold into one tool line; the step line names the one running now.
+    const site = (id: string, detail: string, running: boolean) => call({ id, detail, running });
+    expect(
+      waitStep(t, [site("c1", "https://one.example.com/x", false), site("c2", "https://two.example.com/y", true)]),
+    ).toBe("Usando o navegador · two.example.com…");
+    const file = (id: string, detail: string, running: boolean) => call({ id, tool: "read_file", detail, running });
+    expect(waitStep(t, [file("f1", "auth/refresh.ts", false), file("f2", "auth/session.ts", true)])).toBe(
+      "Mexendo nos arquivos do PC · session.ts…",
+    );
   });
 
   test("a target is a URL's host, a path's last part, else a short start cut at a word", () => {
     expect(shortTarget("https://console.example.com/a/b")).toBe("console.example.com");
     expect(shortTarget("apps/web/src/auth/refresh.ts")).toBe("refresh.ts");
     expect(shortTarget("/var/log/")).toBe("log");
+    expect(shortTarget("console.example.com/login")).toBe("console.example.com");
+    expect(shortTarget("./src/auth/refresh.ts")).toBe("refresh.ts");
+    expect(shortTarget("~/notes/plan.md")).toBe("plan.md");
+    expect(shortTarget("acme/repo")).toBe("acme/repo");
+    expect(shortTarget("10/31")).toBe("10/31");
+    expect(shortTarget("and/or")).toBe("and/or");
     expect(shortTarget("relatório de vendas")).toBe("relatório de vendas");
     expect(shortTarget("a long line about the quarterly numbers of the north team")).toBe(
       "a long line about the quarterly numbers",
