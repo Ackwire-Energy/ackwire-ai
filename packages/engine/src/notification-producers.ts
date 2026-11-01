@@ -2,6 +2,7 @@ import { and, asc, eq, inArray, isNotNull, schema } from "@agenteschat/db";
 import { approvalCardThreads, approvalOriginOf } from "./approvals";
 import { accountablePerson, runAuthorityById } from "./authority";
 import { threadFollowChoices } from "./follows";
+import { isAgentOnlyNotice } from "./notices";
 import {
   type NotificationActor,
   type NotificationDeps,
@@ -119,6 +120,8 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   if (meta.questionId || meta.approvalId || meta.secretRequestId || meta.forum) return;
   // An agent's follow-up line, and the notice that wakes it: the reply it brings notifies instead.
   if ((meta.notice as { kind?: unknown } | undefined)?.kind === "follow_up") return;
+  // Only for its agent: people never see it.
+  if (isAgentOnlyNotice(meta)) return;
   const [channel] = await db
     .select({ kind: channels.kind, name: channels.name })
     .from(channels)

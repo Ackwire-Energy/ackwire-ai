@@ -7,6 +7,7 @@ import { sha256 } from "./crypto";
 import { NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
 import { type PreviewMeta, previewMeta } from "./message-preview";
+import { agentOnlyNoticeSql } from "./notices";
 import { resolveNotifications } from "./notifications";
 import { can, getMembership, requirePermission } from "./organizations";
 
@@ -242,6 +243,8 @@ export async function listDms(db: Database, actorId: string, orgId: string): Pro
           isNull(messages.deletedAt),
           // A routine's call is hidden in the chat (only the agent's answer shows), so not the preview either.
           sql`not (${messages.authorType} = 'person' and ${messages.meta}->'routine' is not null)`,
+          // Nor what only its agent reads.
+          sql`not ${agentOnlyNoticeSql(sql`${messages.meta}`)}`,
         ),
       )
       .orderBy(messages.channelId, desc(messages.createdAt)),
@@ -258,6 +261,7 @@ export async function listDms(db: Database, actorId: string, orgId: string): Pro
             eq(messages.channelId, id),
             isNull(messages.deletedAt),
             sql`(${messages.authorUserId} is null or ${messages.authorUserId} <> ${actorId})`,
+            sql`not ${agentOnlyNoticeSql(sql`${messages.meta}`)}`,
             gt(messages.createdAt, readAt.get(id) ?? new Date(0)),
           ),
         );

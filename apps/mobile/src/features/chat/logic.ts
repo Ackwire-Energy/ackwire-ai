@@ -13,6 +13,7 @@ import { type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
 import {
   answeredNotices,
   followUpLine,
+  isAgentOnlyNotice,
   isAnsweredNotice,
   isEventLine,
   isTalkerReply,
@@ -95,7 +96,7 @@ export function buildRows(messages: Message[], hidden: (m: Message) => boolean =
   let prev: Message | null = null;
   const answered = answeredNotices(messages);
   for (const m of [...messages].sort(byTime)) {
-    if (hidden(m) || isRoutineCall(m) || isAnsweredNotice(m, answered)) continue;
+    if (hidden(m) || isRoutineCall(m) || isAnsweredNotice(m, answered) || isAgentOnlyNotice(m.meta)) continue;
     const day = dayKey(m.createdAt);
     if (day !== lastDay) {
       rows.push({ kind: "day", key: `day-${day}`, iso: m.createdAt });

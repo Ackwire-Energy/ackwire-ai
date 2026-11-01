@@ -9,6 +9,7 @@ import { followsThreadSql } from "./follows";
 import { type PreviewMeta, previewMeta } from "./message-preview";
 import { type Message, messageView, replyExcerpt } from "./messages";
 import { pendingCommandsSql } from "./mission-command-rules";
+import { agentOnlyNoticeSql } from "./notices";
 import { can, type Membership, requirePermission } from "./organizations";
 import { maySql } from "./permissions";
 
@@ -1016,6 +1017,7 @@ async function queryThreads(
         from ${messages} m
         where m.org_id = ${orgId}::uuid and m.channel_id in (select id from visible)
           and m.thread_id is not null and m.deleted_at is null
+          and not ${agentOnlyNoticeSql(sql`m.meta`)}
           ${input.rootId ? sql`and m.thread_id = ${input.rootId}::uuid` : sql``}
         group by m.thread_id
       ), candidates as (

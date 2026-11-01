@@ -6,6 +6,7 @@ import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, Valida
 import { publishChannelEvent, publishOrgEvent, publishUserEvent } from "./events";
 import { followsThreadSql } from "./follows";
 import { type PreviewMeta, previewMeta } from "./message-preview";
+import { agentOnlyNoticeSql } from "./notices";
 import { notificationSnippet } from "./notifications";
 import { can, getMembership, type Membership, requireActiveMembership, requirePermission } from "./organizations";
 import { memberKeysSql, memberRankSql, resolvePermissions } from "./permissions";
@@ -147,6 +148,7 @@ export async function listChannels(db: Database, userId: string, orgId: string):
         where cm.id is not null and m.org_id = ${orgId}::uuid and m.channel_id = c.id
           and m.thread_id is null and m.deleted_at is null
           and not (m.author_type = 'person' and m.meta->'routine' is not null)
+          and not ${agentOnlyNoticeSql(sql`m.meta`)}
         order by m.created_at desc, m.id desc
         limit 1
       ) lm on true
@@ -158,6 +160,7 @@ export async function listChannels(db: Database, userId: string, orgId: string):
           where cm.id is not null and u.org_id = ${orgId}::uuid and u.channel_id = c.id and u.deleted_at is null
             and u.created_at > coalesce(cr.last_read_at, cm.created_at)
             and (u.author_user_id is null or u.author_user_id <> ${userId})
+            and not ${agentOnlyNoticeSql(sql`u.meta`)}
             and (u.thread_id is null or ${followsThreadSql(orgId, userId, sql`u.thread_id`)})
           limit ${MAX_CHANNEL_UNREAD}
         ) unread

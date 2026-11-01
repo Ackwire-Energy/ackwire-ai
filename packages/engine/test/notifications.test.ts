@@ -8,6 +8,9 @@ import {
   commentIssue,
   createIssue,
   drainOutbox,
+  getThread,
+  listChannels,
+  listDms,
   listMembers,
   listNotifications,
   markAllNotificationsRead,
@@ -27,6 +30,7 @@ import {
   ValidationError,
   wakeSnoozedNotifications,
 } from "../src";
+import { deliverNotice } from "../src/delivery";
 import { addMember, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
@@ -379,4 +383,62 @@ test("snippets are plain text and at most 280 characters", () => {
   const long = notificationSnippet("x".repeat(500));
   expect(long).toHaveLength(280);
   expect(long.endsWith("…")).toBe(true);
+});
+
+test("a notice only its agent reads notifies nobody, counts for nobody and is no preview", async () => {
+  f = await setup();
+  const { bia } = await people();
+  const root = await post(f.owner.id, "Cria um agente que lê meus emails");
+  // What a person decided on its proposal, another agent's note, the late result of a wait: in the thread people follow.
+  for (const kind of ["proposal_result", "agent_note", "wait_result"] as const) {
+    await f.db.transaction((tx) =>
+      deliverNotice(tx, {
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        channelId: f.general.id,
+        threadId: root.id,
+        hop: 1,
+        stretchId: null,
+        notice: { kind, from: "Your proposal of the agent «Caio»", text: "ana created it: @caio (Caio)." },
+        wake: false,
+      }),
+    );
+  }
+  // And one at the channel's top level.
+  await f.db.transaction((tx) =>
+    deliverNotice(tx, {
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      channelId: f.general.id,
+      threadId: null,
+      hop: 1,
+      stretchId: null,
+      notice: { kind: "proposal_result", text: "bia said no." },
+      wake: false,
+    }),
+  );
+  await drainOutbox(f.db, f.handlers);
+  expect((await inbox(f.owner.id)).items).toEqual([]);
+  const general = (await listChannels(f.db, bia.id, f.org.id)).find((c) => c.id === f.general.id);
+  expect(general?.lastMessage?.preview).toBe("Cria um agente que lê meus emails");
+  expect(general?.unreadCount).toBe(1);
+  // Its author follows the thread: nothing in it is unread for her, and it has no reply.
+  expect((await listChannels(f.db, f.owner.id, f.org.id)).find((c) => c.id === f.general.id)?.unreadCount).toBe(0);
+  expect((await getThread(f.db, f.owner.id, f.org.id, root.id)).replyCount).toBe(0);
+  // A DM with the agent: the same.
+  const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+  await f.db.transaction((tx) =>
+    deliverNotice(tx, {
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      channelId: dm.id,
+      threadId: null,
+      hop: 1,
+      stretchId: null,
+      notice: { kind: "proposal_result", text: "ana created it." },
+      wake: false,
+    }),
+  );
+  const [mine] = (await listDms(f.db, f.owner.id, f.org.id)).filter((d) => d.channelId === dm.id);
+  expect(mine).toMatchObject({ lastMessage: null, unread: 0 });
 });

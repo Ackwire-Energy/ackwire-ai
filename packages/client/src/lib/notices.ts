@@ -28,6 +28,23 @@ export interface MessageNotice {
   refs: Record<string, string>;
 }
 
+/**
+ * Notices only for the agent they are for (packages/engine/src/notices.ts): another agent's note, the late result of a
+ * wait, what a person decided on its proposal (its card already says it). People never see them: what matters to
+ * them, the agent says in its reply.
+ */
+export const AGENT_ONLY_NOTICES: ReadonlySet<string> = new Set<NoticeKind>([
+  "agent_note",
+  "wait_result",
+  "proposal_result",
+]);
+
+/** A message that is a notice only its agent reads: left out of the conversation. */
+export const isAgentOnlyNotice = (meta: Meta) => {
+  const kind = (meta?.notice as { kind?: unknown } | undefined)?.kind;
+  return typeof kind === "string" && AGENT_ONLY_NOTICES.has(kind);
+};
+
 /** The notice card of a message, or null (none, or a fast reply that shows as a normal message). */
 export function noticeOf(meta: Meta): MessageNotice | null {
   const n = meta?.notice as { kind?: unknown; text?: unknown; from?: unknown; refs?: unknown } | undefined;
