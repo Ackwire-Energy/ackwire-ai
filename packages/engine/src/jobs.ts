@@ -55,7 +55,7 @@ import { notifyMessage } from "./notification-producers";
 import { ORG_FILES_PURGE_ATTEMPTS, ORG_FILES_PURGE_JOB, USER_FILES_PURGE_JOB } from "./organizations";
 import { enqueue, type JobHandlers, type OutboxJob, PermanentJobError } from "./outbox";
 import { checkPushReceipts, deliverPush, pushTicketsOf } from "./push";
-import { reachOf, settleReach } from "./reach";
+import { reachOf, routinePostRun, settleReach } from "./reach";
 import {
   createLlmRouterStrategy,
   DEFAULT_ROUTER_POLICY,
@@ -331,11 +331,13 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
   /**
    * Agents the run behind an agent's message tried to reach with tell_agent or ask_agent and couldn't, its routine's
    * creator being out of their audience (the refusal's `data.reach`), not yet shown under an earlier message of it.
-   * A routine's report is told by another run than the routine's own: that one's refusals show under it too.
+   * A routine's report is told by another run than the routine's own: that one's refusals show under it too,
+   * and a routine's own message (posted with no run) shows its routine run's.
    */
   async function refusedReach(message: NonNullable<Awaited<ReturnType<typeof getMessage>>>) {
-    if (!message.agentRunId) return [];
-    const authority = await runAuthorityById(deps.db, message.orgId, message.agentRunId);
+    const ownRunId = message.agentRunId ?? (await routinePostRun(deps.db, message));
+    if (!ownRunId) return [];
+    const authority = await runAuthorityById(deps.db, message.orgId, ownRunId);
     const brief = authority.kind !== "person" ? (authority.brief ?? null) : null;
     const [routineRun] = brief
       ? await deps.db
@@ -343,7 +345,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           .from(schema.routineRuns)
           .where(and(eq(schema.routineRuns.orgId, message.orgId), eq(schema.routineRuns.id, brief.routineRunId)))
       : [];
-    const runIds = [...new Set([message.agentRunId, routineRun?.agentRunId].filter((id): id is string => !!id))];
+    const runIds = [...new Set([ownRunId, routineRun?.agentRunId].filter((id): id is string => !!id))];
     const steps = schema.agentRunSteps;
     const [tried, shown] = await Promise.all([
       deps.db
@@ -458,8 +460,14 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         // its agent didn't answer, and an action card waits for a person's click: nobody else chimes in.
         if (message.meta.notice || message.meta.noAi || message.meta.actionCard) return;
         // A routine's own message (hand_off, no run behind it, ADR 0053 addendum 2026-11-01) wakes nobody: its
-        // mentions and the router would start runs outside the routine's bounds, from text it may have read.
-        if (message.meta.routine && !message.meta.reminder && !message.agentRunId) return;
+        // mentions and the router would start runs outside the routine's bounds, from text it may have read. Never
+        // silently: the members it named and its run's tell_agent refusals show under it.
+        if (message.meta.routine && !message.meta.reminder && !message.agentRunId) {
+          const blocked = await refusedReach(message);
+          const named = message.mentionedAgentIds.filter((id) => id !== message.authorAgentId);
+          await settleReach(deps, message, { outside: [], blocked, routinePost: named });
+          return;
+        }
         // Agents' mentions go through the hop limit here; a person's mentions and DMs already
         // started their runs in the same statement as the message (postPersonMessage).
         const [outside, refused] = await Promise.all([outsideAgents(message), refusedReach(message)]);

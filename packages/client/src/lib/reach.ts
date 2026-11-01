@@ -21,6 +21,8 @@ export interface ReachEntry {
   private?: true;
   /** `not_in_channel` to an agent with no AI connected: nothing could answer it. */
   noAi?: true;
+  /** A routine's own message named it: such a message wakes nobody. */
+  routinePost?: true;
   /** Whose reach fell short: the agent's owner may let them talk to it. */
   userId?: string;
   routine?: { id: string; name: string; creatorUserId: string | null; access: RoutineAccess };
@@ -39,17 +41,19 @@ export function reachOf(meta: Record<string, unknown> | null | undefined): Reach
 /** The routine only looks and tells: its access, not anyone's audience, keeps the agent out. */
 export const reachByAccess = (e: ReachEntry) => e.reason === "routine_creator_reach" && e.routine?.access === "read";
 
-/** The line's text key: handed, no AI, kept private, the routine only looks, or who couldn't call it. */
+/** The line's text key: handed, a routine's message, no AI, kept private, the routine only looks, or who couldn't call it. */
 export const reachKey = (e: ReachEntry) =>
   e.consultationId
     ? ("reach.handed" as const)
-    : e.noAi
-      ? ("reach.noAi" as const)
-      : e.private
-        ? ("reach.private" as const)
-        : reachByAccess(e)
-          ? ("reach.routineRead" as const)
-          : ("reach.blocked" as const);
+    : e.routinePost
+      ? ("reach.routinePost" as const)
+      : e.noAi
+        ? ("reach.noAi" as const)
+        : e.private
+          ? ("reach.private" as const)
+          : reachByAccess(e)
+            ? ("reach.routineRead" as const)
+            : ("reach.blocked" as const);
 
 /**
  * The agents a routine's prompt names that it won't be able to call, for its dialog (a warning, never a block): set to

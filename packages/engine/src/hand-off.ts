@@ -148,7 +148,7 @@ export function createHandOffToolSource(deps: { pubsub?: PubSub }): ToolSource {
   const tool: ToolDefinition = {
     name: HAND_OFF_TOOL,
     description:
-      "Post this routine's message where it reports, once. `message` is posted as-is as your own message to the people there: write the message itself (the greeting, the digest, the reminder, what you found and what you recommend), in their language, never about this routine or its runs. Set `wake_me` only when what you found needs you to act or decide in that conversation: then `message` is a note to you there (you'll be woken with it and tell the people yourself), not posted as-is. Without it nothing is posted.",
+      "Post this routine's message where it reports, once. `message` is posted as-is as your own message to the people there: write the message itself (the greeting, the digest, the reminder, what you found and what you recommend), in their language, never about this routine or its runs. It wakes nobody, not even the agents it @mentions: to get another agent to act, use tell_agent. Set `wake_me` only when what you found needs you to act or decide in that conversation: then `message` is a note to you there (you'll be woken with it and tell the people yourself), not posted as-is. Without it nothing is posted.",
     scope: "",
     inputSchema: {
       type: "object",

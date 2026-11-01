@@ -156,3 +156,27 @@ scenario("S50", "a routine told to go on keeps what its first turn found in its 
   expect(run?.summary).toContain("Issues abertas.");
   await assertInvariants(w);
 });
+
+scenario(
+  "S51",
+  "a routine that already posted ends there: a next check named in its record is no promise",
+  async () => {
+    const w = await world({
+      agents: ["otto"],
+      judge: { followThrough: (s) => (String(s.reply).includes("amanhã") ? "continue" : "done") },
+      script: {
+        otto: [
+          { calls: [{ name: "hand_off", input: { message: "Bom dia! Nenhum erro novo no Sentry." } }] },
+          { text: "Resumo postado. Checo de novo amanhã às 8h." },
+          { text: "A conversation run should not have run." },
+        ],
+      },
+    });
+    const run = await fireRoutine(w, "otto", "Me dê um bom dia com o resumo do Sentry.", "act");
+    expect(run?.status).toBe("reported");
+    expect(w.judgedAs("follow_through")).toEqual([]);
+    expect((await w.calls("otto")).map((c) => c.name)).toEqual(["hand_off"]);
+    expect((await w.posts()).map((p) => p.body)).toEqual(["Bom dia! Nenhum erro novo no Sentry."]);
+    await assertInvariants(w);
+  },
+);

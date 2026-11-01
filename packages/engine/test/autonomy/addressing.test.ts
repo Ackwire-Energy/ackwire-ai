@@ -1,6 +1,6 @@
 import { afterEach, expect } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
-import { runAuthority } from "../../src";
+import { removeChannelMember, runAuthority } from "../../src";
 import { closeWorlds, world } from "./harness";
 import { assertInvariants } from "./invariants";
 import { scenario } from "./known";
@@ -291,6 +291,25 @@ scenario("S48", "an agent outside the conversation only named in an answer costs
   expect((await w.posts("otto")).map((m) => m.body)).toEqual(["Quem cuida do deploy é a @vera."]);
   expect(w.f.provider.calls.filter((c) => !c.request.outputSchema)).toHaveLength(1);
   expect(await w.runs("vera")).toHaveLength(0);
+  await assertInvariants(w);
+});
+
+scenario("S52", "in a public channel a mention the reach hands over as a note costs no extra turn", async () => {
+  const w = await world({
+    agents: ["ada", "nina"],
+    judge: { followThrough: (s) => (s.unreached ? "continue" : "done") },
+    script: {
+      ada: [{ text: "@nina revisa o PR #227" }, { text: "A Nina aprovou o #227." }],
+      nina: [{ text: "Aprovado." }],
+    },
+  });
+  await removeChannelMember(w.db, w.owner.id, w.org.id, w.channelId, { agentId: w.agents.nina?.id ?? "" });
+  await w.say("@ada pede para a nina revisar o #227");
+  await w.settle();
+  expect(await w.calls("ada")).toEqual([]);
+  expect(await w.runs("nina")).toHaveLength(1);
+  const here = (await w.posts("ada")).filter((m) => m.channelId === w.channelId);
+  expect(here.map((m) => m.body)).toEqual(["@nina revisa o PR #227", "A Nina aprovou o #227."]);
   await assertInvariants(w);
 });
 

@@ -75,6 +75,7 @@ describe("reachKey", () => {
     expect(reachKey({ ...base, consultationId: "c" })).toBe("reach.handed");
     expect(reachKey({ ...base, private: true })).toBe("reach.private");
     expect(reachKey({ ...base, noAi: true })).toBe("reach.noAi");
+    expect(reachKey({ ...base, reason: "routine_creator_reach", routinePost: true })).toBe("reach.routinePost");
     expect(reachKey({ ...base, reason: "audience" })).toBe("reach.blocked");
   });
 });

@@ -122,6 +122,7 @@ import { notifyPlanResetUnknown, resolveRunFailed } from "./notification-produce
 import { enqueue, PermanentJobError } from "./outbox";
 import { createProfiler, type StageTiming } from "./profile";
 import { ASK_USER_TOOL, questionResult } from "./questions";
+import { reachWillHand } from "./reach";
 import {
   endsWithSentinel,
   isSentinelOnly,
@@ -2837,11 +2838,20 @@ async function executeRunInner(
         // Work it said it would do still undone: once more in the same run (ADR 0097). It never asks: its report
         // goes to a conversation whose own run can.
         const state = transcript.continuation ?? { count: 0 };
+        // Its hand_off already spoke (the routine run is `reported`): that was its last act, and it fires again on
+        // its own schedule, so a "next time I'll check" in its record is no unkept promise.
+        const routineRunId = routineRunIdOf(triggerMessage?.meta);
+        const [routineRun] = routineRunId
+          ? await db
+              .select({ status: routineRuns.status })
+              .from(routineRuns)
+              .where(and(eq(routineRuns.id, routineRunId), eq(routineRuns.orgId, run.orgId)))
+          : [];
         const decision = await decideTurnEnd({
           state,
           kind: "routine",
           executed: transcript.executedCalls ?? 0,
-          bound: run.turns + 1 >= maxTurns ? "turn_cap" : null,
+          bound: run.turns + 1 >= maxTurns ? "turn_cap" : routineRun?.status === "reported" ? "reported" : null,
           quiet: !record,
           decided: null,
           unanswered: false,
@@ -2943,21 +2953,29 @@ async function executeRunInner(
       const state = t.continuation ?? { count: 0 };
       // A forum's turn is its post (the topic moves on); a run at its turn cap has no turn left to give.
       const capped = run.turns + 1 >= maxTurns;
-      const unreached =
+      const outside =
         text.includes("@") && channelRow
-          ? unreachedNote(
-              await unreachedAgents(db, {
-                orgId: run.orgId,
-                channelId: run.channelId,
-                authorAgentId: run.agentId,
-                body: text,
-                // Naming an agent it already handed this to (`ask_agent`, `tell_agent`) is no hand-off.
-                handedTo: run.id,
-              }).catch(() => []),
-              channelRow.kind === "dm" ? "this DM" : `#${channelRow.name}`,
-              channelRow.kind !== "dm",
-            )
-          : "";
+          ? await unreachedAgents(db, {
+              orgId: run.orgId,
+              channelId: run.channelId,
+              authorAgentId: run.agentId,
+              body: text,
+              // Naming an agent it already handed this to (`ask_agent`, `tell_agent`) is no hand-off.
+              handedTo: run.id,
+            }).catch(() => [])
+          : [];
+      // The ones the message's reach hands it to as a note (`settleReach`) are handed already.
+      const handedByReach =
+        channelRow && outside.length > 0
+          ? await reachWillHand(db, run, channelRow, outside).catch(() => [] as string[])
+          : [];
+      const unreached = channelRow
+        ? unreachedNote(
+            outside.filter((h) => !handedByReach.includes(h)),
+            channelRow.kind === "dm" ? "this DM" : `#${channelRow.name}`,
+            channelRow.kind !== "dm",
+          )
+        : "";
       const decision = await decideTurnEnd({
         state,
         kind: betweenAgents ? "agents_dm" : "conversation",

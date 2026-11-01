@@ -1641,6 +1641,7 @@ export const ptBR = {
     inHere: "nesta conversa",
     blocked: "Não consegui chamar {{article}} <b>{{name}}</b>: só quem cuida {{hers}} pode",
     routineRead: "Não consegui chamar {{article}} <b>{{name}}</b>: esta rotina só olha e conta",
+    routinePost: "Não chamei {{article}} <b>{{name}}</b>: a mensagem de uma rotina não acorda ninguém",
     outside: "Não está {{place}}",
     routine: "Rotina {{name}}",
     see: "Ver",

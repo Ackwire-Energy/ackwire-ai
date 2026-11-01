@@ -10,7 +10,7 @@ import { notifyAgentUnreached } from "./notification-producers";
 import { routineCreatorOf } from "./requester";
 import type { RoutineBrief } from "./routine-brief";
 
-const { agents, agentConsultations, channels, messages, routingDecisions } = schema;
+const { agents, agentConsultations, channels, messages, routineRuns, routingDecisions } = schema;
 
 /**
  * Why an agent's mention didn't wake the agent it names, the one vocabulary every skip uses (`routing_decisions.reason`,
@@ -36,6 +36,8 @@ export interface ReachEntry {
   private?: true;
   /** `not_in_channel` to an agent with no AI connected: nothing could answer it. */
   noAi?: true;
+  /** A routine's own message (`hand_off`) named a member: it wakes nobody (only tell_agent hands work on). */
+  routinePost?: true;
   userId?: string;
   routine?: { id: string; name: string; creatorUserId: string | null; access: RoutineBrief["access"] };
 }
@@ -59,6 +61,8 @@ export function reachNote(entries: ReachEntry[]): string {
     .map((e) => {
       if (e.consultationId)
         return `[Delivered as a note]: @${e.handle} isn't in this conversation, so your mention went to it as a note (tell_agent); what comes of it reaches you here. To reach it next time, use tell_agent or ask_agent.`;
+      if (e.routinePost)
+        return `[Not delivered]: @${e.handle} wasn't woken: a routine's message wakes nobody, even the agents it mentions. To get another agent to act, use tell_agent when the routine may act.`;
       if (e.noAi)
         return `[Not delivered]: @${e.handle} isn't in this conversation and has no AI connected, so nothing could answer it. The people here can see that.`;
       if (e.private)
@@ -78,29 +82,68 @@ export function reachNote(entries: ReachEntry[]): string {
  * Whose reach a message's mentions have: the person behind it, or the creator of the routine set to act behind it
  * (`routineCreatorOf`); `routine`: the routine its chain roots in, if any (its bounds hold, ADR 0053 §4).
  */
-export async function reachOfMessage(db: Database, message: Pick<Message, "orgId" | "id" | "agentRunId">) {
+export async function reachOfMessage(db: Database, message: Pick<Message, "orgId" | "id" | "agentRunId" | "meta">) {
   const person = await personOfMessage(db, message.orgId, message.id);
-  if (person || !message.agentRunId) return { person, routine: null };
-  const authority = await runAuthorityById(db, message.orgId, message.agentRunId);
+  const runId = message.agentRunId ?? (await routinePostRun(db, message));
+  if (person || !runId) return { person, routine: null };
+  const authority = await runAuthorityById(db, message.orgId, runId);
   const routine = authority.kind !== "person" && fedByRoutine(authority) ? (authority.brief ?? null) : null;
   return { person: routineCreatorOf(authority), routine };
+}
+
+/**
+ * Of the agents outside a conversation a run's reply @names (handles), the ones `settleReach` will hand it to as a
+ * note: in a public channel, to those whoever is behind the run may talk to and that aren't in its chain. For them the
+ * mention is no unkept hand-off.
+ */
+export async function reachWillHand(
+  db: Database,
+  run: { orgId: string; id: string; triggerMessageId: string },
+  channel: { kind: string; visibility: string },
+  handles: string[],
+): Promise<string[]> {
+  if (handles.length === 0 || channel.kind !== "channel" || channel.visibility !== "public") return [];
+  const behind = { orgId: run.orgId, id: run.triggerMessageId, agentRunId: run.id, meta: {} };
+  const { person, routine } = await reachOfMessage(db, behind);
+  if (routine?.access === "read") return [];
+  const [rows, talks, chain] = await Promise.all([
+    db
+      .select()
+      .from(agents)
+      .where(and(eq(agents.orgId, run.orgId), inArray(agents.handle, handles), isNull(agents.archivedAt))),
+    talksToAgents(db, run.orgId, person),
+    chainOfRun(db, run.orgId, run.id),
+  ]);
+  return rows.filter((a) => !chain.includes(a.id) && canTalkTo(a, person, talks)).map((a) => a.handle);
+}
+
+/** The routine's background run behind a routine's own message (`hand_off`, `meta.routine`, posted with no run). */
+export async function routinePostRun(db: Database, message: Pick<Message, "orgId" | "agentRunId" | "meta">) {
+  const routine = message.meta.routine as { runId?: unknown } | undefined;
+  if (message.agentRunId || message.meta.reminder || typeof routine?.runId !== "string") return null;
+  const [row] = await db
+    .select({ agentRunId: routineRuns.agentRunId })
+    .from(routineRuns)
+    .where(and(eq(routineRuns.orgId, message.orgId), eq(routineRuns.id, routine.runId)));
+  return row?.agentRunId ?? null;
 }
 
 /**
  * Never silent (owner direction: a message meant for an agent reaches it, or someone is told why not). For an agent's
  * message once its mentions were dispatched: `outside`, agents of the workspace it @named that aren't members here
  * and that the judge read as needed, go as a hand-off note (`sendNote`, as `tell_agent`) when the person behind it
- * (or the routine's creator) may talk to them; `blocked`, members its mention didn't wake for who is behind it. Each
+ * (or the routine's creator) may talk to them; `blocked`, members its mention didn't wake for who is behind it;
+ * `routinePost`, members a routine's own message (`hand_off`) named, which it never wakes. Each
  * one is written on the message (`meta.reach`, the line under it, and the author's next context), in
  * `routing_decisions`, and, when a routine's creator couldn't reach an agent, told to that agent's owner.
  */
 export async function settleReach(
   deps: { db: Database; pubsub?: PubSub } & Partial<Pick<AiStatusDeps, "gateway" | "machines">>,
   message: Message,
-  input: { outside: string[]; blocked: string[] },
+  input: { outside: string[]; blocked: string[]; routinePost?: string[] },
 ): Promise<ReachEntry[]> {
   const { db } = deps;
-  const ids = [...new Set([...input.outside, ...input.blocked])];
+  const ids = [...new Set([...input.outside, ...input.blocked, ...(input.routinePost ?? [])])];
   if (ids.length === 0) return [];
   const rows = await db
     .select()
@@ -124,6 +167,8 @@ export async function settleReach(
   });
   const entries: ReachEntry[] = [];
   for (const a of rows.filter((r) => input.blocked.includes(r.id))) entries.push(blockedOf(a, false));
+  for (const a of rows.filter((r) => input.routinePost?.includes(r.id) && !input.blocked.includes(r.id)))
+    entries.push({ agentId: a.id, handle: a.handle, reason: blockedReason, routinePost: true, routine: routineRef });
   const outside = rows.filter((r) => input.outside.includes(r.id) && !input.blocked.includes(r.id));
   if (outside.length > 0) {
     const [where] = await db
@@ -211,7 +256,13 @@ export async function settleReach(
   if (updated && deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(updated));
   // Only a routine set to act that its creator's reach kept out: the agent's owner may let its creator in.
   for (const e of entries) {
-    if (e.reason !== "routine_creator_reach" || e.routine?.access !== "act" || !e.routine.creatorUserId) continue;
+    if (
+      e.reason !== "routine_creator_reach" ||
+      e.routinePost ||
+      e.routine?.access !== "act" ||
+      !e.routine.creatorUserId
+    )
+      continue;
     await notifyAgentUnreached(deps, {
       orgId: message.orgId,
       agentId: e.agentId,

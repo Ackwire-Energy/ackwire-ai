@@ -1625,6 +1625,7 @@ export const en: Translations = {
     inHere: "in this conversation",
     blocked: "Couldn't call <b>{{name}}</b>: only the people who look after {{pronoun}} can",
     routineRead: "Couldn't call <b>{{name}}</b>: this routine only looks and tells",
+    routinePost: "Didn't call <b>{{name}}</b>: a routine's message wakes nobody",
     outside: "Not {{place}}",
     routine: "Routine {{name}}",
     see: "See",
