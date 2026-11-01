@@ -243,3 +243,32 @@ scenario(
     await assertInvariants(w);
   },
 );
+
+scenario("S53", "a person's 'don't do that again' becomes a lasting lesson the agent reads in later runs", async () => {
+  const lesson = "Não encaminhar pedidos a outros agentes sem a pessoa pedir; resolver eu mesmo ou perguntar.";
+  const w = await world({
+    agents: ["otto"],
+    setup: { contextTools: true },
+    script: {
+      otto: [
+        { calls: [{ name: "remember", input: { content: lesson, kind: "preference" } }] },
+        { text: "Combinado: não encaminho mais pedidos a outros agentes." },
+        { text: "O relatório de vendas de outubro está pronto: R$ 182 mil, 12% acima de setembro." },
+      ],
+    },
+  });
+  await w.say("@otto não encaminhe isso para outros agentes, não faça mais isso.");
+  await w.settle();
+  // The memory tool tells the agent such a correction is something to remember.
+  const offered = w.f.provider.calls[0]?.request.tools?.find((t) => t.name === "remember");
+  expect(offered?.description).toContain("not to do something again");
+  const saved = (await w.db.select().from(schema.contextItems)).filter((i) => i.agentId === w.agents.otto?.id);
+  expect(saved.map((i) => [i.kind, i.content])).toEqual([["preference", lesson]]);
+
+  await w.say("@otto me manda o relatório de vendas de outubro.");
+  await w.settle();
+  // A later run reads the lesson in its prompt.
+  expect(w.prompts("otto").at(-1)).toContain(lesson);
+  expect((await w.posts("otto")).at(-1)?.body).toContain("relatório");
+  await assertInvariants(w);
+});
