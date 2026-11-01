@@ -248,6 +248,50 @@ describe("a mission keeps going between people's messages", () => {
     expect(resumed?.status).toBe("done");
     expect(await keepGoingBlocker(f.db, await missionRow())).toBeNull();
   });
+
+  test("waiting on a card that already asks the person, it isn't told to ask again", async () => {
+    await agentMission({
+      askUser: true,
+      judge: (kind, _id, state) =>
+        kind === "follow_through" && String(state.reply).includes("Aguardo") ? "waiting" : undefined,
+      reply: (req) => {
+        const last = lastText(req);
+        if (last.includes("didn't ask them in a card"))
+          return {
+            chunks: [],
+            toolUses: [
+              {
+                name: "ask_user",
+                input: {
+                  question: "Você revisou o relatório?",
+                  why: "The report waits on the person's review before it goes out to anyone.",
+                },
+              },
+            ],
+          };
+        if (last.includes("tool_result")) return { chunks: [""] };
+        if (last.includes("PLAN MODE"))
+          return { chunks: [], toolUses: [{ name: "update_plan", input: { items: PLAN } }] };
+        return { chunks: ["Aguardo sua revisão do relatório."] };
+      },
+    });
+    const view = await createMission(md(), f.owner.id, f.org.id, {
+      agentId: f.agent.id,
+      channelId: f.general.id,
+      goal: "Relatório diário",
+      title: "Relatório",
+    });
+    await drainOutbox(f.db, f.handlers);
+    await startMission(md(), f.owner.id, f.org.id, view.id);
+    await f.db.insert(schema.missionReviews).values({ orgId: f.org.id, missionId: view.id, title: "Relatório v1" });
+    await drainOutbox(f.db, f.handlers);
+    const judged = (f.context.judge as unknown as { calls: { kind: string }[] }).calls;
+    expect(judged.some((c) => c.kind === "follow_through")).toBe(true);
+    const steps = await f.db.select().from(schema.agentRunSteps);
+    expect(steps.some((st) => (st.data as { nudged?: string }).nudged === "mission_ask")).toBe(false);
+    expect(await f.db.select().from(schema.agentQuestions)).toHaveLength(0);
+    expect(await keepGoingBlocker(f.db, await missionRow())).toBe("waiting_person");
+  });
 });
 
 describe("the mission's computer and its conversations", () => {

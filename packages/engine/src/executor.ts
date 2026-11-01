@@ -111,7 +111,7 @@ import { touchMachineAccount } from "./machine-accounts";
 import { computerBackSoon, type MachineStatus } from "./machine-hub";
 import { MEDIA_TOOLS } from "./media";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
-import { missionReportSince, scheduleKeepGoing } from "./missions-engine";
+import { missionAsksPerson, missionReportSince, scheduleKeepGoing } from "./missions-engine";
 import { postNoAiCard } from "./no-ai";
 import { enqueue, PermanentJobError } from "./outbox";
 import { createProfiler, type StageTiming } from "./profile";
@@ -2536,8 +2536,13 @@ async function executeRunInner(
           appendUserText(t, keep);
           if (plan.kind !== "model") nextPrompt = keep;
           later(() => addRunStep(db, run, "context", { nudged: "promise" }));
-        } else if (verdict === "waiting" && plan.missionId) {
-          // A mission waiting on a person asks with a card: the thread shows it waits, and the answer resumes it.
+        } else if (
+          verdict === "waiting" &&
+          plan.missionId &&
+          !(await missionAsksPerson(db, plan.missionId).catch(() => false))
+        ) {
+          // A mission waiting on a person asks with a card (unless one already asks): the thread shows it waits, and
+          // the answer resumes it.
           keep = MISSION_ASK_NUDGE;
           appendUserText(t, keep);
           if (plan.kind !== "model") nextPrompt = keep;
