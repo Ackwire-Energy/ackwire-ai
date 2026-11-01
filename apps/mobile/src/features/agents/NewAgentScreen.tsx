@@ -347,8 +347,9 @@ function NewAgentForm({
           await api.agents.setBrain(orgId, agent.id, plan.input);
         });
       } else if (thinks.contextTokens !== null) {
-        const contextTokens = thinks.contextTokens;
-        await savePart(failures, () => api.agents.setBrain(orgId, agent.id, { brain: "model", contextTokens }));
+        await savePart(failures, () =>
+          api.agents.setBrain(orgId, agent.id, { brain: "model", contextTokens: thinks.contextTokens }),
+        );
       }
       // My own mailboxes at the level chosen here (every send asks), then its routine, now that it is where it reports.
       for (const [accountId, level] of Object.entries(mailLevels)) {

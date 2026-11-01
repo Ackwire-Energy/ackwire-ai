@@ -19,7 +19,7 @@ describe("a reply's tools sit last, live and saved", () => {
     expect(
       ascending(
         at(row, [
-          "body ? (\n          <MessageText body={body}",
+          ") : body ? (\n          <MessageText\n            body={body}",
           "<Receipts message={m} />",
           "{cards}\n        {/* Its tools after",
           "<ConsultGroup message={m} color={color} />",
