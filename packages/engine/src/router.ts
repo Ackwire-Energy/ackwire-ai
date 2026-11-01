@@ -843,6 +843,7 @@ export async function routeMessage(
         routable,
         // Whom the router sent it to (null: it never decided on it), and whether a run it started is still at work.
         routedTo: routingDecisions.selectedAgentIds,
+        routedBy: routingDecisions.strategy,
         working: sql<boolean>`exists (select 1 from ${agentRuns} r where r.org_id = ${messages.orgId}
           and r.trigger_message_id = ${messages.id} and ${inArray(sql`r.status`, [...ACTIVE_RUN_STATUSES])})`,
         threadId: messages.threadId,
@@ -1029,7 +1030,10 @@ export async function routeMessage(
         after.threadId === m.threadId &&
         after.createdAt.getTime() - m.createdAt.getTime() <= quietMs;
       if (m.routable && m.routedTo === null && !continued && !answeredBy) break;
-      const routed = m.routedTo?.length === 1 ? m.routedTo.filter((id) => m.working || spoke.has(id)) : m.routedTo;
+      // The coordinator took it because nobody else did: that is no talk with it, or the generalist would pull
+      // every later pick back to itself.
+      const routedTo = m.routedBy === "rule:coordinator" ? [] : m.routedTo;
+      const routed = routedTo?.length === 1 ? routedTo.filter((id) => m.working || spoke.has(id)) : routedTo;
       const to =
         m.mentionedAgentIds.length > 0
           ? m.mentionedAgentIds

@@ -504,7 +504,7 @@ describe("the agent a person last talked to", () => {
     text: string,
     minutesAgo: number,
     routedTo?: { id: string }[],
-    more?: { working?: boolean; thread?: number },
+    more?: { working?: boolean; thread?: number; strategy?: string },
   ];
 
   /** Ana alone with Theo (PM) and Ada (Dev), as in #private on 2026-10-31. */
@@ -554,7 +554,7 @@ describe("the agent a person last talked to", () => {
             orgId: f.org.id,
             channelId: channel.id,
             messageId: m.id,
-            strategy: "jev",
+            strategy: more?.strategy ?? "jev",
             candidates: [],
             selectedAgentIds,
           });
@@ -652,6 +652,33 @@ describe("the agent a person last talked to", () => {
       best: "theo",
     }));
     expect(tasks.selected).toEqual([t.theo.id]);
+  });
+
+  test("with a coordinator, a message it took isn't a talk with it", async () => {
+    const t = await privateRoom();
+    await f.db.update(schema.agents).set({ coordinator: true }).where(eq(schema.agents.id, t.theo.id));
+    // Theo took Ana's question as the coordinator and handed it to Ada, who did the work.
+    const handedOver = await t.talk(
+      [
+        [null, "alguém consegue ver se o PR do checkout subiu?", 15, [t.theo], { strategy: "rule:coordinator" }],
+        [t.theo, "@ada pode olhar o PR do checkout?", 14.6],
+        [t.ada, "Subiu sim, está verde.", 14],
+      ],
+      "e os testes de integração passaram?",
+      () => ({ nouls: { "@theo": 0.55, "@ada": 0.72 }, needs: 0.8, best: "ada" }),
+    );
+    expect(handedOver.selected).toEqual([t.ada.id]);
+    expect(handedOver.decision?.reason).toBe("jev: best @ada (confidence 0.80)");
+    // A greeting the coordinator answered doesn't keep the next request with it.
+    const greeted = await t.talk(
+      [
+        [null, "bom dia", 12.4, [t.theo], { strategy: "rule:coordinator" }],
+        [t.theo, "Bom dia, Ana!", 12],
+      ],
+      "o checkout está dando 500",
+      () => ({ nouls: { "@theo": 0.5, "@ada": 0.75 }, needs: 0.9, best: "ada" }),
+    );
+    expect(greeted.selected).toEqual([t.ada.id]);
   });
 
   test("with no pick between agents to settle, nothing changes", async () => {
