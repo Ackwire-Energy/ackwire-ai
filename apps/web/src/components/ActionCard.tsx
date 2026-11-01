@@ -11,17 +11,23 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOpenAgentPanel } from "@/components/agent-panel-context";
 import { useConnectAi } from "@/components/ConnectAi";
 import { useOrg } from "@/components/org-context";
+import { RequestCard, RequestFuse, useExpired } from "@/components/RequestCard";
 import { StretchCardView } from "@/components/StretchCard";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
 import { inPlaceClick } from "@/lib/navigate";
 import { useToast } from "@/lib/toast";
+import { expiryText } from "@/pages/ApprovalsPage";
+
+/** The whole time a proposal has (a day when its message doesn't say): the fuse burns down over it. */
+const DAY_MS = 24 * 3_600_000;
 
 /**
  * An agent's action card (ADR 0061, `meta.actionCard`) in place of its text: what needs a person's
  * credentials or consent, one click away. "Conectar uma IA" opens the Connect dialog at the card's step for
  * the agents it names (the dialog says what each person may do), and reads "Conectado" once they can think.
- * A proposal of a new agent (ADR 0081) is its own card, and so is a stretch's pause with Continuar (ADR 0089).
+ * A proposal of a new agent (ADR 0081) is a request while it is open (`AgentProposalCardView`); a stretch's pause with
+ * Continuar (ADR 0089) is its own card.
  */
 export function ActionCard({ message }: { message: Message }) {
   const { t } = useTranslation();
@@ -78,9 +84,10 @@ export function ActionCard({ message }: { message: Message }) {
 }
 
 /**
- * "Ada propõe um novo agente": the draft at a glance (its face, name, role and the AI it would think with).
- * Revisar opens "Criar agente" filled in with it, Recusar says no; both only for who may create agents, and
- * only until it expires. Created, it links to the agent.
+ * "Ada propõe um novo agente". While it is open, a request card like every other: the agent's reason, the draft
+ * in the well (its face, name, handle and role, and the AI it would think with where the line has room), Revisar
+ * (opens "Criar agente" filled in with it) and Recusar for who may create agents, and the fuse to its expiry.
+ * Then what was decided; created, it links to the agent.
  */
 function AgentProposalCardView({ message, card }: { message: Message; card: AgentProposalCard }) {
   const { t } = useTranslation();
@@ -91,13 +98,56 @@ function AgentProposalCardView({ message, card }: { message: Message; card: Agen
   const openPanel = useOpenAgentPanel();
   const { draft, why } = card.params;
   const status = proposalStatus(card);
+  // Open until it expires: drawn again at that moment, even before the server's event says so.
+  useExpired(status === "open" ? card.expiresAt : null);
   const decides = status === "open" && can(org, "create_agents");
-  const proposer = (message.author.id && dir.agentById.get(message.author.id)?.name) || t("channel.unknownAgent");
+  const agent = message.author.id ? dir.anyAgent(message.author.id) : undefined;
+  const proposer = agent?.name || t("channel.unknownAgent");
+  const title = t("actionCard.agentProposal.title", { agent: proposer });
+  if (status === "open") {
+    const end = Date.parse(card.expiresAt);
+    const span = Math.max(1, end - Date.parse(message.createdAt) || DAY_MS);
+    const refuse = () => deny.mutate(message.id, { onError: (error) => toast.show(errorText(t, error), "error") });
+    return (
+      <RequestCard
+        id={message.id}
+        kind="agent"
+        agent={agent}
+        label={title}
+        mine={decides}
+        waitingFor={t("proposals.waitingAdmin")}
+        lead={why || title}
+        object={{
+          logo: <AgentAvatar name={draft.name} appearance={lookOf(draft)} size="md" />,
+          title: draft.name,
+          // The AI comes last: where the line runs out, it is what gives way.
+          detail: [`@${draft.handle}`, draft.role, suggestedAiText(t, draft.ai)].filter(Boolean).join(" · "),
+        }}
+        actions={
+          decides ? (
+            <>
+              <Button asChild size="sm" variant="primary">
+                <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }} search={{ proposal: message.id }}>
+                  {t("actionCard.agentProposal.review")}
+                </Link>
+              </Button>
+              <Button size="sm" loading={deny.isPending} onClick={refuse}>
+                {t("approval.refuse")}
+              </Button>
+            </>
+          ) : undefined
+        }
+        end={<RequestFuse left={Math.max(0, end - Date.now()) / span} agent={agent} text={expiryText(t, card)} />}
+        what={draft.name}
+      />
+    );
+  }
+  // Created, refused or expired: what was decided.
   return (
     <div className="waitcard" data-done={status === "created" || undefined}>
       <span className="waitcard__top ac-iconline">
         <Icon name={status === "created" ? "check" : "agent"} size={16} />
-        <span>{t("actionCard.agentProposal.title", { agent: proposer })}</span>
+        <span>{title}</span>
       </span>
       <span className="ac-faceline">
         <AgentAvatar name={draft.name} appearance={lookOf(draft)} size="md" />
@@ -112,22 +162,7 @@ function AgentProposalCardView({ message, card }: { message: Message; card: Agen
       </span>
       {why && <p>{why}</p>}
       <span className="waitcard__acts">
-        {decides ? (
-          <>
-            <Button asChild size="sm" variant="primary">
-              <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }} search={{ proposal: message.id }}>
-                {t("actionCard.agentProposal.review")}
-              </Link>
-            </Button>
-            <Button
-              size="sm"
-              loading={deny.isPending}
-              onClick={() => deny.mutate(message.id, { onError: (error) => toast.show(errorText(t, error), "error") })}
-            >
-              {t("approval.refuse")}
-            </Button>
-          </>
-        ) : status === "created" ? (
+        {status === "created" ? (
           <>
             <Chip icon="check" tone="done">
               {t("actionCard.agentProposal.created")}
@@ -147,10 +182,6 @@ function AgentProposalCardView({ message, card }: { message: Message; card: Agen
               </Button>
             )}
           </>
-        ) : status === "open" ? (
-          <Chip icon="waiting" tone="waiting">
-            {t("proposals.waitingAdmin")}
-          </Chip>
         ) : (
           <Chip icon="close">{t(status === "denied" ? "proposals.refused" : "approval.expired")}</Chip>
         )}

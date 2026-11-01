@@ -33,6 +33,8 @@ const click = async (el: Element) => {
   await act(async () => fireEvent.click(el));
   await settle(4);
 };
+/** In the conversation, "Aprovar sempre" and what it covers live behind the request card's "Ver detalhes". */
+const seeDetails = (card: HTMLElement) => click(within(card).getByRole("button", { name: "Ver detalhes" }));
 const approveCalls = (state: ReturnType<typeof seedState>) =>
   state.calls.filter((c) => c.method === "approvals.approve").map((c) => c.args);
 
@@ -42,6 +44,8 @@ describe("Aprovar sempre on a request", () => {
     const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(4);
     const card = screen().getByRole("group", { name: "Pedido de aprovação" });
+    expect(card.textContent).not.toContain(HINT);
+    await seeDetails(card);
     expect(card.textContent).toContain(HINT);
     expect(card.querySelector(".ap-always")?.getAttribute("title")).toBe("GITHUB_CREATE_AN_ISSUE_COMMENT");
     await click(within(card).getByRole("button", { name: "Aprovar sempre" }));
@@ -66,6 +70,7 @@ describe("Aprovar sempre on a request", () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(4);
     const card = screen().getByRole("group", { name: "Pedido de aprovação" });
+    await seeDetails(card);
     expect(within(card).queryByRole("button", { name: "Aprovar sempre" })).toBeNull();
     expect(card.querySelector(".ap-always")).toBeNull();
     await click(within(card).getByRole("button", { name: "Aprovar merge" }));
@@ -201,6 +206,7 @@ describe("git requests", () => {
     await settle(4);
     const card = screen().getByRole("group", { name: "Pedido de aprovação" });
     expect(card.textContent).toContain("Enviar para ana/fix em acme/app (24 h, sem force push)");
+    await seeDetails(card);
     expect(card.textContent).toContain("Aprova este e os próximos iguais da Ada: enviar para ana/fix em acme/app.");
     expect(card.textContent).not.toContain("com qualquer valor");
     await click(within(card).getByRole("button", { name: "Aprovar sempre" }));

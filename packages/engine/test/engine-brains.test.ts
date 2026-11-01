@@ -20,6 +20,7 @@ import {
   cancelRun,
   clearPlanLimits,
   computerBrainUnavailable,
+  computerMediaNote,
   createChannel,
   createJobHandlers,
   createMissionEngine,
@@ -351,7 +352,8 @@ test("a gated call through the bridge leaves the run waiting; the decision resum
   expect(gh.executed).toEqual([]);
   expect(seen.length).toBe(1);
   const main = await timeline(f);
-  expect(main.map((m) => m.body)).toContain("Pedi aprovação para o merge.");
+  // The card says it all: a line that only announces it stays out of the conversation.
+  expect(main.map((m) => m.body)).not.toContain("Pedi aprovação para o merge.");
   expect(main.some((m) => typeof m.meta.approvalId === "string")).toBe(true);
   const transcript = run?.transcript as { pending?: { calls: { toolUseId: string; bridged?: boolean }[] } };
   expect(transcript.pending?.calls).toMatchObject([{ toolUseId: "call-1", bridged: true }]);
@@ -462,7 +464,6 @@ test("approved, it ran, and the brain ended its turn without a word: one more tu
   expect(run?.status).toBe("done");
   const fromAgent = (await timeline(f)).filter((m) => m.author.type === "agent" && !m.meta.approvalId);
   expect(fromAgent.map((m) => m.body)).toEqual([
-    promised,
     "The preview hid the rows, so I read them again: tests took 9 min, lint 2.",
   ]);
   const steps = await f.db
@@ -594,7 +595,7 @@ test("two decisions of one pause: the resume that finds the run running under th
   const [run] = await f.db.select().from(schema.agentRuns);
   expect(run?.status).toBe("done");
   const fromAgent = (await timeline(f)).filter((m) => m.author.type === "agent" && !m.meta.approvalId);
-  expect(fromAgent.map((m) => m.body)).toEqual(["Reading both CI runs.", "Tests took 9 min, lint 2."]);
+  expect(fromAgent.map((m) => m.body)).toEqual(["Tests took 9 min, lint 2."]);
 });
 
 test("a question asked through the bridge: the text written before it comes first, what follows isn't posted", async () => {
@@ -1794,6 +1795,30 @@ test("a computer brain with the react tool is told to end with an empty reply af
   await drainOutbox(f.db, handlers);
   expect(systems[0]).toContain(COMPUTER_REACT_NOTE);
   expect(systems[0]).toContain("not even the emoji again");
+});
+
+test("a computer brain with the GIF and sticker tools is told an empty reply after one adds nothing", async () => {
+  f = await setup({ mediaTools: true });
+  await computerAgent(f);
+  const systems: string[] = [];
+  const brain: Brain = {
+    kind: "claude_code",
+    async *run(turn) {
+      systems.push(turn.system);
+      yield { type: "done", text: "Oi." };
+    },
+  };
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  // No GIF search on this server: the note names only the sticker, and no reaction note without `react`.
+  expect(systems[0]).toContain(computerMediaNote(["send_sticker"]));
+  expect(systems[0]).not.toContain("`send_gif`");
+  expect(systems[0]).not.toContain(COMPUTER_REACT_NOTE);
 });
 
 test("bridged side effects reach the engine: artifacts and memory cards on the reply, memory.updated published", async () => {

@@ -61,6 +61,15 @@ Each row is decided by whoever may make that change on the agent's page today:
 
 Model, key, budget, owner, audience, channels, reply mode, the coordinator flag and archiving. There is no Undo: the person reads the change before accepting, which makes it their own edit, as Salvar on the agent's page.
 
+### 6. The agent that proposed is told
+
+A proposal suspends no run, so accepting one woke nothing, and the agent couldn't say it had happened.
+
+- The agent's message that shows the card says which run proposed it and which rows are on it (`meta.memoryUpdates`, no new column). When the card's last open row is decided, the agent gets one `proposal_result` notice in the conversation where it proposed (`deliverNoticeToRun`, so a run still active reads it at its next step, and one that ended wakes), written after the row commits. Partial decisions on a card still end in one notice, whoever made them, and it says what became of each row: accepted (already in effect), refused (don't propose it again unless someone asks), or not applied because what it was made against changed.
+- A card where every row went stale changed nothing, so it says nothing: the person who clicked already got the refusal.
+- A proposal no message shows (a memory promotion, a card not posted yet) gets no notice. A failure to deliver never fails the decision.
+- The rows of the card are locked while the notice is written, and `refs.proposalCardId` on the message means two last rows decided at once still send one.
+
 ## Consequences
 
 - Nothing escalates. Applying calls the editors as the person, instructions grant nothing, and the permission-text judge refuses text that tries to change permissions or approvals.

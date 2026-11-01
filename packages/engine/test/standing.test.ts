@@ -257,7 +257,7 @@ describe("suspended", () => {
     expect((await createOrganization(f.db, bia.id, { name: "Bia's" })).organization.name).toBe("Bia's");
 
     await standing("active");
-    expect(await acceptInvitation(f.db, bia, sent.token)).toEqual({ orgId: f.org.id });
+    expect(await acceptInvitation(f.db, bia, sent.token)).toMatchObject({ orgId: f.org.id });
     expect((await createOrganization(f.db, f.owner.id, { name: "Acme 2" })).organization.name).toBe("Acme 2");
   });
 

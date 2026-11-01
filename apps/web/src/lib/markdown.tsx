@@ -81,11 +81,14 @@ export function renderInline(
       break;
     }
     const tok = m[0];
+    // The text before this token keeps the key it had as the trailing text, so its words stay on screen as they are;
+    // the text after takes the next one. Two pieces with one key leave the old words behind in the DOM.
+    const textKey = `${key}-t${n}`;
     const k = `${key}-${n++}`;
     // `![[…]]` inside a sentence: the "!" belongs to the embed.
     const isEmbed = Boolean(m[6] && embed && m.index > 0 && rest[m.index - 1] === "!");
     const before = rest.slice(0, isEmbed ? m.index - 1 : m.index);
-    if (before) out.push(...withMentions(before, `${key}-t${n}`, mention, words));
+    if (before) out.push(...withMentions(before, textKey, mention, words));
     if (isEmbed && embed) {
       out.push(embed(parseWikiToken(tok).title, k, false));
       rest = rest.slice(m.index + tok.length);

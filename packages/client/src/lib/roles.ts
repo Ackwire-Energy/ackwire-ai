@@ -1,4 +1,6 @@
+import type { TFunction } from "i18next";
 import type { OrgRole, PermissionArea, Person } from "../api/types";
+import { joinNames } from "./format";
 import type { RolePermission } from "./permissions";
 
 /**
@@ -107,6 +109,25 @@ export function summaryKeys(role: OrgRole, everyone: OrgRole | undefined): RoleP
   const base = baseOf(role, everyone);
   const own = new Set(role.permissions);
   return SUMMARY_ORDER.filter((k) => own.has(k) && !base.has(k));
+}
+
+/** "a, b e c" in the person's language; the phone's JavaScript engine has no `Intl.ListFormat`. */
+const wordList = (t: TFunction, locale: string, items: string[]) =>
+  typeof Intl.ListFormat === "function"
+    ? new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(items)
+    : joinNames(items, t("notifications.and"));
+
+/** The sentence that sums a role up: its own keys past what `everyone` gives, the first three, "and N more". */
+export function roleSummary(t: TFunction, locale: string, role: OrgRole, everyone: OrgRole | undefined) {
+  const keys = summaryKeys(role, everyone);
+  if (keys[0] === "administrator") return t("rolesPage.summary.admin");
+  const words = keys.slice(0, 3).map((k) => t(`permissions.${k}.say`));
+  if (keys.length > 3) words.push(t("rolesPage.summary.more", { count: keys.length - 3 }));
+  if (isEveryone(role))
+    return keys.length
+      ? t("rolesPage.summary.everyone", { list: wordList(t, locale, words) })
+      : t("rolesPage.summary.everyoneNone");
+  return keys.length ? t("rolesPage.summary.extra", { list: wordList(t, locale, words) }) : t("rolesPage.summary.none");
 }
 
 /** A person's rank: their highest role's position (an owner above all, `Infinity` with none). */

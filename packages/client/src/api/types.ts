@@ -35,6 +35,19 @@ export interface JevKey {
 }
 
 /**
+ * The installation's GIPHY key, for its pinned owner on a server that isn't agentes.chat's own (`GET
+ * /api/app/gif-key`, ADR 0091): with it, every workspace has GIFs (`OrgSettings.gifsAvailable`).
+ */
+export interface GifKey {
+  /** `env`: `GIPHY_API_KEY`, read-only here. `settings`: added in Settings. Null: none. */
+  source: "env" | "settings" | null;
+  /** The key's last 4 characters (the key itself is never returned). */
+  hint: string | null;
+  /** `invalid`: a saved key this server can't read, or one in `GIPHY_API_KEY` that can't be a key. */
+  state: "off" | "ok" | "invalid";
+}
+
+/**
  * A device that hears pushes (`POST /api/app/push/devices`): the phone app's Expo token (ADR 0035), or this
  * browser's Web Push subscription (ADR 0071: its endpoint and keys, from `PushSubscription.toJSON()`).
  */
@@ -315,13 +328,24 @@ export interface InvitationPreview {
   /** How many more agents work there than `agents` names ("… e mais 2 já trabalham lá"). */
   moreAgents?: number;
   /**
-   * A link turned off, expired, or whose workspace is paused, or an invitation to a workspace being deleted: nobody can
-   * ask or join with it (ADR 0068).
+   * A link turned off, expired, or whose workspace is paused, or an invitation to a workspace paused or being
+   * deleted: nobody can ask or join with it (ADR 0068).
    */
   closed?: true;
   /** A link opened signed in: where that person stands (on a link that no longer works, only a member's). */
   you?: JoinStatus;
+  /** An email invitation: until when it works. */
+  expiresAt?: string;
+  /** An email invitation: how its address signs in, so the page asks only what is missing (ADR 0090). */
+  account?: { exists: boolean; password: boolean; providers: ("google" | "github" | "apple")[] };
+  /** An email invitation to a workspace with no seat left, said before anyone makes an account (ADR 0090). */
+  full?: true;
 }
+
+/** An email invitation that no longer opens (ADR 0090): accepted, or expired and who to ask. */
+export type InvitationState =
+  | { state: "accepted"; orgId: string; orgName: string; at: string }
+  | { state: "expired"; orgName: string; invitedBy: string | null; at: string };
 
 /** A signed-in person and a workspace's invitation link: in or not, and their latest request with its answer. */
 export interface JoinStatus {
@@ -337,6 +361,26 @@ export interface AskToJoinResult {
   status: "pending";
   email: string;
   emailed: boolean;
+  /** Asked with a `password` (ADR 0090): what this page keeps to sign in once approved (`invites.claim`). */
+  key?: string;
+}
+
+/**
+ * Where the request a page made stands (ADR 0090): waiting, in (once: `signIn` for the one-time sign-in), denied,
+ * or closed (run out, turned off, or approved for an address that signs in as it always did).
+ */
+export type JoinClaim =
+  | { status: "pending" }
+  | { status: "in"; orgId: string; signIn: string }
+  | { status: "denied"; reason: string | null }
+  | { status: "closed" };
+
+/** A suggestion a member made that still waits for the admins (ADR 0090). */
+export interface MySuggestion {
+  id: string;
+  email: string;
+  note: string | null;
+  createdAt: string;
 }
 
 /**
@@ -375,6 +419,8 @@ export interface JoinRequest {
   verified: boolean;
   /** @deprecated Read `verified`. Kept for phone builds from before it: approving lets an account in at once. */
   confirmed: boolean;
+  /** The member who suggested this person (their name, ADR 0090): it came through no link. */
+  suggestedBy?: string | null;
   createdAt: string;
   /** Closes unanswered after this. */
   expiresAt: string;
@@ -431,6 +477,11 @@ export interface Agent {
   coordinator?: boolean;
   /** No longer in the team (ADR 0082): only its name, role and look, from `FormerAgent`. */
   former?: "archived" | "deleted";
+  /**
+   * It may send a sticker or a GIF (ADR 0091): when someone asks for one, and after a light reply as often as the
+   * workspace allows. Absent: on (the default).
+   */
+  mediaReplies?: boolean;
 }
 
 /** An agent no longer in the team (archived or deleted): what its messages and reports still show. */
@@ -520,6 +571,8 @@ export interface AgentInput {
   coordinator?: boolean;
   /** Created from an agent's proposal (its card's message id, ADR 0081): the card is marked created. */
   proposal?: string;
+  /** Its stickers and GIFs after a light reply (ADR 0091); same permission as editing the agent. */
+  mediaReplies?: boolean;
 }
 
 /**
@@ -640,6 +693,8 @@ export interface ChannelLastMessage {
   preview: string;
   /** A body the server wrote: show it in the reader's language (`previewBody`). Null for a plain message. */
   meta?: PreviewMeta | null;
+  /** It was a GIF or a sticker (ADR 0091): with no text, `previewBody` says which. */
+  mediaKind?: MediaKind | null;
   createdAt: string;
 }
 
@@ -1401,7 +1456,22 @@ export interface OrgSettings {
   actionCheck: boolean;
   /** Per provider, the models Automático picks per tier where the workspace chose its own (ADR 0087). */
   autoModels: Partial<Record<string, Partial<Record<ModelTier, string>>>>;
+  /** People can send GIFs in chat (ADR 0091); only with `gifsAvailable` too. On by default. */
+  gifs: boolean;
+  /** The most a GIF may be rated. */
+  gifRating: GifRating;
+  /** The agents' own stickers in the picker. On by default. */
+  agentStickers: boolean;
+  /** How often agents follow a light reply with a sticker or a GIF. */
+  agentMedia: AgentMediaLevel;
+  /** Read only: this server can search GIFs (it has a GIF provider). */
+  gifsAvailable: boolean;
+  /** Read only: this server can decide when agents send one (agents send none on their own without it). */
+  agentMediaAvailable: boolean;
 }
+
+/** `OrgSettings` the server works out itself: never in a PATCH. */
+export type ReadOnlyOrgSettings = "gifsAvailable" | "agentMediaAvailable";
 
 /** Automático's sizes: quick tasks, everyday work, hard work. */
 export type ModelTier = "small" | "medium" | "large";
@@ -1507,9 +1577,24 @@ export interface InvitationWithStatus {
   email: string;
   role: Role;
   roleIds?: string[];
+  /** Channels it adds them to, besides #general (ADR 0090). */
+  channelIds?: string[];
   status: "pending" | "expired";
   expiresAt: string;
   createdAt: string;
+  /** Who sent it (their name). */
+  invitedBy?: string | null;
+  /** Its link, the same as the email's, to copy at any time (ADR 0090); null for one sent before that. */
+  url?: string | null;
+}
+
+/** What the invite dialog sends (ADR 0090): each address with its roles, the channels and the note for all. */
+export interface InviteBatch {
+  emails?: string[];
+  invites?: { email: string; roleIds?: string[] }[];
+  roleIds?: string[];
+  channelIds?: string[];
+  note?: string;
 }
 
 export interface BatchInviteResult {
@@ -1740,6 +1825,88 @@ export interface ReplyRef {
   author: { type: AuthorType; id: string | null };
   authorName: string;
   excerpt: string;
+  /** What it quotes was a GIF or a sticker (ADR 0091): the quote says so where its excerpt is empty. */
+  media?: MediaKind;
+}
+
+// ── GIFs and stickers in chat (ADR 0091) ──────────────────────────────────────
+
+/** A message's media: a GIF or one of an agent's stickers. */
+export type MediaKind = "gif" | "sticker";
+
+/** The agents' stickers, one animation per mood (`STICKER_MOODS` in `lib/media.ts`). */
+export type StickerMood = "celebrate" | "love" | "deal" | "thinking" | "wow" | "dizzy";
+
+/** The GIF picker's chips (`GIF_CATEGORY_IDS` in `lib/media.ts`); the server searches each with its own words. */
+export type GifCategory =
+  | "celebrate"
+  | "thanks"
+  | "ok"
+  | "applause"
+  | "wow"
+  | "coffee"
+  | "good_morning"
+  | "bye"
+  | "friday"
+  | "oops"
+  | "thinking";
+
+/** Which file of a GIF the server sends: a small one for the picker, the one a message shows, or a still frame. */
+export type GifSize = "preview" | "full" | "still";
+
+/** The most a GIF may be rated in the workspace: `g` (any age) or `pg` (up to 13). */
+export type GifRating = "g" | "pg";
+
+/** How often the workspace's agents follow a light reply with a sticker or a GIF. */
+export type AgentMediaLevel = "never" | "sometimes" | "often";
+
+/** `meta.media` of a GIF message: what the app needs to draw it, never a URL (the file comes from our server). */
+export interface GifMedia {
+  kind: "gif";
+  provider: "giphy";
+  id: string;
+  /** The provider's title (outside text). */
+  title: string;
+  width: number;
+  height: number;
+}
+
+/** `meta.media` of a sticker: each app draws it from the agent's look. */
+export interface StickerMedia {
+  kind: "sticker";
+  agentId: string;
+  mood: StickerMood;
+}
+
+/** `message.meta.media`: a message may have media and no text. */
+export type MessageMedia = GifMedia | StickerMedia;
+
+/** What `chat.post` takes for a message's media: the server looks a GIF up again and writes the real `meta.media`. */
+export type PostMedia = { kind: "gif"; id: string } | { kind: "sticker"; agentId: string; mood: StickerMood };
+
+/** A GIF the search found (`GET …/gifs`). */
+export interface Gif {
+  id: string;
+  /** The provider's title (outside text). */
+  title: string;
+  /** Of the `full` file, in pixels. */
+  width: number;
+  height: number;
+}
+
+/** A page of GIFs; `next` is the offset of the next page (null: no more). */
+export interface GifPage {
+  gifs: Gif[];
+  next: number | null;
+}
+
+/** A GIF search: free text, a category, or neither (what is trending); `lang` is the person's (two letters). */
+export interface GifQuery {
+  q?: string;
+  category?: GifCategory | null;
+  offset?: number;
+  limit?: number;
+  lang?: string;
 }
 
 /**
@@ -1903,8 +2070,15 @@ export interface DmRead {
 export interface DirectMessage {
   channelId: string;
   with: { type: AuthorType; id: string; name: string; handle: string | null };
-  /** `meta`: a body the server wrote, shown in the reader's language (`previewBody`). */
-  lastMessage: { id: string; body: string; meta?: PreviewMeta | null; createdAt: string; authorType: string } | null;
+  /** `meta`: a body the server wrote, shown in the reader's language (`previewBody`); `mediaKind`: a GIF or a sticker. */
+  lastMessage: {
+    id: string;
+    body: string;
+    meta?: PreviewMeta | null;
+    mediaKind?: MediaKind | null;
+    createdAt: string;
+    authorType: string;
+  } | null;
   unread: number;
 }
 
@@ -3600,7 +3774,14 @@ export interface ThreadInfo {
   replyCount: number;
   lastActivityAt: string;
   /** `meta`: a body the server wrote, shown in the reader's language (`previewBody`). */
-  lastMessage: { author: ThreadActor; excerpt: string; meta?: PreviewMeta | null; createdAt: string } | null;
+  lastMessage: {
+    author: ThreadActor;
+    excerpt: string;
+    meta?: PreviewMeta | null;
+    /** A GIF or a sticker (ADR 0091): with no text, `previewBody` says which. */
+    mediaKind?: MediaKind | null;
+    createdAt: string;
+  } | null;
   participants: ThreadActor[];
   /** An agent run is in progress (or waiting) in this thread. */
   working: boolean;
@@ -4426,7 +4607,12 @@ export type NotificationKind =
    * ADR 0068: someone asks to join through the invitation link (owners and admins). Waiting; no actor;
    * `latest.title` the newest name, `count` how many asked while it was unread. Opens Members.
    */
-  | "join_request";
+  | "join_request"
+  /**
+   * ADR 0090: someone accepted the email invitation this person sent. The person as actor, `latest.title` their
+   * name, `source.label` the workspace's. Inbox only. Opens Members.
+   */
+  | "invitation_accepted";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {
@@ -4463,6 +4649,8 @@ export interface NotificationSource {
 export interface NotificationLatest {
   /** Snippet of the latest message, comment, question or summary (≤ 280 chars); an approval's why. */
   text?: string;
+  /** The latest message was a GIF or a sticker (ADR 0091): with no `text`, the card names what it was. */
+  media?: MediaKind;
   /** Issue title, the approval's action title, the topic's question. */
   title?: string;
   /** Reactions: distinct emojis (≤ 5) and my message's snippet. */
@@ -4494,6 +4682,8 @@ export interface NotificationLatest {
   cloud?: boolean;
   /** `join_request`: the first two people who asked, in the order they asked (`count` says how many in all). */
   names?: string[];
+  /** `join_request` from a member's suggestion (ADR 0090): who suggested. */
+  suggestedBy?: string;
 }
 
 export interface AppNotification {

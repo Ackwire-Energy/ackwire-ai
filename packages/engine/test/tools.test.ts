@@ -486,18 +486,15 @@ describe("approval flow (end to end)", () => {
     // Its card is where it was asked: the main timeline.
     expect(approval).toMatchObject({ title: "Merge PR #42 in acme/app", canDecide: true, threadId: null });
 
-    // The chat shows what the agent said before the approval and the card, in the main timeline where it
-    // was asked; earlier narration is a step.
+    // The chat shows the card, in the main timeline where it was asked: the line that only announces it stays out
+    // (`pauseLead`) and earlier narration is a step.
     let main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
     expect(main.map((m) => m.body)).toEqual([
       "@dev merge PR 42 if the tests pass",
-      "Tests pass, merging.",
       "Approval request: Merge PR #42 in acme/app",
     ]);
-    // Its reply came after a tool call: "Ver o que ele fez" has something to show.
-    expect((main[1]?.meta?.work as { steps: number } | undefined)?.steps).toBeGreaterThan(0);
     // The card carries the agent's reason (ADR 0053 §8).
-    expect(main[2]?.meta).toEqual({
+    expect(main[1]?.meta).toEqual({
       approvalId: approval?.id,
       bodyCode: "approval_request",
       bodyParams: { title: "Merge PR #42 in acme/app" },
@@ -525,6 +522,8 @@ describe("approval flow (end to end)", () => {
     ]);
     main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
     expect(main.at(-1)?.body).toBe("Merge done.");
+    // Its reply came after a tool call: "Ver o que ele fez" has something to show.
+    expect((main.at(-1)?.meta?.work as { steps: number } | undefined)?.steps).toBeGreaterThan(0);
 
     // The resumed call sent the same history (append-only, thinking block intact) plus the tool result.
     const calls = f.provider.calls.map((c) => c.request);

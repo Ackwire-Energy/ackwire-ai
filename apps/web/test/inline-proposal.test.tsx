@@ -86,6 +86,9 @@ describe("a change proposed for several agents in the chat", () => {
     const state = await openCard([row("p-ada"), atlas("p-atlas")]);
     const card = screen().getByRole("group", { name: "Proposta de mudança de Atlas para 2 agentes" });
     expect(card.textContent).toContain("Atlas propõe · instruções de 2 agentes");
+    // The change once, behind "Ver a mudança", its first line in the well.
+    expect(card.querySelector(".rq__wt")?.textContent).toContain("Responder em português.");
+    await click(within(card).getByRole("button", { name: "Ver a mudança" }));
     expect(card.querySelectorAll(".ac-diff")).toHaveLength(1);
     expect(card.querySelector(".ac-diff__line--add:last-child")?.textContent).toContain("- Responder em português.");
     expect(within(card).getByRole("switch", { name: "Incluir Ada" })).toBeTruthy();
@@ -93,7 +96,9 @@ describe("a change proposed for several agents in the chat", () => {
     await click(within(card).getByRole("button", { name: "Aceitar para todos" }));
     await settle(4);
     expect(accepted(state)).toEqual(["p-ada", "p-atlas"]);
-    expect([...card.querySelectorAll(".proposal-row__status")].map((s) => s.textContent)).toEqual(["Aceita", "Aceita"]);
+    // Decided: the settled card takes the request card's place.
+    const done = screen().getByRole("group", { name: "Proposta de mudança de Atlas para 2 agentes" });
+    expect([...done.querySelectorAll(".proposal-row__status")].map((s) => s.textContent)).toEqual(["Aceita", "Aceita"]);
   });
 
   test("a row the viewer can't decide stays off and says whom it waits for; the button counts the chosen rows", async () => {
@@ -128,7 +133,8 @@ describe("a change proposed for several agents in the chat", () => {
     expect(document.querySelector(".ac-toast")?.textContent).toContain(
       "Uma não foi aceita: o texto mudou desde a proposta.",
     );
-    expect([...card.querySelectorAll(".proposal-row__status")].map((s) => s.textContent)).toEqual([
+    const done = screen().getByRole("group", { name: "Proposta de mudança de Atlas para 2 agentes" });
+    expect([...done.querySelectorAll(".proposal-row__status")].map((s) => s.textContent)).toEqual([
       "Aceita",
       "Ficou velha",
     ]);
@@ -175,7 +181,7 @@ describe("a change proposed for several agents in the chat", () => {
   test("one row alone keeps the single card: a new role is taken as proposed, with no Editar", async () => {
     const state = await openCard([adaRole("p-role")]);
     const card = screen().getByRole("group", { name: "Proposta de mudança de Atlas" });
-    expect(card.textContent).toContain("Atlas propõe · papel da Ada");
+    expect(card.textContent).toContain("papel da Ada");
     expect(card.textContent).toContain("Mudar o papel da Ada");
     expect(card.textContent).toContain("Papel: Dev → Revisora de código");
     expect(within(card).queryByRole("button", { name: "Editar" })).toBeNull();

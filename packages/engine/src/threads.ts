@@ -1016,6 +1016,8 @@ async function queryThreads(
         from ${messages} m
         where m.org_id = ${orgId}::uuid and m.channel_id in (select id from visible)
           and m.thread_id is not null and m.deleted_at is null
+          -- An agent's sticker or GIF after its own reply (ADR 0091) is part of that reply: no reply, no activity.
+          and m.meta->>'mediaAfter' is null
           ${input.rootId ? sql`and m.thread_id = ${input.rootId}::uuid` : sql``}
         group by m.thread_id
       ), candidates as (
@@ -1108,7 +1110,8 @@ async function threadExtras(db: Database, orgId: string, rows: ThreadSqlRow[]) {
     db
       .selectDistinctOn([messages.threadId])
       .from(messages)
-      .where(scope)
+      // The reply, not the agent's sticker or GIF after it (ADR 0091).
+      .where(and(scope, sql`${messages.meta}->>'mediaAfter' is null`))
       .orderBy(messages.threadId, desc(messages.createdAt), desc(messages.id)),
   ]);
   const authors = new Map<string, Actor[]>();

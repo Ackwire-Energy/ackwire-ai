@@ -99,6 +99,7 @@ import {
 import { MoveChannelDialog, NewCategoryDialog, RenameCategoryDialog } from "./ChannelCategoryDialogs";
 import { openPalette } from "./CommandMenu";
 import { DeleteAccountDialog } from "./DeleteAccount";
+import { useInviteDialog } from "./invite/InviteDialog";
 import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
 import { NewChannelDialog } from "./NewChannelDialog";
 import { OpenOnPhoneDialog } from "./OpenOnPhone";
@@ -1589,11 +1590,19 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
   const managesAgents = can(org, "manage_agents");
   const connections = useConnections(org.id);
   const skills = useSkills(org.id, managesAgents);
+  const invite = useInviteDialog();
   const go = (section?: SettingsSection) => () => {
     onDone();
     void (section
       ? navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section } })
       : navigate({ to: "/org/$orgId/settings", params: { orgId: org.id } }));
+  };
+  // The workspace's invite dialog (ADR 0090), over the page this menu was opened on.
+  const inviteNow = () => {
+    if (invite) {
+      onDone();
+      invite.open();
+    } else go("members")();
   };
   let key = 0;
   const next = () => String(++key);
@@ -1601,7 +1610,7 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
     <>
       <MenuOverlayGroup label={t("shell.workspaceMenuOf", { name: org.name })}>
         {can(org, "invite_people") && (
-          <MenuOverlayItem icon="plus" shortcut={next()} description={t("shell.inviteHint")} onSelect={go("members")}>
+          <MenuOverlayItem icon="plus" shortcut={next()} description={t("shell.inviteHint")} onSelect={inviteNow}>
             {t("shell.invite")}
           </MenuOverlayItem>
         )}
