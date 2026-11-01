@@ -447,7 +447,9 @@ export function didLines(items: AgentForYouItem[] | undefined): DidLine[] {
       case "wiki.page_created":
         return line("pageCreated", "doc", { title }, null, chat);
       case "wiki.page_edited":
-        return line("pageEdited", "pen", { title }, null, chat);
+        return p.restricted
+          ? line("pageEditedRestricted", "pen", {}, null, chat)
+          : line("pageEdited", "pen", { title }, null, chat);
       case "thread.renamed":
         return line("threadRenamed", "chat", { to: str(p.to) }, null, {
           kind: "chat",

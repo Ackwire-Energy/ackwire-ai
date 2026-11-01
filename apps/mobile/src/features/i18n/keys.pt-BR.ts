@@ -1139,6 +1139,7 @@ export const featureKeysPtBR = {
         agentAdded: "Chamou {{name}} para #{{channel}}",
         pageCreated: "Criou a página {{title}}",
         pageEdited: "Editou a página {{title}}",
+        pageEditedRestricted: "Editou uma página restrita",
         threadRenamed: "Renomeou uma thread para {{to}}",
         threadClosed: "Fechou a thread {{title}}",
       },

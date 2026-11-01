@@ -1725,6 +1725,7 @@ export const ptBR = {
     wiki: {
       page_created: "Criei a página <b>{{title}}</b> na wiki",
       page_edited: "Editei a página <b>{{title}}</b> da wiki",
+      page_edited_restricted: "Editei uma página restrita da wiki",
     },
     thread: {
       renamed: "Renomeei a conversa para <b>{{to}}</b>",
@@ -6528,6 +6529,24 @@ export const ptBR = {
     lockedHint: "Página trancada: só admins editam.",
     lockedDone: "Trancada. Agora só admins editam.",
     unlockedDone: "Destrancada. Membros voltam a editar.",
+    restricted: "Restrita",
+    restrictedHint: "Só os agentes, os donos e quem foi escolhido veem esta página.",
+    audience: "Quem vê",
+    audienceTitle: "Quem vê {{title}}",
+    audienceText:
+      "Os agentes e os donos sempre leem. Quem fica de fora não encontra a página em listas, buscas ou links.",
+    audienceEveryone: "Todos do workspace",
+    audienceEveryoneText: "Qualquer membro lê a página.",
+    audienceLimited: "Só os agentes e quem eu escolher",
+    audienceLimitedText: "Os agentes continuam usando o que ela diz para decidir, sem citá-la para quem está fora.",
+    audienceRoles: "Papéis",
+    audiencePeople: "Pessoas",
+    audienceSearch: "Buscar pessoas",
+    audienceNoMatch: "Ninguém com esse nome.",
+    audienceSaved: "Pronto. Só quem você escolheu vê a página.",
+    audienceOpened: "Pronto. Todos do workspace veem a página.",
+    noAccessTitle: "Você não tem acesso a esta página",
+    noAccessText: "Ela é só para algumas pessoas. Se precisar, peça a quem cuida da wiki.",
     delete: "Mover para a lixeira",
     deleteTitle: "Mover {{title}} para a lixeira?",
     deleteText: "Os links para ela viram “página para criar”. Dá para restaurar depois.",
@@ -8135,6 +8154,12 @@ export const ptBR = {
     downloadOnly: "Sem prévia para este tipo de arquivo. Baixe para abrir.",
   },
   errors: {
+    /** Restricted wiki pages (ADR 0023). */
+    wiki: {
+      noAccess: "Você não tem acesso a esta página.",
+      audienceForbidden: "Só quem edita a wiki e gerencia papéis escolhe quem vê uma página.",
+      audienceExcludesYou: "Inclua você (um papel seu ou o seu nome) para continuar vendo a página.",
+    },
     /** GIFs and stickers (ADR 0091). */
     media: {
       off: "GIFs e figurinhas estão desligados neste workspace.",

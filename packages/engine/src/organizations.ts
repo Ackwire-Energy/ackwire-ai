@@ -853,6 +853,11 @@ export async function removeMember(
     await tx
       .delete(channelMembers)
       .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.userId, targetUserId)));
+    // And the wiki pages they were named on: rejoining later doesn't give a restricted page back.
+    await tx
+      .update(schema.wikiPages)
+      .set({ audienceUserIds: sql`array_remove(${schema.wikiPages.audienceUserIds}, ${targetUserId})` })
+      .where(and(eq(schema.wikiPages.orgId, orgId), sql`${targetUserId} = any(${schema.wikiPages.audienceUserIds})`));
     const action = actorId === targetUserId ? "member.left" : "member.removed";
     await auditMember(tx, orgId, actorId, action, targetUserId, { role: target.role });
     // Their AI accounts on the organization's computers are signed out and removed (ADR 0059 §1).

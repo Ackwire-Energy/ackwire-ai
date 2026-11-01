@@ -230,6 +230,7 @@ import type {
   TrashedArtifact,
   UndoAllResult,
   UsageReport,
+  WikiAudience,
   WikiGraph,
   WikiImportInput,
   WikiImportResult,
@@ -1051,6 +1052,8 @@ export interface ApiClient {
     lock(orgId: string, slug: string, locked: boolean): Promise<WikiPage>;
     /** "Fixadas": at the top of the wiki for everyone. */
     pin(orgId: string, slug: string, pinned: boolean): Promise<WikiPage>;
+    /** Who sees it (null = every member); for people who edit the wiki and manage roles. */
+    audience(orgId: string, slug: string, audience: WikiAudience | null): Promise<WikiPage>;
     /** To the trash (the server can restore it). */
     remove(orgId: string, slug: string): Promise<void>;
     /** What the agents read most in the last 7 days. */

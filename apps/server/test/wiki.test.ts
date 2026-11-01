@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
+import { browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
 beforeEach(async () => {
@@ -131,4 +131,64 @@ test("wiki API: Obsidian import in batches, pin, what the agents read", async ()
     },
   });
   expect(tooMany.status).toBe(400);
+});
+
+test("wiki API: a page limited to admins and agents is out of reach for other members", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId } = await seedOrg(owner);
+  const ana = await joinByInvitation(t, owner, orgId, "ana@example.com", { role: "admin" });
+  const bia = await joinByInvitation(t, owner, orgId, "bia@example.com");
+  const api = (b: typeof owner, path: string, init?: Parameters<typeof owner>[1]) =>
+    b(`/api/app/organizations/${orgId}${path}`, init);
+  const errorCode = async (res: Response) => ((await res.json()) as { error: { code: string } }).error.code;
+  const { roles } = (await (await api(owner, "/roles")).json()) as { roles: { id: string; permissions: string[] }[] };
+  const adminRole = roles.find((r) => r.permissions.includes("administrator"))?.id ?? "";
+
+  await api(owner, "/wiki/pages", { json: { title: "Margens", body: "Margem mínima de 40%." } });
+  const denied = await api(bia, "/wiki/pages/margens/audience", {
+    method: "PUT",
+    json: { audience: { roleIds: [], userIds: [] } },
+  });
+  expect(denied.status).toBe(403);
+  expect(await errorCode(denied)).toBe("wiki.audience_forbidden");
+  const set = await api(ana, "/wiki/pages/margens/audience", {
+    method: "PUT",
+    json: { audience: { roleIds: [adminRole], userIds: [] } },
+  });
+  expect(set.status).toBe(200);
+  expect(((await set.json()) as { audience: unknown }).audience).toEqual({ roleIds: [adminRole], userIds: [] });
+
+  const opened = await api(bia, "/wiki/pages/margens");
+  expect(opened.status).toBe(403);
+  expect(await errorCode(opened)).toBe("wiki.no_access");
+  expect((await api(ana, "/wiki/pages/margens")).status).toBe(200);
+  const listed = (await (await api(bia, "/wiki/pages")).json()) as { pages: unknown[] };
+  expect(listed.pages).toEqual([]);
+  const tree = (await (await api(bia, "/wiki/tree")).json()) as { pages: unknown[] };
+  expect(tree.pages).toEqual([]);
+  const search = (await (await api(bia, "/wiki/search?q=marg")).json()) as { pages: unknown[] };
+  expect(search.pages).toEqual([]);
+  const posted = (await (
+    await api(bia, `/channels/${channelId}/messages`, { json: { body: "e as [[Margens]]?" } })
+  ).json()) as {
+    meta: { wikiLinks?: unknown[] };
+  };
+  expect(posted.meta.wikiLinks).toEqual([
+    {
+      target: "Margens",
+      label: "Margens",
+      section: null,
+      slug: "margens",
+      title: null,
+      exists: true,
+      restricted: true,
+    },
+  ]);
+  const edit = await api(bia, "/wiki/pages/margens", { method: "PUT", json: { body: "x", baseVersion: 1 } });
+  expect(edit.status).toBe(403);
+
+  const reopened = await api(owner, "/wiki/pages/margens/audience", { method: "PUT", json: { audience: null } });
+  expect(reopened.status).toBe(200);
+  expect((await api(bia, "/wiki/pages/margens")).status).toBe(200);
 });

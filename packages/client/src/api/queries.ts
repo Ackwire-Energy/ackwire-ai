@@ -121,6 +121,7 @@ import type {
   ThreadInfo,
   ThreadPatch,
   ToolDecision,
+  WikiAudience,
   WikiPage,
   WikiPageInput,
   WikiUpdateInput,
@@ -3244,6 +3245,7 @@ export function useWikiAction(orgId: string) {
         | { type: "move"; slug: string; folder: string }
         | { type: "lock"; slug: string; locked: boolean }
         | { type: "pin"; slug: string; pinned: boolean }
+        | { type: "audience"; slug: string; audience: WikiAudience | null }
         | {
             type: "append";
             slug: string;
@@ -3264,6 +3266,8 @@ export function useWikiAction(orgId: string) {
           return api.wiki.lock(orgId, action.slug, action.locked);
         case "pin":
           return api.wiki.pin(orgId, action.slug, action.pinned);
+        case "audience":
+          return api.wiki.audience(orgId, action.slug, action.audience);
         case "append":
           return api.wiki.append(orgId, action.slug, { text: action.text, source: action.source });
       }

@@ -3540,6 +3540,12 @@ export interface WikiAuthor {
   onBehalfOf?: string | null;
 }
 
+/** Who sees a restricted wiki page besides agents and owners: roles (`OrgRole` ids) and people. */
+export interface WikiAudience {
+  roleIds: string[];
+  userIds: string[];
+}
+
 export interface WikiPageSummary {
   id: string;
   /** URL key ("processos/onboarding"); changes when the page is renamed. */
@@ -3554,6 +3560,8 @@ export interface WikiPageSummary {
   locked?: boolean;
   /** "Fixadas": at the top of the wiki for everyone. */
   pinned?: boolean;
+  /** Limited to these roles and people (agents and owners always read it); null or missing = every member. */
+  audience?: WikiAudience | null;
   /** The start of the text, plain, for cards. */
   excerpt?: string;
   /** `obsidian` for an imported page. */

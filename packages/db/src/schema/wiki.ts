@@ -34,6 +34,13 @@ export const wikiPages = pgTable(
     locked: boolean().notNull().default(false),
     /** "Fixadas": shown at the top of the wiki for everyone. */
     pinned: boolean().notNull().default(false),
+    /**
+     * Limited to an audience (ADR 0023 addendum): only owners, the people holding one of `audienceRoleIds` and the
+     * people in `audienceUserIds` see it. Agents always read it.
+     */
+    restricted: boolean().notNull().default(false),
+    audienceRoleIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    audienceUserIds: text().array().notNull().default(sql`'{}'::text[]`),
     /** Where it came from: "Salvar na wiki" (`message`, `forum_topic`) or an import (`obsidian`, id = the vault's name). */
     source: jsonb().$type<{ type: string; id: string; channelId?: string; attachments?: Record<string, string> }>(),
     /** `person` or `agent`. */
