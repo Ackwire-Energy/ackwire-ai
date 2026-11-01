@@ -2419,7 +2419,7 @@ export const en: Translations = {
     identityHelp: "It's how everyone sees the agent. Mentions keep using @{{handle}}.",
     nameLabel: "Name",
     roleLabel: "Role",
-    roleHelp: "One line, e.g. PM, Dev, Research.",
+    roleHelp: "What it does for the team, e.g. Email and calendar assistant.",
     edit: "Edit",
     chat: "Chat",
     moreActions: "More actions",
