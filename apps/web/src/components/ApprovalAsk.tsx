@@ -1,7 +1,7 @@
 import type { Agent, Approval, Member } from "@agenteschat/client";
 import { approveAlwaysOffered } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalWhy } from "@agenteschat/client/lib/approval-origin";
-import { approvalTitle } from "@agenteschat/client/lib/approval-words";
+import { approvalSummary, approvalTitle } from "@agenteschat/client/lib/approval-words";
 import { Button } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -27,7 +27,7 @@ export function ApprovalAsk({
   agent: Agent | undefined;
   members: Map<string, Member>;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [refusing, setRefusing] = useState(false);
   const why = approvalWhy(approval);
   const origin = approvalOriginShort(approval);
@@ -37,9 +37,10 @@ export function ApprovalAsk({
   const owner = agent?.ownerUserId ? members.get(agent.ownerUserId) : undefined;
   const title = approvalTitle(t, approval);
   const email = approval.email;
+  // A connector's detail is its raw call (`tool · key=value`): its values in words instead, the call under "Ver detalhes".
   const detail = email
     ? [email.to.join(", "), email.subject].filter(Boolean).join(" · ")
-    : approval.detail || undefined;
+    : (approval.connector ? approvalSummary(approval, i18n.language) : approval.detail) || undefined;
   return (
     <RequestCard
       id={approval.id}

@@ -1,12 +1,14 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, gt, inArray, isNull, ne, or, schema, sql } from "@agenteschat/db";
 import { mayJoin, type RunTrigger, startOrJoinRun } from "./dispatch";
 import { publishChannelEvent } from "./events";
+import { cutText } from "./format";
 import type { Message } from "./messages";
+import { stripSentinel } from "./reply-policy";
 import { holdsMessages } from "./run-hold";
 import { type AgentRun, addRunStep, replyThreadOf } from "./runs";
 
-const { agentRuns, agents, channels, messages } = schema;
+const { agentRunSteps, agentRuns, agents, channels, messages, users } = schema;
 
 /**
  * A run's inbox (`agent_runs.pending_message_ids`): messages sent to the agent's conversation while
@@ -113,6 +115,65 @@ export async function releaseHeldInbox(db: Database, pubsub: PubSub | undefined,
   const [row] = await db.select().from(agentRuns).where(eq(agentRuns.id, runId));
   if (!row || row.pendingMessageIds.length === 0 || !(await holdsMessages(db, row))) return null;
   return releaseInbox(db, pubsub, row, { reason: "held" });
+}
+
+/**
+ * What the agent's other runs did in this conversation while this one waited on a decision (`holdsMessages`):
+ * the messages that started them (handed on from here, or sent meanwhile) and what they posted. The run
+ * resumes from its own transcript, so without this it would answer as if the conversation had stopped
+ * when it paused: restating what another run of its own already said, or redoing it. Read once, when it
+ * resumes; null when nothing happened.
+ */
+export async function whileHeld(
+  db: Executor,
+  run: Pick<AgentRun, "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId">,
+): Promise<string | null> {
+  const [paused] = await db
+    .select({ at: sql<string | null>`max(${agentRunSteps.createdAt})` })
+    .from(agentRunSteps)
+    .where(eq(agentRunSteps.runId, run.id));
+  if (!paused?.at) return null;
+  const since = new Date(paused.at);
+  const threadId = replyThreadOf(run);
+  const rows = await db
+    .select({ body: messages.body, person: users.name, agent: agents.name })
+    .from(messages)
+    .leftJoin(users, eq(users.id, messages.authorUserId))
+    .leftJoin(agents, eq(agents.id, messages.authorAgentId))
+    .where(
+      and(
+        eq(messages.orgId, run.orgId),
+        eq(messages.channelId, run.channelId),
+        // Its conversation, as `startOrJoinRun` finds the run: its thread (a run asked in the main timeline
+        // answers there and in the replies under its trigger), or the whole DM.
+        or(
+          eq(messages.threadId, run.threadRootId),
+          threadId ? undefined : isNull(messages.threadId),
+          sql`exists (select 1 from channels c where c.id = ${run.channelId}::uuid and c.kind = 'dm')`,
+        ),
+        gt(messages.createdAt, since),
+        isNull(messages.deletedAt),
+        or(
+          and(eq(messages.authorAgentId, run.agentId), ne(messages.agentRunId, run.id)),
+          sql`${messages.id} in (select r.trigger_message_id from agent_runs r where r.org_id = ${run.orgId}::uuid
+            and r.agent_id = ${run.agentId}::uuid and r.channel_id = ${run.channelId}::uuid and r.id <> ${run.id}::uuid
+            and r.created_at > ${since.toISOString()}::timestamptz)`,
+        ),
+      ),
+    )
+    .orderBy(asc(messages.createdAt))
+    .limit(10);
+  const lines = rows.flatMap((m) => {
+    const text = cutText(stripSentinel(m.body), 1500);
+    if (!text) return [];
+    return [m.agent ? `[You, in another run]: ${text}` : `[${m.person ?? "Someone"}]: ${text}`];
+  });
+  if (lines.length === 0) return null;
+  return [
+    "While you waited, the conversation went on (another run of yours answered these; don't answer them again):",
+    ...lines,
+    "Carry on from here: say only what your waiting call changed.",
+  ].join("\n\n");
 }
 
 /** Messages taken from a run's inbox go on: to a run of their own, or the agent's run already active there. */

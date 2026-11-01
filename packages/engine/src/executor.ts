@@ -128,7 +128,7 @@ import {
 import { routineBriefOf } from "./routine-brief";
 import { routineRunWaitingForComputer } from "./routine-firing";
 import { closeRoutineRun, type RoutineRunEnd, recordRoutineReportMessage, routineFailureEnd } from "./routine-ledger";
-import { type ReleaseReason, releaseHeldInbox, releaseInbox, takeInbox } from "./run-inbox";
+import { type ReleaseReason, releaseHeldInbox, releaseInbox, takeInbox, whileHeld } from "./run-inbox";
 import { issueRunToolToken, revokeRunToolTokens } from "./run-tool-tokens";
 import {
   absorbBrowserCall,
@@ -1122,6 +1122,8 @@ async function executeRunInner(
   }
   // Resuming after approvals: run what was approved, report what was refused.
   if (transcript.pending) {
+    // Read before this resume adds steps: what its other runs here did since it paused (`whileHeld`).
+    const meanwhile = await whileHeld(db, run).catch(() => null);
     const blocks: ContentBlock[] = [];
     const bridgedLines: string[] = [];
     const decided: string[] = [];
@@ -1181,8 +1183,9 @@ async function executeRunInner(
     if (blocks.length > 0) transcript.messages.push({ role: "user", content: blocks });
     if (bridgedLines.length > 0) {
       resumeText = `What a person decided on your waiting call${bridgedLines.length > 1 ? "s" : ""}:\n${bridgedLines.join("\n")}`;
-      appendUserText(transcript, resumeText);
     }
+    if (meanwhile) resumeText = resumeText ? `${resumeText}\n\n${meanwhile}` : meanwhile;
+    if (resumeText) appendUserText(transcript, resumeText);
     // Someone decided or answered what it waited on: it answers them now, it can't pass anymore.
     transcript.answerOwed = true;
     transcript.decided = decided.join("\n");

@@ -152,6 +152,33 @@ describe("Canal", () => {
     expect(screen().getByRole("alert").textContent).toContain("Atlas não conseguiu responder: budget_exceeded");
   });
 
+  test("a connector's request says its values in words, waiting and decided, so two calls of one tool differ", async () => {
+    const state = seedState();
+    const [first] = state.approvals;
+    if (!first) throw new Error("no approval");
+    Object.assign(first, {
+      tool: "goal_upsert",
+      title: "Painel: Goal upsert",
+      detail: "panel.goal_upsert · role=seller · month=2026-10 · revenue_goal=97000",
+      connector: "panel",
+      params: { role: "seller", month: "2026-10", revenue_goal: 97000 },
+    });
+    await open(state);
+    const card = screen().getByRole("group", { name: "Pedido de aprovação" });
+    expect(card.textContent).toContain("Role: seller · Month: 2026-10 · Revenue goal: 97.000");
+    // The raw call stays under "Ver detalhes" only.
+    expect(card.textContent).not.toContain("role=seller");
+    const approve = within(card)
+      .getAllByRole("button")
+      .find((b) => /^Aprovar/.test(b.textContent ?? "") && !/sempre/.test(b.textContent ?? ""));
+    if (!approve) throw new Error("no approve button");
+    await act(async () => fireEvent.click(approve));
+    await settle(4);
+    const done = screen().getByRole("group", { name: "Aprovação concluída" });
+    expect(done.textContent).toContain("Aprovado por você");
+    expect(done.textContent).toContain("Month: 2026-10");
+  });
+
   test("a request in the conversation: approve calls the API, shrinks to one line; events update it", async () => {
     const r0 = await open();
     const { state, socket } = r0;

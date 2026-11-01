@@ -8,7 +8,7 @@ import {
   approveAlwaysOffered,
 } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalWhy } from "@agenteschat/client/lib/approval-origin";
-import { approvalTitle, approveAlwaysHint } from "@agenteschat/client/lib/approval-words";
+import { approvalSummary, approvalTitle, approveAlwaysHint } from "@agenteschat/client/lib/approval-words";
 import { timeLeft, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { ApprovalCard, Button } from "@agenteschat/ui";
@@ -182,7 +182,15 @@ export function InlineApproval({
           />
         }
         statusLabel={decisionLabel(t, i18n.language, approval, me.user.id, members)}
-        detail={approval.reason ? t("approval.reasonLine", { reason: approval.reason }) : undefined}
+        // What was decided, so several requests for one tool are told apart.
+        detail={
+          [
+            approvalSummary(approval, i18n.language),
+            approval.reason ? t("approval.reasonLine", { reason: approval.reason }) : "",
+          ]
+            .filter(Boolean)
+            .join(" · ") || undefined
+        }
       />
     );
   }
@@ -201,7 +209,13 @@ export function InlineApproval({
       origin={origin ? tt(origin.key, origin.values) : undefined}
       title={approvalTitle(t, approval)}
       action={approval.email ? <EmailLetter email={approval.email} /> : undefined}
-      detail={approval.email ? expires || undefined : `${approval.detail}${expires ? ` · ${expires}` : ""}`}
+      detail={
+        approval.email
+          ? expires || undefined
+          : [approval.connector ? approvalSummary(approval, i18n.language) : approval.detail, expires]
+              .filter(Boolean)
+              .join(" · ")
+      }
       why={
         why ? (
           <Trans i18nKey="approval.said" values={{ name, text: why }} components={{ b: <b /> }} {...TYPED_VALUES} />

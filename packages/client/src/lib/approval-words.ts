@@ -125,8 +125,18 @@ export function approvalReadsOnly(approval: Pick<Approval, "tool" | "scope" | "p
  */
 export function approvalValues(
   approval: Pick<Approval, "params" | "connector" | "email">,
-  { max = Number.POSITIVE_INFINITY, long = false }: { max?: number; long?: boolean } = {},
+  {
+    max = Number.POSITIVE_INFINITY,
+    long = false,
+    locale,
+  }: {
+    max?: number;
+    long?: boolean;
+    /** Numbers in the locale's format ("97.000"); grouped from five digits, so a year or an id stays as is. */
+    locale?: string;
+  } = {},
 ): [string, string][] {
+  const number = locale ? new Intl.NumberFormat(locale, { maximumFractionDigits: 4, useGrouping: "min2" }) : null;
   // An email is said by its sentence and its letter; its fields aren't values.
   if (approval.email) return [];
   const skip = innerTool(approval) ? "name" : null;
@@ -136,7 +146,7 @@ export function approvalValues(
     for (const [k, v] of Object.entries(obj)) {
       if (top && k === skip) continue;
       if (plain(v)) {
-        const text = String(v).trim();
+        const text = typeof v === "number" && number ? number.format(v) : String(v).trim();
         if (text && (long || text.length <= 60)) out.push([humanize(k), text]);
       } else if (Array.isArray(v) && v.length > 0 && v.every(plain)) {
         // A list of names (the branches to delete) is one value; on a card it is cut, never left out.
@@ -148,6 +158,15 @@ export function approvalValues(
   walk(approval.params ?? {}, true);
   return out.slice(0, max);
 }
+
+/**
+ * Its values on one line ("Role: seller · Month: 2026-10 · Revenue: 97.000"): what tells apart two requests
+ * for the same tool, on the card while it waits and on the line once decided. The raw call stays in the details.
+ */
+export const approvalSummary = (approval: Pick<Approval, "params" | "connector" | "email">, locale: string, max = 4) =>
+  approvalValues(approval, { max, locale })
+    .map(([label, value]) => `${label}: ${value}`)
+    .join(" · ");
 
 /** Articles in an action's slug (`GITHUB_CREATE_AN_ISSUE_COMMENT`) that only make its words longer. */
 const SLUG_ARTICLES = new Set(["a", "an", "the"]);

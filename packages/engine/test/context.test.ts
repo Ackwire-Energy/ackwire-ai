@@ -3,7 +3,9 @@ import { eq, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
 import {
   buildRunContext,
+  CONTINUE_THE_CONVERSATION,
   createAgent,
+  forComputerBrain,
   insertMessage,
   type Message,
   nowLine,
@@ -135,6 +137,23 @@ test("system prompt carries org context, agent instructions and channel; history
     },
   ]);
   expect(ctx.stats.historyMessages).toBe(3);
+});
+
+test("every brain reads that it carries one conversation on: no name up front, no status restated", async () => {
+  const ask = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev grava as metas de outubro e novembro",
+  });
+  const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, ask.id));
+  if (!run) throw new Error("no run");
+  for (const toolsAvailable of [false, true]) {
+    const text = systemText((await buildRunContext(f.db, run, f.agent, { maxMessages: 10, toolsAvailable })).system);
+    expect(text).toContain(CONTINUE_THE_CONVERSATION);
+    // A computer brain (Claude Code, Codex) gets the same system text, with its own tools added.
+    expect(forComputerBrain(text)).toContain(CONTINUE_THE_CONVERSATION);
+  }
+  expect(CONTINUE_THE_CONVERSATION).toContain("Don't open with the person's name");
+  expect(CONTINUE_THE_CONVERSATION).toContain("don't repeat what you or others already said here");
+  expect(CONTINUE_THE_CONVERSATION).toContain("say only what changed");
 });
 
 test("a new top-level message reads the replies shown under earlier messages, not only the top level", async () => {

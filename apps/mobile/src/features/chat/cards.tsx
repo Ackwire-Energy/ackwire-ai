@@ -8,6 +8,7 @@ import {
   useDecideApproval,
 } from "@agenteschat/client";
 import { approvalWhy } from "@agenteschat/client/lib/approval-origin";
+import { approvalSummary } from "@agenteschat/client/lib/approval-words";
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -115,7 +116,7 @@ export function ConsultationCard({
  * what happened.
  */
 export function ApprovalInline({ approvalId }: { approvalId: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const orgId = useOrgId();
   const c = useColors();
   const surface = useSurface();
@@ -128,7 +129,10 @@ export function ApprovalInline({ approvalId }: { approvalId: string }) {
     <View style={[styles.done, surface]}>
       <Icon name={ok ? "checkc" : "x"} size={16} color={ok ? c.ok : c.muted} />
       <Text variant="small" tone="muted" style={styles.grow}>
-        {t(`mobile.chat.approval.${a.status}`, { title: approvalTitleText(t, a) })}
+        {t(`mobile.chat.approval.${a.status}`, {
+          // What was decided, so several requests for one tool are told apart.
+          title: [approvalTitleText(t, a), approvalSummary(a, i18n.language)].filter(Boolean).join(" · "),
+        })}
       </Text>
     </View>
   );
@@ -142,7 +146,7 @@ export function ApprovalInline({ approvalId }: { approvalId: string }) {
  * for the agent). Who can't decide sees who it waits for.
  */
 function ApprovalAsk({ approval: a }: { approval: Approval }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const orgId = useOrgId();
   const dir = useDirectory();
   const c = useColors();
@@ -173,12 +177,12 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
       },
     );
   // An email says to whom and about what; a connector's detail is its raw call (`tool · key=value`), so its
-  // values wait under "Ver detalhes".
+  // values in words instead, the call under "Ver detalhes".
   const detail = a.email
     ? [a.email.to.join(", "), a.email.subject].filter(Boolean).join(" · ")
     : !a.connector
       ? a.detail
-      : null;
+      : approvalSummary(a, i18n.language) || null;
   return (
     <AskCard
       id={a.id}

@@ -16,6 +16,7 @@ import {
 } from "@agenteschat/db";
 import type { ModelMessage, SystemBlock } from "@agenteschat/providers";
 import type { Agent } from "./agents";
+import { scalarParams } from "./approvals";
 import { talksToAgents } from "./audience";
 import { personOfMessage, runAuthority } from "./authority";
 import { caches } from "./cache";
@@ -37,7 +38,18 @@ import { loadTeam, rosterScopeNames, teamPrompt } from "./team";
 import { rangeStillVisible, threadRunInfo } from "./threads";
 import { untrustedBlock } from "./untrusted";
 
-const { messages, users, agents, channels, channelMembers, organizations, routines, routineRuns, agentRuns } = schema;
+const {
+  messages,
+  users,
+  agents,
+  approvals,
+  channels,
+  channelMembers,
+  organizations,
+  routines,
+  routineRuns,
+  agentRuns,
+} = schema;
 
 /**
  * The old "nothing to report" word of routine runs. Routines no longer use it (they run in the
@@ -74,6 +86,13 @@ export const finishWhatYouStart = (followUp: boolean) =>
       ? "If it has to wait (a build, a deploy, a job still running), set a follow_up to come back to it and say when."
       : "If it has to wait, say what is left and what it waits on."
   } After a person approves or answers what you waited on, go on with the task at once and tell them what came of it. When the person already asked for the outcome, do the work instead of asking whether to. In long work, keep them posted with a short line now and then.`;
+
+/**
+ * One conversation, not a series of fresh reports: a reply after an approval, a tool result or another of its
+ * own messages carries on from there, as a person texting would. Every brain reads it ("# How to reply").
+ */
+export const CONTINUE_THE_CONVERSATION =
+  "- It's one ongoing conversation: carry on from your last message. Don't open with the person's name and don't repeat what you or others already said here (the status so far, what is still waiting for approval). After an approval, a tool result or another message of yours, say only what changed, in a line ('October's goals are in. November's too, all done'), not the whole status again.";
 
 /**
  * True when a reply is the old "nothing to report" word (tolerates spacing, a trailing period and
@@ -309,6 +328,9 @@ export async function buildRunContext(
   const rootIsTrigger = run.threadRootId === trigger.id;
   // Asked in the main timeline: the run answers there, not in a thread.
   const flat = rootIsTrigger;
+  const heldElsewhere = run.background
+    ? null
+    : heldHere(db, run, channel.kind === "channel" ? flat : null).catch(() => null);
   // A routine's background run (ADR 0053 §4): its room's history (earlier briefs) is no conversation;
   // it reads its brief, and what people said where it reports comes in the routine block.
   const background = run.background;
@@ -604,7 +626,8 @@ export async function buildRunContext(
           "- Write like a colleague texting the team, not a report: plain sentences in short paragraphs, in a natural spoken tone. No headings, no bold, no labeled bullets ('Size:', 'Cause:', 'Logs:') and no numbered recommendations: say each thing in a sentence. A list only for a plain enumeration the reader will scan, like several files or ids.",
           '- Numbers to compare: a few rows go in a Markdown table (it shows as a real table). A trend, a ranking or the parts of a whole read better as a chart: a ```chart block holding only JSON data, like {"type":"bar","title":"Conversion by trigger","subtitle":"Purchases ÷ views, week of Oct 18","unit":"%","labels":["a","b"],"series":[{"name":"Rate","values":[15,6.7]}]}. Types: bar (rankings), line (over time), pie (parts of a whole), number (one big figure: "value" and an optional "delta" like "+0.8 pp vs last week", with labels/series for a small trend line or empty). Every series has one value per label, at most 24 labels; people can flip the chart to a table, so don\'t repeat every number in your text: say the takeaway around it. More data than that belongs in a table saved to the Drive.',
           "- Name what the data names, as it is: the person and where they are, the time with its zone, the version, the deploy ('Inês, from Braga, at 03:55', not 'a user'). Put news against what came before: is it new, the same pattern as always, how many so far.",
-          "- Keep it as short as the news: a report with nothing for the person to decide fits in one or two short paragraphs; leave out what didn't change and numbers that don't move the story.",
+          CONTINUE_THE_CONVERSATION,
+          "- Keep it as short as the news:a report with nothing for the person to decide fits in one or two short paragraphs; leave out what didn't change and numbers that don't move the story.",
           "- When something is fine, say it in a few words ('the rest was quiet'). No ritual openings or closings ('I remain available', 'let me know if you need anything'); a greeting only when it is natural, like the first message here of the morning, yours or the person's ('Now' below gives the local time and when the previous message here was). Caveats about your own tools or data only when they change the answer. When something is the person's to decide, end with that one question, asked directly.",
           options.toolsAvailable
             ? "- Actions marked sensitive (merge, deploy, rollback and similar) wait for a person's approval; you will be told the outcome. Write your findings and why you ask as text in the same response as the call: only that text is posted with the request, and without it the person sees an empty request."
@@ -738,6 +761,7 @@ export async function buildRunContext(
     // Per turn and read whole, like memory: it changes between runs, and a live computer session keeps the
     // system prompt it started with.
     ...(openTasks ? await openTasks.then((text) => (text ? [{ turn: true, found: true, text }] : [])) : []),
+    ...(heldElsewhere ? await heldElsewhere.then((text) => (text ? [{ turn: true, found: true, text }] : [])) : []),
   ];
   const systemChars = system.reduce((n, b) => n + b.text.length, 0);
 
@@ -747,6 +771,50 @@ export async function buildRunContext(
     stats: { historyMessages: history.length, systemChars, truncated: thread.length >= options.maxMessages },
     issueId: workIssueId ?? (typeof trigger.meta?.issueId === "string" ? trigger.meta.issueId : null),
   };
+}
+
+/**
+ * What this agent's other runs in the same conversation still wait on (a person's approval). A run waiting
+ * on a decision takes no new message (`holdsMessages`: the decision may take hours), so a message sent
+ * meanwhile gets this run: it must know what is already asked, so it neither asks for it again nor
+ * restates it. `flat`: a channel run's conversation is its main timeline (true) or its thread; null
+ * anywhere else (a DM is one conversation).
+ */
+async function heldHere(db: Database, run: AgentRun, flat: boolean | null): Promise<string | null> {
+  const rows = await db
+    .select({ title: approvals.title, params: approvals.params })
+    .from(approvals)
+    .innerJoin(agentRuns, eq(agentRuns.id, approvals.runId))
+    .where(
+      and(
+        eq(approvals.orgId, run.orgId),
+        eq(approvals.agentId, run.agentId),
+        eq(approvals.channelId, run.channelId),
+        eq(approvals.status, "pending"),
+        ne(agentRuns.id, run.id),
+        eq(agentRuns.status, "waiting_approval"),
+        flat === null
+          ? undefined
+          : flat
+            ? sql`${agentRuns.threadRootId} = ${agentRuns.triggerMessageId}`
+            : eq(agentRuns.threadRootId, run.threadRootId),
+      ),
+    )
+    .orderBy(asc(approvals.createdAt))
+    .limit(10);
+  if (rows.length === 0) return null;
+  const lines = rows.map((r) => {
+    const params = Object.entries(scalarParams(r.params))
+      .map(([k, v]) => `${k}=${v}`)
+      .join(", ");
+    return `- ${r.title}${params ? ` (${params})` : ""}`;
+  });
+  return [
+    "# Already waiting for approval here",
+    "Another run of yours in this conversation asked for these and waits for a person's decision; it carries on by itself once decided and says how it went:",
+    ...lines,
+    "Don't ask for them again, don't do them yourself and don't repeat their status: answer only what is new.",
+  ].join("\n");
 }
 
 /** The root of a thread made from a range carries only its title: say what it is. */
