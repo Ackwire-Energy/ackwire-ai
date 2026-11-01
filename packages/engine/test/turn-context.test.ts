@@ -115,12 +115,12 @@ describe("notices", () => {
     const decided = {
       notice: {
         kind: "proposal_result",
-        from: "Your proposal of the agent «Caio»",
-        text: "Heitor created it: @caio (Caio). It is on the team now. It joined #private.",
+        from: "Your proposal of the agent «Lia»",
+        text: "Ana created it: @lia (Lia). It is on the team now. It joined #time.",
       },
     };
     const line =
-      "[Your proposal of the agent «Caio»]: Heitor created it: @caio (Caio). It is on the team now. It joined #private.";
+      "[Your proposal of the agent «Lia»]: Ana created it: @lia (Lia). It is on the team now. It joined #time.";
     const now = noticeText(decided, true) ?? "";
     expect(now).toStartWith(`${line}\nOnly you see this.`);
     expect(now).toContain("then do what is left of what they asked");
