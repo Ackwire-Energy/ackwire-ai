@@ -2,9 +2,9 @@ import { outageKey } from "@agenteschat/client/lib/outages";
 import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, useWindowDimensions, View } from "react-native";
 import { readValueSync, STORED, writeValue } from "@/lib/storage";
-import { Button, Icon, IconButton, Text } from "@/ui";
+import { Button, IconButton, LineIcon, Text, textLineOf } from "@/ui";
 import { useColors, useEdition } from "../shared/hooks";
 import { useSurface } from "../shared/parts";
 import { computerIcon, dismissedOutages, type MachineOutage, noticeText } from "./logic";
@@ -67,6 +67,9 @@ function OutageNotice({ outage: o, onDismiss }: { outage: MachineOutage; onDismi
   const edition = useEdition();
   const cloud = edition === "cloud";
   const text = noticeText(t, o, cloud);
+  // The close's middle where the eye reads the title's first line, as the icon across from it.
+  const { fontScale } = useWindowDimensions();
+  const closeTop = textLineOf("callout", fontScale).middle - CLOSE / 2;
   return (
     <View style={[styles.card, surface]}>
       <View style={styles.top}>
@@ -76,7 +79,7 @@ function OutageNotice({ outage: o, onDismiss }: { outage: MachineOutage; onDismi
           accessibilityRole="summary"
           accessibilityLabel={`${text.a11y}. ${text.title}. ${text.sub}`}
         >
-          <Icon name={computerIcon(o.platform)} size={22} color={c.amber} />
+          <LineIcon name={computerIcon(o.platform)} variant="callout" size={22} color={c.amber} />
           <View style={styles.tx}>
             <Text variant="callout" tone="ink" style={styles.bold} numberOfLines={2}>
               {text.title}
@@ -86,7 +89,7 @@ function OutageNotice({ outage: o, onDismiss }: { outage: MachineOutage; onDismi
             </Text>
           </View>
         </View>
-        <View style={styles.close}>
+        <View style={[styles.close, { marginTop: closeTop }]}>
           <IconButton icon="x" label={t("mobile.outage.dismiss")} onPress={onDismiss} />
         </View>
       </View>
@@ -103,13 +106,16 @@ function OutageNotice({ outage: o, onDismiss }: { outage: MachineOutage; onDismi
   );
 }
 
+/** `IconButton`'s box. */
+const CLOSE = 40;
+
 const styles = StyleSheet.create({
   list: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8, gap: 10 },
   card: { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
-  top: { flexDirection: "row", alignItems: "center", gap: 4 },
-  line: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 10 },
+  top: { flexDirection: "row", alignItems: "flex-start", gap: 4 },
+  line: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "flex-start", gap: 10 },
   tx: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
-  // The 40-point button sits in the card's corner without growing it.
-  close: { marginVertical: -8, marginRight: -8 },
+  // The × stands as far from the card's edge as the icon across from it, and the button doesn't grow the card.
+  close: { marginBottom: -8, marginRight: -12 },
 });

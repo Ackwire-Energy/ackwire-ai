@@ -382,18 +382,19 @@ export function ComputerSetupNotice() {
               {t("computerSetup.notice.see")}
             </Link>
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            icon="close"
-            aria-label={t("computerSetup.notice.hide")}
-            onClick={() => {
-              storage.set(STORAGE_KEYS.setupNoticeHidden, key);
-              setHidden(key);
-            }}
-          />
         </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          icon="close"
+          className="outage__close"
+          aria-label={t("computerSetup.notice.hide")}
+          onClick={() => {
+            storage.set(STORAGE_KEYS.setupNoticeHidden, key);
+            setHidden(key);
+          }}
+        />
       </div>
     </section>
   );
