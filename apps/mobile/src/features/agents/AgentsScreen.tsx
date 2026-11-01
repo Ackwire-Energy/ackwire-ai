@@ -204,7 +204,10 @@ function AgentRow({ line: l, divider, live }: { line: TeamLine; divider: boolean
         ? t("mobile.outage.rowWaiting", { computer })
         : noAi
           ? t("noAi.chip")
-          : (plainRole(a.instructions) ?? (l.preview ? previewBody(t, l.preview, l.previewMeta ?? null) : ""));
+          : (plainRole(a.instructions) ??
+            (l.preview || l.previewMedia
+              ? previewBody(t, l.preview ?? "", l.previewMeta ?? null, l.previewMedia)
+              : ""));
   return (
     <ListRow
       onPress={() => router.push(`/agent/${a.id}`)}

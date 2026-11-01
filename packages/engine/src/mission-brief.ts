@@ -1,4 +1,5 @@
 import { and, type Database, desc, eq, inArray, isNull, schema } from "@agenteschat/db";
+import { cutText } from "./format";
 import { MISSION_RULES } from "./mission-rules";
 import { missionCwd, onlyReadsWhileWriting, shortSha } from "./mission-worktree";
 
@@ -86,7 +87,7 @@ export async function missionBrief(db: Database, missionId: string): Promise<str
   const provisional = decisions.filter((d) => d.status === "provisional");
   // Titles, lines and questions come from the executor (or the agent's own tools): data, never instructions.
   const data = [
-    `"${mission.title}" (${mission.status}). Goal: ${mission.goal.slice(0, 600)}`,
+    `"${mission.title}" (${mission.status}). Goal: ${cutText(mission.goal, 600)}`,
     items.length
       ? `Plan: ${mission.planDone} of ${mission.planTotal} done.${doing.length ? ` In progress: ${doing.join("; ")}.` : ""}${
           waiting.length ? ` Waiting for people: ${waiting.join("; ")}.` : ""
@@ -143,7 +144,7 @@ export async function missionBrief(db: Database, missionId: string): Promise<str
           : null;
   const guidance = [
     ...(place ? [place] : []),
-    `You do this mission's work yourself on ${computer}. Use start_task for anything long (it runs in the background and wakes you here when it ends; don't wait or poll) and run_code for short commands; files with read_file and write_file. Keep the plan with update_plan (mark items doing, done or waiting_you as they move), report milestones with report, ask decisions only with ask_decision (blocking when you can't go on), request_review when there is something to show, and request_approval before any merge, deploy or rollback, then wait. When every plan item is done, call complete_mission with what you delivered and what the person should check (files with upload_file first), then stop. Before the people start the mission, only read and plan.`,
+    `You do this mission's work yourself on ${computer}. Use start_task for anything long (it runs in the background and wakes you here when it ends; don't wait or poll) and run_code for short commands; files with read_file and write_file. Keep the plan with update_plan (mark items doing, done or waiting_you as they move), report milestones with report, ask decisions only with ask_decision (blocking when you can't go on), request_review when there is something to show, and request_approval before any merge, deploy or rollback, then wait. The mission goes on by itself between people's messages: when your turn ends with plan items open and nothing waiting on a person, you are woken to go on. When you need something only a person can give (a credential, an access, an answer, a test only they can run), ask for it directly: ask_user with one clear question (request_secret for a credential, a blocking ask_decision for a choice), and mark that item waiting_you. A list of what is missing is never how a turn ends. When every plan item is done, call complete_mission with what you delivered and what the person should check (files with upload_file first), then stop. Before the people start the mission, only read and plan.`,
     `Mission rules: ${MISSION_RULES} When the mission folder is not a git repository (images, documents, files), skip branches, commits and pushes: work in plain folders and deliver results with the Drive or request_review.`,
     "Commands people have: /stop, /pause, /summary, /plan.",
   ];

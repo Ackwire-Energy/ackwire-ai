@@ -519,7 +519,15 @@ test("with a server token the bridge asks the server for the list and relays any
   expect(list).toMatchObject({ type: "mcp.list", taskId: TASK, token: SERVER_TOKEN });
   const tool = { name: "github_get_pr", description: "Read a PR", inputSchema: { type: "object", properties: {} } };
   b.tools({ type: "mcp.tools", callId: list.callId, ok: true, tools: [tool, { name: "bad name!" } as never] });
-  expect(await listing).toEqual({ ok: true, text: "", tools: [tool] });
+  expect(await listing).toEqual({ ok: true, text: "", tools: [tool], memo: true });
+  // Asked again for the same run (each MCP process asks every second): answered here, the server isn't asked.
+  expect(await b.handle({ taskId: TASK, token: "secret-token-1", tool: "", args: {}, kind: "list" })).toEqual({
+    ok: true,
+    text: "",
+    tools: [tool],
+    memo: true,
+  });
+  expect(frames.filter((f) => f.type === "mcp.list")).toHaveLength(1);
 
   const call = b.handle({ taskId: TASK, token: "secret-token-1", tool: "github_get_pr", args: { q: "tok_1" } });
   await waitFor(() => frames.length === 2);
@@ -584,7 +592,33 @@ test("the MCP process caches the run's list, refreshes it and notices a change; 
   expect((await empty.get()).map((t) => t.name)).toEqual(MISSION_MCP_TOOLS.map((t) => t.name));
 });
 
-test("MCP JSON-RPC with the bridge's list: tools/list is the run's; only listed tools can be called", async () => {
+test("every change the MCP process sees is announced, one a call's get saw first too; asks don't overlap", async () => {
+  let now = 0;
+  let served = [{ name: "a", description: "A", inputSchema: { type: "object" } }];
+  let asked = 0;
+  let announced = 0;
+  const cache = new McpToolCache(
+    async () => {
+      asked++;
+      return { ok: true, text: "", tools: served };
+    },
+    { ttlMs: 1000, now: () => now, onChange: () => announced++ },
+  );
+  await cache.get();
+  expect(announced).toBe(0);
+  // The list changes; a call's `get` sees it first (the TTL ran out), and the background refresh after it sees none.
+  now = 2000;
+  served = [...served, { name: "b", description: "B", inputSchema: { type: "object" } }];
+  expect((await cache.get()).map((t) => t.name)).toEqual(["a", "b"]);
+  expect(await cache.refresh()).toBe(false);
+  expect(announced).toBe(1);
+  // Two asks at once are one.
+  const before = asked;
+  await Promise.all([cache.refresh(), cache.refresh()]);
+  expect(asked).toBe(before + 1);
+});
+
+test("MCP JSON-RPC with the bridge's list: tools/list is the run's; a name it lacks still goes to the server", async () => {
   const calls: string[] = [];
   const call = async (tool: string) => {
     calls.push(tool);
@@ -614,6 +648,7 @@ test("MCP JSON-RPC with the bridge's list: tools/list is the run's; only listed 
     list,
   );
   expect(ran).toMatchObject({ result: { content: [{ type: "text", text: "ran github_get_pr" }], isError: false } });
+  // A kept-alive executor may list what it had before: the server decides (it runs any tool the agent may use).
   expect(
     await handleMcpMessage(
       { jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "update_plan", arguments: {} } },
@@ -621,9 +656,89 @@ test("MCP JSON-RPC with the bridge's list: tools/list is the run's; only listed 
       undefined,
       list,
     ),
+  ).toMatchObject({ result: { content: [{ type: "text", text: "ran update_plan" }], isError: false } });
+  expect(calls).toEqual(["github_get_pr", "update_plan"]);
+  // Nothing beyond this computer to ask (a background task outside a mission): only its own prompt tool.
+  expect(
+    await handleMcpMessage(
+      { jsonrpc: "2.0", id: 5, method: "tools/call", params: { name: "update_plan", arguments: {} } },
+      call,
+      undefined,
+      list,
+      "work",
+      { local: true },
+    ),
   ).toMatchObject({ error: { code: -32602 } });
-  expect(calls).toEqual(["github_get_pr"]);
 });
+
+test.skipIf(!posix)(
+  "a kept-alive brain process tells its executor the next turn's tools within a moment of the turn's start, before any call",
+  async () => {
+    const home = tempDir("mcp-");
+    dirs.push(home);
+    const socketPath = path.join(home, "mcp.sock");
+    // A brain process's bridge entry: between turns idle, then the next run with its own token.
+    const info: McpTaskInfo = { token: "tok-123456789", missionId: "", running: false, idle: true };
+    const b = new McpBridge({ socketPath, task: (id) => (id === TASK ? info : null), callTimeoutMs: 2000 });
+    closers.push(() => b.close());
+    await b.listen();
+    const tool = (name: string) => ({ name, description: name, inputSchema: { type: "object", properties: {} } });
+    let served = [tool("find_tools"), tool("use_tool")];
+    let asked = 0;
+    b.attach((f) => {
+      if (f.type !== "mcp.list") return;
+      asked++;
+      queueMicrotask(() => b.tools({ type: "mcp.tools", callId: f.callId, ok: true, tools: served }));
+    });
+    const turn = (runId: string | null) => {
+      Object.assign(
+        info,
+        runId ? { running: true, idle: false, runId, serverToken: SERVER_TOKEN } : { running: false, idle: true },
+      );
+      if (!runId) delete info.runId;
+    };
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const lines: Record<string, unknown>[] = [];
+    output.on("data", (chunk: Buffer) => {
+      for (const l of chunk.toString().split("\n").filter(Boolean)) lines.push(JSON.parse(l));
+    });
+    const server = runMcpServer({
+      taskId: TASK,
+      socketPath,
+      token: "tok-123456789",
+      input,
+      output,
+      refreshMs: 60_000,
+      pollMs: 20,
+    });
+    const send = (msg: Record<string, unknown>) => input.write(`${JSON.stringify({ jsonrpc: "2.0", ...msg })}\n`);
+    const listed = async (id: number) => {
+      send({ id, method: "tools/list" });
+      await waitFor(() => lines.some((l) => l.id === id));
+      const reply = lines.find((l) => l.id === id) as { result: { tools: { name: string }[] } };
+      return reply.result.tools.map((t) => t.name);
+    };
+    // The first turn: the executor lists once, at its start.
+    turn("0193aaaa-0000-7000-8000-0000000000a1");
+    send({ id: 1, method: "initialize", params: {} });
+    expect(await listed(2)).toEqual(["find_tools", "use_tool"]);
+    // Between turns a person gives the agent a connector.
+    turn(null);
+    await new Promise((r) => setTimeout(r, 80));
+    served = [...served, tool("vega_crm_find_tools"), tool("vega_crm_use_tool")];
+    expect(lines.some((l) => l.method === "notifications/tools/list_changed")).toBe(false);
+    // The next turn: told at once, with no call in between, and the list it reads again is the new one.
+    turn("0193aaaa-0000-7000-8000-0000000000a2");
+    await waitFor(() => lines.some((l) => l.method === "notifications/tools/list_changed"), 2000);
+    expect(await listed(3)).toEqual(["find_tools", "use_tool", "vega_crm_find_tools", "vega_crm_use_tool"]);
+    // Asked every 20 ms all along, yet the server only once per run: the daemon answered the rest.
+    expect(asked).toBe(2);
+    input.end();
+    expect(await server).toBe(0);
+  },
+  10_000,
+);
 
 test.skipIf(!posix)("a mission task started with the server's token keeps it for the bridge", async () => {
   const ws = tempDir("ws-");

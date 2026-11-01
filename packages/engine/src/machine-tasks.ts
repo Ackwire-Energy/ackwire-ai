@@ -7,14 +7,18 @@ import {
   parseBaseBehind,
   type RunnerFrame,
   type RunnerTask,
+  TASK_ACCOUNTS_PROTOCOL,
   TASK_LIMITS,
   TASKS_PROTOCOL,
   type TaskExecutor,
 } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { createAgentRuns, eligibleChannelAgents } from "./dispatch";
 import { publishChannelEvent, publishMessageCreated } from "./events";
+import { cutText } from "./format";
+import { routineDeliveryBlock } from "./hand-off";
 import { taskEndText } from "./machine-task-text";
 import {
   getMachineById,
@@ -31,6 +35,7 @@ import { MISSION_RULES } from "./mission-rules";
 import { recordTaskFinished } from "./operator-events";
 import { enqueue } from "./outbox";
 import { personBehindCall } from "./requester";
+import { routineBriefOf } from "./routine-brief";
 import { issueRunToolToken } from "./run-tool-tokens";
 import { replyThreadOf } from "./runs";
 import { hopLimitReached, runStretchOf } from "./stretch";
@@ -275,6 +280,82 @@ export class RunnerOutdatedError extends Error {
   }
 }
 
+/** A Claude Code or Codex task has nothing to sign in with on its computer: it would only fail "Not logged in". */
+export class TaskSignInError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TaskSignInError";
+  }
+}
+
+/** The CLI a task's executor runs: its accounts' kind, and the names people know it and its plans by. */
+const TASK_CLIS = {
+  claude: { kind: "claude_code", cli: "Claude Code", plan: "Claude" },
+  codex: { kind: "codex", cli: "Codex", plan: "ChatGPT" },
+} as const;
+
+/**
+ * What a Claude Code or Codex task signs in with (ADR 0041 §5.1), by its turns' rules (`computerBrainUnavailable`):
+ * the agent's own account for that CLI on that computer (`brainAccountFor`) where the runner takes one
+ * (`TASK_ACCOUNTS_PROTOCOL`), else the computer's own sign-in, as before, where that thinks for the agent (ADR 0059
+ * §3). Throws `TaskSignInError`, with what the agent can do, when the task has nothing to sign in with there.
+ */
+export async function taskSignIn(
+  db: Database,
+  input: Pick<QueuedTaskStart, "orgId" | "agent" | "machineId" | "executor">,
+): Promise<{ account?: string }> {
+  if (input.executor !== "claude" && input.executor !== "codex") return {};
+  const [agent, machine] = await Promise.all([
+    getAgentCached(db, input.orgId, input.agent.id),
+    getMachineById(db, input.machineId),
+  ]);
+  if (!agent || !machine) return {};
+  // Loaded here: the brains' selection builds on the missions, which build on this module.
+  const { brainAccountFor, planIsOwners } = await import("./brains/select");
+  const { kind, cli, plan } = TASK_CLIS[input.executor];
+  const own = await brainAccountFor(db, agent, kind, machine.id);
+  const account = own && machine.protocol >= TASK_ACCOUNTS_PROTOCOL ? own : undefined;
+  const refuse = (why: string, who: string) =>
+    new TaskSignInError(`${why} Tell the person: ${who} (until then do this work with run_code or a shell task).`);
+  // On a computer nobody connected, nobody signs its CLIs in: only an account of the agent's own can.
+  if (!account && machine.pairedByUserId === null) {
+    if (own) {
+      throw refuse(
+        `The runner on ${machine.name} is too old to sign tasks in with your ${plan} account.`,
+        "the computer's runner needs an update before tasks can use your account, so try again later",
+      );
+    }
+    const other = input.executor === "codex" ? "claude" : "codex";
+    const instead = await brainAccountFor(db, agent, TASK_CLIS[other].kind, machine.id);
+    throw refuse(
+      `${cli} has nothing to sign in with on ${machine.name}: you have no ${plan} account there, and nobody signs ${cli} in on that computer itself.${instead ? ` Your own account there signs in ${TASK_CLIS[other].cli}: start the task with executor "${other}".` : ""}`,
+      `your owner can connect a ${plan} account on your page`,
+    );
+  }
+  // The owner-only plan rule binds where turns already apply it: an account, or an agent that thinks with this CLI.
+  // Other agents' tasks keep the computer's own sign-in, as before this rule reached tasks.
+  const thinksWithIt = account || agent.brain === kind;
+  if (thinksWithIt && !(await planIsOwners(db, agent, machine.id, account))) {
+    throw refuse(
+      `${cli} on ${machine.name} would think with a plan that isn't your owner's (a plan thinks only for its owner's agents).`,
+      `your owner can connect a ${plan} account of their own on your page`,
+    );
+  }
+  if (account?.status === "signed_out") {
+    throw refuse(
+      `Your ${plan} account "${account.label}" on ${machine.name} is signed out, so ${cli} can't sign in for this task.`,
+      "its owner can sign in to it again in Settings, AI accounts",
+    );
+  }
+  if (!account && kind === "claude_code" && machine.executors?.claude?.loggedIn === false) {
+    throw refuse(
+      `${cli} isn't signed in on ${machine.name}.`,
+      `its owner can sign it in there, or your owner can connect a ${plan} account on your page`,
+    );
+  }
+  return account ? { account: account.id } : {};
+}
+
 /**
  * Records a task and asks the machine to start it. On failure the row is
  * kept as `failed` with the reason, and the error goes up.
@@ -346,6 +427,8 @@ export async function launchTask(
   options: { requeue?: boolean } = {},
 ): Promise<{ row: MachineTaskRow; queued: boolean; baseBehind?: number }> {
   try {
+    // Its CLI signs in with the agent's own account, as its turns (refused here when there's nothing to sign in with).
+    const signIn = await taskSignIn(deps.db, input);
     // The mission tools' token (ADR 0032): the runner sends it with each of the executor's calls.
     const mcpToken = input.mission
       ? await issueRunToolToken(deps.db, {
@@ -371,6 +454,7 @@ export async function launchTask(
       ...(input.commit ? { commit: input.commit } : {}),
       ...(input.baseCheck ? { baseCheck: input.baseCheck } : {}),
       ...(input.approved ? { approved: true } : {}),
+      ...signIn,
     });
     const at = new Date(started.startedAt);
     const [running] = await deps.db
@@ -1181,7 +1265,7 @@ export function taskEndNotice(row: MachineTaskRow, computer: string) {
         ...(row.branch ? { branch: row.branch } : {}),
         ...(row.lastLine ? { lastLine: row.lastLine } : {}),
         ...(files.length ? { files: files.slice(0, 20) } : {}),
-        ...(row.result ? { result: row.result.slice(0, TASK_TEXT_LIMITS.wakeResult) } : {}),
+        ...(row.result ? { result: cutText(row.result, TASK_TEXT_LIMITS.wakeResult) } : {}),
       },
       bodyCode: `machine_task_${row.status}`,
       bodyParams: {
@@ -1196,8 +1280,9 @@ export function taskEndNotice(row: MachineTaskRow, computer: string) {
 
 /**
  * `machine.task_done`: wakes the conversation once per task. A notice in the
- * task's thread (as its agent) carries the result for the model
- * (`meta.machineTask`), and a run of that agent starts on it, unless the hop
+ * task's thread (a routine's task: where the routine reports), as its agent,
+ * carries the result for the model (`meta.machineTask`, with the run that
+ * started it), and a run of that agent starts on it, unless the hop
  * limit or the agent's audience says no, or the agent left the
  * channel. A run of that agent already active in the thread gets it as a
  * new message instead (one run per agent and conversation).
@@ -1216,21 +1301,40 @@ export async function wakeConversationForTask(deps: TaskDeps, taskId: string, op
   const computer = machine?.name ?? "the computer";
   const [origin] = row.runId
     ? await deps.db
-        .select({ hop: agentRuns.hop, stretchId: agentRuns.stretchId, triggerMessageId: agentRuns.triggerMessageId })
+        .select({
+          hop: agentRuns.hop,
+          stretchId: agentRuns.stretchId,
+          triggerMessageId: agentRuns.triggerMessageId,
+          background: agentRuns.background,
+        })
         .from(agentRuns)
         .where(eq(agentRuns.id, row.runId))
     : [];
   const hop = origin?.hop ?? 1;
   // The work it ends is the origin run's, in its stretch (ADR 0089).
   const stretchId = origin ? runStretchOf(origin) : null;
+  // A routine's task ends where the routine reports, like its approval cards: nobody reads its room (ADR 0053 §4).
+  // Only while the routine may still speak there (deleted, paused, or its creator can't post there: its room keeps
+  // the record and nobody is woken), and the run it wakes follows the routine's report policy.
+  const brief = origin?.background
+    ? routineBriefOf((await getMessage(deps.db, row.orgId, origin.triggerMessageId))?.meta)
+    : null;
+  const blocked = brief ? await routineDeliveryBlock(deps.db, brief) : null;
+  const report = brief && !blocked ? brief.deliverTo : undefined;
+  const channelId = report?.channelId ?? row.channelId;
   const eligible = await eligibleChannelAgents(
     deps.db,
     row.orgId,
-    row.channelId,
+    channelId,
     [row.agentId],
     row.requestedByUserId ? { requesterUserId: row.requestedByUserId } : {},
   );
   const notice = taskEndNotice(row, computer);
+  const machineTask = {
+    ...notice.meta.machineTask,
+    ...(row.runId ? { runId: row.runId } : {}),
+    ...(report && brief ? { routine: { name: brief.name, report: brief.report } } : {}),
+  };
   const result = await deps.db.transaction(async (tx) => {
     const [claimed] = await tx
       .update(machineTasks)
@@ -1240,14 +1344,15 @@ export async function wakeConversationForTask(deps: TaskDeps, taskId: string, op
     if (!claimed) return null;
     const message = await insertMessage(tx, {
       orgId: row.orgId,
-      channelId: row.channelId,
-      threadId: row.threadRootId,
+      channelId,
+      threadId: report ? report.threadId : row.threadRootId,
       author: { type: "agent", agentId: row.agentId, runId: null, hop, stretchId },
       body: notice.body,
-      meta: notice.meta,
+      // The run that started it: the work it ends continues for whoever is behind that run (`authority.ts`).
+      meta: { ...notice.meta, machineTask },
     });
     const runs =
-      eligible.length > 0 && !(await hopLimitReached(tx, message, options.maxHops))
+      !blocked && eligible.length > 0 && !(await hopLimitReached(tx, message, options.maxHops))
         ? await createAgentRuns(tx, message, [row.agentId], "mention")
         : [];
     return { message, runs };
@@ -1257,7 +1362,7 @@ export async function wakeConversationForTask(deps: TaskDeps, taskId: string, op
   for (const run of result.runs) {
     await publishChannelEvent(deps.pubsub, {
       type: "agent.thinking",
-      channelId: row.channelId,
+      channelId,
       threadId: replyThreadOf(run),
       agentId: run.agentId,
       runId: run.id,

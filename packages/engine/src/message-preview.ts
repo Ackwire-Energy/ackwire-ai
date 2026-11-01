@@ -1,3 +1,5 @@
+import { type MessageMedia, mediaOf } from "./media";
+
 /** One line of at most `max` chars (a preview's text). */
 function oneLine(text: string, max = 200): string {
   const line = text.replace(/\s+/g, " ").trim();
@@ -7,7 +9,7 @@ function oneLine(text: string, max = 200): string {
 /**
  * What a last-message preview needs to show a server-written body in the reader's language (the same
  * `meta` keys the chat reads: `bodyCode`/`bodyParams`, a cut-off run's notes, memory lines, why an
- * agent has no AI), or null for a plain message. Long texts are cut: a preview is one line.
+ * agent has no AI, a GIF or a sticker), or null for a plain message. Long texts are cut: a preview is one line.
  */
 export interface PreviewMeta {
   bodyCode?: string;
@@ -16,12 +18,27 @@ export interface PreviewMeta {
   brainInterrupted?: { brain?: string; text: string; tools?: string[] };
   memoryUpdates?: { action: string; text: string }[];
   noAi?: { reason: string; own?: string };
+  /** A GIF or a sticker (ADR 0091), as `meta.media`: a message of only that has no text to preview. */
+  media?: MessageMedia;
+}
+
+/**
+ * A message of only a GIF or a sticker (ADR 0091): which, so a preview with no text says it in the reader's
+ * language ("GIF", "Figurinha"); null for a message with text or without media.
+ */
+export function previewMediaKind(
+  body: string | null | undefined,
+  meta: Record<string, unknown> | null | undefined,
+): MessageMedia["kind"] | null {
+  return (body ?? "").trim() === "" ? (mediaOf(meta)?.kind ?? null) : null;
 }
 
 export function previewMeta(meta: Record<string, unknown> | null | undefined): PreviewMeta | null {
   if (!meta) return null;
   const out: PreviewMeta = {};
   if (typeof meta.bodyCode === "string") out.bodyCode = meta.bodyCode;
+  const media = mediaOf(meta);
+  if (media) out.media = media;
   if (meta.bodyParams && typeof meta.bodyParams === "object") {
     out.bodyParams = meta.bodyParams as Record<string, unknown>;
   }

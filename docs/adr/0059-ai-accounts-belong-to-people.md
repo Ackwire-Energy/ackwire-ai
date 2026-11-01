@@ -1,6 +1,6 @@
 # 0059. AI accounts belong to people: one account per agent, a plan answers its owner, more providers, official marks
 
-- Status: Accepted (2026-10-24). Built in steps; the provider marks (§9) first. Amended 2026-10-27: §2 and §4 (one login per agent), §5 (plans are personal where the server provisions the computers); 2026-10-28: §6 (no address asked); 2026-10-29: §5 (in every setup the plan's owner lets its agent reply to everyone, with nothing to accept); 2026-10-30: §2 (Claude's sign-ins are one login per agent), §3 (the computer's own sign-in on a computer nobody connected), §4 (automatic names leave the plan out, and Claude's plans go by Anthropic's names), §5 (the switch's words, and a line that says whom the agent answers), then §2 and §8 again (one sign-in thinks for all of its owner's agents on a computer); 2026-10-30 by ADR 0088: §1 (a deleted workspace's accounts leave its computers before it goes)
+- Status: Accepted (2026-10-24). Built in steps; the provider marks (§9) first. Amended 2026-10-27: §2 and §4 (one login per agent), §5 (plans are personal where the server provisions the computers); 2026-10-28: §6 (no address asked); 2026-10-29: §5 (in every setup the plan's owner lets its agent reply to everyone, with nothing to accept); 2026-10-30: §2 (Claude's sign-ins are one login per agent), §3 (the computer's own sign-in on a computer nobody connected), §4 (automatic names leave the plan out, and Claude's plans go by Anthropic's names), §5 (the switch's words, and a line that says whom the agent answers), then §2 and §8 again (one sign-in thinks for all of its owner's agents on a computer); 2026-10-30 by ADR 0088: §1 (a deleted workspace's accounts leave its computers before it goes); 2026-10-31: §7 (the bars change color as a window nears its limit); 2026-10-31 by ADR 0041 §5.1: §3 (a background task is checked too)
 - Date: 2026-10-24
 - Extends: ADR 0018 (providers), ADR 0027 (secrets end to end), ADR 0032 (computer brains), ADR 0041 (accounts per agent)
 - Supersedes in part: ADR 0041 §2 (who adds accounts), §4 (who decides) and §7 (removing); ADR 0032 §5 (when the plan warning shows); ADR 0058 §4 (who drives an agent's computer in system mode while its user holds a sign-in)
@@ -71,6 +71,8 @@ A personal plan thinks only for agents owned by the plan's owner. This is checke
 
 *Amended 2026-10-30:* on a computer nobody connected (the Cloud workspace's; the server's own computer is its owner's) the computer's own sign-in is nobody's plan, so it never thinks for an agent there. Such an agent's run reads it as not signed in (`not_logged_in`, ADR 0041 §1) instead of `plan_not_owner`: it fails at once with no AI and Connect, rather than waiting for a computer whose coming back would change nothing.
 
+*Amended 2026-10-31 by ADR 0041 §5.1:* a background task's Claude Code or Codex is checked the same way when it starts. Before, a task ran on the computer's own sign-in for any agent; now one that would think with someone else's plan, or with nothing on a computer nobody connected, doesn't start, and its agent reads why.
+
 ### 4. Labels people recognize
 
 Automatic names are the maker and the plan, numbered per owner: "Claude Max", "Claude Team 2", "ChatGPT Plus", "GLM Coding", "Kimi Code", "MiniMax", "OpenCode Go". The owner sees the email under the name (and the organization of a team seat); everyone else sees "Claude Team 2 · {owner}'s" and never the email. The same email twice for one owner on one computer is refused, and the new folder is removed.
@@ -104,6 +106,8 @@ ADR 0041's path stays: the provider's own CLI signs in on the computer, the past
 ### 7. Usage limits, read without touching a token
 
 Each account's usage comes from the CLIs themselves: the rate-limit events during turns and a usage request that makes no model call (Claude Code), the app-server's rate-limit calls (Codex), and the provider's usage endpoint for a coding-plan key, called from the computer. The server keeps percentages and reset times only. The meter shows each window, tightest first, warns at 80% and says until when an account is at its limit. Accounts never switch by themselves.
+
+*Amended 2026-10-31:* the bars say it too. Each window's bar is ink below 80%, amber from 80% and red from 90% and at the limit (`planLevel` and `PLAN_TONE` in `packages/ui/src/plan-state.ts`, on the web and the phone), and the words above the bars take the plan's level: the tightest window's, or at the limit when the plan refused a request, so a refused plan reads red over bars that may still be ink. The percentage and the words stay beside the color, which is never the only signal, and only plan meters change: budgets and the other meters stay ink. The runner sends the usage at once when a window crosses 80, 90 or 100, and an OpenCode window whose status is `rate-limited` reads as full, whatever its percent says.
 
 ### 8. More providers, on the right side of their terms
 

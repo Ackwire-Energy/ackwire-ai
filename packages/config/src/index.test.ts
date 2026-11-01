@@ -193,6 +193,17 @@ describe("loadConfig", () => {
     ]);
   });
 
+  test("OPS_REPORT_EMAIL: off unless set, one address or a list, each an address", () => {
+    expect(loadConfig(valid).OPS_REPORT_EMAIL).toBeUndefined();
+    expect(loadConfig({ ...valid, OPS_REPORT_EMAIL: " ops@example.com, ana@example.com ," }).OPS_REPORT_EMAIL).toEqual([
+      "ops@example.com",
+      "ana@example.com",
+    ]);
+    expect(() => loadConfig({ ...valid, OPS_REPORT_EMAIL: "ops@example.com, not an address" })).toThrow(
+      /OPS_REPORT_EMAIL/,
+    );
+  });
+
   test("ignores variables that are not in the schema", () => {
     const config = loadConfig({ ...valid, SOMETHING_ELSE: "1" }) as Record<string, unknown>;
     expect(config.SOMETHING_ELSE).toBeUndefined();

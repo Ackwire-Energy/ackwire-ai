@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { eq, schema, sql } from "@agenteschat/db";
+import { and, eq, schema, sql } from "@agenteschat/db";
 import { ProviderError, systemText, textOf } from "@agenteschat/providers";
 import {
+  archiveAgent,
   buildRunContext,
   createAgent,
   createJobHandlers,
   createLlmRouterStrategy,
   DEFAULT_ROUTER_POLICY,
+  decidedByOf,
   drainOutbox,
   insertMessage,
   insertMessageWithRuns,
@@ -19,9 +21,13 @@ import {
   type RouterStrategy,
   type RoutingCandidate,
   type RoutingInput,
+  type RoutingResult,
   routeMessage,
   routerPrompt,
+  SPOKEN_TO,
+  scoresOf,
   selectAgents,
+  setCoordinator,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
@@ -103,6 +109,7 @@ describe("parseRouterOutput", () => {
     ).toEqual({
       needs_agent: 0.8,
       for_everyone: 0,
+      already_answered: 0,
       scores: [{ handle: "dev", score: 0.9 }],
       reason: "r",
     });
@@ -140,6 +147,102 @@ describe("routerPrompt", () => {
     expect(prompt).toContain("<history>\n[@ada]: Campanha publicada.\n</history>");
     expect(prompt).toContain("<message>\n[Ana, names Walter]: boa tarde walter\ncomo esta hoje\n</message>");
     expect(prompt).toContain("This person is the only one here with @ada");
+  });
+});
+
+describe("who a message speaks to, for the small model", () => {
+  test("it says first which agent the message speaks to, under the rule every step reads", () => {
+    const { system, schema: answer } = routerPrompt({
+      orgId: "o",
+      channel: { id: "c", name: "geral", topic: "" },
+      message: { id: "m", author: "ana", body: "ada pergunta pro theo meu email" },
+      thread: [],
+      candidates: [cand("ada"), cand("theo")],
+    });
+    expect(system).toContain(`- ${SPOKEN_TO}`);
+    expect(system).toContain("First give `addressee`");
+    expect(Object.keys(answer.properties)[0]).toBe("addressee");
+    expect(answer.properties.addressee).toEqual({ type: "string", enum: ["ada", "theo", "none"] });
+    expect(answer.required).toContain("addressee");
+  });
+
+  test("like Jev, it counts only for a person's message among two or more agents", () => {
+    const answer = {
+      addressee: "theo",
+      needs_agent: 0.85,
+      for_everyone: 0,
+      already_answered: 0,
+      scores: [{ handle: "theo", score: 0.4 }],
+      reason: "",
+    };
+    const kept = { agents: [{ agentId: "theo", score: 0.4 }], needsAgent: 0.85, forEveryone: 0, alreadyAnswered: 0 };
+    expect(scoresOf({ candidates: [cand("ada"), cand("theo")] }, answer)).toMatchObject({
+      addressee: "theo",
+      agents: [{ agentId: "theo", score: 0.85 }],
+    });
+    // An agent's message: another agent comes in only past its own bar (ADR 0034).
+    expect(scoresOf({ candidates: [cand("ada"), cand("theo")], authorUserId: null }, answer)).toEqual(kept);
+    // The only agent of a room: nobody to tell it from, and it keeps its `pass`.
+    expect(scoresOf({ candidates: [cand("theo")] }, answer)).toEqual(kept);
+  });
+
+  test("its `addressee` decides between the agents a message names; `none` leaves the scores as they are", async () => {
+    let addressee = "ada";
+    f = await setup({
+      reply: (req) =>
+        req.outputSchema
+          ? {
+              chunks: [
+                JSON.stringify({
+                  addressee,
+                  needs_agent: 0.8,
+                  for_everyone: 0,
+                  scores: [
+                    { handle: "theo", score: 0.9 },
+                    { handle: "ada", score: 0.4 },
+                  ],
+                  reason: "email",
+                }),
+              ],
+            }
+          : { chunks: ["ok"] },
+    });
+    const make = async (name: string) => {
+      const a = await createAgent(
+        f.db,
+        f.owner.id,
+        f.org.id,
+        { name, handle: name.toLowerCase() },
+        { model: "claude-sonnet-5-5" },
+      );
+      await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: a.id });
+      return a;
+    };
+    const ada = await make("Ada");
+    const theo = await make("Theo");
+    const strategy = createLlmRouterStrategy({ gateway: f.gateway, resolveModel: async () => "claude-haiku-5-5" });
+    const route = async (body: string) => {
+      const m = await insertMessage(f.db, {
+        orgId: f.org.id,
+        channelId: f.general.id,
+        author: { type: "person", userId: f.owner.id },
+        body,
+      });
+      const routed = await routeMessage({ db: f.db, strategy, policy }, { orgId: f.org.id, messageId: m.id });
+      const [decision] = await f.db
+        .select()
+        .from(schema.routingDecisions)
+        .where(eq(schema.routingDecisions.messageId, m.id));
+      return { routed, decision };
+    };
+    const toAda = await route("ada pergunta pro theo ai qual meu email mais recente pls");
+    expect(toAda.routed.selected).toEqual([ada.id]);
+    // Theo only named: nothing. Ada spoken to: as far as an agent is needed, and addressed.
+    expect(toAda.decision?.candidates).toContainEqual({ agentId: theo.id, score: 0 });
+    expect(toAda.decision?.candidates).toContainEqual({ agentId: ada.id, score: 0.8 });
+    expect(toAda.decision?.reason).toBe("follow-up; model: email");
+    addressee = "none";
+    expect((await route("alguém sabe qual meu email mais recente?")).routed.selected).toEqual([theo.id]);
   });
 });
 
@@ -796,6 +899,263 @@ describe("what the router reads, and a person's messages in a row", () => {
     expect((await routeMessage(quick, { orgId: f.org.id, messageId: quoted.id })).skipped).toBe("continued");
     expect(await routeMessage(quick, { orgId: f.org.id, messageId: more.id })).toMatchObject({
       selected: [f.agent.id],
+      decidedBy: { step: "rule", rule: "reply" },
+    });
+  });
+});
+
+describe("the team's coordinator (ADR 0093)", () => {
+  /**
+   * #general with Ana, Dev, Theo (who coordinates) and Ada. Walter is in the workspace, and here with `people`.
+   * `reply`: the fake model's answers.
+   */
+  async function coordinated(
+    options: { people?: boolean; reply?: NonNullable<Parameters<typeof setup>[0]>["reply"] } = {},
+  ) {
+    f = await setup({ reply: options.reply });
+    const join = async (name: string) => {
+      const a = await createAgent(
+        f.db,
+        f.owner.id,
+        f.org.id,
+        { name, handle: name.toLowerCase() },
+        { model: "claude-sonnet-5-5" },
+      );
+      await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: a.id });
+      return a;
+    };
+    const theo = await join("Theo");
+    const ada = await join("Ada");
+    await setCoordinator({ db: f.db }, f.owner.id, f.org.id, theo.id, true);
+    const walter = await addMember(f.db, f.org.id, "member", "Walter");
+    if (options.people) {
+      await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: walter.id });
+    }
+    return { theo, ada, walter };
+  }
+  /** Scores by handle (0.1 for the others), with the step's other answers. */
+  const scored = (scores: Record<string, number>, rest: Omit<RoutingResult, "agents"> = {}): RouterStrategy => ({
+    name: "fixed",
+    async decide(input) {
+      return { agents: input.candidates.map((c) => ({ agentId: c.agentId, score: scores[c.handle] ?? 0.1 })), ...rest };
+    },
+  });
+  const failing: RouterStrategy = { name: "boom", decide: async () => Promise.reject(new Error("down")) };
+  const route = (strategy: RouterStrategy, messageId: string) =>
+    routeMessage(
+      { db: f.db, strategy, policy: { ...DEFAULT_ROUTER_POLICY, maxHops: 3 } },
+      { orgId: f.org.id, messageId },
+    );
+  const byAgent = (agentId: string, body: string) =>
+    insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "agent", agentId, runId: null, hop: 1, stretchId: null },
+      body,
+    });
+  const COORDINATES = { step: "rule", rule: "coordinator" } as const;
+
+  test("a message that needs an agent and that no other agent took goes to the coordinator", async () => {
+    const { theo } = await coordinated({ people: true });
+    const asked = await post("alguém pode me ajudar com uma coisa?");
+    const result = await route(scored({}, { needsAgent: 0.7, reason: "no clear fit" }), asked.id);
+    expect(result).toMatchObject({ selected: [theo.id], decidedBy: COORDINATES });
+    expect(result.runs.map((r) => [r.agentId, r.trigger])).toEqual([[theo.id, "router"]]);
+    const [decision] = await f.db
+      .select()
+      .from(schema.routingDecisions)
+      .where(eq(schema.routingDecisions.messageId, asked.id));
+    expect(decision).toMatchObject({
+      strategy: "rule:coordinator",
+      selectedAgentIds: [theo.id],
+      reason: "coordinator; fixed: no clear fit",
+    });
+    // The receipt reads it back after a reload.
+    expect(decidedByOf(decision?.strategy ?? "", f.owner.id)).toEqual(COORDINATES);
+  });
+
+  test("a low need gets nobody while other people are here; a person alone with the agents gets the coordinator, even for a greeting", async () => {
+    const { theo, walter } = await coordinated({ people: true });
+    const low = scored({}, { needsAgent: 0.2 });
+    const among = await post("vou almoçar, volto já");
+    expect(await route(low, among.id)).toMatchObject({ selected: [], runs: [] });
+    await f.db.delete(schema.channelMembers).where(eq(schema.channelMembers.userId, walter.id));
+    const greeting = await post("bom dia!");
+    expect(await route(low, greeting.id)).toMatchObject({ selected: [theo.id], decidedBy: COORDINATES });
+  });
+
+  test("a specialist's pick still answers and a short follow-up stays with it; what nobody took goes to the coordinator", async () => {
+    const { theo, ada } = await coordinated({ people: true });
+    const bug = await post("o checkout está dando 500");
+    expect((await route(scored({ ada: 0.9 }, { needsAgent: 0.9 }), bug.id)).selected).toEqual([ada.id]);
+    await byAgent(ada.id, "Achei: o deploy de ontem quebrou o checkout.");
+    const more = await post("e os testes?");
+    expect((await route(scored({ ada: 0.4 }, { needsAgent: 0.6 }), more.id)).selected).toEqual([ada.id]);
+    const other = await post("alguém sabe onde ficou o contrato novo?");
+    expect((await route(scored({}, { needsAgent: 0.8 }), other.id)).selected).toEqual([theo.id]);
+  });
+
+  test("what nobody took but speaks to one agent goes to that agent, as the step's pick, not to the coordinator", async () => {
+    const { theo, ada } = await coordinated();
+    const toAda = await post("ada, bom dia");
+    const low = (addressee: string) => scored({ ada: 0.3, theo: 0.3 }, { needsAgent: 0.3, addressee });
+    const result = await route(low(ada.id), toAda.id);
+    expect(result.selected).toEqual([ada.id]);
+    expect(result.decidedBy).toBeUndefined();
+    expect(result.runs.map((r) => [r.agentId, r.trigger])).toEqual([[ada.id, "router"]]);
+    const [decision] = await f.db
+      .select()
+      .from(schema.routingDecisions)
+      .where(eq(schema.routingDecisions.messageId, toAda.id));
+    expect(decision?.strategy).toBe("fixed");
+    // Spoken to, the coordinator itself is the agent spoken to: the continuity bar picks it, as for any agent.
+    const toTheo = await post("theo, bom dia");
+    expect((await route(low(theo.id), toTheo.id)).selected).toEqual([theo.id]);
+  });
+
+  test("a message already answered, or for a person, gets nobody, also from a person alone with the agents", async () => {
+    const { theo } = await coordinated();
+    const needs = scored({}, { needsAgent: 0.9 });
+    const answered = await post("qual é o prazo do relatório?");
+    expect((await route(scored({}, { needsAgent: 0.9, alreadyAnswered: 0.9 }), answered.id)).selected).toEqual([]);
+    const open = await post("alguém aí?");
+    expect((await route(needs, open.id)).selected).toEqual([theo.id]);
+    const toWalter = await post("bom dia, Walter");
+    expect((await route(needs, toWalter.id)).selected).toEqual([]);
+    const runs = await f.db.select().from(schema.agentRuns);
+    expect(runs.map((r) => [r.agentId, r.triggerMessageId])).toEqual([[theo.id, open.id]]);
+  });
+
+  test("the small model says what was already answered too, so the coordinator doesn't answer it twice", async () => {
+    let alreadyAnswered = 0.9;
+    const { theo, walter } = await coordinated({
+      people: true,
+      reply: () => ({
+        chunks: [
+          JSON.stringify({
+            needs_agent: 0.7,
+            for_everyone: 0,
+            already_answered: alreadyAnswered,
+            scores: [],
+            reason: "no clear fit",
+          }),
+        ],
+      }),
+    });
+    const model = createLlmRouterStrategy({ gateway: f.gateway, resolveModel: async () => "claude-haiku-5-5" });
+    await post("alguém sabe a senha do wifi?");
+    await byAgent(theo.id, "É acme-2026, está no cofre de senhas.");
+    const again = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, walter.id, f.org.id, f.general.id, {
+      body: "alguém sabe a senha do wifi?",
+    });
+    expect(await route(model, again.id)).toMatchObject({ selected: [], runs: [] });
+    const asked = f.provider.calls[0]?.request;
+    expect(systemText(asked?.system ?? "")).toContain("And `already_answered`:");
+    expect(asked?.outputSchema).toMatchObject({ required: expect.arrayContaining(["already_answered"]) });
+    alreadyAnswered = 0;
+    const other = await post("alguém sabe onde ficou o contrato novo?");
+    expect((await route(model, other.id)).selected).toEqual([theo.id]);
+  });
+
+  test("a coordinator that waits for a mention here, is on hold, out of the person's reach or archived changes nothing", async () => {
+    const { theo, walter } = await coordinated();
+    const ask = async () =>
+      (await route(scored({}, { needsAgent: 0.9 }), (await post("alguém pode ver isso?")).id)).selected;
+    const membership = and(
+      eq(schema.channelMembers.channelId, f.general.id),
+      eq(schema.channelMembers.agentId, theo.id),
+    );
+    await f.db.update(schema.channelMembers).set({ autoReply: false }).where(membership);
+    expect(await ask()).toEqual([]);
+    await f.db.update(schema.channelMembers).set({ autoReply: true }).where(membership);
+    await f.db.update(schema.agents).set({ operatorHoldAt: new Date() }).where(eq(schema.agents.id, theo.id));
+    expect(await ask()).toEqual([]);
+    await f.db.update(schema.agents).set({ operatorHoldAt: null }).where(eq(schema.agents.id, theo.id));
+    await f.db
+      .update(schema.agents)
+      .set({ ownerUserId: walter.id, audienceMode: "owner" })
+      .where(eq(schema.agents.id, theo.id));
+    expect(await ask()).toEqual([]);
+    await f.db
+      .update(schema.agents)
+      .set({ ownerUserId: f.owner.id, audienceMode: "everyone" })
+      .where(eq(schema.agents.id, theo.id));
+    expect(await ask()).toEqual([theo.id]);
+    await archiveAgent(f.db, f.owner.id, f.org.id, theo.id);
+    expect(await ask()).toEqual([]);
+  });
+
+  test("an agent's message never falls back to the coordinator", async () => {
+    const { theo } = await coordinated();
+    const needs = scored({}, { needsAgent: 0.9 });
+    const question = await post("por que o staging está lento?");
+    expect((await route(needs, question.id)).selected).toEqual([theo.id]);
+    const answer = await byAgent(f.agent.id, "Parece o banco de dados. Alguém de infra saberia dizer.");
+    expect(await route(needs, answer.id)).toMatchObject({ selected: [], runs: [] });
+  });
+
+  test("the only agent of a channel that coordinates takes a message whose need passes the lower gate of one agent", async () => {
+    const { theo, ada } = await coordinated({ people: true });
+    await f.db
+      .update(schema.channelMembers)
+      .set({ autoReply: false })
+      .where(
+        and(
+          eq(schema.channelMembers.channelId, f.general.id),
+          sql`${schema.channelMembers.agentId} in (${f.agent.id}, ${ada.id})`,
+        ),
+      );
+    const maybe = await post("isso aqui está certo?");
+    expect((await route(scored({}, { needsAgent: 0.4 }), maybe.id)).selected).toEqual([theo.id]);
+    const chat = await post("vou almoçar");
+    expect((await route(scored({}, { needsAgent: 0.3 }), chat.id)).selected).toEqual([]);
+  });
+
+  test("a person alone with the coordinator as the channel's only agent: the strategy was told so, and its nobody stands", async () => {
+    f = await setup();
+    await setCoordinator({ db: f.db }, f.owner.id, f.org.id, f.agent.id, true);
+    const told: (string | null | undefined)[] = [];
+    const low: RouterStrategy = {
+      name: "fixed",
+      async decide(input) {
+        told.push(input.aloneWith);
+        return { agents: [{ agentId: f.agent.id, score: 0.05 }], needsAgent: 0.05 };
+      },
+    };
+    const thanks = await post("valeu!");
+    expect(await route(low, thanks.id)).toMatchObject({ selected: [], runs: [] });
+    expect(told).toEqual(["dev"]);
+  });
+
+  test("when no step can read it: a reply and a talk with an agent first, then the coordinator only for a person alone here", async () => {
+    const { theo, ada, walter } = await coordinated({ people: true });
+    const crowded = await post("alguém viu o relatório?");
+    expect(await route(failing, crowded.id)).toMatchObject({ selected: [], reason: "mention_needed" });
+    await f.db.delete(schema.channelMembers).where(eq(schema.channelMembers.userId, walter.id));
+    const alone = await post("alguém viu o relatório?");
+    expect(await route(failing, alone.id)).toMatchObject({ selected: [theo.id], decidedBy: COORDINATES });
+    const [decision] = await f.db
+      .select()
+      .from(schema.routingDecisions)
+      .where(eq(schema.routingDecisions.messageId, alone.id));
+    expect(decision).toMatchObject({ strategy: "rule:coordinator", error: "boom: down" });
+    // Naming a person, the rule stays out of it.
+    const toWalter = await post("bom dia, Walter");
+    expect(await route(failing, toWalter.id)).toMatchObject({ selected: [], reason: "mention_needed" });
+    // Her own talk with Ada goes on with Ada (R3), and a quote reply to Ada is for Ada (R1).
+    await post("@ada faz o resumo da semana");
+    const done = await byAgent(ada.id, "Feito, está no Drive.");
+    const next = await post("e o de ontem?");
+    expect(await route(failing, next.id)).toMatchObject({
+      selected: [ada.id],
+      decidedBy: { step: "rule", rule: "follow_up" },
+    });
+    const quoted = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "qual pasta?",
+      replyTo: done.id,
+    });
+    expect(await route(failing, quoted.id)).toMatchObject({
+      selected: [ada.id],
       decidedBy: { step: "rule", rule: "reply" },
     });
   });

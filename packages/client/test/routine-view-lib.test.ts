@@ -38,6 +38,7 @@ const state = (over: Partial<Routine>) => ({
   failuresInRow: 0,
   waitingFor: null,
   target: { type: "channel" as const, channelId: "c1" },
+  trigger: { type: "event", event: "issue.created" } as Routine["trigger"],
   ...over,
 });
 
@@ -131,6 +132,18 @@ describe("a routine's state and its one-tap fix", () => {
       "routines.state.waitingAnyComputer",
     );
     expect(routineStateWords(state({ state: "waiting_person" })).key).toBe("routines.state.waitingPerson");
+    // Its event comes through a webhook the workspace doesn't have: it can't run yet, and says whose.
+    const pr = { type: "event", event: "github.pr_opened" } as const;
+    expect(routineStateWords(state({ state: "needs_webhook", trigger: pr }))).toMatchObject({
+      key: "routines.state.needsWebhook",
+      values: { provider: "GitHub" },
+      icon: "alert",
+      tone: "waiting",
+    });
+    const sentry = { type: "event", event: "sentry.issue_created" } as const;
+    expect(routineStateWords(state({ state: "needs_webhook", trigger: sentry })).values).toEqual({
+      provider: "Sentry",
+    });
     expect(
       routineStateWords(state({ state: "paused", active: false, pausedReason: "agent_not_in_channel" })),
     ).toMatchObject({ key: "routines.pausedReason.agent_not_in_channel", tone: "waiting" });

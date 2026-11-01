@@ -13,19 +13,34 @@ import {
   whenAt,
 } from "@agenteschat/client/lib/format";
 import { agentGrammar, isFeminineName, providerGrammar, runErrorGrammar } from "@agenteschat/client/lib/grammar";
-import { landingFor, membershipIn, safeRedirect, settingUp, webUrl } from "@agenteschat/client/lib/guards";
+import {
+  INVITATION_MAIL_HEADER,
+  INVITATION_TOKEN_HEADER,
+  landingFor,
+  membershipIn,
+  safeRedirect,
+  settingUp,
+  webUrl,
+} from "@agenteschat/client/lib/guards";
 import {
   addInvites,
   aheadOf,
   crewOf,
   firstAskOrder,
   ONBOARDING_STEPS,
-  splitEmails,
   stepIndex,
   validInvites,
 } from "@agenteschat/client/lib/onboarding";
 import { can } from "@agenteschat/client/lib/permissions";
-import { handleFrom, isEmail, parseAmount, parseEmails, passwordState, slugify } from "@agenteschat/client/lib/text";
+import {
+  addressesIn,
+  emailsFrom,
+  handleFrom,
+  isEmail,
+  parseAmount,
+  passwordState,
+  slugify,
+} from "@agenteschat/client/lib/text";
 import { en, ptBR } from "@agenteschat/i18n";
 import type { TFunction } from "i18next";
 import { createBetterAuthClient } from "@/auth/better-auth";
@@ -92,10 +107,34 @@ describe("text", () => {
   test("emails", () => {
     expect(isEmail("nome@empresa.com.br")).toBe(true);
     expect(isEmail("nome@empresa")).toBe(false);
-    expect(parseEmails("A@x.com, b@x.com ,bad, a@x.com")).toEqual(["a@x.com", "b@x.com"]);
+    expect(emailsFrom("A@x.com, b@x.com ,bad, a@x.com")).toEqual({ valid: ["a@x.com", "b@x.com"], invalid: ["bad"] });
+    expect(emailsFrom("a@x.com, c@x.com", ["A@x.com"])).toEqual({ valid: ["c@x.com"], invalid: [] });
+  });
+  test("emails as mail apps and spreadsheets paste them: the address, never its wrapping", () => {
+    // Bracketed, quoted or `mailto:`: none of it ends up in an invitation nobody could accept.
+    expect(isEmail("<ana@x.com>")).toBe(false);
+    expect(isEmail('"ana@x.com"')).toBe(false);
+    expect(emailsFrom('Ana Silva <Ana@x.com>, "Silva, Bia" <bia@x.com>; mailto:caio@x.com')).toEqual({
+      valid: ["ana@x.com", "bia@x.com", "caio@x.com"],
+      invalid: [],
+    });
+    // A spreadsheet column: quoted cells, one per line, a sentence's full stop.
+    expect(emailsFrom('"dani@x.com"\n"edu@x.com"\nfabi@x.com.')).toEqual({
+      valid: ["dani@x.com", "edu@x.com", "fabi@x.com"],
+      invalid: [],
+    });
+    // With no names in brackets, a word is a typo to fix; in order, once each.
+    expect(addressesIn("gil@x.com gil gil@x.com <>")).toEqual([
+      { email: "gil@x.com", valid: true },
+      { email: "gil", valid: false },
+    ]);
+    expect(addressesIn("Ana <ana@x.com>, ana@x")).toEqual([
+      { email: "ana@x.com", valid: true },
+      { email: "ana@x", valid: false },
+    ]);
   });
   test("onboarding: typed or pasted e-mails become chips (commas, spaces, new lines); invalid ones stay marked", () => {
-    expect(splitEmails(" A@x.com,b@x.com\n\nc@x.com;  bad  a@x.com ")).toEqual([
+    expect(addressesIn(" A@x.com,b@x.com\n\nc@x.com;  bad  a@x.com ").map((a) => a.email)).toEqual([
       "a@x.com",
       "b@x.com",
       "c@x.com",
@@ -451,6 +490,41 @@ describe("the confirmation email", () => {
         language: "pt-BR",
         body: { email: "bia@example.com" },
       });
+    } finally {
+      globalThis.fetch = real;
+    }
+  });
+
+  test("an email invitation's sign-up carries its token and its email's proof in headers, never in the body (ADR 0090)", async () => {
+    type Sent = { path: string; invitation: string | null; mail: string | null; body: Record<string, unknown> | null };
+    const sent: Sent[] = [];
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      sent.push({
+        path: new URL(String(url)).pathname,
+        invitation: headers.get(INVITATION_TOKEN_HEADER),
+        mail: headers.get(INVITATION_MAIL_HEADER),
+        body: typeof init?.body === "string" ? JSON.parse(init.body) : null,
+      });
+      return Response.json({ token: null, user: { id: "u", name: "Bia", email: "bia@example.com" } });
+    }) as typeof fetch;
+    try {
+      const auth = createBetterAuthClient("http://localhost:3000");
+      const bia = { name: "Bia", email: "bia@example.com", password: "senha-longa" };
+      await auth.signUp({ ...bia, invitation: { token: "inv-token", mail: "inv-proof" } });
+      await auth.signUp({ ...bia, invitation: { token: "copied-token" } });
+      await auth.signUp(bia);
+      const signUps = sent.filter((r) => r.path === "/api/auth/sign-up/email");
+      expect(INVITATION_TOKEN_HEADER).toBe("x-invitation-token");
+      expect(INVITATION_MAIL_HEADER).toBe("x-invitation-mail");
+      expect(signUps.map((r) => [r.invitation, r.mail])).toEqual([
+        ["inv-token", "inv-proof"],
+        ["copied-token", null],
+        [null, null],
+      ]);
+      expect(signUps[0]?.body).toMatchObject(bia);
+      expect(signUps[0]?.body).not.toHaveProperty("invitation");
     } finally {
       globalThis.fetch = real;
     }

@@ -10,7 +10,7 @@ import type {
   PlanUsage,
 } from "../api/types";
 import { joinNames } from "./format";
-import { loginPerAgent, planName } from "./plans";
+import { isPlanId, loginPerAgent, planName } from "./plans";
 
 /** One account as a row shows it: its logins, one per agent where its plan allows it (`LOGIN_PER_AGENT`). */
 export interface PlanAccount<A extends MachineAccount> {
@@ -150,7 +150,10 @@ export function accountAbout(
 ): string | undefined {
   if (!a.mine) return t("agentPage.work.brain.accountOf", { name: a.ownerName?.split(" ")[0] ?? "" });
   if (also) return t("agentPage.work.brain.accountAlso", { agents: joinNames(usedBy, t("newAgent.and")) });
-  if (a.status === "signed_out") return t("agentPage.work.brain.accountSignedOut");
+  // A coding plan's key never signs out: it reads signed out once its endpoint refused it.
+  if (a.status === "signed_out") {
+    return t(isPlanId(a.provider) ? "aiAccounts.page.keyRefused" : "agentPage.work.brain.accountSignedOut");
+  }
   const others = a.usedBy.filter((n) => n !== agentName);
   // One made for all of its owner's agents there thinks for this one too: nothing moves.
   if (others.length && a.shared === true) {

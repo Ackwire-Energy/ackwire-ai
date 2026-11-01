@@ -19,7 +19,7 @@ import { useTranslation } from "react-i18next";
 import { useOrg } from "@/providers/org";
 import { useRealtime } from "@/providers/realtime";
 import { rememberAgentLooks, useTheme } from "@/ui";
-import { agentLook, daysAgo, whenKind } from "./logic";
+import { agentLook, daysAgo, type PacedClock, pacedClock, whenKind } from "./logic";
 
 /** The current organization's id. */
 export function useOrgId(): string {
@@ -129,14 +129,19 @@ export function useWhen() {
   }, [t, locale]);
 }
 
-/** The current time, refreshed every `ms` (fuses, "expira em", clocks). */
+/**
+ * The current time, refreshed every `ms` (fuses, "expira em", clocks). A new `ms` reads it afresh in the render that
+ * asks for it (`pacedClock`), so that render never shows the old pace's time.
+ */
 export function useNow(ms = 30_000): number {
-  const [now, setNow] = useState(() => Date.now());
+  const [clock, setClock] = useState<PacedClock>(() => ({ every: ms, now: Date.now() }));
+  const paced = pacedClock(clock, ms, Date.now());
+  if (paced !== clock) setClock(paced);
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), ms);
+    const timer = setInterval(() => setClock({ every: ms, now: Date.now() }), ms);
     return () => clearInterval(timer);
   }, [ms]);
-  return now;
+  return paced.now;
 }
 
 /**

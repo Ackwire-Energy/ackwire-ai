@@ -1,5 +1,6 @@
 import type {
   EmailSender,
+  GifProvider,
   MailAdapters,
   Presence,
   PushSender,
@@ -8,9 +9,11 @@ import type {
   WebPushSender,
 } from "@agenteschat/adapters";
 import { and, count, eq, inArray, queryTrace, schema } from "@agenteschat/db";
+import { AGENT_MEDIA_JOB, enqueueAgentMedia, maybeSendAgentMedia } from "./agent-media";
 import { aiConnectIntent, type ConnectIntent } from "./ai-intent";
 import { orgHasAi } from "./ai-status";
 import type { ArtifactDeps } from "./artifacts";
+import { AUTONOMY_REPORT_JOB, queueAutonomyEmail } from "./autonomy-report";
 import type { ConnectorDeps } from "./connectors/connections";
 import { getChannelCached } from "./context";
 import { consolidateOrg } from "./context/consolidate";
@@ -24,10 +27,11 @@ import { forgetCodeEmail } from "./email-codes";
 import { type DecidedBy, publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
 import { FOLLOW_UP_JOB, wakeFollowUp } from "./follow-through";
+import { cutText } from "./format";
 import { advanceForumTopic } from "./forum";
 import { FILE_JOIN_REQUEST_JOB, fileJoinRequest } from "./invite-requests";
 import type { JevKey, JevKeySource } from "./jev-key";
-import { mentionHandoffs } from "./judge";
+import { MENTION_WAKE_THRESHOLD, mentionNeedsNothing } from "./judge";
 import { platformCapReached } from "./limits";
 import { wakeForAccessDecision } from "./machine-access";
 import type { MachineCaller } from "./machine-hub";
@@ -38,12 +42,13 @@ import {
   type TaskCall,
   wakeConversationForTask,
 } from "./machine-tasks";
+import { isMediaAfterReply, isMediaOnly } from "./media";
 import { getMessage, referencedOf } from "./messages";
 import { checkMissionDone } from "./mission-delivery";
 import { onMissionTaskEnded, syncMissionFiles } from "./mission-sync";
 import { afterMachineTaskEnded, afterMissionRunEnded, startQueuedMissionTasks } from "./mission-worktree";
 import { type MissionDeps, missionOfThread, missionRole, reactivateMission } from "./missions";
-import type { MissionEngine } from "./missions-engine";
+import { KEEP_GOING_JOB, keepMissionGoing, type MissionEngine } from "./missions-engine";
 import { notifyMessage } from "./notification-producers";
 import { ORG_FILES_PURGE_ATTEMPTS, ORG_FILES_PURGE_JOB, USER_FILES_PURGE_JOB } from "./organizations";
 import { enqueue, type JobHandlers, type OutboxJob, PermanentJobError } from "./outbox";
@@ -101,6 +106,8 @@ export interface JobDeps extends RunExecutorDeps {
   webPush?: WebPushSender | null;
   /** Who has the app open: pushes not waiting on them hold a little (ADR 0071 §7); absent = never held. */
   presence?: Presence | null;
+  /** GIF search (ADR 0091): an agent's GIF after its reply (job `agents.media`); absent = its own stickers only. */
+  gifs?: GifProvider | null;
   /** Org storage (job `storage.migrate`). */
   storage?: StorageDeps;
   /** Connectors: job `org.delete` revokes a workspace's GitHub OAuth grants at GitHub before its rows go. */
@@ -126,7 +133,7 @@ export interface JobDeps extends RunExecutorDeps {
     /** The small model on another provider's key (e.g. `{ openai: "gpt-6-luna" }`); else its catalog pick. */
     cheapModels?: Record<string, string>;
     minScore?: number;
-    /** Jev probability needed for an agent's @mention of another agent to start it (default 0.6). */
+    /** Probability that an agent's @mention needs the agent it names for it to wake (`MENTION_WAKE_THRESHOLD`). */
     mentionThreshold?: number;
     /** Replaces the core small-model step (e.g. an optional external classifier). */
     strategy?: RouterStrategy;
@@ -212,13 +219,14 @@ async function jevPicks(key: JevKeySource | undefined): Promise<boolean> {
 export function createJobHandlers(deps: JobDeps): JobHandlers {
   const routing = messageRouter(deps);
 
-  // An agent's @mention starts the other agent only when it hands it something to act on now (the judge decides).
-  const mentionThreshold = deps.router?.mentionThreshold ?? 0.6;
+  // An agent's @mention wakes the other agent unless the judge is sure it needs nothing from it.
+  const mentionThreshold = deps.router?.mentionThreshold ?? MENTION_WAKE_THRESHOLD;
   /**
-   * Which agents an agent's @mentions actually hand off to (ADR 0089): the judge asks, per mentioned agent,
-   * whether it is handed work or a question to act on now, in any language, reading the message being answered
-   * too. Thanks, an "ok" or a sign-off hand nothing off. Only without a judge, or when it fails, does a message
-   * that opens with "@handle" count by itself. Every decision is recorded in `routing_decisions` for audit.
+   * Which agents an agent's @mentions wake (ADR 0089): the judge asks, per mentioned agent, whether the message
+   * needs nothing from it, in any language, reading the message being answered too; it wakes unless the judge is
+   * sure (`MENTION_WAKE_THRESHOLD`). Thanks, an "ok", a sign-off or a quote need nothing. Without a judge, or when it
+   * fails, only a message that opens with "@handle" wakes that agent. Each decision goes in
+   * `routing_decisions`, its score the chance the message needs the agent (1 − the judge's "nothing").
    */
   async function delegatedAgents(message: NonNullable<Awaited<ReturnType<typeof getMessage>>>) {
     const targets = await deps.db
@@ -234,7 +242,6 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     const scores = new Map<string, number>();
     let strategy = "mention-judge";
     let error: string | null = null;
-    let judged = false;
     const judge = deps.context ? judgeOf(deps.context) : null;
     if (judge && others.length > 0) {
       const [[author], answering] = await Promise.all([
@@ -247,7 +254,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         answeredBy(message),
       ]);
       try {
-        const out = await mentionHandoffs(judge, {
+        const out = await mentionNeedsNothing(judge, {
           orgId: message.orgId,
           agentId: message.authorAgentId,
           body: message.body,
@@ -255,15 +262,15 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           answering,
           targets: others.map((t) => ({ agentId: t.id, handle: t.handle, name: t.name, role: t.role || null })),
         });
-        for (const [id, p] of out) scores.set(id, p);
+        for (const [id, nothing] of out) scores.set(id, 1 - nothing);
         strategy = `mention-${judge.name}`;
-        judged = true;
       } catch (e) {
         error = e instanceof Error ? e.message.slice(0, 300) : String(e);
       }
     }
-    // Nobody could read it: a message that opens by addressing an agent ("@ada já postei…") is a reply to it.
-    if (!judged) for (const t of others) if (opensWith(message.body, t.handle)) scores.set(t.id, 1);
+    // No judge, or it failed: only a message that opens by addressing an agent ("@ada já postei…") wakes it. Waking
+    // every agent named would let two agents thank each other in a loop while the judge is down.
+    if (!judge || error !== null) for (const t of others) if (opensWith(message.body, t.handle)) scores.set(t.id, 1);
     const allowed = others.filter((t) => (scores.get(t.id) ?? 0) >= mentionThreshold).map((t) => t.id);
     await deps.db
       .insert(schema.routingDecisions)
@@ -302,7 +309,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     if (!row) return null;
     return {
       from: row.authorType === "person" ? "a person" : row.handle ? `@${row.handle}` : "an agent",
-      text: row.body.slice(0, 1000),
+      text: cutText(row.body, 1000),
     };
   }
 
@@ -326,6 +333,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (message.meta.issueWork || message.meta.issueWorkStart || message.meta.issueTaken) return;
       // A fast reply while the task works (talker.ts): its task reads it; it starts nobody, not even by mention.
       if (message.meta.talker) return;
+      // A GIF or a sticker alone (ADR 0091), an agent's silent one after its reply too: it starts nobody, routes
+      // to nobody and gets no sticker after it. Its insert queues no `message.posted`; one delivered anyway does
+      // nothing.
+      if (isMediaAfterReply(message.meta) || isMediaOnly(message)) return;
       // A routine's trigger: its background run is already started; nobody else is routed (routines.ts).
       if (message.meta.background) return;
       const routed = (
@@ -396,13 +407,15 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           return;
         }
         // No mention: another agent may chime in when it clearly should (ADR 0034). Only in
-        // channels, never in a mission's thread (the mission's own turns run it).
-        if (!routing || where?.kind !== "channel") return;
+        // channels, never in a mission's thread (the mission's own turns run it). Once that is settled, a
+        // light reply may get the agent's sticker or a GIF after it (ADR 0091): judged in a job of its own.
+        if (!routing || where?.kind !== "channel") return enqueueAgentMedia(deps.db, message, where);
         if (message.threadId && (await missionOfThread(deps.db, message.orgId, message.threadId))) return;
         const res = await routeMessage(routing, input);
         // Receipts only when someone answers: an agent's message isn't waiting for anyone.
         if (res.runs.length > 0)
           await routed("router", res.seenBy ?? [], res.runs, res.reason, undefined, res.decidedBy);
+        await enqueueAgentMedia(deps.db, message, where);
         return;
       }
       if (message.mentionedAgentIds.length > 0) {
@@ -591,6 +604,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     "mission.check_done": async (job) => {
       await checkMissionDone(missions, String(job.payload.missionId), Number(job.payload.attempt ?? 0) || 0);
     },
+    // A mission run ended a while ago: with plan items open and nothing waiting on a person, the work goes on.
+    [KEEP_GOING_JOB]: async (job) => {
+      await keepMissionGoing(missions, String(job.payload.missionId));
+    },
     // The person at a connected computer answered an agent's folder request (ADR 0036 §8): the agent wakes.
     "machine.access_decided": async (job) => {
       await wakeForAccessDecision({ db: deps.db, pubsub: deps.pubsub }, String(job.payload.requestId), {
@@ -622,6 +639,14 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     [FILE_JOIN_REQUEST_JOB]: async (job) => {
       await fileJoinRequest({ db: deps.db, pubsub: deps.pubsub }, job.payload);
     },
+    // An agent's reply may get its sticker or a GIF after it (ADR 0091): free checks, then one calibrated judgment.
+    // A slow, failing or keyless judgment sends nothing and fails nothing.
+    [AGENT_MEDIA_JOB]: async (job) => {
+      await maybeSendAgentMedia(
+        { db: deps.db, pubsub: deps.pubsub, judge: deps.context?.judge ?? null, gifs: deps.gifs ?? null },
+        { orgId: orgOf(job), messageId: String(job.payload.messageId) },
+      );
+    },
     // In-app notifications of a message: mentions, thread replies, DMs.
     "notifications.message": async (job) => {
       await notifyMessage({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), String(job.payload.messageId));
@@ -641,6 +666,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     "context.consolidate": async (job) => {
       if (!deps.context) return;
       await consolidateOrg(deps.context, orgOf(job));
+    },
+    // Yesterday's stall-and-noise report, to the people who run the server (`OPS_REPORT_EMAIL`).
+    [AUTONOMY_REPORT_JOB]: async (job) => {
+      await queueAutonomyEmail(deps.db, job.payload, { router: deps.router?.enabled ?? false });
     },
   };
 }

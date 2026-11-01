@@ -84,18 +84,18 @@ function SkillRow({ skill, users, onOpen }: { skill: Skill; users: number | null
   const { t } = useTranslation();
   return (
     <div className="ac-list__row skill-row">
-      <span className="list-col" style={{ flex: "1 1 240px" }}>
-        <button type="button" className="skill-row__name" onClick={onOpen}>
-          {skill.name}
-        </button>
-        <span className="small muted">{skill.description}</span>
+      <button type="button" className="skill-row__name" onClick={onOpen}>
+        {skill.name}
+      </button>
+      <span className="skill-row__meta">
+        <SourceChip skill={skill} />
+        {skill.defaultForNewAgents && <Chip icon="check">{t("skills.defaultChip")}</Chip>}
+        <span className="small muted tabular">
+          {t("skills.version", { version: skill.version })}
+          {users !== null && <> · {t("skills.usedBy", { count: users })}</>}
+        </span>
       </span>
-      <SourceChip skill={skill} />
-      {skill.defaultForNewAgents && <Chip icon="check">{t("skills.defaultChip")}</Chip>}
-      <span className="small muted tabular">
-        {t("skills.version", { version: skill.version })}
-        {users !== null && <> · {t("skills.usedBy", { count: users })}</>}
-      </span>
+      <span className="small muted">{skill.description}</span>
     </div>
   );
 }
@@ -127,7 +127,7 @@ export function SkillsSection() {
         )}
       </div>
       {unavailable && <p className="small muted">{t("skills.unavailable")}</p>}
-      {skills.isLoading && <LoadingList count={3} avatar={false} trailing />}
+      {skills.isLoading && <LoadingList count={3} avatar={false} />}
       {skills.isSuccess && list.length === 0 && <p className="small muted">{t("skills.empty")}</p>}
       {list.length > 0 && (
         <List aria-label={t("skills.title")}>

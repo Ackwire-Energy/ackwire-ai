@@ -60,8 +60,6 @@ export function MeScreen() {
   // On which computer, as "Contas de IA" says it: only where the accounts sit on more than one.
   const several = onSeveralComputers(ai.data?.accounts ?? []);
   const c = useColors();
-  // Membros, for who invites people or manages members (the requests to join and the invitation link live there).
-  const manager = can(org.org, "invite_people") || can(org.org, "manage_members");
   const requests = useJoinRequests(org.orgId, can(org.org, "invite_people"));
   const waiting = requests.data?.length ?? 0;
   const push = usePushSwitch().on;
@@ -82,16 +80,13 @@ export function MeScreen() {
   const myAgents = dir.agents.filter((a) => a.ownerUserId === meId);
   const headline = [mine?.handle ? `@${mine.handle}` : null, role, org.org?.name].filter(Boolean).join(" · ");
   const workspaceRows: { icon: IconName; label: string; value?: string; href: string }[] = [
-    ...(manager
-      ? [
-          {
-            icon: "members" as const,
-            label: t("members.title"),
-            ...(waiting > 0 ? { value: t("mobile.members.waiting", { count: waiting }) } : {}),
-            href: "/me/members",
-          },
-        ]
-      : []),
+    // Everyone's: who invites finds the requests there, and a member who may not suggests someone (ADR 0090).
+    {
+      icon: "members",
+      label: t("members.title"),
+      ...(waiting > 0 ? { value: t("mobile.members.waiting", { count: waiting }) } : {}),
+      href: "/me/members",
+    },
     {
       icon: "checkc",
       label: t("mobile.me.issues"),

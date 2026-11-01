@@ -20,8 +20,10 @@ export interface MemoryUpdate {
   requestedByUserId: string;
   /** Undo: `POST /api/app/organizations/{orgId}/memories/{itemId}/revert`. Absent for proposals. */
   undo?: { method: "POST"; path: string };
-  /** For `proposed`: the proposal to accept inline, and whether the requester can decide it. */
+  /** For `proposed`: the proposal to accept inline (the card's first), and whether the requester can decide one. */
   proposalId?: string;
+  /** For `proposed`: every proposal on the card, one per agent and kind of change (older apps read `proposalId`). */
+  proposalIds?: string[];
   canDecide?: boolean;
   /** `memory.remembered` | `memory.updated` | `memory.forgot` | `memory.proposed`: the app's own words, with `params`. */
   code?: string;
@@ -39,12 +41,15 @@ export type DecidedBy =
   | { step: "model"; model: string; provider: string }
   /** The author's own plan: `ownerId` is the author. */
   | { step: "plan"; brand: "claude" | "chatgpt"; ownerId: string }
-  | { step: "rule"; rule: "reply" | "only_agent" | "follow_up" };
+  /** `coordinator`: nobody else took it, so the team's coordinator did (ADR 0093). */
+  | { step: "rule"; rule: RouterRule };
+
+type RouterRule = "reply" | "only_agent" | "follow_up" | "coordinator";
 
 /** Why a routed message reached no agent: no step could read it, and no rule fit (`strategy` `none`). */
 export const MENTION_NEEDED = "mention_needed";
 
-const RULES = new Set(["reply", "only_agent", "follow_up"]);
+const RULES = new Set(["reply", "only_agent", "follow_up", "coordinator"]);
 
 /**
  * `DecidedBy` from a stored decision's `strategy` (`jev`, `llm:<model>`, `plan:<kind>`, `rule:<name>`). Undefined
@@ -57,7 +62,7 @@ export function decidedByOf(strategy: string, authorUserId: string | null): Deci
   if (step === "plan" && authorUserId && (rest === "claude_code" || rest === "codex")) {
     return { step: "plan", brand: rest === "codex" ? "chatgpt" : "claude", ownerId: authorUserId };
   }
-  if (step === "rule" && RULES.has(rest)) return { step: "rule", rule: rest as "reply" | "only_agent" | "follow_up" };
+  if (step === "rule" && RULES.has(rest)) return { step: "rule", rule: rest as RouterRule };
   return undefined;
 }
 
@@ -126,7 +131,10 @@ export type ChannelEvent =
       /** Background work (a routine's run): not the conversation's "working" indicator. */
       background?: true;
     }
-  /** An agent asked another agent (`ask_agent`, ADR 0034); the answer comes later as a notice: "Dev asked Infra…". */
+  /**
+   * An agent asked another agent (`ask_agent`, ADR 0034), or handed it work (`kind` `note`, `tell_agent`, ADR 0095);
+   * what comes of it arrives later as a notice: "Dev asked Infra…".
+   */
   | {
       type: "agent.consulting";
       channelId: string;
@@ -134,10 +142,11 @@ export type ChannelEvent =
       runId: string;
       agentId: string;
       consultedAgentId: string;
+      kind?: "note";
     }
   /**
-   * An agent's question to another agent (`ask_agent`, ADR 0034) came back:
-   * `status` answered, expired or failed. The asking run resumes.
+   * An agent's question to another agent (`ask_agent`, ADR 0034), or the work it handed it (`kind` `note`), came
+   * back: `status` answered, expired or failed.
    */
   | {
       type: "agent.consulted";
@@ -147,11 +156,12 @@ export type ChannelEvent =
       agentId: string;
       consultedAgentId: string;
       status: "answered" | "expired" | "failed";
+      kind?: "note";
     }
   /**
-   * A question still out changed without closing: the consulted agent stopped on a person (an approval, a
-   * question, a secret) or on its computer, or went back to work. The app reloads the conversation's questions
-   * (`GET …/consultations`).
+   * A question or hand-off still out changed without closing: the consulted agent stopped on a person (an approval,
+   * a question, a secret) or on its computer, went back to work, or got more time while still at it. The app reloads
+   * the conversation's questions (`GET …/consultations`).
    */
   | {
       type: "agent.consultation";

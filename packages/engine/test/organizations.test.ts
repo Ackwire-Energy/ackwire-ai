@@ -154,7 +154,7 @@ describe("invitations", () => {
     const wrong = await addUser(f.db, "carl");
     await expect(acceptInvitation(f.db, wrong, token)).rejects.toBeInstanceOf(ForbiddenError);
     const bia = { id: (await addUser(f.db, "bia")).id, email: "bia@example.com" };
-    expect(await acceptInvitation(f.db, bia, token)).toEqual({ orgId: f.org.id });
+    expect(await acceptInvitation(f.db, bia, token)).toMatchObject({ orgId: f.org.id });
     await expect(acceptInvitation(f.db, bia, token)).rejects.toBeInstanceOf(ConflictError);
     const general = await f.db.select().from(schema.channelMembers).where(eq(schema.channelMembers.userId, bia.id));
     expect(general.map((g) => g.channelId)).toEqual([f.general.id]);

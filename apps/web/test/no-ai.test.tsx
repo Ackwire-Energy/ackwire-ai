@@ -230,12 +230,12 @@ describe("no AI connected: above the composer", () => {
     await open(seedState({ aiStatus: aiStatus(true, ADA_ID) }), `agents/${ADA_ID}`);
     const work = screen().getByRole("region", { name: "Como trabalha" });
     expect(work.textContent).toContain("Pensa comSem IA");
-    expect(work.textContent).not.toContain("o modelo do workspace");
+    expect(work.textContent).not.toContain("Pela API");
     await click(within(work).getByRole("button", { name: "Conectar uma IA" }));
     expect(dialog("Conectar uma IA para a Ada")).not.toBeNull();
     cleanup();
     await open(seedState({ aiStatus: aiStatus(true, ATLAS_ID) }), `agents/${ADA_ID}`);
-    expect(screen().getByRole("region", { name: "Como trabalha" }).textContent).toContain("o modelo do workspace");
+    expect(screen().getByRole("region", { name: "Como trabalha" }).textContent).toContain("Pela API");
   });
 
   test("the agent's page, for an agent on Codex: Connect opens on ChatGPT, its plan, from 'Sem IA' and the cell", async () => {
@@ -584,7 +584,7 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
       "Claude Teamcontato@estudio.example",
       "Claude Pessoal · MaxTambém usada por Atlas",
       "ChatGPT PlusEm uso por Atlas · Mover para cá",
-      "Claude da AcmeClaude · termina em 7f2aPela API. O uso conta no orçamento da Ada.",
+      "Claude da AcmeClaude · termina em 7f2aPago por uso. Conta no orçamento da Ada.",
       "Claude",
     ]);
     expect(within(picker).getByText("Ou conecte outra")).toBeTruthy();
@@ -684,7 +684,7 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
     const state = onClaudeCode(walters(withCard(), ADA_ID));
     const { box, picker } = await connectAda(state, { brain: "claude_code" });
     const key = within(picker).getByRole("button", { name: /^Claude da Acme/ });
-    expect(shownText(key)).toBe("Claude da AcmeClaude · termina em 7f2aPela API. O uso conta no orçamento da Ada.");
+    expect(shownText(key)).toBe("Claude da AcmeClaude · termina em 7f2aPago por uso. Conta no orçamento da Ada.");
     await click(key, 8);
     expect(calls(state, "agents.setBrain").map((c) => c.args)).toEqual([[ORG_ID, ADA_ID, { brain: "model" }]]);
     // Her model runs on that key: it stays.

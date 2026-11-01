@@ -1236,7 +1236,7 @@ describe("the onboarding where the workspace gets its own computer", () => {
     expect(meet?.querySelectorAll(".ac-avatar")).toHaveLength(4);
     expect(meet?.querySelector(".onb__faces-more")?.textContent).toBe("+26");
     await click(screen().getByRole("button", { name: "Pular esta etapa" }));
-    expect(document.querySelector(".onb__welcome-lead")?.textContent).toStartWith(
+    expect(document.querySelector(".welcome-card__lead")?.textContent).toStartWith(
       "Ada, Atlas, Theo, Lia e mais 26 já estão no #general.",
     );
   });

@@ -149,7 +149,7 @@
   background: var(--plate);
   color: var(--ink);
 }
-.status-field__emoji:focus-visible {
+html:not([data-pointer]) .status-field__emoji:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }

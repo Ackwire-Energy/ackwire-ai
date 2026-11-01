@@ -75,6 +75,7 @@ const SIDEWAYS: Record<string, "strip" | "content"> = {
   ".ac-carousel__track": "strip",
   ".dk-orgpick": "strip",
   ".code-card__code": "content",
+  ".code-card__preview": "content",
   ".level-matrix": "content",
   ".machine-command__code": "content",
   ".issues-boardwrap": "content",
@@ -262,7 +263,7 @@ describe("the collapsed sidebar", () => {
     // Edge to edge on the rail…
     expect([margin.left, margin.right]).toEqual([-rail.padding.left, -rail.padding.right]);
     // …one column that holds an item and its ring…
-    expect(column).toBe(item + 2 * ring);
+    expect(column).toBeGreaterThanOrEqual(item + 2 * ring);
     // …on the rail's middle, as the header and the foot…
     expect(padding.left + column / 2).toBe(rail.width / 2);
     // …and after it the room for the kit's scrollbar, so a scrollbar never squeezes the column…

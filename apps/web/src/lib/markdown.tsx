@@ -1,5 +1,6 @@
 import { headingId, INLINE, MENTION, parseMarkdown, parseWikiToken, SAFE_URL } from "@agenteschat/client/lib/markdown";
 import { type ReactNode, useMemo } from "react";
+import { MermaidOrCode } from "@/components/artifacts/Mermaid";
 import { ChartOrCode } from "@/components/ChartBlock";
 import { CodeBlock } from "@/components/CodeBlock";
 
@@ -81,11 +82,14 @@ export function renderInline(
       break;
     }
     const tok = m[0];
+    // The text before this token keeps the key it had as the trailing text, so its words stay on screen as they are;
+    // the text after takes the next one. Two pieces with one key leave the old words behind in the DOM.
+    const textKey = `${key}-t${n}`;
     const k = `${key}-${n++}`;
     // `![[…]]` inside a sentence: the "!" belongs to the embed.
     const isEmbed = Boolean(m[6] && embed && m.index > 0 && rest[m.index - 1] === "!");
     const before = rest.slice(0, isEmbed ? m.index - 1 : m.index);
-    if (before) out.push(...withMentions(before, `${key}-t${n}`, mention, words));
+    if (before) out.push(...withMentions(before, textKey, mention, words));
     if (isEmbed && embed) {
       out.push(embed(parseWikiToken(tok).title, k, false));
       rest = rest.slice(m.index + tok.length);
@@ -131,6 +135,8 @@ export interface MarkdownProps {
   title?: string;
   /** Plain words in `.ac-word` spans: a streaming answer's newest block, whose words fade in. */
   words?: boolean;
+  /** The first lines of a page (a link's hover card): its ```mermaid blocks stay code, the cut may have split one. */
+  excerpt?: boolean;
   /** Added to the wrapper (`md--tail` on a streaming answer's last block). */
   className?: string;
 }
@@ -153,6 +159,7 @@ export function Markdown({
   embed,
   title,
   words,
+  excerpt,
   className,
 }: MarkdownProps) {
   const message = variant === "message";
@@ -183,12 +190,16 @@ export function Markdown({
       }
       case "paragraph":
         return <p key={k}>{inline(b.text, k)}</p>;
-      case "code":
-        return b.lang.toLowerCase() === "chart" ? (
-          <ChartOrCode key={k} text={b.text} writing={Boolean(words)} />
-        ) : (
-          <CodeBlock key={k} lang={b.lang} text={b.text} />
-        );
+      case "code": {
+        const lang = b.lang.toLowerCase();
+        if (lang === "chart") return <ChartOrCode key={k} text={b.text} writing={Boolean(words)} />;
+        // Drawn once its block is done. Only the last block of an answer still being written can grow (an open
+        // fence always runs to the end): it keeps the code, so the diagram isn't drawn again on every word. A
+        // diagram before it stays drawn even when the whole answer is the tail for a frame (it ends on a blank line).
+        if (lang === "mermaid" && !excerpt && !(words && i === parsed.length - 1))
+          return <MermaidOrCode key={k} text={b.text} />;
+        return <CodeBlock key={k} lang={b.lang} text={b.text} />;
+      }
       case "list": {
         const L = b.ordered ? "ol" : "ul";
         return (

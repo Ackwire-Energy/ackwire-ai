@@ -1,8 +1,21 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
-import { buildRunContext, insertMessage, type Message, nowLine, postPersonMessage, toTurns } from "../src";
-import { type Fixture, setup } from "./fixtures";
+import {
+  type AgentRun,
+  buildRunContext,
+  createAgent,
+  type HandOff,
+  handOffsBlock,
+  insertMessage,
+  type Message,
+  nowLine,
+  openAgentDm,
+  postPersonMessage,
+  setCoordinator,
+  toTurns,
+} from "../src";
+import { addMember, type Fixture, setup } from "./fixtures";
 
 const msg = (over: Partial<Message>): Message =>
   ({ authorUserId: null, authorAgentId: null, body: "", ...over }) as Message;
@@ -168,4 +181,238 @@ test("history is capped at maxMessages, keeping the most recent", async () => {
   const runs = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, trigger.id));
   const ctx = await buildRunContext(f.db, runs[0] as NonNullable<(typeof runs)[0]>, f.agent, { maxMessages: 3 });
   expect(ctx.messages[0]?.content).toBe("[ana]: m3\n\n[ana]: m4\n\n(current message) [ana]: @dev go");
+});
+
+test("the team's coordinator hears that what nobody took comes to it, only where other agents are (ADR 0093)", async () => {
+  const trigger = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev what do you think?",
+  });
+  const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, trigger.id));
+  if (!run) throw new Error("no run");
+  const prompt = async (agent: typeof f.agent) =>
+    systemText((await buildRunContext(f.db, run, agent, { maxMessages: 10 })).system);
+  const LINE = "\nYou coordinate the team. A message that needs an agent and that no other agent took comes to you";
+  const dev = await setCoordinator({ db: f.db }, f.owner.id, f.org.id, f.agent.id, true);
+  // Nobody to hand work to: alone with Ana.
+  expect(await prompt(dev)).not.toContain(LINE);
+  const ada = await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: "Ada", handle: "ada" },
+    { model: "claude-sonnet-5-5" },
+  );
+  await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: ada.id });
+  expect(await prompt(dev)).toContain(
+    `${LINE}, so work nobody owns is in your area. Do what is yours. Hand the rest to the agent whose job it is: mention it with what you need, one agent per line, and leave that part to it.`,
+  );
+  // Another agent there doesn't.
+  await setCoordinator({ db: f.db }, f.owner.id, f.org.id, f.agent.id, false);
+  expect(await prompt(f.agent)).not.toContain(LINE);
+});
+
+test("the coordinator hears that a person alone with the agents speaks to the team, so a greeting gets an answer", async () => {
+  const trigger = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev bom dia!",
+  });
+  const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, trigger.id));
+  if (!run) throw new Error("no run");
+  const prompt = async (agent: typeof f.agent) =>
+    systemText((await buildRunContext(f.db, run, agent, { maxMessages: 10 })).system);
+  const ALONE =
+    "\nThis person is the only one here with the agents: what they write to the room is for the team. Answer a greeting or a question; only a thanks or an ok needs no answer.";
+  const ada = await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: "Ada", handle: "ada" },
+    { model: "claude-sonnet-5-5" },
+  );
+  await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: ada.id });
+  expect(await prompt(f.agent)).not.toContain(ALONE);
+  const dev = await setCoordinator({ db: f.db }, f.owner.id, f.org.id, f.agent.id, true);
+  expect(await prompt(dev)).toContain(ALONE);
+  // With another person here, what Ana writes may be for Walter.
+  const walter = await addMember(f.db, f.org.id, "member", "Walter");
+  await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: walter.id });
+  expect(await prompt(dev)).not.toContain(ALONE);
+});
+
+test("the hand-offs block: where each colleague is, an answer's start until it was heard, and no @ to copy", () => {
+  const now = new Date("2026-10-31T17:00:00Z");
+  const at = (hhmm: string) => new Date(`2026-10-31T${hhmm}:00Z`);
+  const base: HandOff = {
+    id: "h",
+    kind: "note",
+    status: "open",
+    question: "Rita vai ser apagada. Passa ao @diogo a tua pasta e tudo o que sabes.",
+    answer: null,
+    handle: "rita",
+    createdAt: at("16:58"),
+    answeredAt: null,
+    reportedAt: null,
+    target: null,
+  };
+  const run = (status: AgentRun["status"], more = {}) => ({
+    status,
+    waitingMachineId: null,
+    handedOn: false,
+    ...more,
+  });
+  const open = handOffsBlock(
+    [
+      { ...base, target: run("running") },
+      { ...base, target: run("queued") },
+      { ...base, target: run("waiting_approval") },
+      { ...base, target: run("waiting_input") },
+      { ...base, target: run("waiting_input", { waitingMachineId: "m1" }) },
+      { ...base, target: run("done", { handedOn: true }) },
+      { ...base, target: null },
+      { ...base, kind: "question", question: "Como o staging sobe?", target: run("running") },
+    ],
+    "Europe/Lisbon",
+    now,
+  );
+  expect(open?.split("\n")).toEqual([
+    "# Work you handed off here",
+    "What the agents you handed work to or asked from here are doing, as of this turn (Europe/Lisbon):",
+    '- @rita, since 16:58 (2 min ago): working on it. You handed it: "Rita vai ser apagada. Passa ao diogo a tua pasta e tudo o que sabes."',
+    '- @rita, since 16:58 (2 min ago): starting. You handed it: "Rita vai ser apagada. Passa ao diogo a tua pasta e tudo o que sabes."',
+    '- @rita, since 16:58 (2 min ago): waiting for a person\'s approval. You handed it: "Rita vai ser apagada. Passa ao diogo a tua pasta e tudo o que sabes."',
+    '- @rita, since 16:58 (2 min ago): waiting for a person\'s answer. You handed it: "Rita vai ser apagada. Passa ao diogo a tua pasta e tudo o que sabes."',
+    '- @rita, since 16:58 (2 min ago): waiting for its computer to come back. You handed it: "Rita vai ser apagada. Passa ao diogo a tua pasta e tudo o que sabes."',
+    '- @rita, since 16:58 (2 min ago): did its part and waits for agents it handed some to. You handed it: "Rita vai ser apagada. Passa ao diogo a tua pasta e tudo o que sabes."',
+    '- @rita, since 16:58 (2 min ago): not started: the agents reached what they may do on their own; a person can let it go on (Continuar). You handed it: "Rita vai ser apagada. Passa ao diogo a tua pasta e tudo o que sabes."',
+    '- @rita, since 16:58 (2 min ago): working on it. You asked: "Como o staging sobe?"',
+    "Each outcome reaches you here by itself, even after your turn ends; what you handed off in one turn comes back together. Until then don't check on it, send it again or do its part. If someone asks, say who has what and since when; never say a colleague hasn't answered or that nothing happened while its part is open.",
+  ]);
+  const long = `O staging sobe da branch main pelo deploy.sh, ${"com cada passo descrito ".repeat(10)}`;
+  const closed = handOffsBlock(
+    [
+      { ...base, handle: "infra", createdAt: at("16:40"), status: "answered", answer: long, answeredAt: at("16:52") },
+      { ...base, status: "answered", answer: "Feito.", answeredAt: at("16:59"), reportedAt: at("16:59") },
+      { ...base, status: "failed", answer: "stopped by a person", answeredAt: at("16:59") },
+      { ...base, status: "expired", answeredAt: at("16:59") },
+    ],
+    "Europe/Lisbon",
+    now,
+  );
+  expect(closed?.split("\n").slice(2, -1)).toEqual([
+    `- @infra, since 16:40: done at 16:52: "${long.replace(/\s+/g, " ").trim().slice(0, 140)}…"`,
+    "- @rita, since 16:58: done at 16:59",
+    "- @rita, since 16:58: couldn't finish at 16:59: stopped by a person",
+    "- @rita, since 16:58: no answer by 16:59",
+  ]);
+  expect(handOffsBlock([], "UTC")).toBeNull();
+});
+
+test("the hand-offs block: only this agent's, from this conversation, the last day; never for a routine or between agents", async () => {
+  const infra = await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: "Infra", handle: "infra", role: "Infrastructure", credentialId: f.credential.id },
+    { model: "claude-sonnet-5-5" },
+  );
+  /** A run of `agentId` in #general: on its own top-level message, or in `thread`. */
+  const runIn = async (agentId: string, thread?: string) => {
+    const m = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      ...(thread ? { threadId: thread } : {}),
+      author: { type: "person", userId: f.owner.id },
+      body: "pedido",
+    });
+    const [run] = await f.db
+      .insert(schema.agentRuns)
+      .values({
+        orgId: f.org.id,
+        agentId,
+        channelId: f.general.id,
+        threadRootId: thread ?? m.id,
+        triggerMessageId: m.id,
+        trigger: "mention",
+        hop: 1,
+        status: "done",
+      })
+      .returning();
+    if (!run) throw new Error("no run");
+    return run;
+  };
+  const handed = (
+    asker: AgentRun,
+    question: string,
+    over: Partial<typeof schema.agentConsultations.$inferInsert> = {},
+  ) =>
+    f.db.insert(schema.agentConsultations).values({
+      orgId: f.org.id,
+      kind: "note",
+      askerRunId: asker.id,
+      askerAgentId: asker.agentId,
+      targetAgentId: asker.agentId === infra.id ? f.agent.id : infra.id,
+      channelId: f.general.id,
+      messageId: Bun.randomUUIDv7(),
+      waitId: `async:${Bun.randomUUIDv7()}`,
+      question,
+      chain: [asker.agentId],
+      expiresAt: new Date(Date.now() + 60_000),
+      ...over,
+    });
+  const earlier = await runIn(f.agent.id);
+  const thread = await runIn(f.agent.id);
+  const inThread = await runIn(f.agent.id, thread.triggerMessageId);
+  await handed(earlier, "Here, still out");
+  await handed(inThread, "In the thread");
+  await handed(await runIn(infra.id), "Infra's own");
+  await handed(earlier, "Closed two hours ago", {
+    status: "answered",
+    answer: "ok",
+    answeredAt: new Date(Date.now() - 2 * 3_600_000),
+  });
+  await handed(earlier, "Two days old", { createdAt: new Date(Date.now() - 2 * 86_400_000) });
+
+  const trigger = await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev e aí, como ficou?",
+  });
+  const [run] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, trigger.id));
+  if (!run) throw new Error("no run");
+  const block = async (options: { routine?: boolean } = {}) =>
+    (await buildRunContext(f.db, run, f.agent, { maxMessages: 30, ...options })).system.find((b) =>
+      b.text.startsWith("# Work you handed off here"),
+    );
+  const listed = await block();
+  expect(listed).toMatchObject({ turn: true, found: true });
+  expect(listed?.text).toContain('You handed it: "Here, still out"');
+  for (const left of ["In the thread", "Infra's own", "Closed two hours ago", "Two days old"])
+    expect(listed?.text).not.toContain(left);
+  expect(await block({ routine: true })).toBeUndefined();
+  // In the thread, its own.
+  const threadCtx = await buildRunContext(f.db, inThread, f.agent, { maxMessages: 30 });
+  expect(systemText(threadCtx.system)).toContain('You handed it: "In the thread"');
+  expect(systemText(threadCtx.system)).not.toContain("Here, still out");
+  // Between agents: none (that run answers one agent).
+  const dm = await openAgentDm(f.db, f.org.id, f.agent.id, infra.id);
+  const note = await insertMessage(f.db, {
+    orgId: f.org.id,
+    channelId: dm.id,
+    author: { type: "agent", agentId: f.agent.id, runId: earlier.id, hop: 1 },
+    body: "Confere o deploy.",
+  });
+  const [between] = await f.db
+    .insert(schema.agentRuns)
+    .values({
+      orgId: f.org.id,
+      agentId: infra.id,
+      channelId: dm.id,
+      threadRootId: note.id,
+      triggerMessageId: note.id,
+      trigger: "dm",
+      hop: 2,
+    })
+    .returning();
+  if (!between) throw new Error("no run");
+  await handed(between, "Infra hands on");
+  expect(systemText((await buildRunContext(f.db, between, infra, { maxMessages: 30 })).system)).not.toContain(
+    "# Work you handed off here",
+  );
 });

@@ -36,6 +36,7 @@ import {
   createLlmJudge,
   createMachineHub,
   createMailToolSource,
+  createMediaToolSource,
   createMissionHooks,
   createMissionRunToolSource,
   createMissionToolSource,
@@ -52,6 +53,7 @@ import {
   createStreamBroker,
   createTalker,
   createToolGateway,
+  createUsageToolSource,
   createWikiToolSource,
   createWorkspaceToolSource,
   type EmailArt,
@@ -71,6 +73,7 @@ import {
   type ResolveHost,
   ROUTER_QUIET_MS,
   type RunExecutorDeps,
+  reauthorizeStream,
   recheckStream,
   resolveSummaryModel,
   type SandboxDeps,
@@ -268,9 +271,12 @@ export function buildEngine(o: EngineOptions) {
       // An agent with no AI connected is refused at once: its answer would never come.
       createAskAgentToolSource({ pubsub: adapters.pubsub, ai: { gateway, machines: machineHub } }),
       createFindAgentToolSource({ machines: machineHub }),
+      createUsageToolSource(),
       // What the agent says it is doing, next to its name (ADR 0084).
       createSetStatusToolSource({ pubsub: adapters.pubsub }),
       createReactToolSource({ pubsub: adapters.pubsub }),
+      // A GIF or the agent's sticker when asked (ADR 0091): listed by the workspace's switches and the agent's.
+      createMediaToolSource({ pubsub: adapters.pubsub, gifs: adapters.gifs ?? null }),
       // An agent comes back to a conversation by itself (a CI run, a deploy), instead of promising to.
       createFollowUpToolSource({ pubsub: adapters.pubsub }),
       // Background runs (routines) speak only through it.
@@ -366,6 +372,7 @@ export function buildEngine(o: EngineOptions) {
       return target;
     },
     recheck: (stream) => recheckStream(db, stream),
+    reauthorize: (stream, mode) => reauthorizeStream(db, stream, mode),
     onReady: sessions ? (stream) => sessions.ready(stream) : undefined,
     onClosed: (stream) => Promise.all([streamClosed(db, stream), sessions?.closed(stream)]),
     log: o.log,
@@ -377,11 +384,10 @@ export function buildEngine(o: EngineOptions) {
   const brainLink = hubBrainLink({ hub: machineHub, pubsub: adapters.pubsub });
   /**
    * A computer turn's permission profile (ADR 0053 §3), the same for Claude Code and Codex: a mission run
-   * keeps its own (plan before Start, while a write item is live and for a run news from a routine or
-   * another agent woke there, work otherwise; ADR 0044); any other
-   * run follows who is behind it, read again every turn (`computerTurnProfile`: `plan` for a routine that
-   * only reads and for unattended runs, `work` for an `act` routine and a person's run). Its own branches
-   * are agentes/<handle>/… (what the git proxy accepts).
+   * keeps its own (plan before Start, while a write item is live and for a routine's run that only looks,
+   * work otherwise; ADR 0044); any other run follows who is behind it, read every turn
+   * (`computerTurnProfile`: `plan` only for a routine that only looks and tells, `work` for every other run,
+   * whoever woke it). Its own branches are agentes/<handle>/… (what the git proxy accepts).
    */
   const turnPermissions = async (turn: BrainTurn): Promise<BrainTurnRequest["permissions"]> =>
     (await missionTurnPermissions(db, turn)) ?? {
@@ -440,6 +446,8 @@ export function buildEngine(o: EngineOptions) {
     // A workspace's deletion revokes its grants at GitHub and Composio, and leaves a line in the log.
     connectors: connectorDeps,
     mail: adapters.mail,
+    // An agent's GIF after a light reply (ADR 0091): none without the server's GIF provider.
+    gifs: adapters.gifs ?? null,
     log: o.log,
     maxToolTurns: config.AGENT_MAX_TOOL_TURNS,
     // Tools on demand (ADR 0043): each run lists what the judge expects it to need; the rest behind `find_tools`.

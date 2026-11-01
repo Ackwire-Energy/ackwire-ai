@@ -71,13 +71,13 @@ describe("Agentes: esperando você, trabalhando, livres", () => {
     const groups = [
       { id: "g1", name: "Integrations", agentIds: ["zoe", "nina", "theo"] },
       { id: "g2", name: "Produto", agentIds: ["nina"] },
-      { id: "g3", name: "Florim | Gestão e Financeiro", agentIds: ["ana"] },
+      { id: "g3", name: "Lumen | Gestão e Financeiro", agentIds: ["ana"] },
     ];
     const sections = freeSections(free, groups);
     expect(sections.map((s) => [s.group?.name ?? null, s.lines.map((l) => l.agent.id)])).toEqual([
       [null, ["iris"]],
       ["Integrations", ["zoe", "theo"]],
-      ["Florim | Gestão e Financeiro", ["ana"]],
+      ["Lumen | Gestão e Financeiro", ["ana"]],
     ]);
     // A working agent stays under "Trabalhando agora", out of its group's section.
     expect(working.map((l) => l.agent.id)).toEqual(["nina"]);
@@ -360,5 +360,13 @@ describe("Perfil: o mês, com os limites do plano (ADR 0063 §5)", () => {
     const t = await translator("pt-BR");
     expect(t("mobile.agent.ofMonthBudget")).toBe("do orçamento do mês");
     expect(t("mobile.agent.exhaustedF", { name: "Ada" })).toBe("A Ada usou todo o orçamento do mês.");
+  });
+
+  test("the bars as the web colors them: each window by its own level, the words and the compact bar by the plan's", async () => {
+    const parts = await Bun.file(new URL("../../src/features/usage/parts.tsx", import.meta.url).pathname).text();
+    expect(parts).toContain('const tone = c[PLAN_TONE[planLevel(shown.top?.used ?? 0, shown.state === "limited")]];');
+    expect(parts).toContain('{ color: c[PLAN_TONE[planLevel(used, state === "limited")]] }');
+    expect(parts).toContain("const level = planLevel(w.used);");
+    expect(parts.match(/color=\{tone\}/g)).toHaveLength(2);
   });
 });

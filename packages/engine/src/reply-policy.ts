@@ -1,4 +1,5 @@
 import { and, asc, type Executor, eq, gt, isNull, ne, schema, sql } from "@agenteschat/db";
+import { cutText } from "./format";
 import type { Message } from "./messages";
 import type { AgentRun } from "./runs";
 import type { ToolDefinition, ToolSource } from "./tools/types";
@@ -27,6 +28,26 @@ export const ANSWER_NUDGE = "You were addressed directly; answer the person.";
 export const WHY_YOU_WERE_CALLED =
   "# Why you were called\nNobody called you by name; you were brought in because you might have something to add. If you don't, or another agent already answered, call pass: staying quiet in a room is normal. A thanks, an ok or people talking among themselves asks nothing of you: pass at once, without looking anything up and without re-checking an answer already given. Speak only when the message asks something in your area that nobody has answered yet.";
 
+/** The prompt block of a run another agent's @mention woke (`byAnotherAgent`): it may pass too. */
+export const WHY_AN_AGENT_CALLED =
+  '# Why you were called\nAnother agent mentioned you, not a person. Do what its message hands you: work, a question, or something to read and act on (a file, results, a summary, a verdict). When it says it will ask you to do something ("I\'ll ask @you to review it"), with no person to decide first, that is the request: do it now. If it only thanks you, acknowledges, agrees, signs off or names you, call pass at once, without looking anything up: nothing is posted, and a thanks never needs one back.';
+
+/**
+ * Another agent's message that @mentions it woke the run (`dispatchMentions`), not one of its own lines (a notice, a
+ * task's end, a follow-up): an agent's mention wakes unless the judge is sure it needs nothing (ADR 0089), so the run
+ * may find nothing for it. Hop 2 or more: a person's click on that message (Continuar on a pause card, "Responder
+ * agora") starts the run at hop 1 in a fresh stretch, and then it answers.
+ */
+export const byAnotherAgent = (
+  run: Pick<AgentRun, "agentId" | "trigger" | "hop">,
+  trigger: (Pick<Message, "authorType"> & { authorAgentId?: string | null }) | null | undefined,
+) =>
+  run.trigger === "mention" &&
+  run.hop >= 2 &&
+  trigger?.authorType === "agent" &&
+  !!trigger.authorAgentId &&
+  trigger.authorAgentId !== run.agentId;
+
 export interface ReplyPolicy {
   /** Nobody called it by name: it may end without a message (`pass`, an empty or sentinel-only answer). */
   mayPass: boolean;
@@ -43,16 +64,17 @@ const INFORMING_NOTICES: ReadonlySet<string> = new Set(["agent_note", "wait_resu
 /**
  * How a run must answer. Only runs nobody called by name may pass: the router
  * brought them in (a person's message without a mention, or an agent's reply
- * it chimes in on, `meta.joined`), or a notice that only informs woke them
- * (`INFORMING_NOTICES`). Never a mention, a DM, another agent's `ask_agent`
- * consultation (a DM between agents), a forum turn, a routine's call or
- * report, a quote reply to this agent, a router follow-up to the agent the
- * person was talking to, nor a run a person answered or wrote into
+ * it chimes in on, `meta.joined`), another agent's @mention woke them
+ * (`byAnotherAgent`), or a notice that only informs woke them
+ * (`INFORMING_NOTICES`). Never a person's mention, a DM, another agent's
+ * `ask_agent` consultation (a DM between agents), a forum turn, a routine's
+ * call or report, a quote reply to this agent, a router follow-up to the agent
+ * the person was talking to, nor a run a person answered or wrote into
  * (`answerOwed`).
  */
 export function replyPolicyFor(
-  run: Pick<AgentRun, "agentId" | "trigger" | "background">,
-  trigger: Pick<Message, "authorType" | "meta"> | null | undefined,
+  run: Pick<AgentRun, "agentId" | "trigger" | "background" | "hop">,
+  trigger: (Pick<Message, "authorType" | "meta"> & { authorAgentId?: string | null }) | null | undefined,
   options: { followUp?: boolean; answerOwed?: boolean } = {},
 ): ReplyPolicy {
   if (run.background) return { mayPass: false, background: true };
@@ -64,6 +86,10 @@ export function replyPolicyFor(
   // for the people (only what it already told them) and stay quiet. One that reports every time always posts.
   if (notice?.kind === "routine_handoff" && notice.refs?.report !== "always")
     return { mayPass: true, background: false };
+  // The end of a task a routine started follows the same report policy (`wakeConversationForTask`).
+  const task = trigger?.meta?.machineTask as { routine?: { report?: unknown } } | undefined;
+  if (task?.routine && task.routine.report !== "always") return { mayPass: true, background: false };
+  if (byAnotherAgent(run, trigger)) return { mayPass: true, background: false };
   if (run.trigger !== "router" || options.followUp) return { mayPass: false, background: false };
   const meta = trigger?.meta ?? {};
   // A routine's call is a person's message written for its creator; an agent's message about a routine's
@@ -95,11 +121,13 @@ export async function loadReplyPolicy(
   const [row] = await db
     .select({
       agentId: agentRuns.agentId,
+      hop: agentRuns.hop,
       trigger: agentRuns.trigger,
       background: agentRuns.background,
       answerOwed: sql<boolean>`coalesce((${agentRuns.transcript} ->> 'answerOwed')::boolean, false)`,
       passListed: sql<boolean>`coalesce((${agentRuns.transcript} ->> 'passListed')::boolean, false)`,
       authorType: messages.authorType,
+      authorAgentId: messages.authorAgentId,
       meta: messages.meta,
       followUp: sql<boolean>`${agentRuns.trigger} = 'router' and ${followUpSql}`,
     })
@@ -107,7 +135,10 @@ export async function loadReplyPolicy(
     .leftJoin(messages, and(eq(messages.orgId, agentRuns.orgId), eq(messages.id, agentRuns.triggerMessageId)))
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.orgId, orgId)));
   if (!row) return null;
-  const policy = replyPolicyFor(row, row.authorType ? { authorType: row.authorType, meta: row.meta ?? {} } : null, {
+  const trigger = row.authorType
+    ? { authorType: row.authorType, authorAgentId: row.authorAgentId, meta: row.meta ?? {} }
+    : null;
+  const policy = replyPolicyFor(row, trigger, {
     followUp: row.followUp === true,
     answerOwed: row.answerOwed === true,
   });
@@ -177,6 +208,15 @@ export function visibleText(text: string, final: boolean): string {
   return kept.map((l) => `${l}\n`).join("") + tail;
 }
 
+/**
+ * What a run posts beside the approval or secret it stops on. The card already says what it asks, so a line that
+ * announces or repeats it ("I'll ask for X", "it's on the card") stays out of the conversation, where it would only
+ * push the card up. A longer text is real work written in the same step, and it is posted. A question keeps what
+ * leads to it: that text is its context, and it comes first.
+ */
+const PAUSE_LEAD_MIN_CHARS = 280;
+export const pauseLead = (text: string) => (text.length >= PAUSE_LEAD_MIN_CHARS ? text : "");
+
 /** The text without the sentinel, trimmed: what may be posted. */
 export const stripSentinel = (text: string) => visibleText(text, true).trim();
 
@@ -207,7 +247,7 @@ export function createPassToolSource(): ToolSource {
   const tool: ToolDefinition = {
     name: PASS_TOOL,
     description:
-      "Stay quiet: end your turn without posting anything. Only for conversations where nobody called you by name: use it when you have nothing to add or another agent already answered. Give a short reason (for the record, nobody sees it in the chat). Then end your turn without any text.",
+      "Stay quiet: end your turn without posting anything. Only when no person called you by name: use it when you have nothing to add, another agent already answered, or another agent's mention needs nothing from you. Give a short reason (for the record, nobody sees it in the chat). Then end your turn without any text.",
     scope: "",
     inputSchema: {
       type: "object",
@@ -220,7 +260,7 @@ export function createPassToolSource(): ToolSource {
       if (!policy?.mayPass) {
         return { content: "You were addressed directly: answer the person instead.", isError: true };
       }
-      const reason = typeof input.reason === "string" ? input.reason.trim().slice(0, 300) : "";
+      const reason = typeof input.reason === "string" ? cutText(input.reason.trim(), 300) : "";
       return {
         content: "Passed: nothing is posted. End your turn now without any text.",
         data: { passed: { reason } },
@@ -268,6 +308,6 @@ export async function repliesAfterTrigger(
     .limit(5);
   if (rows.length === 0) return null;
   return rows
-    .map((m) => `[Meanwhile ${m.name} (@${m.handle}) replied here]: ${stripSentinel(m.body).slice(0, 4000)}`)
+    .map((m) => `[Meanwhile ${m.name} (@${m.handle}) replied here]: ${cutText(stripSentinel(m.body), 4000)}`)
     .join("\n\n");
 }

@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import { previewOf } from "./consultations";
+import { mediaKindOf, mediaWord } from "./media";
 
 type Meta = Record<string, unknown> | undefined;
 
@@ -62,10 +63,15 @@ export function serverBody(t: TFunction, body: string, meta: Meta, namesComputer
 
 /**
  * A conversation list's last-message line: a body the server wrote (`meta` from the list, same keys as
- * the message's) in the reader's language, as the chat shows it, on one plain line, never naming a computer;
- * else the text as is.
+ * the message's) in the reader's language, as the chat shows it, on one plain line, never naming a computer; a GIF
+ * or a sticker with no text as its word (ADR 0091: the list's `mediaKind`, or a kind its meta carries); else the text
+ * as is.
  */
-export function previewBody(t: TFunction, text: string, meta: Meta | null): string {
+export function previewBody(t: TFunction, text: string, meta: Meta | null, mediaKind?: unknown): string {
+  if (!text.trim()) {
+    const kind = mediaKindOf(mediaKind) ?? mediaKindOf(meta?.mediaKind) ?? mediaKindOf(meta?.media);
+    if (kind) return mediaWord(t, kind);
+  }
   if (!meta) return text;
   const shown = serverBody(t, text, meta);
   return shown === text ? text : previewOf(shown);

@@ -613,6 +613,8 @@ interface AppLive {
   client: CodexAppClient;
   sig: string;
   threadId: string | null;
+  /** The tool names its thread opened with (`mcp.tools`): what its Codex listed, once. */
+  tools: Set<string> | null;
   busy: boolean;
   lastUsed: number;
   idleTimer: ReturnType<typeof setTimeout> | null;
@@ -785,7 +787,14 @@ export class CodexAppServers implements CodexAppRunner {
     }
     const sig = this.signature(input, opts);
     let live = this.live.get(key);
-    if (live && (live.client.exited || live.sig !== sig)) {
+    // Codex lists our tools when its thread opens and never again (codex-cli 0.165.0 doesn't follow
+    // `tools/list_changed`: its `mcp_tool_list_changed` feature is under development and off): other tool names
+    // start the process again, resumed, so the turn can call what the agent may use now. Only a new name does: a
+    // dropped one stays listed, and the server answers a call to it.
+    const listed = live?.tools;
+    const stale = !!listed && !!input.mcp.tools && input.mcp.tools.split(" ").some((n) => !listed.has(n));
+    if (live && (live.client.exited || live.sig !== sig || stale)) {
+      if (stale) this.log(`codex app-server for ${input.sessionId.slice(0, 8)}: its tools changed; starting it again`);
       this.drop(live);
       live = undefined;
     }
@@ -897,6 +906,7 @@ export class CodexAppServers implements CodexAppRunner {
       client,
       sig,
       threadId: null,
+      tools: null,
       busy: false,
       lastUsed: Date.now(),
       idleTimer: null,
@@ -936,6 +946,7 @@ export class CodexAppServers implements CodexAppRunner {
     this.running.set(input.runId, live);
     try {
       if (!live.threadId) {
+        live.tools = input.mcp.tools ? new Set(input.mcp.tools.split(" ")) : null;
         const opened = await this.openThread(live, input, opts);
         if (opened !== true) return opened;
       }
