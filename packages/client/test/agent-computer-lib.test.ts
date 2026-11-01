@@ -344,7 +344,7 @@ describe("the entry's status line, first match wins", () => {
       'agentComputer.status.pausedPlain {"computer":"Mac mini"}',
     );
     expect(line({ kind: "needsYou", handoff: request() })).toBe(
-      `agentComputer.status.needsYou {"ask":"Sign in to gov.br · browser.card.leftShort {\\"count\\":4}"}`,
+      `agentComputer.status.needsYou {"ask":"Sign in to gov.br · format.inMinutes {\\"count\\":4}"}`,
     );
     expect(line({ kind: "needsOther", handoff: request(), userId: "ana" })).toContain(
       'agentComputer.status.needsOther {"person":"Ana"',

@@ -1347,8 +1347,7 @@ export const featureKeysEn: FeatureTranslations = {
   browser: {
     card: {
       needs: "{{name}} needs help",
-      needsFor_one: "{{name}} needs help · {{count}} min",
-      needsFor_other: "{{name}} needs help · {{count}} min",
+      needsFor: "{{name}} needs help · {{time}}",
       inControlAt: "You're in control · {{host}}",
       doing: "{{name}} · {{doing}}",
       startingF: "Opening {{name}}'s browser…",

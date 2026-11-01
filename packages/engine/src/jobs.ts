@@ -15,6 +15,7 @@ import { orgHasAi } from "./ai-status";
 import type { ArtifactDeps } from "./artifacts";
 import { routinePostRun, runAuthorityById } from "./authority";
 import { AUTONOMY_REPORT_JOB, queueAutonomyEmail } from "./autonomy-report";
+import { HANDOFF_REMIND_JOB, remindBrowserHandoff } from "./browser/handoff";
 import type { ConnectorDeps } from "./connectors/connections";
 import { getChannelCached } from "./context";
 import { consolidateOrg } from "./context/consolidate";
@@ -795,6 +796,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     // In-app notifications of a message: mentions, thread replies, DMs.
     "notifications.message": async (job) => {
       await notifyMessage({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), String(job.payload.messageId));
+    },
+    // A request for help in an agent's browser nobody answered within the hour: the people asked hear it again, once.
+    [HANDOFF_REMIND_JOB]: async (job) => {
+      await remindBrowserHandoff({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), String(job.payload.handoffId));
     },
     // A notification for a person's phones and browsers (ADR 0035, 0071): skipped if read, done or snoozed meanwhile.
     "push.send": async (job) => {

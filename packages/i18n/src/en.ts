@@ -9834,8 +9834,7 @@ export const en: Translations = {
       group: "{{name}}'s request for help in the browser",
       asked: "asked {{people}} for help",
       askedShort: "needs help",
-      left: "{{count}} min left",
-      leftShort: "{{count}} min",
+      left: "{{time}} left",
       where: "In {{name}}'s browser",
       open: "Open",
       openHint: "Opens {{name}}'s page live. Whoever opens it first does what was asked and presses Done.",
@@ -10470,8 +10469,8 @@ export const en: Translations = {
       offline: "Offline since {{time}}",
     },
     ask: {
-      banner: "{{name}} needs you: “{{ask}}” · {{count}} min",
-      bannerOther: "{{name}} asked {{person}}: “{{ask}}” · {{count}} min",
+      banner: "{{name}} needs you: “{{ask}}” · {{time}}",
+      bannerOther: "{{name}} asked {{person}}: “{{ask}}” · {{time}}",
     },
     state: {
       opening: "Opening {{name}}'s computer…",

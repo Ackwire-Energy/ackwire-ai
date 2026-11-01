@@ -109,13 +109,15 @@ export function whenAt(t: TFunction, locale: string, iso: string, now = new Date
   return formatShortDate(locale, iso);
 }
 
-/** Time left: "23 h", "5 dias", "12 min". */
+/** Time left: "24 h", "5 dias", "45 min", to the nearest unit shown, so a fresh day reads "24 h" (at least 1 min). */
 export function timeLeft(t: TFunction, iso: string, now = new Date()) {
   const ms = new Date(iso).getTime() - now.getTime();
   if (ms <= 0) return null;
-  if (ms < 3_600_000) return t("format.inMinutes", { count: Math.max(1, Math.floor(ms / 60_000)) });
-  if (ms < 2 * 86_400_000) return t("format.inHours", { count: Math.floor(ms / 3_600_000) });
-  return t("format.inDays", { count: Math.floor(ms / 86_400_000) });
+  const minutes = Math.ceil(ms / 60_000);
+  if (minutes < 60) return t("format.inMinutes", { count: minutes });
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return t("format.inHours", { count: hours });
+  return t("format.inDays", { count: Math.round(hours / 24) });
 }
 
 /** "Ana" for "Ana Souza". */

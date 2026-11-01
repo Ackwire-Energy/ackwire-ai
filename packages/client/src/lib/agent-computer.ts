@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { BrowserHandoff, DesktopStatus, Edition, Machine } from "../api/types";
-import { handoffMinutesLeft, handoffScreen, isWaitingHandoff } from "../browser";
+import { handoffScreen, handoffTimeLeft, isWaitingHandoff } from "../browser";
 import {
   type EtaView,
   etaLine,
@@ -144,10 +144,10 @@ export interface EntryWords {
   now?: Date;
 }
 
-/** "Sign in to gov.br · 4 min": the request and the minutes it has left. */
+/** "Sign in to gov.br · 4 min": the request and the time it has left. */
 export function askLine(t: TFunction, h: BrowserHandoff, nowMs = Date.now()) {
-  const minutes = handoffMinutesLeft(h, nowMs);
-  return minutes === null ? h.instructions : `${h.instructions} · ${t("browser.card.leftShort", { count: minutes })}`;
+  const left = handoffTimeLeft(t, h, nowMs);
+  return left === null ? h.instructions : `${h.instructions} · ${left}`;
 }
 
 /** The entry's status line in the person's words (`agentComputer.status.*`). */

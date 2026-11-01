@@ -9911,8 +9911,7 @@ export const ptBR = {
       group: "Pedido de ajuda {{of}} {{name}} no navegador",
       asked: "pediu ajuda a {{people}}",
       askedShort: "precisa de ajuda",
-      left: "{{count}} min restantes",
-      leftShort: "{{count}} min",
+      left: "{{time}} restantes",
       where: "No navegador {{of}} {{name}}",
       open: "Abrir",
       openHint: "Abre a página {{of}} {{name}} ao vivo. Quem abrir primeiro faz o que foi pedido e aperta Pronto.",
@@ -10545,8 +10544,8 @@ export const ptBR = {
       offline: "Offline desde {{time}}",
     },
     ask: {
-      banner: "{{The}} {{name}} precisa de você: “{{ask}}” · {{count}} min",
-      bannerOther: "{{The}} {{name}} pediu para {{person}}: “{{ask}}” · {{count}} min",
+      banner: "{{The}} {{name}} precisa de você: “{{ask}}” · {{time}}",
+      bannerOther: "{{The}} {{name}} pediu para {{person}}: “{{ask}}” · {{time}}",
     },
     state: {
       opening: "Abrindo o computador {{of}} {{name}}…",

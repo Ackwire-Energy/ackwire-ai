@@ -3,7 +3,7 @@ import {
   desktopMode,
   desktopStatusState,
   handoffIsMine,
-  handoffMinutesLeft,
+  handoffTimeLeft,
   isWaitingHandoff,
   type LiveRun,
   type ScreenStep,
@@ -383,7 +383,7 @@ export function AgentScreen({
               ...g,
               ...(asked ? {} : { person: waiting.requestedForUserId ? person(waiting.requestedForUserId) : "" }),
               ask: waiting.instructions,
-              count: handoffMinutesLeft(waiting, now) ?? 0,
+              time: handoffTimeLeft(t, waiting, now) ?? "",
             })}
           </Text>
         </View>

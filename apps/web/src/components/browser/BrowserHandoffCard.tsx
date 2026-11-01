@@ -2,8 +2,8 @@ import type { BrowserHandoff } from "@agenteschat/client";
 import {
   handoffFuse,
   handoffIsMine,
-  handoffMinutesLeft,
   handoffScreen,
+  handoffTimeLeft,
   isWaitingHandoff,
   keys,
   useApi,
@@ -60,7 +60,7 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
   const expired = useExpired(current.status === "pending" ? current.expiresAt : null);
   const waiting = !expired && isWaitingHandoff(current);
   const active = current.status === "active";
-  // The minutes left move on.
+  // The time left moves on.
   useNow(waiting ? 15_000 : false);
   const mineInControl = active && current.controllerUserId === me.user.id;
   const helper = current.controllerUserId ? dir.memberById.get(current.controllerUserId)?.name : undefined;
@@ -70,7 +70,7 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
     .filter(Boolean) as string[];
   const settled = !waiting && !active;
   const status = current.status === "pending" ? "expired" : current.status;
-  const minutes = handoffMinutesLeft(current);
+  const left = handoffTimeLeft(t, current);
   const onDesktop = handoffScreen(current) === "desktop";
   // The agent's browser opens right here, under the request; a request on its screen, in the computer dialog.
   const [here, setHere] = useState(false);
@@ -145,7 +145,7 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
             <RequestFuse
               left={handoffFuse(current)}
               agent={agent}
-              text={minutes !== null ? t("browser.card.left", { count: minutes }) : null}
+              text={left !== null ? t("browser.card.left", { time: left }) : null}
             />
           }
           what={current.instructions}

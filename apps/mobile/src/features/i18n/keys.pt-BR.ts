@@ -1350,8 +1350,7 @@ export const featureKeysPtBR = {
   browser: {
     card: {
       needs: "{{name}} precisa de ajuda",
-      needsFor_one: "{{name}} precisa de ajuda · {{count}} min",
-      needsFor_other: "{{name}} precisa de ajuda · {{count}} min",
+      needsFor: "{{name}} precisa de ajuda · {{time}}",
       inControlAt: "Você no controle · {{host}}",
       doing: "{{name}} · {{doing}}",
       startingF: "Abrindo o navegador da {{name}}…",

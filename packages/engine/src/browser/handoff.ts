@@ -32,9 +32,11 @@ import {
   browserHandoffRecipient,
   humanBehindRun,
   notifyBrowserHandoff,
+  remindBrowserHandoffNotifications,
   resolveBrowserHandoffNotifications,
 } from "../notification-producers";
 import { can, getMembership } from "../organizations";
+import { enqueue } from "../outbox";
 import { resumeRunWithResult } from "../run-resume";
 import { bodyCode, runWhere } from "../run-tools";
 import { closedRefusal } from "../standing";
@@ -55,10 +57,16 @@ const { browserHandoffs, agentRuns, agents, machines, messages, users } = schema
 export type BrowserHandoffRow = typeof browserHandoffs.$inferSelect;
 export type BrowserHandoffStatus = BrowserHandoffRow["status"];
 
-/** How long an agent waits by default for a person to open its request. */
-export const HANDOFF_TIMEOUT_DEFAULT_MINUTES = 10;
+/**
+ * How long an agent waits by default for a person to open its request, its browser held open meanwhile: a day,
+ * since people often see it later and an open browser costs its computer nothing more.
+ */
+export const HANDOFF_TIMEOUT_DEFAULT_MINUTES = 24 * 60;
 /** The longest an agent may ask to wait. */
-export const HANDOFF_TIMEOUT_MAX_MINUTES = 30;
+export const HANDOFF_TIMEOUT_MAX_MINUTES = 24 * 60;
+/** A request still unanswered this long after it was asked reminds the people asked, once (`remindBrowserHandoff`). */
+export const HANDOFF_REMIND_AFTER_MS = 60 * 60_000;
+export const HANDOFF_REMIND_JOB = "browser.handoff_remind";
 /**
  * Once a person has control there is no deadline; only their live view going
  * away for this long ends it (expired): time to reconnect and carry on.
@@ -759,6 +767,15 @@ export function createBrowserHandoffToolSource(
           })
           .returning();
         if (!row) throw new Error("handoff not created");
+        if (minutes * 60_000 > HANDOFF_REMIND_AFTER_MS) {
+          await enqueue(tx, {
+            orgId: run.orgId,
+            kind: HANDOFF_REMIND_JOB,
+            payload: { handoffId: row.id },
+            dedupeKey: `${HANDOFF_REMIND_JOB}:${row.id}`,
+            runAt: new Date(Date.now() + HANDOFF_REMIND_AFTER_MS),
+          });
+        }
         await syncCard(tx, row);
         card.meta = { ...card.meta, browserHandoff: handoffView(row) };
         return { card, row };
@@ -776,7 +793,7 @@ export function createBrowserHandoffToolSource(
       drivers ?? undefined,
     ).catch(() => {});
     return {
-      content: `Asked for help (if nobody opens it within ${minutes} min you'll be told). End your turn now; you'll be woken with the result.`,
+      content: `Asked for help (if nobody opens it within ${formatDuration(minutes * 60)} you'll be told). End your turn now; you'll be woken with the result.`,
       // The run waits on this handoff and resumes with the result (`resumeRunWithResult`).
       data: { pause: { kind: "input", id: created.row.id }, handoffId: created.row.id },
     };
@@ -1306,6 +1323,19 @@ export async function expireBrowserHandoffs(deps: HandoffDeps, now = new Date())
     await resumeWaitingRun(deps, handoff, endedResult(handoff)).catch(() => {});
   }
   return expired.length;
+}
+
+/**
+ * An hour after an agent asked (job `HANDOFF_REMIND_JOB`): while nobody answered, gave it back or took control,
+ * and it hasn't expired, the people asked hear it once more.
+ */
+export async function remindBrowserHandoff(deps: HandoffDeps, orgId: string, handoffId: string, now = new Date()) {
+  const [row] = await deps.db
+    .select()
+    .from(browserHandoffs)
+    .where(and(eq(browserHandoffs.id, handoffId), eq(browserHandoffs.orgId, orgId)));
+  if (row?.status !== "pending" || row.expiresAt <= now) return 0;
+  return remindBrowserHandoffNotifications(deps, orgId, handoffId);
 }
 
 /**

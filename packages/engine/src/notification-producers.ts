@@ -12,6 +12,7 @@ import {
   type NotificationSource,
   notificationSnippet,
   notify,
+  remindNotifications,
   resolveNotifications,
   retargetNotifications,
 } from "./notifications";
@@ -1148,6 +1149,10 @@ export async function notifyBrowserHandoff(
     latest: { text: notificationSnippet(h.instructions), expiresAt: h.expiresAt.toISOString() },
   });
 }
+
+/** Still unanswered an hour later: back on top, unread, and pushed once more saying the agent still needs them. */
+export const remindBrowserHandoffNotifications = (deps: NotificationDeps, orgId: string, handoffId: string) =>
+  remindNotifications(deps, orgId, `browser_handoff:${handoffId}`, { reminder: true }, "reminder");
 
 /** Done, couldn't, canceled or expired: out of everyone's inbox. */
 export async function resolveBrowserHandoffNotifications(deps: NotificationDeps, orgId: string, handoffId: string) {
