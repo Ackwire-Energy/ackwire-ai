@@ -197,10 +197,10 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  # The backend suite (PGlite, servers) on two runners at once. packages/engine is four fifths of it
-  # (731 of 935 s on a runner, 2026-10-20), split by file name; the globs together cover every file.
+  # The backend suite (PGlite, servers) on three runners: the two existing engine file ranges,
+  # then packages and server. Keep the same test paths while avoiding one oversized shard.
   test-backend:
-    name: Test (backend ${{ matrix.shard }}/2)
+    name: Test (backend ${{ matrix.shard }}/3)
     needs: changes
     if: needs.changes.outputs.shared == 'true' || needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
@@ -212,8 +212,10 @@ jobs:
           - shard: 1
             paths: packages/engine/test/[a-m]*.test.ts
           - shard: 2
+            paths: packages/engine/test/[!a-m]*.test.ts
+          - shard: 3
             paths: >-
-              packages/engine/test/[!a-m]*.test.ts packages/adapters packages/config packages/db
+              packages/adapters packages/config packages/db
               packages/modules packages/providers packages/client packages/i18n packages/tokens packages/setup
               apps/server
     steps:
@@ -221,7 +223,7 @@ jobs:
       - *setup-bun
       - *cache-bun
       - *install
-      # Shard 2 took 1198 seconds on 2026-11-01; keep headroom without reducing coverage.
+      # The former combined shard timed out at 25 minutes; retain headroom for each smaller group.
       - name: Test
         timeout-minutes: 25
         run: bun test ${{ matrix.paths }} 2>&1 | tee test.log
