@@ -22,7 +22,7 @@ import { REFUSALS } from "./tools/run-policy";
  *   and @mentions that reached the agent without a word from it in the conversation, each within 30 minutes.
  * - `limitStops`: runs whose reply offers Continuar after a limit (`meta.stepLimit`: at the cap, or told to wrap up
  *   near it), runs told to wrap up (a routine's hands off instead), runs failed on a limit (steps, budget, stuck),
- *   and stretches paused at their limit (one card each).
+ *   stretches paused at their limit (one card each), and missions their stuck guard paused (`meta.missionStuck`).
  * - `personUnanswered`: a person's message meant for agents (a mention, a DM with an agent, the router's pick, or a
  *   channel message the router never decided on) with no agent message there within 10 minutes.
  * - `taskStartFailed`: background tasks that failed within a minute ("Not logged in", a missing CLI).
@@ -407,7 +407,7 @@ export function autonomySql(range: AutonomyRange) {
       select (m.created_at at time zone 'UTC')::date, m.org_id, 'limitStops', count(*) from messages m
         join orgs o on o.id = m.org_id
         where m.created_at >= ${start}::timestamptz and m.created_at < ${end}::timestamptz
-          and m.author_type = 'agent' and m.meta->'actionCard'->>'kind' = 'stretch_paused'
+          and m.author_type = 'agent' and (m.meta->'actionCard'->>'kind' = 'stretch_paused' or m.meta ? 'missionStuck')
         group by 1, 2
       union all
       select day, org_id, 'mentionNoRun', count(*) from mentions where not reached and not referenced group by 1, 2
@@ -524,7 +524,7 @@ const COLUMNS: { key: keyof AutonomyCounts; head: string; means: string }[] = [
   { key: "promiseUnkept", head: "promise", means: "runs the follow-through judge found ending on work undone" },
   { key: "promiseIgnored", head: "ignored", means: "...that did nothing after being told to do it" },
   { key: "handoffUnanswered", head: "handoff", means: "notes, questions and @mentions unanswered in 30 min" },
-  { key: "limitStops", head: "limit", means: "runs at or near the step limit, stuck, out of budget; stretches paused" },
+  { key: "limitStops", head: "limit", means: "runs at or near the step limit, stuck, out of budget; stretches, stuck missions paused" },
   { key: "personUnanswered", head: "person", means: "people's messages for agents unanswered in 10 min" },
   { key: "taskStartFailed", head: "task", means: 'background tasks failed in their first minute ("Not logged in")' },
   { key: "noiseRuns", head: "noise", means: "runs in any noise column, once each" },

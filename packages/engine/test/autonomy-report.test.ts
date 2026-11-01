@@ -424,6 +424,15 @@ describe("one workspace's day", () => {
     expect(day?.ackReplies).toBe(acks.length);
   });
 
+  test("a mission its stuck guard paused stopped at a limit; its other lines didn't", async () => {
+    const other = "2026-10-17";
+    const missionId = crypto.randomUUID();
+    await message({ at: at("10:00:00", other), by: f.agent.id, meta: { missionStuck: { missionId, reason: "no_progress" } } });
+    await message({ at: at("11:00:00", other), by: f.agent.id, meta: { missionReport: { missionId } } });
+    const [day] = await autonomyRows(f.db, { from: other, days: 1 });
+    expect(day?.limitStops).toBe(1);
+  });
+
   test("the talker's quick reply answers a person; another notice doesn't", async () => {
     const other = "2026-10-18";
     const dev = f.agent.id;
