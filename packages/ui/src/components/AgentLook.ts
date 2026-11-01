@@ -6,7 +6,7 @@ import {
   type AgentColor,
 } from "@agenteschat/tokens/look";
 import type { CSSProperties } from "react";
-import { AGENT_GRADIENTS } from "../agent/engine.js";
+import { gradientOf } from "../agent/engine.js";
 
 export {
   AGENT_ACCESSORIES,
@@ -31,12 +31,12 @@ export function randomAppearance(current: AgentAppearance = {}, rand: () => numb
 
 /** Top and bottom of an agent color as fixed hex (sky as on the landing: the same in both themes). For drawing, e.g. the pixel sky. */
 export function agentGradient(color: AgentColor = "sky"): [string, string] {
-  return AGENT_GRADIENTS[color];
+  return gradientOf(color);
 }
 
 /** CSS variables for the symbol's color (none for sky: the tokens). */
 export function appearanceStyle(a: AgentAppearance | undefined): CSSProperties | undefined {
   if (!a?.color || a.color === "sky") return undefined;
-  const [top, bottom] = AGENT_GRADIENTS[a.color];
+  const [top, bottom] = gradientOf(a.color);
   return { "--av-top": top, "--av-bottom": bottom } as CSSProperties;
 }

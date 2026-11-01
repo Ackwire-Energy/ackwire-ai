@@ -1,13 +1,15 @@
 import { createHash } from "node:crypto";
 import type { BlobStore } from "@agenteschat/adapters";
-import { and, asc, type Database, eq, inArray, isNull, like, schema } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, inArray, isNull, like, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "../audit";
 import { caches } from "../cache";
 import { randomToken, sealSecret, sha256 } from "../crypto";
-import { NotFoundError, ValidationError } from "../errors";
+import { ConflictError, isUniqueViolation, NotFoundError, ValidationError } from "../errors";
 import type { Judge } from "../judge";
+import { oneLine } from "../mail/text";
 import { assertPublicHttpsUrl } from "../net-guard";
 import { requirePermission } from "../organizations";
+import { isAgentesCloud } from "../telemetry";
 import {
   classifyByRules,
   classifyTools,
@@ -20,18 +22,34 @@ import {
   type ToolToClassify,
   UNKNOWN_CLASS,
 } from "./classify";
+import { beginComposioConnect, forgetComposioAccount } from "./composio";
 import {
+  bearerHeaders,
   type ConnectionSecret,
+  type ConnectOutcome,
   type ConnectorConnection,
+  checkLabel,
   connectionHeaders,
+  freeLabel,
+  freeToolPrefix,
   grantToEveryAgent,
   OAUTH_STATE_TTL_MS,
   oauthRedirectUri,
+  prefixService,
+  toolPrefixOf,
+  toolPrefixOfConnection,
 } from "./connections";
-import type { McpConnect, McpTool } from "./mcp";
-import { authServerMetadata, ensureOAuthClient, type McpOAuthDeps, probeMcpServer } from "./oauth-mcp";
+import type { McpCallResult, McpConnect, McpSession, McpTool } from "./mcp";
+import {
+  authServerMetadata,
+  ensureOAuthClient,
+  type McpOAuthDeps,
+  oauthScope,
+  probeMcpServer,
+  serverKey,
+} from "./oauth-mcp";
 import { oauthReturnTo } from "./oauth-return";
-import { presetForServer } from "./presets";
+import { composioToolkitOf, type McpPreset, presetForServer } from "./presets";
 import { type McpServerInfo, refreshServerIcon } from "./server-icon";
 
 const { connectorConnections, customTools, oauthStates, agentScopes, agents } = schema;
@@ -143,24 +161,32 @@ export interface CustomToolView {
 export interface CustomServerView {
   id: string;
   serverUrl: string;
+  /** The account's name here ("Stripe (Acme)", "Stripe 2"): admins rename it. */
   label: string;
+  /** The account as the provider names it ("Acme"), when it says; null otherwise. */
+  accountLabel: string | null;
   authType: "oauth" | "api_key";
   /** The server's own icon, served by us (`/api/app/connector-icons/…`); null = a monogram. */
   iconUrl: string | null;
+  /** A service through Composio (ADR 0107): its page signs in, and its address means nothing to people. */
+  via?: "composio";
+  /** `needs_reconnect`: its Composio account stopped working, and it has no tools until Reconectar. */
+  status: "active" | "needs_reconnect";
   tools: CustomToolView[];
   reviewedAt: string | null;
   createdAt: string;
 }
 
 export type CustomConnectStart =
-  | { status: "connected"; server: CustomServerView }
+  | { status: "connected"; server: CustomServerView; outcome: ConnectOutcome }
   | { status: "oauth"; authorizeUrl: string }
-  /** `not_approved`: it has OAuth but only lets in apps it approved, and agentes.chat isn't one yet. */
-  | { status: "needs_key"; reason?: "not_approved" };
+  /**
+   * `not_approved`: it has OAuth but only lets in apps it approved, and agentes.chat isn't one yet. `detail`: how it
+   * refused our registration, in its own words (`error: error_description`, short).
+   */
+  | { status: "needs_key"; reason?: "not_approved"; detail?: string };
 
 export interface CustomDeps extends McpOAuthDeps {
-  /** How to open MCP sessions (tests: in-process servers). */
-  connect?: McpConnect;
   /** Suggests a level for tools whose name doesn't say (none: they suggest approval). */
   judge?: Judge;
   /** Where servers' icons are kept (the platform store); none: no icons. */
@@ -219,8 +245,11 @@ function view(c: ConnectorConnection, tools: ToolRow[]): CustomServerView {
     id: c.id,
     serverUrl: c.serverUrl,
     label: c.label,
+    accountLabel: c.accountLabel,
     authType: c.authType === "oauth" ? "oauth" : "api_key",
     iconUrl: c.icon,
+    ...(composioToolkitOf(c.serverUrl) ? { via: "composio" as const } : {}),
+    status: c.status === "needs_reconnect" ? "needs_reconnect" : "active",
     tools: mine.map((t) => toolView(t, prefix)),
     reviewedAt: c.reviewedAt ? c.reviewedAt.toISOString() : null,
     createdAt: c.createdAt.toISOString(),
@@ -263,11 +292,95 @@ export async function listCustomServers(db: Database, actorId: string, orgId: st
   return rows.map((r) => view(r, tools));
 }
 
+type AccountSpec = NonNullable<McpPreset["account"]>;
+export interface ProviderAccount {
+  id: string;
+  name: string | null;
+}
+
+const at = (value: unknown, path: string) =>
+  path
+    .split(".")
+    .reduce<unknown>((v, k) => (v && typeof v === "object" ? (v as Record<string, unknown>)[k] : undefined), value);
+
 /**
- * Stores a custom server's connection (its own row; several servers per org).
- * Connecting the same address again is a reconnect: the active row gets the
- * new credentials in place, so agents keep their grants and the tools keep
- * their classification. A new server is every agent's (`grantToEveryAgent`).
+ * What a preset's account tool answers (JSON), as one account: the ids of all it lists, sorted and joined, and their
+ * names in that order on one line; without `list`, the one account it answers (Composio's answer may hold it in
+ * `response_data`). Null when it doesn't say, or doesn't say it of every account it lists.
+ */
+export function accountFrom(spec: AccountSpec, result: McpCallResult): ProviderAccount | null {
+  if (result.isError) return null;
+  let data: unknown;
+  try {
+    data = JSON.parse(result.content);
+  } catch {
+    return null;
+  }
+  const list = spec.list ? at(data, spec.list) : [at(data, "response_data") ?? data];
+  if (!Array.isArray(list) || list.length === 0) return null;
+  const accounts = new Map<string, string>();
+  for (const entry of list) {
+    const parts = spec.id.map((path) => at(entry, path));
+    if (typeof parts[0] !== "string" || !parts[0].trim() || parts.some((v) => v === undefined || v === null)) {
+      return null;
+    }
+    const name = at(entry, spec.name);
+    accounts.set(parts.map((v) => String(v).trim()).join(":"), typeof name === "string" ? name.trim() : "");
+  }
+  const ids = [...accounts.keys()].sort();
+  const names = [...new Set(ids.map((id) => accounts.get(id)).filter((n): n is string => Boolean(n)))];
+  return { id: ids.join(","), name: names.length > 0 ? oneLine(names.join(", "), 80) : null };
+}
+
+/** Asks the account behind a session (a preset with an account tool); null when it can't tell. */
+async function askAccount(session: McpSession, spec: AccountSpec | undefined) {
+  if (!spec) return null;
+  return accountFrom(spec, await session.callTool(spec.tool, spec.args ?? {}));
+}
+
+/** The account a fresh sign-in, key or Composio account reached, asked before anything is stored. */
+async function providerAccount(
+  deps: CustomDeps,
+  spec: AccountSpec | undefined,
+  connection: Parameters<McpConnect>[0],
+  headers: Record<string, string>,
+) {
+  if (!spec || !deps.connect) return null;
+  try {
+    const session = await deps.connect(connection, headers);
+    try {
+      return await askAccount(session, spec);
+    } finally {
+      await session.close().catch(() => {});
+    }
+  } catch {
+    return null;
+  }
+}
+
+/** "Stripe (Acme)": the service and the account, within the 80 characters of a name. */
+const accountName = (service: string, account: string) =>
+  `${service} (${oneLine(account, Math.max(8, 77 - service.length))})`;
+
+/** "Reconectar": the live connection of this workspace it names, at the same address (400 otherwise). */
+export async function reconnectTarget(db: Database, orgId: string, connectionId: string, serverUrl: string) {
+  const c = await loadCustom(db, orgId, connectionId).catch(() => null);
+  if (!c) throw new NotFoundError("This account is no longer connected", "connector.gone");
+  if (serverKey(c.serverUrl) !== serverKey(serverUrl)) {
+    throw new ValidationError("Reconnect the account at its own address", "connector.other_server");
+  }
+  return c;
+}
+
+/**
+ * Stores a custom server's connection: one row per account, several per server (ADR 0099). `connectionId`
+ * ("Reconectar") gives that account a new sign-in in place, so its name, tools and grants stay; signing in to
+ * another account there is refused (`connector.other_account`), the grants were given for that one. Without it a
+ * new account comes in, except when the provider says it is one already connected (its sign-in is refreshed,
+ * `same_account`) or the server has no sign-in at all (the one connection it has). Only a server's first account
+ * is every agent's (`grantToEveryAgent`); the others start with no agent. Addresses match as the apps match them
+ * (`serverKey`). A service through Composio (ADR 0107) keeps Composio's account and no secret; the account it
+ * replaces goes away at Composio.
  */
 export async function storeCustomConnection(
   deps: CustomDeps,
@@ -275,88 +388,202 @@ export async function storeCustomConnection(
     orgId: string;
     actorId: string;
     serverUrl: string;
+    /** The service's name ("Stripe", what the person typed): its first account's name, the others' base. */
     label: string;
     authType: "oauth" | "api_key" | "none";
     secret: ConnectionSecret | null;
     tokenExpiresAt?: Date | null;
     oauthClientId?: string | null;
+    resource?: string | null;
+    connectionId?: string | null;
+    /** Through Composio: its connected account, and the name Composio keeps for it when the entry can't ask. */
+    composio?: { accountId: string; name: string | null };
   },
-) {
+): Promise<{ connection: ConnectorConnection; outcome: ConnectOutcome }> {
   const wrapper = deps.keyWrappers[0];
   if (!wrapper) throw new Error("no key wrapper");
-  const [existing] = await deps.db
-    .select()
-    .from(connectorConnections)
-    .where(
-      and(
-        eq(connectorConnections.orgId, input.orgId),
-        like(connectorConnections.connector, `${CUSTOM_PREFIX}%`),
-        eq(connectorConnections.serverUrl, input.serverUrl),
-        isNull(connectorConnections.revokedAt),
-      ),
-    )
-    .orderBy(asc(connectorConnections.createdAt))
-    .limit(1);
-  const id = existing?.id ?? crypto.randomUUID();
+  const preset = presetForServer(input.serverUrl);
+  const reached = { serverUrl: input.serverUrl, orgId: input.orgId, composioAccountId: input.composio?.accountId };
+  const account =
+    input.secret || input.composio
+      ? await providerAccount(deps, preset?.account, reached, input.secret ? bearerHeaders(input.secret) : {})
+      : null;
+  // Composio's name for the account when the entry's account action didn't say: a name, never an identity.
+  const named = account?.name ?? input.composio?.name ?? null;
+  const key = serverKey(input.serverUrl);
+  const same = await liveAccounts(deps.db, input.orgId, key);
+  if (account) {
+    // Accounts connected before their provider was asked: asked now, so the same account is recognized.
+    for (const c of same.filter((c) => !c.accountId)) c.accountId = (await fillAccount(deps, c))?.id ?? null;
+  }
+  let target: ConnectorConnection | undefined;
+  if (input.connectionId) {
+    target = await reconnectTarget(deps.db, input.orgId, input.connectionId, input.serverUrl);
+    // Its grants were given for the account it is: a sign-in that can't say which one it reached doesn't replace it.
+    if (preset?.account && target.accountId && !account) {
+      throw new ConflictError("Couldn't check which account you signed in to", "connector.account_unknown");
+    }
+    if (account && target.accountId && target.accountId !== account.id) {
+      throw new ConflictError("You signed in to another account", "connector.other_account");
+    }
+  } else if (account) {
+    target = same.find((c) => c.accountId === account.id);
+  } else if (input.authType === "none") {
+    // Nothing to sign in to: connecting again is the one connection it has.
+    if (same[0]) return { connection: same[0], outcome: "same_account" };
+  }
+  const outcome: ConnectOutcome = input.connectionId ? "reconnected" : target ? "same_account" : "connected";
+  const id = target?.id ?? crypto.randomUUID();
   const sealed = input.secret ? await sealSecret(wrapper, JSON.stringify(input.secret), aadFor(input.orgId, id)) : null;
-  if (existing) {
+  const credentials = {
+    authType: input.authType,
+    secretCiphertext: sealed?.ciphertext ?? null,
+    wrappedDataKey: sealed?.wrappedDataKey ?? null,
+    kekId: sealed?.kekId ?? null,
+    tokenExpiresAt: input.tokenExpiresAt ?? null,
+    oauthClientId: input.oauthClientId ?? null,
+    resource: input.resource ?? null,
+    ...(account ? { accountId: account.id, accountLabel: named } : named ? { accountLabel: named } : {}),
+    ...(input.composio ? { composioAccountId: input.composio.accountId, status: "active", lastError: null } : {}),
+  };
+  if (target) {
     const [row] = await deps.db
       .update(connectorConnections)
-      .set({
-        authType: input.authType,
-        secretCiphertext: sealed?.ciphertext ?? null,
-        wrappedDataKey: sealed?.wrappedDataKey ?? null,
-        kekId: sealed?.kekId ?? null,
-        tokenExpiresAt: input.tokenExpiresAt ?? null,
-        oauthClientId: input.oauthClientId ?? null,
-        updatedAt: new Date(),
-      })
-      .where(eq(connectorConnections.id, existing.id))
+      .set({ ...credentials, updatedAt: new Date() })
+      .where(eq(connectorConnections.id, target.id))
       .returning();
     if (!row) throw new Error("connection update returned nothing");
     caches.connections.delete(`${input.orgId}:active`);
     caches.scopes.deletePrefix(`${input.orgId}:`);
+    const replaced = target.composioAccountId;
+    if (replaced && deps.composio && replaced !== input.composio?.accountId) {
+      await forgetComposioAccount(deps.composio.client, replaced);
+    }
     await recordAudit(deps.db, {
       orgId: input.orgId,
       actor: { type: "person", id: input.actorId },
       action: "connector.custom_reconnected",
       target: { type: "connector_connection", id: row.id },
-      details: { serverUrl: input.serverUrl, authType: input.authType },
-    });
-    return row;
-  }
-  const row = await deps.db.transaction(async (tx) => {
-    const [row] = await tx
-      .insert(connectorConnections)
-      .values({
-        id,
-        orgId: input.orgId,
-        connector: `${CUSTOM_PREFIX}${id}`,
-        label: input.label.slice(0, 80),
+      details: {
         serverUrl: input.serverUrl,
         authType: input.authType,
-        secretCiphertext: sealed?.ciphertext ?? null,
-        wrappedDataKey: sealed?.wrappedDataKey ?? null,
-        kekId: sealed?.kekId ?? null,
-        tokenExpiresAt: input.tokenExpiresAt ?? null,
-        oauthClientId: input.oauthClientId ?? null,
-        createdByUserId: input.actorId,
-      })
-      .returning();
-    if (!row) throw new Error("connection insert returned nothing");
-    await recordAudit(tx, {
-      orgId: input.orgId,
-      actor: { type: "person", id: input.actorId },
-      action: "connector.custom_connected",
-      target: { type: "connector_connection", id: row.id },
-      details: { serverUrl: input.serverUrl, authType: input.authType },
+        label: row.label,
+        account: row.accountLabel,
+        sameAccount: outcome === "same_account",
+      },
     });
-    await grantToEveryAgent(tx, input.orgId, input.actorId, row);
-    return row;
-  });
-  caches.connections.delete(`${input.orgId}:active`);
-  caches.scopes.deletePrefix(`${input.orgId}:`);
-  return row;
+    return { connection: row, outcome };
+  }
+  const service = input.label.trim().slice(0, 80) || new URL(input.serverUrl).hostname;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const done = await deps.db.transaction(async (tx) => {
+        // Two connects of one server at once: read under the lock, so only one of them is its first account, and
+        // one that reached the same account as the other is that connection, not a second one.
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`connector-accounts:${input.orgId}:${key}`}))`);
+        const live = await liveAccounts(tx, input.orgId, key);
+        const twin = account
+          ? live.find((c) => c.accountId === account.id)
+          : input.authType === "none"
+            ? live[0]
+            : null;
+        if (twin) return { twin, row: null };
+        const first = live.length === 0;
+        // The service's name, not the account's: `stripe`, then `stripe_2`; a later account goes by the server's
+        // oldest one, whatever it is called now.
+        const base = live[0] ? prefixService(toolPrefixOfConnection(live[0])) : toolPrefixOf(service);
+        const label = await freeLabel(tx, input.orgId, named ? accountName(service, named) : service);
+        const toolPrefix = await freeToolPrefix(tx, input.orgId, base, deps.oauthApps);
+        const [row] = await tx
+          .insert(connectorConnections)
+          .values({
+            id,
+            orgId: input.orgId,
+            connector: `${CUSTOM_PREFIX}${id}`,
+            label,
+            toolPrefix,
+            serverUrl: input.serverUrl,
+            ...credentials,
+            createdByUserId: input.actorId,
+          })
+          .returning();
+        if (!row) throw new Error("connection insert returned nothing");
+        await recordAudit(tx, {
+          orgId: input.orgId,
+          actor: { type: "person", id: input.actorId },
+          action: "connector.custom_connected",
+          target: { type: "connector_connection", id: row.id },
+          details: {
+            serverUrl: input.serverUrl,
+            authType: input.authType,
+            label,
+            account: named,
+            everyAgent: first,
+          },
+        });
+        if (first) await grantToEveryAgent(tx, input.orgId, input.actorId, row);
+        return { twin: null, row };
+      });
+      if (!done.row) {
+        // Connected again from the start, it finds that connection and refreshes its sign-in.
+        return account
+          ? storeCustomConnection(deps, input)
+          : { connection: done.twin, outcome: "same_account" as const };
+      }
+      caches.connections.delete(`${input.orgId}:active`);
+      caches.scopes.deletePrefix(`${input.orgId}:`);
+      return { connection: done.row, outcome };
+    } catch (error) {
+      // Another connect took the same tool prefix a moment ago: the next number is free.
+      if (attempt < 2 && isUniqueViolation(error)) continue;
+      throw error;
+    }
+  }
+}
+
+/** A workspace's live accounts of one server (`serverKey`), oldest first. */
+async function liveAccounts(db: Executor, orgId: string, key: string) {
+  const rows = await db
+    .select()
+    .from(connectorConnections)
+    .where(
+      and(
+        eq(connectorConnections.orgId, orgId),
+        like(connectorConnections.connector, `${CUSTOM_PREFIX}%`),
+        isNull(connectorConnections.revokedAt),
+      ),
+    )
+    .orderBy(asc(connectorConnections.createdAt));
+  return rows.filter((c) => serverKey(c.serverUrl) === key);
+}
+
+/** Asks the provider which account a stored connection is (its own credentials) and keeps the answer. */
+async function fillAccount(deps: CustomDeps, c: ConnectorConnection) {
+  const spec = presetForServer(c.serverUrl)?.account;
+  if (!spec || !deps.connect) return null;
+  try {
+    const session = await deps.connect(c, await connectionHeaders(deps, c));
+    try {
+      const account = await askAccount(session, spec);
+      if (account) await keepAccount(deps.db, c, account);
+      return account;
+    } finally {
+      await session.close().catch(() => {});
+    }
+  } catch {
+    return null;
+  }
+}
+
+/** The provider's name for the account, refreshed; its id only when none was known (a sign-in never changes it). */
+async function keepAccount(db: Database, c: ConnectorConnection, account: ProviderAccount) {
+  // The connection is another account than the one its sign-in reaches now: that one's name isn't its name.
+  if (c.accountId && c.accountId !== account.id) return;
+  await db
+    .update(connectorConnections)
+    .set({ accountLabel: account.name, ...(c.accountId ? {} : { accountId: account.id }) })
+    .where(eq(connectorConnections.id, c.id));
+  caches.connections.delete(`${c.orgId}:active`);
 }
 
 /**
@@ -369,17 +596,22 @@ export async function storeCustomConnection(
 export async function syncCustomTools(deps: CustomDeps, c: ConnectorConnection) {
   if (!deps.connect) throw new Error("no MCP connect configured");
   const session = await deps.connect(c, await connectionHeaders(deps, c));
+  const preset = presetForServer(c.serverUrl);
   let listed: McpTool[];
   let info: McpServerInfo | null = null;
+  let account: ProviderAccount | null = null;
   try {
     listed = await session.listTools();
     info = session.serverInfo?.() ?? null;
+    if (listed.some((t) => t.name === preset?.account?.tool)) {
+      account = await askAccount(session, preset?.account).catch(() => null);
+    }
   } finally {
     await session.close().catch(() => {});
   }
+  if (account) await keepAccount(deps.db, c, account);
   const existing = await deps.db.select().from(customTools).where(eq(customTools.connectionId, c.id));
   const byName = new Map(existing.map((t) => [t.name, t]));
-  const preset = presetForServer(c.serverUrl);
   const cached = new Map<string, ToolClass>();
   for (const t of existing) {
     if (t.suggestionSource === "judge" && ACCESS.includes(t.suggestedAccess as ToolAccess)) {
@@ -452,41 +684,52 @@ async function serverView(db: Database, orgId: string, id: string) {
 }
 
 /**
- * Connects an https MCP server by URL (admins). With an API key: stored and
- * connected. Without: if it answers openly, connected; if it speaks MCP
- * OAuth with dynamic registration, the authorize URL comes back; otherwise
- * `needs_key`.
+ * Connects an https MCP server by URL (admins): a new account, or with `connectionId` a new sign-in for that one
+ * ("Reconectar", same address only). With an API key: stored and connected. Without: if it answers openly,
+ * connected; if it speaks MCP OAuth with dynamic registration, the authorize URL comes back; otherwise `needs_key`.
  */
 export async function connectCustomServer(
   deps: CustomDeps,
   actorId: string,
   orgId: string,
-  input: { serverUrl: string; apiKey?: string; label?: string; returnTo?: string },
+  input: { serverUrl: string; apiKey?: string; label?: string; returnTo?: string; connectionId?: string },
 ): Promise<CustomConnectStart> {
   await requirePermission(deps.db, actorId, orgId, "manage_connectors");
+  // A service through Composio signs in on Composio's page: its address is never fetched.
+  if (composioToolkitOf(input.serverUrl.trim())) return beginComposioConnect(deps, actorId, orgId, input);
   const url = await assertPublicHttpsUrl(input.serverUrl.trim(), deps.resolveHost);
   const serverUrl = url.toString();
-  const label = input.label?.trim() || url.hostname;
+  // Checked before anyone signs in for nothing.
+  if (input.connectionId) await reconnectTarget(deps.db, orgId, input.connectionId, serverUrl);
+  const label = input.label?.trim() || presetForServer(serverUrl)?.label || url.hostname;
   const apiKey = input.apiKey?.trim();
-  if (apiKey) {
-    if (apiKey.length < 8) throw new ValidationError("The key looks too short", "connector.key_too_short");
-    const c = await storeCustomConnection(deps, {
+  const stored = async (authType: "api_key" | "none", secret: ConnectionSecret | null) => {
+    const { connection, outcome } = await storeCustomConnection(deps, {
       orgId,
       actorId,
       serverUrl,
       label,
-      authType: "api_key",
-      secret: { apiKey },
+      authType,
+      secret,
+      connectionId: input.connectionId,
     });
-    await syncCustomTools(deps, c).catch(() => {});
-    return { status: "connected", server: await serverView(deps.db, c.orgId, c.id) };
+    await syncCustomTools(deps, connection).catch(() => {});
+    return {
+      status: "connected" as const,
+      server: await serverView(deps.db, connection.orgId, connection.id),
+      outcome,
+    };
+  };
+  if (apiKey) {
+    if (apiKey.length < 8) throw new ValidationError("The key looks too short", "connector.key_too_short");
+    // The vendor's terms forbid asking for a token: on the Cloud it signs in only (ADR 0107).
+    if (presetForServer(serverUrl)?.cloudOAuthOnly && isAgentesCloud(deps.publicUrl)) {
+      throw new ValidationError("This service connects by signing in", "connector.oauth_only");
+    }
+    return stored("api_key", { apiKey });
   }
   const probe = await probeMcpServer(deps, serverUrl);
-  if (probe.kind === "open") {
-    const c = await storeCustomConnection(deps, { orgId, actorId, serverUrl, label, authType: "none", secret: null });
-    await syncCustomTools(deps, c).catch(() => {});
-    return { status: "connected", server: await serverView(deps.db, c.orgId, c.id) };
-  }
+  if (probe.kind === "open") return stored("none", null);
   if (probe.kind === "needs_key") return { status: "needs_key" };
   return beginMcpOAuth(deps, actorId, orgId, {
     connector: "custom",
@@ -496,6 +739,7 @@ export async function connectCustomServer(
     issuer: probe.issuer,
     scopes: probe.scopes,
     returnTo: input.returnTo,
+    connectionId: input.connectionId,
   });
 }
 
@@ -517,13 +761,20 @@ export async function beginMcpOAuth(
     issuer: string;
     scopes: string[];
     returnTo?: string;
+    /** "Reconectar": the connection whose sign-in this replaces. */
+    connectionId?: string;
   },
 ): Promise<Exclude<CustomConnectStart, { status: "connected" }>> {
   const meta = await authServerMetadata(deps, input.issuer);
   if (!meta) return { status: "needs_key" };
   const redirectUri = oauthRedirectUri(deps.publicUrl);
-  const client = await ensureOAuthClient(deps, orgId, input.issuer, meta, { redirectUri, scopes: input.scopes });
-  if (client === "not_approved") return { status: "needs_key", reason: "not_approved" };
+  // Worked out again each time: a client still in use keeps the scope it was registered with, maybe without
+  // offline_access.
+  const scope = oauthScope(meta, input.scopes);
+  const client = await ensureOAuthClient(deps, orgId, input.issuer, meta, { redirectUri, scope });
+  if (client && "notApproved" in client) {
+    return { status: "needs_key", reason: "not_approved", ...(client.detail ? { detail: client.detail } : {}) };
+  }
   if (!client) return { status: "needs_key" };
   const state = randomToken(32);
   const verifier = randomToken(48);
@@ -547,6 +798,7 @@ export async function beginMcpOAuth(
     oauthClientId: client.id,
     resource: input.resource,
     label: input.label ?? null,
+    connectionId: input.connectionId ?? null,
     expiresAt: new Date((deps.now?.() ?? new Date()).getTime() + OAUTH_STATE_TTL_MS),
   });
   const url = new URL(client.authorizationEndpoint);
@@ -557,7 +809,7 @@ export async function beginMcpOAuth(
   url.searchParams.set("code_challenge", challenge);
   url.searchParams.set("code_challenge_method", "S256");
   url.searchParams.set("resource", input.resource);
-  if (client.scope) url.searchParams.set("scope", client.scope);
+  if (scope) url.searchParams.set("scope", scope);
   return { status: "oauth", authorizeUrl: url.toString() };
 }
 
@@ -607,6 +859,8 @@ export async function saveCustomTools(
   }
   const now = new Date();
   await deps.db.transaction(async (tx) => {
+    const asked = input.label.trim();
+    const label = asked && asked !== c.label ? await checkLabel(tx, orgId, asked, c.id) : c.label;
     for (const t of input.tools) {
       const row = known.get(t.name);
       if (!row) continue;
@@ -621,7 +875,7 @@ export async function saveCustomTools(
     }
     await tx
       .update(connectorConnections)
-      .set({ label: input.label.trim().slice(0, 80) || c.label, reviewedAt: now, updatedAt: now })
+      .set({ label, reviewedAt: now, updatedAt: now })
       .where(eq(connectorConnections.id, c.id));
     await recordAudit(tx, {
       orgId,

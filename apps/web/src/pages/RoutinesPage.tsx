@@ -1,6 +1,7 @@
 import type {
   Routine,
   RoutineEvent,
+  RoutineHookCall,
   RoutineInput,
   RoutinePatch,
   RoutineReport,
@@ -15,13 +16,25 @@ import {
   useMachineOutages,
   useMailAccounts,
   useRoutineAction,
+  useRoutineHook,
+  useRoutineHookAction,
   useRoutineRuns,
   useRoutines,
   useRuleDescribe,
   useRuleParse,
 } from "@agenteschat/client";
+import { approvalTitle } from "@agenteschat/client/lib/approval-words";
 import type { RunStatus } from "@agenteschat/client/lib/calendar";
-import { capitalize, formatTokensShort, formatUsd, relativeTime, toYmd, whenAt } from "@agenteschat/client/lib/format";
+import { formatBytes } from "@agenteschat/client/lib/files";
+import {
+  capitalize,
+  formatTokensShort,
+  formatUsd,
+  nextLabel,
+  relativeTime,
+  toYmd,
+  whenAt,
+} from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
@@ -41,7 +54,14 @@ import {
   type Words,
   whereItRuns,
 } from "@agenteschat/client/lib/routine-view";
-import { browserTimezone, onceParts, timezoneName } from "@agenteschat/client/lib/routines";
+import {
+  browserTimezone,
+  hookCurl,
+  isRefusedHookCall,
+  onceParts,
+  routineHookUrl,
+  timezoneName,
+} from "@agenteschat/client/lib/routines";
 import {
   Button,
   Checkbox,
@@ -80,12 +100,14 @@ import type { TFunction } from "i18next";
 import { type CSSProperties, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
+import { CancelAhead } from "@/components/ApprovalItem";
 import { useActors } from "@/components/actors";
 import { DetailsLink } from "@/components/details-link";
 import { cleanFilter, type EmailTriggerDraft, EmailTriggerFields, emailWhen, INBOX } from "@/components/EmailTrigger";
 import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { SwitchComputerDialog } from "@/components/MachineOutages";
+import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { RoutineReachWarnings } from "@/components/RoutineReachWarnings";
 import { useComputerEdition, useNamesComputers } from "@/components/WorkspaceComputer";
@@ -103,21 +125,9 @@ export const ROUTINE_EVENTS: RoutineEvent[] = [
   "deploy.succeeded",
 ];
 
-/** Weekday + time, "seg 20 out, 09:00". */
-const nextLabel = (locale: string, iso: string) =>
-  new Intl.DateTimeFormat(locale, {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-    .format(new Date(iso))
-    .replace(/\./g, "")
-    .replace(/ de /g, " ");
-
-/** Started by something happening (an event or an email), not by the clock. */
-const isEventDriven = (r: Routine) => r.trigger.type === "event" || r.trigger.type === "email";
+/** Started by something happening (an event, an email, a webhook call), not by the clock. */
+const isEventDriven = (r: Routine) =>
+  r.trigger.type === "event" || r.trigger.type === "email" || r.trigger.type === "webhook";
 /** An email routine whose mailbox needs reconnecting (or whose watch fails). */
 const mailTrouble = (r: Routine) =>
   r.trigger.type === "email" && r.trigger.status && r.trigger.status !== "active" ? r.trigger.status : null;
@@ -209,6 +219,7 @@ function useWhen() {
   const myZone = actors.dir.memberById.get(me.user.id)?.timezone || browserTimezone() || "UTC";
   return (r: Routine) => {
     if (r.trigger.type === "email") return emailWhen(t, r, mailboxes.data);
+    if (r.trigger.type === "webhook") return t("routines.webhook.when");
     const zone = r.trigger.type === "event" ? "" : r.trigger.timezone || "UTC";
     const zoneNote = zone && zone !== myZone ? ` (${timezoneName(zone, i18n.language)})` : "";
     if (r.trigger.type === "schedule")
@@ -417,12 +428,13 @@ export function RoutinesPage() {
       {open && (
         <RoutineDetails routine={open} now={now} onClose={() => setOpenId(null)} onEdit={() => setEditing(open)} />
       )}
-      <RoutineDialog open={creating} onClose={() => setCreating(false)} />
+      <RoutineDialog open={creating} onClose={() => setCreating(false)} onWebhook={(r) => setOpenId(r.id)} />
       <RoutineDialog
         key={editing?.id ?? "none"}
         open={Boolean(editing)}
         routine={editing ?? undefined}
         onClose={() => setEditing(null)}
+        onWebhook={(r) => setOpenId(r.id)}
       />
     </div>
   );
@@ -490,7 +502,8 @@ function useNextText() {
       const week = r.recentRuns.filter((x) => now.getTime() - new Date(x.at).getTime() < 7 * 86_400_000).length;
       if (r.trigger.type === "email")
         return week > 0 ? t("mail.routine.thisWeek", { count: week }) : t("mail.routine.waiting");
-      return week > 0 ? t("routines.eventThisWeek", { count: week }) : t("routines.waitingEvent");
+      if (week > 0) return t("routines.eventThisWeek", { count: week });
+      return t(r.trigger.type === "webhook" ? "routines.webhook.waiting" : "routines.waitingEvent");
     }
     if (!r.nextRunAt) return "";
     const ms = new Date(r.nextRunAt).getTime() - now.getTime();
@@ -673,11 +686,13 @@ function RoutineRow({
                 ? "bolt"
                 : r.trigger.type === "email"
                   ? "mail"
-                  : r.trigger.type === "once"
-                    ? reminder
-                      ? "bell"
-                      : "calendar"
-                    : "repeat"
+                  : r.trigger.type === "webhook"
+                    ? "link"
+                    : r.trigger.type === "once"
+                      ? reminder
+                        ? "bell"
+                        : "calendar"
+                      : "repeat"
             }
             size={16}
           />
@@ -758,11 +773,11 @@ function RoutineRow({
               {t("routines.duplicate")}
             </MenuItem>
           )}
-          {r.canManage && r.webhookUrl && (
+          {r.canManage && routineHookUrl(r) && (
             <MenuItem
               icon="link"
               onSelect={async () => {
-                await navigator.clipboard?.writeText(r.webhookUrl ?? "");
+                await navigator.clipboard?.writeText(routineHookUrl(r) ?? "");
                 toast.show(t("routines.webhookCopied"));
               }}
             >
@@ -1144,6 +1159,8 @@ function RoutineDetails({
         )}
         {r.trigger.type === "email" ? (
           <p className="small muted">{t("mail.routine.every")}</p>
+        ) : r.trigger.type === "webhook" ? (
+          <p className="small muted">{t("routines.webhook.every")}</p>
         ) : r.trigger.type === "event" ? (
           <p className="small muted">{t("routines.panel.eventEvery")}</p>
         ) : (
@@ -1164,6 +1181,49 @@ function RoutineDetails({
           </p>
         )}
       </DetailsSection>
+      {r.trigger.type === "webhook" && (
+        <DetailsSection title={t("routines.form.kind.webhook")}>
+          {r.canManage ? (
+            <WebhookPanel routine={r} runs={list} />
+          ) : (
+            <p className="small muted">{t("routines.webhook.hidden")}</p>
+          )}
+        </DetailsSection>
+      )}
+      {r.ahead && r.ahead.length > 0 && (
+        <DetailsSection title={t("routines.panel.ahead")}>
+          <ul className="routine-ahead">
+            {r.ahead.map((a) => (
+              <li key={a.id} className="routine-details__where routine-ahead__item">
+                <span className="routine-details__where-icon">
+                  <Icon name={a.status === "approved" ? "calendar" : "waiting"} size={16} />
+                </span>
+                <span className="routine-ahead__text">
+                  <Link
+                    to="/org/$orgId/approvals"
+                    params={{ orgId: org.id }}
+                    search={{ open: a.id }}
+                    className="routine-ahead__title"
+                  >
+                    {approvalTitle(t, { ...a, email: null })}
+                  </Link>
+                  <small>
+                    {t(a.status === "approved" ? "routines.ahead.approved" : "routines.ahead.pending", {
+                      when: nextLabel(i18n.language, a.runAt),
+                    })}
+                  </small>
+                </span>
+                {a.canCancel && (
+                  <span className="ac-acts">
+                    <CancelAhead id={a.id} />
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="small muted">{t("routines.ahead.hint")}</p>
+        </DetailsSection>
+      )}
       <DetailsSection title={t("routines.panel.report")}>
         <p className="routine-details__sentence">
           <span className="ac-hintline">
@@ -1203,12 +1263,10 @@ const RUN_NODE_ICON: Record<RunStatus, IconName> = { ok: "check", silent: "dash"
  */
 function RunItem({ run: x, routine: r }: { run: RoutineRun; routine: Routine }) {
   const { t, i18n } = useTranslation();
-  const { org } = useOrg();
   const actors = useActors();
   const say = useSay();
   const pixel = runPixelStatus(x.status);
   const outcome = say(runOutcome(x, (id) => actors.dir.memberById.get(id)?.name ?? null));
-  const link = runMessageLink(x);
   const words = r.canSeeDetails && (x.status === "reported" || x.status === "silent") ? x.summary.trim() : "";
   return (
     <li className="routine-runs__item">
@@ -1224,27 +1282,213 @@ function RunItem({ run: x, routine: r }: { run: RoutineRun; routine: Routine }) 
           <b>{outcome}</b>
         )}
         {words && <small>{words}</small>}
-        {link &&
-          (link.threadId ? (
-            <Link
-              to="/org/$orgId/threads/$threadId"
-              params={{ orgId: org.id, threadId: link.threadId }}
-              className="routine-runs__open"
-            >
-              {t("routines.openInChat")}
-            </Link>
-          ) : (
-            <Link
-              to="/org/$orgId/c/$channelId"
-              params={{ orgId: org.id, channelId: link.channelId }}
-              search={{ m: link.messageId }}
-              className="routine-runs__open"
-            >
-              {t("routines.openInChat")}
-            </Link>
-          ))}
+        <RunChatLink run={x} />
       </span>
       <time dateTime={x.at}>{whenAt(t, i18n.language, x.at)}</time>
+    </li>
+  );
+}
+
+/** "Abrir na conversa": the agent's message a run left (its report), when it left one. */
+function RunChatLink({ run }: { run: RoutineRun }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const link = runMessageLink(run);
+  if (!link) return null;
+  return link.threadId ? (
+    <Link
+      to="/org/$orgId/threads/$threadId"
+      params={{ orgId: org.id, threadId: link.threadId }}
+      className="routine-runs__open"
+    >
+      {t("routines.openInChat")}
+    </Link>
+  ) : (
+    <Link
+      to="/org/$orgId/c/$channelId"
+      params={{ orgId: org.id, channelId: link.channelId }}
+      search={{ m: link.messageId }}
+      className="routine-runs__open"
+    >
+      {t("routines.openInChat")}
+    </Link>
+  );
+}
+
+/**
+ * A webhook routine's address (ADR 0106), for who manages it: the address to copy and a new one (the old stops at
+ * once), the signing secret (shown once, replaced or turned off), an example call, Testar, and the latest calls with
+ * the run each went into.
+ */
+function WebhookPanel({ routine: r, runs }: { routine: Routine; runs: RoutineRun[] }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const hook = useRoutineHook(org.id, r.id);
+  const action = useRoutineHookAction(org.id, r.id);
+  const [secret, setSecret] = useState<string | null>(null);
+  const [asking, setAsking] = useState<"address" | "secret" | "unsign" | null>(null);
+  const data = hook.data;
+  if (!data) {
+    return hook.isError ? (
+      <ErrorState error={hook.error} onRetry={() => void hook.refetch()} />
+    ) : (
+      <LoadingList count={1} avatar={false} />
+    );
+  }
+  const busy = (what: "address" | "secret" | "unsign" | "test") => action.isPending && action.variables === what;
+  const change = (what: "address" | "secret" | "unsign") =>
+    action.mutate(what, {
+      onSuccess: (done) => {
+        setAsking(null);
+        if (what === "address") toast.show(t("routines.webhook.replaced"));
+        else setSecret(done.secret ?? null);
+      },
+    });
+  return (
+    <div className="routine-hook">
+      <div className="routine-hook__part">
+        <span className="ac-field__label">{t("routines.webhook.address")}</span>
+        <CommandBlock command={data.url} copied={t("routines.webhook.copied")} />
+        <p className="small muted">{t("routines.webhook.addressHelp")}</p>
+        {asking === "address" ? (
+          <HookQuestion
+            text={t("routines.webhook.replaceBody")}
+            action={t("routines.webhook.replace")}
+            loading={busy("address")}
+            onCancel={() => setAsking(null)}
+            onConfirm={() => change("address")}
+          />
+        ) : (
+          <div className="routine-hook__actions">
+            <Button type="button" size="sm" icon="refresh" onClick={() => setAsking("address")}>
+              {t("routines.webhook.replace")}
+            </Button>
+          </div>
+        )}
+      </div>
+      <div className="routine-hook__part">
+        <span className="ac-hintline">
+          <span className="ac-field__label">{t("routines.webhook.signature")}</span>
+          <InfoHint name={t("common.about", { label: t("routines.webhook.signature") })}>
+            {t("routines.webhook.signedHelp")}
+          </InfoHint>
+        </span>
+        <p className="small">{t(data.signed ? "routines.webhook.signedOn" : "routines.webhook.signedOff")}</p>
+        {secret && data.signed && (
+          <>
+            <p className="routine-note small ac-iconline" role="status">
+              <Icon name="key" size={14} />
+              <span>{t("routines.webhook.secretOnce")}</span>
+            </p>
+            <CommandBlock command={secret} copied={t("routines.webhook.secretCopied")} />
+          </>
+        )}
+        {asking === "secret" || asking === "unsign" ? (
+          <HookQuestion
+            text={t(asking === "secret" ? "routines.webhook.newSecretBody" : "routines.webhook.removeSecretBody")}
+            action={t(asking === "secret" ? "routines.webhook.newSecret" : "routines.webhook.removeSecret")}
+            loading={busy(asking)}
+            onCancel={() => setAsking(null)}
+            onConfirm={() => change(asking)}
+          />
+        ) : (
+          <div className="routine-hook__actions">
+            <Button
+              type="button"
+              size="sm"
+              icon="key"
+              loading={busy("secret")}
+              onClick={() => (data.signed ? setAsking("secret") : change("secret"))}
+            >
+              {t(data.signed ? "routines.webhook.newSecret" : "routines.webhook.addSecret")}
+            </Button>
+            {data.signed && (
+              <Button type="button" size="sm" variant="ghost" onClick={() => setAsking("unsign")}>
+                {t("routines.webhook.removeSecret")}
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="routine-hook__part">
+        <span className="ac-field__label">{t("routines.webhook.example")}</span>
+        <CommandBlock
+          command={hookCurl(data.url, data.signed ? (secret ?? t("routines.webhook.secretPlaceholder")) : null)}
+          copied={t("routines.webhook.exampleCopied")}
+        />
+        <div className="routine-hook__actions">
+          <Button
+            type="button"
+            size="sm"
+            icon="send"
+            loading={busy("test")}
+            onClick={() => action.mutate("test", { onSuccess: () => toast.show(t("routines.webhook.tested")) })}
+          >
+            {t("routines.webhook.test")}
+          </Button>
+        </div>
+      </div>
+      <div className="routine-hook__part">
+        <span className="ac-field__label">{t("routines.webhook.calls")}</span>
+        {data.calls.length === 0 ? (
+          <p className="small muted">{t("routines.webhook.noCalls")}</p>
+        ) : (
+          <ol className="routine-runs" aria-label={t("routines.webhook.calls")}>
+            {data.calls.map((c) => (
+              <HookCallItem key={c.id} call={c} run={runs.find((x) => x.id === c.runId)} />
+            ))}
+          </ol>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** A change that breaks the services calling the address, asked in place of its buttons: what stops working. */
+function HookQuestion(props: {
+  text: string;
+  action: string;
+  loading: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="routine-hook__confirm" role="alert">
+      <p className="small">{props.text}</p>
+      <div className="routine-hook__actions">
+        <Button type="button" size="sm" onClick={props.onCancel}>
+          {t("common.cancel")}
+        </Button>
+        <Button type="button" size="sm" variant="danger" loading={props.loading} onClick={props.onConfirm}>
+          {props.action}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** One call: how it ended, its size, Teste when Testar sent it, and the agent's message of the run it went into. */
+function HookCallItem({ call: c, run }: { call: RoutineHookCall; run: RoutineRun | undefined }) {
+  const { t, i18n } = useTranslation();
+  const refused = isRefusedHookCall(c.outcome);
+  return (
+    <li className="routine-runs__item">
+      <span className={`routine-runs__node routine-runs__node--${refused ? "failed" : "ok"}`}>
+        <Icon name={refused ? "close" : "check"} size={14} />
+      </span>
+      <span>
+        <b>
+          {[
+            t(`routines.webhook.outcome.${c.outcome}`),
+            ...(c.bytes > 0 ? [formatBytes(i18n.language, c.bytes)] : []),
+            ...(c.test ? [t("routines.webhook.callTest")] : []),
+          ].join(" · ")}
+        </b>
+        {run && <RunChatLink run={run} />}
+      </span>
+      <time dateTime={c.at}>{whenAt(t, i18n.language, c.at)}</time>
     </li>
   );
 }
@@ -1297,7 +1541,7 @@ function ruleOf(r: Routine | undefined, zone: string): RecurrenceRule {
   };
 }
 const zoneOf = (r: Routine | undefined) =>
-  r && r.trigger.type !== "event" && r.trigger.type !== "email" ? r.trigger.timezone || "UTC" : "";
+  r && (r.trigger.type === "schedule" || r.trigger.type === "once") ? r.trigger.timezone || "UTC" : "";
 
 /** The email trigger a routine has (new, or another kind: none picked yet, the inbox). */
 const emailDraftOf = (r: Routine | undefined): EmailTriggerDraft =>
@@ -1311,7 +1555,18 @@ const isUtc = (z: string) => z === "UTC" || z === "Etc/UTC";
  * and saves only what changed; a routine still read in UTC (made before time
  * zones) starts in my zone, with a hint to keep UTC instead.
  */
-function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () => void; routine?: Routine }) {
+function RoutineDialog({
+  open,
+  onClose,
+  routine,
+  onWebhook,
+}: {
+  open: boolean;
+  onClose: () => void;
+  routine?: Routine;
+  /** It just became a webhook routine (made, or switched to one): its address is on its page, which opens. */
+  onWebhook?: (routine: Routine) => void;
+}) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const toast = useToast();
@@ -1336,8 +1591,10 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
   );
   const [prompt, setPrompt] = useState(routine?.prompt ?? "");
   const [name, setName] = useState(routine?.name ?? "");
-  const [kind, setKind] = useState<"schedule" | "event" | "email">(
-    routine?.trigger.type === "event" ? "event" : routine?.trigger.type === "email" ? "email" : "schedule",
+  const [kind, setKind] = useState<"schedule" | "event" | "email" | "webhook">(
+    routine?.trigger.type === "event" || routine?.trigger.type === "email" || routine?.trigger.type === "webhook"
+      ? routine.trigger.type
+      : "schedule",
   );
   // "Quando chegar um email": the mailbox, folder and filters.
   const [email, setEmail] = useState<EmailTriggerDraft>(() => emailDraftOf(routine));
@@ -1405,7 +1662,8 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
     : upcomingLabels(i18n.language, rule);
   const phraseFailed = phraseTyped && typed.length > 0 && parsed.data?.ok === false;
   const shownZone = zone;
-  const scheduleOk = kind === "event" || (kind === "email" ? Boolean(email.accountId) : once || !phraseFailed);
+  const scheduleOk =
+    kind === "event" || kind === "webhook" || (kind === "email" ? Boolean(email.accountId) : once || !phraseFailed);
   const targetValue = (): RoutineTargetInput =>
     target === TARGET_FORUM
       ? { type: "forum", agentIds: forumAgents.length > 0 ? forumAgents : [agentId], rounds: Number(forumRounds) }
@@ -1421,17 +1679,19 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
     filter: cleanFilter(email.filter),
   });
   const trigger = (): RoutineInput["trigger"] =>
-    kind === "email"
-      ? emailTrigger()
-      : kind === "event"
-        ? { type: "event", event }
-        : once
-          ? {
-              type: "once",
-              at: zonedInstant(rule.start, rule.times[0] ?? "09:00", rule.timezone).toISOString(),
-              timezone: rule.timezone,
-            }
-          : { type: "schedule", rule: toApiRule(rule) };
+    kind === "webhook"
+      ? { type: "webhook" }
+      : kind === "email"
+        ? emailTrigger()
+        : kind === "event"
+          ? { type: "event", event }
+          : once
+            ? {
+                type: "once",
+                at: zonedInstant(rule.start, rule.times[0] ?? "09:00", rule.timezone).toISOString(),
+                timezone: rule.timezone,
+              }
+            : { type: "schedule", rule: toApiRule(rule) };
   /** What changed against the routine (`PATCH` sends only this). */
   const changes = (r: Routine): RoutinePatch => {
     const patch: RoutinePatch = {};
@@ -1446,21 +1706,23 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
         Number(forumRounds) !== (r.target.rounds ?? 3));
     if (target !== TARGET_KEEP && (target !== targetChoice(r.target) || forumChanged)) patch.target = targetValue();
     const triggerChanged =
-      kind === "email"
-        ? r.trigger.type !== "email" ||
-          JSON.stringify(emailTrigger()) !==
-            JSON.stringify({
-              type: "email",
-              accountId: r.trigger.accountId,
-              folder: r.trigger.folder,
-              filter: cleanFilter(r.trigger.filter ?? {}),
-            })
-        : kind === "event"
-          ? r.trigger.type !== "event" || r.trigger.event !== event
-          : once
-            ? r.trigger.type !== "once" ||
-              JSON.stringify(trigger()) !== JSON.stringify({ type: "once", at: r.trigger.at, timezone: savedZone })
-            : r.trigger.type !== "schedule" || JSON.stringify(toApiRule(rule)) !== savedRule;
+      kind === "webhook"
+        ? r.trigger.type !== "webhook"
+        : kind === "email"
+          ? r.trigger.type !== "email" ||
+            JSON.stringify(emailTrigger()) !==
+              JSON.stringify({
+                type: "email",
+                accountId: r.trigger.accountId,
+                folder: r.trigger.folder,
+                filter: cleanFilter(r.trigger.filter ?? {}),
+              })
+          : kind === "event"
+            ? r.trigger.type !== "event" || r.trigger.event !== event
+            : once
+              ? r.trigger.type !== "once" ||
+                JSON.stringify(trigger()) !== JSON.stringify({ type: "once", at: r.trigger.at, timezone: savedZone })
+              : r.trigger.type !== "schedule" || JSON.stringify(toApiRule(rule)) !== savedRule;
     if (triggerChanged) patch.trigger = trigger();
     if (active !== r.active) patch.active = active;
     if (report !== r.report) patch.report = report;
@@ -1496,6 +1758,9 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
     if (p.kind === "event") setEvent(p.event);
     else typePhrase(t(`routines.presets.${p.key}.phrase`));
   };
+  const becameWebhook = (saved: Routine | undefined) => {
+    if (saved?.trigger.type === "webhook") onWebhook?.(saved);
+  };
   const submit = () => {
     setTouched(true);
     if (!prompt.trim() || !agentId || !scheduleOk) return;
@@ -1516,6 +1781,7 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
                 : t("routines.form.savedNoNext"),
             );
             onClose();
+            if (routine.trigger.type !== "webhook") becameWebhook(saved as Routine);
           },
         },
       );
@@ -1534,12 +1800,13 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
         },
       },
       {
-        onSuccess: () => {
+        onSuccess: (created) => {
           toast.show(t("routines.form.created"));
           setPrompt("");
           setName("");
           setTouched(false);
           onClose();
+          becameWebhook(created as Routine);
         },
       },
     );
@@ -1669,10 +1936,20 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
                 { value: "schedule" as const, label: t("routines.form.kind.schedule") },
                 { value: "event" as const, label: t("routines.form.kind.event") },
                 ...(hasMail ? [{ value: "email" as const, label: t("routines.form.kind.email") }] : []),
+                { value: "webhook" as const, label: t("routines.form.kind.webhook") },
               ]}
             />
           </div>
           {kind === "email" && <EmailTriggerFields value={email} onChange={setEmail} />}
+          {kind === "webhook" &&
+            (routine?.trigger.type === "webhook" ? (
+              <WebhookPanel routine={routine} runs={routine.recentRuns} />
+            ) : (
+              <p className="routine-note small ac-iconline">
+                <Icon name="link" size={14} />
+                <span>{t("routines.webhook.newNote")}</span>
+              </p>
+            ))}
           {kind === "schedule" && (
             <div className="routine-when">
               <div className="routine-when__head">

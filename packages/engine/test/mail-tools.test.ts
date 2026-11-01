@@ -10,7 +10,7 @@ import {
   updateMailAccount,
   wrapUntrusted,
 } from "../src";
-import { giveMail, imapAccount, type MailFixture, mailSetup, runContext } from "./mail-fixtures";
+import { giveMail, gmailAccount, imapAccount, type MailFixture, mailSetup, runContext } from "./mail-fixtures";
 
 let m: MailFixture;
 afterEach(async () => {
@@ -56,6 +56,13 @@ test("tools follow the agent's level on each mailbox; sends ask unless the polic
   ).toBe(false);
   const trash = after.find((t) => t.name === "mail_support_trash");
   expect(trash && isSensitive(trash)).toBe(true);
+
+  // Counted under the IMAP preset or Gmail through Composio, by the verb, never the address (ADR 0103).
+  expect(send?.connector).toEqual({ key: "icloud", via: "native", tool: "send" });
+  const gmail = await gmailAccount(m);
+  await giveMail(m, gmail.accountId, "read");
+  const search = (await m.tools.list(ctx)).find((t) => t.name === "mail_team_search");
+  expect(search?.connector).toEqual({ key: "gmail", via: "composio", tool: "search" });
 });
 
 test("actions turned off for a mailbox never become tools, whatever the agent holds", async () => {

@@ -134,6 +134,7 @@ describe("agents' tool calls in the audit log", () => {
         orgId: fx.org.id,
         connector: "sentry",
         label: "Sentry",
+        toolPrefix: "sentry",
         serverUrl: "https://mcp.sentry.dev",
         authType: "none",
       })
@@ -370,6 +371,7 @@ describe("people's changes in the audit log", () => {
         orgId: f.org.id,
         connector: "linear",
         label: "Linear",
+        toolPrefix: "linear",
         serverUrl: "https://mcp.linear.app/sse",
         authType: "none",
       })

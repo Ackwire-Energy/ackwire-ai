@@ -1,4 +1,11 @@
-import type { Agent, MailAccount, MailConnectError, MailPolicy, MailProviders } from "@agenteschat/client";
+import type {
+  Agent,
+  MailAccount,
+  MailConnectError,
+  MailPolicy,
+  MailProviders,
+  MillionSendInbox,
+} from "@agenteschat/client";
 import {
   keys,
   useAgentMail,
@@ -15,18 +22,21 @@ import {
   CUSTOM_PRESET,
   choiceOf,
   defaultPolicy,
+  fromMailLevel,
   isAddress,
   MAIL_ACTIONS,
   MAIL_BRANDS,
   type MailChoice,
   mailAccessOf,
+  mailActionsChanged,
   mailActionsFrom,
   mailErrorOf,
   mailReviewTools,
+  millionSendErrorText,
   normalizePolicy,
   notIcloudMail,
+  setMailLevel,
   splitEmails,
-  toMailLevel,
 } from "@agenteschat/client/lib/mail";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
@@ -40,6 +50,7 @@ import {
   Field,
   Icon,
   Input,
+  OptionList,
   Segmented,
   Select,
 } from "@agenteschat/ui";
@@ -63,21 +74,23 @@ import { useToast } from "@/lib/toast";
 
 /**
  * People's mailboxes for agents (ADR 0038), in the connectors' own shapes:
- * catalog cards (Gmail, Outlook, iCloud, Outro email), the same 3-step
- * connect flow (conectar → o que faz → quem pode usar), a connected row and
- * "Reconectar". Gmail/Outlook sign in on the provider's page; iCloud and
- * the rest take an app password, then say which other addresses the
- * mailbox has (replies go out from the one the email arrived at).
+ * catalog cards (Gmail, Outlook, iCloud, MillionSend, Outro email), the same
+ * 3-step connect flow (conectar → o que faz → quem pode usar), a connected
+ * row and "Reconectar". Gmail/Outlook sign in on the provider's page; a
+ * MillionSend inbox takes an API key and is picked among the key's inboxes
+ * (ADR 0102); iCloud and the rest take an app password, then say which other
+ * addresses the mailbox has (replies go out from the one the email arrived at).
  */
 
 export const mailChoiceName = (t: TFunction, choice: MailChoice) => t(`mail.choice.${choice}.name`);
 
-/** The catalog cards this server can connect (Gmail/Outlook need Composio; the rest IMAP). */
+/** The catalog cards this server can connect (Gmail/Outlook need Composio, MillionSend its own path; the rest IMAP). */
 export function mailChoices(providers: MailProviders | undefined): MailChoice[] {
   if (!providers) return [];
   return [
     ...(providers.composio ? (["gmail", "outlook"] as const) : []),
     ...(providers.imap && providers.presets.some((p) => p.id === "icloud") ? (["icloud"] as const) : []),
+    ...(providers.millionsend ? (["millionsend"] as const) : []),
     ...(providers.imap ? (["other"] as const) : []),
   ];
 }
@@ -99,7 +112,7 @@ export function MailIcon({ choice, size = "md" }: { choice: MailChoice; size?: "
 
 /** How a mailbox connects, for the card's one tag. */
 export const mailAuthKind = (choice: MailChoice) =>
-  choice === "gmail" || choice === "outlook" ? "oneClick" : "appPassword";
+  choice === "gmail" || choice === "outlook" ? "oneClick" : choice === "millionsend" ? "key" : "appPassword";
 
 export type MailFlowState =
   /** `connected`: the app password worked; now the mailbox's other addresses. */
@@ -156,6 +169,8 @@ export function MailConnectFlow({
           />
         ) : choice === "gmail" || choice === "outlook" ? (
           <OAuthStep provider={choice} onClose={onClose} />
+        ) : choice === "millionsend" ? (
+          <MillionSendStep onConnected={(account) => onChange({ step: 1, account })} onClose={onClose} />
         ) : (
           <ImapStep
             choice={choice}
@@ -258,7 +273,7 @@ export function ImapStep({
   onConnected,
   onClose,
 }: {
-  choice: Exclude<MailChoice, "gmail" | "outlook">;
+  choice: "icloud" | "other";
   onConnected: (account: MailAccount) => void;
   onClose: () => void;
 }) {
@@ -428,6 +443,181 @@ export function ImapStep({
         </Button>
         <Button type="submit" variant="primary" disabled={connectImap.isPending} loading={connectImap.isPending}>
           {t("mail.connect")}
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
+/** "Criar uma chave no MillionSend": MillionSend Cloud's page for keys (none for a self-hosted MillionSend). */
+function MillionSendKeysLink({ url }: { url: string | null | undefined }) {
+  const { t } = useTranslation();
+  if (!url || !/^https:\/\//.test(url)) return null;
+  return (
+    <a className="ac-link small mail-howto__link" href={url} target="_blank" rel="noreferrer noopener">
+      <Icon name="external" size={14} />
+      {t("mail.millionsend.openKeys")}
+    </a>
+  );
+}
+
+/**
+ * Step 1, MillionSend: the key (the MillionSend connector's, when it holds one and the person picks it, or one
+ * pasted), then which of the key's inboxes. Connecting says whether new email reaches agents at once (a webhook
+ * MillionSend posts to) or within minutes (checked).
+ */
+function MillionSendStep({
+  onConnected,
+  onClose,
+}: {
+  onConnected: (account: MailAccount) => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const providers = useMailProviders(org.id);
+  const { millionsendInboxes, connectMillionSend } = useMailAction(org.id);
+  const ms = providers.data?.millionsend ?? null;
+  const [source, setSource] = useState<"connector" | "paste" | null>(null);
+  const chosen = source ?? (ms?.connectorKey ? "connector" : "paste");
+  const [key, setKey] = useState("");
+  const [touched, setTouched] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const [inboxes, setInboxes] = useState<MillionSendInbox[] | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
+  const keyInput = chosen === "connector" ? { useConnector: true } : { apiKey: key.trim() };
+  const keyShort = chosen === "paste" && key.trim().length < 8;
+  const inboxId = picked ?? inboxes?.find((i) => !i.connected)?.id ?? null;
+  const errorText = error ? millionSendErrorText(t, error, inboxes?.find((i) => i.id === inboxId)?.address) : null;
+
+  const read = () => {
+    setTouched(true);
+    setError(null);
+    if (keyShort) return;
+    millionsendInboxes.mutate(keyInput, { onSuccess: setInboxes, onError: setError });
+  };
+  const connect = () => {
+    if (!inboxId) return;
+    setError(null);
+    connectMillionSend.mutate(
+      { ...keyInput, inboxId },
+      {
+        onSuccess: ({ account, instant }) => {
+          toast.show(t(instant ? "mail.millionsend.instant" : "mail.millionsend.polled", { address: account.address }));
+          onConnected(account);
+        },
+        onError: setError,
+      },
+    );
+  };
+
+  if (inboxes) {
+    return (
+      <>
+        <DialogBody className="cflow__body">
+          <p className="muted cflow__text" id="ms-pick">
+            {t("mail.millionsend.pick")}
+          </p>
+          {inboxes.length === 0 ? (
+            <Alert>{t("mail.millionsend.none")}</Alert>
+          ) : (
+            <OptionList
+              aria-labelledby="ms-pick"
+              value={inboxId ?? ""}
+              onValueChange={setPicked}
+              options={inboxes.map((i) => ({
+                value: i.id,
+                title: i.address,
+                ...(i.name && i.name !== i.address ? { description: i.name } : {}),
+                ...(i.connected ? { tag: t("mail.millionsend.taken"), disabled: true } : {}),
+              }))}
+            />
+          )}
+          {errorText && <Alert>{errorText}</Alert>}
+        </DialogBody>
+        <DialogFooter bar note={t("connectFlow.nothingYet")}>
+          <Button onClick={() => setInboxes(null)}>{t("connectFlow.back")}</Button>
+          <Button
+            variant="primary"
+            disabled={!inboxId || connectMillionSend.isPending}
+            loading={connectMillionSend.isPending}
+            onClick={connect}
+          >
+            {t("mail.connect")}
+          </Button>
+        </DialogFooter>
+      </>
+    );
+  }
+
+  const keyField = (
+    <>
+      <Field
+        label={t("mail.millionsend.key")}
+        id="ms-key"
+        help={t("mail.millionsend.keyHelp")}
+        error={touched && keyShort ? t("mail.millionsend.keyInvalid") : undefined}
+      >
+        <Input
+          type="password"
+          autoComplete="off"
+          value={key}
+          onChange={(e) => {
+            setKey(e.target.value);
+            setError(null);
+          }}
+        />
+      </Field>
+      <MillionSendKeysLink url={ms?.keysUrl} />
+    </>
+  );
+  return (
+    <form
+      style={{ display: "contents" }}
+      onSubmit={(e) => {
+        e.preventDefault();
+        read();
+      }}
+    >
+      <DialogBody className="cflow__body">
+        <p className="muted cflow__text">{t("mail.millionsend.text")}</p>
+        {ms?.connectorKey ? (
+          <OptionList
+            aria-label={t("mail.millionsend.key")}
+            value={chosen}
+            onValueChange={(v) => {
+              setSource(v);
+              setError(null);
+            }}
+            options={[
+              {
+                value: "connector",
+                title: t("mail.millionsend.useConnector"),
+                description: t("mail.millionsend.useConnectorText"),
+              },
+              { value: "paste", title: t("mail.millionsend.paste"), children: keyField },
+            ]}
+          />
+        ) : (
+          keyField
+        )}
+        {errorText && <Alert>{errorText}</Alert>}
+      </DialogBody>
+      <DialogFooter
+        bar
+        note={millionsendInboxes.isPending ? t("mail.millionsend.reading") : t("connectFlow.nothingYet")}
+      >
+        <Button type="button" onClick={onClose}>
+          {t("common.cancel")}
+        </Button>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={millionsendInboxes.isPending}
+          loading={millionsendInboxes.isPending}
+        >
+          {t("connectFlow.next")}
         </Button>
       </DialogFooter>
     </form>
@@ -620,8 +810,7 @@ function ActionsStep({ account, onNext, onClose }: { account: MailAccount; onNex
   const [state, setState] = useState<ToolReviewState>({ levels: {}, decided: new Set() });
   const next = () => {
     const chosen = mailActionsFrom(tools, state.levels);
-    const same = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
-    if (same(chosen.offActions, account.offActions) && same(chosen.askActions, account.askActions)) return onNext();
+    if (!mailActionsChanged(account, chosen)) return onNext();
     update.mutate({ accountId: account.id, ...chosen }, { onSuccess: onNext });
   };
   return (
@@ -654,9 +843,6 @@ function ActionsStep({ account, onNext, onClose }: { account: MailAccount; onNex
   );
 }
 
-const toLevel = (l: "none" | "read" | "read_write" | undefined): Level =>
-  l === "read_write" ? "write" : l === "read" ? "read" : "none";
-
 /**
  * Step 3: one level per agent; each saves that agent's access to this mailbox (rules kept). Then the rules. Only who
  * connected the mailbox gives access (to agents that talk to them); anyone else here may only lower it.
@@ -680,7 +866,7 @@ function WhoStep({
   const toast = useToast();
   const agents = useAgents(org.id);
   const list = agents.data ?? [];
-  const current = (agentId: string) => toLevel(account.agents.find((a) => a.agentId === agentId)?.level);
+  const current = (agentId: string) => fromMailLevel(account.agents.find((a) => a.agentId === agentId)?.level);
   const levelsFor = (a: Agent): Level[] => {
     const may = mailAccessOf(account, {
       userId: me.user.id,
@@ -698,15 +884,7 @@ function WhoStep({
   const grant = useMutation({
     mutationFn: async () => {
       const changed = list.filter((a) => levelOf(a.id) !== current(a.id));
-      for (const a of changed) {
-        // Keep the agent's rules for this mailbox; only the level changes here.
-        const saved = (await api.mail.agent(org.id, a.id)).find((m) => m.accountId === account.id);
-        await api.mail.setAgent(org.id, a.id, account.id, {
-          level: toMailLevel(levelOf(a.id)),
-          canDelete: saved?.canDelete ?? false,
-          policy: saved?.policy ?? defaultPolicy(),
-        });
-      }
+      for (const a of changed) await setMailLevel(api, org.id, a.id, account.id, levelOf(a.id));
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.mail(org.id) });
@@ -970,9 +1148,17 @@ export function MailRow({
           <Button size="sm" variant="ghost" aria-label={t("connectors.toolsName", { name })} onClick={onTools}>
             {t("connectors.tools")}
           </Button>
-          <Button size="sm" variant="ghost" aria-label={t("mail.addresses.buttonName", { name })} onClick={onAddresses}>
-            {t("mail.addresses.button")}
-          </Button>
+          {/* A MillionSend inbox sends only as itself: no other addresses. */}
+          {account.via !== "millionsend" && (
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label={t("mail.addresses.buttonName", { name })}
+              onClick={onAddresses}
+            >
+              {t("mail.addresses.button")}
+            </Button>
+          )}
           <Button
             size="sm"
             variant="ghost"
@@ -987,7 +1173,10 @@ export function MailRow({
   );
 }
 
-/** "Reconectar" for an IMAP mailbox: a new app password (Gmail/Outlook sign in again instead). */
+/**
+ * "Reconectar" for an IMAP mailbox (a new app password) or a MillionSend inbox (a new API key). Gmail and Outlook
+ * sign in again instead.
+ */
 export function MailReconnectDialog({ account, onClose }: { account: MailAccount | null; onClose: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -996,8 +1185,9 @@ export function MailReconnectDialog({ account, onClose }: { account: MailAccount
   const { update } = useMailAction(org.id);
   const [password, setPassword] = useState("");
   const [touched, setTouched] = useState(false);
-  const [error, setError] = useState<MailConnectError | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const preset = providers.data?.presets.find((p) => p.id === account?.preset) ?? null;
+  const millionsend = account?.via === "millionsend";
   const close = () => {
     setPassword("");
     setTouched(false);
@@ -1009,13 +1199,15 @@ export function MailReconnectDialog({ account, onClose }: { account: MailAccount
     setError(null);
     if (!account || !password.trim()) return;
     update.mutate(
-      { accountId: account.id, password: password.trim() },
+      millionsend
+        ? { accountId: account.id, apiKey: password.trim() }
+        : { accountId: account.id, password: password.trim() },
       {
         onSuccess: (saved) => {
           toast.show(t("mail.reconnected", { address: saved.address }));
           close();
         },
-        onError: (e) => setError(mailErrorOf(e)),
+        onError: setError,
       },
     );
   };
@@ -1024,7 +1216,7 @@ export function MailReconnectDialog({ account, onClose }: { account: MailAccount
       open={account !== null}
       onOpenChange={(o) => !o && close()}
       title={t("mail.reconnectTitle", { address: account?.address ?? "" })}
-      description={t("mail.reconnectText")}
+      description={millionsend ? t("mail.millionsend.reconnectText") : t("mail.reconnectText")}
       closeLabel={t("common.close")}
       width={480}
     >
@@ -1037,18 +1229,30 @@ export function MailReconnectDialog({ account, onClose }: { account: MailAccount
       >
         <DialogBody className="cflow__body">
           <Field
-            label={t("mail.password")}
+            label={millionsend ? t("mail.millionsend.key") : t("mail.password")}
             id="mail-reconnect-password"
-            help={t("mail.passwordHelp")}
-            error={touched && !password.trim() ? t("mail.passwordInvalid") : undefined}
+            help={millionsend ? t("mail.millionsend.keyHelp") : t("mail.passwordHelp")}
+            error={
+              touched && !password.trim()
+                ? t(millionsend ? "mail.millionsend.keyInvalid" : "mail.passwordInvalid")
+                : undefined
+            }
           >
             <Input type="password" autoComplete="off" value={password} onChange={(e) => setPassword(e.target.value)} />
           </Field>
-          <AppPasswordHelp
-            url={preset?.appPasswordUrl ?? null}
-            name={preset?.label ?? (account ? mailChoiceName(t, choiceOf(account)) : "")}
-          />
-          {error && <Alert>{t(`mail.error.${error}`)}</Alert>}
+          {millionsend ? (
+            <MillionSendKeysLink url={providers.data?.millionsend?.keysUrl} />
+          ) : (
+            <AppPasswordHelp
+              url={preset?.appPasswordUrl ?? null}
+              name={preset?.label ?? (account ? mailChoiceName(t, choiceOf(account)) : "")}
+            />
+          )}
+          {error ? (
+            <Alert>
+              {millionsend ? millionSendErrorText(t, error, account?.address) : t(`mail.error.${mailErrorOf(error)}`)}
+            </Alert>
+          ) : null}
         </DialogBody>
         <DialogFooter>
           <Button type="button" onClick={close}>

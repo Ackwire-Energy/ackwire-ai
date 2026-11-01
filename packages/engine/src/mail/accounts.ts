@@ -1,17 +1,38 @@
+import { randomBytes } from "node:crypto";
 import { isIP } from "node:net";
 import {
   type ComposioClient,
   type KeyWrapper,
   type MailAccountRef,
   type MailAdapters,
+  MailAuthError,
   MailError,
   type MailPreset,
   type MailProvider,
   type MailTestError,
+  type MillionSendClient,
+  type MillionSendInbox,
 } from "@agenteschat/adapters";
-import { and, asc, type Database, eq, inArray, isNull, like, ne, notInArray, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  asc,
+  type Database,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  like,
+  ne,
+  notInArray,
+  or,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { recordAudit } from "../audit";
 import { caches } from "../cache";
+import { countComposioConnection } from "../connector-usage";
+import { activeConnections, openConnectionSecret } from "../connectors/connections";
+import { composioToolkitUrl, presetForServer } from "../connectors/presets";
 import { openSecret, sealSecret, sha256 } from "../crypto";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { isBlockedAddress, type ResolveHost, resolveHostDns } from "../net-guard";
@@ -20,7 +41,7 @@ import { closedRefusal, orgStanding } from "../standing";
 import { isEmailAddress, normalizeAddress } from "./text";
 import { restartMailWatches } from "./watches";
 
-const { mailAccounts, mailAgentPolicies, mailWatches, agentScopes, users } = schema;
+const { mailAccounts, mailAgentPolicies, mailWatches, agentScopes, connectorConnections, users } = schema;
 
 export type MailAccountRow = typeof mailAccounts.$inferSelect;
 
@@ -42,8 +63,8 @@ export interface MailDeps {
 
 export interface MailAccountView {
   id: string;
-  provider: "gmail" | "outlook" | "imap";
-  via: "composio" | "imap";
+  provider: "gmail" | "outlook" | "imap" | "millionsend";
+  via: "composio" | "imap" | "millionsend";
   address: string;
   label: string;
   status: "pending" | "active" | "needs_reconnect";
@@ -82,6 +103,9 @@ export const ASKABLE_MAIL_ACTIONS: readonly MailAction[] = ["draft", "organize"]
 const aadFor = (orgId: string, id: string) => `mail-account|${orgId}|${id}`;
 /** Our Composio user id for an organization. */
 export const composioUserId = (orgId: string) => `org_${orgId}`;
+const COMPOSIO_USER = /^org_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+/** The organization of one of our Composio user ids (`composioUserId`), or null for anything else. */
+export const orgOfComposioUser = (userId: string) => COMPOSIO_USER.exec(userId)?.[1] ?? null;
 /** `from=desktop`: started in the desktop app's window, so the callback hands the return back to the app. */
 export const composioCallbackUrl = (publicUrl: string, accountId: string, desktop = false) =>
   `${publicUrl.replace(/\/$/, "")}/api/app/mail/composio/callback?account=${encodeURIComponent(accountId)}${desktop ? "&from=desktop" : ""}`;
@@ -497,6 +521,9 @@ export async function applyComposioStateFor(
   if (known && remote.status === "active") return "active";
   const now = deps.now?.() ?? new Date();
   if (remote.status === "active" && remote.address) {
+    // Composio made a connected account, which it bills once past the free ones: a reconnect's too, and one that
+    // goes away below (ADR 0103).
+    if (row.status !== "active") await countComposioConnection(deps.db, { orgId: row.orgId, toolkit: row.provider });
     const address = normalizeAddress(remote.address);
     if (row.status === "needs_reconnect" && row.address && address !== row.address) {
       // Signed in to another mailbox: it doesn't take this one's place (its agents and rules are for this
@@ -591,12 +618,211 @@ export async function completeComposioConnect(
   }
 }
 
+// ── MillionSend inboxes ─────────────────────────────────────────────────────
+
+/** What a MillionSend mailbox keeps sealed: its key, and the webhook that wakes routines when it has one. */
+interface MillionSendSecret {
+  apiKey: string;
+  webhook?: { id: string; secret: string };
+}
+
+/** The key the person pasted, or (when they chose it) the one the workspace's MillionSend connector holds. */
+export type MillionSendKeyInput = { apiKey?: string; useConnector?: boolean };
+
+const millionSendOf = (deps: Pick<MailDeps, "mail">) => {
+  const ms = deps.mail?.millionsend;
+  if (!ms) throw new ConflictError("MillionSend inboxes are off on this server", "mail.millionsend_disabled");
+  return ms;
+};
+
+/**
+ * The API key of the workspace's MillionSend connector (the one-click server, or MillionSend's server connected
+ * by its address), when it was connected with a key: a sign-in holds a token for MillionSend's MCP only.
+ */
+export async function millionSendConnectorKey(deps: Pick<MailDeps, "db" | "keyWrappers">, orgId: string) {
+  const connections = await activeConnections(deps.db, orgId);
+  for (const c of connections) {
+    if (c.authType !== "api_key") continue;
+    if (c.connector !== "millionsend" && presetForServer(c.serverUrl)?.id !== "millionsend") continue;
+    const secret = await openConnectionSecret(deps.keyWrappers, c).catch(() => null);
+    if (secret?.apiKey) return secret.apiKey;
+  }
+  return null;
+}
+
+async function millionSendKey(deps: MailDeps, orgId: string, input: MillionSendKeyInput) {
+  const pasted = input.apiKey?.trim();
+  if (pasted) return pasted;
+  if (input.useConnector) {
+    const key = await millionSendConnectorKey(deps, orgId);
+    if (!key) throw new ValidationError("The MillionSend connector has no key", "mail.millionsend_no_connector_key");
+    return key;
+  }
+  throw new ValidationError("Paste the MillionSend API key", "mail.millionsend_key_required");
+}
+
+/**
+ * Where MillionSend posts new mail (`{PUBLIC_URL}/api/webhooks/millionsend`); null when it couldn't reach this
+ * server (not https, or a local or private host), so the mailbox is only polled.
+ */
+export function millionSendWebhookUrl(publicUrl: string) {
+  let url: URL;
+  try {
+    url = new URL(publicUrl);
+  } catch {
+    return null;
+  }
+  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (url.protocol !== "https:") return null;
+  if (host === "localhost" || /\.(localhost|local|internal)$/.test(host)) return null;
+  if (isIP(host) && isBlockedAddress(host)) return null;
+  return `${publicUrl.replace(/\/$/, "")}/api/webhooks/millionsend`;
+}
+
+/** MillionSend Cloud's page for API keys, when this server talks to MillionSend Cloud (a self-hosted one has its own). */
+export const millionSendKeysUrl = (apiUrl: string) =>
+  URL.canParse(apiUrl) && new URL(apiUrl).hostname === "api.millionsend.com"
+    ? "https://app.millionsend.com/api-keys"
+    : null;
+
+/** A new webhook for the inbox, best effort: a key that may not create one (or any failure) leaves it polled. */
+async function newMillionSendWebhook(deps: MailDeps, apiKey: string, inboxId: string) {
+  const endpoint = millionSendWebhookUrl(deps.publicUrl);
+  if (!endpoint) return undefined;
+  const secret = `whsec_${randomBytes(32).toString("base64")}`;
+  const created = await millionSendOf(deps)
+    .client.createWebhook(apiKey, { endpoint, inboxId, secret })
+    .catch(() => null);
+  return created ? { id: created.id, secret } : undefined;
+}
+
+async function sealMillionSend(deps: MailDeps, orgId: string, id: string, secret: MillionSendSecret) {
+  const wrapper = deps.keyWrappers[0];
+  if (!wrapper) throw new Error("no key wrapper");
+  const sealed = await sealSecret(wrapper, JSON.stringify(secret), aadFor(orgId, id));
+  return { secretCiphertext: sealed.ciphertext, wrappedDataKey: sealed.wrappedDataKey, kekId: sealed.kekId };
+}
+
+/** A MillionSend mailbox's sealed key and webhook (backend only). */
+export async function openMillionSendSecret(
+  deps: Pick<MailDeps, "keyWrappers">,
+  row: MailAccountRow,
+): Promise<MillionSendSecret> {
+  if (!row.secretCiphertext || !row.wrappedDataKey || !row.kekId) throw new MailError("Mailbox has no key", false);
+  const json = await openSecret(
+    deps.keyWrappers,
+    { ciphertext: row.secretCiphertext, wrappedDataKey: row.wrappedDataKey, kekId: row.kekId },
+    aadFor(row.orgId, row.id),
+  );
+  return JSON.parse(json) as MillionSendSecret;
+}
+
+/**
+ * MillionSend stops posting a mailbox's new mail here: its webhook goes (a 404 counts as done). A key MillionSend
+ * refuses can delete nothing anymore, which counts as done too.
+ */
+export async function forgetAtMillionSend(
+  client: Pick<MillionSendClient, "deleteWebhook">,
+  deps: Pick<MailDeps, "keyWrappers">,
+  row: MailAccountRow,
+) {
+  const secret = await openMillionSendSecret(deps, row);
+  if (!secret.webhook) return;
+  await client.deleteWebhook(secret.apiKey, secret.webhook.id).catch((error: unknown) => {
+    if (!(error instanceof MailAuthError)) throw error;
+  });
+}
+
+/** Why a key didn't open any inbox, as the screens explain it. */
+const millionSendFailure = (error: unknown): { ok: false; error: MailTestError } => ({
+  ok: false,
+  error: error instanceof MailAuthError ? "auth" : "unknown",
+});
+
+/** The inboxes a key reaches, for the connect step (admins); `connected`: already a mailbox of this workspace. */
+export async function listMillionSendInboxes(
+  deps: MailDeps,
+  actorId: string,
+  orgId: string,
+  input: MillionSendKeyInput,
+): Promise<{ ok: true; inboxes: (MillionSendInbox & { connected: boolean })[] } | { ok: false; error: MailTestError }> {
+  await requirePermission(deps.db, actorId, orgId, "manage_connectors");
+  const ms = millionSendOf(deps);
+  const apiKey = await millionSendKey(deps, orgId, input);
+  let inboxes: MillionSendInbox[];
+  try {
+    inboxes = await ms.client.listInboxes(apiKey);
+  } catch (error) {
+    return millionSendFailure(error);
+  }
+  const taken = new Set((await orgMailAccounts(deps.db, orgId)).map((a) => a.address));
+  return { ok: true, inboxes: inboxes.map((i) => ({ ...i, connected: taken.has(i.address) })) };
+}
+
+/**
+ * Connects one MillionSend inbox (admins): the key must reach it; the key is sealed bound to (org, account), and a
+ * webhook signed with a secret of ours is created when the key may and this server is reachable (`instant`).
+ */
+export async function createMillionSendAccount(
+  deps: MailDeps,
+  actorId: string,
+  orgId: string,
+  input: MillionSendKeyInput & { inboxId: string; label?: string },
+): Promise<{ ok: true; account: MailAccountView; instant: boolean } | { ok: false; error: MailTestError }> {
+  await requirePermission(deps.db, actorId, orgId, "manage_connectors");
+  const ms = millionSendOf(deps);
+  const apiKey = await millionSendKey(deps, orgId, input);
+  let inbox: MillionSendInbox | undefined;
+  try {
+    inbox = (await ms.client.listInboxes(apiKey)).find((i) => i.id === input.inboxId);
+  } catch (error) {
+    return millionSendFailure(error);
+  }
+  if (!inbox) throw new NotFoundError("This key doesn't reach that inbox", "mail.millionsend_inbox_not_found");
+  const address = normalizeAddress(inbox.address);
+  if (!(await assertAddressFree(deps.db, orgId, address))) {
+    throw new ConflictError("This mailbox is already connected", "mail.already_connected");
+  }
+  const id = crypto.randomUUID();
+  const webhook = await newMillionSendWebhook(deps, apiKey, inbox.id);
+  try {
+    const [row] = await deps.db
+      .insert(mailAccounts)
+      .values({
+        id,
+        orgId,
+        provider: "millionsend",
+        via: "millionsend",
+        address,
+        label: input.label?.trim().slice(0, 80) || inbox.name?.trim().slice(0, 80) || address,
+        status: "active",
+        externalAccountId: inbox.id,
+        ...(await sealMillionSend(deps, orgId, id, { apiKey, ...(webhook ? { webhook } : {}) })),
+        createdByUserId: actorId,
+      })
+      .returning();
+    if (!row) throw new Error("mail account insert returned nothing");
+    await recordAudit(deps.db, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "mail_account.connected",
+      target: { type: "mail_account", id },
+      details: { via: "millionsend", address, webhook: Boolean(webhook) },
+    });
+    return { ok: true, account: mailAccountView(row), instant: Boolean(webhook) };
+  } catch (error) {
+    if (webhook) await ms.client.deleteWebhook(apiKey, webhook.id).catch(() => {});
+    throw error;
+  }
+}
+
 // ── Changes ─────────────────────────────────────────────────────────────────
 
 /**
  * Renames, turns actions on or off, sets the mailbox's other addresses and
- * the one new mail goes out from, or (IMAP) replaces the app password after
- * testing it. An agent pinned to an address the mailbox no longer has goes
+ * the one new mail goes out from, or replaces its secret after testing it
+ * (IMAP: the app password; MillionSend: the API key, which must still reach
+ * the inbox). An agent pinned to an address the mailbox no longer has goes
  * back to the default.
  */
 export async function updateMailAccount(
@@ -607,6 +833,7 @@ export async function updateMailAccount(
   input: {
     label?: string;
     password?: string;
+    apiKey?: string;
     offActions?: string[];
     askActions?: string[];
     aliases?: string[];
@@ -670,6 +897,26 @@ export async function updateMailAccount(
       lastError: null,
     });
   }
+  if (input.apiKey !== undefined) {
+    if (row.via !== "millionsend") throw new ValidationError("Only MillionSend mailboxes have a key", "mail.no_key");
+    const apiKey = input.apiKey.trim();
+    if (!apiKey) throw new ValidationError("Paste the MillionSend API key", "mail.millionsend_key_required");
+    let reaches: boolean;
+    try {
+      reaches = (await millionSendOf(deps).client.listInboxes(apiKey)).some((i) => i.id === row.externalAccountId);
+    } catch (error) {
+      return millionSendFailure(error);
+    }
+    if (!reaches) throw new NotFoundError("This key doesn't reach that inbox", "mail.millionsend_inbox_not_found");
+    // The webhook belongs to the MillionSend team, not to the key: it stays. Without one, this key may create it.
+    const old = await openMillionSendSecret(deps, row).catch(() => null);
+    const webhook = old?.webhook ?? (await newMillionSendWebhook(deps, apiKey, row.externalAccountId ?? ""));
+    Object.assign(set, {
+      ...(await sealMillionSend(deps, orgId, row.id, { apiKey, ...(webhook ? { webhook } : {}) })),
+      status: "active",
+      lastError: null,
+    });
+  }
   if (Object.keys(set).length > 0) {
     await deps.db
       .update(mailAccounts)
@@ -688,8 +935,8 @@ export async function updateMailAccount(
         details: { aliases, defaultFrom: "defaultFrom" in set ? set.defaultFrom : row.defaultFrom },
       });
     }
-    if (input.password !== undefined) {
-      // Watches stopped by the old password start again.
+    if (input.password !== undefined || input.apiKey !== undefined) {
+      // Watches stopped by the old password or key start again.
       await deps.db
         .update(mailWatches)
         .set({ status: "active", lastError: null, updatedAt: new Date() })
@@ -697,7 +944,7 @@ export async function updateMailAccount(
       await recordAudit(deps.db, {
         orgId,
         actor: { type: "person", id: actorId },
-        action: "mail_account.password_rotated",
+        action: input.apiKey !== undefined ? "mail_account.key_rotated" : "mail_account.password_rotated",
         target: { type: "mail_account", id: row.id },
       });
     }
@@ -722,11 +969,21 @@ export async function forgetAtComposio(
   if (failures.length > 0) throw failures[0];
 }
 
+/** The toolkits behind the same Google or Microsoft app as a mailbox's, which may share its grant. */
+const SAME_APP_TOOLKITS: Record<string, string[]> = {
+  gmail: ["googledrive", "googledocs", "googlesheets", "googlecalendar"],
+  outlook: ["one_drive", "microsoft_teams"],
+};
+
 /**
- * Whether another connection still in use, in this workspace or another, reaches the same mailbox through Composio:
- * they share one grant at Google or Microsoft, so forgetting this one must leave that grant alone.
+ * Whether another connection still in use, in this workspace or another, reaches the same mailbox's grant through
+ * Composio: another mailbox of the address, or a connector on the same provider's app (Drive, Calendar…) of that
+ * account, or of an account it can't name. Forgetting this one must then leave that grant alone.
  */
-export async function composioGrantShared(db: Pick<Database, "select">, box: { id: string; address: string }) {
+export async function composioGrantShared(
+  db: Pick<Database, "select">,
+  box: { id: string; address: string; provider: string },
+) {
   if (!box.address) return false;
   const [other] = await db
     .select({ id: mailAccounts.id })
@@ -740,7 +997,22 @@ export async function composioGrantShared(db: Pick<Database, "select">, box: { i
       ),
     )
     .limit(1);
-  return Boolean(other);
+  if (other) return true;
+  const toolkits = SAME_APP_TOOLKITS[box.provider];
+  if (!toolkits) return false;
+  const [connector] = await db
+    .select({ id: connectorConnections.id })
+    .from(connectorConnections)
+    .where(
+      and(
+        inArray(connectorConnections.serverUrl, toolkits.map(composioToolkitUrl)),
+        isNotNull(connectorConnections.composioAccountId),
+        isNull(connectorConnections.revokedAt),
+        or(isNull(connectorConnections.accountId), sql`lower(${connectorConnections.accountId}) = ${box.address}`),
+      ),
+    )
+    .limit(1);
+  return Boolean(connector);
 }
 
 /**
@@ -757,6 +1029,8 @@ export async function revokeMailAccount(deps: MailDeps, actorId: string, orgId: 
     const revoke = !(await composioGrantShared(deps.db, row));
     await forgetAtComposio(composio.client, row.externalAccountId, triggers, revoke).catch(() => {});
   }
+  const ms = deps.mail?.millionsend;
+  if (row.via === "millionsend" && ms) await forgetAtMillionSend(ms.client, deps, row).catch(() => {});
   const now = new Date();
   await deps.db.transaction(async (tx) => {
     await tx.update(mailAccounts).set({ revokedAt: now, updatedAt: now }).where(eq(mailAccounts.id, row.id));
@@ -803,6 +1077,10 @@ export async function accountRef(deps: MailDeps, row: MailAccountRow, password?:
     via: row.via as MailAccountRef["via"],
     address: row.address,
   };
+  if (row.via === "millionsend") {
+    const { apiKey } = await openMillionSendSecret(deps, row);
+    return { ...base, millionsend: { apiKey, inboxId: row.externalAccountId ?? "" } };
+  }
   if (row.via !== "imap") {
     return { ...base, externalAccountId: row.externalAccountId, externalUserId: composioUserId(row.orgId) };
   }
@@ -834,8 +1112,11 @@ export async function accountRef(deps: MailDeps, row: MailAccountRow, password?:
 export function connectorFor(deps: Pick<MailDeps, "mail">, via: string) {
   if (via === "composio") return deps.mail?.composio?.connector ?? null;
   if (via === "imap") return deps.mail?.imap?.connector ?? null;
+  if (via === "millionsend") return deps.mail?.millionsend?.connector ?? null;
   return null;
 }
+
+const PATH_NAMES: Record<string, string> = { composio: "Gmail/Outlook", imap: "IMAP", millionsend: "MillionSend" };
 
 /** Opens one mailbox of the org (backend only; the caller closes it). */
 export async function openMailProvider(deps: MailDeps, orgId: string, accountId: string): Promise<MailProvider> {
@@ -845,7 +1126,7 @@ export async function openMailProvider(deps: MailDeps, orgId: string, accountId:
 
 export async function openAccount(deps: MailDeps, row: MailAccountRow): Promise<MailProvider> {
   const connector = connectorFor(deps, row.via);
-  if (!connector) throw new MailError(`${row.via === "imap" ? "IMAP" : "Gmail/Outlook"} mailboxes are off`, false);
+  if (!connector) throw new MailError(`${PATH_NAMES[row.via] ?? row.via} mailboxes are off`, false);
   return connector.open(await accountRef(deps, row));
 }
 
@@ -888,7 +1169,12 @@ export async function suggestMailAddresses(deps: MailDeps, actorId: string, orgI
 
 /** Which paths this server offers (`GET …/mail/providers`). */
 export function mailProviders(mail: MailAdapters | null | undefined) {
-  return { composio: !!mail?.composio, imap: !!mail?.imap, presets: mail?.imap?.presets ?? [] };
+  return {
+    composio: !!mail?.composio,
+    imap: !!mail?.imap,
+    presets: mail?.imap?.presets ?? [],
+    millionsend: !!mail?.millionsend,
+  };
 }
 
 /** Active mailboxes for agents: not pending, not disconnected. */

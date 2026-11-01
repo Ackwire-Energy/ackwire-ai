@@ -3,6 +3,7 @@ import {
   keys,
   useAgents,
   useCatalog,
+  useComposioUsage,
   useConnections,
   useCustomServerAction,
   useCustomServers,
@@ -11,13 +12,38 @@ import {
   useMailAccounts,
   useMailAction,
   useMailProviders,
+  useRenameConnection,
 } from "@agenteschat/client";
 import { levelIn } from "@agenteschat/client/lib/access-levels";
-import { type ConnectedItem, connectedIds, connectedItems, itemName } from "@agenteschat/client/lib/connected";
+import { composioUsageText, nearComposioLimit } from "@agenteschat/client/lib/composio";
+import {
+  type ConnectedItem,
+  connectedIds,
+  connectedItems,
+  itemName,
+  outcomeText,
+} from "@agenteschat/client/lib/connected";
+import { sameServer } from "@agenteschat/client/lib/custom-tools";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { choiceOf, newestAccount } from "@agenteschat/client/lib/mail";
 import { can } from "@agenteschat/client/lib/permissions";
-import { AvatarStack, Button, Card, Chip, Dialog, DialogFooter, List } from "@agenteschat/ui";
+import { connectorBrand } from "@agenteschat/client/lib/scopes";
+import {
+  AvatarStack,
+  Button,
+  Card,
+  Chip,
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  Field,
+  Input,
+  List,
+  Menu,
+  MenuItem,
+  MenuSeparator,
+} from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -53,35 +79,41 @@ import { useToast } from "@/lib/toast";
  * service whatever its kind (state, account, who uses it), "Adicionar
  * conector" (the catalog) and the 3-step connect flow.
  *
- * Back from OAuth: `?connected=github` (or `custom:{id}`) reopens the flow at
- * "O que faz" for that connection; `?review=1` (older returns) opens the
- * newest server waiting for review. Back from Gmail/Outlook:
+ * Back from OAuth: `?connected=github` (or `custom:{id}`) and `?outcome` say what
+ * came in; a new account reopens the flow at "O que faz" for it (a numbered one
+ * asks its name there first); `?review=1` (older returns) opens the newest
+ * server waiting for review. Back from Gmail/Outlook:
  * `?mail=connected&account={id}` opens "O que faz" for that mailbox (older
  * returns without `account`: the newest); `?mail=failed` says it didn't work.
  * Each flow ends on who can use it. Mailboxes (ADR 0038) are rows of the same list.
  */
 export function ConnectorsSection({
   connected,
+  outcome,
   review,
   mail,
   account,
 }: {
   connected?: string;
+  /** What the OAuth return did: `connected` (a new account), `reconnected` or `same_account`. */
+  outcome?: string;
   review?: boolean;
   mail?: string;
   /** The mailbox Gmail/Outlook came back with. */
   account?: string;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const admin = can(org, "manage_connectors");
   const catalog = useCatalog();
   const connections = useConnections(org.id);
   const servers = useCustomServers(org.id);
   const agents = useAgents(org.id);
+  const composio = useComposioUsage(org.id);
   const [adding, setAdding] = useState(false);
   const [flow, setFlow] = useState<FlowState | null>(null);
   const [removing, setRemoving] = useState<ConnectedItem | null>(null);
+  const [renaming, setRenaming] = useState<ConnectedItem | null>(null);
   const toast = useToast();
   const mailProviders = useMailProviders(org.id);
   const mailAccounts = useMailAccounts(org.id);
@@ -98,7 +130,7 @@ export function ConnectorsSection({
   const [reconnectingDb, setReconnectingDb] = useState<DatabaseConnection | null>(null);
   const [removingDb, setRemovingDb] = useState<DatabaseConnection | null>(null);
   const reconnect = (account: MailAccount) => {
-    // Gmail/Outlook sign in again on the provider's page; the rest take a new app password.
+    // Gmail/Outlook sign in again on the provider's page; the rest take a new app password or API key.
     if (account.via === "composio" && (account.provider === "gmail" || account.provider === "outlook")) {
       connectComposio.mutate(
         { provider: account.provider, accountId: account.id, desktop: takesConnectorReturn() },
@@ -144,11 +176,17 @@ export function ConnectorsSection({
       : connected
         ? latest(all.filter((i) => !i.custom && i.def?.id === connected))
         : latest(all.filter((i) => i.custom && i.needsReview));
-    // Signing in elsewhere ends here: say it worked, as connecting with a key does.
-    if (item && connected) toast.show(t("connectors.connectedToast", { name: itemName(t, item) }));
-    if (item && admin) setFlow({ step: 1, item });
+    const done = outcome === "reconnected" || outcome === "same_account" ? outcome : "connected";
+    // Signing in elsewhere ends here: say what happened, as connecting with a key does.
+    if (item && connected) toast.show(outcomeText(t, done, item));
+    // Only a new account goes on to its tools; another account of a server the provider didn't name, to its name.
+    const url = item?.server?.serverUrl;
+    const naming =
+      Boolean(url && !item?.server?.accountLabel) &&
+      all.filter((i) => i.server && url && sameServer(i.server.serverUrl, url)).length > 1;
+    if (item && admin && done === "connected") setFlow({ step: 1, item, naming });
     window.history.replaceState(null, "", window.location.pathname);
-  }, [connected, review, connections.data, servers.data, catalog.data, listsFetching, admin, t, toast]);
+  }, [connected, outcome, review, connections.data, servers.data, catalog.data, listsFetching, admin, t, toast]);
 
   return (
     <Card aria-labelledby="sec-conn">
@@ -162,6 +200,9 @@ export function ConnectorsSection({
           </Button>
         )}
       </div>
+      {composio.data && nearComposioLimit(composio.data) && (
+        <p className="small muted">{composioUsageText(t, i18n.language, composio.data)}</p>
+      )}
       {(connections.isLoading || servers.isLoading) && <LoadingList count={2} trailing />}
       {connections.isSuccess &&
         servers.isSuccess &&
@@ -204,6 +245,9 @@ export function ConnectorsSection({
               admin={admin}
               onTools={() => setFlow({ step: 1, item })}
               onWho={() => setFlow({ step: 2, item })}
+              onRename={() => setRenaming(item)}
+              onReconnect={() => setFlow({ step: 0, def: item.def, mode: "reconnect", item })}
+              onAddAccount={() => setFlow({ step: 0, def: item.def, mode: "add", item })}
               onDisconnect={() => setRemoving(item)}
             />
           ))}
@@ -219,7 +263,9 @@ export function ConnectorsSection({
         loading={catalog.isLoading}
         onPick={(def) => {
           setAdding(false);
-          setFlow({ step: 0, def });
+          // Connected already: a server by address takes another account, a catalog connector a new sign-in.
+          const item = items.find((i) => i.def?.id === def.id);
+          setFlow(item ? { step: 0, def, mode: item.custom ? "add" : "reconnect", item } : { step: 0, def });
         }}
         onOther={() => {
           setAdding(false);
@@ -254,11 +300,15 @@ export function ConnectorsSection({
         using={removing ? using(removing).length : 0}
         onClose={() => setRemoving(null)}
       />
+      <RenameDialog item={renaming} onClose={() => setRenaming(null)} />
     </Card>
   );
 }
 
-/** One connected service: icon, name, state, account, who uses it, and what you can do. */
+/**
+ * One connected account: icon, name, state, account, who uses it, and what you can do (Quem usa, Ferramentas, and
+ * in ⋯ Renomear, Reconectar, another account of an MCP server, Desconectar).
+ */
 function ConnectedRow({
   item,
   using,
@@ -266,6 +316,9 @@ function ConnectedRow({
   admin,
   onTools,
   onWho,
+  onRename,
+  onReconnect,
+  onAddAccount,
   onDisconnect,
 }: {
   item: ConnectedItem;
@@ -274,6 +327,9 @@ function ConnectedRow({
   admin: boolean;
   onTools: () => void;
   onWho: () => void;
+  onRename: () => void;
+  onReconnect: () => void;
+  onAddAccount: () => void;
   onDisconnect: () => void;
 }) {
   const { t, i18n } = useTranslation();
@@ -288,7 +344,11 @@ function ConnectedRow({
       <span className="list-col connected-row__text">
         <span className="connected-row__name">
           <span>{itemName(t, item)}</span>
-          {item.pending > 0 && item.server?.reviewedAt ? (
+          {item.needsReconnect ? (
+            <Chip icon="alert" tone="waiting">
+              {t("connectors.composio.needsReconnect")}
+            </Chip>
+          ) : item.pending > 0 && item.server?.reviewedAt ? (
             <Chip icon="waiting" tone="waiting">
               {t("connectors.toReview", { count: item.pending })}
             </Chip>
@@ -318,7 +378,17 @@ function ConnectedRow({
       </span>
       {admin && (
         <div className="connected-row__actions">
-          {item.needsReview && (
+          {item.needsReconnect && (
+            <Button
+              size="sm"
+              variant="primary"
+              aria-label={t("connectors.reconnectName", { name: itemName(t, item) })}
+              onClick={onReconnect}
+            >
+              {t("connectors.detail.reconnect")}
+            </Button>
+          )}
+          {item.needsReview && !item.needsReconnect && (
             <Button
               size="sm"
               variant="primary"
@@ -339,17 +409,109 @@ function ConnectedRow({
           >
             {t("connectors.tools")}
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            aria-label={t("connectors.disconnectName", { name: itemName(t, item) })}
-            onClick={onDisconnect}
+          <Menu
+            align="end"
+            label={t("connectors.actionsName", { name: itemName(t, item) })}
+            trigger={
+              <Button
+                size="sm"
+                variant="ghost"
+                iconOnly
+                icon="more"
+                aria-label={t("connectors.actionsName", { name: itemName(t, item) })}
+              />
+            }
           >
-            {t("connectors.disconnect")}
-          </Button>
+            <MenuItem icon="edit" onSelect={onRename}>
+              {t("connectors.rename")}
+            </MenuItem>
+            <MenuItem icon="refresh" onSelect={onReconnect}>
+              {t("connectors.detail.reconnect")}
+            </MenuItem>
+            {item.custom && (
+              <MenuItem icon="plus" onSelect={onAddAccount}>
+                {t("connectors.detail.addAccount")}
+              </MenuItem>
+            )}
+            <MenuSeparator />
+            <MenuItem icon="power" danger onSelect={onDisconnect}>
+              {t("connectors.disconnect")}
+            </MenuItem>
+          </Menu>
         </div>
       )}
     </div>
+  );
+}
+
+/** "Renomear": the account's name, which people and agents tell it apart by (its tools keep their names). */
+function RenameDialog({ item, onClose }: { item: ConnectedItem | null; onClose: () => void }) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const rename = useRenameConnection(org.id);
+  const [label, setLabel] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const name = item ? itemName(t, item) : "";
+  useEffect(() => {
+    setLabel(item?.label ?? "");
+    setError(null);
+  }, [item]);
+  const submit = () => {
+    if (!item) return;
+    const wanted = label.trim();
+    if (!wanted || wanted === item.label) return onClose();
+    rename.mutate(
+      { id: item.id, label: wanted },
+      {
+        onSuccess: (saved) => {
+          toast.show(t("connectors.renamed", { name: saved.label }));
+          onClose();
+        },
+        onError: (failed) => setError(errorText(t, failed, i18n.language)),
+      },
+    );
+  };
+  return (
+    <Dialog
+      open={item !== null}
+      onOpenChange={(o) => !o && onClose()}
+      title={t("connectors.renameTitle", { name })}
+      closeLabel={t("common.close")}
+      width={440}
+    >
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
+        <DialogBody>
+          <Field
+            label={t("connectFlow.name")}
+            id="connector-rename"
+            help={t("connectors.renameHelp")}
+            error={error ?? undefined}
+          >
+            <Input
+              value={label}
+              maxLength={80}
+              autoFocus
+              onChange={(e) => {
+                setLabel(e.target.value);
+                setError(null);
+              }}
+            />
+          </Field>
+        </DialogBody>
+        <DialogFooter>
+          <Button onClick={onClose}>{t("common.cancel")}</Button>
+          <Button type="submit" variant="primary" disabled={rename.isPending} loading={rename.isPending}>
+            {t("common.save")}
+          </Button>
+        </DialogFooter>
+      </form>
+    </Dialog>
   );
 }
 
@@ -380,6 +542,13 @@ function DisconnectDialog({
       closeLabel={t("common.close")}
       width={440}
     >
+      {item?.viaComposio && (
+        <DialogBody>
+          <p className="small muted">
+            {t("connectors.composio.disconnectNote", { name: item.def ? connectorBrand(item.def) : name })}
+          </p>
+        </DialogBody>
+      )}
       <DialogFooter>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button

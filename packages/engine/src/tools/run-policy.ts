@@ -75,6 +75,7 @@ const ELSEWHERE = new Set([
   "tell_agent",
   "schedule_reminder",
   "cancel_reminder",
+  "schedule_action",
   "create_routine",
   "update_routine",
   "delete_routine",
@@ -165,6 +166,8 @@ const isReadScope = (scope: string) => /[:.]read$/.test(scope);
 /** What a tool does (see `ToolKind`): provenance first, then built-in name and scope. */
 export function toolKind(tool: PolicyTool): ToolKind {
   if (directoryRole(tool as ToolDefinition)) return { kind: "directory" };
+  // A way in like a directory's: the gateway runs the action approved ahead it names, judged as that action.
+  if (tool.name === "run_approved_action" && !tool.connectionId && tool.scope === "") return { kind: "directory" };
   // These Git tools carry a connection ID for credentials, but they are our own
   // workspace-changing actions. Their exact scopes distinguish them from MCP tools.
   if (tool.name === "git_clone" && tool.scope === "github:git.read") return { kind: "internal", area: "code" };

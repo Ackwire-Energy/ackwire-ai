@@ -534,9 +534,8 @@ describe("Aprovar sempre", () => {
     const ask = asked(await invoke(gateway, ctx, EXEC, { ...exec("GITHUB_CREATE_AN_ISSUE_COMMENT"), why: WHY }));
     await decide(f, f.owner.id, ask.id, { decision: "approve", always: true });
     await saveCustomTools(deps, f.owner.id, f.org.id, serverId, { label: "Cmposio", tools: [] });
-    expect(
-      (await invoke(gateway, ctx, `cmposio_${COMPOSIO_EXECUTOR}`, exec("GITHUB_CREATE_AN_ISSUE_COMMENT"))).type,
-    ).toBe("result");
+    // Renaming never renames tools (ADR 0099): the same name runs, and the rule still covers it.
+    expect((await invoke(gateway, ctx, EXEC, exec("GITHUB_CREATE_AN_ISSUE_COMMENT"))).type).toBe("result");
     expect(mcp.calls.map((c) => c.tool)).toEqual([COMPOSIO_EXECUTOR]);
     expect(await listApprovalRules(f.db, f.owner.id, f.org.id, f.agent.id)).toMatchObject([
       { connectionId: serverId, server: "Cmposio", tool: COMPOSIO_EXECUTOR, action: "GITHUB_CREATE_AN_ISSUE_COMMENT" },

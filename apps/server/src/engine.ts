@@ -8,6 +8,8 @@ import {
   type BrainTurn,
   CodexBrain,
   type ContextDeps,
+  composioConnectorsOf,
+  connectOverHttp,
   createArtifactToolSource,
   createAskAgentToolSource,
   createAskUserToolSource,
@@ -84,9 +86,11 @@ import {
   streamClosed,
   type ToolSource,
   warmAgentBrowser,
+  withComposio,
   withJudgeFallback,
 } from "@agenteschat/engine";
 import { createVoyageEmbeddings, type EmbeddingProvider, type ModelProvider } from "@agenteschat/providers";
+import { hookConfig } from "./routes/app/context";
 
 /** Why `/api/terminal` closes (with 4404) where sessions are screened (ADR 0076 §7). */
 export const NO_TERMINAL = "no_terminal";
@@ -214,13 +218,16 @@ export function buildEngine(o: EngineOptions) {
     gateway,
     resolveModel: (orgId) => resolveSummaryModel(context, orgId),
   });
+  // Services through Composio (ADR 0107) share the mailboxes' client and its per-workspace count of calls.
+  const composio = composioConnectorsOf(adapters.mail);
   const connectorDeps = {
     db,
     keyWrappers,
     oauthApps: connectorOAuthApps(config),
     publicUrl: config.PUBLIC_URL,
     http: o.http,
-    connect: o.mcpConnect,
+    connect: withComposio(o.mcpConnect ?? connectOverHttp, composio),
+    composio,
   };
   const storage: StorageDeps = {
     db,
@@ -301,11 +308,16 @@ export function buildEngine(o: EngineOptions) {
       createIssueToolSource({ db, pubsub: adapters.pubsub }),
       createSkillToolSource({ db, blobs: artifacts.blobs }),
       createCalendarToolSource({ db, pubsub: adapters.pubsub, publicUrl: config.PUBLIC_URL }),
-      createScheduleToolSource({ pubsub: adapters.pubsub, context, mail: adapters.mail }),
+      createScheduleToolSource({
+        pubsub: adapters.pubsub,
+        context,
+        mail: adapters.mail,
+        hooks: hookConfig(config),
+      }),
       createForumToolSource({ pubsub: adapters.pubsub, artifacts }),
       createWikiToolSource({ pubsub: adapters.pubsub, search: context, artifacts }),
       createContextToolSource(context),
-      createConnectorToolSource(connectorDeps),
+      createConnectorToolSource({ ...connectorDeps, artifacts, log: o.log }),
       // People's mailboxes (ADR 0038): only when the server has a mail path (Composio, IMAP).
       createMailToolSource({
         keyWrappers,
@@ -355,7 +367,7 @@ export function buildEngine(o: EngineOptions) {
       }),
       ...(o.toolSources ?? []),
     ],
-    catalog: { oauthApps: connectorDeps.oauthApps, mail: adapters.mail },
+    catalog: { oauthApps: connectorDeps.oauthApps, mail: adapters.mail, composio },
   });
   // Mission tasks' tools and computer-brain runs' tools come through the hub's MCP bridge (ADR 0032).
   machineHub.setMissionHooks(createMissionHooks({ db, ...missionDeps, tools }));

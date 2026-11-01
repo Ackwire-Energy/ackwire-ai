@@ -266,6 +266,8 @@ describe("the agent page: one line, never a paragraph of tool names", () => {
       label: "Ads",
       def: null,
       account: "ads.example.com",
+      viaComposio: false,
+      needsReconnect: false,
       createdAt: SERVER.createdAt,
       tools: 7,
       pending: 0,

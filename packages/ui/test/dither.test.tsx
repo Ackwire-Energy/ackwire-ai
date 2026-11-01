@@ -6,7 +6,7 @@ setupDom();
 import { render } from "@testing-library/react";
 import { Avatar, ditherCells, ditherSvg, ditherTones, ditherUrl, Logo } from "../src";
 import { liveAgentCount } from "../src/agent/live";
-import { avatarSkyCell, avatarSkyCells, avatarSkyTones } from "../src/sky/avatar";
+import { avatarSky, avatarSkyCell, avatarSkyCells, avatarSkyTones } from "../src/sky/avatar";
 
 describe("agent dither", () => {
   test("covers the whole grid, light on top and deep at the bottom", () => {
@@ -75,5 +75,27 @@ describe("avatar tile sky", () => {
     expect(row(n - 1)).toBe(n);
     expect(row(Math.floor(n / 2))).toBeGreaterThan(0);
     expect(row(Math.floor(n / 2))).toBeLessThan(n);
+  });
+
+  test("the tile sky cache stays small while a picker's live preview asks for a new color every move", () => {
+    const make = document.createElement.bind(document);
+    let drawn = 0;
+    document.createElement = ((tag: string) => {
+      if (tag === "canvas") drawn++;
+      return make(tag);
+    }) as typeof document.createElement;
+    try {
+      avatarSky("violet", 33, false);
+      avatarSky("violet", 33, false);
+      expect(drawn).toBe(1);
+      const hex = (i: number) => `#${i.toString(16).padStart(6, "0")}`;
+      for (let i = 0; i < 400; i++) avatarSky(hex(i * 40000), 33, false);
+      drawn = 0;
+      avatarSky(hex(0), 33, false);
+      // The first color was forgotten (drawn again), so the caches never grew past their bound.
+      expect(drawn).toBe(1);
+    } finally {
+      document.createElement = make;
+    }
   });
 });

@@ -25,7 +25,8 @@ export type AppHref =
   | "/threads"
   | "/join-requests"
   | "/computer-setup"
-  | "/connect-ai?ready=1";
+  | "/connect-ai?ready=1"
+  | "/usage";
 
 export const chatHref = (channelId: string, threadId?: string | null): AppHref =>
   threadId && threadId !== channelId ? `/chat/${channelId}?thread=${threadId}` : `/chat/${channelId}`;
@@ -162,6 +163,8 @@ export function notificationHref(
   if (n.kind === "agent_unreached") return isSafeId(s.agentId) ? `/agent/${s.agentId}` : null;
   if (n.kind === "approval") return isSafeId(s.approvalId) ? `/approval/${s.approvalId}` : null;
   if (n.kind === "join_request") return "/join-requests";
+  // The month's Composio calls are counted in Uso.
+  if (n.kind === "composio_limit") return "/usage";
   // An agent's browser handoff (ADR 0040): its conversation, with the request's card in control.
   if (n.kind === "browser_handoff" && isSafeId(s.handoffId))
     return handoffHref(s.handoffId, s.channelId ?? s.dmId, s.threadId);

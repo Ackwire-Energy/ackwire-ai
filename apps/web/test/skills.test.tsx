@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { activityText, toolActivity } from "@agenteschat/client/lib/activity";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createI18n } from "@/i18n";
+import { setNavigateAway } from "@/lib/navigate";
 import { declarations, topLevel } from "./built-css";
 import { ADA_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { proceed, startAs } from "./new-agent-flow";
@@ -183,7 +184,7 @@ describe("Configurações → Skills", () => {
     await type(link, "https://github.com/acme/secret");
     await click(within(dialog).getByRole("button", { name: "Instalar" }));
     await settle(6);
-    expect(dialog.textContent).toContain("O repositório acme/secret é privado ou não existe no GitHub.");
+    expect(dialog.textContent).toContain("acme/secret parece privado ou não existe.");
 
     await type(link, "https://github.com/acme/skills");
     await click(within(dialog).getByRole("button", { name: "Instalar" }));
@@ -228,6 +229,213 @@ describe("Configurações → Skills", () => {
     const { api } = await settings(state);
     expect(screen().queryByRole("region", { name: "Skills" })).toBeNull();
     expect(api).toBeTruthy();
+  });
+});
+
+describe("Instalar skill: private repositories", () => {
+  const CONTOSO = "https://github.com/contoso/skills";
+  const repos = {
+    connected: true,
+    accounts: [
+      {
+        login: "contoso",
+        type: "Organization",
+        repositories: [
+          { fullName: "contoso/skills", owner: "contoso", name: "skills", private: true, updatedAt: null },
+          { fullName: "contoso/site", owner: "contoso", name: "site", private: false, updatedAt: null },
+        ],
+      },
+    ],
+    truncated: false,
+  };
+  const openInstall = async (state = seedState()) => {
+    const { section } = await settings(state);
+    await click(within(section()).getByRole("button", { name: "Instalar skill" }));
+    await settle(4);
+    return { state, dialog: () => screen().getByRole("dialog", { name: "Instalar skill" }) };
+  };
+  const install = async (dialog: HTMLElement, url: string) => {
+    await type(within(dialog).getByRole("textbox", { name: "Link do GitHub" }), url);
+    await click(within(dialog).getByRole("button", { name: "Instalar" }));
+    await settle(6);
+  };
+
+  /** Connecting GitHub's last two steps, as from Conectores: what it does (Continuar), who uses it (Liberar). */
+  const finishConnecting = async () => {
+    await click(
+      within(screen().getByRole("dialog", { name: "O que GitHub faz" })).getByRole("button", { name: "Continuar" }),
+    );
+    await settle(6);
+    await click(
+      within(screen().getByRole("dialog", { name: "Quem pode usar GitHub" })).getByRole("button", { name: "Liberar" }),
+    );
+    await settle(6);
+    expect(screen().queryByRole("dialog", { name: "Quem pode usar GitHub" })).toBeNull();
+  };
+
+  test("none of the workspace's GitHub reads it: Conectar o GitHub, the link read again once connected, then what GitHub does and who uses it", async () => {
+    const left: string[] = [];
+    setNavigateAway((url) => left.push(url));
+    const state = seedState();
+    state.connections = [];
+    const { dialog } = await openInstall(state);
+    await install(dialog(), CONTOSO);
+    expect(dialog().textContent).toContain(
+      "contoso/skills parece privado ou não existe. Conecte o GitHub para ler repositórios privados.",
+    );
+    // Said once, in the dialog: no toast repeating it in other words.
+    expect(document.body.textContent).not.toContain("é privado ou não existe no GitHub");
+    await click(within(dialog()).getByRole("button", { name: "Conectar o GitHub" }));
+    await settle(2);
+    const flow = () => screen().getByRole("dialog", { name: "Conectar GitHub" });
+    // Signing in on GitHub comes back to Skills with the link, not to Conectores.
+    await click(within(flow()).getByRole("button", { name: "Continuar no GitHub" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "connectors.startOAuth")?.args[2]).toEqual({
+      returnTo: `/org/${ORG_ID}/settings/skills?install=${encodeURIComponent(CONTOSO)}`,
+      serverUrl: undefined,
+    });
+    expect(left[0]).toStartWith("https://github.com/login/oauth/authorize");
+
+    // A token instead: connected in place and the link read again to pick, while the flow goes on to its tools and
+    // who uses them, as from Conectores.
+    state.githubRepos = repos;
+    await click(within(flow()).getByText("Conectar com uma chave de API"));
+    await type(within(flow()).getByLabelText("Chave de API"), "ghp_fake_token_for_tests");
+    await click(within(flow()).getByRole("button", { name: "Conectar com a chave" }));
+    await settle(8);
+    expect(state.calls.filter((c) => c.method === "skills.import").at(-1)?.args[1]).toEqual({
+      url: CONTOSO,
+      list: true,
+    });
+    await finishConnecting();
+    expect(dialog().textContent).toContain("Lido pela conexão do GitHub do workspace.");
+    expect(dialog().textContent).toContain("Este link tem 4 skills. Escolha quais instalar.");
+    // GitHub's own mark leads the line.
+    expect(dialog().querySelector(".skill-via .connector-icon__mark")).not.toBeNull();
+    // What the new connection reaches shows at once: another link offers to pick from it.
+    await type(within(dialog()).getByRole("textbox", { name: "Link do GitHub" }), "https://github.com/acme/skills");
+    await settle(4);
+    expect(within(dialog()).getByRole("button", { name: "Escolher do GitHub conectado" })).toBeTruthy();
+  });
+
+  test("someone who may install skills but not manage connectors is told whom to ask, GitHub connected or not", async () => {
+    const asMember = () => {
+      const state = seedState();
+      const me = state.me?.organizations[0];
+      if (me) Object.assign(me, { role: "member", permissions: ["read", "manage_agents"] });
+      return state;
+    };
+    const none = asMember();
+    none.connections = [];
+    const { dialog } = await openInstall(none);
+    await install(dialog(), CONTOSO);
+    expect(dialog().textContent).toContain(
+      "contoso/skills parece privado ou não existe. Peça a quem administra os conectores para conectar o GitHub.",
+    );
+    expect(within(dialog()).queryByRole("button", { name: "Conectar o GitHub" })).toBeNull();
+    cleanup();
+
+    // GitHub connected, and it can't see the repository: access is given on GitHub, by whoever runs the connectors.
+    const { dialog: again } = await openInstall(asMember());
+    await install(again(), "https://github.com/acme/secret");
+    expect(again().textContent).toContain(
+      "acme/secret parece privado ou não existe. O GitHub conectado também não chega a ele. Peça a quem administra os conectores para liberar o acesso.",
+    );
+    expect(within(again()).queryByRole("button", { name: "Conectar o GitHub" })).toBeNull();
+  });
+
+  test("a connection GitHub refuses offers to connect it again; one that works and can't see the repository, to give it access", async () => {
+    const state = seedState();
+    state.refusedGithub = "conn-gh";
+    const { dialog } = await openInstall(state);
+    await install(dialog(), CONTOSO);
+    expect(dialog().textContent).toContain(
+      "contoso/skills parece privado ou não existe. O GitHub recusou a conexão do workspace. Conecte o GitHub de novo.",
+    );
+    await click(within(dialog()).getByRole("button", { name: "Conectar o GitHub" }));
+    await settle(2);
+    // Connecting again keeps what the agents have.
+    expect(screen().getByRole("dialog", { name: "Conectar GitHub" }).textContent).toContain(
+      "Substitui o login atual. Quem usa continua igual.",
+    );
+    cleanup();
+
+    const { dialog: again } = await openInstall();
+    await install(again(), "https://github.com/acme/secret");
+    expect(again().textContent).toContain(
+      "acme/secret parece privado ou não existe. O GitHub conectado também não chega a ele. Libere o acesso no GitHub para a conta conectada.",
+    );
+    expect(within(again()).queryByRole("button", { name: "Conectar o GitHub" })).toBeNull();
+  });
+
+  test("Escolher do GitHub conectado: a search over its repositories, the skills of the one picked, then Install", async () => {
+    const state = seedState();
+    state.githubRepos = repos;
+    const { dialog } = await openInstall(state);
+    await click(within(dialog()).getByRole("button", { name: "Escolher do GitHub conectado" }));
+    await settle(4);
+    await type(within(dialog()).getByRole("searchbox", { name: "Buscar repositório" }), "sk");
+    const rows = within(dialog())
+      .getAllByRole("button")
+      .filter((b) => b.classList.contains("ac-row"));
+    expect(rows.map((r) => r.textContent)).toEqual(["contoso/skillsPrivado"]);
+    await click(rows[0] as HTMLElement);
+    await settle(6);
+    expect(state.calls.find((c) => c.method === "skills.import")?.args[1]).toEqual({ url: CONTOSO, list: true });
+    expect((within(dialog()).getByRole("textbox", { name: "Link do GitHub" }) as HTMLInputElement).value).toBe(CONTOSO);
+    expect(dialog().textContent).toContain("Lido pela conexão do GitHub do workspace.");
+    await click(within(dialog()).getByRole("checkbox", { name: /deploy/ }));
+    await click(within(dialog()).getByRole("button", { name: "Instalar" }));
+    await settle(6);
+    expect(state.calls.find((c) => c.method === "skills.importPicked")?.args.slice(1)).toEqual([
+      CONTOSO,
+      ["skills/deploy"],
+    ]);
+    // The skill's sheet says where it came from and how.
+    const sheet = screen().getByRole("dialog", { name: "deploy" });
+    expect(sheet.textContent).toContain("Do repositório privado, pela conexão do GitHub do workspace.");
+
+    // A token GitHub no longer takes: updating says it as Instalar skill does, once.
+    state.refusedGithub = "conn-gh";
+    await click(within(sheet).getByRole("button", { name: "Atualizar do link" }));
+    await settle(6);
+    expect(document.body.textContent).toContain(
+      "contoso/skills parece privado ou não existe. O GitHub recusou a conexão do workspace. Conecte o GitHub de novo.",
+    );
+    expect(document.body.textContent).not.toContain("é privado ou não existe no GitHub");
+
+    // Disconnected: updating says the connection that read it is gone.
+    state.connections = [];
+    await click(within(sheet).getByRole("button", { name: "Atualizar do link" }));
+    await settle(6);
+    expect(document.body.textContent).toContain(
+      "A conexão do GitHub que lia contoso/skills não existe mais. Conecte o GitHub de novo para atualizar esta skill.",
+    );
+  });
+
+  test("back from signing in on GitHub (`?install=`): the dialog opens on the link, reads it to pick, and the flow goes on", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const folder = `${CONTOSO}/tree/main/skills/deploy`;
+    // As development runs it, every effect twice: the link is read once and stays in its field.
+    await renderApp(`/org/${ORG_ID}/settings/skills?install=${encodeURIComponent(folder)}&connected=github`, {
+      api,
+      strict: true,
+    });
+    await settle(8);
+    expect(state.calls.filter((c) => c.method === "skills.import").map((c) => c.args[1])).toEqual([
+      { url: folder, list: true },
+    ]);
+    // Signing in ends where connecting with a key does: GitHub's tools, then who uses it.
+    expect(document.body.textContent).toContain("GitHub conectado.");
+    await finishConnecting();
+    const dialog = screen().getByRole("dialog", { name: "Instalar skill" });
+    expect((within(dialog).getByRole("textbox", { name: "Link do GitHub" }) as HTMLInputElement).value).toBe(folder);
+    // A folder's one skill, to check before it installs.
+    expect(dialog.textContent).toContain("Lido pela conexão do GitHub do workspace.");
+    expect(dialog.textContent).toContain("Este link tem 1 skill. Marque para instalar.");
+    expect(state.calls.some((c) => c.method === "skills.importPicked")).toBe(false);
   });
 });
 

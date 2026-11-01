@@ -1,10 +1,10 @@
 import type { AppNotification, MediaKind, NotificationActor, Routine } from "@agenteschat/client";
 import { approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
 import { namesText } from "@agenteschat/client/lib/format";
+import { upcomingRoutines } from "@agenteschat/client/lib/home";
 import { mediaKindOf } from "@agenteschat/client/lib/media";
 import { askersOf } from "@agenteschat/client/lib/notifications";
 import { routineNotificationWords, type Words } from "@agenteschat/client/lib/routine-view";
-import { secretNoticeLine } from "@agenteschat/client/lib/secret-requests";
 import type { TFunction } from "i18next";
 import { daysAgo } from "../shared/logic";
 
@@ -117,39 +117,7 @@ export const emojisOf = (n: AppNotification) => (n.kind === "reaction" ? (n.late
 
 // ── Esperando você as cards, and what comes next ─────────────────────────────────────────────────
 
-/**
- * What a waiting item asks of you: approve, answer an agent, take your turn at the table, help in a browser, give
- * a secret, or let someone in.
- */
-export type WaitingCardKind = "approval" | "question" | "forum" | "browser" | "secret" | "join";
-
-export interface WaitingCard {
-  kind: WaitingCardKind;
-  /** The exact request: the action to approve, the question, the topic, what to do in the browser, who asks to join. */
-  title: string;
-  /** Only requests expire. */
-  expiresAt: string | null;
-  /** The one button: "Revisar" (a request), "Responder" or "Abrir" (the agent's browser, a secret's card). */
-  action: "review" | "answer" | "open";
-}
-
-/** A waiting inbox item as a card: who asks (`actors`), the kind, the exact request, the deadline, one button. */
-export function waitingCardOf(n: Pick<AppNotification, "kind" | "count" | "latest">): WaitingCard {
-  const l = n.latest;
-  if (n.kind === "browser_handoff")
-    return { kind: "browser", title: l.text ?? l.title ?? "", expiresAt: l.expiresAt ?? null, action: "open" };
-  // Its name and what it is for, as its card says: typed there, in the conversation, never here.
-  if (n.kind === "secret_request")
-    return { kind: "secret", title: secretNoticeLine(n), expiresAt: l.expiresAt ?? null, action: "open" };
-  if (n.kind === "approval")
-    return { kind: "approval", title: l.title ?? l.text ?? "", expiresAt: l.expiresAt ?? null, action: "review" };
-  if (n.kind === "forum_turn")
-    return { kind: "forum", title: l.title ?? l.text ?? "", expiresAt: null, action: "answer" };
-  // No actor (they aren't a member yet): the first who asked is the title; `joinRequestLine` says them all.
-  if (n.kind === "join_request")
-    return { kind: "join", title: askersOf(n).names[0] ?? "", expiresAt: null, action: "review" };
-  return { kind: "question", title: l.text ?? l.title ?? "", expiresAt: null, action: "answer" };
-}
+export { type WaitingCard, type WaitingCardKind, waitingCardOf } from "@agenteschat/client/lib/notifications";
 
 /**
  * Who asks to join, as the card's line: "Ana asks to join", "Ana and Bruno ask to join", "Ana, Bruno and 2 more ask
@@ -171,16 +139,10 @@ export function joinRequestLine(
 }
 
 /** The next real thing coming: the soonest run of an active routine, still ahead. */
-export function nextRoutine<T extends Pick<Routine, "active" | "nextRunAt">>(routines: readonly T[], now = Date.now()) {
-  let next: T | null = null;
-  for (const r of routines) {
-    if (!r.active || !r.nextRunAt) continue;
-    const at = new Date(r.nextRunAt).getTime();
-    if (!(at > now)) continue;
-    if (!next || at < new Date(next.nextRunAt as string).getTime()) next = r;
-  }
-  return next;
-}
+export const nextRoutine = <T extends Pick<Routine, "active" | "nextRunAt">>(
+  routines: readonly T[],
+  now = Date.now(),
+) => upcomingRoutines(routines, now, 1)[0] ?? null;
 
 /** How "when" is said for the next event: today, tomorrow, or a later day. */
 export function upcomingDay(iso: string, now = new Date()): "today" | "tomorrow" | "later" {

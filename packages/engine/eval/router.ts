@@ -546,6 +546,7 @@ export async function routerEval() {
         .values({
           orgId: f.org.id,
           connector: label.toLowerCase().replaceAll(" ", "-"),
+          toolPrefix: label.toLowerCase().replaceAll(" ", "_"),
           label,
           serverUrl: "https://mcp.example.com",
           authType: "none",

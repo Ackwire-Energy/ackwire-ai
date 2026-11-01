@@ -1,14 +1,28 @@
-import { MailAuthError, type MailSummary } from "@agenteschat/adapters";
+import {
+  COMPOSIO_MAIL_TRIGGERS,
+  type ComposioMailToolkit,
+  MailAuthError,
+  type MailPoller,
+  type MailSummary,
+  millionSendFolder,
+  readMillionSendWebhook,
+  verifyStandardWebhook,
+} from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, lt, or, schema, sql } from "@agenteschat/db";
+import { countComposio } from "../connector-usage";
+import { markComposioAccountBroken } from "../connectors/composio";
 import { NotFoundError } from "../errors";
 import { cutText } from "../format";
 import { type EventMerge, holdForNextRun, queueEventRun, type RoutineEventPayload } from "../routine-events";
+import { ForbiddenSignatureError } from "../webhooks";
 import {
   accountRef,
   applyComposioStateFor,
+  forgetAtMillionSend,
   type MailDeps,
   mailSlugs,
   markNeedsReconnect,
+  openMillionSendSecret,
   orgMailAccounts,
 } from "./accounts";
 import { agentMailPolicy } from "./policies";
@@ -46,7 +60,9 @@ function mailSummary(address: string, folder: string, readTool: string, messages
   const lines = messages.map((m) => {
     const base = `- ${m.date} · ${m.from} · "${m.subject}" · id ${m.id}`;
     const snippetRoom = room - base.length - 3;
-    return snippetRoom > 20 ? `${base} · ${oneLine(m.snippet, snippetRoom)}` : cutText(base, Math.max(40, room));
+    // MillionSend's lists carry no text: no snippet, no dangling separator.
+    const snippet = snippetRoom > 20 ? oneLine(m.snippet, snippetRoom) : "";
+    return snippet ? `${base} · ${snippet}` : cutText(base, Math.max(40, room));
   });
   const more = extra > 0 ? [`(and ${extra} more not listed)`] : [];
   return neutralizeMarkers([head, ...lines, ...more].join("\n"));
@@ -102,7 +118,7 @@ export async function ingestMail(
   const merge = await mailMerge(db, routine.orgId, account, watch.folder);
   // Bursts become one run (§6.3, §6.8): the new messages join the run still queued with its job alive,
   // or the run waiting to start (gathered while another works, or emails held from a run that didn't finish).
-  const outcome = await queueEventRun({ db }, routine, {
+  const { outcome } = await queueEventRun({ db }, routine, {
     event: merge(
       { type: "email.received", accountId: account.id, watchId: watch.id, messages: [], extra: 0, summary: "" },
       { messages: added },
@@ -170,7 +186,8 @@ export async function releaseRoutineEmails(deps: { db: Database }, routineRunId:
 /**
  * `POST /api/webhooks/composio`: the signature is checked by the client
  * (throws `ComposioSignatureError`); then new mail goes to its watch, and an
- * expired account or a disabled trigger asks a person to reconnect.
+ * expired account (a mailbox's or a connector's, ADR 0107) or a disabled
+ * trigger asks a person to reconnect.
  */
 export async function handleComposioWebhook(
   deps: Pick<MailDeps, "db" | "mail" | "now">,
@@ -187,6 +204,10 @@ export async function handleComposioWebhook(
     const [account] = await db.select().from(mailAccounts).where(eq(mailAccounts.id, watch.accountId));
     // The trigger belongs to the account it was created on; anything else is ignored.
     if (!account || account.externalAccountId !== event.connectedAccountId) return { type: event.type, fired: 0 };
+    // Composio bills every delivery, a repeated one too (ADR 0103).
+    const trigger = COMPOSIO_MAIL_TRIGGERS[account.provider as ComposioMailToolkit];
+    if (trigger)
+      await countComposio(db, { orgId: account.orgId, toolkit: account.provider, action: trigger, events: 1 });
     const r = await ingestMail(deps, watch.id, [event.message]);
     return { type: event.type, fired: r.fired ? 1 : 0 };
   }
@@ -196,6 +217,7 @@ export async function handleComposioWebhook(
       .from(mailAccounts)
       .where(and(eq(mailAccounts.externalAccountId, event.connectedAccountId), isNull(mailAccounts.revokedAt)));
     for (const r of rows) await markNeedsReconnect(db, r.id, "composio_expired");
+    await markComposioAccountBroken(db, event.connectedAccountId, "composio_expired");
     return { type: event.type, fired: 0 };
   }
   if (event.type === "trigger.disabled") {
@@ -208,24 +230,76 @@ export async function handleComposioWebhook(
   return { type: event.type, fired: 0 };
 }
 
-// ── IMAP polling ────────────────────────────────────────────────────────────
+// ── MillionSend webhooks ────────────────────────────────────────────────────
+
+/**
+ * `POST /api/webhooks/millionsend`: new mail in a MillionSend inbox. Each mailbox has its own webhook and secret,
+ * so the inbox the body names only says whose secrets to try: nothing counts until one of them signs it
+ * (`ForbiddenSignatureError` otherwise). Then the message goes to the routines watching its folder on each
+ * mailbox it signed for, deduplicated against polling by message id. A delivery for a disconnected mailbox (its
+ * webhook outlived a delete that failed) deletes that webhook with the mailbox's key and is taken, running
+ * nothing: refused, MillionSend would keep mailing the team that its webhook fails.
+ */
+export async function handleMillionSendWebhook(
+  deps: Pick<MailDeps, "db" | "keyWrappers" | "mail" | "now">,
+  headers: Headers,
+  rawBody: string,
+): Promise<{ type: string; fired: number }> {
+  const millionsend = deps.mail?.millionsend;
+  if (!millionsend) throw new NotFoundError("MillionSend inboxes are off");
+  const read = readMillionSendWebhook(rawBody);
+  if (!read) throw new ForbiddenSignatureError();
+  const { db } = deps;
+  const candidates = await db
+    .select()
+    .from(mailAccounts)
+    .where(and(eq(mailAccounts.via, "millionsend"), eq(mailAccounts.externalAccountId, read.inboxId)));
+  const at = (deps.now?.() ?? new Date()).getTime();
+  const signed: (typeof candidates)[number][] = [];
+  for (const account of candidates) {
+    const secret = await openMillionSendSecret(deps, account).catch(() => null);
+    if (secret?.webhook && verifyStandardWebhook(secret.webhook.secret, headers, rawBody, at)) signed.push(account);
+  }
+  if (signed.length === 0) throw new ForbiddenSignatureError();
+  for (const account of signed) {
+    if (account.revokedAt) await forgetAtMillionSend(millionsend.client, deps, account).catch(() => {});
+  }
+  if (read.event.type !== "mail.received") return { type: "other", fired: 0 };
+  const message = read.event.message;
+  let fired = 0;
+  for (const account of signed) {
+    if (account.revokedAt || account.status !== "active") continue;
+    const watches = await db.select().from(mailWatches).where(eq(mailWatches.accountId, account.id));
+    for (const w of watches) {
+      if (millionSendFolder(w.folder) !== millionSendFolder(message.folder)) continue;
+      if ((await ingestMail(deps, w.id, [message])).fired) fired++;
+    }
+  }
+  return { type: "mail.received", fired };
+}
+
+// ── Polling (IMAP, MillionSend) ─────────────────────────────────────────────
 
 /** A watch that failed (not the password) waits this many intervals before the next try. */
 const ERROR_BACKOFF_INTERVALS = 5;
 
 /**
- * Worker tick: checks the IMAP folders watched by active routines whose last
- * check is older than `intervalMs` (failed ones back off). Watches are
- * claimed with `FOR UPDATE SKIP LOCKED` and stamped before the network call,
- * so replicas never poll the same folder twice. A first check starts from
- * now; a changed `UIDVALIDITY` starts over from now too (the poller says so).
+ * Worker tick: checks the folders watched by active routines on IMAP and MillionSend mailboxes whose last
+ * check is older than `intervalMs` (failed ones back off). MillionSend's webhook wakes routines at once, and
+ * this catches what it missed. Watches are claimed with `FOR UPDATE SKIP LOCKED` and stamped before the
+ * network call, so replicas never poll the same folder twice. A first check starts from now; a changed IMAP
+ * `UIDVALIDITY` starts over from now too (the poller says so).
  */
-export async function pollImapWatches(
+export async function pollMailWatches(
   deps: MailDeps,
   options: { intervalMs: number; concurrency?: number; limit?: number } = { intervalMs: 300_000 },
 ): Promise<{ checked: number; fired: number; failed: number }> {
-  const imap = deps.mail?.imap;
-  if (!imap) return { checked: 0, fired: 0, failed: 0 };
+  const pollers: Record<string, MailPoller | undefined> = {
+    imap: deps.mail?.imap?.poller,
+    millionsend: deps.mail?.millionsend?.poller,
+  };
+  const vias = Object.keys(pollers).filter((via) => pollers[via]);
+  if (vias.length === 0) return { checked: 0, fired: 0, failed: 0 };
   const now = deps.now?.() ?? new Date();
   const dueBefore = new Date(now.getTime() - options.intervalMs);
   const errorBefore = new Date(now.getTime() - options.intervalMs * ERROR_BACKOFF_INTERVALS);
@@ -237,7 +311,7 @@ export async function pollImapWatches(
       .innerJoin(routines, eq(routines.id, mailWatches.routineId))
       .where(
         and(
-          eq(mailAccounts.via, "imap"),
+          inArray(mailAccounts.via, vias),
           eq(mailAccounts.status, "active"),
           isNull(mailAccounts.revokedAt),
           eq(routines.active, true),
@@ -266,12 +340,13 @@ export async function pollImapWatches(
   const worker = async () => {
     for (let w = queue.shift(); w; w = queue.shift()) {
       const [account] = await deps.db.select().from(mailAccounts).where(eq(mailAccounts.id, w.accountId));
-      if (!account) continue;
+      const poller = account ? pollers[account.via] : undefined;
+      if (!account || !poller) continue;
       try {
         const ref = await accountRef(deps, account);
         const state =
           w.lastUid !== null && w.uidValidity !== null ? { lastUid: w.lastUid, uidValidity: w.uidValidity } : null;
-        const r = await imap.poller.newMessages(ref, w.folder, state, { limit: 50 });
+        const r = await poller.newMessages(ref, w.folder, state, { limit: 50 });
         await deps.db
           .update(mailWatches)
           .set({

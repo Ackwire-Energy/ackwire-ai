@@ -1,6 +1,12 @@
 import type { InlinePart } from "@agenteschat/adapters";
 import { dark, light, type ThemeColors } from "@agenteschat/tokens";
-import { type AccessoryName, AGENT_GRADIENTS, type AgentColorName, type EyeStyle } from "@agenteschat/ui/agent/engine";
+import {
+  type AccessoryName,
+  AGENT_GRADIENTS,
+  type AgentColorName,
+  type EyeStyle,
+  nearestPreset,
+} from "@agenteschat/ui/agent/engine";
 import { COMPUTER_ART, COMPUTER_ROWS } from "@agenteschat/ui/computer/portrait";
 import { initialsOf } from "@agenteschat/ui/names";
 import { mix, opaque } from "@agenteschat/ui/sky/math";
@@ -112,8 +118,8 @@ export const EMAIL_PICTURES = [
 const FONT = "source-sans-3-latin.woff2";
 const LOGO = { width: 173, height: 36, alt: "agentes.chat" } as const;
 const SKY = { width: 552, height: 27 } as const;
-/** An agent's face for its colour: an unknown one is sky, as the app draws it. */
-const faceOf = (color: string) => `agent-${AGENT_FACES.includes(color) ? color : "sky"}.png`;
+/** An agent's face for its colour: a custom "#rrggbb" is the closest preset's, an unknown one is sky, as the app draws it. */
+const faceOf = (color: string) => `agent-${nearestPreset(color)}.png`;
 /** A look's picture: drawn whole when it is one of the onboarding's, else its colour's face. */
 function pictureOf({ color = "sky", eyes = "round", accessory = "none" }: Look) {
   const whole = ONBOARDING_CREW.find((o) => o.color === color && o.eyes === eyes && o.accessory === accessory);

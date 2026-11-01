@@ -559,7 +559,43 @@ export function createRealtime(deps: RealtimeDeps) {
       },
     },
   };
-  return realtime;
+
+  /** A handler that fails is logged (so reported) with whose socket it was, not left to reach the process. */
+  const guarded =
+    <A extends unknown[]>(handler: string, run: (socket: Bun.ServerWebSocket<SocketData>, ...args: A) => unknown) =>
+    async (socket: Bun.ServerWebSocket<SocketData>, ...args: A) => {
+      try {
+        await run(socket, ...args);
+      } catch (error) {
+        deps.log.error("socket handler failed", {
+          socket: socket.data.kind,
+          handler,
+          ...socketIds(socket.data),
+          error,
+          stack: (error as Error | null)?.stack,
+        });
+      }
+    };
+  const { open, message, close } = realtime.websocket;
+  return {
+    ...realtime,
+    websocket: {
+      ...realtime.websocket,
+      open: guarded("open", open),
+      message: guarded("message", message),
+      close: guarded("close", close),
+    },
+  };
+}
+
+/** Whose socket it is, by internal ids. */
+function socketIds(data: SocketData) {
+  if (data.kind === "browser") return { orgId: data.orgId, userId: data.user.id };
+  if (data.kind === "machine")
+    return { orgId: data.conn?.orgId ?? undefined, machineId: data.conn?.machineId ?? undefined };
+  if (data.kind === "stream.viewer")
+    return { orgId: data.input.orgId, userId: data.input.userId, agentId: data.input.agentId };
+  return {};
 }
 
 export type Realtime = ReturnType<typeof createRealtime>;

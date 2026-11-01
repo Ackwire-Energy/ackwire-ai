@@ -4,14 +4,13 @@ import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 /**
  * Queries show their errors inline; a
  * 401 anywhere means the session ended (back to sign-in); every failed write
- * gets a toast with the server's message.
+ * gets a toast in the person's words.
  */
 export function createQueryClient(handlers: {
   onUnauthorized: () => void;
   onMutationError: (message: string) => void;
-  unknownError: () => string;
-  /** A failed write in the person's language, for the server codes the app knows; null: the server's message. */
-  describeError?: (error: unknown) => string | null;
+  /** A failed write in the person's words (`errorText`). */
+  describeError: (error: unknown) => string;
 }) {
   return new QueryClient({
     defaultOptions: {
@@ -30,9 +29,7 @@ export function createQueryClient(handlers: {
         if (error instanceof ApiError && error.status === 401) return handlers.onUnauthorized();
         // Mutations that show their own inline error opt out with `meta: { silent: true }`.
         if (mutation.meta?.silent) return;
-        const known = handlers.describeError?.(error);
-        if (known) return handlers.onMutationError(known);
-        handlers.onMutationError(error instanceof Error && error.message ? error.message : handlers.unknownError());
+        handlers.onMutationError(handlers.describeError(error));
       },
     }),
   });

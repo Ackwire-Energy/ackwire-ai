@@ -8,10 +8,20 @@ import { humanCheckHeaders } from "@agenteschat/client/lib/human-check";
 import { createAuthClient } from "better-auth/client";
 import type { AuthClient, AuthResult } from "./client";
 
-const toResult = (
-  error: { status?: number; message?: string; code?: string; kind?: unknown; cloud?: unknown } | null | undefined,
-): AuthResult =>
-  error
+type Refusal = { status?: number; message?: string; code?: string; kind?: unknown; cloud?: unknown } | null;
+
+/** No answer at all (the fetch threw): status 0, which `authErrorText` says as offline or out of reach. */
+const NO_ANSWER: AuthResult = { ok: false, status: 0, code: "network", message: "" };
+
+/** A call's refusal as the pages read it; one that got no answer settles as `NO_ANSWER`, so no page spins forever. */
+async function toResult(call: Promise<{ error?: Refusal }>): Promise<AuthResult> {
+  let error: Refusal | undefined;
+  try {
+    ({ error } = await call);
+  } catch {
+    return NO_ANSWER;
+  }
+  return error
     ? {
         ok: false,
         status: error.status ?? 500,
@@ -21,6 +31,14 @@ const toResult = (
         ...(error.cloud === true ? { cloud: true } : {}),
       }
     : { ok: true };
+}
+
+/** A call's data, or `fallback` when it got none (no answer included). */
+const dataOr = async <T, F>(call: Promise<{ data?: T | null }>, fallback: F): Promise<T | F> =>
+  call.then(
+    (res) => res.data ?? fallback,
+    () => fallback,
+  );
 
 /**
  * Better Auth client for the web app (same origin, `/api/auth`). Every request says the app's language
@@ -37,78 +55,63 @@ export function createBetterAuthClient(origin = window.location.origin, language
     },
   });
   return {
-    signIn: async ({ email, password }, humanCheck) =>
+    signIn: ({ email, password }, humanCheck) =>
+      toResult(client.signIn.email({ email, password, fetchOptions: { headers: humanCheckHeaders(humanCheck) } })),
+    signUp: ({ name, email, password, access, invitation }, humanCheck) =>
       toResult(
-        (await client.signIn.email({ email, password, fetchOptions: { headers: humanCheckHeaders(humanCheck) } }))
-          .error,
-      ),
-    signUp: async ({ name, email, password, access, invitation }, humanCheck) =>
-      toResult(
-        (
-          await client.signUp.email({
-            name,
-            email,
-            password,
-            fetchOptions: {
-              headers: {
-                ...humanCheckHeaders(humanCheck),
-                ...earlyAccessHeaders(access),
-                ...(invitation ? { [INVITATION_TOKEN_HEADER]: invitation.token } : {}),
-                ...(invitation?.mail ? { [INVITATION_MAIL_HEADER]: invitation.mail } : {}),
-              },
+        client.signUp.email({
+          name,
+          email,
+          password,
+          fetchOptions: {
+            headers: {
+              ...humanCheckHeaders(humanCheck),
+              ...earlyAccessHeaders(access),
+              ...(invitation ? { [INVITATION_TOKEN_HEADER]: invitation.token } : {}),
+              ...(invitation?.mail ? { [INVITATION_MAIL_HEADER]: invitation.mail } : {}),
             },
-          })
-        ).error,
+          },
+        }),
       ),
-    sendVerificationEmail: async (email) => toResult((await client.sendVerificationEmail({ email })).error),
-    signInSocial: async (provider, callbackURL, earlyAccess) =>
+    sendVerificationEmail: (email) => toResult(client.sendVerificationEmail({ email })),
+    signInSocial: (provider, callbackURL, earlyAccess, errorCallbackURL = "/login") =>
       toResult(
-        (
-          await client.signIn.social({
-            provider,
-            callbackURL,
-            errorCallbackURL: "/login",
-            ...earlyAccessState(earlyAccess),
-          })
-        ).error,
+        client.signIn.social({
+          provider,
+          callbackURL,
+          errorCallbackURL,
+          ...earlyAccessState(earlyAccess),
+        }),
       ),
-    requestPasswordReset: async ({ email, redirectTo }, humanCheck) =>
+    requestPasswordReset: ({ email, redirectTo }, humanCheck) =>
       toResult(
-        (
-          await client.requestPasswordReset({
-            email,
-            redirectTo,
-            fetchOptions: { headers: humanCheckHeaders(humanCheck) },
-          })
-        ).error,
+        client.requestPasswordReset({ email, redirectTo, fetchOptions: { headers: humanCheckHeaders(humanCheck) } }),
       ),
-    resetPassword: async ({ token, newPassword }) =>
-      toResult((await client.resetPassword({ token, newPassword })).error),
+    resetPassword: ({ token, newPassword }) => toResult(client.resetPassword({ token, newPassword })),
     signOut: async () => {
       await client.signOut();
     },
-    desktopOpen: async (challenge) => {
-      const res = await client.$fetch<{ requestId: string; code: string }>("/desktop/open", {
-        method: "POST",
-        body: { challenge },
-      });
-      return res.data ?? null;
-    },
-    desktopRequestCode: async (requestId) => {
-      const res = await client.$fetch<{ code: string | null }>("/desktop/request", {
-        method: "POST",
-        body: { requestId },
-      });
-      return res.data?.code ?? null;
-    },
-    desktopHandoff: async (requestId) =>
-      toResult((await client.$fetch("/desktop/handoff", { method: "POST", body: { requestId } })).error),
-    signInOneTime: async (token) =>
-      toResult((await client.$fetch("/sign-in/one-time-token", { method: "POST", body: { token } })).error),
-    desktopRedeem: async (verifier) => {
-      const res = await client.$fetch<{ signedIn: boolean }>("/desktop/redeem", { method: "POST", body: { verifier } });
-      return res.data?.signedIn === true;
-    },
-    ownerClaim: async (input) => toResult((await client.$fetch("/owner-claim", { method: "POST", body: input })).error),
+    desktopOpen: (challenge) =>
+      dataOr(
+        client.$fetch<{ requestId: string; code: string }>("/desktop/open", { method: "POST", body: { challenge } }),
+        null,
+      ),
+    desktopRequestCode: async (requestId) =>
+      (
+        await dataOr(
+          client.$fetch<{ code: string | null }>("/desktop/request", { method: "POST", body: { requestId } }),
+          null,
+        )
+      )?.code ?? null,
+    desktopHandoff: (requestId) => toResult(client.$fetch("/desktop/handoff", { method: "POST", body: { requestId } })),
+    signInOneTime: (token) => toResult(client.$fetch("/sign-in/one-time-token", { method: "POST", body: { token } })),
+    desktopRedeem: async (verifier) =>
+      (
+        await dataOr(
+          client.$fetch<{ signedIn: boolean }>("/desktop/redeem", { method: "POST", body: { verifier } }),
+          null,
+        )
+      )?.signedIn === true,
+    ownerClaim: (input) => toResult(client.$fetch("/owner-claim", { method: "POST", body: input })),
   };
 }

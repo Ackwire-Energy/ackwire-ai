@@ -3,7 +3,9 @@
 # builds the commit's image (or pulls DEPLOY_IMAGE), migrates the database while the running app still
 # serves, recreates what changed and waits for it to be healthy, or goes back to the previous image
 # and commit. .github/workflows/deploy.yml runs it over SSH once CI passes on main.
-#   deploy/deploy.sh [SHA]    a commit of main, in full (default: main's tip)
+#   deploy/deploy.sh [SHA [VERSION]]    a commit of main, in full (default: main's tip), and this deploy's
+#                                       version (2026.10.31.4), set in the image as APP_VERSION: the release
+#                                       its error reports are filed under (without it, the server's own)
 #
 # The app restarts in place: requests fail for a few seconds while the new container boots, and up to
 # about 25 s more while agent runs finish (they get 20 s, then resume in the new container). A version
@@ -34,6 +36,11 @@ main() {
     echo "deploy: not a full commit SHA: $1" >&2
     return 2
   fi
+  local version=${2:-}
+  if [[ -n $version && ! $version =~ ^[A-Za-z0-9_.+-]{1,64}$ ]]; then
+    echo "deploy: not a version (letters, digits, . _ + -): $version" >&2
+    return 2
+  fi
   [[ -n ${DEPLOY_PREVIOUS:-} ]] || git fetch --quiet origin main
   local target head
   target=$(git rev-parse --verify "${1:-origin/main}^{commit}")
@@ -50,7 +57,7 @@ main() {
     fi
     git checkout --quiet --detach "$target"
     # The commit's own version of this script does the rest.
-    DEPLOY_PREVIOUS=$head exec bash deploy/deploy.sh "$target"
+    DEPLOY_PREVIOUS=$head exec bash deploy/deploy.sh "$target" ${version:+"$version"}
   fi
   local previous=${DEPLOY_PREVIOUS:-$head}
   # Until the new version is healthy, a failure puts the checkout back on the commit that runs.
@@ -71,12 +78,16 @@ main() {
       false
     fi
   fi
-  echo "deploy: ${target:0:7}"
+  echo "deploy: ${target:0:7}${version:+ ($version)}"
   if [[ -n ${DEPLOY_IMAGE:-} ]]; then
     docker pull --quiet "$DEPLOY_IMAGE"
     docker tag "$DEPLOY_IMAGE" agentes:next
   else
     docker build --tag agentes:next .
+  fi
+  if [[ -n $version ]]; then
+    # In the image, not in the container's environment: a rollback to it, or a restart by hand, keeps its version.
+    docker build --quiet --tag agentes:next - <<<$'FROM agentes:next\nENV APP_VERSION='"$version" >/dev/null
   fi
   if docker compose config --services | grep -x backup >/dev/null; then
     docker build --quiet --tag agentes-backup:current deploy/backup
@@ -120,7 +131,7 @@ main() {
   fi
   docker image prune --force >/dev/null
   docker builder prune --force --filter until=24h >/dev/null
-  echo "deploy: ${target:0:7} is live"
+  echo "deploy: ${target:0:7}${version:+ ($version)} is live"
 }
 
 # The checkout changes under this file while it runs: bash has read all of it once this line starts.

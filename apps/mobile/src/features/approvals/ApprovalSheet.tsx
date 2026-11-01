@@ -1,4 +1,7 @@
 import { useApproval, useChannels, useDecideApproval } from "@agenteschat/client";
+import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
+import { aheadEndLine } from "@agenteschat/client/lib/approval-words";
+import { nextLabel } from "@agenteschat/client/lib/format";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
@@ -10,6 +13,7 @@ import { successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { approvalAction, approvalRisk, approveAlwaysToast } from "./logic";
 import {
+  ApprovalAheadLine,
   ApprovalDetails,
   ApprovalEmailLetter,
   ApprovalFuse,
@@ -17,6 +21,7 @@ import {
   ApprovalTraits,
   ApproveAlways,
   approvalTitleText,
+  useCancelAhead,
   useOriginShort,
 } from "./parts";
 
@@ -34,7 +39,7 @@ export function ApprovalSheet({
   refuse?: boolean;
   onClose: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const orgId = useOrgId();
   const dir = useDirectory();
   const c = useColors();
@@ -43,6 +48,7 @@ export function ApprovalSheet({
   const approval = useApproval(orgId, id);
   const channels = useChannels(orgId);
   const decide = useDecideApproval(orgId);
+  const cancelAhead = useCancelAhead();
   const [refusing, setRefusing] = useState(startRefusing);
   const [reason, setReason] = useState("");
   const a = approval.data;
@@ -51,6 +57,7 @@ export function ApprovalSheet({
   const g = genderOf(name);
   const channel = a ? channels.data?.find((x) => x.id === a.channelId) : undefined;
   const origin = useOriginShort({ origin: a?.origin ?? null });
+  const runAt = a?.runAt ? nextLabel(i18n.language, a.runAt) : null;
 
   /** `always`: "Aprovar sempre", this one and the agent's next ones of its kind. */
   const done = (decision: "approve" | "refuse", always = false) => {
@@ -72,7 +79,9 @@ export function ApprovalSheet({
                   title: decision === "approve" ? t("mobile.approval.approved") : t("mobile.approval.refused"),
                   subtitle:
                     decision === "approve"
-                      ? t(`mobile.approval.approvedSub${g}`, { name })
+                      ? runAt
+                        ? t("mobile.approval.approvedAhead", { when: runAt })
+                        : t(`mobile.approval.approvedSub${g}`, { name })
                       : t(`mobile.approval.refusedSub${g}`, { name }),
                 }),
             agentId: a.agentId,
@@ -114,6 +123,7 @@ export function ApprovalSheet({
           </View>
         </View>
         <Text variant="title2">{approvalTitleText(t, a)}</Text>
+        {refusing ? null : <ApprovalAheadLine approval={a} />}
         {refusing ? (
           <>
             <TextArea
@@ -189,7 +199,11 @@ export function ApprovalSheet({
                       />
                     </View>
                     <Text variant="caption" tone="faint" style={styles.note}>
-                      {high ? t("mobile.approval.holdNote") : t("mobile.approval.tapNote")}
+                      {high
+                        ? t("mobile.approval.holdNote")
+                        : runAt
+                          ? t("mobile.approval.tapNoteAhead", { when: runAt })
+                          : t("mobile.approval.tapNote")}
                     </Text>
                   </>
                 ) : (
@@ -198,9 +212,25 @@ export function ApprovalSheet({
                   </Text>
                 )}
               </>
+            ) : aheadPhase(a) === "scheduled" && runAt ? (
+              <>
+                <Text variant="small" tone="muted" style={styles.note}>
+                  {t("mobile.approval.status.scheduled", { when: runAt })}
+                </Text>
+                {a.canCancel ? (
+                  <Button
+                    variant="secondary"
+                    wide
+                    icon="x"
+                    label={t("approval.ahead.cancel")}
+                    loading={cancelAhead.pending}
+                    onPress={() => cancelAhead.cancel(a.id, onClose)}
+                  />
+                ) : null}
+              </>
             ) : (
               <Text variant="small" tone="muted" style={styles.note}>
-                {t(`mobile.approval.status.${a.status === "pending" ? "expired" : a.status}`)}
+                {aheadEndLine(t, a) ?? t(`mobile.approval.status.${a.status === "pending" ? "expired" : a.status}`)}
               </Text>
             )}
           </>

@@ -17,6 +17,7 @@ import {
   inboxOf,
   isAtWork,
   isDoneOnce,
+  isEventDriven,
   isPaused,
   laneTag,
   mailTrouble,
@@ -30,6 +31,7 @@ import {
   targetIcon,
   toastParts,
   whenIcon,
+  zoneOf,
 } from "../../src/features/routines/logic";
 import {
   defaultRule,
@@ -94,6 +96,7 @@ function run(over: Partial<RoutineRun> & Pick<RoutineRun, "id" | "at" | "status"
 const once = (at: string) => ({ type: "once" as const, at, timezone: SP, description: "" });
 const event = { type: "event" as const, event: "github.pr_opened" as const };
 const email = { type: "email" as const, accountId: "m1", folder: "INBOX", filter: {} };
+const webhook = { type: "webhook" as const, url: "https://app.agentes.test/api/hooks/x", signed: false };
 
 describe("what a routine is", () => {
   test("a title: the name, or the first line of a prompt it was named with", () => {
@@ -348,6 +351,23 @@ describe("the form", () => {
     const chat = routine({ id: "k", target: { type: "conversation", channelId: "c1", threadId: "t1" } });
     expect(draftOf(chat, SP, today).target).toBe("keep");
     expect(draftChanges(chat, draftOf(chat, SP, today), saved)).toEqual({});
+  });
+
+  test("a webhook routine: what starts it, never a zone, and only a switch to or from it is a change", () => {
+    const d = draftOf(undefined, SP, today);
+    expect(draftTrigger({ ...d, kind: "webhook" })).toEqual({ type: "webhook" });
+    const r = routine({ id: "w", trigger: webhook });
+    const saved = JSON.stringify(toApiRule(ruleOf(r, SP, today)));
+    const form = draftOf(r, SP, today);
+    expect(form.kind).toBe("webhook");
+    expect(zoneOf(r)).toBe("");
+    expect(draftChanges(r, form, saved)).toEqual({});
+    expect(draftChanges(routine({ id: "s" }), { ...form, kind: "webhook" }, saved)).toMatchObject({
+      trigger: { type: "webhook" },
+    });
+    expect(whenIcon(r)).toBe("globe");
+    expect(isEventDriven(r)).toBe(true);
+    expect(nextLine(r, NOW)).toEqual({ kind: "webhook", week: 0 });
   });
 
   test("a one-off and an email routine left as they were change nothing", () => {

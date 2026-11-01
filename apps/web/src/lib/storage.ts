@@ -40,6 +40,10 @@ export function storedStrings(key: string): string[] {
 export const STORAGE_KEYS = {
   theme: "agentes.theme",
   lastOrg: "agentes.lastOrg",
+  /** The last page shown in each workspace (JSON, by workspace id): where "Onde você parou" opens (ADR 0108). */
+  lastPlace: "agentes.lastPlace",
+  /** Workspaces whose "Primeiros passos" the person hid on Início (JSON array of ids). */
+  firstStepsHidden: "agentes.home.stepsHidden",
   /** How this browser signed in last ("google", "github", "apple" or "email"): marked on the sign-in screen. */
   lastSignIn: "agentes.lastSignIn",
   /** The Drive's view: "grid" (default) or "list". */
@@ -68,6 +72,10 @@ export const STORAGE_KEYS = {
   soundTab: "agentes.sounds.tab",
   /** How many times the notifications dialog opened by itself in this browser (`WebPushAsk`, ADR 0071). */
   pushOffers: "agentes.push.offers",
+  /** In `sessionStore`: when the boot last reloaded because the app's files didn't load (index.html keeps a copy). */
+  bootRetry: "agentes.bootRetry",
+  /** In `sessionStore`: when the app last reloaded into a new version (`reloadForNewVersion`). */
+  versionReload: "agentes.versionReload",
   /**
    * Prefix (`.<invitation token>`, in `sessionStore`): the request this tab made through an invitation link, its key,
    * name and email as JSON, so a reload keeps waiting for the answer (ADR 0090).

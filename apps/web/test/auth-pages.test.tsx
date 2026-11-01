@@ -12,9 +12,11 @@ import {
   type InvitationPreview,
   keys,
   type MachineAccount,
+  NetworkError,
   type SignInOptions,
 } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { createBetterAuthClient } from "@/auth/better-auth";
 import { rememberSignIn } from "@/components/SocialButtons";
 import { setNavigateAway } from "@/lib/navigate";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
@@ -51,6 +53,63 @@ const heading = () => screen().getByRole("heading").textContent;
 const lead = () => document.querySelector(".auth__lead")?.textContent ?? null;
 const ACCOUNT: SignInOptions = { account: true, password: true, providers: [], canSignUp: false };
 const NEW: SignInOptions = { account: false, password: false, providers: [], canSignUp: true };
+
+describe("the sign-in forms when the server doesn't answer", () => {
+  const UNREACHABLE = "Sem conexão com o agentes.chat agora. Tente de novo em instantes.";
+  const alertText = () => screen().getByRole("alert").textContent;
+
+  test("Continuar with no answer: why, under the field, and Continuar works again", async () => {
+    const { api } = authApi(ACCOUNT);
+    let fails = true;
+    const options = api.account.signInOptions;
+    api.account.signInOptions = async (input) => {
+      if (fails) throw new NetworkError(new TypeError("Failed to fetch"));
+      return options(input);
+    };
+    await renderApp("/login", { api });
+    await type("E-mail", "marina@acme.com.br");
+    await press(/^Continuar(?! com)/);
+    expect(alertText()).toBe(UNREACHABLE);
+    const own = Object.getOwnPropertyDescriptor(navigator, "onLine");
+    Object.defineProperty(navigator, "onLine", { configurable: true, get: () => false });
+    try {
+      await press(/^Continuar(?! com)/);
+      expect(alertText()).toBe("Você está sem internet. Confira a conexão e tente de novo.");
+    } finally {
+      if (own) Object.defineProperty(navigator, "onLine", own);
+      else delete (navigator as { onLine?: boolean }).onLine;
+    }
+    fails = false;
+    await press(/^Continuar(?! com)/);
+    expect(heading()).toBe("Bom te ver de novo.");
+  });
+
+  test("Entrar whose request got no answer: the line, the button stops spinning and works again", async () => {
+    const real = globalThis.fetch;
+    let asked = 0;
+    globalThis.fetch = (async () => {
+      asked++;
+      throw new TypeError("Failed to fetch");
+    }) as unknown as typeof fetch;
+    try {
+      const { api } = authApi(ACCOUNT);
+      await renderApp("/login", { api, auth: createBetterAuthClient("http://localhost:3000") });
+      await type("E-mail", "marina@acme.com.br");
+      await press(/^Continuar(?! com)/);
+      await type("Senha", "correct horse");
+      await press(/^Entrar/);
+      expect(alertText()).toBe(UNREACHABLE);
+      const button = screen().getByRole("button", { name: /^Entrar/ });
+      expect(button.getAttribute("aria-busy")).toBeNull();
+      expect(button.hasAttribute("disabled")).toBe(false);
+      await press(/^Entrar/);
+      expect(asked).toBe(2);
+      expect(document.body.textContent).not.toContain("Failed to fetch");
+    } finally {
+      globalThis.fetch = real;
+    }
+  });
+});
 
 describe("Entrar (e-mail primeiro)", () => {
   test("the e-mail has a password: a wrong one frowns and offers a link; the right one enters", async () => {
@@ -115,7 +174,7 @@ describe("Entrar (e-mail primeiro)", () => {
     expect(router.state.location.search).toEqual({ tab: "settings", sec: "budget" });
   });
 
-  test("signed in from the ready email's Connect your AI: #general with Connect an AI open, the computer ready", async () => {
+  test("signed in from the ready email's Connect your AI: Início with Connect an AI open, the computer ready", async () => {
     const state = seedState({
       me: null,
       aiStatus: { any: false, agents: [{ agentId: ADA_ID, state: "no_ai" } as const] },
@@ -135,7 +194,7 @@ describe("Entrar (e-mail primeiro)", () => {
     await press(/^Continuar(?! com)/);
     await type("Senha", "correct horse");
     await press(/^Entrar/, 10);
-    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/home`);
     expect(router.state.location.search).toEqual({});
     const dialog = screen().getByRole("dialog", { name: "Conectar uma IA" });
     const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
@@ -196,13 +255,13 @@ describe("Entrar (e-mail primeiro)", () => {
     expect(screen().queryByRole("button", { name: "Esqueci a senha" })).toBeNull();
   });
 
-  test("a blocked account is told so; another refusal keeps the server's words", async () => {
+  test("a blocked account is told so; another refusal in the person's words, never the server's English", async () => {
     for (const [signIn, says] of [
       [
         { ok: false, status: 403, message: "This account can't sign in.", code: "ACCOUNT_BLOCKED" },
         "Esta conta não pode entrar.",
       ],
-      [{ ok: false, status: 403, message: "Invalid origin" }, "Invalid origin"],
+      [{ ok: false, status: 403, message: "Invalid origin" }, "Algo deu errado. Tente de novo."],
     ] as const) {
       const { api } = authApi(ACCOUNT);
       await renderApp("/login", { api, auth: createFakeAuth({ signIn }).auth });
@@ -462,7 +521,7 @@ describe("Acesso antecipado (o link do convite)", () => {
     }
   });
 
-  test("a provider's sign-up refused comes back with its reason, in the person's words; other codes say nothing", async () => {
+  test("a provider's sign-in refused comes back with its reason, in the person's words, whatever its code", async () => {
     const { api } = authApi(NEW);
     await renderApp("/login?error=EARLY_ACCESS_EMAIL_UNVERIFIED&error_description=x", {
       api,
@@ -478,9 +537,40 @@ describe("Acesso antecipado (o link do convite)", () => {
     );
     // Nothing is wrong with a field nobody typed in.
     expect(screen().getByLabelText("E-mail").getAttribute("aria-invalid")).toBeNull();
-    cleanup();
-    await renderApp("/login?error=state_mismatch", { api, auth: createFakeAuth().auth });
-    expect(screen().queryByRole("alert")).toBeNull();
+    // Better Auth's own codes, by what the person can do; any other one too.
+    for (const [code, says] of [
+      ["access_denied", "O login foi cancelado."],
+      ["unable_to_link_account", "Este email já tem uma conta aqui. Entre do jeito que você entrou antes."],
+      ["email_not_found", "Essa conta não informou um email confirmado. Tente outro jeito de entrar."],
+      ["state_mismatch", "Esse login demorou demais ou já foi usado. Tente de novo."],
+      ["server_error", "Algo deu errado do nosso lado. Tente de novo em instantes."],
+      ["something_new", "Não deu para entrar. Tente de novo."],
+      ["toString", "Não deu para entrar. Tente de novo."],
+    ] as const) {
+      cleanup();
+      await renderApp(`/login?error=${code}`, { api, auth: createFakeAuth().auth });
+      expect(screen().getByRole("alert").textContent).toBe(says);
+    }
+  });
+
+  test("a sign-in that waited for an OAuth callback (under /api/) goes on to it with a full load", async () => {
+    const state = seedState({ me: null });
+    const signedIn = seedState().me;
+    const { auth } = createFakeAuth({ onSignIn: () => (state.me = signedIn) });
+    const { api } = authApi(ACCOUNT, { state });
+    const callback = "/api/app/github-app/callback?state=s&code=c&installation_id=7";
+    const assign = spyOn(window.location, "assign").mockImplementation(() => {});
+    try {
+      const { router } = await renderApp(`/login?redirect=${encodeURIComponent(callback)}`, { api, auth });
+      await type("E-mail", "marina@acme.com.br");
+      await press(/^Continuar(?! com)/);
+      await type("Senha", "correct horse");
+      await press(/^Entrar/);
+      expect(assign).toHaveBeenCalledWith(callback);
+      expect(router.state.location.pathname).toBe("/login");
+    } finally {
+      assign.mockRestore();
+    }
   });
 });
 
@@ -839,6 +929,15 @@ describe("Aceitar convite", () => {
     expect(state.calls.filter((c) => c.method === "invites.requestNew").map((c) => c.args)).toEqual([["old"]]);
     expect(lead()).toBe("Pronto. Ana recebeu seu pedido por e-mail.");
     expect(screen().getByRole("button", { name: "Pedido enviado" }).hasAttribute("disabled")).toBe(true);
+  });
+
+  test("an invitation the server didn't answer for is asked again, never 'não vale mais'", async () => {
+    const state = seedState({ me: null });
+    state.previewFails = [new NetworkError(new TypeError("Failed to fetch"))];
+    await renderApp("/invite/valid", { api: createFakeApi(state) });
+    await settle(6);
+    expect(state.previewFails).toEqual([]);
+    expect(lead()).toBe("Para começar: como o time te chama?");
   });
 
   test("a replaced or cancelled invitation: asking fails, and the page says so instead of a request nobody got", async () => {
@@ -2287,11 +2386,11 @@ describe("Onboarding", () => {
     let down = true;
     const list = api.agents.list;
     api.agents.list = async (orgId) => {
-      if (down) throw new Error("offline");
+      if (down) throw new NetworkError(new TypeError("Failed to fetch"));
       return list(orgId);
     };
     const { router } = await renderApp("/onboarding", { api });
-    expect(document.body.textContent).toContain("Não foi possível carregar. Confira a conexão e tente de novo.");
+    expect(document.body.textContent).toContain("Sem conexão com o agentes.chat agora. Tente de novo em instantes.");
     down = false;
     await click(button("Tentar de novo"), 8);
     // Its team made already: past the agents' step, at the computer's.
@@ -2563,7 +2662,8 @@ describe("Onboarding", () => {
     await toDone(state, "Theo · PM");
     state.failPosts = true;
     await click(button("Enviar para Theo"), 8);
-    expect(document.querySelector(".ac-toast")?.textContent).toContain("Try again");
+    // In the person's words: the server's own ("Try again") are English.
+    expect(document.querySelector(".ac-toast")?.textContent).toContain("Algo deu errado. Tente de novo.");
     expect(screen().getByRole("heading", { name: "Boas-vindas à Acme Saúde" })).toBeTruthy();
     expect(askBox().value).toBe("@theo Monte o plano da nossa primeira semana: o que cada um de nós faz primeiro?");
     state.failPosts = false;

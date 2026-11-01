@@ -11,8 +11,12 @@ import {
   Avatar,
   agentGradient,
   Carousel,
+  ColorPicker,
+  colorKey,
   Field,
   Icon,
+  isHexColor,
+  Popover,
   ProviderLogo,
   SearchSelect,
   Select,
@@ -186,7 +190,7 @@ export function LookPicker({ look, onPick }: LookPickProps) {
     <>
       <div className="newag__look-row">
         <span className="newag__label">
-          {t("look.color")} <span className="newag__opt-label">{t(`look.colors.${look.color}`)}</span>
+          {t("look.color")} <span className="newag__opt-label">{t(`look.colors.${colorKey(look.color)}`)}</span>
         </span>
         <ColorChoices look={look} onPick={onPick} />
       </div>
@@ -224,7 +228,41 @@ function ColorChoices({ look, onPick }: LookPickProps) {
           />
         );
       })}
+      <CustomColor look={look} onPick={onPick} />
     </div>
+  );
+}
+
+/** The ninth swatch, "Personalizar": a rainbow until a custom color is picked, then that color, selected. */
+function CustomColor({ look, onPick }: LookPickProps) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const custom = isHexColor(look.color);
+  const [top, bottom] = custom ? agentGradient(look.color) : [];
+  return (
+    <Popover
+      label={t("look.customColor")}
+      side="bottom"
+      open={open}
+      onOpenChange={setOpen}
+      trigger={
+        <button
+          type="button"
+          className={custom ? "newag__swatch" : "newag__swatch newag__swatch--custom"}
+          aria-label={t("look.customColor")}
+          title={t("look.customColor")}
+          aria-pressed={custom}
+          style={custom ? ({ "--a": top, "--b": bottom } as CSSProperties) : undefined}
+        />
+      }
+    >
+      <ColorPicker
+        value={look.color}
+        onChange={(color) => onPick({ color })}
+        onDone={() => setOpen(false)}
+        labels={{ area: t("look.colorArea"), hue: t("look.hue"), hex: t("look.hex") }}
+      />
+    </Popover>
   );
 }
 

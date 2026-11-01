@@ -106,6 +106,11 @@ export const NOTIFICATION_KINDS = [
    * actor, `latest.title` their name, `source.label` the workspace's. Inbox only (no category, so never a push).
    */
   "invitation_accepted",
+  /**
+   * The workspace used its Composio calls for the month (`COMPOSIO_CALLS_PER_MONTH`, ADR 0107 §7): who manages its
+   * connectors hears it once that month, `latest.title` the month (`2026-11`) and `latest.calls` the cap.
+   */
+  "composio_limit",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -178,6 +183,8 @@ export interface NotificationLatest {
   names?: string[];
   /** `join_request` from a member's suggestion (ADR 0090): who suggested, so a row of one says so. */
   suggestedBy?: string;
+  /** `composio_limit`: the calls a month allows. */
+  calls?: number;
 }
 
 export interface NotificationView {

@@ -28,6 +28,7 @@ export interface EnvVarDefinition {
     | "Storage"
     | "Sandbox"
     | "Email"
+    | "Composio"
     | "Email for agents"
     | "Push"
     | "Operator"
@@ -38,6 +39,10 @@ export interface EnvVarDefinition {
   /** Secret values are never logged and are masked in diagnostics. */
   secret?: boolean;
 }
+
+/** A Sentry DSN: `https://<public key>@<host>/<project id>`. */
+const DSN = /^https?:\/\/[^@/\s]+@[^/\s]+\/(?:[^\s]*\/)?\d+$/;
+const DSN_MESSAGE = "must be a DSN such as https://<key>@errors.example.com/1";
 
 /** Claude model ids accepted as defaults. Prices live in `@agenteschat/providers` (`MODEL_CATALOG`). */
 const modelId = z.string().regex(/^[a-z0-9][a-z0-9.-]*$/, "must be a model id such as claude-sonnet-5-5");
@@ -72,6 +77,16 @@ export const envVars = {
       "Public URL of the agentes.chat landing page (its own site), without a trailing slash. Turns on the waiting list: that origin may call it (CORS on `/api/waitlist` only), and the confirmation email links there. Unset: no waiting list.",
     section: "Server",
     example: "https://agentes.chat",
+  },
+  APP_VERSION: {
+    schema: z
+      .string()
+      .regex(/^[\w.+-]{1,64}$/, "must be a version such as 2026.10.31.4")
+      .optional(),
+    description:
+      "This deploy's version: the release error reports are filed under, and `version` in `GET /api/instance` and `/api/health`. `deploy/deploy.sh` sets it in the image it deploys, from its second argument. Unset (default): the server's own version.",
+    section: "Server",
+    example: "2026.10.31.4",
   },
   WEB_DIR: {
     schema: z.string().default("./public"),
@@ -499,18 +514,6 @@ export const envVars = {
     section: "Connectors",
     secret: true,
   },
-  CONNECTOR_GOOGLE_CLIENT_ID: {
-    schema: z.string().optional(),
-    description:
-      "Client id of the Google OAuth client used to connect Google Drive for agents (not sign-in). Set together with `CONNECTOR_GOOGLE_CLIENT_SECRET`. Redirect URI: `{PUBLIC_URL}/api/app/connectors/oauth/callback`. Without it, Google Drive can still be connected with an API key.",
-    section: "Connectors",
-  },
-  CONNECTOR_GOOGLE_CLIENT_SECRET: {
-    schema: z.string().optional(),
-    description: "Client secret of the Google OAuth client for the Google Drive connector.",
-    section: "Connectors",
-    secret: true,
-  },
   MILLIONSEND_API_KEY: {
     schema: z.string().optional(),
     description:
@@ -553,37 +556,63 @@ export const envVars = {
   COMPOSIO_API_KEY: {
     schema: z.string().optional(),
     description:
-      "Composio project API key (Gmail and Outlook for agents, ADR 0038). Without it, Gmail and Outlook don't appear among the email connectors; IMAP mailboxes still work.",
-    section: "Email for agents",
+      "Composio project API key: Gmail and Outlook mailboxes for agents (ADR 0038) and the connectors that go through Composio, Google Drive, Slack and more (ADR 0107). Without it, Gmail and Outlook don't appear among the email connectors and those services are unavailable; IMAP mailboxes still work.",
+    section: "Composio",
     secret: true,
   },
   COMPOSIO_WEBHOOK_SECRET: {
     schema: z.string().optional(),
     description:
-      "Signing secret of the Composio webhook subscription (Standard Webhooks). Point the subscription at `{PUBLIC_URL}/api/webhooks/composio`. Without it, routines can't wake on new Gmail/Outlook mail.",
-    section: "Email for agents",
+      "Signing secret of the Composio webhook subscription (Standard Webhooks). Point the subscription at `{PUBLIC_URL}/api/webhooks/composio`. Without it, routines can't wake on new Gmail/Outlook mail, and an expired connector account is only noticed when a call fails.",
+    section: "Composio",
     secret: true,
   },
   COMPOSIO_GMAIL_AUTH_CONFIG_ID: {
     schema: z.string().optional(),
     description:
       "Composio auth config for Gmail (`ac_…`). Optional: without it, one using Composio's managed Google app is created on first use. Set it to use our own Google OAuth app (white label).",
-    section: "Email for agents",
+    section: "Composio",
   },
   COMPOSIO_OUTLOOK_AUTH_CONFIG_ID: {
     schema: z.string().optional(),
     description:
       "Composio auth config for Outlook (`ac_…`). Optional: without it, one using Composio's managed Microsoft app is created on first use.",
-    section: "Email for agents",
+    section: "Composio",
+  },
+  COMPOSIO_AUTH_CONFIGS: {
+    schema: z
+      .string()
+      .regex(/^\s*([a-z0-9_]+\s*=\s*ac_[A-Za-z0-9_-]+\s*)(,\s*[a-z0-9_]+\s*=\s*ac_[A-Za-z0-9_-]+\s*)*$/, {
+        error: "must be toolkit=ac_… pairs separated by commas",
+      })
+      .optional(),
+    description:
+      "Composio auth configs for connectors, as `toolkit=ac_…` pairs separated by commas: an OAuth app of your own made in Composio's dashboard, or a white label. Each one wins over Composio's own app for its toolkit.",
+    section: "Composio",
+    example: "googledrive=ac_abc123,slack=ac_def456",
+  },
+  COMPOSIO_CALLS_PER_MONTH: {
+    schema: z.coerce.number().int().min(0).default(0),
+    description:
+      "Composio tool calls a workspace may make per calendar month (UTC), connectors and mailboxes together; at the cap its Composio tools stop until the next month and its admins are told. 0: no cap (a self-hosted server pays its own Composio project).",
+    section: "Composio",
   },
   MAIL_IMAP_ENABLED: {
     schema: z.stringbool().default(true),
     description: "IMAP/SMTP mailboxes for agents (iCloud, hosting providers, any server). `false` hides them.",
     section: "Email for agents",
   },
+  MILLIONSEND_INBOXES_API_URL: {
+    // Its own setting: MILLIONSEND_API_URL may point at Resend, which has no inboxes and mustn't see these keys.
+    schema: z.union([z.literal("off"), z.url()]).default("https://api.millionsend.com"),
+    description:
+      "MillionSend's API, for MillionSend inboxes connected as mailboxes for agents (each with its own key): MillionSend Cloud, or a self-hosted MillionSend. `off` hides them. Their new mail arrives at once when MillionSend can reach `{PUBLIC_URL}/api/webhooks/millionsend` over https, else within `MAIL_POLL_SECONDS`.",
+    section: "Email for agents",
+  },
   MAIL_POLL_SECONDS: {
     schema: z.coerce.number().int().min(60).max(3600).default(300),
-    description: "How often IMAP folders watched by routines are checked for new mail.",
+    description:
+      "How often IMAP folders and MillionSend inboxes watched by routines are checked for new mail (MillionSend's webhook brings it sooner).",
     section: "Email for agents",
   },
   EMAIL_REPLY_TO: {
@@ -801,6 +830,26 @@ export const envVars = {
   LOG_LEVEL: {
     schema: z.enum(["debug", "info", "warn", "error"]).default("info"),
     description: "Minimum log level written to stdout.",
+    section: "Observability",
+  },
+  SENTRY_DSN: {
+    schema: z.string().regex(DSN, DSN_MESSAGE).optional(),
+    description:
+      "Error reports from this server to a Sentry-compatible server: the DSN of a project there. Each report holds the error, its stack, the release and internal ids, never message content, emails, IP addresses, cookies or tokens (SELF_HOSTING.md). Unset (default): no reports, and the reporting code isn't loaded.",
+    section: "Observability",
+    example: "https://<key>@errors.example.com/1",
+    secret: true,
+  },
+  SENTRY_WEB_DSN: {
+    schema: z.string().regex(DSN, DSN_MESSAGE).optional(),
+    description:
+      "The same for the web and desktop apps: every browser that opens this server gets this DSN (a browser DSN is public by design) and reports its own errors there. Unset (default): browsers report nothing and load no reporting code.",
+    section: "Observability",
+    example: "https://<key>@errors.example.com/2",
+  },
+  SENTRY_ENVIRONMENT: {
+    schema: z.string().min(1).max(64).default("production"),
+    description: "The environment error reports are filed under (`production`, `staging`).",
     section: "Observability",
   },
 } satisfies Record<string, EnvVarDefinition>;

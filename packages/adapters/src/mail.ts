@@ -3,11 +3,11 @@
  * per-call checks and approvals; these interfaces only reach a mailbox.
  *
  * - `MailConnector.open` gives a `MailProvider` for one account: Gmail and
- *   Outlook through Composio (`via = composio`), anything else over IMAP/SMTP
- *   (`via = imap`).
- * - `MailPoller` (IMAP only) lists messages that arrived since the last check.
+ *   Outlook through Composio (`via = composio`), a MillionSend inbox through
+ *   its API (`via = millionsend`), anything else over IMAP/SMTP (`via = imap`).
+ * - `MailPoller` (IMAP and MillionSend) lists messages that arrived since the last check.
  * - `ComposioClient` is the Composio-specific part (connect links, connected
- *   accounts, triggers, webhooks).
+ *   accounts, triggers, webhooks); `MillionSendClient` MillionSend's (inboxes, webhooks).
  *
  * Every text field coming out of a mailbox is untrusted: the engine wraps it
  * before a model sees it.
@@ -126,13 +126,15 @@ export interface MailProvider {
 export interface MailAccountRef {
   id: string;
   orgId: string;
-  provider: "gmail" | "outlook" | "imap";
-  via: "composio" | "imap";
+  provider: "gmail" | "outlook" | "imap" | "millionsend";
+  via: "composio" | "imap" | "millionsend";
   address: string;
   /** Composio connected account id. */
   externalAccountId?: string | null;
   /** Composio user id the connected account belongs to. */
   externalUserId?: string | null;
+  /** MillionSend: the inbox and the key that reaches it. */
+  millionsend?: { apiKey: string; inboxId: string };
   imap?: {
     host: string;
     port: number;
@@ -172,7 +174,11 @@ export interface MailPollState {
   uidValidity: number;
 }
 
-/** IMAP: messages that arrived in a folder since `state` (null = start from now, return nothing). */
+/**
+ * Messages that arrived in a folder since `state` (null = start from now, return nothing). IMAP's state is a UID
+ * and its folder's `UIDVALIDITY`; MillionSend's is the arrival time (ms) of the newest message seen, and when its
+ * checks started (ms) in `uidValidity`.
+ */
 export interface MailPoller {
   newMessages(
     account: MailAccountRef,
@@ -204,8 +210,29 @@ export interface MailPreset {
   appPasswordUrl: string | null;
 }
 
-/** Composio (Gmail and Outlook): the account lives there; we keep its id. */
-export type ComposioToolkit = "gmail" | "outlook";
+/** A Composio toolkit (`gmail`, `googledrive`, `slack`…): the account lives there; we keep its id. */
+export type ComposioToolkit = string;
+/** The toolkits mailboxes go through (ADR 0038), the only ones with "new message" triggers. */
+export type ComposioMailToolkit = "gmail" | "outlook";
+
+/** A connected account as a tool call names it. */
+export interface ComposioAccount {
+  connectedAccountId: string;
+  /** The user id it was linked for (`createConnectLink`'s `userId`). */
+  userId: string;
+  /** Its toolkit's slug (`gmail`), for `onExecute`: an action's slug doesn't say it (`ONE_DRIVE_GET_ITEM`). */
+  toolkit: string;
+}
+
+/** One of a toolkit's tools, at a pinned version. */
+export interface ComposioTool {
+  slug: string;
+  description: string;
+  /** JSON Schema of its arguments. */
+  inputSchema: Record<string, unknown>;
+  /** Composio's tags (`readOnlyHint`, `destructiveHint`…). */
+  tags: string[];
+}
 
 export interface ComposioClient {
   /** A link the person opens to connect; Composio redirects to `callbackUrl` after. */
@@ -218,21 +245,43 @@ export interface ComposioClient {
   /**
    * State of a connected account and its mailbox address, when active (`userId`: the one it was linked for).
    * The address is read with a profile tool call, which Composio bills; `readAddress: false` skips it.
+   * `displayName`: the name Composio keeps for the account, when it has one.
    */
   getConnectedAccount(
     id: string,
     userId: string,
     options?: { readAddress?: boolean },
-  ): Promise<{ status: "active" | "pending" | "failed" | "expired"; address: string | null }>;
+  ): Promise<{
+    status: "active" | "pending" | "failed" | "expired";
+    address: string | null;
+    displayName?: string | null;
+  }>;
   /**
    * Deletes a connected account. `revoke` (the default) also revokes its grant at Google or Microsoft, which every
    * connection of the same mailbox to this server's Composio project shares. `revoke: false`: Composio only forgets
    * the account.
    */
   deleteConnectedAccount(id: string, options?: { revoke?: boolean }): Promise<void>;
+  /** A toolkit's tools at a pinned version (no tool call: not billed). */
+  listTools(toolkit: ComposioToolkit, version: string): Promise<ComposioTool[]>;
+  /**
+   * Runs one tool for a connected account (`version`: the toolkit's pinned version); returns the tool's `data`.
+   * Throws `MailAuthError` (the account stopped working), `ComposioKeyError`, `ComposioLimitError` or `MailError`.
+   */
+  executeTool(
+    slug: string,
+    account: ComposioAccount,
+    args: Record<string, unknown>,
+    version?: string,
+  ): Promise<unknown>;
+  /**
+   * Downloads a file a tool returned as a link (`s3url`, short-lived: right away). https only. Past `maxBytes` it throws
+   * `FileTooLargeError` without reading the rest.
+   */
+  fetchFile(url: string, maxBytes?: number): Promise<Uint8Array>;
   /** A "new message" trigger on the account; `query` is a Gmail search (Outlook: filtered on our side). */
   createMailTrigger(input: {
-    toolkit: ComposioToolkit;
+    toolkit: ComposioMailToolkit;
     connectedAccountId: string;
     userId: string;
     query: string | null;
@@ -248,6 +297,42 @@ export type ComposioWebhookEvent =
   | { type: "trigger.disabled"; triggerId: string }
   | { type: "other" };
 
+/** Composio refused this server's project key (401/403): nothing is wrong with the account it was called for. */
+export class ComposioKeyError extends MailError {
+  constructor(message: string) {
+    super(message, false);
+    this.name = "ComposioKeyError";
+  }
+}
+
+/**
+ * A tool Composio ran that failed (`successful: false`): the message is the service's own words. `retryable` reads
+ * those words (a mailbox's quota or rate limit), not Composio's health.
+ */
+export class ComposioActionError extends MailError {
+  constructor(message: string, retryable: boolean) {
+    super(message, retryable);
+    this.name = "ComposioActionError";
+  }
+}
+
+/** A file larger than its caller keeps (`fetchFile`'s `maxBytes`). */
+export class FileTooLargeError extends MailError {
+  constructor(readonly maxBytes: number) {
+    super(`the file is larger than ${maxBytes} bytes`, false);
+    this.name = "FileTooLargeError";
+  }
+}
+
+/** The workspace used its Composio calls for the month (`COMPOSIO_CALLS_PER_MONTH`): nothing reached Composio. */
+export class ComposioLimitError extends MailError {
+  readonly code = "composio.monthly_limit";
+  constructor(message: string) {
+    super(message, false);
+    this.name = "ComposioLimitError";
+  }
+}
+
 /** A webhook whose signature doesn't verify. */
 export class ComposioSignatureError extends Error {
   constructor() {
@@ -256,10 +341,40 @@ export class ComposioSignatureError extends Error {
   }
 }
 
+/** An inbox a MillionSend API key reaches. */
+export interface MillionSendInbox {
+  id: string;
+  /** Lowercase. */
+  address: string;
+  name: string | null;
+  /** `agent` (screened, replies inside its threads by default) or `human`. */
+  kind: "agent" | "human";
+  /** On MillionSend's shared domain (no DNS of the team's own). */
+  shared: boolean;
+}
+
+/** MillionSend (an inbox per mailbox): the key is the mailbox's own, opened by the engine for each call. */
+export interface MillionSendClient {
+  /** The inboxes the key reaches (a key limited to one inbox: that one). `MailAuthError` when the key can't read them. */
+  listInboxes(apiKey: string): Promise<MillionSendInbox[]>;
+  /**
+   * A webhook for new mail in one inbox, signed with `secret` (ours, `whsec_…`). Null when the key may not create
+   * webhooks (one limited to an inbox).
+   */
+  createWebhook(
+    apiKey: string,
+    input: { endpoint: string; inboxId: string; secret: string },
+  ): Promise<{ id: string } | null>;
+  /** A 404 counts as done. */
+  deleteWebhook(apiKey: string, webhookId: string): Promise<void>;
+}
+
 /** The mail adapters the server wires (each absent when not configured). */
 export interface MailAdapters {
   /** Gmail and Outlook through Composio; null = Composio not configured. */
   composio: { client: ComposioClient; connector: MailConnector } | null;
   /** Any IMAP/SMTP server; null = off. */
   imap: { connector: MailConnector; poller: MailPoller; tester: MailConnectionTester; presets: MailPreset[] } | null;
+  /** MillionSend inboxes (ADR 0102); absent or null = off. */
+  millionsend?: { client: MillionSendClient; connector: MailConnector; poller: MailPoller } | null;
 }

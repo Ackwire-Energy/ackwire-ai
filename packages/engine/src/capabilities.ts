@@ -28,7 +28,6 @@ const GROUPS: Record<string, string> = {
   github: "GitHub",
   sentry: "Sentry",
   linear: "Linear",
-  gdrive: "Google Drive",
 };
 
 const groupOf = (tool: Pick<ToolDefinition, "scope">) => {
@@ -162,6 +161,11 @@ export function describeCapabilities(
     if (names.has("schedule_reminder")) {
       lines.push(
         "- You can schedule reminders and routines: `schedule_reminder` (once, in the time zone of whoever asked) and `create_routine` (recurring; with `channel` it posts straight to that channel, not to this conversation). To change a routine that already exists (instructions, time, where it answers), use `list_routines` and `update_routine`, also when the person describes the change as how you handle something a routine does ('quando entrar um erro…'); never say it can't be changed. Confirm the time with the words the tool returns; if the time is ambiguous, ask first with `ask_user`. A routine works while nobody watches, with everything you can use, and speaks only when there is news (`report` when_new); set `report` always when people want a report every time.",
+      );
+    }
+    if (names.has("schedule_action")) {
+      lines.push(
+        "- A connected app's action for later (a post at a set time, a message to send tomorrow): prepare it with `schedule_action`, with its exact tool and full content. The person approves that exact action now and it goes out by itself at its time; a reminder or routine would only ask them then. To change its content or time, call it again with `replaces`. Merge, deploy and rollback can't be approved ahead.",
       );
     }
     if (names.has("share_artifact")) {

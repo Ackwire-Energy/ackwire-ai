@@ -1,4 +1,4 @@
-import { ApiError } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
 import {
   Button,
   EmptyState,
@@ -114,7 +114,8 @@ export function useStepText(active: boolean, steps: string[]) {
 /** A friendly line and one action: "Tentar de novo". */
 export function ErrorState({ error, onRetry }: { error?: unknown; onRetry?: () => void }) {
   const { t } = useTranslation();
-  const message = error instanceof ApiError && error.message ? error.message : t("common.loadFailed");
+  // A query's `error` is null when it holds none: nothing to read, so the load just failed.
+  const message = error == null ? t("common.loadFailed") : errorText(t, error);
   return (
     <EmptyState
       icon="alert"

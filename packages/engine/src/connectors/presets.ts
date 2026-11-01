@@ -23,16 +23,25 @@ import { canonicalResource } from "./oauth-mcp";
  * takes only the clients it approved through its review form, and Figma
  * answers 403 at registration. Calendly refused only the name (letters,
  * digits, hyphens and spaces): `ensureOAuthClient` registers it again
- * without the dot.
+ * without the dot. Intercom's EU server (`intercom-eu`, added after that
+ * check) waits on the same approval as its US one.
  *
- * Left out: HubSpot (its authorization server has no dynamic registration:
- * it needs an app registered with HubSpot). Slack, Zendesk, Box, Render,
- * PagerDuty, Front, Pipedrive, Shopify and Microsoft 365 also need an app
- * registered with them.
+ * Left out as servers of their own: HubSpot (its authorization server has
+ * no dynamic registration: it needs an app registered with HubSpot). Slack,
+ * Zendesk, Box, Render, PagerDuty, Front, Pipedrive, Shopify and Microsoft 365
+ * also need an app registered with them.
+ *
+ * A preset with a `composio` way (ADR 0107) also connects through Composio, on
+ * Composio's own OAuth app only (`ComposioWay.auth`): a service with no server
+ * that connects today (Google Drive, Slack, HubSpot…) and the `soon` ones
+ * Composio signs in to. `connectorListing` picks one way per service.
  */
 export interface McpPreset {
   id: string;
-  /** The brand only ("Supabase"): what a variant is ("read-only") is the app's to say, in each language. */
+  /**
+   * The brand, and in parentheses what a variant is ("Supabase (read-only)"), in English. It is a new connection's
+   * name, so two presets never share one; the apps translate it by `id` and sign in "on" the brand alone.
+   */
   label: string;
   description: string;
   category: ConnectorCategory;
@@ -47,7 +56,53 @@ export interface McpPreset {
   readTools?: readonly string[];
   /** The vendor hasn't approved agentes.chat yet: listed greyed out ("Em breve"), not connectable in one click. */
   soon?: true;
+  /**
+   * The Cloud offers OAuth only, no API key: the vendor's terms forbid an app asking its users for their token
+   * (Intercom: "Never ask users for their Access Tokens", developers.intercom.com, Authentication). Self-hosted, a
+   * workspace connects its own data, which is what those tokens are for, so the key stays.
+   */
+  cloudOAuthOnly?: true;
+  /** How its server takes an API key in `Authorization` (Semrush: `Apikey <key>`); default `Bearer`. */
+  keyScheme?: string;
+  /**
+   * The read-only tool that lists the accounts a sign-in reaches: its answer (JSON) keeps them at `list`, each one's
+   * id made of the values at `id` and its name at `name` (dotted paths). Two connections are the same account when
+   * they reach the same ones. Without `list` the answer is the one account (a Composio action, called with `args`).
+   */
+  account?: { tool: string; list?: string; id: readonly string[]; name: string; args?: Record<string, unknown> };
+  /** The service through Composio (ADR 0107): the way it connects when no server of its own does. */
+  composio?: ComposioWay;
 }
+
+/** A service through Composio (ADR 0107 §3). */
+export interface ComposioWay {
+  /** Composio's toolkit (`googledrive`); its actions start with it in capitals (`GOOGLEDRIVE_FIND_FILE`). */
+  toolkit: string;
+  /** The toolkit's pinned version: the schemas the model sees are the ones that run. */
+  version: string;
+  /**
+   * Composio's own OAuth app, the only sign-in a way may take: plug-and-play, with no key for the person to paste and
+   * no app of ours to register. A service Composio connects only with a key or an app of our own gets no way (product
+   * decision: it would add to the Composio bill for what a connector of our own could do). `connectors-presets.test.ts`
+   * checks every preset.
+   */
+  auth: "managed";
+  /** The explicit actions agents get: never a meta tool, a raw query or a proxy. */
+  actions: readonly string[];
+  /** Actions that always ask a person, whatever their words say (they publish, spend or invite). */
+  ask?: readonly string[];
+  /** What the actions start with when it isn't the toolkit in capitals. */
+  prefix?: string;
+}
+
+/** Where a Composio toolkit is "connected": an address nothing fetches, that only names the service. */
+export const composioToolkitUrl = (toolkit: string) => `https://backend.composio.dev/api/v3.1/toolkits/${toolkit}`;
+
+const COMPOSIO_TOOLKIT_URL = /^https:\/\/backend\.composio\.dev\/api\/v3\.1\/toolkits\/([a-z0-9_]+)\/?$/i;
+
+/** The toolkit a Composio address names, else null. */
+export const composioToolkitOf = (serverUrl: string | null | undefined) =>
+  COMPOSIO_TOOLKIT_URL.exec(serverUrl ?? "")?.[1]?.toLowerCase() ?? null;
 
 export const MCP_PRESETS: readonly McpPreset[] = [
   {
@@ -75,12 +130,219 @@ export const MCP_PRESETS: readonly McpPreset[] = [
     serverUrl: "https://mcp.notion.com/mcp",
   },
   {
+    id: "drive",
+    category: "docs",
+    label: "Google Drive",
+    description: "Google Drive files and folders: search, read, create and share.",
+    icon: "drive",
+    serverUrl: composioToolkitUrl("googledrive"),
+    // One billed call names the account: its Google address.
+    account: {
+      tool: "GOOGLEDRIVE_GET_ABOUT",
+      args: { fields: "user" },
+      id: ["user.emailAddress"],
+      name: "user.emailAddress",
+    },
+    composio: {
+      toolkit: "googledrive",
+      version: "20261022_00",
+      auth: "managed",
+      actions: [
+        "GOOGLEDRIVE_FIND_FILE",
+        "GOOGLEDRIVE_GET_FILE_METADATA",
+        "GOOGLEDRIVE_DOWNLOAD_FILE",
+        "GOOGLEDRIVE_EXPORT_GOOGLE_WORKSPACE_FILE",
+        "GOOGLEDRIVE_CREATE_FILE_FROM_TEXT",
+        "GOOGLEDRIVE_CREATE_FOLDER",
+        "GOOGLEDRIVE_MOVE_FILE",
+        "GOOGLEDRIVE_CREATE_COMMENT",
+        "GOOGLEDRIVE_CREATE_PERMISSION",
+      ],
+      ask: ["GOOGLEDRIVE_CREATE_PERMISSION"],
+    },
+  },
+  {
+    id: "google-docs",
+    category: "docs",
+    label: "Google Docs",
+    description: "Google Docs documents, read and written as text.",
+    icon: "google-docs",
+    serverUrl: composioToolkitUrl("googledocs"),
+    composio: {
+      toolkit: "googledocs",
+      version: "20261008_00",
+      auth: "managed",
+      actions: [
+        "GOOGLEDOCS_SEARCH_DOCUMENTS",
+        "GOOGLEDOCS_GET_DOCUMENT_PLAINTEXT",
+        "GOOGLEDOCS_GET_DOCUMENT_BY_ID",
+        "GOOGLEDOCS_CREATE_DOCUMENT",
+        "GOOGLEDOCS_CREATE_DOCUMENT_MARKDOWN",
+        "GOOGLEDOCS_INSERT_TEXT_ACTION",
+        "GOOGLEDOCS_REPLACE_ALL_TEXT",
+        "GOOGLEDOCS_UPDATE_DOCUMENT_SECTION_MARKDOWN",
+        "GOOGLEDOCS_UPDATE_DOCUMENT_MARKDOWN",
+        "GOOGLEDOCS_COPY_DOCUMENT",
+        "GOOGLEDOCS_EXPORT_DOCUMENT_AS_PDF",
+      ],
+      ask: ["GOOGLEDOCS_UPDATE_DOCUMENT_MARKDOWN"],
+    },
+  },
+  {
+    id: "google-sheets",
+    category: "docs",
+    label: "Google Sheets",
+    description: "Google Sheets spreadsheets: read, add rows and update cells.",
+    icon: "google-sheets",
+    serverUrl: composioToolkitUrl("googlesheets"),
+    composio: {
+      toolkit: "googlesheets",
+      version: "20261018_00",
+      auth: "managed",
+      actions: [
+        "GOOGLESHEETS_SEARCH_SPREADSHEETS",
+        "GOOGLESHEETS_GET_SPREADSHEET_INFO",
+        "GOOGLESHEETS_GET_SHEET_NAMES",
+        "GOOGLESHEETS_VALUES_GET",
+        "GOOGLESHEETS_BATCH_GET",
+        "GOOGLESHEETS_LOOKUP_SPREADSHEET_ROW",
+        "GOOGLESHEETS_CREATE_GOOGLE_SHEET1",
+        "GOOGLESHEETS_ADD_SHEET",
+        "GOOGLESHEETS_VALUES_UPDATE",
+        "GOOGLESHEETS_SPREADSHEETS_VALUES_APPEND",
+        "GOOGLESHEETS_UPDATE_VALUES_BATCH",
+        "GOOGLESHEETS_CLEAR_VALUES",
+        "GOOGLESHEETS_DELETE_SHEET",
+      ],
+      ask: ["GOOGLESHEETS_CLEAR_VALUES"],
+    },
+  },
+  {
+    id: "onedrive",
+    category: "docs",
+    label: "OneDrive",
+    description: "OneDrive files and folders (Microsoft 365).",
+    icon: "onedrive",
+    serverUrl: composioToolkitUrl("one_drive"),
+    composio: {
+      toolkit: "one_drive",
+      version: "20261029_00",
+      auth: "managed",
+      actions: [
+        "ONE_DRIVE_SEARCH_ITEMS",
+        "ONE_DRIVE_ONEDRIVE_LIST_ITEMS",
+        "ONE_DRIVE_ONEDRIVE_FIND_FILE",
+        "ONE_DRIVE_ONEDRIVE_FIND_FOLDER",
+        "ONE_DRIVE_GET_ITEM",
+        "ONE_DRIVE_DOWNLOAD_FILE",
+        "ONE_DRIVE_ONEDRIVE_CREATE_TEXT_FILE",
+        "ONE_DRIVE_ONEDRIVE_CREATE_FOLDER",
+        "ONE_DRIVE_MOVE_ITEM",
+        "ONE_DRIVE_COPY_ITEM",
+        "ONE_DRIVE_CREATE_LINK",
+        "ONE_DRIVE_INVITE_USER_TO_ITEM",
+        "ONE_DRIVE_DELETE_ITEM",
+      ],
+      ask: ["ONE_DRIVE_CREATE_LINK"],
+    },
+  },
+  {
     id: "atlassian",
     category: "product",
     label: "Atlassian",
     description: "Jira issues and Confluence pages.",
     icon: "atlassian",
     serverUrl: "https://mcp.atlassian.com/v1/mcp",
+  },
+  {
+    id: "google-calendar",
+    category: "product",
+    label: "Google Calendar",
+    description: "Google Calendar events, schedules and free time.",
+    icon: "google-calendar",
+    serverUrl: composioToolkitUrl("googlecalendar"),
+    composio: {
+      toolkit: "googlecalendar",
+      version: "20261010_00",
+      auth: "managed",
+      actions: [
+        "GOOGLECALENDAR_LIST_CALENDARS",
+        "GOOGLECALENDAR_EVENTS_LIST",
+        "GOOGLECALENDAR_FIND_EVENT",
+        "GOOGLECALENDAR_EVENTS_GET",
+        "GOOGLECALENDAR_FIND_FREE_SLOTS",
+        "GOOGLECALENDAR_CREATE_EVENT",
+        "GOOGLECALENDAR_QUICK_ADD",
+        "GOOGLECALENDAR_UPDATE_EVENT",
+        "GOOGLECALENDAR_PATCH_EVENT",
+        "GOOGLECALENDAR_DELETE_EVENT",
+      ],
+      ask: [
+        "GOOGLECALENDAR_CREATE_EVENT",
+        "GOOGLECALENDAR_QUICK_ADD",
+        "GOOGLECALENDAR_UPDATE_EVENT",
+        "GOOGLECALENDAR_PATCH_EVENT",
+      ],
+    },
+  },
+  {
+    id: "slack",
+    category: "product",
+    label: "Slack",
+    description: "Slack channels, messages and threads.",
+    icon: "slack",
+    serverUrl: composioToolkitUrl("slack"),
+    composio: {
+      toolkit: "slack",
+      version: "20261023_00",
+      auth: "managed",
+      actions: [
+        "SLACK_FIND_CHANNELS",
+        "SLACK_FETCH_CONVERSATION_HISTORY",
+        "SLACK_FETCH_MESSAGE_THREAD_FROM_A_CONVERSATION",
+        "SLACK_SEARCH_MESSAGES",
+        "SLACK_FIND_USERS",
+        "SLACK_FIND_USER_BY_EMAIL_ADDRESS",
+        "SLACK_DOWNLOAD_SLACK_FILE",
+        "SLACK_ADD_REACTION_TO_AN_ITEM",
+        "SLACK_CREATE_A_REMINDER",
+        "SLACK_CREATE_CHANNEL",
+        "SLACK_SEND_MESSAGE",
+        "SLACK_SCHEDULE_MESSAGE",
+        "SLACK_UPDATES_A_SLACK_MESSAGE",
+        "SLACK_DELETES_A_MESSAGE_FROM_A_CHAT",
+        "SLACK_INVITE_USER_TO_CHANNEL",
+      ],
+      ask: ["SLACK_UPDATES_A_SLACK_MESSAGE"],
+    },
+  },
+  {
+    id: "microsoft-teams",
+    category: "product",
+    label: "Microsoft Teams",
+    description: "Microsoft Teams teams, channels, chats and meetings.",
+    icon: "microsoft-teams",
+    serverUrl: composioToolkitUrl("microsoft_teams"),
+    composio: {
+      toolkit: "microsoft_teams",
+      version: "20261029_00",
+      auth: "managed",
+      actions: [
+        "MICROSOFT_TEAMS_TEAMS_LIST",
+        "MICROSOFT_TEAMS_TEAMS_LIST_CHANNELS",
+        "MICROSOFT_TEAMS_TEAMS_LIST_CHANNEL_MESSAGES",
+        "MICROSOFT_TEAMS_LIST_MESSAGE_REPLIES",
+        "MICROSOFT_TEAMS_CHATS_GET_ALL_CHATS",
+        "MICROSOFT_TEAMS_LIST_USER_CHAT_MESSAGES",
+        "MICROSOFT_TEAMS_SEARCH_MESSAGES",
+        "MICROSOFT_TEAMS_LIST_USERS",
+        "MICROSOFT_TEAMS_TEAMS_POST_CHANNEL_MESSAGE",
+        "MICROSOFT_TEAMS_TEAMS_POST_CHAT_MESSAGE",
+        "MICROSOFT_TEAMS_POST_MESSAGE_REPLY",
+        "MICROSOFT_TEAMS_CREATE_MEETING",
+      ],
+      ask: ["MICROSOFT_TEAMS_CREATE_MEETING"],
+    },
   },
   {
     id: "asana",
@@ -90,6 +352,28 @@ export const MCP_PRESETS: readonly McpPreset[] = [
     icon: "asana",
     serverUrl: "https://mcp.asana.com/mcp",
     soon: true,
+    composio: {
+      toolkit: "asana",
+      version: "20261013_00",
+      auth: "managed",
+      actions: [
+        "ASANA_GET_MULTIPLE_WORKSPACES",
+        "ASANA_GET_WORKSPACE_PROJECTS",
+        "ASANA_GET_A_PROJECT",
+        "ASANA_GET_SECTIONS_IN_PROJECT",
+        "ASANA_GET_TASKS_FROM_A_PROJECT",
+        "ASANA_SEARCH_TASKS_IN_WORKSPACE",
+        "ASANA_GET_A_TASK",
+        "ASANA_GET_STORIES_FOR_TASK",
+        "ASANA_CREATE_A_TASK",
+        "ASANA_UPDATE_A_TASK",
+        "ASANA_CREATE_SUBTASK",
+        "ASANA_CREATE_TASK_COMMENT",
+        "ASANA_ADD_TASK_TO_SECTION",
+        "ASANA_CREATE_A_PROJECT",
+        "ASANA_DELETE_TASK",
+      ],
+    },
   },
   {
     id: "stripe",
@@ -98,11 +382,21 @@ export const MCP_PRESETS: readonly McpPreset[] = [
     description: "Stripe customers, payments, subscriptions and invoices.",
     icon: "stripe",
     serverUrl: "https://mcp.stripe.com",
+    // Stripe's sign-in offers only the `mcp` scope (no OpenID) and may reach several accounts (a live one and its
+    // sandboxes). An OAuth session lists them with this tool, `{ accounts: [{ stripe_context, livemode, name }] }`,
+    // not with the `get_stripe_account_info` Stripe's docs name. The mode is part of the id, so grants given for test
+    // data never move to live money.
+    account: {
+      tool: "list_available_accounts_or_orgs",
+      list: "accounts",
+      id: ["stripe_context", "livemode"],
+      name: "name",
+    },
   },
   {
     id: "cloudflare-bindings",
     category: "dev",
-    label: "Cloudflare",
+    label: "Cloudflare (Workers)",
     description: "Workers, KV, R2 and D1 of the Cloudflare account.",
     icon: "cloudflare",
     serverUrl: "https://bindings.mcp.cloudflare.com/mcp",
@@ -110,7 +404,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
   {
     id: "cloudflare-observability",
     category: "dev",
-    label: "Cloudflare",
+    label: "Cloudflare (logs)",
     description: "Workers logs and metrics.",
     icon: "cloudflare",
     serverUrl: "https://observability.mcp.cloudflare.com/mcp",
@@ -126,7 +420,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
   {
     id: "supabase-readonly",
     category: "dev",
-    label: "Supabase",
+    label: "Supabase (read-only)",
     description: "Read-only queries on Supabase projects: SQL runs as a read-only Postgres user.",
     icon: "supabase",
     // Supabase enforces read_only on its side (SQL as a read-only Postgres user); `features` keeps only the
@@ -139,10 +433,68 @@ export const MCP_PRESETS: readonly McpPreset[] = [
     id: "intercom",
     category: "support",
     label: "Intercom",
-    description: "Intercom conversations and contacts (US accounts).",
+    description: "Intercom conversations and contacts.",
     icon: "intercom",
     serverUrl: "https://mcp.intercom.com/mcp",
     soon: true,
+    cloudOAuthOnly: true,
+    composio: {
+      toolkit: "intercom",
+      version: "20261010_00",
+      auth: "managed",
+      actions: [
+        "INTERCOM_LIST_CONVERSATIONS",
+        "INTERCOM_SEARCH_CONVERSATIONS",
+        "INTERCOM_GET_CONVERSATION",
+        "INTERCOM_LIST_CONTACTS",
+        "INTERCOM_SEARCH_CONTACTS",
+        "INTERCOM_GET_A_CONTACT",
+        "INTERCOM_LIST_ALL_COMPANIES",
+        "INTERCOM_LIST_ALL_ADMINS",
+        "INTERCOM_CREATE_A_NOTE",
+        "INTERCOM_ASSIGN_CONVERSATION",
+        "INTERCOM_ATTACH_TAG_TO_CONVERSATION",
+        "INTERCOM_UPDATE_A_CONTACT",
+        "INTERCOM_CLOSE_CONVERSATION",
+        "INTERCOM_REPLY_TO_CONVERSATION",
+      ],
+    },
+  },
+  {
+    id: "intercom-eu",
+    category: "support",
+    label: "Intercom (EU)",
+    description: "Intercom conversations and contacts, for Intercom workspaces hosted in the EU (app.eu.intercom.com).",
+    icon: "intercom",
+    serverUrl: "https://mcp.eu.intercom.com/mcp",
+    soon: true,
+    cloudOAuthOnly: true,
+  },
+  {
+    id: "zendesk",
+    category: "support",
+    label: "Zendesk",
+    description: "Zendesk tickets, comments, users and organizations.",
+    icon: "zendesk",
+    serverUrl: composioToolkitUrl("zendesk"),
+    composio: {
+      toolkit: "zendesk",
+      version: "20260916_00",
+      auth: "managed",
+      actions: [
+        "ZENDESK_SEARCH_ZENDESK",
+        "ZENDESK_LIST_ZENDESK_TICKETS",
+        "ZENDESK_GET_ZENDESK_TICKET_BY_ID",
+        "ZENDESK_GET_TICKET_COMMENTS",
+        "ZENDESK_SEARCH_ZENDESK_USERS",
+        "ZENDESK_GET_USER",
+        "ZENDESK_SEARCH_ZENDESK_ORGANIZATIONS",
+        "ZENDESK_CREATE_ZENDESK_TICKET",
+        "ZENDESK_UPDATE_ZENDESK_TICKET",
+        "ZENDESK_REPLY_ZENDESK_TICKET",
+      ],
+      ask: ["ZENDESK_CREATE_ZENDESK_TICKET", "ZENDESK_UPDATE_ZENDESK_TICKET"],
+    },
   },
   {
     id: "paypal",
@@ -160,6 +512,29 @@ export const MCP_PRESETS: readonly McpPreset[] = [
     icon: "square",
     serverUrl: "https://mcp.squareup.com/mcp",
     soon: true,
+    composio: {
+      toolkit: "square",
+      version: "20260721_00",
+      auth: "managed",
+      actions: [
+        "SQUARE_LIST_LOCATIONS",
+        "SQUARE_LIST_PAYMENTS",
+        "SQUARE_SEARCH_ORDERS",
+        "SQUARE_RETRIEVE_ORDER",
+        "SQUARE_LIST_CUSTOMERS",
+        "SQUARE_SEARCH_CUSTOMERS",
+        "SQUARE_RETRIEVE_CUSTOMER",
+        "SQUARE_SEARCH_CATALOG_OBJECTS",
+        "SQUARE_LIST_INVOICES",
+        "SQUARE_GET_INVOICE",
+        "SQUARE_CREATE_CUSTOMER",
+        "SQUARE_UPDATE_CUSTOMER",
+        "SQUARE_UPSERT_CATALOG_OBJECT",
+        "SQUARE_CANCEL_PAYMENT",
+        "SQUARE_CREATE_REFUND",
+      ],
+      ask: ["SQUARE_UPSERT_CATALOG_OBJECT", "SQUARE_CANCEL_PAYMENT"],
+    },
   },
   {
     id: "webflow",
@@ -314,6 +689,24 @@ export const MCP_PRESETS: readonly McpPreset[] = [
     icon: "figma",
     serverUrl: "https://mcp.figma.com/mcp",
     soon: true,
+    composio: {
+      toolkit: "figma",
+      version: "20261010_00",
+      auth: "managed",
+      actions: [
+        "FIGMA_GET_PROJECTS_IN_A_TEAM",
+        "FIGMA_GET_FILES_IN_A_PROJECT",
+        "FIGMA_GET_FILE_METADATA",
+        "FIGMA_GET_FILE_NODES",
+        "FIGMA_GET_FILE_COMPONENTS",
+        "FIGMA_GET_FILE_STYLES",
+        "FIGMA_GET_LOCAL_VARIABLES",
+        "FIGMA_RENDER_IMAGES_OF_FILE_NODES",
+        "FIGMA_GET_COMMENTS_IN_A_FILE",
+        "FIGMA_ADD_A_COMMENT_TO_A_FILE",
+        "FIGMA_DELETE_A_COMMENT",
+      ],
+    },
   },
   {
     id: "airtable",
@@ -331,6 +724,24 @@ export const MCP_PRESETS: readonly McpPreset[] = [
     icon: "dropbox",
     serverUrl: "https://mcp.dropbox.com/mcp",
     soon: true,
+    composio: {
+      toolkit: "dropbox",
+      version: "20261001_00",
+      auth: "managed",
+      actions: [
+        "DROPBOX_LIST_FILES_IN_FOLDER",
+        "DROPBOX_SEARCH_FILE_OR_FOLDER",
+        "DROPBOX_GET_METADATA",
+        "DROPBOX_READ_FILE",
+        "DROPBOX_LIST_SHARED_LINKS",
+        "DROPBOX_CREATE_FOLDER",
+        "DROPBOX_MOVE_FILE_OR_FOLDER",
+        "DROPBOX_COPY_FILE_OR_FOLDER",
+        "DROPBOX_CREATE_SHARED_LINK",
+        "DROPBOX_DELETE_FILE",
+      ],
+      ask: ["DROPBOX_CREATE_SHARED_LINK"],
+    },
   },
   {
     id: "miro",
@@ -406,6 +817,71 @@ export const MCP_PRESETS: readonly McpPreset[] = [
     description: "AbacatePay Pix charges, customers and withdrawals.",
     icon: "abacatepay",
     serverUrl: "https://mcp.abacatepay.com/mcp",
+  },
+  {
+    id: "hubspot",
+    category: "sales",
+    label: "HubSpot",
+    description: "HubSpot contacts, companies, deals, notes and tasks.",
+    icon: "hubspot",
+    serverUrl: composioToolkitUrl("hubspot"),
+    composio: {
+      toolkit: "hubspot",
+      version: "20261029_00",
+      auth: "managed",
+      actions: [
+        "HUBSPOT_SEARCH_CONTACTS_BY_CRITERIA",
+        "HUBSPOT_LIST_CONTACTS",
+        "HUBSPOT_READ_CONTACT",
+        "HUBSPOT_SEARCH_COMPANIES",
+        "HUBSPOT_GET_COMPANY",
+        "HUBSPOT_SEARCH_DEALS",
+        "HUBSPOT_GET_DEAL",
+        "HUBSPOT_CREATE_CONTACT",
+        "HUBSPOT_UPDATE_CONTACT",
+        "HUBSPOT_CREATE_COMPANY",
+        "HUBSPOT_UPDATE_COMPANY",
+        "HUBSPOT_CREATE_DEAL",
+        "HUBSPOT_UPDATE_DEAL",
+        "HUBSPOT_CREATE_NOTE",
+        "HUBSPOT_CREATE_TASK",
+        "HUBSPOT_ARCHIVE_CONTACT",
+      ],
+      ask: ["HUBSPOT_ARCHIVE_CONTACT"],
+    },
+  },
+  {
+    id: "salesforce",
+    category: "sales",
+    label: "Salesforce",
+    description: "Salesforce accounts, contacts, leads and opportunities.",
+    icon: "salesforce",
+    serverUrl: composioToolkitUrl("salesforce"),
+    composio: {
+      toolkit: "salesforce",
+      version: "20261029_00",
+      auth: "managed",
+      actions: [
+        "SALESFORCE_SEARCH_ACCOUNTS",
+        "SALESFORCE_GET_ACCOUNT",
+        "SALESFORCE_SEARCH_CONTACTS",
+        "SALESFORCE_GET_CONTACT",
+        "SALESFORCE_SEARCH_LEADS",
+        "SALESFORCE_GET_LEAD",
+        "SALESFORCE_SEARCH_OPPORTUNITIES",
+        "SALESFORCE_GET_OPPORTUNITY",
+        "SALESFORCE_CREATE_ACCOUNT",
+        "SALESFORCE_UPDATE_ACCOUNT",
+        "SALESFORCE_CREATE_CONTACT",
+        "SALESFORCE_UPDATE_CONTACT",
+        "SALESFORCE_CREATE_LEAD",
+        "SALESFORCE_UPDATE_LEAD",
+        "SALESFORCE_CREATE_OPPORTUNITY",
+        "SALESFORCE_UPDATE_OPPORTUNITY",
+        "SALESFORCE_CREATE_TASK",
+        "SALESFORCE_CREATE_NOTE",
+      ],
+    },
   },
   {
     id: "attio",
@@ -494,8 +970,9 @@ export const MCP_PRESETS: readonly McpPreset[] = [
     label: "Semrush",
     description: "Semrush keyword, domain and backlink data.",
     icon: "semrush",
-    serverUrl: "https://mcp.semrush.com/v1/mcp",
+    serverUrl: "https://mcp.semrush.com/v2/mcp",
     soon: true,
+    keyScheme: "Apikey",
   },
   {
     id: "ahrefs",
@@ -549,9 +1026,23 @@ export const MCP_PRESETS: readonly McpPreset[] = [
 
 export const mcpPreset = (id: string) => MCP_PRESETS.find((p) => p.id === id) ?? null;
 
-/** The preset a connection came from (by its server URL), if any. */
+/** The preset a connection came from, by either of its addresses (its server's or its Composio toolkit's), if any. */
 export function presetForServer(serverUrl: string | null | undefined) {
   if (!serverUrl) return null;
+  const toolkit = composioToolkitOf(serverUrl);
+  if (toolkit) return MCP_PRESETS.find((p) => p.composio?.toolkit === toolkit) ?? null;
   const url = canonicalResource(serverUrl);
   return MCP_PRESETS.find((p) => canonicalResource(p.serverUrl) === url) ?? null;
+}
+
+const actionPrefix = (way: Pick<ComposioWay, "toolkit" | "prefix">) => `${way.prefix ?? way.toolkit.toUpperCase()}_`;
+
+/** A Composio action's tool name: the action without its toolkit's prefix, in lower case (`find_file`). */
+export const composioToolName = (way: Pick<ComposioWay, "toolkit" | "prefix">, action: string) =>
+  action.slice(actionPrefix(way).length).toLowerCase();
+
+/** The action of a way a tool name runs (`find_file` → `GOOGLEDRIVE_FIND_FILE`), only one the way lists. */
+export function composioAction(way: ComposioWay, name: string): string | null {
+  const action = `${actionPrefix(way)}${name.toUpperCase()}`;
+  return way.actions.includes(action) ? action : null;
 }

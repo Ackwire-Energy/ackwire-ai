@@ -47,6 +47,23 @@ export function approvalRisk(a: Pick<Approval, "tool" | "scope">): "high" | "nor
 export const approveAlwaysOffered = (a: Pick<Approval, "status" | "canDecide" | "approveAlways" | "tool" | "scope">) =>
   a.status === "pending" && a.canDecide && Boolean(a.approveAlways) && approvalRisk(a) !== "high";
 
+/**
+ * Where an action prepared ahead (`runAt`, `schedule_action`) stands: waiting for a person (`asking`), approved and
+ * waiting for its time (`scheduled`), or done (`ran`); ended without running: approved but its run didn't do it in
+ * time (`lapsed`), not approved by its time (`unapproved`) or withdrawn (`canceled`). Null for an action that runs
+ * once approved, or a refused one.
+ */
+export function aheadPhase(
+  a: Pick<Approval, "runAt" | "status" | "executedAt" | "decidedAt">,
+): "asking" | "scheduled" | "ran" | "lapsed" | "unapproved" | "canceled" | null {
+  if (!a.runAt) return null;
+  if (a.executedAt) return "ran";
+  if (a.status === "pending") return "asking";
+  if (a.status === "approved") return "scheduled";
+  if (a.status === "expired") return a.decidedAt ? "lapsed" : "unapproved";
+  return a.status === "canceled" ? "canceled" : null;
+}
+
 /** What the action touches: only what the request itself says. */
 export function approvalTraits(a: Pick<Approval, "tool" | "scope" | "params">): ApprovalTrait[] {
   const action = approvalAction(a);

@@ -49,11 +49,11 @@ test("install from the app: state, callback binding, list, and the webhook unbin
   expect(url.origin + url.pathname).toBe("https://github.com/apps/agentes-chat/installations/new");
   const state = url.searchParams.get("state") ?? "";
 
-  // An installation the person's GitHub account can't see is refused.
+  // An installation the person's GitHub account can't see is refused, back where it started.
   const foreign = await owner(
     `/api/app/github-app/callback?state=${state}&code=c&installation_id=8&setup_action=install`,
   );
-  expect(foreign.headers.get("location")).toContain("github_app_error=");
+  expect(foreign.headers.get("location")).toBe("http://localhost:3000/conectores?github_app_error=not_visible");
 
   const { installUrl: second } = (await (
     await owner(`/api/app/organizations/${orgId}/github-app/install`, { json: { returnTo: "/conectores" } })
@@ -102,4 +102,59 @@ test("without the app configured: not installable, webhook not mounted", async (
   expect((await owner(`/api/app/organizations/${orgId}/github-app/install`, { json: {} })).status).toBe(400);
   const hook = await t.app.request("/api/github-app/webhook", { method: "POST", body: "{}" });
   expect(hook.status).toBe(404);
+});
+
+test("GitHub's return without a session in this browser: the sign-in page first, then it finishes", async () => {
+  t = await createTestServer({ http, env });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const { installUrl } = (await (
+    await owner(`/api/app/organizations/${orgId}/github-app/install`, { json: { returnTo: "/conectores" } })
+  ).json()) as { installUrl: string };
+  const state = new URL(installUrl).searchParams.get("state") ?? "";
+  const callback = `/api/app/github-app/callback?state=${state}&code=c&installation_id=7&setup_action=install`;
+  const signedOut = await browser(t)(callback);
+  expect(signedOut.status).toBe(302);
+  const signIn = new URL(signedOut.headers.get("location") ?? "");
+  expect(signIn.origin + signIn.pathname).toBe("http://localhost:3000/login");
+  expect(signIn.searchParams.get("redirect")).toBe(callback);
+  // Signed in, the same address finishes.
+  expect((await owner(callback)).headers.get("location")).toBe("http://localhost:3000/conectores?github_app=installed");
+});
+
+test("GitHub's return that didn't install: why as a code where it started, never words", async () => {
+  const refusing = (async (input: string | URL | Request, init?: RequestInit) =>
+    String(input) === "https://github.com/login/oauth/access_token" && String(init?.body).includes("code=bad")
+      ? Response.json({ error: "bad_verification_code" })
+      : http(input)) as unknown as typeof fetch;
+  t = await createTestServer({ http: refusing, env: { ...env, ALLOW_SIGNUP: "true" } });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const start = async () => {
+    const res = await owner(`/api/app/organizations/${orgId}/github-app/install`, {
+      json: { returnTo: "/conectores" },
+    });
+    return new URL(((await res.json()) as { installUrl: string }).installUrl).searchParams.get("state") ?? "";
+  };
+  const back = async (who: typeof owner, query: string) =>
+    (await who(`/api/app/github-app/callback?${query}`)).headers.get("location") ?? "";
+  const landing = "http://localhost:3000/conectores?github_app_error=";
+
+  // Someone without rights on that GitHub account asked its owner to install: news, not a failure.
+  expect(await back(owner, `state=${await start()}&setup_action=request`)).toBe(`${landing}requested`);
+  expect(await back(owner, `state=${await start()}&error=access_denied`)).toBe(`${landing}cancelled`);
+  expect(await back(owner, `state=${await start()}&code=c`)).toBe(`${landing}failed`);
+  expect(await back(owner, `state=${await start()}&code=bad&installation_id=7&setup_action=install`)).toBe(
+    `${landing}failed`,
+  );
+  const other = browser(t);
+  await signUp(other, "other@example.com");
+  expect(await back(other, `state=${await start()}&code=c&installation_id=7&setup_action=install`)).toBe(
+    `${landing}other_account`,
+  );
+  expect(await back(owner, "code=c&installation_id=7&setup_action=request")).toBe(
+    "http://localhost:3000/?github_app_error=requested",
+  );
 });

@@ -4,7 +4,7 @@
  * draws it on a canvas (`engine.ts`); the phone app reproduces it in a shader
  * and tests it against these functions (ADR 0035).
  */
-import { AGENT_GRADIENTS, type AgentColorName, EYE_COLOR, spriteBody, spriteGrid } from "../agent/engine.js";
+import { type AgentColorName, EYE_COLOR, gradientOf, spriteBody, spriteGrid } from "../agent/engine.js";
 
 /* ---------- tones ---------- */
 
@@ -61,7 +61,7 @@ export function pixelOf(color: string): number {
 /** A full sky in an agent's color: deep to near white (sky → the landing's tones). */
 export function agentTones(color: AgentColorName = "sky"): string[] {
   if (color === "sky") return SKY_TONES;
-  const [top, bottom] = AGENT_GRADIENTS[color];
+  const [top, bottom] = gradientOf(color);
   const deep = mix(bottom, "#000000", 0.42);
   return [
     deep,
@@ -77,7 +77,7 @@ export function agentTones(color: AgentColorName = "sky"): string[] {
 
 /** From a surface into the agent's color (empty states, the activity strip). */
 export function glowTones(color: AgentColorName, surface: string): string[] {
-  const [top, bottom] = AGENT_GRADIENTS[color];
+  const [top, bottom] = gradientOf(color);
   return [
     surface,
     mix(surface, bottom, 0.2),
@@ -92,7 +92,7 @@ export function glowTones(color: AgentColorName, surface: string): string[] {
 
 /** The light version: from a surface only into the color's light tones (the sidebar). */
 export function softTones(color: AgentColorName, surface: string): string[] {
-  const [top, bottom] = AGENT_GRADIENTS[color];
+  const [top, bottom] = gradientOf(color);
   return [
     surface,
     mix(surface, top, 0.12),

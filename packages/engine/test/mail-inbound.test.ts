@@ -15,7 +15,7 @@ import {
   gmailQuery,
   handleComposioWebhook,
   ingestMail,
-  pollImapWatches,
+  pollMailWatches,
   type RoutineDeps,
   reconcileComposioAccounts,
   setRoutineActive,
@@ -174,18 +174,22 @@ test("Composio webhooks: bad signature refused; new mail fires the routine; expi
       body({ type: "mail.received", triggerId, connectedAccountId: "ca_other", message: mail("g0", "a@b.com") }),
     ),
   ).toEqual({ type: "mail.received", fired: 0 });
-  expect(
-    await handleComposioWebhook(
-      m.deps,
-      signed,
-      body({
-        type: "mail.received",
-        triggerId,
-        connectedAccountId: gmail.connectedAccountId,
-        message: mail("g1", "a@b.com"),
-      }),
-    ),
-  ).toEqual({ type: "mail.received", fired: 1 });
+  const events = async () =>
+    (await m.f.db.select().from(schema.composioUsageDays))
+      .filter((r) => r.events > 0)
+      .map((r) => [r.orgId, r.toolkit, r.action, r.events]);
+  expect(await events()).toEqual([]);
+  const delivered = body({
+    type: "mail.received",
+    triggerId,
+    connectedAccountId: gmail.connectedAccountId,
+    message: mail("g1", "a@b.com"),
+  });
+  expect(await handleComposioWebhook(m.deps, signed, delivered)).toEqual({ type: "mail.received", fired: 1 });
+  // Each delivery is a billed trigger event, one delivered again too (ADR 0103).
+  expect(await events()).toEqual([[m.f.org.id, "gmail", "GMAIL_NEW_GMAIL_MESSAGE", 1]]);
+  expect(await handleComposioWebhook(m.deps, signed, delivered)).toEqual({ type: "mail.received", fired: 0 });
+  expect(await events()).toEqual([[m.f.org.id, "gmail", "GMAIL_NEW_GMAIL_MESSAGE", 2]]);
 
   await handleComposioWebhook(
     m.deps,
@@ -261,14 +265,14 @@ test("IMAP polling starts from now, tracks UIDs, resets on UIDVALIDITY and stops
   const poll = async () => {
     // Every check is due: last checked an hour ago.
     await m.f.db.update(schema.mailWatches).set({ lastCheckedAt: new Date(Date.now() - 3600_000) });
-    return pollImapWatches(m.deps, { intervalMs: 60_000 });
+    return pollMailWatches(m.deps, { intervalMs: 60_000 });
   };
 
   expect(await poll()).toEqual({ checked: 1, fired: 0, failed: 0 });
   expect(poller.state.calls[0]?.state).toBeNull();
   expect(await watchOf(m, routine.id)).toMatchObject({ lastUid: 1, uidValidity: 1 });
   // Not due again right away.
-  expect(await pollImapWatches(m.deps, { intervalMs: 60_000 })).toMatchObject({ checked: 0 });
+  expect(await pollMailWatches(m.deps, { intervalMs: 60_000 })).toMatchObject({ checked: 0 });
 
   poller.deliver("INBOX", mail("n1", "a@b.com"));
   poller.deliver("INBOX", mail("n2", "c@d.com"));
@@ -292,7 +296,7 @@ test("IMAP polling starts from now, tracks UIDs, resets on UIDVALIDITY and stops
 
   poller.state.failWith = fakeMailAuthError();
   await m.f.db.update(schema.mailWatches).set({ lastCheckedAt: new Date(Date.now() - 24 * 3600_000) });
-  expect(await pollImapWatches(m.deps, { intervalMs: 60_000 })).toMatchObject({ checked: 1, failed: 1 });
+  expect(await pollMailWatches(m.deps, { intervalMs: 60_000 })).toMatchObject({ checked: 1, failed: 1 });
   const [row] = await m.f.db.select().from(schema.mailAccounts).where(eq(schema.mailAccounts.id, account.id));
   expect(row?.status).toBe("needs_reconnect");
   expect(await poll()).toMatchObject({ checked: 0 });

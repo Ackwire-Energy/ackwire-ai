@@ -57,7 +57,6 @@ const CAPS = {
   github: "repo",
   sentry: "alert",
   linear: "layers",
-  gdrive: "cloud",
   mail: "mail",
   custom: "plug",
 } as const satisfies Record<string, IconName>;
@@ -67,7 +66,6 @@ const CAP_CONNECTOR: Partial<Record<CapKey, string>> = {
   github: "github",
   sentry: "sentry",
   linear: "linear",
-  gdrive: "drive",
 };
 const HIDDEN_CAPS = new Set(["context", "memory", "skills", "setup"]);
 /** "What it does" on its card: the first line of its instructions, in whole sentences while they fit. */
