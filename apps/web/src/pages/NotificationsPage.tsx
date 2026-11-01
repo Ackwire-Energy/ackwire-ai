@@ -282,6 +282,7 @@ type WhatKey =
   | "missionStopped"
   | "routineFinished"
   | "routineFailed"
+  | "runFailed"
   | "routinePaused"
   | "routineStalled"
   | "machineConnected"
@@ -346,6 +347,8 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
       return k("routineFinished", { name });
     case "routine_failed":
       return k("routineFailed", { name });
+    case "run_failed":
+      return k("runFailed", { name });
     case "routine_paused":
       return k("routinePaused", { name });
     case "routine_stalled":
@@ -700,7 +703,8 @@ function Row({
   const speaker = n.count > 1 && (n.kind === "thread_reply" || n.kind === "issue_comment") ? name : null;
   const expandable = isExpandable(n);
   const steps = l.steps && l.steps.total > 0 ? l.steps : null;
-  const failed = n.kind === "mission_stopped" || n.kind === "routine_failed" || l.steps?.failedAt != null;
+  const failed =
+    n.kind === "mission_stopped" || n.kind === "routine_failed" || n.kind === "run_failed" || l.steps?.failedAt != null;
   // A routine's trouble says why in the person's language (`latest.reason`): a pause its reason, a failed
   // run what went wrong (never the server's English).
   const why = routineNotificationWords(n);

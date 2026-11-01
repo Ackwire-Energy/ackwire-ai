@@ -20,6 +20,7 @@ import { consolidateOrg } from "./context/consolidate";
 import { applyReactionFeedback } from "./context/feedback";
 import { REFLECT_DEFAULTS, reflectThread } from "./context/reflect";
 import { judgeOf } from "./context/summaries";
+import { reportDroppedMentions } from "./continuation";
 import { dispatchDm, dispatchMentions, requesterOf } from "./dispatch";
 import { isAgentOnlyDm } from "./dms";
 import { type EmailArt, sendQueuedEmail } from "./email";
@@ -397,6 +398,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           const res = allowed.length
             ? await dispatchMentions(deps.db, input, { maxHops: deps.maxHops, onlyAgentIds: allowed })
             : { runs: [] };
+          if ("dropped" in res && res.dropped)
+            await reportDroppedMentions({ db: deps.db, pubsub: deps.pubsub }, message, res.dropped);
           await publishRouted(deps.pubsub, message, {
             strategy: "mention",
             seenBy: message.mentionedAgentIds,

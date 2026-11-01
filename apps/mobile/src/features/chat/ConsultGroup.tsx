@@ -5,6 +5,7 @@ import {
   consultGroupSummary,
   consultLineKey,
   consultLineState,
+  consultProgress,
   consultSeconds,
   firstOfRun,
   groupsByRun,
@@ -87,6 +88,7 @@ export function ConsultGroup({ message: m, color }: { message: Message; color: A
     const state = consultLineState(c, now);
     const to = agentGrammar(t, dir.agentById.get(c.consultedAgentId)?.name ?? t("mobile.chat.someone"));
     const answer = state === "answered" ? (c.answer ?? "") : null;
+    const progress = consultProgress(c);
     return {
       kind: "line",
       line: {
@@ -96,7 +98,7 @@ export function ConsultGroup({ message: m, color }: { message: Message; color: A
         label: consultLineLabel(t, state, c, to),
         hint: null,
         // The start of the answer, as the web shows it next to the phrase: no tap needed to know what came back.
-        preview: answer ? previewOf(answer) : null,
+        preview: answer ? previewOf(answer) : progress ? t(progress.key, progress.values) : null,
         time: formatLineTime(i18n.language, consultSeconds(c, now) * 1000),
         onOpen: () => router.push(consultationHref(c.id, m.channelId)),
       },

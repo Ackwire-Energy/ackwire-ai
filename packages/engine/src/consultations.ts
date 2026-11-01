@@ -31,7 +31,7 @@ import type { Notice } from "./notices";
 import { personBehindCall, routineCreatorOfCall } from "./requester";
 import { isRoutineRoomKey } from "./routine-brief";
 import { deliverNoticeToRun, resumeRunWithResult } from "./run-resume";
-import { type AgentRun, isTerminal, type RunStatus, replyThreadOf } from "./runs";
+import { type AgentRun, isTerminal, outageParkedSql, type RunStatus, replyThreadOf } from "./runs";
 import { MAX_HANDOFF_LINKS, refusedAtLimit } from "./stretch";
 import { noAgentText } from "./team";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
@@ -46,8 +46,12 @@ export const TELL_AGENT_TOOL = "tell_agent";
  * again, every time (`expireConsultations`).
  */
 export const CONSULTATION_TTL_MS = 15 * 60_000;
-/** Agents in one chain of consultations: Dev → Infra → one more, then no further. */
-export const MAX_CONSULTATION_CHAIN = 2;
+/**
+ * Agents already in a chain before one more may be asked (a lead → a dev → a reviewer → a specialist → one more).
+ * Real teams delegate three and four deep; cycles are refused anyway, and the stretch limits (`stretch.ts`: runs
+ * agents start on their own, per stretch and per budget) bound what a deep chain can spend.
+ */
+export const MAX_CONSULTATION_CHAIN = 4;
 /**
  * The wait id of a consultation nobody pauses on (`ask_agent` without
  * `wait`): its answer goes to the asker's conversation as a notice.
@@ -605,7 +609,7 @@ export interface HandOff {
   /** The sender heard what came of it. */
   reportedAt: Date | null;
   /** Null: nobody started it (the stretch held it). */
-  target: { status: RunStatus; waitingMachineId: string | null; handedOn: boolean } | null;
+  target: { status: RunStatus; waitingMachineId: string | null; handedOn: boolean; outage?: boolean } | null;
 }
 
 /** How many of them the block lists. */
@@ -638,10 +642,12 @@ export async function handOffsFrom(
     target_status: RunStatus | null;
     waiting_machine_id: string | null;
     handed_on: boolean | string | null;
+    outage: boolean | string | null;
   }>(
     await db.execute(sql`select c.id, c.kind, c.status, c.question, c.answer, a.handle, c.created_at, c.answered_at,
         c.reported_at, t.status as target_status, t.waiting_machine_id,
-        exists (select 1 from agent_consultations s where s.asker_run_id = t.id and s.status = 'open') as handed_on
+        exists (select 1 from agent_consultations s where s.asker_run_id = t.id and s.status = 'open') as handed_on,
+        (t.status = 'waiting_input' and t.transcript -> 'outage' is not null) as outage
       from agent_consultations c
       join agent_runs r on r.id = c.asker_run_id
       join channels ch on ch.id = r.channel_id
@@ -671,6 +677,7 @@ export async function handOffsFrom(
           status: r.target_status,
           waitingMachineId: r.waiting_machine_id,
           handedOn: r.handed_on === true || r.handed_on === "t",
+          outage: r.outage === true || r.outage === "t",
         }
       : null,
   }));
@@ -800,6 +807,8 @@ async function handBack(tx: Executor, asker: AgentRun, closed: AgentConsultation
           eq(agentConsultations.status, "open"),
         ),
       );
+    // It goes back inside that answer: reported (I3), whether or not this run reads it too.
+    await tx.update(agentConsultations).set({ reportedAt: new Date() }).where(eq(agentConsultations.id, closed.id));
   }
   const notice = consultationNotice(closed, handle);
   if (asker.status === "queued" || asker.status === "running") return deliverNoticeToRun(tx, asker, notice);
@@ -1169,9 +1178,11 @@ export function consultationWait(run: {
   waitingMachineId: string | null;
   /** Something it asked or handed off is still out (`handedOnSql`). */
   handedOn?: boolean;
+  /** Parked on a provider outage (`outageParkedSql`): still on it, nobody to answer. */
+  outage?: boolean;
 }): ConsultationWait | null {
   if (run.status === "waiting_approval") return "approval";
-  if (run.status === "waiting_input") return run.waitingMachineId ? "computer" : "input";
+  if (run.status === "waiting_input") return run.waitingMachineId ? "computer" : run.outage ? null : "input";
   return run.handedOn && isTerminal(run.status as AgentRun["status"]) ? "agents" : null;
 }
 
@@ -1203,6 +1214,11 @@ export interface RunConsultation {
   question: string;
   /** The answer once `answered`; the reason once `failed`; null otherwise. */
   answer: string | null;
+  /**
+   * Open: what the consulted run posted in the agents' DM so far (I7), so the conversation that handed the work sees
+   * it moving: how many messages, the start of the latest, and when. Null when it posted nothing yet.
+   */
+  progress: { posts: number; latest: string; at: Date } | null;
   createdAt: Date;
   answeredAt: Date | null;
   expiresAt: Date;
@@ -1233,6 +1249,7 @@ export async function consultationsIn(db: Executor, orgId: string, channelId: st
       createdAt: agentConsultations.createdAt,
       answeredAt: agentConsultations.answeredAt,
       expiresAt: agentConsultations.expiresAt,
+      dmId: agentConsultations.channelId,
     })
     .from(agentConsultations)
     .innerJoin(agentRuns, eq(agentRuns.id, agentConsultations.askerRunId))
@@ -1248,12 +1265,52 @@ export async function consultationsIn(db: Executor, orgId: string, channelId: st
           status: agentRuns.status,
           waitingMachineId: agentRuns.waitingMachineId,
           handedOn: handedOnSql,
+          outage: outageParkedSql,
         })
         .from(agentRuns)
         .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.id, held)))
     : [];
   const waitOf = new Map(targets.map((t) => [t.id, consultationWait(t)]));
-  return rows.map((r) => consultationView(r, waitOf));
+  const progressOf = await progressIn(
+    db,
+    orgId,
+    rows.flatMap((r) =>
+      r.status === "open" && r.targetRunId ? [{ runId: r.targetRunId, dmId: r.dmId, since: r.createdAt }] : [],
+    ),
+  );
+  return rows.map((r) => ({
+    ...consultationView(r, waitOf),
+    progress: r.status === "open" && r.targetRunId ? (progressOf.get(r.targetRunId) ?? null) : null,
+  }));
+}
+
+/**
+ * What each consulted run posted so far in its agents' DM since the consultation (its messages, not notices): how
+ * many, and its latest's start and time. Bounded by DM and time, so `(channel_id, created_at)` and the partitions
+ * of `messages` keep it to the hand-off's own rows.
+ */
+async function progressIn(db: Executor, orgId: string, targets: { runId: string; dmId: string; since: Date }[]) {
+  if (targets.length === 0) return new Map<string, NonNullable<RunConsultation["progress"]>>();
+  const since = new Date(Math.min(...targets.map((t) => t.since.getTime())));
+  const rows = rowsOf<{ run_id: string; posts: number | string; latest: string; at: string | Date }>(
+    await db.execute(sql`select distinct on (m.agent_run_id) m.agent_run_id as run_id,
+        count(*) over (partition by m.agent_run_id) as posts, left(m.body, 400) as latest, m.created_at as at
+      from ${messages} m
+      join (values ${sql.join(
+        targets.map((t) => sql`(${t.runId}::uuid, ${t.dmId}::uuid, ${t.since.toISOString()}::timestamptz)`),
+        sql`, `,
+      )}) as t(run_id, dm_id, since)
+        on m.agent_run_id = t.run_id and m.channel_id = t.dm_id and m.created_at >= t.since
+      where m.org_id = ${orgId}::uuid and m.created_at >= ${since.toISOString()}::timestamptz
+        and m.deleted_at is null and m.meta->'notice' is null
+      order by m.agent_run_id, m.created_at desc`),
+  );
+  return new Map(
+    rows.map((r) => [
+      r.run_id,
+      { posts: Number(r.posts), latest: cutText(answerForPeople(r.latest), NOTICE_ANSWER_MAX), at: new Date(r.at) },
+    ]),
+  );
 }
 
 type ConsultationRow = Pick<
@@ -1277,6 +1334,7 @@ function consultationView(r: ConsultationRow, waitOf: Map<string, ConsultationWa
     // Open (what it gathered so far is the agents'), or expired: no answer; a failed one keeps its reason.
     answer:
       open || status === "expired" || !r.answer ? null : cutText(answerForPeople(r.answer), NOTICE_ANSWER_MAX) || null,
+    progress: null,
     createdAt: r.createdAt,
     answeredAt: r.answeredAt,
     expiresAt: r.expiresAt,
@@ -1340,6 +1398,7 @@ export async function consultationConversation(
           status: agentRuns.status,
           waitingMachineId: agentRuns.waitingMachineId,
           handedOn: handedOnSql,
+          outage: outageParkedSql,
           createdAt: agentRuns.createdAt,
         })
         .from(agentRuns)

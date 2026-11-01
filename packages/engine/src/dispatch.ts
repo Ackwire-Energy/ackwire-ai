@@ -19,6 +19,11 @@ export interface DispatchResult {
   runs: AgentRun[];
   /** Why nothing was started, when nothing was. */
   skipped?: "no_mentions" | "hop_limit" | "message_missing";
+  /**
+   * Mentioned agents dispatch couldn't wake (I5, I7): no longer in the conversation, archived, or only certain
+   * people may talk to them and the person behind the message (nobody, for a run with none) isn't one.
+   */
+  dropped?: { agentId: string; handle: string; reason: "not_here" | "audience" }[];
 }
 
 /** What starting a run on a message reads of it. */
@@ -257,9 +262,10 @@ export async function dispatchMentions(
   const requester =
     (await requesterOf(db, message)) ??
     (message.agentRunId ? routineCreatorOf(await runAuthorityById(db, message.orgId, message.agentRunId)) : null);
-  const eligible = await eligibleChannelAgents(db, message.orgId, message.channelId, candidates, {
-    requesterUserId: requester,
-  });
+  const [eligible, here] = await Promise.all([
+    eligibleChannelAgents(db, message.orgId, message.channelId, candidates, { requesterUserId: requester }),
+    eligibleChannelAgents(db, message.orgId, message.channelId, candidates),
+  ]);
   const runs = await db.transaction((tx) =>
     createAgentRuns(
       tx,
@@ -268,7 +274,24 @@ export async function dispatchMentions(
       "mention",
     ),
   );
-  return { runs };
+  const woken = new Set(eligible.map((a) => a.id));
+  const present = new Map(here.map((a) => [a.id, a.handle]));
+  const missing = candidates.filter((id) => !woken.has(id));
+  if (missing.length === 0) return { runs };
+  const handles = new Map(
+    (
+      await db
+        .select({ id: agents.id, handle: agents.handle })
+        .from(agents)
+        .where(and(eq(agents.orgId, message.orgId), inArray(agents.id, missing)))
+    ).map((a) => [a.id, a.handle]),
+  );
+  const dropped = missing.map((agentId) => ({
+    agentId,
+    handle: handles.get(agentId) ?? agentId,
+    reason: present.has(agentId) ? ("audience" as const) : ("not_here" as const),
+  }));
+  return { runs, dropped };
 }
 
 /**

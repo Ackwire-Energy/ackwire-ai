@@ -1017,6 +1017,7 @@ export const ptBR = {
     forum_turn: "Sua vez de opinar",
     mission_stopped: "Uma missão parou",
     routine_failed: "Uma rotina não terminou",
+    run_failed: "Um agente não conseguiu terminar",
     routine_paused: "Uma rotina foi pausada",
     browser_handoff: "Um agente precisa de você no navegador",
     waiting: "Tem algo esperando você",
@@ -2197,6 +2198,7 @@ export const ptBR = {
       missionStopped: "<b>{{name}}</b> parou uma missão",
       routineFinished: "<b>{{name}}</b> terminou uma rotina",
       routineFailed: "<b>{{name}}</b> não conseguiu rodar uma rotina",
+      runFailed: "<b>{{name}}</b> não conseguiu terminar",
       routinePaused: "Uma rotina de <b>{{name}}</b> foi pausada",
       routineStalled: "<b>{{name}}</b> espera o computador para rodar uma rotina",
       machineConnected: "<b>{{name}}</b> conectou o computador <b>{{label}}</b>",
@@ -8997,6 +8999,9 @@ export const ptBR = {
       waitingComputer: "{{The}} {{name}} espera o computador voltar",
       /** Its part done, the agent waits on what it handed to other agents. */
       waitingAgents: "{{The}} {{name}} passou uma parte adiante e espera o retorno",
+      /** What a teammate at work posted so far in the agents' conversation, and the start of the latest. */
+      posted_one: "{{count}} mensagem até agora · {{latest}}",
+      posted_other: "{{count}} mensagens até agora · {{latest}}",
       /** An answer whose question is in a reply farther up: one line where it arrived, "Ver" goes to that reply. */
       answeredFar: "{{to}} respondeu à pergunta {{of}} {{from}}",
       answeredRequestFar: "{{to}} respondeu ao pedido {{of}} {{from}}",
@@ -9045,6 +9050,7 @@ export const ptBR = {
       followUpWake: "{{name}} voltou para «{{about}}»",
       followUpCancel: "Cancelar",
       other: "Aviso para {{name}}",
+      wakeSkipped: "A menção de {{name}} não chamou {{agents}}",
       show: "Ver",
       hide: "Ocultar",
       talker: "enquanto trabalha",
@@ -9307,6 +9313,7 @@ export const ptBR = {
         "{{computer}} voltou: “{{title}}” retoma de onde parou quando o projeto estiver pronto.",
       machine_offline: "{{computer}} ficou offline.",
       brain_unavailable: "O {{brain}} não está disponível agora. Respondo quando ele voltar.",
+      provider_unavailable: "Meu provedor de IA não está respondendo agora. Respondo assim que ele voltar.",
       brain_busy: "Meu computador está ocupado com outras tarefas agora. Respondo assim que ele estiver livre.",
       brain_interrupted: "O {{brain}} parou antes de terminar. Já feito, sem repetir: {{tools}}.",
       no_ai: "Ainda não consigo responder: não tenho uma IA conectada.",

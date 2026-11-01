@@ -12,6 +12,7 @@ import {
   consultLineTarget,
   consultNoticeFolds,
   consultOriginKey,
+  consultProgress,
   consultSeconds,
   consultsForLine,
   firstOfRun,
@@ -310,4 +311,15 @@ describe("requestConsultBlock ('Ver' on an answer's line)", () => {
     expect(takeConsultBlockRequest("r1", T0 + CONSULT_REQUEST_FRESH_MS + 1)).toBeNull();
     expect(takeConsultBlockRequest("r1", T0)).toBeNull();
   });
+});
+
+test("an open line shows the work handed off so far; none before it posts, none once answered", () => {
+  const progress = { posts: 12, latest: "Gerei a imagem 40.\nSegue o lote.", at: iso(60) };
+  expect(consultProgress(q({ kind: "note", progress }))).toEqual({
+    key: "chat.consultGroup.posted",
+    values: { count: 12, latest: "Gerei a imagem 40. Segue o lote." },
+  });
+  expect(consultProgress(q({ progress: null }))).toBeNull();
+  expect(consultProgress(q({ progress: { ...progress, posts: 0 } }))).toBeNull();
+  expect(consultProgress(q({ status: "answered", answer: "ok", progress }))).toBeNull();
 });

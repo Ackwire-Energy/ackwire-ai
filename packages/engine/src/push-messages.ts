@@ -60,6 +60,7 @@ interface Strings {
   replyTitle: (actor: string) => string;
   missionStoppedTitle: string;
   routineFailedTitle: string;
+  runFailedTitle: (actor: string) => string;
   routineFailedBody: string;
   routinePausedTitle: string;
   routinePausedBody: string;
@@ -98,6 +99,7 @@ export const PUSH_STRINGS: Record<PushLocale, Strings> = {
     replyTitle: (a) => `${a} respondeu`,
     missionStoppedTitle: "Uma missão parou",
     routineFailedTitle: "Uma rotina não terminou",
+    runFailedTitle: (a) => `${a} não conseguiu terminar`,
     routineFailedBody: "Toque para ver o que aconteceu.",
     routinePausedTitle: "Uma rotina foi pausada",
     routinePausedBody: "Toque para ver o motivo.",
@@ -133,6 +135,7 @@ export const PUSH_STRINGS: Record<PushLocale, Strings> = {
     replyTitle: (a) => `${a} replied`,
     missionStoppedTitle: "A mission stopped",
     routineFailedTitle: "A routine didn't finish",
+    runFailedTitle: (a) => `${a} couldn't finish`,
     routineFailedBody: "Tap to see what happened.",
     routinePausedTitle: "A routine was paused",
     routinePausedBody: "Tap to see why.",
@@ -197,6 +200,8 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
       return out(s.missionStoppedTitle, what || s.openBody);
     case "routine_failed":
       return out(s.routineFailedTitle, what || s.routineFailedBody);
+    case "run_failed":
+      return out(s.runFailedTitle(actor), s.routineFailedBody);
     case "routine_paused":
       // Its name only: the app says why, in the person's words.
       return out(s.routinePausedTitle, what || s.routinePausedBody);

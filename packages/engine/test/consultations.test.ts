@@ -473,6 +473,26 @@ describe("ask_agent", () => {
       .from(schema.channels)
       .where(eq(schema.channels.id, row?.channelId ?? ""));
     expect(await consultationsIn(f.db, f.org.id, other[0]?.id ?? "")).toEqual([]);
+
+    // What the consulted run posts in the agents' DM meanwhile shows here as its progress (ADR 0096).
+    const [target] = await f.db
+      .select()
+      .from(schema.agentRuns)
+      .where(eq(schema.agentRuns.id, row?.targetRunId ?? ""));
+    if (!target) throw new Error("no consulted run");
+    const before = list[0]?.progress?.posts ?? 0;
+    for (const body of ["Gerei a imagem 1.", "Gerei a imagem 2."])
+      await insertMessage(f.db, {
+        orgId: f.org.id,
+        channelId: row?.channelId ?? "",
+        author: { type: "agent", agentId: infra.id, runId: target.id, hop: target.hop },
+        body,
+      });
+    expect((await consultationsIn(f.db, f.org.id, f.general.id))[0]?.progress).toEqual({
+      posts: before + 2,
+      latest: "Gerei a imagem 2.",
+      at: expect.any(Date),
+    });
   });
 
   test("answered and expired questions in the list: the answer once answered, none once expired", async () => {
@@ -637,7 +657,7 @@ describe("ask_agent", () => {
       askAgent: true,
       // A judge that calls @infra's last words an unkept promise.
       judge: (kind, _id, _state, _question, request) =>
-        kind === "follow_through" && request.agentId !== f.agent.id ? "unkept" : undefined,
+        kind === "follow_through" && request.agentId !== f.agent.id ? "continue" : undefined,
       reply: consultReply(() => answer(++infraCalls === 1 ? promised : kept)),
     });
     const infra = await addInfra();
@@ -648,7 +668,8 @@ describe("ask_agent", () => {
     expect(infraCalls).toBe(2);
     expect(await consultations()).toMatchObject([{ status: "answered", answer: kept }]);
     const judged = (f.context.judge as unknown as { calls: { kind: string; agentId?: string }[] }).calls;
-    expect(judged.filter((j) => j.kind === "follow_through" && j.agentId === infra.id)).toHaveLength(1);
+    // Read again after the nudge: the kept answer is done (ADR 0096).
+    expect(judged.filter((j) => j.kind === "follow_through" && j.agentId === infra.id)).toHaveLength(2);
     const nudged = f.provider.calls
       .map((c) => c.request)
       .filter((r) => inAgentDm(r) && lastText(r).includes("your answer goes back as it is"));
@@ -660,16 +681,20 @@ describe("ask_agent", () => {
     f = await setup({
       askAgent: true,
       // Its first reply promises to pass the answer on (unkept), the relay is done.
-      judge: (kind) => (kind === "follow_through" ? (++judged === 1 ? "unkept" : "done") : undefined),
+      judge: (kind, _id, state, _question, request) => {
+        if (kind !== "follow_through") return undefined;
+        judged++;
+        return request.agentId === f.agent.id && !String(state.reply).startsWith("Relaying") ? "continue" : "done";
+      },
       reply: consultReply(() => answer("Staging deploys with deploy.sh")),
     });
     await addInfra();
     await post("@dev how do we deploy to staging?");
     await drainOutbox(f.db, f.handlers);
 
-    // Each run's end is read once (ADR 0089), the consulted one's too (ADR 0095); the open question kept the
-    // first promise.
-    expect(judged).toBe(3);
+    // The open question keeps the first promise, so it isn't judged (ADR 0096); the consulted run's answer and
+    // the relay are.
+    expect(judged).toBe(2);
     const steps = await f.db.select().from(schema.agentRunSteps);
     expect(steps.filter((s) => s.data.nudged === "promise")).toEqual([]);
     const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);

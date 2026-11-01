@@ -324,7 +324,7 @@ export function parseMentionHandles(body: string): string[] {
  */
 export async function unreachedAgents(
   db: Executor,
-  input: { orgId: string; channelId: string; authorAgentId: string; body: string },
+  input: { orgId: string; channelId: string; authorAgentId: string; body: string; handedTo?: string },
 ): Promise<string[]> {
   const handles = parseMentionHandles(input.body);
   if (handles.length === 0) return [];
@@ -341,6 +341,10 @@ export async function unreachedAgents(
           where cm.channel_id = ${input.channelId}::uuid and cm.agent_id = ${agents.id})`,
         sql`not exists (select 1 from ${schema.organizationMembers} om
           where om.org_id = ${input.orgId}::uuid and om.handle = ${agents.handle})`,
+        input.handedTo
+          ? sql`not exists (select 1 from ${schema.agentConsultations} c
+              where c.asker_run_id = ${input.handedTo}::uuid and c.target_agent_id = ${agents.id})`
+          : undefined,
       ),
     );
   return rows.map((r) => r.handle).sort();

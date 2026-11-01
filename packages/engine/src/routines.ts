@@ -3,6 +3,7 @@ import {
   and,
   type Database,
   desc,
+  type Executor,
   eq,
   gte,
   inArray,
@@ -117,6 +118,31 @@ export const EVENT_WEBHOOK: Partial<Record<RoutineEvent, "github" | "sentry">> =
   "deploy.succeeded": "github",
   "sentry.issue_created": "sentry",
 };
+
+/**
+ * The service whose webhook an event routine would wait on when the workspace has none live (null: something can
+ * fire it). An agent's routine that could never fire is refused at creation (I7); people see `needs_webhook`.
+ */
+export async function missingEventSource(
+  db: Executor,
+  orgId: string,
+  event: RoutineEvent,
+): Promise<"github" | "sentry" | null> {
+  const provider = EVENT_WEBHOOK[event];
+  if (!provider) return null;
+  const [hook] = await db
+    .select({ id: webhookEndpoints.id })
+    .from(webhookEndpoints)
+    .where(
+      and(
+        eq(webhookEndpoints.orgId, orgId),
+        eq(webhookEndpoints.provider, provider),
+        isNull(webhookEndpoints.revokedAt),
+      ),
+    )
+    .limit(1);
+  return hook ? null : provider;
+}
 
 export type RoutineTrigger =
   | {

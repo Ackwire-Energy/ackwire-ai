@@ -58,6 +58,10 @@ const Consultation = z.object({
   }),
   question: z.string(),
   answer: z.string().nullable().openapi({ description: "The answer once answered; why it couldn't once failed." }),
+  progress: z.object({ posts: z.number().int(), latest: z.string(), at: z.string() }).nullable().openapi({
+    description:
+      "Open: what the consulted agent posted in the agents' DM so far (how many messages, the start of the latest, when). Null when nothing yet.",
+  }),
   createdAt: z.string(),
   answeredAt: z.string().nullable(),
   expiresAt: z.string(),
@@ -356,6 +360,7 @@ export function chatRoutes(deps: AppDeps) {
         {
           consultations: list.map((q) => ({
             ...q,
+            progress: q.progress ? { ...q.progress, at: q.progress.at.toISOString() } : null,
             createdAt: q.createdAt.toISOString(),
             answeredAt: q.answeredAt?.toISOString() ?? null,
             expiresAt: q.expiresAt.toISOString(),
@@ -388,6 +393,7 @@ export function chatRoutes(deps: AppDeps) {
         {
           consultation: {
             ...q,
+            progress: q.progress ? { ...q.progress, at: q.progress.at.toISOString() } : null,
             createdAt: q.createdAt.toISOString(),
             answeredAt: q.answeredAt?.toISOString() ?? null,
             expiresAt: q.expiresAt.toISOString(),

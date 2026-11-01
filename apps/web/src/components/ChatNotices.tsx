@@ -7,6 +7,7 @@ import {
   noticeAgentHandle,
   noticeOf,
   noticeRoutineName,
+  skippedHandles,
 } from "@agenteschat/client/lib/notices";
 import type { RoutineReply } from "@agenteschat/client/lib/routines";
 import { cx, Icon, type IconName } from "@agenteschat/ui";
@@ -27,6 +28,7 @@ const NOTICE_ICON: Record<string, IconName> = {
   agent_note: "message",
   wait_result: "check",
   follow_up: "clock",
+  wake_skipped: "alert",
 };
 
 /** The line's words: the app's own, never the agent-facing `from` ("Routine «…»") as is. */
@@ -50,6 +52,13 @@ function noticeLabel(
       return from ? t("chat.notice.agentNote", { from }) : t("chat.notice.agentNoteAnon");
     case "wait_result":
       return t("chat.notice.waitResult", { name: agentName });
+    case "wake_skipped":
+      return t("chat.notice.wakeSkipped", {
+        name: agentName,
+        agents: skippedHandles(notice)
+          .map((h) => nameOfHandle(h) ?? h)
+          .join(", "),
+      });
     default:
       return t("chat.notice.other", { name: agentName });
   }
