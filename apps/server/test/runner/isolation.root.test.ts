@@ -1,24 +1,34 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
-import { chmodSync, copyFileSync, mkdirSync, realpathSync, rmSync } from "node:fs";
+import type { EventEmitter } from "node:events";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { type AgentUser, AgentUsers, readAgentUsers, systemLauncher } from "../../runner/agent-users";
-import { ensureBrowserBindPolicy } from "../../runner/browser-bind-policy";
-import { browserPortsForUid } from "../../runner/browser-ports";
+import {
+  type AgentUser,
+  AgentUsers,
+  adbServerPort,
+  agentGid,
+  readAgentUsers,
+  systemLauncher,
+} from "../../runner/agent-users";
+import { type BindPolicyOptions, ensureBrowserBindPolicy } from "../../runner/browser-bind-policy";
+import { browserBand, browserPortsForUid } from "../../runner/browser-ports";
 import { LoopbackGuard, RUNNER_NFT_TABLE } from "../../runner/loopback-guard";
-import { agentSlice, runSync } from "../../runner/service";
+import { AGENT_TMP_ROOT, agentSlice, agentTmp, runSync } from "../../runner/service";
 
 /**
  * System mode's isolation on a real Linux computer, as root: real agent users and slices, the runner's loopback
  * table and bind policy, and what each agent's processes reach, on 127.0.0.1 and ::1. It changes the computer it
- * runs on (users, slices, nftables), so it runs only with AGENTES_ROOT_TESTS=1: in CI's isolation-root job, or on
- * a disposable VM. AGENTES_TEST_RUNNER is the runner bundle the agents' bind check runs.
+ * runs on (users, slices, nftables, a bridge and a network namespace), so it runs only with AGENTES_ROOT_TESTS=1: in
+ * CI's isolation-root job, or on a disposable VM. AGENTES_TEST_RUNNER is the runner bundle the agents' bind check
+ * runs. Where Gradle, Kotlin and adb are installed (GitHub's Ubuntu image), two agents also build and run them at
+ * once.
  */
 const ROOT = process.platform === "linux" && process.getuid?.() === 0 && process.env.AGENTES_ROOT_TESTS === "1";
 
 setDefaultTimeout(120_000);
 
-/** The Cloud's range: its browser pairs are ports 10000-11999. */
+/** The Cloud's range: its browser pairs, the band, are ports 10000-11999. */
 const RANGE: [number, number] = [20000, 20999];
 const HOME = "/var/lib/agentes-isolation-test";
 /** Where the agents' users can run Bun and the runner bundle from (a CI checkout's home isn't theirs to read). */
@@ -26,6 +36,9 @@ const OPT = "/opt/agentes-isolation-test";
 const RUNNER = [path.join(OPT, "bun"), path.join(OPT, "agentes-runner.mjs")];
 const PYTHON = "/usr/bin/python3";
 const HOSTS = ["127.0.0.1", "::1"];
+/** Root's stand-in resolver, on a loopback address of its own (127.0.0.53 may be systemd-resolved's). */
+const DNS = "127.0.0.7";
+const GUEST = { ns: "agentes-guest", bridge: "agentes-br", veth: "agentes-veth", ip: "10.99.0.2", host: "10.99.0.1" };
 
 /** One socket operation, as whoever runs it; prints its outcome (an errno's name on failure). */
 const PY = `
@@ -33,12 +46,12 @@ import errno, os, socket, sys
 def err(e):
     return errno.errorcode.get(e.errno, type(e).__name__) if isinstance(e, OSError) and e.errno else type(e).__name__
 mode = sys.argv[1]
-if mode in ("connect", "bind", "listen", "udp-listen", "udp-send"):
+if mode in ("connect", "bind", "listen", "udp-listen", "udp-send", "udplite-listen", "udplite-send"):
     host, port = sys.argv[2], int(sys.argv[3])
     fam = socket.AF_INET6 if ":" in host else socket.AF_INET
 if mode == "connect":
     s = socket.socket(fam, socket.SOCK_STREAM)
-    s.settimeout(2)
+    s.settimeout(3)
     try:
         s.connect((host, port))
         print("connected")
@@ -65,16 +78,22 @@ elif mode == "listen":
     while True:
         c, _ = s.accept()
         c.close()
-elif mode == "udp-listen":
-    s = socket.socket(fam, socket.SOCK_DGRAM)
-    s.bind((host, port))
+elif mode in ("udp-listen", "udplite-listen"):
+    proto = socket.IPPROTO_UDPLITE if mode == "udplite-listen" else 0
+    try:
+        s = socket.socket(fam, socket.SOCK_DGRAM, proto)
+        s.bind((host, port))
+    except OSError as e:
+        print(err(e), flush=True)
+        sys.exit(1)
     print(s.getsockname()[1], flush=True)
     while True:
         data, _ = s.recvfrom(256)
         print(data.decode(), flush=True)
-elif mode == "udp-send":
-    s = socket.socket(fam, socket.SOCK_DGRAM)
+elif mode in ("udp-send", "udplite-send"):
+    proto = socket.IPPROTO_UDPLITE if mode == "udplite-send" else 0
     try:
+        s = socket.socket(fam, socket.SOCK_DGRAM, proto)
         s.sendto(sys.argv[4].encode(), (host, port))
         print("sent")
     except OSError as e:
@@ -99,33 +118,45 @@ elif mode == "unix-connect":
 
 /** systemd here can enforce the bind policy (`SocketBindDeny=`); Ubuntu's can't. */
 const BPF = ROOT && /\+BPF_FRAMEWORK/.test(runSync("systemctl", ["--version"]).output);
+const has = (file: string) => ROOT && existsSync(file);
+const ADB = "/usr/local/lib/android/sdk/platform-tools/adb";
+const GRADLE = "/usr/bin/gradle";
 
 let A: AgentUser;
 let B: AgentUser;
 let guard: LoopbackGuard;
+let policy: BindPolicyOptions;
 const running: ChildProcess[] = [];
 
-/** `argv` as `user` through its launcher (its slice, its user, its environment), or as root here (null). */
+/** `argv` as `user` through its launcher (its slice, its own /tmp, its user, its environment), or as root (null). */
 function launch(user: AgentUser | null, argv: string[]) {
   if (!user) return { argv, env: { ...process.env } as Record<string, string> };
   const l = systemLauncher(user);
   return { argv: [...l.prefix, ...argv], env: l.env };
 }
 
+function runAs(user: AgentUser | null, argv: string[], timeout = 30_000) {
+  const c = launch(user, argv);
+  const r = spawnSync(c.argv[0] as string, c.argv.slice(1), { env: c.env, encoding: "utf8", timeout });
+  return { code: r.status, out: `${r.stdout ?? ""}${r.stderr ?? ""}`.trim() };
+}
+
+const lastLine = (out: string) => out.trim().split("\n").at(-1) ?? "";
+
 /** A probe's outcome: the last line it printed. */
 function probe(user: AgentUser | null, ...args: string[]): string {
   const { argv, env } = launch(user, [PYTHON, "-c", PY, ...args]);
   const r = spawnSync(argv[0] as string, argv.slice(1), { env, encoding: "utf8", timeout: 30_000 });
-  return (r.stdout ?? "").trim().split("\n").at(-1) || `nothing (${(r.stderr ?? "").trim().slice(0, 300)})`;
+  return lastLine(r.stdout ?? "") || `nothing (${(r.stderr ?? "").trim().slice(0, 300)})`;
 }
 
-/** As `runuser -u <name>` alone: outside every agent's slice. */
+/** As `runuser -u <name>` alone, the way cron or at start it: outside every agent's slice. */
 function probeOutside(name: string, ...args: string[]): string {
   const r = spawnSync("/usr/sbin/runuser", ["-u", name, "--", PYTHON, "-c", PY, ...args], {
     encoding: "utf8",
     timeout: 30_000,
   });
-  return (r.stdout ?? "").trim().split("\n").at(-1) || `nothing (${(r.stderr ?? "").trim().slice(0, 300)})`;
+  return lastLine(r.stdout ?? "") || `nothing (${(r.stderr ?? "").trim().slice(0, 300)})`;
 }
 
 async function until(cond: () => boolean, ms: number) {
@@ -136,30 +167,53 @@ async function until(cond: () => boolean, ms: number) {
   }
 }
 
-/** A listener held by a process of `user`'s (null: root's), and what it printed after its port. */
-async function serve(user: AgentUser | null, ...args: string[]): Promise<{ port: number; lines: string[] }> {
-  const { argv, env } = launch(user, [PYTHON, "-u", "-c", PY, ...args]);
-  const child = spawn(argv[0] as string, argv.slice(1), { env, stdio: ["ignore", "pipe", "pipe"] });
+/** A process held running (`argv` as `user`, or as root), and the lines it printed. */
+async function hold(user: AgentUser | null, argv: string[], ready: (lines: string[]) => boolean) {
+  const c = launch(user, argv);
+  const child = spawn(c.argv[0] as string, c.argv.slice(1), { env: c.env, stdio: ["ignore", "pipe", "pipe"] });
   running.push(child);
   const lines: string[] = [];
   let rest = "";
-  child.stdout?.setEncoding("utf8").on("data", (chunk: string) => {
+  const take = (chunk: string) => {
     const parts = (rest + chunk).split("\n");
     rest = parts.pop() ?? "";
     lines.push(...parts);
-  });
-  child.stderr?.setEncoding("utf8").on("data", (chunk: string) => process.stderr.write(chunk));
-  await until(() => lines.length > 0, 20_000);
+  };
+  child.stdout?.setEncoding("utf8").on("data", take);
+  child.stderr?.setEncoding("utf8").on("data", take);
+  await until(() => ready(lines), 30_000);
+  return lines;
+}
+
+/** A listener held by a process of `user`'s (null: root's): its port, and what it received after it. */
+async function serve(user: AgentUser | null, ...args: string[]): Promise<{ port: number; lines: string[] }> {
+  const lines = await hold(user, [PYTHON, "-u", "-c", PY, ...args], (l) => l.length > 0);
   const port = Number(lines[0]);
   if (!Number.isInteger(port)) throw new Error(`no listener for ${args.join(" ")}: ${lines[0]}`);
   return { port, lines };
 }
+
+/** Root's stand-in resolver on 127.0.0.7:53, TCP and UDP (started once): what it received over UDP. */
+let resolver: Promise<string[]> | null = null;
+const dnsStandIn = () => {
+  resolver ??= serve(null, "listen", DNS, "53").then(() => serve(null, "udp-listen", DNS, "53").then((u) => u.lines));
+  return resolver;
+};
 
 const must = (file: string, args: string[]) => {
   const r = runSync(file, args);
   if (r.code !== 0) throw new Error(`${file} ${args.join(" ")}: ${r.output}`);
   return r.output;
 };
+
+const nft = (text: string) => {
+  const file = path.join(HOME, "test.nft");
+  writeFileSync(file, text);
+  must("nft", ["-f", file]);
+};
+
+/** Root's own address on its way out (the runner's eth0, the VM's NIC). */
+const hostAddress = () => /\bsrc (\S+)/.exec(must("ip", ["-4", "route", "get", "1.1.1.1"]))?.[1] ?? "";
 
 describe.if(ROOT)("the agents' isolation on this computer, as root", () => {
   beforeAll(() => {
@@ -174,93 +228,313 @@ describe.if(ROOT)("the agents' isolation on this computer, as root", () => {
     const users = new AgentUsers({ home: HOME, range: RANGE });
     A = users.ensure({ id: "a0000000-0000-4000-8000-000000000001", handle: "a", name: "Agent A" });
     B = users.ensure({ id: "b0000000-0000-4000-8000-000000000002", handle: "b", name: "Agent B" });
-    must("systemctl", ["start", "agents.slice", agentSlice(A.uid), agentSlice(B.uid)]);
     guard = new LoopbackGuard({
       home: HOME,
       agentUids: () => readAgentUsers(HOME).map((u) => u.uid),
       uidRange: RANGE,
       log: (line) => console.log(`guard: ${line}`),
     });
+    // The real start: modules, every agent's slice, the table. Then each case says when the guard looks again.
     guard.start();
-    // Each case says when the guard looks again.
     guard.stop();
-    if (BPF) for (const u of [A, B]) ensureBrowserBindPolicy(u, RUNNER);
+    policy = { uidRange: RANGE, refresh: () => void guard.reconcile() };
+    if (BPF) for (const u of [A, B]) ensureBrowserBindPolicy(u, RUNNER, policy);
     console.log(`agents ${A.uid} and ${B.uid}; bind policy ${BPF ? "on" : "not enforced by this systemd"}`);
   });
 
   afterAll(() => {
     for (const child of running) child.kill("SIGTERM");
     guard?.stop();
-    runSync("nft", ["delete", "table", "inet", RUNNER_NFT_TABLE]);
+    for (const table of [`inet ${RUNNER_NFT_TABLE}`, "inet agentes_test_notrack", "ip agentes_test_dnat"]) {
+      runSync("nft", ["delete", "table", ...table.split(" ")]);
+    }
+    runSync("ip", ["link", "del", GUEST.bridge]);
+    runSync("ip", ["link", "del", GUEST.veth]);
+    runSync("ip", ["netns", "del", GUEST.ns]);
     for (const u of [A, B]) {
       if (!u) continue;
       runSync("systemctl", ["stop", agentSlice(u.uid)]);
       runSync("userdel", ["-r", u.user]);
+      rmSync(path.join(AGENT_TMP_ROOT, String(u.uid)), { recursive: true, force: true });
     }
     rmSync(HOME, { recursive: true, force: true });
     rmSync(OPT, { recursive: true, force: true });
-    rmSync("/tmp/agentes-isolation-a.sock", { force: true });
   });
 
-  test("1. an agent's listen(0)", () => {
-    for (const host of HOSTS) expect(probe(A, "bind", host, "0")).toStartWith(BPF ? "EPERM" : "bound");
+  test("1. an agent's listen(0) binds outside the band, and it reaches it", async () => {
+    const [first, last] = browserBand(RANGE);
+    for (const host of HOSTS) {
+      const own = await serve(A, "listen", host, "0");
+      expect(own.port < first || own.port > last).toBe(true);
+      expect(probe(A, "connect", host, String(own.port))).toBe("connected");
+    }
   });
 
-  test("2. a new listener: anyone until the guard's scan, then its owner only", async () => {
+  test("2. a new listener is its owner's at once: another agent is refused before any scan", async () => {
     for (const host of HOSTS) {
       const own = await serve(A, "listen", host, "45000");
       expect(probe(A, "connect", host, String(own.port))).toBe("connected");
-      expect(probe(B, "connect", host, String(own.port))).toBe("connected");
+      expect(probe(B, "connect", host, String(own.port))).toBe("ECONNREFUSED");
     }
-    guard.reconcile();
+  });
+
+  test("3. one port number, two agents on different addresses: each reaches only its own", async () => {
+    await serve(A, "listen", "127.0.0.1", "45100");
+    await serve(B, "listen", "127.0.0.2", "45100");
+    await serve(B, "listen", "::1", "45100");
+    expect(probe(A, "connect", "127.0.0.1", "45100")).toBe("connected");
+    expect(probe(B, "connect", "127.0.0.1", "45100")).toBe("ECONNREFUSED");
+    expect(probe(B, "connect", "127.0.0.2", "45100")).toBe("connected");
+    expect(probe(A, "connect", "127.0.0.2", "45100")).toBe("ECONNREFUSED");
+    expect(probe(B, "connect", "::1", "45100")).toBe("connected");
+    expect(probe(A, "connect", "::1", "45100")).toBe("ECONNREFUSED");
+  });
+
+  test("4. another agent's browser port can't be bound; the Kotlin daemon's 17001 can, with the Cloud's range", () => {
+    const { cdp } = browserPortsForUid(B.uid);
     for (const host of HOSTS) {
-      expect(probe(A, "connect", host, "45000")).toBe("connected");
-      expect(probe(B, "connect", host, "45000")).toBe("ECONNREFUSED");
+      if (BPF) expect(probe(A, "bind", host, String(cdp))).toBe("EPERM");
+      expect(probe(A, "bind", host, "17001")).toBe("bound 17001");
     }
   });
 
   test("5. an agent's browser port: root gets in, another agent doesn't", async () => {
     const { cdp } = browserPortsForUid(A.uid);
-    await serve(A, "listen", "127.0.0.1", String(cdp));
-    expect(probe(B, "connect", "127.0.0.1", String(cdp))).toBe("ECONNREFUSED");
-    expect(probe(null, "connect", "127.0.0.1", String(cdp))).toBe("connected");
+    for (const host of HOSTS) {
+      await serve(A, "listen", host, String(cdp));
+      expect(probe(B, "connect", host, String(cdp))).toBe("ECONNREFUSED");
+      expect(probe(null, "connect", host, String(cdp))).toBe("connected");
+    }
   });
 
-  test("6. root's own listener: agents get in; another local user stays out of an agent's", async () => {
-    const root = await serve(null, "listen", "127.0.0.1", "0");
-    expect(probe(A, "connect", "127.0.0.1", String(root.port))).toBe("connected");
-    expect(probeOutside("nobody", "connect", "127.0.0.1", "45000")).toBe("ECONNREFUSED");
+  test("6. root's own listeners refuse agents; another local user stays out of an agent's", async () => {
+    for (const host of HOSTS) {
+      const root = await serve(null, "listen", host, "0");
+      expect(probe(A, "connect", host, String(root.port))).toBe("ECONNREFUSED");
+      expect(probeOutside("nobody", "connect", host, String(root.port))).toBe("connected");
+      const own = await serve(A, "listen", host, "0");
+      expect(probeOutside("nobody", "connect", host, String(own.port))).toBe("ECONNREFUSED");
+    }
   });
 
-  test("8. UDP: every agent's datagrams reach an agent's socket", async () => {
-    const own = await serve(A, "udp-listen", "127.0.0.1", "0");
-    expect(probe(B, "udp-send", "127.0.0.1", String(own.port), "from-b")).toBe("sent");
-    expect(probe(A, "udp-send", "127.0.0.1", String(own.port), "from-a")).toBe("sent");
-    await Bun.sleep(300);
-    expect(own.lines.slice(1).sort()).toEqual(["from-a", "from-b"]);
+  test("7. DNS on this computer stays open to agents, over TCP and UDP", async () => {
+    const received = await dnsStandIn();
+    expect(probe(A, "connect", DNS, "53")).toBe("connected");
+    expect(probe(A, "udp-send", DNS, "53", "query-a")).toBe("sent");
+    await until(() => received.includes("query-a"), 3000);
   });
 
-  test("9. a setuid-root program an agent runs counts as root", async () => {
+  test("8. UDP: only the agent's own datagrams reach its socket", async () => {
+    for (const host of HOSTS) {
+      const own = await serve(A, "udp-listen", host, "0");
+      probe(B, "udp-send", host, String(own.port), "from-b");
+      expect(probe(A, "udp-send", host, String(own.port), "from-a")).toBe("sent");
+      await until(() => own.lines.includes("from-a"), 3000);
+      await Bun.sleep(300);
+      expect(own.lines.slice(1)).toEqual(["from-a"]);
+    }
+  });
+
+  test("9. a setuid-root program an agent runs is still that agent", async () => {
     const suid = path.join(OPT, "python3-suid");
     copyFileSync(realpathSync(PYTHON), suid);
     chmodSync(suid, 0o4755);
-    const other = await serve(B, "listen", "127.0.0.1", "45001");
-    guard.reconcile();
-    const { argv, env } = launch(A, [suid, "-c", PY, "connect", "127.0.0.1", String(other.port)]);
-    const r = spawnSync(argv[0] as string, argv.slice(1), { env, encoding: "utf8", timeout: 30_000 });
-    expect((r.stdout ?? "").trim()).toBe("connected");
+    const mine = await serve(A, "listen", "127.0.0.1", "0");
+    const theirs = await serve(B, "listen", "127.0.0.1", "0");
+    const roots = await serve(null, "listen", "127.0.0.1", "0");
+    const asRoot = (port: number) => lastLine(runAs(A, [suid, "-c", PY, "connect", "127.0.0.1", String(port)]).out);
+    expect(asRoot(mine.port)).toBe("connected");
+    expect(asRoot(theirs.port)).toBe("ECONNREFUSED");
+    expect(asRoot(roots.port)).toBe("ECONNREFUSED");
   });
 
-  test("10. an agent's user outside its slice still reaches its own listener", () => {
-    expect(probeOutside(A.user, "connect", "127.0.0.1", "45000")).toBe("connected");
+  test("10. an agent's user outside its slice (cron, at) owns nothing: refused at its own listener, DNS still works", async () => {
+    const own = await serve(A, "listen", "127.0.0.1", "0");
+    expect(probeOutside(A.user, "connect", "127.0.0.1", String(own.port))).toBe("ECONNREFUSED");
+    await dnsStandIn();
+    expect(probeOutside(A.user, "connect", DNS, "53")).toBe("connected");
   });
 
-  test.if(BPF)("16. the bind check passes for both agents", () => {
-    for (const u of [A, B]) expect(() => ensureBrowserBindPolicy(u, RUNNER)).not.toThrow();
+  test("11. a slice made anew is mapped before its first process: its own listener at once", async () => {
+    must("systemctl", ["stop", agentSlice(A.uid)]);
+    if (BPF) ensureBrowserBindPolicy(A, RUNNER, policy);
+    else {
+      must("systemctl", ["start", agentSlice(A.uid)]);
+      guard.reconcile();
+    }
+    for (const host of HOSTS) {
+      const own = await serve(A, "listen", host, "0");
+      expect(probe(A, "connect", host, String(own.port))).toBe("connected");
+      expect(probe(B, "connect", host, String(own.port))).toBe("ECONNREFUSED");
+    }
   });
 
-  test("17. a Unix socket in /tmp is every agent's", async () => {
-    await serve(A, "unix-listen", "/tmp/agentes-isolation-a.sock");
-    expect(probe(B, "unix-connect", "/tmp/agentes-isolation-a.sock")).toBe("connected");
+  test("12. the table deleted by hand is back at the guard's next look", async () => {
+    const own = await serve(A, "listen", "127.0.0.1", "0");
+    must("nft", ["delete", "table", "inet", RUNNER_NFT_TABLE]);
+    expect(probe(B, "connect", "127.0.0.1", String(own.port))).toBe("connected");
+    expect(guard.reconcile()).toBe(true);
+    expect(probe(B, "connect", "127.0.0.1", String(own.port))).toBe("ECONNREFUSED");
+    expect(probe(A, "connect", "127.0.0.1", String(own.port))).toBe("connected");
   });
+
+  test("13. loopback traffic made untracked: agents are refused, root isn't", async () => {
+    const own = await serve(A, "listen", "127.0.0.1", "0");
+    const roots = await serve(null, "listen", "127.0.0.1", "0");
+    nft(`table inet agentes_test_notrack {
+  chain pre { type filter hook prerouting priority raw; iif "lo" notrack; }
+  chain out { type filter hook output priority raw; oif "lo" notrack; }
+}
+`);
+    try {
+      expect(probe(A, "connect", "127.0.0.1", String(own.port))).toBe("ECONNREFUSED");
+      expect(probe(null, "connect", "127.0.0.1", String(roots.port))).toBe("connected");
+    } finally {
+      must("nft", ["delete", "table", "inet", "agentes_test_notrack"]);
+    }
+    expect(probe(A, "connect", "127.0.0.1", String(own.port))).toBe("connected");
+  });
+
+  test("14. a container's network on this computer: refused but for what is published beyond it", async () => {
+    const host = hostAddress();
+    for (const args of [
+      ["netns", "add", GUEST.ns],
+      ["link", "add", GUEST.bridge, "type", "bridge"],
+      ["link", "add", GUEST.veth, "type", "veth", "peer", "name", `${GUEST.veth}-g`],
+      ["link", "set", GUEST.veth, "master", GUEST.bridge],
+      ["link", "set", `${GUEST.veth}-g`, "netns", GUEST.ns],
+      ["addr", "add", `${GUEST.host}/24`, "dev", GUEST.bridge],
+      ["link", "set", GUEST.bridge, "up"],
+      ["link", "set", GUEST.veth, "up"],
+      ["-n", GUEST.ns, "addr", "add", `${GUEST.ip}/24`, "dev", `${GUEST.veth}-g`],
+      ["-n", GUEST.ns, "link", "set", `${GUEST.veth}-g`, "up"],
+      ["-n", GUEST.ns, "link", "set", "lo", "up"],
+      ["-n", GUEST.ns, "route", "add", "default", "via", GUEST.host],
+    ]) {
+      must("ip", args);
+    }
+    must("sysctl", ["-qw", `net.ipv4.conf.${GUEST.bridge}.route_localnet=1`]);
+    nft(`table ip agentes_test_dnat {
+  chain out {
+    type nat hook output priority dstnat;
+    ip daddr ${host} tcp dport 15432 dnat to ${GUEST.ip}:5432
+    ip daddr 127.0.0.1 tcp dport 15433 dnat to ${GUEST.ip}:5432
+  }
+  chain post { type nat hook postrouting priority srcnat; ip daddr ${GUEST.ip} ip saddr 127.0.0.0/8 masquerade; }
+}
+`);
+    await hold(null, ["ip", "netns", "exec", GUEST.ns, PYTHON, "-u", "-c", PY, "listen", GUEST.ip, "5432"], (l) =>
+      l.includes("5432"),
+    );
+    expect(probe(null, "connect", GUEST.ip, "5432")).toBe("connected");
+    expect(probe(null, "connect", "127.0.0.1", "15433")).toBe("connected");
+    expect(probe(A, "connect", GUEST.ip, "5432")).toBe("ECONNREFUSED");
+    expect(probe(A, "connect", host, "15432")).toBe("connected");
+    expect(probe(A, "connect", "127.0.0.1", "15433")).toBe("ECONNREFUSED");
+  });
+
+  test("15. no other protocol across lo for an agent (UDP-Lite here)", async () => {
+    const roots = await serve(null, "udplite-listen", "127.0.0.1", "0").catch(() => null);
+    if (!roots) return console.log("no UDP-Lite in this kernel: nothing to send it with");
+    expect(probe(null, "udplite-send", "127.0.0.1", String(roots.port), "from-root")).toBe("sent");
+    await until(() => roots.lines.includes("from-root"), 3000);
+    probe(A, "udplite-send", "127.0.0.1", String(roots.port), "from-a");
+    await Bun.sleep(300);
+    expect(roots.lines.slice(1)).toEqual(["from-root"]);
+  });
+
+  test.if(BPF)("16. the bind check passes for both agents, with reject and with drop", () => {
+    for (const u of [A, B]) ensureBrowserBindPolicy(u, RUNNER, policy);
+    const dropping = new LoopbackGuard({
+      home: HOME,
+      agentUids: () => readAgentUsers(HOME).map((u) => u.uid),
+      uidRange: RANGE,
+      log: (line) => console.log(`guard (drop): ${line}`),
+      reject: false,
+    });
+    dropping.start();
+    dropping.stop();
+    try {
+      for (const u of [A, B])
+        ensureBrowserBindPolicy(u, RUNNER, { uidRange: RANGE, refresh: () => void dropping.reconcile() });
+    } finally {
+      must("nft", ["delete", "table", "inet", RUNNER_NFT_TABLE]);
+      expect(guard.reconcile()).toBe(true);
+    }
+  });
+
+  test("17. each agent's /tmp and /dev/shm are its own: its sockets there are out of other agents' reach", async () => {
+    for (const dir of ["/tmp", "/dev/shm"]) {
+      const sock = path.join(dir, "agentes-isolation-a.sock");
+      await serve(A, "unix-listen", sock);
+      expect(probe(A, "unix-connect", sock)).toBe("connected");
+      expect(probe(B, "unix-connect", sock)).toBe("ENOENT");
+      expect(existsSync(sock)).toBe(false);
+    }
+    expect(existsSync(path.join(agentTmp(A.uid), "agentes-isolation-a.sock"))).toBe(true);
+    expect(runAs(B, ["/bin/ls", "-a", "/tmp"]).out).not.toContain("agentes-isolation-a.sock");
+  });
+
+  test.if(has(ADB))("adb: each agent its own server, at once", () => {
+    const servers = [A, B].map((u) => runAs(u, [ADB, "start-server"], 60_000));
+    try {
+      for (const s of servers) expect(s.code).toBe(0);
+      for (const u of [A, B]) {
+        const devices = runAs(u, [ADB, "devices"], 30_000);
+        expect(devices.code).toBe(0);
+        expect(devices.out).toContain("List of devices attached");
+        expect(probe(u, "connect", "127.0.0.1", String(adbServerPort(u.uid)))).toBe("connected");
+      }
+      expect(probe(B, "connect", "127.0.0.1", String(adbServerPort(A.uid)))).toBe("ECONNREFUSED");
+    } finally {
+      for (const u of [A, B]) runAs(u, [ADB, "kill-server"], 30_000);
+    }
+  });
+
+  test("a dev server on port 0, then curl: its agent gets in, another doesn't", async () => {
+    const lines = await hold(A, [PYTHON, "-u", "-m", "http.server", "0", "--bind", "127.0.0.1"], (l) =>
+      l.some((x) => /port \d+/.test(x)),
+    );
+    const port = /port (\d+)/.exec(lines.join("\n"))?.[1] ?? "";
+    const curl = (u: AgentUser) =>
+      runAs(u, ["/usr/bin/curl", "-sS", "-o", "/dev/null", "-w", "%{http_code}", `http://127.0.0.1:${port}/`]);
+    expect(curl(A).out).toBe("200");
+    const refused = curl(B);
+    expect(refused.code).toBe(7);
+  });
+
+  test.if(has(GRADLE))(
+    "Gradle and the Kotlin daemon: two agents build at once, each with its own daemons",
+    async () => {
+      const kotlin = /kotlinc-jvm (\d+\.\d+\.\d+)/.exec(runSync("kotlinc", ["-version"]).output)?.[1] ?? "2.2.21";
+      const builds = [A, B].map((u) => {
+        const dir = path.join(systemLauncher(u).home, "app");
+        mkdirSync(path.join(dir, "src/main/kotlin"), { recursive: true });
+        writeFileSync(path.join(dir, "settings.gradle.kts"), 'rootProject.name = "app"\n');
+        writeFileSync(
+          path.join(dir, "build.gradle.kts"),
+          `plugins { kotlin("jvm") version "${kotlin}" }\nrepositories { mavenCentral() }\n`,
+        );
+        writeFileSync(path.join(dir, "src/main/kotlin/Main.kt"), 'fun main() = println("hi")\n');
+        must("chown", ["-R", `${u.uid}:${agentGid(u.user)}`, dir]);
+        const c = launch(u, ["/bin/sh", "-c", `cd ${dir} && ${GRADLE} build --console=plain 2>&1`]);
+        return new Promise<{ code: number | null; out: string }>((resolve) => {
+          const child = spawn(c.argv[0] as string, c.argv.slice(1), { env: c.env, stdio: ["ignore", "pipe", "pipe"] });
+          let out = "";
+          child.stdout?.setEncoding("utf8").on("data", (d: string) => {
+            out += d;
+          });
+          (child as unknown as EventEmitter).once("exit", (code: number | null) => resolve({ code, out }));
+        });
+      });
+      for (const [i, r] of (await Promise.all(builds)).entries()) {
+        if (r.code !== 0) console.log(r.out);
+        expect(r.out).toContain("BUILD SUCCESSFUL");
+        expect(r.out).not.toMatch(/fallback strategy|Could not connect to Kotlin compile daemon/i);
+        const status = runAs([A, B][i] as AgentUser, [GRADLE, "--status"], 60_000).out;
+        expect(status).toMatch(/\d+\s+(IDLE|BUSY)/);
+      }
+    },
+    600_000,
+  );
 });

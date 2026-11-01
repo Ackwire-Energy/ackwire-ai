@@ -36,7 +36,7 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import type { AccountGrant } from "./accounts";
 import { type AgentUser, readAgentUsers, systemLauncher } from "./agent-users";
-import { ensureBrowserBindPolicy } from "./browser-bind-policy";
+import { type BindPolicyOptions, ensureBrowserBindPolicy } from "./browser-bind-policy";
 import { backoffDelay } from "./connection";
 import { DESKTOP_USE_OPS } from "./desktop";
 import { SHOW_MS } from "./desktop-browser";
@@ -1241,10 +1241,10 @@ export function workerCommand(user: AgentUser, runner: string[], home: string, s
   };
 }
 
-/** Starts each agent's worker as a process (`runner`: how this runner starts itself). */
-export function launchWorker(runner: string[], base = AGENT_WORKER_HOMES): StartWorker {
+/** Starts each agent's worker as a process (`runner`: how this runner starts itself), its bind check passed first. */
+export function launchWorker(runner: string[], policy: BindPolicyOptions, base = AGENT_WORKER_HOMES): StartWorker {
   return (user) => {
-    ensureBrowserBindPolicy(user, runner);
+    ensureBrowserBindPolicy(user, runner, policy);
     const home = workerHome(base, user);
     retireLegacyPending(base, home, user);
     const { argv, cwd, env } = workerCommand(user, runner, home);

@@ -540,7 +540,7 @@ export const fallbackModelFor = (model: string | undefined) => (model && /opus/i
 const API_ANTHROPIC = "https://api.anthropic.com";
 
 /** What sends requests elsewhere besides the base URL: proxies and the certificates trusted on the way. */
-const NETWORK_ENV = [
+export const NETWORK_ENV = [
   "HTTPS_PROXY",
   "https_proxy",
   "HTTP_PROXY",

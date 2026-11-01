@@ -5,6 +5,7 @@ import { writeAgents } from "../../runner/access";
 import {
   AGENT_USERS_FILE,
   AgentUsers,
+  adbServerPort,
   agentGid,
   agentUserName,
   readAgentUsers,
@@ -218,7 +219,7 @@ test("agents.json: only well-formed rows count, and the server's agent list neve
   expect(readAgentUsers(home)).toEqual([{ id: "w", user: "ag-wwwwwwww", uid: 21050 }]);
 });
 
-test("the launcher: the agent's slice and user, absolute paths, and a fixed environment", () => {
+test("the launcher: the agent's slice, its own temporary folders, its user, absolute paths, a fixed environment", () => {
   const user = { id: ANA.id, user: "ag-a1b2c3d4", uid: 21003 };
   const env = {
     HOME: "/home/ag-a1b2c3d4",
@@ -227,29 +228,64 @@ test("the launcher: the agent's slice and user, absolute paths, and a fixed envi
     SHELL: "/bin/bash",
     PATH: "/usr/local/bin:/usr/bin:/bin",
     LANG: "C.UTF-8",
+    ANDROID_ADB_SERVER_PORT: "31627",
   };
-  expect(systemLauncher(user, true)).toEqual({
-    prefix: [
-      "/usr/bin/systemd-run",
-      "--quiet",
-      "--scope",
-      "--collect",
-      "--slice=agents-21003.slice",
-      "--",
-      "/usr/sbin/runuser",
-      "-u",
-      "ag-a1b2c3d4",
-      "--",
-    ],
-    env,
-    home: "/home/ag-a1b2c3d4",
-  });
+  const launcher = systemLauncher(user, true);
+  expect(launcher.prefix.slice(0, 13)).toEqual([
+    "/usr/bin/systemd-run",
+    "--quiet",
+    "--scope",
+    "--collect",
+    "--slice=agents-21003.slice",
+    "--",
+    "/usr/bin/unshare",
+    "--mount",
+    "--propagation",
+    "slave",
+    "--",
+    "/bin/sh",
+    "-c",
+  ]);
+  expect(launcher.prefix.slice(14)).toEqual(["sh", "21003", "/usr/sbin/runuser", "-u", "ag-a1b2c3d4", "--"]);
+  expect(launcher).toMatchObject({ env, home: "/home/ag-a1b2c3d4", tmp: "/var/lib/agentes-runner-tmp/21003/tmp" });
+  // Root, in the agent's own mount namespace, before it becomes the agent: its folders under a root-only one, bound
+  // over the shared ones; in its own /tmp only mkdir, never a chmod an agent's link could aim.
+  const script = launcher.prefix[13] ?? "";
+  expect(script.split("\n")).toEqual([
+    "set -e",
+    "r=/var/lib/agentes-runner-tmp",
+    'mkdir -p "$r"',
+    'chmod 0700 "$r"',
+    'd="$r/$1"',
+    "shift",
+    'mkdir -p "$d"',
+    'chmod 0700 "$d"',
+    'for f in tmp var-tmp shm lock; do mkdir -p "$d/$f"; chmod 1777 "$d/$f"; done',
+    'mount --bind "$d/tmp" /tmp',
+    'mount --bind "$d/var-tmp" /var/tmp',
+    'mount --bind "$d/shm" /dev/shm',
+    'if [ "$(stat -c %a /run/lock 2>/dev/null)" = 1777 ]; then mount --bind "$d/lock" /run/lock; fi',
+    "mkdir -m 1777 /tmp/.X11-unix 2>/dev/null || :",
+    "mkdir -m 1777 /tmp/.ICE-unix 2>/dev/null || :",
+    'exec "$@"',
+  ]);
   // No systemd as PID 1 (a container): runuser alone.
   expect(systemLauncher(user, false)).toEqual({
     prefix: ["/usr/sbin/runuser", "-u", "ag-a1b2c3d4", "--"],
     env,
     home: "/home/ag-a1b2c3d4",
   });
+});
+
+test("adb's server port: one per agent, outside every band and Linux's ephemeral range", () => {
+  expect(adbServerPort(20001)).toBe(30625);
+  const ports = new Set<number>();
+  for (let uid = 20000; uid <= 20999; uid++) ports.add(adbServerPort(uid));
+  expect(ports.size).toBe(1000);
+  for (let uid = 1000; uid <= 59999; uid += 7) {
+    const port = adbServerPort(uid);
+    expect(port >= 30000 && port <= 32767).toBe(true);
+  }
 });
 
 test("inside the agent's slice, its Chrome and its AI CLIs each get one, named from its uid", () => {

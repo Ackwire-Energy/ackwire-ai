@@ -78,7 +78,7 @@ import { cachedExecutors } from "./executors";
 import type { HandlerContext, RequestObserver, RequestOutcome } from "./handlers";
 import { currentProcess, isCompiled, selfCommand } from "./launch";
 import { tailLines } from "./logfile";
-import { LoopbackGuard } from "./loopback-guard";
+import { LoopbackGuard, loopbackEndpoints, runnerEndpoints } from "./loopback-guard";
 import { McpBridge, type McpTaskInfo, mcpSocketPath } from "./mcp";
 import { type CachedLogo, logoDataUrl, readCachedLogo, removeCachedLogo, syncOrgLogo } from "./org-logo";
 import { type DeviceGrant, devicePair, type FetchFn, PairingError, uniqueWorkspace } from "./pairing";
@@ -841,11 +841,34 @@ export class RunnerDaemon implements RequestObserver {
     let supervisor: Supervisor | null = null;
     let agentUser: Session["agentUser"] = null;
     if (config.mode === "system") {
-      const users = new AgentUsers({ home, range: config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE });
+      const range = config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE;
+      const users = new AgentUsers({ home, range });
+      // Tests inject `workers`; a real guard (nft as root) belongs only to the real supervisor. On the
+      // server's own computer one guard covers every organization's agents (`host.ts`): a guard per runner
+      // would replace the others' rules with its own.
+      const guard =
+        this.opts.workers || config.managedBy === "host"
+          ? undefined
+          : new LoopbackGuard({
+              home,
+              agentUids: () => readAgentUsers(home).map((u) => u.uid),
+              uidRange: range,
+              services: () => [
+                ...(readStoredConfig(home)?.services ?? []),
+                ...runnerEndpoints(),
+                ...loopbackEndpoints([config.server]),
+              ],
+              log,
+            });
+      // The bind band is the whole computer's: an organization's block on the server's own computer shares it.
+      const policy = {
+        uidRange: config.managedBy === "host" ? DEFAULT_AGENT_UID_RANGE : range,
+        ...(guard ? { refresh: () => void guard.reconcile() } : {}),
+      };
       const prepared = new Set<number>();
       const prepare = (user: AgentUser) => {
         if (prepared.has(user.uid)) return;
-        ensureBrowserBindPolicy(user, this.self.command);
+        ensureBrowserBindPolicy(user, this.self.command, policy);
         prepared.add(user.uid);
       };
       // Desktops and terminals can start before a worker. The first use of a
@@ -857,23 +880,11 @@ export class RunnerDaemon implements RequestObserver {
           prepare(user);
           return user;
         });
-      // Tests inject `workers`; a real guard (nft/ss as root) belongs only to the real supervisor. On the
-      // server's own computer one guard covers every organization's agents (`host.ts`): a guard per runner
-      // would replace the others' rules with its own.
-      const guard =
-        this.opts.workers || config.managedBy === "host"
-          ? undefined
-          : new LoopbackGuard({
-              home,
-              agentUids: () => readAgentUsers(home).map((u) => u.uid),
-              uidRange: config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE,
-              log,
-            });
       supervisor = new Supervisor({
         home,
         requireRootBroker: !this.opts.workers,
         user: agentUser,
-        start: launchWorker(this.self.command),
+        start: launchWorker(this.self.command, policy),
         ...(this.opts.workers || config.managedBy === "host"
           ? {}
           : {

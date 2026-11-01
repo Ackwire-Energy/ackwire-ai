@@ -15,7 +15,7 @@ import { PassThrough } from "node:stream";
 import type { AgentScope, MachineRequest, RunnerFrame, ServerFrame } from "@agenteschat/adapters/machine-protocol";
 import { sealSecret, secretAad } from "@agenteschat/adapters/secret-box";
 import type { AccountManager } from "../../runner/accounts";
-import { AGENT_USERS_FILE, type AgentUser } from "../../runner/agent-users";
+import { AGENT_USERS_FILE, type AgentUser, systemLauncher } from "../../runner/agent-users";
 import { BrowserManager } from "../../runner/browser";
 import { writeConfig } from "../../runner/config";
 import type { Dial, Socket, SocketHandlers } from "../../runner/connection";
@@ -2175,16 +2175,7 @@ test("the launch line: the agent's launcher, then this runner's worker with the 
   const home = "/var/lib/agentes-runner-agents/ag-a1b2c3d4";
   const cmd = workerCommand(ana, runner, home, true);
   expect(cmd.argv).toEqual([
-    "/usr/bin/systemd-run",
-    "--quiet",
-    "--scope",
-    "--collect",
-    "--slice=agents-21000.slice",
-    "--",
-    "/usr/sbin/runuser",
-    "-u",
-    "ag-a1b2c3d4",
-    "--",
+    ...systemLauncher(ana, true).prefix,
     ...runner,
     "worker",
     "--agent",
@@ -2194,9 +2185,24 @@ test("the launch line: the agent's launcher, then this runner's worker with the 
     "--home",
     home,
   ]);
+  expect(cmd.argv.slice(0, 5)).toEqual([
+    "/usr/bin/systemd-run",
+    "--quiet",
+    "--scope",
+    "--collect",
+    "--slice=agents-21000.slice",
+  ]);
   expect(cmd.cwd).toBe("/home/ag-a1b2c3d4");
   // Only the launcher's environment: never the root runner's own (its token, its home).
-  expect(Object.keys(cmd.env).sort()).toEqual(["HOME", "LANG", "LOGNAME", "PATH", "SHELL", "USER"]);
+  expect(Object.keys(cmd.env).sort()).toEqual([
+    "ANDROID_ADB_SERVER_PORT",
+    "HOME",
+    "LANG",
+    "LOGNAME",
+    "PATH",
+    "SHELL",
+    "USER",
+  ]);
   expect(workerCommand(ana, runner, home, false).argv.slice(0, 4)).toEqual([
     "/usr/sbin/runuser",
     "-u",

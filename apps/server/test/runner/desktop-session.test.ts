@@ -1,11 +1,13 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync, writeSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync, writeSync } from "node:fs";
 import { createConnection } from "node:net";
 import path from "node:path";
 import type { AgentScope, MachineRequest, RunnerAccess } from "@agenteschat/adapters/machine-protocol";
 import { systemLauncher } from "../../runner/agent-users";
 import { LOOK_MARKER, LOOK_SCRIPT, type LookOptions, lookCommand, lookFiles, lookId } from "../../runner/desktop-look";
 import {
+  abstractDisplays,
   DesktopSessions,
   type DesktopSessionsOptions,
   type DesktopSpawnOptions,
@@ -148,13 +150,14 @@ const gone = (system: DesktopSystem): DesktopSystem => ({
 
 const RUNNER = ["/opt/agentes-runner/agentes-runner"];
 
-function setup(over: Partial<DesktopSessionsOptions> = {}) {
+/** `xLockDir`: where the fake X servers keep their locks (an agent's own /tmp), when it isn't the computer's. */
+function setup(over: Partial<DesktopSessionsOptions> = {}, xLockDir?: string) {
   // Short: Browser's socket goes in the runner's home, and a Unix socket's path has at most 103 bytes on macOS.
   const home = tempDir("dsk-");
   const lockDir = tempDir("desk-x-");
   const folders = tempDir("desk-ws-");
   dirs.push(home, lockDir, folders);
-  const fake = fakeComputer(lockDir);
+  const fake = fakeComputer(xLockDir ?? lockDir);
   const logs: string[] = [];
   const clock = { now: 1_000_000 };
   const opts: DesktopSessionsOptions = {
@@ -722,6 +725,8 @@ test("system mode's desktop user: the agent's launcher and home; the cookie and 
     home: "/home/ag-01a142cb",
     dir: "/home/ag-01a142cb/.agentes/desktop",
     ids: { uid: 21001, gid: 21004 },
+    // Its X server's lock is in its own /tmp, where root looks for it.
+    tmp: "/var/lib/agentes-runner-tmp/21001/tmp",
   });
   expect(launcher.prefix.at(-2)).toBe("ag-01a142cb");
   expect(launcher.env.HOME).toBe("/home/ag-01a142cb");
@@ -749,6 +754,42 @@ test("slots: an agent keeps its display; one held by another process is skipped,
   await t.desktops.stop(ops);
   expect((await t.desktops.ensure(ops)).display).toBe(22);
   expect((await t.desktops.ensure(dev)).display).toBe(21);
+  t.desktops.close();
+});
+
+test("an agent's own /tmp: its X server's lock is read there, never in the computer's", async () => {
+  const own = tempDir("desk-own-");
+  dirs.push(own);
+  const t = setup({}, own);
+  const user = t.opts.user;
+  const desktops = new DesktopSessions({ ...t.opts, user: async (agent) => ({ ...(await user(agent)), tmp: own }) });
+  expect((await desktops.ensure(dev)).display).toBe(20);
+  expect(existsSync(path.join(own, ".X20-lock"))).toBe(true);
+  expect(existsSync(path.join(t.lockDir, ".X20-lock"))).toBe(false);
+  desktops.close();
+});
+
+test("a display whose abstract X socket someone holds is taken: an X server's, or the name an agent squats", async () => {
+  const t = setup();
+  const unix = [
+    "Num       RefCount Protocol Flags    Type St Inode Path",
+    "0000000000000000: 00000002 00000000 00010000 0001 01 23456 @/tmp/.X11-unix/X20",
+    "0000000000000000: 00000002 00000000 00010000 0001 01 23457 /tmp/.X11-unix/X21",
+    "0000000000000000: 00000003 00000000 00000000 0001 03 23458 @/tmp/.X11-unix/X220",
+    "0000000000000000: 00000003 00000000 00000000 0001 03 23459 @/tmp/.X11-unix/X22-other",
+  ].join("\n");
+  expect([...abstractDisplays(unix)]).toEqual([20, 220]);
+  t.fake.system.unixSockets = () => unix;
+  expect((await t.desktops.ensure(dev)).display).toBe(21);
+  t.desktops.close();
+});
+
+test.if(posix)("a display lock that is a pipe or a link never stalls root: read as no lock at all", async () => {
+  const t = setup();
+  expect(spawnSync("mkfifo", [path.join(t.lockDir, ".X20-lock")]).status).toBe(0);
+  symlinkSync("/etc/passwd", path.join(t.lockDir, ".X21-lock"));
+  expect((await t.desktops.ensure(dev)).display).toBe(20);
+  expect((await t.desktops.ensure(ops)).display).toBe(21);
   t.desktops.close();
 });
 

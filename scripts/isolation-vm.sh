@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # CI's isolation-root job, Debian 13 leg: boots the agentes.chat Cloud's release (Debian's own kernel, and systemd
 # built with BPF_FRAMEWORK, which the agents' bind policy needs) in QEMU and runs the isolation test there as root.
-# The guest's serial console is this job's log; the test's exit code comes back on it.
+# The guest's second serial port is this job's log (its console, where a getty starts, goes to a file), and the
+# test's exit code comes back on it.
 # Usage: scripts/isolation-vm.sh <bundled test> <runner bundle> <image folder (kept between runs)>
 set -euo pipefail
 test_js=$1 runner=$2 images=$3
@@ -36,10 +37,10 @@ runcmd:
 EOF
 cat > "$seed/guest.sh" << 'EOF'
 #!/bin/sh
-# In the guest, as root: the test, its exit code on the console, then off.
+# In the guest, as root: the test, then its exit code, on ttyS1, then off.
 code=0
-sh /mnt/seed/run.sh > /dev/ttyS0 2>&1 || code=$?
-echo "ISOLATION-EXIT $code" > /dev/ttyS0
+sh /mnt/seed/run.sh > /dev/ttyS1 2>&1 || code=$?
+echo "ISOLATION-EXIT $code" > /dev/ttyS1
 poweroff
 EOF
 cat > "$seed/run.sh" << 'EOF'
@@ -68,5 +69,9 @@ timeout 40m qemu-system-x86_64 -machine "q35,accel=$accel" -cpu "$cpu" -smp 2 -m
   -drive "file=$work/disk.qcow2,if=virtio" \
   -drive "file=$work/seed.iso,media=cdrom,readonly=on" \
   -netdev user,id=net0 -device virtio-net-pci,netdev=net0 \
-  -display none -serial stdio -no-reboot < /dev/null | tee "$work/console.log" || true
-tr -d '\r' < "$work/console.log" | grep -Eq 'ISOLATION-EXIT 0$'
+  -display none -serial "file:$work/console.log" -serial stdio -no-reboot < /dev/null | tee "$work/out.log" || true
+if ! tr -d '\r' < "$work/out.log" | grep -Eq 'ISOLATION-EXIT 0$'; then
+  echo "== The guest's console"
+  tail -n 100 "$work/console.log"
+  exit 1
+fi

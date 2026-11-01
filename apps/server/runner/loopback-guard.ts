@@ -1,135 +1,177 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { browserPortsForUid, checkEphemeralRange, validateBrowserUidRange } from "./browser-ports";
-import { type RunCommand, runSync, systemdBooted } from "./service";
+import { NETWORK_ENV } from "./brain";
+import { browserBand, checkEphemeralRange, EPHEMERAL_RANGE_FILE, validateBrowserUidRange } from "./browser-ports";
+import { parseService } from "./config";
+import { AGENTS_CGROUP, agentCgroup, agentSlice, type RunCommand, runSync, systemdBooted } from "./service";
 
 /**
- * System mode: Chrome CDP and agent-browser stream use permanent per-UID ports.
- * The root guard installs their owner rules for the entire configured UID range
- * before starting any worker, including the first agent. A per-agent systemd
- * bind policy prevents another agent from taking an assigned browser port and
- * denies bind(0), which the pinned stream daemon uses on port collision.
+ * System mode: an agent reaches a local listener only when that listener was made inside its own slice
+ * (`agents.slice/agents-<uid>.slice`, at any level below it: its worker, Chrome, AI CLIs, terminals, desktop and
+ * tasks). The agent itself is told by the cgroup its socket was made in, never by its uid, so a setuid-root
+ * program it runs is still that agent.
  *
- * Other agent-owned listeners are still discovered with `ss` every two
- * seconds. That polling has a startup and stale-port reuse window; this guard
- * does not provide complete isolation for arbitrary local development servers.
- * `meta skuid` is the connecting socket's UID. Reply packets are excluded
- * before port checks because their destination can be another guarded port.
+ * On the way out, each new local TCP or UDP connection gets its sender in the conntrack mark; on the way in, the
+ * kernel's own socket lookup finds where it goes (for a SYN, the listener), and it gets in only when that socket
+ * is the sender's own. A connection across `lo` keeps its conntrack entry but loses its socket, so the way in
+ * reads the mark the way out set. Agents get the computer's own listeners only for DNS and the listed services,
+ * and no container or VM network on this computer. Ports don't matter.
+ *
+ * nft resolves a cgroup's path to its id when it loads the table, so the table is loaded again whenever an
+ * agent's slice appears or is made anew (`reconcile`, every 2 s and right after a slice starts).
  */
 
 /** Our table; the Cloud guard has its own (`inet agentes_guard`). */
 export const RUNNER_NFT_TABLE = "agentes_runner";
-/**
- * How often the supervisor rescans loopback listeners (a cheap `ss`; `nft`
- * runs only when the set changed).
- * Polled discovery retains a window between a generic listener opening and
- * its next scan, and a stale owner exception after a listener closes.
- */
+/** How often the guard checks what the table is made of (a stat per slice, `nft list tables`). */
 export const GUARD_RESCAN_MS = 2000;
 
-/** A guarded loopback listener: an agent-owned TCP listening socket. */
-export interface GuardedListener {
-  port: number;
-  uid: number;
+/**
+ * Who opened a connection, in its conntrack mark: a fixed tag in the top byte, so a mark another tool writes never
+ * reads as root's or an agent's, then an agent's uid (at most 59999), 0 for root, or one of two codes.
+ */
+const MARK_TAG = 0x41000000;
+export const ROOT_MARK = MARK_TAG;
+/** An agent that owns nothing: its uid outside its slice (cron, at), or its slice not mapped yet. */
+export const NO_OWNER_MARK = MARK_TAG + 0xffffff;
+/** Another local user. */
+export const OTHER_USER_MARK = MARK_TAG + 0xfffffe;
+export const agentMark = (uid: number) => MARK_TAG + uid;
+
+/** Always open to agents: their resolver (the Cloud's unbound, systemd-resolved). */
+const DNS = ["tcp/53", "udp/53"];
+/** What the runner hands the AI CLIs as their way out (`accountSettingsEnv`): open to agents where it is local. */
+const ENDPOINT_ENV = [...NETWORK_ENV.filter((k) => /^(https?|all)_proxy$/i.test(k)), "ANTHROPIC_BASE_URL"];
+const DEFAULT_PORTS: Record<string, number> = { "http:": 80, "https:": 443, "socks:": 1080, "socks5:": 1080 };
+
+const hex = (n: number) => `0x${n.toString(16).padStart(8, "0")}`;
+const span = (a: number | string, b: number | string) => (a === b ? `${a}` : `${a}-${b}`);
+const sliceOf = (uid: number) => `agents.slice/${agentSlice(uid)}`;
+
+/** `tcp/11434` → `tcp . 11434`, the set's element; null when it isn't one TCP or UDP port. */
+const serviceElement = (spec: string) => parseService(spec)?.replace("/", " . ") ?? null;
+
+/** The port of each URL here that is on this computer itself: `http://127.0.0.1:8080` → `tcp/8080`. */
+export function loopbackEndpoints(urls: readonly (string | undefined)[]): string[] {
+  const found = new Set<string>();
+  for (const raw of urls) {
+    const text = raw?.trim();
+    if (!text) continue;
+    let url: URL;
+    try {
+      url = new URL(/^[a-z][\w+.-]*:\/\//i.test(text) ? text : `http://${text}`);
+    } catch {
+      continue;
+    }
+    if (!/^(localhost|127(\.\d+){3}|\[::1\])$/i.test(url.hostname)) continue;
+    const port = url.port ? Number(url.port) : DEFAULT_PORTS[url.protocol];
+    if (port) found.add(`tcp/${port}`);
+  }
+  return [...found];
 }
 
-type RejectVerb = "reject with tcp reset" | "drop";
+/** The local ports of the proxies and the Claude endpoint in the runner's environment. */
+export const runnerEndpoints = (env: NodeJS.ProcessEnv = process.env) =>
+  loopbackEndpoints(ENDPOINT_ENV.map((k) => env[k]));
 
 /**
- * The agent-owned loopback listeners in `ss -Htln -e` output: the local port
- * and the socket's owner uid. `ss` run as root prints `uid:<n>` for every
- * socket a non-root user owns and omits it for root's own (uid 0), so a line
- * with no `uid:` is root's and never an agent's. Only listeners whose owner is
- * an agent's uid are kept (deduplicated by port and uid).
+ * The interfaces with a default route, from `/proc/net/route` and `/proc/net/ipv6_route`: a bridge that is this
+ * computer's way out (Proxmox's vmbr0, an LXC container's veth) is no guest network.
  */
-export function parseListeners(ssOutput: string, agentUids: ReadonlySet<number>): GuardedListener[] {
-  const seen = new Set<string>();
-  const out: GuardedListener[] = [];
-  for (const line of ssOutput.split("\n")) {
-    const cols = line.trim().split(/\s+/);
-    // State Recv-Q Send-Q Local:Port Peer:Port [uid:N ino:N …]
-    const local = cols[3];
-    if (!local || cols[0] !== "LISTEN") continue;
-    const port = Number(local.slice(local.lastIndexOf(":") + 1));
-    if (!Number.isInteger(port) || port < 1 || port > 65535) continue;
-    const m = /\buid:(\d+)\b/.exec(line);
-    const uid = m ? Number(m[1]) : 0;
-    if (!agentUids.has(uid)) continue;
-    const key = `${port}.${uid}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push({ port, uid });
+export function defaultRouteInterfaces(route4: string, route6: string): string[] {
+  const found = new Set<string>();
+  for (const line of route4.split("\n").slice(1)) {
+    const [iface, dest, , flags, , , , mask] = line.trim().split(/\s+/);
+    if (iface && dest === "00000000" && mask === "00000000" && Number.parseInt(flags ?? "0", 16) & 0x1)
+      found.add(iface);
   }
-  return out;
+  for (const line of route6.split("\n")) {
+    const [dest, len, , , , , , , flagText, iface] = line.trim().split(/\s+/);
+    const flags = Number.parseInt(flagText ?? "0", 16);
+    // Up, and not a reject route (the kernel's own `unreachable` defaults on lo).
+    if (dest === "0".repeat(32) && len === "00" && flags & 0x1 && !(flags & 0x200) && iface && iface !== "lo") {
+      found.add(iface);
+    }
+  }
+  return [...found].sort();
 }
 
-/** A listener on an assigned browser port must belong to that port's agent. */
-export function conflictingBrowserPorts(ssOutput: string, uidRange: [number, number]): number[] {
-  validateBrowserUidRange(uidRange);
-  const conflicts = new Set<number>();
-  const bucket = Math.floor(uidRange[0] / 10_000) * 10_000;
-  for (const line of ssOutput.split("\n")) {
-    const cols = line.trim().split(/\s+/);
-    if (cols[0] !== "LISTEN" || !cols[3]) continue;
-    const port = Number(cols[3].slice(cols[3].lastIndexOf(":") + 1));
-    if (!Number.isInteger(port) || port < 10_000 || port > 29_999) continue;
-    const owner = bucket + Math.floor((port - 10_000) / 2);
-    if (owner < uidRange[0] || owner > uidRange[1]) continue;
-    const actual = Number(/\buid:(\d+)\b/.exec(line)?.[1] ?? 0);
-    if (actual !== owner) conflicts.add(port);
-  }
-  return [...conflicts].sort((a, b) => a - b);
+export interface RulesetInput {
+  /** The agents whose slice exists now. */
+  agents: number[];
+  /** The computer's whole agent uid range: a uid in it outside every slice is an agent that owns nothing. */
+  uidRange: [number, number];
+  /** What agents may reach of the computer's own listeners besides DNS (`tcp/11434`). */
+  services: string[];
+  /** Interfaces with a default route (`defaultRouteInterfaces`). */
+  uplinks: string[];
+  /** False where the kernel has no `nft_reject_inet`: a refused connection is dropped (it hangs, then fails). */
+  reject: boolean;
 }
 
-const elementList = (items: string[]) => (items.length ? `\n\t\telements = { ${items.join(", ")} }` : "");
+const elements = (items: string[]) => (items.length ? `\n\t\telements = { ${items.join(", ")} }` : "");
 
 /**
- * The whole `nft -f` script for the current listeners. The
- * create-then-delete-then-create idiom replaces the table atomically whatever
- * state it was in, without touching any other table (never `flush ruleset`).
+ * The whole `nft -f` script. The create-then-delete-then-create idiom replaces the table atomically whatever
+ * state it was in, without touching any other table (never `flush ruleset`). Only new connections are judged.
  */
-export function renderRuleset(
-  listeners: readonly GuardedListener[],
-  reject: RejectVerb,
-  uidRange: [number, number],
-  conflictingPorts: ReadonlySet<number> = new Set(),
-): string {
-  validateBrowserUidRange(uidRange);
-  const browserOwner: string[] = [];
-  const browserPorts: string[] = [];
-  for (let uid = uidRange[0]; uid <= uidRange[1]; uid++) {
-    const { cdp, stream } = browserPortsForUid(uid);
-    if (!conflictingPorts.has(cdp)) browserOwner.push(`${cdp} . ${uid}`);
-    if (!conflictingPorts.has(stream)) browserOwner.push(`${stream} . ${uid}`);
-    browserPorts.push(String(cdp), String(stream));
-  }
-  const uidsByPort = new Map<number, Set<number>>();
-  for (const { port, uid } of listeners) {
-    const uids = uidsByPort.get(port) ?? new Set<number>();
-    uids.add(uid);
-    uidsByPort.set(port, uids);
-  }
-  // An attacker can bind 127.0.0.2:port while another agent owns 127.0.0.1:port.
-  // Allowing either uid by port alone would also allow it into the other's listener.
-  const owner = listeners.filter((l) => uidsByPort.get(l.port)?.size === 1).map((l) => `${l.port} . ${l.uid}`);
-  const ports = [...new Set(listeners.map((l) => l.port))].map(String);
+export function renderRuleset(i: RulesetInput): string {
+  validateBrowserUidRange(i.uidRange);
+  const [first, last] = i.uidRange;
+  const uids = span(first, last);
+  const agentMarks = span(hex(agentMark(first)), hex(agentMark(last)));
+  const services = [...new Set([...DNS, ...i.services].map(serviceElement).filter((s) => s !== null))];
+  const owners = i.agents.map((uid) => `${JSON.stringify(sliceOf(uid))} : ${hex(agentMark(uid))}`);
   return [
     `table inet ${RUNNER_NFT_TABLE} {}`,
     `delete table inet ${RUNNER_NFT_TABLE}`,
     `table inet ${RUNNER_NFT_TABLE} {`,
-    `\tset browser_owner {\n\t\ttype inet_service . uid${elementList(browserOwner)}\n\t}`,
-    `\tset browser_ports {\n\t\ttype inet_service${elementList(browserPorts)}\n\t}`,
-    `\tset owner {\n\t\ttype inet_service . uid${elementList(owner)}\n\t}`,
-    `\tset guarded {\n\t\ttype inet_service${elementList(ports)}\n\t}`,
+    `\tmap agent_of {\n\t\ttypeof socket cgroupv2 level 2 : ct mark${elements(owners)}\n\t}`,
+    `\tset services {\n\t\ttype inet_proto . inet_service${elements(services)}\n\t}`,
+    `\tset uplinks {\n\t\ttype ifname${elements(i.uplinks.map((name) => JSON.stringify(name)))}\n\t}`,
     "\tchain output {",
-    "\t\ttype filter hook output priority 0; policy accept;",
-    '\t\toif "lo" meta skuid 0 accept',
-    // A local TCP server's reply has the client's ephemeral destination port.
-    '\t\toif "lo" ct direction reply accept',
-    '\t\toif "lo" tcp dport . meta skuid @browser_owner accept',
-    `\t\toif "lo" tcp dport @browser_ports ${reject}`,
-    '\t\toif "lo" tcp dport . meta skuid @owner accept',
-    `\t\toif "lo" tcp dport @guarded ${reject}`,
+    "\t\ttype filter hook output priority filter; policy accept;",
+    '\t\toif "lo" meta l4proto { tcp, udp } ct state new jump sender',
+    '\t\tct state { new, untracked } socket cgroupv2 level 1 "agents.slice" jump agent_out',
+    `\t\tct state { new, untracked } meta skuid ${uids} socket cgroupv2 level 1 != "agents.slice" jump agent_out`,
+    "\t}",
+    // Who opened it. A lookup that misses ends its rule there, and the next one decides.
+    "\tchain sender {",
+    `\t\tsocket cgroupv2 level 1 "agents.slice" ct mark set ${hex(NO_OWNER_MARK)}`,
+    "\t\tct mark set socket cgroupv2 level 2 map @agent_of return",
+    '\t\tsocket cgroupv2 level 1 "agents.slice" return',
+    `\t\tmeta skuid ${uids} ct mark set ${hex(NO_OWNER_MARK)} return`,
+    `\t\tmeta skuid 0 ct mark set ${hex(ROOT_MARK)} return`,
+    `\t\tct mark set ${hex(OTHER_USER_MARK)}`,
+    "\t}",
+    "\tchain agent_out {",
+    '\t\toif "lo" ct state untracked goto refuse',
+    '\t\toif "lo" meta l4proto != { tcp, udp, icmp, ipv6-icmp } goto refuse',
+    '\t\tmeta oifkind { "bridge", "veth" } oifname != @uplinks jump guest',
+    "\t}",
+    // A container's or a VM's network on this computer: only what is published beyond it.
+    "\tchain guest {",
+    "\t\tct status dnat ct original ip daddr != 127.0.0.0/8 return",
+    "\t\tct status dnat ct original ip6 daddr != ::1 return",
+    "\t\tgoto refuse",
+    "\t}",
+    "\tchain input {",
+    "\t\ttype filter hook input priority filter; policy accept;",
+    '\t\tiif "lo" meta l4proto { tcp, udp } ct state new jump local',
+    "\t}",
+    // Where it goes: the socket the kernel delivers it to (for a SYN, the listener).
+    "\tchain local {",
+    `\t\tct mark ${hex(ROOT_MARK)} accept`,
+    ...i.agents.map(
+      (uid) => `\t\tct mark ${hex(agentMark(uid))} socket cgroupv2 level 2 ${JSON.stringify(sliceOf(uid))} accept`,
+    ),
+    '\t\tsocket cgroupv2 level 1 "agents.slice" goto refuse',
+    `\t\tct mark != { ${agentMarks}, ${hex(NO_OWNER_MARK)} } accept`,
+    "\t\tmeta l4proto . th dport @services accept",
+    "\t\tgoto refuse",
+    "\t}",
+    "\tchain refuse {",
+    ...(i.reject ? ["\t\tmeta l4proto tcp reject with tcp reset", "\t\treject"] : ["\t\tdrop"]),
     "\t}",
     "}",
     "",
@@ -139,35 +181,61 @@ export function renderRuleset(
 export interface LoopbackGuardOptions {
   /** The runner home: the rendered ruleset is written here (root-owned, 0600). */
   home: string;
-  /** The agents' uids right now (`agents.json`); only their loopback listeners are guarded. */
+  /** The agents' uids right now (`agents.json`). */
   agentUids: () => number[];
-  /** Entire configured system-agent UID range, including agents not yet created. */
+  /** The computer's whole configured agent uid range, agents not created yet included. */
   uidRange: [number, number];
+  /** What else of the computer agents may reach (`tcp/11434`), read at every check. */
+  services?: () => string[];
   log: (line: string) => void;
   run?: RunCommand;
-  /** Tests: the systemd and kernel state checked before the guard starts. */
+  /** Tests: the computer's state. */
   systemd?: boolean;
   ephemeralRange?: string;
+  /** A cgroup's id (its inode), or null when it isn't there. */
+  cgroupId?: (dir: string) => string | null;
+  routes?: () => [route4: string, route6: string];
+  /** Tests: drop from the start, as where the kernel has no `nft_reject_inet`. */
+  reject?: boolean;
 }
 
+const cgroupInode = (dir: string) => {
+  try {
+    return String(statSync(dir, { bigint: true }).ino);
+  } catch {
+    return null;
+  }
+};
+
+const readOr = (file: string) => {
+  try {
+    return readFileSync(file, "utf8");
+  } catch {
+    return "";
+  }
+};
+
+const procRoutes = (): [string, string] => [readOr("/proc/net/route"), readOr("/proc/net/ipv6_route")];
+
 /**
- * Keeps `table inet agentes_runner` matching the agents' current loopback
- * listeners. Lives in the root supervisor; the workers (the agents' own uids)
- * can't touch nftables.
+ * Keeps `table inet agentes_runner` matching the agents' slices, the services and the uplinks. Lives in the root
+ * process; agents' processes can't touch nftables.
  */
 export class LoopbackGuard {
   private readonly run: RunCommand;
   private readonly rulesetFile: string;
-  private verb: RejectVerb = "reject with tcp reset";
+  private reject: boolean;
+  /** What the table loaded now was made of. */
   private applied = "";
   private timer: ReturnType<typeof setInterval> | null = null;
   /** One warning per failure streak, cleared on the next success. */
   private warned = false;
-  private conflicts: number[] = [];
+  private lastError = "";
 
   constructor(private readonly opts: LoopbackGuardOptions) {
     this.run = opts.run ?? runSync;
     this.rulesetFile = path.join(opts.home, "loopback-guard.nft");
+    this.reject = opts.reject ?? true;
   }
 
   /** Whether `nft` is here to run (single-user self-hosts have no system-mode guard). */
@@ -175,21 +243,37 @@ export class LoopbackGuard {
     return this.run("nft", ["--version"]).code === 0;
   }
 
-  /** Loads the reject module, applies the first ruleset, and rescans on a timer. */
+  /** Loads the table before any agent process can start, then keeps it current. Throws when it can't load. */
   start() {
     if (!(this.opts.systemd ?? systemdBooted())) {
       throw new Error("System mode requires systemd socket-bind enforcement for agent browsers");
     }
     validateBrowserUidRange(this.opts.uidRange);
-    this.validateExistingUids();
-    checkEphemeralRange(this.opts.ephemeralRange ?? readFileSync("/proc/sys/net/ipv4/ip_local_port_range", "utf8"));
-    if (!this.available()) throw new Error("System mode requires nft for browser port isolation");
-    // Best effort: reject needs nft_reject_inet; without it the ruleset falls back to drop.
-    this.run("modprobe", ["nft_reject_inet"]);
-    if (!this.reconcile()) throw new Error("System mode requires ss and an applied nft loopback guard");
-    if (this.conflicts.length)
-      throw new Error(`Reserved browser ports have the wrong owner: ${this.conflicts.join(", ")}`);
-    this.timer = setInterval(() => this.reconcile(), GUARD_RESCAN_MS);
+    const uids = this.opts.agentUids();
+    if (!this.validExistingUids(uids)) {
+      throw new Error("Persisted agent UIDs overlap or fall outside the configured browser port range");
+    }
+    checkEphemeralRange(
+      this.opts.ephemeralRange ?? readFileSync(EPHEMERAL_RANGE_FILE, "utf8"),
+      browserBand(this.opts.uidRange),
+    );
+    if (!this.available()) throw new Error("System mode requires nft so each agent reaches only its own local ports");
+    // Best effort: an explicit load works whatever kernel.modprobe says, and a kernel with them built in needs none.
+    this.run("modprobe", ["-a", "nft_ct", "nft_socket", "nft_reject_inet"]);
+    // Every listed agent's slice there at the first load: each is mapped before any of its processes starts.
+    this.run("systemctl", ["start", "agents.slice", ...uids.map(agentSlice)]);
+    if (!this.reconcile()) {
+      throw new Error(
+        `System mode needs Linux 5.13 or later with nft_socket, and nftables 1.0 or later, so each agent reaches only its own local ports: ${this.lastError.slice(0, 500)}`,
+      );
+    }
+    this.timer = setInterval(() => {
+      try {
+        this.reconcile();
+      } catch (err) {
+        this.warnOnce(`the loopback guard keeps its last rules: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }, GUARD_RESCAN_MS);
     this.timer.unref?.();
   }
 
@@ -198,44 +282,79 @@ export class LoopbackGuard {
     this.timer = null;
   }
 
-  /** Rescans loopback listeners and, when they changed, reapplies the table. */
+  /**
+   * Loads the table again when what it is made of changed (an agent, a slice made anew, the services, the uplinks)
+   * or it is gone. A load that fails keeps the table loaded before: never flushed.
+   */
   reconcile(): boolean {
-    const existing = this.opts.agentUids();
-    if (!this.validExistingUids(existing)) {
+    const uids = this.opts.agentUids();
+    if (!this.validExistingUids(uids)) {
       this.warnOnce("agent UIDs overlap or fall outside the configured browser port range");
       return false;
     }
-    const uids = new Set(existing);
-    const ss = this.run("ss", ["-Htln", "-e"]);
-    if (ss.code !== 0) {
-      // No listing is not "no listeners": an empty set would unguard every port, so what is applied stays.
-      this.warnOnce(`couldn't list local ports (${ss.output.slice(0, 200)}); the loopback guard keeps its last rules`);
+    let inputs = this.inputs(uids);
+    if (inputs === null) {
+      // agents.slice stopped by hand: the table names it, so it starts again.
+      this.run("systemctl", ["start", "agents.slice"]);
+      inputs = this.inputs(uids);
+    }
+    if (inputs === null) {
+      this.lastError = `${AGENTS_CGROUP} isn't there`;
+      this.warnOnce("the loopback guard can't find agents.slice; it keeps its last rules");
       return false;
     }
-    const listeners = parseListeners(ss.output, uids);
-    this.conflicts = conflictingBrowserPorts(ss.output, this.opts.uidRange);
-    const blocked = new Set(this.conflicts);
-    if (this.conflicts.length)
-      this.warnOnce(`reserved browser ports have the wrong owner: ${this.conflicts.join(", ")}`);
-    const text = renderRuleset(listeners, this.verb, this.opts.uidRange, blocked);
-    if (text === this.applied) return true;
-    if (this.apply(text)) {
-      this.applied = text;
-      this.warned = false;
-      return true;
-    }
-    // The reject rule may be what nft refused (no nft_reject_inet): try drop once.
-    if (this.verb !== "drop") {
-      this.verb = "drop";
-      const dropText = renderRuleset(listeners, this.verb, this.opts.uidRange, blocked);
-      if (this.apply(dropText)) {
-        this.applied = dropText;
-        this.warned = false;
-        return true;
-      }
-    }
-    this.warnOnce("couldn't apply the loopback guard (is NET_ADMIN available?); local ports are not isolated");
+    if (inputs.key === this.applied && this.loaded()) return true;
+    if (this.load(inputs)) return true;
+    // A slice that went between the stat and the load fails it: looked at again, once.
+    const again = this.inputs(uids);
+    if (again && again.key !== inputs.key && this.load(again)) return true;
+    this.warnOnce(`couldn't apply the loopback guard (${this.lastError.slice(0, 300)}); it keeps its last rules`);
     return false;
+  }
+
+  /** What the table is made of now; null without `agents.slice`. */
+  private inputs(uids: number[]) {
+    const id = this.opts.cgroupId ?? cgroupInode;
+    const root = id(AGENTS_CGROUP);
+    if (root === null) return null;
+    const agents: number[] = [];
+    const ids: string[] = [];
+    for (const uid of [...uids].sort((a, b) => a - b)) {
+      const slice = id(agentCgroup(uid));
+      if (slice === null) continue;
+      agents.push(uid);
+      ids.push(`${uid}:${slice}`);
+    }
+    let listed: string[] = [];
+    try {
+      listed = this.opts.services?.() ?? [];
+    } catch {
+      // An unreadable config.json opens nothing more than DNS.
+    }
+    const services = listed.filter((s) => serviceElement(s) !== null).sort();
+    const uplinks = defaultRouteInterfaces(...(this.opts.routes ?? procRoutes)());
+    const input = { agents, uidRange: this.opts.uidRange, services, uplinks };
+    return { key: JSON.stringify({ ...input, root, ids }), input };
+  }
+
+  /** Whether our table is loaded (`nft list tables`: listing the table itself would walk the whole cgroup tree). */
+  private loaded(): boolean {
+    const r = this.run("nft", ["list", "tables"]);
+    return r.code !== 0 || r.output.split("\n").some((line) => line.trim() === `table inet ${RUNNER_NFT_TABLE}`);
+  }
+
+  /** Loads with reject, or with drop where the kernel refuses reject (which then sticks). */
+  private load({ key, input }: { key: string; input: Omit<RulesetInput, "reject"> }): boolean {
+    let ok = this.apply(renderRuleset({ ...input, reject: this.reject }));
+    if (!ok && this.reject && this.apply(renderRuleset({ ...input, reject: false }))) {
+      this.reject = false;
+      ok = true;
+    }
+    if (ok) {
+      this.applied = key;
+      this.warned = false;
+    }
+    return ok;
   }
 
   private warnOnce(line: string) {
@@ -251,20 +370,24 @@ export class LoopbackGuard {
     );
   }
 
-  private validateExistingUids() {
-    if (!this.validExistingUids(this.opts.agentUids())) {
-      throw new Error("Persisted agent UIDs overlap or fall outside the configured browser port range");
-    }
-  }
-
   /** Writes the script and applies it (checked first). True when it took. */
   private apply(text: string): boolean {
     try {
       writeFileSync(this.rulesetFile, text, { mode: 0o600 });
-    } catch {
+    } catch (err) {
+      this.lastError = err instanceof Error ? err.message : String(err);
       return false;
     }
-    if (this.run("nft", ["-c", "-f", this.rulesetFile]).code !== 0) return false;
-    return this.run("nft", ["-f", this.rulesetFile]).code === 0;
+    for (const args of [
+      ["-c", "-f", this.rulesetFile],
+      ["-f", this.rulesetFile],
+    ]) {
+      const r = this.run("nft", args);
+      if (r.code !== 0) {
+        this.lastError = r.output;
+        return false;
+      }
+    }
+    return true;
   }
 }
