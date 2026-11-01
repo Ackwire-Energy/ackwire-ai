@@ -454,6 +454,8 @@ export interface Agent {
   id: string;
   name: string;
   handle: string;
+  /** Handles it had before a rename: mentions still reach it by them, and no one else may take them. */
+  previousHandles?: string[];
   role: string;
   instructions: string;
   model: string;

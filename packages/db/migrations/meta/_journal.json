@@ -1030,6 +1030,13 @@
       "when": 1793535287779,
       "tag": "0146_sidebar_items",
       "breakpoints": true
+    },
+    {
+      "idx": 148,
+      "version": "7",
+      "when": 1793544676936,
+      "tag": "0148_previous_handles",
+      "breakpoints": true
     }
   ]
 }

@@ -587,7 +587,7 @@ export function useUpdateAgent(orgId: string, agentId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: Partial<Omit<AgentInput, "handle">>) => api.agents.update(orgId, agentId, input),
+    mutationFn: (input: Partial<AgentInput>) => api.agents.update(orgId, agentId, input),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
       void qc.invalidateQueries({ queryKey: keys.agentDetail(orgId, agentId) });

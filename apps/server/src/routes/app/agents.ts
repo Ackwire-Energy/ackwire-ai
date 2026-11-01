@@ -34,6 +34,7 @@ import {
   NEW_AGENT_DEFAULTS,
   NotFoundError,
   newAgentBrainMachines,
+  oldHandlesByAgent,
   orgAiStatus,
   orgRouting,
   pickerModels,
@@ -376,18 +377,24 @@ export function agentRoutes(deps: AppDeps) {
       const { orgId } = c.req.valid("param");
       const actor = c.get("user").id;
       const list = await listAgents(db, actor, orgId);
-      const [seesCost, budgets, brains, talks] = await Promise.all([
+      const [seesCost, budgets, brains, talks, old] = await Promise.all([
         canViewCost(db, actor, orgId),
         agentBudgetsThisMonth(db, orgId),
         agentBrainSummaries(db, actor, orgId, list),
         talksToAgents(db, orgId, actor),
+        oldHandlesByAgent(db, orgId),
       ]);
       const percent = (id: string) => {
         const b = budgets.get(id);
         return b ? budgetPercent(b.spentNanoUsd, b.budgetNanoUsd) : 0;
       };
       return c.json(
-        { agents: list.map((a) => toAgent(a, actor, seesCost, percent(a.id), brains.get(a.id), talks)) },
+        {
+          agents: list.map((a) => ({
+            ...toAgent(a, actor, seesCost, percent(a.id), brains.get(a.id), talks),
+            previousHandles: old.get(a.id) ?? [],
+          })),
+        },
         200,
       );
     },
@@ -728,6 +735,10 @@ export function agentRoutes(deps: AppDeps) {
         params: AgentParams,
         body: body(
           AgentFields.partial().extend({
+            handle: z.string().min(2).max(32).optional().openapi({
+              description:
+                "Its new @handle (admins): the one it leaves keeps reaching it. Taken by another agent (now or before) or a person: 409 `agent.handle_taken` with a free `suggestion`.",
+            }),
             coordinator: z.boolean().optional().openapi({
               description:
                 "It coordinates the team (ADR 0093): true takes it from whoever had it, false leaves the team with none. Admins (audited); the workspace's open apps hear `agent.coordinator`.",
@@ -762,19 +773,30 @@ export function agentRoutes(deps: AppDeps) {
         agent = await getAgent(db, orgId, agentId);
         if (!agent) throw new NotFoundError("Agent not found");
       }
-      // Its computer shows its name and look (the desktop app, ADR 0036), and a new owner may take its plan away.
+      // Its computer shows its name and look (the desktop app, ADR 0036) and names its folder by its handle, and a new
+      // owner may take its plan away.
       if (
         agent.machineId &&
-        (input.name !== undefined || appearance !== undefined || input.ownerUserId !== undefined)
+        (input.name !== undefined ||
+          input.handle !== undefined ||
+          appearance !== undefined ||
+          input.ownerUserId !== undefined)
       ) {
         await publishMachineAgentsChanged(adapters.pubsub, orgId);
       }
-      const [seesCost, brains, talks] = await Promise.all([
+      const [seesCost, brains, talks, old] = await Promise.all([
         canViewCost(db, actor, orgId),
         agentBrainSummaries(db, actor, orgId, [agent]),
         talksToAgents(db, orgId, actor),
+        oldHandlesByAgent(db, orgId),
       ]);
-      return c.json(toAgent(agent, actor, seesCost, undefined, brains.get(agent.id), talks), 200);
+      return c.json(
+        {
+          ...toAgent(agent, actor, seesCost, undefined, brains.get(agent.id), talks),
+          previousHandles: old.get(agent.id) ?? [],
+        },
+        200,
+      );
     },
   );
 

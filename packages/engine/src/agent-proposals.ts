@@ -2,7 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, inArray, isNotNull, isNull, notInArray, schema, sql } from "@agenteschat/db";
 import { AUTO_MODEL } from "@agenteschat/providers";
 import { orgToolCatalog, setAgentAccess } from "./access";
-import { type Agent, createAgent, getAgent, HANDLE_PATTERN, NEW_AGENT_DEFAULTS } from "./agents";
+import { type Agent, createAgent, getAgent, HANDLE_PATTERN, NEW_AGENT_DEFAULTS, takenHandles } from "./agents";
 import { type AiStatusDeps, agentAiState } from "./ai-status";
 import { type AgentAppearance, setAgentAppearance, validateAppearance } from "./appearance";
 import { canTalkTo, talksToAgents } from "./audience";
@@ -375,17 +375,7 @@ export async function checkAgentDraft(
   if (!HANDLE_PATTERN.test(handle)) {
     throw new ValidationError("The handle must be 2–32 characters: lower-case letters, digits, - or _.");
   }
-  const [agentTaken, personTaken] = await Promise.all([
-    db
-      .select({ id: agents.id })
-      .from(agents)
-      .where(and(eq(agents.orgId, orgId), eq(agents.handle, handle))),
-    db
-      .select({ id: organizationMembers.userId })
-      .from(organizationMembers)
-      .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.handle, handle))),
-  ]);
-  if (agentTaken.length > 0 || personTaken.length > 0) {
+  if ((await takenHandles(db, orgId)).has(handle)) {
     throw new ValidationError(`@${handle} is already taken: pick another handle.`);
   }
   const role = str(input.role);

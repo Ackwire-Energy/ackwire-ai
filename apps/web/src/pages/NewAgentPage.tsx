@@ -114,6 +114,7 @@ import {
   readBudget,
   savePart,
   stepErrors,
+  takenHandles,
 } from "@/lib/new-agent";
 import { proposedRoutineWhen } from "@/lib/recurrence";
 import { useToast } from "@/lib/toast";
@@ -325,14 +326,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
     [models.data, credentials.data, platform.data],
   );
   const usable = useMemo(() => usableModels(choices), [choices]);
-  const taken = useMemo(
-    () =>
-      new Set([
-        ...(agents.data ?? []).map((a) => a.handle.toLowerCase()),
-        ...(members.data ?? []).map((m) => m.handle?.toLowerCase()).filter((h): h is string => Boolean(h)),
-      ]),
-    [agents.data, members.data],
-  );
+  const taken = useMemo(() => takenHandles(agents.data ?? [], members.data ?? []), [agents.data, members.data]);
 
   // What it starts thinking with (ADR 0094): the last setup saved or used on other agents, where it can think for it.
   const startOf = (ownerId: string | null): NewAgentStart | null =>

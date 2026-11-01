@@ -1137,6 +1137,22 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
     );
   });
 
+  test("an agent named by the handle it had before a rename gets the change", async () => {
+    f = await setup();
+    const ada = await teammate("ada");
+    await updateAgent(f.db, f.owner.id, f.org.id, ada.id, { name: "Claudio", handle: "claudio" });
+    const out = await propose(await runOn("person"), {
+      target: "agents",
+      agents: ["@ada"],
+      change: "Responder em português.",
+      roles: [{ agent: "@ada", role: "Revisora" }],
+    });
+    expect(out.isError).toBeUndefined();
+    const made = await rows();
+    expect(made.length).toBeGreaterThan(0);
+    expect(made.every((r) => r.agentId === ada.id)).toBe(true);
+  });
+
   test("only agents the person who asked can talk to: one out of their reach refuses the card, naming it", async () => {
     f = await setup();
     const bia = await addMember(f.db, f.org.id, "member", "bia");

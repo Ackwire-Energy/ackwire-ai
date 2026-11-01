@@ -2439,7 +2439,9 @@ export const en: Translations = {
   },
   agent: {
     editIdentity: "Edit name and role",
-    identityHelp: "It's how everyone sees the agent. Mentions keep using @{{handle}}.",
+    identityHelp: "It's how everyone sees the agent. The @ follows the name.",
+    handleLabel: "Mentions",
+    handleMoves: "Mentions move to @{{handle}}. @{{old}} keeps working.",
     nameLabel: "Name",
     roleLabel: "Role",
     roleHelp: "What it does for the team, e.g. Email and calendar assistant.",
@@ -2741,6 +2743,7 @@ export const en: Translations = {
       brain: "Who thinks",
       repos: "GitHub repositories",
       group: "Group",
+      handle: "Mentions",
       coordinator: "Coordinates the team",
     },
     lines: {

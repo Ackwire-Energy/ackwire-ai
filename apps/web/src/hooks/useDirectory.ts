@@ -1,6 +1,6 @@
 import type { Agent, Member, Message } from "@agenteschat/client";
 import { useAgents, useFormerAgents, useMembers } from "@agenteschat/client";
-import { formerById } from "@agenteschat/client/lib/directory";
+import { agentsByAnyHandle, formerById } from "@agenteschat/client/lib/directory";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -15,7 +15,7 @@ export function useDirectory(orgId: string) {
     const gone = formerById(former.data);
     /** The team's agent, or one no longer in it (archived or deleted): what it left still names it. */
     const anyAgent = (id: string) => agentById.get(id) ?? gone.get(id);
-    const agentByHandle = new Map<string, Agent>((agents.data ?? []).map((a) => [a.handle.toLowerCase(), a]));
+    const agentByHandle = agentsByAnyHandle(agents.data ?? []);
     // The uploaded photo wins over the sign-in image (`image` is what every avatar reads).
     const people = (members.data ?? []).map((m) => (m.avatarUrl ? { ...m, image: m.avatarUrl } : m));
     const memberById = new Map<string, Member>(people.map((m) => [m.userId, m]));

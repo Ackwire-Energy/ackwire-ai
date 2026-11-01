@@ -1,6 +1,7 @@
 import { useUpdateAgent } from "@agenteschat/client";
 import { coordinatorNote } from "@agenteschat/client/lib/coordinator";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { cleanHandle, handleAfterRename, handleProblemText, takenHandles } from "@agenteschat/client/lib/new-agent";
 import { can } from "@agenteschat/client/lib/permissions";
 import { router, usePreventRemove } from "expo-router";
 import { useMemo, useRef, useState } from "react";
@@ -15,6 +16,7 @@ import { PushedHeader, successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { openAgentDelete } from "./DeleteAgentScreen";
 import { type AgentDraft, agentChanges, editableFields, fullLook } from "./edit";
+import { ErrorLine, HandleInput } from "./HandleInput";
 import { LookPicker } from "./LookPicker";
 import { RoleInput } from "./RoleInput";
 
@@ -22,9 +24,9 @@ import { RoleInput } from "./RoleInput";
 export const openAgentEdit = (id: string) => router.push({ pathname: "/agent-edit", params: { id } });
 
 /**
- * "Editar agente", as the web's Configurações › Identidade and Instruções: name, role, look, whether it
- * coordinates the team and instructions for admins; the look only for the agent's own person (the server's
- * rules). One Salvar.
+ * "Editar agente", as the web's Configurações › Identidade and Instruções: name, its @ (Menções, which follows a
+ * new name until typed), role, look, whether it coordinates the team and instructions for admins; the look only for
+ * the agent's own person (the server's rules). One Salvar.
  */
 export function AgentEditScreen({ id }: { id: string }) {
   const { t } = useTranslation();
@@ -46,6 +48,7 @@ export function AgentEditScreen({ id }: { id: string }) {
       agent
         ? {
             name: agent.name,
+            handle: agent.handle,
             role: agent.role,
             instructions: agent.instructions,
             look: fullLook(agent.appearance),
@@ -55,9 +58,17 @@ export function AgentEditScreen({ id }: { id: string }) {
     [agent],
   );
   const [edits, setEdits] = useState<Partial<AgentDraft>>({});
-  const draft = saved ? { ...saved, ...edits } : null;
+  const draft = saved
+    ? { ...saved, ...edits, handle: handleAfterRename(saved, edits.name ?? saved.name, edits.handle) }
+    : null;
   const changes = saved && draft ? agentChanges(saved, draft, fields) : null;
   const nameMissing = Boolean(draft && fields.has("name") && !draft.name.trim());
+  const taken = useMemo(
+    () => takenHandles(dir.agents, [...dir.memberById.values()], id),
+    [dir.agents, dir.memberById, id],
+  );
+  const moved = Boolean(saved && draft && draft.handle !== saved.handle);
+  const handleIssue = moved && draft ? handleProblemText(t, draft.handle, taken) : null;
   const done = useRef(false);
 
   // Leaving with changes asks first (as writing a wiki page).
@@ -80,7 +91,7 @@ export function AgentEditScreen({ id }: { id: string }) {
 
   const set = <K extends keyof AgentDraft>(key: K, value: AgentDraft[K]) => setEdits((e) => ({ ...e, [key]: value }));
   const save = () => {
-    if (!changes || nameMissing || update.isPending) return;
+    if (!changes || nameMissing || handleIssue || update.isPending) return;
     update.mutate(changes, {
       onSuccess: () => {
         done.current = true;
@@ -109,7 +120,11 @@ export function AgentEditScreen({ id }: { id: string }) {
       <PushedHeader
         title={t("agent.edit")}
         solid={false}
-        action={{ label: t("common.save"), onPress: save, disabled: !changes || nameMissing || update.isPending }}
+        action={{
+          label: t("common.save"),
+          onPress: save,
+          disabled: !changes || nameMissing || Boolean(handleIssue) || update.isPending,
+        }}
       />
       <KeyboardAwareScrollView
         contentInsetAdjustmentBehavior="automatic"
@@ -120,7 +135,7 @@ export function AgentEditScreen({ id }: { id: string }) {
         <View style={styles.hero}>
           <AgentAvatar agent={{ ...draft.look, id }} size={96} name={draft.name} />
           <Text variant="footnote" tone="muted">
-            @{agent.handle}
+            @{draft.handle}
           </Text>
         </View>
 
@@ -140,8 +155,21 @@ export function AgentEditScreen({ id }: { id: string }) {
               style={field}
             />
             <Text variant="footnote" tone="faint">
-              {nameMissing ? t("newAgent.errors.nameRequired") : t("agent.identityHelp", { handle: agent.handle })}
+              {nameMissing
+                ? t("newAgent.errors.nameRequired")
+                : moved && !handleIssue
+                  ? t("agent.handleMoves", { handle: draft.handle, old: agent.handle })
+                  : t("agent.identityHelp")}
             </Text>
+            <Text variant="footnote" tone="faint" style={styles.gapTop}>
+              {t("agent.handleLabel")}
+            </Text>
+            <HandleInput
+              value={draft.handle}
+              onChangeText={(v) => set("handle", cleanHandle(v))}
+              label={t("agent.handleLabel")}
+            />
+            {handleIssue ? <ErrorLine text={handleIssue} /> : null}
           </>
         ) : (
           readOnly(t("agent.nameLabel"), agent.name)

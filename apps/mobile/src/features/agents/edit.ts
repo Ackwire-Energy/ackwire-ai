@@ -56,6 +56,8 @@ export function editableFields(viewer: { admin: boolean; owner: boolean }): Set<
 
 export interface AgentDraft {
   name: string;
+  /** Its @: the one typed in Menções, else the one the name gives (`handleAfterRename`). */
+  handle: string;
   role: string;
   instructions: string;
   look: FullLook;
@@ -68,10 +70,12 @@ export function agentChanges(
   saved: AgentDraft,
   draft: AgentDraft,
   fields: ReadonlySet<AgentEditField>,
-): Partial<Omit<AgentInput, "handle">> | null {
-  const out: Partial<Omit<AgentInput, "handle">> = {};
+): Partial<AgentInput> | null {
+  const out: Partial<AgentInput> = {};
   const name = draft.name.trim();
   if (fields.has("name") && name && name !== saved.name) out.name = name;
+  // Whoever may rename it moves its @ too.
+  if (fields.has("name") && draft.handle !== saved.handle) out.handle = draft.handle;
   if (fields.has("role") && draft.role.trim() !== saved.role.trim()) out.role = draft.role.trim();
   if (fields.has("instructions") && draft.instructions !== saved.instructions) out.instructions = draft.instructions;
   if (fields.has("look") && !sameLook(draft.look, saved.look)) out.appearance = { ...draft.look };
