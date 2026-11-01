@@ -99,10 +99,10 @@ const pingPong = (req: ModelRequest) =>
     ? { chunks: ['{"needs_agent":0,"scores":[],"reason":"none"}'] }
     : { chunks: [isFor(req, "Theo", "theo") ? "@ada sua vez: revisa o PR #12?" : "@theo revisei: corrige os testes?"] };
 
-/** The mention judge's answers in order, then `rest`. */
-const inOrder = (scores: number[], rest = 0) => {
+/** The mention judge's answers in order (how sure each message needs nothing from the agent it names), then `rest`. */
+const inOrder = (scores: number[], rest = 1) => {
   let n = 0;
-  return (kind: string) => (kind === "mention_handoff" ? (scores[n++] ?? rest) : undefined);
+  return (kind: string) => (kind === "mention_needs_nothing" ? (scores[n++] ?? rest) : undefined);
 };
 
 const ask = (fx: Fixture, body: string) =>
@@ -149,8 +149,8 @@ describe("Ada's question back wakes Theo, and a thanks wakes nobody", () => {
   };
   for (const [language, flow] of Object.entries(flows)) {
     test(`in ${language}: hops 1, 2 and 3, then nothing, and Ada only mentioned on Theo's last message`, async () => {
-      // Theo asks Ada (0.9), Ada answers and asks Theo back (0.9), Theo thanks her and asks nothing (0.1).
-      f = await setup({ judge: inOrder([0.9, 0.9, 0.1]), reply: lines(flow) });
+      // Theo asks Ada (0.1: needs her), Ada answers and asks Theo back (0.1), Theo thanks her and asks nothing (0.9).
+      f = await setup({ judge: inOrder([0.1, 0.1, 0.9]), reply: lines(flow) });
       const { theo, ada } = await team(f);
       const asked = await ask(f, flow.ask);
       await drain(f);
@@ -174,7 +174,7 @@ describe("Ada's question back wakes Theo, and a thanks wakes nobody", () => {
 
 describe("the fuse: 50 runs agents start on their own, then one card with Continuar", () => {
   test("a judge that always hands off: exactly 50, one card; Continuar starts the held hand-off once", async () => {
-    f = await setup({ judge: (kind) => (kind === "mention_handoff" ? 0.9 : undefined), reply: pingPong });
+    f = await setup({ judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined), reply: pingPong });
     const { theo, ada } = await team(f);
     const asked = await ask(f, "@theo começa a revisão do PR #12");
     await drain(f);
@@ -230,7 +230,7 @@ describe("the fuse: 50 runs agents start on their own, then one card with Contin
   test("a judge that fails: a message that opens with @name still wakes, and the count still stops it", async () => {
     f = await setup({
       judge: (kind) => {
-        if (kind === "mention_handoff") throw new Error("judge down");
+        if (kind === "mention_needs_nothing") throw new Error("judge down");
         return undefined;
       },
       reply: pingPong,
@@ -247,7 +247,7 @@ describe("the fuse: 50 runs agents start on their own, then one card with Contin
   });
 
   test("work nobody asked for (a routine's report) gets 10", async () => {
-    f = await setup({ judge: (kind) => (kind === "mention_handoff" ? 0.9 : undefined), reply: pingPong });
+    f = await setup({ judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined), reply: pingPong });
     const { theo } = await team(f);
     const report = await f.db.transaction((tx) =>
       deliverNotice(tx, {
@@ -277,7 +277,7 @@ describe("the fuse: 50 runs agents start on their own, then one card with Contin
 
 test("an agent past 20% of its monthly budget in the stretch stops; the other one still wakes", async () => {
   f = await setup({
-    judge: (kind) => (kind === "mention_handoff" ? 0.9 : undefined),
+    judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined),
     // Ada's one answer costs US$ 12 at the model's price, past 20% of the US$ 50 default budget.
     reply: (req) =>
       req.outputSchema
@@ -310,7 +310,7 @@ test("an agent past 20% of its monthly budget in the stretch stops; the other on
 
 test("a person's message read mid-run sets hop 1 and a new stretch: the count starts over", async () => {
   f = await setup({
-    judge: (kind) => (kind === "mention_handoff" ? 0.9 : undefined),
+    judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined),
     reply: lines({ theo: ["@ada pode conferir o deploy?"], ada: ["Conferi: está no ar."] }),
   });
   const { theo, ada } = await team(f);

@@ -9,6 +9,7 @@ import {
   inArray,
   isNull,
   lt,
+  ne,
   or,
   rowsOf,
   schema,
@@ -239,7 +240,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
   const noAi = new Set(decisions.filter((d) => d.error === NO_AI).map((d) => d.messageId));
   const capped = new Set(decisions.filter((d) => d.error === PLATFORM_CAP).map((d) => d.messageId));
   const strategyOf = new Map(decisions.map((d) => [d.messageId, d.strategy]));
-  // An agent's mentions the judge read as no hand-off (`delegatedAgents`); the ones it picked that a stretch's limit
+  // An agent's mentions the judge was sure need nothing (`delegatedAgents`); the ones it woke that a stretch's limit
   // held are its pause card's to explain.
   const handedOff = new Map(
     decisions.filter((d) => d.strategy.startsWith("mention-")).map((d) => [d.messageId, d.selected]),
@@ -300,6 +301,48 @@ export function parseMentionHandles(body: string): string[] {
     if (match[2]) found.add(match[2].toLowerCase());
   }
   return [...found];
+}
+
+/**
+ * The org's agents an agent's text @mentions that aren't members of `channelId`: a mention reaches only members
+ * (`insertMessageWithRuns`), so for them it is plain text that wakes nobody. Handles, lower case; never the author,
+ * an archived agent or a handle a person holds (the @ is theirs).
+ */
+export async function unreachedAgents(
+  db: Executor,
+  input: { orgId: string; channelId: string; authorAgentId: string; body: string },
+): Promise<string[]> {
+  const handles = parseMentionHandles(input.body);
+  if (handles.length === 0) return [];
+  const rows = await db
+    .select({ handle: agents.handle })
+    .from(agents)
+    .where(
+      and(
+        eq(agents.orgId, input.orgId),
+        isNull(agents.archivedAt),
+        inArray(agents.handle, handles),
+        ne(agents.id, input.authorAgentId),
+        sql`not exists (select 1 from ${channelMembers} cm
+          where cm.channel_id = ${input.channelId}::uuid and cm.agent_id = ${agents.id})`,
+        sql`not exists (select 1 from ${schema.organizationMembers} om
+          where om.org_id = ${input.orgId}::uuid and om.handle = ${agents.handle})`,
+      ),
+    );
+  return rows.map((r) => r.handle).sort();
+}
+
+/**
+ * What the agent reads about its mentions that reached nobody (`unreachedAgents`): who, and how to reach them if it
+ * meant to (a mention may only name an agent). `canAdd`: a channel, where `add_agent_to_channel` brings an agent in
+ * with the rights of the person behind the run; a DM keeps its participants. In the past tense: the line stays under
+ * the message, also after the agent joins.
+ */
+export function unreachedNote(handles: string[], where: string, canAdd: boolean): string {
+  if (handles.length === 0) return "";
+  const one = handles.length === 1;
+  const it = one ? "it" : "them";
+  return `${handles.map((h) => `@${h}`).join(", ")} ${one ? "wasn't" : "weren't"} in ${where}, so your mention didn't reach ${it}. If you meant ${it} to act or answer, use tell_agent or ask_agent${canAdd ? `, or add ${it} to ${where} with add_agent_to_channel (it works with the rights of the person you work for)` : ""}.`;
 }
 
 /** An agent's message may bring in one more agent only up to this hop (ADR 0034); `router.ts` enforces it too. */

@@ -197,7 +197,10 @@ export async function setup(
     machines?: boolean;
     /** With `machines`: the mission tools (propose_mission and, in a mission thread, its tools). The hub's mission hooks are always set. */
     missionTools?: boolean;
-    /** Answers of the fake judge (judge.ts): by judgment kind and question id. Default: every Noul 0. */
+    /**
+     * Answers of the fake judge (judge.ts): by judgment kind and question id. Default: every Noul 0, but an agent's
+     * mention needs nothing (`createFakeJudge`).
+     */
     judge?: Parameters<typeof createFakeJudge>[0];
     /** The fake schedule reader's table (phrase → answer), on top of `TEST_SCHEDULES`. */
     schedules?: FakeScheduleAnswers;

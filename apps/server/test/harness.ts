@@ -70,7 +70,7 @@ export async function createTestServer(
     resolveHost?: ResolveHost;
     /** Fake GitHub (git smart HTTP and REST) for the git proxy. */
     github?: { gitUrl: string; apiUrl: string; fetch: typeof fetch };
-    /** Answers of the fake judge (judge.ts). Default: every Noul 0. */
+    /** Answers of the fake judge (judge.ts). Default: every Noul 0, but an agent's mention needs nothing. */
     judge?: Parameters<typeof createFakeJudge>[0];
     /** The fake schedule reader's table (phrase → answer), on top of `TEST_SCHEDULES`. */
     schedules?: FakeScheduleAnswers;

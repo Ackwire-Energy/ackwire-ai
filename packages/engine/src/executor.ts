@@ -106,7 +106,7 @@ import { linkRunToIssue, mirrorReplyToIssue } from "./issues";
 import { listenLiveSteering, renderSteered } from "./live-steer";
 import { touchMachineAccount } from "./machine-accounts";
 import { computerBackSoon, type MachineStatus } from "./machine-hub";
-import { getMessage, insertMessage, type Message, messageView } from "./messages";
+import { getMessage, insertMessage, type Message, messageView, unreachedAgents } from "./messages";
 import { postNoAiCard } from "./no-ai";
 import { enqueue, PermanentJobError } from "./outbox";
 import { createProfiler, type StageTiming } from "./profile";
@@ -939,12 +939,31 @@ async function executeRunInner(
         ...(t.serviceIcon ? { serviceIcon: t.serviceIcon } : {}),
       })),
     };
+    // A mention reaches only this conversation's members: the agents it names that aren't here stay on the message,
+    // and the agent reads so in its next context (`toTurns`). Not where mentions start nobody anyway (the forum, the
+    // agents' DM).
+    const unreached =
+      note || !channelRow || channelRow.kind === "forum" || isAgentOnlyDm(channelRow)
+        ? []
+        : await unreachedAgents(tx, {
+            orgId: run.orgId,
+            channelId: run.channelId,
+            authorAgentId: run.agentId,
+            body: said,
+          });
     const m = await postAgentMessage(
       tx,
       run,
       threadId,
       said,
-      { ...meta, ...runMeta, ...tagged, work, ...(teamChecks.length > 0 ? { teamChecks } : {}) },
+      {
+        ...meta,
+        ...runMeta,
+        ...tagged,
+        work,
+        ...(teamChecks.length > 0 ? { teamChecks } : {}),
+        ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
+      },
       createdAt,
     );
     await linkRunChecks(

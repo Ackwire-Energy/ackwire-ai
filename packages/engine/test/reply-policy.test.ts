@@ -8,10 +8,13 @@ import {
   WHY_YOU_WERE_CALLED,
 } from "../src/reply-policy";
 
-const run = (over: Partial<{ trigger: "mention" | "router" | "dm" | "forum"; background: boolean }> = {}) => ({
+const run = (
+  over: Partial<{ trigger: "mention" | "router" | "dm" | "forum"; background: boolean; hop: number }> = {},
+) => ({
   agentId: "a1",
   trigger: "router" as const,
   background: false,
+  hop: 1,
   ...over,
 });
 const person = (meta: Record<string, unknown> = {}) => ({ authorType: "person" as const, meta });
@@ -23,6 +26,17 @@ describe("replyPolicyFor", () => {
     expect(replyPolicyFor(run(), { authorType: "agent", meta: {} }).mayPass).toBe(true);
     for (const trigger of ["mention", "dm", "forum"] as const)
       expect(replyPolicyFor(run({ trigger }), person()).mayPass).toBe(false);
+  });
+
+  test("another agent's @mention may pass; a person's click on it, or the agent's own line, must answer", () => {
+    const byQa = { authorType: "agent" as const, authorAgentId: "a2", meta: {} };
+    expect(replyPolicyFor(run({ trigger: "mention", hop: 2 }), byQa)).toEqual({ mayPass: true, background: false });
+    // Continuar on a pause card or "Responder agora" starts it at hop 1, in a fresh stretch.
+    expect(replyPolicyFor(run({ trigger: "mention", hop: 1 }), byQa).mayPass).toBe(false);
+    // Its own line (a task's end, a follow-up) is no other agent calling it.
+    const own = { authorType: "agent" as const, authorAgentId: "a1", meta: {} };
+    expect(replyPolicyFor(run({ trigger: "mention", hop: 2 }), own).mayPass).toBe(false);
+    expect(replyPolicyFor(run({ trigger: "mention", hop: 2 }), byQa, { answerOwed: true }).mayPass).toBe(false);
   });
 
   test("never a quote reply to it, a follow-up, a routine's call or a run a person answered", () => {

@@ -1,13 +1,16 @@
 /**
- * Mention hand-off eval (ADR 0034, ADR 0089): when an agent's message @mentions
- * another agent, is it handing that agent something to do now (it gets a run)
- * or only naming it (no run)? Scores every case with the production judge and
- * the production threshold (`mentionThreshold`, 0.6), with the message it
- * answers when there is one. Between agents with no turn cap, the judge also
- * tells a hand-back of the work or a question back (a run) from a thanks, an
- * "ok" or a 👍, an agreement or a sign-off (none), in Portuguese, English,
- * Spanish, German, Japanese and Arabic. It passes when every case is right:
- * no courtesy at 0.6 or more, every hand-back and question back at 0.6 or more.
+ * Mention eval (ADR 0034, ADR 0089): when an agent's message @mentions another
+ * agent, does it need nothing from it (no run: a thanks, an "ok", a sign-off, a
+ * quote or a name, a plan that waits for a person), or something (a run: work,
+ * a question, a delivery, "I'll ask @x to…")? Scores every case with the
+ * production judge (`mentionNeedsNothing`) and the production threshold
+ * (`MENTION_WAKE_THRESHOLD`: it wakes unless the judge is at least 80% sure it
+ * needs nothing), with the message it answers when there is one. Between agents
+ * with no turn cap, it also tells a hand-back of the work or a question back (a
+ * run) from a thanks, an "ok" or a 👍, an agreement or a sign-off (none), in
+ * Portuguese, English, Spanish, German, Japanese and Arabic, and hand-offs
+ * production missed (a handover, a verdict's summary, "I'll ask @x"). It passes
+ * when every case is right.
  *
  * Manual, never in CI (it calls the real service and costs a little):
  *
@@ -17,12 +20,12 @@
  * the LLM fallback (`EVAL_LLM_MODEL`, default claude-haiku-5-5).
  */
 import { createAnthropicProvider } from "@agenteschat/providers";
-import { createJevJudge, createLlmJudge, type Judge, mentionHandoffs } from "../src/judge";
+import { createJevJudge, createLlmJudge, type Judge, MENTION_WAKE_THRESHOLD, mentionNeedsNothing } from "../src/judge";
 
 interface Case {
   id: string;
-  /** True when the mentioned agent should act now. */
-  handoff: boolean;
+  /** True when the mentioned agent should wake: the message needs something from it. */
+  wakes: boolean;
   from: string;
   to: { handle: string; name: string; role: string };
   body: string;
@@ -38,101 +41,139 @@ const atlas = { handle: "atlas", name: "Atlas", role: "Observabilidade" };
 const CASES: Case[] = [
   {
     id: "offer-after-approval",
-    handoff: false,
+    wakes: false,
     from: "theo",
     to: ada,
     body: "Quatro dos cinco negativos aconteceram logo depois de `subscription_completed`, e as cinco pessoas são Pro. O último positivo foi em 16/10. Na prática, pedir a avaliação logo depois da compra só tem gerado negativos. Minha recomendação é tirar o prompt desse momento e deixar só gatilhos de uso, como exportar o PDF ou terminar uma viagem. Se você concordar, abro a issue para a @ada.",
   },
   {
     id: "if-you-want",
-    handoff: false,
+    wakes: false,
     from: "theo",
     to: ada,
     body: "Se quiser, peço para a @ada abrir o PR ainda hoje.",
   },
   {
     id: "past-work",
-    handoff: false,
+    wakes: false,
     from: "theo",
     to: ada,
     body: "A @ada já corrigiu isso ontem no PR #412, está em produção.",
   },
   {
     id: "asks-person-who",
-    handoff: false,
+    wakes: false,
     from: "theo",
     to: ada,
     body: "Walter, você prefere que eu cuide disso ou que a @ada pegue?",
   },
   {
     id: "talk-to",
-    handoff: false,
+    wakes: false,
     from: "theo",
     to: nina,
     body: "Fala com a @nina, ela tem os dados de churn por plano.",
   },
   {
     id: "after-approval",
-    handoff: false,
+    wakes: false,
     from: "theo",
     to: ada,
     body: "Depois que você aprovar o texto, a @ada consegue subir a mudança.",
   },
   {
     id: "en-offer",
-    handoff: false,
+    wakes: false,
     from: "theo",
     to: ada,
     body: "I'd drop the review prompt after checkout. Want me to open an issue for @ada?",
   },
   {
     id: "direct-request",
-    handoff: true,
+    wakes: true,
     from: "theo",
     to: ada,
     body: "@ada, pode abrir o PR que tira o prompt de review depois da compra?",
   },
   {
     id: "data-pull",
-    handoff: true,
+    wakes: true,
     from: "theo",
     to: nina,
     body: "@nina puxa os números de churn de setembro por plano, por favor.",
   },
   {
     id: "issue-assigned",
-    handoff: true,
+    wakes: true,
     from: "theo",
     to: ada,
     body: "Abri a issue #131. @ada, é contigo: o timeout está no cálculo de frete.",
   },
   {
     id: "question-now",
-    handoff: true,
+    wakes: true,
     from: "theo",
     to: atlas,
     body: "@atlas você viu algum erro novo no Sentry desde as 14h?",
   },
   {
     id: "approved-go",
-    handoff: true,
+    wakes: true,
     from: "theo",
     to: ada,
     body: "O Walter aprovou. @ada, segue com o PR que tira o prompt depois da compra.",
   },
   {
     id: "en-request",
-    handoff: true,
+    wakes: true,
     from: "theo",
     to: nina,
     body: "@nina can you pull last week's signups by source?",
   },
   {
     id: "findings-then-ask",
-    handoff: true,
+    wakes: true,
     from: "atlas",
     to: ada,
     body: "Taxa de erro subiu para 3% no checkout desde as 14h, tudo no `calcShipping`. @ada, consegue olhar agora?",
+  },
+  // Production misses under the old question (2026-10-30/31), anonymized: each needed the agent it named.
+  {
+    id: "handover-delivered",
+    wakes: true,
+    from: "theo",
+    to: nina,
+    body: "@nina, aqui está o documento completo da passagem da contabilidade: contas a pagar de novembro, os fornecedores com contrato vencendo e o calendário de fechamento. Está em Financeiro/Passagem, com a planilha de conciliação junto.",
+    answering: { from: "a person", text: "Theo, passa tudo da contabilidade para a Nina antes de sexta." },
+  },
+  {
+    id: "verdict-summary-at-the-end",
+    wakes: true,
+    from: "ada",
+    to: theo,
+    body: "Li o diff dos dois PRs e rodei os testes: 312 passaram, 4 ignorados.\n\n#12, aprovar com ressalvas: a importação agora valida o CSV antes de gravar. Falta um teste para o arquivo vazio.\n\n#13, aprovar: só testes e documentação.\n\n@theo, o resumo é esse.",
+    answering: { from: "a person", text: "@ada consegue revisar o #12 e o #13 agora?" },
+  },
+  {
+    id: "ill-ask-for-review",
+    wakes: true,
+    from: "theo",
+    to: ada,
+    body: "Walter, o PR #12 já está aberto. Vou pedir para a @ada revisar antes de chegar até você.",
+  },
+  {
+    id: "en-ill-ask-for-review",
+    wakes: true,
+    from: "theo",
+    to: ada,
+    body: "Walter, PR #12 is open now. I'll ask @ada to review it before it goes to you.",
+  },
+  {
+    id: "as-said",
+    wakes: false,
+    from: "theo",
+    to: ada,
+    body: "Como a @ada disse, o timeout está no cálculo de frete; o resto do checkout está normal.",
   },
 ];
 
@@ -254,7 +295,7 @@ for (const [language, moments] of Object.entries(TOGETHER)) {
     const fromAda = kind === "handback" || kind === "question_back";
     CASES.push({
       id: `${language}-${kind}`,
-      handoff: fromAda,
+      wakes: fromAda,
       from: fromAda ? "ada" : "theo",
       to: fromAda ? theo : ada,
       body: m.body,
@@ -263,7 +304,6 @@ for (const [language, moments] of Object.entries(TOGETHER)) {
   }
 }
 
-const THRESHOLD = 0.6;
 const ORG = "00000000-0000-0000-0000-000000000000";
 const which = process.argv.includes("--judge") ? process.argv[process.argv.indexOf("--judge") + 1] : "jev";
 const noUsage = { recordExternalUsage: async () => null };
@@ -290,20 +330,22 @@ if (which === "jev") {
 let right = 0;
 const rows = await Promise.all(
   CASES.map(async (c) => {
-    const scores = await mentionHandoffs(judge, {
+    const scores = await mentionNeedsNothing(judge, {
       orgId: ORG,
       body: c.body,
       author: `@${c.from}`,
       answering: c.answering ?? null,
       targets: [{ agentId: c.to.handle, handle: c.to.handle, name: c.to.name, role: c.to.role }],
     });
-    const p = scores.get(c.to.handle) ?? 0;
-    return { c, p, ok: p >= THRESHOLD === c.handoff };
+    const nothing = scores.get(c.to.handle) ?? 0;
+    return { c, nothing, ok: 1 - nothing >= MENTION_WAKE_THRESHOLD === c.wakes };
   }),
 );
-for (const { c, p, ok } of rows) {
+for (const { c, nothing, ok } of rows) {
   if (ok) right++;
-  console.log(`${ok ? "PASS" : "FAIL"}  ${p.toFixed(2)}  ${c.handoff ? "hand-off " : "reference"}  ${c.id}`);
+  console.log(`${ok ? "PASS" : "FAIL"}  nothing ${nothing.toFixed(2)}  ${c.wakes ? "wakes " : "asleep"}  ${c.id}`);
 }
-console.log(`\n${right}/${CASES.length} right (${which}, threshold ${THRESHOLD})`);
+console.log(
+  `\n${right}/${CASES.length} right (${which}, asleep only at "nothing" ≥ ${(1 - MENTION_WAKE_THRESHOLD).toFixed(2)})`,
+);
 process.exit(right === CASES.length ? 0 : 1);
