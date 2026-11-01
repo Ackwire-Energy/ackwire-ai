@@ -360,3 +360,43 @@ html:not([data-pointer]) .rq__more:focus-visible {
   flex: none;
   color: var(--faint);
 }
+
+/* Several requests on one card: each item a well of its own, decided ones quieter with how they ended. */
+.rq__items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.rq__items .rq__well {
+  margin-top: 0;
+  flex-wrap: wrap;
+}
+.rq__item-acts {
+  display: inline-flex;
+  gap: 6px;
+  flex: none;
+}
+.rq__item-outcome {
+  flex: none;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.rq__item--done .rq__wt b {
+  color: var(--ink2);
+  font-weight: 500;
+}
+.rq__item--done .rq__logo {
+  opacity: 0.6;
+}
+.rq__item .ap-refuse {
+  margin-top: 8px;
+}
+.rq__note {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--muted);
+}

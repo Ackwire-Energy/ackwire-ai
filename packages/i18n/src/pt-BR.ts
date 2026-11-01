@@ -2019,6 +2019,17 @@ export const ptBR = {
     seeEmail: "Ver o e-mail",
     seeDetails: "Ver detalhes",
     notNow: "Agora não",
+    /** Several requests of one agent in one conversation: one card with all of them (ApprovalGroupAsk). */
+    askMany_one: "Preciso do seu ok para seguir com isto:",
+    askMany_other: "Preciso do seu ok para seguir com estes {{count}}:",
+    all: {
+      approve: "Aprovar tudo",
+      refuse: "Agora não para todos",
+      partial: "Você pode decidir {{mine}} de {{count}}: Aprovar tudo vale só para esses. Os outros esperam {{who}}.",
+      partialAdmin: "um admin",
+      waitingCount_one: "{{count}} esperando",
+      waitingCount_other: "{{count}} esperando",
+    },
     /** "Aprovar sempre": the agent's next calls of this kind run without asking. */
     always: {
       button: "Aprovar sempre",
@@ -2293,6 +2304,9 @@ export const ptBR = {
   },
   approvals: {
     title: "Aprovações",
+    /** Requests sharing one card in the conversation, together here too. */
+    groupHead_one: "<b>{{name}}</b> pediu {{count}} coisa de uma vez",
+    groupHead_other: "<b>{{name}}</b> pediu {{count}} coisas de uma vez",
     readsOnly: "Só lê",
     technical: "Detalhes técnicos",
     summary_one: "{{count}} pedido esperando você",

@@ -2002,6 +2002,17 @@ export const en: Translations = {
     seeEmail: "See the email",
     seeDetails: "See details",
     notNow: "Not now",
+    /** Several requests of one agent in one conversation: one card with all of them (ApprovalGroupAsk). */
+    askMany_one: "I need your OK for this to go on:",
+    askMany_other: "I need your OK for these {{count}} to go on:",
+    all: {
+      approve: "Approve all",
+      refuse: "Not now for all",
+      partial: "You can decide {{mine}} of {{count}}: Approve all covers only those. The rest wait for {{who}}.",
+      partialAdmin: "an admin",
+      waitingCount_one: "{{count}} waiting",
+      waitingCount_other: "{{count}} waiting",
+    },
     always: {
       button: "Always approve",
       hint: "Approves this one and the next ones like it from {{name}}: {{actions}}, with any values.",
@@ -2275,6 +2286,9 @@ export const en: Translations = {
   },
   approvals: {
     title: "Approvals",
+    /** Requests sharing one card in the conversation, together here too. */
+    groupHead_one: "<b>{{name}}</b> asked for {{count}} thing in one go",
+    groupHead_other: "<b>{{name}}</b> asked for {{count}} things in one go",
     readsOnly: "Read only",
     technical: "Technical details",
     summary_one: "{{count}} request waiting for you",

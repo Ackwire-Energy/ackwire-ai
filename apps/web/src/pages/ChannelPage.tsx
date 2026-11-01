@@ -70,6 +70,7 @@ import {
 import { actionCardOf } from "@agenteschat/client/lib/action-cards";
 import { activityVerb, barElapsed, barEntries, isWriting, toolActivity } from "@agenteschat/client/lib/activity";
 import { looksLikeApiKey } from "@agenteschat/client/lib/api-key-text";
+import { approvalCardItems, asOfNow, cardDeadline } from "@agenteschat/client/lib/approval-card";
 import { artifactRefs } from "@agenteschat/client/lib/artifacts";
 import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
 import {
@@ -189,7 +190,7 @@ import { ActionCard } from "@/components/ActionCard";
 import { AgentActionReceipts } from "@/components/AgentActions";
 import { ActorAvatar, AgentAvatar, AgentSpinner, PersonAvatar } from "@/components/AgentAvatar";
 import { AgentPanel } from "@/components/AgentPanel";
-import { ApprovalAsk } from "@/components/ApprovalAsk";
+import { ApprovalAsk, ApprovalGroupAsk } from "@/components/ApprovalAsk";
 import { InlineApproval } from "@/components/ApprovalItem";
 import { AgentPanelContext, useOpenAgentPanel } from "@/components/agent-panel-context";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
@@ -3524,7 +3525,9 @@ export const TimelineMessage = memo(function TimelineMessage({
           )}
           {m.author.type === "agent" && !m.local && <AgentActionReceipts message={m} />}
           {m.author.type === "agent" && !m.local && <TeamChecks message={m} />}
-          {approvalId && <MessageApproval approvalId={approvalId} agent={agent} members={dir.memberById} />}
+          {approvalId && (
+            <MessageApproval messageId={m.id} approvalId={approvalId} agent={agent} members={dir.memberById} />
+          )}
           {proposalId && <InlineProposal proposalId={proposalId} />}
           {agent &&
             memoryUpdates.map((u) => (
@@ -3658,12 +3661,17 @@ const inlineButton = {
   color: "inherit",
 };
 
-/** The request of a message with `meta.approvalId`: from the approvals list, or fetched by id. */
+/**
+ * The request of a message with `meta.approvalId`: from the approvals list, or fetched by id. Requests the agent
+ * asked later in this conversation join the same card (`messageId`): then one card lists them all.
+ */
 function MessageApproval({
+  messageId,
   approvalId,
   agent,
   members,
 }: {
+  messageId: string;
   approvalId: string;
   agent: Agent | undefined;
   members: Map<string, Member>;
@@ -3673,9 +3681,24 @@ function MessageApproval({
   const listed: Approval | undefined = approvals.data?.find((a) => a.id === approvalId);
   const one = useApproval(org.id, approvalId, !listed && approvals.isSuccess);
   const approval = listed ?? one.data;
+  const items = approvalCardItems(approvals.data, messageId, approval);
   // Past its deadline it has expired, even before the server's event says so.
   const expired = useExpired(approval?.status === "pending" ? approval.expiresAt : null);
+  // Drawn again when the card's earliest deadline passes.
+  useExpired(cardDeadline(items));
   if (!approval) return null;
+  if (items.length > 1) {
+    const now = items.map((a) => asOfNow(a));
+    if (now.some((a) => a.status === "pending"))
+      return <ApprovalGroupAsk items={now} agent={agent} members={members} />;
+    return (
+      <>
+        {now.map((a) => (
+          <InlineApproval key={a.id} approval={a} agent={agent} members={members} />
+        ))}
+      </>
+    );
+  }
   // Waiting: the agent asking, in the conversation; decided or expired: one line.
   if (approval.status === "pending" && !expired)
     return <ApprovalAsk approval={approval} agent={agent} members={members} />;

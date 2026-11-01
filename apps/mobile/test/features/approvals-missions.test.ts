@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import type { MachineTask } from "@agenteschat/client";
+import {
+  approvalCardItems,
+  approvalCards,
+  approveAllScope,
+  asOfNow,
+  cardDeadline,
+} from "@agenteschat/client/lib/approval-card";
 import { approvalRuleWords, approvalTitle } from "@agenteschat/client/lib/approval-words";
 import {
   approvalAction,
@@ -298,5 +305,53 @@ describe("the exact request", () => {
       ),
     ).toBe("Por último");
     expect(approvalSaid(approval({ id: "c", why: null }))).toBeNull();
+  });
+});
+
+describe("several requests on one card", () => {
+  const now = Date.now();
+  const at = (minutes: number) => new Date(now + minutes * 60_000).toISOString();
+  const goal = (id: string, extra: Partial<Parameters<typeof approval>[0]> = {}) =>
+    approval({ id, messageId: "card-1", createdAt: at(-10 + id.length), expiresAt: at(60), ...extra });
+
+  test("the card's items, 'Aprovar tudo' over the ones listed and yours, the earliest deadline", () => {
+    const items = [
+      goal("g1"),
+      goal("g22", { expiresAt: at(20) }),
+      goal("g333", { canDecide: false }),
+      goal("g4444", { status: "approved" }),
+    ];
+    const list = [...items, approval({ id: "other", messageId: "card-2" })];
+    expect(approvalCardItems(list, "card-1").map((a) => a.id)).toEqual(["g1", "g22", "g333", "g4444"]);
+    // The card's own request is there even before the list has it.
+    expect(approvalCardItems([], "card-1", goal("g1")).map((a) => a.id)).toEqual(["g1"]);
+    expect(approveAllScope(items, now)).toEqual({ ids: ["g1", "g22"], waiting: 3, blocked: 1 });
+    // One past its deadline isn't covered, and reads as expired.
+    expect(approveAllScope([goal("late", { expiresAt: at(-1) })], now).ids).toEqual([]);
+    expect(asOfNow(goal("late", { expiresAt: at(-1) }), now).status).toBe("expired");
+    expect(cardDeadline(items)).toBe(at(20));
+    expect(cardDeadline([goal("done", { status: "refused" })])).toBeNull();
+    // Aprovações: the card's requests together, one without a card alone.
+    expect(approvalCards(list).map((card) => card.map((a) => a.id))).toEqual([
+      ["g1", "g22", "g333", "g4444"],
+      ["other"],
+    ]);
+  });
+
+  test("its words in both languages", async () => {
+    const pt = await translator("pt-BR");
+    const en = await translator("en");
+    expect(pt("approval.all.approve")).toBe("Aprovar tudo");
+    expect(en("approval.all.approve")).toBe("Approve all");
+    expect(pt("approval.all.refuse")).toBe("Agora não para todos");
+    expect(en("approval.all.refuse")).toBe("Not now for all");
+    expect(pt("approval.askMany", { count: 4 })).toBe("Preciso do seu ok para seguir com estes 4:");
+    expect(en("approval.askMany", { count: 4 })).toBe("I need your OK for these 4 to go on:");
+    expect(pt("approval.all.partial", { mine: 3, count: 4, who: "Bia" })).toBe(
+      "Você pode decidir 3 de 4: Aprovar tudo vale só para esses. Os outros esperam Bia.",
+    );
+    expect(en("approval.all.partial", { mine: 3, count: 4, who: "Bia" })).toBe(
+      "You can decide 3 of 4: Approve all covers only those. The rest wait for Bia.",
+    );
   });
 });

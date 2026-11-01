@@ -179,6 +179,56 @@ describe("Canal", () => {
     expect(done.textContent).toContain("Month: 2026-10");
   });
 
+  test("several requests on one card: each item, 'Aprovar tudo' for exactly those listed, a new one joining live", async () => {
+    const state = seedState();
+    const [merge] = state.approvals;
+    if (!merge) throw new Error("no approval");
+    const goal = (id: string, month: string, minutes: number) => ({
+      ...merge,
+      id,
+      tool: "goal_upsert",
+      title: "Painel: Goal upsert",
+      detail: `panel.goal_upsert · month=${month}`,
+      connector: "panel",
+      params: { month },
+      createdAt: new Date(Date.now() - minutes * 60_000).toISOString(),
+    });
+    state.approvals.splice(0, 1, goal("ap-g1", "2026-11", 4), goal("ap-g2", "2026-12", 3), goal("ap-g3", "2027-01", 2));
+    const cardMessage = state.messages.find((m) => m.id === "msg-card");
+    if (cardMessage) cardMessage.meta = { ...cardMessage.meta, approvalId: "ap-g1" };
+    const { socket } = await open(state);
+    const card = screen().getByRole("group", { name: "Pedido de aprovação" });
+    expect(screen().getAllByRole("group", { name: "Pedido de aprovação" })).toHaveLength(1);
+    expect(card.querySelectorAll(".rq__item")).toHaveLength(3);
+    expect(card.textContent).toContain("Month: 2026-12");
+    // A fourth joins the open card over realtime, not a card of its own.
+    const fourth = { ...goal("ap-g4", "2027-02", 0), canDecide: false };
+    state.approvals.push(fourth);
+    await act(async () =>
+      socket.push({
+        type: "event",
+        channelId: ENG_ID,
+        event: { type: "approval.created", channelId: ENG_ID, approval: fourth },
+      }),
+    );
+    await settle();
+    expect(card.querySelectorAll(".rq__item")).toHaveLength(4);
+    expect(card.textContent).toContain("Month: 2027-02");
+    // Ana may decide three of the four (only an admin decides the new one): it says so.
+    expect(card.textContent).toContain("Você pode decidir 3 de 4");
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Aprovar tudo" })));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "approvals.decideMany")?.args).toEqual([
+      ORG_ID,
+      ["ap-g1", "ap-g2", "ap-g3"],
+      "approve",
+    ]);
+    // Decided ones fold into the card with how they ended; the one still waiting keeps it open.
+    const after = screen().getByRole("group", { name: "Pedido de aprovação" });
+    expect(after.querySelectorAll(".rq__item--done")).toHaveLength(3);
+    expect(after.textContent).toContain("Aprovado por você");
+  });
+
   test("a request in the conversation: approve calls the API, shrinks to one line; events update it", async () => {
     const r0 = await open();
     const { state, socket } = r0;

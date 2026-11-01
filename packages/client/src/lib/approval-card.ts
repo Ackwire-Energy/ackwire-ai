@@ -20,6 +20,10 @@ export function approveAllScope(items: readonly Approval[], now = Date.now()) {
   return { ids, waiting: waiting.length, blocked: waiting.length - ids.length };
 }
 
+/** A request past its deadline reads as expired, before the server's event says so. */
+export const asOfNow = (a: Approval, now = Date.now()): Approval =>
+  a.status === "pending" && Date.parse(a.expiresAt) <= now ? { ...a, status: "expired" } : a;
+
 /** The card's shared deadline: the earliest of its waiting items (null: nothing waits). */
 export function cardDeadline(items: readonly Approval[]): string | null {
   const pending = items.filter((a) => a.status === "pending").map((a) => a.expiresAt);

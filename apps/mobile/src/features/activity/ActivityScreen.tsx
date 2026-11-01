@@ -139,10 +139,20 @@ function WaitingCardView({ item: n }: { item: AppNotification }) {
   const act = useNotificationAction(orgId);
   const card = waitingCardOf(n);
   // A request's title in words, from the request itself (the notification keeps the tool's raw title).
-  const request = useWaitingApprovals().find((a) => a.id === n.source.approvalId);
+  const waitingApprovals = useWaitingApprovals();
+  const request = waitingApprovals.find((a) => a.id === n.source.approvalId);
+  // One notification per approval card: how many on it still wait for you.
+  const onCard = request?.messageId ? waitingApprovals.filter((a) => a.messageId === request.messageId).length : 0;
   // Someone asking to join: who asked (the first names, how many in all), with their faces.
   const join = card.kind === "join" ? joinRequestLine(t, n) : null;
-  const title = card.kind === "approval" && request ? approvalTitle(t, request) : join ? join.text : card.title;
+  const title =
+    card.kind === "approval" && request
+      ? [approvalTitle(t, request), onCard > 1 ? t("approval.all.waitingCount", { count: onCard }) : null]
+          .filter(Boolean)
+          .join(" · ")
+      : join
+        ? join.text
+        : card.title;
   // A routine's trouble opens the routine; the computer being ready, Connect an AI while no agent has one.
   const ai = useAiStatus(orgId, n.kind === "computer_ready").data;
   const href = notificationHref(n, ai);
