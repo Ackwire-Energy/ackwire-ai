@@ -305,6 +305,11 @@ export const extraIcons = {
     ["circle", { cx: "10", cy: "10", r: "7" }],
     ["path", { d: "M7.2 11.8c.7.9 1.7 1.4 2.8 1.4s2.1-.5 2.8-1.4M7.6 8.2v.01M12.4 8.2v.01" }],
   ],
+  /** GIFs and stickers (ADR 0091): a sticker with its corner peeled. */
+  sticker: [
+    ["path", { d: "M16.5 10.5V6a2.5 2.5 0 0 0-2.5-2.5H6A2.5 2.5 0 0 0 3.5 6v8A2.5 2.5 0 0 0 6 16.5h4.5z" }],
+    ["path", { d: "M16.5 10.5H13a2.5 2.5 0 0 0-2.5 2.5v3.5" }],
+  ],
   /** "Responder" (quote reply). */
   reply: [["path", { d: "M8 5 4 9l4 4M4 9h7a5 5 0 0 1 5 5v1.5" }]],
   /** Composer formatting: bold. */

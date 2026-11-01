@@ -1,11 +1,15 @@
 import { type Message, type Proposal, useCardProposals, useDecideProposals } from "@agenteschat/client";
 import {
   appLabel,
+  type ChangedLine,
   cardHead,
   chosenRows,
+  firstChange,
   isOpen,
   messageProposalCards,
   proposalSections,
+  proposalTarget,
+  proposalTitle,
   proposerOf,
   rowStatus,
   staleCount,
@@ -16,6 +20,8 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, Chip, DiffView, haptics, Icon, Text, ToggleSwitch, useTheme, useToast } from "@/ui";
 import { boldRuns } from "../chat/actions";
+import { AskButtons, AskCard, AskFoot } from "../chat/asks";
+import { IconTile } from "../connectors/ConnectorIcon";
 import { useFailed } from "../routines/hooks";
 import { Face } from "../shared/Face";
 import { useDirectory } from "../shared/hooks";
@@ -79,6 +85,129 @@ function InstructionProposalCard({ ids }: { ids: string[] }) {
         },
       },
     );
+  const rowList = (list: Proposal[]) => (
+    <>
+      {list.map((p) => {
+        const name = p.target.type === "org_context" ? orgName : agentName(p.agentId);
+        const status = rowStatus(t, p);
+        const on = p.canDecide && !off.has(p.id);
+        return (
+          <View key={p.id} style={styles.row}>
+            <View style={styles.line}>
+              {p.target.type === "org_context" ? (
+                <Icon name="members" size={24} color={colors.ink2} />
+              ) : (
+                <Face who={{ type: "agent", id: p.agentId }} size={24} live={false} />
+              )}
+            </View>
+            <View style={styles.fill}>
+              <View style={styles.line}>
+                <Text variant="body" style={styles.bold} numberOfLines={1}>
+                  {name}
+                </Text>
+              </View>
+              <SettingChange p={p} />
+            </View>
+            {status ? (
+              <View style={styles.line}>
+                <Text variant="footnote" tone="faint">
+                  {status}
+                </Text>
+              </View>
+            ) : null}
+            {many && isOpen(p) ? (
+              <Pressable
+                disabled={!p.canDecide || decide.isPending}
+                onPress={() => {
+                  haptics.selection();
+                  toggle(p.id);
+                }}
+                accessibilityRole="switch"
+                accessibilityLabel={t("proposals.include", { name })}
+                accessibilityState={{ checked: on, disabled: !p.canDecide }}
+                hitSlop={8}
+              >
+                <ToggleSwitch value={on} />
+              </Pressable>
+            ) : null}
+          </View>
+        );
+      })}
+    </>
+  );
+  const groups = proposalSections(rows);
+  const texts = groups.flatMap((g) => (g.kind === "text" && g.lines.length > 0 ? [g] : []));
+  const firstLine = firstChange(texts[0]?.lines);
+  const change =
+    texts.length > 0 ? { label: t("ask.seeChange"), content: <Diffs lines={texts.map((g) => g.lines)} /> } : null;
+  const only = many ? undefined : first;
+  // Waiting on the person: a request card like every other, the rows and their switches above the decision.
+  if (decides)
+    return (
+      <AskCard
+        id={ids.join(",")}
+        kind="proposal"
+        agentId={proposerOf(first)}
+        waitsFor="you"
+        lead={only ? proposalTitle(t, only, orgName, agentName) : runs.map((r) => r.text).join("")}
+        well={
+          only
+            ? {
+                tile: <IconTile name={only.target.type === "agent_access" ? "bolt" : "file"} size={32} />,
+                title: proposalTarget(t, only, agentName, orgName),
+                detail:
+                  only.target.type === "agent_role"
+                    ? t("proposals.roleLine", { from: only.before, to: only.after })
+                    : firstLine?.text,
+                more: change,
+              }
+            : firstLine
+              ? { tile: <IconTile name="file" size={32} />, title: firstLine.text, more: change }
+              : null
+        }
+        body={
+          only ? (
+            only.target.type === "agent_access" ? (
+              <SettingChange p={only} />
+            ) : undefined
+          ) : (
+            rowList(groups.flatMap((g) => g.rows))
+          )
+        }
+        foot={
+          <AskFoot>
+            <AskButtons
+              primary={
+                <Button
+                  variant="primary"
+                  size="card"
+                  wide
+                  label={
+                    !many
+                      ? t("proposals.accept")
+                      : all
+                        ? t("proposals.acceptAll")
+                        : t("proposals.acceptSome", { count: chosen.length })
+                  }
+                  disabled={decide.isPending || chosen.length === 0}
+                  onPress={() => run("accept")}
+                />
+              }
+              secondary={
+                <Button
+                  variant="secondary"
+                  size="card"
+                  wide
+                  label={t("proposals.refuse")}
+                  disabled={decide.isPending || chosen.length === 0}
+                  onPress={() => run("refuse")}
+                />
+              }
+            />
+          </AskFoot>
+        }
+      />
+    );
   return (
     <View style={[styles.card, { backgroundColor: colors.sunken }]}>
       <View style={styles.head}>
@@ -95,82 +224,24 @@ function InstructionProposalCard({ ids }: { ids: string[] }) {
           )}
         </Text>
       </View>
-      {proposalSections(rows).map((section) => (
+      {groups.map((section) => (
         <View key={section.rows[0]?.id} style={styles.section}>
-          {section.kind === "text" && section.lines.length > 0 ? <DiffView lines={section.lines} /> : null}
-          {section.rows.map((p) => {
-            const name = p.target.type === "org_context" ? orgName : agentName(p.agentId);
-            const status = rowStatus(t, p);
-            const on = p.canDecide && !off.has(p.id);
-            return (
-              <View key={p.id} style={styles.row}>
-                <View style={styles.line}>
-                  {p.target.type === "org_context" ? (
-                    <Icon name="members" size={24} color={colors.ink2} />
-                  ) : (
-                    <Face who={{ type: "agent", id: p.agentId }} size={24} live={false} />
-                  )}
-                </View>
-                <View style={styles.fill}>
-                  <View style={styles.line}>
-                    <Text variant="body" style={styles.bold} numberOfLines={1}>
-                      {name}
-                    </Text>
-                  </View>
-                  <SettingChange p={p} />
-                </View>
-                {status ? (
-                  <View style={styles.line}>
-                    <Text variant="footnote" tone="faint">
-                      {status}
-                    </Text>
-                  </View>
-                ) : null}
-                {many && isOpen(p) ? (
-                  <Pressable
-                    disabled={!p.canDecide || decide.isPending}
-                    onPress={() => {
-                      haptics.selection();
-                      toggle(p.id);
-                    }}
-                    accessibilityRole="switch"
-                    accessibilityLabel={t("proposals.include", { name })}
-                    accessibilityState={{ checked: on, disabled: !p.canDecide }}
-                    hitSlop={8}
-                  >
-                    <ToggleSwitch value={on} />
-                  </Pressable>
-                ) : null}
-              </View>
-            );
-          })}
+          {section.kind === "text" && section.lines.length > 0 ? <DiffView prose lines={section.lines} /> : null}
+          {rowList(section.rows)}
         </View>
       ))}
-      {decides ? (
-        <View style={styles.acts}>
-          <Button
-            variant="primary"
-            size="sm"
-            label={
-              !many
-                ? t("proposals.accept")
-                : all
-                  ? t("proposals.acceptAll")
-                  : t("proposals.acceptSome", { count: chosen.length })
-            }
-            disabled={decide.isPending || chosen.length === 0}
-            onPress={() => run("accept")}
-          />
-          <Button
-            variant="secondary"
-            size="sm"
-            label={t("proposals.refuse")}
-            disabled={decide.isPending || chosen.length === 0}
-            onPress={() => run("refuse")}
-          />
-        </View>
-      ) : null}
     </View>
+  );
+}
+
+/** What "Ver a mudança" opens: each change once. */
+function Diffs({ lines }: { lines: ChangedLine[][] }) {
+  return (
+    <>
+      {lines.map((l) => (
+        <DiffView key={l.map((x) => x.text).join("\n")} prose lines={l} />
+      ))}
+    </>
   );
 }
 
@@ -209,5 +280,4 @@ const styles = StyleSheet.create({
   fill: { flex: 1, minWidth: 0, gap: 4 },
   bold: { fontWeight: "600" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  acts: { flexDirection: "row", alignItems: "center", gap: 8 },
 });

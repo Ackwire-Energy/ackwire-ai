@@ -128,6 +128,10 @@ const AgentFields = z.object({
   appearance: AgentAppearance.nullable().optional().openapi({
     description: "Its look (fixed allow-list). The agent's owner or admins can change it; null = the default.",
   }),
+  mediaReplies: z.boolean().optional().openapi({
+    description:
+      "It may send a sticker or a GIF (ADR 0091): when someone asks for one, and after a light reply as often as the workspace's `agentMedia` allows; off: never. Like the other fields, editing it needs `manage_agents`. Default on.",
+  }),
 });
 
 const budget = (usd: number | null | undefined) =>

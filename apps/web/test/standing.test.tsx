@@ -236,7 +236,7 @@ describe("a billing hold (ADR 0079): its own words, and its fix for whoever runs
     };
     await renderApp("/invite/held", { api });
     await settle(4);
-    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Aceitar e entrar na Acme" })));
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Entrar na Acme" })));
     await settle(4);
     expect(screen().getByRole("alert").textContent).toBe(
       "O pagamento do plano do agentes.chat deste workspace não passou, e os agentes pararam.",

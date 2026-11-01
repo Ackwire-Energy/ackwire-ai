@@ -1,3 +1,5 @@
+import { invitationMailProof } from "@agenteschat/client/lib/guards";
+
 /** An invitation token from a link: what the server issues (url-safe base64), nothing else. Pure. */
 export const isInviteToken = (value: unknown): value is string =>
   typeof value === "string" && /^[A-Za-z0-9_-]{16,200}$/.test(value);
@@ -5,26 +7,40 @@ export const isInviteToken = (value: unknown): value is string =>
 /** An invitation to one address (it joins), or a workspace's invitation link (it only asks, ADR 0068). */
 export type InviteKind = "email" | "link";
 
-/** How a remembered invitation is stored: a link's token as `link:<token>`, an email invitation's bare. */
-export const storedInvite = (token: string, kind: InviteKind) => (kind === "link" ? `link:${token}` : token);
+/**
+ * How a remembered invitation is stored: a link's token as `link:<token>`, an email invitation's bare, or as
+ * `<token>.<mail>` when it was opened from its own email (`mail`, the proof on that link, ADR 0090).
+ */
+export const storedInvite = (token: string, kind: InviteKind, mail?: string) => {
+  if (kind === "link") return `link:${token}`;
+  return mail ? `${token}.${mail}` : token;
+};
 
 /**
  * What signing in does with a remembered invitation: an email invitation is accepted; a link's page opens again,
  * where the account asks to join. A bare token (kept by builds from before links asked) is an email invitation;
  * a link's would be refused there and forgotten. Null for nothing, or anything malformed.
  */
-export function afterSignIn(stored: string | null): { accept: string } | { open: `/invite/${string}` } | null {
+export function afterSignIn(
+  stored: string | null,
+): { accept: string; mail?: string } | { open: `/invite/${string}` } | null {
   const invite = storedInviteOf(stored);
   if (!invite) return null;
-  return invite.kind === "link" ? { open: `/invite/${invite.token}` } : { accept: invite.token };
+  if (invite.kind === "link") return { open: `/invite/${invite.token}` };
+  return { accept: invite.token, ...(invite.mail ? { mail: invite.mail } : {}) };
 }
 
 /** A remembered invitation read back: its token and kind; null for nothing, or anything malformed. */
-export function storedInviteOf(stored: string | null): { token: string; kind: InviteKind } | null {
+export function storedInviteOf(stored: string | null): { token: string; kind: InviteKind; mail?: string } | null {
   if (!stored) return null;
-  const link = stored.startsWith("link:");
-  const token = link ? stored.slice("link:".length) : stored;
-  return isInviteToken(token) ? { token, kind: link ? "link" : "email" } : null;
+  if (stored.startsWith("link:")) {
+    const token = stored.slice("link:".length);
+    return isInviteToken(token) ? { token, kind: "link" } : null;
+  }
+  const [token, proof] = stored.split(".");
+  if (!isInviteToken(token)) return null;
+  const mail = invitationMailProof(proof);
+  return { token, kind: "email", ...(mail ? { mail } : {}) };
 }
 
 /**
