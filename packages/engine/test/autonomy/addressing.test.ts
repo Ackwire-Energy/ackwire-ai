@@ -120,10 +120,10 @@ scenario("S06", "two people talking to each other wake nobody", async () => {
 scenario("S07", "a greeting to a person wakes nobody", async () => {
   const w = await world({
     agents: ["otto", "ada"],
-    people: ["walter"],
-    route: { "boa tarde walter": { needs: 0.2, scores: { otto: 0.1, ada: 0.1 } } },
+    people: ["joana"],
+    route: { "boa tarde joana": { needs: 0.2, scores: { otto: 0.1, ada: 0.1 } } },
   });
-  await w.say("boa tarde walter");
+  await w.say("boa tarde joana");
   await w.settle();
   expect(await w.runs()).toEqual([]);
   await assertInvariants(w);
