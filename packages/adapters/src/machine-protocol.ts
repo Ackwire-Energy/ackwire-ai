@@ -2759,7 +2759,8 @@ export function parseAccess(v: unknown): RunnerAccess | undefined {
     tools: {
       claude: t.claude === true,
       codex: t.codex === true,
-      ...(t.cursor === true ? { cursor: true } : {}),
+      // Kept off too: absent means a runner before Cursor's switch, where Cursor follows Codex.
+      ...(typeof t.cursor === "boolean" ? { cursor: t.cursor } : {}),
       commands: t.commands === true,
       ...(t.browser === true ? { browser: true } : {}),
       ...(t.desktop === true ? { desktop: true } : {}),

@@ -603,7 +603,7 @@ export interface AgentInput {
  * no agent, else the workspace's model (it has a key), else none (connected after it is created).
  */
 export type SuggestedAi =
-  | { kind: "account"; brain: "claude_code" | "codex"; machineId: string; accountId: string; label: string }
+  | { kind: "account"; brain: "claude_code" | "codex" | "cursor"; machineId: string; accountId: string; label: string }
   | { kind: "model" }
   | { kind: "none" };
 
@@ -3269,7 +3269,7 @@ export interface DesktopRelease {
 }
 
 /** A computer brain that runs on a connected machine. */
-export type ComputerBrain = "claude_code" | "codex";
+export type ComputerBrain = "claude_code" | "codex" | "cursor";
 
 /** An agent waiting for an offline computer, and what it has waiting. */
 export interface OutageAgent {
@@ -4325,7 +4325,7 @@ export interface MissionSettings {
 }
 
 /** "Quem pensa" (ADR 0032): the API, or Claude Code / Codex on the agent's computer with a person's plan. */
-export type BrainKind = "model" | "claude_code" | "codex";
+export type BrainKind = "model" | "claude_code" | "codex" | "cursor";
 
 /** Why a computer brain can't be chosen now. */
 export type BrainUnavailable = "no_computer" | "exec_off" | "runner_old" | "tool_off" | "not_installed" | "outdated";
@@ -4404,7 +4404,7 @@ export type BrainEffort = "low" | "medium" | "high" | "xhigh" | "max";
 /** A level, or "Automático" (each run picks low, medium or high with the model). */
 export type BrainEffortSetting = BrainEffort | "auto";
 
-export type MachineAccountKind = "claude_code" | "codex";
+export type MachineAccountKind = "claude_code" | "codex" | "cursor";
 
 /** ADR 0041 §3, ADR 0059: a Claude Code or Codex account signed in on a connected computer (metadata only). */
 export interface MachineAccount {

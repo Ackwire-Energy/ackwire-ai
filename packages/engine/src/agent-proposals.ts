@@ -50,7 +50,7 @@ export const AGENT_PROPOSAL_CARD = "agent_proposal";
  * else the workspace's model when it has a key, else none (connected after it is created).
  */
 export type SuggestedAi =
-  | { kind: "account"; brain: "claude_code" | "codex"; machineId: string; accountId: string; label: string }
+  | { kind: "account"; brain: "claude_code" | "codex" | "cursor"; machineId: string; accountId: string; label: string }
   | { kind: "model" }
   | { kind: "none" };
 
@@ -469,7 +469,7 @@ export async function suggestAgentAi(
           eq(machineAccounts.orgId, orgId),
           eq(machineAccounts.createdBy, userId),
           eq(machineAccounts.status, "active"),
-          inArray(machineAccounts.kind, ["claude_code", "codex"]),
+          inArray(machineAccounts.kind, ["claude_code", "codex", "cursor"]),
           notInArray(machineAccounts.id, used),
         ),
       )
@@ -478,7 +478,7 @@ export async function suggestAgentAi(
     if (free) {
       return {
         kind: "account",
-        brain: free.kind === "codex" ? "codex" : "claude_code",
+        brain: free.kind === "codex" || free.kind === "cursor" ? free.kind : "claude_code",
         machineId: free.machineId,
         accountId: free.id,
         label: free.label,

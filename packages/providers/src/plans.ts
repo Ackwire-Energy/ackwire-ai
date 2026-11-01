@@ -267,15 +267,24 @@ export const planKeyFits = (plan: CodingPlan, key: string) => new RegExp(plan.ke
  * back to false, a kind refuses a new login of an account already there again; logins made meanwhile keep
  * thinking, each for its agent.
  */
-export const LOGIN_PER_AGENT: Readonly<Record<"claude_code" | "codex" | "key", boolean>> = {
+export const LOGIN_PER_AGENT: Readonly<Record<"claude_code" | "codex" | "cursor" | "key", boolean>> = {
   claude_code: true,
   codex: false,
+  // Cursor documents nothing on several logins of one account: one agent per sign-in until it does (ADR 0114).
+  cursor: false,
   key: true,
 };
 
-/** Whether an account (its CLI's kind, and a coding plan's `provider` for a key) may have one login per agent. */
+/**
+ * Whether an account (its CLI's kind, and a coding plan's `provider` for a key, or `cursor` for a Cursor API key)
+ * may have one login per agent.
+ */
 export const loginPerAgent = (kind: string, provider?: string | null) =>
-  isPlanId(provider) ? LOGIN_PER_AGENT.key : kind === "codex" ? LOGIN_PER_AGENT.codex : LOGIN_PER_AGENT.claude_code;
+  isPlanId(provider) || provider === "cursor"
+    ? LOGIN_PER_AGENT.key
+    : kind === "codex" || kind === "cursor"
+      ? LOGIN_PER_AGENT[kind]
+      : LOGIN_PER_AGENT.claude_code;
 
 /**
  * Where each agent is its own OS user (system mode), whether a new sign-in is made once for every agent of its

@@ -149,7 +149,7 @@ export type WorkerDesktopUse = "desktop" | "browser";
 const BROWSER_SETUP_OPS: ReadonlySet<string> = new Set(["browser.act", "browser.batch", "browser.warm"]);
 
 /** The account a request's CLI signs in with: a turn's or route's, or a Claude Code or Codex task's (protocol 31). */
-function accountOf(req: MachineRequest): { kind: "claude_code" | "codex"; account: string } | null {
+function accountOf(req: MachineRequest): { kind: "claude_code" | "codex" | "cursor"; account: string } | null {
   const cli =
     req.op === "brain.turn" || req.op === "brain.route"
       ? req.kind
@@ -250,14 +250,14 @@ export interface SupervisorOptions {
    */
   prepareExisting?: (users: AgentUser[]) => void;
   /** A brain turn's account folder becomes its agent's user's before the turn reaches the worker (`AccountManager.lendTo`). */
-  lend?: (kind: "claude_code" | "codex", accountId: string, uid: number) => Promise<unknown>;
+  lend?: (kind: "claude_code" | "codex" | "cursor", accountId: string, uid: number) => Promise<unknown>;
   /**
    * Protocol 29: what a brain turn or route on an account root keeps gets with it (`AccountManager.grant`); null for
    * one whose folder is lent instead.
    */
-  grant?: (kind: "claude_code" | "codex", accountId: string) => Promise<AccountGrant | null>;
+  grant?: (kind: "claude_code" | "codex" | "cursor", accountId: string) => Promise<AccountGrant | null>;
   /** A turn's plan usage, for its account (`AccountManager.noteRateLimit`, `noteCodexRateLimits`). */
-  usage?: (kind: "claude_code" | "codex", accountId: string, info: unknown) => void;
+  usage?: (kind: "claude_code" | "codex" | "cursor", accountId: string, info: unknown) => void;
   /** The agent's desktop for its worker (`DesktopSessions`), behind the switches `use` needs; without it a worker gets none. */
   desktop?: (agent: AgentScope, use: WorkerDesktopUse) => Promise<WorkerDesktop>;
   /** How many people watch or control the agent's desktop (`DesktopSessions.status`). */

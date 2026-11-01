@@ -17,7 +17,16 @@ import { getAgentCached } from "../agents";
 import { type MachineCaller, MachineRequestError, type MachineStatus } from "../machine-hub";
 import { MachineDroppedError, MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
 import { computerPrompt } from "./prompt";
-import type { Brain, BrainAccount, BrainEvent, BrainIO, BrainTurn, SteerMessage, SteerReply } from "./types";
+import {
+  BRAIN_PLAN_NAMES,
+  type Brain,
+  type BrainAccount,
+  type BrainEvent,
+  type BrainIO,
+  type BrainTurn,
+  type SteerMessage,
+  type SteerReply,
+} from "./types";
 
 /**
  * The Claude Code brain (ADR 0032): an agent thinks with Claude Code on its
@@ -153,10 +162,10 @@ const err = (code: string, message: string, retryable: boolean): BrainEvent => (
 export function accountUnavailable(
   status: { name?: string; protocol?: number } | null,
   account: BrainAccount | undefined,
-  kind: "claude_code" | "codex",
+  kind: "claude_code" | "codex" | "cursor",
 ): { code: string; message: string } | null {
   if (!account) return null;
-  const name = kind === "codex" ? "Codex" : "Claude";
+  const name = BRAIN_PLAN_NAMES[kind];
   const where = status?.name ? ` on ${status.name}` : "";
   if (status?.protocol !== undefined && status.protocol < ACCOUNTS_PROTOCOL) {
     return {
@@ -230,12 +239,13 @@ export function claudeCodeAvailability(status: MachineStatus | null, account?: B
  */
 export function toolOff(
   status: Pick<MachineStatus, "name" | "execAllowed" | "access">,
-  tool: "claude" | "codex",
+  tool: "claude" | "codex" | "cursor",
 ): { code: string; message: string } | null {
   const tools = status.access?.tools;
-  const name = tool === "claude" ? "Claude Code" : "Codex";
+  const name = tool === "claude" ? "Claude Code" : tool === "codex" ? "Codex" : "Cursor";
   if (tools) {
-    return tools[tool] === true
+    // A runner before Cursor's switch (protocol 35) reports none: Cursor follows Codex's there, as on the runner.
+    return (tool === "cursor" ? (tools.cursor ?? tools.codex) : tools[tool]) === true
       ? null
       : {
           code: "tool_off",

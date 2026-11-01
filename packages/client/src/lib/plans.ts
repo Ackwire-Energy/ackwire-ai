@@ -73,7 +73,7 @@ export function planReplies(
   }: {
     on: boolean;
     agent: string | null;
-    brain: "claude_code" | "codex";
+    brain: "claude_code" | "codex" | "cursor";
     /** The account's plan as the CLI says it (`max`, `team`…): a seat has its own words. */
     plan?: string | null;
     coding?: CodingPlan;

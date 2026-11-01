@@ -70,7 +70,10 @@ export const allowsInApp = (os: string | null | undefined) => os === "darwin" ||
  * `brain.reasons.tool_off`'s line for a brain whose tool is off on `m`: the app's Preferences on a Mac or a PC, and on
  * any other computer the command too.
  */
-export function toolOffReason(m: Pick<Machine, "os" | "mode"> | null | undefined, kind: "claude_code" | "codex") {
+export function toolOffReason(
+  m: Pick<Machine, "os" | "mode"> | null | undefined,
+  kind: "claude_code" | "codex" | "cursor",
+) {
   if (!m || allowsInApp(m.os)) return { key: "brain.reasons.tool_off" as const, command: "" };
   return {
     key: "brain.reasons.tool_offLinux" as const,

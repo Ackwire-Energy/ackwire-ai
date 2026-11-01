@@ -250,11 +250,13 @@ export function machineAccountRoutes(deps: AppDeps) {
                       "The caller adds accounts there (they connected it, or nobody did) and its runner knows accounts.",
                   }),
                   keys: z.boolean().openapi({ description: "Its runner takes coding plans' keys (protocol 20)." }),
-                  shares: z.object({ claude_code: z.boolean(), codex: z.boolean(), key: z.boolean() }).openapi({
-                    description:
-                      "A new sign-in there thinks for all of the caller's agents on it (protocol 29): Claude's, ChatGPT's, a coding plan's key.",
-                  }),
-                  brains: z.object({ claude_code: z.boolean(), codex: z.boolean() }).openapi({
+                  shares: z
+                    .object({ claude_code: z.boolean(), codex: z.boolean(), cursor: z.boolean(), key: z.boolean() })
+                    .openapi({
+                      description:
+                        "A new sign-in there thinks for all of the caller's agents on it (protocol 29): Claude's, ChatGPT's, a coding plan's key.",
+                    }),
+                  brains: z.object({ claude_code: z.boolean(), codex: z.boolean(), cursor: z.boolean() }).openapi({
                     description:
                       "What it can think with now: Claude Code (Claude, the coding plans) and Codex (ChatGPT).",
                   }),

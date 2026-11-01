@@ -62,7 +62,17 @@ import {
   storedPlanUsage,
   UNAVAILABLE_CODES,
 } from "./brains/select";
-import type { Brain, BrainEvent, BrainIO, BrainKind, BrainTool, BrainTurn, ToolResult } from "./brains/types";
+import {
+  BRAIN_NAMES,
+  type Brain,
+  type BrainEvent,
+  type BrainIO,
+  type BrainKind,
+  type BrainTool,
+  type BrainTurn,
+  isComputerBrain,
+  type ToolResult,
+} from "./brains/types";
 import { agentBrowserProfiles } from "./browser/profiles";
 import { browsersPrompt } from "./browser/tools";
 import { BROWSER_SCOPE } from "./browser/types";
@@ -1960,7 +1970,7 @@ async function executeRunInner(
     } else delete t.roomWaitSince;
     // Nothing can stand in (no model credential, or background work): the run waits for the computer.
     await deferred;
-    const name = from === "codex" ? "Codex" : "Claude Code";
+    const name = isComputerBrain(from) ? BRAIN_NAMES[from] : "Claude Code";
     // One note per outage and place: another run of this agent already waits for the same computer and
     // said so here (an hourly routine, a second message): this one waits quietly with it.
     // A routine's run waits quietly: it runs when the computer is back (the next slot supersedes it), and
@@ -2126,7 +2136,7 @@ async function executeRunInner(
   ) => {
     await deferred;
     const t = transcript as Transcript;
-    const name = from === "codex" ? "Codex" : "Claude Code";
+    const name = isComputerBrain(from) ? BRAIN_NAMES[from] : "Claude Code";
     const said = stripSentinel(partial);
     const note = `_${name} stopped before finishing (${failure.message}). Already done, not repeated: ${executed.join(", ")}._`;
     await addRunStep(db, run, "error", {

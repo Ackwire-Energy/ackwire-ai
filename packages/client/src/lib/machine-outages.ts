@@ -10,7 +10,7 @@
  */
 
 /** The brains a computer runs. */
-export type ComputerBrain = "claude_code" | "codex";
+export type ComputerBrain = "claude_code" | "codex" | "cursor";
 
 export interface OutageAgentLike {
   agentId: string;

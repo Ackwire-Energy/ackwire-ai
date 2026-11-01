@@ -237,7 +237,7 @@ const DeviceCode = z
 
 const AgentParams = OrgParams.extend({ agentId: z.uuid() });
 
-const ComputerBrain = z.enum(["claude_code", "codex"]);
+const ComputerBrain = z.enum(["claude_code", "codex", "cursor"]);
 const Platform = z.string().openapi({
   description: "`mac`, `windows`, `linux`, `other` (the workspace's own computer), or the runner's `os` as reported.",
 });
