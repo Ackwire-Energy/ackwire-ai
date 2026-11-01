@@ -280,7 +280,7 @@ export function unwrapShell(command: string) {
 
 const USAGE_LIMIT = /hit your usage limit|usage limit reached|usage_limit/i;
 /** Codex can't authenticate (signed out, a revoked or expired sign-in). */
-const CODEX_AUTH =
+export const CODEX_AUTH =
   /not logged in|codex login|401 unauthorized|refresh token (?:was )?(?:expired|revoked|already used)|access token could not be refreshed/i;
 
 /** A command Codex ran (exec's `command_execution`, app-server's `commandExecution`), as an executed `tool_call`. */

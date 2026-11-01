@@ -1,15 +1,17 @@
 import { afterEach, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { MISSION_DENY_RULES, PUSH_ASK_RULES } from "@agenteschat/adapters/command-policy";
 import {
+  type AccountKind,
   PERMISSION_PROMPT_TOOL,
   parseRunnerFrame,
   parseServerFrame,
   type RunnerFrame,
   TASKS_PROTOCOL,
 } from "@agenteschat/adapters/machine-protocol";
+import { ACCOUNT_MISSING_MESSAGE, ACCOUNT_SIGNED_OUT } from "../../runner/accounts";
 import { handleRequest } from "../../runner/handlers";
 import { agentWorkspace } from "../../runner/paths";
 import {
@@ -560,4 +562,231 @@ test.skipIf(!posix)(
     });
   },
   15_000,
+);
+
+const FOLDER_ACCOUNT = "0193ffff-0000-7000-8000-000000000001";
+const ROOTS_ACCOUNT = "0193ffff-0000-7000-8000-000000000002";
+const GONE_ACCOUNT = "0193ffff-0000-7000-8000-000000000003";
+const TOKEN = "sk-ant-oat01-fake-token-for-tests-only";
+
+/**
+ * The fake CLIs as `claude` and `codex` on a PATH of their own (a task's shell finds them there), the computer's
+ * own sign-in folders empty (`own`, whatever this machine has), and an agent's accounts as folders under `home`:
+ * `FOLDER_ACCOUNT` signed in there for both CLIs, and the agent's own folders for the accounts root keeps.
+ */
+function fakeClis(home: string) {
+  const bin = tempDir("bin-");
+  const logs = tempDir("cli-logs-");
+  const own = tempDir("cli-home-");
+  dirs.push(bin, logs, own);
+  for (const [cli, script] of [
+    ["claude", "fake-claude.mjs"],
+    ["codex", "fake-codex.mjs"],
+  ] as const) {
+    const file = path.join(bin, cli);
+    writeFileSync(file, `#!/bin/sh\nexec "${process.execPath}" "${path.join(import.meta.dir, script)}" "$@"\n`);
+    chmodSync(file, 0o755);
+  }
+  const folder = (kind: AccountKind, id: string) => path.join(home, "accounts", kind, id);
+  const agentHome = (kind: AccountKind, id: string) => path.join(home, "agent", "accounts", kind, id);
+  mkdirSync(folder("claude_code", FOLDER_ACCOUNT), { recursive: true });
+  writeFileSync(path.join(folder("claude_code", FOLDER_ACCOUNT), ".credentials.json"), "{}");
+  mkdirSync(folder("codex", FOLDER_ACCOUNT), { recursive: true });
+  writeFileSync(path.join(folder("codex", FOLDER_ACCOUNT), "auth.json"), "{}");
+  const claudeLog = path.join(logs, "claude.log");
+  const codexLog = path.join(logs, "codex.log");
+  const read = (file: string) =>
+    readFileSync(file, "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+  return {
+    folder,
+    agentHome,
+    own,
+    claudeRuns: () => read(claudeLog),
+    codexRuns: () => read(codexLog),
+    options: {
+      secrets: async () => ({
+        env: {
+          PATH: `${bin}:${process.env.PATH ?? ""}`,
+          HOME: own,
+          CLAUDE_CONFIG_DIR: path.join(own, ".claude"),
+          CODEX_HOME: path.join(own, ".codex"),
+          FAKE_CLAUDE_LOG: claudeLog,
+          FAKE_CODEX_LOG: codexLog,
+        },
+        redact: (s: string) => s,
+      }),
+      accounts: {
+        accountDir: (kind: AccountKind, id: string) => (id === FOLDER_ACCOUNT ? folder(kind, id) : null),
+        agentHome: (kind: AccountKind, id: string) => {
+          mkdirSync(agentHome(kind, id), { recursive: true });
+          return agentHome(kind, id);
+        },
+      },
+    } satisfies Partial<TaskManagerOptions>,
+  };
+}
+
+/** Every file under `dir`. */
+const filesUnder = (dir: string) =>
+  readdirSync(dir, { recursive: true, encoding: "utf8" })
+    .map((rel) => path.join(dir, rel))
+    .filter((file) => statSync(file).isFile());
+
+test.skipIf(!posix)(
+  "protocol 31: a Claude Code task signs in with its agent's account, as its turns: the account's folder, or what root keeps, on a descriptor and in no file",
+  async () => {
+    const { make, home, send, done, frames } = setup();
+    const cli = fakeClis(home);
+    const tasks = make(cli.options);
+    await tasks.init();
+    tasks.attach(send);
+
+    // An account's folder is the CLI's home, its endpoint pinned in the task's own settings.
+    await tasks.start(AGENT, { taskId: id(40), executor: "claude", prompt: "Build it", account: FOLDER_ACCOUNT });
+    await waitFor(() => Boolean(done(id(40))), 8000);
+    expect(done(id(40))).toMatchObject({ exitCode: 0, result: "done: Build it" });
+    expect(cli.claudeRuns()[0]).toMatchObject({
+      configDir: cli.folder("claude_code", FOLDER_ACCOUNT),
+      oauthToken: null,
+      settingsEnv: { ANTHROPIC_BASE_URL: "https://api.anthropic.com" },
+    });
+
+    // One root keeps (protocol 29): the agent's own folder for it, and root's token on descriptor 3 only.
+    const token = { kind: "token", token: TOKEN } as const;
+    await tasks.start(
+      AGENT,
+      { taskId: id(41), executor: "claude", prompt: "Test it", account: ROOTS_ACCOUNT },
+      undefined,
+      token,
+    );
+    await waitFor(() => Boolean(done(id(41))), 8000);
+    expect(done(id(41))).toMatchObject({ exitCode: 0, result: "done: Test it" });
+    expect(cli.claudeRuns()[1]).toMatchObject({
+      configDir: cli.agentHome("claude_code", ROOTS_ACCOUNT),
+      oauthToken: TOKEN,
+      oauthEnv: null,
+      oauthFd: "3",
+    });
+    // Nothing the runner wrote for its tasks holds it, nor anything it sent.
+    for (const file of filesUnder(path.join(home, "tasks"))) expect(readFileSync(file, "utf8")).not.toContain(TOKEN);
+    expect(JSON.stringify(frames)).not.toContain(TOKEN);
+
+    // A coding plan's key root keeps: in the CLI's env under the plan's name, with the plan's endpoint and one of
+    // its models, and hidden in what the task says.
+    const KEY = "zai-fake-key-for-tests-only";
+    await tasks.start(
+      AGENT,
+      { taskId: id(42), executor: "claude", prompt: "ECHOKEY", account: ROOTS_ACCOUNT },
+      undefined,
+      { kind: "key", provider: "zai", key: KEY },
+    );
+    await waitFor(() => Boolean(done(id(42))), 8000);
+    expect(cli.claudeRuns()[2]).toMatchObject({
+      authToken: KEY,
+      settingsEnv: { ANTHROPIC_BASE_URL: "https://api.z.ai/api/anthropic" },
+    });
+    expect(cli.claudeRuns()[2]?.args).toEqual(expect.arrayContaining(["--model", "sonnet"]));
+    expect(done(id(42))?.result).toStartWith("key ");
+    expect(JSON.stringify(frames)).not.toContain(KEY);
+
+    // No account: the computer's own sign-in, and there is none here. The agent reads what it can do, never the
+    // CLI's "Please run /login".
+    await tasks.start(AGENT, { taskId: id(43), executor: "claude", prompt: "Ship it" });
+    await waitFor(() => Boolean(done(id(43))), 8000);
+    expect(cli.claudeRuns()[3]).toMatchObject({ configDir: path.join(cli.own, ".claude"), oauthToken: null });
+    const failed = done(id(43));
+    expect(failed?.exitCode).toBe(1);
+    expect(failed?.result).toStartWith(
+      "Claude Code has no sign-in for this agent on this computer (the agent has no Claude account here)",
+    );
+    expect(`${failed?.result} ${failed?.lastLine}`).not.toContain("/login");
+
+    // An account that isn't here, or one root has nothing for: refused at once, in its turns' words.
+    const refused = (n: number, account: string, grant?: { kind: "none" }) =>
+      tasks
+        .start(AGENT, { taskId: id(n), executor: "claude", prompt: "x", account }, undefined, grant)
+        .catch((err: Error) => err.message);
+    expect(await refused(44, GONE_ACCOUNT)).toBe(ACCOUNT_MISSING_MESSAGE.claude_code);
+    expect(await refused(45, ROOTS_ACCOUNT, { kind: "none" })).toBe(ACCOUNT_SIGNED_OUT);
+    expect(cli.claudeRuns()).toHaveLength(4);
+  },
+  30_000,
+);
+
+test.skipIf(!posix)(
+  "protocol 31: a Codex task signs in with its agent's account's folder; without one it says what the agent can do",
+  async () => {
+    const { make, home, send, done } = setup();
+    const cli = fakeClis(home);
+    const tasks = make(cli.options);
+    await tasks.init();
+    tasks.attach(send);
+    await tasks.start(AGENT, { taskId: id(46), executor: "codex", prompt: "Port it", account: FOLDER_ACCOUNT });
+    await waitFor(() => Boolean(done(id(46))), 8000);
+    expect(done(id(46))).toMatchObject({ exitCode: 0, result: "done: Port it" });
+    expect(cli.codexRuns()[0]?.codexHome).toBe(cli.folder("codex", FOLDER_ACCOUNT));
+
+    await tasks.start(AGENT, { taskId: id(47), executor: "codex", prompt: "Port it" });
+    await waitFor(() => Boolean(done(id(47))), 8000);
+    expect(cli.codexRuns()[1]?.codexHome).toBe(path.join(cli.own, ".codex"));
+    expect(done(id(47))?.result).toStartWith(
+      "Codex has no sign-in for this agent on this computer (the agent has no ChatGPT account here)",
+    );
+  },
+  20_000,
+);
+
+test.skipIf(!posix)(
+  "a task on an account its agent no longer thinks with is canceled, as its turns' processes close",
+  async () => {
+    const { make, home, send, done } = setup();
+    const cli = fakeClis(home);
+    const tasks = make(cli.options);
+    await tasks.init();
+    tasks.attach(send);
+    await tasks.start(AGENT, { taskId: id(48), executor: "claude", prompt: "SLOWTASK", account: FOLDER_ACCOUNT });
+    await tasks.start(AGENT, { taskId: id(49), executor: "shell", command: "sleep 30" });
+    tasks.keepAccount(FOLDER_ACCOUNT);
+    expect(tasks.list().map((t) => t.status)).toEqual(["running", "running"]);
+    // Root says the agent thinks with nothing now: the task on its old account stops, the shell task goes on.
+    tasks.keepAccount(null);
+    await waitFor(() => Boolean(done(id(48))), 8000);
+    expect(done(id(48))).toMatchObject({ canceled: true });
+    expect(done(id(49))).toBeUndefined();
+    tasks.cancel(AGENT, id(49));
+    await waitFor(() => Boolean(done(id(49))), 8000);
+  },
+  20_000,
+);
+
+test.skipIf(!posix)(
+  "a runner restarted since a task on an account started never tries it again on the computer's own sign-in",
+  async () => {
+    const { make, home, send, done } = setup();
+    const cli = fakeClis(home);
+    const first = make(cli.options);
+    await first.init();
+    first.attach(send);
+    const session = "0193aaaa-0000-7000-8000-0000000000ff";
+    await first.start(AGENT, {
+      taskId: id(50),
+      executor: "claude",
+      prompt: "NOSESSION",
+      session,
+      account: FOLDER_ACCOUNT,
+    });
+    // The task outlives its runner; the next one only has the journal, not the account's sign-in.
+    first.close();
+    const again = make(cli.options);
+    await again.init();
+    again.attach(send);
+    await waitFor(() => Boolean(done(id(50))), 8000);
+    // Claude Code refused the session flag, which the runner would otherwise retry with the other one.
+    expect(done(id(50))?.result).toContain("No conversation found");
+    expect(cli.claudeRuns()).toHaveLength(1);
+  },
+  20_000,
 );
