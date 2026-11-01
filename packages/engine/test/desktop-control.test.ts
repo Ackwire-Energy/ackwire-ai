@@ -525,6 +525,35 @@ describe("the agent asks for help on its desktop", () => {
     });
   });
 
+  test("several may drive it: the card stays in the conversation when one of them is in it, else goes to the asker's DM", async () => {
+    const { systemMode } = await start({ agent: true });
+    // System mode, no owner: the person who paired the computer (older) and an admin both drive it; only the admin
+    // is in #general.
+    await systemMode();
+    await f.db.update(schema.agents).set({ ownerUserId: null }).where(eq(schema.agents.id, f.agent.id));
+    const bia = await addMember(f.db, f.org.id, "admin", "bia");
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: bia.id });
+    await f.db
+      .delete(schema.channelMembers)
+      .where(and(eq(schema.channelMembers.channelId, f.general.id), eq(schema.channelMembers.userId, f.owner.id)));
+    expect(await computerDrivers(f.db, f.org.id, f.agent.id)).toEqual([f.owner.id, bia.id]);
+    await postPersonMessage(deps(), bia.id, f.org.id, f.general.id, { body: "@dev sign in please" });
+    await drainOutbox(f.db, f.handlers);
+    const [h] = await f.db.select().from(schema.browserHandoffs);
+    const [card] = await f.db
+      .select({ channelId: schema.messages.channelId })
+      .from(schema.messages)
+      .where(eq(schema.messages.id, h?.id as string));
+    expect(card?.channelId).toBe(f.general.id);
+    const [notice] = await f.db
+      .select()
+      .from(schema.notifications)
+      .where(
+        and(eq(schema.notifications.groupKey, `browser_handoff:${h?.id}`), eq(schema.notifications.userId, bia.id)),
+      );
+    expect(notice?.source).toMatchObject({ channelId: f.general.id, messageId: h?.id });
+  });
+
   test("who is asked: the owner when they may drive it, else everyone who may; nobody on a computer nobody paired", async () => {
     const { setMachine, systemMode } = await start();
     const bia = await addMember(f.db, f.org.id, "admin", "bia");

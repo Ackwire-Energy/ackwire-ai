@@ -55,7 +55,7 @@ import {
   DESKTOP_TOOL_INFO,
 } from "./types";
 
-const { browserHandoffs, agentRuns, agents, machines, messages, users } = schema;
+const { browserHandoffs, agentRuns, agents, channelMembers, machines, messages, users } = schema;
 
 export type BrowserHandoffRow = typeof browserHandoffs.$inferSelect;
 export type BrowserHandoffStatus = BrowserHandoffRow["status"];
@@ -747,8 +747,26 @@ export function createBrowserHandoffToolSource(
       : await browserHandoffRecipient({ db: ctx.db }, ctx.orgId, ctx.runId, ctx.agentId);
     // The card goes where the person asked can act on it: the run's conversation when they're in it, else their DM
     // with the agent (a run in a room between agents, or one they aren't in, would leave the request unreachable).
-    const asked = recipient ?? drivers?.[0] ?? null;
+    // Several drivers: one in the conversation keeps it there, else whoever asked for the work, else the first.
     const runAt = runWhere(run);
+    let asked = recipient;
+    if (!asked && drivers) {
+      const [member] = await ctx.db
+        .select({ userId: channelMembers.userId })
+        .from(channelMembers)
+        .where(
+          and(
+            eq(channelMembers.orgId, run.orgId),
+            eq(channelMembers.channelId, runAt.channelId),
+            inArray(channelMembers.userId, drivers),
+          ),
+        )
+        .limit(1);
+      const requester = member?.userId
+        ? null
+        : await browserHandoffRecipient({ db: ctx.db }, ctx.orgId, ctx.runId, ctx.agentId);
+      asked = member?.userId ?? (requester && drivers.includes(requester) ? requester : (drivers[0] ?? null));
+    }
     const where =
       asked && !(await isChannelMember(ctx.db, run.orgId, runAt.channelId, asked))
         ? { channelId: (await openPersonAgentDm(ctx.db, run.orgId, asked, run.agentId)).id, threadId: null }
