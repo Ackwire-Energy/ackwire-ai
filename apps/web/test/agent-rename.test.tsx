@@ -43,6 +43,8 @@ describe("renaming an agent on its page", () => {
     expect(handleField().value).toBe("claudio");
     expect(text()).toContain("As menções passam a ser por @claudio. @ada continua funcionando.");
     expect(saveBar().textContent).toContain("Nome e Menções");
+    // The page's title and the @ under it follow the draft.
+    expect(document.querySelector(".agp-handle")?.textContent).toBe("@claudio · Dev");
 
     await click(within(saveBar()).getByRole("button", { name: /^Salvar/ }));
     await settle(6);

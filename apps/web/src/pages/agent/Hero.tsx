@@ -216,7 +216,7 @@ export function AgentHero({
         <div className="agp-ident">
           <h1 className="agp-name">{name}</h1>
           <span className="agp-handle">
-            @{agent.handle}
+            @{draft.handle || agent.handle}
             {(draft.role.trim() || agent.role) && ` · ${draft.role.trim() || agent.role}`}
           </span>
           <NoAiChip agentId={agent.id} />
