@@ -10,6 +10,7 @@ import {
   postPersonMessage,
   revokeRunToolTokens,
   startSessionTask,
+  type ToolDefinition,
   type ToolSource,
   verifyRunToolToken,
 } from "../src";
@@ -412,5 +413,91 @@ describe("mission tools through the bridge", () => {
       ok: false,
       error: { code: "mission.task_ended" },
     });
+  });
+});
+
+describe("a kept-alive computer brain after a grant (the Vega CRM case)", () => {
+  const VEGA = "6b3c1f0e-2a4d-4e8f-9b7a-1c2d3e4f5a6b";
+  const PORTAL = "1d2e3f40-5a6b-4c7d-8e9f-0a1b2c3d4e5f";
+
+  /** A custom server of 56 tools named after its label (42 reads: a directory once granted), and a small one. */
+  function connectors(executed: string[]): ToolSource {
+    const tool = (connectionId: string, label: string, name: string, scope: string): ToolDefinition => ({
+      name,
+      description: `[${label}] ${name.replace(/_/g, " ")}`,
+      inputSchema: { type: "object", properties: {} },
+      scope,
+      connectionId,
+      connectorLabel: label,
+      execute: async () => {
+        executed.push(name);
+        return { content: `${name} ok` };
+      },
+    });
+    const verbs = ["listar", "buscar", "obter", "contar", "exportar", "consultar", "criar", "atualizar"];
+    const things = ["atendimentos", "tickets", "departamentos", "contatos", "usuarios", "etiquetas", "mensagens"];
+    const vega = verbs.flatMap((verb, i) =>
+      things.map((what) =>
+        tool(VEGA, "Vega CRM", `vega_crm_${verb}_${what}`, `custom:${VEGA}:${i < 6 ? "read" : "write"}`),
+      ),
+    );
+    const portal = ["listar_colaboradores", "buscar_ferias"].map((n) =>
+      tool(PORTAL, "Portal do Colaborador", `portal_do_colaborador_${n}`, `custom:${PORTAL}:read`),
+    );
+    return { name: "connectors", tools: async () => [...vega, ...portal] };
+  }
+
+  test("the run after a grant reaches its tools from the list the process started with: find_tools, use_tool, the tool runs", async () => {
+    const executed: string[] = [];
+    f = await setup({ machines: true, toolSources: [connectors(executed)], reply: () => ({ chunks: ["ok"] }) });
+    const paired = await pairedMachine(f);
+    const runner = bridgeRunner(f.machineHub as MachineHub);
+    await runner.hello(paired.token);
+    await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: PORTAL, scope: `custom:${PORTAL}:read` }]);
+    const tokenOf = (runId: string) =>
+      issueRunToolToken(f.db, { orgId: f.org.id, agentId: f.agent.id, machineId: paired.machineId, runId });
+    // The tool groups the judge loaded for the run (ADR 0043), as the executor keeps them.
+    const loads = (runId: string, toolGroups: string[]) =>
+      f.db.update(schema.agentRuns).set({ transcript: { toolGroups } }).where(eq(schema.agentRuns.id, runId));
+
+    // Before the grant: the Claude Code process lists its tools when it starts, and keeps that list.
+    const first = await runningRun();
+    await loads(first.id, []);
+    const token1 = await tokenOf(first.id);
+    const harness = names(await runner.list(token1));
+    expect(harness).toEqual(expect.arrayContaining(["find_tools", "use_tool"]));
+    expect(harness.some((n) => n.startsWith("vega"))).toBe(false);
+    const looked = await runner.call(token1, "find_tools", { query: "Vega CRM listar atendimentos chat" });
+    expect(looked.ok && looked.text).toContain("portal_do_colaborador_listar_colaboradores");
+    expect(looked.ok && looked.text).not.toContain("vega");
+    await f.db
+      .update(schema.agentRuns)
+      .set({ status: "done", finishedAt: new Date() })
+      .where(eq(schema.agentRuns.id, first.id));
+
+    // Read access given; the next run loads the connector, which stands as its directory.
+    await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: VEGA, scope: `custom:${VEGA}:read` }]);
+    const second = await runningRun(first.threadRootId);
+    await loads(second.id, [`custom:${VEGA}`]);
+    const token2 = await tokenOf(second.id);
+    expect(names(await runner.list(token2))).toEqual(
+      expect.arrayContaining(["vega_crm_find_tools", "vega_crm_use_tool"]),
+    );
+    // The same process still has `harness`: its search says the directory is listed, and how to run it if not.
+    const found = await runner.call(token2, "find_tools", { query: "Vega CRM" });
+    expect(found.ok && found.text).toStartWith(
+      `Already in your tool list for "Vega CRM": call them directly (if your list doesn't show them yet, use_tool runs them too).`,
+    );
+    expect(found.ok && found.text).toContain("- vega_crm_find_tools:");
+    // The call that failed then, as it was made: the directory's search through use_tool, by the name it had.
+    const search = await runner.call(token2, "use_tool", {
+      tool: "vega_find_tools",
+      arguments: { limit: 10, query: "buscar atendimentos chat e listar tickets e departamentos" },
+    });
+    expect(search.ok && search.text).toContain("- vega_crm_listar_departamentos:");
+    expect(
+      await runner.call(token2, "use_tool", { tool: "vega_crm_listar_departamentos", arguments: {} }),
+    ).toMatchObject({ ok: true, text: "vega_crm_listar_departamentos ok" });
+    expect(executed).toEqual(["vega_crm_listar_departamentos"]);
   });
 });

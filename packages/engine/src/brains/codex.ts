@@ -214,6 +214,8 @@ export class CodexBrain implements Brain {
       this.deps.agent?.(turn),
       this.deps.prepare?.(turn, io.signal).catch(() => null),
     ]);
+    // A kept-alive Codex lists our tools once, as its thread opens: the runner starts it again when a name is new.
+    const toolNames = turn.tools.map((t) => t.name).sort();
     const request: BrainTurnRequest & { agent?: AgentScope } = {
       runId: turn.runId,
       kind: "codex",
@@ -222,7 +224,7 @@ export class CodexBrain implements Brain {
       ...(turn.model ? { model: turn.model } : {}),
       system: code?.prompt ? `${turn.system}\n\n${code.prompt}` : turn.system,
       prompt: computerPrompt(turn),
-      mcp,
+      mcp: { ...mcp, tools: toolNames.join(" ") },
       ...(agent ? { agent } : {}),
       ...accountFields(status.protocol, turn),
       ...contextFields(status.protocol, turn),
