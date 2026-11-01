@@ -4,13 +4,14 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { join } from "node:path";
-import type { Message } from "@agenteschat/client";
+import type { Approval, Message } from "@agenteschat/client";
 import { mentionsHandle } from "@agenteschat/client/lib/markdown";
 import { apiProviderOf } from "@agenteschat/client/lib/providers";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { InlineApproval } from "@/components/ApprovalItem";
 import { declarations, topLevel } from "./built-css";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
-import { renderApp, screen, settle } from "./render";
+import { renderApp, renderPage, screen, settle } from "./render";
 
 afterEach(() => cleanup());
 
@@ -40,7 +41,7 @@ describe("a message that mentions me", () => {
     expect(row("m-me").classList.contains("ac-msg--mentions-me")).toBe(true);
     const chips = [...row("m-me").querySelectorAll(".ac-mention")].map((c) => [c.textContent, c.className]);
     expect(chips).toEqual([
-      ["@Walter Silva", "ac-mention ac-mention--me"],
+      ["@Walter", "ac-mention ac-mention--me"],
       ["@Ada", "ac-mention"],
     ]);
     // m-1 mentions only Ada.
@@ -105,7 +106,7 @@ describe("official provider logos", () => {
   const models = [
     { id: "claude-sonnet-5-5", label: "Sonnet", provider: "anthropic", available: true },
     { id: "gpt-5", label: "GPT-5", provider: "openai", available: false },
-  ] as Parameters<typeof apiProviderOf>[1];
+  ].map((m) => ({ ...m, inputUsdPerMTok: 1, outputUsdPerMTok: 1 }));
 
   test("whose API a model runs on; Automático, the one provider the workspace can use", () => {
     expect(apiProviderOf("gpt-5", models)).toBe("openai");
@@ -146,14 +147,17 @@ describe("agent faces in a line of text", () => {
     expect(value(css, ".ac-who", "white-space")).toBe("nowrap");
   });
 
-  test("an approval card's 'Ada pede aprovação' carries Ada's face before her name", async () => {
-    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState()) });
-    await settle(8);
-    const card = row("msg-card");
-    const who = card.querySelector(".ac-who") as HTMLElement;
+  test("an approval's 'Ada pede aprovação' carries Ada's face before her name", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const approval = state.approvals.find((a) => a.id === "ap-merge") as Approval;
+    const agent = (await api.agents.list(ORG_ID)).find((a) => a.id === ADA_ID);
+    await renderPage(<InlineApproval approval={approval} agent={agent} members={new Map()} />, { api, org: true });
+    await settle(4);
+    const who = document.querySelector(".ac-who") as HTMLElement;
     expect(who.querySelector(".ac-avatar--xs")).toBeTruthy();
     expect(who.querySelector("b")?.textContent).toBe("Ada");
-    expect(card.textContent).toContain("Ada pede aprovação");
+    expect(document.body.textContent).toContain("Ada pede aprovação");
   });
 });
 

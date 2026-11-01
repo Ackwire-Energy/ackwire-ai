@@ -10006,7 +10006,6 @@ export const ptBR = {
       scrollHint: "Rolar agora move a página. Esc para sair",
       touchHint: "Arraste com um dedo. Role com dois",
       targetMarked: "Campo marcado",
-      targetNone: "Clique num campo",
       typePlaceholder: "Digite no campo marcado",
       typePlaceholderTouch: "Toque num campo da página e digite aqui",
       typePlaceholderSecret: "Senha do campo marcado",

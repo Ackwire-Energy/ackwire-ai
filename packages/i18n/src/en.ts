@@ -9929,7 +9929,6 @@ export const en: Translations = {
       scrollHint: "Scrolling now moves the page. Esc to leave",
       touchHint: "Drag with one finger. Scroll with two",
       targetMarked: "Marked field",
-      targetNone: "Click a field",
       typePlaceholder: "Type into the marked field",
       typePlaceholderTouch: "Tap a field on the page and type here",
       typePlaceholderSecret: "Password for the marked field",
