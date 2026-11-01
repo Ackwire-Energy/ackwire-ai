@@ -1,10 +1,19 @@
 import type { SpeechKey, SpeechProvider } from "@agenteschat/client";
-import { useRemoveSpeechKey, useSaveSpeechKey, useSpeechKey } from "@agenteschat/client";
+import {
+  useRemoveSpeechKey,
+  useSaveSpeechKey,
+  useSettings,
+  useSpeechKey,
+  useUpdateSettings,
+} from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { can } from "@agenteschat/client/lib/permissions";
 import { Button, Card, CardHeader, Chip, Input, Radio, RadioGroup, SettingNote, Switch } from "@agenteschat/ui";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ErrorState, LoadingList } from "@/components/Loading";
 import { PrefRow } from "@/components/NoticePrefs";
+import { useOrg } from "@/components/org-context";
 
 /** Who can be chosen, in the order the list shows them. Their names are the providers' own. */
 const PROVIDERS: { id: SpeechProvider; name: string }[] = [
@@ -15,8 +24,34 @@ const PROVIDERS: { id: SpeechProvider; name: string }[] = [
   { id: "openai", name: "OpenAI" },
 ];
 
+/** Configurações › Voz (ADR 0094). Who configures the workspace changes it; everyone else reads it. */
+export function VoiceSettingsSection() {
+  const { org } = useOrg();
+  const settings = useSettings(org.id);
+  const update = useUpdateSettings(org.id);
+  const editable = can(org, "configure");
+  if (!settings.data) {
+    return settings.isError ? (
+      <ErrorState error={settings.error} onRetry={() => void settings.refetch()} />
+    ) : (
+      <LoadingList count={1} avatar={false} trailing />
+    );
+  }
+  const on = (update.isPending ? update.variables?.voiceMessages : undefined) ?? settings.data.voiceMessages;
+  return (
+    <VoiceSettingsCard
+      on={on}
+      available={settings.data.voiceAvailable}
+      editable={editable}
+      onChange={(voiceMessages) => {
+        if (editable) update.mutate({ voiceMessages });
+      }}
+    />
+  );
+}
+
 /**
- * Configurações › Voice messages (ADR 0094): the workspace's switch, and on a server that isn't agentes.chat's own, for
+ * The card of Configurações › Voz (ADR 0094): the workspace's switch, and on a server that isn't agentes.chat's own, for
  * its owner, who turns voice into text (the API answers null to everyone else). A key is tried with the provider
  * before it is kept, sealed on the server and never shown again.
  */

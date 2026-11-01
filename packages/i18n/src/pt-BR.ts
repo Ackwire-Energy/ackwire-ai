@@ -8643,6 +8643,7 @@ export const ptBR = {
       import: "Importar e exportar",
       billing: "Plano e cobrança",
       media: "GIFs e figurinhas",
+      voice: "Voz",
     },
     sectionText: {
       account: "Seu perfil e como o app fica para você.",
@@ -8660,6 +8661,7 @@ export const ptBR = {
       import: "Traga agentes de outro app ou de outro workspace, e leve este para onde quiser.",
       billing: "O plano do agentes.chat deste workspace, o cartão e as faturas ficam numa página nossa, fora do app.",
       media: "O que dá para mandar na conversa, e quando os agentes mandam um GIF ou uma figurinha.",
+      voice: "Mensagens de voz nas conversas, e quem transforma a voz em texto.",
     },
     title: "Configurações",
     account: {

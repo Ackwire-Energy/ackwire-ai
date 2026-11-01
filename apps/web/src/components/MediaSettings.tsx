@@ -9,12 +9,11 @@ import { GifKeyCard } from "@/components/GifKeyCard";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { PrefRow } from "@/components/NoticePrefs";
 import { useOrg } from "@/components/org-context";
-import { VoiceSettingsCard } from "@/components/VoiceSettings";
 
 const RATINGS: GifRating[] = ["g", "pg"];
 const LEVELS: AgentMediaLevel[] = ["never", "sometimes", "often"];
 
-type MediaPatch = Partial<Pick<OrgSettings, "gifs" | "gifRating" | "agentStickers" | "agentMedia" | "voiceMessages">>;
+type MediaPatch = Partial<Pick<OrgSettings, "gifs" | "gifRating" | "agentStickers" | "agentMedia">>;
 
 /**
  * Configurações › GIFs e figurinhas (ADR 0091): what people can send (GIFs and their rating, the agents' stickers),
@@ -107,12 +106,6 @@ export function MediaSettingsSection() {
       </Card>
       {/* The server's own GIPHY key, for its owner on a server that isn't agentes.chat's own (null to anyone else). */}
       <GifKeyCard jevMissing={!shown.agentMediaAvailable} />
-      <VoiceSettingsCard
-        on={shown.voiceMessages}
-        available={shown.voiceAvailable}
-        editable={editable}
-        onChange={(voiceMessages) => save({ voiceMessages })}
-      />
       <Card aria-labelledby="media-agents">
         <CardHeader id="media-agents" icon="agent" title={t("settings.media.agentsTitle")} />
         <div className="settings-rows">

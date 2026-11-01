@@ -8584,6 +8584,7 @@ export const en: Translations = {
       import: "Import and export",
       billing: "Plan and billing",
       media: "GIFs and stickers",
+      voice: "Voice",
     },
     sectionText: {
       account: "Your profile and how the app looks for you.",
@@ -8602,6 +8603,7 @@ export const en: Translations = {
       import: "Bring agents from another app or workspace, and take this one wherever you want.",
       billing: "This workspace's agentes.chat plan, card and invoices are on a page of ours, outside the app.",
       media: "What people can send in a conversation, and when agents send a GIF or a sticker.",
+      voice: "Voice messages in conversations, and who turns voice into text.",
     },
     title: "Settings",
     account: {

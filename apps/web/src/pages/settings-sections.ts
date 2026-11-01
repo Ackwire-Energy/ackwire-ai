@@ -21,7 +21,8 @@ export type SettingsSection =
   | "usage"
   | "billing"
   | "import"
-  | "media";
+  | "media"
+  | "voice";
 
 export type SettingsGroup = "you" | "org" | "agents" | "costs";
 
@@ -44,6 +45,8 @@ export const SETTINGS_SECTIONS: {
   { id: "audit", icon: "shield", group: "org", allowed: (o) => can(o, "view_audit") },
   // GIFs and stickers in chat (ADR 0091): everyone reads them, who configures the workspace changes them.
   { id: "media", icon: "sticker", group: "org", allowed: () => true },
+  // Voice messages (ADR 0094): everyone reads the switch, who configures the workspace changes it.
+  { id: "voice", icon: "mic", group: "org", allowed: () => true },
   { id: "access", icon: "agent", group: "agents", allowed: (o) => can(o, "manage_agents") },
   { id: "connectors", icon: "plug", group: "agents", allowed: () => true },
   { id: "skills", icon: "bulb", group: "agents", allowed: (o) => can(o, "manage_agents") },
