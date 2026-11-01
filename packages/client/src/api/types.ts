@@ -3730,6 +3730,29 @@ export interface ImportPlan {
   items: ImportItemResult[];
 }
 
+/** One of an imported agent's own files, copied into its folder in the Drive (`POST …/imports/files`). */
+export interface ImportFileInput {
+  file: Blob;
+  /** The file's name, for its download. */
+  name: string;
+  /** The agent the import made (or an earlier one did). */
+  agentId: string;
+  /** Where it goes in the agent's folder, keeping the source's folders. */
+  path: string;
+  /** For its first version (the importer's language). */
+  note?: string;
+}
+
+export interface ImportedFile {
+  /** `exists`: the folder had a file with that name already, and it stays as it was. */
+  status: "created" | "exists";
+  artifactId: string;
+  /** `<folder>/<path>`. */
+  title: string;
+  /** The agent's folder in the Drive: its name. */
+  folder: string;
+}
+
 /** A source package this workspace brought things from, with how many of each kind came. */
 export interface ImportedSource {
   app: string;

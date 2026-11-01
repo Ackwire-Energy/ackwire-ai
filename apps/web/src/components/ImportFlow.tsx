@@ -8,6 +8,7 @@ import type {
   MigrationBundle,
 } from "@agenteschat/client";
 import { ApiError, keys } from "@agenteschat/client";
+import { formatBytes, MAX_UPLOAD_MB } from "@agenteschat/client/lib/files";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
@@ -19,6 +20,7 @@ import {
   Chip,
   type ChipTone,
   CountChip,
+  driveFolder,
   Field,
   Icon,
   type IconName,
@@ -43,6 +45,7 @@ import { fileSaver } from "@/components/artifacts/fileSaver";
 import { HelpLink } from "@/components/HelpLink";
 import { useOrg } from "@/components/org-context";
 import {
+  type AgentFile,
   EXPORT_PROMPT,
   groupLeftOut,
   IMPORT_ACCEPT,
@@ -50,19 +53,24 @@ import {
   type ImportFile,
   type LeftOutKind,
   type PickedFile,
-  parseImport,
+  parsePackage,
   readImportFiles,
   SOURCE_NAME,
 } from "@/lib/import";
 import { frontmatter } from "@/lib/import/shared";
 import {
+  agentsArrived,
   applyInChunks,
   blockedItems,
   bundleOrigin,
   CARD_MARK,
   choosable,
+  copyAgentFiles,
   droppedFiles,
   EXPORT_PROMPT_APPS,
+  type FileLeft,
+  type FilesCopy,
+  filesNotes,
   githubRoot,
   IMPORT_CARDS,
   IMPORT_KINDS,
@@ -71,6 +79,7 @@ import {
   isGithubLink,
   itemId,
   kindsLine,
+  MANY_FILES,
   NOT_GITHUB,
   picksOf,
   type RequestCard,
@@ -78,6 +87,7 @@ import {
 } from "@/lib/import-flow";
 import { hasFiles } from "@/lib/obsidian";
 import { useTheme } from "@/lib/theme";
+import { useToast } from "@/lib/toast";
 import "./import-flow.css";
 
 const KIND_ICON: Record<ImportItemKind, IconName> = {
@@ -112,6 +122,19 @@ const TODO_ICON: Record<BundleTodo["kind"], IconName> = {
   model: "settings",
   file: "file",
 };
+/** Why the agents' files stay behind, in the order they're listed. */
+const FILE_LEFT: Record<FileLeft, IconName> = {
+  secret: "lock",
+  junk: "settings",
+  too_large: "block",
+  unreadable: "alert",
+  exists: "check",
+  storage_full: "database",
+  daily_full: "clock",
+  failed: "alert",
+};
+/** Names a reason shows before "e mais N". */
+const NAMES_SHOWN = 4;
 /** The fields the server may cut (`trimmed`), in the person's words. */
 const FIELDS = ["name", "role", "instructions", "handle", "topic", "prompt", "title", "content", "appearance"] as const;
 /** Rows a group shows before "Mostrar mais". */
@@ -129,6 +152,8 @@ type Focus = "preview" | "report" | "drop" | null;
 export function useImportFlow(orgId: string | null) {
   const api = useApi();
   const qc = useQueryClient();
+  const { t } = useTranslation();
+  const toast = useToast();
   const [card, setCard] = useState<ImportCard | null>(null);
   const [busy, setBusy] = useState<"reading" | "planning" | null>(null);
   const [failure, setFailure] = useState<ImportFailure | null>(null);
@@ -137,17 +162,38 @@ export function useImportFlow(orgId: string | null) {
     items: ImportItemResult[];
     /** Files a GitHub link has past the reader's limits: not read. */
     skipped: string[];
+    /** The agents' own files, for their folders in the Drive. */
+    files: AgentFile[];
   } | null>(null);
   const [pick, setPick] = useState<Set<string>>(new Set());
   const [skillsOn, setSkillsOn] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [report, setReport] = useState<ImportItemResult[] | null>(null);
+  // "Copiar os arquivos para o Drive", on until turned off; then the copy, which runs after the import.
+  const [copyFiles, setCopyFiles] = useState(true);
+  const [copy, setCopy] = useState<{
+    done: number;
+    total: number;
+    running: boolean;
+    result: FilesCopy | null;
+  } | null>(null);
   // Something read, or the flow cleared, since it opened: what it shows is this page's doing.
   const [touched, setTouched] = useState(false);
   const done = useRef(new Map<string, ImportItemResult>());
   const run = useRef(0);
   const last = useRef<ReadInput | null>(null);
   const focus = useRef<Focus>(null);
+  const agentIds = useRef(new Map<string, string>());
+  // Closing the page stops the copy (the browser sends each file): ask first.
+  const copying = !!copy?.running;
+  useEffect(() => {
+    if (!copying) return;
+    const ask = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", ask);
+    return () => window.removeEventListener("beforeunload", ask);
+  }, [copying]);
+  // Agents whose files were sent to the Drive, so a later apply (a retry) sends only those it brought.
+  const sent = useRef(new Set<string>());
 
   const read = async (input: ReadInput) => {
     if (!orgId) return;
@@ -162,6 +208,7 @@ export function useImportFlow(orgId: string | null) {
     try {
       let files: ImportFile[];
       let root: string | null = null;
+      let junk: string[] = [];
       let skipped: string[] = [];
       if ("url" in input) {
         if (!isGithubLink(input.url)) throw NOT_GITHUB;
@@ -172,24 +219,29 @@ export function useImportFlow(orgId: string | null) {
       } else if ("text" in input) {
         files = [{ name: "pasted", text: input.text }];
       } else {
-        ({ files, root } = await readImportFiles(await input.files));
+        ({ files, root, junk } = await readImportFiles(await input.files));
       }
       if (!current()) return;
       step = "plan";
       const list = await qc.fetchQuery({ queryKey: keys.models, queryFn: () => api.agents.models() });
       step = "parse";
-      const bundle = parseImport(files, { models: list.models.map((m) => m.id), root });
+      const parsed = parsePackage(files, { models: list.models.map((m) => m.id), root, junk });
+      const { bundle } = parsed;
       if (!current()) return;
       step = "plan";
       setBusy("planning");
       const plan = await api.imports.apply(orgId, { bundle, dryRun: true });
       if (!current()) return;
       done.current = new Map();
+      agentIds.current = new Map();
+      sent.current = new Set();
       focus.current = "preview";
-      setPlanned({ bundle, items: plan.items, skipped });
+      setPlanned({ bundle, items: plan.items, skipped, files: parsed.files });
       setPick(new Set(plan.items.filter(choosable).map(itemId)));
       setSkillsOn(new Set());
       setReport(null);
+      setCopyFiles(parsed.files.filter((f) => !f.skip).length <= MANY_FILES);
+      setCopy(null);
       setCard(bundleOrigin(bundle).card);
     } catch (cause) {
       if (current()) setFailure({ from, step, cause });
@@ -199,8 +251,49 @@ export function useImportFlow(orgId: string | null) {
   };
 
   /**
+   * Copies the agents' files into their Drive folders, without holding the import up: progress and what stayed
+   * behind show in the report, a toast says when it's done. Each agent then keeps a line in its memory about where
+   * its files are. `before`: an earlier copy whose failed files these are.
+   */
+  const copyToDrive = async (files: AgentFile[], bundle: MigrationBundle, before: FilesCopy | null = null) => {
+    if (!orgId) return;
+    const mine = run.current;
+    const app = bundleOrigin(bundle).app ?? bundle.source.name;
+    const total = files.filter((f) => !f.skip && agentIds.current.has(f.agent)).length;
+    setCopy({ done: 0, total, running: true, result: before });
+    const now = await copyAgentFiles(
+      api,
+      orgId,
+      { files, agentIds: agentIds.current, note: t("onboarding.import.files.note", { app }) },
+      (n, of) => {
+        if (mine === run.current) setCopy((c) => c && { ...c, done: n, total: of });
+      },
+    );
+    if (mine !== run.current) return;
+    const result: FilesCopy = before
+      ? {
+          copied: before.copied + now.copied,
+          folders: new Map([...before.folders, ...now.folders]),
+          left: [...before.left, ...now.left],
+        }
+      : now;
+    setCopy({ done: total, total, running: false, result });
+    if (now.copied > 0) toast.show(t("onboarding.import.files.done", { count: now.copied }));
+    const notes = filesNotes(now.folders, (folder) => t("onboarding.import.files.pointer", { app, folder }));
+    if (notes.length === 0) return;
+    await api.imports
+      .apply(orgId, {
+        bundle: { ...bundle, skills: [], channels: [], routines: [], notes, todo: [], leftOut: [] },
+        dryRun: false,
+        pick: notes.map((n) => itemId({ kind: "note", key: n.key })),
+      })
+      .catch(() => {});
+  };
+
+  /**
    * Applies what is picked (in chunks) and keeps the report. `prepare` changes
-   * the bundle first (onboarding sets the models the chosen key can run).
+   * the bundle first (onboarding sets the models the chosen key can run). The
+   * agents' files go to the Drive after the first apply, when chosen.
    */
   const apply = async (prepare?: (bundle: MigrationBundle) => MigrationBundle) => {
     if (!orgId || !planned) return [];
@@ -218,6 +311,13 @@ export function useImportFlow(orgId: string | null) {
       );
       focus.current = "report";
       setReport(items);
+      const arrived = agentsArrived(planned.items, items, pick, sent.current);
+      for (const [key, id] of arrived) agentIds.current.set(key, id);
+      const theirs = planned.files.filter((f) => arrived.has(f.agent));
+      if (copyFiles && theirs.length > 0) {
+        for (const key of arrived.keys()) sent.current.add(key);
+        void copyToDrive(theirs, planned.bundle, copy?.result ?? null);
+      }
       return items;
     } finally {
       setProgress(null);
@@ -259,15 +359,31 @@ export function useImportFlow(orgId: string | null) {
     apply,
     toggle: (ids: string[], on: boolean) => toggle(ids, on),
     toggleSkill: (id: string, on: boolean) => toggle([id], on, setSkillsOn),
+    copyFiles,
+    setCopyFiles,
+    copy,
+    /** The agents here after the import, by key (for links to their files). */
+    agentIds: agentIds.current,
+    /** Sends again the files that failed (the network, the server). */
+    retryFiles: () => {
+      const before = copy?.result;
+      if (!planned || !before || copy?.running) return;
+      const failed = before.left.filter((l) => l.why === "failed").map((l) => l.file);
+      const rest = { ...before, left: before.left.filter((l) => l.why !== "failed") };
+      if (failed.length) void copyToDrive(failed, planned.bundle, rest);
+    },
     reset: () => {
       setTouched(true);
       run.current++;
       done.current = new Map();
+      agentIds.current = new Map();
+      sent.current = new Set();
       focus.current = "drop";
       setBusy(null);
       setFailure(null);
       setPlanned(null);
       setReport(null);
+      setCopy(null);
     },
   };
 }
@@ -685,6 +801,7 @@ function Preview({
             <Group key={kind} kind={kind} rows={rows} flow={flow} blocked={blocked} index={index} level={sub} />
           ) : null;
         })}
+        <FilesGroup flow={flow} index={index} level={sub} />
       </fieldset>
 
       {bundle.todo.length > 0 && (
@@ -833,6 +950,92 @@ function Group({
         </Button>
       )}
     </section>
+  );
+}
+
+/**
+ * The agents' own files (OpenBot.run's `files/`, an OpenClaw workspace): the choice to copy them to the Drive, on
+ * unless turned off; where each agent's go, how many and how big; what stays behind and why (keys and sign-ins are
+ * in "O que não vem junto").
+ */
+function FilesGroup({ flow, index, level }: { flow: ImportFlowState; index: Index; level: 3 | 4 }) {
+  const { t, i18n } = useTranslation();
+  const files = (flow.planned?.files ?? []).filter((f) => index.coming("agent", f.agent));
+  const going = files.filter((f) => !f.skip);
+  if (going.length === 0) return null;
+  const agents = [...new Set(going.map((f) => f.agent))];
+  const left = files.flatMap((file) => (file.skip && file.skip !== "secret" ? [{ file, why: file.skip }] : []));
+  return (
+    <section className="imp-group" aria-labelledby="imp-group-files">
+      <div className="imp-group__head">
+        <Switch id="imp-files-copy" checked={flow.copyFiles} onCheckedChange={flow.setCopyFiles} />
+        <Heading level={level} id="imp-group-files" className="imp-group__title">
+          <label htmlFor="imp-files-copy">{t("onboarding.import.files.copy")}</label>
+        </Heading>
+        <CountChip size="sm">{going.length}</CountChip>
+        <span className="imp-group__help">
+          {t(going.length > MANY_FILES ? "onboarding.import.files.many" : "onboarding.import.files.help", {
+            count: going.length,
+          })}
+        </span>
+      </div>
+      <ul className="imp-rows">
+        {agents.map((key) => {
+          const a = index.agents.get(key);
+          const theirs = going.filter((f) => f.agent === key);
+          const size = formatBytes(
+            i18n.language,
+            theirs.reduce((n, f) => n + f.size, 0),
+          );
+          return (
+            <li key={key} className="imp-row" data-off={!flow.copyFiles || undefined}>
+              <span className="imp-row__mark" aria-hidden="true">
+                <Icon name="drive" size={14} />
+              </span>
+              <span className="imp-row__lead" aria-hidden="true">
+                {a && <AgentAvatar name={a.name} appearance={normalizeAppearance(a.appearance)} size="sm" />}
+              </span>
+              <span className="imp-row__text">
+                <span className="imp-row__title">
+                  {t("onboarding.import.files.folder", { folder: driveFolder(a?.name ?? key) })}
+                </span>
+                <span className="imp-row__line">
+                  {t("onboarding.import.files.count", { count: theirs.length, size })}
+                </span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      {left.length > 0 && (
+        <div className="imp-group__foot">
+          <FilesLeft left={left} />
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** The agents' files that stay behind, by reason: a few names, then how many more. */
+function FilesLeft({ left }: { left: FilesCopy["left"] }) {
+  const { t } = useTranslation();
+  const reasons = (Object.keys(FILE_LEFT) as FileLeft[]).flatMap((why) => {
+    const paths = left.filter((l) => l.why === why).map((l) => l.file.path);
+    return paths.length ? [{ why, paths }] : [];
+  });
+  return (
+    <ul className="imp-left">
+      {reasons.map(({ why, paths }) => (
+        <li key={why}>
+          <Chip icon={FILE_LEFT[why]}>{t(`onboarding.import.files.left.${why}`, { max: MAX_UPLOAD_MB })}</Chip>
+          <span className="small">
+            {paths.length > NAMES_SHOWN + 1
+              ? `${paths.slice(0, NAMES_SHOWN).join(", ")} ${t("onboarding.import.files.more", { count: paths.length - NAMES_SHOWN })}`
+              : paths.join(", ")}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -1112,6 +1315,7 @@ export function ImportReport({
   if (!report || !bundle) return null;
   const made = report.filter((i) => i.action === "create" || i.action === "update");
   const missed = report.filter((i) => i.action === "skip");
+  const copy = flow.copy;
   // Already here: what the plan said so (never sent) and what came back unchanged.
   const sent = new Set(report.map(itemId));
   const kept = [...(flow.planned?.items ?? []).filter((i) => !sent.has(itemId(i))), ...report].filter(
@@ -1218,8 +1422,66 @@ export function ImportReport({
             </li>
           );
         })}
+        {copy && (
+          <li>
+            <span className="imp-made__icon" aria-hidden="true">
+              <Icon name="drive" size={16} />
+            </span>
+            <span className="imp-made__text">
+              {copy.running ? (
+                <>
+                  <b role="status">{t("onboarding.import.files.copying", { done: copy.done, total: copy.total })}</b>
+                  <span>{t("onboarding.import.files.keepOpen")}</span>
+                </>
+              ) : (
+                <b role="status">
+                  {copy.result?.copied
+                    ? t("onboarding.import.files.copied", { count: copy.result.copied })
+                    : t("onboarding.import.files.none")}
+                </b>
+              )}
+              <span className="imp-made__links">
+                {[...(copy.result?.folders ?? [])].map(([key, folder]) => {
+                  const id = flow.agentIds.get(key);
+                  const label = t("onboarding.import.files.folder", { folder });
+                  return linked && id ? (
+                    <Link
+                      key={key}
+                      to="/org/$orgId/agents/$agentId"
+                      params={{ orgId, agentId: id }}
+                      search={{ tab: "files" }}
+                      className="imp-link"
+                    >
+                      {label}
+                    </Link>
+                  ) : (
+                    <span key={key} className="muted">
+                      {label}
+                    </span>
+                  );
+                })}
+              </span>
+            </span>
+          </li>
+        )}
       </ul>
       {kept > 0 && <p className="small muted">{t("onboarding.import.report.kept", { count: kept })}</p>}
+
+      {copy?.result && copy.result.left.length > 0 && (
+        <section className="imp-block" aria-labelledby="imp-files-left-title">
+          <Heading level={sub} id="imp-files-left-title" className="imp-block__title">
+            {t("onboarding.import.files.leftTitle")}
+          </Heading>
+          <FilesLeft left={copy.result.left} />
+          {copy.result.left.some((l) => l.why === "failed") && (
+            <div>
+              <Button icon="refresh" onClick={flow.retryFiles} loading={copy.running} disabled={copy.running}>
+                {t("common.retry")}
+              </Button>
+            </div>
+          )}
+        </section>
+      )}
 
       {missed.length > 0 && (
         <section className="imp-block" aria-labelledby="imp-missed-title">

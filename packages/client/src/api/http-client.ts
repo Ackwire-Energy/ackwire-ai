@@ -78,6 +78,7 @@ import type {
   GitHubRepositories,
   Health,
   HostComputer,
+  ImportedFile,
   ImportedSource,
   ImportPlan,
   Instance,
@@ -617,6 +618,14 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     imports: {
       apply: (orgId, input) => request<ImportPlan>(`${org(orgId)}/imports`, { json: input }),
       sources: async (orgId) => (await request<{ sources: ImportedSource[] }>(`${org(orgId)}/imports`)).sources,
+      copyFile: (orgId, input) => {
+        const form = new FormData();
+        form.append("file", input.file, input.name);
+        form.append("agentId", input.agentId);
+        form.append("path", input.path);
+        if (input.note) form.append("note", input.note);
+        return files.upload<ImportedFile>(`${org(orgId)}/imports/files`, form);
+      },
       exportUrl: (orgId) => `${base}${org(orgId)}/export`,
     },
     chat: {

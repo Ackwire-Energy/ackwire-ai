@@ -96,7 +96,9 @@ import type {
   GitHubRepositories,
   Health,
   HostComputer,
+  ImportedFile,
   ImportedSource,
+  ImportFileInput,
   ImportInput,
   ImportPlan,
   Instance,
@@ -538,6 +540,11 @@ export interface ApiClient {
     apply(orgId: string, input: ImportInput): Promise<ImportPlan>;
     /** What this workspace brought from other apps, by source package (admins). */
     sources(orgId: string): Promise<ImportedSource[]>;
+    /**
+     * One of an imported agent's files into its folder in the Drive (multipart, ≤ 50 MB). A name already in the
+     * folder is never overwritten (`exists`); a credential store is refused (`import.secret_file`).
+     */
+    copyFile(orgId: string, input: ImportFileInput): Promise<ImportedFile>;
     /** Same-origin URL that downloads this workspace as a bundle (`.json`). */
     exportUrl(orgId: string): string;
   };

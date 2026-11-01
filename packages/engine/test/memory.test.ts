@@ -27,6 +27,7 @@ import {
   ensureThreadSummary,
   ForbiddenError,
   grantScopes,
+  holdsSecret,
   insertMessage,
   isVerified,
   listAgentMemoryRows,
@@ -94,6 +95,32 @@ describe("guardrails", () => {
     expect(looksLikeSecret("token: ghp_abcdefghijklmnopqrstuvwxyz0123")).toBe(true);
     expect(looksLikeSecret("senha = hunter22secret")).toBe(true);
     expect(looksLikeSecret("we use tokens to price calls")).toBe(false);
+    // A placeholder in a doc or a skill is not a key.
+    expect(looksLikeSecret("export OPENAI_API_KEY=your-key-here")).toBe(false);
+    expect(looksLikeSecret('{ "api_key": "YOUR_API_KEY" }')).toBe(false);
+  });
+
+  test("a file holds a key when one is set in it, whatever its type; never a placeholder or code", () => {
+    const file = (text: string) => holdsSecret(new TextEncoder().encode(text));
+    for (const text of [
+      '{"gmail":{"password":"hunter22-fixture"}}',
+      "#!/bin/sh\nDB_PASSWORD=fixture-never-stored ./run",
+      "users:\n- name: ci\n  user:\n    token: fixture-never-stored\n",
+      "use sk-ant-api03-abcdefghijklmnopqrstuvwxyz",
+    ]) {
+      expect([text, file(text)]).toEqual([text, true]);
+    }
+    for (const text of [
+      "export OPENAI_API_KEY=your-key-here",
+      '{ "api_key": "YOUR_API_KEY" }',
+      "token = get_token()",
+      'password = input("Senha: ")',
+      'token = os.environ["NORTHWIND_TOKEN"]',
+      `export API_KEY=${"$"}{NORTHWIND_KEY}`,
+      "password: <your password>",
+    ]) {
+      expect([text, file(text)]).toEqual([text, false]);
+    }
   });
 
   test("permission-bending text is the judge's call (any language); a failing judge never blocks memory", async () => {

@@ -1,5 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
+import { and, eq, schema } from "@agenteschat/db";
+import { ARTIFACT_LIMITS, setOrgLimits } from "@agenteschat/engine";
+import {
+  type Browser,
+  browser,
+  createTestServer,
+  joinByInvitation,
+  ORIGIN,
+  seedOrg,
+  signUp,
+  type TestServer,
+} from "./harness";
 
 let t: TestServer | undefined;
 afterEach(async () => {
@@ -221,6 +232,19 @@ const BUNDLE = {
   leftOut: [{ kind: "picture", label: "Scout" }],
 };
 
+/** BUNDLE's agent alone, as another package (`ref`) may bring it. */
+const ONLY_SCOUT = (agent: Partial<(typeof BUNDLE.agents)[number]> = {}, ref = BUNDLE.source.ref) => ({
+  ...BUNDLE,
+  source: { ...BUNDLE.source, ref },
+  agents: [{ ...BUNDLE.agents[0], skills: [], ...agent }],
+  skills: [],
+  channels: [],
+  routines: [],
+  notes: [],
+  todo: [],
+  leftOut: [],
+});
+
 type Plan = { items: { kind: string; key: string; action: string; reason?: string; targetId?: string }[] };
 
 describe("imports and the export", () => {
@@ -315,5 +339,210 @@ describe("imports and the export", () => {
       notes: x.notes.map((n) => n.content),
     });
     expect(names(copy)).toEqual(names(exported));
+  });
+});
+
+describe("an imported agent's own files into the Drive", () => {
+  /** A multipart POST with the browser's session cookie and our Origin. */
+  const send = (b: Browser, path: string, fields: Record<string, string | File>) => {
+    const form = new FormData();
+    for (const [k, v] of Object.entries(fields)) form.set(k, v);
+    return (t as TestServer).app.request(path, {
+      method: "POST",
+      headers: { cookie: b.cookie(), origin: ORIGIN },
+      body: form,
+    });
+  };
+  type Copied = { status: string; artifactId: string; title: string; folder: string };
+
+  test("its folder, made by the agent; a name already there stays as it was; never keys; the Drive's limits; admins only", async () => {
+    const { b, orgId } = await owner({});
+    const base = `/api/app/organizations/${orgId}`;
+    const applied = (await (await b(`${base}/imports`, { json: { bundle: BUNDLE, dryRun: false } })).json()) as Plan;
+    const scout = applied.items.find((i) => i.kind === "agent")?.targetId as string;
+    const copy = (path: string, text: string, name = path.split("/").pop() as string, as = b) =>
+      send(as, `${base}/imports/files`, {
+        file: new File([text], name, { type: "text/markdown" }),
+        agentId: scout,
+        path,
+        note: "Trazido do OpenBot.run",
+      });
+
+    const created = await copy("notes/plan.md", "# Plan");
+    expect(created.status).toBe(201);
+    const first = (await created.json()) as Copied;
+    expect(first).toMatchObject({ status: "created", title: "Scout/notes/plan.md", folder: "Scout" });
+    const file = (await (await b(`${base}/artifacts/${first.artifactId}`)).json()) as {
+      kind: string;
+      channelId: string | null;
+      createdBy: { type: string; id: string };
+      content: { name: string; text?: string };
+    };
+    // The whole workspace sees it; the agent made it (its page lists it); the first version says where it came from.
+    expect(file).toMatchObject({ kind: "file", channelId: null, createdBy: { type: "agent", id: scout } });
+    expect(file.content).toMatchObject({ name: "plan.md", text: "# Plan" });
+    const versions = (await (await b(`${base}/artifacts/${first.artifactId}/versions`)).json()) as {
+      versions: { note: string | null }[];
+    };
+    expect(versions.versions.map((v) => v.note)).toEqual(["Trazido do OpenBot.run"]);
+    const onItsPage = (await (await b(`${base}/artifacts?authorType=agent&authorId=${scout}&changed=1`)).json()) as {
+      artifacts: { id: string }[];
+    };
+    expect(onItsPage.artifacts.map((a) => a.id)).toEqual([first.artifactId]);
+    // Who imported is who the audit names.
+    const [audit] = await (t as TestServer).db
+      .select()
+      .from(schema.auditLog)
+      .where(and(eq(schema.auditLog.action, "artifact.created"), eq(schema.auditLog.targetId, first.artifactId)));
+    expect(audit?.actorType).toBe("person");
+
+    // The same name again: it stays as it was.
+    const again = await copy("notes/plan.md", "# Plan, edited elsewhere");
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual({ ...first, status: "exists" });
+    const kept = (await (await b(`${base}/artifacts/${first.artifactId}`)).json()) as {
+      version: number;
+      content: { text?: string };
+    };
+    expect(kept).toMatchObject({ version: 1, content: { text: "# Plan" } });
+
+    // Never a key file (by its name, or a text with a password in it), never outside the folder.
+    for (const [path, text, code] of [
+      [".env", "NORTHWIND_TOKEN=fixture-never-stored", "import.secret_file"],
+      ["config/credentials.json", "{}", "import.secret_file"],
+      ["keys/deploy.pem", "x", "import.secret_file"],
+      [".netrc", "machine example.com login scout password fixture", "import.secret_file"],
+      ["notes/servers.md", "Deploy box\npassword: fixture-never-stored", "import.secret_file"],
+      ["../escape.md", "x", "import.file_path"],
+    ] as const) {
+      const refused = await copy(path, text);
+      expect(refused.status).toBe(400);
+      expect(((await refused.json()) as { error: { code: string } }).error.code).toBe(code);
+    }
+    // As an archive's file comes (no type): keys by what they hold, whatever the type, JSON's quotes too; key and
+    // login files by their names, a note named like one too.
+    const key = `sk-proj-${"x".repeat(24)}`;
+    const pem = ["-----BEGIN PRIVATE KEY-----", "fixture", "-----END PRIVATE KEY-----"].join("\n");
+    const bytes = (body: string | Uint8Array, path: string) =>
+      send(b, `${base}/imports/files`, {
+        file: new File([body], path.split("/").pop() as string),
+        agentId: scout,
+        path,
+      });
+    const binary = new Uint8Array([0xff, 0xfe, 0, 1, ...new TextEncoder().encode(pem), 0xff]);
+    for (const [path, body] of [
+      ["accounts.json", '{"gmail":{"password":"hunter22-fixture"}}'],
+      ["config.json", `{"apiKey":"${"f".repeat(20)}"}`],
+      ["prod.env", `OPENAI_API_KEY=${key}`],
+      ["deploy.sh", `#!/bin/sh\nexport OPENAI_API_KEY=${key}\n`],
+      ["run.sh", "DB_PASSWORD=fixture-never-stored ./run"],
+      ["kubeconfig", "users:\n- name: ci\n  user:\n    token: fixture-never-stored\n"],
+      ["AuthKey_ABC123.p8", pem],
+      ["certs/server.crt", pem],
+      ["blob.bin", binary],
+      ["passwords.md", "- gmail: fixture"],
+      ["notes/credentials.md", "the logins"],
+    ] as const) {
+      const refused = await bytes(body, path);
+      expect([path, refused.status]).toEqual([path, 400]);
+      expect(((await refused.json()) as { error: { code: string } }).error.code).toBe("import.secret_file");
+    }
+    // A script or a binary with none goes like any file.
+    expect((await bytes("#!/bin/sh\necho hi\n", "hello.sh")).status).toBe(201);
+    expect((await bytes('token = get_token()\npassword = input("Senha: ")\n', "fetch.py")).status).toBe(201);
+    expect((await bytes(new Uint8Array([0xff, 0xfe, 0, 1]), "data.bin")).status).toBe(201);
+
+    // The Drive's limits: the workspace's storage.
+    await setOrgLimits((t as TestServer).db, orgId, {
+      members: null,
+      storageBytes: 10,
+      uploadBytesPerDay: null,
+      platformUsdPerMonth: null,
+    });
+    const full = await copy("notes/long.md", "more than ten bytes");
+    expect(full.status).toBe(409);
+    expect(((await full.json()) as { error: { code: string } }).error.code).toBe("storage.full");
+    await setOrgLimits((t as TestServer).db, orgId, {
+      members: null,
+      storageBytes: null,
+      uploadBytesPerDay: null,
+      platformUsdPerMonth: null,
+    });
+    // And 50 MB a file.
+    const big = await send(b, `${base}/imports/files`, {
+      file: new File([new Uint8Array(ARTIFACT_LIMITS.fileBytes + 1)], "video.mp4"),
+      agentId: scout,
+      path: "video.mp4",
+    });
+    expect([400, 413]).toContain(big.status);
+    expect(((await big.json()) as { error: { code: string } }).error.code).toBe("artifact.file_too_large");
+
+    const titles = (await (await b(`${base}/artifacts?q=Scout%2F`)).json()) as { artifacts: { title: string }[] };
+    expect(titles.artifacts.map((a) => a.title).sort()).toEqual([
+      "Scout/data.bin",
+      "Scout/fetch.py",
+      "Scout/hello.sh",
+      "Scout/notes/plan.md",
+    ]);
+
+    // Only who imports; and only into an agent of this workspace.
+    const member = await joinByInvitation(t as TestServer, b, orgId, "member@example.com");
+    expect((await copy("notes/other.md", "x", "other.md", member)).status).toBe(403);
+    expect((await send(browser(t as TestServer), `${base}/imports/files`, { path: "a.md" })).status).toBe(401);
+    const stranger = await send(b, `${base}/imports/files`, {
+      file: new File(["x"], "a.md"),
+      agentId: crypto.randomUUID(),
+      path: "a.md",
+    });
+    expect(stranger.status).toBe(404);
+  });
+
+  test("who may create agents but not manage them copies only into the agents their own import brought", async () => {
+    const { b, orgId } = await owner({});
+    const base = `/api/app/organizations/${orgId}`;
+    const role = await b(`${base}/roles`, { json: { name: "Builders", permissions: ["create_agents"] } });
+    expect(role.status).toBe(201);
+    const { id: roleId } = (await role.json()) as { id: string };
+    const builder = await joinByInvitation(t as TestServer, b, orgId, "builder@example.com");
+    const builderId = ((await (await builder("/api/app/me")).json()) as { user: { id: string } }).user.id;
+    expect((await b(`${base}/members/${builderId}/roles`, { method: "PUT", json: { roleIds: [roleId] } })).status).toBe(
+      200,
+    );
+    const agentOf = async (as: Browser) =>
+      (
+        (await (await as(`${base}/imports`, { json: { bundle: ONLY_SCOUT(), dryRun: false } })).json()) as Plan
+      ).items.find((i) => i.kind === "agent")?.targetId as string;
+    const admins = await agentOf(b);
+    const copy = (agentId: string, path: string) =>
+      send(builder, `${base}/imports/files`, { file: new File(["# Notes"], "notes.md"), agentId, path });
+
+    // The admin's agent: as if it weren't there, so nothing is credited to it.
+    expect((await copy(admins, "notes.md")).status).toBe(404);
+    // Their own import's agent: like any importer.
+    const mine = await agentOf(builder);
+    expect(mine).not.toBe(admins);
+    expect((await copy(mine, "notes.md")).status).toBe(201);
+  });
+
+  test("importing again keeps what the agent has at a path: the name trimmed as the Drive keeps it, after a rename, never another agent's file", async () => {
+    const { b, orgId } = await owner({});
+    const base = `/api/app/organizations/${orgId}`;
+    const applied = (await (await b(`${base}/imports`, { json: { bundle: BUNDLE, dryRun: false } })).json()) as Plan;
+    const scout = applied.items.find((i) => i.kind === "agent")?.targetId as string;
+    const copy = (path: string, agentId = scout) =>
+      send(b, `${base}/imports/files`, { file: new File(["x"], "plan.md"), agentId, path });
+    const first = (await (await copy("plan.md ")).json()) as Copied;
+    expect(first).toMatchObject({ status: "created", title: "Scout/plan.md" });
+    expect(((await (await copy("plan.md ")).json()) as Copied).status).toBe("exists");
+
+    // Renamed: its files stay where they are, never copied again.
+    await (t as TestServer).db.update(schema.agents).set({ name: "Scout Pro" }).where(eq(schema.agents.id, scout));
+    expect(await (await copy("plan.md")).json()).toEqual({ ...first, status: "exists", folder: "Scout Pro" });
+
+    // Another agent with that name: its file at the same title is its own.
+    const bundle = ONLY_SCOUT({ name: "Scout Pro", handle: "scout-pro" }, "pkg-other");
+    const other = (await (await b(`${base}/imports`, { json: { bundle, dryRun: false } })).json()) as Plan;
+    const theirs = (await (await copy("plan.md", other.items[0]?.targetId)).json()) as Copied;
+    expect(theirs.status).toBe("created");
   });
 });

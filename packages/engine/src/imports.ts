@@ -1,16 +1,17 @@
 import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
-import { and, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
+import { and, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { isKnownModel, isOpenRouterModel } from "@agenteschat/providers";
-import { isIdHandle } from "@agenteschat/ui/names";
+import { driveFolder, isIdHandle, isSecretFile } from "@agenteschat/ui/names";
 import { createAgent, freeHandle, HANDLE_PATTERN, updateAgent } from "./agents";
 import { type AgentAppearance, setAgentAppearance, validateAppearance } from "./appearance";
+import { ARTIFACT_LIMITS, type ArtifactDeps, createFileArtifact } from "./artifacts";
 import { recordAudit } from "./audit";
 import { addChannelMember, CHANNEL_NAME_PATTERN, createChannel } from "./channels";
-import { addContextItemByPerson, editContextItem, looksLikeSecret } from "./context/items";
+import { addContextItemByPerson, editContextItem, holdsSecret, looksLikeSecret } from "./context/items";
 import { nextCronTime, zonedParts } from "./cron";
 import { sha256 } from "./crypto";
-import { ConflictError, ValidationError } from "./errors";
-import { requirePermission } from "./organizations";
+import { ConflictError, NotFoundError, ValidationError } from "./errors";
+import { can, requirePermission } from "./organizations";
 import {
   createRoutine,
   type RoutineDeps,
@@ -912,4 +913,95 @@ export async function importedSources(db: Database, actorId: string, orgId: stri
     sources.set(key, source);
   }
   return [...sources.values()];
+}
+
+/** `<folder>/<path>` in the Drive's title limit: a long path keeps its end, where the file's name is. */
+function driveTitle(folder: string, path: string) {
+  const title = `${folder}/${path}`;
+  const max = ARTIFACT_LIMITS.titleChars;
+  return title.length <= max ? title : `${folder}/…${path.slice(-(max - folder.length - 2))}`;
+}
+
+/**
+ * One of an imported agent's own files (OpenBot.run's `files/`, an OpenClaw workspace) into its folder in the
+ * Drive: titled `<agent's name>/<path>`, keeping the source's folders, seen by the whole workspace and made by the
+ * agent (its page lists it; the audit names the importer). A path the agent already has a file at (outside the
+ * trash, whatever its folder is named now) stays as it was: `exists`, so importing again never overwrites. Never a credential store, by its name (`isSecretFile`) or
+ * by what it holds, whatever its type (`holdsSecret`: a private key, or a key or a password in its text, as for
+ * memory). The Drive's limits apply: 50 MB a file, the workspace's storage and daily uploads (409 `storage.full`,
+ * `storage.daily_full`). Who may import, into an agent their own import brought (or anyone's, who manages agents).
+ */
+export async function copyImportedFile(
+  deps: ArtifactDeps,
+  actorId: string,
+  orgId: string,
+  input: {
+    agentId: string;
+    path: string;
+    name: string;
+    bytes: Uint8Array;
+    contentType?: string | null;
+    note?: string | null;
+  },
+): Promise<{ status: "created" | "exists"; artifactId: string; title: string; folder: string }> {
+  const { db } = deps;
+  const membership = await requirePermission(db, actorId, orgId, "create_agents");
+  // The file is credited to the agent: only into one this person's import brought, unless they manage agents.
+  if (!can(membership, "manage_agents")) {
+    const [mine] = await db
+      .select({ id: importItems.id })
+      .from(importItems)
+      .where(
+        and(
+          eq(importItems.orgId, orgId),
+          eq(importItems.createdByUserId, actorId),
+          eq(importItems.kind, "agent"),
+          eq(importItems.targetId, input.agentId),
+        ),
+      )
+      .limit(1);
+    if (!mine) throw new NotFoundError("Agent not found");
+  }
+  const parts = input.path.split(/[\\/]+/).filter((p) => p && p !== ".");
+  if (parts.length === 0 || parts.includes("..")) {
+    throw new ValidationError("the path must stay inside the agent's folder", "import.file_path");
+  }
+  const path = parts.join("/");
+  const name = input.name || (parts.at(-1) as string);
+  if (isSecretFile(path) || isSecretFile(name) || holdsSecret(input.bytes)) {
+    throw new ValidationError("files with keys or sign-ins are never copied to the Drive", "import.secret_file");
+  }
+  const [agent] = await db
+    .select({ name: agents.name })
+    .from(agents)
+    .where(and(eq(agents.id, input.agentId), eq(agents.orgId, orgId), isNull(agents.deletedAt)));
+  if (!agent) throw new NotFoundError("Agent not found");
+  const folder = driveFolder(agent.name);
+  // Trimmed as the Drive stores titles. What the agent already has at this path, whatever its folder is named now.
+  const title = driveTitle(folder, path).trim();
+  const tail = title.slice(folder.length);
+  const [existing] = await db
+    .select({ id: schema.artifacts.id, title: schema.artifacts.title })
+    .from(schema.artifacts)
+    .where(
+      and(
+        eq(schema.artifacts.orgId, orgId),
+        eq(schema.artifacts.createdByType, "agent"),
+        eq(schema.artifacts.createdById, input.agentId),
+        sql`right(${schema.artifacts.title}, ${[...tail].length}) = ${tail}`,
+        isNull(schema.artifacts.channelId),
+        isNull(schema.artifacts.deletedAt),
+      ),
+    )
+    .limit(1);
+  if (existing) return { status: "exists", artifactId: existing.id, title: existing.title, folder };
+  const created = await createFileArtifact(deps, { type: "person", userId: actorId }, orgId, {
+    title,
+    name,
+    bytes: input.bytes,
+    contentType: input.contentType,
+    note: input.note,
+    author: { type: "agent", id: input.agentId },
+  });
+  return { status: "created", artifactId: created.id, title, folder };
 }
