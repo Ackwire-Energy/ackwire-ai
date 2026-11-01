@@ -40,7 +40,7 @@ A run of a person's messages, each within 2.5 s of the one before and each one t
 
 ## Addendum (2026-10-31): R4, the team's coordinator
 
-After R1 to R3, R4 sends a person's message nobody could read to the team's coordinator (ADR 0093), only when the person is alone in the channel with the agents and the message names no person. When a step could read it and the policy picked nobody, the coordinator takes it too, if it needs an agent or the person is alone with the agents. Both are stored as `rule:coordinator`.
+After R1 to R3, R4 sends a person's message nobody could read to the team's coordinator (ADR 0093), only when the person is alone in the channel with the agents and the message names no person. When a step could read it and the policy picked nobody, the coordinator takes it too, if it needs an agent or the person is alone with the agents. Both are stored as `rule:coordinator`. A message the step heard speak to one agent (`addressee`, below) goes to that agent instead, stored as the step's own pick, and to the coordinator only when it is the one spoken to. The agent last talked to (below) only changes a pick of one other agent, so it never meets the coordinator, which takes only what nobody was picked for.
 
 ## Addendum (2026-10-31): the agent a message speaks to answers
 
