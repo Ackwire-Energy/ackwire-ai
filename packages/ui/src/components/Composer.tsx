@@ -23,7 +23,7 @@ import {
 } from "../format";
 import { Icon, type IconName } from "../icons/Icon";
 import { Button } from "./Button";
-import { type EmojiPickerLabels, EmojiPickerPopover } from "./EmojiPicker";
+import { type EmojiPickerLabels, EmojiPickerPopover, type PickerTab } from "./EmojiPicker";
 import { useAutoGrow } from "./Field";
 import { modKey } from "./Kbd";
 import { PixelStop } from "./PixelMarks";
@@ -158,6 +158,12 @@ export interface ComposerProps {
   format?: ComposerFormatLabels;
   /** The emoji button: the picker inserts at the caret. `button` names it ("Emoji"). */
   emoji?: EmojiPickerLabels & { button: string };
+  /**
+   * More tabs in the emoji button's picker, after Emojis (GIFs and stickers, ADR 0091): one picker with tabs, named
+   * by `pickerLabels`. What a tab picks it sends itself.
+   */
+  pickerTabs?: PickerTab[];
+  pickerLabels?: { dialog: string; tabs: string };
   /** Files picked with the attach button (when there is no `onAttach`), dropped on the box or pasted. */
   onFiles?: (files: File[]) => void;
   /** Inside the card, above the text (e.g. "Respondendo a Ana" with the quoted line). */
@@ -343,6 +349,8 @@ export function Composer({
   sendText,
   format,
   emoji,
+  pickerTabs,
+  pickerLabels,
   onFiles,
   header,
   attachments,
@@ -681,6 +689,8 @@ export function Composer({
                 <EmojiPickerPopover
                   labels={emoji}
                   onPick={insertEmoji}
+                  tabs={pickerTabs}
+                  tabLabels={pickerLabels}
                   align="start"
                   // Back to the text box (the caret after the emoji), not to the button.
                   onCloseAutoFocus={(e) => {

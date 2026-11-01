@@ -18,6 +18,7 @@ import { WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { restrictionLine } from "@agenteschat/client/lib/errors";
 import { daysBetween, formatShortDate, formatTime, namesText, timeLeft } from "@agenteschat/client/lib/format";
 import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
+import { mediaKindOf, mediaWord, messageMediaOf, textOrMedia } from "@agenteschat/client/lib/media";
 import {
   allItems,
   askersOf,
@@ -119,6 +120,15 @@ const nameOf = (t: TFunction, dir: Dir, a: NotificationActor | undefined) =>
       ? (dir.anyAgent(a.id)?.name ?? t("channel.unknownAgent"))
       : (dir.memberById.get(a.id)?.name ?? t("channel.unknownPerson"));
 
+/**
+ * Who an accepted invitation brought in (ADR 0090): the directory's name, else the one the notice carries, while
+ * the members list catches up with someone who just joined.
+ */
+const joinerOf = (t: TFunction, dir: Dir, n: AppNotification) => {
+  const a = n.actors[0];
+  return (a && dir.memberById.get(a.id)?.name) || n.latest.title || nameOf(t, dir, a);
+};
+
 /** A face for an actor: agents are the living symbol, people their photo or initials. */
 function Face({
   actor,
@@ -126,16 +136,19 @@ function Face({
   className,
   size = "md",
   state,
+  name: given,
 }: {
   actor: NotificationActor | undefined;
   dir: Dir;
   className?: string;
   size?: "sm" | "md";
   state?: "idle" | "waiting" | "writing";
+  /** The name when the directory may not have it yet (`joinerOf`). */
+  name?: string;
 }) {
   const { t } = useTranslation();
   if (!actor) return null;
-  const name = nameOf(t, dir, actor);
+  const name = given ?? nameOf(t, dir, actor);
   if (actor.type === "agent")
     return <AgentAvatar agentId={actor.id} name={name} size={size} state={state} className={className} labelled />;
   return (
@@ -203,7 +216,8 @@ function SourceChip({
   let icon: IconName = "channel";
   let label = "";
   if (n.kind === "approval") [icon, label] = ["shield", t("notifications.source.approval")];
-  else if (n.kind === "join_request") [icon, label] = ["members", t("notifications.source.members")];
+  else if (n.kind === "join_request" || n.kind === "invitation_accepted")
+    [icon, label] = ["members", t("notifications.source.members")];
   else if (
     n.kind === "machine_connected" ||
     n.kind === "computer_ready" ||
@@ -276,6 +290,9 @@ type WhatKey =
   | "desktopHandoff"
   | "joinRequest"
   | "joinRequestMany"
+  | "joinSuggestion"
+  | "invitationAccepted"
+  | "invitationAcceptedAny"
   | "reaction";
 
 /** The line on top of a row: who did what, where. */
@@ -342,10 +359,17 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
     case "join_request": {
       // Merged while unread: the first ones to ask, by name, then how many more.
       const asked = askersOf(n);
+      // A member's suggestion says who suggested it (ADR 0090); a merged row counts everyone as asking.
+      if (asked.total === 1 && n.latest.suggestedBy)
+        return k("joinSuggestion", { by: n.latest.suggestedBy, name: asked.names[0] });
       return asked.total > 1
         ? k("joinRequestMany", { names: namesText(t, asked.names, 2, asked.total) })
         : k("joinRequest", { name: asked.names[0] });
     }
+    case "invitation_accepted":
+      return n.source.label
+        ? k("invitationAccepted", { name: joinerOf(t, dir, n), org: n.source.label })
+        : k("invitationAcceptedAny", { name: joinerOf(t, dir, n) });
     case "reaction":
       return k("reaction", { names, count });
   }
@@ -488,9 +512,9 @@ function ThreadReplies({ n, dir, mine }: { n: AppNotification; dir: Dir; mine: s
   const { org } = useOrg();
   const thread = useThreadMessages(org.id, channelOf(n) ?? undefined, n.source.threadId ?? "");
   if (thread.isPending) return <LoadingCards count={1} className="nt-reps" />;
-  // Replies with words (cards like an approval or a question have none of their own).
+  // Replies with words or a GIF or a sticker (cards like an approval or a question have none of their own).
   const replies = (thread.data ?? [])
-    .filter((m) => m.id !== n.source.threadId && !m.local && m.body.trim())
+    .filter((m) => m.id !== n.source.threadId && !m.local && (m.body.trim() || messageMediaOf(m.meta)))
     .slice(-n.count);
   return (
     <div className="nt-reps">
@@ -505,7 +529,7 @@ function ThreadReplies({ n, dir, mine }: { n: AppNotification; dir: Dir; mine: s
                 <small>{whenText(t, i18n.language, m.createdAt)}</small>
               </div>
               <p>
-                <Snippet text={m.body} mine={mine} />
+                <Snippet text={textOrMedia(t, m.body, m.meta)} mine={mine} />
               </p>
             </div>
           </div>
@@ -634,7 +658,9 @@ function Row({
   const { t, i18n } = useTranslation();
   const unread = n.readAt === null;
   const first = n.actors[0];
-  const name = nameOf(t, dir, first);
+  // Someone who just joined may not be in the members list yet: the notice names them (ADR 0090).
+  const joiner = n.kind === "invitation_accepted" ? joinerOf(t, dir, n) : undefined;
+  const name = joiner ?? nameOf(t, dir, first);
   const own = workspaceHeadline(n);
   const label = own ? t(own, { name: n.source.label }) : name;
   const reaction = n.kind === "reaction";
@@ -652,7 +678,7 @@ function Row({
       <Face actor={other} dir={dir} size="sm" className="nt-av17" />
     </span>
   ) : first ? (
-    <Face actor={first} dir={dir} className="nt-av28" />
+    <Face actor={first} dir={dir} className="nt-av28" name={joiner} />
   ) : (
     <SystemFace n={n} />
   );
@@ -679,11 +705,13 @@ function Row({
   // run what went wrong (never the server's English).
   const why = routineNotificationWords(n);
   const restriction = restrictionOf(n);
+  // A GIF or a sticker has no words: its word stands for it (ADR 0091).
+  const media = mediaKindOf(l.media);
   const text = restriction
     ? restrictionLine(t, restriction.code, restriction.facts)
     : why
       ? sayWords(t, why, l.text ?? "")
-      : l.text;
+      : l.text || (media ? mediaWord(t, media) : l.text);
   const stopStep = steps ? (steps.failedAt ?? steps.done + 1) : 0;
   const stepWords = steps
     ? failed

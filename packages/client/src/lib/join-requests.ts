@@ -12,6 +12,8 @@ export const sendsEmail = (config: Pick<AuthConfig, "passwordReset"> | undefined
 export const JOIN_NAME_MAX = 80;
 export const JOIN_NOTE_MAX = 200;
 export const JOIN_REASON_MAX = 300;
+/** The longest note in the invitation email (the server's `INVITE_NOTE_MAX`, packages/engine/src/organizations.ts). */
+export const INVITE_NOTE_MAX = 300;
 /** Digits in an emailed code (the engine's `CODE_LENGTH`): asking to join (ADR 0072) and deleting (ADR 0088). */
 export const CODE_LENGTH = 6;
 

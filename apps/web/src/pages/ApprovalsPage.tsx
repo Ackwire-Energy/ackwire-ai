@@ -63,6 +63,7 @@ import {
 import { useOrg } from "@/components/org-context";
 import { colorOf, prepareBurst } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
+import { TYPED_VALUES } from "@/i18n";
 import { useOpenParam } from "@/lib/open-param";
 import { useToast } from "@/lib/toast";
 import "./approvals.css";
@@ -313,6 +314,7 @@ export function ApprovalsPage() {
                   ),
                 }}
                 components={{ b: <b /> }}
+                {...TYPED_VALUES}
               />
             </span>
           </div>
@@ -570,7 +572,8 @@ function Traits({ approval }: { approval: Approval }) {
   );
 }
 
-export function expiryText(t: TFunction, a: Approval) {
+/** The time a decision has left ("23 h para decidir", "expira em 12 min"): an approval's, or any request's. */
+export function expiryText(t: TFunction, a: Pick<Approval, "expiresAt">) {
   const left = timeLeft(t, a.expiresAt);
   if (!left) return t("approval.expired");
   return new Date(a.expiresAt).getTime() - Date.now() <= URGENT_MS
@@ -812,7 +815,7 @@ function RequestCard({
           <p className="ap-said ac-iconline">
             <AgentAvatar agentId={a.agentId} name={name} size="xs" />
             <span>
-              <Trans i18nKey="approval.said" values={{ name, text: why }} components={{ b: <b /> }} />
+              <Trans i18nKey="approval.said" values={{ name, text: why }} components={{ b: <b /> }} {...TYPED_VALUES} />
             </span>
           </p>
         )}

@@ -597,8 +597,8 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
       await closePopover(pop);
     }
     for (const [text, routed] of [
-      ["ninguém pegou", { pickedBy: [], decidedBy: { step: "jev" } }],
       ["de antes", { pickedBy: [ADA_ID] }],
+      ["ninguém pegou", { pickedBy: [], decidedBy: { step: "jev" } }],
     ] as const) {
       await sendText(text);
       await settle(4);
@@ -608,6 +608,13 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
       await closePopover(pop);
     }
     expect(receiptOf("ninguém pegou").textContent).toContain("Nenhum agente vai responder·Chamar um agente");
+    // Only the newest message says it in words: an older one keeps the check, whose popover says it.
+    await sendText("e depois");
+    await settle(4);
+    expect(receiptOf("ninguém pegou").textContent).not.toContain("Nenhum agente vai responder");
+    const older = await popoverOf("ninguém pegou");
+    expect(older.textContent).toContain("Nenhum agente vai responder·Chamar um agente");
+    await closePopover(older);
   });
 });
 
@@ -873,7 +880,7 @@ describe("memory changes and proposals in the chat", () => {
     expect(screen().getByRole("group", { name: "Proposta de mudança de Ada" })).toBeTruthy();
   });
 
-  test("a proposal in the chat: diff inline with Aceitar / Editar / Recusar", async () => {
+  test("a proposal in the chat: Ver a mudança opens the diff, Editar there, Aceitar / Recusar in the footer", async () => {
     const state = seedState();
     state.messages.push({
       id: "msg-prop",
@@ -888,6 +895,10 @@ describe("memory changes and proposals in the chat", () => {
     });
     await open(state);
     const card = screen().getByRole("group", { name: "Proposta de mudança de Ada" });
+    expect(card.getAttribute("data-ask-kind")).toBe("proposal");
+    // The change is behind "Ver a mudança"; Editar lives there too.
+    expect(card.querySelector(".ac-diff__line--add")).toBeNull();
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Ver a mudança" })));
     expect(card.querySelectorAll(".ac-diff__line--add").length).toBeGreaterThan(0);
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Editar" })));
     await act(async () =>
@@ -902,7 +913,9 @@ describe("memory changes and proposals in the chat", () => {
       "prop-1",
       "Só PRs pequenos.",
     ]);
-    expect(card.querySelector(".ac-chip--done")?.textContent).toBe("Aceita");
+    // Decided: the settled card takes its place (another element).
+    const done = screen().getByRole("group", { name: "Proposta de mudança de Ada" });
+    expect(done.querySelector(".ac-chip--done")?.textContent).toBe("Aceita");
   });
 });
 

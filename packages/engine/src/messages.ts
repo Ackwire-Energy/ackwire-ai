@@ -1,4 +1,4 @@
-import type { PubSub } from "@agenteschat/adapters";
+import { GIF_ID_PATTERN, type GifProvider, type PubSub } from "@agenteschat/adapters";
 import {
   and,
   asc,
@@ -31,6 +31,7 @@ import {
 import { cutText } from "./format";
 import { type Judge, personMentionAddressees } from "./judge";
 import { PLATFORM_CAP } from "./limits";
+import { isMediaAfterReply, isStickerMood, type MessageMedia, mediaOf, mediaSettings, type StickerMood } from "./media";
 import { type MessageMemory, memoriesFor } from "./message-memories";
 import { can } from "./organizations";
 import { afterReplyAnswered } from "./questions";
@@ -118,6 +119,8 @@ export interface ReplyRef {
   author: { type: "person" | "agent"; id: string | null };
   authorName: string;
   excerpt: string;
+  /** The quoted message's GIF or sticker (ADR 0091): a quote of one with no text still says what it was. */
+  mediaKind?: MessageMedia["kind"];
 }
 
 export const REPLY_EXCERPT_LENGTH = 200;
@@ -133,6 +136,15 @@ export function replyExcerpt(body: string, max = REPLY_EXCERPT_LENGTH): string {
 
 /** Files a person may attach to one message. */
 export const MAX_MESSAGE_ATTACHMENTS = 10;
+
+/** What the app sends for a GIF or a sticker (ADR 0091): only what picks it; the rest is looked up. */
+export type MessageMediaInput = { kind: "gif"; id: string } | { kind: "sticker"; agentId: string; mood: StickerMood };
+
+/**
+ * Why a GIF or sticker can't be sent: `message.media_off` (GIFs or stickers off here, or no GIF provider now) and
+ * `message.media_not_found` (no such GIF at the workspace's rating, or no such agent here). The route answers 422.
+ */
+export const MEDIA_REFUSALS: readonly string[] = ["message.media_off", "message.media_not_found"];
 
 /** Model and tokens of the run that wrote an agent message (no money: everyone in the channel sees it). */
 export interface MessageUsage {
@@ -483,10 +495,19 @@ export async function insertMessageWithRuns(
   duplicate: boolean;
 }> {
   const body = input.body.trim();
-  // Files alone are a message (`meta.artifacts`): the text may be empty then.
+  // Files alone are a message (`meta.artifacts`), and so is a GIF or a sticker (`meta.media`, ADR 0091): the
+  // text may be empty then.
   const attached = input.meta?.artifacts;
   const files = Array.isArray(attached) && attached.length > 0;
-  if (body === "" && !files) throw new ValidationError("Message is empty");
+  const media = mediaOf(input.meta);
+  if (body === "" && !files && !media) throw new ValidationError("Message is empty");
+  // A GIF or a sticker alone is like a reaction (ADR 0091 §1): it routes to nobody, starts no run, reaches no run in
+  // progress (nor answers its question), suggests nothing in a mission and reopens no thread. Agents read it in the
+  // conversation later. Nothing to search in it either.
+  const mediaOnly = body === "" && !files && media !== null;
+  // The sticker or GIF an agent adds after its own reply is silent (ADR 0091 §4): it notifies nobody, and a thread
+  // waits for the reply's own assessment.
+  const silent = isMediaAfterReply(input.meta);
   if (body.length > MAX_MESSAGE_LENGTH)
     throw new ValidationError(`Message is longer than ${MAX_MESSAGE_LENGTH} characters`);
   const handles = `{${parseMentionHandles(body).join(",")}}`; // handles match [a-z0-9_-]: safe as an array literal
@@ -499,8 +520,8 @@ export async function insertMessageWithRuns(
   const stretchId =
     (input.author.type === "agent" && input.author.runId === null ? input.author.stretchId : null) ?? null;
   const threadId = input.threadId ?? null;
-  const startRuns = options.startRuns && person;
-  const deliver = person && options.deliver !== false;
+  const startRuns = options.startRuns && person && !mediaOnly;
+  const deliver = person && options.deliver !== false && !mediaOnly;
   // Agents the person only referenced (`classifyAddressees`): mentioned, but no run and no steering.
   const referenced = `{${(person ? referencedOf(input.meta ?? {}) : []).filter((v) => UUID.test(v)).join(",")}}`;
   // Idempotent send: a person's `clientId` is claimed with the message; a resend finds it taken.
@@ -533,7 +554,8 @@ export async function insertMessageWithRuns(
           not exists (select 1 from ${schema.missionParticipants} mo
             where mo.mission_id = mi.id and mo.user_id = ${userId}) as outsider
         from ${schema.missions} mi
-        where ${person}::boolean and ${threadId}::uuid is not null and mi.org_id = ${input.orgId}::uuid
+        where ${person}::boolean and not ${mediaOnly}::boolean and ${threadId}::uuid is not null
+          and mi.org_id = ${input.orgId}::uuid
           and mi.thread_root_id = ${threadId}::uuid and mi.status in ('proposed', 'active', 'paused', 'awaiting_close')
           and mi.owner_id is distinct from ${userId}
           and not exists (select 1 from ${schema.missionParticipants} mp
@@ -677,9 +699,11 @@ export async function insertMessageWithRuns(
           and exists (select 1 from fresh)
         returning *
       ), reopened as (
-        -- A person replying in a closed thread reopens it (one indexed update; no row = nothing to do).
+        -- A person replying in a closed thread reopens it (one indexed update; no row = nothing to do). A GIF or a
+        -- sticker alone doesn't, like a reaction.
         update ${threads} t set state = 'open', closed_by = null, closed_at = null, updated_at = now()
-        where ${person}::boolean and ${threadId}::uuid is not null and t.org_id = ${input.orgId}::uuid
+        where ${person}::boolean and not ${mediaOnly}::boolean and ${threadId}::uuid is not null
+          and t.org_id = ${input.orgId}::uuid
           and t.root_message_id = ${threadId}::uuid and t.state = 'closed' and exists (select 1 from m)
         returning t.id
       ), runs as (
@@ -703,30 +727,34 @@ export async function insertMessageWithRuns(
         union all
         select gen_random_uuid(), ${input.orgId}::uuid, 'search.index',
           jsonb_build_object('kind', 'message', 'sourceId', m.id), 'search.index:message:' || m.id, 8 from m
+          where not ${mediaOnly}::boolean
         union all
         select gen_random_uuid(), ${input.orgId}::uuid, 'message.posted', jsonb_build_object('messageId', m.id),
           'message.posted:' || m.id, 8 from m
           -- An agent's message without a mention goes to the router too: another agent may chime in (ADR 0034).
-          where m.author_type = 'person' or cardinality(m.mentioned_agent_ids) > 0
-            or m.hop < ${AGENT_CHIME_IN_MAX_HOP}
+          -- A GIF or a sticker alone goes to nobody, an agent's silent one after its reply included (ADR 0091).
+          where not ${mediaOnly}::boolean and (m.author_type = 'person' or cardinality(m.mentioned_agent_ids) > 0
+            or m.hop < ${AGENT_CHIME_IN_MAX_HOP})
         union all
         -- In-app notifications: people mentioned, a reply in a thread, a person's DM, an agent's answer to whoever
         -- is behind its run (ADR 0071).
         select gen_random_uuid(), ${input.orgId}::uuid, 'notifications.message', jsonb_build_object('messageId', m.id),
           'notifications.message:' || m.id, 4 from m
-          where cardinality(m.mentioned_user_ids) > 0 or m.thread_id is not null or m.agent_run_id is not null
+          where not ${silent}::boolean and (cardinality(m.mentioned_user_ids) > 0 or m.thread_id is not null
+            or m.agent_run_id is not null
             or (m.author_type = 'person' and exists (
-              select 1 from ${channels} dc where dc.id = ${input.channelId}::uuid and dc.kind = 'dm'))
+              select 1 from ${channels} dc where dc.id = ${input.channelId}::uuid and dc.kind = 'dm')))
         on conflict do nothing
         returning id
       ), assess as (
         -- A reply: the thread's title and "resolved?" are assessed a while later (threads.assess);
-        -- a newer reply's job takes over. Forum replies are skipped by the handler.
+        -- a newer reply's job takes over. Forum replies are skipped by the handler. An agent's silent sticker or GIF
+        -- after its reply leaves it to the reply's own job (the assessment doesn't count it as newer).
         insert into ${outbox} (id, org_id, kind, payload, dedupe_key, max_attempts, next_attempt_at)
         select gen_random_uuid(), ${input.orgId}::uuid, 'threads.assess',
           jsonb_build_object('threadRootId', m.thread_id, 'messageId', m.id), 'threads.assess:' || m.id, 2,
           now() + ${THREAD_ASSESS_DELAY_MS / 1000}::int * interval '1 second'
-        from m where m.thread_id is not null
+        from m where m.thread_id is not null and not ${silent}::boolean
         on conflict do nothing
         returning id
       )
@@ -854,8 +882,9 @@ export async function postPersonMessage(
   /**
    * `judge`: tells a plain "stop" from a correction while an agent works (none = never a stop).
    * `talker`: the agents' conversation layer, for fast replies while they work (none = no fast replies).
+   * `gifs`: the server's GIF provider (ADR 0091; none = no GIFs).
    */
-  deps: { db: Database; pubsub: PubSub; judge?: Judge; talker?: Talker },
+  deps: { db: Database; pubsub: PubSub; judge?: Judge; talker?: Talker; gifs?: GifProvider | null },
   userId: string,
   orgId: string,
   channelId: string,
@@ -879,6 +908,8 @@ export async function postPersonMessage(
      * call stops and it reads the message now (instead of at its next step).
      */
     steer?: "now";
+    /** A GIF or an agent's sticker (ADR 0091), looked up here and stored as `meta.media`; `body` may be empty. */
+    media?: MessageMediaInput;
   },
 ): Promise<MessageView> {
   // One access check (membership + channel) instead of two round trips.
@@ -891,10 +922,11 @@ export async function postPersonMessage(
   // A resend found before the judge call (no cost again); a resend racing the first send is caught by the insert.
   const resent = clientId ? await sentWithClientId(deps.db, orgId, userId, clientId) : null;
   if (resent) return resendView(deps, orgId, resent);
-  // Quote and files: checked and resolved here, so the run's context reads them from the meta (no query there).
-  const [replyTo, files] = await Promise.all([
+  // Quote, files and media: checked and resolved here, so the run's context reads them from the meta (no query there).
+  const [replyTo, files, media] = await Promise.all([
     input.replyTo ? replyRefFor(deps.db, orgId, channelId, input.replyTo) : null,
     input.attachments?.length ? attachmentRefsFor(deps.db, userId, orgId, channelId, input.attachments) : null,
+    input.media ? resolveMedia(deps, orgId, input.media) : null,
   ]);
   // Several agents mentioned: who is asked to act now, who is only referenced (no run for those).
   const addressees = deps.judge
@@ -902,11 +934,12 @@ export async function postPersonMessage(
     : null;
   const referencedIds = addressees?.referenced ?? [];
   const meta =
-    replyTo || files || referencedIds.length > 0
+    replyTo || files || media || referencedIds.length > 0
       ? {
           ...(input.meta ?? {}),
           ...(replyTo ? { replyTo } : {}),
           ...(files ? { artifacts: files } : {}),
+          ...(media ? { media } : {}),
           ...(referencedIds.length > 0 ? { referencedAgentIds: referencedIds } : {}),
         }
       : input.meta;
@@ -1145,6 +1178,41 @@ async function recordAddressees(db: Database, message: Message, d: AddresseeDeci
     .catch(() => undefined);
 }
 
+/**
+ * A person's GIF or sticker (ADR 0091), looked up here: a GIF at the workspace's rating with the provider's own
+ * title and size, a sticker of an agent of this workspace. What the app sent is never stored as it came.
+ */
+async function resolveMedia(
+  deps: { db: Database; gifs?: GifProvider | null },
+  orgId: string,
+  input: MessageMediaInput,
+): Promise<MessageMedia> {
+  const settings = await mediaSettings(deps.db, orgId);
+  const notFound = () => new ValidationError("That GIF or sticker isn't available", "message.media_not_found");
+  if (input.kind === "gif") {
+    // A provider without a key now (`available()`) is none: GIFs come back once the server's owner adds one.
+    const gifs = deps.gifs?.available() ? deps.gifs : null;
+    if (!gifs || !settings.gifs) throw new ValidationError("GIFs are off in this workspace", "message.media_off");
+    if (!GIF_ID_PATTERN.test(input.id)) throw notFound();
+    const gif = await gifs.get(input.id, settings.gifRating).catch((): never => {
+      // The provider didn't answer: no GIFs for now, the same as without one.
+      throw new ValidationError("GIFs aren't available right now", "message.media_off");
+    });
+    if (!gif) throw notFound();
+    return { kind: "gif", provider: "giphy", id: gif.id, title: gif.title, width: gif.width, height: gif.height };
+  }
+  if (!settings.agentStickers) throw new ValidationError("Stickers are off in this workspace", "message.media_off");
+  if (!UUID.test(input.agentId) || !isStickerMood(input.mood)) throw notFound();
+  const [agent] = await deps.db
+    .select({ id: agents.id })
+    .from(agents)
+    .where(
+      and(eq(agents.id, input.agentId), eq(agents.orgId, orgId), isNull(agents.archivedAt), isNull(agents.deletedAt)),
+    );
+  if (!agent) throw notFound();
+  return { kind: "sticker", agentId: agent.id, mood: input.mood };
+}
+
 /** The quoted message (one statement, with its author's name): it must be a live message of this channel. */
 async function replyRefFor(db: Database, orgId: string, channelId: string, messageId: string): Promise<ReplyRef> {
   const [row] = await db
@@ -1156,6 +1224,7 @@ async function replyRefFor(db: Database, orgId: string, channelId: string, messa
       authorUserId: messages.authorUserId,
       authorAgentId: messages.authorAgentId,
       body: messages.body,
+      meta: messages.meta,
       deletedAt: messages.deletedAt,
       userName: schema.users.name,
       agentName: agents.name,
@@ -1168,12 +1237,14 @@ async function replyRefFor(db: Database, orgId: string, channelId: string, messa
     throw new ValidationError("replyTo must be a message of this channel", "message.reply_not_found");
   }
   const person = row.authorType === "person";
+  const media = mediaOf(row.meta);
   return {
     messageId: row.id,
     threadId: row.threadId,
     author: { type: row.authorType, id: person ? row.authorUserId : row.authorAgentId },
     authorName: (person ? row.userName : row.agentName) ?? "",
     excerpt: replyExcerpt(row.body),
+    ...(media ? { mediaKind: media.kind } : {}),
   };
 }
 
@@ -1278,7 +1349,15 @@ async function withReplies(db: Database, orgId: string, roots: MessageView[]): P
       last: sql<string>`max(${messages.createdAt})`,
     })
     .from(messages)
-    .where(and(eq(messages.orgId, orgId), inArray(messages.threadId, ids), isNull(messages.deletedAt)))
+    .where(
+      and(
+        eq(messages.orgId, orgId),
+        inArray(messages.threadId, ids),
+        isNull(messages.deletedAt),
+        // An agent's sticker or GIF after its own reply (ADR 0091) is part of that reply: not one more.
+        sql`${messages.meta}->>'mediaAfter' is null`,
+      ),
+    )
     .groupBy(messages.threadId);
   const recent = await db
     .select()

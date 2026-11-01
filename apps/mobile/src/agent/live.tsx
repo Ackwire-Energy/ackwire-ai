@@ -17,15 +17,16 @@ export const useLivePaused = () => useContext(PausedContext);
 
 /**
  * The shared clock's time in seconds, updating ~25 times a second while `active` (and not paused);
- * otherwise `still`.
+ * otherwise `still`. With `fps`, in steps of that rate: the same step again renders nothing, so what costs more to
+ * draw (a sticker) stays on the one clock at fewer frames.
  */
-export function useFrameTime(active: boolean, still: number): number {
+export function useFrameTime(active: boolean, still: number, fps?: number): number {
   const paused = useLivePaused();
   const running = active && !paused;
   const [t, setT] = useState(() => (running ? frameClock.time() : still));
   useEffect(() => {
     if (!running) return;
-    return frameClock.subscribe(setT);
-  }, [running]);
+    return frameClock.subscribe(fps ? (now) => setT(Math.floor(now * fps) / fps) : setT);
+  }, [running, fps]);
   return running ? t : still;
 }

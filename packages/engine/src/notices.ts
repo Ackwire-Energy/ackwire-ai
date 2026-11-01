@@ -5,8 +5,8 @@ import { untrustedBlock } from "./untrusted";
  * looking: a routine's report (`routine_handoff`), another agent's answer
  * (`consult_reply`) or note (`agent_note`), the late result of a wait it
  * stopped waiting on (`wait_result`), a fast reply it gave while it worked
- * (`talker_reply`), what a person decided on its proposal of a new agent
- * (`proposal_result`), its own follow-up (`follow_up`: the line it set, and at
+ * (`talker_reply`), what people decided on its proposal of a new agent or of
+ * a change (`proposal_result`), its own follow-up (`follow_up`: the line it set, and at
  * its time the notice that wakes it, `refs.wake`). Stored on the notice
  * message as `meta.notice`; the agent's context reads it as an event, never
  * as a person's words.

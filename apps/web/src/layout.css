@@ -2820,7 +2820,17 @@ p {
 }
 
 /* Skills: library rows, detail sheet, file viewer, picker */
+/*
+ * A library row stacks the name, its source line (pill, default chip, version and usage) and what the skill is for,
+ * so a long description runs the row's whole width instead of a column beside the marks.
+ */
+.skill-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+}
 .skill-row__name {
+  align-self: flex-start;
   padding: 0;
   border: 0;
   background: none;
@@ -2839,8 +2849,11 @@ p {
   box-shadow: var(--focus-ring);
   border-radius: 4px;
 }
-.skill-row .ac-chip {
-  margin-left: 0;
+.skill-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
 }
 .skill-picks {
   margin: 12px 0 0;
@@ -8126,14 +8139,7 @@ a.machine-row__name:hover {
   margin: 0;
 }
 
-/* Secrets (ADR 0027): the card's private field and the agent page's list. */
-.secret-card__form {
-  display: grid;
-  gap: var(--space-2);
-}
-.secret-card__form .ac-approval__actions {
-  align-items: center;
-}
+/* Secrets (ADR 0027): the agent page's list. */
 .agent-secrets {
   list-style: none;
   margin: 0;

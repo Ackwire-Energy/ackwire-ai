@@ -493,6 +493,7 @@ export function memoryRoutes(deps: AppDeps) {
         const actorId = c.get("user").id;
         await decideProposal(db, actorId, orgId, proposalId, decision === "accept" ? "accept" : "reject", {
           finalText: decision === "accept" ? c.req.valid("json").text : undefined,
+          pubsub: deps.adapters.pubsub,
         });
         const [row] = await listProposals(db, actorId, orgId, { ids: [proposalId] });
         if (!row) throw new NotFoundError("Proposal not found");

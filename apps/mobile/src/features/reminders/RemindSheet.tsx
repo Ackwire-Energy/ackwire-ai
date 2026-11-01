@@ -1,4 +1,5 @@
 import { ApiError, type Message, type ReminderInput, useReminderAction } from "@agenteschat/client";
+import { textOrMedia } from "@agenteschat/client/lib/media";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
@@ -122,7 +123,7 @@ export function RemindSheet({
         <View style={[styles.preview, surface]}>
           <Face who={message.author} size={24} live={false} />
           <Text variant="small" tone="ink2" numberOfLines={3} style={styles.grow}>
-            {previewOf(message.body) || t("mobile.chat.approvalPreview")}
+            {previewOf(textOrMedia(t, message.body, message.meta)) || t("mobile.chat.approvalPreview")}
           </Text>
         </View>
       ) : null}

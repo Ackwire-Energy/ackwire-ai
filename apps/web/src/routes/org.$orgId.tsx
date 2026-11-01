@@ -12,6 +12,7 @@ import { ConnectAiProvider } from "@/components/ConnectAi";
 import { ComputerDialogProvider } from "@/components/computer/ComputerDialog";
 import { MenuBarActions } from "@/components/DesktopMenus";
 import { DesktopDragStrip, DesktopTitleBar } from "@/components/DesktopTitleBar";
+import { InviteDialogProvider } from "@/components/invite/InviteDialog";
 import { RefetchBar } from "@/components/Loading";
 import { OutageNotices } from "@/components/MachineOutages";
 import { NavDrawerProvider, NavScrim, ShellBar } from "@/components/NavDrawer";
@@ -121,33 +122,36 @@ function OrgLayout() {
           <NavDrawerProvider>
             {inDesktopApp() && <DesktopTitleBar />}
             {inDesktopApp() && <MenuBarActions orgId={membership.id} />}
-            <div className="shell">
-              <RefetchBar />
-              <CommandMenu />
-              {!focused && (
-                <>
-                  <NavScrim />
-                  <Sidebar />
-                  <ShellBar />
-                </>
-              )}
-              {/* The work area: notices on top (agents paused, the workspace's computer on its way, a computer
-                  the agents run on went offline), then the page. */}
-              <div className="shell__work">
-                {!focused && <HoldBanner />}
-                {!focused && <ComputerSetupNotice />}
-                {!focused && <OutageNotices />}
-                <div className="shell__pages">
-                  <ConnectAiProvider>
-                    <ComputerDialogProvider>
-                      <PushOpens />
-                      <WebPushAsk />
-                      <Outlet />
-                    </ComputerDialogProvider>
-                  </ConnectAiProvider>
+            {/* One invite dialog for the workspace (ADR 0090): the menu, ⌘K, Members and a channel open it. */}
+            <InviteDialogProvider>
+              <div className="shell">
+                <RefetchBar />
+                <CommandMenu />
+                {!focused && (
+                  <>
+                    <NavScrim />
+                    <Sidebar />
+                    <ShellBar />
+                  </>
+                )}
+                {/* The work area: notices on top (agents paused, the workspace's computer on its way, a computer
+                    the agents run on went offline), then the page. */}
+                <div className="shell__work">
+                  {!focused && <HoldBanner />}
+                  {!focused && <ComputerSetupNotice />}
+                  {!focused && <OutageNotices />}
+                  <div className="shell__pages">
+                    <ConnectAiProvider>
+                      <ComputerDialogProvider>
+                        <PushOpens />
+                        <WebPushAsk />
+                        <Outlet />
+                      </ComputerDialogProvider>
+                    </ConnectAiProvider>
+                  </div>
                 </div>
               </div>
-            </div>
+            </InviteDialogProvider>
           </NavDrawerProvider>
         </ArtifactViewerProvider>
       </RealtimeProvider>

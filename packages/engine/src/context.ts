@@ -25,6 +25,7 @@ import { cutText } from "./format";
 import { issueWorkBrief, issueWorkOf } from "./issue-work";
 import { openTasksBrief } from "./issues";
 import type { MachineCaller } from "./machine-hub";
+import { type MessageMedia, mediaOf } from "./media";
 import { type Message, unreachedNote } from "./messages";
 import { missionBrief } from "./mission-brief";
 import { noticeForOthers, noticeText } from "./notices";
@@ -130,6 +131,9 @@ export function collapseRepeats(entries: { key: string; line: string }[], max: n
 const QUIET_TOOLS = [
   "ask_user",
   "react",
+  // A GIF or a sticker (ADR 0091) is in its conversation already: not work to recall elsewhere.
+  "send_gif",
+  "send_sticker",
   "search_context",
   "get_summary",
   "expand",
@@ -1099,16 +1103,27 @@ export function nowLine(zone: string, who: string | null, previousAt: Date | nul
   return `# Now\n${when}${who ? ` for ${who}` : ""} (${timeZone})${before}.`;
 }
 
+/** Where `authorNames` keeps an agent's name alone, for its stickers (ADR 0091). */
+export const stickerNameKey = (agentId: string) => `sticker:${agentId}`;
+
 async function authorNames(db: Database, history: Message[]) {
   const userIds = [...new Set(history.flatMap((m) => (m.authorUserId ? [m.authorUserId] : [])))];
   const names = new Map<string, string>();
-  // Agents usually sit in the per-process cache (the running agent always does): read only the misses.
+  const nameAgent = (a: { id: string; name: string; handle: string }) => {
+    names.set(a.id, `${a.name} (@${a.handle})`);
+    names.set(stickerNameKey(a.id), a.name);
+  };
+  // Agents usually sit in the per-process cache (the running agent always does): read only the misses. Besides
+  // the authors, the agents whose stickers were sent (ADR 0091).
   const agentIds: string[] = [];
   for (const m of history) {
-    if (!m.authorAgentId || names.has(m.authorAgentId) || agentIds.includes(m.authorAgentId)) continue;
-    const cached = caches.agents.get(`${m.orgId}:${m.authorAgentId}`) as Agent | null | undefined;
-    if (cached) names.set(cached.id, `${cached.name} (@${cached.handle})`);
-    else agentIds.push(m.authorAgentId);
+    const media = mediaOf(m.meta);
+    for (const id of [m.authorAgentId, media?.kind === "sticker" ? media.agentId : null]) {
+      if (!id || names.has(id) || agentIds.includes(id)) continue;
+      const cached = caches.agents.get(`${m.orgId}:${id}`) as Agent | null | undefined;
+      if (cached) nameAgent(cached);
+      else agentIds.push(id);
+    }
   }
   const [userRows, agentRows] = await Promise.all([
     userIds.length > 0
@@ -1122,7 +1137,7 @@ async function authorNames(db: Database, history: Message[]) {
       : Promise.resolve([]),
   ]);
   for (const u of userRows) names.set(u.id, u.name);
-  for (const a of agentRows) names.set(a.id, `${a.name} (@${a.handle})`);
+  for (const a of agentRows) nameAgent(a);
   return names;
 }
 
@@ -1147,10 +1162,39 @@ export function getChannelCached(db: Database, orgId: string, channelId: string)
 
 /** `meta.replyTo` (a quote reply) as a line before the text: who and what it answers. */
 export function quotedLine(meta: Record<string, unknown> | null | undefined): string {
-  const r = meta?.replyTo as { authorName?: unknown; excerpt?: unknown } | undefined;
-  if (!r || typeof r.excerpt !== "string" || !r.excerpt) return "";
+  const r = meta?.replyTo as { authorName?: unknown; excerpt?: unknown; mediaKind?: unknown } | undefined;
+  if (!r) return "";
   const who = typeof r.authorName === "string" && r.authorName ? r.authorName : "someone";
+  // A GIF or a sticker with no text (ADR 0091): what it was, never its title.
+  if ((typeof r.excerpt !== "string" || !r.excerpt) && (r.mediaKind === "gif" || r.mediaKind === "sticker")) {
+    return `(replying to ${who}'s ${r.mediaKind === "gif" ? "GIF" : "sticker"})\n`;
+  }
+  if (typeof r.excerpt !== "string" || !r.excerpt) return "";
   return `(replying to ${who}: "${r.excerpt}")\n`;
+}
+
+/** Longest GIF title a model reads. */
+const GIF_TITLE_MAX = 200;
+
+/**
+ * A GIF or a sticker someone sent (ADR 0091), as the model reads it: a GIF with its title as outside text (the
+ * provider's, anyone's to write), a sticker as its agent and mood. `names`: from `authorNames`.
+ */
+export function mediaLine(media: MessageMedia, names: Map<string, string>): string {
+  if (media.kind === "sticker") {
+    return `[sticker: ${names.get(stickerNameKey(media.agentId)) ?? "an agent"} (${media.mood})]`;
+  }
+  const title = media.title.trim();
+  return title ? `[GIF titled:]\n${untrustedBlock("GIF title", title, GIF_TITLE_MAX)}` : "[GIF]";
+}
+
+/**
+ * The agent's own sticker or GIF (the silent one after its reply), told on the people's side in one short line, so
+ * it never learns to write one as text.
+ */
+export function ownMediaNote(media: MessageMedia, names: Map<string, string>): string {
+  if (media.kind === "gif") return "[You sent a GIF]";
+  return `[You sent a sticker: ${names.get(stickerNameKey(media.agentId)) ?? "an agent"} (${media.mood})]`;
 }
 
 /** Files a person attached (`meta.artifacts`): titles and ids, so the agent can open them with its file tools. */
@@ -1331,17 +1375,30 @@ export function toTurns(
             `Routine "${routine.name}", created by ${who}; it ran in the background, not a request to you now`
           : `Routine "${routine.name}", created by ${who}`
         : who;
-    // Quote reply and files: from the meta written at post time (no query here).
-    const body = `${quotedLine(m.meta)}${m.body}${attachedLine(m)}`;
+    // Quote reply, files and a GIF or a sticker (ADR 0091): from the meta written at post time (no query here).
+    const media = mediaOf(m.meta);
+    const said = `${quotedLine(m.meta)}${m.body}${attachedLine(m)}`;
+    const body = media && !own ? [said, mediaLine(media, names)].filter(Boolean).join("\n") : said;
     const notes = undoNotes(m.meta);
-    const text = own ? body : `[${label}]: ${body}${notes ? `\n${notes}` : ""}`;
-    const last = turns.at(-1);
-    if (last && last.role === role) last.parts.push({ id: m.id, text });
-    else turns.push({ role, parts: [{ id: m.id, text }] });
-    // Someone undid (or redid) what this reply did, or its mention missed an agent that wasn't here: news for the
-    // agent, on the people's side.
-    const news = own ? [notes, unreachedLine(m.meta, options.canAddAgents === true)].filter(Boolean).join("\n") : "";
-    if (news) turns.push({ role: "user", parts: [{ id: `${m.id}:notes`, text: news }] });
+    // The agent's own sticker or GIF with no text (the silent one after its reply) has no turn of its own: below.
+    if (!own || !media || said.trim()) {
+      const text = own ? body : `[${label}]: ${body}${notes ? `\n${notes}` : ""}`;
+      const last = turns.at(-1);
+      if (last && last.role === role) last.parts.push({ id: m.id, text });
+      else turns.push({ role, parts: [{ id: m.id, text }] });
+    }
+    // Its own sticker or GIF, someone undoing (or redoing) what this reply did, or its mention missing an agent
+    // that wasn't here: news for the agent, on the people's side.
+    const news = own
+      ? [media ? ownMediaNote(media, names) : "", notes, unreachedLine(m.meta, options.canAddAgents === true)]
+          .filter(Boolean)
+          .join("\n")
+      : "";
+    if (news) {
+      const last = turns.at(-1);
+      if (last && last.role === "user") last.parts.push({ id: `${m.id}:notes`, text: news });
+      else turns.push({ role: "user", parts: [{ id: `${m.id}:notes`, text: news }] });
+    }
   }
   while (turns[0]?.role === "assistant") turns.shift();
   while (turns.at(-1)?.role === "assistant") turns.pop();
