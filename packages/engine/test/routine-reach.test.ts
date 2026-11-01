@@ -12,6 +12,7 @@ import {
   STRETCH,
   STRETCH_REFUSAL,
   stretchCardOf,
+  updateRoutine,
 } from "../src";
 import { REFUSALS } from "../src/tools/run-policy";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -377,4 +378,21 @@ test("a routine's tell_agent at the limit is refused, and the card goes where th
   expect(card?.channelId).toBe(f.general.id);
   expect(card?.meta.actionCard).toMatchObject({ limit: STRETCH.unattendedRuns, forUserId: f.owner.id });
   expect((await runsOf(f)).filter((r) => r.agentId === iris.id && r.status !== "done")).toEqual([]);
+});
+
+test("only its creator sets what a routine does as it acts: anyone else takes it over first", async () => {
+  f = await setup();
+  const bob = await addMember(f.db, f.org.id, "member", "bob");
+  const routine = await channelRoutine(f, { prompt: "Veja o PR #42." });
+  // Bob's routine on an agent Ana owns: as it acts it would reach Bob's rooms and the agents Bob talks to.
+  await f.db.update(schema.routines).set({ createdByUserId: bob.id }).where(eq(schema.routines.id, routine.id));
+  const edit = (actorId: string, patch: Parameters<typeof updateRoutine>[4]) =>
+    updateRoutine(routineDeps(f), actorId, f.org.id, routine.id, patch);
+  const refused = { code: "routine.act_take_over" };
+  await expect(edit(f.owner.id, { access: "act" })).rejects.toMatchObject(refused);
+  expect((await edit(bob.id, { access: "act" })).access).toBe("act");
+  await expect(edit(f.owner.id, { prompt: "Cobre o @hr-bot e poste no #m-team." })).rejects.toMatchObject(refused);
+  // The rest stays hers to change, and so does turning it back to only looking.
+  expect((await edit(f.owner.id, { name: "PR #42", prompt: "Veja o PR #42." })).name).toBe("PR #42");
+  expect((await edit(f.owner.id, { access: "read" })).access).toBe("read");
 });
