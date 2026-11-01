@@ -47,3 +47,15 @@ test("an agent's role sits under its name, up to two lines, with the face at the
   expect(value('.sidebar[data-rail="true"] .sidebar__item-text', "display")).toBe("contents");
   expect(value('.sidebar[data-rail="true"] .sidebar__item-role', "display")).toBe("none");
 });
+
+test("an owner's … on an agent's row gets its own room instead of covering the name and role", () => {
+  // The button is 24px at 4px from the row's end.
+  for (const state of [
+    ".sidebar__row:hover:has(> .sidebar__row-menu) > .sidebar__item",
+    '.sidebar__row:has(> .sidebar__row-menu:is(:focus-visible, [data-state="open"])) > .sidebar__item',
+  ]) {
+    expect(value(state, "padding-right")).toBe("32px");
+  }
+  const twoLines = ".sidebar__row:has(> .sidebar__item .sidebar__item-role) > .sidebar__row-menu.ac-btn";
+  expect([value(twoLines, "top"), value(twoLines, "translate")]).toEqual(["4px", "none"]);
+});

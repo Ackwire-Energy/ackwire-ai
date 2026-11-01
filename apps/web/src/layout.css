@@ -10098,7 +10098,8 @@ html[data-menu-overlay] .shell {
   gap: 6px;
 }
 /* An agent with a role: the face at the top beside the name (20px line, 2px down, centred on the 24px face), the role
-   under the name, 4px above and below like a 30px row's face; the count, lock or state stays centred at the end. */
+   under the name, 4px above the face and below the role like a 30px row's face (46px with a one-line role, 62px with
+   two); the count, lock or state stays centred at the end. */
 .sidebar:not([data-rail="true"]) .sidebar__item:has(> .sidebar__item-text > .sidebar__item-role) {
   align-items: flex-start;
   padding-block: 4px;
@@ -10314,6 +10315,16 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
   > .sidebar__item
   > :is(.sidebar__item-meta, .sidebar__unread) {
   visibility: hidden;
+}
+/* The name and role run the row's width, so the `…` gets its own room instead of covering their ends; on a two-line
+   row it sits on the name's line, beside the face. */
+.sidebar__row:hover:has(> .sidebar__row-menu) > .sidebar__item,
+.sidebar__row:has(> .sidebar__row-menu:is(:focus-visible, [data-state="open"])) > .sidebar__item {
+  padding-right: 32px;
+}
+.sidebar__row:has(> .sidebar__item .sidebar__item-role) > .sidebar__row-menu.ac-btn {
+  top: 4px;
+  translate: none;
 }
 @media (hover: none) {
   .sidebar__row-menu.ac-btn {
