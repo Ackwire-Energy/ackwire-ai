@@ -982,6 +982,7 @@ export const featureKeysPtBR = {
     loadFailed: "Não deu para abrir o arquivo.",
     openImage: "Abrir imagem",
     imageOf: "Imagem {{index}} de {{count}}",
+    place: "{{index}} de {{count}}",
     noPreview: "Este arquivo não abre no app. Compartilhe para abrir em outro app.",
   },
   issues: {

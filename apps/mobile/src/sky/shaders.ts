@@ -15,7 +15,6 @@ export type DitherKind =
   | "track"
   | "sweep"
   | "pill"
-  | "pillwork"
   | "horizon"
   | "workspace";
 
@@ -233,17 +232,16 @@ float field(float u, float v, float x, float y) {
   return 0.08 + 0.5 * exp(-(d * d) / 0.035);
 }
 `,
+  // `work` carries the sky at rest (its right end) over to the sweep that crosses the pill, with no cut between.
   pill: `
+uniform float work;
 float field(float u, float v, float x, float y) {
   float e = max(0.0, (u - 0.55) / 0.45);
-  return 0.55 * e * e * (0.8 + 0.2 * sin(v * 5.0 + t * 0.7));
-}
-`,
-  pillwork: `
-float field(float u, float v, float x, float y) {
+  float rest = 0.55 * e * e * (0.8 + 0.2 * sin(v * 5.0 + t * 0.7));
   float p = mod(t * 0.42, 1.6) - 0.3;
   float d = u - p;
-  return min(0.75, 0.32 * u * u * u + 0.5 * exp(-(d * d) / 0.02) * (0.5 + 0.5 * u)) + 0.04 * sin(v * 6.0 + t);
+  float sweep = min(0.75, 0.32 * u * u * u + 0.5 * exp(-(d * d) / 0.02) * (0.5 + 0.5 * u)) + 0.04 * sin(v * 6.0 + t);
+  return mix(rest, sweep, work);
 }
 `,
 };
@@ -251,3 +249,61 @@ float field(float u, float v, float x, float y) {
 /** The full SkSL source of one drawing. */
 export const shaderSource = (kind: DitherKind) =>
   `${PRELUDE}${FIELDS[kind]}${OVERLAID.has(kind) ? MAIN_OVERLAY : MAIN}`;
+
+/**
+ * The effort ramp (`drawEffort` of @agenteschat/ui's EffortPixels, on the UI thread): one-pixel bars a pixel apart
+ * climbing left to right in `steps` groups, filled up to `pos` in the agent's tone and breathing out of phase with
+ * their neighbours, an ink column at the edge, the rest dotted. `t` in milliseconds, as there.
+ */
+export const EFFORT_SHADER = `
+uniform float2 size;
+uniform float px;
+uniform float pos;
+uniform float steps;
+uniform float t;
+uniform float4 fillTone;
+uniform float4 tipTone;
+uniform float4 inkTone;
+uniform float4 offTone;
+
+float hash2(float a, float b) {
+  return fract(sin(a * 127.1 + b * 311.7) * 43758.5453);
+}
+
+float rampAt(float i, float cols, float rows) {
+  return max(2.0, floor(2.0 + (rows - 3.0) * pow(i / (cols - 1.0), 1.15) + 0.5));
+}
+
+bool isGap(float i, float per) {
+  float s = floor(i / per);
+  return s < steps - 1.0 && i + 2.0 >= floor((s + 1.0) * per + 0.5);
+}
+
+bool isOn(float i, float cols) {
+  return ((i + 0.5) / cols) * steps <= pos;
+}
+
+half4 main(float2 at) {
+  float cols = floor(size.x / px);
+  float rows = floor(size.y / px);
+  float ox = floor((size.x - cols * px) / 2.0);
+  float i = floor((at.x - ox) / px);
+  float r = floor((size.y - at.y) / px);
+  if (i < 0.0 || i >= cols || mod(i, 2.0) > 0.5) return half4(0.0);
+  float per = cols / steps;
+  if (isGap(i, per)) return half4(0.0);
+  float h = rampAt(i, cols, rows);
+  if (isOn(i, cols)) {
+    float next = isGap(i + 2.0, per) ? i + 4.0 : i + 2.0;
+    if (next >= cols || !isOn(next, cols)) {
+      return r < min(rows, max(4.0, h + 2.0)) ? half4(inkTone) : half4(0.0);
+    }
+    h = min(rows, h + floor((sin(t / 380.0 - i * 0.45) + 1.0) * 0.5 + 0.5));
+    if (r >= h) return half4(0.0);
+    bool tip = r >= h - 1.0 || hash2(i + floor(t / 110.0), r) < 0.035;
+    return half4(tip ? tipTone : fillTone);
+  }
+  if (r >= h || mod(r, 2.0) > 0.5) return half4(0.0);
+  return half4(float4(offTone.rgb * 0.22, 0.22));
+}
+`;

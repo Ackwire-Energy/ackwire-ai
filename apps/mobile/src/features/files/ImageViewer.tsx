@@ -19,6 +19,7 @@ import { useDirectory, useOrgId } from "../shared/hooks";
 import { savedAt, useFileActions, useSavedWhen } from "./actions";
 import { decodeFileList, fileInfo } from "./logic";
 import { useRemoteFile } from "./source";
+import { tellViewerPlace } from "./viewer-place";
 import { ZoomableImage } from "./ZoomableImage";
 
 /**
@@ -26,11 +27,20 @@ import { ZoomableImage } from "./ZoomableImage";
  * it on top, pinch and double tap to zoom, swipe between the pictures (dots), drag down to close, and
  * Compartilhar, Salvar em Fotos, Ver no Drive at the bottom. A tap hides and shows the bars.
  */
-export function ImageViewer({ files: rawFiles, at }: { files: string | string[] | undefined; at: string | undefined }) {
+export function ImageViewer({
+  files: rawFiles,
+  at,
+  from,
+}: {
+  files: string | string[] | undefined;
+  at: string | undefined;
+  /** The stack it opened from, told where the person stops. */
+  from?: string | undefined;
+}) {
   return (
     // Toasts show inside the modal (the app's host sits under it).
     <ToastHost>
-      <Viewer rawFiles={rawFiles} at={at} />
+      <Viewer rawFiles={rawFiles} at={at} from={from} />
     </ToastHost>
   );
 }
@@ -39,7 +49,15 @@ const WHITE = "#fff";
 const DIM = "rgba(255,255,255,0.6)";
 const PLATE = "rgba(255,255,255,0.14)";
 
-function Viewer({ rawFiles, at }: { rawFiles: string | string[] | undefined; at: string | undefined }) {
+function Viewer({
+  rawFiles,
+  at,
+  from,
+}: {
+  rawFiles: string | string[] | undefined;
+  at: string | undefined;
+  from: string | undefined;
+}) {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const dir = useDirectory();
@@ -56,6 +74,9 @@ function Viewer({ rawFiles, at }: { rawFiles: string | string[] | undefined; at:
   const detail = useArtifact(orgId, current?.id ?? null, current?.version).data;
   const actions = useFileActions(detail);
   const close = () => (router.canGoBack() ? router.back() : router.replace("/"));
+  useEffect(() => {
+    if (from) tellViewerPlace(from, index);
+  }, [from, index]);
 
   const onPage = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const i = Math.round(e.nativeEvent.contentOffset.x / width);

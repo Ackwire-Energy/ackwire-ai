@@ -7,7 +7,6 @@ import {
   extensionOf,
   extLabel,
   fileInfo,
-  imageRows,
   resolveDownloadUrl,
   safeFileName,
   shareSource,
@@ -77,17 +76,6 @@ describe("file kind, tile and size", () => {
 });
 
 describe("pictures in a message", () => {
-  test("one alone, otherwise rows of two", () => {
-    expect(imageRows(0)).toEqual([]);
-    expect(imageRows(1)).toEqual([[0]]);
-    expect(imageRows(2)).toEqual([[0, 1]]);
-    expect(imageRows(3)).toEqual([[0, 1], [2]]);
-    expect(imageRows(4)).toEqual([
-      [0, 1],
-      [2, 3],
-    ]);
-  });
-
   test("a lone picture keeps its shape, within limits", () => {
     expect(singleImageHeight(300, null)).toBe(225);
     expect(singleImageHeight(300, { width: 1000, height: 1000 })).toBe(300);

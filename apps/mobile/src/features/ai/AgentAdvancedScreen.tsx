@@ -5,7 +5,6 @@ import {
   type Advanced,
   advancedDefaults,
   advancedSummary,
-  EFFORT_LEVELS,
   effortLevel,
   isAdvancedDefault,
 } from "@agenteschat/client/lib/brain-advanced";
@@ -22,7 +21,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, useToast } from "@/ui";
 import { useColors, useDirectory } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
 import { PushedHeader } from "../shared/parts";
+import { EffortRamp, useEffortChoice } from "./EffortRamp";
 import { accountKindOf, agentAccounts } from "./logic";
 import { Note, PlanReplies, PlanRepliesOf } from "./parts";
 
@@ -84,6 +85,7 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
         );
   const now = view ? advancedOf(view, options) : null;
   const may = !busy && view?.canEdit === true;
+  const effort = useEffortChoice(agentId, now?.effort);
 
   /** Saves at once and says what the row on "Pensa com" will say now (or `done`). */
   const save = async (input: AgentBrainInput, done?: string) => {
@@ -135,22 +137,18 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
         ) : (
           <>
             {kind && !autoModel ? (
-              <>
-                <GroupedHeader>{t("agentPage.work.brain.effort")}</GroupedHeader>
+              <View style={styles.gap}>
                 <GroupedList>
-                  {EFFORT_LEVELS.map((e) => (
-                    <GroupedRow
-                      key={e}
-                      label={t(`agentPage.work.brain.efforts.${e}`)}
-                      sub={t(`agentPage.work.brain.effortText.${e}`)}
-                      subLines={2}
-                      checked={now.effort === e}
-                      disabled={!may}
-                      onPress={() => e !== now.effort && void save({ effort: e })}
+                  <View style={styles.ramp}>
+                    <EffortRamp
+                      value={effort.value}
+                      onChange={effort.change}
+                      color={agentLook(agent).color}
+                      disabled={!view.canEdit}
                     />
-                  ))}
+                  </View>
                 </GroupedList>
-              </>
+              </View>
             ) : null}
             <GroupedHeader>{t("agentPage.work.brain.context")}</GroupedHeader>
             <GroupedList>
@@ -235,4 +233,5 @@ const styles = StyleSheet.create({
   loading: { marginTop: 16 },
   // A list without a header keeps a header's room above it.
   gap: { marginTop: 18 },
+  ramp: { paddingHorizontal: 15, paddingTop: 13, paddingBottom: 12 },
 });
