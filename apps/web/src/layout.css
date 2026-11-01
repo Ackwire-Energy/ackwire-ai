@@ -440,20 +440,24 @@ p {
   /* Soft edges where the list runs under the top card or the foot (Sidebar.tsx sets the flags). */
   --sidebar-fade-top: 0px;
   --sidebar-fade-bottom: 0px;
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    #000 var(--sidebar-fade-top),
-    #000 calc(100% - var(--sidebar-fade-bottom)),
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    #000 var(--sidebar-fade-top),
-    #000 calc(100% - var(--sidebar-fade-bottom)),
-    transparent 100%
-  );
+  -webkit-mask-image:
+    linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 var(--sidebar-fade-top),
+      #000 calc(100% - var(--sidebar-fade-bottom)),
+      transparent 100%
+    ),
+    var(--scroll-strip);
+  mask-image:
+    linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 var(--sidebar-fade-top),
+      #000 calc(100% - var(--sidebar-fade-bottom)),
+      transparent 100%
+    ),
+    var(--scroll-strip);
 }
 .sidebar__scroll[data-fade-top="true"] {
   --sidebar-fade-top: 24px;
@@ -476,6 +480,22 @@ p {
     transition:
       --sidebar-fade-top 0.2s var(--out),
       --sidebar-fade-bottom 0.2s var(--out);
+  }
+}
+/* Its thumb shows only while the pointer is on the list or the keyboard moves through it. Through the token: Chrome
+   repaints a scrollbar when its element's style changes, never for a `:hover` that only its pseudo-elements read. */
+.sidebar__scroll:not(:hover, :has(:focus-visible)) {
+  --scroll-thumb: transparent;
+}
+/* The kit's 8px scrollbar sits at the sidebar's edge, in room kept whether the list scrolls or not, and the 4px of the
+   list's 12px side padding left beside it hold a row's focus ring: the rows end where the header's and the foot's do,
+   and keep their width when opening a category makes the list scroll. */
+@media (hover: hover) and (pointer: fine) {
+  @supports selector(::-webkit-scrollbar) {
+    .sidebar:not([data-rail="true"]) .sidebar__scroll {
+      scrollbar-gutter: stable;
+      padding-right: 4px;
+    }
   }
 }
 .sidebar__org {
@@ -574,7 +594,8 @@ p {
 .sidebar__channel-icon {
   color: var(--ink-muted);
 }
-/* The icon rail: a channel's initials stand in for its "#" (Sidebar.tsx, channelInitials). */
+/* The icon rail: a channel's initials stand in for its "#" (Sidebar.tsx, channelInitials), on a tile as big as the
+   faces under it, so they read as its mark and not as a cut name. */
 .sidebar__channel-abbr {
   display: none;
 }
@@ -582,14 +603,19 @@ p {
   display: none;
 }
 .sidebar[data-rail="true"] .sidebar__channel-abbr {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 30%;
+  background: var(--plate);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: 11px;
+  font-weight: 650;
   line-height: 1;
-  letter-spacing: -0.01em;
   color: var(--ink-muted);
 }
-.sidebar[data-rail="true"] .sidebar__item[data-status="active"] .sidebar__channel-abbr {
+.sidebar[data-rail="true"] .sidebar__item:is([data-status="active"], [data-unread="true"]) .sidebar__channel-abbr {
   color: var(--ink);
 }
 .sidebar__foot {
@@ -844,8 +870,8 @@ p {
 /* Messages fade out at the list's bottom edge, above the composer: a mask on the list itself, so a hovered
    (lifted) row, its reactions and any background fade too. The padding keeps the newest line clear of it. */
 .channel__messages {
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent), var(--scroll-strip);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent), var(--scroll-strip);
 }
 .channel__status {
   margin: 0 24px;
@@ -1635,6 +1661,11 @@ p {
   padding: 0 16px 14px;
   overflow-x: auto;
   max-height: 420px;
+}
+/* The rest of a longer block scrolls into its 420px in a message too, where the kit keeps code from scrolling up and
+   down. */
+.ac-msg__text .code-card__code {
+  overflow-y: auto;
 }
 .md .code-card code,
 .md .code-viewer code {
@@ -3218,6 +3249,10 @@ p {
     padding: 2px 16px 6px;
     overflow-x: auto;
     overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .settings__groups::-webkit-scrollbar {
+    display: none;
   }
   .settings__group-label {
     display: none;
@@ -5697,6 +5732,11 @@ p {
   font-size: 10px;
   line-height: 16px;
 }
+/* Over a tile's or a face's corner a bare number reads as an exponent: the rail's other counts' plate. */
+.sidebar[data-rail="true"] .sidebar__unread {
+  background: var(--sunken);
+  color: var(--ink2);
+}
 .sidebar[data-rail="true"] .sidebar__top,
 .sidebar[data-rail="true"] .sidebar__scroll,
 .sidebar[data-rail="true"] .sidebar__foot {
@@ -5707,9 +5747,20 @@ p {
 .sidebar[data-rail="true"] .sidebar__scroll {
   gap: 14px;
 }
+/* One 48px column (a 40px item and its focus ring) from the rail's padding, so the items stay on the rail's middle as
+   the header and the foot do, whatever room the scrollbar takes at the edge. Not `scrollbar-gutter: stable
+   both-edges`: WebKit keeps both gutters on the scrollbar's side. Never sideways: Firefox's thin scrollbar is 11px
+   with classic scrollbars on macOS, 1px more than the room beside the column. */
 .sidebar[data-rail="true"] .sidebar__scroll {
+  display: grid;
+  grid-template-columns: 48px;
+  align-content: start;
+  justify-items: center;
+  align-self: stretch;
+  width: auto;
   margin: -4px -10px;
-  padding: 4px 10px;
+  padding: 4px 0 4px 10px;
+  overflow-x: hidden;
 }
 .sidebar[data-rail="true"] .sidebar__jump-row {
   flex-direction: column;
@@ -6485,7 +6536,6 @@ p {
   font-size: 12px;
   line-height: 18px;
   white-space: pre;
-  scrollbar-width: thin;
 }
 .machine-command__copy {
   flex: none;
@@ -7193,6 +7243,10 @@ a.machine-row__name:hover {
     gap: 4px;
     overflow-x: auto;
     overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .onb__steps::-webkit-scrollbar {
+    display: none;
   }
   .onb__step {
     width: auto;
@@ -7973,6 +8027,9 @@ a.machine-row__name:hover {
     scrollbar-width: none;
     padding: 2px;
   }
+  .newag .onb__steps::-webkit-scrollbar {
+    display: none;
+  }
   .newag .onb__steps li {
     flex: none;
   }
@@ -8016,6 +8073,9 @@ a.machine-row__name:hover {
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
+  }
+  .newag__tips::-webkit-scrollbar {
+    display: none;
   }
   .newag__tip {
     flex: none;
