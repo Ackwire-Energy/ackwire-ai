@@ -255,6 +255,7 @@ describe("the agents' own files", () => {
       "passwords.md": "- gmail: fixture",
       "credentials.md": "the logins",
       "hello.sh": "#!/bin/sh\necho hi\n",
+      "fetch.py": 'token = get_token()\npassword = input("Senha: ")\n# export OPENAI_API_KEY=your-key-here\n',
     };
     const files: Record<string, string> = { "openbot-import.json": manifest };
     for (const [path, text] of Object.entries(own)) files[`agents/scout/files/${path}`] = text;
@@ -280,6 +281,7 @@ describe("the agents' own files", () => {
           "passwords.md": "secret",
           "credentials.md": "secret",
           "hello.sh": "copy",
+          "fetch.py": "copy",
         },
       ]);
     }

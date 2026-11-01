@@ -11,6 +11,7 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import { setsCredential } from "@agenteschat/ui/names";
 import { getAgent } from "../agents";
 import { caches } from "../cache";
 import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
@@ -27,17 +28,17 @@ export type Evidence = ContextItem["evidence"][number];
 
 // ── Guardrails ───────────────────────────────────────────────────────────────
 
-const SECRET_PATTERNS = [
+/** Keys by their format. */
+const KEY_FORMATS = [
   /\bsk-[a-z0-9_-]{16,}/i, // Anthropic/OpenAI-style keys
   /\bgh[pousr]_[a-z0-9]{20,}/i, // GitHub tokens
   /\bAKIA[0-9A-Z]{16}\b/, // AWS access keys
   /\bxox[abprs]-[a-z0-9-]{10,}/i, // Slack tokens
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
   /\b(bearer)\s+[a-z0-9._-]{20,}/i,
-  // `name: value`, `NAME=value` and JSON's `"name": "value"`; `_` before it too (`DB_PASSWORD`), never inside a word.
-  /(?:\b|_)(password|senha|passwd|secret(?:[_-]?(?:access[_-]?)?key)?|api[_ -]?key|token)["']?\s*[:=]\s*["']?[^\s"']{6,}/i,
   /\beyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}/, // JWTs
 ];
+const SECRET_PATTERNS = [...KEY_FORMATS, /\b(password|senha|passwd|secret|api[_ -]?key|token)\s*[:=]\s*\S{6,}/i];
 
 /** Memories and context never carry credentials (docs/adr/0017). */
 export const looksLikeSecret = (text: string) => SECRET_PATTERNS.some((p) => p.test(text));
@@ -49,7 +50,7 @@ const utf8 = new TextDecoder("utf-8", { fatal: true });
 
 /**
  * A file that holds credentials, whatever its name or type: a private key's header anywhere in its bytes (PEM, PGP),
- * or a key or a password in what reads as UTF-8 text.
+ * or a key or a password set in what reads as UTF-8 text (`setsCredential`: never a placeholder or code).
  */
 export function holdsSecret(bytes: Uint8Array): boolean {
   const buf = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -58,7 +59,8 @@ export function holdsSecret(bytes: Uint8Array): boolean {
   }
   if (bytes.byteLength > FILE_SCAN_BYTES) return false;
   try {
-    return looksLikeSecret(utf8.decode(bytes));
+    const text = utf8.decode(bytes);
+    return KEY_FORMATS.some((p) => p.test(text)) || setsCredential(text);
   } catch {
     return false;
   }

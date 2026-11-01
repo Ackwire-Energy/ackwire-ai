@@ -9,7 +9,7 @@ import type {
 } from "@agenteschat/client";
 import { handleFrom } from "@agenteschat/client/lib/text";
 import { AGENT_ACCESSORIES, AGENT_COLORS, AGENT_EYES, type AgentAppearance, type AgentColor } from "@agenteschat/ui";
-import { isSecretPath } from "@agenteschat/ui/names";
+import { isSecretPath, setsCredential } from "@agenteschat/ui/names";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 /** A file to read: `name` is its path relative to the dropped folder, the archive root or the GitHub link. */
@@ -304,7 +304,7 @@ const REDACTED = "[redacted]";
  * so an import loses the value instead of the whole item; `name: value` loses
  * its separator too, or the server would still read it as a credential.
  */
-const SECRET_PATTERNS: [RegExp, string][] = [
+const KEY_FORMATS: [RegExp, string][] = [
   [/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g, REDACTED],
   [/sk-ant-[A-Za-z0-9_-]{10,}/g, REDACTED],
   [/\bsk-[A-Za-z0-9_-]{16,}/gi, REDACTED],
@@ -315,11 +315,15 @@ const SECRET_PATTERNS: [RegExp, string][] = [
   [/\bAIza[0-9A-Za-z_-]{30,}/g, REDACTED],
   [/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, REDACTED],
   [/\b(bearer)\s+[A-Za-z0-9._~+/=-]{20,}/gi, `$1 ${REDACTED}`],
-  [
-    /(\b|_)(password|senha|passwd|secret(?:[_-]?(?:access[_-]?)?key)?|api[_ -]?key|token)["']?\s*[:=]\s*["']?[^\s"']{6,}/gi,
-    `$1$2 ${REDACTED}`,
-  ],
 ];
+const SECRET_PATTERNS: [RegExp, string][] = [
+  ...KEY_FORMATS,
+  [/\b(password|senha|passwd|secret|api[_ -]?key|token)\s*[:=]\s*\S{6,}/gi, `$1 ${REDACTED}`],
+];
+
+/** A file that holds a key: one by its format, or one set in its text (`setsCredential`, as the server checks). */
+export const holdsKey = (text: string) =>
+  KEY_FORMATS.some(([re]) => new RegExp(re.source, re.flags.replace("g", "")).test(text)) || setsCredential(text);
 
 export function scrubSecrets(text: string): { text: string; redacted: boolean } {
   let out = text;

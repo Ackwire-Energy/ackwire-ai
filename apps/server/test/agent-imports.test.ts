@@ -449,6 +449,7 @@ describe("an imported agent's own files into the Drive", () => {
     }
     // A script or a binary with none goes like any file.
     expect((await bytes("#!/bin/sh\necho hi\n", "hello.sh")).status).toBe(201);
+    expect((await bytes('token = get_token()\npassword = input("Senha: ")\n', "fetch.py")).status).toBe(201);
     expect((await bytes(new Uint8Array([0xff, 0xfe, 0, 1]), "data.bin")).status).toBe(201);
 
     // The Drive's limits: the workspace's storage.
@@ -479,6 +480,7 @@ describe("an imported agent's own files into the Drive", () => {
     const titles = (await (await b(`${base}/artifacts?q=Scout%2F`)).json()) as { artifacts: { title: string }[] };
     expect(titles.artifacts.map((a) => a.title).sort()).toEqual([
       "Scout/data.bin",
+      "Scout/fetch.py",
       "Scout/hello.sh",
       "Scout/notes/plan.md",
     ]);

@@ -43,5 +43,17 @@ const SECRET_NOTE = /(?:^|\/)[^/]*(?:password|credential|secret)[^/]*\.(?:md|mar
 /** Never copied into the Drive, by its name: a credential store, or a note named like one. */
 export const isSecretFile = (path: string) => isSecretPath(path) || SECRET_NOTE.test(path.replace(/\\/g, "/"));
 
+/**
+ * A credential set in a file's text: `name: value`, `NAME=value`, JSON's `"name": "value"`, `_` before the name too
+ * (`DB_PASSWORD`). Stricter on the value than memory's check, since a script or a doc names these all the time: a
+ * placeholder (`YOUR_API_KEY`, `your-key-here`, `xxx`, `<token>`) or code (`get_token()`, `${TOKEN}`, `os.environ[…]`)
+ * isn't one.
+ */
+const CREDENTIAL_SET =
+  /(?:\b|_)(?:password|senha|passwd|secret(?:[_-]?(?:access[_-]?)?key)?|api[_ -]?key|token)["']?\s*[:=]\s*["']?([^\s"',;]{6,})/gi;
+const NOT_A_VALUE = /your|xxx|changeme|example|placeholder|[<>${}()[\]]|^(?:os|process|env|self|this|config)\./i;
+export const setsCredential = (text: string) =>
+  [...text.matchAll(CREDENTIAL_SET)].some(([, value = ""]) => !/^[A-Z0-9_]+$/.test(value) && !NOT_A_VALUE.test(value));
+
 /** The Drive folder an imported agent's files go in: its name, with no `/` to read as a deeper folder. */
 export const driveFolder = (agentName: string) => agentName.replace(/[\\/]+/g, "-").trim() || "agent";

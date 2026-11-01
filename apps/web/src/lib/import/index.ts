@@ -11,6 +11,7 @@ import * as openmausbot from "./openmausbot";
 import * as paperclip from "./paperclip";
 import {
   Draft,
+  holdsKey,
   IMPORT_MAX_BYTES,
   ImportError,
   type ImportFile,
@@ -192,7 +193,7 @@ function agentFile(agent: string, path: string, f: ImportFile): AgentFile {
   const size = f.size ?? new TextEncoder().encode(f.text).byteLength;
   const read = f.read ?? (f.text ? async () => new Blob([f.text]) : undefined);
   const skip: AgentFileSkip | undefined =
-    isSecretPath(f.name) || isSecretFile(path) || scrubSecrets(f.text || f.peek || "").redacted
+    isSecretFile(path) || holdsKey(f.text || f.peek || "")
       ? "secret"
       : !read
         ? "unreadable"
