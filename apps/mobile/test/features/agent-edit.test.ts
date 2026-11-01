@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { coordinatorNote } from "@agenteschat/client/lib/coordinator";
 import { presetChannels, presetLevels, ROLE_DEFAULTS, ROLE_IDS } from "@agenteschat/client/lib/new-agent";
 import {
@@ -104,6 +106,13 @@ describe("editing an agent", () => {
     );
     expect(coordinatorNote(pt, team, "theo", true)).toBeNull();
     expect(coordinatorNote(pt, [nina], "nina", false)).toBe("Ninguém coordena o time agora.");
+  });
+
+  test("Editar hints the role the way Criar agente does, not with a one-word example", () => {
+    const src = (f: string) => readFileSync(join(import.meta.dir, "..", "..", "src", "features", "agents", f), "utf8");
+    for (const screen of ["AgentEditScreen.tsx", "NewAgentScreen.tsx"]) {
+      expect(src(screen).match(/<RoleInput[\s\S]*?\/>/)?.[0]).toContain('placeholder={t("agent.roleHelp")}');
+    }
   });
 });
 

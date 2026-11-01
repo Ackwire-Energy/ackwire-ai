@@ -148,11 +148,7 @@ export function AgentEditScreen({ id }: { id: string }) {
         )}
 
         {fields.has("role") ? (
-          <RoleInput
-            value={draft.role}
-            onChangeText={(v) => set("role", v)}
-            placeholder={t("mobile.agentEdit.rolePlaceholder")}
-          />
+          <RoleInput value={draft.role} onChangeText={(v) => set("role", v)} placeholder={t("agent.roleHelp")} />
         ) : (
           <View style={styles.gapTop}>{readOnly(t("agent.roleLabel"), agent.role)}</View>
         )}
