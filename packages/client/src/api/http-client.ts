@@ -474,6 +474,12 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       proposal: (orgId, messageId) => request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}`),
       denyProposal: (orgId, messageId) =>
         request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}/deny`, { json: {} }),
+      createProposed: (orgId, messageId) =>
+        request<{ agent: Agent; proposal: AgentProposal }>(`${org(orgId)}/agent-proposals/${enc(messageId)}/create`, {
+          json: {},
+        }),
+      proposalRoutine: (orgId, messageId) =>
+        request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}/routine`, { json: {} }),
       update: (orgId, agentId, input) =>
         request<Agent>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "PATCH", json: input }),
       archive: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "DELETE" }),

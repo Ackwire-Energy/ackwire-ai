@@ -404,6 +404,10 @@ export interface ApiClient {
     proposal(orgId: string, messageId: string): Promise<AgentProposal>;
     /** Says no to it (who may create agents): the card stays, marked denied. */
     denyProposal(orgId: string, messageId: string): Promise<AgentProposal>;
+    /** "Criar" on the card: the agent as proposed, with each line the person may give it. */
+    createProposed(orgId: string, messageId: string): Promise<{ agent: Agent; proposal: AgentProposal }>;
+    /** The routine it came with, for the agent created from the review (once it is where it reports). */
+    proposalRoutine(orgId: string, messageId: string): Promise<AgentProposal>;
     update(orgId: string, agentId: string, input: Partial<Omit<AgentInput, "handle">>): Promise<Agent>;
     archive(orgId: string, agentId: string): Promise<void>;
     /** Deletes it for good (ADR 0082): owners and admins, archived or not. */

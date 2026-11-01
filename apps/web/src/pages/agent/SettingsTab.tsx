@@ -9,6 +9,7 @@ import {
   agentGradient,
   Button,
   Card,
+  CharCount,
   CheckboxPill,
   Chip,
   Field,
@@ -32,7 +33,7 @@ import { useOrg } from "@/components/org-context";
 import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { AGENT_SECTIONS, type AgentSection, type Field as EditField, FIELD_PLACE } from "@/lib/agent-edit";
-import { BLANK_LOOK } from "@/lib/new-agent";
+import { BLANK_LOOK, ROLE_MAX } from "@/lib/new-agent";
 import { CardHead, useAgentEdit, WasLine } from "./context";
 import { ReadOnlyNote, useVisibleChannels } from "./pieces";
 
@@ -197,10 +198,21 @@ export function SettingsTab({
                         onChange={(e) => set("name", e.target.value)}
                       />
                     </Field>
-                    <Field label={t("agent.roleLabel")} id="agp-role">
+                    <Field
+                      label={t("agent.roleLabel")}
+                      id="agp-role"
+                      labelAside={
+                        <CharCount
+                          count={draft.role.length}
+                          max={ROLE_MAX}
+                          label={t("newAgent.roleCount", { count: draft.role.length, max: ROLE_MAX })}
+                        />
+                      }
+                    >
+                      {/* A longer one saved before the limit stays as it is until it's edited (it shows past the count). */}
                       <Input
                         value={draft.role}
-                        maxLength={200}
+                        maxLength={ROLE_MAX}
                         autoComplete="off"
                         onChange={(e) => set("role", e.target.value)}
                       />

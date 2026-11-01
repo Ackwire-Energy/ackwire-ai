@@ -1522,6 +1522,14 @@ export const en: Translations = {
       aiAccount: "Thinks with {{account}}",
       aiModel: "Thinks with the workspace's model",
       aiNone: "No AI yet. Connect one after creating it",
+      reviewTitle: "Review {{name}}",
+      lines: "What {{name}} gets",
+      aChannel: "a channel",
+      anApp: "an app",
+      needsAdmin: "an admin gives it",
+      needsPerson: "only {{name}} gives it",
+      itsOwner: "who connected it",
+      routineNotMade: "not created",
     },
   },
   dm: {
@@ -2294,7 +2302,7 @@ export const en: Translations = {
     identityHelp: "It's how everyone sees the agent. Mentions keep using @{{handle}}.",
     nameLabel: "Name",
     roleLabel: "Role",
-    roleHelp: "One line, e.g. PM, Dev, Research.",
+    roleHelp: "One or two words, e.g. PM, Dev, Email.",
     edit: "Edit",
     chat: "Chat",
     moreActions: "More actions",
@@ -3175,6 +3183,10 @@ export const en: Translations = {
     proposalNoAccess: "Only people in its conversation can see this proposal.",
     backToChat: "Back to the conversation",
     and: " and ",
+    routine: "Routine",
+    routineKeep: "Create the routine {{name}}",
+    routineNotMade: "The routine wasn't created: {{reason}}",
+    roleCount: "{{count}} of {{max}} characters",
   },
   members: {
     agentsOnlyYou: "Your agents answer only you.",
@@ -7618,6 +7630,11 @@ export const en: Translations = {
     agentProposal: {
       decided: "Someone already decided this proposal.",
       expired: "This proposal expired: nobody decided it in a day.",
+      routineMade: "This agent's routine was already created.",
+      noRoutine: "This proposal has no routine to create.",
+    },
+    agent: {
+      roleTooLong: "A role has up to {{max}} characters: one or two words, like PM or Design.",
     },
     approval: {
       alwaysUnavailable: "This request can't be approved for good. Approve just this one.",

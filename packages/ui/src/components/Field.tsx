@@ -99,6 +99,22 @@ export function Field({ label, id, help, error, labelAside, hint, className, sty
   );
 }
 
+/**
+ * "6/16" in a field's `labelAside`: how much of a short text's room is used, `label` in words for screen readers ("6
+ * de 16 caracteres"). Past it (a value saved before the limit), it turns to the danger color; the control's
+ * `maxLength` keeps new typing in.
+ */
+export function CharCount({ count, max, label }: { count: number; max: number; label: string }) {
+  return (
+    <span className="ac-field__count" data-over={count > max || undefined}>
+      <span aria-hidden="true">
+        {count}/{max}
+      </span>
+      <span className="ac-visually-hidden">{label}</span>
+    </span>
+  );
+}
+
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   invalid?: boolean;
 }

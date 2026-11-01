@@ -1537,6 +1537,14 @@ export const ptBR = {
       aiAccount: "Pensa com {{account}}",
       aiModel: "Pensa com o modelo do workspace",
       aiNone: "Sem IA ainda. Conecte uma depois de criar",
+      reviewTitle: "Revisar {{name}}",
+      lines: "O que {{name}} recebe",
+      aChannel: "um canal",
+      anApp: "um app",
+      needsAdmin: "um admin libera",
+      needsPerson: "só {{name}} libera",
+      itsOwner: "quem conectou",
+      routineNotMade: "não criada",
     },
   },
   dm: {
@@ -2311,7 +2319,7 @@ export const ptBR = {
     identityHelp: "É como todo mundo vê o agente. As menções continuam por @{{handle}}.",
     nameLabel: "Nome",
     roleLabel: "Cargo",
-    roleHelp: "Uma linha, ex.: PM, Dev, Pesquisa.",
+    roleHelp: "Uma ou duas palavras, ex.: PM, Dev, E-mail.",
     edit: "Editar",
     chat: "Conversar",
     moreActions: "Mais ações",
@@ -3204,6 +3212,10 @@ export const ptBR = {
     proposalNoAccess: "Só quem está na conversa vê esta proposta.",
     backToChat: "Voltar para a conversa",
     and: " e ",
+    routine: "Rotina",
+    routineKeep: "Criar a rotina {{name}}",
+    routineNotMade: "A rotina não foi criada: {{reason}}",
+    roleCount: "{{count}} de {{max}} caracteres",
   },
   members: {
     /** Before inviting, while every agent with an AI answers only the person. */
@@ -7662,6 +7674,11 @@ export const ptBR = {
     agentProposal: {
       decided: "Alguém já decidiu esta proposta.",
       expired: "Esta proposta expirou: ninguém decidiu em um dia.",
+      routineMade: "A rotina deste agente já foi criada.",
+      noRoutine: "Esta proposta não tem rotina para criar.",
+    },
+    agent: {
+      roleTooLong: "O cargo tem até {{max}} caracteres: uma ou duas palavras, como PM ou Design.",
     },
     approval: {
       alwaysUnavailable: "Este pedido não pode ser aprovado para sempre. Aprove só este.",

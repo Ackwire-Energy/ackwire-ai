@@ -1616,6 +1616,46 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         Object.assign(proposalCard(messageId).card, { state: "denied", decidedByUserId: state.me?.user.id ?? null });
         return proposalView(messageId);
       },
+      // As the server: the draft as it is, owned by me, with the lines I may give (my own mailboxes).
+      createProposed: async (orgId, messageId) => {
+        log("agents.createProposed", orgId, messageId);
+        const { card } = proposalCard(messageId);
+        if (card.state !== "pending") throw new ApiError(409, "agent_proposal.decided", "Already decided");
+        const me = state.me?.user.id ?? null;
+        const { draft } = card.params;
+        const agent: Agent = {
+          id: id("agent"),
+          name: draft.name,
+          handle: draft.handle,
+          role: draft.role,
+          instructions: draft.instructions,
+          model: "auto",
+          ownerUserId: me,
+          hasCredential: false,
+          monthlyBudgetUsd: null,
+          createdAt: NOW.toISOString(),
+          audience: { mode: "everyone", userIds: [] },
+          ...(draft.appearance ? { appearance: draft.appearance } : {}),
+        };
+        state.agents.push(agent);
+        Object.assign(card, {
+          state: "created",
+          agentId: agent.id,
+          decidedByUserId: me,
+          applied: {
+            channelIds: draft.channelIds,
+            connectionIds: draft.access.map((a) => a.connectionId),
+            mailAccountIds: (draft.mail ?? []).filter((m) => m.ownerUserId === me).map((m) => m.accountId),
+          },
+          routineId: draft.routine ? id("routine") : null,
+        });
+        return { agent: { ...agent }, proposal: proposalView(messageId) };
+      },
+      proposalRoutine: async (orgId, messageId) => {
+        log("agents.proposalRoutine", orgId, messageId);
+        Object.assign(proposalCard(messageId).card, { routineId: id("routine") });
+        return proposalView(messageId);
+      },
       update: async (orgId, agentId, input) => {
         log("agents.update", orgId, agentId, input);
         const agent = state.agents.find((a) => a.id === agentId);

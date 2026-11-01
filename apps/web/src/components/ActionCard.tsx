@@ -1,19 +1,42 @@
-import type { AgentProposalCard, Message } from "@agenteschat/client";
-import { useAiStatus, useDenyAgentProposal } from "@agenteschat/client";
-import { actionCardOf, connectAiDone, proposalStatus, suggestedAiText } from "@agenteschat/client/lib/action-cards";
+import type { AgentDraft, AgentProposalCard, Message } from "@agenteschat/client";
+import {
+  useAiStatus,
+  useChannels,
+  useCreateProposedAgent,
+  useDenyAgentProposal,
+  useMailAccounts,
+} from "@agenteschat/client";
+import {
+  actionCardOf,
+  connectAiDone,
+  type ProposalLine,
+  proposalLines,
+  proposalStatus,
+  suggestedAiText,
+} from "@agenteschat/client/lib/action-cards";
+import { itemName } from "@agenteschat/client/lib/connected";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
+import { choiceOf } from "@agenteschat/client/lib/mail";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Button, Chip, Icon } from "@agenteschat/ui";
+import { Button, Chip, Dialog, Icon, Spinner } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
+import { lazy, type ReactNode, Suspense, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useConnectedById } from "@/components/AccessLevels";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useConnectAi } from "@/components/ConnectAi";
+import { ConnectorIcon } from "@/components/ConnectorCatalog";
+import { MailIcon } from "@/components/MailConnect";
 import { useOrg } from "@/components/org-context";
 import { StretchCardView } from "@/components/StretchCard";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
+import { proposedRoutineWhen } from "@/lib/recurrence";
 import { useToast } from "@/lib/toast";
+
+/** "Criar agente" in the card's review, loaded when it opens. */
+const NewAgentPage = lazy(() => import("@/pages/NewAgentPage").then((m) => ({ default: m.NewAgentPage })));
 
 /**
  * An agent's action card (ADR 0061, `meta.actionCard`) in place of its text: what needs a person's
@@ -76,20 +99,27 @@ export function ActionCard({ message }: { message: Message }) {
 }
 
 /**
- * "Ada propõe um novo agente": the draft at a glance (its face, name, role and the AI it would think with).
- * Revisar opens "Criar agente" filled in with it, Recusar says no; both only for who may create agents, and
- * only until it expires. Created, it links to the agent.
+ * "Ada propõe um novo agente": the draft at a glance (its face, name and role, why, what it gets and the AI it would
+ * think with). Criar makes it as it is, in one click, with each line the person may give; Revisar opens "Criar agente"
+ * filled in with it over the conversation; Recusar says no. All three only for who may create agents, and only until
+ * it expires. Created, it links to the agent and says what it got.
  */
 function AgentProposalCardView({ message, card }: { message: Message; card: AgentProposalCard }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
   const dir = useDirectory(org.id);
+  const create = useCreateProposedAgent(org.id);
+  const connect = useConnectAi();
+  const [reviewing, setReviewing] = useState(false);
   const deny = useDenyAgentProposal(org.id);
   const toast = useToast();
   const { draft, why } = card.params;
   const status = proposalStatus(card);
   const decides = status === "open" && can(org, "create_agents");
   const proposer = (message.author.id && dir.agentById.get(message.author.id)?.name) || t("channel.unknownAgent");
+  const lines = proposalLines(card, { userId: me.user.id, admin: can(org, "manage_agents") });
+  const failed = (error: unknown) => toast.show(errorText(t, error), "error");
+  const busy = create.isPending || deny.isPending;
   return (
     <div className="waitcard" data-done={status === "created" || undefined}>
       <span className="waitcard__top ac-iconline">
@@ -98,28 +128,45 @@ function AgentProposalCardView({ message, card }: { message: Message; card: Agen
       </span>
       <span className="ac-faceline">
         <AgentAvatar name={draft.name} appearance={lookOf(draft)} size="md" />
-        <span>
-          <b className="ac-captop">{draft.name}</b>
+        <span className="list-col">
+          <b className="ac-captop">{draft.name}</b>{" "}
           <span className="small muted">{[`@${draft.handle}`, draft.role].filter(Boolean).join(" · ")}</span>
         </span>
       </span>
+      {why && <p>{why}</p>}
+      {lines.length > 0 && <ProposalLines lines={lines} draft={draft} />}
       <span className="small muted ac-iconline">
         <Icon name="bolt" size={14} />
         <span>{suggestedAiText(t, draft.ai)}</span>
       </span>
-      {why && <p>{why}</p>}
       <span className="waitcard__acts">
         {decides ? (
           <>
-            <Button asChild size="sm" variant="primary">
-              <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }} search={{ proposal: message.id }}>
-                {t("actionCard.agentProposal.review")}
-              </Link>
+            <Button
+              size="sm"
+              variant="primary"
+              loading={create.isPending}
+              disabled={deny.isPending}
+              onClick={() =>
+                create.mutate(message.id, {
+                  // Nothing to think with yet: it is created all the same, and Connect opens for it.
+                  onSuccess: ({ agent }) =>
+                    draft.ai.kind === "none" && connect?.open({ agentId: agent.id, agentIds: [agent.id] }),
+                  onError: failed,
+                })
+              }
+            >
+              {t("newAgent.create", { name: draft.name })}
+            </Button>
+            <Button size="sm" disabled={busy} onClick={() => setReviewing(true)}>
+              {t("actionCard.agentProposal.review")}
             </Button>
             <Button
               size="sm"
+              variant="ghost"
               loading={deny.isPending}
-              onClick={() => deny.mutate(message.id, { onError: (error) => toast.show(errorText(t, error), "error") })}
+              disabled={create.isPending}
+              onClick={() => deny.mutate(message.id, { onError: failed })}
             >
               {t("approval.refuse")}
             </Button>
@@ -145,6 +192,95 @@ function AgentProposalCardView({ message, card }: { message: Message; card: Agen
           <Chip icon="close">{t(status === "denied" ? "proposals.refused" : "approval.expired")}</Chip>
         )}
       </span>
+      {reviewing && (
+        // Over the conversation: creating, saying no or leaving closes it, and the person is where they were.
+        <Dialog
+          bare
+          open
+          onOpenChange={(open) => !open && setReviewing(false)}
+          title={t("actionCard.agentProposal.reviewTitle", { name: draft.name })}
+          closeLabel={t("common.close")}
+          width={1200}
+          className="newag-dialog"
+        >
+          <Suspense fallback={<Spinner />}>
+            <NewAgentPage proposalId={message.id} onClose={() => setReviewing(false)} />
+          </Suspense>
+        </Dialog>
+      )}
     </div>
+  );
+}
+
+/**
+ * What the proposed agent gets, a line each: its channels, its apps and mailboxes at their level, its routine. A line
+ * the viewer can't give says who gives it; created in one click, the lines it got take a check.
+ */
+function ProposalLines({ lines, draft }: { lines: ProposalLine[]; draft: AgentDraft }) {
+  const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const channels = useChannels(org.id);
+  const apps = useConnectedById();
+  const mail = useMailAccounts(org.id);
+  const says = (level: "read" | "write" | undefined, name: string) =>
+    t(level === "write" ? "newAgent.preview.readsWrites" : "newAgent.preview.reads", { name });
+  const shown = (l: ProposalLine): { icon: ReactNode; text: string } => {
+    if (l.kind === "channel") {
+      const name = channels.data?.find((c) => c.id === l.id)?.name;
+      return {
+        icon: <Icon name="channel" size={14} />,
+        text: name ?? t("actionCard.agentProposal.aChannel"),
+      };
+    }
+    if (l.kind === "app") {
+      const item = apps.get(l.id);
+      const name = item ? itemName(t, item) : t("actionCard.agentProposal.anApp");
+      return {
+        icon: item ? <ConnectorIcon def={item.def} image={item.image} label={name} /> : <Icon name="plug" size={14} />,
+        text: says(l.level, name),
+      };
+    }
+    if (l.kind === "mail") {
+      const box = draft.mail?.find((m) => m.accountId === l.id);
+      const account = mail.data?.find((a) => a.id === l.id);
+      return {
+        icon: account ? <MailIcon choice={choiceOf(account)} /> : <Icon name="mail" size={14} />,
+        text: says(l.level, box?.address ?? ""),
+      };
+    }
+    const routine = draft.routine;
+    return {
+      icon: <Icon name="routines" size={14} />,
+      text: routine ? `${routine.name} · ${proposedRoutineWhen(t, i18n.language, routine)}` : l.id,
+    };
+  };
+  const needs = (l: ProposalLine) =>
+    !l.needs
+      ? null
+      : l.needs.who === "admin"
+        ? t("actionCard.agentProposal.needsAdmin")
+        : t("actionCard.agentProposal.needsPerson", {
+            name: dir.memberById.get(l.needs.userId)?.name ?? t("actionCard.agentProposal.itsOwner"),
+          });
+  return (
+    <ul className="waitcard__lines" aria-label={t("actionCard.agentProposal.lines", { name: draft.name })}>
+      {lines.map((l) => {
+        const { icon, text } = shown(l);
+        const who = needs(l);
+        return (
+          <li key={l.key} className="ac-iconline" data-given={l.given ?? undefined}>
+            {l.given ? <Icon name="check" size={14} /> : icon}
+            <span>
+              {text}
+              {who && <span className="waitcard__needs"> · {who}</span>}
+              {l.kind === "routine" && l.given === false && (
+                <span className="waitcard__needs"> · {t("actionCard.agentProposal.routineNotMade")}</span>
+              )}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

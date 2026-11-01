@@ -501,6 +501,23 @@ export function useAgentProposal(orgId: string, messageId: string | null) {
   });
 }
 
+/**
+ * "Criar" on an agent's proposal: the agent as proposed, in one click. The card shows it at once, with what it got;
+ * the agents, channels and routines lists take it in.
+ */
+export function useCreateProposedAgent(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (messageId: string) => api.agents.createProposed(orgId, messageId),
+    onSuccess: ({ proposal }) => {
+      cacheAgentProposal(qc, orgId, proposal, proposal);
+      for (const key of [keys.agents(orgId), keys.channels(orgId), keys.routines(orgId)])
+        void qc.invalidateQueries({ queryKey: key });
+    },
+  });
+}
+
 /** "Recusar" on an agent's proposal: the card shows it at once. */
 export function useDenyAgentProposal(orgId: string) {
   const api = useApi();
@@ -884,7 +901,7 @@ export function cacheAgentProposal(
   qc: ReturnType<typeof useQueryClient>,
   orgId: string,
   where: { channelId: string; messageId: string },
-  { state, agentId, decidedByUserId, decidedAt }: AgentProposalDecision,
+  { state, agentId, decidedByUserId, decidedAt, applied, routineId }: AgentProposalDecision,
 ) {
   cacheMessageMeta(qc, orgId, where.channelId, where.messageId, (meta) => ({
     actionCard: {
@@ -893,6 +910,8 @@ export function cacheAgentProposal(
       agentId,
       decidedByUserId,
       decidedAt,
+      ...(applied ? { applied } : {}),
+      ...(routineId ? { routineId } : {}),
     },
   }));
   void qc.invalidateQueries({ queryKey: keys.agentProposal(orgId, where.messageId) });

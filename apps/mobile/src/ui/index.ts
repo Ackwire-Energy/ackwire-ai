@@ -16,6 +16,7 @@ export { Sky, type SkyProps, WorkspaceSky } from "@/sky/Sky";
 export { SpendBar, type SpendBarProps } from "@/sky/SpendBar";
 export { Button, type ButtonProps, type ButtonVariant } from "./Button";
 export { Card, type CardProps } from "./Card";
+export { CharCount } from "./CharCount";
 export { Chip, type ChipProps } from "./Chip";
 export {
   Composer,

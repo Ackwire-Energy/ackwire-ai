@@ -417,6 +417,14 @@ samp {
   align-items: baseline;
   gap: var(--space-2);
 }
+.ac-field__count {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-muted);
+}
+.ac-field__count[data-over] {
+  color: var(--danger);
+}
 .ac-field__help {
   font-size: 13px;
   line-height: 18px;

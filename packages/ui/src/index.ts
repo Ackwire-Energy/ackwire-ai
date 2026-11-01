@@ -128,7 +128,16 @@ export {
   readRecentEmoji,
   rememberEmoji,
 } from "./components/EmojiPicker";
-export { AffixInput, Field, type FieldProps, Input, SearchInput, Textarea, useFieldControl } from "./components/Field";
+export {
+  AffixInput,
+  CharCount,
+  Field,
+  type FieldProps,
+  Input,
+  SearchInput,
+  Textarea,
+  useFieldControl,
+} from "./components/Field";
 export {
   FILTER_SEARCH_AFTER,
   FilterBar,
