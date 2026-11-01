@@ -205,6 +205,14 @@ export const MAX_TIMER_MS = 2_147_483_647;
 /** A timer's delay to `at` (ms since the epoch): never negative, never past the longest a timer takes. */
 export const timerDelay = (at: number, now: number) => Math.min(Math.max(0, at - now), MAX_TIMER_MS);
 
+/** When a request ended: when someone decided it, or the deadline of one that ran out; null when it has neither. */
+export const askEndedAt = (r: { status: string; decidedAt: string | null; expiresAt: string }) =>
+  r.decidedAt ?? (r.status === "expired" ? r.expiresAt : null);
+
+/** When a card of change proposals closed: its last decision; null when its rows only went stale. */
+export const lastDecidedAt = (rows: { decidedAt: string | null }[]) =>
+  rows.reduce<string | null>((last, p) => (p.decidedAt && (!last || p.decidedAt > last) ? p.decidedAt : last), null);
+
 /** How much of a request's card has to show for it to count as on screen (the web's rule). */
 export const SHOWN_MIN_PX = 40;
 

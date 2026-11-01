@@ -5,7 +5,9 @@ import {
   APPROVAL_TTL_MS,
   AskStore,
   approvalMayWait,
+  askEndedAt,
   cardShows,
+  lastDecidedAt,
   MAX_TIMER_MS,
   type Measurable,
   mayAsk,
@@ -265,6 +267,29 @@ describe("the line's stop while it shows a request", () => {
   test("several agents: the line can't say whose, so the box's own stop is the one", () => {
     const runs = [run({ runId: "r1", agentId: "dev" }), run({ runId: "r2", agentId: "infra" })];
     expect(lineStops(workingEntries(runs, [], name), runs, () => true)).toEqual([]);
+  });
+});
+
+describe("when a decided request ended", () => {
+  const expiresAt = "2026-11-02T14:00:00.000Z";
+
+  test("when someone decided it, or the deadline of one that ran out; a canceled one has no time", () => {
+    const decidedAt = "2026-11-01T14:02:00.000Z";
+    expect(askEndedAt({ status: "refused", decidedAt, expiresAt })).toBe(decidedAt);
+    expect(askEndedAt({ status: "expired", decidedAt: null, expiresAt })).toBe(expiresAt);
+    expect(askEndedAt({ status: "canceled", decidedAt: null, expiresAt })).toBeNull();
+  });
+
+  test("a card of proposals closes with its last decision, whatever the rows' order", () => {
+    const first = { decidedAt: "2026-11-01T14:02:00.000Z" };
+    const last = { decidedAt: "2026-11-01T14:09:00.000Z" };
+    expect(lastDecidedAt([last, { decidedAt: null }, first])).toBe(last.decidedAt);
+    expect(lastDecidedAt([first, last])).toBe(last.decidedAt);
+  });
+
+  test("a card whose rows only went stale has no time", () => {
+    expect(lastDecidedAt([{ decidedAt: null }, { decidedAt: null }])).toBeNull();
+    expect(lastDecidedAt([])).toBeNull();
   });
 });
 

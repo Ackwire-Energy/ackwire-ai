@@ -339,12 +339,6 @@ export const featureKeysEn: FeatureTranslations = {
     fileOpen: "Tap to open",
     fileDeleted: "File removed",
     fileFailed: "Couldn't open the file.",
-    approval: {
-      approved: "Approved: {{title}}",
-      refused: "Declined: {{title}}",
-      expired: "Expired: {{title}}",
-      canceled: "Canceled: {{title}}",
-    },
     question: {
       fromF: "Question from {{name}}",
       fromM: "Question from {{name}}",

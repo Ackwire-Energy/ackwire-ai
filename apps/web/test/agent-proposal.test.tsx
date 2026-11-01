@@ -67,11 +67,11 @@ const click = async (el: HTMLElement, rounds = 6) => {
   await act(async () => fireEvent.click(el));
   await settle(rounds);
 };
-/** The proposal's card in its message: the request card while it is open, then what was decided. */
+/** The proposal in its message: the request card while it is open, then the line that says what was decided. */
 const cardOf = (text: string) =>
   screen()
     .getAllByRole("article")
-    .map((a) => a.querySelector<HTMLElement>(".rq, .waitcard"))
+    .map((a) => a.querySelector<HTMLElement>(".rq, .rq-done"))
     .filter((card): card is HTMLElement => Boolean(card?.textContent?.includes(text)));
 const asMember = (state: State) => {
   const org = state.me?.organizations[0];
@@ -103,10 +103,11 @@ describe("an agent's proposal of a new agent, in the chat", () => {
     );
     await click(within(card).getByRole("button", { name: "Recusar" }));
     expect(state.calls.some((c) => c.method === "agents.denyProposal" && c.args[1] === "p-1")).toBe(true);
-    // Decided: what was decided takes its place.
-    const [after] = cardOf("Atlas propõe um novo agente");
-    expect(after?.textContent).toContain("Recusada");
-    expect(within(after as HTMLElement).queryByRole("button", { name: "Recusar" })).toBeNull();
+    // Decided: one line says what was decided.
+    const after = screen().getByRole("group", { name: "Atlas propõe um novo agente" });
+    expect(after.textContent).toContain("Recusada: Nina");
+    expect(after.querySelector(".rq-done__mark[data-done]")).toBeNull();
+    expect(within(after).queryByRole("button", { name: "Recusar" })).toBeNull();
     expect(document.querySelector('[data-ask-id="p-1"]')).toBeNull();
   });
 
@@ -122,7 +123,7 @@ describe("an agent's proposal of a new agent, in the chat", () => {
     await act(() => new Promise((r) => setTimeout(r, Math.max(0, expiresAt - Date.now()) + 50)));
     await settle(2);
     expect(document.querySelector('[data-ask-id="p-1"]')).toBeNull();
-    const [card] = cardOf("@nina");
+    const [card] = cardOf("Nina");
     expect(card?.textContent).toContain("Expirou");
     expect(within(card as HTMLElement).queryByRole("link", { name: "Revisar" })).toBeNull();
   }, 15_000);
@@ -153,16 +154,26 @@ describe("an agent's proposal of a new agent, in the chat", () => {
     expect(open?.hasAttribute("data-ask-mine")).toBe(false);
     expect(within(open as HTMLElement).queryByRole("link", { name: "Revisar" })).toBeNull();
     expect(within(open as HTMLElement).queryByRole("button", { name: "Recusar" })).toBeNull();
-    const [made] = cardOf("@otto");
+    const [made] = cardOf("Otto");
     expect(made?.textContent).toContain("Criado");
+    expect(made?.querySelector(".rq-done__mark[data-done]")).not.toBeNull();
+    // The draft and the way to the agent are behind "Ver detalhes".
+    expect(made?.textContent).not.toContain("@otto");
+    await click(within(made as HTMLElement).getByRole("button", { name: "Ver detalhes" }));
+    expect(made?.textContent).toContain("@otto");
     expect(made?.textContent).toContain("Sem IA ainda. Conecte uma depois de criar");
     expect(
       within(made as HTMLElement)
         .getByRole("link", { name: "Abrir perfil" })
         .getAttribute("href"),
     ).toBe(`/org/${ORG_ID}/agents/${ATLAS_ID}`);
-    const [old] = cardOf("@vera");
+    const [old] = cardOf("Vera");
     expect(old?.textContent).toContain("Expirou");
+    expect(old?.querySelector(".rq-done__mark[data-done]")).toBeNull();
+    // Refused or expired there is no agent to go to.
+    await click(within(old as HTMLElement).getByRole("button", { name: "Ver detalhes" }));
+    expect(old?.textContent).toContain("@vera");
+    expect(within(old as HTMLElement).queryByRole("link", { name: "Abrir perfil" })).toBeNull();
     // In the conversation, the profile opens in the panel beside it.
     await act(async () => fireEvent.click(within(made as HTMLElement).getByRole("link", { name: "Abrir perfil" })));
     await settle(4);
@@ -195,9 +206,10 @@ describe("an agent's proposal of a new agent, in the chat", () => {
       }),
     );
     await settle(3);
-    const [card] = cardOf("@nina");
+    const [card] = cardOf("Nina");
     expect(card?.textContent).toContain("Criado");
     expect(within(card as HTMLElement).queryByRole("link", { name: "Revisar" })).toBeNull();
+    await click(within(card as HTMLElement).getByRole("button", { name: "Ver detalhes" }));
     expect(
       within(card as HTMLElement)
         .getByRole("link", { name: "Abrir perfil" })

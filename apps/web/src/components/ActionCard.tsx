@@ -2,16 +2,16 @@ import type { AgentProposalCard, Message } from "@agenteschat/client";
 import { useAiStatus, useDenyAgentProposal } from "@agenteschat/client";
 import { actionCardOf, connectAiDone, proposalStatus, suggestedAiText } from "@agenteschat/client/lib/action-cards";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { joinNames } from "@agenteschat/client/lib/format";
+import { joinNames, whenAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Button, Chip, Icon } from "@agenteschat/ui";
+import { Button, Icon } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOpenAgentPanel } from "@/components/agent-panel-context";
 import { useConnectAi } from "@/components/ConnectAi";
 import { useOrg } from "@/components/org-context";
-import { RequestCard, RequestFuse, useExpired } from "@/components/RequestCard";
+import { RequestCard, RequestDone, RequestFuse, useExpired } from "@/components/RequestCard";
 import { StretchCardView } from "@/components/StretchCard";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
@@ -25,7 +25,7 @@ const DAY_MS = 24 * 3_600_000;
 /**
  * An agent's action card (ADR 0061, `meta.actionCard`) in place of its text: what needs a person's
  * credentials or consent, one click away. "Conectar uma IA" opens the Connect dialog at the card's step for
- * the agents it names (the dialog says what each person may do), and reads "Conectado" once they can think.
+ * the agents it names (the dialog says what each person may do), and is one line, "Conectado", once they can think.
  * A proposal of a new agent (ADR 0081) is a request while it is open (`AgentProposalCardView`); a stretch's pause with
  * Continuar (ADR 0089) is its own card.
  */
@@ -47,37 +47,36 @@ export function ActionCard({ message }: { message: Message }) {
   const title = agents
     ? t("actionCard.connect_ai.title", { context: card.what, agents })
     : t(`connectAi.title.${card.what ?? "any"}`);
+  if (done) {
+    return (
+      <RequestDone done label={title}>
+        {t("actionCard.connected")}: <b>{title}</b>
+      </RequestDone>
+    );
+  }
   return (
-    <div className="waitcard" data-done={done || undefined}>
+    <div className="waitcard">
       <span className="waitcard__top ac-iconline">
-        <Icon name={done ? "check" : "plug"} size={16} />
+        <Icon name="plug" size={16} />
         <span>{title}</span>
       </span>
       {card.why && <p>{card.why}</p>}
-      {done ? (
+      {connect && (
         <span className="waitcard__acts">
-          <Chip icon="check" tone="done">
-            {t("actionCard.connected")}
-          </Chip>
+          <Button
+            size="sm"
+            onClick={() =>
+              connect.open({
+                intent: card.what,
+                provider: card.provider,
+                agentIds: card.agentIds,
+                agentId: card.agentIds[0],
+              })
+            }
+          >
+            {t("actionCard.connect")}
+          </Button>
         </span>
-      ) : (
-        connect && (
-          <span className="waitcard__acts">
-            <Button
-              size="sm"
-              onClick={() =>
-                connect.open({
-                  intent: card.what,
-                  provider: card.provider,
-                  agentIds: card.agentIds,
-                  agentId: card.agentIds[0],
-                })
-              }
-            >
-              {t("actionCard.connect")}
-            </Button>
-          </span>
-        )
       )}
     </div>
   );
@@ -87,11 +86,11 @@ export function ActionCard({ message }: { message: Message }) {
  * "Ada propõe um novo agente". While it is open, a request card like every other: the agent's reason, the draft
  * in the well (its face, name, handle and role, and the AI it would think with where the line has room), Revisar
  * (opens "Criar agente" filled in with it) and Recusar for who may create agents, and the fuse to its expiry.
- * Then what was decided; created, it links to the agent.
+ * Then one line says what was decided, the draft behind "Ver detalhes"; created, it links to the agent there.
  */
 function AgentProposalCardView({ message, card }: { message: Message; card: AgentProposalCard }) {
   const openPanel = useOpenAgentPanel();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const deny = useDenyAgentProposal(org.id);
@@ -142,16 +141,17 @@ function AgentProposalCardView({ message, card }: { message: Message; card: Agen
       />
     );
   }
-  // Created, refused or expired: what was decided.
-  return (
-    <div className="waitcard" data-done={status === "created" || undefined}>
-      <span className="waitcard__top ac-iconline">
-        <Icon name={status === "created" ? "check" : "agent"} size={16} />
-        <span>{title}</span>
-      </span>
+  // Created, refused or expired: one line. No one decided one that ran out: it expired at its deadline.
+  const ended =
+    status === "created"
+      ? t("actionCard.agentProposal.created")
+      : t(status === "denied" ? "proposals.refused" : "approval.expired");
+  const at = status === "expired" ? card.expiresAt : card.decidedAt;
+  const details = (
+    <>
       <span className="ac-faceline">
         <AgentAvatar name={draft.name} appearance={lookOf(draft)} size="md" />
-        <span>
+        <span className="list-col">
           <b className="ac-captop">{draft.name}</b>
           <span className="small muted">{[`@${draft.handle}`, draft.role].filter(Boolean).join(" · ")}</span>
         </span>
@@ -160,32 +160,29 @@ function AgentProposalCardView({ message, card }: { message: Message; card: Agen
         <Icon name="bolt" size={14} />
         <span>{suggestedAiText(t, draft.ai)}</span>
       </span>
-      {why && <p>{why}</p>}
-      <span className="waitcard__acts">
-        {status === "created" ? (
-          <>
-            <Chip icon="check" tone="done">
-              {t("actionCard.agentProposal.created")}
-            </Chip>
-            {card.agentId && (
-              <Button asChild size="sm" variant="ghost">
-                <Link
-                  to="/org/$orgId/agents/$agentId"
-                  params={{ orgId: org.id, agentId: card.agentId }}
-                  onClick={(e) => {
-                    const id = card.agentId;
-                    if (openPanel && id) panelClick(e, () => openPanel(id));
-                  }}
-                >
-                  {t("newAgent.openProfile")}
-                </Link>
-              </Button>
-            )}
-          </>
-        ) : (
-          <Chip icon="close">{t(status === "denied" ? "proposals.refused" : "approval.expired")}</Chip>
-        )}
-      </span>
-    </div>
+      {why && <span className="small muted">{why}</span>}
+      {status === "created" && card.agentId && (
+        <div className="ac-acts">
+          <Button asChild size="sm" variant="ghost">
+            <Link
+              to="/org/$orgId/agents/$agentId"
+              params={{ orgId: org.id, agentId: card.agentId }}
+              onClick={(e) => {
+                const id = card.agentId;
+                if (openPanel && id) panelClick(e, () => openPanel(id));
+              }}
+            >
+              {t("newAgent.openProfile")}
+            </Link>
+          </Button>
+        </div>
+      )}
+    </>
+  );
+  return (
+    <RequestDone done={status === "created"} label={title} more={{ label: t("approval.seeDetails"), content: details }}>
+      {ended}: <b>{draft.name}</b>
+      {at && ` · ${whenAt(t, i18n.language, at)}`}
+    </RequestDone>
   );
 }
