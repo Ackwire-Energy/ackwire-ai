@@ -3837,7 +3837,9 @@ export type ImportSkipReason =
   /** A routine whose channel isn't coming (unpicked, or a private channel with that name exists). */
   | "channel_not_picked"
   | "invalid"
-  | "failed";
+  | "failed"
+  /** A note on a created routine: its agent already had the most active routines, so it arrived paused. */
+  | "too_many_routines";
 
 export interface ImportItemResult {
   kind: ImportItemKind;
@@ -3866,8 +3868,6 @@ export interface ImportInput {
    * in the plan's order (each call is safe to repeat).
    */
   pick?: string[];
-  /** `skill:key` of the skills to turn on for their agents; imported skills land off otherwise. */
-  enableSkills?: string[];
 }
 
 export interface ImportPlan {

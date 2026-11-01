@@ -119,8 +119,7 @@ export function parse(files: ImportFile[], d: Draft) {
   const settings = obj(doc.settings);
   for (const server of list(settings.mcpServers).map(obj)) {
     const http = str(server.transport) === "http";
-    const headers = list(server.headers).map((h) => str(obj(h).key));
-    d.connection(str(server.name) || str(server.id), http ? str(server.url) : "", headers);
+    d.connection(str(server.name) || str(server.id), http ? str(server.url) : "");
   }
   for (const p of list(settings.customProviders).map(obj)) d.left("model", str(p.name) || str(p.id));
   for (const a of list(settings.customAgents).map(obj)) d.left("remote", str(a.name) || str(a.id));

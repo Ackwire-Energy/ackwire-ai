@@ -228,7 +228,7 @@ const BUNDLE = {
     },
   ],
   notes: [{ key: "cycle", agent: "scout", kind: "fact", content: "O ciclo de venda leva 30 dias." }],
-  todo: [{ kind: "connection", label: "CRM (mcp.example.com)", agents: ["scout"] }],
+  todo: [{ kind: "connection", label: "CRM", agents: ["scout"] }],
   leftOut: [{ kind: "picture", label: "Scout" }],
 };
 
@@ -273,9 +273,11 @@ describe("imports and the export", () => {
     expect(applied.items.every((i) => i.action === "create" && i.targetId)).toBe(true);
     expect(await agents()).toEqual(["dev", "scout"]);
     const routines = (await (await b(`/api/app/organizations/${orgId}/routines`)).json()) as {
-      routines: { name: string; active: boolean }[];
+      routines: { name: string; active: boolean; nextRunAt: string | null }[];
     };
-    expect(routines.routines.map((r) => [r.name, r.active])).toEqual([["Resumo", false]]);
+    // Imported routines arrive active, with their next run already set.
+    expect(routines.routines.map((r) => [r.name, r.active])).toEqual([["Resumo", true]]);
+    expect(Date.parse(routines.routines[0]?.nextRunAt ?? "")).toBeGreaterThan(Date.now());
     const again = (await (await b(imports, { json: { bundle: BUNDLE, dryRun: false } })).json()) as Plan;
     expect(again.items.map((i) => i.action)).toEqual(Array(5).fill("unchanged"));
     // What came, once, by the package it came from.
@@ -302,7 +304,7 @@ describe("imports and the export", () => {
     // Two people with a workspace each (self-host and Cloud).
     const { b, orgId } = await owner({ env: { ALLOW_SIGNUP: "true" } });
     await b(`/api/app/organizations/${orgId}/imports`, {
-      json: { bundle: BUNDLE, dryRun: false, enableSkills: ["skill:weekly"] },
+      json: { bundle: BUNDLE, dryRun: false },
     });
     const res = await b(`/api/app/organizations/${orgId}/export`);
     expect(res.status).toBe(200);
