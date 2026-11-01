@@ -8183,7 +8183,7 @@ export const ptBR = {
       tooFrequent: "Uma rotina roda no máximo a cada 15 minutos. Escolha um intervalo maior.",
       tooMany: "Este agente já tem 20 rotinas ativas. Pause ou apague uma antes.",
       creatorCannotPost: "Quem cria a rotina precisa estar na conversa e poder escrever nela.",
-      actTakeOver: "Assuma a rotina antes de mudar o que ela faz quando pode agir.",
+      actTakeOver: "Assuma a rotina antes de mudar as instruções ou o agente dela.",
       takeOverNoAccess: "Entre na conversa da rotina antes de assumi-la.",
       agentNotInChannel: "Adicione o agente à conversa antes.",
     },

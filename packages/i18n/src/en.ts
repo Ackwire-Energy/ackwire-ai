@@ -8128,7 +8128,7 @@ export const en: Translations = {
       tooFrequent: "A routine runs at most every 15 minutes. Pick a longer interval.",
       tooMany: "This agent already has 20 active routines. Pause or delete one first.",
       creatorCannotPost: "Whoever creates the routine must be in the conversation and able to post there.",
-      actTakeOver: "Take the routine over before changing what it does when it can act.",
+      actTakeOver: "Take the routine over before changing its instructions or agent.",
       takeOverNoAccess: "Join the routine's conversation before taking it over.",
       agentNotInChannel: "Add the agent to the conversation first.",
     },
