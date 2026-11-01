@@ -146,11 +146,14 @@ export function MenuSub({ icon, label, children }: { icon?: IconName; label: Rea
 export function MenuCheckboxItem({
   checked,
   onCheckedChange,
+  icon,
   children,
   hint,
 }: {
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
+  /** Lines its name up with the icon items around it. */
+  icon?: IconName;
   children: ReactNode;
   /** Quiet text on the right (how many it shows). */
   hint?: ReactNode;
@@ -162,6 +165,7 @@ export function MenuCheckboxItem({
       onCheckedChange={(v) => onCheckedChange(v === true)}
       onSelect={(e) => e.preventDefault()}
     >
+      {icon && <Icon name={icon} />}
       <span className="ac-menu__label">{children}</span>
       {hint && <span className="ac-menu__hint">{hint}</span>}
       <svg className="ac-menu__check" viewBox="0 0 20 20" aria-hidden="true">

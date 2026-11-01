@@ -162,6 +162,8 @@ export function FilterChip({
                       className="ac-filter__option"
                       onClick={() => toggle(o)}
                     >
+                      {o.leading}
+                      <span className="ac-filter__label">{o.label}</span>
                       <span className="ac-tz__check" aria-hidden="true">
                         {on && (
                           <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
@@ -169,8 +171,6 @@ export function FilterChip({
                           </svg>
                         )}
                       </span>
-                      {o.leading}
-                      <span className="ac-filter__label">{o.label}</span>
                     </button>
                   </div>
                 );
