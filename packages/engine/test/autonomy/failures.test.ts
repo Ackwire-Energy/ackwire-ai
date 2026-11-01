@@ -1,7 +1,7 @@
 import { afterEach, expect } from "bun:test";
 import { schema } from "@agenteschat/db";
 import { ProviderError } from "@agenteschat/providers";
-import { consultationWait, outageParkedSql } from "../../src";
+import { consultationWait, getMessage, loadAgentStatuses, outageParkedSql, receiptsFor } from "../../src";
 import { closeWorlds, world } from "./harness";
 import { assertInvariants } from "./invariants";
 import { scenario } from "./known";
@@ -25,16 +25,25 @@ scenario("S29", "a provider outage parks the run, which finishes when the provid
   await w.advance(2);
   const notes = (await w.posts("otto")).filter((m) => m.meta.bodyCode === "provider_unavailable");
   expect(notes).toHaveLength(1);
-  // Nobody reads the park as a wait on a person (hand-off lines, the agent's status).
+  // Nobody reads the park as a wait on a person: hand-off lines, the agent's status and the message's receipt say the
+  // provider is down.
   const [parked] = await w.db
     .select({
       status: schema.agentRuns.status,
       waitingMachineId: schema.agentRuns.waitingMachineId,
       outage: outageParkedSql,
+      triggerMessageId: schema.agentRuns.triggerMessageId,
     })
     .from(schema.agentRuns);
   expect(parked?.status).toBe("waiting_input");
-  expect(consultationWait(parked as NonNullable<typeof parked>)).toBeNull();
+  expect(consultationWait(parked as NonNullable<typeof parked>)).toBe("outage");
+  const [status] = await loadAgentStatuses(w.db, w.org.id, new Date(), [w.agents.otto?.id as string]);
+  expect(status?.status?.kind).toBe("provider_down");
+  const asked = await getMessage(w.db, w.org.id, parked?.triggerMessageId as string);
+  const receipts = await receiptsFor(w.db, w.org.id, asked ? [asked] : []);
+  expect(receipts.get(asked?.id as string)?.handled.map((h) => [h.status, h.outage])).toEqual([
+    ["waiting_input", true],
+  ]);
   down = false;
   await w.advance(60);
   expect((await w.runs("otto")).map((r) => r.status)).toEqual(["done"]);

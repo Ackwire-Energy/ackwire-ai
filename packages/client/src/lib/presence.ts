@@ -102,6 +102,7 @@ export const AGENT_KIND_EMOJI: Record<AgentStatusKind, string> = {
   waiting_computer: "⏳",
   waiting_plan: "⏳",
   waiting_budget: "⏳",
+  provider_down: "⚠️",
 };
 
 /** An agent's line in words (its own, or the server's kind worded in the app's language), with its emoji. */

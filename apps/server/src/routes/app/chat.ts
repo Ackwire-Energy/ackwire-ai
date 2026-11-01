@@ -52,9 +52,9 @@ const Consultation = z.object({
     .nullable()
     .openapi({ description: "The consulted agent's run: the cards it posts here carry it (`agentRunId`)." }),
   status: z.enum(["open", "answered", "expired", "failed"]),
-  waiting: z.enum(["approval", "input", "computer", "agents"]).nullable().openapi({
+  waiting: z.enum(["approval", "input", "computer", "agents", "outage"]).nullable().openapi({
     description:
-      "Open, and the consulted agent waits: on a person (`approval`; `input`: an answer or a secret), for its computer to come back online (`computer`), or, its part done, on agents it handed some to (`agents`).",
+      "Open, and the consulted agent waits: on a person (`approval`; `input`: an answer or a secret), for its computer to come back online (`computer`), for its AI provider to come back (`outage`: it retries by itself), or, its part done, on agents it handed some to (`agents`).",
   }),
   question: z.string(),
   answer: z.string().nullable().openapi({ description: "The answer once answered; why it couldn't once failed." }),

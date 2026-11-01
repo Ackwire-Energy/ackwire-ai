@@ -1250,10 +1250,10 @@ export async function openConsultationsIn(
 
 /**
  * What the consulted agent waits on before it can answer: an approval, a person's answer or secret (`input`), its
- * computer to come back (`computer`: no person can move it), or, its own run done, what it handed on to other agents
- * (`agents`, ADR 0095).
+ * computer to come back (`computer`: no person can move it), its AI provider to come back (`outage`: parked, it
+ * retries by itself), or, its own run done, what it handed on to other agents (`agents`, ADR 0095).
  */
-export type ConsultationWait = "approval" | "input" | "computer" | "agents";
+export type ConsultationWait = "approval" | "input" | "computer" | "agents" | "outage";
 
 /**
  * What a consulted run held now waits on, from its row alone (no transcript read). `waiting_machine_id` is set
@@ -1271,7 +1271,7 @@ export function consultationWait(run: {
   outage?: boolean;
 }): ConsultationWait | null {
   if (run.status === "waiting_approval") return "approval";
-  if (run.status === "waiting_input") return run.waitingMachineId ? "computer" : run.outage ? null : "input";
+  if (run.status === "waiting_input") return run.waitingMachineId ? "computer" : run.outage ? "outage" : "input";
   return run.handedOn && isTerminal(run.status as AgentRun["status"]) ? "agents" : null;
 }
 

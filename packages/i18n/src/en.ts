@@ -1403,6 +1403,8 @@ export const en: Translations = {
     failed_other: "{{names}} couldn't answer",
     asking_one: "{{names}} is waiting for your answer",
     asking_other: "{{names}} are waiting for your answer",
+    outage_one: "{{names}}: the AI provider is down · retries by itself",
+    outage_other: "{{names}}: the AI provider is down · retries by itself",
     nobody: "No agent will answer",
     status: {
       seen: "Saw it",
@@ -1410,6 +1412,7 @@ export const en: Translations = {
       claimed: "Answering",
       waiting: "Waiting for approval",
       asking: "Waiting for your answer",
+      outage: "The AI provider is down · retries by itself",
       handled: "Answered",
       failed: "Failed",
       referenced: "Only mentioned",
@@ -1625,7 +1628,7 @@ export const en: Translations = {
     inHere: "in this conversation",
     blocked: "Couldn't call <b>{{name}}</b>: only the people who look after {{pronoun}} can",
     routineRead: "Couldn't call <b>{{name}}</b>: this routine only looks and tells",
-    routinePost: "Didn't call <b>{{name}}</b>: a routine's message wakes nobody",
+    routinePost: "Didn't call <b>{{name}}</b>: a routine that only looks and tells wakes nobody",
     outside: "Not {{place}}",
     routine: "Routine {{name}}",
     see: "See",
@@ -1915,6 +1918,7 @@ export const en: Translations = {
       waiting_computer: "Waiting for the computer",
       waiting_plan: "Waiting for the plan to reset",
       waiting_budget: "Waiting for the budget to reset",
+      provider_down: "The AI provider is down · retries by itself",
     },
     agentWhy: {
       online: "Active now",
@@ -8978,6 +8982,8 @@ export const en: Translations = {
       waitingInput: "{{name}} is waiting for an answer",
       /** The consulted agent's computer is away: paused, not on a person (as the computer screen says it). */
       waitingComputer: "{{name}} is waiting for the computer",
+      /** The consulted agent's AI provider is down: its run is parked and retries by itself. */
+      waitingProvider: "{{name}}: the AI provider is down · retries by itself",
       /** Its part done, the agent waits on what it handed to other agents. */
       waitingAgents: "{{name}} handed part of it on and is waiting to hear back",
       /** What a teammate at work posted so far in the agents' conversation, and the start of the latest. */

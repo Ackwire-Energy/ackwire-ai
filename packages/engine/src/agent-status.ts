@@ -40,7 +40,8 @@ export type AgentStatusKind =
   | "waiting_answer"
   | "waiting_computer"
   | "waiting_plan"
-  | "waiting_budget";
+  | "waiting_budget"
+  | "provider_down";
 
 /** An agent's line: its own words (`self`), one picked for its run (`auto`), or what its run waits on (`wait`). */
 export interface AgentStatusLine {
@@ -175,8 +176,8 @@ export async function loadAgentStatuses(
           ? runs.find((r) => !isWorking(r))
           : undefined;
     if (waits && !(stored?.line.by === "self" && a.statusUntil)) {
-      // Parked on a provider outage it waits on nobody: no line says a person keeps it.
-      status = ms - waits.updatedAt.getTime() < AGENT_WAIT_LINE_MS && !waits.outage ? waitLine(waits) : null;
+      // Parked on a provider outage it waits on nobody: its line says the provider is down for as long as it is.
+      status = waits.outage || ms - waits.updatedAt.getTime() < AGENT_WAIT_LINE_MS ? waitLine(waits) : null;
     }
     const heavy =
       working.some((r) => r.background || r.issueId !== null || long(r)) ||
@@ -235,11 +236,13 @@ const waitLine = (r: {
   status: string;
   waitingMachineId: string | null;
   waitCode?: string | null;
+  outage?: boolean;
 }): AgentStatusLine => ({
   by: "wait",
   text: null,
-  kind:
-    r.status === "waiting_approval"
+  kind: r.outage
+    ? "provider_down"
+    : r.status === "waiting_approval"
       ? "waiting_approval"
       : r.waitCode === "plan_limit"
         ? "waiting_plan"
@@ -276,6 +279,7 @@ export function lineInEnglish(line: AgentStatusLine): string | null {
     waiting_computer: "waiting for its computer",
     waiting_plan: "waiting for its plan to reset",
     waiting_budget: "waiting for its budget to renew",
+    provider_down: "waiting for its AI provider to come back (it retries by itself)",
   };
   return line.kind ? words[line.kind] : null;
 }

@@ -747,9 +747,11 @@ async function executeRunInner(
     threadId: string | null;
     text: string;
   } | null = null;
+  /** `outage`: parked on a provider outage (`parkOutage`), the apps say the provider is down, not that it asks. */
   const finished = async (
     status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled",
     error?: string,
+    outage?: true,
   ) => {
     for (const id of withReceipts.splice(0)) {
       await publishMessageActions({ db, pubsub: deps.pubsub }, run.orgId, id).catch(() => {});
@@ -768,6 +770,7 @@ async function executeRunInner(
       ...bg,
       status,
       ...(error ? { error, ...runErrorDetail(error) } : {}),
+      ...(outage ? { outage } : {}),
     });
     // Its line ends with the run (checked on read); the apps refresh now (ADR 0084 §11).
     await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
@@ -779,6 +782,7 @@ async function executeRunInner(
       runId: run.id,
       status,
       ...(error === NO_AI ? { reason: NO_AI } : {}),
+      ...(outage ? { outage } : {}),
     });
     deps.onTiming?.("run_ms", Date.now() - claimedAt, { runId: run.id, status });
     // A forum turn ended: announce the post and move the topic on (ADR 0022). A question to people
@@ -820,7 +824,7 @@ async function executeRunInner(
     );
   };
 
-  const event = (status: RunStatus, error?: string): ChannelEvent => ({
+  const event = (status: RunStatus, error?: string, outage?: true): ChannelEvent => ({
     type: "agent.run",
     channelId: run.channelId,
     threadId: replyThreadId,
@@ -828,6 +832,7 @@ async function executeRunInner(
     agentId: run.agentId,
     status,
     ...bg,
+    ...(outage ? { outage } : {}),
     ...(error ? { error, ...runErrorDetail(error) } : {}),
   });
   /** Writes that don't need to finish before the model call (steps, usage log); flushed after it. */
@@ -1297,8 +1302,8 @@ async function executeRunInner(
     });
     if (!(await transitionRun(db, run.id, "running", "waiting_input", { transcript: storedTranscript(t) })))
       throw new PermanentJobError("run changed state while executing");
-    await publishChannelEvent(deps.pubsub, event("waiting_input"));
-    await finished("waiting_input");
+    await publishChannelEvent(deps.pubsub, event("waiting_input", undefined, true));
+    await finished("waiting_input", undefined, true);
     return true;
   };
 

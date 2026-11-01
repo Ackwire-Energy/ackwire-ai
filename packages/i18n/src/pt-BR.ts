@@ -1406,6 +1406,8 @@ export const ptBR = {
     failed_other: "{{names}} não conseguiram responder",
     asking_one: "{{names}} está esperando sua resposta",
     asking_other: "{{names}} estão esperando sua resposta",
+    outage_one: "{{names}}: o provedor de IA está fora do ar · tenta de novo sozinho",
+    outage_other: "{{names}}: o provedor de IA está fora do ar · tenta de novo sozinho",
     nobody: "Nenhum agente vai responder",
     status: {
       seen: "Viu",
@@ -1413,6 +1415,7 @@ export const ptBR = {
       claimed: "Respondendo",
       waiting: "Esperando aprovação",
       asking: "Esperando sua resposta",
+      outage: "O provedor de IA está fora do ar · tenta de novo sozinho",
       handled: "Respondeu",
       failed: "Falhou",
       referenced: "Só mencionado",
@@ -1641,7 +1644,7 @@ export const ptBR = {
     inHere: "nesta conversa",
     blocked: "Não consegui chamar {{article}} <b>{{name}}</b>: só quem cuida {{hers}} pode",
     routineRead: "Não consegui chamar {{article}} <b>{{name}}</b>: esta rotina só olha e conta",
-    routinePost: "Não chamei {{article}} <b>{{name}}</b>: a mensagem de uma rotina não acorda ninguém",
+    routinePost: "Não chamei {{article}} <b>{{name}}</b>: uma rotina que só olha e conta não acorda ninguém",
     outside: "Não está {{place}}",
     routine: "Rotina {{name}}",
     see: "Ver",
@@ -1932,6 +1935,7 @@ export const ptBR = {
       waiting_computer: "Esperando o computador",
       waiting_plan: "Esperando o plano renovar",
       waiting_budget: "Esperando o orçamento renovar",
+      provider_down: "O provedor de IA está fora do ar · tenta de novo sozinho",
     },
     agentWhy: {
       online: "Ativo agora",
@@ -9046,6 +9050,8 @@ export const ptBR = {
       waitingInput: "{{The}} {{name}} espera uma resposta",
       /** The consulted agent's computer is away: paused, not on a person (as the computer screen says it). */
       waitingComputer: "{{The}} {{name}} espera o computador voltar",
+      /** The consulted agent's AI provider is down: its run is parked and retries by itself. */
+      waitingProvider: "{{name}}: o provedor de IA está fora do ar · tenta de novo sozinho",
       /** Its part done, the agent waits on what it handed to other agents. */
       waitingAgents: "{{The}} {{name}} passou uma parte adiante e espera o retorno",
       /** What a teammate at work posted so far in the agents' conversation, and the start of the latest. */

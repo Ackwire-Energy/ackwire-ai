@@ -13,8 +13,8 @@ import { noticeOf } from "./notices";
 
 /**
  * Where one question is, for its line. `waiting`: the consulted agent waits on a person; `offline`: for its
- * computer to come back (still out, paused, on no one); `handedOn`: its part done, it waits on agents it handed
- * some to.
+ * computer or its AI provider to come back (still out, paused, on no one); `handedOn`: its part done, it waits on
+ * agents it handed some to.
  */
 export type ConsultLineState = "working" | "waiting" | "offline" | "handedOn" | "answered" | "failed" | "expired";
 
@@ -46,7 +46,7 @@ export function consultLineState(c: RunConsultation, now: number): ConsultLineSt
   if (c.status === "expired") return "expired";
   // Past its deadline the worker closes it within a minute: show it as it will be.
   if (Date.parse(c.expiresAt) < now) return "expired";
-  if (c.waiting === "computer") return "offline";
+  if (c.waiting === "computer" || c.waiting === "outage") return "offline";
   if (c.waiting === "agents") return "handedOn";
   return c.waiting ? "waiting" : "working";
 }
@@ -63,7 +63,9 @@ export function consultLineKey(state: ConsultLineState, c: Pick<RunConsultation,
         ? ("chat.consultGroup.waitingApproval" as const)
         : ("chat.consultGroup.waitingInput" as const);
     case "offline":
-      return "chat.consultGroup.waitingComputer" as const;
+      return c.waiting === "outage"
+        ? ("chat.consultGroup.waitingProvider" as const)
+        : ("chat.consultGroup.waitingComputer" as const);
     case "handedOn":
       return "chat.consultGroup.waitingAgents" as const;
     case "answered":

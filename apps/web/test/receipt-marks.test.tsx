@@ -289,3 +289,22 @@ describe("an agent's message that mentions agents (ADR 0089)", () => {
     expect(within(popover).getByRole("button", { name: "Chamar um agente" })).toBeTruthy();
   });
 });
+
+describe("an agent whose AI provider is down", () => {
+  test("its run parked says so under the message, not that it waits for an answer", async () => {
+    const state = seedState();
+    state.messages = [
+      said("o1", "O build passou?", 2, {
+        receipts: {
+          seenBy: [ADA_ID],
+          pickedBy: [ADA_ID],
+          handled: [{ agentId: ADA_ID, runId: "r-outage", status: "waiting_input", outage: true }],
+        },
+      }),
+    ];
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(8);
+    expect(row("o1").textContent).toContain("Ada: o provedor de IA está fora do ar · tenta de novo sozinho");
+    expect(row("o1").textContent).not.toContain("esperando sua resposta");
+  });
+});

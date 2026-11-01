@@ -37,7 +37,7 @@ import { type MessageMemory, memoriesFor } from "./message-memories";
 import { can } from "./organizations";
 import { afterReplyAnswered } from "./questions";
 import { inChannelRun } from "./run-scope";
-import { NO_AI } from "./runs";
+import { NO_AI, outageParkedSql } from "./runs";
 import { afterSteered } from "./steering";
 import type { Talker } from "./talker";
 import { syncWikiLinks, withWikiLinks } from "./wiki-links";
@@ -178,6 +178,8 @@ export interface Receipts {
     status: "queued" | "running" | "waiting_approval" | "waiting_input" | "done" | "failed" | "canceled";
     /** `no_ai`: it failed for want of an AI to think with. */
     reason?: typeof NO_AI;
+    /** `waiting_input` parked on a provider outage: it retries by itself. */
+    outage?: true;
   }[];
   /** Agents it mentions that won't answer (they don't reply to this person, or a mission's agent). */
   blocked: string[];
@@ -220,6 +222,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
     agentId: schema.agentRuns.agentId,
     status: schema.agentRuns.status,
     error: schema.agentRuns.error,
+    outage: outageParkedSql,
   };
   const [decisions, runs, steeredRuns, answeredRuns] = await Promise.all([
     db
@@ -284,6 +287,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
         runId: r.id,
         status: r.status,
         ...(r.error === NO_AI ? { reason: NO_AI } : {}),
+        ...(r.outage ? { outage: true as const } : {}),
       })),
       // A person's mention always starts, steers or resumes a run, unless that agent can't answer them
       // or the message only references it.

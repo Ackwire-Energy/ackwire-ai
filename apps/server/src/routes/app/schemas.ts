@@ -363,6 +363,10 @@ const MessageBase = z.object({
             .literal("no_ai")
             .optional()
             .openapi({ description: "It couldn't answer: the agent has no AI connected." }),
+          outage: z
+            .literal(true)
+            .optional()
+            .openapi({ description: "`waiting_input` because its AI provider is down: it retries by itself." }),
         }),
       ),
       blocked: z

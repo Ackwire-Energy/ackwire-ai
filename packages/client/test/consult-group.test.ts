@@ -53,6 +53,10 @@ describe("consultLineState", () => {
     expect(consultLineState(q({ waiting: "computer" }), now)).toBe("offline");
     expect(consultLineState(q({ waiting: "computer" }), T0 + 901_000)).toBe("expired");
   });
+  test("open, parked because its AI provider is down: still out, not working and not on a person", () => {
+    expect(consultLineState(q({ waiting: "outage" }), now)).toBe("offline");
+    expect(consultLineKey("offline", q({ waiting: "outage" }))).toBe("chat.consultGroup.waitingProvider");
+  });
   test("open past its deadline reads as expired before the worker closes it", () => {
     expect(consultLineState(q(), T0 + 901_000)).toBe("expired");
   });

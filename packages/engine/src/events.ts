@@ -115,6 +115,8 @@ export type ChannelEvent =
       status: RunStatus;
       /** Background work (a routine's run): not the conversation's "working" indicator. */
       background?: true;
+      /** `waiting_input` parked on a provider outage: it retries by itself, nobody is asked. */
+      outage?: true;
       error?: string;
       /** Stable code of `error` (`run.budget_exceeded`, `run.provider_error`…) and its params. */
       errorCode?: string;
@@ -243,6 +245,8 @@ export type ChannelEvent =
       background?: true;
       runId: string;
       status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled";
+      /** `waiting_input` parked on a provider outage. */
+      outage?: true;
       error?: string;
       errorCode?: string;
       errorParams?: Record<string, string>;
@@ -382,6 +386,8 @@ export type ChannelEvent =
       status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled";
       /** `no_ai`: the agent has no AI to think with. */
       reason?: string;
+      /** `waiting_input` parked on a provider outage. */
+      outage?: true;
     }
   /** An agent changed its memory because a person asked (with an undo). */
   | {
