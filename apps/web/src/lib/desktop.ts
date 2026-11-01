@@ -120,8 +120,9 @@ export async function challengeOf(verifier: string) {
   return base64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
 }
 
-export const browserSignInUrl = (provider: SignInProvider, requestId: string) =>
-  `${BROWSER_SIGN_IN_PATH}?${new URLSearchParams({ provider, request: requestId })}`;
+/** `access`: an early-access link's token, for the sign-up the browser makes (DesktopSignInPage). */
+export const browserSignInUrl = (provider: SignInProvider, requestId: string, access?: string) =>
+  `${BROWSER_SIGN_IN_PATH}?${new URLSearchParams({ provider, request: requestId, ...(access ? { access } : {}) })}`;
 
 /**
  * What the site may ask of this computer (ADR 0036, `this_mac` in main_window.rs): which of this server's

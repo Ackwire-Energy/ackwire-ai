@@ -6,6 +6,9 @@ import type { OpenAPIHono } from "@hono/zod-openapi";
  * (`/reset-password?token=`) open straight in the app when it is installed (iOS universal links, Android App
  * Links); without the app they stay links to the website, which handles both. The files below are what iOS
  * and Android fetch from our domain to trust the app with those paths.
+ * An early-access sign-up (`/signup?email=&access=`) opens the app on Android only (its paths are in the app's
+ * build, apps/mobile app.config.ts). iOS reads its paths from here: `/signup` joins them once every build in the
+ * stores has its route (`app/signup.tsx`), since an older one would open the link on its not-found screen.
  */
 export const APP_LINK_PATHS = ["/invite/*", "/reset-password"];
 

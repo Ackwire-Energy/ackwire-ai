@@ -345,6 +345,12 @@ export const en: Translations = {
     emailLinkExpired: "This confirmation link is no longer valid. Your account works as usual.",
     sendNewLink: "Send a new link",
     newLinkSent: "We sent a new link to {{email}}.",
+    unconfirmed:
+      "This email already has an account with a password that isn't confirmed yet. Sign in with the password, or create a new one by email.",
+    unconfirmedReset: "Create a new password",
+    unconfirmedNoEmail: "This email already has an account with a password. Sign in with the password.",
+    providerUnverified:
+      "Your sign-in provider hasn't confirmed this address yet. Confirm it there, or sign in with your email.",
     termsBefore: "By continuing you accept the ",
     terms: "Terms",
     termsMiddle: " and the ",

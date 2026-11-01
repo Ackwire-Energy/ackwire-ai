@@ -132,6 +132,9 @@ const KNOWN = {
   EARLY_ACCESS_EMAIL_UNVERIFIED: "auth.earlyAccess.unverified",
   // A provider's sign-up on a closed server comes back to /login with this code.
   SIGNUP_CLOSED: "auth.flow.closedLead",
+  account_not_linked: "auth.unconfirmed",
+  // A provider that hasn't confirmed its own address, to a confirmed account here (apps/server auth.ts `authHandler`).
+  provider_email_unverified: "auth.providerUnverified",
   human_check: "errors.humanCheck",
   human_check_blocked: "errors.humanCheckBlocked",
   // TypeSafe refused the key pasted for Jev: said under its field, nothing kept.
@@ -164,6 +167,12 @@ export const ACCOUNT_BLOCKED = "ACCOUNT_BLOCKED";
 
 /** Better Auth's code when an early-access link signs up another address than the one it was sent to. */
 export const EARLY_ACCESS_OTHER_EMAIL = "EARLY_ACCESS_OTHER_EMAIL";
+
+/**
+ * Better Auth's refusal of a provider sign-in to an address whose password account isn't confirmed yet: it links none,
+ * since whoever made that account may not own the address (mirrors apps/server auth.ts).
+ */
+export const ACCOUNT_NOT_LINKED = "account_not_linked";
 
 /** Where a restriction on agentes.chat Cloud is contested. */
 export const LEGAL_EMAIL = "legal@agentes.chat";
@@ -335,6 +344,16 @@ export function authErrorText(
   const { kind, cloud } = refusal;
   const known = knownErrorText(t, new ApiError(refusal.status, refusal.code ?? "", refusal.message, { kind, cloud }));
   return known ?? (refusal.message || t("common.unknownError"));
+}
+
+/**
+ * A provider sign-in the server refused (its code on `/login?error=`), in the person's words, or null for a code the
+ * apps don't know. `emails`: the server sends email, so an unconfirmed account can be confirmed (else only its password
+ * signs in).
+ */
+export function providerRefusalText(t: TFunction, code: string, emails: boolean): string | null {
+  if (code === ACCOUNT_NOT_LINKED && !emails) return t("auth.unconfirmedNoEmail");
+  return knownErrorText(t, new ApiError(403, code, ""));
 }
 
 /** Translated text for a failed request. */

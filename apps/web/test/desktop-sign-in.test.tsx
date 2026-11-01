@@ -22,6 +22,7 @@ afterEach(() => {
 });
 
 const ACCOUNT: SignInOptions = { account: true, password: true, providers: [], canSignUp: false };
+const ACCESS = "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8S9t0U1v";
 const KEY = /^[A-Za-z0-9_-]{43}$/;
 const heading = () => screen().getByRole("heading").textContent;
 
@@ -81,6 +82,27 @@ describe("in the Mac app's window", () => {
     }
   });
 
+  test("from an early-access link: the browser it opens, and opens again, carries the link's token", async () => {
+    app().__agentesDesktop = { version: "0.6.0" };
+    const assign = recordAssign();
+    const api = createFakeApi(seedState({ me: null }));
+    api.account.signInOptions = async () => ({ account: false, password: false, providers: [], canSignUp: true });
+    try {
+      await renderApp(`/signup?email=ana%40acme.com&access=${ACCESS}`, { api, auth: createFakeAuth().auth });
+      await settle(6);
+      await act(async () => fireEvent.click(screen().getByRole("button", { name: "Trocar" })));
+      await act(async () => fireEvent.click(screen().getByRole("button", { name: /Continuar com GitHub/ })));
+      await settle(6);
+      await act(async () => fireEvent.click(screen().getByRole("button", { name: "Abrir o navegador de novo" })));
+      expect(assign.urls.map((u) => new URL(u, "https://app.agentes.chat").searchParams.get("access"))).toEqual([
+        ACCESS,
+        ACCESS,
+      ]);
+    } finally {
+      assign.restore();
+    }
+  });
+
   test("outside the app, GitHub signs in right here as before", async () => {
     const { auth, calls } = createFakeAuth();
     const api = createFakeApi(seedState({ me: null }));
@@ -122,6 +144,19 @@ describe("in the browser, for the app", () => {
     await settle(3);
     expect(back.calls.some((c) => c.method === "desktopHandoff" && c.args[0] === request)).toBe(true);
     expect(heading()).toBe("Tudo certo.");
+  });
+
+  test("an early-access token from the app's window goes on to the provider, for the sign-up it makes", async () => {
+    const { auth, calls } = createFakeAuth();
+    await renderApp(`/desktop/sign-in?provider=google&request=${request}&access=${ACCESS}`, {
+      api: createFakeApi(seedState({ me: null })),
+      auth,
+    });
+    await settle(3);
+    expect(calls[0]).toEqual({
+      method: "signInSocial",
+      args: ["google", `/desktop/sign-in?provider=google&request=${request}&done=1`, ACCESS],
+    });
   });
 
   test("a link straight to the end hands nothing over without a real request", async () => {

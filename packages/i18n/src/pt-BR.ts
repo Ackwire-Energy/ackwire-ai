@@ -342,6 +342,11 @@ export const ptBR = {
     emailLinkExpired: "Este link de confirmação não vale mais. Sua conta funciona normalmente.",
     sendNewLink: "Mandar outro link",
     newLinkSent: "Mandamos outro link para {{email}}.",
+    unconfirmed:
+      "Este e-mail já tem uma conta com senha que ainda não foi confirmada. Entre com a senha ou crie uma nova pelo e-mail.",
+    unconfirmedReset: "Criar uma senha nova",
+    unconfirmedNoEmail: "Este e-mail já tem uma conta com senha. Entre com a senha.",
+    providerUnverified: "Seu provedor de login ainda não confirmou este endereço. Confirme lá, ou entre com o e-mail.",
     termsBefore: "Ao continuar, você aceita os ",
     terms: "Termos",
     termsMiddle: " e a ",
