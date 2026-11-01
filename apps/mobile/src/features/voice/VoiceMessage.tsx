@@ -163,6 +163,7 @@ export const VoiceMessage = memo(function VoiceMessage({ message }: { message: M
                 off={gone ? c.line2 : c.faint}
                 onWidth={setWidth}
                 height={WAVE}
+                handle={!gone}
               />
             </View>
           </GestureDetector>

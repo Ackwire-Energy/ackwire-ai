@@ -17,10 +17,12 @@ function resample(peaks: readonly number[], n: number) {
  * so the line is never half empty. Otherwise the whole recording, played up to `progress`. Colors come from the
  * canvas's `--voice-on` and `--voice-off`.
  */
+const HANDLE = 6;
+
 export function drawVoiceWave(
   canvas: HTMLCanvasElement | null,
   peaks: readonly number[],
-  { progress = 0, live = false }: { progress?: number; live?: boolean } = {},
+  { progress = 0, live = false, handle = false }: { progress?: number; live?: boolean; handle?: boolean } = {},
 ) {
   if (!canvas) return;
   const w = canvas.clientWidth;
@@ -59,6 +61,13 @@ export function drawVoiceWave(
     else g.rect(x0 + i * (BAR + GAP), (h - bar) / 2, BAR, bar);
     g.fill();
   });
+  // Where the audio is, to grab and drag; kept whole at both ends.
+  if (handle) {
+    g.fillStyle = on;
+    g.beginPath();
+    g.arc(Math.min(w - HANDLE, Math.max(HANDLE, progress * w)), h / 2, HANDLE, 0, 7);
+    g.fill();
+  }
 }
 
 /** Calls `paint` again when the canvas changes size or the app's theme changes, since its colors are read to draw. */

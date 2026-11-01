@@ -345,7 +345,7 @@ export function useVoiceRecorder(options: VoiceRecorderOptions | undefined, wave
   const paint = useCallback(() => {
     const rec = current.current;
     if (!rec) return;
-    if (rec.paused) drawVoiceWave(wave.current, rec.levels, { progress: rec.position() });
+    if (rec.paused) drawVoiceWave(wave.current, rec.levels, { progress: rec.position(), handle: true });
     else drawVoiceWave(wave.current, rec.levels, { live: true });
   }, [wave]);
   useWaveRepaint(wave, paint);

@@ -1,10 +1,11 @@
-import { Canvas, Group, Path, rect, rrect, Skia, type SkPath } from "@shopify/react-native-skia";
+import { Canvas, Circle, Group, Path, rect, rrect, Skia, type SkPath } from "@shopify/react-native-skia";
 import { useState } from "react";
 import { type LayoutChangeEvent, StyleSheet, type ViewStyle } from "react-native";
 import { type SharedValue, useDerivedValue } from "react-native-reanimated";
 
 const BAR = 3;
 const GAP = 2;
+const HANDLE = 6;
 
 /** How many bars fit in `width`. */
 export const barsIn = (width: number) => Math.max(1, Math.floor((width + GAP) / (BAR + GAP)));
@@ -44,6 +45,7 @@ export function VoiceBars({
   off,
   onWidth,
   height,
+  handle = false,
   style,
 }: {
   path: SharedValue<SkPath>;
@@ -52,6 +54,8 @@ export function VoiceBars({
   off: string;
   onWidth?: (width: number) => void;
   height: number;
+  /** A dot at `progress`, to grab and drag. */
+  handle?: boolean;
   style?: ViewStyle;
 }) {
   const [width, setWidth] = useState(0);
@@ -61,12 +65,14 @@ export function VoiceBars({
     onWidth?.(next);
   };
   const clip = useDerivedValue(() => rect(0, 0, width * progress.value, height));
+  const handleX = useDerivedValue(() => Math.min(width - HANDLE, Math.max(HANDLE, width * progress.value)));
   return (
     <Canvas onLayout={layout} style={[styles.canvas, { height }, style]}>
       <Path path={path} color={off} />
       <Group clip={clip}>
         <Path path={path} color={on} />
       </Group>
+      {handle ? <Circle cx={handleX} cy={height / 2} r={HANDLE} color={on} /> : null}
     </Canvas>
   );
 }

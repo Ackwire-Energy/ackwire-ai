@@ -217,6 +217,7 @@ export function useVoiceComposer(
                   off={c.faint}
                   onWidth={take.setWidth}
                   height={LIVE_WAVE}
+                  handle={phase === "paused"}
                 />
               </View>
             </GestureDetector>

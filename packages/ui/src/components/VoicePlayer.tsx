@@ -80,7 +80,10 @@ export function VoicePlayer({
   const wordsId = useId();
   const dead = Boolean(expired) || gone;
 
-  const paint = useCallback(() => drawVoiceWave(canvas.current, peaks, { progress: pos.current }), [peaks]);
+  const paint = useCallback(
+    () => drawVoiceWave(canvas.current, peaks, { progress: pos.current, handle: !dead }),
+    [peaks, dead],
+  );
   useWaveRepaint(canvas, paint);
 
   const halt = useCallback(() => {
