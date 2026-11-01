@@ -651,6 +651,38 @@ describe("one request, one card: channels, mailboxes and a routine", () => {
     ).map((m) => (m.meta.notice as { text: string }).text);
     expect(texts[0]).toContain("Not given yet: the mailbox ana@acme.com (only ana gives it).");
     expect(texts[1]).toContain("GitHub (an admin)");
+    // Caio's own plan account thinks for the next one, which then answers only Caio: Ana gives it once it answers her.
+    const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, caio.id, f.org.id, {
+      name: "MacBook",
+      exec: true,
+    });
+    await f.db
+      .update(schema.machines)
+      .set({
+        protocol: 8,
+        executors: { claude: { version: "2.1.300", loggedIn: true }, detectedAt: new Date().toISOString() },
+      })
+      .where(eq(schema.machines.id, machineId));
+    await f.db.insert(schema.machineAccounts).values({
+      id: "0193aaaa-0000-4000-8000-000000000009",
+      orgId: f.org.id,
+      machineId,
+      kind: "claude_code",
+      label: "Claude do Caio",
+      status: "active",
+      createdBy: caio.id,
+    });
+    const third = await card();
+    const onPlan = await createProposedAgent(deps, caio.id, f.org.id, third);
+    expect(onPlan.ai).toBe("account");
+    const said = await f.db
+      .select()
+      .from(schema.messages)
+      .where(sql`${schema.messages.meta}->'notice'->>'kind' = 'proposal_result'`)
+      .orderBy(schema.messages.createdAt);
+    expect(JSON.stringify(said.at(-1)?.meta.notice)).toContain(
+      "the mailbox ana@acme.com (only ana gives it, once it answers ana:",
+    );
   });
 
   test("a member who only creates agents gives the new agent her own mailbox in one click", async () => {

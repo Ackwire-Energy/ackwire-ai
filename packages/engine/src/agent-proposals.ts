@@ -5,6 +5,7 @@ import { orgToolCatalog, setAgentAccess } from "./access";
 import { type Agent, createAgent, getAgent, HANDLE_PATTERN, NEW_AGENT_DEFAULTS, ROLE_MAX, roleTooLong } from "./agents";
 import { type AiStatusDeps, agentAiState } from "./ai-status";
 import { type AgentAppearance, setAgentAppearance, validateAppearance } from "./appearance";
+import { canTalkTo, talksToAgents } from "./audience";
 import { setAgentBrain } from "./brain-settings";
 import { requireChannelAccess } from "./channels";
 import { customScope } from "./connectors/custom";
@@ -905,6 +906,16 @@ async function giveLines(deps: ProposedAgentDeps, userId: string, message: Messa
 
   // In words, for the agent that proposed it.
   const mail = draft.mail ?? [];
+  // A plan thinks only for its owner's agents: a mailbox's owner who can't talk to it can't give it either, yet.
+  const now = (await getAgent(db, orgId, agent.id)) ?? agent;
+  const unheard = new Set<string>();
+  for (const m of mail) {
+    if (
+      !mailAccountIds.includes(m.accountId) &&
+      !canTalkTo(now, m.ownerUserId, await talksToAgents(db, orgId, m.ownerUserId))
+    )
+      unheard.add(m.ownerUserId);
+  }
   const [named, connected, owners] = await Promise.all([
     draft.channelIds.length > 0
       ? db.select({ id: channels.id, name: channels.name }).from(channels).where(inArray(channels.id, draft.channelIds))
@@ -952,10 +963,12 @@ async function giveLines(deps: ProposedAgentDeps, userId: string, message: Messa
       .map((a) => `${appName(a.connectionId)} (an admin)`),
     ...mail
       .filter((m) => !mailAccountIds.includes(m.accountId))
-      .map(
-        (m) =>
-          `the mailbox ${m.address} (only ${owners.find((o) => o.id === m.ownerUserId)?.name ?? "its owner"} gives it)`,
-      ),
+      .map((m) => {
+        const owner = owners.find((o) => o.id === m.ownerUserId)?.name ?? "its owner";
+        return unheard.has(m.ownerUserId)
+          ? `the mailbox ${m.address} (only ${owner} gives it, once it answers ${owner}: it thinks with its owner's plan, so its owner lets ${owner} talk to it first)`
+          : `the mailbox ${m.address} (only ${owner} gives it)`;
+      }),
   ];
   const said = [
     got.length > 0 ? `It ${got.join(", ")}.` : "",
