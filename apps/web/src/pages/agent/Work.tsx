@@ -1333,7 +1333,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
             const off = c !== "key" && away(c);
             return {
               value: c,
-              // Each plan by its maker's mark; the API key by the agent itself, which it pays for per use.
+              // Each plan by its maker's mark; the API key by its model's maker, or the agent itself when none is known.
               leading:
                 c === "key" ? (
                   apiProvider ? (

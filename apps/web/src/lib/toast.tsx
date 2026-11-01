@@ -1,5 +1,5 @@
 import { splitAtNames } from "@agenteschat/client/lib/text";
-import { type AgentAppearance, Avatar, Icon } from "@agenteschat/ui";
+import { type AgentAppearance, Icon } from "@agenteschat/ui";
 import {
   createContext,
   type ReactNode,
@@ -10,6 +10,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { AgentAvatar } from "@/components/AgentAvatar";
 
 /**
  * Minimal toasts in the design language (neutral surface, overlay shadow,
@@ -181,7 +182,7 @@ function ToastWords({ toast }: { toast: Toast }) {
           part
         ) : (
           <span key="who" className="ac-who">
-            <Avatar kind="agent" size="xs" name={who.name} appearance={who.appearance} />
+            <AgentAvatar size="xs" name={who.name} appearance={who.appearance} />
             <b>{who.name}</b>
           </span>
         ),

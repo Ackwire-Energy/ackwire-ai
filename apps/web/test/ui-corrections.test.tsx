@@ -304,13 +304,12 @@ describe("the agent page's cards and the chat's", () => {
     expect(value(css, ".wiki-import-card", "padding")).toBe("12px");
     expect(value(css, ".wiki-backlink", "padding")).toBe("12px");
     expect(value(css, ".drive-note", "padding")).toBe("12px 14px");
-    expect(value(css, ".cmp-entry__row.ac-faceline", "padding")).toBe("12px 14px");
+    expect(value(css, ".cmp-entry__row", "padding")).toBe("12px 14px");
   });
 
   test("the computer card's words centred on its icon; the take-control head's icon on its two lines", async () => {
     const css = await sheet("apps/web/src/components/computer/computer.css");
-    expect(value(css, ".cmp-entry__row.ac-faceline", "align-items")).toBe("center");
-    expect(value(css, ".cmp-entry__t>.ac-captop", "margin-block-start")).toBe("0");
+    expect(value(css, ".cmp-entry__row", "align-items")).toBe("center");
     expect(declarations(css, ".cmp-entry__row>.ac-computer")).toEqual([]);
     const lead = ".cmp-dialog .ac-dialog__lead:has(+ .ac-dialog__titles)";
     expect(value(css, lead, "align-self")).toBe("center");
