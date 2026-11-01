@@ -104,7 +104,14 @@ import {
 } from "./continuation";
 import { modelInfoFor } from "./credentials";
 import { isAgentOnlyDm } from "./dms";
-import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationError } from "./errors";
+import {
+  BudgetExceededError,
+  codedErrorMessage,
+  dataExceptionMessage,
+  MissingCredentialError,
+  NotFoundError,
+  ValidationError,
+} from "./errors";
 import { type ChannelEvent, type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
 import { FOLLOW_UP_TOOL, wakesLater } from "./follow-through";
 import { cutText } from "./format";
@@ -1064,6 +1071,7 @@ async function executeRunInner(
     const work = {
       steps: tools.reduce((n, t) => n + t.n, 0),
       durationMs: Math.max(0, Date.now() - run.createdAt.getTime()),
+      ...(tools.length === 1 && tools[0]?.n === 1 ? await loneCall(tx, run.id, tools[0].name) : {}),
       calls: tools.slice(0, WORK_CALLS).map((t) => ({
         name: t.name,
         ...(t.connector ? { connector: t.connector } : {}),
@@ -1175,7 +1183,12 @@ async function executeRunInner(
       readsWiki && !viaRoutine
         ? retrieveWikiForRun(
             { db, search: contextDeps },
-            { orgId: run.orgId, agentId: agent.id, text: trigger?.body ?? "" },
+            {
+              orgId: run.orgId,
+              agentId: agent.id,
+              text: trigger?.body ?? "",
+              readers: { channelId: run.channelId, person: async () => (await runAuthority(db, run)).personId },
+            },
           ).catch(() => ({ text: "", pageIds: [] as string[] }))
         : Promise.resolve({ text: "", pageIds: [] as string[] }),
     ]);
@@ -3148,6 +3161,21 @@ async function executeRunInner(
   } catch (error) {
     // A state change lost to a cancel (the final or suspend transition found `canceled`): end as canceled.
     if (await isCanceled().catch(() => false)) return stopCanceled("");
+    // A value the database refuses fails every retry, and a last try has none left: the run fails now and says
+    // why, or the stale-run sweep would end it later as cut by a restart.
+    const refused = dataExceptionMessage(error);
+    const gaveUp = refused || (options.finalAttempt && !(error instanceof PermanentJobError));
+    const [current] = gaveUp
+      ? await db.select({ status: agentRuns.status }).from(agentRuns).where(eq(agentRuns.id, run.id))
+      : [];
+    if (current?.status === "running") {
+      // The conversation shows this reason to everyone: a driver's message, never SQL text or a bug's raw words.
+      const detail = refused ?? codedErrorMessage(error);
+      if (!refused) await addRunStep(db, run, "error", { reason: "gave_up", message: String(error) }).catch(() => {});
+      return fail(
+        detail ? `Stopped after an error: ${cutText(detail, 300)}` : "Stopped after an error that kept repeating.",
+      );
+    }
     throw error;
   } finally {
     live.close();
@@ -3545,6 +3573,25 @@ function closingSummary(t: Transcript, anythingPosted: boolean): string {
   if (last) return last;
   const usedTools = turns.some((m) => typeof m.content !== "string" && m.content.some((b) => b.type === "tool_use"));
   return usedTools && !anythingPosted ? DONE_TEXT : "";
+}
+
+/**
+ * A reply's lone tool call (`meta.work` of one step): how long it took and whether the tool answered with an error, so
+ * the reply's line for it ("Criou uma rotina · 0,9 s") reads right before anyone loads the run's steps.
+ */
+async function loneCall(tx: Executor, runId: string, name: string): Promise<{ ms?: number; failed?: true }> {
+  const steps = await tx
+    .select({ kind: agentRunSteps.kind, data: agentRunSteps.data, createdAt: agentRunSteps.createdAt })
+    .from(agentRunSteps)
+    .where(and(eq(agentRunSteps.runId, runId), inArray(agentRunSteps.kind, ["tool_call", "tool_result"])))
+    .orderBy(agentRunSteps.seq);
+  const call = steps.find((s) => s.kind === "tool_call" && s.data.name === name);
+  const result = call && steps.find((s) => s.kind === "tool_result" && s.data.toolUseId === call.data.toolUseId);
+  if (!call || !result) return {};
+  return {
+    ms: Math.max(0, result.createdAt.getTime() - call.createdAt.getTime()),
+    ...(result.data.isError === true ? { failed: true as const } : {}),
+  };
 }
 
 function postAgentMessage(

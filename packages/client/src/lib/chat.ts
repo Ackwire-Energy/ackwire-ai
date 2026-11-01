@@ -52,6 +52,10 @@ export const NEAR_BOTTOM_PX = 120;
 export const nearBottom = (el: { scrollHeight: number; scrollTop: number; clientHeight: number }) =>
   el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_PX;
 
+/** A key that scrolls a focused list up (Shift+Space is the browser's page up). */
+export const isScrollUpKey = (e: { key: string; shiftKey: boolean }) =>
+  e.key === "ArrowUp" || e.key === "PageUp" || e.key === "Home" || (e.key === " " && e.shiftKey);
+
 export type SuggestionTopic = "dev" | "support" | "marketing" | "data" | "product" | "general";
 
 const TOPICS: [SuggestionTopic, RegExp][] = [

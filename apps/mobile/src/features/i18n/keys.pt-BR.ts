@@ -554,6 +554,8 @@ export const featureKeysPtBR = {
     computerOn: "{{name}} · ligado",
     computerOff: "{{name}} · desligado",
     computerNotAnswering: "{{name}} · sem resposta",
+    computerOffPlain: "Computador desligado",
+    computerNotAnsweringPlain: "Computador sem resposta",
     running_one: "{{count}} item em andamento",
     running_other: "{{count}} itens em andamento",
     conversation: "Conversa da missão",
@@ -662,7 +664,6 @@ export const featureKeysPtBR = {
   agentEdit: {
     missing: "Este agente não existe mais.",
     saved: "Alterações salvas",
-    rolePlaceholder: "Ex.: Atendimento",
     adminsOnly: "Só admins mudam o nome, o cargo e as instruções.",
     discardTitle: "Descartar as alterações?",
     discardText: "O que você mudou ainda não foi salvo.",
@@ -674,6 +675,34 @@ export const featureKeysPtBR = {
     leaveText: "O agente que você começou não será criado.",
     keepGoing: "Continuar criando",
     partly: "O agente foi criado, mas parte do que o papel traz não entrou. Ajuste no perfil dele.",
+    import: {
+      where: {
+        openbotrun:
+          "Escolha o openbot-import.json (do Migrator by OpenBot) ou o openbot-transfer.json (da transferência da instância). Um .zip abre no app Arquivos antes: um toque descompacta.",
+        openmausbot:
+          "No OpenMausBot: clique com o botão direito na equipe\u00a0›\u00a0Compartilhar equipe…\u00a0›\u00a0Salvar arquivo. Depois escolha esse arquivo aqui.",
+        hermes:
+          "O Hermes exporta pelo terminal (hermes profile export), num .tar.gz que o celular não abre. Importe pelo computador, ou escolha aqui os arquivos .md e .yaml do perfil.",
+        openclaw:
+          "O OpenClaw guarda os agentes na pasta ~/.openclaw do computador. Escolha aqui os arquivos .md de um workspace, ou importe a pasta inteira pelo computador.",
+        paperclip: "Cole abaixo o link do pacote no GitHub, ou escolha o COMPANY.md e os outros arquivos .md.",
+        agenteschat:
+          "No outro workspace: Configurações\u00a0›\u00a0Importar e exportar\u00a0›\u00a0Baixar o arquivo. Depois escolha o .json aqui.",
+      },
+      pick: "Escolher arquivos",
+      pasteTitle: "Ou cole a resposta do outro app ou um link do GitHub",
+      paste: "Colar",
+      read: "Ler",
+      copyFailed: "Não deu para copiar. Tente de novo.",
+      archive:
+        "O celular não abre .zip nem .tar.gz. No app Arquivos, toque no .zip para descompactar e escolha os arquivos de dentro, ou importe pelo computador.",
+      privacy: "Lido neste celular. Arquivos de chaves e logins nunca são abertos.",
+      also: "Também vem junto",
+      leftOut: "Não vem junto: {{groups}}",
+      arrived_one: "{{name}} chegou",
+      arrived_other: "{{count}} agentes chegaram",
+      partial: "{{done}} de {{total}} chegaram. Importar de novo traz o resto.",
+    },
   },
   agent: {
     talk: "Conversar",
@@ -754,6 +783,8 @@ export const featureKeysPtBR = {
       reaction_other: "{{names}} reagiram",
       browser_handoff_one: "{{names}} precisa de você no navegador",
       browser_handoff_other: "{{names}} precisam de você no navegador",
+      secret_request_one: "{{names}} precisa de um segredo seu",
+      secret_request_other: "{{names}} precisam de um segredo seu",
       desktop_handoff_one: "{{names}} precisa de você no computador",
       desktop_handoff_other: "{{names}} precisam de você no computador",
       org_standing_one: "O status do workspace mudou",
@@ -789,6 +820,13 @@ export const featureKeysPtBR = {
       newTask: "Pedir uma tarefa",
       newAgent: "Criar agente",
     },
+  },
+  channelRef: {
+    list: "Canais",
+    a11y: "Canal #{{name}}",
+    archivedA11y: "Canal #{{name}}, arquivado",
+    archived: "#{{name}} foi arquivado",
+    notMember: "você não participa",
   },
   mention: {
     list: "Pessoas e agentes",
@@ -1078,6 +1116,7 @@ export const featureKeysPtBR = {
       question: "Pergunta",
       forum: "Sua vez",
       browser: "Navegador",
+      secret: "Segredo",
       join: "Membros",
     },
     review: "Revisar",
@@ -1136,6 +1175,7 @@ export const featureKeysPtBR = {
         agentAdded: "Chamou {{name}} para #{{channel}}",
         pageCreated: "Criou a página {{title}}",
         pageEdited: "Editou a página {{title}}",
+        pageEditedRestricted: "Editou uma página restrita",
         threadRenamed: "Renomeou uma thread para {{to}}",
         threadClosed: "Fechou a thread {{title}}",
       },
@@ -1570,8 +1610,6 @@ export const featureKeysPtBR = {
       toolsHow: "Toque numa ferramenta ligada para desligar. Para ligar de novo, só no próprio computador.",
     },
     import: {
-      onComputer:
-        "Trazer agentes, skills e canais de outro app é pelo computador: abra o agentes.chat no navegador, em Configurações\u00a0›\u00a0Importar e exportar.",
       preparing: "Preparando o arquivo…",
       failed: "Não deu para baixar o arquivo. Tente de novo.",
     },

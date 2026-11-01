@@ -79,6 +79,8 @@ interface Strings {
   browserHandoffBody: string;
   desktopHandoffTitle: (actor: string) => string;
   desktopHandoffBody: string;
+  secretTitle: (actor: string) => string;
+  secretBody: string;
   joinRequestTitle: (name: string, org: string) => string;
   joinSuggestionTitle: (by: string, name: string, org: string) => string;
   joinRequestBody: string;
@@ -124,6 +126,8 @@ export const PUSH_STRINGS: Record<PushLocale, Strings> = {
     browserHandoffBody: "Toque para abrir a tela.",
     desktopHandoffTitle: (a) => `${a} precisa de você no computador`,
     desktopHandoffBody: "Abra o agentes.chat num notebook para ajudar.",
+    secretTitle: (a) => `${a} precisa de um segredo seu`,
+    secretBody: "Toque para enviar com segurança.",
     joinRequestTitle: (name, org) => `${name} pede para entrar na ${org}`,
     joinSuggestionTitle: (by, name, org) => `${by} sugeriu ${name} para a ${org}`,
     joinRequestBody: "Toque para aprovar ou recusar.",
@@ -166,6 +170,8 @@ export const PUSH_STRINGS: Record<PushLocale, Strings> = {
     browserHandoffBody: "Tap to open the screen.",
     desktopHandoffTitle: (a) => `${a} needs you on the computer`,
     desktopHandoffBody: "Open agentes.chat on a laptop to help.",
+    secretTitle: (a) => `${a} needs a secret from you`,
+    secretBody: "Tap to send it securely.",
     joinRequestTitle: (name, org) => `${name} asks to join ${org}`,
     joinSuggestionTitle: (by, name, org) => `${by} suggested ${name} for ${org}`,
     joinRequestBody: "Tap to approve or deny.",
@@ -247,6 +253,9 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
       // open on the phone: its body says where it does.
       if (input.screen === "desktop") return out(s.desktopHandoffTitle(actor), text || s.desktopHandoffBody);
       return out(s.browserHandoffTitle(actor), text || s.browserHandoffBody);
+    case "secret_request":
+      // What it is for, in the agent's words: the value is typed in the app, sealed there, never here.
+      return out(s.secretTitle(actor), text || what || s.secretBody);
     case "join_request": {
       // The name the person typed, never their note: approving happens in the app, never from the notification.
       const who = input.title?.trim() || s.someone;

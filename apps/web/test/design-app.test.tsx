@@ -146,7 +146,9 @@ describe("work summary", () => {
       { api, org: true },
     );
     const [live, saved] = [...document.querySelectorAll<HTMLElement>(".ac-tools")];
-    expect(live?.querySelector(".ac-tools__text")?.textContent).toBe("Usou 1 ferramenta");
+    // Its one other call is its own line, no block to open.
+    expect(live?.querySelector(".ac-tools__head")).toBeNull();
+    expect(live?.querySelector(".ac-tools__row b")?.textContent).toBe("Criou uma tarefa");
     await click(saved?.querySelector(".ac-tools__head") as HTMLElement);
     await settle(4);
     expect(saved?.querySelector(".ac-tools__text")?.textContent).toBe("Usou 1 ferramenta");
@@ -230,7 +232,8 @@ describe("the block's logos are the services' own", () => {
       { api, org: true },
     );
     await settle(4);
-    const logos = document.querySelector(".ac-tools__logos") as HTMLElement;
+    // One call: its line's logo.
+    const logos = document.querySelector(".ac-tools__row .ac-tools__logo") as HTMLElement;
     const img = logos.querySelector(".connector-icon__img") as HTMLImageElement;
     expect(img.getAttribute("src")).toBe(icon);
     await act(async () => {

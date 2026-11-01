@@ -15,6 +15,7 @@ import {
   requirePermission,
   resolveWikiTargets,
   restoreWikiPage,
+  setWikiPageAudience,
   setWikiPageLock,
   setWikiPagePinned,
   suggestWikiPages,
@@ -48,6 +49,12 @@ const Author = z
     onBehalfOf: z.string().nullable().openapi({ description: "Agents: the person who asked for the edit." }),
   })
   .openapi("WikiAuthor");
+const Audience = z
+  .object({
+    roleIds: z.array(z.uuid()).max(100),
+    userIds: z.array(z.string().min(1).max(200)).max(500),
+  })
+  .openapi("WikiAudience");
 const Summary = z
   .object({
     id: z.uuid(),
@@ -58,6 +65,9 @@ const Summary = z
     version: z.number(),
     locked: z.boolean().openapi({ description: "Only admins edit it." }),
     pinned: z.boolean().openapi({ description: "At the top of the wiki for everyone." }),
+    audience: Audience.nullable().openapi({
+      description: "Limited to these roles and people (plus owners and agents); null = every member.",
+    }),
     excerpt: z.string().openapi({ description: "The start of the text, plain." }),
     sourceType: z.string().nullable().openapi({ description: '"obsidian" for an imported page.' }),
     updatedAt: z.string(),
@@ -244,6 +254,10 @@ export function wikiRoutes(deps: AppDeps) {
                 slug: z.string(),
                 title: z.string().nullable(),
                 exists: z.boolean(),
+                restricted: z
+                  .literal(true)
+                  .optional()
+                  .openapi({ description: "Limited to an audience: no title, and only its audience opens it." }),
               }),
             ),
           }),
@@ -536,6 +550,28 @@ export function wikiRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, slug } = c.req.valid("param");
       return c.json(await setWikiPageLock(wiki(), c.get("user").id, orgId, slug, c.req.valid("json").locked), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/wiki/pages/{slug}/audience",
+      tags,
+      security,
+      summary:
+        "Limit a page to roles and people (agents and owners always read it), or open it to everyone with `null`; for people who edit the wiki and manage roles",
+      description:
+        "`wiki.audience_forbidden`: missing `edit_wiki` or `manage_roles`; `wiki.audience_excludes_you`: the audience must include you. People outside it get `wiki.no_access` on the page.",
+      request: { params: PageParams, body: body(z.object({ audience: Audience.nullable() })) },
+      responses: { 200: json(Page), ...errors },
+    }),
+    async (c) => {
+      const { orgId, slug } = c.req.valid("param");
+      return c.json(
+        await setWikiPageAudience(wiki(), c.get("user").id, orgId, slug, c.req.valid("json").audience),
+        200,
+      );
     },
   );
 

@@ -15,6 +15,8 @@ import {
   createAgentFromProposal,
   createAgentGroup,
   createCredential,
+  createProposedAgent,
+  createProposedRoutine,
   deleteAgent,
   deleteAgentGroup,
   deleteCredential,
@@ -32,6 +34,7 @@ import {
   NEW_AGENT_DEFAULTS,
   NotFoundError,
   newAgentBrainMachines,
+  oldHandlesByAgent,
   orgAiStatus,
   orgRouting,
   pickerModels,
@@ -162,6 +165,38 @@ const AgentProposal = z
         appearance: AgentAppearance.nullable(),
         channelIds: z.array(z.uuid()),
         access: z.array(z.object({ connectionId: z.uuid(), level: z.enum(["read", "write"]) })),
+        mail: z
+          .array(
+            z.object({
+              accountId: z.uuid(),
+              address: z.string(),
+              level: z.enum(["read", "write"]),
+              ownerUserId: z.string(),
+            }),
+          )
+          .optional()
+          .openapi({ description: "Mailboxes of the person who asked: only a mailbox's owner gives an agent access." }),
+        routine: z
+          .object({
+            name: z.string(),
+            prompt: z.string(),
+            schedule: z.string(),
+            rule: z.record(z.string(), z.unknown()).nullable(),
+            cron: z.string(),
+            timezone: z.string(),
+            description: z.string(),
+            report: z.enum(["always", "when_new"]),
+            access: z.enum(["read", "act"]),
+            reportsIn: z.uuid().nullable().optional().openapi({
+              description: "The channel it reports in, which the agent must be in first (null: the creator's DM).",
+            }),
+          })
+          .nullable()
+          .optional()
+          .openapi({
+            description:
+              "A routine of its own, created with it (its schedule read when proposed: `rule`, else `cron`). It reports where the card is (a DM: the creator's DM with it).",
+          }),
         ai: z.discriminatedUnion("kind", [
           z.object({
             kind: z.literal("account"),
@@ -181,6 +216,13 @@ const AgentProposal = z
     decidedByUserId: z.string().nullable(),
     decidedAt: z.string().nullable(),
     expiresAt: z.string(),
+    applied: z
+      .object({ channelIds: z.array(z.uuid()), connectionIds: z.array(z.uuid()), mailAccountIds: z.array(z.uuid()) })
+      .optional()
+      .openapi({
+        description: "Created in one click: the lines of its draft it got (the rest waits for who may give it).",
+      }),
+    routineId: z.string().nullable().optional().openapi({ description: "The routine made with it." }),
     expired: z.boolean(),
     canDecide: z.boolean(),
   })
@@ -335,18 +377,24 @@ export function agentRoutes(deps: AppDeps) {
       const { orgId } = c.req.valid("param");
       const actor = c.get("user").id;
       const list = await listAgents(db, actor, orgId);
-      const [seesCost, budgets, brains, talks] = await Promise.all([
+      const [seesCost, budgets, brains, talks, old] = await Promise.all([
         canViewCost(db, actor, orgId),
         agentBudgetsThisMonth(db, orgId),
         agentBrainSummaries(db, actor, orgId, list),
         talksToAgents(db, orgId, actor),
+        oldHandlesByAgent(db, orgId),
       ]);
       const percent = (id: string) => {
         const b = budgets.get(id);
         return b ? budgetPercent(b.spentNanoUsd, b.budgetNanoUsd) : 0;
       };
       return c.json(
-        { agents: list.map((a) => toAgent(a, actor, seesCost, percent(a.id), brains.get(a.id), talks)) },
+        {
+          agents: list.map((a) => ({
+            ...toAgent(a, actor, seesCost, percent(a.id), brains.get(a.id), talks),
+            previousHandles: old.get(a.id) ?? [],
+          })),
+        },
         200,
       );
     },
@@ -551,7 +599,7 @@ export function agentRoutes(deps: AppDeps) {
             }),
             autonomy: CommandApproval.optional().openapi({
               description:
-                "The Autonomia it starts with (ADR 0094, the last setup's): only from an admin or its own owner, else 403. Default: low_risk_auto.",
+                "The Autonomia it starts with (ADR 0094, the last setup's). Default: low_risk_auto. Whoever may create it may set it: an admin, or its owner (without Manage agents, only your own agent).",
             }),
           }),
         ),
@@ -603,6 +651,68 @@ export function agentRoutes(deps: AppDeps) {
   app.openapi(
     createRoute({
       method: "post",
+      path: "/organizations/{orgId}/agent-proposals/{messageId}/create",
+      tags,
+      security,
+      summary: "Create a proposed agent as it is, in one click (who may create agents)",
+      description:
+        "The agent from the draft, owned by whoever creates it, with each line they may give it: its AI (an account of theirs), its channels, its access to the connected apps (an admin's), the mailboxes (only their owner's) and its routine. The card (`applied`, `routineId`) says what it got; the agent that proposed it is told what waits for whom.",
+      request: { params: ProposalParams },
+      responses: {
+        201: json(
+          z.object({
+            agent: Agent,
+            proposal: AgentProposal,
+            ai: z.enum(["account", "model", "none"]).openapi({
+              description: "What it thinks with now (the clicker's account, the workspace's model or nothing yet).",
+            }),
+          }),
+          "Created",
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, messageId } = c.req.valid("param");
+      const userId = c.get("user").id;
+      const gateway = deps.extras?.context?.gateway;
+      const made = await createProposedAgent({ db, pubsub: adapters.pubsub, gateway }, userId, orgId, messageId);
+      if (made.agent.machineId) await publishMachineAgentsChanged(adapters.pubsub, orgId);
+      return c.json(
+        {
+          agent: toAgent(made.agent, userId, await canViewCost(db, userId, orgId)),
+          proposal: made.proposal,
+          ai: made.ai,
+        },
+        201,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/agent-proposals/{messageId}/routine",
+      tags,
+      security,
+      summary: "Create the routine a proposal came with, for the agent created from it in the review",
+      description:
+        "After the review put the agent where the routine reports. Once (409 `agent_proposal.routine_made`); the routine's own rules apply (the agent's owner or an admin).",
+      request: { params: ProposalParams },
+      responses: { 200: json(AgentProposal), ...errors },
+    }),
+    async (c) => {
+      const { orgId, messageId } = c.req.valid("param");
+      return c.json(
+        await createProposedRoutine({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, messageId),
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
       path: "/organizations/{orgId}/agent-proposals/{messageId}/deny",
       tags,
       security,
@@ -628,6 +738,10 @@ export function agentRoutes(deps: AppDeps) {
         params: AgentParams,
         body: body(
           AgentFields.partial().extend({
+            handle: z.string().min(2).max(32).optional().openapi({
+              description:
+                "Its new @handle (admins): the one it leaves keeps reaching it. Taken by another agent (now or before) or a person: 409 `agent.handle_taken` with a free `suggestion`.",
+            }),
             coordinator: z.boolean().optional().openapi({
               description:
                 "It coordinates the team (ADR 0093): true takes it from whoever had it, false leaves the team with none. Admins (audited); the workspace's open apps hear `agent.coordinator`.",
@@ -662,19 +776,30 @@ export function agentRoutes(deps: AppDeps) {
         agent = await getAgent(db, orgId, agentId);
         if (!agent) throw new NotFoundError("Agent not found");
       }
-      // Its computer shows its name and look (the desktop app, ADR 0036), and a new owner may take its plan away.
+      // Its computer shows its name and look (the desktop app, ADR 0036) and names its folder by its handle, and a new
+      // owner may take its plan away.
       if (
         agent.machineId &&
-        (input.name !== undefined || appearance !== undefined || input.ownerUserId !== undefined)
+        (input.name !== undefined ||
+          input.handle !== undefined ||
+          appearance !== undefined ||
+          input.ownerUserId !== undefined)
       ) {
         await publishMachineAgentsChanged(adapters.pubsub, orgId);
       }
-      const [seesCost, brains, talks] = await Promise.all([
+      const [seesCost, brains, talks, old] = await Promise.all([
         canViewCost(db, actor, orgId),
         agentBrainSummaries(db, actor, orgId, [agent]),
         talksToAgents(db, orgId, actor),
+        oldHandlesByAgent(db, orgId),
       ]);
-      return c.json(toAgent(agent, actor, seesCost, undefined, brains.get(agent.id), talks), 200);
+      return c.json(
+        {
+          ...toAgent(agent, actor, seesCost, undefined, brains.get(agent.id), talks),
+          previousHandles: old.get(agent.id) ?? [],
+        },
+        200,
+      );
     },
   );
 

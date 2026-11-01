@@ -51,7 +51,8 @@ export interface ToolBlockHead {
  * The tools of one reply: one line while it works, what it does now, the apps' logos and how
  * many steps; a click opens every call, each with its phrase, the tool in grey, its time and a pixel mark
  * (the orbit, one green pixel, an exclamation), and opens again into what it was given and answered. What the
- * agent said between calls and the messages it read sit among the lines (`note`).
+ * agent said between calls and the messages it read sit among the lines (`note`). A single call (`one`) is its own
+ * line, with nothing to open around it: what was said goes in that line's open view.
  */
 export function ToolBlock({
   logos,
@@ -62,6 +63,7 @@ export function ToolBlock({
   defaultOpen = false,
   onToggle,
   className,
+  one = false,
 }: {
   logos: ReactNode[];
   head: ToolBlockHead;
@@ -71,14 +73,40 @@ export function ToolBlock({
   /** The block's name for screen readers ("O que a Ana fez"). */
   label: string;
   defaultOpen?: boolean;
-  /** Opened (load the saved steps) or closed. */
+  /** Opened (load the saved steps) or closed; with `one`, its line. */
   onToggle?: (open: boolean) => void;
   className?: string;
+  /** The work is one call: its line in place of the head ("Criou uma rotina", not "Usou 1 ferramenta"). */
+  one?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   // Its lines stay once opened, so closing folds them away smoothly.
   const [shown, setShown] = useState(defaultOpen);
   const id = useId();
+  const only = one ? items.find((i) => i.kind === "line") : undefined;
+  if (only?.kind === "line") {
+    const notes = items.flatMap((i) => (i.kind === "note" ? [i] : []));
+    const detail =
+      notes.length > 0 ? (
+        <>
+          {notes.map((n) => (
+            <p key={n.key} className="ac-tools__note">
+              {n.node}
+            </p>
+          ))}
+          {only.line.detail}
+        </>
+      ) : (
+        only.line.detail
+      );
+    return (
+      <section className={cx("ac-tools ac-tools--one", className)} aria-label={label}>
+        <ol className="ac-tools__lines" aria-live="polite">
+          <Line line={{ ...only.line, detail }} color={color} onToggle={onToggle} />
+        </ol>
+      </section>
+    );
+  }
   return (
     <section className={cx("ac-tools", className)} aria-label={label}>
       <button
@@ -127,7 +155,15 @@ export function ToolBlock({
   );
 }
 
-function Line({ line, color }: { line: ToolBlockLine; color?: AgentColor }) {
+function Line({
+  line,
+  color,
+  onToggle,
+}: {
+  line: ToolBlockLine;
+  color?: AgentColor;
+  onToggle?: (open: boolean) => void;
+}) {
   const [open, setOpen] = useState(line.defaultOpen === true);
   // Open while it runs (its code), it folds when the call ends; a click opens it again.
   const running = useRef(line.state === "run");
@@ -162,7 +198,10 @@ function Line({ line, color }: { line: ToolBlockLine; color?: AgentColor }) {
           className="ac-tools__row"
           aria-expanded={open}
           aria-controls={open ? id : undefined}
-          onClick={() => setOpen(!open)}
+          onClick={() => {
+            setOpen(!open);
+            onToggle?.(!open);
+          }}
         >
           {body}
         </button>

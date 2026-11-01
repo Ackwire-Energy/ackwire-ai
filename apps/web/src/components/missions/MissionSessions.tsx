@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentSpinner } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
+import { useNamesComputers } from "@/components/WorkspaceComputer";
 import { useNow } from "./MissionBits";
 
 /**
@@ -92,7 +93,7 @@ const inFilter = (task: MachineTask, f: SessionFilter) =>
  * "N sessões ›" from the mission header: every executor session in the
  * shared details dialog, filtered Todas / Rodando / Concluídas / Falharam
  * (with counts); a session opens in place ("O que mudou", "Ver saída" with
- * the live log).
+ * the live log). The computer only where the workspace has more than one.
  */
 export function SessionsDialog({
   mission,
@@ -104,6 +105,8 @@ export function SessionsDialog({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
+  const names = useNamesComputers(org.id);
   const [filter, setFilter] = useState<SessionFilter>("all");
   const running = tasks.filter((x) => x.status === "running").length;
   const now = useNow(running > 0);
@@ -119,7 +122,7 @@ export function SessionsDialog({
       subtitle={
         <span>
           {t("missions.sessions.count", { count: tasks.length })}
-          {mission.machine && ` · ${mission.machine.name}`}
+          {names && mission.machine && ` · ${mission.machine.name}`}
         </span>
       }
     >

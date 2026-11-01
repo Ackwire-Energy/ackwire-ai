@@ -1005,7 +1005,10 @@ const startsRuns = (triggerType: string, target: RoutineTarget) =>
  * Refuses a schedule whose real occurrences (DST and month ends included) come closer than the
  * minimum interval anywhere in the next year.
  */
-function checkFrequency(r: Pick<RoutineRow, "triggerType" | "rule" | "cron" | "timezone">, target: RoutineTarget) {
+export function checkFrequency(
+  r: Pick<RoutineRow, "triggerType" | "rule" | "cron" | "timezone">,
+  target: RoutineTarget,
+) {
   if (r.triggerType !== "schedule" || !startsRuns(r.triggerType, target)) return;
   const now = new Date();
   const slots = routineSlots(r, now, new Date(now.getTime() + FREQUENCY_WINDOW_MS), 300);

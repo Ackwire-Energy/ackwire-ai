@@ -1,5 +1,6 @@
 import { type SecretRequest, useApi } from "@agenteschat/client";
-import { MAX_SECRET_BYTES, secretAad } from "@agenteschat/client/lib/secret-box";
+import { secretAad } from "@agenteschat/client/lib/secret-box";
+import { secretValueProblem, secretWhere } from "@agenteschat/client/lib/secret-requests";
 import { secretEndedAt, secretOutcome } from "@agenteschat/client/lib/secret-words";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -48,8 +49,8 @@ export function SecretCard({ request }: { request: SecretRequest }) {
     setAnswered(res);
   };
   const send = async () => {
-    if (!value) return setError(t("secret.empty"));
-    if (new TextEncoder().encode(value).byteLength > MAX_SECRET_BYTES) return setError(t("secret.tooLarge"));
+    const problem = secretValueProblem(value);
+    if (problem) return setError(t(problem));
     setError(null);
     setBusy("send");
     try {
@@ -78,10 +79,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
     }
   };
 
-  const where =
-    r.target.kind === "file"
-      ? t("secret.targetFile", { path: r.target.path, agent: agentName })
-      : t("secret.targetEnv", { name: r.name, agent: agentName });
+  const where = secretWhere(t, r, agentName);
   // Closed: one line, how it ended and which secret, never its value; what it was for when asked.
   if (!pending)
     return (

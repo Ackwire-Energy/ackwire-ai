@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { plainLines } from "../src/lib/markdown";
-import { around, emailTypoFix, excerpt, matchesName, webmailOf } from "../src/lib/text";
+import { around, emailTypoFix, excerpt, jwtEmail, matchesName, webmailOf } from "../src/lib/text";
 
 test("a name typed to confirm: case, extra spaces, width forms and invisible characters aside, never a part", () => {
   expect(matchesName(" new  AGENT ", "New agent")).toBe(true);
@@ -104,4 +104,18 @@ test("instructions in Markdown read as plain words: past headings and rules, wit
       "> Run `pg_query` on my_table, see ![the map](map.png) and [[Processos/Onboarding|o onboarding]].\n\n```\nrm -rf /\n```\n\n| a | b |\n| --- | --- |\n| 1 | 2 |",
     ),
   ).toEqual(["Run pg_query on my_table, see the map and o onboarding."]);
+});
+
+test("the address in an ID token's email claim, whatever its base64url and padding; nothing from anything else", () => {
+  const part = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const token = (claims: unknown) => `${part({ alg: "RS256", kid: "k" })}.${part(claims)}.c2ln`;
+  // "???>>>" puts "_" and "-" (base64url's own) in the payload; the others leave out each length of padding.
+  for (const nonce of ["???>>>", "a", "ab", "abc"]) {
+    expect(jwtEmail(token({ nonce, email: "ana@icloud.com", email_verified: "true" }))).toBe("ana@icloud.com");
+  }
+  expect(jwtEmail(token({ sub: "001" }))).toBeUndefined();
+  expect(jwtEmail(token({ email: "not an address" }))).toBeUndefined();
+  expect(jwtEmail(token(null))).toBeUndefined();
+  expect(jwtEmail("not.a-token!")).toBeUndefined();
+  expect(jwtEmail("")).toBeUndefined();
 });

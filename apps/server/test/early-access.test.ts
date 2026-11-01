@@ -3,7 +3,16 @@ import { eq, schema, sql } from "@agenteschat/db";
 import { setSignupMode } from "@agenteschat/engine";
 import { createLogger } from "../src/logger";
 import { createOperatorApp } from "../src/operator/app";
-import { type Browser, browser, createTestServer, signUp, type TestServer } from "./harness";
+import {
+  type Browser,
+  browser,
+  createTestServer,
+  GOOGLE_BACK,
+  GOOGLE_ENV,
+  googleSignIn,
+  signUp,
+  type TestServer,
+} from "./harness";
 
 const TOKEN = "operator-test-token-".padEnd(48, "x");
 const PASSWORD = "correct horse battery";
@@ -406,3 +415,25 @@ test("open sign-up through a provider that hasn't verified the address doesn't u
   expect(await userId(t, "ana@acme.test")).toBeString();
   expect(await invitation(t, "ana@acme.test")).toMatchObject({ usedAt: null, userId: null });
 });
+
+for (const app of ["web", "desktop", "phone"] as const) {
+  test(`through Google from the ${app} app: the link's token signs its address up and is used; without it, sign-up is closed`, async () => {
+    const t = await server(GOOGLE_ENV);
+    await signUp(browser(t), "owner@acme.test");
+    const access = await invite(t, "ana@acme.test");
+
+    const closed = new URL((await googleSignIn(t, app, "ana@acme.test")).location, CLOUD);
+    expect([closed.pathname, closed.searchParams.get("error")]).toEqual(["/login", "SIGNUP_CLOSED"]);
+    expect(await userId(t, "ana@acme.test")).toBeUndefined();
+
+    const { location } = await googleSignIn(t, app, "ana@acme.test", { earlyAccess: access });
+    expect(location.startsWith(GOOGLE_BACK[app])).toBe(true);
+    // The phone's session comes back to the app in the link that closes its browser.
+    if (app === "phone") expect(new URL(location).searchParams.get("cookie")).toContain("session_token");
+    expect(await invitation(t, "ana@acme.test")).toMatchObject({
+      userId: await userId(t, "ana@acme.test"),
+      tokenHash: null,
+    });
+    expect((await invitation(t, "ana@acme.test"))?.usedAt).toBeInstanceOf(Date);
+  });
+}

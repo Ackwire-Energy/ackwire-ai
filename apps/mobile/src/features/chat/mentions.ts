@@ -4,6 +4,8 @@
  * the workspace), the part of the name or handle that matched, and the text after picking.
  */
 
+import { channelQuery, insertChannelRef } from "@agenteschat/client/lib/channel-refs";
+
 /** Lowercase, accent-free: "João" → "joao" (same length for composed text). */
 export const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
@@ -117,4 +119,19 @@ export function insertMention(
 export function splitMatch(value: string, range: { start: number; end: number } | null): [string, string, string] {
   if (!range || range.start < 0 || range.end > value.length) return [value, "", ""];
   return [value.slice(0, range.start), value.slice(range.start, range.end), value.slice(range.end)];
+}
+
+/** The "#channel" or "@who" being typed right before the caret (`sigil: "#"` for a channel); null when neither. */
+export function refQuery(text: string, caret: number): { start: number; query: string; sigil?: "#" } | null {
+  const channel = channelQuery(text, caret);
+  return channel ? { ...channel, sigil: "#" } : mentionQuery(text, caret);
+}
+
+/** The text after picking from either list: "#name " for a channel, "@handle " for someone. */
+export function insertRef(
+  text: string,
+  token: { start: number; query: string; sigil?: "#" },
+  value: string,
+): { text: string; caret: number } {
+  return token.sigil === "#" ? insertChannelRef(text, token, value) : insertMention(text, token, value);
 }

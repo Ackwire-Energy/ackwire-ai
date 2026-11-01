@@ -454,6 +454,8 @@ export interface Agent {
   id: string;
   name: string;
   handle: string;
+  /** Handles it had before a rename: mentions still reach it by them, and no one else may take them. */
+  previousHandles?: string[];
   role: string;
   instructions: string;
   model: string;
@@ -593,11 +595,39 @@ export interface AgentDraft {
   role: string;
   instructions: string;
   appearance: Required<AgentLookInput> | null;
-  /** Public channels it joins. */
+  /** Channels it joins: public ones, and private ones everyone who reads the card is in. */
   channelIds: string[];
   /** Its level on the workspace's connections (the connected apps' ids). */
   access: { connectionId: string; level: "read" | "write" }[];
+  /** Mailboxes of the person who asked: only a mailbox's owner gives an agent access to it. */
+  mail?: { accountId: string; address: string; level: "read" | "write"; ownerUserId: string }[];
+  /** A routine of its own, created with it. */
+  routine?: ProposedRoutine | null;
   ai: SuggestedAi;
+}
+
+/** The routine a proposal comes with, its schedule read when proposed (`rule`, else `cron`). */
+export interface ProposedRoutine {
+  name: string;
+  prompt: string;
+  /** As the agent wrote it. */
+  schedule: string;
+  rule: ApiRule | null;
+  cron: string;
+  timezone: string;
+  /** English (the agent's); the apps say `rule` in the reader's language. */
+  description: string;
+  report: RoutineReport;
+  access: RoutineAccess;
+  /** The channel it reports in, which the agent must be in first (null: the creator's DM; absent on older cards). */
+  reportsIn?: string | null;
+}
+
+/** What "Criar" on the card gave the agent of its draft (ids); the rest waits for who may give it. */
+export interface ProposalApplied {
+  channelIds: string[];
+  connectionIds: string[];
+  mailAccountIds: string[];
 }
 
 /** An agent's proposal of a new agent (`meta.actionCard` of its card, ADR 0081). A person creates it or says no. */
@@ -613,10 +643,17 @@ export interface AgentProposalCard {
   decidedAt: string | null;
   /** Past it, a pending one is expired. */
   expiresAt: string;
+  /** Created in one click: what it got. Absent when it was created from the review. */
+  applied?: ProposalApplied;
+  /** The routine made with it. */
+  routineId?: string | null;
 }
 
 /** What a person decided on a proposal: all that `agent.proposal.updated` carries of its card. */
-export type AgentProposalDecision = Pick<AgentProposalCard, "state" | "agentId" | "decidedByUserId" | "decidedAt">;
+export type AgentProposalDecision = Pick<
+  AgentProposalCard,
+  "state" | "agentId" | "decidedByUserId" | "decidedAt" | "applied" | "routineId"
+>;
 
 /** `GET …/agent-proposals/{messageId}`: the card, where it is and what the viewer may do. */
 export interface AgentProposal extends AgentProposalCard {
@@ -674,6 +711,20 @@ export interface Channel {
   unreadCount?: number;
   /** Channel list only: the latest top-level message; null when empty or not a member. */
   lastMessage?: ChannelLastMessage | null;
+}
+
+/** A `#channel` link's card (`chat.card`): what the channel is and who is in it. */
+export interface ChannelCard {
+  id: string;
+  name: string;
+  topic: string;
+  visibility: "public" | "private";
+  isMember: boolean;
+  archived: boolean;
+  /** People in it. */
+  people: number;
+  /** Agents in it. */
+  agents: number;
 }
 
 /** A named group of channels in the sidebar, the same for everyone in the organization (ADR 0080). */
@@ -2137,8 +2188,11 @@ export interface AgentQuestion {
   answeredByUserId: string | null;
 }
 
-/** Where a secret goes on the agent's computer (ADR 0027). */
-export type SecretTarget = { kind: "env" } | { kind: "file"; path: string };
+/**
+ * Where a secret goes on the agent's computer (ADR 0027): a variable of its commands, a file in its folder, or
+ * (`site`) only its browser's typing on that site (`https://host`), never its commands.
+ */
+export type SecretTarget = { kind: "env" } | { kind: "file"; path: string } | { kind: "site"; site: string };
 
 /**
  * An agent asked a person for a secret for its computer (`request_secret`,
@@ -3501,6 +3555,12 @@ export interface WikiAuthor {
   onBehalfOf?: string | null;
 }
 
+/** Who sees a restricted wiki page besides agents and owners: roles (`OrgRole` ids) and people. */
+export interface WikiAudience {
+  roleIds: string[];
+  userIds: string[];
+}
+
 export interface WikiPageSummary {
   id: string;
   /** URL key ("processos/onboarding"); changes when the page is renamed. */
@@ -3515,6 +3575,8 @@ export interface WikiPageSummary {
   locked?: boolean;
   /** "Fixadas": at the top of the wiki for everyone. */
   pinned?: boolean;
+  /** Limited to these roles and people (agents and owners always read it); null or missing = every member. */
+  audience?: WikiAudience | null;
   /** The start of the text, plain, for cards. */
   excerpt?: string;
   /** `obsidian` for an imported page. */
@@ -3692,6 +3754,29 @@ export interface ImportInput {
 
 export interface ImportPlan {
   items: ImportItemResult[];
+}
+
+/** One of an imported agent's own files, copied into its folder in the Drive (`POST …/imports/files`). */
+export interface ImportFileInput {
+  file: Blob;
+  /** The file's name, for its download. */
+  name: string;
+  /** The agent the import made (or an earlier one did). */
+  agentId: string;
+  /** Where it goes in the agent's folder, keeping the source's folders. */
+  path: string;
+  /** For its first version (the importer's language). */
+  note?: string;
+}
+
+export interface ImportedFile {
+  /** `exists`: the folder had a file with that name already, and it stays as it was. */
+  status: "created" | "exists";
+  artifactId: string;
+  /** `<folder>/<path>`. */
+  title: string;
+  /** The agent's folder in the Drive: its name. */
+  folder: string;
 }
 
 /** A source package this workspace brought things from, with how many of each kind came. */
@@ -4714,6 +4799,11 @@ export type NotificationKind =
   /** ADR 0040 §6: an agent needs a person in its browser (sign in, a code). `source.handoffId`. */
   | "browser_handoff"
   /**
+   * ADR 0027: an agent waits for a secret only this person can give (`latest.title` its name, `latest.text` what it
+   * is for, `latest.expiresAt`). Opens the conversation at its card, where it is typed: never answered in the inbox.
+   */
+  | "secret_request"
+  /**
    * ADR 0056 §8: the workspace was held, suspended or restored (owners and admins). `latest.statusTo`, `latest.text`:
    * why. On agentes.chat Cloud also an agent held (`statusTo: "agent_hold"`, `latest.holdKind`, `source.agentId`).
    */
@@ -4901,6 +4991,13 @@ export interface NoticePrefs {
   phones: number;
 }
 
+/** A tool at the top of the sidebar (`SIDEBAR_ITEMS` in packages/engine/src/sidebar-items.ts). */
+export type SidebarItem = "approvals" | "threads" | "issues" | "wiki" | "drive" | "routines" | "calendar" | "forum";
+/** `always` in the list, `more` only in the More menu, `auto` in the list while its count is above zero. */
+export type SidebarPlace = "always" | "more" | "auto";
+/** Where I put each tool I moved, in one workspace (`GET …/me/sidebar`); the others keep their default. */
+export type SidebarItems = Partial<Record<SidebarItem, SidebarPlace>>;
+
 export interface NotificationCount {
   unread: number;
   waiting: number;
@@ -5037,6 +5134,8 @@ export interface MailAccount {
   aliases: string[];
   /** What new emails go out from; null = `address`. */
   defaultFrom: string | null;
+  /** Who connected it: the only person who gives agents access to it (absent on older servers). */
+  ownerUserId?: string | null;
   /** Agents with access, and how much. */
   agents: { agentId: string; level: MailLevel; canDelete: boolean }[];
 }

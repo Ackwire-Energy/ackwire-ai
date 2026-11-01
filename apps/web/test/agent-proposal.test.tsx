@@ -3,9 +3,9 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { AgentDraft, AgentInput, AgentProposalCard, Message } from "@agenteschat/client";
+import type { AgentDraft, AgentInput, AgentProposalCard, MailAccount, Message } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ATLAS_ID, createFakeApi, ENG_ID, NOW, ORG_ID, seedState } from "./fake-api";
+import { ATLAS_ID, createFakeApi, ENG_ID, fakeMailOf, meWithRole, NOW, ORG_ID, seedState } from "./fake-api";
 import { railStep, title, typeIn } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";
 
@@ -79,10 +79,10 @@ const asMember = (state: State) => {
 };
 
 describe("an agent's proposal of a new agent, in the chat", () => {
-  test("a request card: its reason, the draft in the well; Revisar opens Criar agente on it, Recusar says no", async () => {
+  test("a request card: its reason, the draft in the well; Revisar opens Criar agente over the conversation, Recusar says no", async () => {
     const state = seedState();
     state.messages.push(proposal("p-1"));
-    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(5);
     const card = screen().getByRole("group", { name: "Atlas propõe um novo agente" });
     // Waiting for who may create agents, like every other request (the bar can bring it back).
@@ -98,9 +98,18 @@ describe("an agent's proposal of a new agent, in the chat", () => {
       expect(card.textContent).toContain(shown);
     expect(card.querySelector(".ac-expiry-fuse")).not.toBeNull();
     expect(card.textContent).not.toContain("server text");
-    expect(within(card).getByRole("link", { name: "Revisar" }).getAttribute("href")).toBe(
-      `/org/${ORG_ID}/agents/new?proposal=p-1`,
-    );
+    // Its name on one line, the handle and role on the next: never run together.
+    const who = card.querySelector(".rq__wt");
+    expect(who?.querySelector(":scope > b")?.textContent).toBe("Nina");
+    expect(who?.querySelector(":scope > small")?.textContent).toBe("@nina · Designer · Pensa pela API");
+    // Revisar: the review in a dialog over the conversation, which stays as it was.
+    await click(within(card).getByRole("button", { name: "Revisar" }), 10);
+    const dialog = screen().getByRole("dialog", { name: "Revisar Nina" });
+    expect(within(dialog).getByRole("heading", { name: "Tudo certo com a Nina?" })).toBeTruthy();
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
+    await click(within(dialog).getByRole("button", { name: "Sair sem criar" }));
+    expect(screen().queryByRole("dialog", { name: "Revisar Nina" })).toBeNull();
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
     await click(within(card).getByRole("button", { name: "Recusar" }));
     expect(state.calls.some((c) => c.method === "agents.denyProposal" && c.args[1] === "p-1")).toBe(true);
     // Decided: one line says what was decided.
@@ -145,7 +154,7 @@ describe("an agent's proposal of a new agent, in the chat", () => {
       ),
       proposal("p-old", { expiresAt: new Date(Date.now() - HOUR).toISOString() }, { name: "Vera", handle: "vera" }, 2),
     );
-    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(5);
     const [open] = cardOf("@nina");
     expect(open?.textContent).toContain("Pensa com Claude Max");
@@ -174,6 +183,11 @@ describe("an agent's proposal of a new agent, in the chat", () => {
     await click(within(old as HTMLElement).getByRole("button", { name: "Ver detalhes" }));
     expect(old?.textContent).toContain("@vera");
     expect(within(old as HTMLElement).queryByRole("link", { name: "Abrir perfil" })).toBeNull();
+    // In the conversation, the profile opens in the panel beside it.
+    await act(async () => fireEvent.click(within(made as HTMLElement).getByRole("link", { name: "Abrir perfil" })));
+    await settle(4);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
+    expect(screen().getByRole("complementary", { name: "Perfil do Atlas" })).toBeTruthy();
   });
 
   test("live: decided by someone else, the card changes in place (only the decision comes)", async () => {
@@ -210,6 +224,169 @@ describe("an agent's proposal of a new agent, in the chat", () => {
         .getByRole("link", { name: "Abrir perfil" })
         .getAttribute("href"),
     ).toBe(`/org/${ORG_ID}/agents/${ATLAS_ID}`);
+  });
+});
+
+describe("one request, one card: what it gets, created in one click", () => {
+  const ROUTINE = {
+    name: "E-mails do dia",
+    prompt: "Lê a caixa de entrada e resume o que chegou.",
+    schedule: "todo dia ao meio-dia",
+    rule: { freq: "daily" as const, interval: 1, times: ["12:00"], timezone: "America/Sao_Paulo" },
+    cron: "0 12 * * *",
+    timezone: "America/Sao_Paulo",
+    description: "Every day, at 12:00 (Brasília time)",
+    report: "when_new" as const,
+    access: "read" as const,
+  };
+  const withLines = (minute = 0) =>
+    proposal(
+      "p-1",
+      {},
+      {
+        access: [{ connectionId: "conn-gh", level: "read" }],
+        mail: [
+          { accountId: "mb-w", address: "walter@acme.com.br", level: "read", ownerUserId: "u-walter" },
+          { accountId: "mb-j", address: "joao@acme.com.br", level: "write", ownerUserId: "u-joao" },
+        ],
+        routine: ROUTINE,
+      },
+      minute,
+    );
+  // A line's own text (the routine's folded prompt apart).
+  const lines = (card: HTMLElement) =>
+    [...card.querySelectorAll(".waitcard__lines > li")].map((li) => {
+      const line = li.cloneNode(true) as HTMLElement;
+      line.querySelector(".waitcard__prompt")?.remove();
+      return line.textContent?.replace(/\s+/g, " ").trim();
+    });
+
+  test("each line, with who gives it when I can't; Criar makes it as it is and the card says what it got", async () => {
+    const state = seedState();
+    state.messages.push(withLines());
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(6);
+    const [card] = cardOf("@nina");
+    if (!card) throw new Error("no card");
+    expect(lines(card)).toEqual([
+      "eng",
+      "GitHub · só consulta",
+      "walter@acme.com.br · só consulta",
+      "joao@acme.com.br · consulta e muda · só João libera",
+      "E-mails do dia · Todos os dias, às 12:00 (horário de Brasília)",
+    ]);
+    // What each run is told, folded under its line: one click makes it under my name.
+    expect(card.querySelector(".waitcard__prompt")?.textContent).toContain(ROUTINE.prompt);
+    await click(within(card).getByRole("button", { name: "Criar Nina" }), 8);
+    expect(state.calls.find((c) => c.method === "agents.createProposed")?.args).toEqual([ORG_ID, "p-1"]);
+    expect(state.calls.some((c) => c.method === "agents.create")).toBe(false);
+    const [made] = cardOf("Nina");
+    if (!made) throw new Error("no card");
+    expect(made.textContent).toContain("Criado");
+    // What it got is behind "Ver detalhes", with the way to the agent.
+    await click(within(made).getByRole("button", { name: "Ver detalhes" }));
+    expect(within(made).getByRole("link", { name: "Abrir perfil" })).toBeTruthy();
+    // What it got takes a check; João's mailbox waits for him.
+    const given = [...made.querySelectorAll(".waitcard__lines > li")].map((li) => li.getAttribute("data-given"));
+    expect(given).toEqual(["true", "true", "true", "false", "true"]);
+    expect(lines(made)[3]).toBe("joao@acme.com.br · consulta e muda · só João libera");
+  });
+
+  test("a routine one click couldn't make waits for an admin, and its card makes it once the agent can report", async () => {
+    const state = seedState();
+    state.messages.push(
+      proposal(
+        "p-1",
+        {
+          state: "created",
+          agentId: ATLAS_ID,
+          decidedByUserId: "u-walter",
+          applied: { channelIds: [], connectionIds: [], mailAccountIds: [] },
+          routineId: null,
+        },
+        { routine: { ...ROUTINE, reportsIn: ENG_ID } },
+      ),
+    );
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(6);
+    const [card] = cardOf("Nina");
+    if (!card) throw new Error("no card");
+    await click(within(card).getByRole("button", { name: "Ver detalhes" }));
+    expect(lines(card).at(-1)).toBe(
+      "E-mails do dia · Todos os dias, às 12:00 (horário de Brasília) · um admin libera · não criada",
+    );
+    await click(within(card).getByRole("button", { name: "Criar a rotina E-mails do dia" }), 6);
+    expect(state.calls.find((c) => c.method === "agents.proposalRoutine")?.args).toEqual([ORG_ID, "p-1"]);
+    const [made] = cardOf("Nina");
+    expect(within(made as HTMLElement).queryByRole("button", { name: "Criar a rotina E-mails do dia" })).toBeNull();
+  });
+
+  test("Criar opens Connect when the agent got nothing to think with, whatever the card suggested", async () => {
+    const state = seedState();
+    state.messages.push(
+      proposal(
+        "p-1",
+        {},
+        { ai: { kind: "account", brain: "claude_code", machineId: "m-1", accountId: "a-1", label: "Claude Max" } },
+      ),
+    );
+    // The asker's plan, but whoever clicks has no account of their own free.
+    state.proposalAi = "none";
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(6);
+    const [card] = cardOf("@nina");
+    if (!card) throw new Error("no card");
+    await click(within(card).getByRole("button", { name: "Criar Nina" }), 8);
+    expect(screen().getByRole("dialog", { name: /Conectar uma IA/ })).toBeTruthy();
+  });
+
+  test("Revisar, then Criar: the dialog closes on the conversation as it was, and the routine is made", async () => {
+    const state = seedState();
+    state.messages.push(withLines());
+    const api = createFakeApi(state);
+    const fakeMail = fakeMailOf.get(api);
+    if (!fakeMail) throw new Error("no mail fake");
+    const mailbox = (id: string, address: string): MailAccount => ({
+      id,
+      provider: "gmail",
+      via: "composio",
+      address,
+      label: address,
+      status: "active",
+      lastError: null,
+      preset: null,
+      createdAt: NOW.toISOString(),
+      offActions: [],
+      askActions: [],
+      aliases: [],
+      defaultFrom: null,
+      ownerUserId: id === "mb-w" ? "u-walter" : "u-joao",
+      agents: [],
+    });
+    fakeMail.accounts = [mailbox("mb-w", "walter@acme.com.br"), mailbox("mb-j", "joao@acme.com.br")];
+    const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(6);
+    const [card] = cardOf("@nina");
+    if (!card) throw new Error("no card");
+    await click(within(card).getByRole("button", { name: "Revisar" }), 10);
+    const dialog = screen().getByRole("dialog", { name: "Revisar Nina" });
+    // The routine is on the review, to keep or not; my own mailbox comes at its level, João's is his to give.
+    const review = dialog.querySelector(".newag__review")?.textContent ?? "";
+    expect(review).toContain("E-mails do dia");
+    expect(review).toContain("walter@acme.com.br · só consulta");
+    expect(review).not.toContain("joao@acme.com.br");
+    expect(
+      within(dialog).getByRole("switch", { name: "Criar a rotina E-mails do dia" }).getAttribute("aria-checked"),
+    ).toBe("true");
+    await click(within(dialog).getByRole("button", { name: "Criar Nina" }), 12);
+    expect(state.calls.find((c) => c.method === "agents.create")?.args[1]).toMatchObject({ proposal: "p-1" });
+    expect(state.calls.find((c) => c.method === "agents.proposalRoutine")?.args).toEqual([ORG_ID, "p-1"]);
+    // My mailbox at its level; João's isn't mine to give.
+    expect(state.calls.filter((c) => c.method === "mail.setAgent").map((c) => c.args.slice(2, 4))).toEqual([
+      ["mb-w", expect.objectContaining({ level: "read" })],
+    ]);
+    expect(screen().queryByRole("dialog", { name: "Revisar Nina" })).toBeNull();
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
   });
 });
 
@@ -296,7 +473,7 @@ describe("Revisar: Criar agente filled in with the draft", () => {
     expect(screen().queryByText("Esta proposta já foi decidida ou expirou.")).toBeNull();
   });
 
-  test("the channels it proposes, also public ones I'm not in: shown, and the agent joins them", async () => {
+  test("the channels it proposes, also public ones I'm not in when I arrange channels: shown, and the agent joins them", async () => {
     const state = seedState();
     state.channels.push({
       id: DESIGN_ID,
@@ -315,6 +492,28 @@ describe("Revisar: Criar agente filled in with the draft", () => {
     await click(screen().getByRole("button", { name: "Criar Nina" }), 10);
     const joined = state.calls.find((c) => c.method === "agents.setChannels")?.args[2];
     expect(joined).toEqual([{ channelId: ENG_ID }, { channelId: DESIGN_ID }]);
+  });
+
+  test("with Create agents alone, a channel it proposes that I'm not in isn't offered: it joins the ones I'm in", async () => {
+    const state = seedState();
+    meWithRole(state, ["create_agents"]);
+    state.channels.push({
+      id: DESIGN_ID,
+      name: "design",
+      topic: "",
+      visibility: "public",
+      isMember: false,
+      createdAt: NOW.toISOString(),
+    });
+    state.messages.push(proposal("p-1", {}, { channelIds: [ENG_ID, DESIGN_ID] }));
+    await renderApp(`/org/${ORG_ID}/agents/new?proposal=p-1`, { api: createFakeApi(state) });
+    await settle(8);
+    const chips = [...document.querySelectorAll(".newag__review .ac-chip")].map((c) => c.textContent);
+    expect(chips).toContain("eng");
+    expect(chips).not.toContain("design");
+    await click(screen().getByRole("button", { name: "Criar Nina" }), 10);
+    const joined = state.calls.find((c) => c.method === "agents.setChannels")?.args[2];
+    expect(joined).toEqual([{ channelId: ENG_ID }]);
   });
 
   test("changing the role keeps the rest of the draft; its words are a field of their own", async () => {

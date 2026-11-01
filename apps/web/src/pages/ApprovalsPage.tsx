@@ -1058,6 +1058,31 @@ function AskAgain({ approval, agent }: { approval: Approval; agent: Agent | unde
   );
 }
 
+/** A request's details over whatever page is open (`DetailsHost`): a routine's run, an audit row. */
+export function ApprovalDetailsDialog({ approvalId, onClose }: { approvalId: string; onClose: () => void }) {
+  const { org } = useOrg();
+  const approvals = useApprovals(org.id);
+  const channels = useChannels(org.id);
+  const [refusing, setRefusing] = useState(false);
+  const all = approvals.data ?? [];
+  const approval = all.find((a) => a.id === approvalId);
+  useEffect(() => {
+    if (approvals.isSuccess && !approval) onClose();
+  }, [approvals.isSuccess, approval, onClose]);
+  if (!approval) return null;
+  return (
+    <ApprovalDetails
+      approval={approval}
+      all={all}
+      channel={channels.data?.find((c) => c.id === approval.channelId)?.name ?? ""}
+      refusing={refusing}
+      onRefuse={() => setRefusing(true)}
+      onCancelRefuse={() => setRefusing(false)}
+      onClose={onClose}
+    />
+  );
+}
+
 /**
  * A request's details, in the centered details dialog: the exact action, why,
  * how it got here, the agent's record, who decides, and the decision bar.

@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { WikiGraph } from "@agenteschat/client";
+import { ApiError, type WikiGraph } from "@agenteschat/client";
 import {
   outlineOf,
   prefixLines,
@@ -16,14 +16,15 @@ import {
   wrapSelection,
 } from "@agenteschat/client/lib/wiki";
 import { readZip } from "@agenteschat/client/lib/zip";
+import { HOVER_CLOSE_MS } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
 import { setMermaidRenderer } from "@/components/artifacts/Mermaid";
-import { layoutGraph, neighborsOf } from "@/components/WikiGraph";
+import { graphWidth, layoutGraph, neighborsOf } from "@/components/WikiGraph";
 import { VaultCard } from "@/components/wiki/VaultCard";
 import { useVaultReader } from "@/components/wiki/WikiImport";
 import { headingId, Markdown, parseWikiToken, wikiLinksIn } from "@/lib/markdown";
 import { filesFromList, homeOf, parseNote, readVault, type VaultFile } from "@/lib/obsidian";
-import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ADMIN_ROLE_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, renderPage, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -120,6 +121,14 @@ describe("wiki rules", () => {
     }
     expect([...neighborsOf(g, "a")].sort()).toEqual(["b", "c"]);
   });
+
+  test("the full graph draws in its box's shape: a wide box gets a wide drawing, not side bands", () => {
+    expect(graphWidth(1516, 680)).toBe(1248);
+    expect(graphWidth(2200, 1220)).toBe(1010);
+    expect(graphWidth(400, 560)).toBe(560);
+    expect(graphWidth(9000, 420)).toBe(2240);
+    expect(graphWidth(0, 0)).toBe(960);
+  });
 });
 
 describe("the wiki", () => {
@@ -207,6 +216,36 @@ describe("the wiki", () => {
     await settle(6);
     const saves = state.calls.filter((c) => c.method === "wiki.update").map((c) => c.args[2]);
     expect(saves.at(-1)).toMatchObject({ body: "# Deploy\n\nMinha versão.", baseVersion: 2 });
+  });
+
+  test("Quem vê: limit a page to a role; the page shows Restrita", async () => {
+    const { state } = await go("wiki/deploy");
+    const more = screen().getByRole("button", { name: "Mais ações" });
+    more.focus();
+    await act(async () => {
+      fireEvent.keyDown(more, { key: "Enter" });
+      fireEvent.keyUp(more, { key: "Enter" });
+    });
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+    await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Quem vê" }));
+    const dialog = screen().getByRole("dialog", { name: "Quem vê Deploy" });
+    await click(within(dialog).getByRole("radio", { name: /Só os agentes e quem eu escolher/ }));
+    await click(within(dialog).getByRole("checkbox", { name: "Admin" }));
+    await click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await settle(6);
+    const call = state.calls.find((c) => c.method === "wiki.audience");
+    expect(call?.args.slice(1)).toEqual(["deploy", { roleIds: [ADMIN_ROLE_ID], userIds: [] }]);
+    expect(screen().getByText("Restrita")).toBeTruthy();
+  });
+
+  test("a page outside your audience: a plain no access", async () => {
+    const api = createFakeApi(seedState(), { seed: true });
+    api.wiki.get = async () => {
+      throw new ApiError(403, "wiki.no_access", "You don't have access to this page");
+    };
+    await renderApp(`/org/${ORG_ID}/wiki/deploy`, { api });
+    await settle(8);
+    expect(document.body.textContent).toContain("Você não tem acesso a esta página");
   });
 
   test("history with a diff", async () => {
@@ -337,6 +376,9 @@ describe("links everywhere", () => {
     expect(document.activeElement).toBe(box);
     await act(async () => fireEvent.pointerLeave(link, { pointerType: "mouse" }));
     await settle(2);
+    // A moment to come back before it closes.
+    expect(preview()).not.toBeNull();
+    await act(() => new Promise((r) => setTimeout(r, HOVER_CLOSE_MS + 20)));
     expect(preview()).toBeNull();
     expect(document.activeElement).toBe(box);
     await act(async () => link.focus());

@@ -740,6 +740,8 @@ export type BrowserInputEvent =
       deltaX?: number;
       deltaY?: number;
       modifiers?: BrowserModifiers;
+      /** When the person made it (ms, the sender's clock): the runner keeps a drag's gaps (ADR 0040 §14). */
+      at?: number;
     }
   | {
       kind: "key";
@@ -890,13 +892,17 @@ export interface WireSecretBox {
   iv: string;
   ct: string;
 }
-export type WireSecretTarget = { kind: "env" } | { kind: "file"; path: string };
+export type WireSecretTarget = { kind: "env" } | { kind: "file"; path: string } | { kind: "site"; site: string };
 
 /**
  * Secrets of the request's agent (ADR 0027): `keypair` makes the key for a
  * request (the private key stays on the machine), `deliver` validates and stages
  * only the sealed box, `activate` opens it after the server commits delivery,
  * `discard` drops a request's key and staged box, `remove` forgets a secret.
+ * A runner that keeps a site's password for its browser alone (target `site`:
+ * typed on that site, never in a command's environment) says so in its
+ * `keypair` answer (`sites`); the server asks an older one for an environment
+ * variable instead, as before.
  */
 export type SecretRequest =
   | { action: "keypair"; requestId: string }
@@ -1522,8 +1528,11 @@ export interface MachineReplies {
   list: { entries: FileEntry[] };
   /** What was sent: the uploaded name (`report.pdf`, or `folder.zip`), bytes and SHA-256 (hex). */
   push: { name: string; size: number; sha256: string; contentType: string };
-  /** `keypair`: public key; `deliver`/`activate`: size; an older activation may be superseded. */
-  secret: { publicKey?: string; size?: number; superseded?: boolean };
+  /**
+   * `keypair`: public key, and `sites` from a runner that keeps a `site` target out of its commands; `deliver`/
+   * `activate`: size; an older activation may be superseded.
+   */
+  secret: { publicKey?: string; sites?: boolean; size?: number; superseded?: boolean };
   /**
    * `begin`: what the person needs (`url`; Claude Code: `publicKey`; Codex: `userCode`);
    * `status`: `state` and, when done, `account`; `list`: `accounts`; `code`, `cancel`, `remove`: `{}`.
@@ -2823,6 +2832,7 @@ export function parseBrowserInputEvent(v: unknown): BrowserInputEvent | null {
       const clickCount = finite(v.clickCount);
       const deltaX = coord(v.deltaX);
       const deltaY = coord(v.deltaY);
+      const at = finite(v.at);
       return {
         kind: "mouse",
         type,
@@ -2833,6 +2843,7 @@ export function parseBrowserInputEvent(v: unknown): BrowserInputEvent | null {
         ...(deltaX !== undefined ? { deltaX } : {}),
         ...(deltaY !== undefined ? { deltaY } : {}),
         ...modifiers,
+        ...(at !== undefined && at >= 0 ? { at } : {}),
       };
     }
     case "key": {

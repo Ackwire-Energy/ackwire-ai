@@ -180,15 +180,16 @@ const channel = (name: string) => {
 const shown = (el: Element) => window.getComputedStyle(el).display !== "none";
 
 describe("a category in the sidebar (ADR 0080)", () => {
-  test("its channels sit a step in under its header; a channel in none stays where it was", async () => {
+  test("its channels line up with the ones in none, under its header; a channel in none stays where it was", async () => {
     await withLayout();
     await go(withCategory());
     const { body } = category("Engenharia");
     expect(body.contains(channel("eng"))).toBe(true);
-    expect(window.getComputedStyle(body).paddingLeft).toBe("19px");
     const loose = channel("general").parentElement as HTMLElement;
     expect(loose.closest(".sidebar__section")).toBeNull();
-    expect(window.getComputedStyle(loose).paddingLeft).not.toBe("19px");
+    // No step in: a channel's # sits in its header's chevron column, as the ones in no category (sidebar-css.test.ts).
+    expect(window.getComputedStyle(body).paddingLeft).toBe(window.getComputedStyle(loose).paddingLeft);
+    expect(window.getComputedStyle(body).paddingLeft).not.toBe("19px");
   });
 
   test("closed, it hides its channels but the unread ones, and its header says it is closed", async () => {

@@ -7,6 +7,7 @@ import type { BrainTool, ToolResult } from "./brains/types";
 import { consultationCardThread, consultationOrigin } from "./consultations";
 import { NotFoundError } from "./errors";
 import { type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
+import { pgSafeStringify } from "./format";
 import type { Judge } from "./judge";
 import { insertMessage, type Message, messageView } from "./messages";
 import { notifyMissionApproval } from "./mission-tools";
@@ -310,7 +311,7 @@ async function recordBridgeEffects(
  */
 export function storedTranscript(t: object): SQL {
   const { [BRIDGE_EFFECTS]: _kept, ...rest } = t as Record<string, unknown>;
-  return sql`(${JSON.stringify(rest)}::jsonb || jsonb_strip_nulls(jsonb_build_object(${BRIDGE_EFFECTS}::text, ${agentRuns.transcript} -> ${BRIDGE_EFFECTS}::text)))`;
+  return sql`(${pgSafeStringify(rest)}::jsonb || jsonb_strip_nulls(jsonb_build_object(${BRIDGE_EFFECTS}::text, ${agentRuns.transcript} -> ${BRIDGE_EFFECTS}::text)))`;
 }
 
 /** Takes (and clears) the side effects the bridge kept for this run (`recordBridgeEffects`). */
@@ -833,7 +834,7 @@ export async function publishPauseCards(deps: { db: Database; pubsub?: PubSub },
     await publishQuestion(pubsub, q, "question.asked");
     await notifyQuestion({ db, pubsub } as Parameters<typeof notifyQuestion>[0], q).catch(() => {});
   }
-  for (const r of posted.secrets) await publishSecret(pubsub, r, "secret.requested");
+  for (const r of posted.secrets) await publishSecret({ db, pubsub }, r, "secret.requested");
 }
 
 /**

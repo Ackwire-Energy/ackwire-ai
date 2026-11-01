@@ -13,6 +13,7 @@ import { openSecret, sealSecret } from "../crypto";
 import { ConflictError, NotFoundError, ValidationError } from "../errors";
 import { publicHostAddress, type ResolveHost, resolveHostDns } from "../net-guard";
 import { requirePermission } from "../organizations";
+import { identPath } from "./identifiers";
 
 const { dbConnections, agentScopes } = schema;
 
@@ -305,7 +306,7 @@ async function sensitiveColumns(run: DatabaseRun) {
   const rows = (await run(COLUMNS_SQL)).rows;
   return rows
     .filter((r) => SENSITIVE_COLUMN.test(String(r[2] ?? "")))
-    .map((r) => `${r[0]}.${r[1]}.${r[2]}`.toLowerCase())
+    .map((r) => identPath([String(r[0]), String(r[1]), String(r[2])]))
     .slice(0, 200);
 }
 

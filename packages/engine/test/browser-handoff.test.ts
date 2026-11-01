@@ -925,6 +925,39 @@ describe("live view", () => {
     live.close();
   });
 
+  test("a slow batch is not overtaken: the next waits, so a drag's press reaches the computer before its moves", async () => {
+    await start();
+    const { hub, calls } = fakeHub();
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub, inputBatchMs: 5 });
+    await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    await startTakeover(live.handoffDeps, f.owner.id, f.org.id, f.agent.id);
+    await Bun.sleep(5);
+    const real = live.sendInput;
+    let first = true;
+    live.sendInput = async (...args) => {
+      // The press's checks are slow (a busy database).
+      if (first) {
+        first = false;
+        await Bun.sleep(40);
+      }
+      return real(...args);
+    };
+    const press = live.input(f.owner.id, f.org.id, f.agent.id, [
+      { kind: "mouse", type: "mousePressed", x: 1, y: 1, button: "left" },
+    ]);
+    await Bun.sleep(15);
+    const move = live.input(f.owner.id, f.org.id, f.agent.id, [
+      { kind: "mouse", type: "mouseMoved", x: 9, y: 1, button: "left" },
+    ]);
+    await Promise.all([press, move]);
+    const types = calls
+      .filter((c) => c.op === "browser.input")
+      .flatMap((c) => (c as Extract<MachineRequest, { op: "browser.input" }>).events as BrowserInputEvent[])
+      .map((e) => (e.kind === "mouse" ? e.type : e.kind));
+    expect(types).toEqual(["mousePressed", "mouseMoved"]);
+    live.close();
+  });
+
   test("coalesceInput keeps keys, text and touches in order", () => {
     const events: BrowserInputEvent[] = [
       { kind: "mouse", type: "mouseMoved", x: 1, y: 1 },

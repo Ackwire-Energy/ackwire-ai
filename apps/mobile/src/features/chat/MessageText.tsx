@@ -21,6 +21,7 @@ export const MessageText = memo(function MessageText({
   muted = false,
   selectable = true,
   accent,
+  channelRefs,
 }: {
   body: string;
   streaming?: boolean;
@@ -34,6 +35,8 @@ export const MessageText = memo(function MessageText({
   selectable?: boolean;
   /** The writing agent's color: its charts take its tones. */
   accent?: AgentColorName;
+  /** The message's `meta.channelRefs`: the channel each `#name` meant when written. */
+  channelRefs?: Record<string, string>;
 }) {
   const c = useColors();
   const blocks = useMemo(() => parseBlocks(body), [body]);
@@ -72,7 +75,7 @@ export const MessageText = memo(function MessageText({
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
               <Text key={i} variant="body" tone="ink" style={[styles.line, styles.heading]}>
-                <Spans inline={b.inline} />
+                <Spans inline={b.inline} channelRefs={channelRefs} />
                 {end}
               </Text>
             );
@@ -84,7 +87,7 @@ export const MessageText = memo(function MessageText({
                   {b.ordinal ? `${b.ordinal}.` : "•"}
                 </Text>
                 <Text variant="body" tone={tone} style={[styles.line, styles.flex]}>
-                  <Spans inline={b.inline} />
+                  <Spans inline={b.inline} channelRefs={channelRefs} />
                   {end}
                 </Text>
               </View>
@@ -94,7 +97,7 @@ export const MessageText = memo(function MessageText({
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
               <View key={i} style={[styles.quote, { borderLeftColor: c.line2 ?? c.line }]}>
                 <Text variant="body" tone="muted" style={styles.line}>
-                  <Spans inline={b.inline} />
+                  <Spans inline={b.inline} channelRefs={channelRefs} />
                   {end}
                 </Text>
               </View>
@@ -103,7 +106,7 @@ export const MessageText = memo(function MessageText({
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
               <Text key={i} variant="body" tone={tone} style={styles.line} selectable={selectable}>
-                <Spans inline={b.inline} />
+                <Spans inline={b.inline} channelRefs={channelRefs} />
                 {end}
               </Text>
             );
