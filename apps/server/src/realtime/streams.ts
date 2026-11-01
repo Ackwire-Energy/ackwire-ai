@@ -11,7 +11,8 @@ import { personUpgrade, UUID } from "./ws";
  * stream broker:
  *
  * - `GET /api/desktop?orgId&agentId&mode=watch|control` (raw RFB, binary; an
- *   older app's `keyboard` is ignored) and
+ *   older app's `keyboard` is ignored; `switch=1`: its mode may change in place,
+ *   ADR 0058 §17) and
  *   `GET /api/terminal?orgId&agentId&cols&rows` (the shell's bytes; text
  *   frames: `resize` out, `exit` in) are a person's sockets, refused before
  *   the upgrade like `/api/ws` (401 without a session, 403 for a foreign
@@ -139,9 +140,17 @@ export function createStreamSockets(deps: { db: Database; auth: Auth; config: Co
       if (!UUID.test(agentId) || !request) {
         return new Response("agentId and a mode (or a terminal's cols and rows) are required", { status: 400 });
       }
+      const switches = request.kind === "desktop" && q.get("switch") === "1";
       const data: ViewerSocketData = {
         kind: "stream.viewer",
-        input: { userId: user.id, orgId, agentId, request, sessionToken: user.sessionToken },
+        input: {
+          userId: user.id,
+          orgId,
+          agentId,
+          request,
+          sessionToken: user.sessionToken,
+          ...(switches ? { switches } : {}),
+        },
         stream: null,
         sessionValidatedAt: 0,
         sessionCheckInFlight: null,

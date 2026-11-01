@@ -103,7 +103,7 @@ export function proposalStatus(card: AgentProposalCard, now = Date.now()): "open
   return Date.parse(card.expiresAt) <= now ? "expired" : "open";
 }
 
-/** "Pensa com Claude Max", "Pensa com o modelo do workspace", "Sem IA ainda…": the AI a proposal suggests. */
+/** "Pensa com Claude Max", "Pensa pela API", "Sem IA ainda…": the AI a proposal suggests. */
 export const suggestedAiText = (t: TFunction, ai: SuggestedAi) =>
   ai.kind === "account"
     ? t("actionCard.agentProposal.aiAccount", { account: ai.label })

@@ -1,5 +1,7 @@
 import {
   DESKTOP_PROTOCOL,
+  DESKTOP_SWITCH_PROTOCOL,
+  type DesktopMode,
   type PubSub,
   type RateLimiter,
   STREAM_CLOSE,
@@ -67,7 +69,11 @@ export async function desktopTarget(
   if (machine.protocol < DESKTOP_PROTOCOL) return refused(STREAM_CLOSE.refused, "runner_outdated");
   if (!machine.access?.tools[kind]) return refused(STREAM_CLOSE.refused, "not_allowed");
   if (!machine.executors?.[kind]?.available) return refused(STREAM_CLOSE.refused, `${kind}_unavailable`);
-  return { machineId: machine.id, agent: { id: agentId, handle: agent.handle, name: agent.name } };
+  return {
+    machineId: machine.id,
+    agent: { id: agentId, handle: agent.handle, name: agent.name },
+    ...(kind === "desktop" && machine.protocol >= DESKTOP_SWITCH_PROTOCOL ? { switches: true } : {}),
+  };
 }
 
 /**
@@ -135,6 +141,22 @@ export async function authorizeStream(deps: StreamPolicyDeps, input: StreamInput
     return { ...target, held: true };
   }
   return target;
+}
+
+/**
+ * The broker's `reauthorize`, as its handoff changed: whether a desktop stream may go on in `mode` on the same
+ * sockets (ADR 0058 §17), as `authorizeStream` decides for one that opens in it, on the computer it runs on. Control
+ * is new work, not for a held agent, and its holder is back: the grace of their control starts again.
+ */
+export async function reauthorizeStream(db: Database, stream: Stream, mode: DesktopMode) {
+  const access = await streamAccess(db, { ...stream, request: { kind: "desktop", mode } });
+  if ("refused" in access) return access;
+  if (access.driven && access.driven !== stream.machineId) return refused(STREAM_CLOSE.forbidden, "forbidden");
+  if (mode === "control") {
+    if (await standingRefusal(db, stream.orgId, stream.agentId)) return refused(STREAM_CLOSE.refused, "held");
+    if (access.control) await touchControl(db, access.control, stream.userId, new Date(), true).catch(() => {});
+  }
+  return null;
 }
 
 /**
@@ -294,7 +316,7 @@ export interface DesktopControlDeps {
   db: Database;
   pubsub?: PubSub;
   hub: Pick<MachineHub, "call" | "isLocal">;
-  streams: Pick<StreamBroker, "closeWhere" | "some">;
+  streams: Pick<StreamBroker, "closeWhere" | "some" | "switchWhere" | "switches">;
   log?: { warn(message: string, data?: Record<string, unknown>): void };
 }
 
@@ -304,7 +326,10 @@ export interface DesktopControlDeps {
  * hands (on any server), the streams here that may no longer show it close:
  * everyone else's while someone is in control (4409), and a control stream
  * whose holder lost control (4410). Their panels open again once it is handed
- * back. It also keeps the desktops of open handoffs from idling.
+ * back. Where the viewer and the computer both can (ADR 0058 §17), the holder's
+ * own streams change mode in place instead: those watching go on in control
+ * when they take it, and theirs in control go on watching when it ends. It also
+ * keeps the desktops of open handoffs from idling.
  */
 export function createDesktopControl(deps: DesktopControlDeps) {
   /** Last keep-alive per open handoff. */
@@ -321,11 +346,11 @@ export function createDesktopControl(deps: DesktopControlDeps) {
       STREAM_CLOSE.hidden,
       "someone_in_control",
     );
-    deps.streams.closeWhere(
-      (s) => ofAgent(s) && s.request.kind === "desktop" && s.request.mode === "control" && s.userId !== onDesktop,
-      STREAM_CLOSE.controlEnded,
-      "control_ended",
-    );
+    const mode = (s: Stream) => (s.request.kind === "desktop" ? s.request.mode : null);
+    const ended = (s: Stream) => ofAgent(s) && mode(s) === "control" && s.userId !== onDesktop;
+    deps.streams.switchWhere(ended, "watch");
+    deps.streams.closeWhere((s) => ended(s) && !deps.streams.switches(s), STREAM_CLOSE.controlEnded, "control_ended");
+    if (onDesktop) deps.streams.switchWhere((s) => ofAgent(s) && s.userId === onDesktop, "control");
   }
 
   const off = deps.pubsub?.subscribe(BROWSER_HANDOFF_TOPIC, (event) => {

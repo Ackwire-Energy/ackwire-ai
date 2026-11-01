@@ -123,5 +123,9 @@ describe("the agent's screen", () => {
     expect(desktopSocketUrl("http://localhost:5173/x", { orgId: "o 1", agentId: "a1", mode: "control" })).toBe(
       "ws://localhost:5173/api/desktop?orgId=o%201&agentId=a1&mode=control",
     );
+    // One that takes its mode changing in place says so.
+    expect(desktopSocketUrl(base, { orgId: "o1", agentId: "a1", mode: "watch", switches: true })).toBe(
+      "wss://agentes.chat/api/desktop?orgId=o1&agentId=a1&switch=1&mode=watch",
+    );
   });
 });
