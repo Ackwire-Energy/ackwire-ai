@@ -985,7 +985,7 @@ describe("the team's coordinator (ADR 0093)", () => {
   });
 
   test("a specialist's pick still answers and a short follow-up stays with it, and so does what nobody took next", async () => {
-    const { theo, ada } = await coordinated({ people: true });
+    const { ada } = await coordinated({ people: true });
     const bug = await post("o checkout está dando 500");
     expect((await route(scored({ ada: 0.9 }, { needsAgent: 0.9 }), bug.id)).selected).toEqual([ada.id]);
     await byAgent(ada.id, "Achei: o deploy de ontem quebrou o checkout.");

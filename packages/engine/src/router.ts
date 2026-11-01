@@ -1280,8 +1280,7 @@ export async function routeMessage(
       // after a colleague spoke.
       ((decided.forEveryone ?? 0) >= FOR_EVERYONE_THRESHOLD ||
         needs >= needGateOf(policy, candidates.length === 1) ||
-        (!peopleTalking &&
-          (talkingWith !== null || needs >= DEFAULT_NEED || (await aloneWithTeam())))) &&
+        (!peopleTalking && (talkingWith !== null || needs >= DEFAULT_NEED || (await aloneWithTeam())))) &&
       !(await defaultCapReached())
     ) {
       const agentId = talkingWith ?? coordinatorId ?? bestPlaced(scoreOf, decided.best);
