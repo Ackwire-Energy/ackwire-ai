@@ -530,7 +530,11 @@ const COLUMNS: { key: keyof AutonomyCounts; head: string; means: string }[] = [
   { key: "promiseUnkept", head: "promise", means: "runs the follow-through judge found ending on work undone" },
   { key: "promiseIgnored", head: "ignored", means: "...that did nothing after being told to do it" },
   { key: "handoffUnanswered", head: "handoff", means: "notes, questions and @mentions unanswered in 30 min" },
-  { key: "limitStops", head: "limit", means: "runs at or near the step limit, stuck, out of budget; stretches, stuck missions paused" },
+  {
+    key: "limitStops",
+    head: "limit",
+    means: "runs at or near the step limit, stuck, out of budget; stretches, stuck missions paused",
+  },
   { key: "personUnanswered", head: "person", means: "people's messages for agents unanswered in 10 min" },
   { key: "taskStartFailed", head: "task", means: 'background tasks failed in their first minute ("Not logged in")' },
   { key: "noiseRuns", head: "noise", means: "runs in any noise column, once each" },

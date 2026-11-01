@@ -482,7 +482,11 @@ describe("one workspace's day", () => {
   test("a mission its stuck guard paused stopped at a limit; its other lines didn't", async () => {
     const other = "2026-10-17";
     const missionId = crypto.randomUUID();
-    await message({ at: at("10:00:00", other), by: f.agent.id, meta: { missionStuck: { missionId, reason: "no_progress" } } });
+    await message({
+      at: at("10:00:00", other),
+      by: f.agent.id,
+      meta: { missionStuck: { missionId, reason: "no_progress" } },
+    });
     await message({ at: at("11:00:00", other), by: f.agent.id, meta: { missionReport: { missionId } } });
     const [day] = await autonomyRows(f.db, { from: other, days: 1 });
     expect(day?.limitStops).toBe(1);
@@ -518,7 +522,12 @@ describe("one workspace's day", () => {
       mentions: [dev],
     });
     await decide(told.id, [dev]);
-    await run({ at: at("12:00:01", other), triggerId: told.id, trigger: "mention", steps: [["tool_call", { name: "react" }]] });
+    await run({
+      at: at("12:00:01", other),
+      triggerId: told.id,
+      trigger: "mention",
+      steps: [["tool_call", { name: "react" }]],
+    });
     const [day] = await autonomyRows(f.db, { from: other, days: 1 });
     expect(day).toMatchObject({ personUnanswered: 1, handoffUnanswered: 0, quietRuns: 2, idleWakes: 1, stalls: 1 });
   });
