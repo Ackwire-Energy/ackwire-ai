@@ -2,6 +2,7 @@ import { type Executor, inArray, rowsOf, schema, sql } from "@agenteschat/db";
 import { nanoUsdToUsd } from "@agenteschat/providers";
 import { emailLocale, emailsByLocale, queueEmail } from "./email";
 import { enqueue } from "./outbox";
+import { STUCK_ERROR } from "./runs";
 import { REFUSALS } from "./tools/run-policy";
 
 /**
@@ -405,7 +406,8 @@ export function autonomySql(range: AutonomyRange) {
         group by 1, 2
       union all
       select day, org_id, 'limitStops', count(*) from runs
-        where wrapped_up or reply_limit or (status = 'failed' and error in ('too_many_tool_calls', 'budget_exceeded', 'stuck'))
+        where wrapped_up or reply_limit
+          or (status = 'failed' and error in ('too_many_tool_calls', 'budget_exceeded', ${STUCK_ERROR}))
         group by 1, 2
       union all
       select (m.created_at at time zone 'UTC')::date, m.org_id, 'limitStops', count(*) from messages m
