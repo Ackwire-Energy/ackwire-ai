@@ -14,30 +14,43 @@ const at = (text: string, pieces: string[]) =>
 const ascending = (xs: number[]) => xs.every((x, i) => i === 0 || (xs[i - 1] ?? 0) < x);
 
 describe("a reply's tools sit last, live and saved", () => {
-  test("saved: its words, then what it changed, then its questions to others and its tools", () => {
+  test("saved: its words, what it changed and its cards, then its questions to others and its tools", () => {
     const row = source("MessageRow.tsx");
     expect(
       ascending(
         at(row, [
           "body ? (\n          <MessageText body={body}",
           "<Receipts message={m} />",
+          "{cards}\n        {/* Its tools last",
           "<ConsultGroup message={m} color={color} />",
           "<TurnTools",
           "<SavedTools",
-          "{cards}\n      </View>\n    </Pressable>\n  );\n});",
+          "{foot}\n      </View>\n    </Pressable>\n  );\n});",
         ]),
       ),
     ).toBe(true);
+    // The cards above the tools are an issue's and a mission's; the thread, the reactions and the send state go under.
+    const [cardsAt, footAt, endAt] = at(row, ["const cards = (", "const foot = (", "\n  if (mine) {"]);
+    const cards = row.slice(cardsAt, footAt);
+    const foot = row.slice(footAt, endAt);
+    for (const card of [
+      "<IssueWorkCard",
+      "<MissionCard",
+      "<PlanCard",
+      "<ReviewCard",
+      "<DecisionCard",
+      "<SetupFailedCard",
+    ])
+      expect([card, cards.includes(card)]).toEqual([card, true]);
+    for (const part of ["<ThreadLink", "<Reactions", "<Sending"])
+      expect([part, foot.includes(part)]).toEqual([part, true]);
   });
 
   test("live: the words stream above its tools, where the saved reply keeps them", () => {
     const live = source("LiveRows.tsx");
     expect(
       ascending(
-        at(live, [
-          "{run.text && !wordsOnTop ? <RevealText",
-          '<TurnTools items={lines} agentName={agent?.name ?? ""}',
-        ]),
+        at(live, ["{run.text && !wordsOnTop ? <RevealText", '<TurnTools items={lines} agentName={agent?.name ?? ""}']),
       ),
     ).toBe(true);
   });

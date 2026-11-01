@@ -200,15 +200,11 @@ export const MessageRow = memo(function MessageRow({
   // My own message: a light bubble on the right, no face or name.
   const mine = m.author.type === "person" && Boolean(meId) && m.author.id === meId;
 
+  // The cards it carries: above an agent's tools, which come last.
   const cards = (
     <>
       {issueWork ? (
         <IssueWorkCard work={issueWork} authorId={m.author.type === "person" ? (m.author.id ?? null) : null} />
-      ) : null}
-      {thread && !meta?.missionStart ? (
-        <View style={mine ? styles.meEnd : undefined}>
-          <ThreadLink thread={thread} />
-        </View>
       ) : null}
       {meta?.missionStart ? <MissionCard threadId={m.id} /> : null}
       {link ? <MissionCard missionId={link.missionId} /> : null}
@@ -222,6 +218,16 @@ export const MessageRow = memo(function MessageRow({
           error={setup.error}
           {...(setup.reason === "branch_missing" ? { lostBranch: setup.branch ?? null } : {})}
         />
+      ) : null}
+    </>
+  );
+  // Under everything: the thread it started, its reactions and whether it went out.
+  const foot = (
+    <>
+      {thread && !meta?.missionStart ? (
+        <View style={mine ? styles.meEnd : undefined}>
+          <ThreadLink thread={thread} />
+        </View>
       ) : null}
       {readOnly ? null : (
         <View style={mine ? styles.meEnd : undefined}>
@@ -279,7 +285,10 @@ export const MessageRow = memo(function MessageRow({
             <MessageFiles files={files} align="end" />
           </View>
         ) : null}
-        <View style={styles.meCards}>{cards}</View>
+        <View style={styles.meCards}>
+          {cards}
+          {foot}
+        </View>
       </Pressable>
     );
   }
@@ -411,7 +420,8 @@ export const MessageRow = memo(function MessageRow({
           />
         ) : null}
         {question ? <QuestionCard key={`${question.id}:${question.status}`} question={question} /> : null}
-        {/* Its tools last, after its words and what it changed: the same place live, kept and saved. */}
+        {cards}
+        {/* Its tools last, after its words, what it changed and its cards: the same place live, kept and saved. */}
         {isAgent && m.agentRunId && !m.local && !readOnly && consulted.length === 0 ? (
           <ConsultGroup message={m} color={color} />
         ) : null}
@@ -433,7 +443,7 @@ export const MessageRow = memo(function MessageRow({
             skipScreens={onCards}
           />
         ) : null}
-        {cards}
+        {foot}
       </View>
     </Pressable>
   );
