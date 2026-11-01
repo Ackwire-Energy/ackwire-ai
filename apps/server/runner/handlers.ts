@@ -871,8 +871,9 @@ async function doCodexTurn(
   let final: CodexBrainEvent = { type: "error", code: "codex_failed", message: "Codex ended without an answer." };
   let ended = false;
   const token = req.mcp?.token;
+  // `handleRequest` made the workspace the agent's own folder already.
+  const folder = ctx.workspaceReal;
   if (req.agent && typeof token === "string" && token) {
-    const folder = await agentWorkspace(ctx.workspaceReal, req.agent);
     codex.runs.set(runId, {
       token,
       missionId: "",
@@ -886,7 +887,7 @@ async function doCodexTurn(
   try {
     await handleCodexBrainTurn(
       {
-        workspaceReal: ctx.workspaceReal,
+        folder,
         exec: toolOn(ctx, "codex"),
         runnerHome: codex.runnerHome,
         ...(ctx.secretsDir ? { secretsDir: ctx.secretsDir } : {}),
@@ -928,7 +929,7 @@ function handleTask(
     case "task.start":
       requireTool(ctx, req.executor === "claude" ? "claude" : req.executor === "codex" ? "codex" : "commands");
       if (!req.agent) throw new RunnerError("bad_request", "A task belongs to an agent");
-      return tasks.start(req.agent, req, ctx.grants ? { grants: ctx.grants } : undefined);
+      return tasks.start(req.agent, req, ctx.grants ? { grants: ctx.grants } : undefined, ctx.grant);
     case "task.status":
       return tasks.status(req.agent, typeof req.taskId === "string" ? req.taskId : undefined);
     case "task.cancel":

@@ -184,4 +184,19 @@ describe("consultationOfNotice", () => {
     const meta = notice({ askerAgentId: "dev", agentId: "infra", status: "expired", question: "Onde?" });
     expect(consultationOfNotice(meta)?.consultation.answer).toBeNull();
   });
+
+  test("what came of work handed off says so: its card words it as a request", () => {
+    const meta = notice({
+      kind: "note",
+      askerAgentId: "dev",
+      agentId: "infra",
+      status: "failed",
+      question: "Limpa a fila.",
+    });
+    expect(consultationOfNotice(meta)?.consultation).toMatchObject({ kind: "note", status: "failed" });
+    expect(
+      consultationOfNotice(notice({ askerAgentId: "dev", agentId: "infra", status: "failed", question: "Q?" }))
+        ?.consultation.kind,
+    ).toBeUndefined();
+  });
 });

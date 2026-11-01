@@ -138,11 +138,11 @@ describe("pure parts", () => {
     dueAt: new Date().toISOString(),
   });
   const routine = (access: RoutineAccess): RunAuthority => ({ kind: "routine", personId: null, brief: brief(access) });
-  const unattended: RunAuthority = { kind: "unattended", personId: null, reason: "routine_report" };
+  const unattended: RunAuthority = { kind: "unattended", personId: null, reason: "agent" };
   const person: RunAuthority = { kind: "person", personId: "user_ana" };
   const desktopTool = { name: "desktop_do", scope: DESKTOP_SCOPE, connectionId: null };
 
-  test("the desktop is its own area: routines that act may use it; read-only routines and unattended runs may not", () => {
+  test("the desktop is its own area: routines that act and runs nobody is behind may use it; read-only routines may not", () => {
     expect(toolKind(desktopTool)).toEqual({ kind: "internal", area: "desktop" });
     expect(toolPolicy(person, desktopTool).action).toBe("allow");
     expect(toolPolicy(routine("act"), desktopTool).action).toBe("allow");
@@ -150,7 +150,7 @@ describe("pure parts", () => {
       action: "refuse",
       reason: REFUSALS.routineDesktopReadOnly,
     });
-    expect(toolPolicy(unattended, desktopTool).action).toBe("refuse");
+    expect(toolPolicy(unattended, desktopTool).action).toBe("allow");
     // Asking a person speaks in the run's own conversation, like the browser's.
     const ask = { name: "desktop_ask_person", scope: DESKTOP_SCOPE, connectionId: null };
     expect(toolKind(ask).kind).toBe("here");

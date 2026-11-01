@@ -112,7 +112,7 @@ Superseded by ADR 0065 §1: the apps have no terminal view (in control, the desk
 - One built-in scope, `desktop:use`: outside "all tools" (`NOT_IN_ALL`), on by default for new agents (`DEFAULT_AGENT_SCOPES`), revocable by admins and the agent's owner. Desktop computer use (the agent's own tools on this desktop) uses it and adds no scope of its own.
 - Driving a desktop runs commands as the agent's user, on any site (a terminal window, "Open Terminal Here"). So the desktop's tools are offered, and allowed on each call, only while the agent also has `sandbox:run`, the org's sandbox setting allows it, and the machine has both its `commands` and its `desktop` switches on.
 - Migration 0096 grants `desktop:use` to the live agents that already have both `browser:use` and `sandbox:run`, and to no other.
-- Routines (ADR 0053): its own internal area, `desktop`, allowed in routines that act and refused in read-only routines and unattended runs. `desktop_ask_person` speaks in the run's own conversation, like `browser_ask_person`.
+- Routines (ADR 0053): its own internal area, `desktop`, allowed in routines that act and refused in read-only routines (a run nobody is behind may use it since ADR 0053's addendum of 2026-10-31). `desktop_ask_person` speaks in the run's own conversation, like `browser_ask_person`.
 
 ### 9. Switches and availability
 

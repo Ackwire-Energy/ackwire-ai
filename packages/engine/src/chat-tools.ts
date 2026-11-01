@@ -5,10 +5,11 @@ import { recordAudit } from "./audit";
 import { addAgentReaction, isValidReaction, normalizeReaction } from "./context/feedback";
 import { openPersonAgentDm } from "./dms";
 import { publishMessageCreated } from "./events";
-import { getMessage, insertMessage, MAX_MESSAGE_LENGTH, messageView } from "./messages";
+import { getMessage, insertMessage, MAX_MESSAGE_LENGTH, messageView, unreachedAgents, unreachedNote } from "./messages";
 import { enqueue } from "./outbox";
-import { personBehindCall } from "./requester";
+import { actingRoutineOfCall, personBehindCall } from "./requester";
 import { isRoutineRoomKey } from "./routine-brief";
+import { personCanPost } from "./routine-state";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import { withWikiLinks } from "./wiki-links";
 
@@ -25,7 +26,7 @@ const failed = (error: unknown): ToolOutput => ({
   isError: true,
 });
 
-/** Posting where the run already is: a reply. (A routine's run never posts: the run policy refuses it.) */
+/** Posting where the run already is: a reply. */
 const SAME_CONVERSATION = "That is this conversation: just reply.";
 
 /** For matching what someone typed against names: lower case, no accents, no leading @. */
@@ -64,7 +65,8 @@ export async function findMember(ctx: Pick<ToolContext, "db" | "orgId">, who: st
 /**
  * `post_message`: "manda no #geral" from a DM. Posts a new message (with
  * files) in another channel, on behalf of the person who asked: they must be
- * in that channel, and the agent too unless it is public. Files are brought
+ * in that channel, and the agent too unless it is public. With nobody behind
+ * the run, the agent posts as itself, only where it is a member. Files are brought
  * the way `share_artifact` does it (the same file when it's visible there, a
  * copy from a DM or a private channel the person is in). The post is an
  * agent message like any reply (same run and hop, so mentions follow the hop
@@ -75,7 +77,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
     {
       name: POST_MESSAGE_TOOL,
       description:
-        'Post a new message in another channel, e.g. when someone in a DM says "manda no #geral". `channel` is its name (with or without #). Attach files with `artifact_ids` (from list_artifacts or files you made); a file from a DM goes as a copy. Only channels the person who asked is in. Then reply here saying where you posted. For this conversation, just reply.',
+        'Post a new message in another channel, e.g. when someone in a DM says "manda no #geral". `channel` is its name (with or without #). Attach files with `artifact_ids` (from list_artifacts or files you made); a file from a DM goes as a copy. Only channels the person who asked is in (when nobody asked, channels you are in). Then reply here saying where you posted. For this conversation, just reply.',
       scope: "",
       inputSchema: {
         type: "object",
@@ -98,7 +100,9 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
       async execute(input, ctx) {
         try {
           const requester = await personBehindCall(ctx);
-          if (!requester) return { content: "Only a person's request can post in another channel.", isError: true };
+          // A routine set to act posts where its creator can post, as itself: never with their files.
+          const routine = requester ? null : await actingRoutineOfCall(ctx);
+          const creator = routine?.creatorUserId ?? null;
           const name = str(input.channel).trim().replace(/^#/, "").toLowerCase();
           const { channels, channelMembers } = schema;
           const [found] = await ctx.db
@@ -120,9 +124,15 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
                 .from(channelMembers)
                 .where(eq(channelMembers.channelId, channel.id))
             : [];
-          // Not in it = not found: never reveal private channels.
-          if (!channel || !members.some((m) => m.userId === requester)) {
-            return { content: `No channel #${name} that the person who asked is in.`, isError: true };
+          // Not in it = not found: never reveal private channels. Nobody behind the run: the agent's own channels.
+          if (
+            !channel ||
+            !(creator
+              ? await personCanPost(ctx.db, ctx.orgId, creator, channel.id)
+              : members.some((m) => (requester ? m.userId === requester : m.agentId === ctx.agentId)))
+          ) {
+            const who = creator ? "this routine's creator can post" : requester ? "the person who asked is" : "you are";
+            return { content: `No channel #${name} that ${who} in.`, isError: true };
           }
           if (channel.id === ctx.channelId) return { content: SAME_CONVERSATION, isError: true };
           if (channel.visibility !== "public" && !members.some((m) => m.agentId === ctx.agentId)) {
@@ -144,20 +154,35 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
           };
           const files: string[] = [];
           for (const id of ids) {
-            const shared = await shareArtifact(deps.artifacts, actor, ctx.orgId, id, { requesterUserId: requester });
+            // A routine's own files live in its room, which only its run reads.
+            const shared = await shareArtifact(deps.artifacts, actor, ctx.orgId, id, {
+              requesterUserId: requester,
+              // Only a routine's own run takes files from its room; a run it woke takes none from its conversation.
+              alsoFrom: routine && ctx.background ? ctx.channelId : null,
+            });
             files.push(shared.artifact.id);
           }
           const [run] = await ctx.db
             .select({ hop: schema.agentRuns.hop })
             .from(schema.agentRuns)
             .where(eq(schema.agentRuns.id, ctx.runId));
+          // A mention reaches only that channel's members: the result names the agents it missed.
+          const unreached = await unreachedAgents(ctx.db, {
+            orgId: ctx.orgId,
+            channelId: channel.id,
+            authorAgentId: ctx.agentId,
+            body: text,
+          });
           const message = await insertMessage(ctx.db, {
             orgId: ctx.orgId,
             channelId: channel.id,
             threadId: null,
             author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: run?.hop ?? 0 },
             body: text,
-            meta: files.length > 0 ? { artifacts: files } : undefined,
+            meta: {
+              ...(files.length > 0 ? { artifacts: files } : {}),
+              ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
+            },
           });
           await recordAudit(ctx.db, {
             orgId: ctx.orgId,
@@ -169,14 +194,16 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
               toChannelId: channel.id,
               requesterUserId: requester,
               artifactIds: files,
+              ...(routine ? { routineId: routine.routineId, creatorUserId: creator } : {}),
             },
           });
           if (deps.pubsub) {
             const [view] = await withWikiLinks(ctx.db, ctx.orgId, [messageView(message)]);
             if (view) await publishMessageCreated(deps.pubsub, view);
           }
+          const note = unreachedNote(unreached, `#${channel.name}`, true);
           return {
-            content: `Posted in #${channel.name}${files.length > 0 ? ` with ${files.length} file(s)` : ""}. Tell the person it's there.`,
+            content: `Posted in #${channel.name}${files.length > 0 ? ` with ${files.length} file(s)` : ""}. Tell the person it's there.${note ? ` ${note}` : ""}`,
             data: { message: { id: message.id, channelId: channel.id } },
           };
         } catch (error) {
@@ -205,7 +232,10 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
       async execute(input, ctx) {
         try {
           const requester = await personBehindCall(ctx);
-          if (!requester) return { content: "Only a person's request can send a DM.", isError: true };
+          // A routine set to act writes in its creator's DM with the agent, and no one else's.
+          const routine = requester ? null : await actingRoutineOfCall(ctx);
+          const creator = routine?.creatorUserId ?? null;
+          if (!requester && !creator) return { content: "Only a person's request can send a DM.", isError: true };
           const text = str(input.text).trim();
           if (!text) return { content: "Give the text to send.", isError: true };
           const matches = await findMember(ctx, str(input.person));
@@ -217,6 +247,13 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             return { content: `Several people match: ${names}. Ask which one.`, isError: true };
           }
           const to = matches[0] as (typeof matches)[number];
+          if (creator && to.userId !== creator) {
+            return {
+              content:
+                "A routine's background work sends a DM only to the person who set it up. Put what others should hear in hand_off.",
+              isError: true,
+            };
+          }
           const { messages } = schema;
           const [sent] = await ctx.db
             .select({ n: count() })
@@ -233,6 +270,12 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             .select({ hop: schema.agentRuns.hop })
             .from(schema.agentRuns)
             .where(eq(schema.agentRuns.id, ctx.runId));
+          const unreached = await unreachedAgents(ctx.db, {
+            orgId: ctx.orgId,
+            channelId: dm.id,
+            authorAgentId: ctx.agentId,
+            body: text,
+          });
           const message = await insertMessage(ctx.db, {
             orgId: ctx.orgId,
             channelId: dm.id,
@@ -240,7 +283,10 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: run?.hop ?? 0 },
             body: text,
             // Started by the agent on someone's behalf: the person is notified (an agent's reply isn't).
-            meta: { agentDm: { requesterUserId: requester, fromChannelId: ctx.channelId } },
+            meta: {
+              agentDm: { requesterUserId: requester, fromChannelId: ctx.channelId },
+              ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
+            },
           });
           await enqueue(ctx.db, {
             orgId: ctx.orgId,
@@ -254,14 +300,20 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             actor: { type: "agent", id: ctx.agentId },
             action: "message.sent_dm",
             target: { type: "message", id: message.id },
-            details: { toUserId: to.userId, fromChannelId: ctx.channelId, requesterUserId: requester },
+            details: {
+              toUserId: to.userId,
+              fromChannelId: ctx.channelId,
+              requesterUserId: requester,
+              ...(routine ? { routineId: routine.routineId, creatorUserId: creator } : {}),
+            },
           });
           if (deps.pubsub) {
             const [view] = await withWikiLinks(ctx.db, ctx.orgId, [messageView(message)]);
             if (view) await publishMessageCreated(deps.pubsub, view);
           }
+          const note = unreachedNote(unreached, `your DM with ${to.name}`, false);
           return {
-            content: `Sent to ${to.name} in your DM with them. Tell the person who asked.`,
+            content: `Sent to ${to.name} in your DM with them. Tell the person who asked.${note ? ` ${note}` : ""}`,
             data: { message: { id: message.id, channelId: dm.id } },
           };
         } catch (error) {

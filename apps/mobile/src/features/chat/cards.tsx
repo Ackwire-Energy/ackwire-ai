@@ -8,6 +8,8 @@ import {
   useDecideApproval,
 } from "@agenteschat/client";
 import { approvalWhy } from "@agenteschat/client/lib/approval-origin";
+import { consultAskedKey } from "@agenteschat/client/lib/consult-group";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -62,7 +64,9 @@ export function ConsultationCard({
       ? t("mobile.chat.consult.answered", { name })
       : cs.status === "expired"
         ? t(`mobile.chat.consult.expired${gn}`, { name })
-        : t(`mobile.chat.consult.failed${gn}`, { name });
+        : cs.kind === "note"
+          ? t("chat.consultation.failedNote", { name, The: agentGrammar(t, name).The })
+          : t(`mobile.chat.consult.failed${gn}`, { name });
   return (
     <View style={[styles.box, styles.cs, surface]}>
       <Pressable
@@ -85,7 +89,7 @@ export function ConsultationCard({
       {open ? (
         <View style={styles.csBody}>
           <Text variant="caption" tone="faint" style={styles.bold}>
-            {t("mobile.chat.consult.asked", { name: asker })}
+            {t(consultAskedKey(cs), { name: asker })}
           </Text>
           <Text variant="small" tone="muted">
             {cs.question}

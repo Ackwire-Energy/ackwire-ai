@@ -1,5 +1,7 @@
 import { and, asc, type Database, desc, eq, gte, inArray, isNotNull, isNull, schema, sql } from "@agenteschat/db";
 import { type AgentStatusView, lineInEnglish, loadAgentStatuses } from "./agent-status";
+import { currentHandles } from "./agents";
+import { type AiStatusDeps, agentAiStates } from "./ai-status";
 import type { AgentAppearance } from "./appearance";
 import { canTalkTo, talksToAgents } from "./audience";
 import { agentBrowserStatus } from "./browser/status";
@@ -187,6 +189,28 @@ export async function archivedAgentsPrompt(db: Database, orgId: string, texts: s
 }
 
 /**
+ * "# Renamed agents": the old handles (`currentHandles`) that what a run reads still names (a routine's brief, its
+ * notes, the conversation), each with the handle its agent has now, so the run asks and mentions it by that one.
+ * Empty when it names none.
+ */
+export async function renamedAgentsPrompt(db: Database, orgId: string, texts: string[]): Promise<string> {
+  const named = [...new Set(texts.flatMap((t) => parseMentionHandles(t)))];
+  const now = await currentHandles(db, orgId, named);
+  const renamed = named.flatMap((h, i) => (now[i] && now[i] !== h ? [`@${h} is @${now[i]}`] : []));
+  if (renamed.length === 0) return "";
+  return `# Renamed agents\nSome text here names agents by a handle they had before: ${renamed.join(", ")}. It is the same agent: ask and mention it by the handle it has now.`;
+}
+
+/** The org's other agents the person behind a run can talk to, `skip` left out: who "# Your team" lists. */
+export const teammatesFor = (
+  team: Teammate[],
+  selfId: string,
+  requester: string | null,
+  skip: Set<string>,
+  talks = true,
+) => team.filter((a) => a.id !== selfId && !skip.has(a.id) && canTalkTo(a, requester, talks));
+
+/**
  * "# Your team" for the system prompt: the other agents the person
  * behind the run can talk to, one short line each, so an agent knows who
  * exists even in a DM. Details stay behind `find_agent`. Agents already
@@ -200,13 +224,13 @@ export function teamPrompt(
   /** Whether the requester's roles let them talk to agents (`talksToAgents`). */
   talks = true,
 ) {
-  const others = team.filter((a) => a.id !== selfId && !skip.has(a.id) && canTalkTo(a, requester, talks));
+  const others = teammatesFor(team, selfId, requester, skip, talks);
   if (others.length === 0) return "";
   const lines =
     others.length > TEAM_IN_PROMPT
       ? `${others.length} other agents work in this organization.`
       : `Other agents in this organization: ${others.map((a) => `@${a.handle}${a.role ? ` (${a.role})` : ""}`).join(", ")}.`;
-  return `# Your team\n${lines} Use \`${FIND_AGENT_TOOL}\` to see who knows or can do something and what each one can do; ask one with \`ask_agent\` when you need its help for the task, instead of saying you can't or sending the person to it (its answer reaches you as a message; you carry on meanwhile), or let one know something with \`tell_agent\`.`;
+  return `# Your team\n${lines} Use \`${FIND_AGENT_TOOL}\` to see who knows or can do something and what each one can do. When you need another agent's answer for the task, ask it with \`ask_agent\`; to hand one work, use \`tell_agent\`, giving the whole job to the agent that owns it with everything it needs. Do this instead of saying you can't or sending the person to it. Either way the call returns at once and what comes of it reaches you here by itself.`;
 }
 
 const words = (s: string) =>
@@ -291,12 +315,55 @@ export function createFindAgentToolSource(deps: { machines?: Pick<MachineCaller,
   return { name: "team", tools: async () => [tool] };
 }
 
-/** " (busy: Revisando o PR #12)" after an agent's name in `find_agent`; its line is its own words. */
-function presenceNote(s: AgentStatusView | undefined) {
-  if (!s) return "";
+/** "busy, on heavy work: Revisando o PR #12": what an agent is doing, its line in its own words. */
+function presenceWords(s: AgentStatusView) {
   const what = { online: "online", busy: "busy, on heavy work", away: "away", offline: "paused" }[s.presence];
   const line = s.status ? lineInEnglish(s.status) : null;
-  return ` (${what}${line ? `: ${line.replace(/[()\n]/g, " ")}` : ""})`;
+  return `${what}${line ? `: ${line.replace(/[()\n]/g, " ")}` : ""}`;
+}
+
+/** " (busy, on heavy work: Revisando o PR #12)" after an agent's name in `find_agent`. */
+function presenceNote(s: AgentStatusView | undefined) {
+  return s ? ` (${presenceWords(s)})` : "";
+}
+
+/**
+ * "# Your teammates now": the live state of the agents a run's context lists ("Where you are", "# Your team"), in
+ * that order: no AI yet, its computer away, paused, or else that it answers when called (busy with what, if so). Idle
+ * isn't a state here: a mention or `ask_agent` wakes an idle agent at once (`find_agent` says its presence). It
+ * outweighs older messages (a "no AI connected" card stays in the history after the agent gets one). Empty when none
+ * of them is left.
+ */
+export async function teammatesNowPrompt(
+  deps: Omit<AiStatusDeps, "db"> & { db: Database },
+  orgId: string,
+  listed: { id: string; handle: string }[],
+): Promise<string> {
+  const ids = listed.map((a) => a.id);
+  if (ids.length === 0) return "";
+  const [ai, presence] = await Promise.all([
+    agentAiStates(deps, orgId, ids),
+    loadAgentStatuses(deps.db, orgId, new Date(), ids),
+  ]);
+  const presenceOf = new Map(presence.map((s) => [s.agentId, s]));
+  const lines = listed.flatMap((a) => {
+    const s = presenceOf.get(a.id);
+    if (!s) return [];
+    const state = ai.get(a.id)?.state;
+    const now =
+      state === "no_ai"
+        ? "no AI connected yet"
+        : state === "waiting"
+          ? "its computer is away for now"
+          : s.presence === "offline"
+            ? "paused"
+            : s.presence === "busy"
+              ? `${presenceWords(s)} (answers when called)`
+              : "has an AI, answers when called";
+    return [`- @${a.handle}: ${now}`];
+  });
+  if (lines.length === 0) return "";
+  return `# Your teammates now\n${lines.join("\n")}\nThis is how they are now: it outweighs what older messages here say about them (a "no AI connected" card stays in the history after the agent gets one).`;
 }
 
 /** Consultations shown on the team screen: the last day. */

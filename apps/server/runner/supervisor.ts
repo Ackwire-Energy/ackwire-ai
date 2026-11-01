@@ -148,6 +148,18 @@ export type WorkerDesktopUse = "desktop" | "browser";
 /** Browser requests that may start the agent's Chrome, whose answers say what they waited on (protocol 27). */
 const BROWSER_SETUP_OPS: ReadonlySet<string> = new Set(["browser.act", "browser.batch", "browser.warm"]);
 
+/** The account a request's CLI signs in with: a turn's or route's, or a Claude Code or Codex task's (protocol 31). */
+function accountOf(req: MachineRequest): { kind: "claude_code" | "codex"; account: string } | null {
+  const cli =
+    req.op === "brain.turn" || req.op === "brain.route"
+      ? req.kind
+      : req.op === "task.start" && (req.executor === "claude" || req.executor === "codex")
+        ? req.executor
+        : null;
+  if (cli === null || !("account" in req) || typeof req.account !== "string" || !req.account) return null;
+  return { kind: cli === "codex" ? "codex" : "claude_code", account: req.account };
+}
+
 /** What a request the server sent may use its agent's desktop for; null when it may not. */
 function desktopUseOf(req: MachineRequest): WorkerDesktopUse | null {
   if (DESKTOP_USE_OPS.has(req.op)) return "desktop";
@@ -375,11 +387,11 @@ export class Supervisor {
     const cold = BROWSER_SETUP_OPS.has(req.op) && this.workers.get(String(req.agent.id))?.ready !== true;
     const w = this.entry(this.opts.user(req.agent));
     let grant: AccountGrant | null = null;
-    // Its turn gets the account root keeps with it, or reads the account's folder as the agent's user; a folder it
-    // can't have is `account_missing` there.
-    if ((req.op === "brain.turn" || req.op === "brain.route") && typeof req.account === "string" && req.account) {
-      const kind = req.kind === "codex" ? "codex" : "claude_code";
-      const account = req.account;
+    // Its turn, route or Claude Code/Codex task gets the account root keeps with it, or reads the account's folder
+    // as the agent's user; a folder it can't have is `account_missing` there.
+    const signIn = accountOf(req);
+    if (signIn) {
+      const { kind, account } = signIn;
       const failed = (err: unknown) =>
         this.opts.log(
           `[${w.user.user}] couldn't hand it its account: ${err instanceof Error ? err.message : String(err)}`,

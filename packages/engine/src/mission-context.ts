@@ -50,6 +50,10 @@ export async function actsInMission(db: Executor, mission: Pick<RunMission, "id"
   return p?.role === "decide";
 }
 
+/** What a run that doesn't act for the mission (`runActsForMission`) is told when it tries to make it act. */
+export const NOT_FOR_MISSION =
+  "Only the mission's owner or someone who can decide can make the mission act. Tell the person; the owner can accept their suggestion.";
+
 /**
  * A run may do the mission's work (its tools, tasks on its computer, cancel
  * its tasks) when the person behind it is the owner or decides, or when the
