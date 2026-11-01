@@ -357,10 +357,10 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
       { metric: "noiseCostNanoUsd", today: 3_104_000_000, average: 2_410_000_000 },
     ],
     topStalls: [
-      { name: "Codevale", count: 61 },
-      { name: "Florim", count: 13 },
+      { name: "Acme", count: 61 },
+      { name: "Lumen", count: 13 },
     ],
-    topNoise: [{ name: "Codevale", count: 12, costNanoUsd: 3_104_000_000 }],
+    topNoise: [{ name: "Acme", count: 12, costNanoUsd: 3_104_000_000 }],
     url: APP,
   },
   /** A quiet day: nobody stalled and nothing ran for nothing. */
