@@ -1,3 +1,4 @@
+import { grantedTo, sharedFolderOf } from "@agenteschat/adapters";
 import {
   and,
   asc,
@@ -739,7 +740,13 @@ export async function buildRunContext(
       : []),
     ...(briefing ? await briefing.then((text) => (text ? [{ text }] : [])) : []),
     ...(issueBrief ? [{ text: issueBrief }] : []),
-    ...(machineAccess ? await machineAccess.then((a) => (a ? [{ text: machineAccessText(a) }] : [])) : []),
+    ...(machineAccess
+      ? await machineAccess.then((a) =>
+          a
+            ? [{ text: machineAccessText(a) }, ...(a.shared ? [{ text: sharedFolderText(a.name, a.shared) }] : [])]
+            : [],
+        )
+      : []),
     // A routine's background run (ADR 0053 §4): its routine and what people said where it reports.
     ...(routine ? [{ text: routine.block }, { text: routine.deliverToView }] : []),
     // Per turn from here on: a computer brain reads these in "# This turn" (`thisTurnText`).
@@ -1364,14 +1371,16 @@ export function attachedLine(m: Pick<Message, "authorUserId" | "meta">): string 
 /** What the agent's computer allows it (protocol 10); null when it doesn't say (an older runner) or is gone. */
 async function machineAccessOf(db: Database, orgId: string, agentId: string, machineId: string) {
   const [m] = await db
-    .select({ name: schema.machines.name, access: schema.machines.access })
+    .select({ name: schema.machines.name, access: schema.machines.access, executors: schema.machines.executors })
     .from(schema.machines)
     .where(and(eq(schema.machines.orgId, orgId), eq(schema.machines.id, machineId), isNull(schema.machines.deletedAt)));
   if (!m?.access) return null;
+  const shared = sharedFolderOf(m.access);
   return {
     name: m.name,
-    folders: m.access.folders.filter((f) => f.agents.includes(agentId)).map((f) => f.path),
+    folders: m.access.folders.filter((f) => f.path !== shared && grantedTo(f, agentId)).map((f) => f.path),
     tools: m.access.tools,
+    shared: shared ? { dir: shared, system: m.executors?.mode === "system" } : null,
   };
 }
 
@@ -1399,6 +1408,29 @@ export function machineAccessText(a: {
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+/**
+ * The computer's shared folder (ADR 0115): every agent there reads and writes it, so what one fetched the others
+ * needn't fetch again. Agents look there first and leave there what others will need, tools in `bin/` included.
+ */
+export function sharedFolderText(computer: string, shared: { dir: string; system: boolean }) {
+  const { dir, system } = shared;
+  return [
+    `# Shared folder on "${computer}"`,
+    `${dir} is shared by every agent on that computer${system ? " (also ~/shared in your home there)" : ""}.`,
+    "- Before downloading or cloning anything big (a repository, a dataset, a model, a toolchain), look there first; when it's there, use it.",
+    `- Put there what other agents will need too. A command-line tool others will use goes in ${dir}/bin${system ? " (on your PATH there)" : ""}, installed once for everyone and without root, not in your own folder.`,
+    ...(system
+      ? [
+          `- To move something of yours there, copy it and then delete your copy (mv keeps it private to you), or afterwards run chgrp -R --reference=${dir} and chmod -R g+rwX on it.`,
+        ]
+      : []),
+    `- Clone or download into it under a lock, so two agents never write the same thing at once: flock ${dir}/.lock git clone …`,
+    "- Never put credentials there: no .env files, tokens, keys, passwords or sign-in folders.",
+    "- Read a script someone left there before you run it.",
+    "- Check the free space with df -h before putting more than 1 GB there.",
+  ].join("\n");
 }
 
 /** The text the model reads for a folder request's outcome (`meta.machineAccess`); null for other messages. */

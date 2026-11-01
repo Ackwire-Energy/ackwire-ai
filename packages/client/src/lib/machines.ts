@@ -90,6 +90,13 @@ export const MACHINE_TOOLS: MachineToolName[] = ["claude", "codex", "commands"];
 export const foldersOfAgent = (access: MachineAccess | null | undefined, agentId: string): MachineFolderGrant[] =>
   (access?.folders ?? []).filter((f) => f.agents.includes(agentId));
 
+/** Agents of the grant every agent on the computer has (`ALL_AGENTS` in the machine protocol). */
+const ALL_AGENTS = "*";
+
+/** The computer's shared folder (ADR 0115): its folder granted to every agent; null when its runner has none. */
+export const sharedFolderOf = (access: MachineAccess | null | undefined): string | null =>
+  access?.folders.find((f) => f.agents.includes(ALL_AGENTS))?.path ?? null;
+
 /** Paused now: `until` absent or still ahead. */
 export function isPaused(m: Pick<Machine, "paused">, now = Date.now()): boolean {
   const p = m.paused;

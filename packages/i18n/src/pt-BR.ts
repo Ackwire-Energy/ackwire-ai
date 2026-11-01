@@ -8807,6 +8807,14 @@ export const ptBR = {
       agentFolders: "Usa {{folders}} e a própria pasta",
       agentOwnFolder: "Só a própria pasta",
     },
+    shared: {
+      title: "Pasta compartilhada",
+      text: "Todos os agentes daqui leem e escrevem nela. O que um baixa ou instala na pasta bin, os outros usam.",
+      size: "{{size}} nela",
+      free: "{{free}} livres no disco",
+      measuring: "Tamanho ainda não medido",
+      diskFullNotice: "O disco de {{name}} está quase cheio",
+    },
     access: {
       folders: "Pastas liberadas",
       ownFolder: "Pasta de cada agente",

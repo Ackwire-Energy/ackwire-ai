@@ -146,6 +146,9 @@ function control(
   return { input, out, done, request, data, events, sockets, connect };
 }
 
+/** The shared folder's grant (ADR 0115): `<workspace>/shared` for every agent, never in config.json. A new object each call. */
+const sharedGrant = () => ({ path: expect.stringMatching(/[\\/]shared$/), agents: ["*"] });
+
 const stored = (home: string) => JSON.parse(readFileSync(configPath(home), "utf8")) as Record<string, unknown>;
 
 test("hello comes first; an unpaired runner answers status; unknown requests are bad_request; stdin closing ends it", async () => {
@@ -183,7 +186,7 @@ test("paired: status and hello carry pause and access; pause/resume persist, go 
     protocol: MACHINE_PROTOCOL_VERSION,
     exec: false,
     paused: { paused: false },
-    access: { folders: [], tools: { claude: false, codex: false, commands: false } },
+    access: { folders: [sharedGrant()], tools: { claude: false, codex: false, commands: false } },
     // Protocol 22: how big this computer is.
     size: { cpus: expect.any(Number), memoryGb: expect.any(Number), diskGb: expect.any(Number) },
   });
@@ -361,9 +364,11 @@ test("access requests: pending until the person answers on the machine; the answ
     decision: "granted",
     scope: "agent",
   });
-  expect(answered.access.folders).toEqual([{ path: folder, agents: [AGENT.id] }]);
+  expect(answered.access.folders).toEqual([{ path: folder, agents: [AGENT.id] }, sharedGrant()]);
   expect((stored(home).access as { folders: unknown[] }).folders).toEqual([{ path: folder, agents: [AGENT.id] }]);
-  expect(s.of("access.changed").at(-1)).toMatchObject({ access: { folders: [{ path: folder, agents: [AGENT.id] }] } });
+  expect(s.of("access.changed").at(-1)).toMatchObject({
+    access: { folders: [{ path: folder, agents: [AGENT.id] }, sharedGrant()] },
+  });
   expect(s.of("access.decided")).toEqual([
     { type: "access.decided", requestId: "req-00000001", decision: "granted", scope: "agent" },
   ]);
@@ -414,7 +419,7 @@ test("access requests: pending until the person answers on the machine; the answ
   await waitFor(() => s.sent.some((f) => f.id === "r1"));
   expect(s.sent.find((f) => f.id === "r1")).toMatchObject({ ok: true });
   expect((stored(home).access as { folders: { path: string }[] }).folders.map((f) => f.path)).toEqual([other]);
-  expect(s.of("access.changed").at(-1)).toMatchObject({ access: { folders: [{ path: other }] } });
+  expect(s.of("access.changed").at(-1)).toMatchObject({ access: { folders: [{ path: other }, sharedGrant()] } });
   // Terminal mode would print the command; the app gets the event instead (both kept in sync).
   expect(lines.some((l) => l.includes(`agentes-runner folders allow ${other} --agent dev`))).toBe(true);
 });
@@ -433,12 +438,19 @@ test("folders, tools and settings from the app: system folders refused, everythi
     error: { code: "invalid_path" },
   });
   expect(await c.data({ type: "folders.add", path: folder, agents: [AGENT.id] })).toMatchObject({
-    folders: [{ path: folder, agents: [AGENT.id] }],
+    folders: [{ path: folder, agents: [AGENT.id] }, sharedGrant()],
   });
   expect(await c.data({ type: "folders.setAgents", path: folder, agents: [] })).toMatchObject({
-    folders: [{ path: folder, agents: [] }],
+    folders: [{ path: folder, agents: [] }, sharedGrant()],
   });
-  expect(await c.data({ type: "folders.remove", path: folder })).toMatchObject({ folders: [] });
+  const left = await c.data<{ folders: { path: string }[] }>({ type: "folders.remove", path: folder });
+  const sharedPath = left.folders[0]?.path ?? "";
+  expect(left).toMatchObject({ folders: [sharedGrant()] });
+  // The shared folder can't be removed: it is every agent's, and never in config.json.
+  expect(await c.data({ type: "folders.remove", path: sharedPath })).toMatchObject({
+    folders: [sharedGrant()],
+  });
+  expect(stored(home)).toMatchObject({ access: { folders: [] } });
   expect(await c.request({ type: "folders.remove", path: folder })).toMatchObject({
     ok: false,
     error: { code: "not_found" },

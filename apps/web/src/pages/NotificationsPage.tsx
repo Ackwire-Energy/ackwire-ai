@@ -178,6 +178,12 @@ export function SystemFace({ n, className = "nt-av28" }: { n: AppNotification; c
         <Icon name="plug" size={16} />
       </span>
     );
+  if (n.kind === "computer_disk_full")
+    return (
+      <span className="nt-sys" aria-hidden="true">
+        <Icon name="drive" size={16} />
+      </span>
+    );
   if (n.kind !== "org_standing") return null;
   const status = n.latest.statusTo;
   return (
@@ -232,6 +238,7 @@ function SourceChip({
   else if (
     n.kind === "machine_connected" ||
     n.kind === "computer_ready" ||
+    n.kind === "computer_disk_full" ||
     (n.kind === "browser_handoff" && s.screen === "desktop")
   )
     [icon, label] = ["computer", t("notifications.source.machine")];

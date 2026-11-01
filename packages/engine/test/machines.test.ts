@@ -18,6 +18,7 @@ import {
   grantScopes,
   listAgentSecrets,
   listMachines,
+  listNotifications,
   MACHINE_CONTROL_TOPIC,
   MachineDroppedError,
   type MachineHub,
@@ -411,6 +412,34 @@ describe("a runner that dies mid-request (brain turns never stay working)", () =
     // A pong without either keeps what the last one said; one out of bounds says nothing.
     await runner.frame({ type: "pong", at: 3, browserTraffic: { ...more, up: -5 } });
     expect((await row())?.browserTraffic).toMatchObject(more);
+  });
+
+  test("a disk past 85% tells the admins once each time it crosses; the page shows the disk and the shared folder", async () => {
+    f = await setup({ machines: true });
+    const hub = f.machineHub as MachineHub;
+    const paired = await pair();
+    const runner = fakeRunner(hub);
+    await runner.hello(paired.token);
+    const base = { loadAvg: 0.1, loadPeak: 0.5, memoryAvg: 0.3, memoryPeak: 0.4, hours: 0.2 };
+    const warnings = async () =>
+      (await listNotifications({ db: f.db }, f.owner.id, f.org.id, { limit: 50 })).items.filter(
+        (n) => n.kind === "computer_disk_full",
+      );
+    await runner.frame({ type: "pong", at: 1, load: { ...base, diskFreeGb: 40, diskUse: 0.6, sharedGb: 2.5 } });
+    expect(await warnings()).toEqual([]);
+    expect((await listMachines(f.db, f.owner.id, f.org.id))[0]?.disk).toEqual({ freeGb: 40, use: 0.6, sharedGb: 2.5 });
+
+    await runner.frame({ type: "pong", at: 2, load: { ...base, diskFreeGb: 9, diskUse: 0.91, sharedGb: 30 } });
+    await runner.frame({ type: "pong", at: 3, load: { ...base, diskFreeGb: 8, diskUse: 0.92, sharedGb: 31 } });
+    const [warned] = await warnings();
+    expect(await warnings()).toHaveLength(1);
+    expect(warned?.source).toMatchObject({ machineId: paired.machineId, label: "Build box" });
+    expect(warned?.latest).toMatchObject({ diskUse: 0.91, diskFreeGb: 9 });
+
+    // Back under the line, then over it again: a new notice.
+    await runner.frame({ type: "pong", at: 4, load: { ...base, diskFreeGb: 30, diskUse: 0.7 } });
+    await runner.frame({ type: "pong", at: 5, load: { ...base, diskFreeGb: 5, diskUse: 0.95 } });
+    expect(await warnings()).toHaveLength(2);
   });
 
   test("a tool switched on the machine holds now (exec on the row) and wakes what waited for it", async () => {

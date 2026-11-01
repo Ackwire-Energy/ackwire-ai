@@ -186,6 +186,7 @@ export const askersOf = (n: Pick<AppNotification, "count" | "latest">) => ({
 export function workspaceHeadline(n: Pick<AppNotification, "kind" | "latest">) {
   if (n.kind === "computer_ready") return "computerSetup.notification.ready" as const;
   if (n.kind === "composio_limit") return "connectors.composio.limitNotice" as const;
+  if (n.kind === "computer_disk_full") return "machines.shared.diskFullNotice" as const;
   if (n.kind !== "org_standing") return null;
   const to = n.latest.statusTo;
   const billing = billingHoldOf({ state: "hold", reason: n.latest.billingHold ?? null });
@@ -291,7 +292,7 @@ export function openTarget(n: AppNotification): OpenTarget | null {
   }
   // The month's Composio calls are counted in Uso.
   if (n.kind === "composio_limit") return { to: "/org/$orgId/settings/$section", params: { section: "usage" } };
-  if (n.kind === "machine_connected" || n.kind === "computer_ready")
+  if (n.kind === "machine_connected" || n.kind === "computer_ready" || n.kind === "computer_disk_full")
     return s.machineId
       ? { to: "/org/$orgId/settings/computers/$machineId", params: { machineId: s.machineId } }
       : { to: "/org/$orgId/settings/$section", params: { section: "computers" } };

@@ -30,6 +30,7 @@ import {
   MACHINE_TOOLS,
   machineTitle,
   platformOf,
+  sharedFolderOf,
 } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
@@ -717,12 +718,14 @@ function ReduceDialog({ machine, reduce, onClose }: { machine: Machine; reduce: 
 
 /** Pastas liberadas: each folder, which agents use it, and (for the owner) Remover. */
 function FoldersCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r: Reduce) => void }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const agents = useAgents(org.id);
   const nameOf = (id: string) =>
     agents.data?.find((a) => a.id === id)?.name ?? m.agents.find((a) => a.id === id)?.name ?? "";
   const access = m.access;
+  const shared = sharedFolderOf(access);
+  const gb = (n: number) => formatBytes(i18n.language, n * 2 ** 30);
   // This very Mac with an app too old to report: update it from here (agentes for Mac, ADR 0036).
   const here = useIsThisMac(org.id, m.id);
   return (
@@ -753,61 +756,83 @@ function FoldersCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r:
               <span className="small muted">{t("machines.access.ownFolderText")}</span>
             </span>
           </div>
+          {shared && (
+            <div className="ac-list__row machine-folder" data-shared-folder>
+              <span className="machine-row__icon">
+                <Icon name="members" />
+              </span>
+              <span className="list-col" style={{ flex: "1 1 220px", minWidth: 0 }}>
+                <span className="machine-folder__name">{t("machines.shared.title")}</span>
+                <span className="small muted">{t("machines.shared.text")}</span>
+                <code className="machine-folder__path">{shared}</code>
+                <span className="small muted">
+                  {[
+                    m.disk?.sharedGb != null
+                      ? t("machines.shared.size", { size: gb(m.disk.sharedGb) })
+                      : t("machines.shared.measuring"),
+                    ...(m.disk ? [t("machines.shared.free", { free: gb(m.disk.freeGb) })] : []),
+                  ].join(" · ")}
+                </span>
+              </span>
+            </div>
+          )}
           {access.folders.length === 0 && (
             <div className="ac-list__row machine-folder">
               <span className="small muted">{t("machines.access.noFolders")}</span>
             </div>
           )}
-          {access.folders.map((f) => {
-            const folder = folderName(f.path);
-            const label = t("machines.access.folderActions", { folder });
-            return (
-              <div key={f.path} className="ac-list__row machine-folder" data-folder={f.path}>
-                <span className="machine-row__icon">
-                  <Icon name="drive" />
-                </span>
-                <span className="list-col" style={{ flex: "1 1 220px", minWidth: 0 }}>
-                  <span className="machine-folder__name">{folder}</span>
-                  <code className="machine-folder__path">{f.path}</code>
-                </span>
-                {f.agents.length > 0 ? (
-                  <span className="machine-folder__agents">
-                    <span className="ac-visually-hidden">
-                      {t("machines.access.usedBy", { folder })}: {joinNames(f.agents.map(nameOf), t("newAgent.and"))}
-                    </span>
-                    <AvatarStack aria-hidden="true">
-                      {f.agents.map((id) => (
-                        <AgentAvatar key={id} agentId={id} size="sm" name={nameOf(id)} />
-                      ))}
-                    </AvatarStack>
+          {access.folders
+            .filter((f) => f.path !== shared)
+            .map((f) => {
+              const folder = folderName(f.path);
+              const label = t("machines.access.folderActions", { folder });
+              return (
+                <div key={f.path} className="ac-list__row machine-folder" data-folder={f.path}>
+                  <span className="machine-row__icon">
+                    <Icon name="drive" />
                   </span>
-                ) : (
-                  <span className="small muted">{t("machines.access.nobody")}</span>
-                )}
-                {canReduceAccess(m) && (
-                  <Menu
-                    align="end"
-                    label={label}
-                    trigger={<Button size="sm" variant="ghost" iconOnly icon="more" aria-label={label} />}
-                  >
-                    <MenuItem icon="trash" danger onSelect={() => onReduce({ kind: "folder", path: f.path })}>
-                      {t("machines.access.removeAll")}
-                    </MenuItem>
-                    {f.agents.length > 0 && <MenuSeparator />}
-                    {f.agents.map((id) => (
-                      <MenuItem
-                        key={id}
-                        icon="close"
-                        onSelect={() => onReduce({ kind: "folder", path: f.path, agent: { id, name: nameOf(id) } })}
-                      >
-                        {t("machines.access.removeAgent", { name: nameOf(id) })}
+                  <span className="list-col" style={{ flex: "1 1 220px", minWidth: 0 }}>
+                    <span className="machine-folder__name">{folder}</span>
+                    <code className="machine-folder__path">{f.path}</code>
+                  </span>
+                  {f.agents.length > 0 ? (
+                    <span className="machine-folder__agents">
+                      <span className="ac-visually-hidden">
+                        {t("machines.access.usedBy", { folder })}: {joinNames(f.agents.map(nameOf), t("newAgent.and"))}
+                      </span>
+                      <AvatarStack aria-hidden="true">
+                        {f.agents.map((id) => (
+                          <AgentAvatar key={id} agentId={id} size="sm" name={nameOf(id)} />
+                        ))}
+                      </AvatarStack>
+                    </span>
+                  ) : (
+                    <span className="small muted">{t("machines.access.nobody")}</span>
+                  )}
+                  {canReduceAccess(m) && (
+                    <Menu
+                      align="end"
+                      label={label}
+                      trigger={<Button size="sm" variant="ghost" iconOnly icon="more" aria-label={label} />}
+                    >
+                      <MenuItem icon="trash" danger onSelect={() => onReduce({ kind: "folder", path: f.path })}>
+                        {t("machines.access.removeAll")}
                       </MenuItem>
-                    ))}
-                  </Menu>
-                )}
-              </div>
-            );
-          })}
+                      {f.agents.length > 0 && <MenuSeparator />}
+                      {f.agents.map((id) => (
+                        <MenuItem
+                          key={id}
+                          icon="close"
+                          onSelect={() => onReduce({ kind: "folder", path: f.path, agent: { id, name: nameOf(id) } })}
+                        >
+                          {t("machines.access.removeAgent", { name: nameOf(id) })}
+                        </MenuItem>
+                      ))}
+                    </Menu>
+                  )}
+                </div>
+              );
+            })}
         </List>
       )}
     </Card>

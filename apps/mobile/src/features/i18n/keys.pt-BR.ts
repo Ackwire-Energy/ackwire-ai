@@ -799,6 +799,8 @@ export const featureKeysPtBR = {
       composio_limit_other: "As chamadas da Composio deste mês acabaram",
       browser_profile_request_one: "{{names}} pede mais um perfil do navegador",
       browser_profile_request_other: "{{names}} pedem mais um perfil do navegador",
+      computer_disk_full_one: "O disco de um computador está quase cheio",
+      computer_disk_full_other: "O disco de um computador está quase cheio",
     },
     markRead: "Marcar como lida",
     markUnread: "Marcar como não lida",

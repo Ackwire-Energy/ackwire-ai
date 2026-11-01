@@ -14,6 +14,7 @@ import {
   runSync,
   systemdBooted,
 } from "./service";
+import { joinShared, SHARED_LINK, type SharedSpec } from "./shared-folder";
 
 /**
  * System mode: every agent works as its own OS user, `ag-<first 8 of its id>`,
@@ -149,7 +150,17 @@ export class AgentUsers {
   /** Agents already checked by this process, with their user's comment. */
   private readonly ready = new Map<string, { user: AgentUser; comment: string }>();
 
-  constructor(private readonly opts: { home: string; range: [number, number]; run?: RunCommand; etc?: string }) {}
+  constructor(
+    private readonly opts: {
+      home: string;
+      range: [number, number];
+      run?: RunCommand;
+      etc?: string;
+      /** The computer's shared folder (ADR 0115), which every agent's user joins. */
+      shared?: Required<SharedSpec>;
+      log?: (line: string) => void;
+    },
+  ) {}
 
   /**
    * The agent's user, made on its first request. After that, a request only
@@ -191,7 +202,14 @@ export class AgentUsers {
       this.run("usermod", ["--comment", name, user.user]);
       comment = name;
     }
-    if (!known) denySchedulers(user.user, this.opts.etc);
+    if (!known) {
+      denySchedulers(user.user, this.opts.etc);
+      // A computer that can't share still serves the agent, in its own folders.
+      const { shared } = this.opts;
+      for (const p of shared ? joinShared(user.user, agentHome(user.user), shared, this.opts.run) : []) {
+        this.opts.log?.(`${user.user} can't use the shared folder: ${p}`);
+      }
+    }
     this.ready.set(agent.id, { user, comment });
     return user;
   }
@@ -275,7 +293,8 @@ export function systemLauncher(u: AgentUser, systemd = systemdBooted()): Launche
     USER: u.user,
     LOGNAME: u.user,
     SHELL: AGENT_SHELL,
-    PATH: AGENT_PATH,
+    // Last, so a tool an agent put in the shared `bin/` never stands in for the computer's own.
+    PATH: `${AGENT_PATH}:${home}/${SHARED_LINK}/bin`,
     LANG: "C.UTF-8",
     ANDROID_ADB_SERVER_PORT: String(adbServerPort(u.uid)),
   };

@@ -1024,6 +1024,33 @@ export async function notifyMachineConnected(
   });
 }
 
+/** The share of a computer's workspace disk in use past which its admins hear it (ADR 0115). */
+export const DISK_WARN_USE = 0.85;
+
+/**
+ * A computer's disk passed `DISK_WARN_USE` (ADR 0115): who configures the workspace hears it, once each time it
+ * crosses (the caller compares with the last report), since agents filling the shared folder fail together.
+ */
+export async function notifyComputerDiskFull(
+  deps: NotificationDeps,
+  machine: { id: string; orgId: string; name: string },
+  disk: { diskUse: number; diskFreeGb?: number },
+  at: Date,
+) {
+  await notify(deps, {
+    orgId: machine.orgId,
+    userIds: await adminsOf(deps, machine.orgId, "configure"),
+    kind: "computer_disk_full",
+    groupKey: `computer_disk_full:${machine.id}:${at.getTime()}`,
+    source: { machineId: machine.id, label: machine.name },
+    latest: {
+      title: machine.name,
+      diskUse: disk.diskUse,
+      ...(disk.diskFreeGb === undefined ? {} : { diskFreeGb: disk.diskFreeGb }),
+    },
+  });
+}
+
 /**
  * The workspace's own computer is ready (ADR 0056 §10): its owners hear it, since preparing it may take
  * from seconds to an approval hours later. One row each time it gets ready.

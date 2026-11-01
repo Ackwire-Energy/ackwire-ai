@@ -299,6 +299,13 @@ export interface MachineLoad {
    * runner: the server needs to know nothing new, so no protocol number.
    */
   oomKills?: number;
+  /**
+   * Free space on the workspace's disk (GB) and the share of it in use (0 to 1), and the shared folder's size (GB,
+   * measured hourly), ADR 0115. Absent from an older runner: no protocol number, as `oomKills`.
+   */
+  diskFreeGb?: number;
+  diskUse?: number;
+  sharedGb?: number;
 }
 
 /** How often a computer's load is sampled (protocol 22). */
@@ -1279,9 +1286,20 @@ export interface RunnerTools {
 export interface RunnerFolderGrant {
   /** Absolute, normalized path on the machine. */
   path: string;
-  /** Agent ids that may use it; empty = allowed on the machine but no agent uses it yet. */
+  /** Agent ids that may use it; empty = allowed on the machine but no agent uses it yet; `ALL_AGENTS`: every agent. */
   agents: string[];
 }
+
+/** The agents of the folder grant every agent on the computer has: its shared folder (ADR 0115). */
+export const ALL_AGENTS = "*";
+
+/** Whether a folder grant is for `agentId` (by its id, or for every agent). */
+export const grantedTo = (grant: Pick<RunnerFolderGrant, "agents">, agentId: string) =>
+  grant.agents.includes(agentId) || grant.agents.includes(ALL_AGENTS);
+
+/** The computer's shared folder (ADR 0115): the folder granted to every agent; null from an older runner. */
+export const sharedFolderOf = (access: Pick<RunnerAccess, "folders"> | null | undefined) =>
+  access?.folders.find((f) => f.agents.includes(ALL_AGENTS))?.path ?? null;
 
 /** What the machine allows (protocol 10). */
 export interface RunnerAccess {
@@ -2780,6 +2798,9 @@ export function parseMachineLoad(v: unknown): MachineLoad | null {
     memoryPeak: v.memoryPeak,
     hours: v.hours,
     ...(inRange(v.oomKills, [0, 1e9]) ? { oomKills: v.oomKills } : {}),
+    ...(between(v.diskFreeGb, 0, 1e6) ? { diskFreeGb: v.diskFreeGb } : {}),
+    ...(between(v.diskUse, 0, 1) ? { diskUse: v.diskUse } : {}),
+    ...(between(v.sharedGb, 0, 1e6) ? { sharedGb: v.sharedGb } : {}),
   };
 }
 

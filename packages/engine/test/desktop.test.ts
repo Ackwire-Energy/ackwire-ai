@@ -34,6 +34,7 @@ import {
   publishMachineAgentsChanged,
   reduceMachineAccess,
   setAgentComputerTarget,
+  sharedFolderText,
   startDeviceCode,
   type ToolContext,
   UNAVAILABLE_CODES,
@@ -699,6 +700,25 @@ describe("folders and tools on the machine (protocol 10)", () => {
     };
     expect(accessNotice(note, true)).toContain("Use /x now");
     expect(accessNotice({ body: "hi", meta: {} })).toBeNull();
+  });
+
+  test("the shared folder's block: look there first, share there, tools in bin, no credentials (ADR 0115)", () => {
+    const system = sharedFolderText("Build box", { dir: "/srv/agentes/shared", system: true });
+    expect(system).toStartWith('# Shared folder on "Build box"\n/srv/agentes/shared is shared by every agent');
+    expect(system).toContain("~/shared");
+    expect(system).toContain("look there first");
+    expect(system).toContain("/srv/agentes/shared/bin (on your PATH there)");
+    expect(system).toContain("mv keeps it private");
+    expect(system).toContain("chgrp -R --reference=/srv/agentes/shared");
+    expect(system).toContain("flock /srv/agentes/shared/.lock");
+    expect(system).toContain("Never put credentials there");
+    expect(system).toContain("df -h");
+    // One person's own computer: every agent is the same user, so no group, no ~/shared, no PATH.
+    const single = sharedFolderText("MacBook", { dir: "/Users/ana/agentes/shared", system: false });
+    expect(single).not.toContain("~/shared");
+    expect(single).not.toContain("chgrp");
+    expect(single).not.toContain("PATH");
+    expect(single).toContain("/Users/ana/agentes/shared/bin");
   });
 
   test("the runner's new frames are parsed and cut", () => {

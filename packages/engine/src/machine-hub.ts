@@ -61,6 +61,7 @@ import {
   publishMachineStatus,
   publishMachineUpdated,
 } from "./machines";
+import { DISK_WARN_USE, notifyComputerDiskFull } from "./notification-producers";
 import { enqueue } from "./outbox";
 import { assertCanWork, standingRefusal } from "./standing";
 
@@ -810,6 +811,17 @@ export function createMachineHub(deps: MachineHubDeps) {
     conn.lastSeenWrite = Date.now();
     const now = new Date();
     const at = now.toISOString();
+    const machineId = conn.machineId;
+    // ADR 0115: the disk just passed the warning line (the last report was under it, or said nothing).
+    const crossed =
+      load?.diskUse !== undefined && load.diskUse >= DISK_WARN_USE
+        ? await db
+            .select({ load: machines.load, orgId: machines.orgId, name: machines.name })
+            .from(machines)
+            .where(eq(machines.id, machineId))
+            .then(([m]) => (m && !((m.load?.diskUse ?? 0) >= DISK_WARN_USE) ? m : null))
+            .catch(() => null)
+        : null;
     await db
       .update(machines)
       .set({
@@ -818,8 +830,16 @@ export function createMachineHub(deps: MachineHubDeps) {
         ...(load ? { load: { ...load, at } } : {}),
         ...(browserTraffic ? { browserTraffic: { ...browserTraffic, at } } : {}),
       })
-      .where(and(eq(machines.id, conn.machineId), eq(machines.connectedReplica, replicaId)))
+      .where(and(eq(machines.id, machineId), eq(machines.connectedReplica, replicaId)))
       .catch(() => undefined);
+    if (crossed && load?.diskUse !== undefined) {
+      await notifyComputerDiskFull(
+        { db, pubsub },
+        { id: machineId, orgId: crossed.orgId, name: crossed.name },
+        { diskUse: load.diskUse, ...(load.diskFreeGb === undefined ? {} : { diskFreeGb: load.diskFreeGb }) },
+        now,
+      ).catch((error) => deps.log?.warn("disk warning failed", { machineId, error: String(error) }));
+    }
   }
 
   function callLocal<Op extends MachineOp>(
