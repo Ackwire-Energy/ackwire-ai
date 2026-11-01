@@ -5,7 +5,6 @@ import {
   type BrowserHandoff,
   type BrowserLiveUnavailable,
   type BrowserStep,
-  handoffScreen,
   pagePoint,
   type ScreenKind,
 } from "@agenteschat/client";
@@ -18,17 +17,12 @@ import type { TFunction } from "i18next";
  */
 
 /**
- * What the card shows: waiting for someone, me in control, someone else helping, or how it ended;
- * `computer`: an open request on the agent's desktop, which the phone can't show (ADR 0058), so it is
- * never taken here.
+ * What the card shows: waiting for someone, me in control, someone else helping, or how it ended. On the agent's
+ * desktop the same states open its computer's view (ADR 0098).
  */
-export type CardState = "waiting" | "mine" | "helping" | "computer" | "done" | "failed" | "expired" | "cancelled";
+export type CardState = "waiting" | "mine" | "helping" | "done" | "failed" | "expired" | "cancelled";
 
-export function cardStateOf(
-  h: Pick<BrowserHandoff, "status" | "controllerUserId" | "screen">,
-  meId: string | null,
-): CardState {
-  if ((h.status === "pending" || h.status === "active") && handoffScreen(h) === "desktop") return "computer";
+export function cardStateOf(h: Pick<BrowserHandoff, "status" | "controllerUserId">, meId: string | null): CardState {
   if (h.status === "pending") return "waiting";
   if (h.status === "active") return h.controllerUserId && h.controllerUserId === meId ? "mine" : "helping";
   return h.status;

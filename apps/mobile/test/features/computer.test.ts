@@ -22,10 +22,8 @@ import { offersKeyNow, pollsPlan } from "../../src/features/ai/logic";
 import { pageGapKey, stepText } from "../../src/features/browser/logic";
 import {
   offersSwitch,
-  onScreen,
   phoneEntryButton,
   phoneStage,
-  screenRequest,
   setupNoticeLine,
   setupSub,
 } from "../../src/features/computer/logic";
@@ -40,7 +38,6 @@ const CLOUD_KEYS = [
   "browser.live.unavailable.offlineCloudM",
   "browser.live.closedHelpF",
   "browser.live.closedHelpM",
-  "browser.card.computer",
   "outage.titleCloud",
   "outage.a11yCloud",
   "outage.cloudSub",
@@ -65,15 +62,6 @@ describe("the agent's computer on the phone: its words by edition", () => {
     const en = await translator("en");
     expect(en(pageGapKey("offline", "F", true), { name: "Ada" })).toBe("Ada's computer isn't answering right now.");
     expect(en(pageGapKey("offline", "F", false), { name: "Ada" })).toBe("Ada's computer is offline.");
-  });
-
-  test("a screen request is helped from a laptop: 'a computer' alone would read as the agent's", async () => {
-    const t = await translator("pt-BR");
-    expect(t("mobile.browser.card.computer", { title: "Entrar no banco" })).toBe(
-      "Ajude pelo notebook: Entrar no banco",
-    );
-    const en = await translator("en");
-    expect(en("mobile.browser.card.computer", { title: "Sign in" })).toBe("Help from a laptop: Sign in");
   });
 
   test("a mission's computer on the Cloud isn't answering, never off", async () => {
@@ -188,48 +176,40 @@ const waiting = (over: Partial<AgentComputerFacts> = {}) =>
   facts({ setup: viewOf(), machine: null, desktop: null, browser: false, ...over });
 
 describe("the agent's computer full screen on the phone: what its stage shows", () => {
-  test("the page where the web shows the screen: on the phone, take control means the browser", () => {
-    expect(phoneStage(facts(), false)).toBe("page");
-    // A computer without screens (a Mac): the page too.
-    expect(phoneStage(facts({ desktop: { available: false, reason: "not_allowed" } }), false)).toBe("page");
-    // At work in another app on its screen: the phone says so, and to watch it from a laptop.
-    expect(phoneStage(facts({ working: true }), true)).toBe("otherApp");
-    // This person in the agent's browser: its page, whatever the agent did on its screen before.
-    expect(phoneStage(facts({ handoff: request({ status: "active", controllerUserId: "me" }) }), true)).toBe("page");
-    // A screen and no browser: nothing the phone can show.
-    expect(phoneStage(facts({ browser: false }), false)).toBe("laptop");
+  test("the screen where the web shows it; the page where there is none, or for a person in the browser", () => {
+    expect(phoneStage(facts())).toBe("screen");
+    expect(phoneStage(facts({ working: true }))).toBe("screen");
+    expect(phoneStage(facts({ browser: false }))).toBe("screen");
+    // A computer without screens (a Mac): the page.
+    expect(phoneStage(facts({ desktop: { available: false, reason: "not_allowed" } }))).toBe("page");
+    // This person in the agent's browser: its page, whatever else the computer serves.
+    expect(phoneStage(facts({ handoff: request({ status: "active", controllerUserId: "me" }) }))).toBe("page");
+    // A request on the screen, whoever holds it: the screen.
+    expect(
+      phoneStage(facts({ handoff: request({ screen: "desktop", status: "active", controllerUserId: "me" }) })),
+    ).toBe("screen");
   });
 
   test("held or on its way first, then why nothing shows, in the web's order", () => {
-    expect(phoneStage(waiting(), false)).toBe("preparing");
-    expect(phoneStage(waiting({ held: true }), false)).toBe("held");
-    expect(phoneStage(facts({ machine: { ...ACME, online: false } }), false)).toBe("offline");
+    expect(phoneStage(waiting())).toBe("preparing");
+    expect(phoneStage(waiting({ held: true }))).toBe("held");
+    expect(phoneStage(facts({ machine: { ...ACME, online: false } }))).toBe("offline");
     // Ready, and the agent gets it at its next hello: a moment more.
-    expect(phoneStage(facts({ machine: null, desktop: null, browser: false }), false)).toBe("joining");
-    expect(phoneStage(facts({ edition: "selfhost", machine: null, desktop: null, browser: false }), false)).toBe(
-      "noComputer",
-    );
+    expect(phoneStage(facts({ machine: null, desktop: null, browser: false }))).toBe("joining");
+    expect(phoneStage(facts({ edition: "selfhost", machine: null, desktop: null, browser: false }))).toBe("noComputer");
     const neither = { desktop: { available: false, reason: "no_desktop" }, browser: false, browserGranted: false };
-    expect(phoneStage(facts(neither), false)).toBe("noScreen");
-    expect(phoneStage(facts({ desktop: { available: false, reason: "runner_outdated" }, browser: false }), false)).toBe(
+    expect(phoneStage(facts(neither))).toBe("noScreen");
+    expect(phoneStage(facts({ desktop: { available: false, reason: "runner_outdated" }, browser: false }))).toBe(
       "unavailable",
     );
   });
 
-  test("the agent's latest step decides whether it works on its screen; the screen's steps in its words", async () => {
-    expect(onScreen([{ screen: "browser" }, { screen: "desktop" }])).toBe(true);
-    expect(onScreen([{ screen: "desktop" }, { screen: "browser" }])).toBe(false);
-    expect(onScreen([])).toBe(false);
+  test("the screen's steps in its words", async () => {
     const en = await translator("en");
     expect(stepText(en, { tool: "desktop_click", detail: null }, "desktop")).toBe("Clicked");
     expect(stepText(en, { tool: "mcp__agentes__desktop_open", detail: "Files" }, "desktop")).toBe("Opened Files");
     expect(stepText(en, { tool: "desktop_open", detail: null }, "desktop")).toBe("Opened an app");
     expect(stepText(en, { tool: "desktop_something_new", detail: null }, "desktop")).toBe("Used the screen");
-    const pt = await translator("pt-BR");
-    expect(pt("agentComputer.phone.otherApp", { name: "Ada", The: "A" })).toBe(
-      "A Ada está usando outro app na própria tela",
-    );
-    expect(pt("agentComputer.phone.fromComputer")).toBe("Para ver a tela, abra o agentes.chat num notebook");
   });
 
   test("its header says each thing once: live alone under a banner, who holds it over a page that hides", async () => {
@@ -250,23 +230,11 @@ describe("the agent's computer full screen on the phone: what its stage shows", 
 });
 
 describe("the profile's Computador entry on the phone", () => {
-  test("Help only for a request in the agent's browser; one on its screen is helped from a laptop", () => {
-    const browserAsk = entryState(facts({ handoff: request() }), NOW);
-    expect(phoneEntryButton(browserAsk)).toBe("help");
+  test("Help for a request of this person's, in the agent's browser or on its screen", () => {
+    expect(phoneEntryButton(entryState(facts({ handoff: request() }), NOW))).toBe("help");
     const screenAsk = entryState(facts({ handoff: request({ screen: "desktop" }) }), NOW);
     expect(screenAsk.kind).toBe("needsYou");
-    expect(phoneEntryButton(screenAsk)).toBe("open");
-    expect(screenRequest(request({ screen: "desktop" }), NOW)?.id).toBe("h1");
-    expect(screenRequest(request({ screen: "desktop", status: "done" }), NOW)).toBeNull();
-    expect(screenRequest(request(), NOW)).toBeNull();
-    // Only a request still waiting: not one someone already helps with, not one past its time, and never a take
-    // over, which asks nothing (its banner would read "Ajude pelo notebook: " with nothing after it).
-    const helping = request({ screen: "desktop", status: "active", controllerUserId: "ana" });
-    expect(screenRequest(helping, NOW)).toBeNull();
-    expect(screenRequest(request({ screen: "desktop" }), NOW + 5 * 60_000)).toBeNull();
-    const takeover = request({ screen: "desktop", kind: "takeover", instructions: "", status: "active" });
-    expect(screenRequest({ ...takeover, controllerUserId: "ana" }, NOW)).toBeNull();
-    expect(screenRequest({ ...takeover, status: "pending" }, NOW)).toBeNull();
+    expect(phoneEntryButton(screenAsk)).toBe("help");
     // A request for someone else, and no computer (the phone has no picker): Open.
     expect(phoneEntryButton(entryState(facts({ handoff: request({ requestedForUserId: "ana" }) }), NOW))).toBe("open");
     const none = entryState(facts({ edition: "selfhost", machine: null, desktop: null, browser: false }), NOW);
