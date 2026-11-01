@@ -788,6 +788,8 @@ export const featureKeysEn: FeatureTranslations = {
       computer_ready_other: "Your workspace's computer is ready",
       invitation_accepted_one: "{{names}} accepted your invitation",
       invitation_accepted_other: "{{names}} accepted your invitation",
+      browser_profile_request_one: "{{names}} asks for one more browser profile",
+      browser_profile_request_other: "{{names}} ask for one more browser profile",
     },
     markRead: "Mark as read",
     markUnread: "Mark as unread",

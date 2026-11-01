@@ -794,6 +794,8 @@ export const featureKeysPtBR = {
       computer_ready_other: "O computador do seu workspace está pronto",
       invitation_accepted_one: "{{names}} aceitou seu convite",
       invitation_accepted_other: "{{names}} aceitaram seu convite",
+      browser_profile_request_one: "{{names}} pede mais um perfil do navegador",
+      browser_profile_request_other: "{{names}} pedem mais um perfil do navegador",
     },
     markRead: "Marcar como lida",
     markUnread: "Marcar como não lida",
