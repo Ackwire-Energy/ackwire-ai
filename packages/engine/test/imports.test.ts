@@ -653,14 +653,18 @@ describe("agents another app knows by an id", () => {
       { model: DEFAULT_MODEL },
     );
     await updateMyProfile(f.db, f.owner.id, f.org.id, { handle: "ritarevisao" });
-    // Made by hand, so never renamed, whatever its handle looks like.
+    // Made by hand (before id-shaped handles were refused), so never renamed, whatever its handle looks like.
     const byHand = await createAgent(
       f.db,
       f.owner.id,
       f.org.id,
-      { name: "Bot", handle: "agent-75ba44fd-45b0-4b0e-9bb0-37" },
+      { name: "Bot", handle: "bot" },
       { model: DEFAULT_MODEL },
     );
+    await f.db
+      .update(schema.agents)
+      .set({ handle: "agent-75ba44fd-45b0-4b0e-9bb0-37" })
+      .where(eq(schema.agents.id, byHand.id));
     // Another workspace's handles don't count here.
     const bia = await addUser(f.db, "bia");
     const { organization: other } = await createOrganization(f.db, bia.id, { name: "Outra" });

@@ -26,7 +26,7 @@ import { useMyPerson } from "../status/hooks";
 import { MyStatusRow } from "../status/MyStatusRow";
 import { PlanMeter } from "../usage/parts";
 import { openIssuesWithMe } from "./logic";
-import { usePushSwitch, useSoundLabel } from "./PreferencePages";
+import { usePushSwitch, useSoundLabel, useStartLabel } from "./PreferencePages";
 
 /** Opens a screen over this page with the platform's push (back comes here). */
 const open = (href: string) => router.push(href as never);
@@ -73,6 +73,7 @@ export function MeScreen() {
   const themeLabel = t(`mobile.theme.${theme.preference}`);
   const sounds = useSoundChoice();
   const styleLabel = useSoundLabel();
+  const startLabel = useStartLabel();
   const en = i18n.language.startsWith("en");
   const withMe = openIssuesWithMe(issues.data, meId);
   const version = Constants.expoConfig?.version ?? "";
@@ -120,6 +121,10 @@ export function MeScreen() {
       ...(push === null ? {} : { value: push ? t("mobile.me.on") : t("mobile.me.off") }),
       href: "/me/notifications",
     },
+    // A server from before the choice sends none and can't keep one (`PUT …/me/start` answers 404).
+    ...(org.org?.start !== undefined
+      ? [{ icon: "home" as const, label: t("mobile.me.start"), value: startLabel, href: "/me/start" }]
+      : []),
     {
       icon: "sound",
       label: t("mobile.me.sounds"),

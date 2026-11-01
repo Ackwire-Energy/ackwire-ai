@@ -96,10 +96,17 @@ const cardOf = async (fx: Fixture, id: string) => {
 };
 const agentCount = async (fx: Fixture) =>
   (await fx.db.select().from(schema.agents).where(eq(schema.agents.orgId, fx.org.id))).length;
-const connect = async (fx: Fixture, connector: string, label: string) => {
+const connect = async (fx: Fixture, connector: string, label: string, toolPrefix = connector) => {
   const [row] = await fx.db
     .insert(schema.connectorConnections)
-    .values({ orgId: fx.org.id, connector, label, serverUrl: `https://${connector}.example.com/mcp`, authType: "none" })
+    .values({
+      orgId: fx.org.id,
+      connector,
+      label,
+      toolPrefix,
+      serverUrl: `https://${connector}.example.com/mcp`,
+      authType: "none",
+    })
     .returning();
   if (!row) throw new Error("no connection");
   return row;
@@ -186,6 +193,27 @@ describe("propose_agent", () => {
     await refused({ look: { color: "gold", eyes: "round" } }, "color");
     await refused({ why: "  " }, "why");
     expect(await proposals(f)).toHaveLength(0);
+  });
+
+  test("apps by name or by service: a Stripe account is 'stripe'; with two, its name says which", async () => {
+    f = await setup();
+    const acme = await connect(f, `custom:${crypto.randomUUID()}`, "Stripe (Acme)", "stripe");
+    const accessFor = async (connector: string) => {
+      const ctx = await runFor(f, f.owner.id, "cria um agente de cobrança");
+      const out = await propose(f, ctx, { ...ADA, access: [{ connector, level: "read" }] });
+      if (out.isError) return out.content;
+      const { messageId } = (out.data as { agentProposal: { messageId: string } }).agentProposal;
+      return (await cardOf(f, messageId)).params.draft.access;
+    };
+    expect(await accessFor("stripe")).toEqual([{ connectionId: acme.id, level: "read" }]);
+    const loja = await connect(f, `custom:${crypto.randomUUID()}`, "Stripe (Loja B)", "stripe_2");
+    expect(await accessFor("Stripe")).toContain(
+      '"stripe" is connected more than once: name one of "Stripe (Acme)", "Stripe (Loja B)".',
+    );
+    expect(await accessFor("stripe (loja b)")).toEqual([{ connectionId: loja.id, level: "read" }]);
+    expect(await accessFor("jira")).toContain(
+      'No connected app or mailbox "jira". Channels you can name here: #general. Connected apps: "Stripe (Acme)", "Stripe (Loja B)".',
+    );
   });
 
   test("only where someone who may create agents can open the conversation and decide it", async () => {

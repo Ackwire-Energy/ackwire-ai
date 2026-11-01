@@ -32,6 +32,88 @@
         document.documentElement.dataset.theme = t;
       } catch (e) {}
     </script>
+    <script>
+      // The app's own files didn't load while the boot sky is up (a deploy replaced them, the connection broke): one
+      // reload at most every 30 s, then a box that says so over the sky. main.tsx calls it too, for the language's
+      // file. The key mirrors STORAGE_KEYS.bootRetry (src/lib/storage.ts), the language rule public/unavailable.html.
+      (() => {
+        const KEY = "agentes.bootRetry";
+        const reloaded = () => {
+          try {
+            if (Date.now() - Number(sessionStorage.getItem(KEY)) < 30000) return false;
+            sessionStorage.setItem(KEY, String(Date.now()));
+            // Storage that keeps nothing would reload forever.
+            if (!sessionStorage.getItem(KEY)) return false;
+          } catch {
+            return false;
+          }
+          location.reload();
+          return true;
+        };
+        const language = () => {
+          let lang = null;
+          try {
+            lang = localStorage.getItem("agentes.locale");
+          } catch {}
+          if (lang === "pt-BR" || lang === "en") return lang;
+          const cookie = /(?:^|;\s*)agentes_locale=(pt|en)(?![^;])/.exec(document.cookie);
+          if (cookie) return cookie[1] === "pt" ? "pt-BR" : "en";
+          const tags = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
+          for (const tag of tags) {
+            const t = String(tag || "").toLowerCase();
+            if (t.startsWith("pt")) return "pt-BR";
+            if (t.startsWith("en")) return "en";
+          }
+          return "pt-BR";
+        };
+        const failed = () => {
+          const boot = document.querySelector("#root > .boot");
+          if (!boot || reloaded()) return;
+          const lang = language();
+          const words =
+            lang === "en"
+              ? ["agentes.chat didn't open", "Part of the app didn't load. Check your connection, then reload.", "Reload"]
+              : ["O agentes.chat não abriu", "Uma parte do app não carregou. Confira a conexão e recarregue.", "Recarregar"];
+          document.documentElement.lang = lang;
+          const box = document.createElement("div");
+          box.className = "boot__box";
+          box.setAttribute("role", "alert");
+          const [, , button] = ["h1", "p", "button"].map((tag, i) => {
+            const el = box.appendChild(document.createElement(tag));
+            el.textContent = words[i];
+            return el;
+          });
+          button.type = "button";
+          button.addEventListener("click", () => location.reload());
+          boot.removeAttribute("aria-hidden");
+          boot.replaceChildren(box);
+          // In the desktop app's window: its cover lifts (pageReady, src/lib/desktop.ts) and a Mac drags by the top.
+          const app = window.__agentesDesktop;
+          if (!app) return;
+          if (app.platform !== "windows" && app.platform !== "linux") {
+            const strip = boot.appendChild(document.createElement("div"));
+            strip.className = "boot__strip";
+            strip.setAttribute("data-tauri-drag-region", "deep");
+          }
+          const tauri = window.__TAURI_INTERNALS__;
+          if (tauri && typeof tauri.invoke === "function") {
+            requestAnimationFrame(() =>
+              requestAnimationFrame(() => Promise.resolve(tauri.invoke("page_ready", {})).catch(() => {})),
+            );
+          }
+        };
+        window.__agentesBootFailed = failed;
+        addEventListener(
+          "error",
+          (event) => {
+            const el = event.target;
+            const url = el && (el.tagName === "SCRIPT" ? el.getAttribute("src") : el.tagName === "LINK" ? el.getAttribute("href") : null);
+            if (url && new URL(url, location.href).pathname.startsWith("/assets/")) failed();
+          },
+          true,
+        );
+      })();
+    </script>
     <style>
       /* Before the app's CSS: the theme's own colour, never white (packages/ui tokens.css --side). */
       html { background: #f6f9fd; }
@@ -44,6 +126,17 @@
       @keyframes boot-in { to { opacity: 1; } }
       @keyframes boot-breathe { 50% { transform: translateY(-3px); } }
       @media (prefers-reduced-motion: reduce) { .boot { animation-duration: 0s; } .boot img { animation: none; } }
+      /* A boot that failed (the script above): white on the sky, the primary button in white. */
+      .boot__box { display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 420px;
+        padding: 0 24px; color: #fff; text-align: center; font: 15px/1.5 Onest, "Segoe UI", system-ui, sans-serif; }
+      .boot__box h1 { margin: 0; font-size: 24px; line-height: 30px; font-weight: 700; letter-spacing: -0.03em;
+        text-wrap: balance; }
+      .boot__box p { margin: 0; color: rgba(255, 255, 255, 0.84); }
+      .boot__box button { height: 40px; margin-top: 8px; padding: 0 14px; border: 0; border-radius: 12px;
+        background: #fff; color: #151514; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+      .boot__box button:hover { opacity: 0.88; }
+      .boot__box button:focus-visible { outline: none; box-shadow: 0 0 0 2px #0a3f9c, 0 0 0 4px #fff; }
+      .boot__strip { position: fixed; inset: 0 0 auto; height: 40px; }
     </style>
   </head>
   <body>

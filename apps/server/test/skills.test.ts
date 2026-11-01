@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { zip } from "@agenteschat/engine";
-import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
+import { browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer | undefined;
 afterEach(async () => {
@@ -84,4 +84,67 @@ test("reading links is limited per person, 60 an hour, updating from a link incl
   expect(upload.status).toBe(201);
   const { id } = (await upload.json()) as { id: string };
   expect((await b(`/api/app/organizations/${orgId}/skills/${id}/reimport`, { json: {} })).status).toBe(429);
+});
+
+test("a private repository is read through the workspace's GitHub connection, never in an answer; members may not", async () => {
+  const token = "ghp_fake_connection_token";
+  const archive = zip([
+    ["acme-private-abc/skills/deploy/SKILL.md", skill("deploy")],
+    ["acme-private-abc/skills/review/SKILL.md", skill("review")],
+  ]);
+  const sent: { url: string; auth: string | null }[] = [];
+  // github.com hides acme/private; the API's zipball answers only the connection's token.
+  const http = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input instanceof Request ? input.url : input);
+    const auth = new Headers(init?.headers).get("authorization");
+    sent.push({ url, auth });
+    if (url === "https://api.github.com/repos/acme/private/zipball" && auth === `Bearer ${token}`) {
+      return new Response(null, {
+        status: 302,
+        headers: { location: "https://codeload.github.com/acme/private/z?t=1" },
+      });
+    }
+    if (url === "https://codeload.github.com/acme/private/z?t=1") return new Response(archive);
+    return new Response("404: Not Found", { status: 404 });
+  }) as typeof fetch;
+  t = await createTestServer({ http, resolveHost: async () => ["140.82.112.3"] });
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const url = "https://github.com/acme/private";
+  const importing = (b: typeof owner, json: unknown) => b(`/api/app/organizations/${orgId}/skills/import`, { json });
+
+  const hidden = await importing(owner, { url });
+  expect(hidden.status).toBe(400);
+  expect(await hidden.json()).toMatchObject({
+    error: { code: "github.repo_missing", params: { repo: "acme/private", connection: "none", app: false } },
+  });
+
+  const connected = await owner(`/api/app/organizations/${orgId}/connectors`, {
+    json: { connector: "github", apiKey: token },
+  });
+  expect(connected.status).toBe(201);
+  const listed = await importing(owner, { url, list: true });
+  expect(listed.status).toBe(200);
+  const body = await listed.text();
+  expect(JSON.parse(body)).toEqual({
+    choices: [
+      { path: "skills/deploy", name: "deploy", description: "Use for deploy." },
+      { path: "skills/review", name: "review", description: "Use for review." },
+    ],
+    via: "github",
+  });
+  expect(body).not.toContain("ghp_");
+  const picked = await importing(owner, { url, paths: ["skills/deploy"] });
+  expect(picked.status).toBe(201);
+  const installed = await picked.text();
+  expect(JSON.parse(installed)).toMatchObject({ skills: [{ name: "deploy", sourceVia: "github" }] });
+  expect(installed).not.toContain("ghp_");
+  expect(sent.filter((s) => s.auth && !s.url.startsWith("https://api.github.com/"))).toEqual([]);
+
+  // Installing skills is what lets a person read through the workspace's GitHub.
+  const member = await joinByInvitation(t, owner, orgId, "member@example.com");
+  const before = sent.length;
+  expect((await importing(member, { url, list: true })).status).toBe(403);
+  expect(sent.length).toBe(before);
 });

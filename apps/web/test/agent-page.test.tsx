@@ -553,6 +553,43 @@ describe("agent page: inline editing and the save bar", () => {
     expect(input.scopes.map((g) => g.scope)).toEqual(["memory:write"]);
   });
 
+  test("Conectores: two accounts of one service are two rows, each by its name and with its own level", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const connect = async () => {
+      const res = await api.customConnectors.connect(ORG_ID, {
+        serverUrl: "https://oauth.zapier.example/mcp",
+        label: "Zapier",
+        returnTo: "/",
+      });
+      if (res.status !== "connected") throw new Error("expected connected");
+      await api.customConnectors.saveTools(ORG_ID, res.server.id, {
+        label: res.server.label,
+        tools: res.server.tools.map((x) => ({
+          name: x.name,
+          access: x.sensitive ? "approval" : "read",
+          label: x.name,
+        })),
+      });
+      return res.server.id;
+    };
+    const first = await connect();
+    const second = await connect();
+    await api.access.set(ORG_ID, ADA_ID, {
+      all: false,
+      connectors: { [first]: true },
+      scopes: [{ connectionId: second, scope: `custom:${second}:read` }],
+      tools: { allow: [], deny: [] },
+    });
+    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=access`, { api });
+    await settle(8);
+    const level = (name: string) =>
+      within(screen().getByRole("radiogroup", { name: `Nível em ${name}` }))
+        .getAllByRole("radio")
+        .find((r) => r.getAttribute("aria-checked") === "true")?.textContent;
+    expect([level("Zapier"), level("Zapier 2")]).toEqual(["Ler e escrever", "Ler"]);
+  });
+
   test("⌘S saves; an invalid budget blocks it and says why", async () => {
     const { state } = await go("?tab=settings&sec=budget");
     const budget = screen().getByRole("textbox", { name: /^Orçamento mensal/ });

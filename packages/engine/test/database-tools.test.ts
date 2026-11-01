@@ -78,6 +78,12 @@ test("tools follow the agent's access; never part of 'all tools' nor replaced by
   expect(await names()).toEqual([]);
   await giveDatabase(d, c.id);
   expect(await names()).toEqual(["pg_producao_describe_table", "pg_producao_list_tables", "pg_producao_query"]);
+  // Counted as Postgres by our own verbs, never the connection's label (ADR 0103).
+  expect((await d.tools.list(ctx)).flatMap((t) => (t.name.startsWith("pg_") ? [t.connector] : []))).toEqual([
+    { key: "postgres", via: "native", tool: "describe_table" },
+    { key: "postgres", via: "native", tool: "list_tables" },
+    { key: "postgres", via: "native", tool: "query" },
+  ]);
   const query = (await d.tools.list(ctx)).find((t) => t.name === "pg_producao_query");
   expect(query && isSensitive(query)).toBe(false);
   expect(query?.connectorLabel).toBe("Produção");

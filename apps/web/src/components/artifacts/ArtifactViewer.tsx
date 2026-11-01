@@ -1,6 +1,7 @@
 import type { ArtifactAuthor, ArtifactContent, ArtifactDetail } from "@agenteschat/client";
 import { useArtifact, useArtifactVersions, useChannels, useSaveArtifact } from "@agenteschat/client";
 import { KIND_ICON } from "@agenteschat/client/lib/artifacts";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { fileIcon } from "@agenteschat/client/lib/files";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { Alert, Button, Chip, DetailsDialog, Field, Icon, Input, Menu, MenuItem, Textarea } from "@agenteschat/ui";
@@ -252,7 +253,7 @@ function Versions({ artifact, onVersion }: { artifact: ArtifactDetail; onVersion
 }
 
 function Editor({ artifact, onDone }: { artifact: ArtifactDetail; onDone: (saved: boolean) => void }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
   const save = useSaveArtifact(org.id, artifact.id);
@@ -274,7 +275,7 @@ function Editor({ artifact, onDone }: { artifact: ArtifactDetail; onDone: (saved
             },
             onError: (error) => {
               if ((error as { status?: number }).status === 409) setStale(true);
-              else toast.show(error.message, "error");
+              else toast.show(errorText(t, error, i18n.language), "error");
             },
           },
         );

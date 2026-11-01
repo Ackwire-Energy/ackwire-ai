@@ -3,7 +3,7 @@ import type { LegalDocument } from "./types";
 export const privacyEn: LegalDocument = {
   title: "Privacy Policy",
   summary: "What we collect, what agents send where, who can see your workspace, and the rights you have.",
-  updated: "2026-10-30",
+  updated: "2026-10-31",
   sections: [
     {
       id: "overview",
@@ -27,7 +27,7 @@ export const privacyEn: LegalDocument = {
             "**Account data:** name, email address, password hash, profile photo, language and time zone. If you sign in with Google, Apple or GitHub, we receive your name, email address and the account identifier from that provider, never its password.",
             "**Workspace data:** the workspace's name, members, roles and invitations.",
             "**Billing data:** for a workspace with an agentes.chat plan, the name, email address, billing address and tax ID of the person who pays, the plan, and its invoices and payments. Payments are processed by Stripe, which handles the card details: they never reach us.",
-            "**Usage and log data:** IP addresses, browser and device, sign-in sessions, security events, API requests, and the record of each model call (model, tokens and cost, with the workspace and agent it belongs to), which we keep to enforce budgets and show usage.",
+            "**Usage and log data:** IP addresses, browser and device, sign-in sessions, security events, API requests, and the record of each model call (model, tokens and cost, with the workspace and agent it belongs to), which we keep to enforce budgets and show usage. When something breaks, we record the error, without message content, to fix it.",
             "**Devices:** for the phone app, the push notification token of each device you sign in on; for connected computers and the Mac app, the computer's name, operating system and app version.",
             "**Waiting list:** the email address and language you give us on agentes.chat, and whether you confirmed it.",
             "**Site analytics:** on agentes.chat (the public site, not the workspace), the pages viewed, the referring site, the device type and an approximate location derived from the IP address, collected with Himetrica.",
@@ -63,7 +63,7 @@ export const privacyEn: LegalDocument = {
             "**Deciding who replies.** A routing model reads a new message, the names and roles of the workspace's agents, and recent conversation to decide which agent, if any, should reply. It runs at TypeSafe or, as a fallback, at the workspace's model provider. Routing never grants an agent any permission.",
             "**Memory.** Agents keep memory from conversations (summaries, facts and lessons) so they improve over time. Some judgments about memory (whether something is worth keeping, or conflicts with what an agent already knows) are made by TypeSafe. Memory can be seen and removed in the agent's page, and it is deleted with the workspace.",
             "**Search.** To find related messages and documents, text may be turned into vectors (embeddings) by Voyage AI.",
-            "**Connectors.** When the workspace connects a service (such as GitHub, Google, Linear, Sentry, an email inbox or any MCP server), we store its access tokens encrypted and read or write that service only within the scopes the workspace gave each agent. The connected service processes that data under its own terms. Connections to Gmail and Outlook inboxes go through Composio.",
+            "**Connectors.** When the workspace connects a service (such as GitHub, Google, Linear, Sentry, an email inbox or any MCP server), we store its access tokens encrypted and read or write that service only within the scopes the workspace gave each agent. The connected service processes that data under its own terms. Connections to Gmail and Outlook inboxes, and to Google Drive, Google Calendar, Google Sheets, Google Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox and Square, go through Composio, which processes what agents read and write there.",
             "**Databases.** Database connections are read-only; credentials are stored encrypted and each query is checked before it runs.",
             "**Connected computers.** When someone connects a computer, agents can run commands and use a browser there, within the folders and permissions set on that computer. The live view of an agent's browser passes through Cloudflare and through our servers' memory, and is not recorded; a summary of the steps the agent took (such as addresses visited and actions) is kept with its work so the team can see what it did.",
             "**The workspace's computer.** On agentes.chat Cloud, a workspace's agents work on a computer we run for that workspace, hosted by Contabo in the European Union. We count how much data each agent's browser, AI tools and other programs send and receive there, per day. The computer is wiped after the workspace's agentes.chat plan ends, as the Terms of Use describe.",

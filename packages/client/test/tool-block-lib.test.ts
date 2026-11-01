@@ -208,6 +208,8 @@ describe("the block's lines", () => {
     expect(toolHint("create_issue", { kind: "creatingIssue" })).toBeNull();
     expect(toolHint("github_search_issues", { kind: "consulting", app: "GitHub" })).toBe("search issues");
     expect(toolHint("mcp__linear__get_project", { kind: "consulting", app: "Linear" })).toBe("get project");
+    // A later account's number goes with its app.
+    expect(toolHint("stripe_2_list_customers", { kind: "consulting", app: "Stripe (Loja B)" })).toBe("list customers");
   });
 
   test("phrases: working, done, failed, stopped", () => {
@@ -495,6 +497,13 @@ describe("each call's service and its logo", () => {
     expect(logo(googleDrive)).toMatchObject({
       def: { iconUrl: "/connectors/googledrive.svg" },
     });
+  });
+
+  test("another account of a service: its mark by the account's name, its tools' hint without the number", () => {
+    // A run saved before calls carried their service: only the account's name says which service it is.
+    const [second] = lines(toolItemsLive([call("1", "linear_2_list_issues", { connector: "Linear (Acme) 2" })]));
+    expect(logo(second)).toMatchObject({ kind: "service", def: { iconUrl: "/connectors/linear.svg" } });
+    expect(second?.hint).toBe("list issues");
   });
 
   test("the block's logos: each service once, in order of first use, four at most", () => {

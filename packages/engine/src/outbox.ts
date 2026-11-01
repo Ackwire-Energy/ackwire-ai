@@ -95,12 +95,14 @@ const backgroundJobSql = sql`(${outbox.kind} = 'routine.run' or (${outbox.kind} 
 const orphanedRunJobSql = sql`(${outbox.kind} = 'agent_run.execute' and exists (
   select 1 from ${schema.agentRuns} r where r.id = ${runOfJob} and r.status = 'running'))`;
 
+const LEASE_LOST = "lease expired on the final attempt";
+
 /**
  * Claims due jobs: pending ones whose time has come, and processing ones whose lease expired (except a dead
  * worker's agent run, `orphanedRunJobSql`). Other work first, then background jobs up to `maxBackground` in the
  * slots left.
  */
-export async function claimJobs(db: Database, options: ClaimOptions): Promise<ClaimedJob[]> {
+export async function claimJobs(db: Database, options: ProcessOptions): Promise<ClaimedJob[]> {
   const now = options.now ?? new Date();
   const batch = options.batchSize ?? 20;
   const foreground = await claimWhere(db, options, now, sql`not ${backgroundJobSql}`, batch);
@@ -111,14 +113,16 @@ export async function claimJobs(db: Database, options: ClaimOptions): Promise<Cl
     ...background.map((job) => ({ ...job, background: true })),
   ];
 
-  // A job whose lease expired after its final attempt is not retried again.
+  // A job whose lease expired after its final attempt is not retried again. Its worker died or hung on it, which
+  // nothing else sees: it is told as a failed job.
   const runnable: ClaimedJob[] = [];
   for (const job of claimed) {
     if (job.attempts > job.maxAttempts) {
       await db
         .update(outbox)
-        .set({ status: "failed", lockedUntil: null, lastError: job.lastError ?? "lease expired on the final attempt" })
+        .set({ status: "failed", lockedUntil: null, lastError: job.lastError ?? LEASE_LOST })
         .where(eq(outbox.id, job.id));
+      options.onError?.(job, new Error(LEASE_LOST), "failed");
     } else {
       runnable.push(job);
       options.onTiming?.("queue_wait_ms", Math.max(0, now.getTime() - job.nextAttemptAt.getTime()), {
@@ -203,7 +207,7 @@ const handedBack = (now: Date) => ({
 });
 
 /** A handler that stopped because its worker is shutting down throws an error with `handback: true`. */
-const isHandback = (error: unknown) => (error as { handback?: unknown } | null)?.handback === true;
+export const isHandback = (error: unknown) => (error as { handback?: unknown } | null)?.handback === true;
 
 /**
  * Records a failure: schedules a retry with backoff, or marks the job `failed`. A handback (`isHandback`) is no
@@ -268,6 +272,8 @@ export interface JobContext {
   finalAttempt: boolean;
   /** Whether this claim still holds the job: a stale-run recovery may have taken it since. */
   owned?(): Promise<boolean>;
+  /** The handler gave up on `error` without throwing (it ended its work as failed): told like a failed job. */
+  failed?(error: unknown): void;
 }
 
 export type JobHandler = (job: OutboxJob, ctx: JobContext) => Promise<void>;
@@ -302,7 +308,8 @@ async function runJob(db: Database, handlers: JobHandlers, job: OutboxJob, optio
   };
   try {
     if (!handler) throw new PermanentJobError(`no handler for job kind ${job.kind}`);
-    await handler(job, { finalAttempt: job.attempts >= job.maxAttempts, owned });
+    const failed = (error: unknown) => options.onError?.(job, error, "failed");
+    await handler(job, { finalAttempt: job.attempts >= job.maxAttempts, owned, failed });
     await completeJob(db, job, options.now);
   } catch (error) {
     // The database may be what failed: the failure can't be recorded then, and the lease brings the job back.

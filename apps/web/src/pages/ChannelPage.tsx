@@ -176,7 +176,7 @@ import { useApi } from "@/api/context";
 import { tokenizeBody } from "@/chat/body";
 import { ChatMedia } from "@/chat/ChatMedia";
 import { MessageBody } from "@/chat/MessageBody";
-import { browserOffline } from "@/chat/offline";
+import { useBrowserOffline } from "@/chat/offline";
 import { readingLanding } from "@/chat/reading";
 import {
   blockRowByRun,
@@ -2711,17 +2711,7 @@ function useAfter(ms: number, on: boolean) {
  */
 function ConnectionBanner({ status }: { status: ConnectionStatus }) {
   const { t } = useTranslation();
-  const [offline, setOffline] = useState(browserOffline);
-  useEffect(() => {
-    const on = () => setOffline(false);
-    const off = () => setOffline(true);
-    window.addEventListener("online", on);
-    window.addEventListener("offline", off);
-    return () => {
-      window.removeEventListener("online", on);
-      window.removeEventListener("offline", off);
-    };
-  }, []);
+  const offline = useBrowserOffline();
   const reconnecting = status === "reconnecting";
   const [longReconnect, setLongReconnect] = useState(false);
   useEffect(() => {
@@ -3864,9 +3854,7 @@ function ChannelDetails({
           setSaved(true);
         },
         onError: (e) =>
-          setNameError(
-            e instanceof ApiError && e.status === 409 ? t("channel.nameTaken", { name }) : (e as Error).message,
-          ),
+          setNameError(e instanceof ApiError && e.status === 409 ? t("channel.nameTaken", { name }) : errorText(t, e)),
       },
     );
   };
@@ -3883,7 +3871,7 @@ function ChannelDetails({
       { channelId: channel.id, categoryId },
       {
         onSuccess: () => setSaved(true),
-        onError: (e) => toast.show((e as Error).message, "error"),
+        onError: (e) => toast.show(errorText(t, e), "error"),
       },
     );
   const archiveIt = () =>
@@ -3900,7 +3888,7 @@ function ChannelDetails({
             }),
         });
       },
-      onError: (e) => toast.show((e as Error).message, "error"),
+      onError: (e) => toast.show(errorText(t, e), "error"),
     });
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: keys.roster(org.id, channel.id) });

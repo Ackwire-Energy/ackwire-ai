@@ -469,6 +469,10 @@ export async function invokeWithChip(
             ? promptEnd(outcome.output)
             : { failed: outcome.output.isError === true },
       );
+      // An action approved ahead went out (or couldn't): its cards, Aprovações and its routine's page show it.
+      if (outcome.type === "result" && outcome.ran && deps.pubsub) {
+        await publishApproval({ db: deps.db, pubsub: deps.pubsub }, outcome.ran, "approval.decided").catch(() => {});
+      }
       return outcome;
     },
     async (error: unknown) => {

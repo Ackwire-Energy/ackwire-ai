@@ -4,7 +4,7 @@ import * as AppleAuthentication from "expo-apple-authentication";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Platform, View } from "react-native";
-import { earlyAccessRequests, socialRefusalText } from "@/features/auth/human-check";
+import { earlyAccessRequests, socialRefusalText, socialReturnText } from "@/features/auth/human-check";
 import { authClient } from "@/lib/auth";
 import { readValueSync, writeValue } from "@/lib/storage";
 import { Button } from "../Button";
@@ -78,8 +78,14 @@ export function SocialButtons({
     setBusy(true);
     rememberSignIn(provider);
     try {
-      const res = await authClient().signIn.social(requests.browser(provider, callbackURL));
-      if (res.error) onError(socialRefusalText(t, res.error, emails));
+      // A refusal comes back to the app too, so the browser sheet closes on it.
+      const res = await authClient().signIn.social({
+        ...requests.browser(provider, callbackURL),
+        errorCallbackURL: "/",
+      });
+      const signedIn = !res.error && Boolean((await authClient().getSession()).data);
+      const said = socialReturnText(t, res, signedIn, emails);
+      if (said) onError(said);
       else onSignedIn?.();
     } catch {
       onError(t("mobile.auth.errors.network"));

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { KeyWrapper } from "@agenteschat/adapters";
-import { and, asc, type Database, type Executor, eq, isNull, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, isNull, lt, or, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "../audit";
 import { caches } from "../cache";
 import { openSecret, randomToken, sealSecret, sha256 } from "../crypto";
@@ -9,13 +9,97 @@ import type { ResolveHost } from "../net-guard";
 import { requirePermission } from "../organizations";
 import { CONNECTOR_ALL } from "../tools/scopes";
 import { CONNECTOR_CATALOG, type ConnectorDefinition } from "./catalog";
-import { beginMcpOAuth, storeCustomConnection } from "./custom";
-import { clientCredentials, getOAuthClient, type McpOAuthDeps, probeMcpServer } from "./oauth-mcp";
+import { type ComposioConnectors, completeComposioOAuth, forgetComposioAccount } from "./composio";
+import { beginMcpOAuth, isCustom, storeCustomConnection } from "./custom";
+import { offersCatalog } from "./listing";
+import type { McpConnect } from "./mcp";
+import { clientAuth, getOAuthClient, type McpOAuthDeps, probeMcpServer } from "./oauth-mcp";
 import { oauthReturnTo } from "./oauth-return";
+import { presetForServer } from "./presets";
 
 const { connectorConnections, oauthStates, agentScopes, agents, approvalRules } = schema;
 
 export type ConnectorConnection = typeof connectorConnections.$inferSelect;
+
+/** What connecting did: a new account, a new sign-in for one ("Reconectar"), or the same account again. */
+export type ConnectOutcome = "connected" | "reconnected" | "same_account";
+
+/** A label as tool names start with it: `Stripe` → `stripe`, `Ads Brasil!` → `ads_brasil`. */
+export const toolPrefixOf = (label: string) =>
+  label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "")
+    .slice(0, 24) || "mcp";
+
+/** The service a connection's tools are named after: its prefix without a later account's number (`stripe_2`). */
+export const prefixService = (toolPrefix: string) => toolPrefix.replace(/_\d+$/, "");
+
+/**
+ * What a connection's tool names start with. A row the previous version stored while this one deployed has none:
+ * its tools keep the names that version gave them, a catalog connector's id or a server's label as a slug.
+ */
+export const toolPrefixOfConnection = (c: Pick<ConnectorConnection, "connector" | "label" | "toolPrefix">) =>
+  c.toolPrefix ?? (isCustom(c) ? toolPrefixOf(c.label) : c.connector);
+
+const activeOf = (orgId: string) => and(eq(connectorConnections.orgId, orgId), isNull(connectorConnections.revokedAt));
+
+/**
+ * The first of `base`, `base_2`, `base_3`… that no live connection of the workspace starts its tools with. The id of a
+ * catalog connector this server offers is kept for it (`own`: that connector's own connection), so tool names never
+ * collide; one it doesn't offer (Linear without its OAuth app) is free for the one-click server standing in for it.
+ */
+export async function freeToolPrefix(tx: Executor, orgId: string, base: string, oauthApps?: OAuthApps, own?: string) {
+  const rows = await tx
+    .select({
+      connector: connectorConnections.connector,
+      label: connectorConnections.label,
+      toolPrefix: connectorConnections.toolPrefix,
+    })
+    .from(connectorConnections)
+    .where(activeOf(orgId));
+  const kept = Object.keys(CONNECTOR_CATALOG).filter((id) => id !== own && offersCatalog(id, oauthApps));
+  const taken = new Set([...rows.map(toolPrefixOfConnection), ...kept]);
+  if (!taken.has(base)) return base;
+  let n = 2;
+  while (taken.has(`${base}_${n}`)) n++;
+  return `${base}_${n}`;
+}
+
+async function labelsTaken(tx: Executor, orgId: string, exceptId?: string) {
+  const rows = await tx
+    .select({ id: connectorConnections.id, label: connectorConnections.label })
+    .from(connectorConnections)
+    .where(activeOf(orgId));
+  return new Set(rows.filter((r) => r.id !== exceptId).map((r) => r.label.toLowerCase()));
+}
+
+/** `base`, else `base 2`, `base 3`…: a name no other live connection of the workspace has. */
+export async function freeLabel(tx: Executor, orgId: string, base: string) {
+  const taken = await labelsTaken(tx, orgId);
+  if (!taken.has(base.toLowerCase())) return base;
+  let n = 2;
+  while (taken.has(`${base} ${n}`.toLowerCase())) n++;
+  return `${base} ${n}`;
+}
+
+/** A connection's name: 1 to 80 characters, and no other live connection of the workspace has it (409). */
+export async function checkLabel(tx: Executor, orgId: string, label: string, connectionId: string) {
+  const name = label.trim();
+  if (name.length < 1 || name.length > 80) {
+    throw new ValidationError("The name must have 1 to 80 characters", "connector.label_invalid");
+  }
+  if ((await labelsTaken(tx, orgId, connectionId)).has(name.toLowerCase())) {
+    throw new ConflictError("Another connector already has this name", "connector.label_taken");
+  }
+  return name;
+}
+
+/** The headers a sign-in or a key opens the server with. */
+export function bearerHeaders(secret: ConnectionSecret): Record<string, string> {
+  const token = secret.apiKey ?? secret.accessToken;
+  return token ? { authorization: `Bearer ${token}` } : {};
+}
 
 /**
  * A new connection starts at "Ler e escrever" (`connector:*`) for every agent: agents get the basics and people take
@@ -76,6 +160,12 @@ export interface ConnectorDeps {
   /** DNS for the SSRF guard (tests: fake). */
   resolveHost?: ResolveHost;
   now?: () => Date;
+  /** How to open MCP sessions (tests: in-process servers): the account a sign-in reached is asked with it. */
+  connect?: McpConnect;
+  /** Services through Composio (ADR 0107): null without `COMPOSIO_API_KEY`. */
+  composio?: ComposioConnectors | null;
+  /** Between reads of a Composio account still finishing its sign-in (tests: 0). */
+  composioPollMs?: number;
 }
 
 const aadFor = (orgId: string, id: string) => `connector-connection|${orgId}|${id}`;
@@ -129,8 +219,9 @@ async function storeConnection(
     tokenExpiresAt?: Date | null;
     accountLabel?: string | null;
     oauthClientId?: string | null;
+    resource?: string | null;
   },
-): Promise<ConnectorConnection> {
+): Promise<{ connection: ConnectorConnection; outcome: ConnectOutcome }> {
   const def = connectorDefinition(input.connector);
   const wrapper = deps.keyWrappers[0];
   if (!wrapper) throw new Error("no key wrapper");
@@ -155,7 +246,10 @@ async function storeConnection(
         id,
         orgId: input.orgId,
         connector: input.connector,
-        label: input.label?.trim() || def.label,
+        label: previous?.label ?? (await freeLabel(tx, input.orgId, input.label?.trim() || def.label)),
+        toolPrefix: previous
+          ? toolPrefixOfConnection(previous)
+          : await freeToolPrefix(tx, input.orgId, def.id, deps.oauthApps, def.id),
         serverUrl: input.serverUrl,
         authType: input.authType,
         secretCiphertext: sealed?.ciphertext ?? null,
@@ -164,6 +258,7 @@ async function storeConnection(
         tokenExpiresAt: input.tokenExpiresAt ?? null,
         accountLabel: input.accountLabel ?? null,
         oauthClientId: input.oauthClientId ?? null,
+        resource: input.resource ?? null,
         createdByUserId: input.actorId,
       })
       .returning();
@@ -184,7 +279,7 @@ async function storeConnection(
     if (!previous) await grantToEveryAgent(tx, input.orgId, input.actorId, row);
     caches.connections.delete(`${input.orgId}:active`);
     caches.scopes.deletePrefix(`${input.orgId}:`);
-    return row;
+    return { connection: row, outcome: previous ? "reconnected" : "connected" };
   });
 }
 
@@ -193,14 +288,14 @@ export async function createApiKeyConnection(
   deps: ConnectorDeps,
   actorId: string,
   orgId: string,
-  input: { connector: string; apiKey?: string; serverUrl?: string; label?: string },
+  input: { connector: string; apiKey?: string; label?: string },
 ) {
   await requirePermission(deps.db, actorId, orgId, "manage_connectors");
   const def = connectorDefinition(input.connector);
-  const serverUrl = checkServerUrl(input.serverUrl ?? def.serverUrl ?? "");
+  const serverUrl = checkServerUrl(def.serverUrl);
   const apiKey = input.apiKey?.trim();
   if (apiKey !== undefined && apiKey.length < 8) throw new ValidationError("apiKey looks too short");
-  return storeConnection(deps, {
+  const { connection } = await storeConnection(deps, {
     orgId,
     actorId,
     connector: input.connector,
@@ -209,6 +304,7 @@ export async function createApiKeyConnection(
     label: input.label,
     secret: apiKey ? { apiKey } : null,
   });
+  return connection;
 }
 
 export async function listConnections(db: Database, actorId: string, orgId: string) {
@@ -225,6 +321,39 @@ export async function listConnections(db: Database, actorId: string, orgId: stri
       ),
     )
     .orderBy(asc(connectorConnections.createdAt));
+}
+
+/**
+ * Renames a connection, any kind (admins): it's how people and agents tell two accounts of a service apart. Its tools
+ * keep their names (`tool_prefix`), so grants and denials of single tools keep applying.
+ */
+export async function renameConnection(db: Database, actorId: string, orgId: string, id: string, label: string) {
+  await requirePermission(db, actorId, orgId, "manage_connectors");
+  const row = await db.transaction(async (tx) => {
+    const [c] = await tx
+      .select()
+      .from(connectorConnections)
+      .where(and(eq(connectorConnections.id, id), activeOf(orgId)));
+    if (!c) throw new NotFoundError("Connection not found");
+    if (label.trim() === c.label) return c;
+    const name = await checkLabel(tx, orgId, label, c.id);
+    const [row] = await tx
+      .update(connectorConnections)
+      .set({ label: name, updatedAt: new Date() })
+      .where(eq(connectorConnections.id, c.id))
+      .returning();
+    if (!row) throw new Error("connection update returned nothing");
+    await recordAudit(tx, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "connector.renamed",
+      target: { type: "connector_connection", id: c.id },
+      details: { from: c.label, to: name, label: name },
+    });
+    return row;
+  });
+  caches.connections.delete(`${orgId}:active`);
+  return row;
 }
 
 /**
@@ -256,10 +385,19 @@ export async function revokeAtProvider(deps: ConnectorDeps, orgId: string, conne
   return Boolean(res && (res.status === 204 || res.status === 404));
 }
 
-/** Disconnects: the secret stays sealed but unused; agents lose the connection's scopes and its "Aprovar sempre" rules. */
-export async function revokeConnection(db: Database, actorId: string, orgId: string, connectionId: string) {
+/**
+ * Disconnects: the secret stays sealed but unused; agents lose the connection's scopes and its "Aprovar sempre" rules.
+ * A service through Composio: Composio then drops the account (`composio`), best effort, never revoking it there.
+ */
+export async function revokeConnection(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  connectionId: string,
+  composio?: Pick<ComposioConnectors, "client"> | null,
+) {
   await requirePermission(db, actorId, orgId, "manage_connectors");
-  await db.transaction(async (tx) => {
+  const gone = await db.transaction(async (tx) => {
     const [row] = await tx
       .update(connectorConnections)
       .set({ revokedAt: new Date() })
@@ -281,9 +419,11 @@ export async function revokeConnection(db: Database, actorId: string, orgId: str
       target: { type: "connector", id: connectionId },
       details: { connector: row.connector, label: row.label },
     });
+    return row;
   });
   caches.connections.delete(`${orgId}:active`);
   caches.scopes.deletePrefix(`${orgId}:`);
+  if (gone.composioAccountId && composio) await forgetComposioAccount(composio.client, gone.composioAccountId);
 }
 
 export async function activeConnections(db: Database, orgId: string) {
@@ -327,12 +467,12 @@ export async function startOAuth(
   actorId: string,
   orgId: string,
   connector: string,
-  options: { returnTo?: string; serverUrl?: string } = {},
+  options: { returnTo?: string } = {},
 ): Promise<{ authorizeUrl: string; state: string }> {
   await requirePermission(deps.db, actorId, orgId, "manage_connectors");
   const def = connectorDefinition(connector);
   const app = deps.oauthApps?.[connector];
-  const serverUrl = checkServerUrl(options.serverUrl ?? def.serverUrl ?? "");
+  const serverUrl = checkServerUrl(def.serverUrl);
   if (!def.oauth || !app) {
     // A catalog entry without a fixed OAuth app uses the server's own MCP OAuth (discovery + registration).
     const native =
@@ -371,10 +511,6 @@ export async function startOAuth(
   url.searchParams.set("state", state);
   url.searchParams.set("code_challenge", challenge);
   url.searchParams.set("code_challenge_method", "S256");
-  if (connector === "drive") {
-    url.searchParams.set("access_type", "offline");
-    url.searchParams.set("prompt", "consent");
-  }
   return { authorizeUrl: url.toString(), state };
 }
 
@@ -390,11 +526,14 @@ async function tokenRequest(
   deps: ConnectorDeps,
   url: string,
   form: Record<string, string | undefined>,
+  headers: Record<string, string> = {},
 ): Promise<TokenResponse> {
   const http = deps.http ?? fetch;
   const res = await http(url, {
     method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
+    // Well inside a refresh's 30 s lease (`refreshOnce`), which the other calls for that connection wait on.
+    signal: AbortSignal.timeout(15_000),
+    headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json", ...headers },
     body: new URLSearchParams(
       Object.entries(form).filter((e): e is [string, string] => typeof e[1] === "string"),
     ).toString(),
@@ -440,33 +579,32 @@ export async function completeOAuth(
   deps: ConnectorDeps,
   user: { id: string },
   input: { state: string; code: string },
-): Promise<{ connection: ConnectorConnection; returnTo: string }> {
+): Promise<{ connection: ConnectorConnection; returnTo: string; outcome: ConnectOutcome }> {
   const at = deps.now?.() ?? new Date();
   const [row] = await deps.db
     .select()
     .from(oauthStates)
     .where(eq(oauthStates.stateHash, sha256(input.state)));
-  if (!row || row.usedAt || row.expiresAt <= at)
-    throw new ConflictError("This authorization link is invalid or expired");
-  if (row.userId !== user.id) throw new ForbiddenError("Finish connecting with the account that started it");
+  if (row?.usedAt) throw new ConflictError("This authorization link was already used", "oauth.link_used");
+  if (!row || row.expiresAt <= at)
+    throw new ConflictError("This authorization link is invalid or expired", "oauth.link_expired");
+  if (row.userId !== user.id)
+    throw new ForbiddenError("Finish connecting with the account that started it", "oauth.other_account");
   const claimed = await deps.db
     .update(oauthStates)
     .set({ usedAt: at })
     .where(and(eq(oauthStates.id, row.id), isNull(oauthStates.usedAt)))
     .returning({ id: oauthStates.id });
-  if (claimed.length === 0) throw new ConflictError("This authorization link was already used");
+  if (claimed.length === 0) throw new ConflictError("This authorization link was already used", "oauth.link_used");
   // Still an admin? (Roles can change during the round trip.)
   await requirePermission(deps.db, user.id, row.orgId, "manage_connectors");
 
+  if (row.composioAccountId) return completeComposioOAuth(deps, user, row, input.code);
   if (row.oauthClientId) return completeMcpOAuth(deps, user, row, input.code, at);
   const def = connectorDefinition(row.connector);
   const app = deps.oauthApps?.[row.connector];
   if (!def.oauth || !app) throw new ValidationError(`OAuth for ${def.label} is not configured on this server`);
-  const verifier = await openSecret(
-    deps.keyWrappers,
-    { ciphertext: row.verifierCiphertext, wrappedDataKey: row.wrappedDataKey, kekId: row.kekId },
-    stateAad(row.orgId, row.id),
-  );
+  const verifier = await stateVerifier(deps, row);
   const token = await tokenRequest(deps, def.oauth.tokenUrl, {
     grant_type: "authorization_code",
     code: input.code,
@@ -475,17 +613,20 @@ export async function completeOAuth(
     client_secret: app.clientSecret,
     code_verifier: verifier,
   });
-  const connection = await storeConnection(deps, {
+  const stored = await storeConnection(deps, {
     orgId: row.orgId,
     actorId: user.id,
     connector: row.connector,
     authType: "oauth",
-    serverUrl: checkServerUrl(row.serverUrl ?? def.serverUrl ?? ""),
+    serverUrl: checkServerUrl(row.serverUrl ?? def.serverUrl),
     secret: { accessToken: token.access_token, refreshToken: token.refresh_token },
     tokenExpiresAt: token.expires_in ? new Date(at.getTime() + token.expires_in * 1000) : null,
   });
-  return { connection, returnTo: row.returnTo };
+  return { ...stored, returnTo: row.returnTo };
 }
+
+/** This process's refreshes in flight, by connection id: calls that need the same one share it. */
+const refreshing = new Map<string, Promise<ConnectionSecret | null>>();
 
 /**
  * Credentials to call a connection's MCP server, refreshing an OAuth token
@@ -494,57 +635,122 @@ export async function completeOAuth(
 export async function connectionHeaders(deps: ConnectorDeps, c: ConnectorConnection): Promise<Record<string, string>> {
   const secret = await openConnectionSecret(deps.keyWrappers, c);
   if (!secret) return {};
-  if (secret.apiKey) return { authorization: `Bearer ${secret.apiKey}` };
+  if (secret.apiKey) {
+    return { authorization: `${presetForServer(c.serverUrl)?.keyScheme ?? "Bearer"} ${secret.apiKey}` };
+  }
   const at = deps.now?.() ?? new Date();
-  const expiring = c.tokenExpiresAt && c.tokenExpiresAt.getTime() - at.getTime() < 60_000 && secret.refreshToken;
-  if (expiring && c.oauthClientId && secret.refreshToken) {
-    const client = await getOAuthClient(deps.db, c.oauthClientId);
-    if (client) {
-      const token = await tokenRequest(deps, client.tokenEndpoint, {
-        grant_type: "refresh_token",
-        refresh_token: secret.refreshToken,
-        ...(await clientCredentials(deps.keyWrappers, client)),
-      });
-      const next: ConnectionSecret = {
-        accessToken: token.access_token,
-        refreshToken: token.refresh_token ?? secret.refreshToken,
-      };
-      await resealTokens(deps, c, next, token.expires_in, at);
-      return { authorization: `Bearer ${next.accessToken}` };
-    }
+  if (!expiring(c, secret, at)) return bearer(secret);
+  let pending = refreshing.get(c.id);
+  if (!pending) {
+    pending = refreshOnce(deps, c.id, at).finally(() => refreshing.delete(c.id));
+    refreshing.set(c.id, pending);
   }
-  if (expiring && secret.refreshToken && !c.connector.startsWith("custom:")) {
-    const def = connectorDefinition(c.connector);
+  const fresh = await pending;
+  caches.connections.delete(`${c.orgId}:active`);
+  return fresh ? bearer(fresh) : {};
+}
+
+const expiring = (c: ConnectorConnection, secret: ConnectionSecret, at: Date) =>
+  Boolean(secret.refreshToken && c.tokenExpiresAt && c.tokenExpiresAt.getTime() - at.getTime() < 60_000);
+
+const bearer = (secret: ConnectionSecret): Record<string, string> =>
+  secret.accessToken ? { authorization: `Bearer ${secret.accessToken}` } : {};
+
+/**
+ * One refresh at a time per connection, across processes: many servers rotate the refresh token, so a second
+ * refresh with the one just spent fails and breaks the connection. The call that takes the row's lease
+ * (`refreshing_until`) asks the provider, with no transaction open while it answers (native mode's PGlite would hold
+ * every other query until then); the others read the row until its tokens change, or the lease ends and one of them
+ * takes it. Null when the row has no tokens.
+ */
+async function refreshOnce(deps: ConnectorDeps, id: string, at: Date): Promise<ConnectionSecret | null> {
+  const read = async () =>
+    (await deps.db.select().from(connectorConnections).where(eq(connectorConnections.id, id)))[0];
+  const row = await read();
+  const stored = row ? await openConnectionSecret(deps.keyWrappers, row) : null;
+  if (!row?.secretCiphertext || !stored) return null;
+  if (!expiring(row, stored, at)) return stored;
+  const old = row.secretCiphertext;
+  for (;;) {
+    const [leased] = await deps.db
+      .update(connectorConnections)
+      .set({ refreshingUntil: sql`now() + interval '30 seconds'` })
+      .where(
+        and(
+          eq(connectorConnections.id, id),
+          eq(connectorConnections.secretCiphertext, old),
+          or(isNull(connectorConnections.refreshingUntil), lt(connectorConnections.refreshingUntil, sql`now()`)),
+        ),
+      )
+      .returning({ id: connectorConnections.id });
+    if (leased) {
+      try {
+        return (await refreshTokens(deps, row, stored, at)) ?? stored;
+      } finally {
+        // Left alone (the process died), the lease ends by itself.
+        await deps.db
+          .update(connectorConnections)
+          .set({ refreshingUntil: null })
+          .where(eq(connectorConnections.id, id))
+          .catch(() => {});
+      }
+    }
+    const latest = await read();
+    if (!latest?.secretCiphertext) return null;
+    if (latest.secretCiphertext !== old) return openConnectionSecret(deps.keyWrappers, latest);
+    await Bun.sleep(200);
+  }
+}
+
+/**
+ * New tokens from the connection's registered client (MCP OAuth, for the resource it was authorized for) or our OAuth
+ * app, sealed in its row unless it got other tokens meanwhile (a reconnect). Null when neither can refresh it.
+ */
+async function refreshTokens(
+  deps: ConnectorDeps,
+  c: ConnectorConnection,
+  secret: ConnectionSecret,
+  at: Date,
+): Promise<ConnectionSecret | null> {
+  const refresh = { grant_type: "refresh_token", refresh_token: secret.refreshToken };
+  const client = c.oauthClientId ? await getOAuthClient(deps.db, c.oauthClientId) : null;
+  let token: TokenResponse;
+  if (client) {
+    const auth = await clientAuth(deps.keyWrappers, client);
+    token = await tokenRequest(
+      deps,
+      client.tokenEndpoint,
+      { ...refresh, resource: c.resource ?? undefined, ...auth.form },
+      auth.headers,
+    );
+  } else {
+    const def = c.connector.startsWith("custom:") ? null : connectorDefinition(c.connector);
     const app = deps.oauthApps?.[c.connector];
-    if (def.oauth && app) {
-      const token = await tokenRequest(deps, def.oauth.tokenUrl, {
-        grant_type: "refresh_token",
-        refresh_token: secret.refreshToken,
-        client_id: app.clientId,
-        client_secret: app.clientSecret,
-      });
-      const next: ConnectionSecret = {
-        accessToken: token.access_token,
-        refreshToken: token.refresh_token ?? secret.refreshToken,
-      };
-      const wrapper = deps.keyWrappers[0];
-      if (!wrapper) throw new Error("no key wrapper");
-      const sealed = await sealSecret(wrapper, JSON.stringify(next), aadFor(c.orgId, c.id));
-      await deps.db
-        .update(connectorConnections)
-        .set({
-          secretCiphertext: sealed.ciphertext,
-          wrappedDataKey: sealed.wrappedDataKey,
-          kekId: sealed.kekId,
-          tokenExpiresAt: token.expires_in ? new Date(at.getTime() + token.expires_in * 1000) : null,
-          updatedAt: at,
-        })
-        .where(eq(connectorConnections.id, c.id));
-      caches.connections.delete(`${c.orgId}:active`);
-      return { authorization: `Bearer ${next.accessToken}` };
-    }
+    if (!def?.oauth || !app) return null;
+    token = await tokenRequest(deps, def.oauth.tokenUrl, {
+      ...refresh,
+      client_id: app.clientId,
+      client_secret: app.clientSecret,
+    });
   }
-  return secret.accessToken ? { authorization: `Bearer ${secret.accessToken}` } : {};
+  const next: ConnectionSecret = {
+    accessToken: token.access_token,
+    refreshToken: token.refresh_token ?? secret.refreshToken,
+  };
+  const wrapper = deps.keyWrappers[0];
+  if (!wrapper) throw new Error("no key wrapper");
+  const sealed = await sealSecret(wrapper, JSON.stringify(next), aadFor(c.orgId, c.id));
+  await deps.db
+    .update(connectorConnections)
+    .set({
+      secretCiphertext: sealed.ciphertext,
+      wrappedDataKey: sealed.wrappedDataKey,
+      kekId: sealed.kekId,
+      tokenExpiresAt: token.expires_in ? new Date(at.getTime() + token.expires_in * 1000) : null,
+      updatedAt: at,
+    })
+    .where(and(eq(connectorConnections.id, c.id), eq(connectorConnections.secretCiphertext, c.secretCiphertext ?? "")));
+  return next;
 }
 
 /** Validates a connector grant: the connection is active in the org and the scope is in its catalog. */
@@ -578,27 +784,16 @@ export const connectorGrantValidator = async (
   return null;
 };
 
-async function resealTokens(
-  deps: ConnectorDeps,
-  c: ConnectorConnection,
-  next: ConnectionSecret,
-  expiresIn: number | undefined,
-  at: Date,
-) {
-  const wrapper = deps.keyWrappers[0];
-  if (!wrapper) throw new Error("no key wrapper");
-  const sealed = await sealSecret(wrapper, JSON.stringify(next), aadFor(c.orgId, c.id));
-  await deps.db
-    .update(connectorConnections)
-    .set({
-      secretCiphertext: sealed.ciphertext,
-      wrappedDataKey: sealed.wrappedDataKey,
-      kekId: sealed.kekId,
-      tokenExpiresAt: expiresIn ? new Date(at.getTime() + expiresIn * 1000) : null,
-      updatedAt: at,
-    })
-    .where(eq(connectorConnections.id, c.id));
-  caches.connections.delete(`${c.orgId}:active`);
+/** The PKCE verifier an authorization was started with (a Composio sign-in has none). */
+async function stateVerifier(deps: ConnectorDeps, row: typeof oauthStates.$inferSelect) {
+  if (!row.verifierCiphertext || !row.wrappedDataKey || !row.kekId) {
+    throw new ConflictError("This authorization link is invalid or expired");
+  }
+  return openSecret(
+    deps.keyWrappers,
+    { ciphertext: row.verifierCiphertext, wrappedDataKey: row.wrappedDataKey, kekId: row.kekId },
+    stateAad(row.orgId, row.id),
+  );
 }
 
 /** Catalog connector without a registered app: the server's own MCP OAuth, if it has one. */
@@ -630,27 +825,29 @@ async function completeMcpOAuth(
   row: typeof oauthStates.$inferSelect,
   code: string,
   at: Date,
-): Promise<{ connection: ConnectorConnection; returnTo: string }> {
+): Promise<{ connection: ConnectorConnection; returnTo: string; outcome: ConnectOutcome }> {
   const client = row.oauthClientId ? await getOAuthClient(deps.db, row.oauthClientId) : null;
   if (!client) throw new ValidationError("The authorization server registration is missing");
-  const verifier = await openSecret(
-    deps.keyWrappers,
-    { ciphertext: row.verifierCiphertext, wrappedDataKey: row.wrappedDataKey, kekId: row.kekId },
-    stateAad(row.orgId, row.id),
+  const verifier = await stateVerifier(deps, row);
+  const auth = await clientAuth(deps.keyWrappers, client);
+  const token = await tokenRequest(
+    deps,
+    client.tokenEndpoint,
+    {
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: oauthRedirectUri(deps.publicUrl),
+      code_verifier: verifier,
+      ...(row.resource ? { resource: row.resource } : {}),
+      ...auth.form,
+    },
+    auth.headers,
   );
-  const token = await tokenRequest(deps, client.tokenEndpoint, {
-    grant_type: "authorization_code",
-    code,
-    redirect_uri: oauthRedirectUri(deps.publicUrl),
-    code_verifier: verifier,
-    ...(row.resource ? { resource: row.resource } : {}),
-    ...(await clientCredentials(deps.keyWrappers, client)),
-  });
   const secret = { accessToken: token.access_token, refreshToken: token.refresh_token };
   const tokenExpiresAt = token.expires_in ? new Date(at.getTime() + token.expires_in * 1000) : null;
   const serverUrl = row.serverUrl ?? "";
   if (row.connector === "custom") {
-    const connection = await storeCustomConnection(deps, {
+    const stored = await storeCustomConnection(deps, {
       orgId: row.orgId,
       actorId: user.id,
       serverUrl,
@@ -659,10 +856,12 @@ async function completeMcpOAuth(
       secret,
       tokenExpiresAt,
       oauthClientId: client.id,
+      resource: row.resource,
+      connectionId: row.connectionId,
     });
-    return { connection, returnTo: row.returnTo };
+    return { ...stored, returnTo: row.returnTo };
   }
-  const connection = await storeConnection(deps, {
+  const stored = await storeConnection(deps, {
     orgId: row.orgId,
     actorId: user.id,
     connector: row.connector,
@@ -671,6 +870,7 @@ async function completeMcpOAuth(
     secret,
     tokenExpiresAt,
     oauthClientId: client.id,
+    resource: row.resource,
   });
-  return { connection, returnTo: row.returnTo };
+  return { ...stored, returnTo: row.returnTo };
 }

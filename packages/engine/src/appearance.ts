@@ -29,21 +29,27 @@ export const AGENT_LOOK = {
   ],
 } as const;
 
+/** A custom color picked in "Personalizar": "#rrggbb", stored lowercase in the same field as a preset name. */
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+
 export interface AgentAppearance {
-  color: (typeof AGENT_LOOK.colors)[number];
+  color: (typeof AGENT_LOOK.colors)[number] | `#${string}`;
   eyes: (typeof AGENT_LOOK.eyes)[number];
   accessory: (typeof AGENT_LOOK.accessories)[number];
 }
 
 export function validateAppearance(input: { color?: unknown; eyes?: unknown; accessory?: unknown }): AgentAppearance {
-  const pick = <T extends string>(value: unknown, allowed: readonly T[], field: string): T => {
+  const pick = <T extends string>(value: unknown, allowed: readonly T[], field: string, or = ""): T => {
     if (typeof value !== "string" || !allowed.includes(value as T)) {
-      throw new ValidationError(`appearance.${field} must be one of: ${allowed.join(", ")}`);
+      throw new ValidationError(`appearance.${field} must be one of: ${allowed.join(", ")}${or}`);
     }
     return value as T;
   };
   return {
-    color: pick(input.color, AGENT_LOOK.colors, "color"),
+    color:
+      typeof input.color === "string" && HEX_COLOR.test(input.color)
+        ? (input.color.toLowerCase() as `#${string}`)
+        : pick(input.color, AGENT_LOOK.colors, "color", " or #rrggbb"),
     eyes: pick(input.eyes, AGENT_LOOK.eyes, "eyes"),
     accessory: pick(input.accessory ?? "none", AGENT_LOOK.accessories, "accessory"),
   };

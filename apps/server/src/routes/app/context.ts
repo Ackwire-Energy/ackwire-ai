@@ -1,10 +1,10 @@
 import type { Adapters } from "@agenteschat/adapters";
 import type { Config } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
-import type { AiStatusDeps } from "@agenteschat/engine";
+import { type AiStatusDeps, ForbiddenError, type RoutineHookConfig, type RoutineHookDeps } from "@agenteschat/engine";
 import { OpenAPIHono, z } from "@hono/zod-openapi";
 import { createMiddleware } from "hono/factory";
-import { type Auth, type SessionUser, sessionUser } from "../../auth";
+import { type Auth, type SessionUser, sessionUser, signInPageUrl } from "../../auth";
 import { apiError, errorResponse, validationHook } from "../../http/errors";
 import type { Logger } from "../../logger";
 import type { AppExtras } from "./extras";
@@ -22,6 +22,20 @@ export interface AppDeps {
 }
 
 export type AppEnv = { Variables: { user: SessionUser } };
+
+/** Where webhook routines' addresses point and the secret their tokens derive from (ADR 0106). */
+export const hookConfig = (config: Config): RoutineHookConfig => ({
+  publicUrl: config.PUBLIC_URL,
+  secret: config.AGENTES_SECRET,
+});
+
+/** What a webhook routine's address needs: the keys that seal its signing secret and the rate limiter too. */
+export const routineHookDeps = (deps: AppDeps): RoutineHookDeps => ({
+  db: deps.db,
+  hooks: hookConfig(deps.config),
+  keyWrappers: [deps.adapters.keyWrapper, ...deps.adapters.legacyKeyWrappers],
+  rateLimiter: deps.adapters.rateLimiter,
+});
 
 /** Allowed browser origins for state-changing requests and WebSocket upgrades. */
 export function allowedOrigins(config: Config): Set<string> {
@@ -103,6 +117,45 @@ export function requireSession(auth: Auth) {
     await next();
   });
 }
+
+/** The sign-in page, coming back to this request's address once signed in. */
+export function signInPage(publicUrl: string, requestUrl: string) {
+  const { pathname, search } = new URL(requestUrl);
+  return signInPageUrl(publicUrl, { redirect: pathname + search });
+}
+
+/**
+ * Before `requireSession` on a browser navigation that needs a session (a provider's return from installing or
+ * connecting): with none in this browser, the sign-in page first, and the return finishes once signed in. Never the
+ * API's JSON 401 on screen.
+ */
+export function signInFirst(auth: Auth, publicUrl: string) {
+  return createMiddleware<AppEnv>(async (c, next) => {
+    const user = c.get("user") ?? (await sessionUser(auth, c.req.raw.headers));
+    if (!user) return c.redirect(signInPage(publicUrl, c.req.url), 302);
+    c.set("user", user);
+    await next();
+  });
+}
+
+/**
+ * Why a provider's return (`?connector_error=`, `?github_app_error=`) failed, as a code the app says
+ * (`oauthReturnText`): never the error's own message. `refusals`: codes that go back as they are. "failed" is
+ * anything else.
+ */
+export function oauthFailure(error: unknown, refusals: readonly string[] = []): string {
+  const code = (error as { code?: unknown } | null)?.code;
+  if (typeof code === "string" && refusals.includes(code)) return code;
+  if (code === "oauth.link_expired") return "expired";
+  if (code === "oauth.link_used") return "used";
+  if (code === "oauth.other_account") return "other_account";
+  if (code === "github_app.not_visible") return "not_visible";
+  return error instanceof ForbiddenError ? "not_allowed" : "failed";
+}
+
+/** Back to `landing` on our site (`base`, the OAuth state's `returnTo` else "/") with why the return failed. */
+export const oauthFailedUrl = (base: string, landing: string, param: string, reason: string) =>
+  `${base}${landing}${landing.includes("?") ? "&" : "?"}${param}=${encodeURIComponent(reason)}`;
 
 // ── Shared OpenAPI pieces ─────────────────────────────────────────────────────
 

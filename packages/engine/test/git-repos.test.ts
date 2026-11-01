@@ -20,6 +20,7 @@ import {
   repoInList,
   repositoriesPrompt,
   reposOfGithubCall,
+  revokeConnection,
   setAgentRepositories,
   setAgentScopes,
   type ToolContext,
@@ -396,6 +397,29 @@ describe("the organization's repositories", () => {
     // Members can read it; an installation of another organization never counts.
     const member = await addMember(f.db, f.org.id, "member");
     expect((await listOrgRepositories(deps, member.id, f.org.id)).accounts).toHaveLength(2);
+  });
+
+  test("a GitHub connection made, replaced or removed shows at once, the minute's cache notwithstanding", async () => {
+    f = await setup();
+    const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const auth = new Headers(init?.headers).get("authorization");
+      if (!String(input).startsWith(`${API}/user/repos`)) return new Response("unexpected", { status: 500 });
+      return Response.json(auth === "Bearer ghp_second_token" ? [repo("walt/new")] : [repo("walt/notes")]);
+    }) as typeof globalThis.fetch;
+    const deps = { db: f.db, connectors: depsOf(f), app: null, github: { apiUrl: API, fetch } };
+    const names = async () => {
+      const listing = await listOrgRepositories(deps, f.owner.id, f.org.id);
+      return [listing.connected, listing.accounts.flatMap((a) => a.repositories.map((r) => r.name))];
+    };
+    expect(await names()).toEqual([false, []]);
+    const connect = (apiKey: string) =>
+      createApiKeyConnection(depsOf(f), f.owner.id, f.org.id, { connector: "github", apiKey });
+    await connect("ghp_first_token");
+    expect(await names()).toEqual([true, ["notes"]]);
+    const second = await connect("ghp_second_token");
+    expect(await names()).toEqual([true, ["new"]]);
+    await revokeConnection(f.db, f.owner.id, f.org.id, second.id);
+    expect(await names()).toEqual([false, []]);
   });
 
   test("no GitHub: not connected, nothing listed", async () => {

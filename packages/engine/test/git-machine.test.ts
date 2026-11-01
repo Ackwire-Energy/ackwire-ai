@@ -222,7 +222,16 @@ describe("git on a connected machine through the proxy (ADR 0024 addendum)", () 
       pubsub: f.pubsub,
     });
     const ctx = await runCtx();
-    const clone = (await source.tools(ctx)).find((t) => t.name === "git_clone");
+    const tools = await source.tools(ctx);
+    // GitHub's own tools count as GitHub the native way, beside its MCP server's (ADR 0103).
+    expect(tools.map((t) => t.connector)).toEqual(
+      ["git_clone", "open_pull_request", "delete_branches", "request_branch_push"].map((tool) => ({
+        key: "github",
+        via: "native",
+        tool,
+      })),
+    );
+    const clone = tools.find((t) => t.name === "git_clone");
     expect(clone?.scope).toBe("github:git.read");
     const out = await clone?.execute({ repo: "https://github.com/acme/app.git" }, ctx);
     expect(out?.isError).toBeFalsy();

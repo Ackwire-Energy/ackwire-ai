@@ -46,8 +46,8 @@ export interface ConnectorDefinition {
   label: string;
   description: string;
   category: ConnectorCategory;
-  /** Default MCP endpoint (streamable HTTP). Null = the org must give one. */
-  serverUrl: string | null;
+  /** Its MCP endpoint (streamable HTTP). */
+  serverUrl: string;
   auth: ("oauth" | "api_key")[];
   oauth?: { authorizeUrl: string; tokenUrl: string; scopes: string[]; scopeSeparator?: string };
   scopes: Record<string, ConnectorScope>;
@@ -172,32 +172,6 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
       create_issue: { scope: "issues.write" },
       update_issue: { scope: "issues.write" },
       create_comment: { scope: "issues.write" },
-    },
-  },
-  drive: {
-    id: "drive",
-    category: "docs",
-    label: "Google Drive",
-    description: "Search, read and write documents (any Drive-like MCP server).",
-    serverUrl: null,
-    auth: ["oauth", "api_key"],
-    oauth: {
-      authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth",
-      tokenUrl: "https://oauth2.googleapis.com/token",
-      scopes: ["https://www.googleapis.com/auth/drive"],
-      scopeSeparator: " ",
-    },
-    scopes: {
-      "files.read": s("Read documents", "Search and read files."),
-      "files.write": s("Write documents", "Create and edit files."),
-      "files.share": s("Share documents", "Change who can see a file. Always asks for approval."),
-    },
-    tools: {
-      search_files: { scope: "files.read" },
-      read_file: { scope: "files.read" },
-      create_file: { scope: "files.write" },
-      update_file: { scope: "files.write" },
-      share_file: { scope: "files.share", sensitive: true, title: "Share {fileId} with {email}" },
     },
   },
 };

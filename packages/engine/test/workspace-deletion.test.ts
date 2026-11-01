@@ -4,6 +4,9 @@ import {
   type ComposioClient,
   createFakeComposioClient,
   createFakeMailConnector,
+  createFakeMailPoller,
+  createFakeMillionSend,
+  FAKE_MILLIONSEND_KEY,
   MailError,
   orgTopic,
   type ServerFrame,
@@ -20,11 +23,14 @@ import {
   type ConnectorDeps,
   canViewCost,
   completeOAuth,
+  composioToolkitUrl,
   consolidateItem,
   createContextToolSource,
   createInvitation,
   createJobHandlers,
+  createLocalKeyWrapper,
   createMachineHub,
+  createMillionSendAccount,
   createOrganization,
   type DeletionDeps,
   drainOutbox,
@@ -912,6 +918,116 @@ describe("the purge", () => {
     expect(await purgeWorkspace({ db: f.db, mail }, f.org.id)).toBe(true);
     expect(composio.state.deletedAccounts.sort()).toEqual(["ca_1", "ca_2"]);
     expect(composio.state.grantsKept).toEqual(["ca_1"]);
+  });
+
+  test("MillionSend stops posting its inboxes' mail: each webhook is deleted with the inbox's own key", async () => {
+    f = await setup();
+    const fake = createFakeMillionSend();
+    const mail = {
+      composio: null,
+      imap: null,
+      millionsend: {
+        client: fake.client,
+        connector: createFakeMailConnector().connector,
+        poller: createFakeMailPoller().poller,
+      },
+    };
+    const keyWrappers = [createLocalKeyWrapper(SECRET)];
+    const publicUrl = "https://agentes.example.com";
+    const inboxId = fake.state.inboxes[0]?.id ?? "";
+    const r = await createMillionSendAccount({ db: f.db, keyWrappers, mail, publicUrl }, f.owner.id, f.org.id, {
+      apiKey: FAKE_MILLIONSEND_KEY,
+      inboxId,
+    });
+    const [webhookId] = [...fake.state.webhooks.keys()];
+    expect(r.ok && r.instant).toBe(true);
+    await scheduleDeletion({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "owner");
+    await pastItsDate();
+    const connectors: ConnectorDeps = { db: f.db, keyWrappers, publicUrl };
+    expect(await purgeWorkspace({ db: f.db, mail, connectors }, f.org.id)).toBe(true);
+    expect(fake.state.deletedWebhooks).toEqual([webhookId ?? "none"]);
+  });
+
+  test("a mailbox's grant stays while a Drive of its Google account outlives the purge; the workspace's own goes first", async () => {
+    f = await setup();
+    const team = await createOrganization(f.db, f.owner.id, { name: "Team" });
+    const box = (address: string, externalAccountId: string) => ({
+      orgId: f.org.id,
+      provider: "gmail",
+      via: "composio",
+      address,
+      status: "active",
+      externalAccountId,
+    });
+    const drive = (orgId: string, accountId: string, composioAccountId: string) => {
+      const id = crypto.randomUUID();
+      return {
+        id,
+        orgId,
+        connector: `custom:${id}`,
+        label: "Google Drive",
+        toolPrefix: "google_drive",
+        serverUrl: composioToolkitUrl("googledrive"),
+        authType: "oauth",
+        composioAccountId,
+        accountId,
+      };
+    };
+    await f.db.insert(schema.mailAccounts).values([box("me@example.com", "ca_1"), box("team@example.com", "ca_2")]);
+    await f.db
+      .insert(schema.connectorConnections)
+      .values([
+        drive(f.org.id, "me@example.com", "ca_own"),
+        drive(team.organization.id, "team@example.com", "ca_team"),
+      ]);
+    const composio = createFakeComposioClient();
+    const mail = { composio: { client: composio.client, connector: createFakeMailConnector().connector }, imap: null };
+    await scheduleDeletion({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "owner");
+    await pastItsDate();
+    expect(await purgeWorkspace({ db: f.db, mail }, f.org.id)).toBe(true);
+    expect(composio.state.revokedAccounts).toEqual(["ca_1"]);
+    expect(composio.state.grantsKept.sort()).toEqual(["ca_2", "ca_own"]);
+  });
+
+  test("its connectors through Composio go away there too, disconnected ones included, never revoked (ADR 0107)", async () => {
+    f = await setup();
+    const drive = "https://backend.composio.dev/api/v3.1/toolkits/googledrive";
+    const row = (composioAccountId: string, toolPrefix: string, revokedAt: Date | null = null) => {
+      const id = crypto.randomUUID();
+      return {
+        id,
+        orgId: f.org.id,
+        connector: `custom:${id}`,
+        label: `Google Drive ${toolPrefix}`,
+        toolPrefix,
+        serverUrl: drive,
+        authType: "oauth",
+        composioAccountId,
+        revokedAt,
+      };
+    };
+    await f.db
+      .insert(schema.connectorConnections)
+      .values([row("ca_9", "google_drive"), row("ca_8", "google_drive_old", new Date())]);
+    // Its Connect Links: the one that made ca_9, and one whose account no connection holds (a sign-in that never
+    // finished, or one someone else finished on the link).
+    const link = (composioAccountId: string) => ({
+      orgId: f.org.id,
+      connector: "custom",
+      userId: f.owner.id,
+      stateHash: crypto.randomUUID(),
+      serverUrl: drive,
+      composioAccountId,
+      expiresAt: new Date(),
+    });
+    await f.db.insert(schema.oauthStates).values([link("ca_9"), link("ca_7")]);
+    const composio = createFakeComposioClient();
+    const mail = { composio: { client: composio.client, connector: createFakeMailConnector().connector }, imap: null };
+    await scheduleDeletion({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, "owner");
+    await pastItsDate();
+    expect(await purgeWorkspace({ db: f.db, mail }, f.org.id)).toBe(true);
+    expect(composio.state.deletedAccounts.sort()).toEqual(["ca_7", "ca_8", "ca_9"]);
+    expect(composio.state.revokedAccounts).toEqual([]);
   });
 
   test("a hold that commits while the purge revokes grants wins: the workspace stays, its grants revoked", async () => {

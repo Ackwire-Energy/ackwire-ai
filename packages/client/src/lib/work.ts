@@ -2,6 +2,7 @@ import type { TFunction } from "i18next";
 import type { ConnectorDef, Run, RunStep } from "../api/types";
 import type { LiveCode, LiveOutput, LiveWork } from "../realtime/streams";
 import { type Activity, type ActivityKind, activityVerb, appLabel, PERMISSION_TOOL, toolActivity } from "./activity";
+import { appConnector } from "./connected";
 import { POSTGRES_MARK } from "./databases";
 import { joinNames } from "./format";
 import { MAIL_BRANDS } from "./mail";
@@ -391,7 +392,12 @@ export function toolHint(tool: string, activity: Activity, detail?: string | nul
   if (detail?.trim()) return detail.trim() === activity.app ? null : detail.trim();
   if (activity.kind !== "consulting") return null;
   const name = tool.trim().replace(/^mcp__[^_]+(?:_[^_]+)*?__/, "");
-  if (activity.service === "mail" || activity.service === "postgres" || MAIL_BRANDS[activity.service ?? ""])
+  // The MillionSend connector shares its service name with MillionSend mailboxes: only `mail_` tools are a mailbox's.
+  if (
+    activity.service === "mail" ||
+    activity.service === "postgres" ||
+    (MAIL_BRANDS[activity.service ?? ""] && name.startsWith("mail_"))
+  )
     return toolLabel(name.replace(activity.service === "postgres" ? /^pg_[a-z0-9]+_/ : /^mail_/, "")) || null;
   const app = (activity.app ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
   const parts = name.split(/[_.:]/);
@@ -401,6 +407,8 @@ export function toolHint(tool: string, activity: Activity, detail?: string | nul
     if (!app.startsWith(next) && !(lead === 0 && next.startsWith(app))) break;
     joined = next;
   }
+  // A later account's tools carry its number after the app's name (`stripe_2_list_customers`).
+  if (lead > 0 && lead < parts.length - 1 && /^\d+$/.test(parts[lead] ?? "")) lead++;
   return toolLabel(parts.slice(lead).join("_")) || null;
 }
 
@@ -559,8 +567,6 @@ export type CallLogo =
       label: string;
     };
 
-const plain = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
-
 /** A call's logo: its service's mark (a mailbox's maker, Postgres, the catalog's by id or name), or ours. */
 export function callLogo(
   a: Activity,
@@ -569,8 +575,9 @@ export function callLogo(
   if (a.service === "mail") return { kind: "mail" };
   const mark = a.service === "postgres" ? { iconUrl: POSTGRES_MARK, brandColor: null } : MAIL_BRANDS[a.service ?? ""];
   if (mark) return { kind: "service", def: mark, image: null, label: a.app ?? "" };
-  const names = [a.service, a.kind === "consulting" ? a.app : undefined].flatMap((n) => (n ? [plain(n)] : []));
-  const def = catalog.find((d) => names.includes(plain(d.id)) || names.includes(plain(d.label))) ?? null;
+  const def =
+    (a.service ? appConnector(catalog, a.service) : null) ??
+    (a.kind === "consulting" && a.app ? appConnector(catalog, a.app) : null);
   if (!def && a.kind !== "consulting") return { kind: "own" };
   return { kind: "service", def, image: a.icon ?? null, label: a.app ?? def?.label ?? "" };
 }

@@ -805,6 +805,28 @@ html:not([data-pointer]) .ap-link:focus-visible {
   }
 }
 
+/* Approved ahead: the later run approving covers, under the action (ApprovalAsk). */
+.ap-ask__ahead {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.ap-ask__ahead > svg {
+  color: var(--ink2);
+}
+/* Approved ahead: the later run approving covers, before the action. */
+.ap-card__ahead {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.ap-card__ahead > svg {
+  color: var(--ink2);
+}
 /* Requests sharing one card in the conversation: together, with "Aprovar tudo" in their head. */
 .ap-group {
   display: flex;

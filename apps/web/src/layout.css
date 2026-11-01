@@ -965,16 +965,28 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   display: inline-flex;
   flex: none;
 }
-/* First-message suggestions in an empty conversation: neutral buttons that wrap */
+/* First-message suggestions in an empty conversation: neutral buttons that wrap, each inside the card. */
 .channel__suggestions {
   margin: 0;
   padding: 0;
   border: 0;
   min-width: 0;
+  max-width: 100%;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: var(--space-2);
+}
+/* A phone: one suggestion per row, the card's whole width. Only the sides narrow: the sky's top stays its own. */
+@media (max-width: 640px) {
+  .channel__empty .ac-empty {
+    padding-inline: 16px;
+  }
+  .channel__suggestions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 .member-row {
   display: flex;
@@ -2997,6 +3009,45 @@ html:not([data-pointer]) .skill-file--open:focus-visible {
   -webkit-line-clamp: 2;
   overflow: hidden;
 }
+/* Which of the workspace's GitHub connections read a private repository: GitHub's bare mark on the line. */
+.skill-via {
+  margin: 0;
+}
+/* The tab's own gap above the skills it read, not that and the list's margin too. */
+.skill-via + .skill-picks {
+  margin-top: 0;
+}
+.skill-via > .connector-icon,
+.ac-btn > .connector-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+.skill-via > .connector-icon > .connector-icon__mark,
+.ac-btn > .connector-icon > .connector-icon__mark {
+  width: 16px;
+  height: 16px;
+}
+/* In a button, a one-color mark takes the button's ink (a primary button's light one included). */
+.ac-btn > .connector-icon > .connector-icon__mark {
+  background: currentColor;
+}
+.skill-hidden {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* Instalar skill › Escolher do GitHub conectado: an account over its repositories, on the rows' icons. */
+.skill-repos {
+  display: flex;
+  flex-direction: column;
+}
+.skill-repos > .ac-eyebrow {
+  margin: 0;
+  padding: 12px 8px 4px;
+}
 .skill-sheet {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 240px;
@@ -3559,6 +3610,9 @@ html:not([data-pointer]) .catalog__cat:focus-visible {
 .catalog__empty {
   margin: auto 0;
 }
+.catalog__note {
+  margin: 16px 2px 0;
+}
 .catalog-feat__card,
 .catalog-tile {
   flex: 1;
@@ -4054,6 +4108,12 @@ html:not([data-pointer]) .cflow__more summary:focus-visible {
   flex-direction: column;
   gap: 8px;
   margin-top: 10px;
+}
+/* The server's own words under ours: its codes are long unbroken words. */
+.cflow__said {
+  display: block;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
 }
 .cflow__lead {
   display: flex;
@@ -7834,6 +7894,9 @@ html:not([data-pointer]) .newag__addrow:focus-visible {
 }
 .newag__swatch:hover {
   transform: translateY(-2px);
+}
+.newag__swatch--custom {
+  background: conic-gradient(from 200deg, #f58aa6, #f3c25c, #5fcf8b, #4cd0c0, #8cc3ff, #7d8bff, #ae8cf7, #f58aa6);
 }
 .newag__swatch[aria-pressed="true"] {
   box-shadow:

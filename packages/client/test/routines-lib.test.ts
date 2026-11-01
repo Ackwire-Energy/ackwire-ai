@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import type { Message } from "../src/index";
 import {
+  hookCurl,
+  isRefusedHookCall,
   isRoutineCall,
   platformZoneName,
+  routineHookUrl,
   routineReplyOf,
   timezoneLabel,
   timezoneName,
@@ -87,5 +90,34 @@ describe("time zones", () => {
     } finally {
       Intl.DateTimeFormat.prototype.formatToParts = real;
     }
+  });
+});
+
+describe("a webhook routine's address", () => {
+  const url = "https://app.agentes.test/api/hooks/abc";
+  test("only a webhook routine's, as the server gave it (null for who doesn't manage it)", () => {
+    expect(routineHookUrl({ trigger: { type: "webhook", url, signed: false } })).toBe(url);
+    expect(routineHookUrl({ trigger: { type: "webhook", url: null, signed: true } })).toBeNull();
+    expect(routineHookUrl({ trigger: { type: "event", event: "issue.created" } })).toBeNull();
+  });
+
+  test("the example call: plain, or signed the way a sending service signs its body", () => {
+    expect(hookCurl(url, null)).toBe(
+      `curl -X POST '${url}' \\\n  -H 'Content-Type: application/json' \\\n  -d '{"text":"hello"}'`,
+    );
+    const signed = hookCurl(url, "s3cret").split("\n");
+    expect(signed.slice(0, 3)).toEqual([
+      "SECRET='s3cret'",
+      `BODY='{"text":"hello"}'`,
+      `SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" | sed 's/^.* //')`,
+    ]);
+    expect(signed).toContain(`  -H "X-Agentes-Signature: sha256=$SIG" \\`);
+    expect(signed.at(-1)).toBe('  -d "$BODY"');
+  });
+
+  test("a call the address refused never reached the routine; a repeat did, with the first one's run", () => {
+    expect((["bad_signature", "too_large", "rate_limited"] as const).every(isRefusedHookCall)).toBe(true);
+    expect(isRefusedHookCall("accepted")).toBe(false);
+    expect(isRefusedHookCall("duplicate")).toBe(false);
   });
 });

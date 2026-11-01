@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import type { Connection, ConnectorDef, CustomServer } from "@agenteschat/client";
-import { connectedItems } from "@agenteschat/client/lib/connected";
+import { connectedItems, itemName } from "@agenteschat/client/lib/connected";
+import { choiceOf, MAIL_BRANDS } from "@agenteschat/client/lib/mail";
+import type { TFunction } from "i18next";
 import {
+  accountActions,
   authAnswerOf,
   brandOf,
   capabilityLines,
@@ -15,8 +18,10 @@ import {
   markFinishing,
   monogram,
   needsKeyText,
+  noResults,
   ownMarkUri,
   searchConnectors,
+  shownMailboxes,
   stateOf,
   suggestionsOf,
 } from "../../src/features/connectors/logic";
@@ -31,8 +36,7 @@ const def = (id: string, over: Partial<ConnectorDef> = {}): ConnectorDef => ({
   auth: ["oauth", "api_key"],
   oauthConfigured: true,
   available: true,
-  needsServerUrl: false,
-  serverUrl: null,
+  serverUrl: `https://mcp.${id}.example/mcp`,
   iconUrl: `/connectors/${id}.svg`,
   brandColor: "#181717",
   scopes: [],
@@ -114,6 +118,16 @@ describe("connectors gallery", () => {
     ]);
   });
 
+  test("through Composio on a server without it: hidden, unless already connected (ADR 0107)", () => {
+    const url = "https://backend.composio.dev/api/v3.1/toolkits/googledrive";
+    const drive = def("drive", { kind: "remote_mcp", via: "composio", available: false, serverUrl: url });
+    expect(galleryTiles([drive, def("github")], []).map((x) => x.def.id)).toEqual(["github"]);
+    const items = connectedItems([], [{ ...server(url), via: "composio" }], [drive]);
+    expect(galleryTiles([drive], items).map((x) => [x.def.id, x.connected, x.opens])).toEqual([["drive", true, true]]);
+    // Its account shows no address: Composio's means nothing to people.
+    expect(items[0]?.account).toBeNull();
+  });
+
   test("a server whose OAuth only lets in apps it approved says so; one with no sign-in just asks for a key", async () => {
     const pt = await translator("pt-BR");
     expect(needsKeyText(pt, { status: "needs_key", reason: "not_approved" }, "Asana")).toBe(
@@ -123,6 +137,14 @@ describe("connectors gallery", () => {
     const en = await translator("en");
     expect(needsKeyText(en, { status: "needs_key", reason: "not_approved" }, "Asana")).toBe(
       "Asana only lets apps it approved sign in, and agentes.chat isn't approved yet. If it gives you an API key, you can connect with that.",
+    );
+    // The server's own words under ours: which one refused and why.
+    const said = { status: "needs_key", reason: "not_approved", detail: "invalid_redirect_uri: not allowed" } as const;
+    expect(needsKeyText(pt, said, "Asana")).toBe(
+      "Asana só deixa entrar apps que aprovou, e o agentes.chat ainda não foi aprovado. Se ele te der uma chave de API, dá para conectar com ela.\nO servidor respondeu: invalid_redirect_uri: not allowed",
+    );
+    expect(needsKeyText(en, said, "Asana").split("\n")[1]).toBe(
+      "The server answered: invalid_redirect_uri: not allowed",
     );
   });
 
@@ -163,6 +185,68 @@ describe("connectors gallery", () => {
     expect(capabilityLines(tr, exists, sentry, (s) => s.label)).toEqual([
       { text: "Read issues", asks: false },
       { text: "Resolve issues", asks: true },
+    ]);
+  });
+
+  test("a MillionSend inbox's sheet says what agents can do there as the web's card does, in both languages", async () => {
+    const routines = { "pt-BR": "Acordar rotinas quando chega um email", en: "Wake routines when an email arrives" };
+    for (const lng of ["pt-BR", "en"] as const) {
+      const tr = (await translator(lng)) as unknown as (key: string) => string;
+      const lines = capabilityLines(
+        tr,
+        (k) => tr(k) !== k,
+        { id: "mail-millionsend", scopes: [] },
+        () => "",
+      );
+      expect(lines).toHaveLength(4);
+      expect(lines[2]).toEqual({ text: routines[lng], asks: false });
+      expect(lines[3]?.asks).toBe(true);
+    }
+    // Its tile and a connected inbox's: MillionSend's M, tinted in the ink like the connector's.
+    const mark = MAIL_BRANDS[choiceOf({ provider: "millionsend", preset: null })];
+    expect(mark).toEqual({ name: "MillionSend", iconUrl: "/connectors/millionsend.svg", brandColor: null });
+    expect(iconUri("https://app.agentes.chat", mark?.iconUrl ?? null)).toBe(
+      "https://app.agentes.chat/connectors/millionsend.svg",
+    );
+  });
+
+  test("the connected row leaves out sign-ins still pending; a search the Email card matches isn't 'no results'", () => {
+    const boxes = [
+      { id: "m1", status: "active", label: "Suporte" },
+      { id: "m2", status: "pending", label: "" },
+      { id: "m3", status: "needs_reconnect", label: "Vendas" },
+    ];
+    expect(shownMailboxes(boxes).map((a) => a.id)).toEqual(["m1", "m3"]);
+    // "caixa" matches only the MillionSend card under Email.
+    expect(noResults(0, true, true)).toBe(false);
+    expect(noResults(0, true, false)).toBe(true);
+    // Not searching, the card is always there: a category with no tiles still says so.
+    expect(noResults(0, false, true)).toBe(true);
+    expect(noResults(2, true, false)).toBe(false);
+  });
+});
+
+describe("several accounts of one service", () => {
+  const t = ((key: string, o?: { defaultValue?: string }) => o?.defaultValue ?? key) as unknown as TFunction;
+  const sentry = def("sentry", { kind: "remote_mcp", serverUrl: "https://mcp.sentry.dev/mcp" });
+  const items = connectedItems(
+    [conn("github", { label: "Github" })],
+    [
+      server("https://mcp.sentry.dev/mcp"),
+      { ...server("https://mcp.sentry.dev/mcp"), id: "s-2", label: "Sentry 2", createdAt: "2026-10-24T12:00:00.000Z" },
+    ],
+    [def("github"), sentry],
+  );
+
+  test("the connected strip and each screen name every account apart", () => {
+    expect(items.map((i) => itemName(t, i))).toEqual(["Github", "Sentry", "Sentry 2"]);
+  });
+
+  test("a connected account's screen: rename and sign in again; an MCP server also takes another account", () => {
+    expect(items.map((i) => accountActions(i))).toEqual([
+      ["rename", "reconnect"],
+      ["rename", "reconnect", "add"],
+      ["rename", "reconnect", "add"],
     ]);
   });
 });

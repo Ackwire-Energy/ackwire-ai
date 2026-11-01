@@ -1,10 +1,13 @@
 import {
   type ConnectorDef,
   type CustomServer,
+  type MailAccount,
   type ToolDecision,
   useCustomServerAction,
   useCustomServers,
+  useMailAction,
 } from "@agenteschat/client";
+import { mailActionsChanged, mailActionsFrom, mailReviewTools } from "@agenteschat/client/lib/mail";
 import {
   countLevels,
   levelSummary,
@@ -17,7 +20,7 @@ import { Trans, useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Button, Icon, SearchField, Segmented, Text } from "@/ui";
 import { useColors, useOrgId } from "../shared/hooks";
-import { errorHaptic, MONO, successHaptic } from "../shared/parts";
+import { errorHaptic, MONO, successHaptic, Tile } from "../shared/parts";
 import { Problem } from "./Problem";
 import {
   acceptAll,
@@ -169,6 +172,94 @@ function ServerReview({
         onPress={next}
       />
     </>
+  );
+}
+
+/**
+ * A mailbox's "O que faz", as on the web: each action at Consulta · Muda · Aprovação · Desligada (sending and
+ * deleting only ask or are off), saved through the mailbox on Continuar (Salvar on its own).
+ */
+export function MailReview({
+  account,
+  onNext,
+  onScreen = false,
+}: {
+  account: MailAccount;
+  onNext: () => void;
+  onScreen?: boolean;
+}) {
+  const { t } = useTranslation();
+  const orgId = useOrgId();
+  const { update } = useMailAction(orgId);
+  const [state, setState] = useState<ReviewState>(emptyReview);
+  const [failed, setFailed] = useState(false);
+  const tools = useMemo(() => mailReviewTools(t, account), [t, account]);
+  const next = () => {
+    const chosen = mailActionsFrom(tools, state.levels);
+    if (!mailActionsChanged(account, chosen)) return onNext();
+    setFailed(false);
+    update.mutate(
+      { accountId: account.id, ...chosen },
+      {
+        onSuccess: () => {
+          successHaptic();
+          onNext();
+        },
+        onError: () => {
+          errorHaptic();
+          setFailed(true);
+        },
+      },
+    );
+  };
+  return (
+    <>
+      <Text variant="body" tone="muted">
+        {t("mail.toolsLead", { name: account.address })}
+      </Text>
+      <ToolList tools={tools} levelOf={(x) => chosenLevel(state, x)} review={{ state, onChange: setState }} />
+      {failed ? <Problem text={t("mail.actionsError")} /> : null}
+      <Button
+        variant="primary"
+        wide
+        label={
+          update.isPending ? t("mobile.connectors.review.saving") : onScreen ? t("common.save") : t("connectFlow.next")
+        }
+        disabled={update.isPending}
+        onPress={next}
+      />
+    </>
+  );
+}
+
+/** "Ferramentas" on a connection or a mailbox: how many tools, how many wait for a decision ("Revisar"). */
+export function ToolsRow({ count, waiting = 0, onPress }: { count: number; waiting?: number; onPress: () => void }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const line = waiting > 0 ? t("toolReview.decideTitle", { count: waiting }) : t("toolReview.subjectCount", { count });
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${t("connectors.tools")}, ${line}`}
+      style={({ pressed }) => [styles.row, { borderColor: c.line }, pressed && { backgroundColor: c.sunken }]}
+    >
+      <Tile icon="list" size={36} />
+      <View style={styles.grow}>
+        <Text variant="body" style={styles.bold}>
+          {t("connectors.tools")}
+        </Text>
+        <Text variant="small" tone="muted" numberOfLines={1} style={waiting > 0 && { color: c.warn }}>
+          {line}
+        </Text>
+      </View>
+      {waiting > 0 ? (
+        <Text variant="small" style={[styles.bold, { color: c.warn }]}>
+          {t("connectors.review")}
+        </Text>
+      ) : null}
+      <Icon name="right" size={15} color={c.faint} />
+    </Pressable>
   );
 }
 
@@ -469,4 +560,12 @@ const styles = StyleSheet.create({
   box: { gap: 10, padding: 12, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth },
   head: { flexDirection: "row", alignItems: "center", gap: 10 },
   tool: { gap: 8, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
 });

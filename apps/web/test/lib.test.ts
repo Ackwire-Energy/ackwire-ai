@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { Me } from "@agenteschat/client";
+import { ApiError, type Me } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
 import {
   dayLabel,
   formatInt,
@@ -47,7 +48,7 @@ import { en, ptBR } from "@agenteschat/i18n";
 import type { TFunction } from "i18next";
 import { createBetterAuthClient } from "@/auth/better-auth";
 import { createI18n } from "@/i18n";
-import { announceConfirmation, emailConfirmedToast } from "@/lib/email-confirmation";
+import { announceConfirmation, emailConfirmedToast, sendNewLink } from "@/lib/email-confirmation";
 import type { ToastAction } from "@/lib/toast";
 import { createFakeAuth } from "./fake-auth";
 
@@ -410,6 +411,16 @@ describe("i18n", () => {
     expect(t("approval.approve.merge")).toBe("Aprovar merge");
     expect(t("auth.passwordMissing", { count: 3 })).toBe("Faltam 3 caracteres (mínimo de 8).");
   });
+  test("a form's own refusals say what to change: an @ that's taken or wrong, a wiki page's title", () => {
+    const said = (code: string, params?: Record<string, unknown>) =>
+      errorText(t, new ApiError(409, code, "The server's English", params));
+    expect(said("handle.taken", { handle: "bia" })).toBe("O @bia já é de outra pessoa.");
+    expect(said("handle.taken_by_agent", { handle: "atlas" })).toBe("O @atlas é de um agente.");
+    expect(said("handle.invalid", { min: 2, max: 32 })).toBe("O @ tem de 2 a 32 letras minúsculas, números, - ou _.");
+    expect(said("slug_taken", { title: "Onboarding" })).toBe("Já existe uma página “Onboarding”.");
+    expect(said("wiki.title_characters")).toBe("O título não pode ter [ ] | ou #.");
+    expect(said("wiki.title_empty_slug")).toBe("O título precisa de letras ou números.");
+  });
   test("no exclamation marks in the interface copy (voice rules)", () => {
     const strings: string[] = [];
     const walk = (o: object) => {
@@ -472,6 +483,26 @@ describe("the confirmation email", () => {
     ]);
   });
 
+  test("a new link that didn't go out says why in the person's words, never Better Auth's", async () => {
+    const shown: string[] = [];
+    const show = (text: string) => void shown.push(text);
+    const refusals = [
+      { ok: false, status: 0, code: "network", message: "" },
+      { ok: false, status: 429, message: "Too many requests. Please try again later." },
+      { ok: false, status: 400, code: "EMAIL_ALREADY_VERIFIED", message: "Email is already verified" },
+    ] as const;
+    for (const verification of refusals) {
+      expect(await sendNewLink({ auth: createFakeAuth({ verification }).auth, t, show }, "bia@example.com")).toBe(
+        false,
+      );
+    }
+    expect(shown).toEqual([
+      "Sem conexão com o agentes.chat agora. Tente de novo em instantes.",
+      "Muitas tentativas. Espere alguns minutos e tente de novo.",
+      "Algo deu errado. Tente de novo.",
+    ]);
+  });
+
   test("the auth client says the app's language on every request; the server picks where a link lands", async () => {
     const sent: { path: string; language: string | null; body: Record<string, unknown> | null }[] = [];
     const real = globalThis.fetch;
@@ -499,6 +530,33 @@ describe("the confirmation email", () => {
         language: "pt-BR",
         body: { email: "bia@example.com" },
       });
+    } finally {
+      globalThis.fetch = real;
+    }
+  });
+
+  test("the auth client settles when the request gets no answer: status 0, never a page spinning forever", async () => {
+    const real = globalThis.fetch;
+    globalThis.fetch = (async () => {
+      throw new TypeError("Failed to fetch");
+    }) as unknown as typeof fetch;
+    try {
+      const auth = createBetterAuthClient("http://localhost:3000");
+      const none = { ok: false, status: 0, code: "network", message: "" };
+      expect(await auth.signIn({ email: "bia@example.com", password: "senha-longa" })).toEqual(none);
+      expect(await auth.signUp({ name: "Bia", email: "bia@example.com", password: "senha-longa" })).toEqual(none);
+      expect(await auth.requestPasswordReset({ email: "bia@example.com", redirectTo: "/reset-password" })).toEqual(
+        none,
+      );
+      expect(await auth.resetPassword({ token: "t", newPassword: "senha-longa" })).toEqual(none);
+      expect(await auth.sendVerificationEmail("bia@example.com")).toEqual(none);
+      expect(await auth.signInSocial("github", "/")).toEqual(none);
+      expect(await auth.ownerClaim({ token: "t", name: "Bia", email: "bia@example.com", password: "x" })).toEqual(none);
+      expect(await auth.signInOneTime("t")).toEqual(none);
+      expect(await auth.desktopHandoff("r")).toEqual(none);
+      expect(await auth.desktopOpen("c")).toBeNull();
+      expect(await auth.desktopRequestCode("r")).toBeNull();
+      expect(await auth.desktopRedeem("v")).toBe(false);
     } finally {
       globalThis.fetch = real;
     }

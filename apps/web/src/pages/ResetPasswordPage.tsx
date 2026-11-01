@@ -1,3 +1,4 @@
+import { authErrorText } from "@agenteschat/client/lib/errors";
 import { passwordState } from "@agenteschat/client/lib/text";
 import { Button, Icon, Input } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
@@ -29,7 +30,7 @@ export function ResetPasswordPage({ token }: { token?: string }) {
     setPending(false);
     if (result.ok) return setDone(true);
     if (result.status === 400) return setExpired(true);
-    setError(result.message || t("common.unknownError"));
+    setError(authErrorText(t, result));
   };
 
   // Before saving, no lead: the line under the field says what a password needs.

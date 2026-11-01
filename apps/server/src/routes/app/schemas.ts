@@ -1,5 +1,5 @@
 import { ACCOUNT_KINDS, BRAIN_EFFORTS } from "@agenteschat/adapters";
-import { AGENT_ACTION_KINDS, ONBOARDING_STEPS, STANDING_STATES } from "@agenteschat/engine";
+import { AGENT_ACTION_KINDS, ONBOARDING_STEPS, STANDING_STATES, START_PAGES } from "@agenteschat/engine";
 import { CONTEXT_LIMITS, MODEL_TIERS, PROVIDER_IDS } from "@agenteschat/providers";
 import { z } from "@hono/zod-openapi";
 
@@ -33,6 +33,16 @@ const RoleIds = z.array(z.string()).openapi({ description: "Their roles (`org_ro
 export const ProviderId = z.enum(PROVIDER_IDS).openapi("ProviderId");
 
 export const ModelTier = z.enum(MODEL_TIERS as ["small", "medium", "large"]);
+
+export const StartChoice = z
+  .object({
+    page: z.enum(START_PAGES),
+    channelId: z.uuid().nullable().openapi({ description: "With `channel`, else null." }),
+  })
+  .openapi("StartChoice", {
+    description:
+      "What opens when the app starts here (ADR 0108): `home` (Início, Conversas on the phone), `last` (where the person was, kept on each device) or `channel` (open the home when they are no longer in it).",
+  });
 
 export const Organization = z
   .object({
@@ -86,6 +96,9 @@ export const Organization = z
         description:
           "In `GET /me`, while an owner's deletion is pending: the workspace is closed (`org.deleting`), and any owner can restore it until `dueAt` (`DELETE …/deletion`). Absent: not being deleted.",
       }),
+    start: StartChoice.optional().openapi({
+      description: "In `GET /me`: what opens when the app starts here (`PUT …/me/start`). Absent elsewhere.",
+    }),
   })
   .openapi("Organization");
 
@@ -135,7 +148,13 @@ export const AgentAudience = z
 
 export const AgentAppearance = z
   .object({
-    color: z.enum(["sky", "indigo", "violet", "rose", "amber", "green", "teal", "graphite"]),
+    color: z.union([
+      z.enum(["sky", "indigo", "violet", "rose", "amber", "green", "teal", "graphite"]),
+      z
+        .string()
+        .regex(/^#[0-9a-fA-F]{6}$/)
+        .openapi({ description: 'A custom color ("Personalizar"), stored lowercase.' }),
+    ]),
     eyes: z.enum(["round", "dots", "wide", "happy", "sleepy"]),
     accessory: z.enum([
       "none",

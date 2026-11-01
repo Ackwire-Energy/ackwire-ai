@@ -1,8 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
 import type { RealtimeEvent } from "@agenteschat/adapters";
-import { asc, eq, schema } from "@agenteschat/db";
+import { and, asc, eq, schema } from "@agenteschat/db";
 import { ProviderError, systemText } from "@agenteschat/providers";
-import { drainOutbox, listMessages, postPersonMessage } from "../src";
+import { drainOutbox, listMessages, type OutboxJob, postPersonMessage } from "../src";
 import { type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
@@ -131,6 +131,50 @@ test("transient provider failures retry the job; the run completes on a later at
   [run] = await f.db.select().from(schema.agentRuns);
   expect(run?.status).toBe("done");
   expect(await f.db.select().from(schema.usageRecords)).toHaveLength(1);
+});
+
+/** What the outbox's `onError` hears about the run's job (`attempt outcome: message`), over `rounds` drains. */
+async function toldAboutRun(fx: Fixture, rounds = 1) {
+  const told: string[] = [];
+  const onError = (job: OutboxJob, error: unknown, outcome: "retry" | "failed") => {
+    if (job.kind === "agent_run.execute") told.push(`${job.attempts} ${outcome}: ${(error as Error).message}`);
+  };
+  for (let i = 0; i < rounds; i++) {
+    await drainOutbox(fx.db, fx.handlers, { onError });
+    // A retry's backoff, over at once.
+    await fx.db
+      .update(schema.outbox)
+      .set({ nextAttemptAt: new Date(0) })
+      .where(and(eq(schema.outbox.kind, "agent_run.execute"), eq(schema.outbox.status, "pending")));
+  }
+  return told;
+}
+
+test("a run that keeps failing on a provider outage parks on its last attempt, never told as a failed job", async () => {
+  f = await setup({ reply: () => new ProviderError("overloaded", true, 529) });
+  await post(f, "@dev hi");
+  const told = await toldAboutRun(f, 5);
+  const [run] = await f.db.select().from(schema.agentRuns);
+  // The last attempt parks the run on the outage ladder (it answers once the provider is back): no failure to report.
+  expect([run?.status, run?.error]).toEqual(["running", null]);
+  expect(told.slice(0, 3)).toEqual(["1 retry: overloaded", "2 retry: overloaded", "3 retry: overloaded"]);
+  expect(told.filter((line) => line.includes("failed"))).toEqual([]);
+});
+
+test("a request the provider rejects fails the run and is told as a failed job", async () => {
+  f = await setup({ reply: () => new ProviderError("provider rejected the request (400)", false, 400) });
+  await post(f, "@dev hi");
+  expect(await toldAboutRun(f)).toEqual(["1 failed: provider rejected the request (400)"]);
+  const [run] = await f.db.select().from(schema.agentRuns);
+  expect([run?.status, run?.error]).toEqual(["failed", "provider_error: provider rejected the request (400)"]);
+});
+
+test("the account's own refusal (an invalid key) fails the run untold: the person sees why", async () => {
+  f = await setup({ reply: () => new ProviderError("invalid provider API key", false, 401) });
+  await post(f, "@dev hi");
+  expect(await toldAboutRun(f)).toEqual([]);
+  const [run] = await f.db.select().from(schema.agentRuns);
+  expect([run?.status, run?.error]).toEqual(["failed", "provider_error: invalid provider API key"]);
 });
 
 test("a refused request fails the run with the provider's words, credentials masked, on the run and its error step", async () => {

@@ -6,6 +6,7 @@ import {
   type AgentAccessory,
   type AgentColor,
   type AgentEyes,
+  colorOf,
 } from "../shared/logic";
 
 /**
@@ -26,7 +27,7 @@ const pick = <T extends string>(list: readonly T[], v: unknown, fallback: T): T 
 export function fullLook(appearance: unknown): FullLook {
   const o = (appearance && typeof appearance === "object" ? appearance : {}) as Record<string, unknown>;
   return {
-    color: pick(AGENT_COLORS, o.color, "sky"),
+    color: colorOf(o.color) ?? "sky",
     eyes: pick(AGENT_EYES, o.eyes, "round"),
     accessory: pick(AGENT_ACCESSORIES, o.accessory, "none"),
   };

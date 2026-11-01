@@ -1402,6 +1402,7 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
       .values({
         orgId: f.org.id,
         connector: "linear",
+        toolPrefix: "linear",
         label: "Linear",
         serverUrl: "https://linear.example.com/mcp",
         authType: "none",
@@ -1459,6 +1460,7 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
       .values({
         orgId: f.org.id,
         connector: "linear",
+        toolPrefix: "linear",
         label: "Linear",
         serverUrl: "https://linear.example.com/mcp",
         authType: "none",

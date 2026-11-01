@@ -1,5 +1,5 @@
 import { keys, type Me } from "@agenteschat/client";
-import { errorCode, REAUTH_SIGN_IN } from "@agenteschat/client/lib/errors";
+import { errorCode, errorText, REAUTH_SIGN_IN } from "@agenteschat/client/lib/errors";
 import { passwordState } from "@agenteschat/client/lib/text";
 import { Alert, Button, Dialog, DialogBody, DialogFooter, Field, Input } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -41,7 +41,7 @@ export function AddPasswordDialog({ open, onClose }: { open: boolean; onClose: (
     onError: (e) => {
       const stale = errorCode(e) === REAUTH_SIGN_IN;
       setReauth(stale);
-      setError(stale ? t("shell.addPasswordReauth") : e.message);
+      setError(stale ? t("shell.addPasswordReauth") : errorText(t, e));
     },
   });
   const signInAgain = useSignInAgain(qc.getQueryData<Me | null>(keys.me)?.user.email ?? "");

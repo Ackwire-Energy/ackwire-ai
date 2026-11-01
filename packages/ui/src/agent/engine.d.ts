@@ -1,6 +1,10 @@
 /** Types for engine.js (plain JavaScript so plain HTML pages can import it as is). */
 
-export type AgentColorName = "sky" | "indigo" | "violet" | "rose" | "amber" | "green" | "teal" | "graphite";
+export type AgentPresetColor = "sky" | "indigo" | "violet" | "rose" | "amber" | "green" | "teal" | "graphite";
+/** A custom agent color, "#rrggbb". */
+export type HexColor = `#${string}`;
+/** A preset or a custom color. */
+export type AgentColorName = AgentPresetColor | HexColor;
 export type EyeStyle = "round" | "dots" | "wide" | "happy" | "sleepy";
 export type EyeKind = "pill" | "arc" | "lid" | "cup" | "spiral" | "heart" | "star" | "cross" | "ring" | "slant";
 export type Expression = "closed" | "happy" | "dizzy" | "heart" | "star" | "cross" | "surprised" | "angry" | "wink";
@@ -74,7 +78,7 @@ export type Ctx2D = Pick<
   | "closePath"
 >;
 
-export const AGENT_GRADIENTS: Record<AgentColorName, [string, string]>;
+export const AGENT_GRADIENTS: Record<AgentPresetColor, [string, string]>;
 export const EYE_COLOR: string;
 export const BODY_RADIUS: number;
 export const BODY_CUT: number;
@@ -94,6 +98,14 @@ export function bodyFrame(pose?: Pose): BodyFrame;
 
 export function rgbOf(hex: string): [number, number, number];
 export function mixHex(a: string, b: string, k: number): string;
+export function isHexColor(v: unknown): v is HexColor;
+export function colorKey<T extends string>(color: T): T extends HexColor ? "custom" : T;
+export function hexToHsv(hex: string): [number, number, number];
+export function hsvToHex(h: number, s: number, v: number): string;
+export function luminance(hex: string): number;
+export function customGradient(hex: string): [string, string];
+export function nearestPreset(color: string): AgentColorName;
+export function pickerStart(color?: string): string;
 export function gradientOf(color?: AgentColorName | string): [string, string];
 export function bodyTones(color?: AgentColorName | string, deep?: boolean): string[];
 export function spriteBody(color?: AgentColorName | string): string;

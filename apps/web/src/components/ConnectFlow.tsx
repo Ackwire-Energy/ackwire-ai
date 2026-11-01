@@ -1,4 +1,4 @@
-import type { ConnectorDef, CustomServer } from "@agenteschat/client";
+import type { ConnectOutcome, ConnectorDef, CustomConnectStart, CustomServer } from "@agenteschat/client";
 import {
   keys,
   useAgents,
@@ -7,6 +7,7 @@ import {
   useConnectWithKey,
   useCustomServerAction,
   useCustomServers,
+  useRenameConnection,
   useStartOAuth,
 } from "@agenteschat/client";
 import {
@@ -18,9 +19,18 @@ import {
   saveLevels,
   sharedLevel,
 } from "@agenteschat/client/lib/access-levels";
-import { type ConnectedItem, fromConnection, fromServer, itemName } from "@agenteschat/client/lib/connected";
+import { composioConnectText } from "@agenteschat/client/lib/composio";
+import {
+  accountUnchecked,
+  type ConnectedItem,
+  fromConnection,
+  fromServer,
+  itemName,
+  outcomeText,
+} from "@agenteschat/client/lib/connected";
 import { humanize, isHttpsUrl, sameServer } from "@agenteschat/client/lib/custom-tools";
-import { connectorDescription, connectorName } from "@agenteschat/client/lib/scopes";
+import { errorText } from "@agenteschat/client/lib/errors";
+import { connectorBrand, connectorDescription, connectorName } from "@agenteschat/client/lib/scopes";
 import {
   partsOf,
   type ReviewTool,
@@ -52,8 +62,13 @@ import { reviewNote, ToolLevelsView, ToolReview, type ToolReviewState } from "./
  * agent). Rows of "Conectados" open steps 2 and 3 again.
  */
 export type FlowState =
-  /** Step 1: a catalog entry, or `null` for any MCP server by address. */
-  { step: 0; def: ConnectorDef | null } | { step: 1 | 2; item: ConnectedItem };
+  /**
+   * Step 1: a catalog entry, or `null` for any MCP server by address. `add`: another account of `item`'s server
+   * (an MCP server takes several); `reconnect`: a new sign-in for `item`, whose name, tools and agents stay.
+   */
+  | { step: 0; def: ConnectorDef | null; mode?: "add" | "reconnect"; item?: ConnectedItem }
+  /** `naming`: a new account the provider didn't name ("Stripe 2"): its name comes first, above its tools. */
+  | { step: 1 | 2; item: ConnectedItem; naming?: boolean };
 
 /** Back from OAuth the app lands here; the server adds `?connected=…`. In the desktop app, through its window. */
 const returnPath = (orgId: string) => oauthReturnPath(`/org/${orgId}/settings/connectors`);
@@ -62,20 +77,32 @@ export function ConnectFlow({
   flow,
   onChange,
   onClose,
+  returnTo,
 }: {
   flow: FlowState | null;
   onChange: (flow: FlowState) => void;
   onClose: () => void;
+  /** Where signing in elsewhere comes back to (a path on the site); Conectores by default. */
+  returnTo?: string;
 }) {
   const { t } = useTranslation();
   if (!flow) return null;
-  const name = flow.step === 0 ? (flow.def ? connectorName(t, flow.def) : null) : itemName(t, flow.item);
-  const icon = flow.step === 0 ? flow.def : flow.item.def;
+  const name =
+    flow.step === 0
+      ? flow.def
+        ? connectorName(t, flow.def)
+        : flow.item
+          ? itemName(t, flow.item)
+          : null
+      : itemName(t, flow.item);
+  const icon = flow.step === 0 ? (flow.def ?? flow.item?.def ?? null) : flow.item.def;
   const title =
     flow.step === 0
-      ? name
-        ? t("connectFlow.connectTitle", { name })
-        : t("connectFlow.customTitle")
+      ? flow.mode === "reconnect" && flow.item
+        ? t("connectFlow.reconnectTitle", { name: itemName(t, flow.item) })
+        : name
+          ? t(flow.mode === "add" ? "connectFlow.addTitle" : "connectFlow.connectTitle", { name })
+          : t("connectFlow.customTitle")
       : flow.step === 1
         ? flow.item.server
           ? t("toolReview.title")
@@ -89,7 +116,7 @@ export function ConnectFlow({
         <FlowTitle
           tile={
             name ? (
-              <ConnectorIcon def={icon} image={flow.step === 0 ? null : flow.item.image} label={name} size="lg" />
+              <ConnectorIcon def={icon} image={flow.item?.image ?? null} label={name} size="lg" />
             ) : (
               <span className="connector-icon connector-icon--lg connector-icon--mono" aria-hidden="true">
                 <Icon name="plus" />
@@ -112,12 +139,20 @@ export function ConnectFlow({
         ))}
       </ol>
       {flow.step === 0 && (
-        <ConnectStep def={flow.def} onConnected={(item) => onChange({ step: 1, item })} onClose={onClose} />
+        <ConnectStep
+          def={flow.def}
+          returnTo={returnTo}
+          mode={flow.mode}
+          item={flow.item}
+          onConnected={(item, naming) => onChange({ step: 1, item, naming })}
+          onClose={onClose}
+        />
       )}
       {flow.step === 1 && (
         <ToolsStep
           key={flow.item.id}
           item={flow.item}
+          naming={flow.naming === true}
           onNext={(item) => onChange({ step: 2, item })}
           onClose={onClose}
         />
@@ -134,14 +169,25 @@ export function ConnectFlow({
   );
 }
 
-/** Step 1: OAuth ("Continuar no Linear"), or an API key. */
+/**
+ * Step 1: OAuth ("Continuar no Linear"), or an API key. A service through Composio signs in on Composio's page
+ * ("Continuar na Composio"): no key field of ours. A new account goes on to its tools; a new sign-in for an account,
+ * or the same account again, ends here with a toast saying which.
+ */
 function ConnectStep({
   def,
+  returnTo,
+  mode,
+  item,
   onConnected,
   onClose,
 }: {
   def: ConnectorDef | null;
-  onConnected: (item: ConnectedItem) => void;
+  returnTo?: string;
+  mode?: "add" | "reconnect";
+  item?: ConnectedItem;
+  /** `naming`: another account of a server the provider didn't name ("Stripe 2"). */
+  onConnected: (item: ConnectedItem, naming: boolean) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -157,20 +203,34 @@ function ConnectStep({
   const [label, setLabel] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [keyOpen, setKeyOpen] = useState(false);
-  const [needsKey, setNeedsKey] = useState<boolean | "not_approved">(false);
+  const [needsKey, setNeedsKey] = useState<Extract<CustomConnectStart, { status: "needs_key" }> | null>(null);
   const [touched, setTouched] = useState<"oauth" | "key" | null>(null);
 
+  // An account of a server by address: its own address, whatever the catalog says.
+  const fixed = item?.server?.serverUrl ?? null;
   // A server by address (any, or a vendor's official one) or our catalog connector.
-  const byAddress = def === null || def.kind === "remote_mcp";
-  const askUrl = def === null || (def.kind === "catalog" && def.needsServerUrl);
+  const byAddress = fixed !== null || def === null || def.kind === "remote_mcp";
+  const askUrl = fixed === null && def === null;
+  const viaComposio = item ? item.viaComposio : def?.via === "composio";
   const canOAuth = byAddress || Boolean(def?.oauthConfigured && def.auth.includes("oauth"));
-  const canKey = byAddress || Boolean(def?.auth.includes("api_key"));
-  const serverUrl = def?.kind === "remote_mcp" ? (def.serverUrl ?? "") : url.trim();
+  // A one-click server the catalog lists without a key (Intercom on the Cloud) offers none, unless it answers that it
+  // needs one; a service through Composio signs in there.
+  // An account by address follows its catalog entry's rule too, so Reconectar doesn't bring the key back.
+  const listed =
+    fixed === null
+      ? def
+      : (catalog.data?.connectors.find((c) => c.kind === "remote_mcp" && sameServer(c.serverUrl, fixed)) ?? null);
+  const canKey = !viaComposio && (listed === null || listed.auth.includes("api_key") || needsKey !== null);
+  const serverUrl = fixed ?? (def?.kind === "remote_mcp" ? def.serverUrl : url.trim());
   const busy = connect.isPending || withKey.isPending || oauth.isPending;
-  // As the server does: one connection per catalog connector, one per address; connecting again keeps the grants.
+  // As the server does: a server by address takes another account, a catalog connector a new sign-in.
+  const accounts = (servers.data ?? []).filter((s) => sameServer(s.serverUrl, serverUrl));
   const again = byAddress
-    ? (servers.data ?? []).some((s) => sameServer(s.serverUrl, serverUrl))
+    ? accounts.length > 0
     : (connections.data ?? []).some((c) => c.connector === def?.id && !c.revokedAt);
+  const replacing = mode === "reconnect" || (!byAddress && again);
+  const connectionId = mode === "reconnect" && item?.custom ? item.id : undefined;
+  const unchecked = byAddress && accountUnchecked(accounts);
   const steps = useStepText(connect.isPending, [
     t("connectFlow.reaching"),
     t("connectFlow.listing"),
@@ -180,30 +240,31 @@ function ConnectStep({
   const urlError = touched && askUrl && !isHttpsUrl(url) ? t("connectors.serverUrlInvalid") : undefined;
   const keyError = touched === "key" && apiKey.trim().length < 8 ? t("connectors.apiKeyInvalid") : undefined;
 
-  const done = (item: ConnectedItem) => {
-    toast.show(t("connectors.connectedToast", { name: itemName(t, item) }));
-    onConnected(item);
+  const done = (next: ConnectedItem, outcome: ConnectOutcome) => {
+    toast.show(outcomeText(t, outcome, next));
+    if (outcome === "connected") onConnected(next, byAddress && again && !next.server?.accountLabel);
+    else onClose();
   };
   const byAddressResult = (result: Awaited<ReturnType<typeof connect.mutateAsync>>) => {
     if (result.status === "oauth") navigateAway(result.authorizeUrl);
     else if (result.status === "needs_key") {
-      setNeedsKey(result.reason ?? true);
+      setNeedsKey(result);
       setKeyOpen(true);
       setTouched(null);
-    } else done(fromServer(result.server, catalog.data?.connectors ?? []));
+    } else done(fromServer(result.server, catalog.data?.connectors ?? []), result.outcome ?? "connected");
   };
-  const name = (def ? connectorName(t, def) : label.trim()) || undefined;
+  // The service's name: the server names another account after it ("Stripe 2"). A catalog entry's goes in English,
+  // so each viewer reads a name nobody changed in their own language.
+  const name = (def ? def.label : fixed ? (accounts[0]?.label ?? item?.label) : label.trim()) || undefined;
+  const back = returnTo ? oauthReturnPath(returnTo) : returnPath(org.id);
 
   const startOAuth = () => {
     setTouched("oauth");
     if (askUrl && !isHttpsUrl(url)) return;
     if (byAddress) {
-      connect.mutate({ serverUrl, label: name, returnTo: returnPath(org.id) }, { onSuccess: byAddressResult });
+      connect.mutate({ serverUrl, label: name, returnTo: back, connectionId }, { onSuccess: byAddressResult });
     } else if (def) {
-      oauth.mutate(
-        { connector: def.id, returnTo: returnPath(org.id), serverUrl: askUrl ? serverUrl : undefined },
-        { onSuccess: (to) => navigateAway(to) },
-      );
+      oauth.mutate({ connector: def.id, returnTo: back }, { onSuccess: (to) => navigateAway(to) });
     }
   };
   const submitKey = () => {
@@ -211,13 +272,16 @@ function ConnectStep({
     if ((askUrl && !isHttpsUrl(url)) || apiKey.trim().length < 8) return;
     if (byAddress) {
       connect.mutate(
-        { serverUrl, label: name, apiKey: apiKey.trim(), returnTo: returnPath(org.id) },
+        { serverUrl, label: name, apiKey: apiKey.trim(), returnTo: back, connectionId },
         { onSuccess: byAddressResult },
       );
     } else if (def) {
       withKey.mutate(
-        { connector: def.id, apiKey: apiKey.trim(), serverUrl: askUrl ? serverUrl : undefined },
-        { onSuccess: (c) => done(fromConnection(c, catalog.data?.connectors ?? [])) },
+        { connector: def.id, apiKey: apiKey.trim() },
+        {
+          onSuccess: (c) =>
+            done(fromConnection(c, catalog.data?.connectors ?? []), again ? "reconnected" : "connected"),
+        },
       );
     }
   };
@@ -232,9 +296,18 @@ function ConnectStep({
     >
       {needsKey && (
         <Alert tone="neutral">
-          {needsKey === "not_approved"
-            ? t("connectFlow.notApproved", { name: name ?? new URL(serverUrl).hostname })
-            : t("connectFlow.needsKey")}
+          {needsKey.reason === "not_approved" ? (
+            <>
+              {t("connectFlow.notApproved", { name: name ?? new URL(serverUrl).hostname })}
+              {needsKey.detail && (
+                <span className="cflow__said small muted">
+                  {t("connectFlow.serverSaid", { detail: needsKey.detail })}
+                </span>
+              )}
+            </>
+          ) : (
+            t("connectFlow.needsKey")
+          )}
         </Alert>
       )}
       <Field label={t("connectors.apiKey")} id="cflow-key" help={t("connectors.apiKeyHelp")} error={keyError}>
@@ -256,32 +329,35 @@ function ConnectStep({
   return (
     <>
       <DialogBody className="cflow__body">
-        {def ? (
+        {def && viaComposio ? (
           <p className="muted cflow__text">
-            {connectorDescription(t, def)} {canOAuth && t("connectFlow.oauthHelp", { name: def.label })}
+            {connectorDescription(t, def)} {composioConnectText(t, def)}
           </p>
+        ) : def ? (
+          <p className="muted cflow__text">
+            {connectorDescription(t, def)} {canOAuth && t("connectFlow.oauthHelp", { name: connectorBrand(def) })}
+          </p>
+        ) : viaComposio ? (
+          <p className="muted cflow__text">{t("connectors.composio.via")}</p>
+        ) : fixed ? (
+          <p className="muted cflow__text">{fixed}</p>
         ) : (
           <p className="muted cflow__text">{t("connectFlow.customText")}</p>
         )}
         {askUrl && (
-          <Field
-            label={t("connectors.serverUrl")}
-            id="cflow-url"
-            help={def ? t("connectors.serverUrlHelp", { org: org.name }) : t("connectFlow.urlHelp")}
-            error={urlError}
-          >
+          <Field label={t("connectors.serverUrl")} id="cflow-url" help={t("connectFlow.urlHelp")} error={urlError}>
             <Input
               value={url}
               onChange={(e) => {
                 setUrl(e.target.value);
-                setNeedsKey(false);
+                setNeedsKey(null);
               }}
               placeholder="https://"
               inputMode="url"
             />
           </Field>
         )}
-        {def === null && (
+        {def === null && fixed === null && (
           <Field label={t("connectFlow.name")} id="cflow-name">
             <Input
               value={label}
@@ -299,7 +375,11 @@ function ConnectStep({
             loading={(connect.isPending || oauth.isPending) && touched === "oauth"}
             onClick={startOAuth}
           >
-            {def ? t("connectFlow.continueIn", { name: def.label }) : t("connectors.connect")}
+            {viaComposio
+              ? t("connectFlow.continueInComposio")
+              : def
+                ? t("connectFlow.continueIn", { name: connectorBrand(def) })
+                : t("connectors.connect")}
           </Button>
         )}
         {canOAuth && canKey && (
@@ -319,7 +399,15 @@ function ConnectStep({
       </DialogBody>
       <DialogFooter
         bar
-        note={connect.isPending ? steps : t(again ? "connectFlow.keepAccess" : "connectFlow.allCanUse")}
+        note={
+          connect.isPending
+            ? steps
+            : replacing
+              ? t(unchecked ? "connectFlow.replaceUnchecked" : "connectFlow.replace")
+              : again
+                ? t(unchecked ? "connectFlow.newAccountUnchecked" : "connectFlow.newAccount")
+                : t("connectFlow.allCanUse")
+        }
       >
         <Button onClick={onClose}>{t("common.cancel")}</Button>
       </DialogFooter>
@@ -355,19 +443,25 @@ function catalogReviewTools(t: TFunction, item: ConnectedItem): ReviewTool[] {
  */
 function ToolsStep({
   item,
+  naming,
   onNext,
   onClose,
 }: {
   item: ConnectedItem;
+  /** A new account the provider didn't name: its name, editable, above its tools. */
+  naming: boolean;
   onNext: (item: ConnectedItem) => void;
   onClose: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
   const catalog = useCatalog();
   const { save, refresh } = useCustomServerAction(org.id);
+  const rename = useRenameConnection(org.id);
   const [server, setServer] = useState(item.server);
+  const [label, setLabel] = useState(item.label);
+  const [labelError, setLabelError] = useState<string | null>(null);
   const tools = server ? reviewToolsOf(t, server) : [];
   const [state, setState] = useState<ToolReviewState>({ levels: {}, decided: new Set() });
   const next = (saved?: CustomServer) => onNext(saved ? fromServer(saved, catalog.data?.connectors ?? []) : item);
@@ -391,9 +485,43 @@ function ToolsStep({
     );
   }
 
+  const saveAll = async () => {
+    const wanted = label.trim();
+    let named = server.label;
+    if (naming && wanted && wanted !== server.label) {
+      try {
+        named = (await rename.mutateAsync({ id: server.id, label: wanted })).label;
+      } catch (error) {
+        setLabelError(errorText(t, error, i18n.language));
+        return;
+      }
+    }
+    save.mutate(
+      { id: server.id, label: named, tools: reviewDecisions(tools, state.levels, state.decided) },
+      { onSuccess: (saved) => next(saved) },
+    );
+  };
+
   return (
     <>
       <DialogBody className="cflow__body tr-body">
+        {naming && (
+          <Field
+            label={t("connectFlow.accountName")}
+            id="cflow-account"
+            help={t("connectFlow.accountNameHelp")}
+            error={labelError ?? undefined}
+          >
+            <Input
+              value={label}
+              maxLength={80}
+              onChange={(e) => {
+                setLabel(e.target.value);
+                setLabelError(null);
+              }}
+            />
+          </Field>
+        )}
         <div className="cflow__lead">
           <p className="muted cflow__text">{t("toolReview.lead", { count: tools.length, name })}</p>
           <Button
@@ -417,14 +545,9 @@ function ToolsStep({
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button
           variant="primary"
-          disabled={save.isPending}
-          loading={save.isPending}
-          onClick={() =>
-            save.mutate(
-              { id: server.id, label: server.label, tools: reviewDecisions(tools, state.levels, state.decided) },
-              { onSuccess: (saved) => next(saved) },
-            )
-          }
+          disabled={save.isPending || rename.isPending}
+          loading={save.isPending || rename.isPending}
+          onClick={() => void saveAll()}
         >
           {t("connectFlow.next")}
         </Button>

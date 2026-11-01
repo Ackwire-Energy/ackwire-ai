@@ -3,6 +3,7 @@
  */
 
 import type { TFunction } from "i18next";
+import type { ApiClient } from "../api/client";
 import { ApiError } from "../api/http";
 import type {
   AgentMailbox,
@@ -18,19 +19,21 @@ import { webmailOf } from "./text";
 import type { ReviewTool } from "./tool-review";
 
 /** The cards in the catalog's "Email" group. */
-export type MailChoice = "gmail" | "outlook" | "icloud" | "other";
+export type MailChoice = "gmail" | "outlook" | "icloud" | "millionsend" | "other";
 
 /** `Outro email` with no preset: the person types the servers (under "Avançado"). */
 export const CUSTOM_PRESET = "custom";
 
 /**
  * The mailboxes drawn with their maker's mark, by provider or IMAP preset (the catalog cards' names too): Gmail's
- * and iCloud's in one color (Simple Icons, CC0), Outlook's in Microsoft's colors. Any other mailbox is our envelope.
+ * and iCloud's in one color (Simple Icons, CC0), Outlook's in Microsoft's colors, MillionSend's M (the MillionSend
+ * connector's) in the ink. Any other mailbox is our envelope.
  */
 export const MAIL_BRANDS: Partial<Record<string, { name: string; iconUrl: string; brandColor: string | null }>> = {
   gmail: { name: "Gmail", iconUrl: "/connectors/gmail.svg", brandColor: "#EA4335" },
   outlook: { name: "Outlook", iconUrl: "/brands/outlook.svg", brandColor: null },
   icloud: { name: "iCloud", iconUrl: "/connectors/icloud.svg", brandColor: "#3693F3" },
+  millionsend: { name: "MillionSend", iconUrl: "/connectors/millionsend.svg", brandColor: null },
 };
 
 export const MAIL_ERRORS: MailConnectError[] = [
@@ -51,10 +54,22 @@ export function mailErrorOf(error: unknown): MailConnectError {
   return "unknown";
 }
 
+/**
+ * What a MillionSend key step says when it fails. A key that doesn't reach the inbox (another MillionSend team's, or
+ * limited to another inbox) and a connector with no key aren't fixed by trying again, so each says why.
+ */
+export function millionSendErrorText(t: TFunction, error: unknown, address = ""): string {
+  const code = error instanceof ApiError ? error.code : "";
+  if (code === "mail.millionsend_inbox_not_found") return t("mail.millionsend.notReached", { address });
+  if (code === "mail.millionsend_no_connector_key") return t("mail.millionsend.noConnectorKey");
+  return t(mailErrorOf(error) === "auth" ? "mail.millionsend.auth" : "mail.error.unknown");
+}
+
 /** The catalog card a connected mailbox belongs to. */
 export function choiceOf(account: Pick<MailAccount, "provider" | "preset">): MailChoice {
   if (account.provider === "gmail") return "gmail";
   if (account.provider === "outlook") return "outlook";
+  if (account.provider === "millionsend") return "millionsend";
   return account.preset === "icloud" ? "icloud" : "other";
 }
 
@@ -111,6 +126,25 @@ export const DEFAULT_DAILY_CAP = 25;
 
 /** The connectors' level (Sem acesso · Ler · Ler e escrever) as the mail API says it. */
 export const toMailLevel = (level: Level): AgentMailbox["level"] => (level === "write" ? "read_write" : level);
+/** And back: the mail API's level as the connectors' (an agent without any is `none`). */
+export const fromMailLevel = (level: AgentMailbox["level"] | undefined): Level =>
+  level === "read_write" ? "write" : (level ?? "none");
+
+/** Sets an agent's level on a mailbox and keeps its delete switch and rules there (what "Quem usa" changes). */
+export async function setMailLevel(
+  api: Pick<ApiClient, "mail">,
+  orgId: string,
+  agentId: string,
+  accountId: string,
+  level: Level,
+) {
+  const saved = (await api.mail.agent(orgId, agentId)).find((m) => m.accountId === accountId);
+  return api.mail.setAgent(orgId, agentId, accountId, {
+    level: toMailLevel(level),
+    canDelete: saved?.canDelete ?? false,
+    policy: saved?.policy ?? defaultPolicy(),
+  });
+}
 
 /**
  * What a viewer may do with an agent's access to a mailbox (same rule as the backend): only who connected it gives
@@ -208,4 +242,13 @@ export function mailActionsFrom(tools: ReviewTool[], levels: Record<string, Tool
     offActions: names("off"),
     askActions: names("approval").filter((n) => ACTION_LEVELS[n].level !== "approval"),
   };
+}
+
+/** Whether the review's choices change the mailbox (unchanged, there is nothing to save). */
+export function mailActionsChanged(
+  account: Pick<MailAccount, "offActions" | "askActions">,
+  chosen: ReturnType<typeof mailActionsFrom>,
+) {
+  const same = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x) => b.includes(x));
+  return !same(chosen.offActions, account.offActions) || !same(chosen.askActions, account.askActions);
 }

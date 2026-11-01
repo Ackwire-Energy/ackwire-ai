@@ -20,6 +20,7 @@ import {
   refusalText,
   signUpClosed,
   socialRefusalText,
+  socialReturnText,
 } from "../../src/features/auth/human-check";
 import { signUpLinkTarget } from "../../src/features/auth/links";
 import { translator } from "./fixtures";
@@ -227,6 +228,19 @@ describe("refusals in the phone's words", () => {
     expect(socialRefusalText(en, { code: blocked }, true)).toBe(en("auth.accountBlocked"));
     expect(socialRefusalText(en, { code: "INVALID_TOKEN" }, true)).toBe("Couldn't sign you in right now. Try again.");
     expect(socialRefusalText(en, {}, true)).toBe(en("mobile.auth.social.failed"));
+  });
+
+  test("a browser sign-in that closed without a session says it didn't finish; a refusal says why", async () => {
+    const pt = await translator("pt-BR");
+    const en = await translator("en");
+    expect(socialReturnText(pt, { error: null }, false, true)).toBe(
+      "O login não terminou. Tente de novo ou use seu email.",
+    );
+    expect(socialReturnText(en, {}, false, true)).toBe("Sign-in didn't finish. Try again or use your email.");
+    expect(socialReturnText(en, { error: null }, true, true)).toBeNull();
+    expect(socialReturnText(en, { error: { code: "INVALID_TOKEN" } }, false, true)).toBe(
+      "Couldn't sign you in right now. Try again.",
+    );
   });
 
   test("a social sign-in refused in the web's words: an unconfirmed password account, a closed sign-up, an invitation", async () => {
