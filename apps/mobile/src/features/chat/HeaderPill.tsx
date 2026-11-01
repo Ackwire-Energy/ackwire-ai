@@ -14,7 +14,6 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
-import { needsHeaderBlur } from "@/lib/nav";
 import { Dither } from "@/sky/Dither";
 import { softTones } from "@/sky/math";
 import { Glass, haptics, PressScale, Text, useReducedMotion, useTheme } from "@/ui";
@@ -129,7 +128,7 @@ export function HeaderPill({
     set(Math.ceil(e.nativeEvent.layout.width));
 
   return (
-    <View style={[styles.slot, { width: room }, LIQUID && styles.liquidNudge]} pointerEvents="box-none">
+    <View style={[styles.slot, { width: room }]} pointerEvents="box-none">
       {/* What the words measure, whole, with no room limit. */}
       <View
         style={styles.measure}
@@ -273,14 +272,8 @@ function SlidingText({
   );
 }
 
-/** iOS 26's bar: its glass buttons sit lower than a title view's center. */
-const LIQUID = Platform.OS === "ios" && !needsHeaderBlur(Platform.OS, Platform.Version);
-
 const styles = StyleSheet.create({
   slot: { alignItems: Platform.OS === "ios" ? "center" : "flex-start" },
-  // Level with the back and "…" circles beside it (they sat about 5 points lower); `top` moves it without
-  // changing the size the bar lays out.
-  liquidNudge: { top: 5 },
   measure: { position: "absolute", top: 0, left: 0, width: 1000, alignItems: "flex-start", opacity: 0 },
   pill: {
     flexDirection: "row",
