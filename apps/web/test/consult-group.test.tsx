@@ -153,13 +153,12 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
     expect(text).not.toContain("Perguntou a 1 colega");
     expect(text).toContain("Atlas está trabalhando");
     expect(block?.querySelector(".ac-tools__line")?.getAttribute("data-s")).toBe("run");
-  });
-
-  test("two questions keep the block: 'Perguntou a 2 colegas' open, the count, a line each", async () => {
+    cleanup();
+    // Two questions keep the block: 'Perguntou a 2 colegas' open, the count, a line each.
     await open(withAsk([consultation({}), consultation({ id: "q2", question: "E a de 5 anos?" })]));
-    const text = group()?.textContent ?? "";
-    expect(text).toContain("Perguntou a 2 colegas");
-    expect(text).toContain("0 de 2");
+    const two = group()?.textContent ?? "";
+    expect(two).toContain("Perguntou a 2 colegas");
+    expect(two).toContain("0 de 2");
     expect(group()?.querySelectorAll(".ac-tools__line")).toHaveLength(2);
   });
 
@@ -172,6 +171,8 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
     await open(withAsk([consultation({ waiting: "computer" })]));
     const text = group()?.textContent ?? "";
     expect(text).toContain("Atlas espera o computador voltar");
+    // Still out, on its own line: no head with the count.
+    expect(group()?.querySelector(".ac-tools__head")).toBeNull();
     expect(group()?.querySelector(".ac-tools__line")?.getAttribute("data-s")).toBe("run");
     expect(text).not.toContain("espera uma");
   });
