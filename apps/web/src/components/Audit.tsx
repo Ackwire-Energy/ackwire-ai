@@ -58,7 +58,11 @@ export function AuditSection() {
   // Esc closes the panel, like a thread's.
   useEffect(() => {
     if (!openId) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpenId(null);
+    // An Escape a dialog over the panel took (the request's, from "Ver o pedido") is the dialog's alone.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[role="dialog"]')) return;
+      setOpenId(null);
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [openId]);

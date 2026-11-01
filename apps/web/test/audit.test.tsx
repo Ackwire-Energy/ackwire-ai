@@ -156,6 +156,11 @@ describe("Configurações → Auditoria", () => {
     await settle(4);
     expect(r.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/audit`);
     expect(document.querySelector(".ap-dialog")?.textContent).toContain("Run deploy workflow");
+    // Escape dismisses the request alone; the row stays open under it.
+    await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
+    await settle(2);
+    expect(document.querySelector(".ap-dialog")).toBeNull();
+    expect(screen().getByRole("complementary", { name: "Detalhe da auditoria" })).toBeTruthy();
   });
 
   test("a call waiting for a secret says what became of it", async () => {
