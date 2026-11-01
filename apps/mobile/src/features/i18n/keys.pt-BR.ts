@@ -748,6 +748,8 @@ export const featureKeysPtBR = {
       routine_paused_other: "Rotina pausada",
       routine_stalled_one: "Rotina esperando o computador",
       routine_stalled_other: "Rotina esperando o computador",
+      agent_unreached_one: "Rotina não conseguiu chamar um agente",
+      agent_unreached_other: "Rotina não conseguiu chamar um agente",
       reaction_one: "{{names}} reagiu",
       reaction_other: "{{names}} reagiram",
       browser_handoff_one: "{{names}} precisa de você no navegador",

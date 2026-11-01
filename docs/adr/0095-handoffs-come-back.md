@@ -48,3 +48,14 @@ A hand-off is a tracked row. It comes back by itself, once, with what came of it
 - A real-model eval in CI: evals stay manual (`eval/README.md`) and the release waits on them.
 - Files that travel with a hand-off and move to the person's conversation when it comes back: the next step, without a migration.
 - Continuar from the person's conversation for a colleague at its step limit: its wrap-up comes back as the result, and the delegating agent decides whether to hand it again.
+
+## Addendum (2026-11-01): a mention never reaches nobody
+
+An agent's @mention of an agent of the workspace that isn't a member of the conversation used to be plain text: no run, and only the author read about it in its next context. Now, once an agent's message is dispatched (`message.posted`), `settleReach` (`reach.ts`) settles every agent it named and didn't wake:
+
+- **Outside the conversation**: the mention judge (ADR 0089) reads it with the members; one it needs goes as a note (`sendNote`, the delivery `tell_agent` uses), so its result comes back as any note's does. Only when the person behind the message, or the creator of the routine set to act behind it (ADR 0053 §4), may talk to that agent; a routine that only looks reaches none; an agent already in the chain or already told by this run gets nothing new.
+- **Not woken for who is behind it**: a member the requester can't talk to (`dispatchMentions` now returns them as `blocked`).
+
+Each is written on the message (`meta.reach`: agent, reason, the note's consultation, whether it was outside, whose reach fell short, the routine), drawn under it on web and phone (with Ver, Adicionar ao canal for who manages channels, and "Deixar … falar com …" for who may change the agent's audience), and read by the author in its next context. Every skip goes in the message's `routing_decisions` row with one of three reasons: `not_in_channel`, `audience`, `routine_creator_reach`. When a routine set to act couldn't reach an agent, its owner gets `agent_unreached` (once per routine and agent), opening the message. The routine dialog warns, without blocking, about agents its prompt names that it won't reach.
+
+What doesn't change: who may wake whom. The limit of a routine's creator and an agent's audience stay as they were; this only makes hitting them visible.

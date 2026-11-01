@@ -31,6 +31,7 @@ import { type MessageMedia, mediaOf } from "./media";
 import { type Message, unreachedNote } from "./messages";
 import { missionBrief } from "./mission-brief";
 import { handoffGuidance, noticeForOthers, noticeText } from "./notices";
+import { reachNote, reachOf } from "./reach";
 import { byAnotherAgent, WHY_AN_AGENT_CALLED, WHY_YOU_WERE_CALLED } from "./reply-policy";
 import { isRoutineRoomKey, type RoutineBrief, routineAccessOf, routineBriefOf, routineReportOf } from "./routine-brief";
 import { type AgentRun, replyThreadOf } from "./runs";
@@ -1420,11 +1421,13 @@ function undoNotes(meta: Record<string, unknown> | undefined): string {
 
 /** `meta.unreachedAgents` (the agents its mentions didn't reach: not in this conversation) as a line; "" when none. */
 function unreachedLine(meta: Record<string, unknown> | undefined, canAdd: boolean): string {
+  const reach = reachOf(meta);
+  const settled = new Set(reach.map((e) => e.handle));
   const handles = Array.isArray(meta?.unreachedAgents)
-    ? meta.unreachedAgents.filter((h): h is string => typeof h === "string")
+    ? meta.unreachedAgents.filter((h): h is string => typeof h === "string" && !settled.has(h))
     : [];
   const note = unreachedNote(handles, "this conversation", canAdd);
-  return note ? `[Not delivered]: ${note}` : "";
+  return [note ? `[Not delivered]: ${note}` : "", reachNote(reach)].filter(Boolean).join("\n");
 }
 
 /**

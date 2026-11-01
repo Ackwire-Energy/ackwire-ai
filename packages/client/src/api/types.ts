@@ -4683,6 +4683,8 @@ export type NotificationKind =
   | "routine_paused"
   /** A routine waits for its computer (once per outage; `source.machineId`). Opens it in Rotinas. */
   | "routine_stalled"
+  /** A routine set to act named an agent its creator can't talk to (the agent's owner). Opens the message. */
+  | "agent_unreached"
   | "reaction"
   /** ADR 0036 §5: a new computer joined the organization (admins). `source.machineId`; `source.label` = its name. */
   | "machine_connected"

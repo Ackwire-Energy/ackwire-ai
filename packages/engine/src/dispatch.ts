@@ -19,6 +19,8 @@ export interface DispatchResult {
   runs: AgentRun[];
   /** Why nothing was started, when nothing was. */
   skipped?: "no_mentions" | "hop_limit" | "message_missing";
+  /** Members it mentions that the person behind it (or the acting routine's creator) can't talk to: no run. */
+  blocked?: string[];
 }
 
 /** What starting a run on a message reads of it. */
@@ -257,9 +259,10 @@ export async function dispatchMentions(
   const requester =
     (await requesterOf(db, message)) ??
     (message.agentRunId ? routineCreatorOf(await runAuthorityById(db, message.orgId, message.agentRunId)) : null);
-  const eligible = await eligibleChannelAgents(db, message.orgId, message.channelId, candidates, {
-    requesterUserId: requester,
-  });
+  const [members, eligible] = await Promise.all([
+    eligibleChannelAgents(db, message.orgId, message.channelId, candidates),
+    eligibleChannelAgents(db, message.orgId, message.channelId, candidates, { requesterUserId: requester }),
+  ]);
   const runs = await db.transaction((tx) =>
     createAgentRuns(
       tx,
@@ -268,7 +271,8 @@ export async function dispatchMentions(
       "mention",
     ),
   );
-  return { runs };
+  const blocked = members.filter((m) => !eligible.some((e) => e.id === m.id)).map((m) => m.id);
+  return { runs, ...(blocked.length > 0 ? { blocked } : {}) };
 }
 
 /**

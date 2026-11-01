@@ -8,7 +8,9 @@ import {
   useRuleDescribe,
   useRuleParse,
 } from "@agenteschat/client";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { splitAddresses } from "@agenteschat/client/lib/mail";
+import { routineReachWarnings } from "@agenteschat/client/lib/reach";
 import { busyOnComputer, runsPerDay } from "@agenteschat/client/lib/routine-view";
 import { timezoneName, zoneDisplayName } from "@agenteschat/client/lib/routines";
 import { router } from "expo-router";
@@ -30,6 +32,7 @@ import {
   Text,
   useToast,
 } from "@/ui";
+import { boldRuns } from "../chat/actions";
 import { ZoneList } from "../me/AccountPage";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
@@ -671,6 +674,23 @@ function Form({ routine }: { routine: Routine | undefined }) {
           ))}
         </GroupedList>
         <GroupedFooter>{t("routines.access.hint")}</GroupedFooter>
+        {routineReachWarnings(d.prompt, dir.agents, { access: d.access, agentId: d.agentId || null }).map((w) => (
+          <Text key={w.agent.id} variant="footnote" tone="ink2" style={styles.error} accessibilityLiveRegion="polite">
+            {boldRuns(
+              t(w.kind === "read" ? "routines.reachWarning.read" : "routines.reachWarning.blocked", {
+                ...agentGrammar(t, w.agent.name),
+              }) as string,
+            ).map((r, i) =>
+              r.bold ? (
+                <Text key={String(i)} variant="footnote" tone="ink" style={styles.bold}>
+                  {r.text}
+                </Text>
+              ) : (
+                r.text
+              ),
+            )}
+          </Text>
+        ))}
         {routine && !isDoneOnce(routine) ? (
           <>
             <View style={styles.gap} />
@@ -728,5 +748,6 @@ const styles = StyleSheet.create({
   utc: { paddingTop: 7, paddingHorizontal: 16, gap: 4 },
   link: { fontWeight: "600", textDecorationLine: "underline" },
   error: { paddingTop: 7, paddingHorizontal: 16 },
+  bold: { fontWeight: "600" },
   noMail: { paddingTop: 10, paddingHorizontal: 16, gap: 10, alignItems: "flex-start" },
 });

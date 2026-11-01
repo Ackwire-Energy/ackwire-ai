@@ -1614,6 +1614,19 @@ export const en: Translations = {
     undone: "Undone",
     group: "Memory updated by {{name}}",
   },
+  reach: {
+    group: "Who the message didn't call directly",
+    handed: "Handed to <b>{{name}}</b> by direct message, {{she}} isn't in {{place}}",
+    blocked: "Couldn't call <b>{{name}}</b>: only the people who look after {{pronoun}} can",
+    routineRead: "Couldn't call <b>{{name}}</b>: this routine only looks and tells",
+    outside: "Not in {{place}}",
+    routine: "Routine {{name}}",
+    see: "See",
+    add: "Add to channel",
+    added: "{{name}} joined the channel.",
+    allow: "Let {{person}} talk to {{pronoun}}",
+    allowed: "Done: {{person}} can now talk to {{name}}.",
+  },
   teamChecks: {
     group: "What the agent didn't repeat",
     teammate: "Didn't repeat: <b>{{who}}</b> already did this with {{target}} {{when}}",
@@ -2189,6 +2202,7 @@ export const en: Translations = {
       routineFailed: "<b>{{name}}</b> couldn't run a routine",
       routinePaused: "A routine of <b>{{name}}</b> was paused",
       routineStalled: "<b>{{name}}</b> is waiting for the computer to run a routine",
+      agentUnreached: "A routine couldn't call <b>{{name}}</b>",
       machineConnected: "<b>{{name}}</b> connected the computer <b>{{label}}</b>",
       machineConnectedAny: "<b>{{name}}</b> connected a computer",
       browserHandoff: "<b>{{name}}</b> needs you in the browser",
@@ -4117,6 +4131,12 @@ export const en: Translations = {
       runs_other: "{{count}} runs",
       tokens: "{{tokens}} plan tokens",
       cost: "{{cost}} on the API",
+    },
+    reachWarning: {
+      blocked:
+        "This routine won't be able to call <b>{{name}}</b>: only the people who look after {{pronoun}} can. The rest of the routine runs as usual.",
+      read: "This routine only looks and tells, so it won't call <b>{{name}}</b>. To call it, pick Can act.",
+      allow: "Let {{person}} talk to {{pronoun}}",
     },
     access: {
       read: "Only look and tell",

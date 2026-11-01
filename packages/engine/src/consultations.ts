@@ -273,36 +273,14 @@ function createTellAgentTool(deps: { pubsub?: PubSub; ai?: AiCheck }): ToolDefin
       if (same) return same;
       const atLimit = await refusedAtLimit(db, reached.run, target.id);
       if (atLimit) return atLimit;
-      const consultationId = Bun.randomUUIDv7();
-      const sent = await db.transaction(async (tx) => {
-        const channel = await openAgentDm(tx, ctx.orgId, ctx.agentId, target.id);
-        if (await sameNoteSent(tx, ctx, channel.id, body)) return null;
-        const message = await insertMessage(tx, {
-          orgId: ctx.orgId,
-          channelId: channel.id,
-          author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: reached.hop },
-          body,
-          // `agentNote`: the run it came from (the same-note check, `peopleRun`); `consultation`: its row.
-          meta: { agentNote: { runId: ctx.runId }, consultation: { id: consultationId } },
-        });
-        // A run of the other agent at work in this DM for the same person takes it: the row waits on that run.
-        const started = await startOrJoinRun(tx, message, target.id, "dm");
-        await tx.insert(agentConsultations).values({
-          id: consultationId,
-          orgId: ctx.orgId,
-          kind: "note",
-          askerRunId: ctx.runId,
-          askerAgentId: ctx.agentId,
-          targetAgentId: target.id,
-          channelId: channel.id,
-          messageId: message.id,
-          targetRunId: started ? ("created" in started ? started.created.id : started.joined) : null,
-          waitId: `${ASYNC_WAIT}${Bun.randomUUIDv7()}`,
-          question: body,
-          chain,
-          expiresAt: new Date(Date.now() + CONSULTATION_TTL_MS),
-        });
-        return message;
+      const sent = await sendNote(db, {
+        orgId: ctx.orgId,
+        agentId: ctx.agentId,
+        runId: ctx.runId,
+        hop: reached.hop,
+        targetAgentId: target.id,
+        body,
+        chain,
       });
       if (!sent) {
         return {
@@ -326,13 +304,67 @@ function createTellAgentTool(deps: { pubsub?: PubSub; ai?: AiCheck }): ToolDefin
             ? `Handed to @${handle}. Your answer goes back once @${handle} is done, together with what came of it: do your own part now, then end your turn saying what you handed on.`
             : `Handed to @${handle}; it's on it, and the people here can see that. What comes of it reaches you here by itself once everything you handed off this turn is back. Tell the people in a line who has it, without promising a time, then do your own part or end your turn.`,
         data: {
-          agentNote: { messageId: sent.id, agentId: target.id },
-          consultation: { id: consultationId, agentId: target.id },
+          agentNote: { messageId: sent.message.id, agentId: target.id },
+          consultation: { id: sent.consultationId, agentId: target.id },
         },
       };
     },
   };
 }
+
+/**
+ * A note from a run to another agent (`tell_agent`'s delivery, also an @mention of an agent outside the
+ * conversation, `reach.ts`): into the two agents' private DM, taken by the other agent's run at work there for the
+ * same person or starting one, tracked as a `note` row whose result comes back to the sending run's conversation
+ * (`reportHandOffs`). The caller checked who may be reached. Null: the same note went out within the hour.
+ */
+export async function sendNote(
+  db: Database,
+  input: {
+    orgId: string;
+    agentId: string;
+    runId: string;
+    hop: number;
+    targetAgentId: string;
+    body: string;
+    chain: string[];
+  },
+) {
+  const consultationId = Bun.randomUUIDv7();
+  return db.transaction(async (tx) => {
+    const channel = await openAgentDm(tx, input.orgId, input.agentId, input.targetAgentId);
+    if (await sameNoteSent(tx, input, channel.id, input.body)) return null;
+    const message = await insertMessage(tx, {
+      orgId: input.orgId,
+      channelId: channel.id,
+      author: { type: "agent", agentId: input.agentId, runId: input.runId, hop: input.hop },
+      body: input.body,
+      // `agentNote`: the run it came from (the same-note check, `peopleRun`); `consultation`: its row.
+      meta: { agentNote: { runId: input.runId }, consultation: { id: consultationId } },
+    });
+    // A run of the other agent at work in this DM for the same person takes it: the row waits on that run.
+    const started = await startOrJoinRun(tx, message, input.targetAgentId, "dm");
+    await tx.insert(agentConsultations).values({
+      id: consultationId,
+      orgId: input.orgId,
+      kind: "note",
+      askerRunId: input.runId,
+      askerAgentId: input.agentId,
+      targetAgentId: input.targetAgentId,
+      channelId: channel.id,
+      messageId: message.id,
+      targetRunId: started ? ("created" in started ? started.created.id : started.joined) : null,
+      waitId: `${ASYNC_WAIT}${Bun.randomUUIDv7()}`,
+      question: input.body,
+      chain: input.chain,
+      expiresAt: new Date(Date.now() + CONSULTATION_TTL_MS),
+    });
+    return { message, consultationId };
+  });
+}
+
+/** The agents already in the chain of consultations a run answers, for a note sent from outside a tool call. */
+export const chainOfRun = (db: Executor, orgId: string, runId: string) => chainOf(db, { orgId, runId });
 
 /** A note with the same text to the same agent within this long is dropped (a loop, or a routine's repeats). */
 export const NOTE_DEDUPE_MS = 3600_000;
