@@ -491,6 +491,10 @@ const NOTICE_ANSWER_MAX = 8_000;
 /** How much of a reply and what came back with it a row keeps. */
 const ANSWER_MAX = 16_000;
 
+/** How the answer a run in an agents' DM owes carries a part another agent did (`handBack`): agents read it so. */
+const handedPartLine = (handle: string, by: string, text: string) =>
+  `[@${handle}, to whom @${by} handed part of it]: ${text}`;
+
 async function handleOf(db: Executor, orgId: string, agentId: string) {
   const [a] = await db
     .select({ handle: agents.handle })
@@ -632,7 +636,7 @@ export async function handOffsFrom(
  * Closes a consultation (once: compare-and-set from open) and tells the asker what came of it, by where the asking
  * run works:
  * - it paused on the answer (before 2026-10-23): it resumes with it;
- * - in an agents' DM, answering another agent: `handBack`;
+ * - in an agents' DM, answering another agent: `handBack`, in the close's own transaction;
  * - in a person's conversation: a question's answer comes as its notice, a note's with the rest of that turn's
  *   notes (`reportHandOffs`).
  * `told`: nothing in it for the sender (a note's acknowledgement): reported as it closes, with no notice. The
@@ -646,15 +650,24 @@ async function closeConsultation(
   options: { told?: boolean } = {},
 ) {
   const now = new Date();
-  const [closed] = await deps.db
-    .update(agentConsultations)
-    .set({ status, answer, answeredAt: now, ...(options.told ? { reportedAt: now } : {}) })
-    .where(and(eq(agentConsultations.id, row.id), eq(agentConsultations.status, "open")))
-    .returning();
-  if (!closed) return null;
-  const [asker] = await deps.db.select().from(agentRuns).where(eq(agentRuns.id, closed.askerRunId));
+  const out = await deps.db.transaction(async (tx) => {
+    const [closed] = await tx
+      .update(agentConsultations)
+      .set({ status, answer, answeredAt: now, ...(options.told ? { reportedAt: now } : {}) })
+      .where(and(eq(agentConsultations.id, row.id), eq(agentConsultations.status, "open")))
+      .returning();
+    if (!closed) return null;
+    // Locked until this commits: a run that asked from an agents' DM neither ends nor reads its inbox in between, so
+    // what came back is in what it owes before anything settles that.
+    const [asker] = await tx.select().from(agentRuns).where(eq(agentRuns.id, closed.askerRunId)).for("update");
+    const handle = await handleOf(tx, closed.orgId, closed.targetAgentId);
+    const between = Boolean(asker && isAsyncConsultation(closed) && (await inAgentsDm(tx, asker)));
+    const delivered = asker && between ? await handBack(tx, asker, closed, handle, Boolean(options.told)) : null;
+    return { closed, asker, handle, between, delivered };
+  });
+  if (!out) return null;
+  const { closed, asker, handle } = out;
   if (!asker) return closed;
-  const handle = await handleOf(deps.db, closed.orgId, closed.targetAgentId);
   if (!isAsyncConsultation(closed)) {
     const notice = consultationNotice(closed, handle);
     await resumeRunWithResult(deps.db, {
@@ -672,16 +685,18 @@ async function closeConsultation(
       late: { kind: notice.kind, text: notice.text, from: notice.from },
       pubsub: deps.pubsub,
     });
-  } else if (await inAgentsDm(deps.db, asker)) {
-    await handBack(deps, asker, closed, handle, Boolean(options.told));
+  } else if (out.between) {
+    if (out.delivered) await publishDelivery(deps.pubsub, out.delivered).catch(() => {});
+    // Its run already ended: what it owes goes back once nothing it handed on is out.
+    if (asker.status === "done") await settleOwed(deps, asker, "done");
   } else if (closed.kind === "note") {
     // Its own close committed: this claim sees it, and every sibling that closed before.
     await reportHandOffs(deps, asker);
   } else {
     const delivered = await deps.db.transaction(async (tx) => {
-      const out = await deliverNoticeToRun(tx, asker, consultationNotice(closed, handle));
+      const sent = await deliverNoticeToRun(tx, asker, consultationNotice(closed, handle));
       await tx.update(agentConsultations).set({ reportedAt: now }).where(eq(agentConsultations.id, closed.id));
-      return out;
+      return sent;
     });
     await publishDelivery(deps.pubsub, delivered).catch(() => {});
   }
@@ -700,55 +715,123 @@ async function closeConsultation(
 
 /**
  * What came of a question or note asked from an agents' DM, for the run there that asked (it answers another agent,
- * ADR 0094). While that run works, it reads it at its next step. Once it ended, what came of it joins the answer that
- * run owes (`[@x, to whom @a handed part of it]: …`), which goes back once nothing it handed on is out. Nothing ever
- * starts a run in an agents' DM to read a result: no person would read what it says.
+ * ADR 0094), in the close's transaction with that run locked. It joins the answer that run owes for what it read
+ * (`[@x, to whom @a handed part of it]: …`), which goes back with its reply once nothing it handed on is out
+ * (`settleOwed`). A run still at work also reads it at its next step. Nothing starts a run in an agents' DM to read a
+ * result (`handOn` leaves one unread there): no person would read what it says. Returns the notice to publish.
  */
-async function handBack(deps: Deps, asker: AgentRun, closed: AgentConsultationRow, handle: string, told: boolean) {
-  const notice = consultationNotice(closed, handle);
-  if (asker.status === "queued" || asker.status === "running") {
-    if (told) return;
-    const delivered = await deps.db.transaction((tx) => deliverNoticeToRun(tx, asker, notice));
-    await publishDelivery(deps.pubsub, delivered).catch(() => {});
-    return;
-  }
-  const owed = await deps.db
-    .select()
-    .from(agentConsultations)
-    .where(
-      and(
-        eq(agentConsultations.orgId, asker.orgId),
-        eq(agentConsultations.targetRunId, asker.id),
-        eq(agentConsultations.status, "open"),
-      ),
+async function handBack(tx: Executor, asker: AgentRun, closed: AgentConsultationRow, handle: string, told: boolean) {
+  if (told) return null;
+  const owed = (
+    await tx
+      .select({ id: agentConsultations.id, messageId: agentConsultations.messageId })
+      .from(agentConsultations)
+      .where(
+        and(
+          eq(agentConsultations.orgId, asker.orgId),
+          eq(agentConsultations.targetRunId, asker.id),
+          eq(agentConsultations.status, "open"),
+        ),
+      )
+  ).filter((r) => !asker.pendingMessageIds.includes(r.messageId));
+  if (owed.length > 0) {
+    const line = handedPartLine(
+      handle,
+      await handleOf(tx, closed.orgId, closed.askerAgentId),
+      closed.status === "answered" && closed.answer
+        ? closed.answer
+        : `couldn't: ${closed.status === "expired" ? "it never got to it" : (closed.answer ?? "its run failed")}`,
     );
-  if (owed.length === 0) {
-    // It answers nothing still out: written for the record, waking nobody.
-    if (!told) await deps.db.transaction((tx) => deliverNoticeToRun(tx, asker, notice, { wake: false }));
-    return;
+    await tx
+      .update(agentConsultations)
+      .set({
+        answer: sql`left(concat_ws(${"\n\n"}::text, ${agentConsultations.answer}, ${line}::text), ${ANSWER_MAX}::int)`,
+      })
+      .where(
+        and(
+          inArray(
+            agentConsultations.id,
+            owed.map((r) => r.id),
+          ),
+          eq(agentConsultations.status, "open"),
+        ),
+      );
   }
-  const line = told
-    ? null
-    : `[@${handle}, to whom @${await handleOf(deps.db, closed.orgId, closed.askerAgentId)} handed part of it]: ${
-        closed.status === "answered" && closed.answer
-          ? closed.answer
-          : `couldn't: ${closed.status === "expired" ? "it never got to it" : (closed.answer ?? "its run failed")}`
-      }`;
-  const settled = isTerminal(asker.status) && !(await sentOpen(deps.db, asker));
-  for (const parent of owed) {
-    const answer = line ? [parent.answer, line].filter(Boolean).join("\n\n").slice(0, ANSWER_MAX) : parent.answer;
-    if (line) {
-      await deps.db
-        .update(agentConsultations)
-        .set({ answer })
-        .where(and(eq(agentConsultations.id, parent.id), eq(agentConsultations.status, "open")));
+  const notice = consultationNotice(closed, handle);
+  if (asker.status === "queued" || asker.status === "running") return deliverNoticeToRun(tx, asker, notice);
+  // It answers nothing still out: written for the record, waking nobody.
+  if (owed.length === 0) await deliverNoticeToRun(tx, asker, notice, { wake: false });
+  return null;
+}
+
+/**
+ * Closes what a run in an agents' DM owes now that it ended (ADR 0094), only what it read: a question or note still
+ * unread in its inbox goes to the run that answers it (`handOn`). Done: once nothing it asked or handed on is out,
+ * each with its reply, then what came back (`handBack`); a note's bare acknowledgement (the judge reads nothing in it
+ * for the sender) closes as told, with no notice. Failed or stopped: failed, with why. Null when it owes nothing.
+ */
+async function settleOwed(
+  deps: Deps,
+  run: { id: string; orgId: string },
+  status: "done" | "failed" | "canceled",
+  error?: string,
+): Promise<AgentConsultationRow[] | null> {
+  const owed = async () => {
+    const [ending] = await deps.db
+      .select({ pending: agentRuns.pendingMessageIds, reply: messages.body })
+      .from(agentRuns)
+      .leftJoin(messages, and(eq(messages.orgId, agentRuns.orgId), eq(messages.id, agentRuns.replyMessageId)))
+      .where(eq(agentRuns.id, run.id));
+    const rows = await deps.db
+      .select()
+      .from(agentConsultations)
+      .where(
+        and(
+          eq(agentConsultations.orgId, run.orgId),
+          eq(agentConsultations.targetRunId, run.id),
+          eq(agentConsultations.status, "open"),
+        ),
+      );
+    return { rows: rows.filter((r) => !ending?.pending.includes(r.messageId)), reply: ending?.reply?.trim() || null };
+  };
+  const first = await owed();
+  if (first.rows.length === 0) return null;
+  const closed: AgentConsultationRow[] = [];
+  if (status !== "done") {
+    for (const row of first.rows) {
+      const c = await closeConsultation(deps, row, "failed", error?.slice(0, 500) ?? status);
+      if (c) closed.push(c);
     }
-    if (settled) {
-      await (answer
-        ? closeConsultation(deps, { ...parent, answer }, "answered", answer)
-        : closeConsultation(deps, parent, "failed", "no reply"));
-    }
+    return closed;
   }
+  // Part of it handed on: it settles as the last of that comes back (`closeConsultation`).
+  if (await sentOpen(deps.db, run)) return closed;
+  // Read again: what came back meanwhile joined them.
+  const { rows, reply } = await owed();
+  for (const row of rows) {
+    const text = [reply, row.answer].filter(Boolean).join("\n\n").slice(0, ANSWER_MAX) || null;
+    if (!text) {
+      const c = await closeConsultation(deps, row, "failed", "no reply");
+      if (c) closed.push(c);
+      continue;
+    }
+    // With no judge, or when it fails, a reply counts as one the sender needs.
+    const told =
+      row.kind === "note" &&
+      !row.answer &&
+      reply !== null &&
+      Boolean(deps.judge) &&
+      !(await noteReplyMatters(deps.judge as Judge, {
+        orgId: run.orgId,
+        agentId: row.targetAgentId,
+        runId: run.id,
+        note: row.question,
+        reply,
+      }).catch(() => true));
+    const c = await closeConsultation(deps, row, "answered", text, { told });
+    if (c) closed.push(c);
+  }
+  return closed;
 }
 
 /**
@@ -827,12 +910,9 @@ export async function reportHandOffs(deps: Pick<Deps, "db" | "pubsub">, asker: A
 }
 
 /**
- * A run in an agents' DM ended (ADR 0034, ADR 0094): each question or note it was answering closes with its reply,
- * and the asker hears it (`closeConsultation`). A run that didn't finish closes them as failed. One that handed
- * part of its work on and still waits on it keeps them open with its reply (`handBack` closes them later, with what
- * came back). A note's bare acknowledgement (the judge reads nothing in it for the sender) closes as told, with no
- * notice. Waiting on a person, it keeps them open and holds up no other hand-off (`reportHandOffs`). A note sent
- * before notes were rows comes back as before (`noteReply`).
+ * A run in an agents' DM ended or paused (ADR 0034, ADR 0094). Ended, what it owes closes (`settleOwed`) and each
+ * asker hears it (`closeConsultation`); a note sent before notes were rows comes back as before (`noteReply`).
+ * Waiting on a person, it keeps them open and holds up no other hand-off (`reportHandOffs`).
  */
 export async function onConsultedRunFinished(
   deps: Deps,
@@ -859,69 +939,9 @@ export async function onConsultedRunFinished(
     }
     return [];
   }
-  // Several questions and notes may have reached the same run (it read the later ones at its next step).
-  const rows = await deps.db
-    .select()
-    .from(agentConsultations)
-    .where(
-      and(
-        eq(agentConsultations.orgId, run.orgId),
-        eq(agentConsultations.targetRunId, run.id),
-        eq(agentConsultations.status, "open"),
-      ),
-    );
-  if (rows.length === 0) {
-    if (status === "done") await noteReply(deps, run).catch(() => {});
-    return [];
-  }
-  const [last] =
-    status === "done"
-      ? await deps.db
-          .select({ body: messages.body })
-          .from(agentRuns)
-          .innerJoin(messages, and(eq(messages.orgId, agentRuns.orgId), eq(messages.id, agentRuns.replyMessageId)))
-          .where(eq(agentRuns.id, run.id))
-      : [];
-  const reply = last?.body?.trim() || null;
-  const handedOn = status === "done" && (await sentOpen(deps.db, run));
-  const closed: AgentConsultationRow[] = [];
-  for (const row of rows) {
-    if (status !== "done") {
-      const c = await closeConsultation(deps, row, "failed", error?.slice(0, 500) ?? status);
-      if (c) closed.push(c);
-      continue;
-    }
-    // Its reply first, then what came back while it wasn't running.
-    const text = [reply, row.answer].filter(Boolean).join("\n\n").slice(0, ANSWER_MAX) || null;
-    if (handedOn) {
-      await deps.db
-        .update(agentConsultations)
-        .set({ answer: text })
-        .where(and(eq(agentConsultations.id, row.id), eq(agentConsultations.status, "open")));
-      continue;
-    }
-    if (!text) {
-      const c = await closeConsultation(deps, row, "failed", "no reply");
-      if (c) closed.push(c);
-      continue;
-    }
-    // With no judge, or when it fails, a reply counts as one the sender needs.
-    const told =
-      row.kind === "note" &&
-      !row.answer &&
-      reply !== null &&
-      Boolean(deps.judge) &&
-      !(await noteReplyMatters(deps.judge as Judge, {
-        orgId: run.orgId,
-        agentId: row.targetAgentId,
-        runId: run.id,
-        note: row.question,
-        reply,
-      }).catch(() => true));
-    const c = await closeConsultation(deps, row, "answered", text, { told });
-    if (c) closed.push(c);
-  }
-  return closed;
+  const closed = await settleOwed(deps, run, status, error);
+  if (!closed && status === "done") await noteReply(deps, run).catch(() => {});
+  return closed ?? [];
 }
 
 /**

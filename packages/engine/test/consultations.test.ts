@@ -30,6 +30,7 @@ import {
   openAgentDm,
   postPersonMessage,
   recoverStaleRuns,
+  releaseInbox,
   reportHandOffs,
   runAuthority,
   STRETCH,
@@ -1291,7 +1292,8 @@ describe("tell_agent: what comes of work handed off comes back by itself (ADR 00
     await drainOutbox(f.db, handlers);
     const parent = (await consultations()).find((c) => c.targetAgentId === infra.id);
     expect((await runsOf(infra.id))[0]?.status).toBe("done");
-    expect(parent).toMatchObject({ status: "open", answer: "Deploy ok; passei a fila ao Ops." });
+    // Its reply joins as it closes: nothing came back yet.
+    expect(parent).toMatchObject({ status: "open", answer: null });
     expect((await consultationsIn(f.db, f.org.id, f.general.id)).find((c) => c.id === parent?.id)?.waiting).toBe(
       "agents",
     );
@@ -1309,11 +1311,12 @@ describe("tell_agent: what comes of work handed off comes back by itself (ADR 00
     expect(await runsOf(f.agent.id)).toHaveLength(2);
   });
 
-  test("what comes back while the agent that handed it on still works is read by that run, at its next step", async () => {
+  test("what comes back while the agent that handed it on still works is read at its next step, and joins its answer even if it ends first", async () => {
     f = await setup({ askAgent: true, judge: notesMatter });
     const infra = await addInfra();
     await addAgent("Ops");
     const dev = await devRun("@dev pede ao infra");
+    await ended(dev.id);
     await tell(dev, "@infra", "Cuida do deploy de staging.");
     const toInfra = (await consultations())[0];
     const infraRun = await runFor(toInfra);
@@ -1328,8 +1331,65 @@ describe("tell_agent: what comes of work handed off comes back by itself (ADR 00
       .from(schema.messages)
       .where(inArray(schema.messages.id, after?.pendingMessageIds ?? []));
     expect(pending.map((m) => (m.meta.notice as { kind?: string } | undefined)?.kind)).toEqual(["consult_reply"]);
-    expect((await consultations()).find((c) => c.id === toInfra?.id)).toMatchObject({ status: "open", answer: null });
+    const line = "[@ops, to whom @infra handed part of it]: Fila limpa.";
+    expect((await consultations()).find((c) => c.id === toInfra?.id)).toMatchObject({ status: "open", answer: line });
+
+    // It ends after its last look at its inbox: what came back still goes with its answer, and no run starts to read it.
+    await answered(infraRun, "Deploy feito.");
+    await releaseInbox(f.db, f.pubsub, infraRun, { reason: "done" });
+    expect((await consultations()).find((c) => c.id === toInfra?.id)).toMatchObject({
+      status: "answered",
+      answer: `Deploy feito.\n\n${line}`,
+    });
     expect(await runsOf(infra.id)).toHaveLength(1);
+    expect((await notesBack()).filter((m) => m.channelId === f.general.id)).toHaveLength(1);
+  });
+
+  test("what comes back between the end of the run that handed it on and that run's end hook joins its reply", async () => {
+    f = await setup({ askAgent: true, judge: notesMatter });
+    await addInfra();
+    await addAgent("Ops");
+    const dev = await devRun("@dev pede ao infra");
+    await ended(dev.id);
+    await tell(dev, "@infra", "Cuida do deploy de staging.");
+    const toInfra = (await consultations())[0];
+    const infraRun = await runFor(toInfra);
+    await tell(infraRun, "@ops", "Limpa a fila de jobs.");
+    const toOps = (await consultations()).find((c) => c.askerRunId === infraRun.id);
+    await endsWith(infraRun, "Deploy feito; passei a fila ao Ops.");
+    await answered(await runFor(toOps), "Fila limpa.");
+    await endHook(infraRun);
+    expect((await consultations()).find((c) => c.id === toInfra?.id)).toMatchObject({
+      status: "answered",
+      answer: "Deploy feito; passei a fila ao Ops.\n\n[@ops, to whom @infra handed part of it]: Fila limpa.",
+    });
+    expect(await notesBack()).toHaveLength(1);
+  });
+
+  test("two parts handed on that come back at once both join the answer", async () => {
+    f = await setup({ askAgent: true, judge: notesMatter });
+    await addInfra();
+    const ops = await addAgent("Ops");
+    const qa = await addAgent("QA");
+    const dev = await devRun("@dev pede ao infra");
+    await ended(dev.id);
+    await tell(dev, "@infra", "Cuida do deploy de staging.");
+    const toInfra = (await consultations())[0];
+    const infraRun = await runFor(toInfra);
+    await tell(infraRun, "@ops", "Limpa a fila de jobs.");
+    await tell(infraRun, "@qa", "Roda os testes de fumaça.");
+    await answered(infraRun, "Deploy feito.");
+    const partOf = async (agentId: string) => runFor((await consultations()).find((c) => c.targetAgentId === agentId));
+    const [opsRun, qaRun] = [await partOf(ops.id), await partOf(qa.id)];
+    await Promise.all([answered(opsRun, "Fila limpa."), answered(qaRun, "Testes verdes.")]);
+    const parent = (await consultations()).find((c) => c.id === toInfra?.id);
+    expect(parent?.status).toBe("answered");
+    expect(parent?.answer?.split("\n\n").sort()).toEqual([
+      "Deploy feito.",
+      "[@ops, to whom @infra handed part of it]: Fila limpa.",
+      "[@qa, to whom @infra handed part of it]: Testes verdes.",
+    ]);
+    expect(await notesBack()).toHaveLength(1);
   });
 
   test("colleagues whose runs both ended before either row closed: the sender still wakes once", async () => {
@@ -1353,6 +1413,128 @@ describe("tell_agent: what comes of work handed off comes back by itself (ADR 00
       [ops.id, "1"],
     ]);
     expect(await runsOf(f.agent.id)).toHaveLength(2);
+  });
+
+  test("a note that joined a run at work and wasn't read when it failed goes to a run of its own, whose answer comes back", async () => {
+    f = await setup({ askAgent: true, judge: notesMatter });
+    await addInfra();
+    const dev = await devRun("@dev pede ao infra");
+    await ended(dev.id);
+    await tell(dev, "@infra", "Confere a taxa de erro.");
+    const [first] = await consultations();
+    const working = await runFor(first);
+    await f.db.update(schema.agentRuns).set({ status: "running" }).where(eq(schema.agentRuns.id, working.id));
+    await tell(dev, "@infra", "E confere a fila de jobs.");
+    const joined = (await consultations()).find((c) => c.id !== first?.id);
+    expect(joined?.targetRunId).toBe(working.id);
+    // The executor's `fail`: failed, its end hook, then its unread messages get a run of their own.
+    await f.db.update(schema.agentRuns).set({ status: "failed" }).where(eq(schema.agentRuns.id, working.id));
+    await endHook(working, "failed", "model_error");
+    const released = await releaseInbox(f.db, f.pubsub, working, { reason: "failed" });
+    const own = await runFor({ targetRunId: released?.runId ?? null });
+    expect((await consultations()).find((c) => c.id === joined?.id)).toMatchObject({
+      status: "open",
+      targetRunId: own.id,
+    });
+    expect(await notesBack()).toEqual([]);
+    await answered(own, "Fila vazia: 0 jobs.");
+    const rowOf = async (id?: string) => (await consultations()).find((c) => c.id === id);
+    expect(await rowOf(first?.id)).toMatchObject({ status: "failed", answer: "model_error" });
+    expect(await rowOf(joined?.id)).toMatchObject({ status: "answered", answer: "Fila vazia: 0 jobs." });
+    expect((await notesBack()).map((m) => refsOf(m).status)).toEqual(["failed", "answered"]);
+  });
+
+  test("a note that joined a run at work after its last look at its inbox goes to a run of its own, not into that run's answer", async () => {
+    f = await setup({ askAgent: true, judge: notesMatter });
+    await addInfra();
+    const dev = await devRun("@dev pede ao infra");
+    await ended(dev.id);
+    await tell(dev, "@infra", "Confere a taxa de erro.");
+    const [first] = await consultations();
+    const working = await runFor(first);
+    await f.db.update(schema.agentRuns).set({ status: "running" }).where(eq(schema.agentRuns.id, working.id));
+    await tell(dev, "@infra", "E confere a fila de jobs.");
+    const joined = (await consultations()).find((c) => c.id !== first?.id);
+    const rowOf = async (id?: string) => (await consultations()).find((c) => c.id === id);
+    // It ends with its answer to the first: its end hook, then what it didn't read gets a run of its own.
+    await answered(working, "Taxa de erro normal.");
+    expect(await rowOf(first?.id)).toMatchObject({ status: "answered", answer: "Taxa de erro normal." });
+    expect(await rowOf(joined?.id)).toMatchObject({ status: "open" });
+    const released = await releaseInbox(f.db, f.pubsub, working, { reason: "done" });
+    const own = await runFor({ targetRunId: released?.runId ?? null });
+    expect(await rowOf(joined?.id)).toMatchObject({ status: "open", targetRunId: own.id });
+    await answered(own, "Fila vazia: 0 jobs.");
+    expect(await rowOf(joined?.id)).toMatchObject({ status: "answered", answer: "Fila vazia: 0 jobs." });
+    expect((await notesBack()).map((m) => [refsOf(m).consultationId, refsOf(m).wake ?? null])).toEqual([
+      [first?.id, null],
+      [joined?.id, "1"],
+    ]);
+  });
+
+  test("a note that joined a run at work and wasn't read when it paused on an approval goes to a run of its own; the rest wait for it", async () => {
+    const github = fakeGithub();
+    let dev: AgentRun | undefined;
+    let joining: Promise<unknown> | undefined;
+    f = await setup({
+      askAgent: true,
+      judge: notesMatter,
+      toolSources: [github.source],
+      reply: (req) => {
+        if (youAre(req, "Ops")) return answer("Deploy conferido.");
+        if (!youAre(req, "Infra")) return answer("Pronto.");
+        if (lastText(req).includes("E confere a fila")) return answer("Fila vazia: 0 jobs.");
+        // The second note comes in while it thinks, after its last look at its inbox.
+        joining ??= tell(dev as AgentRun, "@infra", "E confere a fila de jobs.");
+        return {
+          chunks: ["Fazendo o merge."],
+          hold: joining,
+          toolUses: [
+            {
+              name: "github_merge_pr",
+              input: {
+                repo: "acme/app",
+                pr: 7,
+                why: "The checks passed and the change was reviewed: this action finishes what was asked.",
+              },
+            },
+          ],
+        };
+      },
+    });
+    const infra = await addInfra();
+    const ops = await addAgent("Ops");
+    await grantScopes(f.db, f.org.id, infra.id, ALL_GITHUB_SCOPES);
+    const { handlers, release } = holding(infra.id);
+    dev = await devRun("@dev faz o deploy com o infra e o ops");
+    await ended(dev.id);
+    await tell(dev, "@infra", "Faz o merge do PR #7.");
+    await tell(dev, "@ops", "Confere o deploy.");
+    await drainOutbox(f.db, handlers);
+    expect(await notesBack()).toEqual([]);
+
+    await release(infra.id);
+    const infraRuns = await runsOf(infra.id);
+    const paused = infraRuns.find((r) => r.status === "waiting_approval");
+    const own = infraRuns.find((r) => r.status === "queued");
+    const rowOf = async (question: string) => (await consultations()).find((c) => c.question === question);
+    expect(await rowOf("Faz o merge do PR #7.")).toMatchObject({ status: "open", targetRunId: paused?.id });
+    expect(await rowOf("E confere a fila de jobs.")).toMatchObject({ status: "open", targetRunId: own?.id });
+    // That note is being worked on again: Ops's result waits for it.
+    expect(await notesBack()).toEqual([]);
+
+    await release(infra.id);
+    expect(await rowOf("E confere a fila de jobs.")).toMatchObject({
+      status: "answered",
+      answer: "Fila vazia: 0 jobs.",
+    });
+    const back = await notesBack();
+    expect(back.map((m) => [refsOf(m).agentId, refsOf(m).wake ?? null, refsOf(m).pending ?? null])).toEqual([
+      [ops.id, null, null],
+      [infra.id, "1", "@infra"],
+    ]);
+    const read = f.provider.calls.map((c) => lastText(c.request)).find((t) => t.includes("Fila vazia: 0 jobs."));
+    expect(read).toContain("Still out, waiting on a person or a computer: @infra.");
+    expect(await rowOf("Faz o merge do PR #7.")).toMatchObject({ status: "open" });
   });
 
   test("an agent that fails after handing part on: what it owed fails at once, and what comes back later wakes nobody", async () => {

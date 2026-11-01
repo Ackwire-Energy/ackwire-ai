@@ -622,7 +622,7 @@ export const agentConsultations = pgTable(
     chain: uuid().array().notNull(),
     status: agentConsultationStatusEnum().notNull().default("open"),
     kind: agentConsultationKindEnum().notNull().default("question"),
-    /** Once closed, what came of it; while open after its run handed part on, its reply and what came back so far. */
+    /** Once closed, what came of it; while open, what came back so far from agents its run handed part to. */
     answer: text(),
     answeredAt: timestamp({ withTimezone: true }),
     /** The sender heard what came of it, or there was nothing worth telling it (a note's acknowledgement). */

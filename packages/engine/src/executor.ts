@@ -678,15 +678,16 @@ async function executeRunInner(
     if (channelRow?.kind === "forum" && status !== "waiting_approval") {
       await onForumRunFinished({ db, pubsub: deps.pubsub }, run.orgId, run.channelId, run.id).catch(() => {});
     }
+    // Paused on a decision (an approval, a secret, a mission's): what came in during this turn and wasn't
+    // read gets a run of its own; nothing sent to the agent waits behind the decision. Before the consultation hook:
+    // a hand-off among them is being worked on again, not waiting on a person (`reportHandOffs`).
+    if ((status === "waiting_approval" || status === "waiting_input") && !run.background)
+      await releaseHeldInbox(db, deps.pubsub, run.id).catch(() => null);
     // It answered another agent's question (ADR 0034): the asking run resumes with the reply.
     if (channelRow && isAgentOnlyDm(channelRow))
       await onConsultedRunFinished({ db, pubsub: deps.pubsub, judge: deps.context?.judge }, run, status, error).catch(
         () => {},
       );
-    // Paused on a decision (an approval, a secret, a mission's): what came in during this turn and wasn't
-    // read gets a run of its own; nothing sent to the agent waits behind the decision.
-    if ((status === "waiting_approval" || status === "waiting_input") && !run.background)
-      await releaseHeldInbox(db, deps.pubsub, run.id).catch(() => null);
     // A routine's run is heard through its ledger (`closeRoutineRun`, on every ending), never from here.
   };
 

@@ -1,12 +1,13 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { mayJoin, type RunTrigger, startOrJoinRun } from "./dispatch";
+import { isAgentOnlyDm } from "./dms";
 import { publishChannelEvent } from "./events";
 import type { Message } from "./messages";
 import { holdsMessages } from "./run-hold";
 import { type AgentRun, addRunStep, replyThreadOf } from "./runs";
 
-const { agentRuns, agents, channels, messages } = schema;
+const { agentConsultations, agentRuns, agents, channels, messages } = schema;
 
 /**
  * A run's inbox (`agent_runs.pending_message_ids`): messages sent to the agent's conversation while
@@ -69,7 +70,7 @@ export async function releaseInbox(
   run: Pick<AgentRun, "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId" | "trigger">,
   options: { reason: ReleaseReason; exclude?: string[] },
 ): Promise<{ runId: string; messageIds: string[] } | null> {
-  const taken = await takeInbox(db, run.id).catch(() => [] as string[]);
+  const taken = await takeToHandOn(db, run).catch(() => [] as string[]);
   return handOn(db, pubsub, run, taken, options);
 }
 
@@ -87,22 +88,42 @@ export async function handOnMessages(
 ): Promise<{ runId: string; messageIds: string[] } | null> {
   // Forum turns are driven by the topic: nothing is handed on from them.
   if (messageIds.length === 0 || run.trigger === "forum") return null;
-  const taken = await db.transaction(async (tx) => {
+  const taken = await takeToHandOn(db, run, messageIds);
+  return handOn(db, pubsub, run, taken, { reason: "held" });
+}
+
+/**
+ * Takes unread messages out of a run's inbox (all of them, or those of `only` still there) to hand them on. A
+ * question or note from another agent among them is no longer this run's to answer: its row waits on no run until
+ * the run that takes it adopts it (`handOn`), and past its deadline it expires (ADR 0094).
+ */
+async function takeToHandOn(db: Database, run: Pick<AgentRun, "id" | "orgId">, only?: string[]) {
+  return db.transaction(async (tx) => {
     const [row] = await tx
       .select({ pending: agentRuns.pendingMessageIds })
       .from(agentRuns)
       .where(eq(agentRuns.id, run.id))
       .for("update");
     const pending = row?.pending ?? [];
-    const ids = pending.filter((id) => messageIds.includes(id));
+    const ids = only ? pending.filter((id) => only.includes(id)) : pending;
     if (ids.length === 0) return [];
     await tx
       .update(agentRuns)
       .set({ pendingMessageIds: pending.filter((id) => !ids.includes(id)) })
       .where(eq(agentRuns.id, run.id));
+    await tx
+      .update(agentConsultations)
+      .set({ targetRunId: null })
+      .where(
+        and(
+          eq(agentConsultations.orgId, run.orgId),
+          inArray(agentConsultations.messageId, ids),
+          eq(agentConsultations.targetRunId, run.id),
+          eq(agentConsultations.status, "open"),
+        ),
+      );
     return ids;
   });
-  return handOn(db, pubsub, run, taken, { reason: "held" });
 }
 
 /**
@@ -128,11 +149,20 @@ async function handOn(
   // An archived (or deleted) agent answers nobody: a run of its own would only fail, so what it was sent is dropped.
   const [agent] = await db.select({ archivedAt: agents.archivedAt }).from(agents).where(eq(agents.id, run.agentId));
   if (!agent || agent.archivedAt) return null;
-  const rows = await db
-    .select()
-    .from(messages)
-    .where(and(eq(messages.orgId, run.orgId), inArray(messages.id, ids), isNull(messages.deletedAt)))
-    .orderBy(asc(messages.createdAt));
+  const [channel] = await db
+    .select({ kind: channels.kind, dmKey: channels.dmKey })
+    .from(channels)
+    .where(eq(channels.id, run.channelId));
+  const betweenAgents = Boolean(channel && isAgentOnlyDm(channel));
+  // Between agents, a colleague's result the run didn't read is already in the answer it owes (`handBack`): no run
+  // starts to read it.
+  const rows = (
+    await db
+      .select()
+      .from(messages)
+      .where(and(eq(messages.orgId, run.orgId), inArray(messages.id, ids), isNull(messages.deletedAt)))
+      .orderBy(asc(messages.createdAt))
+  ).filter((m) => !(betweenAgents && (m.meta.notice as { kind?: unknown } | undefined)?.kind === "consult_reply"));
   // The trigger: the last person's message, else the last notice (a routine's report, another agent's
   // answer: events the agent must act on), else another agent's call. The agent's own fast reply
   // (talker) is context only: it never starts a run by itself.
@@ -144,17 +174,37 @@ async function handOn(
   if (!last) return null;
   const trigger = await triggerFor(db, run, last);
   const started = await db.transaction(async (tx) => {
+    // A question or note from another agent is answered by the run that has it now (ADR 0094).
+    const adopt = (runId: string, messageIds: string[]) =>
+      tx
+        .update(agentConsultations)
+        .set({ targetRunId: runId })
+        .where(
+          and(
+            eq(agentConsultations.orgId, run.orgId),
+            inArray(agentConsultations.messageId, messageIds),
+            isNull(agentConsultations.targetRunId),
+            eq(agentConsultations.status, "open"),
+          ),
+        );
     const out = await startOrJoinRun(tx, last, run.agentId, trigger);
     if (!out) return out;
     const taker = "created" in out ? out.created.id : out.joined;
+    const taken = [last.id];
     for (const m of rows) {
       if (m.id === last.id) continue;
       // One that may not reach the run that took them (a routine's report next to a person's message,
       // ADR 0053 §4) goes its own way.
-      if (!(await mayJoin(tx, m, taker))) await startOrJoinRun(tx, m, run.agentId, await triggerFor(tx, run, m));
+      if (!(await mayJoin(tx, m, taker))) {
+        const own = await startOrJoinRun(tx, m, run.agentId, await triggerFor(tx, run, m));
+        if (own) await adopt("created" in own ? own.created.id : own.joined, [m.id]);
+        continue;
+      }
       // Joined a run that already read its context: the rest go to it too (a new run reads them in the conversation).
-      else if ("joined" in out) await queueOnRun(tx, out.joined, m.id);
+      if ("joined" in out) await queueOnRun(tx, out.joined, m.id);
+      taken.push(m.id);
     }
+    await adopt(taker, taken);
     return out;
   });
   if (!started) return null;
