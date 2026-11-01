@@ -273,7 +273,7 @@ describe("a proposal's short form", () => {
     const add = (text: string) => ({ kind: "add" as const, text });
     const del = { kind: "del" as const, text: "Responder em inglês." };
     expect(firstChange([del, add("## Aprendido"), add("- Responder em português.")])?.text).toBe(
-      "- Responder em português.",
+      "Responder em português.",
     );
     expect(firstChange([add("## Aprendido")])?.text).toBe("## Aprendido");
     expect(firstChange([del])?.text).toBe("Responder em inglês.");
