@@ -61,6 +61,19 @@ export const allAgentsLimitsPath = (unitPath = SYSTEM_UNIT_PATH) =>
 /** `agents.slice` in the cgroup tree (cgroup v2), where its counters are (`memory.events`). */
 export const AGENTS_CGROUP = "/sys/fs/cgroup/agents.slice";
 export const agentCgroup = (uid: number) => path.join(AGENTS_CGROUP, agentSlice(uid));
+/**
+ * Each agent's own /tmp, /dev/shm and /run/lock (`<uid>/tmp`, `shm`, `lock`): in memory as the computer's are, on a
+ * tmpfs of the agent's own at `<uid>`, in a folder only root can reach.
+ */
+export const AGENT_RAM_ROOT = "/run/agentes-runner-tmp";
+/** Each agent's own /var/tmp (`<uid>/var-tmp`): on disk as the computer's is, in a folder only root can reach. */
+export const AGENT_TMP_ROOT = "/var/lib/agentes-runner-tmp";
+export const agentTmp = (uid: number) => path.join(AGENT_RAM_ROOT, String(uid), "tmp");
+/** systemd-tmpfiles' lines for them: what agents leave goes after 10 days, 30 in /var/tmp, as in a stock system. */
+export const AGENT_TMP_CLEANUP = `# agentes.chat runner: each agent's own temporary folders\ne ${AGENT_RAM_ROOT}/*/* - - - 10d\ne ${AGENT_TMP_ROOT}/*/* - - - 30d\n`;
+/** In `/etc/tmpfiles.d`, two folders up from the unit's (`/etc/systemd/system`). */
+export const agentTmpCleanupPath = (unitPath = SYSTEM_UNIT_PATH) =>
+  path.join(path.dirname(unitPath), "..", "..", "tmpfiles.d", `${SERVICE_NAME}.conf`);
 
 /**
  * How the service starts the runner: this runtime (node or bun) and this
@@ -452,6 +465,7 @@ export function installSystemService(io: SystemServiceIo): number {
   const limits: [file: string, text: string][] = [
     [agentSliceLimitsPath(file), each],
     [allAgentsLimitsPath(file), all],
+    [agentTmpCleanupPath(file), AGENT_TMP_CLEANUP],
   ];
   for (const [dropIn, text] of limits) {
     mkdirSync(path.dirname(dropIn), { recursive: true });
@@ -505,6 +519,7 @@ export function uninstallService(io: ServiceIo & { system?: boolean }): number {
     if (existsSync(SYSTEM_UNIT_PATH)) rmSync(SYSTEM_UNIT_PATH);
     rmSync(agentSliceLimitsPath(), { force: true });
     rmSync(allAgentsLimitsPath(), { force: true });
+    rmSync(agentTmpCleanupPath(), { force: true });
     run("systemctl", ["daemon-reload"]);
     print(`Removed ${SYSTEM_UNIT_PATH}.`);
     return 0;

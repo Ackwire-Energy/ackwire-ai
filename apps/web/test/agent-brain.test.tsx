@@ -1359,11 +1359,12 @@ describe("Quem pensa: a coding plan's models", () => {
     expect(tip()).toBe(described(beam) ?? "");
     await act(async () => fireEvent.pointerLeave(info, { pointerType: "mouse" }));
     expect(tip()).toBeNull();
-    // The keys reaching the option show it as well.
+    // The keys reaching the option show it as well. The key goes to the page, not the list: on an arrow, Radix
+    // moves the focus itself in a timeout, to the option after the one the key was pressed on.
     await act(async () => {
-      fireEvent.keyDown(document.activeElement ?? document.body, { key: "ArrowDown" });
+      fireEvent.keyDown(document.body, { key: "ArrowDown" });
       (deepseek[0] as HTMLElement).focus();
-      fireEvent.keyUp(document.activeElement ?? document.body, { key: "ArrowDown" });
+      fireEvent.keyUp(document.body, { key: "ArrowDown" });
     });
     expect(tip()).toBe("Precisa da região Global no OpenCode.");
     await click(screen().getByRole("option", { name: /^DeepSeek V4\.1 Flash/ }));

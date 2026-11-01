@@ -2226,6 +2226,12 @@ export const useMemory = (orgId: string, agentId: string) => {
   return useQuery({ queryKey: keys.memory(orgId, agentId), queryFn: () => api.memory.list(orgId, agentId) });
 };
 
+/** What all the agents know (the viewer's share of it), for the map of the workspace's memory. */
+export const useOrgMemories = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.orgMemories(orgId), queryFn: () => api.memory.listAll(orgId) });
+};
+
 /** "O que sabe sobre você": the agent's memories that came from the viewer, each with the message. */
 export const useMemoryAboutMe = (orgId: string, agentId: string, enabled = true) => {
   const api = useApi();
@@ -2261,7 +2267,11 @@ export function useMemoryAction(orgId: string, agentId: string) {
       if (action.type === "pin") return api.memory.setPinned(orgId, action.id, action.pinned);
       return api.memory.setArchived(orgId, action.id, action.archived);
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: keys.memory(orgId, agentId) }),
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: keys.memory(orgId, agentId) }),
+        qc.invalidateQueries({ queryKey: keys.orgMemories(orgId) }),
+      ]),
   });
 }
 
