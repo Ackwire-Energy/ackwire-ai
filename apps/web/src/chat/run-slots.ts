@@ -107,23 +107,19 @@ export const sameSlots = (a: RunSlot[], b: RunSlot[]) =>
   a.every((s, i) => s.key === b[i]?.key && s.runId === b[i]?.runId && s.goneAt === b[i]?.goneAt);
 
 /**
- * One block at a time: only the first at work draws, so what is on screen never changes order (who
- * finishes first can't be known). The others are in the bar above the composer and come in as their
- * final message, like any new one, or as the block once the first is done. Stopped or failed still show.
+ * The blocks in the order they draw: every agent at work has its own, and the ones still waiting for their first
+ * words (`waiting`) stay last, so an answer that starts goes above them; each group keeps its order.
  */
-export const drawsBehind = (r: Pick<LiveRun, "status">) => r.status === "canceled" || r.status === "failed";
-
-/** How many generic openers there are (`run.opener0`…): one per run, always the same. */
-export const OPENERS = 3;
+export function waitingLast<S extends Pick<RunSlot, "runId">>(
+  slots: readonly S[],
+  waiting: (runId: string) => boolean,
+) {
+  return [...slots.filter((s) => !waiting(s.runId)), ...slots.filter((s) => waiting(s.runId))];
+}
 
 /**
- * What the block opens with, as if it had answered at once (the bar above the composer says it works):
- * the first thing it said (out of its work list), or a generic phrase with an ellipsis until then
- * (`opener`, which of `OPENERS`). Nothing when its words already arrive or it stopped or failed first.
- */
-/**
- * How long after it starts the block waits before it shows anything of its own (1.2–2 s, one per run):
- * a reply in the same instant reads as a machine; the bar above the composer already says it works.
+ * How long after it starts the block waits before its waiting row shows (1.2–2 s, one per run): the bar above the
+ * composer says it works at once, and a row in the same instant reads as a machine.
  */
 export function openerDelayMs(runId: string) {
   return 1200 + (hashOf(runId) % 800);
@@ -141,14 +137,10 @@ function hashOf(s: string) {
   return h;
 }
 
-export function openerOf(r: Pick<LiveRun, "runId" | "status" | "text" | "work">): {
-  said: string | null;
-  opener: number | null;
-  work: NonNullable<LiveRun["work"]>;
-} {
+/** The first thing it said, out of its work list (the line its block opens with, above its tools). */
+export function openerOf(r: Pick<LiveRun, "work">): { said: string | null; work: NonNullable<LiveRun["work"]> } {
   const work = r.work ?? [];
   const first = work.find((w) => w.kind === "say");
-  if (first?.kind === "say") return { said: first.text, opener: null, work: work.filter((w) => w !== first) };
-  const generic = r.text.length === 0 && r.status !== "canceled" && r.status !== "failed";
-  return { said: null, opener: generic ? hashOf(r.runId) % OPENERS : null, work };
+  if (first?.kind === "say") return { said: first.text, work: work.filter((w) => w !== first) };
+  return { said: null, work };
 }

@@ -287,9 +287,6 @@ export const featureKeysEn: FeatureTranslations = {
       working: "working",
       writing: "writing",
       stopped: "stopped",
-      opener0: "Let me see…",
-      opener1: "Looking into it…",
-      opener2: "One moment…",
     },
     steer: {
       waiting: "{{name}} reads it at the next pause",

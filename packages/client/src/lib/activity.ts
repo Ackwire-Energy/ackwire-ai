@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { LiveConsult, LiveConsultStatus } from "../realtime/consults";
-import { type LiveRun, narrationOf } from "../realtime/streams";
+import type { LiveRun } from "../realtime/streams";
 import { joinNames } from "./format";
 import { agentGrammar } from "./grammar";
 import { MAIL_BRANDS } from "./mail";
@@ -344,6 +344,15 @@ export interface EntryConsult {
 /** Live statuses the working bar shows (the ones "Parar" can stop; a provisional row is about to be one). */
 const BAR_STATUSES: ReadonlySet<string> = new Set(["thinking", "queued", "running"]);
 
+/**
+ * At work with no words of its own yet (nothing written, said or read): its row in the conversation is the waiting
+ * row (face, dots, step line), with no name or time until words arrive.
+ */
+export const waitsForWords = (r: Pick<LiveRun, "status" | "text" | "work">) =>
+  BAR_STATUSES.has(r.status) &&
+  r.text.length === 0 &&
+  !(r.work ?? []).some((w) => w.kind === "say" || w.kind === "steer");
+
 export function barEntries(
   runs: LiveRun[],
   typingUserIds: string[],
@@ -497,57 +506,15 @@ export function activitySentence(t: TFunction, entries: ActivityEntry[], mark: M
 /** The bar's sentence as plain text (see `activitySentence`). */
 export const activityText = (t: TFunction, entries: ActivityEntry[]) => activitySentence(t, entries);
 
-/** How often the card's phrase turns. */
-export const PHRASE_TURN_MS = 2600;
-/** A step running this long gets an aside in turn ("Isso leva um minutinho…"). */
-export const LONG_STEP_MS = 4000;
-const THINKING_LINES = [
-  "chat.phrase.thinking.l0",
-  "chat.phrase.thinking.l1",
-  "chat.phrase.thinking.l2",
-  "chat.phrase.thinking.l3",
-  "chat.phrase.thinking.l4",
-] as const;
-const LONG_LINES = [
-  "chat.phrase.long.l0",
-  "chat.phrase.long.l1",
-  "chat.phrase.long.l2",
-  "chat.phrase.long.l3",
-] as const;
-
 /**
- * The card's phrase at turn `tick`. One agent on its own: nothing done yet → who it is, then light lines
- * ("Juntando as peças…"); at work → what it does, an aside when the step is long, and what it
- * said last ("Theo: Achei a área de viagens…"), in turn. Anyone else (several, a question out, people
- * typing, writing): the plain sentence.
+ * The card's phrase. One agent on its own says only its name (the bar adds its time): what it does is its waiting
+ * row's step line in the conversation (`waitStep`), never said twice. Anyone else (several, a question out, people
+ * typing): the plain sentence.
  */
-export function barPhrase(
-  t: TFunction,
-  entries: ActivityEntry[],
-  runs: LiveRun[],
-  tick: number,
-  now: number,
-  mark: MarkName = plain,
-): string {
-  const sentence = activitySentence(t, entries, mark);
+export function barPhrase(t: TFunction, entries: ActivityEntry[], mark: MarkName = plain): string {
   const only = entries.length === 1 ? entries[0] : undefined;
-  if (only?.type !== "agent" || only.consult || only.activity.kind === "writing") return sentence;
-  const run = turnAtWork(runs, only.id);
-  if (!run) return sentence;
-  const calls = (run.work ?? []).filter((w) => w.kind === "call");
-  if (only.activity.kind === "thinking" && calls.length === 0) {
-    // Who it is first, then two light lines, and again (the lines move on each round).
-    const k = Math.floor(tick / 3) * 2;
-    const line = (i: number) => `${t(THINKING_LINES[i % THINKING_LINES.length] ?? THINKING_LINES[0])}…`;
-    return [sentence, line(k), line(k + 1)][tick % 3] ?? sentence;
-  }
-  const pool = [sentence];
-  const step = calls.at(-1);
-  if (step?.kind === "call" && step.running && step.since !== undefined && now - step.since >= LONG_STEP_MS)
-    pool.push(`${t(LONG_LINES[Math.floor(tick / 2) % LONG_LINES.length] ?? LONG_LINES[0])}…`);
-  const said = narrationOf(run).at(-1);
-  if (said) pool.push(t("chat.phrase.said", { name: mark(only.name), text: said }));
-  return pool[tick % pool.length] ?? sentence;
+  if (only?.type === "agent" && !only.consult) return mark(only.name);
+  return activitySentence(t, entries, mark);
 }
 
 /**
@@ -558,13 +525,10 @@ export function barPhrase(
 export function barWords(
   t: TFunction,
   entries: ActivityEntry[],
-  runs: LiveRun[],
-  tick: number,
-  now: number,
   mark: MarkName = plain,
 ): [agents: string, sep: string, typers: string, typing: string] {
   const typing = typingPhrase(t, entries, mark);
-  if (!typing) return [barPhrase(t, entries, runs, tick, now, mark), "", "", ""];
+  if (!typing) return [barPhrase(t, entries, mark), "", "", ""];
   const agents = agentsPhrase(t, entries, mark);
   // The names lead the phrase in pt-BR and en; a language that puts them later keeps the phrase whole.
   const names = listNames(t, typingNames(entries), mark);

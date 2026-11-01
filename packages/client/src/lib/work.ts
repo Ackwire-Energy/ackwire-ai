@@ -3,7 +3,7 @@ import type { ConnectorDef, Run, RunStep } from "../api/types";
 import type { LiveCode, LiveOutput, LiveWork } from "../realtime/streams";
 import { type Activity, type ActivityKind, activityVerb, appLabel, PERMISSION_TOOL, toolActivity } from "./activity";
 import { POSTGRES_MARK } from "./databases";
-import { joinNames } from "./format";
+import { joinNames, shortTarget } from "./format";
 import { MAIL_BRANDS } from "./mail";
 
 /** Fallback when a tool has no label: "github_merge_pull_request" → "github merge pull request". */
@@ -594,6 +594,19 @@ export function toolPhrase(t: TFunction, l: Pick<ToolLine, "kind" | "app" | "too
 }
 
 const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
+
+/**
+ * The waiting row's step line: what the agent does right now, verb first ("Usando o navegador · console.example.com…",
+ * "Mexendo nos arquivos do PC · refresh.ts…"), from the same live work as its tool block; "Pensando…" while no step
+ * runs.
+ */
+export function waitStep(t: TFunction, work: LiveWork[] | undefined): string {
+  const now = toolNow(toolItemsLive(work ?? []));
+  if (now?.state !== "run") return t("chat.wait.thinking");
+  const verb = capitalize(activityVerb(t, now));
+  const target = now.hint ? shortTarget(now.hint) : "";
+  return target ? `${verb} · ${target}…` : `${verb}…`;
+}
 
 /** "1,2 s", "760 ms": a line's time, finer than the block's. */
 export function formatLineTime(locale: string, ms: number) {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { LiveConsult, LiveRun, LiveWork, Message, RunConsultation } from "@agenteschat/client";
-import { activitySentence, barElapsed, barFaces, barWords, PHRASE_TURN_MS } from "@agenteschat/client/lib/activity";
+import { activitySentence, barElapsed, barFaces, barWords } from "@agenteschat/client/lib/activity";
 import { consultBlocksNearEnd, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { secretRequestOf, secretValueProblem, secretWhere } from "@agenteschat/client/lib/secret-requests";
@@ -42,8 +42,6 @@ import {
 } from "../../src/features/chat/logic";
 import {
   fadeTail,
-  OPENERS,
-  openingRuns,
   outputTail,
   pruneMarks,
   recentTurn,
@@ -52,8 +50,10 @@ import {
   stoppedOf,
   turnItems,
   turnOpener,
+  turnOrder,
   turnPhase,
   turnRuns,
+  waitDot,
   withContinued,
   withOpacity,
 } from "../../src/features/chat/turn";
@@ -269,12 +269,7 @@ describe("working line", () => {
     const people: Record<string, string> = { u1: "Maria Fernanda Albuquerque" };
     const entries = workingEntries([run({ runId: "r", agentId: "ada" })], [], name, ["u1"], (id) => people[id]);
     // The shared pieces, in the order they give way: the agents' words (and their " · "), then the names.
-    expect(barWords(t, entries, [], 0, 0)).toEqual([
-      "Ada is working",
-      " · ",
-      "Maria Fernanda Albuquerque",
-      " is typing…",
-    ]);
+    expect(barWords(t, entries)).toEqual(["Ada is working", " · ", "Maria Fernanda Albuquerque", " is typing…"]);
     // What iOS drew of each: a cut-off "A" beside someone typing leaves, " · " with it.
     expect(lineFit({ agents: 4.7, typers: 170.3 }, true)).toEqual({ agents: null, typers: 171 });
     expect(lineFit({ agents: AGENT_WORDS_MIN }, true).agents).toBe(AGENT_WORDS_MIN);
@@ -375,9 +370,9 @@ describe("working line", () => {
     let clock = pacedClock({ every: 60_000, now: U - 50_000 }, 1000, U);
     const shown = [{ at: U, took: barElapsed(en, alone, [ada], clock.now) }];
     expect(shown[0]?.took).toBe("2m 28s");
-    // Each second its interval reads the time; the phrase turning (every 2.6 s) redraws the line in between.
+    // Each second its interval reads the time; an event redraws the line in between (every 2.6 s here).
     const reads = Array.from({ length: 12 }, (_, k) => U + 4 + (k + 1) * 1000);
-    const turns = Array.from({ length: 4 }, (_, k) => U + 4 + (k + 1) * PHRASE_TURN_MS);
+    const turns = Array.from({ length: 4 }, (_, k) => U + 4 + (k + 1) * 2600);
     for (const at of [...reads, ...turns].sort((a, b) => a - b)) {
       clock = reads.includes(at) ? { every: 1000, now: at } : pacedClock(clock, 1000, at);
       const took = barElapsed(en, alone, [ada], clock.now);
@@ -391,22 +386,15 @@ describe("working line", () => {
     expect(line).not.toContain("Date.now()");
   });
 
-  test("each time the bar comes back it opens on who is at work: the phrase's tick mounts with the pill, as on the web", async () => {
+  test("one agent on its own: the line says its name (its row says what it does), with no face of its own", async () => {
     const en = await translator("en");
     const ada = run({ runId: "r", agentId: "ada" });
-    const entries = workingEntries([ada], [], name);
-    // A turn opens thinking: its first tick says who it is, where a tick kept from the last turn could open on a light
-    // line without the name.
-    expect(barWords(en, entries, [ada], 0, 0)[0]).toBe("Ada is working…");
-    expect(barWords(en, entries, [ada], 7, 0)[0]).not.toContain("Ada");
-    // The line stays mounted while the bar is gone; the words under the pill don't, and the tick is theirs.
+    const atlas = run({ runId: "s", agentId: "atlas" });
+    expect(barWords(en, workingEntries([ada], [], name), markName)[0]).toBe(markName("Ada"));
+    expect(barWords(en, workingEntries([ada, atlas], [], name))[0]).toBe("Atlas and Ada are working…");
     const lines = await source("features/chat/LiveRows.tsx");
     const line = lines.slice(lines.indexOf("export function WorkingLine("), lines.indexOf("type LinePiece"));
-    const words = lines.slice(lines.indexOf("function TurningWords("), lines.indexOf("function BarWords("));
-    expect(line).toContain("if (entries.length === 0) return null;");
-    expect(line).not.toContain("PHRASE_TURN_MS");
-    expect(words).toContain("const [tick, setTick] = useState(() => ({ n: 0, at: Date.now() }));");
-    expect(words).toContain("PHRASE_TURN_MS");
+    expect(line).toContain("(entries.length === 1 && lead && !asking ? [] : barFaces(entries))");
   });
 
   test("Parar: real runs at work, also while they write (not a guess, not one waiting)", () => {
@@ -814,29 +802,39 @@ describe("an agent's turn as one block", () => {
     ]);
   });
 
-  test("it opens as if it had answered: a generic phrase, then the first thing it said", () => {
+  test("it opens with the first thing it said; no placeholder before it", () => {
     const quiet = run({ runId: "r" });
-    const generic = turnOpener(quiet, turnItems(quiet));
-    expect(generic.said).toBeNull();
-    expect(generic.opener).toBeGreaterThanOrEqual(0);
-    expect(generic.opener).toBeLessThan(OPENERS);
-    expect(turnOpener(quiet, []).opener).toBe(generic.opener);
-
+    expect(turnOpener(turnItems(quiet))).toEqual({ said: null, lines: [] });
     const said = run({
       runId: "r",
       work: [call("1", "sentry_list_issues", false), { kind: "say", text: "Vou pedir pro Josh", turn: 1 }],
     });
-    const opened = turnOpener(said, turnItems(said));
-    expect(opened).toMatchObject({ said: "Vou pedir pro Josh", opener: null });
+    const opened = turnOpener(turnItems(said));
+    expect(opened.said).toBe("Vou pedir pro Josh");
     expect(opened.lines.map((x) => x.kind)).toEqual(["call"]);
-
-    expect(turnOpener(run({ runId: "w", status: "running", text: "Ontem" }), []).opener).toBeNull();
-    expect(turnOpener(run({ runId: "s", status: "canceled" }), []).opener).toBeNull();
   });
 
-  test("one block at a time: the first at work, plus any stopped one (the order on screen never changes)", () => {
-    const runs = [run({ runId: "a" }), run({ runId: "b", text: "Ontem" }), run({ runId: "c", status: "canceled" })];
-    expect(openingRuns(runs).map((r) => r.runId)).toEqual(["a", "c"]);
+  test("every agent at work has its block; the ones waiting for words go last, each group in its order", () => {
+    const runs = [
+      run({ runId: "a" }),
+      run({ runId: "b", text: "Ontem" }),
+      run({ runId: "c", status: "canceled" }),
+      run({ runId: "d", work: [call("1", "sentry_list_issues", true)] }),
+    ];
+    expect(turnOrder(runs).map((r) => r.runId)).toEqual(["b", "c", "a", "d"]);
+  });
+
+  test("the waiting row's pixels light up in turn, 2px up, stepped; still at 60% with Reduce Motion", () => {
+    const at = (t: number) => [0, 1, 2].map((i) => waitDot(t, i));
+    expect(at(0)).toEqual([
+      { opacity: 1, lift: -2 },
+      { opacity: 0.3, lift: 0 },
+      { opacity: 0.3, lift: 0 },
+    ]);
+    expect(at(0.25).map((d) => d.opacity)).toEqual([0.6, 1, 0.3]);
+    expect(at(0.45).map((d) => d.opacity)).toEqual([0.3, 0.6, 1]);
+    expect(at(1.2)).toEqual(at(0));
+    expect(waitDot(0, 0, true)).toEqual({ opacity: 0.6, lift: 0 });
   });
 
   test("a stopped run's call that was running shows as stopped", () => {
