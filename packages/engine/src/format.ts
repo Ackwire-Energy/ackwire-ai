@@ -12,21 +12,41 @@ export const cutTextEnd = (text: string, max: number) =>
 export const pgSafeText = (text: string) =>
   text.replaceAll("\0", "").replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "");
 
-/** `JSON.stringify` with every string in it `pgSafeText`, for a jsonb write that must never fail on its text. */
+/** `JSON.stringify` with every string and key in it `pgSafeText`, for a jsonb write that must never fail on its text. */
 export const pgSafeStringify = (value: unknown) =>
-  JSON.stringify(value, (_key, v) => (typeof v === "string" ? pgSafeText(v) : v));
+  JSON.stringify(value, (_key, v) => {
+    if (typeof v === "string") return pgSafeText(v);
+    if (!v || typeof v !== "object" || Array.isArray(v)) return v;
+    const keys = Object.keys(v);
+    // Keys come from third parties too (MCP structuredContent): rebuilt only when one needs it.
+    return keys.every((k) => pgSafeText(k) === k)
+      ? v
+      : Object.fromEntries(keys.map((k) => [pgSafeText(k), (v as Record<string, unknown>)[k]]));
+  });
 
 /** A JSON value as `pgSafeStringify` writes it. */
-export const pgSafeJson = <T>(value: T): T => JSON.parse(pgSafeStringify(value));
+export const pgSafeJson = <T>(value: T): T => {
+  const json = pgSafeStringify(value);
+  return json === undefined ? value : JSON.parse(json);
+};
 
-/** The UTF-8 text of file bytes, or null when they are binary (a NUL byte, or not UTF-8). */
+/**
+ * The text of file bytes, or null when they are binary. UTF-8 first; a UTF-16 BOM decodes as UTF-16; otherwise
+ * bytes with no NUL and few control characters are Windows-1252 text (an Excel CSV export, a Latin-1 file).
+ */
 export function textOfBytes(bytes: Uint8Array): string | null {
+  const bom =
+    bytes[0] === 0xff && bytes[1] === 0xfe ? "utf-16le" : bytes[0] === 0xfe && bytes[1] === 0xff ? "utf-16be" : null;
+  if (bom) return new TextDecoder(bom).decode(bytes, { stream: true });
   if (bytes.includes(0)) return null;
   try {
     // `stream`: a character cut at the end (the read stopped mid-file) is no reason to call it binary.
     return new TextDecoder("utf-8", { fatal: true }).decode(bytes, { stream: true });
   } catch {
-    return null;
+    let control = 0;
+    for (const b of bytes) if ((b < 0x20 && b !== 0x09 && b !== 0x0a && b !== 0x0d) || b === 0x7f) control++;
+    // ponytail: control-byte share as the binary test; magic bytes would catch a NUL-free binary that passes it.
+    return control > bytes.length / 20 ? null : new TextDecoder("windows-1252").decode(bytes);
   }
 }
 
