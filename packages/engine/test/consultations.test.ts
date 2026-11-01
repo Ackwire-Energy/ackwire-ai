@@ -1393,6 +1393,38 @@ describe("tell_agent: what comes of work handed off comes back by itself (ADR 00
     expect(await notesBack()).toHaveLength(1);
   });
 
+  test("people read a part handed on as that agent's words, and not one that couldn't be done; the agent reads both", async () => {
+    f = await setup({ askAgent: true, judge: notesMatter });
+    await addInfra();
+    const ops = await addAgent("Ops");
+    const qa = await addAgent("QA");
+    const dev = await devRun("@dev pede ao infra");
+    await ended(dev.id);
+    await tell(dev, "@infra", "Cuida do deploy de staging.");
+    const toInfra = (await consultations())[0];
+    const infraRun = await runFor(toInfra);
+    await tell(infraRun, "@ops", "Limpa a fila de jobs.");
+    await tell(infraRun, "@qa", "Roda os testes de fumaça.");
+    await answered(infraRun, "Deploy feito.");
+    const partOf = async (agentId: string) => runFor((await consultations()).find((c) => c.targetAgentId === agentId));
+    await answered(await partOf(ops.id), "Fila limpa.");
+    const qaRun = await partOf(qa.id);
+    await f.db.update(schema.agentRuns).set({ status: "failed" }).where(eq(schema.agentRuns.id, qaRun.id));
+    await endHook(qaRun, "failed", "model_error");
+
+    const shown = "Deploy feito.\n\nops: Fila limpa.";
+    const listed = (await consultationsIn(f.db, f.org.id, f.general.id)).find((c) => c.id === toInfra?.id);
+    expect(listed).toMatchObject({ status: "answered", answer: shown });
+    const [back, ...more] = await notesBack();
+    expect(more).toEqual([]);
+    expect(back?.meta.notice).toMatchObject({
+      refs: { answer: shown },
+      text: expect.stringContaining(
+        "Deploy feito.\n\n[@ops, to whom @infra handed part of it]: Fila limpa.\n\n[@qa, to whom @infra handed part of it]: couldn't: model_error",
+      ),
+    });
+  });
+
   test("colleagues whose runs both ended before either row closed: the sender still wakes once", async () => {
     f = await setup({ askAgent: true, judge: notesMatter });
     const infra = await addInfra();

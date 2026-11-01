@@ -464,6 +464,7 @@ export function consultationNotice(
       : c.status === "expired"
         ? `No answer: it didn't answer within ${CONSULTATION_TTL_MS / 60_000} minutes (${asked}). Say what is still missing if it matters; ask again only if you still need it.`
         : `No answer: it couldn't (${c.answer ?? "its run failed"}; ${asked}). Go on with what you know.`;
+  const shown = c.answer ? answerForPeople(c.answer) : "";
   return {
     kind: "consult_reply",
     text,
@@ -477,7 +478,7 @@ export function consultationNotice(
       agentId: c.targetAgentId,
       status: c.status,
       question: c.question.slice(0, NOTICE_QUESTION_MAX),
-      ...(c.answer ? { answer: c.answer.slice(0, NOTICE_ANSWER_MAX) } : {}),
+      ...(shown ? { answer: shown.slice(0, NOTICE_ANSWER_MAX) } : {}),
       ...(note ? { kind: "note" } : {}),
       ...(options.wake ? { wake: "1" } : {}),
       ...(options.pending ? { pending: options.pending } : {}),
@@ -494,6 +495,25 @@ const ANSWER_MAX = 16_000;
 /** How the answer a run in an agents' DM owes carries a part another agent did (`handBack`): agents read it so. */
 const handedPartLine = (handle: string, by: string, text: string) =>
   `[@${handle}, to whom @${by} handed part of it]: ${text}`;
+const HANDED_PART = /^\[@([\w-]+), to whom @[\w-]+ handed part of it\]: /;
+const BEFORE_HANDED_PART = /\n\n(?=\[@[\w-]+, to whom @[\w-]+ handed part of it\]: )/;
+
+/**
+ * An answer as people read it (the apps' lists and cards): a part another agent did reads "ops: …", without the
+ * agents' marker and without an "@" the apps would draw as a mention, and a part that couldn't be done is left out
+ * (the agent it comes back to tells them).
+ */
+function answerForPeople(answer: string) {
+  return answer
+    .split(BEFORE_HANDED_PART)
+    .flatMap((part) => {
+      const marked = HANDED_PART.exec(part);
+      if (!marked) return [part];
+      const text = part.slice(marked[0].length);
+      return text.startsWith("couldn't: ") ? [] : [`${marked[1]}: ${text}`];
+    })
+    .join("\n\n");
+}
 
 async function handleOf(db: Executor, orgId: string, agentId: string) {
   const [a] = await db
@@ -680,7 +700,7 @@ async function closeConsultation(
         consultationId: closed.id,
         status,
         question: closed.question.slice(0, 2000),
-        answer: status === "answered" ? (closed.answer?.slice(0, 4000) ?? null) : null,
+        answer: status === "answered" && closed.answer ? answerForPeople(closed.answer).slice(0, 4000) || null : null,
       },
       late: { kind: notice.kind, text: notice.text, from: notice.from },
       pubsub: deps.pubsub,
@@ -1230,7 +1250,8 @@ function consultationView(r: ConsultationRow, waitOf: Map<string, ConsultationWa
     waiting: open && r.targetRunId ? (waitOf.get(r.targetRunId) ?? null) : null,
     question: r.question.slice(0, NOTICE_QUESTION_MAX),
     // Open (what it gathered so far is the agents'), or expired: no answer; a failed one keeps its reason.
-    answer: open || status === "expired" ? null : (r.answer?.slice(0, NOTICE_ANSWER_MAX) ?? null),
+    answer:
+      open || status === "expired" || !r.answer ? null : answerForPeople(r.answer).slice(0, NOTICE_ANSWER_MAX) || null,
     createdAt: r.createdAt,
     answeredAt: r.answeredAt,
     expiresAt: r.expiresAt,
