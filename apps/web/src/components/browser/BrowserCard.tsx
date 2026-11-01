@@ -478,6 +478,8 @@ export function BrowserCard({
   // A mouse or a pen presses at once and drags while held, as on a computer; fingers go through
   // `createTouchInput` (a tap clicks, one moving finger drags, two scroll).
   const press = useRef<{ id: number; at: { x: number; y: number } } | null>(null);
+  // A mouse button held on the page: the scroll hint waits for its release, so a drag never reads as a scroll.
+  const [pressing, setPressing] = useState(false);
   const [fingers] = useState(() => createTouchInput((p, clamp) => toPageNow.current(p, clamp)));
   const landed = useRef({ x: 0, y: 0 });
   // A finger drags or scrolls: the hint says how to scroll.
@@ -509,6 +511,7 @@ export function BrowserCard({
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {}
     press.current = { id: e.pointerId, at };
+    setPressing(true);
     setCapturing(true);
     markAt(p);
     send(pressEvents(at, modifiersOf(e, remoteIsMac)));
@@ -518,6 +521,13 @@ export function BrowserCard({
     if (e.pointerType === "touch") return onFingers(fingers.move(e.pointerId, p));
     const held = press.current;
     const at = held?.id === e.pointerId ? toPage(p, true) : null;
+    if (held && at && (e.buttons & 1) === 0) {
+      // Its release went elsewhere (another window took it): this move is the release.
+      press.current = null;
+      setPressing(false);
+      send([releaseEvent(at)]);
+      return;
+    }
     if (!held || !at || (at.x === held.at.x && at.y === held.at.y)) return;
     held.at = at;
     send([dragEvent(at, modifiersOf(e, remoteIsMac))]);
@@ -533,6 +543,7 @@ export function BrowserCard({
     const held = press.current;
     if (!held || held.id !== e.pointerId) return;
     press.current = null;
+    setPressing(false);
     const at = toPage(p, true) ?? held.at;
     const mods = modifiersOf(e, remoteIsMac);
     const moved = at.x !== held.at.x || at.y !== held.at.y;
@@ -548,6 +559,7 @@ export function BrowserCard({
     const held = press.current;
     if (!held || held.id !== e.pointerId) return;
     press.current = null;
+    setPressing(false);
     send([releaseEvent(held.at)]);
   };
 
@@ -589,6 +601,7 @@ export function BrowserCard({
   useEffect(() => {
     if (pointing) return;
     press.current = null;
+    setPressing(false);
     fingers.cancel();
     setSliding(false);
   }, [pointing, fingers]);
@@ -1112,7 +1125,7 @@ export function BrowserCard({
             >
               <img ref={imgRef} src={src} alt={t("browser.live.page", g)} draggable={false} />
               {mark && <span key={mark.key} className="brw-mark" style={{ left: mark.x, top: mark.y }} />}
-              {(sliding || capturing) && (
+              {(sliding || (capturing && !pressing)) && (
                 <span className="brw-ac__capture" role="status">
                   {sliding ? t("browser.inCard.touchHint") : t("browser.inCard.scrollHint")}
                 </span>
