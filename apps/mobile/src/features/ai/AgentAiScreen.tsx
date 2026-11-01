@@ -354,7 +354,7 @@ export function AgentModelScreen({ agentId }: { agentId: string }) {
                     key={r.value}
                     label={r.label}
                     {...(r.sub ? { sub: r.sub } : {})}
-                    {...(r.note ? { belowText: r.note } : {})}
+                    {...(r.note ? { hint: { name: t("common.about", { label: r.label }), text: r.note } } : {})}
                     {...(isAuto(r.value)
                       ? { icon: "sparkle" as const }
                       : { leading: <ProviderLogo id={r.maker ?? mark} size="sm" /> })}

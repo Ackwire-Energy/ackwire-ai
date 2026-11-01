@@ -1,6 +1,9 @@
 import { Select as RSelect } from "radix-ui";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { cx } from "../cx";
+import { movesByKeys, trackInput } from "../device";
+import { Icon } from "../icons/Icon";
 import { useFieldControl } from "./Field";
 
 export interface SelectOption<V extends string = string> {
@@ -12,6 +15,11 @@ export interface SelectOption<V extends string = string> {
   group?: string;
   /** Something before the label in the list (a person's avatar, an icon). */
   leading?: ReactNode;
+  /**
+   * A note behind an ⓘ at the option's end (plain sentences): shown while the pointer rests on the ⓘ, on a tap or
+   * click on it (which never picks the option), and while the keys rest on the option; always its description.
+   */
+  hint?: string;
 }
 
 export interface SelectProps<V extends string = string> {
@@ -39,9 +47,34 @@ export interface SelectProps<V extends string = string> {
 }
 
 function renderItem<V extends string>(o: SelectOption<V>) {
+  return <SelectItem key={o.value} option={o} />;
+}
+
+function SelectItem<V extends string>({ option: o }: { option: SelectOption<V> }) {
+  const hintId = `hint${useId().replace(/[^\w-]/g, "")}`;
+  const mark = useRef<HTMLSpanElement>(null);
+  // Where the ⓘ is while its note shows: the list scrolls and clips, so the note is drawn over the page, above it.
+  const [at, setAt] = useState<DOMRect | null>(null);
+  useEffect(() => {
+    if (o.hint) trackInput();
+  }, [o.hint]);
+  const show = () => setAt(mark.current?.getBoundingClientRect() ?? null);
+  const hide = () => setAt(null);
+  const keep = (e: { stopPropagation: () => void }) => e.stopPropagation();
   return (
     // The chosen option shows by its background (no check column, so every row lines up).
-    <RSelect.Item key={o.value} value={o.value} disabled={o.disabled} className="ac-menu__item">
+    <RSelect.Item
+      value={o.value}
+      disabled={o.disabled}
+      className="ac-menu__item"
+      {...(o.hint
+        ? {
+            "aria-describedby": hintId,
+            onFocus: () => (movesByKeys() ? show() : undefined),
+            onBlur: hide,
+          }
+        : {})}
+    >
       {o.leading && (
         <span className="ac-menu__leading" aria-hidden="true">
           {o.leading}
@@ -51,6 +84,39 @@ function renderItem<V extends string>(o: SelectOption<V>) {
         <RSelect.ItemText>{o.label}</RSelect.ItemText>
         {o.description && <span className="ac-menu__desc">{o.description}</span>}
       </span>
+      {o.hint && (
+        <span
+          ref={mark}
+          className="ac-hint ac-menu__hint"
+          aria-hidden="true"
+          data-state={at ? "open" : "closed"}
+          onPointerEnter={show}
+          onPointerLeave={hide}
+          onPointerDown={keep}
+          onPointerUp={keep}
+          onClick={(e) => {
+            keep(e);
+            if (at) hide();
+            else show();
+          }}
+        >
+          <Icon name="info" size={14} />
+          <span id={hintId} hidden>
+            {o.hint}
+          </span>
+        </span>
+      )}
+      {at &&
+        createPortal(
+          <span
+            className="ac-hint__bubble ac-glass ac-menu__tip"
+            aria-hidden="true"
+            style={{ right: window.innerWidth - at.right - 4, top: at.top - 6 }}
+          >
+            {o.hint}
+          </span>,
+          document.body,
+        )}
     </RSelect.Item>
   );
 }
