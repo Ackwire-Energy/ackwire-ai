@@ -15,6 +15,8 @@ import { asksMe, liveSubLine } from "@agenteschat/client/lib/agent-computer";
 import { computerName } from "@agenteschat/client/lib/computer";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
+import { bodyTones } from "@agenteschat/ui/agent/engine";
+import { Canvas, Fill, Shader, Skia } from "@shopify/react-native-skia";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AppState, Keyboard, type LayoutChangeEvent, StyleSheet, TextInput, View } from "react-native";
@@ -30,6 +32,8 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import Animated, {
   type SharedValue,
   useAnimatedStyle,
+  useDerivedValue,
+  useFrameCallback,
   useSharedValue,
   withSequence,
   withTiming,
@@ -39,8 +43,12 @@ import { WebView } from "react-native-webview";
 import { scheduleOnRN } from "react-native-worklets";
 import { lastCookie } from "@/lib/auth";
 import { useServer } from "@/lib/server";
+import { readValue, STORED, writeValue } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
-import { Button, Icon, IconButton, Text, useToast } from "@/ui";
+import { rgba } from "@/sky/math";
+import { TRACKPAD_SHADER } from "@/sky/shaders";
+import { Button, Icon, IconButton, Text, useReducedMotion, useToast } from "@/ui";
+import { useInfoHint } from "@/ui/InfoHint";
 import { type LiveKey, stepText } from "../browser/logic";
 import { TypeBar } from "../browser/parts";
 import { useFinishHandoff } from "../browser/useFinishHandoff";
@@ -74,12 +82,15 @@ import {
   WHEEL_STEP,
   zoomCamera,
 } from "./screen-view";
+import { type PadLesson, padLesson } from "./trackpad";
 import type { AgentComputerView } from "./useAgentComputer";
 
 /** How long the screen may stay opening before it says it can't: a socket refused before it opens never closes with a code. */
 const STUCK_MS = 30_000;
 /** The trackpad's height: a thumb's reach, the rest goes to the screen. */
-const PAD_HEIGHT = 208;
+const PAD_HEIGHT = 224;
+/** Points between the trackpad's dots. */
+const DOT_GAP = 9;
 /** How long a press holds before it drags. */
 const HOLD_MS = 320;
 const CAMERA = { duration: 260 };
@@ -93,6 +104,27 @@ interface Camera {
   cursorY: SharedValue<number>;
   box: SharedValue<Size>;
   desk: SharedValue<Size>;
+}
+
+/** The lesson's cursor, on top of the real one. */
+interface Ghost {
+  x: number;
+  y: number;
+  scale: number;
+}
+const GHOST_REST: Ghost = { x: 0, y: 0, scale: 1 };
+
+/** Compiled once; null if the device refuses it (the pad still works, plain). */
+let padEffect: ReturnType<typeof Skia.RuntimeEffect.Make> | undefined;
+function trackpadEffect() {
+  if (padEffect === undefined) {
+    try {
+      padEffect = Skia.RuntimeEffect.Make(TRACKPAD_SHADER);
+    } catch {
+      padEffect = null;
+    }
+  }
+  return padEffect;
 }
 
 function useAppActive() {
@@ -188,6 +220,7 @@ export function AgentScreen({
   const box = useSharedValue<Size>({ width: 0, height: 0 });
   const desk = useSharedValue<Size>(DEFAULT_DESKTOP);
   const nudge = useSharedValue(1);
+  const ghost = useSharedValue<Ghost>(GHOST_REST);
   const camera: Camera = { s, x, y, cursorX, cursorY, box, desk };
 
   // The whole screen to watch; in control the box filled, around the cursor.
@@ -299,9 +332,9 @@ export function AgentScreen({
   }));
   const pointer = useAnimatedStyle(() => ({
     transform: [
-      { translateX: (cursorX.value - x.value) * s.value },
-      { translateY: (cursorY.value - y.value) * s.value },
-      { scale: nudge.value },
+      { translateX: (cursorX.value - x.value) * s.value + ghost.value.x },
+      { translateY: (cursorY.value - y.value) * s.value + ghost.value.y },
+      { scale: nudge.value * ghost.value.scale },
     ],
   }));
 
@@ -372,9 +405,17 @@ export function AgentScreen({
     setBoxSize({ width, height });
   };
 
+  // What taking control means, behind an ⓘ beside "Você no controle", as on the web (ADR 0076).
+  const notice = useInfoHint({
+    name: t("common.about", { label: t("desktop.session.check") }),
+    text: `${t("desktop.control.notice", g)}${f?.edition === "cloud" ? ` ${t("desktop.session.screening")}` : ""}`,
+    variant: "footnote",
+  });
+
   return (
     <KeyboardAvoidingView behavior="padding" style={styles.fill}>
-      {top(sub, action)}
+      {top(sub, action, inControl ? notice.button : undefined)}
+      {inControl ? <View style={styles.notice}>{notice.text}</View> : null}
       {banner}
       {waiting ? (
         <View style={[styles.ask, { backgroundColor: c.sunken }]}>
@@ -469,16 +510,14 @@ export function AgentScreen({
             <Trackpad
               camera={camera}
               nudge={nudge}
+              ghost={ghost}
+              color={color}
               onMove={moved}
               onClick={clicked}
               onHold={held}
               onWheel={wheeled}
               onKeyboard={() => setTyping(true)}
             />
-            <Text variant="caption" tone="faint" style={styles.center}>
-              {t("desktop.control.notice", g)}
-              {f?.edition === "cloud" ? ` ${t("desktop.session.screening")}` : ""}
-            </Text>
             {ask ? (
               <Button variant="ghost" size="sm" label={t("mobile.browser.live.couldnt")} onPress={couldnt} />
             ) : null}
@@ -491,10 +530,15 @@ export function AgentScreen({
   );
 }
 
-/** The person's fingers as a laptop's trackpad: swipe moves, tap clicks, hold drags, two fingers scroll. */
+/**
+ * The person's fingers as a laptop's trackpad: swipe moves, tap clicks, hold drags, two fingers scroll. No words: the
+ * dots answer the fingers, and until the first touch a pixel finger shows the gestures.
+ */
 function Trackpad({
   camera,
   nudge,
+  ghost,
+  color,
   onMove,
   onClick,
   onHold,
@@ -504,6 +548,9 @@ function Trackpad({
   camera: Camera;
   /** The cursor's scale: it answers a click or a hold. */
   nudge: SharedValue<number>;
+  /** The lesson's cursor, drawn only: it never moves the real one. */
+  ghost: SharedValue<Ghost>;
+  color: Parameters<typeof bodyTones>[0];
   onMove: (x: number, y: number) => void;
   onClick: () => void;
   onHold: (down: boolean) => void;
@@ -512,14 +559,83 @@ function Trackpad({
 }) {
   const { t } = useTranslation();
   const c = useColors();
+  const reduced = useReducedMotion();
   const { s, x, y, cursorX, cursorY, box, desk } = camera;
   const wheel = useSharedValue(0);
   const [holding, setHolding] = useState(false);
+  const [size, setSize] = useState<Size>({ width: 0, height: 0 });
+  const padSize = useSharedValue<Size>({ width: 0, height: 0 });
+  const demo = useSharedValue<PadLesson | null>(null);
+  const taught = useSharedValue(false);
+  const spotX = useSharedValue(0);
+  const spotY = useSharedValue(0);
+  const tailX = useSharedValue(0);
+  const tailY = useSharedValue(0);
+  const spread = useSharedValue(0);
+  const on = useSharedValue(0);
+  const ringX = useSharedValue(0);
+  const ringY = useSharedValue(0);
+  const ringT = useSharedValue(-1);
+
+  const lesson = useFrameCallback((f) => {
+    if (taught.value) return;
+    const l = padLesson(f.timeSinceFirstFrame / 1000, padSize.value.width, padSize.value.height);
+    demo.value = l;
+    ghost.value = { x: l.cursorX, y: l.cursorY, scale: l.cursorScale };
+  }, false);
+  const lessonOver = () => {
+    lesson.setActive(false);
+    void writeValue(STORED.trackpadTaught, "1");
+  };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the lesson starts once, with the pad
+  useEffect(() => {
+    let alive = true;
+    void readValue(STORED.trackpadTaught).then((v) => {
+      if (alive && v !== "1" && !reduced) lesson.setActive(true);
+    });
+    return () => {
+      alive = false;
+      lesson.setActive(false);
+      ghost.value = GHOST_REST;
+    };
+  }, []);
+
+  const touch = (px: number, py: number) => {
+    "worklet";
+    if (!taught.value) {
+      taught.value = true;
+      demo.value = null;
+      ghost.value = GHOST_REST;
+      scheduleOnRN(lessonOver);
+    }
+    spotX.value = px;
+    spotY.value = py;
+    tailX.value = px;
+    tailY.value = py;
+    spread.value = 0;
+    on.value = withTiming(1, { duration: 80 });
+  };
+  const follow = (px: number, py: number) => {
+    "worklet";
+    spotX.value = px;
+    spotY.value = py;
+    tailX.value = withTiming(px, { duration: 220 });
+    tailY.value = withTiming(py, { duration: 220 });
+  };
+  const lift = () => {
+    "worklet";
+    on.value = withTiming(0, { duration: 280 });
+  };
 
   const swipe = usePanGesture({
     maxPointers: 1,
+    onBegin: (e) => {
+      "worklet";
+      touch(e.x, e.y);
+    },
     onUpdate: (e) => {
       "worklet";
+      follow(e.x, e.y);
       const gain = cursorGain(Math.hypot(e.velocityX, e.velocityY) / 1000, s.value);
       const d = desk.value;
       cursorX.value = clamp(cursorX.value + e.changeX * gain, 0, d.width);
@@ -534,6 +650,10 @@ function Trackpad({
       x.value = to.x;
       y.value = to.y;
       scheduleOnRN(onMove, cursorX.value, cursorY.value);
+    },
+    onFinalize: () => {
+      "worklet";
+      lift();
     },
   });
   const hold = useLongPressGesture({
@@ -559,6 +679,10 @@ function Trackpad({
       "worklet";
       if (e.canceled) return;
       nudge.value = withSequence(withTiming(0.84, { duration: 60 }), withTiming(1, { duration: 120 }));
+      ringX.value = e.x;
+      ringY.value = e.y;
+      ringT.value = 0;
+      ringT.value = withTiming(1, { duration: 600 });
       scheduleOnRN(onClick);
     },
   });
@@ -569,8 +693,14 @@ function Trackpad({
       "worklet";
       wheel.value = 0;
     },
+    onActivate: (e) => {
+      "worklet";
+      touch(e.x, e.y);
+      spread.value = 22;
+    },
     onUpdate: (e) => {
       "worklet";
+      follow(e.x, e.y);
       wheel.value += e.changeY;
       if (Math.abs(wheel.value) < WHEEL_STEP) return;
       // Fingers going up bring the page's lower part in, as on a phone.
@@ -578,25 +708,61 @@ function Trackpad({
       wheel.value += down ? WHEEL_STEP : -WHEEL_STEP;
       scheduleOnRN(onWheel, down);
     },
+    onDeactivate: () => {
+      "worklet";
+      lift();
+    },
   });
   const gestures = useSimultaneousGestures(swipe, hold, tap, scroll);
+
+  const source = trackpadEffect();
+  const tones = bodyTones(color);
+  const dotTone = rgba(c.faint);
+  dotTone[3] = 0.32;
+  const base = { size: [size.width, size.height], gap: DOT_GAP, dotTone, glowTone: rgba(tones[3] ?? c.ink) };
+  const uniforms = useDerivedValue(() => {
+    const l = demo.value;
+    const px = l ? l.x : spotX.value;
+    const py = l ? l.y : spotY.value;
+    const ex = l ? l.tailX : tailX.value;
+    const ey = l ? l.tailY : tailY.value;
+    const apart = l ? l.spread : spread.value;
+    return {
+      ...base,
+      a: [px - apart, py],
+      aTail: [ex - apart, ey],
+      b: [px + apart, py],
+      bTail: [ex + apart, ey],
+      on: l ? l.on : on.value,
+      two: apart > 0 ? 1 : 0,
+      ring: l ? [l.ringX, l.ringY] : [ringX.value, ringY.value],
+      ringT: l ? l.ringT : ringT.value,
+    };
+  });
 
   return (
     <GestureDetector gesture={gestures}>
       <View
         collapsable={false}
-        style={[styles.pad, { backgroundColor: holding ? c.raised : c.sunken, borderColor: holding ? c.ink : c.line }]}
+        onLayout={(e) => {
+          const { width, height } = e.nativeEvent.layout;
+          padSize.value = { width, height };
+          setSize({ width, height });
+        }}
+        style={[styles.pad, { backgroundColor: c.sunken, borderColor: holding ? tones[3] : c.line }]}
         accessibilityLabel={t("agentComputer.phone.trackpad")}
+        accessibilityHint={t("agentComputer.phone.trackpadHint")}
       >
+        {source && size.width > 0 ? (
+          <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
+            <Fill>
+              <Shader source={source} uniforms={uniforms} />
+            </Fill>
+          </Canvas>
+        ) : null}
         <View style={styles.padKeyboard}>
           <IconButton icon="keyboard" plate label={t("desktop.keyboard.label")} onPress={onKeyboard} />
         </View>
-        <Text variant="callout" tone="ink" style={styles.bold}>
-          {t("agentComputer.phone.trackpad")}
-        </Text>
-        <Text variant="caption" tone="muted" style={styles.center}>
-          {t("agentComputer.phone.trackpadHint")}
-        </Text>
       </View>
     </GestureDetector>
   );
@@ -699,7 +865,7 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
-  center: { textAlign: "center" },
+  notice: { paddingHorizontal: 14 },
   ask: { marginHorizontal: 12, marginBottom: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14 },
   box: { marginHorizontal: 12, borderRadius: 18, overflow: "hidden", backgroundColor: "#101010" },
   frame: { position: "absolute", left: 0, top: 0, transformOrigin: "left top" },
@@ -726,12 +892,9 @@ const styles = StyleSheet.create({
     height: PAD_HEIGHT,
     borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 3,
-    paddingHorizontal: 20,
+    overflow: "hidden",
   },
-  padKeyboard: { position: "absolute", right: 10, top: 10 },
+  padKeyboard: { position: "absolute", right: 10, bottom: 10 },
   typing: { flexDirection: "row", alignItems: "flex-end", gap: 8, paddingHorizontal: 12, paddingTop: 8 },
   under: { flex: 1, paddingHorizontal: 14, paddingTop: 12, gap: 12 },
   steps: { gap: 7 },

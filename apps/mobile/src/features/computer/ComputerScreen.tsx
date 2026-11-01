@@ -134,7 +134,7 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
       help={t("machines.pausedHint")}
     />
   ) : null;
-  const top = (line: string, action?: ReactNode) => (
+  const top = (line: string, action?: ReactNode, info?: ReactNode) => (
     <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
       <IconButton icon="x" plate label={t("mobile.common.close")} onPress={goBack} />
       <View style={styles.title}>
@@ -142,9 +142,18 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
           {t("agentComputer.title", g)}
         </Text>
         {line ? (
-          <Text variant="footnote" tone="faint" numberOfLines={1} accessibilityLiveRegion="polite">
-            {line}
-          </Text>
+          <View style={styles.line}>
+            <Text
+              variant="footnote"
+              tone="faint"
+              numberOfLines={1}
+              accessibilityLiveRegion="polite"
+              style={styles.lineText}
+            >
+              {line}
+            </Text>
+            {info}
+          </View>
         ) : null}
       </View>
       {action}
@@ -309,6 +318,8 @@ function Banner({ icon, text, help, tone }: { icon: IconName; text: string; help
 }
 
 const styles = StyleSheet.create({
+  line: { flexDirection: "row", alignItems: "center", gap: 5 },
+  lineText: { flexShrink: 1 },
   screen: { flex: 1 },
   fill: { flex: 1 },
   top: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingBottom: 10 },

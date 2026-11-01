@@ -307,3 +307,44 @@ half4 main(float2 at) {
   return half4(float4(offTone.rgb * 0.22, 0.22));
 }
 `;
+
+/**
+ * The trackpad's surface: a grid of dots that light up in the agent's color under each finger and along its trail,
+ * and a ring that opens where it taps.
+ */
+export const TRACKPAD_SHADER = `
+uniform float2 size;
+uniform float gap;
+uniform float4 dotTone;
+uniform float4 glowTone;
+uniform float2 a;
+uniform float2 aTail;
+uniform float2 b;
+uniform float2 bTail;
+uniform float on;
+uniform float two;
+uniform float2 ring;
+uniform float ringT;
+
+float spot(float2 p, float2 s, float2 e) {
+  float2 d = e - s;
+  float len = dot(d, d);
+  float k = len < 0.001 ? 0.0 : clamp(dot(p - s, d) / len, 0.0, 1.0);
+  return max(0.0, 1.0 - length(p - s - d * k) / 34.0);
+}
+
+half4 main(float2 at) {
+  float2 c = (floor(at / gap) + 0.5) * gap;
+  float2 d = abs(at - c);
+  float glow = on * max(spot(c, a, aTail), two * spot(c, b, bTail));
+  if (ringT >= 0.0 && ringT < 1.0) {
+    float off = abs(length(c - ring) - ringT * 114.0);
+    glow = max(glow, max(0.0, 1.0 - off / 12.0) * (1.0 - ringT));
+  }
+  bool lit = glow > 0.02;
+  if (max(d.x, d.y) > (lit ? 1.5 + glow : 1.0)) return half4(0.0);
+  float4 tone = lit ? glowTone : dotTone;
+  float alpha = lit ? min(1.0, 0.25 + glow) : tone.a;
+  return half4(float4(tone.rgb * alpha, alpha));
+}
+`;
