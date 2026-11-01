@@ -3,6 +3,7 @@ import {
   BROWSER_TOOL_SCOPE,
   isOpenHandoff,
   keys,
+  machineProfiles,
   useAgents,
   useAgentsBrowserHandoffs,
   useApi,
@@ -420,8 +421,8 @@ function ProfilesSection({ machine: m }: { machine: Machine }) {
   const dir = useDirectory();
   const profiles = useBrowserProfiles(orgId);
   const actions = useBrowserProfileMutations(orgId);
-  const mine = (profiles.data ?? []).filter((p) => p.machineId === m.id);
-  if (mine.length === 0 || m.mode === "system") return null;
+  const mine = machineProfiles(profiles.data, m);
+  if (mine.length === 0) return null;
   const drive = can(org, "manage_connectors") && can(org, "control_computers");
   const login = (profileId: string) =>
     actions.takeover.mutate(profileId, {

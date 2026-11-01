@@ -211,3 +211,36 @@ test("the agent's browser: which profile Ada uses, the default tagged, and a mem
   await settle(6);
   expect(s.calls.find((c) => c.method === "setDefault")?.args).toEqual([ADA_ID, null]);
 });
+
+test("a system-mode computer (the Cloud's) has no Perfis do navegador, not even the update note", async () => {
+  const s = withProfiles();
+  fakeMachinesOf.get(s.api)?.patch(s.machine.id, { mode: "system", browserProfiles: false });
+  await renderApp(`/org/${ORG_ID}/settings/computers/${s.machine.id}`, { api: s.api });
+  await settle(8);
+  expect(screen().getByRole("heading", { name: "Servidor" })).toBeTruthy();
+  expect(screen().queryByRole("heading", { name: "Perfis do navegador" })).toBeNull();
+  expect(document.body.textContent).not.toContain("Atualize o computador para usar perfis do navegador.");
+});
+
+test("the agent's browser on a system-mode computer: no profile choice and no asking for one", async () => {
+  const s = withProfiles("member");
+  fakeMachinesOf.get(s.api)?.patch(s.machine.id, { mode: "system" });
+  // The server lists no profile of a system-mode computer.
+  if (s.api.browserProfiles) s.api.browserProfiles.list = async () => [];
+  await s.api.sandbox.setTarget(ORG_ID, ADA_ID, s.machine.id);
+  fakeBrowserOf.get(s.api)?.settings.set(ADA_ID, {
+    allowedDomains: null,
+    available: true,
+    reason: null,
+    detail: null,
+    machine: { id: s.machine.id, name: "Servidor" },
+    profileId: null,
+  });
+  await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}`, { api: s.api });
+  await settle(8);
+  await click(screen().getByRole("button", { name: "Mudar o navegador" }));
+  const d = screen().getByRole("dialog", { name: "A Ada pode navegar em sites?" });
+  expect(within(d).queryByRole("radiogroup", { name: "Qual perfil do navegador a Ada usa?" })).toBeNull();
+  expect(within(d).queryByRole("button", { name: "Pedir mais um perfil" })).toBeNull();
+  expect(d.textContent).toContain("fica com o login");
+});

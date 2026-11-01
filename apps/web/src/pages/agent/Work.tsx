@@ -13,6 +13,7 @@ import {
   BROWSER_TOOL_SCOPE,
   DESKTOP_TOOL_SCOPE,
   keys,
+  profilesApply,
   profilesOfAgent,
   useAgentBrain,
   useAgentBrowserSettings,
@@ -1966,6 +1967,9 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
     on === work.granted &&
     (!on || (JSON.stringify(sitesNow) === JSON.stringify(domains) && profileId === savedProfile));
   const noComputer = on && work.machineId === NO_COMPUTER && !moveTo;
+  // Profiles only where they exist: its browser's computer is single mode, or it already has one (on such a computer).
+  const browserMachineId = moveTo?.id ?? work.browser.data?.machine?.id ?? work.machineId;
+  const withProfiles = mine.length > 0 || profilesApply(work.machines.data?.find((m) => m.id === browserMachineId));
   // On the Cloud the agent's browser comes with the workspace's computer: it can be turned on while that one is prepared.
   const blocked = noComputer && edition !== "cloud";
   const use = async () => {
@@ -2103,7 +2107,8 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
               machineId={moveTo?.id ?? work.browser.data?.machine?.id}
             />
           )}
-          {on && (
+          {on && !withProfiles && <SettingNote icon="lock">{t("browser.agent.signedIn", g)}</SettingNote>}
+          {on && withProfiles && (
             <div className="ac-field">
               <span className="ac-field__label" id="agent-browser-profile">
                 {t("browser.profiles.agentChoice", g)}

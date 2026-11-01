@@ -197,12 +197,51 @@ test("a new profile is granted only to the agents chosen; only manage_connectors
   expect((await b.profile([])).name).toBe("Shop chat");
 });
 
-test("a computer in system mode, or one too old, can't hold profiles", async () => {
+test("a computer too old can't hold profiles", async () => {
   const b = await profilesSetup();
-  b.s.status = { executors: { mode: "system", browser: { available: true } } } as Partial<MachineStatus>;
-  await expect(b.profile([])).rejects.toBeInstanceOf(ValidationError);
   b.s.status = { protocol: BROWSER_PROFILE_PROTOCOL - 1 };
   await expect(b.profile([])).rejects.toThrow("Update this computer");
+});
+
+test("on a system-mode computer profiles don't exist: none listed, no tool or prompt line, every call refused", async () => {
+  const b = await profilesSetup();
+  const p = await b.profile([f.agent.id]);
+  // The runner reported system mode (each agent its own OS user), as a Cloud computer does.
+  await f.db
+    .update(schema.machines)
+    .set({ executors: { mode: "system", browser: { available: true } } })
+    .where(eq(schema.machines.id, b.machineId));
+  const refused = { code: "browser_profile.system_mode" };
+  await expect(b.profile([], "Other")).rejects.toMatchObject(refused);
+  await expect(listBrowserProfiles(f.db, f.owner.id, f.org.id, { machineId: b.machineId })).rejects.toMatchObject(
+    refused,
+  );
+  await expect(setBrowserProfileAgents(f.db, f.owner.id, f.org.id, p.id, [b.bia.id])).rejects.toMatchObject(refused);
+  await expect(setAgentBrowserProfile(f.db, f.owner.id, f.org.id, f.agent.id, p.id)).rejects.toMatchObject(refused);
+  await expect(startProfileControl({ db: f.db, hub: b.hub }, f.owner.id, f.org.id, p.id)).rejects.toMatchObject(
+    refused,
+  );
+  expect(await listBrowserProfiles(f.db, f.owner.id, f.org.id)).toEqual([]);
+  const ada = await runOf(f.agent.id);
+  expect(await b.names(ada)).not.toContain("browser_profile");
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "*" }]);
+  expect((await missingPermissions(await runOf(b.bia.id))).some((m) => m.profileId)).toBe(false);
+
+  // A workspace with both kinds: a single-mode computer's profile still shows and is offered.
+  const laptop = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "Notebook" });
+  await f.db
+    .update(schema.machines)
+    .set({ protocol: BROWSER_PROFILE_PROTOCOL })
+    .where(eq(schema.machines.id, laptop.machineId));
+  await createBrowserProfile({ db: f.db }, f.owner.id, f.org.id, {
+    machineId: laptop.machineId,
+    name: "Shop mail",
+    agentIds: [f.agent.id],
+  });
+  expect((await listBrowserProfiles(f.db, f.owner.id, f.org.id)).map((x) => x.name)).toEqual(["Shop mail"]);
+  const tool = (await (f.tools as NonNullable<Fixture["tools"]>).list(ada)).find((t) => t.name === "browser_profile");
+  if (!tool) throw new Error("no browser_profile tool");
+  expect((tool.inputSchema.properties as { name: { enum: string[] } }).name.enum).toEqual(["own", "Shop mail"]);
 });
 
 test("an agent not granted the profile is refused: no tool for it, and a default set behind its back sends nothing", async () => {

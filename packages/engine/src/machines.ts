@@ -368,7 +368,7 @@ async function machineViews(db: Database, actorId: string, orgId: string, only?:
       runnerVersion: m.runnerVersion,
       /** The runner's machine protocol (9+: pause; 10+: access on the machine). */
       protocol: m.protocol,
-      /** Its runner can hold browser profiles (ADR 0110); system mode is refused apart (`mode`). */
+      /** Its runner can hold browser profiles (ADR 0110); a system-mode computer has none at all (`mode`). */
       browserProfiles: m.protocol >= BROWSER_PROFILE_PROTOCOL,
       execAllowed: m.execAllowed,
       /** The owner paused it (ADR 0036 §6); `until` null: until they resume. */

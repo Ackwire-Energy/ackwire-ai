@@ -1371,7 +1371,7 @@ export interface ApiClient {
    */
   browserProfiles?: {
     list(orgId: string, machineId?: string): Promise<BrowserProfile[]>;
-    /** 409 `browser_profile.name_taken`; 400 `browser_profile.machine` (outdated, or a system-mode computer). */
+    /** 409 `browser_profile.name_taken`; 400 `browser_profile.machine` (outdated runner); 400 `browser_profile.system_mode` (never offered there). */
     create(orgId: string, input: { machineId: string; name: string; agentIds: string[] }): Promise<BrowserProfile>;
     update(orgId: string, profileId: string, input: { name?: string; agentIds?: string[] }): Promise<BrowserProfile>;
     remove(orgId: string, profileId: string): Promise<void>;

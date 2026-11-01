@@ -109,7 +109,7 @@ export const Machine = z
     protocol: z.number().int().openapi({ description: "The runner's machine protocol (9+: pause; 10+: access)." }),
     browserProfiles: z.boolean().openapi({
       description:
-        "Its runner can hold browser profiles (protocol 34, ADR 0110); `false`: update the computer. System mode is refused apart (`mode`).",
+        "Its runner can hold browser profiles (protocol 34, ADR 0110); `false`: update the computer. A system-mode computer has none at all (`mode`): the apps hide them there.",
     }),
     execAllowed: z.boolean().openapi({ description: "`false`: started with `--no-exec` (files and uploads only)." }),
     paused: z

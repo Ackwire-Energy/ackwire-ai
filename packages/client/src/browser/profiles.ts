@@ -1,10 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../api/context";
 import { keys } from "../api/keys";
-import type { BrowserProfile } from "../api/types";
+import type { BrowserProfile, Machine } from "../api/types";
 
 /** The live view's key of a browser profile (ADR 0110): watched where an agent's id would be. */
 export const profileLiveKey = (profileId: string) => `profile:${profileId}`;
+
+/**
+ * Browser profiles exist only on a single-mode computer (ADR 0110 phase 1): on a system-mode one, as the Cloud's
+ * computers run, nothing about them shows. Unknown computer: hidden too.
+ */
+export const profilesApply = (m: Pick<Machine, "mode"> | null | undefined) => Boolean(m) && m?.mode !== "system";
+
+/** The profiles a computer's page lists: its own, and none at all on a system-mode computer. */
+export const machineProfiles = (profiles: BrowserProfile[] | undefined, m: Pick<Machine, "id" | "mode">) =>
+  profilesApply(m) ? (profiles ?? []).filter((p) => p.machineId === m.id) : [];
 
 /** The workspace's browser profiles (every member sees names and who may use them); none on a server without them. */
 export function useBrowserProfiles(orgId: string, enabled = true) {

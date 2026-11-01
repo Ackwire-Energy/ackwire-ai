@@ -1,5 +1,6 @@
 import type { Machine, MachineAccessReduce, MachineOs, MachinePause, MachineToolName } from "@agenteschat/client";
 import {
+  profilesApply,
   useAgents,
   useAuthConfig,
   useDesktopLatest,
@@ -1084,7 +1085,7 @@ export function MachinePage({ machineId }: { machineId: string }) {
           <FoldersCard machine={m} onReduce={setReduce} />
           <ToolsCard machine={m} onReduce={setReduce} />
           <MachineBrowserCard machine={m} onTurnOff={() => setReduce({ kind: "tool", tool: "browser" })} />
-          <BrowserProfilesCard machine={m} />
+          {profilesApply(m) && <BrowserProfilesCard machine={m} />}
           <MachineDesktopUseCard machine={m} />
           <GrantCard machine={m} />
         </>

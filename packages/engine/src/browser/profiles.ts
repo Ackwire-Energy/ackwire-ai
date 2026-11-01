@@ -79,9 +79,30 @@ export async function getBrowserProfile(db: Executor, orgId: string, profileId: 
   return row ?? null;
 }
 
+/**
+ * Phase 1 (ADR 0110) holds profiles only on single-mode computers: on a system-mode one (each agent its own OS user,
+ * as the Cloud's computers run) the feature doesn't exist, so its profiles are never listed or offered.
+ */
+export const onSingleModeMachine = sql`not exists (select 1 from ${machines} m where m.id = ${browserProfiles.machineId} and m.executors->>'mode' = 'system')`;
+
+/** The API's guard behind the hidden UI: anything about profiles on a system-mode computer is refused. */
+async function requireSingleMode(db: Executor, orgId: string, machineId: string) {
+  const [m] = await db
+    .select({ executors: machines.executors })
+    .from(machines)
+    .where(and(eq(machines.id, machineId), eq(machines.orgId, orgId)));
+  if (m?.executors?.mode === "system") {
+    throw new ValidationError(
+      "Browser profiles work only on a computer where every agent runs as one user",
+      "browser_profile.system_mode",
+    );
+  }
+}
+
 async function requireProfile(db: Executor, orgId: string, profileId: string) {
   const row = await getBrowserProfile(db, orgId, profileId);
   if (!row) throw new NotFoundError("Browser profile not found");
+  await requireSingleMode(db, orgId, row.machineId);
   return row;
 }
 
@@ -93,6 +114,7 @@ export async function listBrowserProfiles(
   filter: { machineId?: string } = {},
 ): Promise<BrowserProfileView[]> {
   await requirePermission(db, actorId, orgId, "read");
+  if (filter.machineId) await requireSingleMode(db, orgId, filter.machineId);
   const rows = await db
     .select()
     .from(browserProfiles)
@@ -100,6 +122,7 @@ export async function listBrowserProfiles(
       and(
         eq(browserProfiles.orgId, orgId),
         isNull(browserProfiles.deletedAt),
+        onSingleModeMachine,
         filter.machineId ? eq(browserProfiles.machineId, filter.machineId) : undefined,
       ),
     )
@@ -163,9 +186,9 @@ async function requireEditableAgents(
 }
 
 /**
- * Whether the computer can hold profiles now: its runner speaks `BROWSER_PROFILE_PROTOCOL` and runs every agent as
- * one OS user. System mode (an OS user per profile) is phase 2: until then such a computer is refused with a clear
- * message. An unknown or older computer (offline since before the protocol) is refused as outdated.
+ * Whether a single-mode computer can hold profiles now: its runner speaks `BROWSER_PROFILE_PROTOCOL`. An unknown or
+ * older computer (offline since before the protocol) is refused as outdated. System mode is refused apart
+ * (`requireSingleMode`): there the feature is hidden, not explained.
  */
 export async function profileMachineProblem(
   db: Executor,
@@ -174,16 +197,12 @@ export async function profileMachineProblem(
   machineId: string,
 ): Promise<string | null> {
   const [m] = await db
-    .select({ protocol: machines.protocol, executors: machines.executors, deletedAt: machines.deletedAt })
+    .select({ protocol: machines.protocol, deletedAt: machines.deletedAt })
     .from(machines)
     .where(and(eq(machines.id, machineId), eq(machines.orgId, orgId)));
   if (!m || m.deletedAt) return "This computer no longer exists";
   const status = await hub?.status(machineId).catch(() => null);
   const protocol = status?.protocol ?? m.protocol ?? 0;
-  const mode = (status?.executors ?? m.executors)?.mode;
-  if (mode === "system") {
-    return "Browser profiles don't work yet on a computer where each agent runs as its own user (system mode)";
-  }
   if (protocol < BROWSER_PROFILE_PROTOCOL) return "Update this computer to use browser profiles";
   return null;
 }
@@ -207,6 +226,7 @@ export async function createBrowserProfile(
   await requireEditableAgents(db, membership, orgId, actorId, agentIds);
   const problem = await profileMachineProblem(db, deps.hub, orgId, input.machineId);
   if (problem) throw new ValidationError(problem, "browser_profile.machine");
+  await requireSingleMode(db, orgId, input.machineId);
   return db.transaction(async (tx) => {
     await requireFreeName(tx, orgId, name);
     const [row] = await tx
@@ -448,6 +468,7 @@ export async function agentBrowserProfiles(db: Executor, orgId: string, agentId:
         eq(browserProfileGrants.orgId, orgId),
         eq(browserProfileGrants.agentId, agentId),
         isNull(browserProfiles.deletedAt),
+        onSingleModeMachine,
       ),
     )
     .orderBy(asc(browserProfileGrants.createdAt));

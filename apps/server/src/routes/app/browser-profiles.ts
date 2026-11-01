@@ -78,7 +78,7 @@ export function browserProfileRoutes(deps: AppDeps) {
       security,
       summary: "Create a browser profile on a computer, for the chosen agents",
       description:
-        "`manage_connectors`, and only agents the person may edit. 409 `browser_profile.name_taken`; 400 `browser_profile.machine` when the computer can't hold profiles (outdated, or system mode).",
+        "`manage_connectors`, and only agents the person may edit. 409 `browser_profile.name_taken`; 400 `browser_profile.machine` when the computer's runner is too old. Every call about a system-mode computer, or a profile on one, is refused with 400 `browser_profile.system_mode` (the apps never show profiles there).",
       request: {
         params: OrgParams,
         body: body(

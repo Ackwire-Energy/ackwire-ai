@@ -310,7 +310,8 @@ type Open = { kind: "new" } | { kind: "rename" | "agents" | "delete" | "view"; p
 /**
  * "Perfis do navegador" on a computer's page (ADR 0110): named, shared logins that the chosen agents use, one at a
  * time. Each row says whether it is free or who uses it, who may use it, "Fazer login" and a menu. Creating,
- * choosing agents and deleting are for "apps e computadores"; everyone else sees the list.
+ * choosing agents and deleting are for "apps e computadores"; everyone else sees the list. Single-mode computers
+ * only (`profilesApply`): the caller leaves it out elsewhere.
  */
 export function BrowserProfilesCard({ machine: m }: { machine: Machine }) {
   const { t } = useTranslation();
@@ -323,8 +324,7 @@ export function BrowserProfilesCard({ machine: m }: { machine: Machine }) {
   const manage = canDo(org, "manage_connectors");
   const drive = manage && canDo(org, "control_computers");
   const mine = (profiles.data ?? []).filter((p) => p.machineId === m.id);
-  const system = m.mode === "system";
-  const outdated = !system && m.browserProfiles === false;
+  const outdated = m.browserProfiles === false;
   const login = (p: BrowserProfile) =>
     actions.takeover.mutate(p.id, {
       onSuccess: (now) => setOpen({ kind: "view", profile: now }),
@@ -342,7 +342,6 @@ export function BrowserProfilesCard({ machine: m }: { machine: Machine }) {
         subtitle={t("browser.profiles.sub")}
         action={
           manage &&
-          !system &&
           !outdated && (
             <Button size="sm" icon="plus" onClick={() => setOpen({ kind: "new" })}>
               {t("browser.profiles.new")}
@@ -350,9 +349,7 @@ export function BrowserProfilesCard({ machine: m }: { machine: Machine }) {
           )
         }
       />
-      {system ? (
-        <SettingNote icon="alert">{t("browser.profiles.systemMode")}</SettingNote>
-      ) : outdated ? (
+      {outdated ? (
         <SettingNote icon="alert">{t("browser.profiles.outdated")}</SettingNote>
       ) : mine.length === 0 ? (
         <p className="small muted">{t("browser.profiles.empty")}</p>
@@ -450,7 +447,7 @@ export function BrowserProfilesCard({ machine: m }: { machine: Machine }) {
           })}
         </div>
       )}
-      {!system && mine.length > 0 && <SettingNote icon="lock">{t("browser.profiles.sameUser")}</SettingNote>}
+      {mine.length > 0 && <SettingNote icon="lock">{t("browser.profiles.sameUser")}</SettingNote>}
       {open?.kind === "new" && (
         <NewProfileDialog
           machineId={m.id}

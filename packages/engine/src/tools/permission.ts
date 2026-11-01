@@ -1,5 +1,5 @@
 import { and, eq, isNull, schema, sql } from "@agenteschat/db";
-import { grantBrowserProfile } from "../browser/profiles";
+import { grantBrowserProfile, onSingleModeMachine } from "../browser/profiles";
 import {
   ALL_TOOLS,
   BUILTIN_SCOPES,
@@ -63,6 +63,7 @@ export async function missingPermissions(ctx: Pick<ToolContext, "db" | "orgId" |
       and(
         eq(p.orgId, ctx.orgId),
         isNull(p.deletedAt),
+        onSingleModeMachine,
         sql`not exists (select 1 from ${g} where ${g.profileId} = ${p.id} and ${g.agentId} = ${ctx.agentId})`,
       ),
     );

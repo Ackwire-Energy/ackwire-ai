@@ -165,3 +165,27 @@ test("an agent's owner can take their own agent off a profile, but not someone e
     (await asAna(`/browser-profiles/${p.id}`, { method: "PATCH", json: { agentIds: [org.agentId] } })).status,
   ).toBe(403);
 });
+
+test("a system-mode computer refuses every profile call: create, list, change, Fazer login, default", async () => {
+  const { org, api, machine } = await seeded();
+  const p = await json<Profile>(
+    await api("/browser-profiles", {
+      json: { machineId: machine.machineId, name: "Shop chat", agentIds: [org.agentId] },
+    }),
+  );
+  await t.db
+    .update(schema.machines)
+    .set({ executors: { mode: "system" } })
+    .where(eq(schema.machines.id, machine.machineId));
+  const refused = async (res: Response) => {
+    expect(res.status).toBe(400);
+    expect((await json<{ error: { code: string } }>(res)).error.code).toBe("browser_profile.system_mode");
+  };
+  await refused(await api("/browser-profiles", { json: { machineId: machine.machineId, name: "Other" } }));
+  await refused(await api(`/browser-profiles?machineId=${machine.machineId}`));
+  await refused(await api(`/browser-profiles/${p.id}`, { method: "PATCH", json: { name: "Renamed" } }));
+  await refused(await api(`/browser-profiles/${p.id}/takeover`, { json: {} }));
+  await refused(await api(`/browser-profiles/${p.id}/open`, { json: { url: "chat.example" } }));
+  await refused(await api(`/agents/${org.agentId}/browser-profile`, { method: "PUT", json: { profileId: p.id } }));
+  expect((await json<{ profiles: Profile[] }>(await api("/browser-profiles"))).profiles).toEqual([]);
+});

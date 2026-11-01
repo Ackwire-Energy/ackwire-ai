@@ -9921,8 +9921,6 @@ export const ptBR = {
       deleted: "Perfil {{name}} apagado.",
       sameUser:
         "Neste computador os agentes rodam como o mesmo usuário, então qualquer agente com terminal consegue chegar aos perfis.",
-      systemMode:
-        "Perfis do navegador ainda não funcionam neste computador, onde cada agente roda como um usuário próprio.",
       outdated: "Atualize o computador para usar perfis do navegador.",
       nameTaken: "Já existe um perfil com esse nome.",
       busy: "Outra pessoa está usando este perfil agora.",

@@ -9843,7 +9843,6 @@ export const en: Translations = {
       deleted: "Profile {{name}} deleted.",
       sameUser:
         "On this computer the agents run as the same user, so any agent with a terminal can reach the profiles.",
-      systemMode: "Browser profiles don't work yet on this computer, where each agent runs as its own user.",
       outdated: "Update this computer to use browser profiles.",
       nameTaken: "A profile with this name already exists.",
       busy: "Someone else is using this profile now.",
