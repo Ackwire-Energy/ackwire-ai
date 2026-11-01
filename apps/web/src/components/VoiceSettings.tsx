@@ -11,7 +11,6 @@ import { can } from "@agenteschat/client/lib/permissions";
 import {
   Button,
   Card,
-  CardHeader,
   Chip,
   Icon,
   Input,
@@ -81,8 +80,7 @@ export function VoiceSettingsCard({
   const { t } = useTranslation();
   const view = useSpeechKey().data;
   return (
-    <Card aria-labelledby="media-voice">
-      <CardHeader id="media-voice" icon="mic" title={t("voice.settings.title")} />
+    <Card aria-label={t("voice.settings.title")}>
       <div className="settings-rows">
         <PrefRow
           id="media-voice-on"
