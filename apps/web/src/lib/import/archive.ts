@@ -31,7 +31,9 @@ export const ARCHIVE_LIMITS = {
 
 const ARCHIVE = /\.(zip|tar\.gz|tgz|tar)$/i;
 const TEXT = /\.(md|markdown|json|json5|yaml|yml|txt)$/i;
-const JUNK = /(^|\/)(__MACOSX\/|\.DS_Store$|\._[^/]*$|Thumbs\.db$|desktop\.ini$|\.git\/|node_modules\/|__pycache__\/)/;
+/** System files, and what tools make and fetch again (dependencies, caches, builds): never an agent's own. */
+const JUNK =
+  /(^|\/)(__MACOSX\/|\.DS_Store$|\._[^/]*$|Thumbs\.db$|desktop\.ini$|\.git\/|node_modules\/|__pycache__\/|\.?venv\/|site-packages\/|\.cache\/|\.next\/|\.tox\/)/;
 /** Folders a format itself has at its root: an archive with only one of them is not wrapped in a folder. */
 const LAYOUT = new Set(["agents", "skills", "memory", "memories", "cron", "tasks", "projects", "teams", "profiles"]);
 
@@ -154,12 +156,11 @@ async function fromZip(blob: Blob): Promise<Read> {
       out.junk.push(path);
       continue;
     }
-    // An entry larger than its declared size is a zip bomb or a broken archive.
-    const bytes = async () => {
-      const data = await entry.read();
-      if (data.length > entry.size) throw new ImportError("tooLarge");
-      return data;
-    };
+    // An entry larger than its declared size is a zip bomb or a broken archive: the reader stops there.
+    const bytes = () =>
+      entry.read().catch((error: unknown) => {
+        throw error instanceof ZipError && error.code === "too_large" ? new ImportError("tooLarge") : error;
+      });
     // An encrypted entry, or one packed in a way the reader doesn't know, is listed without being read.
     const readable = () =>
       bytes().catch((error: unknown) => {
@@ -263,17 +264,19 @@ function numeric(block: Uint8Array, at: number, length: number): number {
 
 /**
  * A ustar archive (GNU long names and pax paths too), streamed: only the text files read are kept. A file's bytes
- * are read later as a slice of the archive, unpacked whole the first time a file of a .tar.gz is asked for (the
- * stream here already held it to the size limits).
+ * are read later as a slice of the archive, unpacked again the first time a file of a .tar.gz is asked for, up to
+ * where the last file ends.
  */
 async function fromTar(blob: Blob, gzip: boolean): Promise<Read> {
   const unpack = () => blob.stream().pipeThrough(new DecompressionStream("gzip"));
   const stream = gzip ? unpack() : blob.stream();
   const bytes = new Bytes(stream.getReader(), blob.size);
   let unpacked: Promise<Blob> | undefined;
+  // Where the last file kept ends: unpacking again stops there.
+  let end = 0;
   const tar = () => {
     if (!gzip) return Promise.resolve(blob);
-    unpacked ??= new Response(unpack()).blob();
+    unpacked ??= head(unpack(), end);
     return unpacked;
   };
   const { wants, peeks } = budget();
@@ -305,6 +308,7 @@ async function fromTar(blob: Blob, gzip: boolean): Promise<Read> {
       const regular = type === "0" || type === "\0" || type === "7";
       const at = bytes.position;
       const file = { name: path, size, read: async () => (await tar()).slice(at, at + size) };
+      if (regular) end = Math.max(end, at + size);
       if (regular && JUNK.test(path)) out.junk.push(path);
       const own = regular && !JUNK.test(path) && !path.endsWith("/");
       if (own && wants(path, size)) {
@@ -332,4 +336,19 @@ async function fromTar(blob: Blob, gzip: boolean): Promise<Read> {
     bytes.cancel();
   }
   return out;
+}
+
+/** The first `max` bytes of a stream, then it stops. */
+async function head(stream: ReadableStream<Uint8Array>, max: number): Promise<Blob> {
+  const reader = stream.getReader();
+  const parts: Uint8Array[] = [];
+  let size = 0;
+  while (size < max) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    parts.push(value);
+    size += value.byteLength;
+  }
+  await reader.cancel();
+  return new Blob(parts as BlobPart[]).slice(0, max);
 }

@@ -814,6 +814,22 @@ describe("Configurações → Importar e exportar", () => {
       );
     });
 
+    test("past 500 files, copying starts off and says why", async () => {
+      const { state } = await go();
+      const files: Record<string, string> = {
+        "openbot-export/openbot-import.json": openbot("openbot-import.json"),
+      };
+      for (let i = 0; i < 501; i++) files[`openbot-export/agents/scout/files/data/${i}.csv`] = `${i}`;
+      await pick("Arquivos para importar", [new File([zip(files).slice()], "openbot-export.zip")]);
+      const group = screen().getByRole("region", { name: "Copiar os arquivos para o Drive" });
+      expect(
+        within(group).getByRole("switch", { name: "Copiar os arquivos para o Drive" }).getAttribute("aria-checked"),
+      ).toBe("false");
+      expect(group.textContent).toContain("São 501 arquivos, então a cópia começa desligada.");
+      await importIt();
+      expect(copies(state)).toEqual([]);
+    });
+
     test("turned off, nothing is copied", async () => {
       const { state, api } = await go();
       await pick("Arquivos para importar", [exported()]);

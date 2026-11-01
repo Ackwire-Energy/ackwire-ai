@@ -746,7 +746,8 @@ export const en: Translations = {
       applying: "Importing… {{done}} of {{total}}",
       files: {
         copy: "Copy the files to the Drive",
-        help: "Each agent gets a folder with its name. What's already there stays as it is.",
+        help: "Each agent gets a folder with its name, which the whole workspace sees. What's already there stays as it is.",
+        many: "That's {{count}} files, so copying starts off. Each agent would get a folder with its name, which the whole workspace sees.",
         folder: "Drive\u00a0›\u00a0{{folder}}",
         count_one: "{{count}} file · {{size}}",
         count_other: "{{count}} files · {{size}}",
@@ -763,6 +764,7 @@ export const en: Translations = {
         more_one: "and {{count}} more",
         more_other: "and {{count}} more",
         copying: "Copying the files to the Drive… {{done}} of {{total}}",
+        keepOpen: "Keep this page open. If you close it, import again to finish.",
         copied_one: "{{count}} file in the Drive",
         copied_other: "{{count}} files in the Drive",
         none: "No new files in the Drive",

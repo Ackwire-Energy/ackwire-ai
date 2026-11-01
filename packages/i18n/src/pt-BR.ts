@@ -742,7 +742,8 @@ export const ptBR = {
       applying: "Importando… {{done}} de {{total}}",
       files: {
         copy: "Copiar os arquivos para o Drive",
-        help: "Cada agente ganha uma pasta com o nome dele. O que já estiver lá fica como está.",
+        help: "Cada agente ganha uma pasta com o nome dele, que todo o workspace vê. O que já estiver lá fica como está.",
+        many: "São {{count}} arquivos, então a cópia começa desligada. Cada agente ganharia uma pasta com o nome dele, que todo o workspace vê.",
         folder: "Drive\u00a0›\u00a0{{folder}}",
         count_one: "{{count}} arquivo · {{size}}",
         count_other: "{{count}} arquivos · {{size}}",
@@ -759,6 +760,7 @@ export const ptBR = {
         more_one: "e mais {{count}}",
         more_other: "e mais {{count}}",
         copying: "Copiando os arquivos para o Drive… {{done}} de {{total}}",
+        keepOpen: "Deixe esta página aberta. Se fechar, importe de novo para terminar.",
         copied_one: "{{count}} arquivo no Drive",
         copied_other: "{{count}} arquivos no Drive",
         none: "Nenhum arquivo novo no Drive",

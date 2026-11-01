@@ -79,6 +79,7 @@ import {
   isGithubLink,
   itemId,
   kindsLine,
+  MANY_FILES,
   NOT_GITHUB,
   picksOf,
   type RequestCard,
@@ -183,6 +184,14 @@ export function useImportFlow(orgId: string | null) {
   const last = useRef<ReadInput | null>(null);
   const focus = useRef<Focus>(null);
   const agentIds = useRef(new Map<string, string>());
+  // Closing the page stops the copy (the browser sends each file): ask first.
+  const copying = !!copy?.running;
+  useEffect(() => {
+    if (!copying) return;
+    const ask = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", ask);
+    return () => window.removeEventListener("beforeunload", ask);
+  }, [copying]);
   // Agents whose files were sent to the Drive, so a later apply (a retry) sends only those it brought.
   const sent = useRef(new Set<string>());
 
@@ -231,7 +240,7 @@ export function useImportFlow(orgId: string | null) {
       setPick(new Set(plan.items.filter(choosable).map(itemId)));
       setSkillsOn(new Set());
       setReport(null);
-      setCopyFiles(true);
+      setCopyFiles(parsed.files.filter((f) => !f.skip).length <= MANY_FILES);
       setCopy(null);
       setCard(bundleOrigin(bundle).card);
     } catch (cause) {
@@ -964,7 +973,11 @@ function FilesGroup({ flow, index, level }: { flow: ImportFlowState; index: Inde
           <label htmlFor="imp-files-copy">{t("onboarding.import.files.copy")}</label>
         </Heading>
         <CountChip size="sm">{going.length}</CountChip>
-        <span className="imp-group__help">{t("onboarding.import.files.help")}</span>
+        <span className="imp-group__help">
+          {t(going.length > MANY_FILES ? "onboarding.import.files.many" : "onboarding.import.files.help", {
+            count: going.length,
+          })}
+        </span>
       </div>
       <ul className="imp-rows">
         {agents.map((key) => {
@@ -1416,7 +1429,10 @@ export function ImportReport({
             </span>
             <span className="imp-made__text">
               {copy.running ? (
-                <b role="status">{t("onboarding.import.files.copying", { done: copy.done, total: copy.total })}</b>
+                <>
+                  <b role="status">{t("onboarding.import.files.copying", { done: copy.done, total: copy.total })}</b>
+                  <span>{t("onboarding.import.files.keepOpen")}</span>
+                </>
               ) : (
                 <b role="status">
                   {copy.result?.copied

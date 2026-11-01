@@ -1,3 +1,5 @@
+import { CP850_HIGH } from "@agenteschat/client/lib/zip";
+
 /** Archives built in tests, as the tools people export with write them (`tar`, Python's `tarfile`, zip). */
 const enc = new TextEncoder();
 
@@ -54,21 +56,31 @@ export function paxPath(path: string): TarEntry {
 }
 
 /** A .zip with stored entries; `sizes` can lie about an entry's unpacked size, as a zip bomb does. */
-export function zip(files: Record<string, string | Uint8Array>, sizes: Record<string, number> = {}) {
+export function zip(
+  files: Record<string, string | Uint8Array>,
+  sizes: Record<string, number> = {},
+  options: { deflate?: boolean; cp437?: boolean } = {},
+) {
+  const flags = options.cp437 ? 0 : 0x800;
   const parts: Uint8Array[] = [];
   const central: Uint8Array[] = [];
   let offset = 0;
   const u16 = (v: number) => [v & 255, (v >> 8) & 255];
   const u32 = (v: number) => [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255];
   for (const [name, content] of Object.entries(files)) {
-    const n = enc.encode(name);
-    const d = typeof content === "string" ? enc.encode(content) : content;
-    const size = sizes[name] ?? d.length;
+    // As old Windows tools write names: CP850, the UTF-8 flag clear.
+    const n = options.cp437
+      ? Uint8Array.from(name, (c) => (c.charCodeAt(0) < 128 ? c.charCodeAt(0) : 128 + CP850_HIGH.indexOf(c)))
+      : enc.encode(name);
+    const raw = typeof content === "string" ? enc.encode(content) : content;
+    const size = sizes[name] ?? raw.length;
+    const d = options.deflate ? Bun.deflateSync(raw) : raw;
+    const method = options.deflate ? 8 : 0;
     const local = new Uint8Array([
       ...u32(0x04034b50),
       ...u16(20),
-      ...u16(0x800),
-      ...u16(0),
+      ...u16(flags),
+      ...u16(method),
       ...u16(0),
       ...u16(0),
       ...u32(0),
@@ -83,8 +95,8 @@ export function zip(files: Record<string, string | Uint8Array>, sizes: Record<st
         ...u32(0x02014b50),
         ...u16(20),
         ...u16(20),
-        ...u16(0x800),
-        ...u16(0),
+        ...u16(flags),
+        ...u16(method),
         ...u16(0),
         ...u16(0),
         ...u32(0),

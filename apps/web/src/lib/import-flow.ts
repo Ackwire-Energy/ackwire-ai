@@ -255,6 +255,12 @@ export interface FilesCopy {
   left: { file: AgentFile; why: FileLeft }[];
 }
 
+/**
+ * Past this many files, copying them starts off: the browser sends each one, so the page stays open that long, and
+ * that many in a flat Drive is more likely a project's working copy than the agent's own files.
+ */
+export const MANY_FILES = 500;
+
 /** Files sent at a time. */
 const PARALLEL_COPIES = 4;
 

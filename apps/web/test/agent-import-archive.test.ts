@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { MAX_UPLOAD_BYTES } from "@agenteschat/client/lib/files";
+import { CP850_HIGH, readZip } from "@agenteschat/client/lib/zip";
 import { ImportError, parseImport, parsePackage, readImportFiles } from "@/lib/import";
 import { ARCHIVE_LIMITS } from "@/lib/import/archive";
 import { paxPath, type TarEntry, tar, zip } from "./archives";
@@ -133,6 +134,22 @@ describe("archives", () => {
     // A zip that says it unpacks to almost 4 GB.
     const lying = zip({ "a/SOUL.md": "x" }, { "a/SOUL.md": 0xfffffff0 });
     expect(await failure(() => readImportFiles([archive(lying, "a.zip")]))).toBe("tooLarge");
+    // An entry that says 1 KB and inflates far past it: the reader stops at the declared size.
+    const big = "a".repeat(8 * 1024 * 1024);
+    const bomb2 = zip({ "a/SOUL.md": "x", "a/a.bin": big }, { "a/a.bin": 1024 }, { deflate: true });
+    const read = readZip(new Blob([bomb2.slice()]));
+    const entry = (await read).find((e) => e.name === "a/a.bin");
+    await expect(entry?.read() ?? Promise.resolve()).rejects.toThrow("too_large");
+    expect(await failure(() => readImportFiles([archive(bomb2, "a.zip")]))).toBe("tooLarge");
+  });
+
+  test("a zip from an old Windows tool keeps its accented names (CP850 when not flagged UTF-8)", async () => {
+    expect(CP850_HIGH).toHaveLength(128);
+    const names = async (z: Uint8Array) => (await readZip(new Blob([z.slice()]))).map((e) => e.name);
+    expect(await names(zip({ "notas/relatório ação.md": "x" }, {}, { cp437: true }))).toEqual([
+      "notas/relatório ação.md",
+    ]);
+    expect(await names(zip({ "relatório.md": "x" }))).toEqual(["relatório.md"]);
   });
 
   test("an unreadable archive is corrupt", async () => {
@@ -194,6 +211,10 @@ describe("the agents' own files", () => {
       "openbot-export/agents/scout/files/.DS_Store": "junk",
       "openbot-export/agents/scout/files/charts/Thumbs.db": "junk",
       "__MACOSX/openbot-export/agents/scout/files/._rivals.txt": "junk",
+      // What tools fetch or build again.
+      "openbot-export/agents/scout/files/app/.venv/lib/site.py": "junk",
+      "openbot-export/agents/scout/files/app/venv/bin/activate": "junk",
+      "openbot-export/agents/scout/files/app/.next/cache.json": "junk",
     };
     const read = await readImportFiles([archive(zip(exported), "openbot-export-2026-10-18.zip")]);
     expect(read.root).toBe("openbot-export");
@@ -201,6 +222,9 @@ describe("the agents' own files", () => {
       "agents/scout/files/.DS_Store",
       "agents/scout/files/charts/Thumbs.db",
       "agents/scout/files/._rivals.txt",
+      "agents/scout/files/app/.venv/lib/site.py",
+      "agents/scout/files/app/venv/bin/activate",
+      "agents/scout/files/app/.next/cache.json",
     ]);
 
     const { bundle, files } = parsePackage(read.files, { root: read.root, junk: read.junk });
@@ -212,6 +236,9 @@ describe("the agents' own files", () => {
       ["scout", ".DS_Store", 0, "junk"],
       ["scout", "charts/Thumbs.db", 0, "junk"],
       ["scout", "._rivals.txt", 0, "junk"],
+      ["scout", "app/.venv/lib/site.py", 0, "junk"],
+      ["scout", "app/venv/bin/activate", 0, "junk"],
+      ["scout", "app/.next/cache.json", 0, "junk"],
     ]);
     // The bytes as the archive has them, a binary's too; what stays behind can't be read at all.
     expect(await bytesOf(files[2]?.read)).toEqual(png);
