@@ -335,7 +335,7 @@ export {
 } from "./format";
 export { useNow } from "./hooks/useNow";
 export { Icon, type IconName, type IconProps, iconNames, icons } from "./icons/Icon";
-export { initialsOf, isIdHandle } from "./names";
+export { driveFolder, initialsOf, isIdHandle } from "./names";
 export {
   BUSINESS_DAYS,
   nextOccurrences,

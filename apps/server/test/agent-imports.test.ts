@@ -1,5 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
+import { and, eq, schema } from "@agenteschat/db";
+import { ARTIFACT_LIMITS, setOrgLimits } from "@agenteschat/engine";
+import {
+  type Browser,
+  browser,
+  createTestServer,
+  joinByInvitation,
+  ORIGIN,
+  seedOrg,
+  signUp,
+  type TestServer,
+} from "./harness";
 
 let t: TestServer | undefined;
 afterEach(async () => {
@@ -315,5 +326,124 @@ describe("imports and the export", () => {
       notes: x.notes.map((n) => n.content),
     });
     expect(names(copy)).toEqual(names(exported));
+  });
+});
+
+describe("an imported agent's own files into the Drive", () => {
+  /** A multipart POST with the browser's session cookie and our Origin. */
+  const send = (b: Browser, path: string, fields: Record<string, string | File>) => {
+    const form = new FormData();
+    for (const [k, v] of Object.entries(fields)) form.set(k, v);
+    return (t as TestServer).app.request(path, {
+      method: "POST",
+      headers: { cookie: b.cookie(), origin: ORIGIN },
+      body: form,
+    });
+  };
+  type Copied = { status: string; artifactId: string; title: string; folder: string };
+
+  test("its folder, made by the agent; a name already there stays as it was; never keys; the Drive's limits; admins only", async () => {
+    const { b, orgId } = await owner({});
+    const base = `/api/app/organizations/${orgId}`;
+    const applied = (await (await b(`${base}/imports`, { json: { bundle: BUNDLE, dryRun: false } })).json()) as Plan;
+    const scout = applied.items.find((i) => i.kind === "agent")?.targetId as string;
+    const copy = (path: string, text: string, name = path.split("/").pop() as string, as = b) =>
+      send(as, `${base}/imports/files`, {
+        file: new File([text], name, { type: "text/markdown" }),
+        agentId: scout,
+        path,
+        note: "Trazido do OpenBot.run",
+      });
+
+    const created = await copy("notes/plan.md", "# Plan");
+    expect(created.status).toBe(201);
+    const first = (await created.json()) as Copied;
+    expect(first).toMatchObject({ status: "created", title: "Scout/notes/plan.md", folder: "Scout" });
+    const file = (await (await b(`${base}/artifacts/${first.artifactId}`)).json()) as {
+      kind: string;
+      channelId: string | null;
+      createdBy: { type: string; id: string };
+      content: { name: string; text?: string };
+    };
+    // The whole workspace sees it; the agent made it (its page lists it); the first version says where it came from.
+    expect(file).toMatchObject({ kind: "file", channelId: null, createdBy: { type: "agent", id: scout } });
+    expect(file.content).toMatchObject({ name: "plan.md", text: "# Plan" });
+    const versions = (await (await b(`${base}/artifacts/${first.artifactId}/versions`)).json()) as {
+      versions: { note: string | null }[];
+    };
+    expect(versions.versions.map((v) => v.note)).toEqual(["Trazido do OpenBot.run"]);
+    const onItsPage = (await (await b(`${base}/artifacts?authorType=agent&authorId=${scout}&changed=1`)).json()) as {
+      artifacts: { id: string }[];
+    };
+    expect(onItsPage.artifacts.map((a) => a.id)).toEqual([first.artifactId]);
+    // Who imported is who the audit names.
+    const [audit] = await (t as TestServer).db
+      .select()
+      .from(schema.auditLog)
+      .where(and(eq(schema.auditLog.action, "artifact.created"), eq(schema.auditLog.targetId, first.artifactId)));
+    expect(audit?.actorType).toBe("person");
+
+    // The same name again: it stays as it was.
+    const again = await copy("notes/plan.md", "# Plan, edited elsewhere");
+    expect(again.status).toBe(200);
+    expect(await again.json()).toEqual({ ...first, status: "exists" });
+    const kept = (await (await b(`${base}/artifacts/${first.artifactId}`)).json()) as {
+      version: number;
+      content: { text?: string };
+    };
+    expect(kept).toMatchObject({ version: 1, content: { text: "# Plan" } });
+
+    // Never a key file (by its name, or a text with a password in it), never outside the folder.
+    for (const [path, text, code] of [
+      [".env", "NORTHWIND_TOKEN=fixture-never-stored", "import.secret_file"],
+      ["config/credentials.json", "{}", "import.secret_file"],
+      ["keys/deploy.pem", "x", "import.secret_file"],
+      [".netrc", "machine example.com login scout password fixture", "import.secret_file"],
+      ["notes/servers.md", "Deploy box\npassword: fixture-never-stored", "import.secret_file"],
+      ["../escape.md", "x", "import.file_path"],
+    ] as const) {
+      const refused = await copy(path, text);
+      expect(refused.status).toBe(400);
+      expect(((await refused.json()) as { error: { code: string } }).error.code).toBe(code);
+    }
+
+    // The Drive's limits: the workspace's storage.
+    await setOrgLimits((t as TestServer).db, orgId, {
+      members: null,
+      storageBytes: 10,
+      uploadBytesPerDay: null,
+      platformUsdPerMonth: null,
+    });
+    const full = await copy("notes/long.md", "more than ten bytes");
+    expect(full.status).toBe(409);
+    expect(((await full.json()) as { error: { code: string } }).error.code).toBe("storage.full");
+    await setOrgLimits((t as TestServer).db, orgId, {
+      members: null,
+      storageBytes: null,
+      uploadBytesPerDay: null,
+      platformUsdPerMonth: null,
+    });
+    // And 50 MB a file.
+    const big = await send(b, `${base}/imports/files`, {
+      file: new File([new Uint8Array(ARTIFACT_LIMITS.fileBytes + 1)], "video.mp4"),
+      agentId: scout,
+      path: "video.mp4",
+    });
+    expect([400, 413]).toContain(big.status);
+    expect(((await big.json()) as { error: { code: string } }).error.code).toBe("artifact.file_too_large");
+
+    const titles = (await (await b(`${base}/artifacts?q=Scout%2F`)).json()) as { artifacts: { title: string }[] };
+    expect(titles.artifacts.map((a) => a.title)).toEqual(["Scout/notes/plan.md"]);
+
+    // Only who imports; and only into an agent of this workspace.
+    const member = await joinByInvitation(t as TestServer, b, orgId, "member@example.com");
+    expect((await copy("notes/other.md", "x", "other.md", member)).status).toBe(403);
+    expect((await send(browser(t as TestServer), `${base}/imports/files`, { path: "a.md" })).status).toBe(401);
+    const stranger = await send(b, `${base}/imports/files`, {
+      file: new File(["x"], "a.md"),
+      agentId: crypto.randomUUID(),
+      path: "a.md",
+    });
+    expect(stranger.status).toBe(404);
   });
 });
