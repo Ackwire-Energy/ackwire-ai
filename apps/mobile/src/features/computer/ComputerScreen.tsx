@@ -1,9 +1,4 @@
-import {
-  type BrowserHandoff,
-  controlledBy,
-  handoffScreen,
-  useBrowserHandoffActions,
-} from "@agenteschat/client";
+import { type BrowserHandoff, controlledBy, handoffScreen, useBrowserHandoffActions } from "@agenteschat/client";
 import { liveSubLine } from "@agenteschat/client/lib/agent-computer";
 import { computerName, READY_FLASH_MS, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { clockAt } from "@agenteschat/client/lib/format";

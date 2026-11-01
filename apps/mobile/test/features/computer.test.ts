@@ -170,9 +170,9 @@ describe("the agent's computer full screen on the phone: what its stage shows", 
     // This person in the agent's browser: its page, whatever else the computer serves.
     expect(phoneStage(facts({ handoff: request({ status: "active", controllerUserId: "me" }) }))).toBe("page");
     // A request on the screen, whoever holds it: the screen.
-    expect(phoneStage(facts({ handoff: request({ screen: "desktop", status: "active", controllerUserId: "me" }) }))).toBe(
-      "screen",
-    );
+    expect(
+      phoneStage(facts({ handoff: request({ screen: "desktop", status: "active", controllerUserId: "me" }) })),
+    ).toBe("screen");
   });
 
   test("held or on its way first, then why nothing shows, in the web's order", () => {
@@ -181,9 +181,7 @@ describe("the agent's computer full screen on the phone: what its stage shows", 
     expect(phoneStage(facts({ machine: { ...ACME, online: false } }))).toBe("offline");
     // Ready, and the agent gets it at its next hello: a moment more.
     expect(phoneStage(facts({ machine: null, desktop: null, browser: false }))).toBe("joining");
-    expect(phoneStage(facts({ edition: "selfhost", machine: null, desktop: null, browser: false }))).toBe(
-      "noComputer",
-    );
+    expect(phoneStage(facts({ edition: "selfhost", machine: null, desktop: null, browser: false }))).toBe("noComputer");
     const neither = { desktop: { available: false, reason: "no_desktop" }, browser: false, browserGranted: false };
     expect(phoneStage(facts(neither))).toBe("noScreen");
     expect(phoneStage(facts({ desktop: { available: false, reason: "runner_outdated" }, browser: false }))).toBe(

@@ -2,8 +2,8 @@ import { describe, expect, mock, test } from "bun:test";
 import { CURSOR_CELLS, cursorCells } from "../../src/features/computer/pixel-cursor";
 import {
   BUTTON,
-  PointerLine,
   POINTER_MS,
+  PointerLine,
   screenCall,
   screenEvent,
   screenPageStays,
@@ -76,9 +76,13 @@ describe("the pointer on its way to the page", () => {
       run = fn;
       return 1 as unknown as ReturnType<typeof setTimeout>;
     });
-    const l = new PointerLine((x, y, b) => sent.push([x, y, b]), schedule, () => {
-      run = null;
-    });
+    const l = new PointerLine(
+      (x, y, b) => sent.push([x, y, b]),
+      schedule,
+      () => {
+        run = null;
+      },
+    );
     return { l, sent, schedule, tick: () => run?.() };
   };
 
@@ -140,8 +144,8 @@ describe("the camera over the agent's screen", () => {
 
   test("watching shows it all; control fills the box, never past what stays sharp", () => {
     expect(fitScale(PHONE, desk)).toBeCloseTo(336 / 1280);
-    expect(controlScale(PHONE, desk)).toBeCloseTo(320 / 900 > (336 / 1280) * 1.25 ? 320 / 900 : (336 / 1280) * 1.25);
-    expect(controlScale({ width: 4000, height: 4000 }, desk)).toBeLessThanOrEqual(MAX_SCALE);
+    expect(controlScale(PHONE, desk)).toBeCloseTo(Math.max(320 / 900, (336 / 1280) * 1.25));
+    expect(controlScale({ width: 2000, height: 4000 }, desk)).toBe(MAX_SCALE);
   });
 
   test("the camera stays on the desktop, centered on a side the box is larger than it", () => {

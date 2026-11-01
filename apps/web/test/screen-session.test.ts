@@ -7,7 +7,21 @@ import type RFB from "@novnc/novnc";
 import type { RfbChannel } from "@novnc/novnc";
 import { type ScreenEvent, ScreenSession } from "@/screen/session";
 
-class FakeSocket extends EventTarget {
+/** Listeners without `EventTarget`: the native one refuses the events of the DOM the tests run on. */
+class Listeners {
+  private heard = new Map<string, Set<(e: unknown) => void>>();
+  addEventListener(type: string, fn: (e: unknown) => void) {
+    this.heard.set(type, (this.heard.get(type) ?? new Set()).add(fn));
+  }
+  removeEventListener(type: string, fn: (e: unknown) => void) {
+    this.heard.get(type)?.delete(fn);
+  }
+  emit(type: string, fields: object = {}) {
+    for (const fn of this.heard.get(type) ?? []) fn({ type, ...fields });
+  }
+}
+
+class FakeSocket extends Listeners {
   binaryType = "blob";
   readyState = 1;
   sent: unknown[] = [];
@@ -22,14 +36,14 @@ class FakeSocket extends EventTarget {
     this.closed = true;
   }
   serverCloses(code: number, reason = "") {
-    this.dispatchEvent(Object.assign(new Event("close"), { code, reason }));
+    this.emit("close", { code, reason });
   }
   serverSays(text: string) {
-    this.dispatchEvent(new MessageEvent("message", { data: text }));
+    this.emit("message", { data: text });
   }
 }
 
-class FakeRfb extends EventTarget {
+class FakeRfb extends Listeners {
   viewOnly = false;
   qualityLevel = 0;
   compressionLevel = 0;
@@ -54,7 +68,7 @@ class FakeRfb extends EventTarget {
     this.channel.close();
   }
   connects() {
-    this.dispatchEvent(new Event("connect"));
+    this.emit("connect");
   }
 }
 

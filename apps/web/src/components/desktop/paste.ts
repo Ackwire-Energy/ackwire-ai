@@ -9,4 +9,5 @@ export const CONTROL = { keysym: 0xffe3, code: "ControlLeft" };
 export const INSERT = { keysym: 0xff63, code: "Insert" };
 
 /** What a text takes on the desktop's clipboard, in the bytes `PASTE_MAX_BYTES` counts. */
-export const pasteBytes = (text: string) => new TextEncoder().encode(text.replace(/\r\n|\r|\n/g, "\r\n")).byteLength + 1;
+export const pasteBytes = (text: string) =>
+  new TextEncoder().encode(text.replace(/\r\n|\r|\n/g, "\r\n")).byteLength + 1;

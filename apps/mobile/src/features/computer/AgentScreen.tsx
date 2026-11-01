@@ -314,8 +314,7 @@ export function AgentScreen({
     if (down) tapHaptic();
     line.press(cursorX.value, cursorY.value, down ? BUTTON.left : BUTTON.none);
   };
-  const wheeled = (down: boolean) =>
-    line.click(cursorX.value, cursorY.value, down ? BUTTON.wheelDown : BUTTON.wheelUp);
+  const wheeled = (down: boolean) => line.click(cursorX.value, cursorY.value, down ? BUTTON.wheelDown : BUTTON.wheelUp);
 
   const pinchFrom = useSharedValue(1);
   const pinch = usePinchGesture({
@@ -393,9 +392,7 @@ export function AgentScreen({
         onLayout={onLayout}
         style={[
           styles.box,
-          inControl
-            ? styles.fill
-            : { aspectRatio: deskSize.width / deskSize.height, flexGrow: 0, flexShrink: 1 },
+          inControl ? styles.fill : { aspectRatio: deskSize.width / deskSize.height, flexGrow: 0, flexShrink: 1 },
         ]}
         accessibilityRole="image"
         accessibilityLabel={t("agentComputer.screen", g)}
@@ -588,10 +585,7 @@ function Trackpad({
     <GestureDetector gesture={gestures}>
       <View
         collapsable={false}
-        style={[
-          styles.pad,
-          { backgroundColor: holding ? c.raised : c.sunken, borderColor: holding ? c.ink : c.line },
-        ]}
+        style={[styles.pad, { backgroundColor: holding ? c.raised : c.sunken, borderColor: holding ? c.ink : c.line }]}
         accessibilityLabel={t("agentComputer.phone.trackpad")}
       >
         <View style={styles.padKeyboard}>
@@ -672,7 +666,7 @@ function Watching({
           {recent.map((step, i) => {
             const latest = i === recent.length - 1;
             return (
-              <View key={`${i}-${step.tool}`} style={styles.step}>
+              <View key={step.id} style={styles.step}>
                 <Icon name={latest ? "person" : "check"} size={15} color={latest ? c.ink : c.faint} />
                 <Text variant="small" tone={latest ? "ink" : "ink2"} numberOfLines={1} style={latest && styles.bold}>
                   {stepText(t, step, step.screen)}
@@ -694,13 +688,7 @@ function Watching({
             onSubmitEditing={send}
             submitBehavior="submit"
           />
-          <IconButton
-            icon="send"
-            plate
-            label={t("mobile.browser.live.send")}
-            disabled={!text.trim()}
-            onPress={send}
-          />
+          <IconButton icon="send" plate label={t("mobile.browser.live.send")} disabled={!text.trim()} onPress={send} />
         </View>
       ) : null}
     </View>
@@ -727,7 +715,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1.5 },
   },
   taking: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(15,15,14,0.45)",
