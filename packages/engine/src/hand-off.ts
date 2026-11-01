@@ -302,25 +302,28 @@ export async function askVerdict(
   return "person";
 }
 
+/** A question naming a secret, read when the judge fails: a missed one would be typed into the chat in plain text. */
+const NAMES_SECRET =
+  /\b(api[ _-]?keys?|chaves?|tokens?|senhas?|passwords?|secrets?|segredos?|credenciais|credentials?)\b/i;
+
 /** What the run reads when it asked a person for a secret in a chat question. */
 const SECRET_IN_CHAT = "Not asked: a secret typed in the chat stays in the conversation in plain text.";
 
 /**
  * An `ask_user` question goes through the same resourcefulness check as giving up (ADR 0109 addendum): a question for
  * something the run could find with its means is held once (the tool answers with its means and what it tried, and
- * the next findable question is asked), and a secret asked as a chat question is turned to `request_secret`. At most
- * `CONTINUE.maxPerRun` holds per run, then every question goes through without a judgment. Null: ask it.
+ * the next findable question is asked), and a secret asked as a chat question is refused every time and turned to
+ * `request_secret` (on a judge error, a question naming a secret is refused too). Null: ask it.
  */
 export async function holdAsk(deps: ResourcefulDeps, ctx: ToolContext, question: string): Promise<string | null> {
   if (!deps.judge) return null;
-  const { CONTINUE, findableNudge } = await import("./continuation");
+  const { findableNudge } = await import("./continuation");
   const [run] = await ctx.db
     .select()
     .from(agentRuns)
     .where(and(eq(agentRuns.id, ctx.runId), eq(agentRuns.orgId, ctx.orgId)));
   if (run?.status !== "running") return null;
   const held = await heldRules(ctx.db, run, "ask_user");
-  if (held.length >= CONTINUE.maxPerRun) return null;
   const { request, means, tried, names } = await runEvidence(deps, ctx, run);
   const verdict = await askVerdict(deps.judge, {
     orgId: ctx.orgId,
@@ -330,7 +333,7 @@ export async function holdAsk(deps: ResourcefulDeps, ctx: ToolContext, question:
     request,
     means,
     tried,
-  }).catch(() => "person" as const);
+  }).catch((): AskVerdict => (NAMES_SECRET.test(question) ? "secret" : "person"));
   if (verdict === "person" || (verdict === "findable" && held.includes("findable"))) return null;
   await addRunStep(ctx.db, run, "context", {
     continuation: { outcome: "continue", rule: verdict, held: "ask_user", count: held.length + 1 },

@@ -11,7 +11,7 @@ import {
   toolPolicy,
   turnMeans,
 } from "../src";
-import { callLine, decideTurnEnd, type TurnEnd } from "../src/continuation";
+import { advance, type ContinuationVerdict, callLine, decideTurnEnd, type TurnEnd } from "../src/continuation";
 
 // ADR 0109: web reading for every agent, the general means, and the controller's `untried` verdict.
 
@@ -173,7 +173,7 @@ describe("the general means", () => {
 });
 
 describe("the controller's untried verdict", () => {
-  const turn = (verdict: "untried" | "done", count = 0, executed = 1): TurnEnd => ({
+  const turn = (verdict: ContinuationVerdict, count = 0, executed = 1): TurnEnd => ({
     state: { count, executedAtNudge: count ? 1 : undefined },
     kind: "conversation",
     executed,
@@ -197,6 +197,24 @@ describe("the controller's untried verdict", () => {
     expect(await decideTurnEnd(turn("untried", 1, 1))).toMatchObject({ outcome: "done", rule: "untried_cap" });
     expect(await decideTurnEnd(turn("untried", 2, 9))).toMatchObject({ outcome: "done", rule: "untried_cap" });
     expect(await decideTurnEnd(turn("done"))).toMatchObject({ outcome: "done", rule: "judged" });
+  });
+
+  test("a secret asked in the chat never becomes a question card: told the secure way once, then ends", async () => {
+    const asked = { ...turn("secret"), state: { count: 0, askNudged: true, askPending: true } };
+    const d = await decideTurnEnd(asked);
+    expect(d).toMatchObject({ outcome: "continue", rule: "secret" });
+    expect(d.nudge).toContain("request_secret");
+    const next = advance(asked.state, d, 1);
+    expect(next.secretNudged).toBe(true);
+    expect(next.count).toBe(0);
+    expect(await decideTurnEnd({ ...turn("secret"), state: next })).toMatchObject({
+      outcome: "done",
+      rule: "secret_cap",
+    });
+    expect(await decideTurnEnd({ ...turn("secret"), kind: "routine" })).toMatchObject({
+      outcome: "done",
+      rule: "ask_elsewhere",
+    });
   });
 
   test("a call as the judge reads it", () => {
@@ -227,5 +245,6 @@ describe("asking a person (ADR 0109 addendum)", () => {
   test("the prompt says to find first, ask only what a person can give, a secret through request_secret", () => {
     expect(HOW_YOU_WORK).toContain("Before asking a person, find what you can");
     expect(HOW_YOU_WORK).toContain("A secret or a key always through `request_secret`");
+    expect(HOW_YOU_WORK).toContain("with no `request_secret`, say which key is needed and where it is set up");
   });
 });

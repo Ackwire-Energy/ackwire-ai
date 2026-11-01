@@ -33,9 +33,11 @@ export interface ContinuationState {
   askNudged?: boolean;
   /** The last turn was told to ask: this one is judged past the cap, and turns into the question if it didn't. */
   askPending?: boolean;
+  /** It was told once to ask for a secret securely: the next secret verdict ends the run as it is. */
+  secretNudged?: boolean;
 }
 
-export type ContinuationVerdict = "done" | "continue" | "ask" | "untried";
+export type ContinuationVerdict = "done" | "continue" | "ask" | "untried" | "secret";
 
 /**
  * What a run reads when it ended saying it couldn't while it still had ways to try (ADR 0109): its means and what it
@@ -61,9 +63,16 @@ export function findableNudge(means: string[], tried: string[]) {
 export const ASK_NUDGE =
   "You need something only a person can give (a credential, a decision, a test, access). Ask them now with ask_user: one direct question, with choices if it is one of a few (a key or a password through request_secret). Do not end with a list of what's missing.";
 
+/**
+ * What a run reads, once, when its reply asks a person for a secret in the chat (ADR 0109 addendum): its reply is not
+ * posted, and a question card is never made of it, since the answer would stay in the conversation in plain text.
+ */
+export const SECRET_NUDGE =
+  "Not posted: never ask for a secret (a key, a token, a password) in the chat, where it stays in plain text. If you have request_secret, call it: the person types it into a secure card. Otherwise say which key is needed and where it is set up, without asking for it here.";
+
 /** The run's last judged turn, kept for the mission's keep-going check (`keepGoingBlocker` reads `waiting`). */
 export const verdictRecord = (v: ContinuationVerdict) =>
-  v === "continue" || v === "untried" ? "unkept" : v === "ask" ? "waiting" : v;
+  v === "continue" || v === "untried" ? "unkept" : v === "ask" || v === "secret" ? "waiting" : v;
 
 /**
  * One judge call on a turn's end (kind `follow_through`, recorded on the agent's and the workspace's usage like
@@ -115,13 +124,17 @@ export async function continuationVerdict(
             "It said it couldn't or that it lacks a tool, or asked a person to do or connect something, or asked a person for information its means could find (an address, docs, what a name refers to), while `means` has ways that fit the task it hasn't used in `tried`, or it gave up after one empty or failed attempt without varying it. Handing the work to a teammate counts as an attempt.",
           continue:
             "It said it will do more itself (next, later, after a build), or offered reversible work inside what it was asked ('want me to create the issues?' after 'triage these'), or stopped midway, and nothing it set up brings it back. Also when `unreached` is set and the reply hands work or a question to an agent it names (that mention reached nobody); merely naming one is not that.",
-          ask: "To go on it needs something only a person can give (a credential, a decision, a test, access) that its `means` can't find, but it described the need or listed what's missing instead of asking one direct question.",
+          ask: "To go on it needs something only a person can give (a decision, a test, access) that its `means` can't find, but it described the need or listed what's missing instead of asking one direct question.",
+          secret:
+            "It asks a person to type or paste a secret into the chat (a password, an API key, a token, a private key), or it needs one from a person and hasn't asked for it through a secure request (`tried` has no request_secret call).",
         },
       },
     },
   });
   const a = answers.verdict;
   const p = (k: ContinuationVerdict) => a?.probabilities?.[k] ?? (a?.choice === k ? 1 : 0);
+  if (p("secret") >= 0.45 && (["untried", "continue", "ask"] as const).every((k) => p("secret") >= p(k)))
+    return "secret";
   if (p("untried") >= 0.45 && p("untried") >= p("continue") && p("untried") >= p("ask")) return "untried";
   if (p("continue") >= 0.45 && p("continue") >= p("ask")) return "continue";
   if (p("ask") >= 0.45) return "ask";
@@ -239,7 +252,13 @@ export async function decideTurnEnd(t: TurnEnd): Promise<TurnEndDecision> {
   }
   // No person reads a routine's run or an agents' DM: what it lacks goes out in its report or its answer, and
   // the controller of the run that reads it can ask.
-  if (verdict === "ask" && t.kind !== "conversation") return { outcome: "done", rule: "ask_elsewhere", verdict };
+  if ((verdict === "ask" || verdict === "secret") && t.kind !== "conversation")
+    return { outcome: "done", rule: "ask_elsewhere", verdict };
+  // A secret asked in the chat is never posted nor made a question card: once told the secure way, then as it is.
+  if (verdict === "secret")
+    return t.state.secretNudged
+      ? { outcome: "done", rule: "secret_cap", verdict }
+      : { outcome: "continue", rule: "secret", verdict, nudge: SECRET_NUDGE };
   // A hand-off by mention to an agent that isn't here is an unkept hand-off: it goes on and hands it over.
   if (verdict === "continue" && t.unreached && canNudge)
     return { outcome: "continue", rule: "unreached", verdict, nudge: t.unreached };
@@ -278,6 +297,7 @@ export function advance(state: ContinuationState, d: TurnEndDecision, executed: 
   const { askPending: _, ...rest } = state;
   if (d.outcome !== "continue") return rest;
   if (d.rule === "ask") return { ...rest, askNudged: true, askPending: true };
+  if (d.rule === "secret") return { ...rest, secretNudged: true };
   return { ...rest, count: state.count + 1, executedAtNudge: executed };
 }
 

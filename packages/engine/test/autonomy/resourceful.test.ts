@@ -437,3 +437,62 @@ scenario("S62", "a secret is never asked in the chat, even with no secure reques
   expect(await questions(w)).toHaveLength(0);
   await assertInvariants(w);
 });
+
+scenario("S63", "the controller never makes a question card of a reply asking for a key in the chat", async () => {
+  const w = await world({
+    agents: ["ada"],
+    setup: { toolSources: [docsWeb()] },
+    judge: { followThrough: (s) => (/chave|key/i.test(String(s.reply)) ? "secret" : "done") },
+    script: {
+      ada: [
+        { text: "Me manda a API key do Acme Ledger aqui que eu puxo os gastos." },
+        { text: "Preciso da chave do Acme Ledger: ela é criada em Configurações > API do Acme Ledger." },
+      ],
+    },
+  });
+  await w.say("@ada puxa meus gastos na api do acme ledger");
+  await w.settle();
+  // The reply asking for the key is never posted nor turned into a card; the run says which key and where.
+  expect(await questions(w)).toHaveLength(0);
+  expect((await w.posts("ada")).map((p) => p.body)).toEqual([
+    "Preciso da chave do Acme Ledger: ela é criada em Configurações > API do Acme Ledger.",
+  ]);
+  expect((await w.runs("ada")).map((r) => r.status)).toEqual(["done"]);
+  await assertInvariants(w);
+});
+
+scenario(
+  "S64",
+  "a key asked in the chat is refused every time, past the other holds and when the judge fails",
+  async () => {
+    const keyQuestion = (question: string) => ({
+      calls: [{ name: "ask_user", input: { question, why: "Preciso disso para seguir com o pedido da pessoa aqui." } }],
+    });
+    const w = await world({
+      agents: ["ada"],
+      setup: { toolSources: [docsWeb()] },
+      // The judge is down for the last question: one naming a secret is refused all the same.
+      judge: { ask: (s) => (/senha/i.test(String(s.question)) ? "fail" : askRubric(s)) },
+      script: {
+        ada: [
+          keyQuestion("Qual é o endereço da API do Acme Ledger?"),
+          keyQuestion("Me passa a chave da API do Acme Ledger?"),
+          keyQuestion("Me passa a chave da API, por favor?"),
+          keyQuestion("Qual é a senha da conta?"),
+          { text: "Preciso da chave do Acme Ledger, criada em Configurações > API." },
+        ],
+      },
+    });
+    await w.say("@ada puxa meus gastos na api do acme ledger");
+    await w.settle();
+    const calls = await w.calls("ada");
+    expect(calls.map((c) => c.result?.slice(0, 14))).toEqual([
+      "Not asked yet:",
+      "Not asked: a s",
+      "Not asked: a s",
+      "Not asked: a s",
+    ]);
+    expect(await questions(w)).toHaveLength(0);
+    await assertInvariants(w);
+  },
+);

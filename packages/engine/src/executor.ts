@@ -3078,6 +3078,7 @@ async function executeRunInner(
         promise: "promise",
         unreached: "unreached",
         untried: "untried",
+        secret: "secret",
       }[decision.rule];
       const { nudge: _, ...recorded } = { ...decision, count: t.continuation.count };
       later(() =>
@@ -3093,7 +3094,13 @@ async function executeRunInner(
         if (plan.kind !== "model") nextPrompt = decision.nudge;
         // Nothing to post first: it simply goes on. A give-up judged untried isn't posted either: it would send people
         // after something the next turn may do itself.
-        if (decision.rule === "decision" || decision.rule === "answer" || decision.rule === "untried") {
+        // Nor a secret asked in the chat (ADR 0109 addendum).
+        if (
+          decision.rule === "decision" ||
+          decision.rule === "answer" ||
+          decision.rule === "untried" ||
+          decision.rule === "secret"
+        ) {
           await saveTranscript(db, t);
           continue;
         }

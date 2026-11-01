@@ -66,6 +66,9 @@ const provider = createAnthropicProvider();
 const GAVE_UP =
   /n[ãa]o (consegui|consigo|tenho como|tenho acesso|tenho ferramenta)|couldn'?t|can'?t (find|access|search)|unable to/i;
 const TRIED = /tentei|procurei|busquei|i tried|i searched|i looked/i;
+/** A reply asking the person to send a secret in the chat. */
+const ASKS_KEY_IN_CHAT =
+  /\b(mand|envi|cole|pass|digit|paste|send|share|compartilh)\w*\b[^.?!\n]{0,40}\b(api[ _-]?key|chave|token|senha|password)/i;
 
 interface Outcome {
   id: string;
@@ -100,6 +103,7 @@ function grade(
     c.maxCalls !== undefined && calls > c.maxCalls ? `${calls} calls (max ${c.maxCalls})` : "",
     c.onlyKey && !keyed ? "no request_secret" : "",
     c.onlyKey && asked > 0 ? `${asked} question(s) in the chat` : "",
+    c.onlyKey && ASKS_KEY_IN_CHAT.test(reply) ? "asks for the key in the chat" : "",
     c.oneQuestion && asked !== 1 ? `${asked} questions (one expected)` : "",
   ].filter(Boolean);
   return { pass: why.length === 0, gaveUp, why: why.join("; ") };
