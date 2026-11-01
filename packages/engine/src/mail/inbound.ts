@@ -14,6 +14,7 @@ import { markComposioAccountBroken } from "../connectors/composio";
 import { NotFoundError } from "../errors";
 import { cutText } from "../format";
 import { type EventMerge, holdForNextRun, queueEventRun, type RoutineEventPayload } from "../routine-events";
+import { neutralizeUntrusted } from "../untrusted";
 import { ForbiddenSignatureError } from "../webhooks";
 import {
   accountRef,
@@ -26,7 +27,7 @@ import {
   orgMailAccounts,
 } from "./accounts";
 import { agentMailPolicy } from "./policies";
-import { formatAddress, matchesAddressRules, neutralizeMarkers, oneLine } from "./text";
+import { formatAddress, matchesAddressRules, oneLine } from "./text";
 import type { MailFilter } from "./watches";
 
 const { mailWatches, mailSeen, mailAccounts, routines, routineRuns } = schema;
@@ -65,7 +66,7 @@ function mailSummary(address: string, folder: string, readTool: string, messages
     return snippet ? `${base} · ${snippet}` : cutText(base, Math.max(40, room));
   });
   const more = extra > 0 ? [`(and ${extra} more not listed)`] : [];
-  return neutralizeMarkers([head, ...lines, ...more].join("\n"));
+  return neutralizeUntrusted([head, ...lines, ...more].join("\n"));
 }
 
 /**

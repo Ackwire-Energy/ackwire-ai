@@ -308,6 +308,7 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
         service: account.preset ?? account.provider,
         sensitive:
           effect === "delete" || (effect === "send" && askToSend) || account.askActions.includes(actionOf(verb)),
+        ...(effect === "read" ? { readsOutside: true as const } : {}),
         ...extra,
       };
     };

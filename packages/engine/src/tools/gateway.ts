@@ -747,12 +747,15 @@ export function createToolGateway(deps: {
       };
       /** `outcome`: what the audit says; none for a call that never really was one (a malformed input). */
       const finish = async (output: ToolOutput, outcome?: AuditOutcome) => {
+        // A result read from outside marks the run (`runReadOutside`, ADR 0117).
+        const outside = !output.isError && (tool?.external || tool?.readsOutside) ? { outside: true } : null;
+        const data = output.data || outside ? { ...output.data, ...outside } : null;
         await record(ctx.db, step, "tool_result", {
           toolUseId: call.toolUseId,
           name: call.name,
           isError: output.isError === true,
           content: shown(output.content),
-          ...(output.data ? { data: output.data } : {}),
+          ...(data ? { data } : {}),
         });
         if (outcome) await audit(outcome, outcome === "done" ? {} : { reason: shown(output.content) });
         return { type: "result" as const, output };

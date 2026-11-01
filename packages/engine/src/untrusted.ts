@@ -1,4 +1,7 @@
+import { cleanOutside, hasInvisible } from "@agenteschat/adapters";
 import { cutText } from "./format";
+
+export { cleanOutside };
 
 /**
  * One envelope for outside content (ADR 0053): an MCP server's answer, an email, a webhook's event,
@@ -9,7 +12,10 @@ import { cutText } from "./format";
  */
 
 /** Markers of every envelope the engine writes, old and current: none may appear inside a block. */
-const MARKERS = /<\s*\/?\s*(?:external_data|email_content|database_rows|untrusted_data)\b[^>]*>/gi;
+const MARKERS = /<\s*\/?\s*(?:external_data|email_content|database_rows|untrusted_data|page_content|thread)\b[^>]*>/gi;
+
+/** Said once when outside text carried invisible characters (zero-width, bidi, tag characters). */
+export const HIDDEN_CHARS_NOTE = "[hidden characters removed]";
 
 /** A block's longest text by default (a routine's event or record, not a whole page of results). */
 export const UNTRUSTED_MAX_CHARS = 8000;
@@ -21,8 +27,15 @@ const sourceLabel = (source: string) =>
     .trim()
     .slice(0, 80) || "external";
 
-/** Outside text with its markers neutralised (for text placed inside an existing envelope). */
-export const neutralizeUntrusted = (text: string) => text.replace(MARKERS, "[marker removed]");
+/**
+ * Outside text with invisible characters stripped, look-alike forms folded (`cleanOutside`, so a full-width
+ * or zero-width-split tag is recognised) and every envelope marker neutralised: for text placed inside an
+ * envelope, or shown to a model next to one.
+ */
+export function neutralizeUntrusted(text: string): string {
+  const clean = cleanOutside(text).replace(MARKERS, "[marker removed]");
+  return hasInvisible(text) ? `${clean}\n${HIDDEN_CHARS_NOTE}` : clean;
+}
 
 /** Outside text inside the `<external_data>` envelope, neutralised and cut to `maxChars`. */
 export function untrustedBlock(source: string, text: string, maxChars = UNTRUSTED_MAX_CHARS): string {

@@ -2,6 +2,7 @@ import { and, type Database, desc, eq, inArray, isNull, schema, sql } from "@age
 import { currentHandles } from "../agents";
 import { cutText, cutTextEnd } from "../format";
 import { announceMessageMemories } from "../message-memories";
+import { neutralizeUntrusted } from "../untrusted";
 import {
   type ConsolidateResult,
   changesPermissions,
@@ -178,7 +179,7 @@ export async function reflectThread(
     const reacted = r.length
       ? ` (${r.map((x) => `${x.reaction === "+1" ? "👍" : "👎"} by ${thread.names.get(x.userId ?? "") ?? "someone"}`).join(", ")})`
       : "";
-    return `m${i + 1} ${isTrustedMessage(m) ? "" : "[untrusted] "}[${authorOf(thread, m)}]: ${cutText(m.body, 1500)}${reacted}`;
+    return `m${i + 1} ${isTrustedMessage(m) ? "" : "[untrusted] "}[${authorOf(thread, m)}]: ${neutralizeUntrusted(cutText(m.body, 1500))}${reacted}`;
   });
   outcomeRows.forEach((o, i) => {
     refs.set(`o${i + 1}`, { outcome: o });

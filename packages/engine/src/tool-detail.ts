@@ -183,9 +183,16 @@ export function carriesCredential(value: unknown): boolean {
   return PRIVATE_KEY.test(text) || text.replace(SECRET, "") !== text;
 }
 
+const PRIVATE_KEY_BLOCK = /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(-----END [A-Z ]*PRIVATE KEY-----|$)/g;
+
 /** `maskSecrets`, private keys too (from their first line on): text people read that must hold none. */
-export const maskCredentials = (text: string) =>
-  maskSecrets(text).replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(-----END [A-Z ]*PRIVATE KEY-----|$)/g, "••••");
+export const maskCredentials = (text: string) => maskSecrets(text).replace(PRIVATE_KEY_BLOCK, "••••");
+
+/** `maskCredentials`, except a credential that appears word for word in `pasted` (what people wrote themselves). */
+export const maskCredentialsExcept = (text: string, pasted: string) => {
+  const keep = (found: string) => (pasted.includes(found) ? found : "••••");
+  return text.replace(SECRET, keep).replace(PRIVATE_KEY_BLOCK, keep);
+};
 
 /** An address's user and password (`postgres://user:pass@host`). */
 const USERINFO = /\b([a-z][a-z0-9+.-]*:\/\/)[^\s/?#@'"]+@/gi;

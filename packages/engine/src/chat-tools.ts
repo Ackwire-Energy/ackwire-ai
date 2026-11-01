@@ -7,6 +7,7 @@ import { openPersonAgentDm } from "./dms";
 import { publishMessageCreated } from "./events";
 import { getMessage, insertMessage, MAX_MESSAGE_LENGTH, messageView, unreachedAgents, unreachedNote } from "./messages";
 import { enqueue } from "./outbox";
+import { runReadOutsideById } from "./outside";
 import { actingRoutineOfCall, personBehindCall } from "./requester";
 import { isRoutineRoomKey } from "./routine-brief";
 import { personCanPost } from "./routine-state";
@@ -182,6 +183,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             meta: {
               ...(files.length > 0 ? { artifacts: files } : {}),
               ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
+              ...((await runReadOutsideById(ctx.db, ctx.orgId, ctx.runId)) ? { readOutside: true } : {}),
             },
           });
           await recordAudit(ctx.db, {
@@ -286,6 +288,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             meta: {
               agentDm: { requesterUserId: requester, fromChannelId: ctx.channelId },
               ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
+              ...((await runReadOutsideById(ctx.db, ctx.orgId, ctx.runId)) ? { readOutside: true } : {}),
             },
           });
           await enqueue(ctx.db, {

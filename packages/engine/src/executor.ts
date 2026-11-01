@@ -132,6 +132,7 @@ import { missionAsksPerson, missionReportSince, scheduleKeepGoing } from "./miss
 import { postNoAiCard } from "./no-ai";
 import { notifyPlanResetUnknown, resolveRunFailed } from "./notification-producers";
 import { enqueue, PermanentJobError } from "./outbox";
+import { personWords, runReadOutside } from "./outside";
 import { createProfiler, type StageTiming } from "./profile";
 import { ASK_USER_TOOL, questionResult } from "./questions";
 import { reachWillHand } from "./reach";
@@ -198,7 +199,7 @@ import {
 } from "./stuck";
 import { archivedAgentsPrompt, FIND_AGENT_TOOL, renamedAgentsPrompt, teammateMeans } from "./team";
 import { linkRunChecks, runChecksForReply } from "./team-actions";
-import { carriesCredential, maskCredentials } from "./tool-detail";
+import { carriesCredential, maskCredentials, maskCredentialsExcept } from "./tool-detail";
 import { chooseToolGroups, keptToolGroups, recentForJudge, type ToolGroupChoice } from "./tool-loading";
 import {
   ON_DEMAND_FIND,
@@ -1057,6 +1058,8 @@ async function executeRunInner(
     followUp: await routedAsFollowUp(db, run).catch(() => false),
     answerOwed: Boolean((run.transcript as unknown as Transcript | null)?.answerOwed),
   });
+  /** Whether this run read outside content (`runReadOutside`): sticky once true. */
+  let readOutside = false;
   /** Posts as the agent where it replies. `note`: a line the server writes about the run (not its words). */
   const post = async (
     tx: Executor,
@@ -1071,8 +1074,19 @@ async function executeRunInner(
     // wrote into since (`steeredBy`, in the transcript as it is now) answers that person. Any other run writes as
     // the agent, with its own grants, as a person's does.
     const current = { ...run, transcript: transcript as unknown as Record<string, unknown> | null };
+    // A run that read outside content (ADR 0117) marks what it posts, so the next agent reads it as relayed and memory
+    // from it stays low trust; once it has read outside, every later post is marked too. A credential in its reply is
+    // masked unless a person wrote it here.
+    const authority = note ? null : await runAuthority(tx, current);
+    if (!note && !readOutside) readOutside = await runReadOutside(tx, current, authority ?? undefined);
     const said =
-      !note && carriesCredential(body) && fedByRoutine(await runAuthority(tx, current)) ? maskCredentials(body) : body;
+      note || !carriesCredential(body)
+        ? body
+        : fedByRoutine(authority)
+          ? maskCredentials(body)
+          : readOutside
+            ? maskCredentialsExcept(body, await personWords(tx, run.orgId, run.channelId, threadId))
+            : body;
     // Team actions (ADR 0064): what the run didn't repeat because the team already did it rides on its reply.
     const teamChecks = note ? [] : await runChecksForReply(tx, run.orgId, run.id);
     // "Ver o que ele fez" under the reply: how many tool calls so far, so the apps leave it out at 0, and one call
@@ -1141,6 +1155,7 @@ async function executeRunInner(
         ...meta,
         ...runMeta,
         ...tagged,
+        ...(readOutside && !note ? { readOutside: true } : {}),
         work,
         ...(teamChecks.length > 0 ? { teamChecks } : {}),
         ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
