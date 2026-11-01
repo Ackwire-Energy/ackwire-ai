@@ -106,6 +106,13 @@ export const FOLLOW_THROUGH_NUDGE =
 export const FOLLOW_THROUGH_NUDGE_DM =
   "You ended saying you would do more, and nothing brings you back here: your answer goes back as it is. Do it now with your tools, then answer with what came of it. If a part needs another agent, hand it on with tell_agent: what comes of it goes back with your answer.";
 
+/**
+ * What a mission's run reads, once, when it ended waiting on a person without a card: asked in a card, the thread
+ * shows the mission waits on them, the answer resumes the session, and the mission doesn't go on by itself meanwhile.
+ */
+export const MISSION_ASK_NUDGE =
+  "You ended waiting on a person, but you didn't ask them in a card. Ask now, directly: ask_user with one clear question (request_secret for a credential or a key, a blocking ask_decision for a choice between options), mark the plan item waiting_you with update_plan, then end your turn. Don't repeat the question in your text.";
+
 // ── Coming back by itself (`follow_up`) ──────────────────────────────────────
 
 /** A follow-up notice's refs: the run that set it, when, the people's words for it, and its state. */

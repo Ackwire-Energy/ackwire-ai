@@ -97,7 +97,9 @@ import {
   FOLLOW_THROUGH_NUDGE,
   FOLLOW_THROUGH_NUDGE_DM,
   FOLLOW_UP_TOOL,
+  type FollowThroughVerdict,
   followThroughVerdict,
+  MISSION_ASK_NUDGE,
   wakesLater,
 } from "./follow-through";
 import { cutText } from "./format";
@@ -111,6 +113,7 @@ import { touchMachineAccount } from "./machine-accounts";
 import { computerBackSoon, type MachineStatus } from "./machine-hub";
 import { MEDIA_TOOLS } from "./media";
 import { getMessage, insertMessage, type Message, messageView, unreachedAgents } from "./messages";
+import { missionAsksPerson, missionReportSince, scheduleKeepGoing } from "./missions-engine";
 import { postNoAiCard } from "./no-ai";
 import { enqueue, PermanentJobError } from "./outbox";
 import { createProfiler, type StageTiming } from "./profile";
@@ -323,6 +326,8 @@ export interface Transcript {
   decisionNudged?: boolean;
   /** Its last message was checked once for a promise nothing keeps (`followThroughVerdict`). */
   followThroughChecked?: boolean;
+  /** What that check found: `waiting` holds a mission from going on by itself (`keepGoingBlocker`). */
+  followThroughVerdict?: FollowThroughVerdict;
   /**
    * A person decided or answered what it waited on (an approval, a question), or wrote to it while it
    * worked (ADR 0053 §10): it owes them an answer and can't pass anymore.
@@ -714,6 +719,9 @@ async function executeRunInner(
       await onConsultedRunFinished({ db, pubsub: deps.pubsub, judge: deps.context?.judge }, run, status, error).catch(
         () => {},
       );
+    // A mission's run ended: unless it waits on a person, the mission goes on by itself a while later.
+    if (status === "done" && brainPlan?.missionId && !run.background)
+      await scheduleKeepGoing(db, { id: brainPlan.missionId, orgId: run.orgId }).catch(() => {});
     // A routine's run is heard through its ledger (`closeRoutineRun`, on every ending), never from here.
   };
 
@@ -1231,6 +1239,9 @@ async function executeRunInner(
     // Someone decided or answered what it waited on: it answers them now, it can't pass anymore.
     transcript.answerOwed = true;
     transcript.decided = decided.join("\n");
+    // A new turn: what it ends with is judged again, and the last turn's verdict no longer holds a mission.
+    delete transcript.followThroughChecked;
+    delete transcript.followThroughVerdict;
     // As a person's message does (`oweAnswer`): what they decided may be what it lacked, unless it is already ending.
     if (byPerson && transcript.stuck?.endAt === undefined) delete transcript.stuck;
     delete transcript.pending;
@@ -1335,6 +1346,9 @@ async function executeRunInner(
     const person = await lastPersonAmong(db, run.orgId, run.agentId, ids);
     if (!person) return false;
     t.answerOwed = true;
+    // A new turn for them: its ending is judged again, and the last verdict no longer holds a mission.
+    delete t.followThroughChecked;
+    delete t.followThroughVerdict;
     // What they wrote may be what it lacked: its repetition so far no longer counts, unless it is already ending.
     if (t.stuck?.endAt === undefined) delete t.stuck;
     if (!run.background && !t.steeredBy) {
@@ -2558,10 +2572,15 @@ async function executeRunInner(
       // is read (ADR 0095): its last message is that answer, and nothing wakes it there again.
       let keep: string | null = null;
       const betweenAgents = Boolean(channelRow && isAgentOnlyDm(channelRow));
+      // A mission's report card is its answer (`silent`): what it said there is what is judged.
+      const judged = !silent
+        ? said
+        : plan.missionId && t.reported
+          ? said || (await missionReportSince(db, run, replyThreadId).catch(() => ""))
+          : "";
       if (
         judge &&
-        said &&
-        !silent &&
+        judged &&
         !t.followThroughChecked &&
         run.turns + 1 < maxTurns &&
         (!betweenAgents || (await answersOpen(db, run).catch(() => false)))
@@ -2573,13 +2592,25 @@ async function executeRunInner(
           agentId: run.agentId,
           runId: run.id,
           request: t.request ?? triggerMessage?.body ?? triggerText,
-          reply: said,
+          reply: judged,
         }).catch(() => "done" as const);
+        t.followThroughVerdict = verdict;
         if (verdict === "unkept" && !(await wakesLater(db, run, detached).catch(() => false))) {
           keep = betweenAgents ? FOLLOW_THROUGH_NUDGE_DM : FOLLOW_THROUGH_NUDGE;
           appendUserText(t, keep);
           if (plan.kind !== "model") nextPrompt = keep;
           later(() => addRunStep(db, run, "context", { nudged: "promise" }));
+        } else if (
+          verdict === "waiting" &&
+          plan.missionId &&
+          !(await missionAsksPerson(db, plan.missionId).catch(() => false))
+        ) {
+          // A mission waiting on a person asks with a card (unless one already asks): the thread shows it waits, and
+          // the answer resumes it.
+          keep = MISSION_ASK_NUDGE;
+          appendUserText(t, keep);
+          if (plan.kind !== "model") nextPrompt = keep;
+          later(() => addRunStep(db, run, "context", { nudged: "mission_ask" }));
         }
       }
       // Someone wrote while it answered: post this answer, then read the new message(s) and go on.
