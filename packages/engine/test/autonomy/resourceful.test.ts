@@ -171,9 +171,7 @@ scenario("S56", "a 'couldn't' with one empty attempt is told its means once, the
     outputTokens: 0,
     costNanoUsd: 0,
   });
-  const answer = (await listMessages(w.f.db, w.owner.id, w.org.id, w.channelId)).find(
-    (m) => m.agentRunId === run?.id,
-  );
+  const answer = (await listMessages(w.f.db, w.owner.id, w.org.id, w.channelId)).find((m) => m.agentRunId === run?.id);
   expect(answer?.usage?.model).toStartWith("claude-");
   expect(await usageSummary(w.f.db, w.owner.id, w.org.id)).toEqual(before);
   await assertInvariants(w);
