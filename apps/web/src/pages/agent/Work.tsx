@@ -13,6 +13,7 @@ import {
   BROWSER_TOOL_SCOPE,
   DESKTOP_TOOL_SCOPE,
   keys,
+  profilesOfAgent,
   useAgentBrain,
   useAgentBrowserSettings,
   useAgentScopes,
@@ -20,6 +21,8 @@ import {
   useAiAccounts,
   useAiStatus,
   useApi,
+  useBrowserProfileMutations,
+  useBrowserProfiles,
   useComputer,
   useCredentials,
   useMachines,
@@ -1906,6 +1909,9 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
 
 // ── Navegador ───────────────────────────────────────────────────────────────
 
+/** The agent's own browser in its profile choice (ADR 0110): any value that isn't a profile's id. */
+const OWN_BROWSER = "own";
+
 function BrowserDialog({ onClose }: { onClose: () => void }) {
   const work = useWork();
   if (!work.browser.data || !work.scopes.data || !work.computer.data || !work.machines.data) return null;
@@ -1924,6 +1930,13 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
   const pickable = usePickable();
   const setTarget = useSetComputerTarget(org.id);
   const saveSites = useUpdateAgentBrowserSettings(org.id, agent.id);
+  const profileActions = useBrowserProfileMutations(org.id);
+  const profiles = useBrowserProfiles(org.id);
+  const dir = useDirectory(org.id);
+  const mine = profilesOfAgent(profiles.data, agent.id);
+  const savedProfile = work.browser.data?.profileId ?? null;
+  const [profile, setProfile] = useState<string>(savedProfile ?? OWN_BROWSER);
+  const profileId = profile === OWN_BROWSER ? null : profile;
   const admin = viewer === "admin";
   const domains = work.browser.data?.allowedDomains ?? [];
   const [mode, setMode] = useState<"any" | "only" | "off">(
@@ -1949,7 +1962,9 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
   };
   const on = mode !== "off";
   const sitesNow = mode === "only" ? sites : [];
-  const unchanged = on === work.granted && (!on || JSON.stringify(sitesNow) === JSON.stringify(domains));
+  const unchanged =
+    on === work.granted &&
+    (!on || (JSON.stringify(sitesNow) === JSON.stringify(domains) && profileId === savedProfile));
   const noComputer = on && work.machineId === NO_COMPUTER && !moveTo;
   // On the Cloud the agent's browser comes with the workspace's computer: it can be turned on while that one is prepared.
   const blocked = noComputer && edition !== "cloud";
@@ -1962,6 +1977,8 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
       }
       if (on && JSON.stringify(sitesNow) !== JSON.stringify(domains))
         await saveSites.mutateAsync(sitesNow.length ? sitesNow : null);
+      if (on && profileId !== savedProfile)
+        await profileActions.setDefault.mutateAsync({ agentId: agent.id, profileId });
       refresh();
       const where = moveTo ?? pickable.find((m) => m.id === work.machineId);
       toast.show(
@@ -2086,7 +2103,62 @@ function BrowserForm({ onClose }: { onClose: () => void }) {
               machineId={moveTo?.id ?? work.browser.data?.machine?.id}
             />
           )}
-          {on && <SettingNote icon="lock">{t("browser.agent.signedIn", g)}</SettingNote>}
+          {on && (
+            <div className="ac-field">
+              <span className="ac-field__label" id="agent-browser-profile">
+                {t("browser.profiles.agentChoice", g)}
+              </span>
+              <OptionList
+                aria-labelledby="agent-browser-profile"
+                value={profile}
+                onValueChange={setProfile}
+                options={[
+                  {
+                    value: OWN_BROWSER,
+                    leading: lead("person"),
+                    title: t("browser.profiles.own", g),
+                    description: t("browser.profiles.ownText", g),
+                    ...(savedProfile === null ? { tag: t("browser.profiles.default") } : {}),
+                  },
+                  ...mine.map((p) => {
+                    const holder = p.holder?.type === "agent" ? dir.agentById.get(p.holder.agentId)?.name : undefined;
+                    return {
+                      value: p.id,
+                      leading: lead("globe"),
+                      title: p.name,
+                      description: p.holder
+                        ? t("browser.profiles.inUsePerson", {
+                            name:
+                              holder ??
+                              (p.holder.type === "person" ? dir.memberById.get(p.holder.userId)?.name : "") ??
+                              "",
+                          })
+                        : t("browser.profiles.free"),
+                      ...(savedProfile === p.id ? { tag: t("browser.profiles.default") } : {}),
+                    };
+                  }),
+                ]}
+              />
+              {!canDo(org, "manage_connectors") && (
+                <div className="row">
+                  <Button
+                    size="sm"
+                    icon="plus"
+                    loading={profileActions.request.isPending}
+                    onClick={() =>
+                      profileActions.request.mutate(agent.id, {
+                        onSuccess: () => toast.show(t("browser.profiles.asked")),
+                        onError: () => toast.show(t("browser.profiles.failed"), "error"),
+                      })
+                    }
+                  >
+                    {t("browser.profiles.askMore")}
+                  </Button>
+                  <span className="small muted">{t("browser.profiles.askHelp", g)}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </DialogBody>
       <Footer

@@ -7085,6 +7085,36 @@ html:not([data-pointer]) .machine-connect__toggle:focus-visible {
 .machine-page__agent-row + .machine-page__agent-row {
   border-top: 1px solid var(--line);
 }
+/* Browser profiles (ADR 0110): the stacks, counts and actions line up across rows. */
+.pf-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content max-content max-content;
+  overflow: visible;
+}
+.pf-list > .machine-page__agent-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  align-items: center;
+}
+.pf-stack {
+  justify-self: end;
+  display: flex;
+  padding-right: 8px;
+}
+.pf-count {
+  padding-right: 24px;
+}
+.pf-acts {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  margin-right: 10px;
+}
+.ac-dialog__body > .ac-setnote {
+  margin: 0;
+}
 .machine-page__agent {
   flex: 1;
   min-width: 0;

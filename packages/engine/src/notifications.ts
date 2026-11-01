@@ -106,6 +106,11 @@ export const NOTIFICATION_KINDS = [
    * actor, `latest.title` their name, `source.label` the workspace's. Inbox only (no category, so never a push).
    */
   "invitation_accepted",
+  /**
+   * An agent's owner asks for one more browser profile for it (ADR 0110): the people who can grant profiles
+   * (`manage_connectors`), one row per agent, `source.agentId` and its name in `source.label`. Waiting until seen.
+   */
+  "browser_profile_request",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 

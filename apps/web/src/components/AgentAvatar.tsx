@@ -8,6 +8,7 @@ import {
   PixelSpinner,
   type PixelSpinnerSize,
 } from "@agenteschat/ui";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
@@ -54,6 +55,29 @@ export function AgentAvatar(props: AgentAvatarProps) {
       presence={given}
       {...rest}
     />
+  );
+}
+
+/** An agent named in a line of text: its face at the text's size, then its name (`.ac-who`). */
+export function AgentWho({ agentId, name }: { agentId?: string; name: string }) {
+  return (
+    <span className="ac-who">
+      <AgentAvatar agentId={agentId} size="xs" name={name} />
+      <b>{name}</b>
+    </span>
+  );
+}
+
+/** `text` with the agent's name, where it first appears, drawn as `AgentWho`. */
+export function withAgentFace(text: string, name: string, agentId?: string): ReactNode {
+  const at = name ? text.indexOf(name) : -1;
+  if (at < 0) return text;
+  return (
+    <>
+      {text.slice(0, at)}
+      <AgentWho agentId={agentId} name={name} />
+      {text.slice(at + name.length)}
+    </>
   );
 }
 

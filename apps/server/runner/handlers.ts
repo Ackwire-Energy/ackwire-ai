@@ -130,6 +130,8 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   "browser.batch": "agent",
   "browser.capture": "agent",
   "browser.warm": "agent",
+  // Root answers it, and refuses it (and every op with `profile`) in system mode until profiles have their own users.
+  "browser.profile.delete": "machine",
   // Root's: a stream's data socket needs the machine token, which no worker holds, and a desktop's password file
   // must be one its agent can't rewrite.
   "desktop.session.start": "machine",
@@ -439,6 +441,8 @@ const workStream = (req: MachineRequest) =>
 export async function handleRequest(ctx: HandlerContext, req: MachineRequest, scope: RequestScope): Promise<unknown> {
   // Protocol 9: paused by the owner. What already runs finishes; status, output and cancel still answer.
   if ((NEW_WORK_OPS.has(req.op) || workStream(req)) && ctx.paused?.()) throw new RunnerError("paused", PAUSED);
+  // Protocol 34: a browser profile's session, never an agent's worker or folder (ADR 0110).
+  if (req.profile || req.op === "browser.profile.delete") return handleProfileBrowser(ctx, req, scope);
   if (ctx.systemMode?.() && OP_ROUTES[req.op] !== "machine") {
     if (!ctx.workers) {
       throw new RunnerError(
@@ -715,6 +719,57 @@ async function handleBrowser(
     case "browser.input":
       requireTool(ctx, "browser");
       return browser.input(req.agent, Array.isArray(req.events) ? req.events : []);
+  }
+}
+
+export const PROFILES_SYSTEM_MODE =
+  "Browser profiles don't work yet on a computer where each agent runs as its own user (system mode).";
+const PROFILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Protocol 34 (ADR 0110): a `browser.*` op in a browser profile's session. The session is keyed by the profile
+ * (`profile:<id>`), its folder is under the runner's home, and its Chrome is always headless; `agent` only says who
+ * acts. Single mode only: in system mode a profile needs an OS user of its own (phase 2), so it is refused.
+ */
+async function handleProfileBrowser(ctx: HandlerContext, req: MachineRequest, scope: RequestScope) {
+  if (ctx.systemMode?.()) throw new RunnerError("not_allowed", PROFILES_SYSTEM_MODE);
+  const browser = ctx.browser;
+  if (!browser) throw new RunnerError("browser_unavailable", "This runner has no agent browser");
+  const id = req.profile?.id;
+  if (typeof id !== "string" || !PROFILE_ID.test(id)) throw new RunnerError("bad_request", "Which browser profile?");
+  const agent: AgentScope = {
+    id: `profile:${id.toLowerCase()}`,
+    handle: req.agent?.handle ?? "profile",
+    ...(req.agent?.name ? { name: req.agent.name } : {}),
+  };
+  const folder = browser.profileFolder(id.toLowerCase());
+  switch (req.op) {
+    case "browser.profile.delete":
+      return browser.deleteProfile(agent, folder);
+    case "browser.stop":
+      return browser.stop(agent);
+    case "browser.stream.stop":
+      return browser.streamStop(agent);
+    case "browser.act":
+      requireTool(ctx, "browser");
+      return browser.act(agent, folder, { ...req, desktop: false }, scope.signal);
+    case "browser.batch":
+      requireTool(ctx, "browser");
+      return browser.batch(agent, folder, { ...req, desktop: false }, scope.signal);
+    case "browser.capture":
+      requireTool(ctx, "browser");
+      return browser.capture(agent, folder, req.allowedDomains, scope.signal);
+    case "browser.warm":
+      requireTool(ctx, "browser");
+      return browser.warm(agent, folder, false);
+    case "browser.stream.start":
+      requireTool(ctx, "browser");
+      return browser.streamStart(agent, req.mode);
+    case "browser.input":
+      requireTool(ctx, "browser");
+      return browser.input(agent, Array.isArray(req.events) ? req.events : []);
+    default:
+      throw new RunnerError("bad_request", `${req.op} doesn't take a browser profile`);
   }
 }
 

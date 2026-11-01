@@ -50,6 +50,7 @@ import type {
   BrainKind,
   BrainMachine,
   BrowserHandoff,
+  BrowserProfile,
   CalendarEvent,
   CalendarEventInput,
   CalendarEventPatch,
@@ -1362,6 +1363,28 @@ export interface ApiClient {
      * stay), and every live view gets it again. Resolves once it closed. Only who may drive it (403 otherwise).
      */
     restart(orgId: string, agentId: string): Promise<void>;
+  };
+  /**
+   * Browser profiles (ADR 0110): named, shared logins on one computer. Everyone sees the list; creating, choosing
+   * who may use one and deleting take "apps e computadores" (403 otherwise); logging in also takes driving
+   * computers. The live view is `browser.watch` with `agentId: "profile:<id>"`.
+   */
+  browserProfiles?: {
+    list(orgId: string, machineId?: string): Promise<BrowserProfile[]>;
+    /** 409 `browser_profile.name_taken`; 400 `browser_profile.machine` (outdated, or a system-mode computer). */
+    create(orgId: string, input: { machineId: string; name: string; agentIds: string[] }): Promise<BrowserProfile>;
+    update(orgId: string, profileId: string, input: { name?: string; agentIds?: string[] }): Promise<BrowserProfile>;
+    remove(orgId: string, profileId: string): Promise<void>;
+    /** "Fazer login": this person takes control (agents wait); 409 `browser_profile.busy` while another has it. */
+    takeover(orgId: string, profileId: string): Promise<BrowserProfile>;
+    /** "Devolver". */
+    handback(orgId: string, profileId: string): Promise<BrowserProfile>;
+    /** The person in control opens a site. */
+    open(orgId: string, profileId: string, url: string): Promise<void>;
+    /** The agent's default browser: a profile it may use, or null for its own. */
+    setDefault(orgId: string, agentId: string, profileId: string | null): Promise<void>;
+    /** "Pedir mais um perfil": the people who grant profiles hear of it. */
+    request(orgId: string, agentId: string): Promise<void>;
   };
   /**
    * The agent's screen (ADR 0058): its state. The screen itself is a WebSocket (`desktopSocketUrl`), which

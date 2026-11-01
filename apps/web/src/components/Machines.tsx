@@ -65,6 +65,7 @@ import { useOrg } from "@/components/org-context";
 import { OpenPrefsButton, ThisMacButton, useAgentsHere, useIsThisMac } from "@/components/ThisMac";
 import { inDesktopApp } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
+import { BrowserProfilesCard } from "./browser/BrowserProfiles";
 import { MachineBrowserCard } from "./browser/MachineBrowserCard";
 import { MachineDesktopUseCard } from "./desktop/MachineDesktopUseCard";
 import { ComputerTitle, SetupFacts, useSetupView } from "./WorkspaceComputer";
@@ -1083,6 +1084,7 @@ export function MachinePage({ machineId }: { machineId: string }) {
           <FoldersCard machine={m} onReduce={setReduce} />
           <ToolsCard machine={m} onReduce={setReduce} />
           <MachineBrowserCard machine={m} onTurnOff={() => setReduce({ kind: "tool", tool: "browser" })} />
+          <BrowserProfilesCard machine={m} />
           <MachineDesktopUseCard machine={m} />
           <GrantCard machine={m} />
         </>

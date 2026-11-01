@@ -197,6 +197,8 @@ export const keys = {
   /** The agent browser (ADR 0040): an agent's settings, its open request on each screen, one request (prefix). */
   browser: (orgId: string) => ["org", orgId, "browser"] as const,
   agentBrowser: (orgId: string, agentId: string) => ["org", orgId, "browser", "agent", agentId] as const,
+  /** The workspace's browser profiles (ADR 0110). */
+  browserProfiles: (orgId: string) => ["org", orgId, "browser", "profiles"] as const,
   agentBrowserHandoff: (orgId: string, agentId: string, screen: ScreenKind = "browser") =>
     ["org", orgId, "browser", "agent", agentId, "handoff", screen] as const,
   agentBrowserControl: (orgId: string, agentId: string, screen: ScreenKind = "browser") =>

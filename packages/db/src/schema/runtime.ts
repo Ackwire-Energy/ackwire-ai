@@ -122,6 +122,14 @@ export const agentRuns = pgTable(
      * "working now" from a live run, and "stalled" when none is alive.
      */
     issueId: uuid(),
+    /**
+     * The browser this run is in (ADR 0110), set by `browser_profile`: a profile, or null for the agent's default.
+     * `browserProfileTurnAt`: when it last took that profile's turn; a run that held a turn another took since
+     * doesn't run its next command (the page may have changed under it).
+     */
+    browserProfileId: uuid(),
+    browserProfileOwn: boolean(),
+    browserProfileTurnAt: timestamp({ withTimezone: true }),
     /** Bumped by the worker while it executes the run; a stale one means the worker died (recovered on boot). */
     heartbeatAt: timestamp({ withTimezone: true }),
     /**

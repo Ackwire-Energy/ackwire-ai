@@ -44,6 +44,7 @@ import type {
   BatchInviteResult,
   BrainMachine,
   BrowserHandoff,
+  BrowserProfile,
   CalendarEvent,
   CalendarRange,
   Channel,
@@ -333,6 +334,29 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/open`, { json: { url } }),
       stop: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/stop`, { json: {} }),
       restart: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/restart`, { json: {} }),
+    },
+    browserProfiles: {
+      list: async (orgId, machineId) =>
+        (
+          await request<{ profiles: BrowserProfile[] }>(`${org(orgId)}/browser-profiles`, {
+            query: machineId ? { machineId } : {},
+          })
+        ).profiles,
+      create: (orgId, input) => request<BrowserProfile>(`${org(orgId)}/browser-profiles`, { json: input }),
+      update: (orgId, profileId, input) =>
+        request<BrowserProfile>(`${org(orgId)}/browser-profiles/${enc(profileId)}`, { method: "PATCH", json: input }),
+      remove: (orgId, profileId) =>
+        request<void>(`${org(orgId)}/browser-profiles/${enc(profileId)}`, { method: "DELETE" }),
+      takeover: (orgId, profileId) =>
+        request<BrowserProfile>(`${org(orgId)}/browser-profiles/${enc(profileId)}/takeover`, { json: {} }),
+      handback: (orgId, profileId) =>
+        request<BrowserProfile>(`${org(orgId)}/browser-profiles/${enc(profileId)}/handback`, { json: {} }),
+      open: (orgId, profileId, url) =>
+        request<void>(`${org(orgId)}/browser-profiles/${enc(profileId)}/open`, { json: { url } }),
+      setDefault: (orgId, agentId, profileId) =>
+        request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser-profile`, { method: "PUT", json: { profileId } }),
+      request: (orgId, agentId) =>
+        request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser-profile/request`, { json: {} }),
     },
     desktop: {
       status: (orgId, agentId) => request<DesktopStatus>(`${org(orgId)}/agents/${enc(agentId)}/desktop`),

@@ -20,8 +20,10 @@ import {
   isConnected,
   NotFoundError,
   type OrgEvent,
+  profileIdOfKey,
   requireBrowserAccess,
   requireChannelAccess,
+  requireProfileWatcher,
   touchLastSeen,
 } from "@agenteschat/engine";
 import type { Auth, SessionUser } from "../auth";
@@ -303,7 +305,9 @@ export function createRealtime(deps: RealtimeDeps) {
     ws.data.browsers.set(agentId, starting);
     let stop: () => void;
     try {
-      await requireBrowserAccess(deps.db, user.id, orgId, agentId);
+      const profileId = profileIdOfKey(agentId);
+      if (profileId) await requireProfileWatcher(deps.db, user.id, orgId, profileId);
+      else await requireBrowserAccess(deps.db, user.id, orgId, agentId);
       stop = await live.watch(
         {
           userId: user.id,

@@ -1085,6 +1085,15 @@ export type ChannelEvent =
       runId: string;
       consultationId: string;
     }
+  /** A browser command waits for a shared browser profile another holds (ADR 0110); `wait: null` once it ended. */
+  | {
+      type: "agent.browser.waiting";
+      channelId: string;
+      threadId: string;
+      agentId: string;
+      runId: string;
+      wait: BrowserProfileWait | null;
+    }
   /** The agent's first words arrived. */
   | { type: "agent.typing"; channelId: string; threadId: string; agentId: string; runId: string }
   /** The agent stopped (done, failed or waiting for approval). */
@@ -4819,7 +4828,12 @@ export type NotificationKind =
    * ADR 0090: someone accepted the email invitation this person sent. The person as actor, `latest.title` their
    * name, `source.label` the workspace's. Inbox only. Opens Members.
    */
-  | "invitation_accepted";
+  | "invitation_accepted"
+  /**
+   * ADR 0110: an agent's owner asks for one more browser profile for it (the people who grant profiles). Waiting;
+   * `source.agentId` and its name in `source.label`. Opens the agent's page.
+   */
+  | "browser_profile_request";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {
@@ -5347,6 +5361,8 @@ export interface AgentBrowserSettings {
   /** The computer's own words, when it said why. */
   detail: string | null;
   machine: { id: string; name: string } | null;
+  /** Its default browser: a shared browser profile it may use (ADR 0110); null or absent = its own. */
+  profileId?: string | null;
 }
 
 /** `GET …/agents/{id}/desktop` (ADR 0058): the agent's desktop as this person sees it. */
@@ -5462,4 +5478,27 @@ export interface AgentPlanUsage {
   /** Every day of the month so far: tokens per source key. */
   days: { date: string; tokens: Record<string, number> }[];
   current: PlanAccountUsage | null;
+}
+
+/** Who has a shared browser profile now (ADR 0110): an agent's run or a person in control. */
+export type BrowserProfileHolder =
+  | { type: "agent"; agentId: string; since: string }
+  | { type: "person"; userId: string; since: string };
+
+/** A browser profile (ADR 0110): named, shared logins on one computer that the agents granted it use. */
+export interface BrowserProfile {
+  id: string;
+  machineId: string;
+  name: string;
+  createdAt: string;
+  agentIds: string[];
+  holder: BrowserProfileHolder | null;
+  lastUsedAt: string | null;
+}
+
+/** What an agent's browser command waits for. */
+export interface BrowserProfileWait {
+  profileId: string;
+  name: string;
+  holder: BrowserProfileHolder;
 }

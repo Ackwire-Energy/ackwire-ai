@@ -133,7 +133,10 @@ test("offered only with browser:use (never through 'all tools') and a machine th
   expect(await b.names()).toEqual([]);
   await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "browser:use" }]);
   // Every browser tool but the handoff, which has its own source.
-  expect((await b.names()).sort()).toEqual(BROWSER_TOOLS.filter((n) => n !== "browser_ask_person").sort());
+  // `browser_profile` only comes with a shared profile granted (browser-profiles.test.ts).
+  expect((await b.names()).sort()).toEqual(
+    BROWSER_TOOLS.filter((n) => n !== "browser_ask_person" && n !== "browser_profile").sort(),
+  );
 
   b.s.status = { access: { folders: [], tools: { claude: true, codex: true, commands: true, browser: false } } };
   expect(await b.names()).toEqual([]);
@@ -152,7 +155,7 @@ test("offered only with browser:use (never through 'all tools') and a machine th
   expect(await agentBrowserStatus(f.db, b.hub, f.org.id, f.agent.id)).toMatchObject({ code: "not_reported" });
   // An offline machine still offers them: the call says it's offline.
   b.s.status = { online: false };
-  expect(await b.names()).toHaveLength(BROWSER_TOOLS.length - 1);
+  expect(await b.names()).toHaveLength(BROWSER_TOOLS.length - 2);
   await f.db.update(schema.agents).set({ machineId: null }).where(eq(schema.agents.id, f.agent.id));
   expect(await b.names()).toEqual([]);
   expect(await agentBrowserStatus(f.db, b.hub, f.org.id, f.agent.id)).toMatchObject({ code: "no_machine" });

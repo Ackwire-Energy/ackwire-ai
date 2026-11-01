@@ -174,6 +174,10 @@ function AppStack() {
         name="computer/[agentId]"
         options={{ presentation: "fullScreenModal", contentStyle: { backgroundColor: colors.bg } }}
       />
+      <Stack.Screen
+        name="browser-profile/[profileId]"
+        options={{ presentation: "fullScreenModal", contentStyle: { backgroundColor: colors.bg } }}
+      />
     </Stack>
   );
 }

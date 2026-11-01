@@ -13,6 +13,8 @@ export interface BrowserTrailStep {
   detail: string | null;
   at: string;
   failed: boolean;
+  /** The shared browser profile it ran in, by its name then (ADR 0110); null: the agent's own browser. */
+  profileName?: string | null;
 }
 
 /** The calls made on one page (or in one app): from an open (or a new tab) to the next one. */
@@ -41,6 +43,7 @@ export function screenTrailOf(meta: unknown, screen: ScreenKind): BrowserTrailSt
             detail: typeof s.detail === "string" && s.detail ? s.detail : null,
             at: s.at,
             failed: s.failed === true,
+            profileName: typeof s.profileName === "string" && s.profileName ? s.profileName : null,
           },
         ]
       : [],
@@ -48,6 +51,9 @@ export function screenTrailOf(meta: unknown, screen: ScreenKind): BrowserTrailSt
 }
 
 export const browserTrailOf = (meta: unknown) => screenTrailOf(meta, "browser");
+
+/** The profile a trail ended in (the card's chip); null for the agent's own browser. */
+export const trailProfile = (steps: BrowserTrailStep[]) => steps.at(-1)?.profileName ?? null;
 export const desktopTrailOf = (meta: unknown) => screenTrailOf(meta, "desktop");
 
 /** The opens that start a new page in the trail, and whether what they open is a web address. */

@@ -5,10 +5,12 @@ import {
   handoffMinutesLeft,
   isOpenHandoff,
   type LiveRun,
+  profileLiveKey,
   rememberHeldPlace,
   useAgentBrowserHandoff,
   useAgentScreenControl,
   useBrowserHandoffActions,
+  useBrowserProfileMutations,
   useBrowserStuck,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -59,8 +61,11 @@ export function BrowserCard({
   canTakeOver = true,
   onClosed,
   style,
+  profile,
 }: {
   agentId: string;
+  /** A shared browser profile (ADR 0110) instead of the agent's browser: "Fazer login" from the computer's page. */
+  profile?: { id: string; name: string };
   /** The agent's run in its browser (what it does now, the log). */
   run?: LiveRun | null;
   /** At work with no run to show here (its profile): closed, the card still shows its small live picture. */
@@ -98,6 +103,7 @@ export function BrowserCard({
   const cloud = useEdition() === "cloud";
   const now = useNow(15_000);
   const actions = useBrowserHandoffActions(orgId);
+  const profileActions = useBrowserProfileMutations(orgId);
   const [ownOpen, setOwnOpen] = useState(false);
   const open = surface || (openProp ?? ownOpen);
   const setOpen = (next: boolean) => {
@@ -106,21 +112,21 @@ export function BrowserCard({
   };
 
   const agent = dir.agentById.get(agentId);
-  const name = agent?.name ?? "";
+  const name = profile?.name ?? agent?.name ?? "";
   const g = genderOf(name);
   const color = agentLook(agent).color;
   // A take over has no message of its own: the agent's open request, while this card is open.
-  const ofAgent = useAgentBrowserHandoff(orgId, agentId, open && !given);
+  const ofAgent = useAgentBrowserHandoff(orgId, agentId, open && !given && !profile);
   const handoff = given ?? (ofAgent.data && isOpenHandoff(ofAgent.data) ? ofAgent.data : null);
   // Watching is for everyone behind its work; driving it only for admins, its owner and who it asked (ADR 0040).
-  const control = useAgentScreenControl(orgId, agentId, !given);
-  const mayDrive = given !== null || control.data !== false;
+  const control = useAgentScreenControl(orgId, agentId, !given && !profile);
+  const mayDrive = Boolean(profile) || given !== null || control.data !== false;
   // Open, or closed while the agent works in it (its small live picture); a finished one keeps the last frame.
   // The person in control keeps watching even closed: their watching is what keeps their control.
   const holding = Boolean(meId) && handoff?.status === "active" && handoff.controllerUserId === meId;
   const working = Boolean(run) || busy;
   const watching = open || working || holding;
-  const live = useLiveConnection(agentId, watching);
+  const live = useLiveConnection(profile ? profileLiveKey(profile.id) : agentId, watching || Boolean(profile));
   const controller = live.handoff?.controllerUserId ?? live.controllerUserId ?? handoff?.controllerUserId ?? null;
   const mine = Boolean(meId) && controller === meId;
   const waiting = handoff?.status === "pending";
@@ -174,6 +180,10 @@ export function BrowserCard({
     tapHaptic();
     setOpen(true);
     try {
+      if (profile) {
+        await profileActions.takeover.mutateAsync(profile.id);
+        return;
+      }
       // From a run's card: bound to that run, so the card stays in this conversation while the run waits.
       const h = await actions.takeover(agentId, run?.runId);
       if (h.kind === "takeover" && h.runId && run) {
@@ -185,6 +195,10 @@ export function BrowserCard({
     }
   };
   const finish = async (ok: boolean, said?: string) => {
+    if (profile) {
+      await profileActions.handback.mutateAsync(profile.id).then(successHaptic, failedToast);
+      return;
+    }
     if (!handoff) return;
     const text = said?.slice(0, NOTE_MAX) || undefined;
     try {
@@ -198,6 +212,7 @@ export function BrowserCard({
   // Pronto / Devolver: what the person wants the agent to know, which it reads as their own words.
   const handBack = () => {
     tapHaptic();
+    if (profile) return void finish(true);
     sheet.open(
       <PromptForm
         title={t("mobile.browser.done.title")}
@@ -229,7 +244,7 @@ export function BrowserCard({
   const retry = () => {
     tapHaptic();
     setAttempt((n) => n + 1);
-    if (mayDrive) void actions.restart(agentId).catch(failedToast).finally(live.retry);
+    if (mayDrive && !profile) void actions.restart(agentId).catch(failedToast).finally(live.retry);
     else live.retry();
   };
   const couldnt = () => {
@@ -362,7 +377,7 @@ export function BrowserCard({
                       onPress={takeover}
                     />
                   ) : null}
-                  {ready && !surface ? (
+                  {ready && !surface && !profile ? (
                     <Pressable
                       onPress={stop}
                       accessibilityRole="button"
@@ -426,7 +441,17 @@ export function BrowserCard({
           </View>
           {mine ? (
             <View style={styles.control}>
-              {goShown ? <AddressBar name={name} cloud={cloud} onOpen={(url) => actions.open(agentId, url)} /> : null}
+              {goShown ? (
+                <AddressBar
+                  name={name}
+                  cloud={cloud}
+                  onOpen={(url) =>
+                    profile
+                      ? profileActions.open.mutateAsync({ profileId: profile.id, url })
+                      : actions.open(agentId, url)
+                  }
+                />
+              ) : null}
               <TypeBar onInput={live.sendInput} />
               {/* A take over asked for nothing: it only hands back. */}
               {handoff?.kind === "ask" ? (

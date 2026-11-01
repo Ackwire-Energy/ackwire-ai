@@ -108,6 +108,7 @@ export function toolDetail(name: string, input: Record<string, unknown> | undefi
   const i = input ?? {};
   switch (name) {
     case "load_skill":
+    case "browser_profile":
       return short(i.name);
     case "read_skill_file": {
       const skill = short(i.name);
