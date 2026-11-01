@@ -90,7 +90,6 @@ test("approvals API: an action approved ahead is on its routine and withdrawn wi
     description: "in two hours",
     message: "Post de lançamento",
     askAgent: true,
-    access: "act",
   });
   const row = (id: string, runAt: Date | null) => ({
     id,
