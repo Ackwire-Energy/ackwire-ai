@@ -5,6 +5,9 @@ import {
   BAYER,
   barField,
   bayerAt,
+  COMPUTER_SPRITES,
+  computerSpriteAt,
+  computerSpriteBlinks,
   type Field,
   fromSurface,
   fuseField,
@@ -94,7 +97,18 @@ describe("palettes", () => {
 });
 
 test("every shader declares the uniforms the component passes", () => {
-  for (const kind of ["sky", "fuse", "bar", "track", "sweep", "pill", "pillwork", "horizon", "workspace"] as const) {
+  for (const kind of [
+    "sky",
+    "computer",
+    "fuse",
+    "bar",
+    "track",
+    "sweep",
+    "pill",
+    "pillwork",
+    "horizon",
+    "workspace",
+  ] as const) {
     const src = shaderSource(kind);
     for (const u of ["size", "px", "t", "last", "fade", "clear", "pal"])
       expect(src).toMatch(new RegExp(`uniform \\w+ ${u}\\b`));
@@ -143,4 +157,28 @@ test("the header pill: sky only at its right end; working, a sweep that crosses 
   expect(shaderSource("pillwork")).toContain("mod(t * 0.42, 1.6) - 0.3");
   // Over glass the lowest tone is see-through.
   expect(shaderSource("pill")).toContain("if (clear > 0.5 && idx < 0.5) return half4(0.0);");
+});
+
+test("the computer's sky: its agents rise past the top and start again, at the sides, on whole cells", () => {
+  expect(shaderSource("computer")).toContain("0.78 - 0.18 * u - 0.4 * v + 0.06 * sin(u * 5.0 + t * 0.5)");
+  const [sprite] = COMPUTER_SPRITES;
+  if (!sprite) throw new Error("no sprites");
+  const w = 84;
+  const h = 59;
+  const rise = sprite.speed;
+  const before = computerSpriteAt(sprite, 1, w, h);
+  const after = computerSpriteAt(sprite, 2, w, h);
+  expect(before.y - after.y).toBeCloseTo(rise, -0.5);
+  // One whole trip later it is back.
+  expect(computerSpriteAt(sprite, 1 + (h + 18) / rise, w, h).y).toBeCloseTo(before.y, -0.5);
+  for (const s of COMPUTER_SPRITES) {
+    for (let t = 0; t < 60; t += 0.7) {
+      const at = computerSpriteAt(s, t, w, h);
+      expect(Number.isInteger(at.x) && Number.isInteger(at.y)).toBe(true);
+      expect(at.y).toBeGreaterThanOrEqual(-9);
+      expect(at.y).toBeLessThanOrEqual(h + 9);
+    }
+  }
+  expect(computerSpriteBlinks(sprite, 4 - sprite.blink)).toBe(true);
+  expect(computerSpriteBlinks(sprite, 2)).toBe(false);
 });
