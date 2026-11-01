@@ -175,77 +175,81 @@ export function VoicePlayer({
   const hasWords = Boolean(words?.trim());
   return (
     <div className={cx("ac-voice", className)} data-expired={dead || undefined} data-open={open || undefined}>
-      <div className="ac-voice__bar">
-        {dead ? (
-          <span className="ac-voice__play" aria-hidden="true">
-            <Icon name="play" size={14} />
-          </span>
-        ) : (
-          <button
-            type="button"
-            className="ac-voice__play"
-            aria-label={on ? labels.pause : labels.play}
-            onClick={play}
-          >
-            <Icon name={on ? "pause" : "play"} size={14} />
-          </button>
-        )}
-        <canvas
-          ref={canvas}
-          className="ac-voice__wave"
-          {...(dead
-            ? { "aria-hidden": true }
-            : {
-                role: "slider",
-                tabIndex: 0,
-                "aria-label": labels.seek,
-                "aria-valuemin": 0,
-                "aria-valuemax": Math.round(durationMs / 1000),
-                "aria-valuenow": Math.round(time / 1000),
-                "aria-valuetext": clock(time),
-                onPointerDown: grab,
-                onKeyDown: keys,
-              })}
-        />
-        {dead ? (
-          <span className="ac-voice__expired">{labels.expired}</span>
-        ) : (
-          <>
-            <span className="ac-voice__time">{clock(on || time > 0 ? time : durationMs)}</span>
+      <div className="ac-voice__card">
+        <div className="ac-voice__bar">
+          {dead ? (
+            <span className="ac-voice__play" aria-hidden="true">
+              <Icon name="play" size={14} />
+            </span>
+          ) : (
             <button
               type="button"
-              className="ac-voice__speed"
-              aria-label={labels.speed(speed)}
-              onClick={() => {
-                const next = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length] ?? 1;
-                setSpeed(next);
-                if (audio.current) audio.current.playbackRate = next;
-              }}
+              className="ac-voice__play"
+              aria-label={on ? labels.pause : labels.play}
+              onClick={play}
             >
-              {speed}×
+              <Icon name={on ? "pause" : "play"} size={14} />
             </button>
-          </>
-        )}
-        {hasWords && (
-          <button
-            type="button"
-            className="ac-voice__words-toggle"
-            aria-label={open ? labels.hideText : labels.showText}
-            aria-expanded={open}
-            aria-controls={open ? wordsId : undefined}
-            title={open ? labels.hideText : labels.showText}
-            onClick={() => setOpen(!open)}
-          >
-            <Icon name="note" size={14} />
-          </button>
-        )}
+          )}
+          <canvas
+            ref={canvas}
+            className="ac-voice__wave"
+            {...(dead
+              ? { "aria-hidden": true }
+              : {
+                  role: "slider",
+                  tabIndex: 0,
+                  "aria-label": labels.seek,
+                  "aria-valuemin": 0,
+                  "aria-valuemax": Math.round(durationMs / 1000),
+                  "aria-valuenow": Math.round(time / 1000),
+                  "aria-valuetext": clock(time),
+                  onPointerDown: grab,
+                  onKeyDown: keys,
+                })}
+          />
+          {dead ? (
+            <span className="ac-voice__expired">{labels.expired}</span>
+          ) : (
+            <>
+              <span className="ac-voice__time">{clock(on || time > 0 ? time : durationMs)}</span>
+              <button
+                type="button"
+                className="ac-voice__speed"
+                aria-label={labels.speed(speed)}
+                onClick={() => {
+                  const next = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length] ?? 1;
+                  setSpeed(next);
+                  if (audio.current) audio.current.playbackRate = next;
+                }}
+              >
+                {speed}×
+              </button>
+            </>
+          )}
+        </div>
+        {hasWords &&
+          (open ? (
+            <div className="ac-voice__words" id={wordsId}>
+              <p>{words}</p>
+              <button type="button" className="ac-voice__words-close" aria-expanded onClick={() => setOpen(false)}>
+                {labels.hideText}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="ac-voice__preview"
+              aria-label={labels.showText}
+              aria-expanded={false}
+              title={labels.showText}
+              onClick={() => setOpen(true)}
+            >
+              {words}
+            </button>
+          ))}
       </div>
       {note && <span className="ac-voice__note">{note}</span>}
-      {open && hasWords && (
-        <p id={wordsId} className="ac-voice__words">
-          {words}
-        </p>
-      )}
     </div>
   );
 }

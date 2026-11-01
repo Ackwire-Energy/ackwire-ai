@@ -8,7 +8,19 @@ import {
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Button, Card, CardHeader, Chip, Input, Radio, RadioGroup, SettingNote, Switch } from "@agenteschat/ui";
+import {
+  Button,
+  Card,
+  CardHeader,
+  Chip,
+  Icon,
+  Input,
+  ProviderLogo,
+  Radio,
+  RadioGroup,
+  SettingNote,
+  Switch,
+} from "@agenteschat/ui";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ErrorState, LoadingList } from "@/components/Loading";
@@ -125,18 +137,31 @@ function SpeechProviderPicker({ view }: { view: SpeechKey }) {
     <div className="voice-engine">
       <div className="voice-engine__body">
         <h3 className="voice-engine__title">{t("voice.settings.engineTitle")}</h3>
-        <RadioGroup value={provider} onValueChange={pick} aria-label={t("voice.settings.engineTitle")}>
+        <RadioGroup
+          className="voice-engine__tiles"
+          value={provider}
+          onValueChange={pick}
+          aria-label={t("voice.settings.engineTitle")}
+        >
           {PROVIDERS.map((p) => (
-            <label key={p.id} className="voice-engine__option">
-              <Radio value={p.id} aria-label={p.name} />
-              <span>{p.name}</span>
+            <label key={p.id} className="voice-tile">
+              <Radio className="voice-tile__radio" value={p.id} aria-label={p.name} />
+              <ProviderLogo id={p.id} size="sm" />
+              <span className="voice-tile__name">{p.name}</span>
+              <span className="voice-tile__check" aria-hidden="true">
+                <Icon name="check" size={12} />
+              </span>
             </label>
           ))}
-          <label className="voice-engine__option">
-            <Radio value="local" aria-label={t("voice.settings.own")} />
-            <span className="list-col">
-              <span>{t("voice.settings.own")}</span>
-              <span className="small muted">{t("voice.settings.ownHelp")}</span>
+          <label className="voice-tile">
+            <Radio className="voice-tile__radio" value="local" aria-label={t("voice.settings.own")} />
+            <span className="voice-tile__own" aria-hidden="true">
+              <Icon name="computer" size={16} />
+            </span>
+            <span className="voice-tile__name">{t("voice.settings.own")}</span>
+            <span className="small muted">{t("voice.settings.ownHelp")}</span>
+            <span className="voice-tile__check" aria-hidden="true">
+              <Icon name="check" size={12} />
             </span>
           </label>
         </RadioGroup>

@@ -14,9 +14,9 @@ People want to talk to agents, on the web, the desktop and the phone. Models tak
 
 We keep the recording and the apps show a wave and a player. The words go in `messages.body`, so routing, mentions, context, memory and search work as for any message, and `meta.voice` (`clipId`, `durationMs`, `peaks`, `expiresAt`, `noWords`) says it is a voice message.
 
-### 2. Words hidden by default, shown only on request in the message
+### 2. Words only in the message itself: one line under the wave, the rest on request
 
-The words are hidden by default. A person may open them on demand on the message itself, read from `message.body`, so they stay in the API. Everywhere a message is listed, they don't appear: channel and DM previews, thread titles and excerpts, notifications, push, quotes and search snippets go through `readableBody` and say "voice message" in the reader's language (`mediaKind: "voice"`). A voice message is found by its words and shown as its audio. When no engine could make out the words, `body` holds a placeholder for the agent and `meta.voice.noWords` is true, so the apps never offer it as text.
+On the message itself, one line of the words sits under the wave, in the player's card, and opens in full there; they come from `message.body`, so they stay in the API. Everywhere a message is listed, they don't appear: channel and DM previews, thread titles and excerpts, notifications, push, quotes and search snippets go through `readableBody` and say "voice message" in the reader's language (`mediaKind: "voice"`). A voice message is found by its words and shown as its audio. When no engine could make out the words, `body` holds a placeholder for the agent and `meta.voice.noWords` is true, so the apps never offer it as text.
 
 ### 3. One interface, swappable engines
 

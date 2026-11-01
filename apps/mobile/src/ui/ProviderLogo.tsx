@@ -8,7 +8,10 @@ import { useTheme } from "./theme";
 const INITIAL_SIZE = { xs: 9, chip: 10, sm: 13, tile: 18, hero: 24 } as const;
 
 /** The phone's own copies of the image marks (assets/images/brands/README.md). */
-const MARK_IMAGES: Partial<Record<MarkId, number>> = { gemini: require("../../assets/images/brands/gemini.png") };
+const MARK_IMAGES: Partial<Record<MarkId, number>> = {
+  gemini: require("../../assets/images/brands/gemini.png"),
+  soniox: require("../../assets/images/brands/soniox.png"),
+};
 
 export interface ProviderLogoProps {
   /** A provider, plan, brain or mission executor id (`anthropic`, `zai`, `claude_code`…). */

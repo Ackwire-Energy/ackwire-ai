@@ -22,13 +22,14 @@ const player = (props: Partial<VoicePlayerProps> = {}) =>
   render(<VoicePlayer src="/a" peaks={[0.2, 0.8]} durationMs={12_000} labels={labels} {...props} />);
 
 describe("VoicePlayer", () => {
-  test("the words stay closed until opened, and close again", () => {
+  test("one line of the words under the wave, opened in place and closed again", () => {
     player({ words: "as palavras" });
-    expect(document.body.textContent).not.toContain("as palavras");
+    expect(screen.getByRole("button", { name: "Ver texto" }).textContent).toBe("as palavras");
     fireEvent.click(screen.getByRole("button", { name: "Ver texto" }));
-    expect(document.body.textContent).toContain("as palavras");
+    expect(screen.queryByRole("button", { name: "Ver texto" })).toBeNull();
+    expect(document.querySelector(".ac-voice__words p")?.textContent).toBe("as palavras");
     fireEvent.click(screen.getByRole("button", { name: "Ocultar texto" }));
-    expect(document.body.textContent).not.toContain("as palavras");
+    expect(screen.getByRole("button", { name: "Ver texto" })).toBeTruthy();
   });
 
   test("no words, no button", () => {

@@ -5,7 +5,7 @@ import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore } from
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { GestureDetector, useExclusiveGestures, usePanGesture, useTapGesture } from "react-native-gesture-handler";
-import Animated, { FadeIn, useSharedValue } from "react-native-reanimated";
+import { useSharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { appHeaders, authedFetch, lastCookie } from "@/lib/auth";
 import { serverUrl } from "@/lib/server";
@@ -23,9 +23,8 @@ const expired = new Set<string>();
 let speed = 1;
 
 /**
- * A voice message: the audio is the message. Its words stay closed behind a faint button at the player's end, and
- * nowhere else; they open below it, so the player doesn't move. A recording the server no longer keeps stays as a
- * dimmed wave with its words.
+ * A voice message: the audio is the message, with one line of its words under the wave, in the same card, and nowhere
+ * else; a tap opens the rest there. A recording the server no longer keeps stays as a dimmed wave with its words.
  */
 export const VoiceMessage = memo(function VoiceMessage({ message }: { message: Message }) {
   const { t } = useTranslation();
@@ -138,56 +137,58 @@ export const VoiceMessage = memo(function VoiceMessage({ message }: { message: M
   if (!voice) return null;
   return (
     <View style={styles.box}>
-      <View style={[styles.player, { backgroundColor: c.raised, borderColor: c.line }]}>
-        {gone ? null : (
-          <PressScale
-            to={0.92}
-            disabled={!canPlay}
-            onPress={() => void toggle()}
-            accessibilityRole="button"
-            accessibilityLabel={playing ? t("voice.stop") : t("voice.play")}
-            hitSlop={8}
-            style={[styles.play, { backgroundColor: canPlay ? c.ink : c.sunken }]}
-          >
-            <View style={styles.center}>
-              <Icon name={playing ? "pause" : "play"} size={15} color={canPlay ? c.bg : c.muted} />
+      <View style={[styles.card, { backgroundColor: c.raised, borderColor: c.line }]}>
+        <View style={styles.player}>
+          {gone ? null : (
+            <PressScale
+              to={0.92}
+              disabled={!canPlay}
+              onPress={() => void toggle()}
+              accessibilityRole="button"
+              accessibilityLabel={playing ? t("voice.stop") : t("voice.play")}
+              hitSlop={8}
+              style={[styles.play, { backgroundColor: canPlay ? c.ink : c.sunken }]}
+            >
+              <View style={styles.center}>
+                <Icon name={playing ? "pause" : "play"} size={15} color={canPlay ? c.bg : c.muted} />
+              </View>
+            </PressScale>
+          )}
+          <GestureDetector gesture={scrub}>
+            <View style={[styles.wave, gone && styles.dim]} accessible={false}>
+              <VoiceBars
+                path={path}
+                progress={progress}
+                on={c.ink}
+                off={gone ? c.line2 : c.faint}
+                onWidth={setWidth}
+                height={WAVE}
+              />
             </View>
-          </PressScale>
-        )}
-        <GestureDetector gesture={scrub}>
-          <View style={[styles.wave, gone && styles.dim]} accessible={false}>
-            <VoiceBars
-              path={path}
-              progress={progress}
-              on={c.ink}
-              off={gone ? c.line2 : c.faint}
-              onWidth={setWidth}
-              height={WAVE}
-            />
-          </View>
-        </GestureDetector>
-        {gone ? (
-          <Text variant="caption" tone="faint" numberOfLines={1}>
-            {t("voice.expired")}
-          </Text>
-        ) : (
-          <Text variant="caption" tone="muted" style={styles.time}>
-            {voiceClock(time)}
-          </Text>
-        )}
-        {canPlay ? (
-          <Pressable
-            onPress={cycle}
-            accessibilityRole="button"
-            accessibilityLabel={t("voice.speed")}
-            hitSlop={8}
-            style={[styles.speed, { backgroundColor: c.sunken }]}
-          >
-            <Text variant="caption" tone="muted" style={styles.speedText}>
-              {`${rate}×`}
+          </GestureDetector>
+          {gone ? (
+            <Text variant="caption" tone="faint" numberOfLines={1}>
+              {t("voice.expired")}
             </Text>
-          </Pressable>
-        ) : null}
+          ) : (
+            <Text variant="caption" tone="muted" style={styles.time}>
+              {voiceClock(time)}
+            </Text>
+          )}
+          {canPlay ? (
+            <Pressable
+              onPress={cycle}
+              accessibilityRole="button"
+              accessibilityLabel={t("voice.speed")}
+              hitSlop={8}
+              style={[styles.speed, { backgroundColor: c.sunken }]}
+            >
+              <Text variant="caption" tone="muted" style={styles.speedText}>
+                {`${rate}×`}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
         {words ? (
           <Pressable
             onPress={flip}
@@ -195,36 +196,30 @@ export const VoiceMessage = memo(function VoiceMessage({ message }: { message: M
             accessibilityState={{ expanded: open }}
             accessibilityLabel={open ? t("voice.hideText") : t("voice.showText")}
             hitSlop={8}
-            style={styles.textButton}
+            style={styles.words}
           >
-            <Icon name="text" size={15} color={open ? c.muted : c.faint} />
+            <Text variant="small" tone="muted" numberOfLines={open ? undefined : 1} selectable={open}>
+              {message.body}
+            </Text>
           </Pressable>
         ) : null}
       </View>
-      {words && open ? (
-        <Animated.View entering={FadeIn.duration(140)} style={styles.words}>
-          <Text variant="small" tone="muted" selectable>
-            {message.body}
-          </Text>
-        </Animated.View>
-      ) : null}
     </View>
   );
 });
 
 const styles = StyleSheet.create({
   box: { marginTop: 4, gap: 6, maxWidth: 320 },
-  player: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    minHeight: 48,
+  card: {
+    gap: 4,
+    paddingVertical: 7,
     paddingLeft: 7,
-    paddingRight: 4,
+    paddingRight: 8,
     borderRadius: 16,
     borderBottomLeftRadius: 4,
     borderWidth: StyleSheet.hairlineWidth,
   },
+  player: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 34 },
   play: { width: 34, height: 34, borderRadius: 17 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   wave: { flex: 1, minWidth: 0, height: WAVE, flexDirection: "row" },
@@ -232,7 +227,6 @@ const styles = StyleSheet.create({
   time: { minWidth: 30, textAlign: "right", fontVariant: ["tabular-nums"] },
   speed: { height: 22, minWidth: 28, paddingHorizontal: 5, borderRadius: 6, alignItems: "center", justifyContent: "center" },
   speedText: { fontVariant: ["tabular-nums"] },
-  // 28 + 8 on each side of hit area: 44.
-  textButton: { width: 28, height: 28, alignItems: "center", justifyContent: "center" },
-  words: { paddingHorizontal: 4 },
+  // Under the wave, past the play button.
+  words: { paddingLeft: 42, paddingBottom: 2 },
 });
