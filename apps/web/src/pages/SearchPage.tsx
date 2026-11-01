@@ -44,7 +44,7 @@ export function SearchPage() {
   const channel = (id: string | undefined) => channels.data?.find((c) => c.id === id);
 
   return (
-    <div className="page page--mid">
+    <div className="page page--full">
       <header className="page__header">
         <h1 className="page-title">{t("searchPage.title")}</h1>
       </header>

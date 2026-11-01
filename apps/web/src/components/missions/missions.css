@@ -814,7 +814,6 @@ a.mi-pr:hover {
   letter-spacing: -0.015em;
 }
 .mi-q p {
-  max-width: 70ch;
   margin-top: 4px;
   font-size: 13.5px;
   color: var(--muted);

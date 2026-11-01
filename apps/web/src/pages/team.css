@@ -1,6 +1,6 @@
 /* Equipe: the agents in the pixel sky, grouped by their person. */
 .page.team {
-  max-width: 1240px;
+  max-width: none;
   gap: 20px;
 }
 .team-head {
