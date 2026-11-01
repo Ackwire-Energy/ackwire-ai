@@ -8,7 +8,7 @@ import { missingConnectors, type ServerCatalog } from "../connectors/listing";
 import { consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
-import { cutText, pgSafeText } from "../format";
+import { cutText, pgSafeJson, pgSafeText } from "../format";
 import { addRunStep } from "../runs";
 import {
   callTargets,
@@ -383,7 +383,9 @@ export function createToolGateway(deps: {
     list,
     granted,
 
-    async invoke(ctx: ToolContext, requested: ToolCall): Promise<InvokeResult> {
+    async invoke(ctx: ToolContext, raw: ToolCall): Promise<InvokeResult> {
+      // The model's arguments land in jsonb and text columns (steps, approvals, the audit): a NUL would fail them.
+      const requested = { ...raw, input: pgSafeJson(raw.input) };
       // Who is behind the run decides what it may do: listing already hid refused tools, this is the call.
       const [all, authority] = await Promise.all([allTools(ctx), authorityOf(ctx)]);
       // A directory (tools/directory.ts): `use_tool` runs the tool it names by that tool's own name, so everything
