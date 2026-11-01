@@ -157,7 +157,8 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             // A routine's own files live in its room, which only its run reads.
             const shared = await shareArtifact(deps.artifacts, actor, ctx.orgId, id, {
               requesterUserId: requester,
-              alsoFrom: routine ? ctx.channelId : null,
+              // Only a routine's own run takes files from its room; a run it woke takes none from its conversation.
+              alsoFrom: routine && ctx.background ? ctx.channelId : null,
             });
             files.push(shared.artifact.id);
           }

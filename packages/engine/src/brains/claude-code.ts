@@ -14,7 +14,7 @@ import {
 } from "@agenteschat/adapters";
 import { type Database, type Executor, schema } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
-import { type RunAuthority, runAuthorityById } from "../authority";
+import { fedByRoutine, type RunAuthority, runAuthorityById } from "../authority";
 import { type MachineCaller, MachineRequestError, type MachineStatus } from "../machine-hub";
 import { MachineDroppedError, MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
 import { computerPrompt } from "./prompt";
@@ -57,11 +57,13 @@ import type { Brain, BrainAccount, BrainEvent, BrainIO, BrainTurn, SteerMessage,
  * commands by the command policy and a person), whoever woke it, except a
  * routine set to only look and tell (`read`, the default, also a legacy
  * brief-less one), which reads (`plan`: no edits, read-only shell, no web, our
- * tools only; its context says why). Missions keep their own profile
+ * tools only; its context says why), and so does a run its report or work woke
+ * (`fedByRoutine`). Missions keep their own profile
  * (`missionTurnPermissions`).
  */
 export function computerProfile(authority: RunAuthority): "plan" | "work" {
-  return authority.kind === "routine" && authority.brief?.access !== "act" ? "plan" : "work";
+  const bounded = authority.kind === "routine" || fedByRoutine(authority);
+  return bounded && authority.kind !== "person" && authority.brief?.access !== "act" ? "plan" : "work";
 }
 
 /** A turn's profile (`computerProfile`), from its run. */

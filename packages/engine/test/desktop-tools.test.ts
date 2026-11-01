@@ -383,7 +383,7 @@ test("routines that only read can't use the desktop, a run nobody is behind can;
     dueAt: new Date().toISOString(),
   });
   const routine = (access: "read" | "act"): RunAuthority => ({ kind: "routine", personId: null, brief: brief(access) });
-  const unattended: RunAuthority = { kind: "unattended", personId: null, reason: "routine_report" };
+  const unattended: RunAuthority = { kind: "unattended", personId: null, reason: "agent" };
   for (const name of TOOLS) {
     const tool = { name, scope: DESKTOP_SCOPE, connectionId: null };
     expect(toolPolicy(routine("read"), tool)).toEqual({ action: "refuse", reason: REFUSALS.routineDesktopReadOnly });

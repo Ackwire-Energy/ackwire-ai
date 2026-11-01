@@ -90,12 +90,13 @@ describe("who is behind a run", () => {
     expect(accountablePerson(authority)).toBe(f.owner.id);
     // Whatever that run writes roots in the routine, never in its creator.
     const written = await byAgent("@dev olha isso", run.id);
-    expect(await messageRoot(f.db, f.org.id, written.id)).toEqual({ kind: "routine" });
+    expect(await messageRoot(f.db, f.org.id, written.id)).toEqual({ kind: "routine", briefMessageId: trigger.id });
   });
 
   test("a routine's report wakes a run nobody is behind, and so is what it starts", async () => {
     f = await setup();
-    const fired = await byPerson("Confira o checkout", { routineBrief: brief(), background: true });
+    const b = brief();
+    const fired = await byPerson("Confira o checkout", { routineBrief: b, background: true });
     const routineRun = await runFor(fired.id, { background: true });
     const report = await byAgent("Erro novo no checkout", null, {
       notice: {
@@ -106,7 +107,13 @@ describe("who is behind a run", () => {
       },
     });
     const woken = await runFor(report.id);
-    expect(await runAuthority(f.db, woken)).toEqual({ kind: "unattended", personId: null, reason: "routine_report" });
+    // It keeps within the routine that reported (`brief`), and so does what it starts.
+    expect(await runAuthority(f.db, woken)).toEqual({
+      kind: "unattended",
+      personId: null,
+      reason: "routine_report",
+      brief: b,
+    });
     // Its reply mentioning someone else still roots in the report.
     const reply = await byAgent("@dev é do seu deploy?", woken.id);
     expect(await messageRoot(f.db, f.org.id, reply.id)).toEqual({
@@ -163,11 +170,18 @@ describe("who is behind a run", () => {
       expect(await personOfMessage(f.db, f.org.id, (await byAgent("…", null, meta)).id)).toBe(f.owner.id);
     }
     // A routine's task: nobody behind it, whoever created the routine.
-    const routine = await runFor((await byPerson("Confira", { routineBrief: brief(), background: true })).id, {
-      background: true,
-    });
+    const b = brief();
+    const fired = await byPerson("Confira", { routineBrief: b, background: true });
+    const routine = await runFor(fired.id, { background: true });
     const ended = await byAgent("…", null, { machineTask: { id: crypto.randomUUID(), runId: routine.id } });
-    expect(await messageRoot(f.db, f.org.id, ended.id)).toEqual({ kind: "routine" });
+    expect(await messageRoot(f.db, f.org.id, ended.id)).toEqual({ kind: "routine", briefMessageId: fired.id });
+    // The run that end wakes keeps within that routine.
+    expect(await runAuthority(f.db, await runFor(ended.id))).toEqual({
+      kind: "unattended",
+      personId: null,
+      reason: "routine",
+      brief: b,
+    });
   });
 
   test("a link to another workspace's run, or to no run id, leads to nobody", async () => {

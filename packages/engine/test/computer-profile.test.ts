@@ -66,9 +66,17 @@ describe("the profile follows who is behind the run", () => {
     expect(computerProfile({ kind: "routine", personId: null, brief: { ...briefShape, access: "read" } })).toBe("plan");
     // A routine whose brief is missing (an older firing) only reads.
     expect(computerProfile({ kind: "routine", personId: null, brief: null })).toBe("plan");
-    // Nobody behind it (a routine's report, an agent's own message): it works as the agent itself.
-    for (const reason of ["routine_report", "agent"] as const) {
-      expect(computerProfile({ kind: "unattended", personId: null, reason })).toBe("work");
+    // Nobody behind it (an agent's own message): it works as the agent itself.
+    expect(computerProfile({ kind: "unattended", personId: null, reason: "agent" })).toBe("work");
+    // Woken by a routine's report or work: within that routine's access (only reading when unknown).
+    for (const reason of ["routine_report", "routine"] as const) {
+      expect(
+        computerProfile({ kind: "unattended", personId: null, reason, brief: { ...briefShape, access: "act" } }),
+      ).toBe("work");
+      expect(
+        computerProfile({ kind: "unattended", personId: null, reason, brief: { ...briefShape, access: "read" } }),
+      ).toBe("plan");
+      expect(computerProfile({ kind: "unattended", personId: null, reason })).toBe("plan");
     }
   });
 
@@ -87,13 +95,14 @@ describe("the profile follows who is behind the run", () => {
     expect(await profileOf(personRun.id)).toBe("work");
   });
 
-  test("a run a routine's report woke works; a person who writes into it is behind it from then on", async () => {
+  test("a run a routine's report woke works as that routine may; a person who writes into it is behind it from then on", async () => {
     f = await setup();
     const report = await message("agent", "Erro novo no checkout", {
       notice: { kind: "routine_handoff", text: "Erro novo no checkout", from: "Routine «Sentry»", refs: {} },
     });
     const woken = await runFor(report.id);
-    expect(await profileOf(woken.id)).toBe("work");
+    // No routine run named: what it read may be anyone's, so it only reads.
+    expect(await profileOf(woken.id)).toBe("plan");
     await f.db
       .update(schema.agentRuns)
       .set({ transcript: { ...(woken.transcript as Record<string, unknown>), steeredBy: f.owner.id } as never })

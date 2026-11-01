@@ -146,7 +146,8 @@ const ACTIVE: AgentRun["status"][] = ["queued", "running", "waiting_approval", "
  * joins the agent's run there or starts one, in the run's stretch: past its limits the run is held for the pause
  * card (ADR 0089), and the notice is still read by the agent's next run there. A routine's run that ended hears
  * it where the routine reports, like its approval cards: nobody reads its room. `wake: false`: only written there,
- * for a notice that wakes the agent right after it (`reportHandOffs`) or that no run should read. In the caller's
+ * for a notice that wakes the agent right after it (`reportHandOffs`) or that no run should read. `joinRun: false`:
+ * never read by the run itself, even while it is active (a routine's hand-offs, which come back where it reports). In the caller's
  * transaction; publish with `publishDelivery` after the commit.
  */
 export async function deliverNoticeToRun(
@@ -165,11 +166,11 @@ export async function deliverNoticeToRun(
     | "background"
   >,
   notice: Notice,
-  options: { wake?: boolean } = {},
+  options: { wake?: boolean; joinRun?: boolean } = {},
 ): Promise<{ message: Message; runs: AgentRun[] }> {
   const wake = options.wake !== false;
   let active = false;
-  if (wake) {
+  if (wake && options.joinRun !== false) {
     const [current] = await tx
       .select({ id: agentRuns.id, orgId: agentRuns.orgId, status: agentRuns.status })
       .from(agentRuns)

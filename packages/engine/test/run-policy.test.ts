@@ -47,7 +47,12 @@ const briefOf = (access: RoutineAccess): RoutineBrief => ({
 const routine = (access: RoutineAccess): RunAuthority => ({ kind: "routine", personId: null, brief: briefOf(access) });
 const unattended: RunAuthority = { kind: "unattended", personId: null, reason: "agent" };
 /** The run a routine's report woke: what the routine read (inbound mail, a webhook) feeds it. */
-const reportWoke: RunAuthority = { kind: "unattended", personId: null, reason: "routine_report" };
+const reportWoke: RunAuthority = {
+  kind: "unattended",
+  personId: null,
+  reason: "routine_report",
+  brief: briefOf("act"),
+};
 const person: RunAuthority = { kind: "person", personId: "user_ana" };
 
 const builtIn = (name: string, scope = "") => ({ name, scope, connectionId: null });
@@ -139,10 +144,49 @@ describe("run policy table", () => {
       app("github_merge_pr", "github:pr.merge", true),
     ]) {
       expect(decide(unattended, tool)).toBe("allow");
-      // Woken by a routine's report it works too, but every write to a connected app asks a person.
-      expect(decide(reportWoke, tool)).toBe(toolKind(tool).kind === "external" ? "approve" : "allow");
     }
     expect(toolPolicy(unattended, builtIn("hand_off"))).toEqual({ action: "refuse", reason: REFUSALS.handOffOnly });
+  });
+
+  test("a run a routine's report or work woke keeps that routine's bounds, and replies where it is", () => {
+    for (const reason of ["routine_report", "routine"] as const) {
+      const looks: RunAuthority = { kind: "unattended", personId: null, reason, brief: briefOf("read") };
+      const acts: RunAuthority = { kind: "unattended", personId: null, reason, brief: briefOf("act") };
+      // Set to only look and tell (or unknown): reads and the reply here, nothing that changes or reaches further.
+      for (const who of [looks, { ...looks, brief: null }, { kind: "unattended", personId: null, reason } as const]) {
+        for (const tool of [builtIn("list_issues", "issues:read"), builtIn("react"), builtIn("ask_user")])
+          expect(decide(who, tool)).toBe("allow");
+        for (const tool of [
+          builtIn("browser_open", "browser:use"),
+          builtIn("desktop_do", "desktop:use"),
+          builtIn("start_task", "sandbox:run"),
+          builtIn("create_issue", "issues:write"),
+          builtIn("post_message"),
+          builtIn("send_dm"),
+          builtIn("tell_agent"),
+          builtIn("ask_agent"),
+        ])
+          expect(toolPolicy(who, tool)).toEqual({ action: "refuse", reason: REFUSALS.fedReadOnly });
+        expect(decide(who, app("github_create_issue", "github:issues.write"))).toBe("approve");
+      }
+      // Set to act: what the routine itself may do, its writes to connected apps asking a person.
+      for (const tool of [
+        builtIn("browser_open", "browser:use"),
+        builtIn("create_issue", "issues:write"),
+        builtIn("post_message"),
+        builtIn("tell_agent"),
+        builtIn("react"),
+      ])
+        expect(decide(acts, tool)).toBe("allow");
+      expect(decide(acts, app("github_merge_pr", "github:pr.merge", true))).toBe("approve");
+      // Never beyond what the routine reaches, whatever its access.
+      for (const who of [looks, acts]) {
+        for (const name of ["request_secret", "create_routine", "schedule_reminder", "brand_new_tool"])
+          expect(toolPolicy(who, builtIn(name))).toEqual({ action: "refuse", reason: REFUSALS.fedElsewhere });
+        expect(toolPolicy(who, builtIn("hand_off"))).toEqual({ action: "refuse", reason: REFUSALS.handOffOnly });
+        expect(toolPolicy(who, builtIn("start_task"))).toEqual({ action: "refuse", reason: REFUSALS.fedMission });
+      }
+    }
   });
 
   test("the computer's own permission prompt is listed for every run; a mission's tools never for a routine", () => {

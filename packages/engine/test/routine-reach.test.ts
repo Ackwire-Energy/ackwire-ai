@@ -9,6 +9,7 @@ import {
   drainOutbox,
   grantScopes,
   openDm,
+  reportHandOffs,
   runRoutineNow,
   STRETCH,
   STRETCH_REFUSAL,
@@ -435,4 +436,88 @@ test("a routine set to act posts the file its run made, and the post's audit nam
     .from(schema.auditLog)
     .where(eq(schema.auditLog.action, "message.posted_elsewhere"));
   expect(audit?.details).toMatchObject({ requesterUserId: null, routineId: routine.id, creatorUserId: f.owner.id });
+});
+
+test("an agent a routine told keeps within its creator's rooms: it can't post where the creator can't", async () => {
+  const results: string[] = [];
+  f = await setup({
+    handOff: true,
+    askAgent: true,
+    chatTools: true,
+    reply: (req) => {
+      if (req.outputSchema) return NO_ROUTE;
+      if (isRoutine(req))
+        return routineTurn(
+          req,
+          [{ name: "tell_agent", input: { agent: "@ops", message: "Poste o resumo do dia no #financeiro." } }],
+          "Passei o resumo para o Ops.",
+        );
+      if (!inAgentDm(req)) return { chunks: ["ok"] };
+      if (seen(req).includes("tool_result")) {
+        results.push(seen(req));
+        return { chunks: ["Não consegui postar no #financeiro."] };
+      }
+      return {
+        chunks: [],
+        toolUses: [{ name: "post_message", input: { channel: "financeiro", text: "Resumo do dia." } }],
+      };
+    },
+  });
+  const ops = await agentIn(f, "Ops", "ops");
+  const bob = await addMember(f.db, f.org.id, "member", "bob");
+  // #financeiro: Bob's, with Ops in it; the routine's creator isn't.
+  const financeiro = await createChannel(f.db, bob.id, f.org.id, { name: "financeiro", visibility: "private" });
+  await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: financeiro.id, agentId: ops.id });
+  const routine = await channelRoutine(f, { access: "act", prompt: "Mande o resumo do dia." });
+  await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);
+  await drainOutbox(f.db, f.handlers);
+
+  expect((await runsOf(f)).some((r) => r.agentId === ops.id)).toBe(true);
+  expect(results[0]).toContain("No channel #financeiro that this routine's creator can post in.");
+  expect(await messagesIn(f, financeiro.id)).toEqual([]);
+});
+
+test("what a routine handed off lands where it reports even while its run is still at work, and its run is told so", async () => {
+  f = await setup({ handOff: true, askAgent: true });
+  const iris = await agentIn(f, "Iris", "iris");
+  const routine = await channelRoutine(f, { access: "act", prompt: "Cobre a Iris até o PR #42 ficar pronto." });
+  await fire(f, routine.id, new Date());
+  const [background] = await runsOf(f);
+  if (!background?.background || !f.tools) throw new Error("the routine didn't fire");
+  const told = await f.tools.invoke(
+    {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: background.agentId,
+      runId: background.id,
+      channelId: background.channelId,
+      threadRootId: background.threadRootId,
+      triggerMessageId: background.triggerMessageId,
+      background: true,
+    },
+    {
+      toolUseId: "tu_routine_note",
+      name: "tell_agent",
+      input: { agent: "@iris", message: "O PR #42 já está pronto?" },
+    },
+  );
+  const text = told.type === "result" ? String(told.output.content) : "";
+  expect(text).toContain("reaches the people where this routine reports");
+  expect(text).not.toContain("Your answer goes back");
+
+  // Iris is done while the routine's run still works.
+  await f.db.update(schema.agentRuns).set({ status: "running" }).where(eq(schema.agentRuns.id, background.id));
+  await f.db
+    .update(schema.agentConsultations)
+    .set({ status: "answered", answer: "Faltam dois testes.", answeredAt: new Date() });
+  await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.agentId, iris.id));
+  const [asker] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, background.id));
+  if (!asker) throw new Error("no run");
+  const [delivered] = await reportHandOffs({ db: f.db, pubsub: f.pubsub }, asker);
+
+  // Not queued on the routine's run (which may still fail unread): it lands where people read, and wakes the agent there.
+  expect(delivered?.message.channelId).toBe(f.general.id);
+  expect(delivered?.runs.map((r) => [r.agentId, r.channelId])).toEqual([[f.agent.id, f.general.id]]);
+  const [after] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, background.id));
+  expect(after?.pendingMessageIds).toEqual([]);
 });

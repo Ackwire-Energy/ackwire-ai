@@ -17,7 +17,8 @@ const { agentRuns, messages } = schema;
  *   accountable (notifications, approvals), but the run never acts as them. What it may do comes only
  *   from the routine's access level (`brief.access`): one set to only look and tell reads.
  * - `unattended`: no person at the root: the conversation run a routine's report woke, an agent's own
- *   message, work either started. It works as the agent itself, with the tools a person's run has; what
+ *   message, work either started. It works as the agent itself, with the tools a person's run has (one a
+ *   routine's report or work woke keeps within that routine's `brief`: see `run-policy.ts`); what
  *   needs a person's request (their channels, their reminders) is refused, and its approvals and pauses
  *   go to the agent's owner. A person writing into such a run (`steeredBy`) puts that person behind it
  *   from then on.
@@ -28,7 +29,8 @@ const { agentRuns, messages } = schema;
 export type RunAuthority =
   | { kind: "person"; personId: string }
   | { kind: "routine"; personId: null; brief: RoutineBrief | null }
-  | { kind: "unattended"; personId: null; reason: UnattendedReason };
+  /** `brief`: the routine whose report or work woke it (reasons `routine_report` and `routine`), whose bounds it keeps. */
+  | { kind: "unattended"; personId: null; reason: UnattendedReason; brief?: RoutineBrief | null };
 
 /**
  * Why nobody is behind an unattended run: a routine's report woke it (`routine_report`), its chain roots in a
@@ -39,7 +41,8 @@ export type UnattendedReason = "routine_report" | "routine" | "agent";
 /** What a message's chain roots in. */
 export type MessageRoot =
   | { kind: "person"; personId: string }
-  | { kind: "routine" }
+  /** `briefMessageId`: the routine's brief the chain started from, when known. */
+  | { kind: "routine"; briefMessageId: string | null }
   /** `backgroundRunId`: the routine's run that handed it off (the notice's `refs.runId`). */
   | { kind: "routine_report"; backgroundRunId: string | null }
   | { kind: "agent" };
@@ -110,7 +113,7 @@ async function walkRoot(db: Executor, orgId: string, messageId: string, walked: 
     if (!m) return null;
     if (m.authorType === "person") {
       // A routine's brief is written by its creator, but nobody is behind the work it starts.
-      if (routineBriefOf(m.meta) || m.meta.background === true) return { kind: "routine" };
+      if (routineBriefOf(m.meta) || m.meta.background === true) return { kind: "routine", briefMessageId: id };
       return m.authorUserId ? { kind: "person", personId: m.authorUserId } : { kind: "agent" };
     }
     const notice = noticeOf(m.meta);
@@ -126,7 +129,7 @@ async function walkRoot(db: Executor, orgId: string, messageId: string, walked: 
       .from(agentRuns)
       .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.id, runId)));
     if (!run) return null;
-    if (run.background) return { kind: "routine" };
+    if (run.background) return { kind: "routine", briefMessageId: run.triggerMessageId };
     id = run.triggerMessageId;
   }
   return null;
@@ -164,7 +167,31 @@ export async function runAuthority(db: Executor, run: AuthorityRun): Promise<Run
   if (root.kind === "person") return { kind: "person", personId: root.personId };
   const steeredBy = steeredByOf(run.transcript);
   if (steeredBy) return { kind: "person", personId: steeredBy };
-  return { kind: "unattended", personId: null, reason: root.kind };
+  if (root.kind === "agent") return { kind: "unattended", personId: null, reason: "agent" };
+  return { kind: "unattended", personId: null, reason: root.kind, brief: await feedingBrief(db, run.orgId, root) };
+}
+
+/** The brief of the routine a chain roots in (its own, or the one whose run handed off the report); null when gone. */
+async function feedingBrief(
+  db: Executor,
+  orgId: string,
+  root: Extract<MessageRoot, { kind: "routine" | "routine_report" }>,
+): Promise<RoutineBrief | null> {
+  if (root.kind === "routine") {
+    if (!root.briefMessageId) return null;
+    const [m] = await db
+      .select({ meta: messages.meta })
+      .from(messages)
+      .where(and(eq(messages.orgId, orgId), eq(messages.id, root.briefMessageId)));
+    return routineBriefOf(m?.meta);
+  }
+  if (!root.backgroundRunId || !UUID.test(root.backgroundRunId)) return null;
+  const [row] = await db
+    .select({ meta: messages.meta })
+    .from(agentRuns)
+    .innerJoin(messages, and(eq(messages.orgId, agentRuns.orgId), eq(messages.id, agentRuns.triggerMessageId)))
+    .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.id, root.backgroundRunId), eq(agentRuns.background, true)));
+  return routineBriefOf(row?.meta);
 }
 
 /**

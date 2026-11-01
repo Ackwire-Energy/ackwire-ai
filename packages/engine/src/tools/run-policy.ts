@@ -12,8 +12,10 @@ import type { ToolDefinition } from "./types";
  *
  * - `person` and `unattended` (nobody behind it: it works as the agent itself): every tool but
  *   `hand_off`; scopes and the tools' own approvals decide. A tool that needs a person's request
- *   refuses on its own when nobody is behind the run. An `unattended` run a routine's report or work woke
- *   (`fedByRoutine`) asks a person before every write to a connected app.
+ *   refuses on its own when nobody is behind the run.
+ * - `unattended` that a routine's report or work woke (`fedByRoutine`): what the routine read (inbound mail, a
+ *   webhook) feeds it, so it keeps the routine's bounds (below, by the routine's `brief`), plus the reply where it
+ *   is (`here`), never `hand_off` nor a mission's tools; every write to a connected app asks a person.
  * - `routine`, any access: nothing that speaks for someone (reactions, GIFs and stickers, questions,
  *   reminders, routines, events, forum, channels, secrets, permissions). It reports through `hand_off`.
  * - `routine`, access `read`: reads only, plus `hand_off`.
@@ -207,6 +209,12 @@ export const REFUSALS = {
     "This routine only reads and reports, and the browser can send data out: use your other tools, and say in hand_off what you'd check.",
   routineDesktopReadOnly:
     "This routine only reads and reports, and the desktop can run anything on the computer and send data out: use your other tools, and say in hand_off what you'd check.",
+  fedElsewhere:
+    "A routine's report or work started this, so you keep within what that routine may do: you can't manage routines or reminders, propose events, open forum topics, change channels, ask for secrets or permissions, or use this tool. Say it in your reply here; the people decide.",
+  fedReadOnly:
+    "A routine that only looks and tells started this, so you change nothing and reach no one else yourself (no browser, desktop, code, posts elsewhere or other agents). Say in your reply what you'd do; a person asks you to go ahead.",
+  fedMission:
+    "A routine's report or work started this, not the mission: say in your reply what you'd do; the people decide.",
   handOffOnly: "Only background work (a routine's run) hands off: just reply.",
   missionOnly:
     "A routine's background work doesn't start a mission's tasks or upload its files: put what you'd do in hand_off; the people decide.",
@@ -234,28 +242,32 @@ export function toolPolicy(authority: RunAuthority, tool: PolicyTool): PolicyDec
     return ALLOW;
   }
   // A person's run and a run nobody is behind work alike: as the agent, with every tool its scopes give.
-  // The mission's own tools check that the run works for the mission (`runActsForMission`). What a routine read
-  // feeding a run can't approve its own writes to connected apps (`fedByRoutine`).
-  if (authority.kind === "unattended" && what.kind === "external" && fedByRoutine(authority)) return APPROVE;
-  if (authority.kind !== "routine") return what.kind === "hand_off" ? refuse(REFUSALS.handOffOnly) : ALLOW;
+  // The mission's own tools check that the run works for the mission (`runActsForMission`).
+  const fed = authority.kind === "unattended" && fedByRoutine(authority);
+  if (authority.kind !== "routine" && !fed) return what.kind === "hand_off" ? refuse(REFUSALS.handOffOnly) : ALLOW;
+  // What a routine read feeds a run its report or work woke (`fedByRoutine`): that run keeps the routine's
+  // bounds (`brief`, read-only when unknown), replies where it is, and asks a person before writing to a connected app.
+  const acts = authority.brief?.access === "act";
   switch (what.kind) {
-    case "hand_off":
     case "read":
       return ALLOW;
+    case "hand_off":
+      return fed ? refuse(REFUSALS.handOffOnly) : ALLOW;
     case "elsewhere":
-      if (!ROUTINE_REACH.has(tool.name)) return refuse(REFUSALS.routineElsewhere);
-      return authority.brief?.access === "act" ? ALLOW : refuse(REFUSALS.routineReachReadOnly);
+      if (!ROUTINE_REACH.has(tool.name)) return refuse(fed ? REFUSALS.fedElsewhere : REFUSALS.routineElsewhere);
+      if (acts) return ALLOW;
+      return refuse(fed ? REFUSALS.fedReadOnly : REFUSALS.routineReachReadOnly);
     case "here":
-      return refuse(ROUTINE_HERE_REFUSAL[tool.name] ?? REFUSALS.routineHere);
+      return fed ? ALLOW : refuse(ROUTINE_HERE_REFUSAL[tool.name] ?? REFUSALS.routineHere);
     case "internal":
-      if (authority.brief?.access === "act") return ALLOW;
-      return refuse(READ_ONLY_REFUSAL[what.area] ?? REFUSALS.routineReadOnly);
+      if (acts) return ALLOW;
+      return refuse(fed ? REFUSALS.fedReadOnly : (READ_ONLY_REFUSAL[what.area] ?? REFUSALS.routineReadOnly));
     case "external":
-      return authority.brief?.access === "act" ? APPROVE : refuse(REFUSALS.routineReadOnly);
+      return acts || fed ? APPROVE : refuse(REFUSALS.routineReadOnly);
     case "mission":
-      return refuse(REFUSALS.missionOnly);
+      return refuse(fed ? REFUSALS.fedMission : REFUSALS.missionOnly);
     case "unknown":
-      return refuse(REFUSALS.unknownTool);
+      return refuse(fed ? REFUSALS.fedElsewhere : REFUSALS.unknownTool);
   }
 }
 

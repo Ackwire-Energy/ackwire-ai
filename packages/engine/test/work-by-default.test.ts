@@ -234,7 +234,7 @@ describe("work that comes back goes on for the person behind it", () => {
   test("a task a routine's run started ends where the routine reports, never in its room", async () => {
     f = await setup();
     const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "MacBook" });
-    const { run, room } = await routineRun("act");
+    const { run, room, brief } = await routineRun("act");
     const [task] = await f.db
       .insert(schema.machineTasks)
       .values({
@@ -254,9 +254,9 @@ describe("work that comes back goes on for the person behind it", () => {
     const woke = await wakeConversationForTask({ db: f.db }, task?.id ?? "", { maxHops: 100 });
     expect(woke?.message?.channelId).toBe(f.general.id);
     expect(woke?.runs.map((r) => r.channelId)).toEqual([f.general.id]);
-    // Nobody is behind a routine's work: the run it wakes works as the agent itself, fed by the routine's work.
+    // Nobody is behind a routine's work: the run it wakes works as the agent itself, within that routine.
     expect(await howItWorks(woke?.runs[0]?.id ?? "")).toEqual({
-      behind: { kind: "unattended", personId: null, reason: "routine" },
+      behind: { kind: "unattended", personId: null, reason: "routine", brief },
       profile: "work",
     });
   });
@@ -435,16 +435,20 @@ describe("work that comes back goes on for the person behind it", () => {
 });
 
 describe("with nobody behind it, a run works as the agent itself", () => {
-  test("a routine's report wakes a run that works, whatever the routine's access", async () => {
+  test("a routine's report wakes a run that works within that routine's access", async () => {
     f = await setup();
+    const expected: Record<RoutineAccess, { profile: string; decisions: string[] }> = {
+      // Set to act: it hands the work on and does it (code, background tasks, other agents, other channels, PRs).
+      act: { profile: "work", decisions: ["allow", "allow", "allow", "allow", "allow"] },
+      // Set to only look and tell: what it read may be a stranger's, so the run it wakes only reads and replies.
+      read: { profile: "plan", decisions: ["refuse", "refuse", "refuse", "refuse", "refuse"] },
+    };
     for (const access of ["read", "act"] as const) {
-      const { run } = await routineRun(access);
+      const { run, brief } = await routineRun(access);
       const woken = await reportWakes(run);
       const { behind, profile } = await howItWorks(woken.id);
-      expect(behind).toEqual({ kind: "unattended", personId: null, reason: "routine_report" });
-      expect(profile).toBe("work");
-      // It can hand the work on and do it: code, background tasks, other agents, other channels, pull requests.
-      expect(decisions(behind)).toEqual(["allow", "allow", "allow", "allow", "allow"]);
+      expect(behind).toEqual({ kind: "unattended", personId: null, reason: "routine_report", brief });
+      expect({ profile: profile as string, decisions: decisions(behind) as string[] }).toEqual(expected[access]);
     }
   });
 

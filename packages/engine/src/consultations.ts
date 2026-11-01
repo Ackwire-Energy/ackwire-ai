@@ -320,8 +320,9 @@ function createTellAgentTool(deps: { pubsub?: PubSub; ai?: AiCheck }): ToolDefin
         kind: "note",
       });
       return {
-        content:
-          here && isAgentOnlyDm(here)
+        content: ctx.background
+          ? `Handed to @${handle}. What comes of it reaches the people where this routine reports, by itself, and wakes you there: don't wait for it. Do your own part now, and say in hand_off who has what.`
+          : here && isAgentOnlyDm(here)
             ? `Handed to @${handle}. Your answer goes back once @${handle} is done, together with what came of it: do your own part now, then end your turn saying what you handed on.`
             : `Handed to @${handle}; it's on it, and the people here can see that. What comes of it reaches you here by itself once everything you handed off this turn is back. Tell the people in a line who has it, without promising a time, then do your own part or end your turn.`,
         data: {
@@ -926,7 +927,8 @@ export async function reportHandOffs(deps: Pick<Deps, "db" | "pubsub">, asker: A
       const wake = i === claimed.length - 1;
       const handle = await handleOf(tx, row.orgId, row.targetAgentId);
       const notice = consultationNotice(row, handle, { wake, ...(wake && pending ? { pending } : {}) });
-      out.push(await deliverNoticeToRun(tx, asker, notice, { wake }));
+      // A routine's run never reads them itself: all of them land where it reports, so none is lost when it ends unread.
+      out.push(await deliverNoticeToRun(tx, asker, notice, { wake, joinRun: !asker.background }));
     }
     const last = out.at(-1)?.message.id;
     const earlier = out.slice(0, -1).map((d) => sql`${d.message.id}::uuid`);

@@ -138,7 +138,7 @@ describe("pure parts", () => {
     dueAt: new Date().toISOString(),
   });
   const routine = (access: RoutineAccess): RunAuthority => ({ kind: "routine", personId: null, brief: brief(access) });
-  const unattended: RunAuthority = { kind: "unattended", personId: null, reason: "routine_report" };
+  const unattended: RunAuthority = { kind: "unattended", personId: null, reason: "agent" };
   const person: RunAuthority = { kind: "person", personId: "user_ana" };
   const desktopTool = { name: "desktop_do", scope: DESKTOP_SCOPE, connectionId: null };
 
