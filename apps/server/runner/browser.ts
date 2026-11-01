@@ -1086,6 +1086,8 @@ interface Session {
   headed?: boolean;
   /** When `agent-browser` last got a command: its own idle timeout counts from there, not from frames or input. */
   commandAt?: number;
+  /** The agent's allowed sites at its last command: a reopened page must still be on them. */
+  allowed?: string[];
   /** For the desktop app: the page's host, what the agent did last, and the conversation it was for. */
   host?: string;
   doing?: ControlBrowserDoing;
@@ -1727,6 +1729,7 @@ export class BrowserManager {
     setup?: BrowserSetup,
   ): Promise<BrowserAnswer> {
     const { command, args, timeoutMs } = p;
+    session.allowed = allowed;
     if (command === "agentes:type_secret") {
       const answer = await this.typeSecret(agent, session, args, timeoutMs, signal);
       this.noteAct(session, command, [], answer, link);
@@ -2672,12 +2675,14 @@ export class BrowserManager {
   private async openStream(agent: AgentScope, session: Session, mode: BrowserStreamMode): Promise<void> {
     const port = await this.enqueue(session, async () => {
       // Closed anyway while a person's help is asked for (Chrome crashed or was quit, or `agent-browser` let go of
-      // it): open again where it was.
+      // it): open again where it was, when that page is still on the agent's allowed sites.
       const held = this.held(session.agentId);
       let reopened = false;
       const reopen = async () => {
         reopened = true;
-        await this.run(session, ["open", session.url ?? "about:blank"], { timeoutMs: QUICK_TIMEOUT_MS * 4 });
+        const url = session.url;
+        const page = url && session.allowed && domainAllowed(url, session.allowed) ? url : "about:blank";
+        await this.run(session, ["open", page], { timeoutMs: QUICK_TIMEOUT_MS * 4 });
       };
       if (!session.chrome && session.url && held) {
         await this.ensureOwnChrome(agent, session, session.headed === true, []);

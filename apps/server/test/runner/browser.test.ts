@@ -1386,6 +1386,27 @@ test.if(posix)(
 );
 
 test.if(posix)(
+  "a browser reopened for a help request never goes back to a page off the agent's allowed sites",
+  async () => {
+    const t = setup();
+    await t.act("open", ["https://shop.example.com/login"], { allowedDomains: ["shop.example.com"] });
+    // The page moved off the sites (a redirect seen in the live view), then Chrome crashed.
+    t.manager.setHandoff(dev.id, { status: "pending", request: "Sign in" });
+    await t.manager.streamStart(dev, "watch");
+    t.sockets[0]?.push({ type: "url", url: "https://evil.example/x" });
+    await t.manager.streamStop(dev);
+    t.chromes[0]?.close();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(await t.manager.streamStart(dev, "watch")).toEqual({ mode: "watch" });
+    const opens = t
+      .logged()
+      .filter((c) => c.args.at(-2) === "open")
+      .map((c) => c.args.at(-1));
+    expect(opens).toEqual(["https://shop.example.com/login", "about:blank"]);
+  },
+);
+
+test.if(posix)(
   "a browser that closed under an open help request opens again on its last page for the view",
   async () => {
     const t = setup();
