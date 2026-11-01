@@ -117,7 +117,7 @@ test("a routine set to act tells another agent: it wakes, and its reply reaches 
   const general = await messagesIn(f, f.general.id);
   expect(general.map((m) => [m.authorAgentId, (m.meta.notice as { kind?: string } | undefined)?.kind ?? null])).toEqual(
     [
-      [f.agent.id, "agent_note"],
+      [f.agent.id, "consult_reply"],
       [f.agent.id, null],
     ],
   );
@@ -170,7 +170,7 @@ test("a routine posts only where its creator can post, and writes in a DM only t
   f = await setup({
     handOff: true,
     chatTools: true,
-    judge: (kind) => (kind === "mention_handoff" ? 0.9 : undefined),
+    judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined),
     reply: (req) => {
       if (req.outputSchema) return NO_ROUTE;
       if (isRoutine(req)) {
@@ -254,7 +254,7 @@ test("a routine wakes only agents its creator can talk to", async () => {
     .where(eq(schema.agents.id, iris.id));
   await fire(f, routine.id, new Date());
   await drainOutbox(f.db, f.handlers);
-  expect(results[1]).toContain("Told @iris");
+  expect(results[1]).toContain("Handed to @iris");
   expect((await runsOf(f)).filter((r) => r.agentId === iris.id).map((r) => r.status)).toEqual(["done"]);
 });
 
@@ -314,7 +314,7 @@ test("loops stay held: agents a routine's post set off stop at the limit of work
   f = await setup({
     handOff: true,
     chatTools: true,
-    judge: (kind) => (kind === "mention_handoff" ? 0.9 : undefined),
+    judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined),
     reply: pingPong,
   });
   const iris = await agentIn(f, "Iris", "iris");

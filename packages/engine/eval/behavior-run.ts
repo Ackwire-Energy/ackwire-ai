@@ -310,7 +310,7 @@ export interface RunOptions {
 }
 
 /** The judgments of agents working together that a case where they do asks of production's judge. */
-const TOGETHER = new Set(["note_reply", "follow_through", "mention_handoff"]);
+const TOGETHER = new Set(["note_reply", "follow_through", "mention_needs_nothing"]);
 
 /** A case's conversation with every person's line in one language. */
 function inLanguage(

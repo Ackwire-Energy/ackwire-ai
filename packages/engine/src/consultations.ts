@@ -29,6 +29,7 @@ import type { Judge } from "./judge";
 import { getMessage, insertMessage, type MessageView, withMessageDetails } from "./messages";
 import type { Notice } from "./notices";
 import { personBehindCall, routineCreatorOfCall } from "./requester";
+import { isRoutineRoomKey } from "./routine-brief";
 import { deliverNoticeToRun, resumeRunWithResult } from "./run-resume";
 import { type AgentRun, isTerminal, type RunStatus, replyThreadOf } from "./runs";
 import { MAX_HANDOFF_LINKS, refusedAtLimit } from "./stretch";
@@ -547,13 +548,13 @@ async function handleOf(db: Executor, orgId: string, agentId: string) {
 
 type Deps = { db: Database; pubsub?: PubSub; judge?: Judge | null };
 
-/** Whether a run works in a private DM between agents (it answers another agent there). */
+/** Whether a run works in a private DM between agents (it answers another agent there); a routine's room isn't one. */
 async function inAgentsDm(db: Executor, run: Pick<AgentRun, "orgId" | "channelId">) {
   const [channel] = await db
     .select({ kind: channels.kind, dmKey: channels.dmKey })
     .from(channels)
     .where(and(eq(channels.orgId, run.orgId), eq(channels.id, run.channelId)));
-  return Boolean(channel && isAgentOnlyDm(channel));
+  return Boolean(channel && isAgentOnlyDm(channel) && !isRoutineRoomKey(channel.dmKey));
 }
 
 /** Whether something this run asked or handed off is still out. */

@@ -3,6 +3,7 @@ import { nanoUsdToUsd } from "@agenteschat/providers";
 import { emailLocale, emailsByLocale, queueEmail } from "./email";
 import { enqueue } from "./outbox";
 import { STUCK_ERROR } from "./runs";
+import { openOrg } from "./standing";
 import { REFUSALS } from "./tools/run-policy";
 
 /**
@@ -302,11 +303,9 @@ export function autonomySql(range: AutonomyRange) {
     Object.values(REFUSALS).map((r) => sql`${r}`),
     sql`, `,
   );
-  const orgs = range.orgId
-    ? sql`o.id = ${range.orgId}::uuid`
-    : sql`o.standing = 'active' and o.deletion_due_at is null`;
+  const orgs = range.orgId ? sql`${schema.organizations.id} = ${range.orgId}::uuid` : openOrg;
   return sql`with orgs as (
-      select o.id, o.name from organizations o where ${orgs}
+      select ${schema.organizations.id} as id, ${schema.organizations.name} as name from ${schema.organizations} where ${orgs}
     ),
     runs as (
       select r.id, r.org_id, r.agent_id, r.trigger_message_id, r.trigger, r.status, r.error, r.background,
