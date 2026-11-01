@@ -264,6 +264,41 @@ test("a computer-brain turn ends after the tools it ran through the bridge (neve
   expect(tokens[0]?.revokedAt).not.toBeNull();
 });
 
+test("a computer brain that keeps doing real work between promises gets both continues, never the ask nudge", async () => {
+  f = await setup({
+    judge: (kind, _id, state) =>
+      kind === "follow_through" ? (String(state.reply).includes("vou ") ? "continue" : "done") : undefined,
+  });
+  await computerAgent(f);
+  const ran = (id: string): BrainEvent => ({
+    type: "tool_call",
+    id,
+    name: "Bash",
+    input: { command: "bun run lint" },
+    executed: { content: "ok" },
+  });
+  const turns: BrainEvent[][] = [
+    [ran("t1"), { type: "done", text: "Rodei os testes; vou corrigir o lint." }],
+    [ran("t2"), { type: "done", text: "Corrigi o lint; vou rodar os testes de novo." }],
+    [ran("t3"), { type: "done", text: "Tudo verde." }],
+  ];
+  const { brain, seen } = scriptedComputerBrain((n) => turns[n] ?? [{ type: "done", text: "EXTRA" }]);
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev arruma o lint e os testes");
+  await drainOutbox(f.db, handlers);
+
+  expect(seen.length).toBe(3);
+  const nudged = (await f.db.select().from(schema.agentRunSteps)).flatMap((s) =>
+    typeof s.data.nudged === "string" ? [s.data.nudged] : [],
+  );
+  expect(nudged).toEqual(["promise", "promise"]);
+  expect((await timeline(f)).at(-1)?.body).toBe("Tudo verde.");
+});
+
 test("computer sessions: the conversation's session goes on while recent and small; a big, idle or routine one starts fresh", async () => {
   f = await setup();
   const machineId = await computerAgent(f);
