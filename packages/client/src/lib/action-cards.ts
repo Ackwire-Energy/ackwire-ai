@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { Agent, AgentDraft, AgentProposalCard, AiStatus, SuggestedAi } from "../api/types";
+import type { Agent, AgentDraft, AgentProposalCard, AiStatus, ProposedRoutine, SuggestedAi } from "../api/types";
 import type { Level } from "./access-levels";
 import { joinNames } from "./format";
 import { aiStateOf, PLAN_BRAIN } from "./no-ai";
@@ -109,6 +109,14 @@ export const suggestedAiText = (t: TFunction, ai: SuggestedAi) =>
     ? t("actionCard.agentProposal.aiAccount", { account: ai.label })
     : t(ai.kind === "model" ? "actionCard.agentProposal.aiModel" : "actionCard.agentProposal.aiNone");
 
+/** "Pode agir", "Só olhar e contar": what a proposed routine may do on its own. */
+export const routineAccessText = (t: TFunction, routine: ProposedRoutine) =>
+  t(routine.access === "act" ? "routines.access.act" : "routines.access.read");
+
+/** A created proposal's routine nobody made yet (its agent wasn't where it reports): it can still be made. */
+export const routineLeft = (card: AgentProposalCard) =>
+  card.state === "created" && !!card.agentId && !!card.params.draft.routine && !card.routineId;
+
 /** The draft's connector levels as "Criar agente" keeps them (by connection; the rest none). */
 export const draftLevels = (draft: AgentDraft): Record<string, Level> =>
   Object.fromEntries(draft.access.map((a) => [a.connectionId, a.level]));
@@ -165,22 +173,28 @@ export function proposalLines(card: AgentProposalCard, viewer: { userId: string;
         m.accountId,
         applied?.mailAccountIds,
         { who: "person", userId: m.ownerUserId },
-        m.ownerUserId === viewer.userId,
+        // Its owner gives it, under the mailbox API's own rule (who may manage agents).
+        m.ownerUserId === viewer.userId && viewer.admin,
         m.level,
       ),
     ),
-    ...(draft.routine
-      ? [
-          {
-            key: "routine",
-            kind: "routine" as const,
-            id: draft.routine.name,
-            given: status === "created" && (applied || card.routineId) ? Boolean(card.routineId) : null,
-            needs: null,
-          },
-        ]
-      : []),
+    ...(draft.routine ? [routineLine(card, draft.routine, status, viewer.admin)] : []),
   ];
+}
+
+/** Its routine waits for whoever puts the agent in the channel it reports in (an admin), when nobody did yet. */
+function routineLine(
+  card: AgentProposalCard,
+  routine: ProposedRoutine,
+  status: ReturnType<typeof proposalStatus>,
+  admin: boolean,
+): ProposalLine {
+  const applied = status === "created" ? card.applied : undefined;
+  const given = status === "created" && (applied || card.routineId) ? Boolean(card.routineId) : null;
+  const where = routine.reportsIn;
+  const waits = !!where && !(applied ? applied.channelIds.includes(where) : admin);
+  const needs = (status === "open" || given === false) && waits ? ({ who: "admin" } as const) : null;
+  return { key: "routine", kind: "routine", id: routine.name, given, needs };
 }
 
 export function actionCardOf(meta: Record<string, unknown> | null | undefined): ActionCard | null {

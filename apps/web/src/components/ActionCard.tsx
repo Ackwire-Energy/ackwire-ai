@@ -3,6 +3,7 @@ import {
   useAiStatus,
   useChannels,
   useCreateProposedAgent,
+  useCreateProposedRoutine,
   useDenyAgentProposal,
   useMailAccounts,
 } from "@agenteschat/client";
@@ -12,6 +13,8 @@ import {
   type ProposalLine,
   proposalLines,
   proposalStatus,
+  routineAccessText,
+  routineLeft,
   suggestedAiText,
 } from "@agenteschat/client/lib/action-cards";
 import { itemName } from "@agenteschat/client/lib/connected";
@@ -116,6 +119,7 @@ function AgentProposalCardView({ message, card }: { message: Message; card: Agen
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const create = useCreateProposedAgent(org.id);
+  const makeRoutine = useCreateProposedRoutine(org.id);
   const connect = useConnectAi();
   const [reviewing, setReviewing] = useState(false);
   const deny = useDenyAgentProposal(org.id);
@@ -161,9 +165,10 @@ function AgentProposalCardView({ message, card }: { message: Message; card: Agen
                   disabled={deny.isPending}
                   onClick={() =>
                     create.mutate(message.id, {
-                      // Nothing to think with yet: it is created all the same, and Connect opens for it.
-                      onSuccess: ({ agent: made }) =>
-                        draft.ai.kind === "none" && connect?.open({ agentId: made.id, agentIds: [made.id] }),
+                      // Nothing to think with yet (the clicker's accounts decide, not the suggestion): it is
+                      // created all the same, and Connect opens for it.
+                      onSuccess: ({ agent: made, ai }) =>
+                        ai === "none" && connect?.open({ agentId: made.id, agentIds: [made.id] }),
                       onError: failed,
                     })
                   }
@@ -239,6 +244,17 @@ function AgentProposalCardView({ message, card }: { message: Message; card: Agen
                 </Link>
               </Button>
             )}
+            {routineLeft(card) && (card.decidedByUserId === me.user.id || can(org, "manage_routines")) && (
+              // Not made with it (the agent wasn't where it reports yet): made from here once it is.
+              <Button
+                size="sm"
+                variant="ghost"
+                loading={makeRoutine.isPending}
+                onClick={() => makeRoutine.mutate(message.id, { onError: failed })}
+              >
+                {t("newAgent.routineKeep", { name: draft.routine?.name })}
+              </Button>
+            )}
           </>
         ) : (
           <Chip icon="close">{t(status === "denied" ? "proposals.refused" : "approval.expired")}</Chip>
@@ -288,7 +304,10 @@ function ProposalLines({ lines, draft }: { lines: ProposalLine[]; draft: AgentDr
     const routine = draft.routine;
     return {
       icon: <Icon name="routines" size={14} />,
-      text: routine ? `${routine.name} · ${proposedRoutineWhen(t, i18n.language, routine)}` : l.id,
+      // What it may do on its own shows: one click makes it under the clicker's name.
+      text: routine
+        ? [routine.name, proposedRoutineWhen(t, i18n.language, routine), routineAccessText(t, routine)].join(" · ")
+        : l.id,
     };
   };
   const needs = (l: ProposalLine) =>
@@ -312,6 +331,12 @@ function ProposalLines({ lines, draft }: { lines: ProposalLine[]; draft: AgentDr
               {who && <span className="waitcard__needs"> · {who}</span>}
               {l.kind === "routine" && l.given === false && (
                 <span className="waitcard__needs"> · {t("actionCard.agentProposal.routineNotMade")}</span>
+              )}
+              {l.kind === "routine" && draft.routine && (
+                <details className="waitcard__prompt">
+                  <summary className="small muted">{t("routines.form.what")}</summary>
+                  <p className="small">{draft.routine.prompt}</p>
+                </details>
               )}
             </span>
           </li>

@@ -156,6 +156,7 @@ import type {
   StorageConfig,
   StorageMigration,
   StorageTestResult,
+  SuggestedAi,
   TaskOutput,
   Team,
   ThreadFilters,
@@ -502,9 +503,12 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       denyProposal: (orgId, messageId) =>
         request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}/deny`, { json: {} }),
       createProposed: (orgId, messageId) =>
-        request<{ agent: Agent; proposal: AgentProposal }>(`${org(orgId)}/agent-proposals/${enc(messageId)}/create`, {
-          json: {},
-        }),
+        request<{ agent: Agent; proposal: AgentProposal; ai: SuggestedAi["kind"] }>(
+          `${org(orgId)}/agent-proposals/${enc(messageId)}/create`,
+          {
+            json: {},
+          },
+        ),
       proposalRoutine: (orgId, messageId) =>
         request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}/routine`, { json: {} }),
       update: (orgId, agentId, input) =>

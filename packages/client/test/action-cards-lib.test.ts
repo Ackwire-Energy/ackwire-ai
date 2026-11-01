@@ -82,6 +82,7 @@ test("what a proposed agent gets, a line each: who gives what the viewer can't, 
     description: "Every day, at 12:00",
     report: "when_new" as const,
     access: "read" as const,
+    reportsIn: "ch-private",
   };
   const draft = {
     ...card().params.draft,
@@ -104,10 +105,14 @@ test("what a proposed agent gets, a line each: who gives what the viewer can't, 
     ["mail:mb-bia", null, { who: "person", userId: "u-bia" }],
     ["routine", null, null],
   ]);
-  // A member who isn't an admin: the channel and the app wait for one.
-  expect(at(proposalLines(open, { userId: "u-ana", admin: false })).slice(0, 2)).toEqual([
+  // A member who isn't an admin: the channel and the app wait for one, and so does the routine reporting in that
+  // channel; her own mailbox too (the mailbox API is an admin's), so the card promises nothing Criar can't give.
+  expect(at(proposalLines(open, { userId: "u-ana", admin: false }))).toEqual([
     ["channel:ch-private", null, { who: "admin" }],
     ["app:c-github", null, { who: "admin" }],
+    ["mail:mb-ana", null, { who: "person", userId: "u-ana" }],
+    ["mail:mb-bia", null, { who: "person", userId: "u-bia" }],
+    ["routine", null, { who: "admin" }],
   ]);
   expect(draftMailLevels(draft, "u-ana")).toEqual({ "mb-ana": "read" });
   // Created in one click by Ana: what it got takes a check, Bia's mailbox still waits for her.
@@ -124,6 +129,19 @@ test("what a proposed agent gets, a line each: who gives what the viewer can't, 
     ["mail:mb-ana", true, null],
     ["mail:mb-bia", false, { who: "person", userId: "u-bia" }],
     ["routine", true, null],
+  ]);
+  // Created by someone who couldn't put it in the channel: its routine wasn't made and waits for an admin.
+  const stuck = card({
+    params: { draft, why: "x" },
+    state: "created",
+    agentId: "a-caio",
+    applied: { channelIds: [], connectionIds: [], mailAccountIds: [] },
+    routineId: null,
+  });
+  expect(at(proposalLines(stuck, { userId: "u-ana", admin: true })).at(-1)).toEqual([
+    "routine",
+    false,
+    { who: "admin" },
   ]);
   // Created from the review: the card can't say what it got, so no line says it.
   const reviewed = card({ params: { draft, why: "x" }, state: "created", agentId: "a-caio" });

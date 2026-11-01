@@ -417,6 +417,14 @@ p {
 .waitcard__needs {
   color: var(--attention);
 }
+/* What each run of its routine is told, folded under its line. */
+.waitcard__prompt > summary {
+  cursor: pointer;
+}
+.waitcard__prompt > p {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+}
 /* Under the request card's well, on its 4px grid. */
 .rq > .waitcard__lines {
   margin-top: 12px;

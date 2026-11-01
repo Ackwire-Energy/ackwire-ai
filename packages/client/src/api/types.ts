@@ -615,6 +615,8 @@ export interface ProposedRoutine {
   description: string;
   report: RoutineReport;
   access: RoutineAccess;
+  /** The channel it reports in, which the agent must be in first (null: the creator's DM; absent on older cards). */
+  reportsIn?: string | null;
 }
 
 /** What "Criar" on the card gave the agent of its draft (ids); the rest waits for who may give it. */

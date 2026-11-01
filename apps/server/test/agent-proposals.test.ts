@@ -138,10 +138,13 @@ test("Criar on the card: the agent as proposed in one click, with its channel an
 
   const made = await api(`/agent-proposals/${card}/create`, { json: {} });
   expect(made.status).toBe(201);
-  const { agent, proposal } = (await made.json()) as {
+  const { agent, proposal, ai } = (await made.json()) as {
     agent: { id: string; name: string; handle: string; role: string };
     proposal: { state: string; agentId: string; applied: { channelIds: string[] }; routineId: string | null };
+    ai: string;
   };
+  // What it thinks with now, for the apps to open Connect when it is nothing.
+  expect(["account", "model", "none"]).toContain(ai);
   expect(agent).toMatchObject({ name: "Caio", handle: "caio", role: "E-mail" });
   // Its routine reports where it was asked: it joined that channel to do it.
   expect(proposal).toMatchObject({ state: "created", agentId: agent.id, applied: { channelIds: [channelId] } });

@@ -97,6 +97,8 @@ export interface ProposedRoutine {
   description: string;
   report: RoutineReport;
   access: RoutineAccess;
+  /** The channel it reports in, which the agent must be in first (null: the creator's DM; absent on older cards). */
+  reportsIn?: string | null;
 }
 
 /** What "Criar" on the card gave the agent of its draft (the rest waits for whoever may give it). */
@@ -325,7 +327,15 @@ async function checkRoutine(
     );
   }
   try {
-    checkFrequency({ triggerType: "schedule", rule: read.rule, cron: read.cron, timezone: read.timezone }, { type: "dm" });
+    checkFrequency(
+      {
+        triggerType: "schedule",
+        rule: read.rule as unknown as Record<string, unknown> | null,
+        cron: read.cron,
+        timezone: read.timezone,
+      },
+      { type: "dm" },
+    );
   } catch (error) {
     throw new ValidationError(
       `The routine's schedule: ${error instanceof Error ? error.message : String(error)}. Propose one at most that often.`,
@@ -419,7 +429,7 @@ export async function checkAgentDraft(
     channelIds,
     access: [...access].map(([connectionId, level]) => ({ connectionId, level })),
     mail: [...mail.values()],
-    routine,
+    routine: routine && { ...routine, reportsIn: offer.here?.id ?? null },
   };
 }
 
@@ -715,6 +725,8 @@ export async function createProposedAgent(deps: ProposedAgentDeps, userId: strin
   return {
     agent: (await getAgent(deps.db, orgId, agent.id)) ?? agent,
     proposal: view(found.message, card, found.proposedBy, true),
+    /** The AI it got, which the clicker's accounts decide (not the one suggested when it was proposed). */
+    ai: given.ai,
   };
 }
 
@@ -849,12 +861,14 @@ async function giveLines(deps: ProposedAgentDeps, userId: string, message: Messa
   };
   // Its AI: an account of this person's that thinks for no agent (a plan thinks only for its owner's agents).
   const ai = await suggestAgentAi(deps, orgId, userId);
-  if (ai.kind === "account") {
-    await attempt(async () => {
-      await setAgentComputerTarget(deps, userId, orgId, agent.id, ai.machineId);
-      await setAgentBrain(deps, userId, orgId, agent.id, { brain: ai.brain, account: ai.accountId });
-    });
-  }
+  const thinks =
+    ai.kind !== "account" ||
+    (
+      await attempt(async () => {
+        await setAgentComputerTarget(deps, userId, orgId, agent.id, ai.machineId);
+        await setAgentBrain(deps, userId, orgId, agent.id, { brain: ai.brain, account: ai.accountId });
+      })
+    ).ok;
   // Its channels, as the review puts them (an admin's): all of them or none.
   const joined =
     draft.channelIds.length > 0
@@ -954,6 +968,7 @@ async function giveLines(deps: ProposedAgentDeps, userId: string, message: Messa
     applied: { channelIds, connectionIds, mailAccountIds },
     routineId: routine?.ok ? routine.value.id : null,
     said,
+    ai: thinks ? ai.kind : ("none" as const),
   };
 }
 

@@ -555,6 +555,19 @@ export function useCreateProposedAgent(orgId: string) {
   });
 }
 
+/** The routine a proposal came with, once its agent is where it reports (the card's "Criar a rotina"). */
+export function useCreateProposedRoutine(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (messageId: string) => api.agents.proposalRoutine(orgId, messageId),
+    onSuccess: (proposal) => {
+      cacheAgentProposal(qc, orgId, proposal, proposal);
+      void qc.invalidateQueries({ queryKey: keys.routines(orgId) });
+    },
+  });
+}
+
 /** "Recusar" on an agent's proposal: the card shows it at once. */
 export function useDenyAgentProposal(orgId: string) {
   const api = useApi();

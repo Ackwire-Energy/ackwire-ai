@@ -156,6 +156,8 @@ function fakePlanAccount(money: boolean): PlanAccountUsage {
 
 export interface FakeState {
   me: Me | null;
+  /** What a one-click proposed agent thinks with (default: what its draft suggested). */
+  proposalAi?: "account" | "model" | "none";
   /** Overrides `account.authConfig` (default: GitHub only, sign-up open). */
   authConfig?: Partial<AuthConfig>;
   /** Overrides `account.signInOptions` (default: no account, sign-up allowed). */
@@ -1743,7 +1745,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           },
           routineId: draft.routine ? id("routine") : null,
         });
-        return { agent: { ...agent }, proposal: proposalView(messageId) };
+        return { agent: { ...agent }, proposal: proposalView(messageId), ai: state.proposalAi ?? draft.ai.kind };
       },
       proposalRoutine: async (orgId, messageId) => {
         log("agents.proposalRoutine", orgId, messageId);

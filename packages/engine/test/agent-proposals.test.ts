@@ -550,6 +550,7 @@ describe("one request, one card: channels, mailboxes and a routine", () => {
     const id = (out.data as { agentProposal: { messageId: string } }).agentProposal.messageId;
     // Its routine reports here: #private comes with it.
     expect((await cardOf(f, id)).params.draft.channelIds).toEqual([priv.id]);
+    expect((await cardOf(f, id)).params.draft.routine?.reportsIn).toBe(priv.id);
 
     const events = f.listen(priv.id);
     const made = await createProposedAgent(

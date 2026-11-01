@@ -238,8 +238,13 @@ describe("one request, one card: what it gets, created in one click", () => {
       },
       minute,
     );
+  // A line's own text (the routine's folded prompt apart).
   const lines = (card: HTMLElement) =>
-    [...card.querySelectorAll(".waitcard__lines > li")].map((li) => li.textContent?.replace(/\s+/g, " ").trim());
+    [...card.querySelectorAll(".waitcard__lines > li")].map((li) => {
+      const line = li.cloneNode(true) as HTMLElement;
+      line.querySelector(".waitcard__prompt")?.remove();
+      return line.textContent?.replace(/\s+/g, " ").trim();
+    });
 
   test("each line, with who gives it when I can't; Criar makes it as it is and the card says what it got", async () => {
     const state = seedState();
@@ -253,8 +258,10 @@ describe("one request, one card: what it gets, created in one click", () => {
       "GitHub · só consulta",
       "walter@acme.com.br · só consulta",
       "joao@acme.com.br · consulta e muda · só João libera",
-      "E-mails do dia · Todos os dias, às 12:00 (horário de Brasília)",
+      "E-mails do dia · Todos os dias, às 12:00 (horário de Brasília) · Só olhar e contar",
     ]);
+    // What each run is told, folded under its line: one click makes it under my name.
+    expect(card.querySelector(".waitcard__prompt")?.textContent).toContain(ROUTINE.prompt);
     await click(within(card).getByRole("button", { name: "Criar Nina" }), 8);
     expect(state.calls.find((c) => c.method === "agents.createProposed")?.args).toEqual([ORG_ID, "p-1"]);
     expect(state.calls.some((c) => c.method === "agents.create")).toBe(false);
@@ -266,6 +273,53 @@ describe("one request, one card: what it gets, created in one click", () => {
     const given = [...made.querySelectorAll(".waitcard__lines > li")].map((li) => li.getAttribute("data-given"));
     expect(given).toEqual(["true", "true", "true", "false", "true"]);
     expect(lines(made)[3]).toBe("joao@acme.com.br · consulta e muda · só João libera");
+  });
+
+  test("a routine one click couldn't make waits for an admin, and its card makes it once the agent can report", async () => {
+    const state = seedState();
+    state.messages.push(
+      proposal(
+        "p-1",
+        {
+          state: "created",
+          agentId: ATLAS_ID,
+          decidedByUserId: "u-walter",
+          applied: { channelIds: [], connectionIds: [], mailAccountIds: [] },
+          routineId: null,
+        },
+        { routine: { ...ROUTINE, reportsIn: ENG_ID } },
+      ),
+    );
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(6);
+    const [card] = cardOf("@nina");
+    if (!card) throw new Error("no card");
+    expect(lines(card).at(-1)).toBe(
+      "E-mails do dia · Todos os dias, às 12:00 (horário de Brasília) · Só olhar e contar · um admin libera · não criada",
+    );
+    await click(within(card).getByRole("button", { name: "Criar a rotina E-mails do dia" }), 6);
+    expect(state.calls.find((c) => c.method === "agents.proposalRoutine")?.args).toEqual([ORG_ID, "p-1"]);
+    const [made] = cardOf("@nina");
+    expect(within(made as HTMLElement).queryByRole("button", { name: "Criar a rotina E-mails do dia" })).toBeNull();
+  });
+
+  test("Criar opens Connect when the agent got nothing to think with, whatever the card suggested", async () => {
+    const state = seedState();
+    state.messages.push(
+      proposal(
+        "p-1",
+        {},
+        { ai: { kind: "account", brain: "claude_code", machineId: "m-1", accountId: "a-1", label: "Claude Max" } },
+      ),
+    );
+    // The asker's plan, but whoever clicks has no account of their own free.
+    state.proposalAi = "none";
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(6);
+    const [card] = cardOf("@nina");
+    if (!card) throw new Error("no card");
+    await click(within(card).getByRole("button", { name: "Criar Nina" }), 8);
+    expect(screen().getByRole("dialog", { name: /Conectar uma IA/ })).toBeTruthy();
   });
 
   test("Revisar, then Criar: the dialog closes on the conversation as it was, and the routine is made", async () => {

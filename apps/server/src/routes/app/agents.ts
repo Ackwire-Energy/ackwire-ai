@@ -186,6 +186,9 @@ const AgentProposal = z
             description: z.string(),
             report: z.enum(["always", "when_new"]),
             access: z.enum(["read", "act"]),
+            reportsIn: z.uuid().nullable().optional().openapi({
+              description: "The channel it reports in, which the agent must be in first (null: the creator's DM).",
+            }),
           })
           .nullable()
           .optional()
@@ -639,7 +642,19 @@ export function agentRoutes(deps: AppDeps) {
       description:
         "The agent from the draft, owned by whoever creates it, with each line they may give it: its AI (an account of theirs), its channels, its access to the connected apps (an admin's), the mailboxes (only their owner's) and its routine. The card (`applied`, `routineId`) says what it got; the agent that proposed it is told what waits for whom.",
       request: { params: ProposalParams },
-      responses: { 201: json(z.object({ agent: Agent, proposal: AgentProposal }), "Created"), ...errors },
+      responses: {
+        201: json(
+          z.object({
+            agent: Agent,
+            proposal: AgentProposal,
+            ai: z.enum(["account", "model", "none"]).openapi({
+              description: "What it thinks with now (the clicker's account, the workspace's model or nothing yet).",
+            }),
+          }),
+          "Created",
+        ),
+        ...errors,
+      },
     }),
     async (c) => {
       const { orgId, messageId } = c.req.valid("param");
@@ -648,7 +663,11 @@ export function agentRoutes(deps: AppDeps) {
       const made = await createProposedAgent({ db, pubsub: adapters.pubsub, gateway }, userId, orgId, messageId);
       if (made.agent.machineId) await publishMachineAgentsChanged(adapters.pubsub, orgId);
       return c.json(
-        { agent: toAgent(made.agent, userId, await canViewCost(db, userId, orgId)), proposal: made.proposal },
+        {
+          agent: toAgent(made.agent, userId, await canViewCost(db, userId, orgId)),
+          proposal: made.proposal,
+          ai: made.ai,
+        },
         201,
       );
     },

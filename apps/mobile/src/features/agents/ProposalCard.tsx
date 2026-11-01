@@ -5,6 +5,7 @@ import {
   useChannels,
   useConnections,
   useCreateProposedAgent,
+  useCreateProposedRoutine,
   useCustomServers,
   useDenyAgentProposal,
 } from "@agenteschat/client";
@@ -13,6 +14,8 @@ import {
   type ProposalLine,
   proposalLines,
   proposalStatus,
+  routineAccessText,
+  routineLeft,
   suggestedAiText,
 } from "@agenteschat/client/lib/action-cards";
 import { connectedItems, itemName } from "@agenteschat/client/lib/connected";
@@ -44,6 +47,7 @@ export function ProposalCard({ message: m }: { message: Message }) {
   const dir = useDirectory();
   const { colors } = useTheme();
   const create = useCreateProposedAgent(orgId);
+  const makeRoutine = useCreateProposedRoutine(orgId);
   const deny = useDenyAgentProposal(orgId);
   const failed = useFailed();
   const asks = useAskStore();
@@ -101,10 +105,11 @@ export function ProposalCard({ message: m }: { message: Message }) {
                       disabled={busy}
                       onPress={() =>
                         create.mutate(m.id, {
-                          onSuccess: ({ agent }) => {
+                          onSuccess: ({ agent, ai }) => {
                             asks?.settle(m.id);
-                            // Nothing to think with yet: it is created all the same, and Connect opens for it here.
-                            if (draft.ai.kind === "none") openConnectAi({ agentId: agent.id });
+                            // Nothing to think with yet (the tapper's accounts decide, not the suggestion): it is
+                            // created all the same, and Connect opens for it here.
+                            if (ai === "none") openConnectAi({ agentId: agent.id });
                           },
                           onError: failed,
                         })
@@ -183,6 +188,16 @@ export function ProposalCard({ message: m }: { message: Message }) {
             onPress={() => router.push(`/agent/${encodeURIComponent(card.agentId ?? "")}` as never)}
           />
         ) : null}
+        {routineLeft(card) && (card.decidedByUserId === meId || can(org, "manage_routines")) ? (
+          // Not made with it (the agent wasn't where it reports yet): made from here once it is.
+          <Button
+            variant="secondary"
+            size="sm"
+            label={t("newAgent.routineKeep", { name: draft.routine?.name })}
+            disabled={makeRoutine.isPending}
+            onPress={() => makeRoutine.mutate(m.id, { onError: failed })}
+          />
+        ) : null}
       </View>
     </View>
   );
@@ -224,7 +239,10 @@ function Lines({ lines, draft }: { lines: ProposalLine[]; draft: AgentDraft }) {
     const routine = draft.routine;
     return {
       icon: <Icon name="clock" size={14} color={colors.muted} />,
-      text: routine ? `${routine.name} · ${proposedRoutineWhen(t, i18n.language, routine)}` : l.id,
+      // What it may do on its own shows: one tap makes it under the tapper's name.
+      text: routine
+        ? [routine.name, proposedRoutineWhen(t, i18n.language, routine), routineAccessText(t, routine)].join(" · ")
+        : l.id,
     };
   };
   const needs = (l: ProposalLine) =>
@@ -239,14 +257,26 @@ function Lines({ lines, draft }: { lines: ProposalLine[]; draft: AgentDraft }) {
     <View style={styles.lines} accessibilityLabel={t("actionCard.agentProposal.lines", { name: draft.name })}>
       {lines.map((l) => {
         const { icon, text } = shown(l);
-        const who = l.kind === "routine" && l.given === false ? t("actionCard.agentProposal.routineNotMade") : needs(l);
+        const who = [
+          l.kind === "routine" && l.given === false ? t("actionCard.agentProposal.routineNotMade") : null,
+          needs(l),
+        ]
+          .filter(Boolean)
+          .join(" · ");
         return (
           <View key={l.key} style={styles.line}>
             <View style={styles.mark}>{l.given ? <Icon name="check" size={14} color={colors.success} /> : icon}</View>
-            <Text variant="footnote" tone="ink2" style={styles.fill}>
-              {text}
-              {who ? <Text style={{ color: colors.attention }}>{` · ${who}`}</Text> : null}
-            </Text>
+            <View style={styles.fill}>
+              <Text variant="footnote" tone="ink2">
+                {text}
+                {who ? <Text style={{ color: colors.attention }}>{` · ${who}`}</Text> : null}
+              </Text>
+              {l.kind === "routine" && draft.routine ? (
+                <Text variant="footnote" tone="muted" numberOfLines={2}>
+                  {draft.routine.prompt}
+                </Text>
+              ) : null}
+            </View>
           </View>
         );
       })}
