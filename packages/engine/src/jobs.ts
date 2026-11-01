@@ -26,6 +26,7 @@ import { forgetCodeEmail } from "./email-codes";
 import { type DecidedBy, publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
 import { FOLLOW_UP_JOB, wakeFollowUp } from "./follow-through";
+import { cutText } from "./format";
 import { advanceForumTopic } from "./forum";
 import { FILE_JOIN_REQUEST_JOB, fileJoinRequest } from "./invite-requests";
 import type { JevKey, JevKeySource } from "./jev-key";
@@ -307,7 +308,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     if (!row) return null;
     return {
       from: row.authorType === "person" ? "a person" : row.handle ? `@${row.handle}` : "an agent",
-      text: row.body.slice(0, 1000),
+      text: cutText(row.body, 1000),
     };
   }
 

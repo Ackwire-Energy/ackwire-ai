@@ -10,7 +10,7 @@ import {
   stepIndex,
 } from "@agenteschat/client/lib/onboarding";
 import { platformZoneName } from "@agenteschat/client/lib/routines";
-import { handleFrom, isEmail } from "@agenteschat/client/lib/text";
+import { handleFrom } from "@agenteschat/client/lib/text";
 import type { AgentColorName, EyeStyle } from "@agenteschat/ui/agent/engine";
 import type { TFunction } from "i18next";
 import { joinNames } from "../shared/logic";
@@ -291,22 +291,8 @@ export const prevStep = (step: StepId): StepId | null => {
   return i > 0 && step !== "done" ? (STEPS[i - 1] ?? null) : null;
 };
 
-/**
- * E-mails typed or pasted ("rafael@acme.com, bia@acme.com"): lower-cased, without repeats, the ones that look
- * wrong kept apart (marked, not invited).
- */
-export function emailsFrom(text: string, already: string[] = []): { valid: string[]; invalid: string[] } {
-  const seen = new Set(already.map((e) => e.toLowerCase()));
-  const valid: string[] = [];
-  const invalid: string[] = [];
-  for (const raw of text.split(/[\s,;]+/)) {
-    const email = raw.trim().replace(/^<|>$/g, "").toLowerCase();
-    if (!email || seen.has(email)) continue;
-    seen.add(email);
-    (isEmail(email) ? valid : invalid).push(email);
-  }
-  return { valid, invalid };
-}
+/** E-mails typed or pasted, the ones that look wrong kept apart (marked, not invited): the shared reader. */
+export { emailsFrom } from "@agenteschat/client/lib/text";
 
 /** The phone's time zone ("America/Sao_Paulo"), or null. */
 export function phoneTimezone(): string | null {

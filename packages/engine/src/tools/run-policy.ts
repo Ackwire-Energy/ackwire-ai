@@ -1,4 +1,5 @@
 import type { RunAuthority } from "../authority";
+import { cutText } from "../format";
 import { directoryRole } from "./directory";
 import type { JsonSchema } from "./json-schema";
 import type { ToolDefinition } from "./types";
@@ -331,9 +332,9 @@ export function takeWhy(
 ): { why: string | null; input: Record<string, unknown> } {
   if (ownsWhy(schema)) {
     const own = typeof input.why === "string" ? input.why.trim() : "";
-    return { why: own.length >= WHY_MIN_CHARS ? own.slice(0, WHY_MAX_CHARS) : null, input };
+    return { why: own.length >= WHY_MIN_CHARS ? cutText(own, WHY_MAX_CHARS) : null, input };
   }
   const { why, ...rest } = input;
   const text = typeof why === "string" ? why.trim() : "";
-  return { why: text.length >= WHY_MIN_CHARS ? text.slice(0, WHY_MAX_CHARS) : null, input: rest };
+  return { why: text.length >= WHY_MIN_CHARS ? cutText(text, WHY_MAX_CHARS) : null, input: rest };
 }

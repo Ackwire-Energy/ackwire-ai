@@ -119,6 +119,10 @@ function AppStack() {
       <Stack.Screen name="me/zone" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/workspaces" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/members" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="invite-people" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="invite-channels" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="invite-note" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="suggest-person" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/notifications" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/sounds" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/appearance" options={{ ...pushed, ...scrollUnder }} />

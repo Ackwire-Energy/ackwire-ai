@@ -1,5 +1,5 @@
 {
-  "id": "ceb88d08-83eb-4007-9b30-b73a4f547497",
+  "id": "fd191436-7816-49cc-a3c2-d57fa82a5dda",
   "prevId": "7370c9c5-68b3-4e46-b77d-1f97637b0b87",
   "version": "7",
   "dialect": "postgresql",
@@ -216,13 +216,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "media_replies": {
-          "name": "media_replies",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
         },
         "context_tokens": {
           "name": "context_tokens",
@@ -525,34 +518,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'{}'::jsonb"
-        },
-        "gifs": {
-          "name": "gifs",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "gif_rating": {
-          "name": "gif_rating",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'g'"
-        },
-        "agent_stickers": {
-          "name": "agent_stickers",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "agent_media": {
-          "name": "agent_media",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'sometimes'"
         },
         "updated_at": {
           "name": "updated_at",
@@ -3825,6 +3790,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "proposed_by_agent_id": {
+          "name": "proposed_by_agent_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "base_hash": {
           "name": "base_hash",
           "type": "text",
@@ -3842,6 +3813,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "access": {
+          "name": "access",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         },
         "rationale": {
           "name": "rationale",
@@ -3919,6 +3896,19 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "context_proposals_proposed_by_agent_id_agents_id_fk": {
+          "name": "context_proposals_proposed_by_agent_id_agents_id_fk",
+          "tableFrom": "context_proposals",
+          "tableTo": "agents",
+          "columnsFrom": [
+            "proposed_by_agent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         },
         "context_proposals_decided_by_user_id_users_id_fk": {
@@ -18582,7 +18572,9 @@
       "schema": "public",
       "values": [
         "agent_instructions",
-        "org_context"
+        "org_context",
+        "agent_role",
+        "agent_access"
       ]
     },
     "public.context_trust": {

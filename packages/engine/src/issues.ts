@@ -21,6 +21,7 @@ import { runAuthorityById } from "./authority";
 import { openDm } from "./dms";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishOrgEvent } from "./events";
+import { cutText } from "./format";
 import { boardColumns, columnForMove, columnOf, topRank } from "./issue-columns";
 import type { IssueWorkMeta } from "./issue-work";
 import { getMessage, insertMessage, messageView } from "./messages";
@@ -910,9 +911,9 @@ export async function setCriterion(
     await addActivity(tx, updated, {
       kind: "event",
       author: actorOf(actor),
-      text: `${done ? "checked" : "unchecked"} the criterion "${criterion.text.slice(0, 80)}"`,
+      text: `${done ? "checked" : "unchecked"} the criterion "${cutText(criterion.text, 80)}"`,
       event: "criterion_checked",
-      data: { criterionId, done, text: criterion.text.slice(0, 80) },
+      data: { criterionId, done, text: cutText(criterion.text, 80) },
     });
     return updated;
   });

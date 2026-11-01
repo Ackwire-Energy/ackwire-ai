@@ -89,6 +89,8 @@ export function subtitleOf(n: AppNotification, say: SayWords, mediaWord?: (kind:
   const media = mediaKindOf(l.media);
   const word = media && mediaWord ? mediaWord(media) : "";
   if (n.kind === "reaction") return l.quote || word;
+  // Its title already names who joined (ADR 0090): `latest.title` would say it twice.
+  if (n.kind === "invitation_accepted") return "";
   const reason = routineNotificationWords(n);
   if (reason) return say(reason, l.text ?? "");
   if (n.kind === "approval") {
@@ -147,10 +149,13 @@ export function joinRequestLine(
   n: Pick<AppNotification, "count" | "latest">,
 ): { text: string; faces: string[] } {
   const asked = askersOf(n);
+  // A member's suggestion says who suggested it (ADR 0090).
   const text =
     asked.total > 1
       ? t("notifications.wait.joinRequestNames", { names: namesText(t, asked.names, 2, asked.total) })
-      : t("notifications.wait.joinRequest", { count: 1, name: asked.names[0] });
+      : n.latest.suggestedBy
+        ? t("notifications.wait.joinSuggestion", { by: n.latest.suggestedBy, name: asked.names[0] })
+        : t("notifications.wait.joinRequest", { count: 1, name: asked.names[0] });
   return { text, faces: asked.names.slice(0, 2) };
 }
 

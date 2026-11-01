@@ -296,7 +296,7 @@ describe("HTTP client: management (phase 4)", () => {
     expect(calls[5]?.init.body).toBe('{"emails":["a@x.com"],"roleIds":[]}');
   });
 
-  test("credentials rotate/purge/platform, agent detail, channels, runs, roster, channel update", async () => {
+  test("credentials rotate/purge/platform, agent detail, channels, runs, roster, channel update, auto-reply", async () => {
     const { fetch, calls } = fakeFetch({
       [`POST ${org}/credentials/k/rotate`]: { status: 200, body: { id: "k", keyHint: "9999" } },
       [`DELETE ${org}/credentials/k?purge=true`]: { status: 204 },
@@ -310,6 +310,7 @@ describe("HTTP client: management (phase 4)", () => {
       [`${org}/runs/r1`]: { status: 200, body: { run: { id: "r1" }, steps: [] } },
       [`${org}/channels/c1/roster`]: { status: 200, body: { members: [{ type: "agent", id: "a1", autoReply: true }] } },
       [`PATCH ${org}/channels/c1`]: { status: 200, body: { id: "c1", topic: "novo" } },
+      [`PATCH ${org}/channels/c1/members/agents/a1`]: { status: 204 },
     });
     const api = createHttpApi({ fetch });
     expect((await api.agents.rotateCredential("o1", "k", { apiKey: "sk-ant-9999" })).keyHint).toBe("9999");
@@ -321,8 +322,10 @@ describe("HTTP client: management (phase 4)", () => {
     expect((await api.agents.run("o1", "r1")).steps).toEqual([]);
     expect((await api.chat.roster("o1", "c1"))[0]?.autoReply).toBe(true);
     expect((await api.chat.update("o1", "c1", { topic: "novo" })).topic).toBe("novo");
+    await api.chat.setAutoReply("o1", "c1", "a1", false);
     expect(calls[1]?.init.method).toBe("DELETE");
     expect(calls[4]?.init.body).toBe('{"channels":[{"channelId":"c1"}]}');
+    expect(calls[9]?.init.body).toBe('{"autoReply":false}');
   });
 });
 

@@ -26,11 +26,12 @@ export function receiptIcon(view: ReceiptView): IconName {
   return "check";
 }
 
-/** A rule's line leads with what it follows: the reply, the one person with the agent, the talk. */
+/** A rule's line leads with what it follows: the reply, the one person with the agent, the talk, the coordinator. */
 const RULE_ICON: Record<Extract<DecidedBy, { step: "rule" }>["rule"], IconName> = {
   reply: "reply",
   only_agent: "person",
   follow_up: "thread",
+  coordinator: "flag",
 };
 
 /** A dot and the action after it: one piece, which wraps whole. */

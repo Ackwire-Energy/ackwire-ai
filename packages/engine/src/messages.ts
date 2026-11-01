@@ -27,6 +27,7 @@ import {
   publishMessageCreated,
   publishUserEvent,
 } from "./events";
+import { cutText } from "./format";
 import { type Judge, personMentionAddressees } from "./judge";
 import { PLATFORM_CAP } from "./limits";
 import { isMediaAfterReply, isStickerMood, type MessageMedia, mediaOf, mediaSettings, type StickerMood } from "./media";
@@ -129,7 +130,7 @@ export function replyExcerpt(body: string, max = REPLY_EXCERPT_LENGTH): string {
     .replace(/```[\w+-]*/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  return line.length > max ? `${line.slice(0, max - 1).trimEnd()}…` : line;
+  return line.length > max ? `${cutText(line, max - 1).trimEnd()}…` : line;
 }
 
 /** Files a person may attach to one message. */

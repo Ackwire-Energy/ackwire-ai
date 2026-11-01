@@ -230,7 +230,7 @@ export async function setup(
     label: "main",
     apiKey: "sk-ant-test-key-1234",
   });
-  const agent = await createAgent(
+  const first = await createAgent(
     db,
     owner.id,
     org.id,
@@ -244,6 +244,9 @@ export async function setup(
     },
     { model: "claude-sonnet-5-5" },
   );
+  // The first agent coordinates its team (ADR 0093); here nobody does, and the tests about it pick one themselves.
+  await db.update(schema.agents).set({ coordinator: false }).where(eq(schema.agents.id, first.id));
+  const agent = { ...first, coordinator: false };
   // New agents get their computer by default; tests that use it grant it themselves.
   await db
     .delete(schema.agentScopes)

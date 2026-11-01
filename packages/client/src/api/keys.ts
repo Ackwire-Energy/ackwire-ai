@@ -16,6 +16,7 @@ export const keys = {
   webPushKey: ["push", "web-key"] as const,
   models: ["models"] as const,
   invitation: (token: string) => ["invitation", token] as const,
+  invitationState: (token: string) => ["invitation", token, "state"] as const,
   org: (orgId: string) => ["org", orgId] as const,
   members: (orgId: string) => ["org", orgId, "members"] as const,
   /** The workspace's roles (ADR 0085). */
@@ -76,6 +77,7 @@ export const keys = {
   allInvitations: (orgId: string) => ["org", orgId, "invitations", "all"] as const,
   /** Under `invitations`: an approval (which may invite) refreshes the pending list too. */
   joinRequests: (orgId: string) => ["org", orgId, "invitations", "join-requests"] as const,
+  mySuggestions: (orgId: string) => ["org", orgId, "invitations", "suggestions"] as const,
   inviteLinks: (orgId: string) => ["org", orgId, "invitations", "links"] as const,
   usageReport: (orgId: string) => ["org", orgId, "usage-report"] as const,
   audit: (orgId: string, query: object) => ["org", orgId, "audit", query] as const,
@@ -89,6 +91,8 @@ export const keys = {
   memoryAboutMe: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "memory", "me"] as const,
   agentForYou: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "for-you"] as const,
   proposals: (orgId: string) => ["org", orgId, "proposals"] as const,
+  /** A chat card's rows (under `proposals`: deciding any refreshes it too). */
+  cardProposals: (orgId: string, ids: string[]) => ["org", orgId, "proposals", "card", ids.join(",")] as const,
   dms: (orgId: string) => ["org", orgId, "dms"] as const,
   dmReads: (orgId: string, channelId: string) => ["org", orgId, "dmReads", channelId] as const,
   storage: (orgId: string) => ["org", orgId, "storage"] as const,

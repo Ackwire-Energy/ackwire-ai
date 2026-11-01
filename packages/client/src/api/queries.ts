@@ -74,6 +74,7 @@ import type {
   ForumTopicInput,
   GifCategory,
   GifKey,
+  InviteBatch,
   IssueColumn,
   IssueInput,
   IssuePatch,
@@ -94,6 +95,7 @@ import type {
   NotificationFilter,
   OrgRoles,
   Person,
+  Proposal,
   ReactionCount,
   ReminderInput,
   Role,
@@ -144,6 +146,13 @@ export const channelsQuery = (api: ApiClient, orgId: string) =>
 /** An invitation's preview (its page, and the sign-in that leads to it). */
 export const invitationQuery = (api: ApiClient, token: string) =>
   queryOptions({ queryKey: keys.invitation(token), queryFn: () => api.orgs.previewInvitation(token), retry: false });
+/** An email invitation that no longer opens: accepted or expired (ADR 0090). */
+export const invitationStateQuery = (api: ApiClient, token: string) =>
+  queryOptions({
+    queryKey: keys.invitationState(token),
+    queryFn: () => api.orgs.invitationState(token),
+    retry: false,
+  });
 
 // ── Account ─────────────────────────────────────────────────────────────────
 
@@ -1572,8 +1581,58 @@ export function useInviteMany(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { emails: string[]; roleIds?: string[] }) => api.orgs.inviteMany(orgId, input),
+    mutationFn: (input: InviteBatch) => api.orgs.inviteMany(orgId, input),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
+  });
+}
+
+/** The roles a pending invitation gives (ADR 0090): the same link, nothing is sent. */
+export function useSetInvitationRoles(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; roleIds: string[] }) =>
+      api.orgs.setInvitationRoles(orgId, input.id, input.roleIds),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
+  });
+}
+
+/** 30 more days for the same link (ADR 0090). */
+export function useRenewInviteLink(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (linkId: string) => api.invites.renewLink(orgId, linkId),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.inviteLinks(orgId) }),
+  });
+}
+
+/** A member's suggestions that still wait (ADR 0090). */
+export const useMySuggestions = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.mySuggestions(orgId), queryFn: () => api.joinRequests.mine(orgId), enabled });
+};
+
+/**
+ * A member suggests someone to the people who may invite (ADR 0090). Its refusals are about the person suggested
+ * (`join.member`: they're in already), so the screen says them in its own words, never the generic toast's.
+ */
+export function useSuggestPerson(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { email: string; note?: string }) => api.joinRequests.suggest(orgId, input),
+    meta: { silent: true },
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
+  });
+}
+
+export function useCancelSuggestion(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.joinRequests.cancel(orgId, id),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
   });
 }
 
@@ -2114,6 +2173,36 @@ export const useProposals = (orgId: string) => {
   return useQuery({ queryKey: keys.proposals(orgId), queryFn: () => api.proposals.list(orgId) });
 };
 
+/**
+ * A proposal card's rows, in the card's order, read by id: the list only holds the newest, and a card stays whole
+ * however many came after it. (A server without `ids` sends the list: the card's rows are picked from it.)
+ */
+export function useCardProposals(orgId: string, ids: string[]) {
+  const api = useApi();
+  const query = useQuery({
+    queryKey: keys.cardProposals(orgId, ids),
+    queryFn: () => api.proposals.list(orgId, { ids }),
+  });
+  return (query.data ?? []).filter((p) => ids.includes(p.id)).sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+}
+
+/**
+ * What accepted proposals changed on their agents' pages, wherever they were accepted: the instructions and role
+ * (profile card, hero, team), and the apps (the Access tab and the matrix).
+ */
+function refreshAccepted(qc: QueryClient, orgId: string, decided: Proposal[]) {
+  const accepted = decided.filter((p) => p.status === "accepted" && p.target.type !== "org_context");
+  if (accepted.length === 0) return;
+  void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+  void qc.invalidateQueries({ queryKey: keys.team(orgId) });
+  for (const p of accepted) {
+    void qc.invalidateQueries({ queryKey: keys.agentDetail(orgId, p.agentId) });
+    if (p.target.type === "agent_access") void qc.invalidateQueries({ queryKey: keys.scopes(orgId, p.agentId) });
+  }
+  if (accepted.some((p) => p.target.type === "agent_access"))
+    void qc.invalidateQueries({ queryKey: keys.access(orgId) });
+}
+
 export function useDecideProposal(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
@@ -2124,6 +2213,35 @@ export function useDecideProposal(orgId: string) {
         : api.proposals.refuse(orgId, input.id),
     // The page explains a stale proposal (409) itself.
     meta: { silent: true },
+    onSuccess: (row) => refreshAccepted(qc, orgId, [row]),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.proposals(orgId) }),
+  });
+}
+
+/**
+ * A card's rows accepted or refused at once: one request per row, so each applies on its own and a stale one
+ * never stops the rest, then one refresh. Resolves with the rows decided and the ones that failed and why.
+ */
+export function useDecideProposals(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { ids: string[]; decision: "accept" | "refuse" }) => {
+      const decided: Proposal[] = [];
+      const failed: { id: string; error: unknown }[] = [];
+      for (const id of input.ids) {
+        try {
+          decided.push(
+            await (input.decision === "accept" ? api.proposals.accept(orgId, id) : api.proposals.refuse(orgId, id)),
+          );
+        } catch (error) {
+          failed.push({ id, error });
+        }
+      }
+      return { decided, failed };
+    },
+    meta: { silent: true },
+    onSuccess: ({ decided }) => refreshAccepted(qc, orgId, decided),
     onSettled: () => qc.invalidateQueries({ queryKey: keys.proposals(orgId) }),
   });
 }

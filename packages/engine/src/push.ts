@@ -360,6 +360,7 @@ export async function deliverPush(
     title: latest.title,
     text: latest.text,
     media: await sentMediaOf(db, row.orgId, row.kind, source, latest),
+    suggestedBy: latest.suggestedBy ?? null,
     highRisk,
     routine: latest.origin?.kind === "routine" ? latest.origin.routineName : null,
     screen: source.screen ?? null,
