@@ -75,7 +75,7 @@ test("process observation uses kernel UIDs, ignores zombies and exits, and refus
   mkdirSync(path.join(root, "3"));
   writeFileSync(path.join(root, "3", "status"), "State:\tZ (zombie)\n");
   mkdirSync(path.join(root, "4")); // exited after listing
-  expect(readNetworkProcesses(root)).toEqual([
+  expect(readNetworkProcesses(root)?.sort((a, b) => a.pid - b.pid)).toEqual([
     { pid: 1, ppid: 0, uids: [0, 0, 0, 0] },
     { pid: 2, ppid: 1, uids: [21000, 21000, 21000, 21000] },
   ]);

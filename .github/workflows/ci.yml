@@ -204,7 +204,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.shared == 'true' || needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -221,9 +221,9 @@ jobs:
       - *setup-bun
       - *cache-bun
       - *install
-      # About 9 minutes for shard 1 and 7 for shard 2 on a private-repo runner (2026-10-20), and growing.
+      # Shard 2 took 1198 seconds on 2026-11-01; keep headroom without reducing coverage.
       - name: Test
-        timeout-minutes: 20
+        timeout-minutes: 25
         run: bun test ${{ matrix.paths }} 2>&1 | tee test.log
       - &keep-test-errors
         name: Keep errors
