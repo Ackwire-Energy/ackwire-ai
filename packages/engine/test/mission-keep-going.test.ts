@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { and, eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
+  answerQuestion,
   createMission,
   drainOutbox,
   getMission,
@@ -182,6 +183,7 @@ describe("a mission keeps going between people's messages", () => {
             ],
           };
         }
+        if (last.includes("leitura-de-teste")) return { chunks: ["Recebi, sigo com o relatório."] };
         if (last.includes("tool_result")) return { chunks: [""] };
         if (last.includes("PLAN MODE"))
           return { chunks: [], toolUses: [{ name: "update_plan", input: { items: PLAN } }] };
@@ -213,6 +215,18 @@ describe("a mission keeps going between people's messages", () => {
       .where(eq(schema.agentRuns.id, question?.runId as string));
     expect(runs[0]?.status).toBe("waiting_input");
     expect(await keepGoingBlocker(f.db, await missionRow())).toBe("run_active");
+
+    // Answered: the same run goes on and ends; the old turn's "waiting" no longer holds the mission.
+    await answerQuestion({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, question?.id ?? "", {
+      text: "leitura-de-teste",
+    });
+    await drainOutbox(f.db, f.handlers);
+    const [resumed] = await f.db
+      .select()
+      .from(schema.agentRuns)
+      .where(eq(schema.agentRuns.id, question?.runId as string));
+    expect(resumed?.status).toBe("done");
+    expect(await keepGoingBlocker(f.db, await missionRow())).toBeNull();
   });
 });
 

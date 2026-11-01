@@ -1194,6 +1194,9 @@ async function executeRunInner(
     // Someone decided or answered what it waited on: it answers them now, it can't pass anymore.
     transcript.answerOwed = true;
     transcript.decided = decided.join("\n");
+    // A new turn: what it ends with is judged again, and the last turn's verdict no longer holds a mission.
+    delete transcript.followThroughChecked;
+    delete transcript.followThroughVerdict;
     // As a person's message does (`oweAnswer`): what they decided may be what it lacked, unless it is already ending.
     if (byPerson && transcript.stuck?.endAt === undefined) delete transcript.stuck;
     delete transcript.pending;
@@ -1298,6 +1301,9 @@ async function executeRunInner(
     const person = await lastPersonAmong(db, run.orgId, run.agentId, ids);
     if (!person) return false;
     t.answerOwed = true;
+    // A new turn for them: its ending is judged again, and the last verdict no longer holds a mission.
+    delete t.followThroughChecked;
+    delete t.followThroughVerdict;
     // What they wrote may be what it lacked: its repetition so far no longer counts, unless it is already ending.
     if (t.stuck?.endAt === undefined) delete t.stuck;
     if (!run.background && !t.steeredBy) {
