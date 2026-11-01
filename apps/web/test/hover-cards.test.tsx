@@ -3,9 +3,9 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { HOVER_CLOSE_MS } from "@agenteschat/ui";
-import { box, mouse, place, tick } from "@agenteschat/ui/testing";
-import { cleanup, within } from "@testing-library/react";
+import { HOVER_CLOSE_MS, HOVER_SWITCH_MS } from "@agenteschat/ui";
+import { box, mouse, place, step, tick } from "@agenteschat/ui/testing";
+import { cleanup, fireEvent, within } from "@testing-library/react";
 import { MEMBERS_OPEN_MS } from "@/components/ChannelMembers";
 import { HOVER_OPEN_MS } from "@/components/ProfileCard";
 import { createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
@@ -100,14 +100,56 @@ describe("the profile card opened on hover", () => {
     expect(shown()).toEqual([]);
   });
 
-  test("another name switches cards at once, never two open", async () => {
+  test("another name the pointer rests on switches cards after a short rest, never two open", async () => {
     const { joao, ada, text } = await joaoOpen();
     await leave(joao, 110, 102, text);
     await move(text, 250, 102);
     await enter(ada, 400, 104);
+    expect(shown()).toEqual(["João"]);
+    await tick(HOVER_SWITCH_MS);
     expect(shown()).toEqual(["Ada"]);
     await leave(ada, 400, 104, text);
     await enter(joao, 109, 104);
+    await tick(HOVER_SWITCH_MS);
+    expect(shown()).toEqual(["João"]);
+  });
+
+  test("a click on another name, as its card takes over, leaves that card open", async () => {
+    const { joao, ada, text } = await joaoOpen();
+    await leave(joao, 110, 102, text);
+    await move(text, 250, 102);
+    await enter(ada, 400, 104);
+    await tick(HOVER_SWITCH_MS);
+    await step(() => fireEvent.click(ada));
+    expect(shown()).toEqual(["Ada"]);
+  });
+
+  test("a member clicked in the member list hover opened: the list and their card stay while the pointer is on it", async () => {
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState()) });
+    await settle(6);
+    jest.useFakeTimers();
+    const stack = screen().getByRole("button", { name: "Membros do canal (4)" });
+    const list = () => screen().queryByRole("dialog", { name: "Membros do canal (4)" });
+    place(stack, box(700, 20, 80, 28));
+    await enter(stack, 740, 30);
+    await tick(MEMBERS_OPEN_MS);
+    const members = list() as HTMLElement;
+    place(members, box(460, 54, 320, 300));
+    await leave(stack, 740, 48, members);
+    await enter(members, 740, 60);
+    const row = within(members).getByRole("button", { name: "Perfil de João" });
+    place(row, box(468, 120, 304, 40));
+    await enter(row, 600, 140);
+    await tick(100);
+    await step(() => fireEvent.click(row));
+    // His card under the row, over the list.
+    const card = cards()[0] as HTMLElement;
+    place(card, box(468, 166, 300, 220));
+    await leave(row, 600, 161, card);
+    await enter(card, 600, 170);
+    await move(card, 610, 200);
+    await tick(HOVER_CLOSE_MS * 3);
+    expect(list()).not.toBeNull();
     expect(shown()).toEqual(["João"]);
   });
 

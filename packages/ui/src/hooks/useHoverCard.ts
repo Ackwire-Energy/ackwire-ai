@@ -1,4 +1,4 @@
-import { type PointerEvent, useEffect, useState } from "react";
+import { type MouseEvent, type PointerEvent, useEffect, useState } from "react";
 import { hoverPointer } from "../device";
 
 /**
@@ -7,6 +7,9 @@ import { hoverPointer } from "../device";
  * pointer moved on from doesn't linger.
  */
 export const HOVER_CLOSE_MS = 300;
+
+/** How long the pointer rests on another trigger, while a card is open, before that one's card takes over. */
+export const HOVER_SWITCH_MS = 120;
 
 /** How a hover card is open: the pointer rests on it, or a press or a key brought it (it stays until dismissed). */
 export type HoverCardOpen = false | "hover" | "press";
@@ -21,6 +24,7 @@ export interface HoverCard {
   trigger: {
     onPointerEnter: (e: PointerEvent<HTMLElement>) => void;
     onPointerLeave: (e: PointerEvent<HTMLElement>) => void;
+    onClick: (e: MouseEvent<HTMLElement>) => void;
   };
   /** The card's ref and handlers. */
   content: {
@@ -147,6 +151,17 @@ function set(card: Card, open: HoverCardOpen) {
   card.render(open);
 }
 
+/**
+ * A press or a key opens it: it takes over from the card it would have closed, and pins the cards it sits in, so
+ * the pointer can go to it (portaled outside them) without them closing under it.
+ */
+function press(card: Card) {
+  const from = leaving(card);
+  if (from) close(from);
+  for (const c of shown.filter((c) => inside(c, card.trigger))) set(c, "press");
+  set(card, "press");
+}
+
 /** Closes it and the cards open inside it. */
 function close(card: Card) {
   const at = shown.indexOf(card);
@@ -233,16 +248,16 @@ function listen(on: boolean) {
  * does, with `onOpenChange`). It stays open while the pointer crosses from the trigger to it: through the gap between
  * them and over whatever lies in the triangle from where the pointer left the trigger to the card's near edge. Off
  * them, it closes `HOVER_CLOSE_MS` later. One card at a time: resting on another trigger opens that one's card
- * instead, at once, and a scroll that takes the trigger from under the pointer closes it. Cards inside a card (a
+ * instead, after a short rest, and a scroll that takes the trigger from under the pointer closes it. Cards inside a card (a
  * member's profile in the member list) open beside it. A card a press or a key opened stays until Esc or a press
- * elsewhere, and while it is up hover opens nothing outside it.
+ * elsewhere, and pins the cards it sits in; while it is up hover opens nothing outside it.
  */
 export function useHoverCard(openMs: number): HoverCard {
   const [open, render] = useState<HoverCardOpen>(false);
   const [card] = useState<Card>(() => ({ open: false, openMs, trigger: null, content: null, exit: null, render }));
   useEffect(() => () => close(card), [card]);
   const [handlers] = useState(() => ({
-    onOpenChange: (o: boolean) => (o ? set(card, "press") : close(card)),
+    onOpenChange: (o: boolean) => (o ? press(card) : close(card)),
     close: () => close(card),
     trigger: {
       onPointerEnter: (e: PointerEvent<HTMLElement>) => {
@@ -255,8 +270,12 @@ export function useHoverCard(openMs: number): HoverCard {
           return;
         }
         const from = leaving(card);
-        // Straight onto another trigger, not over it on the way to an open card: its card takes over at once.
-        if (from && !onItsWay(from)) return hoverOpen(card);
+        // Straight onto another trigger, not over it on the way to an open card: its card takes over after a short
+        // rest (a sweep across names opens none), and the open one stays until then.
+        if (from && !onItsWay(from)) {
+          for (const c of shown.slice(shown.indexOf(from))) stopClosing(c);
+          return wait(card, Math.min(card.openMs, HOVER_SWITCH_MS));
+        }
         wait(card, from ? Math.max(card.openMs, HOVER_CLOSE_MS) : card.openMs);
       },
       onPointerLeave: (e: PointerEvent<HTMLElement>) => {
@@ -267,6 +286,12 @@ export function useHoverCard(openMs: number): HoverCard {
         if (card.open !== "hover") return;
         card.exit = pointer;
         closeLater(card);
+      },
+      // A press on the trigger of a card hover opened pins it, instead of Radix's toggle closing it.
+      onClick: (e: MouseEvent<HTMLElement>) => {
+        if (e.defaultPrevented || card.open !== "hover") return;
+        e.preventDefault();
+        press(card);
       },
     },
     content: {
