@@ -309,9 +309,10 @@ export function SavedTools({
   const blockItems = useBlockItems(items);
   // Nothing more to show than the message does: no tools (lookups and reactions aren't counted), or only the ones
   // its own cards show (where it browsed).
-  const shown = compact ? workSteps(compact, onCard) : 0;
+  // No `meta.work` (a reply saved before it): a block that loads the run's steps when opened, gone if it called none.
+  const shown = compact ? workSteps(compact, onCard) : null;
   if (shown === 0) return null;
-  const calls = work ? toolCalls(items) : shown;
+  const calls = work ? toolCalls(items) : (shown ?? 0);
   const lone = savedOneLine(meta, onCard);
   // The run's only call only fed the answer (`quietLine`): the reply says it.
   if (lone && quietLine(lone) && compact?.steps === 1) return null;
@@ -354,7 +355,7 @@ export function SavedTools({
     <ToolBlock
       logos={apps.map((a) => <span key={appKey(a)}>{logo(a)}</span>)}
       head={{
-        text: t("chat.work.used", { count: calls }),
+        text: calls > 0 ? t("chat.work.used", { count: calls }) : t("chat.work.block", agentGrammar(t, agentName)),
         time: durationMs !== null ? formatDuration(t, durationMs) : undefined,
       }}
       items={[...status, ...blockItems]}

@@ -112,6 +112,34 @@ describe("work summary", () => {
     expect(within(work).getByText("Deu erro escrevendo no Drive")).toBeTruthy();
   });
 
+  test("a reply without meta.work (saved before it) keeps a block that loads its steps, gone if it called none", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    let runSteps = steps;
+    api.agents.run = async (_orgId, runId) => ({
+      run: { id: runId, createdAt: at(0), finishedAt: at(12) } as Run,
+      steps: runSteps,
+    });
+    const reply = state.messages.find((m) => m.id === "m-2");
+    if (reply) reply.meta = {};
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(8);
+    const head = screen().getAllByRole("button", { name: /O que ela fez/ })[0] as HTMLElement;
+    await click(head);
+    await settle(4);
+    expect(head.textContent).toContain("Usou 2 ferramentas");
+    cleanup();
+
+    runSteps = [steps[0], steps[steps.length - 1]].filter((s) => s !== undefined);
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(8);
+    const none = screen().getAllByRole("button", { name: /O que ela fez/ })[0] as HTMLElement;
+    await click(none);
+    await settle(4);
+    expect(none.isConnected).toBe(false);
+    expect(document.body.textContent).not.toContain("sem usar ferramentas");
+  });
+
   test("a reaction already shows on the message: no block for a reply that only reacted, other tools count alone", async () => {
     const call = (id: string, tool: string): LiveWork => ({
       kind: "call",

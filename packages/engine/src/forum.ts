@@ -516,6 +516,7 @@ export function postsOf(topicId: string, rows: Message[]): ForumPostView[] {
       const existing = byRun.get(m.agentRunId);
       if (existing) {
         existing.body = `${existing.body}\n\n${m.body}`.trim();
+        if (m.meta.work) existing.meta = { ...existing.meta, work: m.meta.work };
         continue;
       }
     }
@@ -563,7 +564,15 @@ export function postsOf(topicId: string, rows: Message[]): ForumPostView[] {
       replyTo: meta?.replyTo ?? (header.replyTo && !header.replyTo.startsWith("@") ? header.replyTo : null),
       position: meta?.position ?? header.position,
       ...(meta?.requestRound ? { requestRound: meta.requestRound } : {}),
-      ...(kind === "synthesis" ? { meta: { synthesis: true } } : {}),
+      // `work`: the run's tool work (`meta.work`), for the post's "Usou N ferramentas" block.
+      ...(kind === "synthesis" || m.meta.work
+        ? {
+            meta: {
+              ...(kind === "synthesis" ? { synthesis: true } : {}),
+              ...(m.meta.work ? { work: m.meta.work } : {}),
+            },
+          }
+        : {}),
       createdAt: m.createdAt.toISOString(),
     };
     if (isAgent && m.agentRunId) byRun.set(m.agentRunId, post);
