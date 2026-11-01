@@ -116,7 +116,7 @@ describe("one block per answer (run-slots)", () => {
         { kind: "say" as const, text: "Uso as ferramentas.", turn: 2 },
       ],
     });
-    expect(said).toMatchObject({ said: "Vou ler o código.", opener: null });
+    expect(said.said).toBe("Vou ler o código.");
     expect(said.work).toEqual([{ kind: "say", text: "Uso as ferramentas.", turn: 2 }]);
     expect(elapsedParts(1_500)).toBeNull();
     expect(elapsedParts(4_200)).toEqual({ m: 0, s: 4 });

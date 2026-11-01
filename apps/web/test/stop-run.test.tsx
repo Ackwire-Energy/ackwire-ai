@@ -32,7 +32,7 @@ const cancels = (state: ReturnType<typeof seedState>) => state.calls.filter((c) 
 const esc = () => act(async () => fireEvent.keyDown(window, { key: "Escape" }));
 
 describe("Parar is immediate", () => {
-  test("the card above the box: living avatar with its look, the words, 'Ver' out of view and its stop", async () => {
+  test("the card above the box: the agent's name, no face of its own, 'Ver' out of view and its stop", async () => {
     const { state, ev } = await open((s) => {
       const ada = s.agents.find((a) => a.id === ADA_ID);
       if (ada) (ada as { appearance?: unknown }).appearance = { color: "amber", accessory: "hat" };
@@ -41,8 +41,9 @@ describe("Parar is immediate", () => {
     await settle(3);
     // happy-dom has no layout: the block counts as out of view, so the line above the composer speaks.
     const bar = document.querySelector('.ac-typing[data-active="true"]') as HTMLElement;
-    const avatar = bar.querySelector(".ac-avatar--agent") as HTMLElement;
-    expect(avatar.getAttribute("data-accessory")).toBe("hat");
+    // Its face is on its row in the conversation, not in the bar again.
+    expect(bar.querySelector(".ac-avatar--agent")).toBeNull();
+    expect(bar.querySelector(".ac-typing__text")?.textContent).toBe("Ada");
     expect(within(bar).getByRole("button", { name: "Ver" })).toBeTruthy();
     // Its stop, one click, nothing asked.
     await act(async () => fireEvent.click(within(bar).getByRole("button", { name: "Parar" })));

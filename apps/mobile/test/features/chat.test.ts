@@ -391,7 +391,7 @@ describe("working line", () => {
     const ada = run({ runId: "r", agentId: "ada" });
     const atlas = run({ runId: "s", agentId: "atlas" });
     expect(barWords(en, workingEntries([ada], [], name), markName)[0]).toBe(markName("Ada"));
-    expect(barWords(en, workingEntries([ada, atlas], [], name))[0]).toBe("Atlas and Ada are working…");
+    expect(barWords(en, workingEntries([ada, atlas], [], name))[0]).toBe("Ada and Atlas are working…");
     const lines = await source("features/chat/LiveRows.tsx");
     const line = lines.slice(lines.indexOf("export function WorkingLine("), lines.indexOf("type LinePiece"));
     expect(line).toContain("(entries.length === 1 && lead && !asking ? [] : barFaces(entries))");
