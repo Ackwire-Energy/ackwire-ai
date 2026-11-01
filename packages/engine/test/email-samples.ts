@@ -337,6 +337,7 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     kind: "autonomy_report",
     locale: "en",
     day: "2026-10-30",
+    totalStalls: 68,
     stalls: [
       { metric: "mentionNoRun", today: 7, average: 4.3 },
       { metric: "readOnly", today: 40, average: 12.1 },
@@ -367,6 +368,7 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     kind: "autonomy_report",
     locale: "pt-BR",
     day: "2026-10-31",
+    totalStalls: 0,
     stalls: [{ metric: "readOnly", today: 0, average: 5.7 }],
     noise: [{ metric: "noiseRuns", today: 0, average: 9.7 }],
     topStalls: [],

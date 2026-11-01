@@ -224,6 +224,8 @@ export type EmailTemplate =
       kind: "autonomy_report";
       locale?: EmailLocale;
       day: string;
+      /** The day's stalls, each once (a line can be part of the one above it). */
+      totalStalls: number;
       stalls: { metric: string; today: number; average: number }[];
       noise: { metric: string; today: number; average: number }[];
       topStalls: { name: string; count: number }[];
@@ -627,10 +629,9 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
               ]),
             }
           : { small: c.none };
-      const stalls = t.stalls.reduce((n, m) => n + m.today, 0);
       const noise = t.noise.find((m) => m.metric === "noiseRuns")?.today ?? 0;
       return doc(
-        c.subject(t.day, num(stalls), num(noise)),
+        c.subject(t.day, num(t.totalStalls), num(noise)),
         c.preheader,
         c.headline(t.day),
         [

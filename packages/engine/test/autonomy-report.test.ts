@@ -17,13 +17,16 @@ import {
   type EmailTemplate,
   enqueueAutonomyReport,
   expireConsultations,
+  holdOf,
   insertMessage,
   type MachineStatus,
   NEW_AGENT_DEFAULTS,
   onConsultedRunFinished,
   postPersonMessage,
+  postStretchCard,
   REFUSALS,
   renderEmail,
+  STRETCH,
   type ToolSource,
   toolPolicy,
   WRAP_UP_REPLY_NOTE,
@@ -378,7 +381,8 @@ describe("one workspace's day", () => {
     expect(row.noiseRuns).toBe(4);
     expect(row.noiseTokens).toBe(2100);
     expect(row.noiseCostNanoUsd).toBe(7_000_000);
-    expect(row.stalls).toBe(1 + 3 + 2 + 4 + 1 + 3 + 4 + 1);
+    // Each stall once: the ignored promise is one of the four unkept ones.
+    expect(row.stalls).toBe(1 + 3 + 2 + 4 + 3 + 4 + 1);
   });
 
   test("the day's report: totals, the 7 days before as a daily average, and the operators' table", async () => {
@@ -690,5 +694,18 @@ describe("rows as the server writes them", () => {
     await run({ at: when, background: true });
     const [day] = await autonomyRows(f.db, { from: when.toISOString().slice(0, 10), days: 1 });
     expect(day?.limitStops).toBe(2);
+  });
+
+  test("a mention its stretch's limit held counts once, as that pause; one that woke nobody still counts", async () => {
+    f = await setup();
+    ops = (await createAgent(f.db, f.owner.id, f.org.id, { name: "Ops", handle: "ops" }, NEW_AGENT_DEFAULTS)).id;
+    // The card is posted as the job does, now: the mentions just before it.
+    const said = new Date(Date.now() - 2000);
+    const held = await message({ at: said, by: ops, body: "@dev sobe o staging", mentions: [f.agent.id] });
+    await message({ at: new Date(said.getTime() + 1000), by: ops, body: "@dev e a produção", mentions: [f.agent.id] });
+    const stop = { reason: "runs", limit: STRETCH.unattendedRuns } as const;
+    await postStretchCard({ db: f.db, pubsub: f.pubsub }, f.org.id, holdOf(held, f.agent.id, "mention", stop));
+    const [day] = await autonomyRows(f.db, { from: said.toISOString().slice(0, 10), days: 1 });
+    expect(day).toMatchObject({ mentionNoRun: 1, limitStops: 1, stalls: 2 });
   });
 });

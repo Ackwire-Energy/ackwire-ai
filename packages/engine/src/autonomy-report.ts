@@ -11,7 +11,8 @@ import { REFUSALS } from "./tools/run-policy";
  *
  * Stalls:
  * - `mentionNoRun`: an agent @mentioned another agent and that agent got no run and never read the message in
- *   one; mentions the judge read as only a reference ("Só mencionado") are left out, never those it failed to read.
+ *   one; mentions the judge read as only a reference ("Só mencionado") are left out, never those it failed to read,
+ *   and so are those a stretch's limit held (its pause card counts them, in `limitStops`).
  * - `readOnly`: conversation runs the policy kept from tools the agent's scopes grant, for who was behind them
  *   (ADR 0053), from the run's first `context` step (`heldBack`), and runs with a tool call refused for that
  *   (`tool.call` audit rows with a run-policy refusal).
@@ -56,7 +57,7 @@ export const AUTONOMY_NOISE = [
 ] as const;
 
 export type AutonomyMetric = (typeof AUTONOMY_STALLS)[number] | (typeof AUTONOMY_NOISE)[number];
-/** Every count, plus `stalls`: the stall counts added up. */
+/** Every count, plus `stalls`: the stall counts added up, each stall once (`promiseIgnored` is part of `promiseUnkept`). */
 export type AutonomyCounts = Record<AutonomyMetric | "stalls", number>;
 export interface AutonomyRow extends AutonomyCounts {
   /** `YYYY-MM-DD`, UTC. */
@@ -353,7 +354,13 @@ export function autonomySql(range: AutonomyRange) {
               and r.created_at > m.created_at - interval '1 day' and r.created_at < m.created_at
               and s.kind = 'context' and s.data->'steeredMessageIds' ? m.id::text) as reached,
         exists (select 1 from routing_decisions d
-          where d.message_id = m.id and d.error is null and not (a.agent_id = any(d.selected_agent_ids))) as referenced
+          where d.message_id = m.id and d.error is null and not (a.agent_id = any(d.selected_agent_ids))) as referenced,
+        -- Held by its stretch's limit: that pause card counts it (limitStops). A card stays open for 7 days.
+        exists (select 1 from messages k where k.org_id = m.org_id and k.channel_id = m.channel_id
+          and k.created_at > m.created_at - interval '7 days' and k.created_at < ${end}::timestamptz + interval '1 day'
+          and k.author_type = 'agent' and k.meta->'actionCard'->>'kind' = 'stretch_paused'
+          and k.meta->'actionCard'->'held' @> jsonb_build_array(jsonb_build_object('messageId', m.id, 'agentId', a.agent_id))
+        ) as held
       from messages m
       join orgs o on o.id = m.org_id
       join channels c on c.org_id = m.org_id and c.id = m.channel_id
@@ -410,7 +417,8 @@ export function autonomySql(range: AutonomyRange) {
           and m.author_type = 'agent' and (m.meta->'actionCard'->>'kind' = 'stretch_paused' or m.meta ? 'missionStuck')
         group by 1, 2
       union all
-      select day, org_id, 'mentionNoRun', count(*) from mentions where not reached and not referenced group by 1, 2
+      select day, org_id, 'mentionNoRun', count(*) from mentions where not reached and not referenced and not held
+        group by 1, 2
       union all
       select m.day, m.org_id, 'handoffUnanswered', count(*) from mentions m
         where m.reached and not exists (select 1 from messages a where ${SAME_CONVERSATION} and ${SPOKE}
@@ -481,7 +489,8 @@ export function autonomySql(range: AutonomyRange) {
 const emptyCounts = (): AutonomyCounts =>
   Object.fromEntries([...AUTONOMY_STALLS, ...AUTONOMY_NOISE, "stalls"].map((k) => [k, 0])) as AutonomyCounts;
 
-const stallsOf = (c: Record<AutonomyMetric, number>) => AUTONOMY_STALLS.reduce((sum, k) => sum + c[k], 0);
+const stallsOf = (c: Record<AutonomyMetric, number>) =>
+  AUTONOMY_STALLS.reduce((sum, k) => (k === "promiseIgnored" ? sum : sum + c[k]), 0);
 
 /** One day's report: its workspaces (most stalls first), their total, and the daily average of the 7 days before. */
 export interface AutonomyReport {
@@ -518,7 +527,7 @@ export async function autonomyReport(
 
 /** The headers of the operators' table, and what each column counts. */
 const COLUMNS: { key: keyof AutonomyCounts; head: string; means: string }[] = [
-  { key: "stalls", head: "stalls", means: "the stall columns added up" },
+  { key: "stalls", head: "stalls", means: "the stall columns added up (ignored is part of promise)" },
   { key: "mentionNoRun", head: "mention", means: "agent @mentions of agents that started no run" },
   { key: "readOnly", head: "readonly", means: "runs kept from their tools for who was behind them, or refused one" },
   { key: "promiseUnkept", head: "promise", means: "runs the follow-through judge found ending on work undone" },
@@ -630,6 +639,7 @@ export async function queueAutonomyEmail(db: Executor, payload: Record<string, u
         kind: "autonomy_report",
         locale: group.locale,
         day,
+        totalStalls: report.total.stalls,
         stalls: counts(AUTONOMY_STALLS),
         noise: counts(AUTONOMY_NOISE),
         topStalls: top("stalls").map((w) => ({ name: w.orgName, count: w.stalls })),
