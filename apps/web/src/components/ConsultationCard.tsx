@@ -1,4 +1,5 @@
 import type { MessageConsultation } from "@agenteschat/client";
+import { consultAskedKey, consultLineKey } from "@agenteschat/client/lib/consult-group";
 import { CONSULTATION_MINUTES, previewOf } from "@agenteschat/client/lib/consultations";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { cx, Icon } from "@agenteschat/ui";
@@ -10,10 +11,10 @@ import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 
 /**
- * What another agent told this one before it answered (`meta.consulted`):
+ * What another agent told this one before it answered (`meta.consulted`), or did with work it handed it:
  * a neutral one-line card
  * on top of the reply, "Infra respondeu" with a faded preview, that opens to
- * the question and the full answer. Expired or failed: the same card, calm,
+ * the question (or the work) and the full answer. Expired or failed: the same card, calm,
  * with an icon instead of the agent.
  */
 export function ConsultationCard({
@@ -33,12 +34,8 @@ export function ConsultationCard({
   const from = agentGrammar(t, dir.agentById.get(askerId)?.name ?? t("channel.unknownAgent"));
   const ok = c.status === "answered" && c.answer !== null;
   const minutes = CONSULTATION_MINUTES;
-  const title = ok
-    ? t("chat.consultation.answered", { name: to.name })
-    : t(c.status === "expired" ? "chat.consultation.expired" : "chat.consultation.failed", {
-        name: to.name,
-        The: to.The,
-      });
+  const state = ok ? "answered" : c.status === "expired" ? "expired" : "failed";
+  const title = t(consultLineKey(state, { kind: c.kind, waiting: null }), { name: to.name, The: to.The });
   const preview = ok
     ? previewOf(c.answer ?? "")
     : c.status === "expired"
@@ -68,7 +65,7 @@ export function ConsultationCard({
       </button>
       {open && (
         <div className="ac-consult__body" id={bodyId}>
-          <small>{t("chat.consultation.asked", { name: from.name })}</small>
+          <small>{t(consultAskedKey(c), { name: from.name })}</small>
           <div className="ac-consult__text ac-consult__text--q">
             <MessageBody body={c.question} resolveMention={dir.mentionName} />
           </div>

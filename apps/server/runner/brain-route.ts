@@ -15,6 +15,7 @@ import {
 import {
   type AccountGrant,
   accountEnv,
+  accountSettingsEnv,
   handToken,
   planKeyOf,
   routesRunning,
@@ -22,7 +23,6 @@ import {
   TOKEN_FD_ENV,
   TOKEN_STDIO,
 } from "./accounts";
-import { accountSettingsEnv } from "./brain";
 import { RunnerError } from "./errors";
 import { killTree } from "./exec";
 import { resolveCommand } from "./executors";
@@ -191,8 +191,8 @@ export interface RouteDeps {
   /** The processes kept for turns: a sign-in with one open is busy. */
   brains?: { holds(account: string | null): boolean };
   codexApp?: { holds(account: string | null): boolean };
-  /** Background tasks run their CLI on the computer's own sign-in. */
-  tasks?: { runningTasks(): { executor: string }[] };
+  /** Background tasks, each with its CLI on its sign-in: its agent's account, or the computer's own (none). */
+  tasks?: { runningTasks(): { executor: string; account?: string }[] };
   signal?: AbortSignal;
   /** Tests: the CLIs, the time limit and where temporary folders go. */
   claudeCommand?: string[];
@@ -236,7 +236,7 @@ export async function routeWithPlan(req: BrainRouteRequest, deps: RouteDeps): Pr
   const key = signInKey(req.kind, home);
   const open = req.kind === "codex" ? deps.codexApp : deps.brains;
   const cli = req.kind === "codex" ? "codex" : "claude";
-  const task = account === null && deps.tasks?.runningTasks().some((t) => t.executor === cli);
+  const task = deps.tasks?.runningTasks().some((t) => t.executor === cli && (t.account ?? null) === account);
   if (routesRunning.has(key) || open?.holds(account) || task) return { busy: true };
   const stop = new AbortController();
   const signal = deps.signal ? AbortSignal.any([deps.signal, stop.signal]) : stop.signal;

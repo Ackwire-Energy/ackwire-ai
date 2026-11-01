@@ -1,17 +1,19 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, desc, type Executor, eq, inArray, rowsOf, schema, sql } from "@agenteschat/db";
+import { and, desc, type Executor, eq, gte, inArray, rowsOf, schema, sql } from "@agenteschat/db";
 import type { BrainKind, BrainSession, BrainTurn, ToolResult } from "./brains/types";
 import { abortLocalRun, RUN_CANCEL_TOPIC } from "./cancel";
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import type { RunIdentity } from "./executor";
+import { wakesLater } from "./follow-through";
 import { cutText } from "./format";
 import { insertMessage, messageView } from "./messages";
 import { MISSION_LIMITS } from "./mission-limits";
 import { enqueueRunJob } from "./mission-runs";
-import { missionCwd, worktreeBlocksWork } from "./mission-worktree";
+import { hasLiveTasks, missionCwd, worktreeBlocksWork } from "./mission-worktree";
 import {
   agentAnswers,
   getMissionRow,
+  latestPlan,
   MISSION_STUCK,
   type MissionDeps,
   type MissionRow,
@@ -24,11 +26,25 @@ import {
   recordMissionEvent,
   type WakeKind,
 } from "./missions";
+import { enqueue } from "./outbox";
 import { resumeRunWithResult } from "./run-resume";
 import { revokeRunToolTokens } from "./run-tool-tokens";
 import { isTerminal, type RunStatus, transitionRun } from "./runs";
+import { pauseStretch, runStretchOf, stretchStop } from "./stretch";
 
-const { missions, missionEvents, agentRuns, approvals, agentQuestions, outbox } = schema;
+const {
+  missions,
+  missionEvents,
+  agentRuns,
+  approvals,
+  agentQuestions,
+  outbox,
+  messages,
+  missionDecisions,
+  missionReviews,
+  missionDeliveries,
+  agentConsultations,
+} = schema;
 
 /**
  * Missions on the agent engine (ADR 0032 §6, block 4).
@@ -60,6 +76,8 @@ export interface MissionRunStart
   triggerMessageId: string;
   /** Hop of the notice (the mission's own wake-ups are 0, so their runs are hop 1). */
   hop: number;
+  /** The notice's stretch (ADR 0089), when its run counts toward one (`TellOptions.stretchId`). */
+  stretchId?: string | null;
   brain: BrainKind;
   missionId: string;
   /** The person behind it (audience and acting rights), or null for the mission's own notices. */
@@ -204,6 +222,8 @@ export interface TellOptions {
   resume?: NonNullable<ToolResult["pause"]>;
   /** A new main session (planning after a proposal or a new brain): its first turn starts it. */
   freshSession?: boolean;
+  /** The stretch the wake-up counts in (its run at hop 2, as agents' own wake-ups are): none, it counts in none. */
+  stretchId?: string;
 }
 
 /** The latest run of the agent in the thread that waits for a person (approval or input). */
@@ -293,7 +313,13 @@ export async function tellMainSession(
       orgId: fresh.orgId,
       channelId: fresh.channelId,
       threadId: fresh.threadRootId,
-      author: { type: "agent", agentId: fresh.agentId, runId: null, hop: 0, stretchId: null },
+      author: {
+        type: "agent",
+        agentId: fresh.agentId,
+        runId: null,
+        hop: options.stretchId ? 1 : 0,
+        stretchId: options.stretchId ?? null,
+      },
       body: options.notice?.body ?? (noMentions(body).slice(0, 39_000) || "…"),
       meta: options.notice?.meta ?? {
         missionInbox: { missionId: fresh.id, from, text: noMentions(body), requestedBy: requester, kind },
@@ -309,6 +335,7 @@ export async function tellMainSession(
           threadRootId: fresh.threadRootId,
           triggerMessageId: message.id,
           hop: message.hop,
+          stretchId: message.stretchId,
           trigger: body,
           brain: choice.brain,
           ...(choice.model ? { model: choice.model } : {}),
@@ -392,6 +419,165 @@ export async function deliverMissionInbox(
   return sent;
 }
 
+// ── Keeping the work going between messages ──────────────────────────────────
+
+/** The outbox job that checks, a while after a mission run ended, whether the work goes on by itself. */
+export const KEEP_GOING_JOB = "mission.keep_going";
+/** How long after a mission run ends it goes on by itself (a person writing meanwhile starts a run first). */
+export const KEEP_GOING_DELAY_MS = 60_000;
+
+/** What the main session reads when its turn ended with plan items open and nothing waiting on a person. */
+export const KEEP_GOING_PROMPT =
+  "Your last turn ended with plan items still open and nothing waiting on a person: go on with the next one now. If you can't go on without something only a person can give (a credential, an access, a decision, a test only they can run), ask for it directly now: ask_user with one clear question (request_secret for a credential, a blocking ask_decision for a choice), and mark that item waiting_you. A list of what is missing is not a question. If the plan is out of date, fix it with update_plan.";
+
+/** Schedules the keep-going check of a mission whose run just ended (`keepMissionGoing`). */
+export async function scheduleKeepGoing(db: Executor, mission: { id: string; orgId: string }) {
+  const at = Date.now() + KEEP_GOING_DELAY_MS;
+  await enqueue(db, {
+    orgId: mission.orgId,
+    kind: KEEP_GOING_JOB,
+    payload: { missionId: mission.id },
+    dedupeKey: `${KEEP_GOING_JOB}:${mission.id}:${Math.floor(at / 10_000)}`,
+    runAt: new Date(at),
+    maxAttempts: 3,
+  });
+}
+
+/** Whether a card in the mission waits on a person: a decision, a review or a delivery (its answer wakes the agent). */
+export async function missionAsksPerson(db: Executor, missionId: string): Promise<boolean> {
+  const [row] = rowsOf<{ asks: boolean | string }>(
+    await db.execute(sql`select
+      exists (select 1 from ${missionDecisions} d where d.mission_id = ${missionId}::uuid and d.status = 'pending')
+        or exists (select 1 from ${missionReviews} v where v.mission_id = ${missionId}::uuid and v.status = 'pending')
+        or exists (select 1 from ${missionDeliveries} l where l.mission_id = ${missionId}::uuid and l.status = 'pending')
+        as asks`),
+  );
+  return row?.asks === true || row?.asks === "t";
+}
+
+/**
+ * Why the mission doesn't go on by itself now, or null when it should: it isn't active or can't work, no plan item
+ * is open (todo or doing), the agent works or waits in the thread, a card waits on a person, its last run ended
+ * waiting on a person (the follow-through verdict), something already wakes it (a follow-up there, another agent's
+ * answer it asked for, a reminder, a detached wait: `wakesLater`), or an item runs on the computer.
+ */
+export async function keepGoingBlocker(db: Executor, mission: MissionRow): Promise<string | null> {
+  if (mission.status !== "active" || !canWork(mission)) return "not_working";
+  const plan = await latestPlan(db, mission.id);
+  const items = Array.isArray(plan?.items) ? (plan.items as { status?: string }[]) : [];
+  if (!items.some((i) => i.status === "todo" || i.status === "doing")) return "no_open_items";
+  const inThread = and(
+    eq(agentRuns.orgId, mission.orgId),
+    eq(agentRuns.agentId, mission.agentId),
+    eq(agentRuns.channelId, mission.channelId),
+    eq(agentRuns.threadRootId, mission.threadRootId),
+  );
+  const [active] = await db
+    .select({ id: agentRuns.id })
+    .from(agentRuns)
+    .where(and(inThread, inArray(agentRuns.status, ["queued", "running", "waiting_input", "waiting_approval"])))
+    .limit(1);
+  if (active) return "run_active";
+  if (await missionAsksPerson(db, mission.id)) return "waiting_person";
+  const [last] = await db.select().from(agentRuns).where(inThread).orderBy(desc(agentRuns.createdAt)).limit(1);
+  const transcript = (last?.transcript ?? {}) as {
+    followThroughVerdict?: string;
+    detachedWaits?: { waitId: string }[];
+  };
+  if (transcript.followThroughVerdict === "waiting") return "asked_person";
+  const [row] = rowsOf<{ wakes: boolean | string }>(
+    await db.execute(sql`select
+      exists (select 1 from ${messages} m where m.org_id = ${mission.orgId}::uuid and m.channel_id = ${mission.channelId}::uuid
+        and m.thread_id = ${mission.threadRootId}::uuid and m.author_agent_id = ${mission.agentId}::uuid
+        and m.deleted_at is null and m.meta->'notice'->>'kind' = 'follow_up'
+        and m.meta->'notice'->'refs'->>'state' = 'pending')
+      or exists (select 1 from ${agentConsultations} c join ${agentRuns} r on r.id = c.asker_run_id
+        where c.org_id = ${mission.orgId}::uuid and c.status = 'open' and r.agent_id = ${mission.agentId}::uuid
+          and r.channel_id = ${mission.channelId}::uuid and r.thread_root_id = ${mission.threadRootId}::uuid) as wakes`),
+  );
+  if (row?.wakes === true || row?.wakes === "t") return "wakes_later";
+  if (last && (await wakesLater(db, last, transcript.detachedWaits))) return "wakes_later";
+  if (await hasLiveTasks(db, mission.id)) return "task_running";
+  return null;
+}
+
+/** The text of the last report card the run's agent posted in its thread since the run started (`report`). */
+export async function missionReportSince(
+  db: Executor,
+  run: { orgId: string; agentId: string; channelId: string; createdAt: Date },
+  threadId: string | null,
+) {
+  if (!threadId) return "";
+  const [row] = await db
+    .select({ body: messages.body })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.orgId, run.orgId),
+        eq(messages.channelId, run.channelId),
+        eq(messages.threadId, threadId),
+        eq(messages.authorAgentId, run.agentId),
+        gte(messages.createdAt, run.createdAt),
+        sql`${messages.meta}->'missionReport' is not null`,
+      ),
+    )
+    .orderBy(desc(messages.createdAt))
+    .limit(1);
+  return row?.body ?? "";
+}
+
+/**
+ * Job `mission.keep_going`: a mission run ended a while ago. With plan items open and nothing waiting on a person,
+ * the main session is told to go on (`tellMainSession`): a wake-up of the mission's own, so the stuck guard counts it
+ * (wake-ups in a row with no plan item moving pause the mission), and in the stretch of its last run, so the stretch
+ * limits hold it even while the plan keeps changing (a person's message opens a new one). Returns whether it woke.
+ */
+export async function keepMissionGoing(deps: MissionDeps, missionId: string) {
+  const mission = await getMissionRow(deps.db, missionId);
+  // What waits in its inbox goes out with the inbox's own delivery.
+  if (!mission || mission.inbox.some((e) => e.sessionId === mission.mainSessionId)) return false;
+  if (await keepGoingBlocker(deps.db, mission)) return false;
+  // It counts in the stretch of the thread's last run: past its limit, the pause card instead (its Continuar goes on).
+  const [last] = await deps.db
+    .select()
+    .from(agentRuns)
+    .where(
+      and(
+        eq(agentRuns.orgId, mission.orgId),
+        eq(agentRuns.agentId, mission.agentId),
+        eq(agentRuns.channelId, mission.channelId),
+        eq(agentRuns.threadRootId, mission.threadRootId),
+      ),
+    )
+    .orderBy(desc(agentRuns.createdAt))
+    .limit(1);
+  const stretchId = last ? runStretchOf(last) : undefined;
+  if (last && stretchId) {
+    const stop = await stretchStop(deps.db, mission.orgId, stretchId, mission.agentId);
+    if (stop) {
+      await pauseStretch(deps.db, mission.orgId, {
+        stretchId,
+        channelId: mission.channelId,
+        threadId: mission.threadRootId,
+        authorAgentId: mission.agentId,
+        runId: last.id,
+        hop: last.hop,
+        agentId: mission.agentId,
+        messageId: null,
+        trigger: "mention",
+        stop,
+      });
+      return false;
+    }
+  }
+  const out = await tellMainSession(deps, mission, KEEP_GOING_PROMPT, {
+    kind: "system",
+    from: "the mission",
+    ...(stretchId ? { stretchId } : {}),
+  });
+  return out.delivered;
+}
+
 /** Stop, close or a new brain: the main session's runs in the thread are canceled. */
 export async function cancelMainRuns(deps: MissionDeps, mission: MissionRow, actorId: string | null, reason: string) {
   const ids = await engineOf(deps).cancelRuns({
@@ -441,6 +627,7 @@ export function createMissionEngine(deps: { pubsub?: PubSub; db: MissionDeps["db
           channelId: input.channelId,
           threadId: input.threadRootId,
           hop: input.hop,
+          stretchId: input.stretchId ?? null,
         },
         input.agentId,
       );

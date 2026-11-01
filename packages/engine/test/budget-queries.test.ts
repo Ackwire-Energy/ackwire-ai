@@ -71,21 +71,22 @@ async function mentionRun(options: { askAgent?: boolean } = {}) {
   return { beforeModel, total: p.total.queries };
 }
 
-test("claim → model request stays within 13 statements; a whole mention run within 23", async () => {
+test("claim → model request stays within 14 statements; a whole mention run within 24", async () => {
   const run = await mentionRun();
   // 11 since every agent has a budget (ADR 0026): the call always reserves (one statement on the fast path).
   // 12 since the run stores the brain it runs with (ADR 0053 §10).
   // 13 since a run's context lists the agent's open tasks (one statement however many, read while the thread is).
-  expect(run.beforeModel).toBeLessThanOrEqual(13);
+  // 14 since it lists the work the agent handed off from this conversation (ADR 0095; one statement, read beside them).
+  expect(run.beforeModel).toBeLessThanOrEqual(14);
   // 22 since the reply carries how many tool calls the run made, so the apps leave "Ver o que ele fez" out at 0.
-  // 23 with the open tasks.
-  expect(run.total).toBeLessThanOrEqual(23);
+  // 23 with the open tasks, 24 with the work handed off.
+  expect(run.total).toBeLessThanOrEqual(24);
 });
 
-test("with tools, as every production run has them (find_agent among them): within 17 before the model call, 27 in all", async () => {
+test("with tools, as every production run has them (find_agent among them): within 18 before the model call, 28 in all", async () => {
   const run = await mentionRun({ askAgent: true });
   // 4 more, all for the tool list and the prompt: who is behind the run (2, the Tool Gateway's policy), the connectors
   // it lacks (1) and whether the person may talk to agents ("# Your team", 1, beside the context's other reads).
-  expect(run.beforeModel).toBeLessThanOrEqual(17);
-  expect(run.total).toBeLessThanOrEqual(27);
+  expect(run.beforeModel).toBeLessThanOrEqual(18);
+  expect(run.total).toBeLessThanOrEqual(28);
 });

@@ -31,6 +31,8 @@ export interface BrainSession {
   machineId: string;
   /** Folder on the machine (relative to the agent folder), e.g. "" or a mission repo dir. */
   cwd: string;
+  /** Start in the agent's own folder, never one of its checkouts: the folder of its session before was gone. */
+  ownFolder?: boolean;
 }
 
 export interface BrainTurn {

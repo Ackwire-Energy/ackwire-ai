@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
 import { type AgentActionParams, recordAgentActions } from "./agent-actions";
 import { routineRow, routineSnapshot } from "./agent-undo";
+import { currentHandles } from "./agents";
 import { canTalkTo, talksToAgents } from "./audience";
 import { runAuthorityById } from "./authority";
 import { consultationOrigin } from "./consultations";
@@ -14,6 +15,7 @@ import {
   createReminder,
   createRoutine,
   deleteRoutine,
+  EVENT_WEBHOOK,
   listOrgRoutines,
   listReminders,
   ROUTINE_EVENTS,
@@ -47,8 +49,8 @@ const failed = (error: unknown): ToolOutput => ({
 /**
  * The person this run acts for (authority.ts): reminders and routines are
  * theirs, in their time zone. Null when nobody is behind the run (a routine's
- * work, the run its report woke, a note from another agent): then nothing is
- * scheduled or changed (the run policy refuses these tools there anyway).
+ * work, the run its report woke, an agent's own message): then nothing is
+ * scheduled or changed (a routine's run doesn't even list these tools).
  */
 async function requesterOf(ctx: ToolContext) {
   const authority = await runAuthorityById(ctx.db, ctx.orgId, ctx.runId);
@@ -147,7 +149,7 @@ async function sameRoutine(ctx: ToolContext, conv: { channelId: string; threadId
 
 const noRequester: ToolOutput = {
   content:
-    "Only a person's request can schedule or change routines and reminders, and no person is behind this run (a routine's work, its report, a note from another agent, or an agent's own message).",
+    "Only a person's request can schedule or change routines and reminders, and no person is behind this run (a routine's report or an agent's own message started it). To come back to this work yourself within a day, use follow_up.",
   isError: true,
 };
 
@@ -220,9 +222,22 @@ function stateText(r: RoutineView) {
       return "waiting for a person (an approval or an answer)";
     case "failing":
       return `failing (${r.failuresInRow} in a row)`;
+    case "needs_webhook":
+      return `can't run yet: no ${hookName(r)} webhook sends its event here`;
     default:
       return "active";
   }
+}
+
+/** The service whose webhook a routine waits for (`EVENT_WEBHOOK`), as people name it. */
+const hookName = (r: RoutineView) =>
+  r.trigger.type === "event" && EVENT_WEBHOOK[r.trigger.event] === "sentry" ? "Sentry" : "GitHub";
+
+/** What a routine that can't run yet needs (state `needs_webhook`), for the agent to tell the person; else "". */
+function needsText(r: RoutineView) {
+  if (r.state !== "needs_webhook") return "";
+  const name = hookName(r);
+  return ` It can't run yet: no ${name} webhook sends this workspace its events, so nothing starts it. Tell the person what it needs: a ${name} webhook for this workspace, which a workspace admin sets up (the app can't create one yet). Until then it never runs; if they'd rather not wait, offer a schedule that checks instead.`;
 }
 
 /** One run, coded: "2026-10-20 09:00 failed (provider_error)". */
@@ -388,7 +403,7 @@ const ACCESS_SCHEMA = {
   type: "string",
   enum: ROUTINE_ACCESS,
   description:
-    '"read" (default): only look and report. "act": may also change things (tasks, memory, wiki, Drive, its own branches and PRs; changes in connected apps still ask first). Only when the person clearly wants changes made.',
+    '"read" (default): only look and report. "act": may also change things (tasks, memory, wiki, Drive, its own branches and PRs; changes in connected apps still ask first), tell or ask other agents, and post where the person can (their channels, their DM with you). Only when the person clearly wants changes made or messages sent.',
 };
 
 /** The routine in one line for the agent to confirm. */
@@ -470,7 +485,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
     {
       name: "create_routine",
       description:
-        'Create a routine: work you do on your own, in the background, on a schedule ("toda segunda às 9h", "dias úteis às 18h", "every hour") or when something happens (`trigger`). Each run gets `prompt` as its instructions and nobody watches it: it speaks only by handing its findings off to the conversation it reports to, where you then tell the people. That is this conversation by default; set `channel` (its name, with or without #) when the person wants it in a channel ("manda no #general"). `report` says when it speaks, `access` what it may do on its own. When the person says "when a new email arrives" or "when a new error comes in", use `trigger` (an email filter or an event), never a schedule that checks again and again. A routine runs at most every 15 minutes. Only admins or your owner can create routines; the person sees it with Undo.',
+        'Create a routine: work you do on your own, in the background, on a schedule ("toda segunda às 9h", "dias úteis às 18h", "every hour") or when something happens (`trigger`). Each run gets `prompt` as its instructions and nobody watches it: it reports by handing its findings off to the conversation it reports to, where you then tell the people (with `access` "act" it may also tell or ask other agents and post where the person can). That is this conversation by default; set `channel` (its name, with or without #) when the person wants it in a channel ("manda no #general"). `report` says when it speaks, `access` what it may do on its own. When the person says "when a new email arrives" or "when a new error comes in", use `trigger` (an email filter or an event), never a schedule that checks again and again. A routine runs at most every 15 minutes. Only admins or your owner can create routines; the person sees it with Undo.',
       scope: SCHEDULE_SCOPE,
       inputSchema: {
         type: "object",
@@ -545,7 +560,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             ]);
           }
           return {
-            content: `Created routine ${routine.id} ${await summaryOf(ctx, routine)}. Confirm it to the person.`,
+            content: `Created routine ${routine.id} ${await summaryOf(ctx, routine)}. Confirm it to the person.${needsText(routine)}`,
             data: { routine: { id: routine.id } },
           };
         } catch (error) {
@@ -569,7 +584,9 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
       async execute(input, ctx) {
         try {
           const person = await requesterOf(ctx);
-          const handle = str(input.agent).trim().replace(/^@/, "").toLowerCase();
+          const [handle = ""] = await currentHandles(ctx.db, ctx.orgId, [
+            str(input.agent).trim().replace(/^@/, "").toLowerCase(),
+          ]);
           const { agents } = schema;
           const team = await ctx.db
             .select({
@@ -638,7 +655,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
     {
       name: "update_routine",
       description:
-        'Change one of your routines (id from list_routines) when the person asks: `channel` moves where it reports ("manda no #general" — then nothing comes to the old conversation), `prompt` replaces its instructions, `schedule` its time ("dias úteis às 9h", "weekdays at 9am") or `trigger` what starts it (an email filter or an event instead of a schedule), `report` when it speaks, `access` what it may do on its own ("act" only when the person clearly wants changes made), `active` pauses or resumes it. Only who created it, your owner or an admin can change it; the person sees it with Undo.',
+        'Change one of your routines (id from list_routines) when the person asks: `channel` moves where it reports ("manda no #general" — then nothing comes to the old conversation), `prompt` replaces its instructions, `schedule` its time ("dias úteis às 9h", "weekdays at 9am") or `trigger` what starts it (an email filter or an event instead of a schedule), `report` when it speaks, `access` what it may do on its own ("act" only when the person clearly wants changes made or messages sent), `active` pauses or resumes it. Only who created it, your owner or an admin can change it; the person sees it with Undo.',
       scope: SCHEDULE_SCOPE,
       inputSchema: {
         type: "object",
@@ -717,7 +734,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             }
           }
           return {
-            content: `Updated routine ${routine.id} ${await summaryOf(ctx, routine)}. Tell the person what changed.`,
+            content: `Updated routine ${routine.id} ${await summaryOf(ctx, routine)}. Tell the person what changed.${needsText(routine)}`,
             data: { routine: { id: routine.id } },
           };
         } catch (error) {

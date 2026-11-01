@@ -778,6 +778,7 @@ export class RunnerDaemon implements RequestObserver {
       log,
       agentFolder: (agent) => agentWorkspace(workspaceReal, agent),
       secrets: (agent) => agentSecrets(secretsDir, agent),
+      accounts: this.accounts,
       ...(this.self.compiled ? { wrapperCommand: [...this.self.command, "task-wrapper"] } : {}),
       onSettled: (t) => this.taskSettled(t),
       ...(this.opts.caffeinate !== undefined ? { caffeinate: this.opts.caffeinate } : {}),

@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, inArray, isNotNull, isNull, schema, sql } from "@agenteschat/db";
 import { AUTO_MODEL, isAutoModel, MODEL_CATALOG } from "@agenteschat/providers";
+import { isIdHandle } from "@agenteschat/ui/names";
 import type { AgentAppearance } from "./appearance";
 import { recordAudit } from "./audit";
 import { isComputerBrain } from "./brains/types";
@@ -14,7 +15,7 @@ import { can, getMembership, type Membership, requirePermission } from "./organi
 import { DEFAULT_AGENT_SCOPES, grantScopes } from "./tools/scopes";
 import { resyncBudgetCounter } from "./usage";
 
-const { agents, machines, providerCredentials } = schema;
+const { agents, importItems, machines, providerCredentials } = schema;
 
 export type Agent = typeof agents.$inferSelect;
 
@@ -450,9 +451,43 @@ export const agentView = (a: Agent) => ({
 /** A handle as a tool's input names it ("@Ada ") → as stored ("ada"). */
 export const handleOf = (raw: unknown) => String(raw).replace(/^@/, "").trim().toLowerCase();
 
-/** `@handles` (a tool's input) → the organization's agents that aren't archived; the missing ones by handle. */
+/**
+ * `handles` (lower case, without the @) as their agents have them now. An import gave an agent the other app's id
+ * cut to 32 characters (`agent-e9665a97-c8d5-423f-ae59-25`, OpenBot.run's) until migration 0132 named it, and
+ * routines, memory and messages written before still cite it: that handle is read again from the import's key
+ * (`import_items.key`), never stored, and names the agent while no agent here has it as its own.
+ */
+export async function currentHandles(db: Executor, orgId: string, handles: string[]): Promise<string[]> {
+  const old = handles.filter((h) => HANDLE_PATTERN.test(h) && isIdHandle(h));
+  if (old.length === 0) return handles;
+  const key = sql<string>`left(lower(${importItems.key}), 32)`;
+  const rows = await db
+    .selectDistinctOn([key], { old: key, handle: agents.handle })
+    .from(importItems)
+    .innerJoin(agents, and(eq(agents.id, importItems.targetId), eq(agents.orgId, importItems.orgId)))
+    .where(
+      and(
+        eq(importItems.orgId, orgId),
+        eq(importItems.kind, "agent"),
+        isNull(agents.archivedAt),
+        inArray(key, old),
+        sql`not exists (select 1 from ${agents} held where held.org_id = ${orgId}::uuid and held.handle = ${key})`,
+      ),
+    )
+    // Two people who imported the same file: the first import held the handle (the second got a suffix).
+    .orderBy(key, asc(importItems.createdAt));
+  const now = new Map(rows.map((r) => [r.old, r.handle]));
+  return handles.map((h) => now.get(h) ?? h);
+}
+
+/**
+ * `@handles` (a tool's input) → the organization's agents that aren't archived; the missing ones by handle. `rowOf`:
+ * the agent one of those inputs names, an old handle too (`currentHandles`).
+ */
 export async function agentsByHandle(db: Executor, orgId: string, raw: unknown) {
-  const handles = [...new Set((Array.isArray(raw) ? raw : []).map(handleOf))];
+  const asked = (Array.isArray(raw) ? raw : []).map(handleOf);
+  const now = await currentHandles(db, orgId, asked);
+  const handles = [...new Set(now)];
   const rows =
     handles.length === 0
       ? []
@@ -461,7 +496,8 @@ export async function agentsByHandle(db: Executor, orgId: string, raw: unknown) 
           .from(agents)
           .where(and(eq(agents.orgId, orgId), inArray(agents.handle, handles), isNull(agents.archivedAt)));
   const missing = handles.filter((h) => !rows.some((r) => r.handle === h));
-  return { handles, rows, missing };
+  const rowOf = (input: unknown) => rows.find((r) => r.handle === now[asked.indexOf(handleOf(input))]);
+  return { handles, rows, missing, rowOf };
 }
 
 /** `getAgent` through the per-process cache (run path). */
