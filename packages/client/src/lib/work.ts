@@ -1,7 +1,15 @@
 import type { TFunction } from "i18next";
 import type { ConnectorDef, Run, RunStep } from "../api/types";
 import type { LiveCode, LiveOutput, LiveWork } from "../realtime/streams";
-import { type Activity, type ActivityKind, activityVerb, appLabel, PERMISSION_TOOL, toolActivity } from "./activity";
+import {
+  type Activity,
+  type ActivityKind,
+  activityVerb,
+  appLabel,
+  LONG_STEP_MS,
+  PERMISSION_TOOL,
+  toolActivity,
+} from "./activity";
 import { POSTGRES_MARK } from "./databases";
 import { joinNames } from "./format";
 import { MAIL_BRANDS } from "./mail";
@@ -57,6 +65,8 @@ export interface WorkCall {
   connector?: string;
   service?: string;
   serviceIcon?: string;
+  /** How many calls it stands for (absent on replies saved before it was written). */
+  n?: number;
 }
 
 /** The compact form the backend puts on the message (`meta.work`), before the steps are loaded. */
@@ -96,8 +106,15 @@ const onlyLookups = (c: WorkCall) => !c.connector && !c.service && UNLISTED.has(
 export const workApps = (calls: WorkCall[]) =>
   uniqueApps(calls.filter((c) => !onlyLookups(c)).map((c) => toolActivity(c.name, c.connector, null, c)));
 
-/** How many calls a saved reply shows (0: no block). A reply saved before lookups were left out counted them. */
-export const workSteps = (w: WorkMeta) => (w.calls.length > 0 && w.calls.every(onlyLookups) ? 0 : w.steps);
+/**
+ * How many calls a saved reply's block shows (0: no block). A reply saved before lookups were left out counted them.
+ * `skip`: calls another card on the message already shows (where it browsed); a reply saved before the calls carried
+ * their count shows its total unless every call is skipped.
+ */
+export function workSteps(w: WorkMeta, skip: (name: string) => boolean = () => false) {
+  if (w.calls.length > 0 && w.calls.every((c) => onlyLookups(c) || skip(c.name))) return 0;
+  return w.calls.reduce((n, c) => (skip(c.name) && typeof c.n === "number" ? n - c.n : n), w.steps);
+}
 
 const DRIVE: ActivityKind[] = ["readingDrive", "writingDrive", "exportingFile", "importingFile"];
 const time = (iso: string) => new Date(iso).getTime();
@@ -608,15 +625,59 @@ export function formatLineTime(locale: string, ms: number) {
 export const oneCall = (items: ToolItem[]) => toolCalls(items) === 1;
 
 /**
+ * Our own reads that only feed the answer: the reply states what they found, so a card saying "Conferiu o próprio
+ * uso" adds nothing. Anything that changes something, reaches an app, a file, the PC or a screen is not here.
+ */
+const QUIET_READS: ReadonlySet<ActivityKind> = new Set([
+  "checkingUsage",
+  "gettingContext",
+  "searchingMemory",
+  "findingAgent",
+  "checkingComputer",
+  "checkingCalendar",
+  "readingIssues",
+  "listingTasks",
+  "checkingTask",
+  "listingReminders",
+  "listingRoutines",
+  "readingWiki",
+  "readingForum",
+  "consultingSkill",
+  "openingSkill",
+]);
+
+/** One quick internal read that ended well, with nothing of its own to show (no code, no output). */
+export const quietLine = (l: Pick<ToolLine, "kind" | "state" | "count" | "ms" | "code" | "output">) =>
+  l.count === 1 &&
+  l.state === "done" &&
+  QUIET_READS.has(l.kind) &&
+  !l.code &&
+  !l.output?.length &&
+  (l.ms === null || l.ms < LONG_STEP_MS);
+
+/** The turn's only tool work is a quiet read (`quietLine`): no card, live, kept or saved. */
+export const quietWork = (items: ToolItem[]) => {
+  const lines = linesOf(items);
+  return lines.length === 1 && lines[0] !== undefined && quietLine(lines[0]);
+};
+
+/**
  * A saved reply's lone call (`meta.work` of one step) as its line, before the run's steps load: what it did, from
  * `meta.work.calls`; how long it took and whether it failed, from `meta.work.ms` and `failed`. A reply saved before
  * the server wrote those reads as done, in the reply's own time. Null when the reply made no call, or several.
  */
-export function savedOneLine(meta: Record<string, unknown> | undefined): ToolLine | null {
+export function savedOneLine(
+  meta: Record<string, unknown> | undefined,
+  skip: (name: string) => boolean = () => false,
+): ToolLine | null {
   const w = workMeta(meta);
-  const call = w?.steps === 1 ? w.calls[0] : undefined;
-  if (!w || !call) return null;
-  const { ms, failed } = (meta?.work ?? {}) as { ms?: unknown; failed?: unknown };
+  if (!w) return null;
+  // Besides the calls another card shows, one call left: its line, its time and outcome known only when it was the
+  // run's only call (the server writes them for that one).
+  const rest = w.calls.filter((c) => !skip(c.name));
+  const call = workSteps(w, skip) === 1 && rest.length === 1 ? rest[0] : undefined;
+  if (!call) return null;
+  const { ms, failed } = (w.steps === 1 ? (meta?.work ?? {}) : {}) as { ms?: unknown; failed?: unknown };
   const a = toolActivity(call.name, call.connector, null, call);
   return {
     key: `one-${call.name}`,
@@ -624,7 +685,7 @@ export function savedOneLine(meta: Record<string, unknown> | undefined): ToolLin
     tool: call.name,
     state: failed === true ? "fail" : "done",
     hint: toolHint(call.name, a),
-    ms: typeof ms === "number" ? ms : w.durationMs,
+    ms: typeof ms === "number" ? ms : w.steps === 1 ? w.durationMs : null,
     count: 1,
     why: null,
     input: null,

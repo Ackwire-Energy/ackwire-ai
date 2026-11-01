@@ -8,6 +8,8 @@ import {
   foldSteps,
   formatLineTime,
   oneCall,
+  quietLine,
+  quietWork,
   savedOneLine,
   stepPhrase,
   type ToolItem,
@@ -627,5 +629,56 @@ describe("one call is its own line (no 'Usou 1 ferramenta' to open)", () => {
     expect(savedOneLine({ work: { steps: 0, calls: [], durationMs: 900 } })).toBeNull();
     expect(savedOneLine({})).toBeNull();
     expect(savedOneLine(undefined)).toBeNull();
+  });
+});
+
+describe("a lone quick read that only fed the answer shows no card", () => {
+  test("one quick internal read, done: quiet; anything else keeps its card", () => {
+    for (const tool of ["get_my_usage", "get_context", "search_context", "find_agent", "mcp__agentes__get_my_usage"])
+      expect([tool, quietWork(toolItemsLive([call("1", tool, { ms: 33 })]))]).toEqual([tool, true]);
+    // A teammate looked up is ours, not an app called "find".
+    expect(toolActivity("find_agent").kind).toBe("findingAgent");
+    const kept: [string, LiveWork[]][] = [
+      ["two reads", [call("1", "get_my_usage"), call("2", "search_context")]],
+      ["the same read twice", [call("1", "get_my_usage"), call("2", "get_my_usage")]],
+      ["it changed something", [call("1", "create_routine")]],
+      ["an app", [call("1", "github_list_issues")]],
+      ["the browser", [call("1", "browser_navigate")]],
+      ["a file on the PC", [call("1", "read_file")]],
+      ["it failed", [call("1", "get_my_usage", { failed: true })]],
+      ["still running", [call("1", "get_my_usage", { running: true })]],
+      ["a long step", [call("1", "get_my_usage", { ms: 5000 })]],
+    ];
+    for (const [why, work] of kept) expect([why, quietWork(toolItemsLive(work))]).toEqual([why, false]);
+    // Lookups aren't steps: a usage check after looking the tool up is still a lone read.
+    expect(quietWork(toolItemsLive([call("1", "find_tools"), call("2", "get_my_usage")]))).toBe(true);
+  });
+
+  test("saved: the run's lone call is quiet by meta.work; calls another card shows are left out of the count", () => {
+    const usage = savedOneLine({ work: { steps: 1, calls: [{ name: "get_my_usage" }], durationMs: 2000, ms: 33 } });
+    expect(usage && quietLine(usage)).toBe(true);
+    const browser = (name: string) => name.startsWith("browser_");
+    // Three browser steps on their card: nothing left for the block.
+    const trail = { steps: 3, calls: [{ name: "browser_navigate" }], durationMs: 43_000 };
+    expect(workSteps(trail, browser)).toBe(0);
+    expect(workSteps(trail)).toBe(3);
+    // With each call's count: the browser's steps come off; the one left is its own line, time unknown.
+    const mixed = {
+      work: {
+        steps: 4,
+        calls: [
+          { name: "browser_navigate", n: 3 },
+          { name: "create_issue", n: 1 },
+        ],
+        durationMs: 9000,
+      },
+    };
+    expect(workSteps(mixed.work, browser)).toBe(1);
+    expect(savedOneLine(mixed, browser)).toMatchObject({ kind: "creatingIssue", ms: null, state: "done" });
+    expect(savedOneLine(mixed)).toBeNull();
+    // Saved before the calls carried their count: the total stays.
+    expect(workSteps({ ...mixed.work, calls: [{ name: "browser_navigate" }, { name: "create_issue" }] }, browser)).toBe(
+      4,
+    );
   });
 });

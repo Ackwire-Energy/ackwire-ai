@@ -9191,10 +9191,8 @@ export const en: Translations = {
       tip: "Nobody called {{name}}. {{She}} joined to help.",
     },
     work: {
-      see: "See what {{she}} did",
       steps_one: "{{count}} step",
       steps_other: "{{count}} steps",
-      none: "Answered without tools.",
       failed: "Couldn't load the steps.",
       /** The tool block (one per reply): its name, its closed line once done, a line's open view. */
       block: "What {{she}} did",
@@ -9279,6 +9277,7 @@ export const en: Translations = {
         listingRoutines: "Looked at the routines",
         checkingComputer: "Checked the PC",
         checkingUsage: "Checked its usage",
+        findingAgent: "Looked up a teammate",
         writingWiki: "Wrote in the wiki",
         readingWiki: "Read the wiki",
         linkingWiki: "Linked a wiki page",
@@ -9360,6 +9359,7 @@ export const en: Translations = {
       listingRoutines: "looking at the routines",
       checkingComputer: "checking the PC",
       checkingUsage: "checking its usage",
+      findingAgent: "looking up a teammate",
       writingWiki: "writing in the wiki",
       readingWiki: "reading the wiki",
       linkingWiki: "linking a wiki page",

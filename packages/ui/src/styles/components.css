@@ -902,6 +902,22 @@ textarea.ac-input {
   padding-top: 2px;
 }
 /*
+ * Only the words select: a double or triple click on a message's text, copied, gives that text and nothing after it.
+ * The rest of the row (its header, cards, reactions, bars, receipts, hidden lines) would add blank lines.
+ */
+.ac-msg {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.ac-msg .ac-msg__text,
+.ac-msg pre,
+.ac-msg input,
+.ac-msg textarea,
+.ac-msg [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+/*
  * The cards in a message (its tools, what it changed, a request, a file): one width, short of the text's. The row's
  * hover plate must never match what sits on it: a card's face is a step up (`--raised-2`, white in light), a well
  * (code, a quote, "Leu seu recado") is `--msg-well`, darker than the row whether it is hovered or not.

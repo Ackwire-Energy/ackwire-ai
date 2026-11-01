@@ -1071,6 +1071,7 @@ async function executeRunInner(
       ...(tools.length === 1 && tools[0]?.n === 1 ? await loneCall(tx, run.id, tools[0].name) : {}),
       calls: tools.slice(0, WORK_CALLS).map((t) => ({
         name: t.name,
+        n: t.n,
         ...(t.connector ? { connector: t.connector } : {}),
         ...(t.service ? { service: t.service } : {}),
         ...(t.serviceIcon ? { serviceIcon: t.serviceIcon } : {}),

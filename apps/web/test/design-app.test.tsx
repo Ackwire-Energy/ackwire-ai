@@ -90,9 +90,14 @@ describe("work summary", () => {
         steps,
       };
     };
+    const reply = state.messages.find((m) => m.id === "m-2");
+    if (reply)
+      reply.meta = {
+        work: { steps: 2, calls: [{ name: "himetrica_get_summary" }, { name: "create_artifact" }], durationMs: 12_000 },
+      };
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(8);
-    const head = screen().getAllByRole("button", { name: /Ver o que ela fez/ })[0] as HTMLElement;
+    const head = screen().getAllByRole("button", { name: /Usou 2 ferramentas/ })[0] as HTMLElement;
     expect(asked).toEqual([]);
     await click(head);
     await settle(4);

@@ -9262,10 +9262,8 @@ export const ptBR = {
       tip: "Ninguém chamou {{article}} {{name}}. {{She}} entrou para ajudar.",
     },
     work: {
-      see: "Ver o que {{she}} fez",
       steps_one: "{{count}} passo",
       steps_other: "{{count}} passos",
-      none: "Respondeu sem usar ferramentas.",
       failed: "Não foi possível carregar os passos.",
       /** The tool block (one per reply): its name, its closed line once done, a line's open view. */
       block: "O que {{she}} fez",
@@ -9352,6 +9350,7 @@ export const ptBR = {
         listingRoutines: "Viu as rotinas",
         checkingComputer: "Conferiu o PC",
         checkingUsage: "Conferiu o próprio uso",
+        findingAgent: "Procurou um colega",
         writingWiki: "Escreveu na wiki",
         readingWiki: "Leu a wiki",
         linkingWiki: "Ligou a uma página da wiki",
@@ -9433,6 +9432,7 @@ export const ptBR = {
       listingRoutines: "vendo as rotinas",
       checkingComputer: "conferindo o PC",
       checkingUsage: "conferindo o próprio uso",
+      findingAgent: "procurando um colega",
       writingWiki: "escrevendo na wiki",
       readingWiki: "lendo a wiki",
       linkingWiki: "ligando a uma página da wiki",

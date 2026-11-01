@@ -419,11 +419,11 @@ describe("approval flow (end to end)", () => {
     const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
     expect(main.at(-1)?.meta?.work).toMatchObject({ steps: tools.length });
     expect((main.at(-1)?.meta?.work as { calls?: unknown } | undefined)?.calls).toEqual([
-      { name: "github_tool_00", connector: "GitHub", service: "github" },
-      { name: "browser_open" },
-      { name: "mail_suporte_read", connector: "Email", service: "gmail" },
-      { name: "create_note" },
-      { name: "linear_list_issues", connector: "Linear", service: "linear" },
+      { name: "github_tool_00", n: 13, connector: "GitHub", service: "github" },
+      { name: "browser_open", n: 2 },
+      { name: "mail_suporte_read", n: 2, connector: "Email", service: "gmail" },
+      { name: "create_note", n: 1 },
+      { name: "linear_list_issues", n: 1, connector: "Linear", service: "linear" },
     ]);
   });
 
@@ -467,6 +467,8 @@ describe("approval flow (end to end)", () => {
     // Two calls keep the block, which says how many: no lone call to time.
     const two = await workOf("make_note", "make_note");
     expect(two).toMatchObject({ steps: 2 });
+    // Each call says how many steps it stands for: the apps take off the ones another card shows (the browser's).
+    expect(two?.calls).toEqual([{ name: "make_note", n: 2 }]);
     expect(two?.ms).toBeUndefined();
     expect(two?.failed).toBeUndefined();
   });
