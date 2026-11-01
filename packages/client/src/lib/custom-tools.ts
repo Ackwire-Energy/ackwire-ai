@@ -59,3 +59,7 @@ export const isHttpsUrl = (v: string) => /^https:\/\/[^\s/]+/.test(v.trim());
 /** Same MCP address, ignoring a trailing slash and case. */
 export const sameServer = (a: string | null | undefined, b: string | null | undefined) =>
   Boolean(a && b) && (a ?? "").replace(/\/+$/, "").toLowerCase() === (b ?? "").replace(/\/+$/, "").toLowerCase();
+
+/** The fields a tool's JSON Schema input takes, by name (none for a schema without `properties`). */
+export const inputFields = (schema: Record<string, unknown>) =>
+  schema.properties && typeof schema.properties === "object" ? Object.keys(schema.properties) : [];

@@ -1873,6 +1873,19 @@ export interface CustomTool {
   firstSeenAt: string;
 }
 
+/**
+ * ADR 0117: an approved MCP tool whose server changed its description or input. Agents keep `before` until a
+ * connector admin accepts the change.
+ */
+export interface ToolChange {
+  connectionId: string;
+  connectionLabel: string;
+  toolName: string;
+  before: { description: string; inputSchema: Record<string, unknown> };
+  after: { description: string; inputSchema: Record<string, unknown> };
+  changedAt: string;
+}
+
 export interface CustomServer {
   id: string;
   serverUrl: string;
@@ -4953,7 +4966,12 @@ export type NotificationKind =
    * ADR 0110: an agent's owner asks for one more browser profile for it (the people who grant profiles). Waiting;
    * `source.agentId` and its name in `source.label`. Opens the agent's page.
    */
-  | "browser_profile_request";
+  | "browser_profile_request"
+  /**
+   * ADR 0117: a connected MCP server changed tools an admin approved (connector admins). Waiting; `source.label` the
+   * connection's name, `latest.title` the tools. Opens Conectores, where it is accepted.
+   */
+  | "connector_tool_changed";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {

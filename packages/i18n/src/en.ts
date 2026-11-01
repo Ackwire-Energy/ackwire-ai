@@ -2430,6 +2430,7 @@ export const en: Translations = {
       browser: "Browser",
       members: "Members",
       usage: "Usage",
+      connectors: "Connectors",
     },
     reactions_one: "{{count}} reaction",
     reactions_other: "{{count}} reactions",
@@ -7692,6 +7693,18 @@ export const en: Translations = {
       limitNotice: "This workspace used its Composio calls for the month",
       disconnectNote:
         "Composio forgets the account. To remove its access in {{name}} too, remove Composio in your account settings there.",
+    },
+    toolChanges: {
+      title: "Tools that changed",
+      intro:
+        "These servers changed what a tool says or asks for. Agents keep the version you approved until you accept the new one.",
+      before: "Approved",
+      after: "Now",
+      input: "Input: {{fields}}",
+      noInput: "No input",
+      accept: "Accept",
+      accepted: "{{tool}} updated.",
+      notice: "{{name}} changed tools you approved",
     },
     names: {
       atlassian: "Atlassian (Jira and Confluence)",

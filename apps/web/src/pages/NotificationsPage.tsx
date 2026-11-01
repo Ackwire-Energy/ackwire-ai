@@ -172,7 +172,7 @@ export function SystemFace({ n, className = "nt-av28" }: { n: AppNotification; c
         <ComputerIcon kind={WORKSPACE_COMPUTER_KIND} size={16} />
       </span>
     );
-  if (n.kind === "composio_limit")
+  if (n.kind === "composio_limit" || n.kind === "connector_tool_changed")
     return (
       <span className="nt-sys" aria-hidden="true">
         <Icon name="plug" size={16} />
@@ -229,6 +229,7 @@ function SourceChip({
   else if (n.kind === "join_request" || n.kind === "invitation_accepted")
     [icon, label] = ["members", t("notifications.source.members")];
   else if (n.kind === "composio_limit") [icon, label] = ["wallet", t("notifications.source.usage")];
+  else if (n.kind === "connector_tool_changed") [icon, label] = ["plug", t("notifications.source.connectors")];
   else if (
     n.kind === "machine_connected" ||
     n.kind === "computer_ready" ||

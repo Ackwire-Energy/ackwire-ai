@@ -5,6 +5,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -200,6 +201,33 @@ export const customTools = pgTable(
     confirmedAt: timestamp({ withTimezone: true }),
   },
   (t) => [unique().on(t.connectionId, t.name), index().on(t.orgId)],
+);
+
+/**
+ * An MCP tool's description and input schema as first listed (ADR 0117): the model sees these, not what the server
+ * says later, until an admin accepts a change. `pending_*`: the server's newer version, kept from its first listing
+ * (`changed_at`) and replaced if it changes again. Composio's tools and the ones we serve are never pinned.
+ */
+export const connectorToolPins = pgTable(
+  "connector_tool_pins",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    orgId: uuid().notNull(),
+    connectionId: uuid()
+      .notNull()
+      .references(() => connectorConnections.id, { onDelete: "cascade" }),
+    toolName: text().notNull(),
+    /** sha256 of the canonical JSON of `{description, inputSchema}`. */
+    fingerprint: text().notNull(),
+    description: text().notNull().default(""),
+    inputSchema: jsonb().$type<Record<string, unknown>>().notNull(),
+    pinnedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    pendingFingerprint: text(),
+    pendingDescription: text(),
+    pendingSchema: jsonb().$type<Record<string, unknown>>(),
+    changedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [unique().on(t.orgId, t.connectionId, t.toolName), index().on(t.connectionId)],
 );
 
 /**

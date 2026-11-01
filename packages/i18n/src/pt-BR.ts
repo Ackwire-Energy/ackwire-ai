@@ -2451,6 +2451,7 @@ export const ptBR = {
       browser: "Navegador",
       members: "Membros",
       usage: "Uso",
+      connectors: "Conectores",
     },
     reactions_one: "{{count}} reação",
     reactions_other: "{{count}} reações",
@@ -7747,6 +7748,18 @@ export const ptBR = {
       limitNotice: "As chamadas da Composio deste mês acabaram",
       disconnectNote:
         "A Composio esquece a conta. Para tirar o acesso também no {{name}}, remova a Composio nas configurações da sua conta de lá.",
+    },
+    toolChanges: {
+      title: "Ferramentas que mudaram",
+      intro:
+        "Estes servidores mudaram o que uma ferramenta diz ou pede. Os agentes seguem com a versão aprovada até você aceitar a nova.",
+      before: "Aprovada",
+      after: "Agora",
+      input: "Entrada: {{fields}}",
+      noInput: "Sem entrada",
+      accept: "Aceitar",
+      accepted: "{{tool}} atualizada.",
+      notice: "{{name}} mudou ferramentas que você aprovou",
     },
     names: {
       atlassian: "Atlassian (Jira e Confluence)",

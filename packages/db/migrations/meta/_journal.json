@@ -1114,6 +1114,13 @@
       "when": 1793558117869,
       "tag": "0160_browser_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 160,
+      "version": "7",
+      "when": 1793575356875,
+      "tag": "0161_connector_tool_pins",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,69 @@
+import type { ToolChange } from "@agenteschat/client";
+import { useAcceptToolChange, useToolChanges } from "@agenteschat/client";
+import { inputFields } from "@agenteschat/client/lib/custom-tools";
+import { errorText } from "@agenteschat/client/lib/errors";
+import { Button } from "@agenteschat/ui";
+import { useTranslation } from "react-i18next";
+import { useToast } from "@/lib/toast";
+
+/**
+ * Settings → Conectores, for connector admins (ADR 0117): approved tools whose server changed what they say or take.
+ * Agents keep the approved version until an admin accepts the new one here, side by side. Nothing when none waits.
+ */
+export function ToolChanges({ orgId }: { orgId: string }) {
+  const { t } = useTranslation();
+  const changes = useToolChanges(orgId);
+  const accept = useAcceptToolChange(orgId);
+  const toast = useToast();
+  const list = changes.data ?? [];
+  if (list.length === 0) return null;
+  return (
+    <section className="tool-changes" aria-labelledby="tool-changes-title">
+      <h3 id="tool-changes-title" className="tool-changes__title">
+        {t("connectors.toolChanges.title")}
+      </h3>
+      <p className="small muted">{t("connectors.toolChanges.intro")}</p>
+      {list.map((c) => (
+        <article key={`${c.connectionId}:${c.toolName}`} className="tool-change">
+          <div className="tool-change__head">
+            <span className="tool-change__name">
+              {c.connectionLabel} · <code>{c.toolName}</code>
+            </span>
+            <Button
+              size="sm"
+              loading={accept.isPending && accept.variables?.toolName === c.toolName}
+              onClick={() =>
+                accept.mutate(c, {
+                  onSuccess: () => toast.show(t("connectors.toolChanges.accepted", { tool: c.toolName })),
+                  onError: (e) => toast.show(errorText(t, e), "error"),
+                })
+              }
+            >
+              {t("connectors.toolChanges.accept")}
+            </Button>
+          </div>
+          <div className="tool-change__sides">
+            <Version label={t("connectors.toolChanges.before")} version={c.before} />
+            <Version label={t("connectors.toolChanges.after")} version={c.after} />
+          </div>
+        </article>
+      ))}
+    </section>
+  );
+}
+
+function Version({ label, version }: { label: string; version: ToolChange["before"] }) {
+  const { t } = useTranslation();
+  const fields = inputFields(version.inputSchema);
+  return (
+    <div className="tool-change__side">
+      <div className="small muted">{label}</div>
+      <p className="tool-change__text">{version.description}</p>
+      <div className="small muted">
+        {fields.length > 0
+          ? t("connectors.toolChanges.input", { fields: fields.join(", ") })
+          : t("connectors.toolChanges.noInput")}
+      </div>
+    </div>
+  );
+}

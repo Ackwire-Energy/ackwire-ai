@@ -799,6 +799,8 @@ export const featureKeysPtBR = {
       composio_limit_other: "As chamadas da Composio deste mês acabaram",
       browser_profile_request_one: "{{names}} pede mais um perfil do navegador",
       browser_profile_request_other: "{{names}} pedem mais um perfil do navegador",
+      connector_tool_changed_one: "Um servidor conectado mudou ferramentas que você aprovou",
+      connector_tool_changed_other: "Um servidor conectado mudou ferramentas que você aprovou",
     },
     markRead: "Marcar como lida",
     markUnread: "Marcar como não lida",

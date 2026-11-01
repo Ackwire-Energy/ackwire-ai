@@ -317,7 +317,7 @@ export function buildEngine(o: EngineOptions) {
       createForumToolSource({ pubsub: adapters.pubsub, artifacts }),
       createWikiToolSource({ pubsub: adapters.pubsub, search: context, artifacts }),
       createContextToolSource(context),
-      createConnectorToolSource({ ...connectorDeps, artifacts, log: o.log }),
+      createConnectorToolSource({ ...connectorDeps, artifacts, log: o.log, pubsub: adapters.pubsub }),
       // People's mailboxes (ADR 0038): only when the server has a mail path (Composio, IMAP).
       createMailToolSource({
         keyWrappers,

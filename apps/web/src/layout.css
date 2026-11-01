@@ -11719,3 +11719,41 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
     padding-left: 44px;
   }
 }
+
+/* Settings → Conectores: approved tools a server changed, old and new side by side (ADR 0117). */
+.tool-changes {
+  display: grid;
+  gap: var(--space-2);
+}
+.tool-changes__title {
+  margin: 0;
+  font-size: 1rem;
+}
+.tool-change {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.tool-change__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.tool-change__name {
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.tool-change__sides {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-3);
+}
+.tool-change__text {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

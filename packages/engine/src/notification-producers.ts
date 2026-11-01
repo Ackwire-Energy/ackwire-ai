@@ -1058,6 +1058,31 @@ export async function notifyComposioLimit(deps: NotificationDeps, orgId: string,
   });
 }
 
+const toolChangedGroup = (connectionId: string) => `connector_tool_changed:${connectionId}:`;
+
+/**
+ * A connected MCP server changed tools an admin approved (ADR 0117): who manages connectors hears it once per change,
+ * `source.label` the connection's name and `latest.title` the tools. Resolved when nothing of it waits any more.
+ */
+export async function notifyToolChanged(
+  deps: NotificationDeps,
+  connection: { id: string; orgId: string; label: string },
+  tools: { name: string; fingerprint: string }[],
+) {
+  await notify(deps, {
+    orgId: connection.orgId,
+    userIds: await adminsOf(deps, connection.orgId, "manage_connectors"),
+    kind: "connector_tool_changed",
+    groupKey: `${toolChangedGroup(connection.id)}${tools[0]?.fingerprint ?? ""}`,
+    waiting: true,
+    source: { label: connection.label },
+    latest: { title: tools.map((t) => t.name).join(", ") },
+  });
+}
+
+export const resolveToolChanged = (deps: NotificationDeps, orgId: string, connectionId: string) =>
+  resolveNotifications(deps, orgId, { groupKeyPrefix: toolChangedGroup(connectionId) });
+
 // ── Workspace standing (ADR 0056 §8) ──────────────────────────────────────────
 
 /**

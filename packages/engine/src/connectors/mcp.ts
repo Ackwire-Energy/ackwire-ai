@@ -1,4 +1,4 @@
-import { type ComposioClient, composioFile, FileTooLargeError } from "@agenteschat/adapters";
+import { type ComposioClient, composioFile, FileTooLargeError, type PubSub } from "@agenteschat/adapters";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
@@ -28,6 +28,7 @@ import {
   isCustom,
   type ToolAccess,
 } from "./custom";
+import { applyToolPins } from "./pins";
 import { composioAction, presetForServer } from "./presets";
 import type { McpServerInfo } from "./server-icon";
 
@@ -133,6 +134,8 @@ export function createConnectorToolSource(
     /** Where files a Composio action returns are kept (the workspace's Drive); none: they aren't kept. */
     artifacts?: ArtifactDeps;
     log?: { warn(message: string, data?: Record<string, unknown>): void };
+    /** Tells connector admins live when a server changes an approved tool. */
+    pubsub?: PubSub;
   },
 ): ToolSource {
   const connect = deps.connect ?? connectOverHttp;
@@ -151,9 +154,17 @@ export function createConnectorToolSource(
     const key = `${connection.id}:${connection.updatedAt.getTime()}`;
     const hit = cache.get(key);
     if (hit && Date.now() - hit.at < LIST_TTL_MS) return hit.tools;
-    const tools = await withSession(connection, (s) => s.listTools());
+    const listed = await withSession(connection, (s) => s.listTools());
+    const tools = await applyToolPins(deps, connection, listed, pinnedTool(connection));
     cache.set(key, { at: Date.now(), tools });
     return tools;
+  }
+
+  /** Which of a connection's tools keep their approved text (ADR 0117): not Composio's (pinned by toolkit version), not ours. */
+  function pinnedTool(connection: ConnectorConnection): (name: string) => boolean {
+    if (isCustom(connection)) return composioServiceOf(connection.serverUrl) ? () => false : () => true;
+    const def = CONNECTOR_CATALOG[connection.connector];
+    return (name) => Boolean(def?.tools[name] && !def.tools[name]?.ours);
   }
 
   /**

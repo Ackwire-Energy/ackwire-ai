@@ -793,6 +793,8 @@ export const featureKeysEn: FeatureTranslations = {
       composio_limit_other: "This workspace used its Composio calls for the month",
       browser_profile_request_one: "{{names}} asks for one more browser profile",
       browser_profile_request_other: "{{names}} ask for one more browser profile",
+      connector_tool_changed_one: "A connected server changed tools you approved",
+      connector_tool_changed_other: "A connected server changed tools you approved",
     },
     markRead: "Mark as read",
     markUnread: "Mark as unread",
