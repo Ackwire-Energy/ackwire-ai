@@ -184,7 +184,7 @@ describe("a person's message while a run waits for help in the browser", () => {
     await stopChecksSettled();
     await drainOutbox(f.db, f.handlers);
     expect((await runs())[0]?.status).toBe("done");
-    // What the run waits on brings it back: not judged, no more turns (ADR 0096).
+    // What the run waits on brings it back: not judged, no more turns (ADR 0097).
     const judged = (f.context.judge as unknown as { calls: { kind: string }[] }).calls;
     expect(judged.filter((j) => j.kind === "follow_through").length).toBe(0);
     const steps = await f.db.select().from(schema.agentRunSteps);

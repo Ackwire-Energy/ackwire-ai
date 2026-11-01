@@ -25,7 +25,7 @@ export type ConsultLineState = "working" | "waiting" | "offline" | "handedOn" | 
 export const CONSULT_GROUP_POLL_MS = 10_000;
 
 /**
- * What an open line shows of the work so far (ADR 0096): how many messages the consulted agent posted in the agents'
+ * What an open line shows of the work so far (ADR 0097): how many messages the consulted agent posted in the agents'
  * DM and the start of the latest ("12 mensagens · Gerei a imagem 40"), or null. Answered lines show the answer.
  */
 export function consultProgress(c: Pick<RunConsultation, "status" | "progress">) {

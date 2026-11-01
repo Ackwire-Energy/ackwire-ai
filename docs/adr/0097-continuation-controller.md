@@ -1,4 +1,4 @@
-# 0096. One controller decides how every turn ends
+# 0097. One controller decides how every turn ends
 
 - Status: Accepted (built: the server, the web and the phone app)
 - Date: 2026-11-01

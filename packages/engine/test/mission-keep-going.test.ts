@@ -319,7 +319,7 @@ describe("a mission keeps going between people's messages", () => {
     await f.db.insert(schema.missionReviews).values({ orgId: f.org.id, missionId: view.id, title: "Relatório v1" });
     await drainOutbox(f.db, f.handlers);
     const judged = (f.context.judge as unknown as { calls: { kind: string }[] }).calls;
-    // The card that asks brings the mission back: nothing to judge (ADR 0096).
+    // The card that asks brings the mission back: nothing to judge (ADR 0097).
     expect(judged.some((c) => c.kind === "follow_through")).toBe(false);
     const steps = await f.db.select().from(schema.agentRunSteps);
     expect(steps.some((st) => (st.data as { nudged?: string }).nudged === "mission_ask")).toBe(false);

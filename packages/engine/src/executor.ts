@@ -321,7 +321,7 @@ export interface Transcript {
    */
   decided?: string;
   /**
-   * The continuation controller's count of extra turns in this run (ADR 0096). A person's answer or message starts
+   * The continuation controller's count of extra turns in this run (ADR 0097). A person's answer or message starts
    * it over (they are the bound); another agent's answer doesn't.
    */
   continuation?: ContinuationState;
@@ -1685,7 +1685,7 @@ async function executeRunInner(
   };
 
   /**
-   * Told to ask and still describing what it needs (ADR 0096): its reply becomes the question, as `ask_user` would
+   * Told to ask and still describing what it needs (ADR 0097): its reply becomes the question, as `ask_user` would
    * post it. The run waits on the card, the accountable person hears it, and the answer resumes the run as text.
    */
   const askWithCard = async (text: string) => {
@@ -2604,7 +2604,7 @@ async function executeRunInner(
         // `reported`), so a routine that goes in circles on every firing is heard of and paused like any failing one.
         if (transcript.stuck?.endAt !== undefined)
           return fail(STUCK_ERROR, { code: STUCK_ERROR, ...(record ? { detail: record } : {}) });
-        // Work it said it would do still undone: once more in the same run (ADR 0096). It never asks: its report
+        // Work it said it would do still undone: once more in the same run (ADR 0097). It never asks: its report
         // goes to a conversation whose own run can.
         const state = transcript.continuation ?? { count: 0 };
         const decision = await decideTurnEnd({
@@ -2696,7 +2696,7 @@ async function executeRunInner(
                 ? bodyCode("done")
                 : undefined;
       const t = transcript;
-      // How the turn ends (ADR 0096): it goes on in this run (told why), it waits on something durable, it asks a
+      // How the turn ends (ADR 0097): it goes on in this run (told why), it waits on something durable, it asks a
       // person with a card, or it is done. One choke point for every run kind but a routine's (above) and a forum's.
       const decided = t.decided;
       delete t.decided;
@@ -2810,7 +2810,7 @@ async function executeRunInner(
         if (posted) {
           const [view] = await withWikiLinks(db, run.orgId, [messageView(posted)]);
           if (view) await publishMessageCreated(deps.pubsub, view);
-          // Work handed to it shows moving where it was handed from (its line's `progress`, ADR 0096).
+          // Work handed to it shows moving where it was handed from (its line's `progress`, ADR 0097).
           if (betweenAgents) await announceConsultationChange({ db, pubsub: deps.pubsub }, run).catch(() => {});
           if (typeof issueId === "string")
             await mirrorReplyToIssue({ db, pubsub: deps.pubsub }, run, issueId, posted.body).catch(() => {});

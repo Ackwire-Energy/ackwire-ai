@@ -229,7 +229,7 @@ scenario(
     expect((await runAuthority(w.db, run as NonNullable<typeof run>)).kind).toBe("person");
     expect(await w.posts("otto")).toHaveLength(1);
     // A hand-off by mention closes in the conversation itself: Otto's answer is there for Nina and the person, so
-    // Nina isn't woken again for it (a failure is reported to her instead: S30, ADR 0096).
+    // Nina isn't woken again for it (a failure is reported to her instead: S30, ADR 0097).
     expect(await w.runs("nina")).toHaveLength(1);
     await assertInvariants(w);
   },

@@ -82,7 +82,7 @@ test("a promise nothing keeps: one more turn to keep it, one to ask, then the re
   expect(nudge).toContain("You ended saying you would do more");
   // No sentence of it is quoted back: the judge read the whole message, in whatever language.
   expect(nudge).not.toContain("Vou checar");
-  // Promising again without doing anything: it is told to ask instead, once (ADR 0096).
+  // Promising again without doing anything: it is told to ask instead, once (ADR 0097).
   expect(lastUserText(f.provider.calls[2]?.request as ModelRequest)).toContain("Ask them now with ask_user");
   expect(followThroughCalls(f).length).toBe(3);
   const steps = await f.db.select().from(schema.agentRunSteps);

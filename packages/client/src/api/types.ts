@@ -872,7 +872,7 @@ export interface RunConsultation {
   question: string;
   /** The answer once answered; why it couldn't once failed. */
   answer: string | null;
-  /** Open: what the consulted agent posted in the agents' DM so far (ADR 0096). Older servers send none. */
+  /** Open: what the consulted agent posted in the agents' DM so far (ADR 0097). Older servers send none. */
   progress?: { posts: number; latest: string; at: string } | null;
   createdAt: string;
   answeredAt: string | null;
@@ -4681,7 +4681,7 @@ export type NotificationKind =
   | "routine_finished"
   /** A routine's failure streak began (one per streak; the next good run resolves it). Opens it in Rotinas. */
   | "routine_failed"
-  /** ADR 0096: an agent's run in a conversation failed for good (`latest.reason` coded). Opens that conversation. */
+  /** ADR 0097: an agent's run in a conversation failed for good (`latest.reason` coded). Opens that conversation. */
   | "run_failed"
   /** The server paused a routine (`latest.reason`: its coded `pausedReason`). Opens it in Rotinas. */
   | "routine_paused"

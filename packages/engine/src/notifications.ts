@@ -62,7 +62,7 @@ export const NOTIFICATION_KINDS = [
   "routine_finished",
   "routine_failed",
   /**
-   * A conversation run failed for good (ADR 0096): the person accountable for it, else the agent's owner, once per
+   * A conversation run failed for good (ADR 0097): the person accountable for it, else the agent's owner, once per
    * agent and conversation, its coded reason in `latest.reason`. Resolved by the agent's next good run there.
    */
   "run_failed",

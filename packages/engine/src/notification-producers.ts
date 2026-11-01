@@ -731,7 +731,7 @@ export async function notifyRoutineFinished(
   });
 }
 
-// ── Runs (ADR 0096) ─────────────────────────────────────────────────────────────
+// ── Runs (ADR 0097) ─────────────────────────────────────────────────────────────
 
 const runFailedGroup = (run: { agentId: string; channelId: string; threadRootId: string }) =>
   `run_failed:${run.agentId}:${run.channelId}:${run.threadRootId}`;

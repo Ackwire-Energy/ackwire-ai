@@ -474,7 +474,7 @@ describe("ask_agent", () => {
       .where(eq(schema.channels.id, row?.channelId ?? ""));
     expect(await consultationsIn(f.db, f.org.id, other[0]?.id ?? "")).toEqual([]);
 
-    // What the consulted run posts in the agents' DM meanwhile shows here as its progress (ADR 0096).
+    // What the consulted run posts in the agents' DM meanwhile shows here as its progress (ADR 0097).
     const [target] = await f.db
       .select()
       .from(schema.agentRuns)
@@ -668,7 +668,7 @@ describe("ask_agent", () => {
     expect(infraCalls).toBe(2);
     expect(await consultations()).toMatchObject([{ status: "answered", answer: kept }]);
     const judged = (f.context.judge as unknown as { calls: { kind: string; agentId?: string }[] }).calls;
-    // Read again after the nudge: the kept answer is done (ADR 0096).
+    // Read again after the nudge: the kept answer is done (ADR 0097).
     expect(judged.filter((j) => j.kind === "follow_through" && j.agentId === infra.id)).toHaveLength(2);
     const nudged = f.provider.calls
       .map((c) => c.request)
@@ -692,7 +692,7 @@ describe("ask_agent", () => {
     await post("@dev how do we deploy to staging?");
     await drainOutbox(f.db, f.handlers);
 
-    // The open question keeps the first promise, so it isn't judged (ADR 0096); the consulted run's answer and
+    // The open question keeps the first promise, so it isn't judged (ADR 0097); the consulted run's answer and
     // the relay are.
     expect(judged).toBe(2);
     const steps = await f.db.select().from(schema.agentRunSteps);

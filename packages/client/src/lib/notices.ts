@@ -63,7 +63,7 @@ export function noticeAgentHandle(notice: MessageNotice): string | null {
   return handle ? handle.replace(/^@/, "") : null;
 }
 
-/** `wake_skipped`: the handles an agent's mention couldn't wake (ADR 0096), for the line's names. */
+/** `wake_skipped`: the handles an agent's mention couldn't wake (ADR 0097), for the line's names. */
 export const skippedHandles = (notice: MessageNotice) => (notice.refs.agentHandles ?? "").split(",").filter(Boolean);
 
 /** An automatic line in the conversation (a notice): nothing groups with it. */

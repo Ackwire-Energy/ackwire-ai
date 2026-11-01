@@ -14,7 +14,7 @@ import { deliverNoticeToRun } from "./run-resume";
 import type { AgentRun } from "./runs";
 
 /**
- * The continuation controller (ADR 0096): every turn of every run kind that reaches its final answer ends in exactly
+ * The continuation controller (ADR 0097): every turn of every run kind that reaches its final answer ends in exactly
  * one of continue (the same run keeps working), waiting (something durable brings it back) or done. Cheap rules
  * first, then at most one judgment (`continuationVerdict`). A failed run goes to `reportRunFailure` instead.
  */
