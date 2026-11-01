@@ -2,7 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, gt, gte, isNotNull, isNull, schema, sql } from "@agenteschat/db";
 import { runAuthority } from "./authority";
 import { requireChannelAccess } from "./channels";
-import { handOffsFrom } from "./consultations";
+import { handOffsFrom, sentOpen } from "./consultations";
 import { getChannelCached } from "./context";
 import { publishDelivery } from "./delivery";
 import { eligibleChannelAgents } from "./dispatch";
@@ -151,13 +151,15 @@ async function pendingFollowUps(
  * Whether something brings the agent back here by itself, keeping its promise: a follow-up this run set still to
  * come, a question or work it or an earlier run of it asked or handed off from this conversation that is still out
  * (`ask_agent`, `tell_agent`, the last day: what comes of it wakes the agent here), a wait it stopped waiting on
- * whose result hasn't come, or a reminder it set to do the work then (`schedule_reminder` with `ask_agent`).
+ * whose result hasn't come, or a reminder it set to do the work then (`schedule_reminder` with `ask_agent`). In an
+ * agents' DM only what this run handed on counts: what another run there handed on goes back with that run's answer.
  */
 export async function wakesLater(
   db: Executor,
   run: Pick<AgentRun, "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId" | "createdAt">,
   detachedWaits: { waitId: string }[] = [],
 ) {
+  const channel = await getChannelCached(db, run.orgId, run.channelId);
   const [followUp, handedOff, reminder] = await Promise.all([
     db
       .select({ id: messages.id })
@@ -175,7 +177,9 @@ export async function wakesLater(
         ),
       )
       .limit(1),
-    handOffsFrom(db, run, { openOnly: true }),
+    channel && isAgentOnlyDm(channel)
+      ? sentOpen(db, run)
+      : handOffsFrom(db, run, { openOnly: true }).then((rows) => rows.length > 0),
     db
       .select({ id: routines.id })
       .from(routines)
@@ -194,7 +198,7 @@ export async function wakesLater(
       )
       .limit(1),
   ]);
-  if (followUp.length > 0 || handedOff.length > 0 || reminder.length > 0) return true;
+  if (followUp.length > 0 || handedOff || reminder.length > 0) return true;
   for (const d of detachedWaits) if (!(await lateNoticeSent(db, run, d.waitId))) return true;
   return false;
 }

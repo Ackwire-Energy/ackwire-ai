@@ -38,6 +38,7 @@ import {
   startOrJoinRun,
   stretchCardOf,
   type ToolContext,
+  wakesLater,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
 import { fakeRunner, pairMachine, RUNNER } from "./machine-fixtures";
@@ -1535,6 +1536,26 @@ describe("tell_agent: what comes of work handed off comes back by itself (ADR 00
     const read = f.provider.calls.map((c) => lastText(c.request)).find((t) => t.includes("Fila vazia: 0 jobs."));
     expect(read).toContain("Still out, waiting on a person or a computer: @infra.");
     expect(await rowOf("Faz o merge do PR #7.")).toMatchObject({ status: "open" });
+  });
+
+  test("between agents, only what this run handed on keeps its promise, not what another run there handed on", async () => {
+    f = await setup({ askAgent: true, judge: notesMatter });
+    await addInfra();
+    await addAgent("Ops");
+    const dev = await devRun("@dev pede ao infra");
+    await ended(dev.id);
+    await tell(dev, "@infra", "Cuida do deploy de staging.");
+    const first = await runFor((await consultations())[0]);
+    await tell(first, "@ops", "Limpa a fila de jobs.");
+    await ended(first.id);
+    const again = await devRun("@dev pede ao infra outra coisa");
+    await ended(again.id);
+    await tell(again, "@infra", "Atualiza o certificado do staging.");
+    const second = await runFor((await consultations()).find((c) => c.askerRunId === again.id));
+    expect(second.id).not.toBe(first.id);
+    expect(await wakesLater(f.db, second)).toBe(false);
+    await tell(second, "@ops", "Renova o certificado do balanceador.");
+    expect(await wakesLater(f.db, second)).toBe(true);
   });
 
   test("an agent that fails after handing part on: what it owed fails at once, and what comes back later wakes nobody", async () => {

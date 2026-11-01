@@ -515,7 +515,7 @@ async function inAgentsDm(db: Executor, run: Pick<AgentRun, "orgId" | "channelId
 }
 
 /** Whether something this run asked or handed off is still out. */
-async function sentOpen(db: Executor, run: Pick<AgentRun, "id" | "orgId">) {
+export async function sentOpen(db: Executor, run: Pick<AgentRun, "id" | "orgId">) {
   const [row] = await db
     .select({ id: agentConsultations.id })
     .from(agentConsultations)
