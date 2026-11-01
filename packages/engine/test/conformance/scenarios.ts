@@ -46,7 +46,7 @@ const TOLD = "Apareceram 12 erros novos no checkout desde as 9h (cálculo do fre
 /** The routine's run hands off its report, then ends with its record. */
 const handsOff: ScriptRun = {
   background: true,
-  steps: [{ calls: [{ name: "hand_off", input: { message: REPORT } }] }, { text: RECORD }],
+  steps: [{ calls: [{ name: "hand_off", input: { message: REPORT, wake_me: true } }] }, { text: RECORD }],
 };
 
 const look: ScriptCall = { name: "look", input: {} };

@@ -135,7 +135,7 @@ test("an event stays in the routine run, never in the brief; an issue's event ca
   expect(brief?.body).toBe("Faça a triagem da issue nova.");
 });
 
-test("hand_off delivers to the conversation the routine reports to, never its room; the agent tells people there", async () => {
+test("hand_off with wake_me delivers to the conversation the routine reports to, never its room; the agent tells people there", async () => {
   f = await setup({
     handOff: true,
     reply: (req) => {
@@ -143,7 +143,9 @@ test("hand_off delivers to the conversation the routine reports to, never its ro
       if (seen(req).includes("Handed off")) return { chunks: ["Checado: 3 avaliações novas, reportadas."] };
       return {
         chunks: [],
-        toolUses: [{ name: "hand_off", input: { message: "3 avaliações novas: 2 negativas (PDF), 1 positiva." } }],
+        toolUses: [
+          { name: "hand_off", input: { message: "3 avaliações novas: 2 negativas (PDF), 1 positiva.", wake_me: true } },
+        ],
       };
     },
   });
@@ -261,6 +263,7 @@ test("report every time: a final text without hand_off is the report (auto_repor
     code: "auto_report",
     summary: "Relatório: 3 itens novos.",
   });
+  // Its final text is its record, not a message for people: a notice the agent tells them from.
   const [notice] = await messagesIn(f, f.general.id);
   expect(notice?.meta.notice).toMatchObject({
     kind: "routine_handoff",

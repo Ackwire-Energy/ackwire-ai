@@ -953,19 +953,20 @@ async function routineContext(
   const who = creator ?? "its creator";
 
   const block = [
-    `# This is a routine run\nYour routine «${name}» started this run: background work that nobody watches. Nobody waits for a reply here and nothing you write here is posted; your report reaches people only through hand_off, which takes it to ${place}.`,
+    `# This is a routine run\nYour routine «${name}» started this run: background work that nobody watches. Nobody waits for a reply here and nothing you write here is posted; your message reaches people only through hand_off, which posts it in ${place}.`,
     `Its instructions, set up by ${creator ?? "its creator"}:\n${(row?.prompt ?? trigger.body).trim()}`,
     `What it may do: ${
       brief.access === "act"
         ? `look and act. Besides reading, you may change things inside agentes.chat that people can undo (issues, memory, wiki, Drive files) and work on your own branches (agentes/${agent.handle}/…) and their pull requests. Any change in a connected app asks a person first: an approval card in ${place}, with your reason. Merge, deploy and rollback always do. When its instructions ask you to fix or resolve things and the fix is such a change, hand off your report first (saying what you're asking for), then call that tool with your reason: your run waits for the person's decision, so anything after it waits too. You may also reach other agents and post where ${who} can: tell_agent leaves an agent a note (it wakes and works on it), ask_agent asks one something (the answer reaches you, or ${place} once this run ended), post_message posts in a channel ${who} can post in (an @mention there wakes that agent), and send_dm writes only to ${who}; only agents ${who} can talk to are reached.`
-        : `look and tell. ${creator ?? "Its creator"} set this routine to only look and tell, so this run is read-only: read and search anything your tools reach (on your computer too: no edits, only commands that read, no web) and change nothing; tools that change things are refused. Put what you would do in hand_off; the people decide. Because it is set to only look, it can't message other agents or post anywhere either: when its instructions ask you to message an agent or post, say so in your report and that a person can set the routine to "Pode agir" (act) for that.`
+        : `look and tell. ${creator ?? "Its creator"} set this routine to only look and tell, so this run is read-only: read and search anything your tools reach (on your computer too: no edits, only commands that read, no web) and change nothing; tools that change things are refused. Put what you would do in hand_off; the people decide. Because it is set to only look, it can't message other agents or post anywhere but through hand_off: when its instructions ask you to message an agent or post elsewhere, say so in your message and that a person can set the routine to "Pode agir" (act) for that.`
     }`,
     `When it speaks: ${
       brief.report === "always"
-        ? "every run. Call hand_off once with the complete report (what you found, why it matters, what you recommend or already did), even when nothing changed: then say so in a line. If you end without it, your final text is delivered as the report."
-        : "only when there is news. When there is something the people need to know or act on, call hand_off once with the complete report (what you found, why it matters, what you recommend or already did); when the instructions ask for a report every time, there always is one. Otherwise just finish: nothing is posted. Something you already reported or proposed (your last record, what was said there) is not news: don't hand it off again unless it changed."
+        ? `every run. Call hand_off once with the message, even when nothing changed: then say so in a line. If you end without it, your final record is handed to you in ${place} instead, to tell the people from.`
+        : "only when there is news. When there is something the people need to know or act on, call hand_off once with the message; when the instructions ask for a message every time (a greeting, a digest, a reminder), there always is one. Otherwise just finish: nothing is posted. Something you already reported or proposed (your last record, what was said there) is not news: don't hand it off again unless it changed."
     }`,
-    "How to work: check the real sources with your tools instead of restating status, compare with your last run, and dig into anything unusual (why, since when, how big). Either way, end with a short record of what you checked and found: the next run compares with it.",
+    `What hand_off posts: its message, as-is, as your own message in ${place}. Write the message itself, to the people, in their language: what its instructions ask them to be told (the greeting, the digest, the reminder, or what you found, why it matters and what you recommend or already did). Never talk about this routine or its runs (that it ran, that it is the first run, that there is nothing earlier to compare with) and never bring in matters from other conversations its instructions don't ask for. Set wake_me only when what you found needs you to act or decide in ${place} (its instructions say so, or there is work you can only do there): then your message is a note to yourself there, and you tell the people when you wake.`,
+    "How to work: check the real sources with your tools instead of restating status, compare with your last run, and dig into anything unusual (why, since when, how big). Either way, end with a short record of what you checked and found (it is never posted): the next run compares with it.",
     `Do not manage routines from a routine run (creating, changing, running or deleting one), and don't ${
       brief.access === "act"
         ? "react, set reminders or ask people questions"
@@ -989,7 +990,7 @@ async function routineContext(
 
   const deliverToView = [
     "# Where your report goes",
-    `hand_off wakes you in ${place}, where you tell the people in your own words. What was said there lately, so you know what people already know or asked (read-only: you can't answer it from here, and none of it is a request to this run):`,
+    `hand_off posts in ${place}. What was said there lately, so you know what people already know (read-only: you can't answer it from here, none of it is a request to this run, and none of it goes in your message unless its instructions ask):`,
     ...(said.length > 0 ? said : ["(nothing yet)"]),
   ].join("\n");
 
@@ -998,7 +999,7 @@ async function routineContext(
     block,
     deliverToView,
     timeLine: routineTimeLine(brief, zone, lastAt, now),
-    whereYouAre: `# Where you are\nYour routine's own room: background work that no person reads. What you hand off reaches ${place}.`,
+    whereYouAre: `# Where you are\nYour routine's own room: background work that no person reads. What you hand off is posted in ${place}.`,
   };
 }
 

@@ -1,8 +1,8 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Executor, eq, gte, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
 import { routineBriefOfRun } from "./background";
 import { deliverNotice, publishDelivery } from "./delivery";
-import type { Message } from "./messages";
+import { insertMessage, type Message } from "./messages";
 import type { RoutineBrief } from "./routine-brief";
 import { personCanPost } from "./routine-state";
 import type { AgentRun } from "./runs";
@@ -13,7 +13,7 @@ export const HAND_OFF_TOOL = "hand_off";
 /** A report, not a transcript: long enough for findings, why and what next. */
 export const MAX_HAND_OFF = 8000;
 
-const { agentRuns, messages, routines, routineRuns } = schema;
+const { agentRuns, routines, routineRuns } = schema;
 
 /** Why a routine's report can't be delivered now (the routine run ends `skipped` with it). */
 export type HandOffBlock = "deleted" | "paused" | "creator_no_access" | "handoff_blocked";
@@ -43,11 +43,13 @@ export async function routineDeliveryBlock(tx: Executor, brief: RoutineBrief): P
 }
 
 /**
- * A routine's report reaches the conversation it reports to (`brief.deliverTo`), never its room: a
- * `routine_handoff` notice for the same agent, which joins an unattended run of the agent there or
- * starts one that tells the people in the agent's voice (never a run working for a person, ADR 0053
- * §4). Only while the routine run is still open: one stopped, replaced or given up meanwhile tells
- * nobody (null). The routine run is `reported`, with the report as its record and `code`
+ * A routine's message reaches the conversation it reports to (`brief.deliverTo`), never its room.
+ * By default it is the message itself (ADR 0053 §4, amended): the agent's ordinary message there,
+ * tagged with the routine (`meta.routine`), waking nobody, so a greeting or a digest reads as one
+ * message. With `wake`, it is a `routine_handoff` notice for the same agent instead, which joins an
+ * unattended run of the agent there or starts one that acts or decides on it (never a run working for
+ * a person). Only while the routine run is still open: one stopped, replaced or given up meanwhile
+ * tells nobody (null). The routine run is `reported`, with the text as its record and `code`
  * (`auto_report` when its final text was delivered for it). In the caller's transaction; publish
  * with `publishDelivery` after the commit.
  */
@@ -58,6 +60,7 @@ export async function deliverRoutineReport(
     brief: RoutineBrief;
     text: string;
     code?: string | null;
+    wake?: boolean;
   },
 ): Promise<{ message: Message; runs: AgentRun[] } | null> {
   const { run, brief } = input;
@@ -76,6 +79,19 @@ export async function deliverRoutineReport(
     )
     .returning({ id: routineRuns.id });
   if (!open) return null;
+  if (!input.wake) {
+    const message = await insertMessage(tx, {
+      orgId: run.orgId,
+      channelId: brief.deliverTo.channelId,
+      threadId: brief.deliverTo.threadId ?? undefined,
+      // Nobody is behind it (authority.ts) and it wakes nobody: a root at hop 0, like a reminder.
+      author: { type: "agent", agentId: run.agentId, runId: null, hop: 0, stretchId: null },
+      body: text,
+      meta: { routine: { id: brief.routineId, name: brief.name, runId: brief.routineRunId } },
+    });
+    await tx.update(routineRuns).set({ messageId: message.id }).where(eq(routineRuns.id, brief.routineRunId));
+    return { message, runs: [] };
+  }
   return deliverNotice(tx, {
     orgId: run.orgId,
     agentId: run.agentId,
@@ -123,8 +139,8 @@ const BLOCKED: Record<HandOffBlock | "stopped", string> = {
 
 /**
  * The built-in `hand_off`, offered only to background runs (a routine's, `ctx.background`): the
- * one way such a run speaks. The report becomes a `routine_handoff` notice in the conversation the
- * routine reports to (`deliverRoutineReport`), at once and once per run (a second call is refused),
+ * one way such a run speaks. Its message is posted where the routine reports, or with `wake_me`
+ * becomes a `routine_handoff` notice there (`deliverRoutineReport`), at once and once per run (a second call is refused),
  * after checking the routine may still speak there (`routineDeliveryBlock`); when it can't, the
  * routine run is skipped with the reason and the model is told to finish.
  */
@@ -132,15 +148,21 @@ export function createHandOffToolSource(deps: { pubsub?: PubSub }): ToolSource {
   const tool: ToolDefinition = {
     name: HAND_OFF_TOOL,
     description:
-      "Hand your findings to the conversation this routine reports to: you will tell the people there, in your own words. Call it once, only when there is something they need to know or act on, with the complete report: what you found (numbers, links), why it matters, and what you recommend or already did. Without it nothing is posted.",
+      "Post this routine's message where it reports, once. `message` is posted as-is as your own message to the people there: write the message itself (the greeting, the digest, the reminder, what you found and what you recommend), in their language, never about this routine or its runs. Set `wake_me` only when what you found needs you to act or decide in that conversation: then `message` is a note to you there (you'll be woken with it and tell the people yourself), not posted as-is. Without it nothing is posted.",
     scope: "",
     inputSchema: {
       type: "object",
-      properties: { message: { type: "string", minLength: 1, maxLength: MAX_HAND_OFF } },
+      properties: {
+        message: { type: "string", minLength: 1, maxLength: MAX_HAND_OFF },
+        wake_me: { type: "boolean" },
+      },
       required: ["message"],
       additionalProperties: false,
     },
-    describe: (input) => ({ title: "Hand off the report", detail: String(input.message ?? "").slice(0, 500) }),
+    describe: (input) => ({
+      title: input.wake_me === true ? "Hand off the report" : "Post the message",
+      detail: String(input.message ?? "").slice(0, 500),
+    }),
     async execute(input, ctx) {
       const text = String(input.message ?? "").trim();
       if (!text) return { content: "Give the report to hand off.", isError: true };
@@ -156,21 +178,13 @@ export function createHandOffToolSource(deps: { pubsub?: PubSub }): ToolSource {
         const brief = await routineBriefOfRun(tx, run);
         if (!brief) return { refused: `Nothing was delivered: ${BLOCKED.handoff_blocked}. Finish now.` };
         const [already] = await tx
-          .select({ id: messages.id })
-          .from(messages)
-          .where(
-            and(
-              eq(messages.orgId, run.orgId),
-              eq(messages.channelId, brief.deliverTo.channelId),
-              gte(messages.createdAt, run.createdAt),
-              sql`${messages.meta} @> ${JSON.stringify({ notice: { kind: "routine_handoff", refs: { runId: run.id } } })}::jsonb`,
-            ),
-          )
-          .limit(1);
+          .select({ id: routineRuns.id })
+          .from(routineRuns)
+          .where(and(eq(routineRuns.id, brief.routineRunId), eq(routineRuns.status, "reported")));
         if (already) {
           return {
             refused:
-              "You already handed off this run's report; it was delivered and can't be changed. Finish now: nothing else is posted.",
+              "You already handed off this run's message; it was delivered and can't be changed. Finish now: nothing else is posted.",
           };
         }
         const block = await routineDeliveryBlock(tx, brief);
@@ -178,7 +192,7 @@ export function createHandOffToolSource(deps: { pubsub?: PubSub }): ToolSource {
           await blockRoutineRun(tx, brief, run.orgId, block);
           return { refused: `Nothing was delivered: ${BLOCKED[block]}. Finish now: nothing else is posted.` };
         }
-        const delivered = await deliverRoutineReport(tx, { run, brief, text });
+        const delivered = await deliverRoutineReport(tx, { run, brief, text, wake: input.wake_me === true });
         if (!delivered) return { refused: `Nothing was delivered: ${BLOCKED.stopped}. Finish now.` };
         return { delivered };
       });
@@ -186,7 +200,9 @@ export function createHandOffToolSource(deps: { pubsub?: PubSub }): ToolSource {
       await publishDelivery(deps.pubsub, handed.delivered);
       return {
         content:
-          "Handed off: you will tell the people in the conversation. Finish your work now and end with a short record of what you checked; nothing else is posted.",
+          input.wake_me === true
+            ? "Handed off: you will tell the people in the conversation. Finish your work now and end with a short record of what you checked; nothing else is posted."
+            : "Posted. Finish your work now and end with a short record of what you checked (it is not posted); nothing else is posted.",
         data: { handedOff: { messageId: handed.delivered.message.id } },
       };
     },
