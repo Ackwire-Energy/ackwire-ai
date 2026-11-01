@@ -945,6 +945,8 @@ export function managementRoutes(deps: AppDeps) {
       tags: ["Agents"],
       security,
       summary: "Set the agent's channels (and whether it answers without a mention in each)",
+      description:
+        "Its owner, or who may manage agents, in the channels they're in and may post in, or that they manage (its creator, `manage_channels`). The list replaces the channels `GET` shows the caller: private channels they can't see, DMs and archived channels stay.",
       request: {
         params: AgentParams,
         body: body(

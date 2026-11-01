@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { AgentInput } from "@agenteschat/client";
+import { type AgentInput, ApiError } from "@agenteschat/client";
 import { en, ptBR } from "@agenteschat/i18n";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import {
@@ -23,11 +23,13 @@ import {
   fakeMachinesOf,
   fakeMailOf,
   GENERAL_ID,
+  meWithRole,
   OPENROUTER_KEY,
   OPENROUTER_MODELS,
   ORG_ID,
   seedState,
 } from "./fake-api";
+import { hintOf } from "./hint";
 import {
   click,
   continueButton,
@@ -999,6 +1001,79 @@ describe("Criar agente: what gets created", () => {
     expect(screen().queryByRole("complementary", { name: "Prévia do agente" })).toBeNull();
     await startAs("Do zero");
     expect((screen().getByLabelText("Nome") as HTMLInputElement).value).toBe("");
+  });
+
+  test("a save refused once the agent exists is said, and the flow still ends on the agent, without the channel", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    api.agents.setChannels = async () => {
+      throw new ApiError(403, "forbidden", "Forbidden");
+    };
+    await open(state, api);
+    await startAs("QA");
+    await toReview();
+    await click(screen().getByRole("button", { name: "Criar Iris" }));
+    await settle(8);
+    expect(document.querySelector(".ac-toasts")?.textContent).toContain(
+      "A Iris já existe, mas parte do que você escolheu não foi salva. Você não tem permissão para isso. Peça a um admin do workspace.",
+    );
+    expect(screen().getByRole("heading", { name: "Iris entrou no time" })).toBeTruthy();
+    expect(document.body.textContent).toContain(
+      "Adicione Iris a um canal e mencione @iris numa conversa para começar.",
+    );
+    // What came after the channels was still saved.
+    expect(state.calls.some((c) => c.method === "access.set")).toBe(true);
+    expect(state.agents.filter((a) => a.handle === "iris")).toHaveLength(1);
+  });
+});
+
+describe("Criar agente with Criar agentes alone: an agent of my own, without apps", () => {
+  const asMaker = () => {
+    const state = seedState();
+    meWithRole(state, ["create_agents"]);
+    return open(state);
+  };
+
+  test("Responsável is me, with an ⓘ: nobody else and no one to pick", async () => {
+    const state = await asMaker();
+    await startAs("QA");
+    await proceed(3);
+    expect(title()).toBe("Onde trabalha e com quem");
+    expect(screen().queryByRole("combobox", { name: "Responsável" })).toBeNull();
+    expect(document.querySelector(".newag .agp-person__t")?.textContent).toBe("Walter (você)Membro");
+    expect(hintOf("Responsável").text).toBe(
+      "Quem cria o agente é o responsável. Um admin pode passar para outra pessoa depois.",
+    );
+    await proceed(2);
+    await click(screen().getByRole("button", { name: "Criar Iris" }));
+    await settle(8);
+    expect(createdWith(state)?.ownerUserId).toBe("u-walter");
+    expect(screen().getByRole("heading", { name: "Iris entrou no time" })).toBeTruthy();
+  });
+
+  test("apps start without access and can't be changed here; Criar saves none, so nothing is refused", async () => {
+    const state = await asMaker();
+    // QA's apps (GitHub) aren't on its card: they wouldn't come with it.
+    expect(screen().getByRole("button", { name: /^QA/ }).textContent).not.toContain("GitHub");
+    await startAs("QA");
+    await proceed(2);
+    expect(title()).toBe("Ferramentas e acesso");
+    expect(document.querySelector(".onb__lead")?.textContent).toBe("A Iris começa sem acesso aos apps do workspace.");
+    expect(hintOf("Ferramentas e acesso").text).toBe(
+      "Só admins dão acesso a apps e caixas de email. Depois de criar, peça a um admin.",
+    );
+    const apps = screen().getByRole("list", { name: "Conectores e níveis" });
+    expect(within(apps).queryByRole("radiogroup")).toBeNull();
+    expect(apps.textContent).toContain("GitHub");
+    expect(apps.textContent).toContain("Sem acesso");
+    expect(screen().queryByRole("button", { name: "Ler" })).toBeNull();
+    expect(screen().queryByRole("link", { name: /Conectar outro app/ })).toBeNull();
+    await proceed(3);
+    await click(screen().getByRole("button", { name: "Criar Iris" }));
+    await settle(8);
+    expect(state.calls.some((c) => c.method === "access.set" || c.method === "mail.setAgent")).toBe(false);
+    expect(document.querySelector(".ac-toasts")?.textContent ?? "").not.toContain("não foi salva");
+    expect(screen().getByRole("heading", { name: "Iris entrou no time" })).toBeTruthy();
   });
 });
 

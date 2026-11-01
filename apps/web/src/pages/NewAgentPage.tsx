@@ -35,7 +35,7 @@ import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { choiceOf, defaultPolicy, MAIL_ACTIONS, toMailLevel } from "@agenteschat/client/lib/mail";
 import { planOfKind } from "@agenteschat/client/lib/no-ai";
-import { can } from "@agenteschat/client/lib/permissions";
+import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
 import { AUTO, isAuto, modelChoices, usableModels } from "@agenteschat/client/lib/providers";
 import { scopeText } from "@agenteschat/client/lib/scopes";
 import {
@@ -80,6 +80,7 @@ import {
   ModelCards,
   NO_OWNER,
   OwnerSelect,
+  OwnerValue,
   PlanCards,
   type PlanChoice,
   usd,
@@ -111,6 +112,7 @@ import {
   type RoleGroupId,
   type RoleId,
   readBudget,
+  savePart,
   stepErrors,
 } from "@/lib/new-agent";
 import { proposedRoutineWhen } from "@/lib/recurrence";
@@ -258,6 +260,9 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
   const heading = useRef<HTMLHeadingElement>(null);
   const preview = useRef<HTMLDivElement>(null);
   const phone = useMediaQuery("(max-width: 820px)");
+  // Who edits any agent picks its owner and gives it apps and mailboxes. Anyone else makes their own agent, which
+  // starts without access (the server's rule, ADR 0085 §5).
+  const managesAgents = can(org, "manage_agents");
 
   // An agent's proposal starts on the last step, filled in: its role as written, its look, levels and channels.
   const draft = from?.params.draft;
@@ -281,7 +286,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
     (draft?.appearance as Required<AgentAppearance> | null) ?? BLANK_LOOK,
   );
   const [instructions, setInstructions] = useState(draft?.instructions ?? "");
-  const [levels, setLevels] = useState<Record<string, Level>>(draft ? draftLevels(draft) : {});
+  const [levels, setLevels] = useState<Record<string, Level>>(draft && managesAgents ? draftLevels(draft) : {});
   // A proposal's own mailboxes of mine come at its level: only a mailbox's owner gives an agent access to it.
   const [mailLevels, setMailLevels] = useState<Record<string, Level>>(draft ? draftMailLevels(draft, me.user.id) : {});
   // The routine a proposal came with: made once the agent is where it reports.
@@ -306,11 +311,14 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
   const step = NEW_AGENT_STEPS[index] ?? "role";
   const total = NEW_AGENT_STEPS.length;
   const dmChannels = useMemo(() => new Set((dms.data ?? []).map((d) => d.channelId)), [dms.data]);
-  // Mine, and the public ones a proposal names that I'm not in: whoever may create agents adds one to any of them.
+  // Mine, and the ones a proposal names: only where I may put an agent (in it and posting, or managing it).
   const myChannels = useMemo(
     () =>
-      (channels.data ?? []).filter((c) => (c.isMember || draft?.channelIds.includes(c.id)) && !dmChannels.has(c.id)),
-    [channels.data, dmChannels, draft],
+      (channels.data ?? []).filter(
+        (c) =>
+          (c.isMember || draft?.channelIds.includes(c.id)) && !dmChannels.has(c.id) && addsAgentsTo(c, me.user.id, org),
+      ),
+    [channels.data, dmChannels, draft, me.user.id, org],
   );
   const choices = useMemo(
     () => modelChoices(models.data?.models ?? [], credentials.data ?? [], platform.data ?? false),
@@ -369,12 +377,13 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
       setSkillIds(new Set(library.data.filter((s) => s.defaultForNewAgents).map((s) => s.id)));
   }, [library.data, skillIds]);
   useEffect(() => {
+    if (!managesAgents) return;
     setLevels((prev) => {
       const missing = connectedList.filter((i) => prev[i.id] === undefined);
       if (missing.length === 0) return prev;
       return { ...prev, ...presetLevels(role ?? "custom", missing) };
     });
-  }, [connectedList, role]);
+  }, [connectedList, role, managesAgents]);
 
   const ownerId = owner === NO_OWNER ? null : owner;
   const ownerMember = (members.data ?? []).find((m) => m.userId === ownerId);
@@ -533,13 +542,20 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
     } else if (start?.brain === "model" && onStart && start.contextTokens !== null) {
       await api.agents.setBrain(org.id, agent.id, { brain: "model", contextTokens: start.contextTokens });
     }
-    if (joined.length > 0) {
-      await api.agents.setChannels(
-        org.id,
-        agent.id,
-        joined.map((c) => ({ channelId: c.id })),
-      );
-    }
+    // The rest is saved one part at a time. What fails is said, and the flow still ends on the new agent: its @ is
+    // taken now, so "Criar" again would only be refused.
+    const failures: unknown[] = [];
+    const inChannels =
+      joined.length > 0 &&
+      (await savePart(failures, () =>
+        api.agents.setChannels(
+          org.id,
+          agent.id,
+          joined.map((c) => ({ channelId: c.id })),
+        ),
+      ))
+        ? joined
+        : [];
     // New agents start with the built-in defaults; the chosen connector levels go on top, in one
     // write that reads the agent's grants first (nothing written afterwards replaces them).
     const chosen = Object.fromEntries(
@@ -547,27 +563,32 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
         .filter((item) => (levels[item.id] ?? "none") !== "none")
         .map((item) => [`connector:${item.id}`, levels[item.id] as Level]),
     );
-    if (Object.keys(chosen).length > 0) await saveLevels(api, org.id, agent.id, chosen);
+    if (Object.keys(chosen).length > 0) await savePart(failures, () => saveLevels(api, org.id, agent.id, chosen));
     // Mailboxes: the chosen level with the default rules (every send asks); rules are set on the agent page.
     for (const account of grantedMail) {
-      await api.mail.setAgent(org.id, agent.id, account.id, {
-        level: toMailLevel(mailLevels[account.id] ?? "none"),
-        canDelete: false,
-        policy: defaultPolicy(),
-      });
+      await savePart(failures, () =>
+        api.mail.setAgent(org.id, agent.id, account.id, {
+          level: toMailLevel(mailLevels[account.id] ?? "none"),
+          canDelete: false,
+          policy: defaultPolicy(),
+        }),
+      );
     }
     const libraryList = library.data ?? [];
     if (libraryList.length > 0) {
-      await api.skills.setForAgent(
-        org.id,
-        agent.id,
-        libraryList.map((s) => ({ skillId: s.id, enabled: skillIds?.has(s.id) ?? s.defaultForNewAgents })),
+      await savePart(failures, () =>
+        api.skills.setForAgent(
+          org.id,
+          agent.id,
+          libraryList.map((s) => ({ skillId: s.id, enabled: skillIds?.has(s.id) ?? s.defaultForNewAgents })),
+        ),
       );
     }
+    if (failures.length > 0) toast.show(t("newAgent.partly", { ...g, reason: failureText(t, failures[0]) }), "error");
     setCreated({
       agent,
       look,
-      channels: joined.map((c) => ({ id: c.id, name: c.name })),
+      channels: inChannels.map((c) => ({ id: c.id, name: c.name })),
     });
     mood.react("happy", 2200);
     scrollTop();
@@ -681,7 +702,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
     setHandleTouched(false);
     setLook({ ...preset.look });
     setInstructions(t(`newAgent.roles.${id}.instructions`));
-    setLevels(presetLevels(id, connectedList));
+    if (managesAgents) setLevels(presetLevels(id, connectedList));
     setChannelIds(new Set(presetChannels(id, myChannels)));
     startWith(startOf(ownerId));
     setAiPicked(false);
@@ -767,6 +788,12 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
       .map((m) => m.name.split(/\s+/)[0] ?? m.name);
     return names.length ? joinNames(names, t("newAgent.and")) : t("audience.summary.nobody");
   };
+  const ownerTitle = (
+    <h2>
+      <Icon name="person" />
+      {t("newAgent.owner")}
+    </h2>
+  );
 
   const views: Record<NewAgentStep, () => ReactNode> = {
     role: () => {
@@ -849,7 +876,9 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
                 <div className="newag__roles">
                   {group.roles.map((id) => {
                     const preset = ROLE_PRESETS[id];
-                    const kit = connectedList.filter((i) => i.def && (preset.levels[i.def.id] ?? "none") !== "none");
+                    const kit = managesAgents
+                      ? connectedList.filter((i) => i.def && (preset.levels[i.def.id] ?? "none") !== "none")
+                      : [];
                     const room = presetChannels(id, myChannels)
                       .map((cid) => myChannels.find((c) => c.id === cid)?.name)
                       .filter(Boolean)[0];
@@ -1028,7 +1057,13 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
     },
     tools: () => (
       <>
-        {head(t("newAgent.steps.tools.title"), t("newAgent.steps.tools.lead", { ...g, org: org.name }))}
+        {head(
+          t("newAgent.steps.tools.title"),
+          managesAgents
+            ? t("newAgent.steps.tools.lead", { ...g, org: org.name })
+            : t("newAgent.steps.tools.leadNoAccess", g),
+          managesAgents ? undefined : t("newAgent.accessAdmins"),
+        )}
         <Card as="div" className="newag__card">
           {connectedList.length + mailboxes.length > 0 ? (
             <>
@@ -1036,29 +1071,31 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
                 <span className="small muted">
                   {t("newAgent.connectedCount", { count: connectedList.length + mailboxes.length })}
                 </span>
-                <span className="newag__quick">
-                  {t("newAgent.all")}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setLevels(presetLevels("custom", connectedList));
-                      setMailLevels({});
-                    }}
-                  >
-                    {t("access.level.none")}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setLevels(Object.fromEntries(connectedList.map((i) => [i.id, "read" as Level])));
-                      setMailLevels(Object.fromEntries(mailboxes.map((a) => [a.id, "read" as Level])));
-                    }}
-                  >
-                    {t("access.level.read")}
-                  </Button>
-                </span>
+                {managesAgents && (
+                  <span className="newag__quick">
+                    {t("newAgent.all")}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setLevels(presetLevels("custom", connectedList));
+                        setMailLevels({});
+                      }}
+                    >
+                      {t("access.level.none")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setLevels(Object.fromEntries(connectedList.map((i) => [i.id, "read" as Level])));
+                        setMailLevels(Object.fromEntries(mailboxes.map((a) => [a.id, "read" as Level])));
+                      }}
+                    >
+                      {t("access.level.read")}
+                    </Button>
+                  </span>
+                )}
               </div>
               <ul className="level-list" aria-label={t("newAgent.connectorsLabel")}>
                 {connectedList.map((item) => {
@@ -1073,7 +1110,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
                       asks={level === "write" ? asksOf(item) : []}
                       levels={LEVELS}
                       value={level}
-                      onChange={(l) => setLevel(item.id, l)}
+                      onChange={managesAgents ? (l) => setLevel(item.id, l) : undefined}
                     />
                   );
                 })}
@@ -1088,10 +1125,14 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
                       asks={level === "write" ? mailAsks : []}
                       levels={LEVELS}
                       value={level}
-                      onChange={(l) => {
-                        setMailLevels((prev) => ({ ...prev, [account.id]: l }));
-                        if (l === "write") mood.react("star", 900);
-                      }}
+                      onChange={
+                        managesAgents
+                          ? (l) => {
+                              setMailLevels((prev) => ({ ...prev, [account.id]: l }));
+                              if (l === "write") mood.react("star", 900);
+                            }
+                          : undefined
+                      }
                     />
                   );
                 })}
@@ -1100,15 +1141,17 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
           ) : (
             <p className="small muted">{t("access.noConnectors", { org: org.name })}</p>
           )}
-          <Link
-            className="newag__addrow"
-            to="/org/$orgId/settings/$section"
-            params={{ orgId: org.id, section: "connectors" }}
-          >
-            <Icon name="plug" />
-            {t("newAgent.connectOther")}
-            <span className="newag__addrow-aside">{t("newAgent.opensConnectors")}</span>
-          </Link>
+          {managesAgents && (
+            <Link
+              className="newag__addrow"
+              to="/org/$orgId/settings/$section"
+              params={{ orgId: org.id, section: "connectors" }}
+            >
+              <Icon name="plug" />
+              {t("newAgent.connectOther")}
+              <span className="newag__addrow-aside">{t("newAgent.opensConnectors")}</span>
+            </Link>
+          )}
         </Card>
         <p className="newag__note ac-iconline">
           <Icon name="shield" size={16} />
@@ -1166,22 +1209,30 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
           <p className="small muted">{t("newAgent.noChannels")}</p>
         )}
         <div className="newag__sect">
-          <h2>
-            <Icon name="person" />
-            {t("newAgent.owner")}
-          </h2>
+          {managesAgents ? (
+            ownerTitle
+          ) : (
+            <div className="ac-hintline">
+              {ownerTitle}
+              <InfoHint name={t("common.about", { label: t("newAgent.owner") })}>{t("newAgent.ownerYours")}</InfoHint>
+            </div>
+          )}
         </div>
         <Card as="div" className="newag__card">
-          <OwnerSelect
-            value={owner}
-            members={members.data ?? []}
-            meId={me.user.id}
-            onChange={(v) => {
-              setOwner(v);
-              if (!aiPicked) startWith(startOf(v === NO_OWNER ? null : v));
-              if (v !== NO_OWNER) setAudience((a) => ({ ...a, userIds: a.userIds.filter((id) => id !== v) }));
-            }}
-          />
+          {managesAgents ? (
+            <OwnerSelect
+              value={owner}
+              members={members.data ?? []}
+              meId={me.user.id}
+              onChange={(v) => {
+                setOwner(v);
+                if (!aiPicked) startWith(startOf(v === NO_OWNER ? null : v));
+                if (v !== NO_OWNER) setAudience((a) => ({ ...a, userIds: a.userIds.filter((id) => id !== v) }));
+              }}
+            />
+          ) : (
+            <OwnerValue member={ownerMember} meId={me.user.id} />
+          )}
           <span className="small muted">{ownerId ? t("newAgent.ownerHelp") : t("newAgent.noOwnerHelp")}</span>
         </Card>
         <div className="newag__sect">

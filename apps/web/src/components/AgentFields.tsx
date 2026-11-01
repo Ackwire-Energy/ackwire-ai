@@ -369,6 +369,32 @@ export function OwnerSelect({
   );
 }
 
+/** "Responsável" where it can't be changed: the person and their role, or "Sem responsável". */
+export function OwnerValue({ member, meId }: { member: Member | undefined; meId: string }) {
+  const { t } = useTranslation();
+  return (
+    <div className="agp-person">
+      {member ? (
+        <Avatar kind="person" size="md" name={member.name} imageUrl={member.image} />
+      ) : (
+        <span className="newag__ib">
+          <Icon name="members" size={16} />
+        </span>
+      )}
+      <span className="agp-person__t">
+        <b>
+          {member
+            ? member.userId === meId
+              ? t("newAgent.you", { name: member.name })
+              : member.name
+            : t("newAgent.noOwnerOption")}
+        </b>
+        {member && <span>{t(`roles.${member.role}`)}</span>}
+      </span>
+    </div>
+  );
+}
+
 /** "Chave": the workspace default first, then the other stored keys. */
 export function KeySelect({
   value,

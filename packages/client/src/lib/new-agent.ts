@@ -245,3 +245,19 @@ export function stepErrors(step: NewAgentStep, d: DraftCheck): DraftError[] {
 
 /** The first step that can't go on yet (-1 when everything is ready). */
 export const firstInvalidStep = (d: DraftCheck) => NEW_AGENT_STEPS.findIndex((s) => stepErrors(s, d).length > 0);
+
+/* ---------- Once it exists ---------- */
+
+/**
+ * One of the saves after the agent is created: what it throws joins `failures` instead of stopping the rest, so a
+ * refused part doesn't keep the others (its AI included) from saving. Whether it saved.
+ */
+export async function savePart(failures: unknown[], save: () => Promise<unknown>) {
+  try {
+    await save();
+    return true;
+  } catch (error) {
+    failures.push(error);
+    return false;
+  }
+}

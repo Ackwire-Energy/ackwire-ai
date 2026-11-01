@@ -122,6 +122,10 @@ export async function createAgent(
 ): Promise<Agent> {
   const membership = await requirePermission(db, actorId, orgId, "create_agents");
   const { autonomy, ...fields } = input;
+  // `create_agents` makes the creator's own agent (ADR 0085 §5): another owner, or none, is for who edits any agent.
+  if (input.ownerUserId !== undefined && input.ownerUserId !== actorId && !can(membership, "manage_agents")) {
+    throw new ForbiddenError("Only an admin can create an agent for someone else or with no owner");
+  }
   const values = { ...fields, handle: fields.handle.toLowerCase(), model: fields.model ?? defaults.model };
   await validateAgentFields(db, orgId, values);
   const ownerUserId = input.ownerUserId === undefined ? actorId : input.ownerUserId;

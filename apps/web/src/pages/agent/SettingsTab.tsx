@@ -4,9 +4,9 @@ import { audienceSummary, audienceWidens } from "@agenteschat/client/lib/audienc
 import { engineOfBrain } from "@agenteschat/client/lib/brain";
 import { coordinatorNote } from "@agenteschat/client/lib/coordinator";
 import { formatMonth, formatPercent, formatTokensShort, formatUsd } from "@agenteschat/client/lib/format";
+import { addsAgentsTo } from "@agenteschat/client/lib/permissions";
 import {
   type AgentAppearance,
-  Avatar,
   agentGradient,
   Button,
   Card,
@@ -28,7 +28,7 @@ import { useTranslation } from "react-i18next";
 import { AudienceChoice } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { AgentComputerPanel } from "@/components/AgentComputer";
-import { BudgetField, LookRows, NO_OWNER, OwnerSelect, usd } from "@/components/AgentFields";
+import { BudgetField, LookRows, NO_OWNER, OwnerSelect, OwnerValue, usd } from "@/components/AgentFields";
 import { AgentSecretsList } from "@/components/AgentSecrets";
 import { LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
@@ -56,6 +56,7 @@ function Section({
   title,
   fields,
   action,
+  hint,
   children,
   danger,
 }: {
@@ -63,6 +64,7 @@ function Section({
   title: string;
   fields: EditField[];
   action?: ReactNode;
+  hint?: { name: string; text: ReactNode };
   children: ReactNode;
   danger?: boolean;
 }) {
@@ -84,6 +86,7 @@ function Section({
         changeKeys={keys}
         lock={editable || danger ? undefined : fields[0]}
         action={editable ? action : undefined}
+        hint={hint}
       />
       {children}
     </Card>
@@ -127,6 +130,18 @@ export function SettingsTab({
   const limit = detail.data?.monthlyBudgetUsd ?? detail.data?.defaultBudgetUsd;
   const month = formatMonth(locale, new Date());
   const visibleChannels = useVisibleChannels().list;
+  // Where I may put it or take it out; the rest of its channels show as they are.
+  const placeable = visibleChannels.filter((c) => addsAgentsTo(c, me.user.id, org));
+  const fixed = visibleChannels.filter((c) => draft.channels?.includes(c.id) && !placeable.includes(c));
+  const channelChips = (list: typeof visibleChannels) => (
+    <span className="agp-chips">
+      {list.map((c) => (
+        <Chip key={c.id} icon="channel">
+          {c.name}
+        </Chip>
+      ))}
+    </span>
+  );
   const look = draft.look;
   const coordination = coordinatorNote(t, dir.agents, agent.id, draft.coordinator);
   // On a plan (ADR 0059 §5) only its owner lets more people in.
@@ -369,25 +384,7 @@ export function SettingsTab({
                 <WasLine changeKey="owner" />
               </>
             ) : (
-              <div className="agp-person">
-                {owner ? (
-                  <Avatar kind="person" size="md" name={owner.name} imageUrl={owner.image} />
-                ) : (
-                  <span className="newag__ib">
-                    <Icon name="members" size={16} />
-                  </span>
-                )}
-                <span className="agp-person__t">
-                  <b>
-                    {owner
-                      ? owner.userId === me.user.id
-                        ? t("newAgent.you", { name: owner.name })
-                        : owner.name
-                      : t("newAgent.noOwnerOption")}
-                  </b>
-                  {owner && <span>{t(`roles.${owner.role}`)}</span>}
-                </span>
-              </div>
+              <OwnerValue member={owner} meId={me.user.id} />
             )}
             <span className="small muted">{ownerId ? t("newAgent.ownerHelp") : t("newAgent.noOwnerHelp")}</span>
           </Section>
@@ -426,41 +423,48 @@ export function SettingsTab({
             )}
           </Section>
 
-          <Section id="channels" title={t("newAgent.channels")} fields={["channels"]}>
+          <Section
+            id="channels"
+            title={t("newAgent.channels")}
+            fields={["channels"]}
+            hint={
+              can("channels") && placeable.length < visibleChannels.length
+                ? {
+                    name: t("common.about", { label: t("newAgent.channels") }),
+                    text: t("agentPage.settings.channelsYours"),
+                  }
+                : undefined
+            }
+          >
             {draft.channels === undefined ? (
               <LoadingLine width={220} />
             ) : can("channels") ? (
-              visibleChannels.length ? (
-                <div className="newag__pills">
-                  {visibleChannels.map((c) => (
-                    <CheckboxPill
-                      key={c.id}
-                      id={`agp-ch-${c.id}`}
-                      checked={draft.channels?.includes(c.id) ?? false}
-                      onCheckedChange={(on) => {
-                        const next = new Set(draft.channels ?? []);
-                        if (on) next.add(c.id);
-                        else next.delete(c.id);
-                        set("channels", [...next].sort());
-                      }}
-                    >
-                      {`#${c.name}`}
-                    </CheckboxPill>
-                  ))}
-                </div>
-              ) : (
-                <span className="small muted">{t("newAgent.noChannels")}</span>
-              )
+              <>
+                {placeable.length ? (
+                  <div className="newag__pills">
+                    {placeable.map((c) => (
+                      <CheckboxPill
+                        key={c.id}
+                        id={`agp-ch-${c.id}`}
+                        checked={draft.channels?.includes(c.id) ?? false}
+                        onCheckedChange={(on) => {
+                          const next = new Set(draft.channels ?? []);
+                          if (on) next.add(c.id);
+                          else next.delete(c.id);
+                          set("channels", [...next].sort());
+                        }}
+                      >
+                        {`#${c.name}`}
+                      </CheckboxPill>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="small muted">{t("newAgent.noChannels")}</span>
+                )}
+                {fixed.length > 0 && channelChips(fixed)}
+              </>
             ) : draft.channels.length ? (
-              <span className="agp-chips">
-                {visibleChannels
-                  .filter((c) => draft.channels?.includes(c.id))
-                  .map((c) => (
-                    <Chip key={c.id} icon="channel">
-                      {c.name}
-                    </Chip>
-                  ))}
-              </span>
+              channelChips(visibleChannels.filter((c) => draft.channels?.includes(c.id)))
             ) : (
               <span className="small muted">{t("agentPage.overview.noChannels", { handle: agent.handle })}</span>
             )}

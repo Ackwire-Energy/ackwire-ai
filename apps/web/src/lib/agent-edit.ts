@@ -79,11 +79,12 @@ export interface Edits {
 export type Field = Exclude<keyof Edits, "levels"> | "levels";
 
 /**
- * Who edits what (the server's rules): admins everything; the agent's owner its look, audience, computer and
- * who thinks. Access and repositories are admins' like its scopes: giving an agent more is an admin's call.
+ * Who edits what (the server's rules): admins everything; the agent's owner its look, audience, channels, computer
+ * and who thinks. Channels, for both, only the ones they may put an agent in (`addsAgentsTo`). Access and
+ * repositories are admins' like its scopes: giving an agent more is an admin's call.
  */
 export type Viewer = "admin" | "owner" | "member";
-export const OWNER_EDITS: ReadonlySet<Field> = new Set<Field>(["look", "audience", "machine", "brain"]);
+export const OWNER_EDITS: ReadonlySet<Field> = new Set<Field>(["look", "audience", "channels", "machine", "brain"]);
 export const canEdit = (viewer: Viewer, field: Field) =>
   viewer === "admin" || (viewer === "owner" && OWNER_EDITS.has(field));
 

@@ -2757,7 +2757,8 @@ export const en: Translations = {
     readOnly: {
       member: "You see how {{name}} works. Only admins edit.",
       memberOwner: "You see how {{name}} works. Who edits: admins and {{owner}} (owner).",
-      owner: "You own {{name}}: you change the look, who can talk and the computer. The rest, only admins.",
+      owner:
+        "You own {{name}}: you change the look, who can talk, the channels and the computer. The rest, only admins.",
       ownerInstructions: "Only admins edit the instructions. As the owner, you approve proposed changes.",
       ownerAccess: "Only admins give or take away access and repositories.",
     },
@@ -2960,6 +2961,7 @@ export const en: Translations = {
       useDefault: "Use the default",
       budgetAdmins: "Only admins see what agents spend and change the limit.",
       channelsHelp: "Joins the checked channels. Elsewhere, call @{{handle}} or send a direct message.",
+      channelsYours: "You change only the channels you're in. To change another one, join it first.",
     },
     archive: {
       action: "Archive {{name}}",
@@ -3139,6 +3141,7 @@ export const en: Translations = {
         name: "Tools and access",
         title: "Tools and access",
         lead: "Choose how far {{name}} can go in each app.",
+        leadNoAccess: "{{name}} starts without access to the workspace's apps.",
       },
       where: {
         name: "Where and who",
@@ -3304,6 +3307,8 @@ export const en: Translations = {
     noOwnerShort: "Admins get the alerts and approve",
     noOwnerHelp: "Without an owner, admins get the alerts and approve sensitive actions.",
     ownerHelp: "Gets the budget alerts and approves sensitive actions.",
+    ownerYours: "Whoever creates the agent is its owner. An admin can hand it to someone else later.",
+    accessAdmins: "Only admins give agents access to apps and mailboxes. Once it's created, ask an admin.",
     modelAndCost: "Model and cost",
     model: "Model",
     modelDesc: {
@@ -3318,6 +3323,7 @@ export const en: Translations = {
     plansHelp: "Claude Code or Codex with the subscription of whoever connected the computer. No key needed.",
     planOnlyOwner:
       "On a plan, {{name}} starts answering only {{owner}}. On {{name}}'s page, {{owner}} can choose whether {{she}} answers other people.",
+    partly: "{{name}} is ready, but part of what you chose wasn't saved. {{reason}}",
     planNotSaved:
       "{{name}} is ready, but {{brain}} couldn't be set up now. Choose it again in Who thinks, on {{name}}'s page.",
     lastSetup: "Starts with the latest choice: {{setup}}.",

@@ -33,8 +33,9 @@ import {
   ROLE_DEFAULTS,
   ROLE_GROUPS,
   type RoleId,
+  savePart,
 } from "@agenteschat/client/lib/new-agent";
-import { can } from "@agenteschat/client/lib/permissions";
+import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
 import { modelChoices, usableModels } from "@agenteschat/client/lib/providers";
 import { router, usePreventRemove } from "expo-router";
 import { type ReactNode, useMemo, useRef, useState } from "react";
@@ -43,7 +44,7 @@ import { Alert, Pressable, ScrollView, type ScrollViewInstance, StyleSheet, Text
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import { AgentAvatar, Button, Card, fieldText, Icon, Row, Text, Toggle, useToast } from "@/ui";
+import { AgentAvatar, Button, Card, fieldText, Icon, InfoHint, Row, Text, Toggle, useToast } from "@/ui";
 import { newAgentAi } from "../ai/logic";
 import { openConnectAi } from "../ai/NoAiCard";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
@@ -115,6 +116,8 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
   const orgId = useOrgId();
   const { org } = useOrg();
   const mayImport = can(org, "create_agents");
+  // Giving a new agent apps is for who edits any agent: anyone else's starts without them (ADR 0085 §5).
+  const managesAgents = can(org, "manage_agents");
   const meId = useMeId();
   const dir = useDirectory();
   const create = useCreateAgent(orgId);
@@ -147,7 +150,7 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
   const [channelIds, setChannelIds] = useState<Set<string>>(new Set(proposed?.channelIds));
   // A proposal's levels are the reviewer's to change in Revisar; otherwise they come with the role.
   const [proposedLevels, setProposedLevels] = useState<Record<string, Level>>(() =>
-    proposed ? draftLevels(proposed) : {},
+    proposed && managesAgents ? draftLevels(proposed) : {},
   );
   // My own mailboxes it asked for, at its level (only a mailbox's owner gives an agent access to it), and its routine.
   const [mailLevels, setMailLevels] = useState<Record<string, Level>>(() =>
@@ -178,20 +181,20 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
     [connections.data, servers.data, catalog.data],
   );
   const levels = useMemo(
-    () => (proposed ? proposedLevels : presetLevels(role ?? "custom", items)),
-    [proposed, proposedLevels, role, items],
+    () => (proposed ? proposedLevels : managesAgents ? presetLevels(role ?? "custom", items) : {}),
+    [proposed, proposedLevels, role, items, managesAgents],
   );
   const granted = items.filter((i) => (levels[i.id] ?? "none") !== "none");
   const myMail = (proposed?.mail ?? []).filter((m) => m.accountId in mailLevels);
   // Revisar lists what a proposal asked for at any level, so a change can be taken back.
   const listedApps = proposed ? items.filter((i) => i.id in proposedLevels) : granted;
-  // Mine, and the public ones a proposal names that I'm not in: whoever may create agents adds one to any of them.
+  // Mine, and the ones a proposal names: only where I may put an agent (in it and posting, or managing it).
   const myChannels = useMemo(() => {
     const dmIds = new Set((dms.data ?? []).map((d) => d.channelId));
     return (channels.data ?? []).filter(
-      (ch) => (ch.isMember || proposed?.channelIds.includes(ch.id)) && !dmIds.has(ch.id),
+      (ch) => (ch.isMember || proposed?.channelIds.includes(ch.id)) && !dmIds.has(ch.id) && addsAgentsTo(ch, meId, org),
     );
-  }, [channels.data, dms.data, proposed]);
+  }, [channels.data, dms.data, proposed, meId, org]);
   const taken = useMemo(
     () =>
       new Set([
@@ -286,63 +289,79 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
         ...(thinks.autonomy ? { autonomy: thinks.autonomy } : {}),
       });
       created.current = true;
-      // What the role brings, as the web's last step: its channels, its apps' levels, the default skills.
+      // What the role brings, as the web's last step: its channels, its apps' levels, the default skills. One part
+      // at a time, so a refused one doesn't keep the rest (the AI below too) from saving.
+      const failures: unknown[] = [];
       const joined = myChannels.filter((ch) => channelIds.has(ch.id));
       if (joined.length > 0)
-        await api.agents.setChannels(
-          orgId,
-          agent.id,
-          joined.map((ch) => ({ channelId: ch.id })),
+        await savePart(failures, () =>
+          api.agents.setChannels(
+            orgId,
+            agent.id,
+            joined.map((ch) => ({ channelId: ch.id })),
+          ),
         );
       const chosen = Object.fromEntries(granted.map((i) => [`connector:${i.id}`, levels[i.id] as Level]));
-      if (Object.keys(chosen).length > 0) await saveLevels(api, orgId, agent.id, chosen);
+      if (Object.keys(chosen).length > 0) await savePart(failures, () => saveLevels(api, orgId, agent.id, chosen));
       const list = library.data ?? [];
       if (list.length > 0)
-        await api.skills.setForAgent(
-          orgId,
-          agent.id,
-          list.map((s) => ({ skillId: s.id, enabled: s.defaultForNewAgents })),
+        await savePart(failures, () =>
+          api.skills.setForAgent(
+            orgId,
+            agent.id,
+            list.map((s) => ({ skillId: s.id, enabled: s.defaultForNewAgents })),
+          ),
         );
       // The AI the server suggests for me: an account of mine on its computer; the workspace's model needs nothing.
       const ai = proposed?.ai;
       if (ai?.kind === "account") {
-        await api.sandbox.setTarget(orgId, agent.id, ai.machineId);
-        await api.agents.setBrain(orgId, agent.id, { brain: ai.brain, account: ai.accountId });
+        await savePart(failures, async () => {
+          await api.sandbox.setTarget(orgId, agent.id, ai.machineId);
+          await api.agents.setBrain(orgId, agent.id, { brain: ai.brain, account: ai.accountId });
+        });
       }
       // Or the last setup's plan, with its model, effort and the rest; on the API, its context window.
-      if (thinks.plan) {
-        await api.sandbox.setTarget(orgId, agent.id, thinks.plan.machineId);
-        await api.agents.setBrain(orgId, agent.id, thinks.plan.input);
+      const plan = thinks.plan;
+      if (plan) {
+        await savePart(failures, async () => {
+          await api.sandbox.setTarget(orgId, agent.id, plan.machineId);
+          await api.agents.setBrain(orgId, agent.id, plan.input);
+        });
       } else if (thinks.contextTokens !== null) {
-        await api.agents.setBrain(orgId, agent.id, { brain: "model", contextTokens: thinks.contextTokens });
+        const contextTokens = thinks.contextTokens;
+        await savePart(failures, () => api.agents.setBrain(orgId, agent.id, { brain: "model", contextTokens }));
       }
       // My own mailboxes at the level chosen here (every send asks), then its routine, now that it is where it reports.
       for (const [accountId, level] of Object.entries(mailLevels)) {
         if (level === "none") continue;
-        await api.mail.setAgent(orgId, agent.id, accountId, {
-          level: toMailLevel(level),
-          canDelete: false,
-          policy: defaultPolicy(),
-        });
+        await savePart(failures, () =>
+          api.mail.setAgent(orgId, agent.id, accountId, {
+            level: toMailLevel(level),
+            canDelete: false,
+            policy: defaultPolicy(),
+          }),
+        );
       }
-      if (from && proposed?.routine && withRoutine) await api.agents.proposalRoutine(orgId, from.messageId);
-      successHaptic();
-      toast({ title: t("mobile.agents.created", { name: agent.name }), agentId: agent.id });
+      if (from && proposed?.routine && withRoutine)
+        await savePart(failures, () => api.agents.proposalRoutine(orgId, from.messageId));
+      if (failures.length > 0) toast({ title: t("mobile.newAgent.partly"), icon: "x" });
+      else {
+        successHaptic();
+        toast({ title: t("mobile.agents.created", { name: agent.name }), agentId: agent.id });
+      }
       if (from) {
         // From its card: back to that conversation as it was, Connect over it when it has nothing to think with.
         router.back();
         if (ai?.kind === "none") openConnectAi({ agentId: agent.id });
         return;
       }
-      // Nothing to think with yet: Connect opens for it over its conversation.
+      // It exists either way (Criar again would only find its @ taken): on to its conversation, where Connect opens
+      // when it has nothing to think with yet.
       void openDm({ agentId: agent.id }).then(() => {
         if (ai?.kind === "none") openConnectAi({ agentId: agent.id });
       });
     } catch (e) {
-      if (created.current) {
-        // The agent exists; only part of what the role brings didn't go through.
-        toast({ title: t("mobile.newAgent.partly"), icon: "x" });
-      } else failed(e);
+      failed(e);
     } finally {
       setBusy(false);
     }
@@ -370,6 +389,11 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
     </View>
   );
   const input = [styles.input, fieldText("body"), { backgroundColor: c.raised, color: c.ink, borderColor: c.line }];
+  const usesTitle = (
+    <Text variant="title" accessibilityRole="header">
+      {t("newAgent.preview.uses")}
+    </Text>
+  );
 
   const views: Record<PhoneStep, () => ReactNode> = {
     role: () => (
@@ -566,9 +590,17 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
         ) : null}
 
         <View style={styles.section}>
-          <Text variant="title" accessibilityRole="header">
-            {t("newAgent.preview.uses")}
-          </Text>
+          {managesAgents ? (
+            usesTitle
+          ) : (
+            <InfoHint
+              name={t("common.about", { label: t("newAgent.preview.uses") })}
+              text={t("newAgent.accessAdmins")}
+              variant="title"
+            >
+              {usesTitle}
+            </InfoHint>
+          )}
           {listedApps.length > 0 ? (
             <Card>
               {listedApps.map((i) => {

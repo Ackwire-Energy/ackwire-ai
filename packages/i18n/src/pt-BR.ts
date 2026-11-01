@@ -2785,7 +2785,8 @@ export const ptBR = {
     readOnly: {
       member: "Você vê como {{article}} {{name}} trabalha. Só admins editam.",
       memberOwner: "Você vê como {{article}} {{name}} trabalha. Quem edita: admins e {{owner}} (responsável).",
-      owner: "Você é responsável {{of}} {{name}}: muda o jeito, quem pode falar e o computador. O resto, só admins.",
+      owner:
+        "Você é responsável {{of}} {{name}}: muda o jeito, quem pode falar, os canais e o computador. O resto, só admins.",
       ownerInstructions: "Só admins editam as instruções. Você, como responsável, aprova as propostas de mudança.",
       ownerAccess: "Só admins dão ou tiram acessos e repositórios.",
     },
@@ -2988,6 +2989,7 @@ export const ptBR = {
       useDefault: "Usar o padrão",
       budgetAdmins: "Só admins veem o gasto dos agentes e mudam o limite.",
       channelsHelp: "Entra nos canais marcados. Em outros, dá para chamar por @{{handle}} ou mensagem direta.",
+      channelsYours: "Você muda só os canais em que está. Para mexer em outro, entre nele antes.",
     },
     archive: {
       action: "Arquivar {{article}} {{name}}",
@@ -3168,6 +3170,7 @@ export const ptBR = {
         name: "Ferramentas e acesso",
         title: "Ferramentas e acesso",
         lead: "Escolha até onde {{article}} {{name}} vai em cada app.",
+        leadNoAccess: "{{The}} {{name}} começa sem acesso aos apps do workspace.",
       },
       where: {
         name: "Onde e quem",
@@ -3337,6 +3340,8 @@ export const ptBR = {
     noOwnerShort: "Os admins recebem os avisos e aprovam",
     noOwnerHelp: "Sem responsável, os admins recebem os avisos e aprovam as ações sensíveis.",
     ownerHelp: "Recebe os avisos de orçamento e aprova as ações sensíveis.",
+    ownerYours: "Quem cria o agente é o responsável. Um admin pode passar para outra pessoa depois.",
+    accessAdmins: "Só admins dão acesso a apps e caixas de email. Depois de criar, peça a um admin.",
     modelAndCost: "Modelo e custo",
     model: "Modelo",
     modelDesc: {
@@ -3351,6 +3356,7 @@ export const ptBR = {
     plansHelp: "Claude Code ou Codex com a assinatura de quem conectou o computador. Não usa chave.",
     planOnlyOwner:
       "No plano, {{article}} {{name}} começa atendendo só {{owner}}. Na página {{of}} {{name}}, {{owner}} pode escolher se {{she}} atende outras pessoas.",
+    partly: "{{The}} {{name}} já existe, mas parte do que você escolheu não foi salva. {{reason}}",
     planNotSaved:
       "{{The}} {{name}} já existe, mas não deu para usar o {{brain}} agora. Escolha de novo em Quem pensa, na página {{of}} {{name}}.",
     /** What a new agent starts thinking with (ADR 0094): the last setup saved or used on other agents. */
