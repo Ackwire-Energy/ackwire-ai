@@ -105,3 +105,17 @@ export function isUniqueViolation(error: unknown): boolean {
   }
   return false;
 }
+
+/**
+ * The Postgres message of a data exception (SQLSTATE class 22: a value the database refuses), which fails the
+ * same way on every try; null for anything else. Works with postgres.js and PGlite (Drizzle wraps the error).
+ */
+export function dataExceptionMessage(error: unknown): string | null {
+  let e: unknown = error;
+  for (let i = 0; i < 4 && e; i++) {
+    const code = (e as { code?: unknown }).code;
+    if (typeof code === "string" && code.startsWith("22")) return (e as { message?: string }).message || code;
+    e = (e as { cause?: unknown }).cause;
+  }
+  return null;
+}

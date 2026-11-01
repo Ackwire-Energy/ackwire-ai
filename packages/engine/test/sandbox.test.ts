@@ -62,6 +62,36 @@ const call = async (ctx: ToolContext, name: string, input: Record<string, unknow
   return outcome.output;
 };
 
+describe("binary files", () => {
+  test("read_file says what a binary file is instead of its bytes; text still reads; export_file refuses it", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    const { runner } = await connectedComputer(f);
+    const ctx = await runCtx();
+    const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0xc3, 0x28]);
+    const zip = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0xff, 0xfe, 0x80]);
+    for (const [path, bytes] of [
+      ["screenshots/before.jpg", jpeg],
+      ["out/data.zip", zip],
+    ] as const) {
+      expect((await call(ctx, "write_file", { path, content: "x" })).isError).toBeFalsy();
+      const key = [...runner.files.keys()].find((k) => k.endsWith(path)) as string;
+      runner.files.set(key, bytes);
+    }
+    const shot = await call(ctx, "read_file", { path: "screenshots/before.jpg" });
+    expect(shot.isError).toBeFalsy();
+    expect(shot.content).toBe(
+      "screenshots/before.jpg: binary file (14 bytes, image/jpeg): not shown as text. To know what a screen says, use desktop_read; to show the picture to people, upload_file puts it in the Drive.",
+    );
+    const archive = await call(ctx, "read_file", { path: "out/data.zip" });
+    expect(archive.content).toStartWith(
+      "out/data.zip: binary file (7 bytes, zip): not shown as text. Inspect it with run_code",
+    );
+    expect(await call(ctx, "export_file", { path: "out/data.zip" })).toMatchObject({ isError: true });
+    expect((await call(ctx, "write_file", { path: "notes.md", content: "olá 🐝" })).isError).toBeFalsy();
+    expect((await call(ctx, "read_file", { path: "notes.md" })).content).toEndWith(":\nolá 🐝");
+  });
+});
+
 describe("access", () => {
   test("new agents get the computer and the browser", async () => {
     f = await setup({ reply: () => ({ chunks: ["ok"] }) });

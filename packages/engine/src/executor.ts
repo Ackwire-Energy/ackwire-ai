@@ -90,7 +90,13 @@ import { itemLabel, retrieveForRun } from "./context/tools";
 import { fitContextWindow } from "./context-budget";
 import { modelInfoFor } from "./credentials";
 import { isAgentOnlyDm } from "./dms";
-import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationError } from "./errors";
+import {
+  BudgetExceededError,
+  dataExceptionMessage,
+  MissingCredentialError,
+  NotFoundError,
+  ValidationError,
+} from "./errors";
 import { type ChannelEvent, type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
 import {
   decisionNudge,
@@ -2681,6 +2687,17 @@ async function executeRunInner(
   } catch (error) {
     // A state change lost to a cancel (the final or suspend transition found `canceled`): end as canceled.
     if (await isCanceled().catch(() => false)) return stopCanceled("");
+    // A value the database refuses fails every retry, and a last try has none left: the run fails now and says
+    // why, or the stale-run sweep would end it later as cut by a restart.
+    const refused = dataExceptionMessage(error);
+    const gaveUp = refused || (options.finalAttempt && !(error instanceof PermanentJobError));
+    const [current] = gaveUp
+      ? await db.select({ status: agentRuns.status }).from(agentRuns).where(eq(agentRuns.id, run.id))
+      : [];
+    if (current?.status === "running") {
+      const detail = refused ?? (error instanceof Error ? error.message : String(error));
+      return fail(`Stopped after an error: ${cutText(detail, 300)}`);
+    }
     throw error;
   } finally {
     live.close();

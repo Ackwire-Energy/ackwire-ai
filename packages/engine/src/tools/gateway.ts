@@ -8,7 +8,7 @@ import { missingConnectors, type ServerCatalog } from "../connectors/listing";
 import { consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
-import { cutText } from "../format";
+import { cutText, pgSafeText } from "../format";
 import { addRunStep } from "../runs";
 import {
   callTargets,
@@ -365,13 +365,15 @@ export function createToolGateway(deps: {
           ...output.outcome,
         }).catch(() => {});
       }
-      const capped =
-        output.content.length > MAX_RESULT_CHARS
-          ? { ...output, content: `${cutText(output.content, MAX_RESULT_CHARS)}\n[truncated]` }
-          : output;
+      // A NUL or a lone surrogate (a binary printed by a command) would make every save of this result fail.
+      const text = pgSafeText(output.content);
+      const capped = {
+        ...output,
+        content: text.length > MAX_RESULT_CHARS ? `${cutText(text, MAX_RESULT_CHARS)}\n[truncated]` : text,
+      };
       return tool.external ? { ...capped, content: wrapExternal(tool.name, capped.content) } : capped;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = pgSafeText(error instanceof Error ? error.message : String(error));
       // An MCP server's error text is its own words too.
       return { content: `Tool failed: ${tool.external ? wrapExternal(tool.name, message) : message}`, isError: true };
     }

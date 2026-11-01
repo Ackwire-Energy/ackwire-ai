@@ -8,6 +8,28 @@ export const cutText = (text: string, max: number) => text.slice(0, max).replace
 export const cutTextEnd = (text: string, max: number) =>
   text.slice(Math.max(0, text.length - max)).replace(/^[\uDC00-\uDFFF]/, "");
 
+/** Postgres text and jsonb refuse NUL and lone UTF-16 surrogates: `text` without either. */
+export const pgSafeText = (text: string) =>
+  text.replaceAll("\0", "").replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "");
+
+/** `JSON.stringify` with every string in it `pgSafeText`, for a jsonb write that must never fail on its text. */
+export const pgSafeStringify = (value: unknown) =>
+  JSON.stringify(value, (_key, v) => (typeof v === "string" ? pgSafeText(v) : v));
+
+/** A JSON value as `pgSafeStringify` writes it. */
+export const pgSafeJson = <T>(value: T): T => JSON.parse(pgSafeStringify(value));
+
+/** The UTF-8 text of file bytes, or null when they are binary (a NUL byte, or not UTF-8). */
+export function textOfBytes(bytes: Uint8Array): string | null {
+  if (bytes.includes(0)) return null;
+  try {
+    // `stream`: a character cut at the end (the read stopped mid-file) is no reason to call it binary.
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes, { stream: true });
+  } catch {
+    return null;
+  }
+}
+
 /** `2.3 MB`, `12 KB`, `512 bytes`, `50.0 GB`: sizes in the English agents read. */
 export function formatBytes(n: number) {
   if (n < 1024) return `${n} bytes`;

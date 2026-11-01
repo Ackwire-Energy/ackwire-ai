@@ -3,6 +3,7 @@ import { and, type Database, type Executor, eq, schema, sql } from "@agenteschat
 import { routineBriefOfRun } from "./background";
 import type { ToolResult } from "./brains/types";
 import { deliverNotice, publishDelivery } from "./delivery";
+import { pgSafeJson } from "./format";
 import type { Message } from "./messages";
 import type { Notice } from "./notices";
 import { enqueue } from "./outbox";
@@ -94,7 +95,7 @@ export async function resumeRunWithResult(
     if (input.consulted) t.consulted = [...(t.consulted ?? []), input.consulted];
     await tx
       .update(agentRuns)
-      .set({ transcript: t as Record<string, unknown>, updatedAt: new Date() })
+      .set({ transcript: pgSafeJson(t) as Record<string, unknown>, updatedAt: new Date() })
       .where(eq(agentRuns.id, row.id));
     await enqueue(tx, {
       orgId: row.orgId,
