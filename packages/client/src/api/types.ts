@@ -984,6 +984,8 @@ export type ChannelEvent =
   | { type: "message.created"; channelId: string; messageId: string; message?: Message }
   /** Someone reacted or took it back: the message's reactions now (replace). */
   | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] }
+  /** A vote came in or the poll closed (ADR 0109). */
+  | { type: "poll.updated"; channelId: string; poll: Poll }
   | { type: "message.memories"; channelId: string; messageId: string; memories: MessageMemory[] }
   /** An agent message's receipts changed (linked to it, undone or redone): its whole list now (replace). */
   | { type: "message.actions"; channelId: string; threadId: string | null; messageId: string; actions: AgentAction[] }
@@ -2352,7 +2354,7 @@ export interface StorageMigration {
 
 // ── Artifacts (expected: `…/artifacts`, events `artifact.created` / `artifact.updated`, `meta.artifacts`) ──
 
-export type ArtifactKind = "document" | "table" | "diff" | "diagram" | "html" | "file";
+export type ArtifactKind = "document" | "table" | "diff" | "diagram" | "html" | "file" | "block" | "poll";
 
 /**
  * An uploaded file as is (ADR 0025): metadata only; the bytes come from the
@@ -2385,7 +2387,25 @@ export type ArtifactContent =
   | { kind: "diff"; files: ArtifactDiffFile[] }
   | { kind: "diagram"; mermaid: string }
   | { kind: "html"; html: string }
+  | { kind: "block"; html: string; subtitle?: string }
+  | { kind: "poll"; question: string; options: string[]; multiple: boolean }
   | ArtifactFileContent;
+
+/** One person's mark in a poll: a row per option they chose. */
+export interface PollVote {
+  userId: string;
+  option: number;
+}
+
+/** A vote among the people of a conversation (ADR 0109); its question and options are the artifact's content. */
+export interface Poll {
+  id: string;
+  closesAt: string;
+  closedAt: string | null;
+  /** How many people can answer. */
+  people: number;
+  votes: PollVote[];
+}
 
 export interface Artifact {
   id: string;

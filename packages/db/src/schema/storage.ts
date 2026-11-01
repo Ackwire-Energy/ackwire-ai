@@ -160,7 +160,16 @@ export const auditLog = pgTable(
 
 export type AuditOutcome = "done" | "failed" | "refused" | "pending";
 
-export const artifactKindEnum = pgEnum("artifact_kind", ["document", "table", "diff", "html", "diagram", "file"]);
+export const artifactKindEnum = pgEnum("artifact_kind", [
+  "document",
+  "table",
+  "diff",
+  "html",
+  "diagram",
+  "file",
+  "block",
+  "poll",
+]);
 
 /**
  * Files people and agents make (Drive): documents, tables, diffs, HTML
@@ -183,6 +192,8 @@ export const artifacts = pgTable(
     threadId: uuid(),
     /** `html` is always untrusted: the app renders it only in a sandboxed iframe on another origin. */
     untrusted: boolean().notNull().default(false),
+    /** Listed in the Drive and found by search. False for what lives in a conversation (ADR 0109): blocks and polls. */
+    inDrive: boolean().notNull().default(true),
     /** Text for search (first part of the latest version). */
     excerpt: text().notNull().default(""),
     currentVersion: integer().notNull().default(1),
@@ -270,4 +281,45 @@ export const artifactUploads = pgTable(
     index().on(t.orgId, t.createdAt),
     foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
   ],
+);
+
+/**
+ * A poll's state (ADR 0109); its question and options are the artifact's content. Open until `closesAt`, or until
+ * everyone in the conversation has voted; the agent that started it (`runId`) then hears the result.
+ */
+export const polls = pgTable(
+  "polls",
+  {
+    artifactId: uuid()
+      .primaryKey()
+      .references(() => artifacts.id, { onDelete: "cascade" }),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    runId: uuid().notNull(),
+    closesAt: timestamp({ withTimezone: true }).notNull(),
+    closedAt: timestamp({ withTimezone: true }),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.orgId)],
+);
+
+/** One person's choice in a poll: a row per option they marked. */
+export const pollVotes = pgTable(
+  "poll_votes",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    artifactId: uuid()
+      .notNull()
+      .references(() => polls.artifactId, { onDelete: "cascade" }),
+    userId: text().notNull(),
+    option: integer().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("poll_votes_choice").on(t.artifactId, t.userId, t.option), index().on(t.orgId)],
 );

@@ -5,16 +5,21 @@ import {
   artifactDownload,
   artifactFile,
   attachmentDisposition,
+  BLOCK_REPLY_CHARS,
   createArtifact,
   createFileArtifact,
   deleteArtifact,
   getArtifact,
+  getPoll,
+  keepBlock,
   listArtifacts,
   listArtifactVersions,
   listDeletedArtifacts,
+  replyToBlock,
   restoreArtifact,
   updateArtifact,
   ValidationError,
+  votePoll,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { createMiddleware } from "hono/factory";
@@ -33,7 +38,7 @@ import {
 } from "./context";
 
 const tags = ["Drive"];
-const Kind = z.enum(["document", "table", "diff", "html", "diagram", "file"]);
+const Kind = z.enum(["document", "table", "diff", "html", "diagram", "file", "block", "poll"]);
 const Author = z.object({ type: z.enum(["agent", "person"]), id: z.string() });
 
 const textContents = [
@@ -60,7 +65,19 @@ const FileContent = z
     description: "An uploaded file as is: metadata only; the bytes come from the download link.",
   });
 
-const Content = z.discriminatedUnion("kind", [...textContents, FileContent]).openapi("ArtifactContent");
+const Content = z
+  .discriminatedUnion("kind", [
+    ...textContents,
+    FileContent,
+    z.object({ kind: z.literal("block"), html: z.string(), subtitle: z.string().optional() }),
+    z.object({
+      kind: z.literal("poll"),
+      question: z.string(),
+      options: z.array(z.string()),
+      multiple: z.boolean(),
+    }),
+  ])
+  .openapi("ArtifactContent");
 
 /** A file upload (multipart): at most 50 MB. */
 const fileField = z.any().openapi({ type: "string", format: "binary", description: "The file (≤ 50 MB)." });
@@ -86,8 +103,19 @@ const Artifact = z
       description:
         "HTML and files: never rendered on the app's origin (sandboxed iframe on another origin, or download).",
     }),
+    inDrive: z.boolean().openapi({ description: "False for a block or a poll, which live in their conversation." }),
   })
   .openapi("Artifact");
+
+const Poll = z
+  .object({
+    id: z.string(),
+    closesAt: z.string(),
+    closedAt: z.string().nullable(),
+    people: z.number().openapi({ description: "How many people can answer." }),
+    votes: z.array(z.object({ userId: z.string(), option: z.number() })),
+  })
+  .openapi("Poll");
 
 const ArtifactDetail = Artifact.extend({ shownVersion: z.number(), content: Content }).openapi("ArtifactDetail");
 
@@ -362,6 +390,90 @@ export function artifactRoutes(deps: AppDeps) {
       },
     });
   });
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/artifacts/{artifactId}/keep",
+      tags,
+      security,
+      summary: "Keep a block in the Drive (it lives only in its conversation until then)",
+      request: { params: ArtifactParams },
+      responses: { 200: json(Artifact), ...errors },
+    }),
+    async (c) => {
+      const { orgId, artifactId } = c.req.valid("param");
+      return c.json(await keepBlock(artifacts(), c.get("user").id, orgId, artifactId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/artifacts/{artifactId}/reply",
+      tags,
+      security,
+      summary: "Send a block's answer to the agent that made it, as the person's own message",
+      description: "The apps show this exact text beside the button, outside the block, before it goes.",
+      request: {
+        params: ArtifactParams,
+        body: body(
+          z.object({ text: z.string().min(1).max(BLOCK_REPLY_CHARS), clientId: z.string().max(64).nullable().optional() }),
+        ),
+      },
+      responses: { 201: json(z.object({ id: z.string() })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, artifactId } = c.req.valid("param");
+      const user = c.get("user");
+      const limit = await deps.adapters.rateLimiter.consume(`post:${user.id}`, { limit: 30, windowMs: 10_000 });
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Slow down");
+      const message = await replyToBlock(
+        { ...artifacts(), pubsub: deps.adapters.pubsub, judge: deps.extras?.context?.judge, talker: deps.extras?.talker },
+        user.id,
+        orgId,
+        artifactId,
+        c.req.valid("json"),
+      );
+      deps.wakeWorkers?.();
+      return c.json({ id: message.id }, 201);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/polls/{artifactId}",
+      tags,
+      security,
+      summary: "A vote in a conversation: who marked what, and when it closes",
+      request: { params: ArtifactParams },
+      responses: { 200: json(Poll), ...errors },
+    }),
+    async (c) => {
+      const { orgId, artifactId } = c.req.valid("param");
+      return c.json(await getPoll(artifacts(), c.get("user").id, orgId, artifactId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/polls/{artifactId}/vote",
+      tags,
+      security,
+      summary: "Mark options in a vote, replacing your last choice (empty takes it back)",
+      request: {
+        params: ArtifactParams,
+        body: body(z.object({ options: z.array(z.number().int().min(0)).max(8) })),
+      },
+      responses: { 200: json(Poll), ...errors },
+    }),
+    async (c) => {
+      const { orgId, artifactId } = c.req.valid("param");
+      return c.json(await votePoll(artifacts(), c.get("user").id, orgId, artifactId, c.req.valid("json").options), 200);
+    },
+  );
 
   app.openapi(
     createRoute({

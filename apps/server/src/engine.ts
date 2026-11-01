@@ -12,6 +12,7 @@ import {
   computerTurnProfile,
   connectOverHttp,
   createArtifactToolSource,
+  createBlockToolSource,
   createAskAgentToolSource,
   createAskUserToolSource,
   createBlobStoreResolver,
@@ -291,6 +292,8 @@ export function buildEngine(o: EngineOptions) {
       // Runs nobody called by name may stay quiet (reply-policy.ts): listed only for them.
       createPassToolSource(),
       createArtifactToolSource(artifacts),
+      // Live blocks and votes in the agent's own conversation (ADR 0109).
+      createBlockToolSource(artifacts),
       createChatToolSource({ pubsub: adapters.pubsub, artifacts }),
       createWorkspaceToolSource({ pubsub: adapters.pubsub }),
       // Setting up the workspace from the chat: Connect cards a person clicks, channels with Undo, new agents proposed.

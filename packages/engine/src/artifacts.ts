@@ -12,10 +12,24 @@ import { agentSearchChannels, enqueueIndex, registerDocumentBuilder } from "./se
 
 const { artifacts, artifactVersions, channels, channelMembers } = schema;
 
-export type ArtifactKind = "document" | "table" | "diff" | "html" | "diagram" | "file";
-export const ARTIFACT_KINDS: readonly ArtifactKind[] = ["document", "table", "diff", "html", "diagram", "file"];
+export type ArtifactKind = "document" | "table" | "diff" | "html" | "diagram" | "file" | "block" | "poll";
+export const ARTIFACT_KINDS: readonly ArtifactKind[] = [
+  "document",
+  "table",
+  "diff",
+  "html",
+  "diagram",
+  "file",
+  "block",
+  "poll",
+];
+/**
+ * What lives in a conversation and not in the Drive (ADR 0109): made only through `show_block` and `start_poll`,
+ * never by `create_artifact` or a person.
+ */
+export type ConversationKind = "block" | "poll";
 /** Kinds made from content (JSON); `file` is made only from bytes (`createFileArtifact`, ADR 0025). */
-export const TEXT_ARTIFACT_KINDS: readonly Exclude<ArtifactKind, "file">[] = [
+export const TEXT_ARTIFACT_KINDS: readonly Exclude<ArtifactKind, "file" | ConversationKind>[] = [
   "document",
   "table",
   "diff",
@@ -39,6 +53,8 @@ export type ArtifactContent =
   | { kind: "diff"; files: { path: string; patch: string }[] }
   | { kind: "diagram"; mermaid: string }
   | { kind: "html"; html: string }
+  | { kind: "block"; html: string; subtitle?: string }
+  | { kind: "poll"; question: string; options: string[]; multiple: boolean }
   | FileContent;
 
 type TextContent = Exclude<ArtifactContent, FileContent>;
@@ -64,6 +80,8 @@ export interface ArtifactView {
   canEdit: boolean;
   /** HTML pages and files: never rendered on the app's origin (sandboxed iframe on another origin, or download). */
   untrusted: boolean;
+  /** False for a block or a poll, which live in their conversation until someone keeps a block (ADR 0109). */
+  inDrive: boolean;
 }
 
 export interface ArtifactDetailView extends ArtifactView {
@@ -94,6 +112,10 @@ export const ARTIFACT_LIMITS = {
   titleChars: 200,
   documentBytes: 1_000_000,
   htmlBytes: 2_000_000,
+  /** A block is short by design (ADR 0109): the kit does the work and the data goes in it. */
+  blockBytes: 200_000,
+  pollOptions: 8,
+  pollOptionChars: 120,
   diagramBytes: 200_000,
   tableRows: 10_000,
   tableColumns: 100,
@@ -129,6 +151,22 @@ export function validateContent(raw: unknown): TextContent {
       if (typeof c.html !== "string") throw new ValidationError("html needs html");
       if (bytes(c.html) > ARTIFACT_LIMITS.htmlBytes) throw tooBig("html page");
       return { kind: "html", html: c.html };
+    }
+    case "block": {
+      if (typeof c.html !== "string" || !c.html.trim()) throw new ValidationError("a block needs html");
+      if (bytes(c.html) > ARTIFACT_LIMITS.blockBytes) throw tooBig("block");
+      const subtitle = typeof c.subtitle === "string" ? c.subtitle.trim().slice(0, 120) : "";
+      return { kind: "block", html: c.html, ...(subtitle ? { subtitle } : {}) };
+    }
+    case "poll": {
+      const options = Array.isArray(c.options) ? c.options.map((o) => String(o).trim()).filter(Boolean) : [];
+      if (typeof c.question !== "string" || !c.question.trim()) throw new ValidationError("a poll needs a question");
+      if (new Set(options).size !== options.length) throw new ValidationError("poll options must differ");
+      if (options.length < 2 || options.length > ARTIFACT_LIMITS.pollOptions) {
+        throw new ValidationError(`a poll takes 2 to ${ARTIFACT_LIMITS.pollOptions} options`);
+      }
+      if (options.some((o) => o.length > ARTIFACT_LIMITS.pollOptionChars)) throw tooBig("poll option");
+      return { kind: "poll", question: c.question.trim(), options, multiple: c.multiple === true };
     }
     case "diagram": {
       if (typeof c.mermaid !== "string") throw new ValidationError("diagram needs mermaid source");
@@ -178,6 +216,13 @@ function encode(content: TextContent): { body: Uint8Array; contentType: string }
       return text(content.markdown, "text/markdown; charset=utf-8");
     case "html":
       return text(content.html, "text/html; charset=utf-8");
+    case "block":
+      return text(JSON.stringify({ html: content.html, subtitle: content.subtitle }), "application/json");
+    case "poll":
+      return text(
+        JSON.stringify({ question: content.question, options: content.options, multiple: content.multiple }),
+        "application/json",
+      );
     case "diagram":
       return text(content.mermaid, "text/plain; charset=utf-8");
     case "table":
@@ -194,6 +239,10 @@ function decode(kind: Exclude<ArtifactKind, "file">, body: Uint8Array): TextCont
       return { kind, markdown: s };
     case "html":
       return { kind, html: s };
+    case "block":
+      return { kind, ...(JSON.parse(s) as { html: string; subtitle?: string }) };
+    case "poll":
+      return { kind, ...(JSON.parse(s) as { question: string; options: string[]; multiple: boolean }) };
     case "diagram":
       return { kind, mermaid: s };
     case "table": {
@@ -212,6 +261,8 @@ const EXTENSIONS: Record<ArtifactKind, string> = {
   table: "json",
   diff: "json",
   file: "bin",
+  block: "json",
+  poll: "json",
 };
 
 // ── Files (ADR 0025) ─────────────────────────────────────────────────────────
@@ -332,13 +383,15 @@ function excerptOf(content: ArtifactContent): string {
       ? content.name
       : content.kind === "document"
         ? content.markdown
-        : content.kind === "html"
+        : content.kind === "html" || content.kind === "block"
           ? content.html.replace(/<[^>]+>/g, " ")
-          : content.kind === "diagram"
-            ? content.mermaid
-            : content.kind === "table"
-              ? [content.columns.join(" "), ...content.rows.map((r) => r.join(" "))].join("\n")
-              : content.files.map((f) => f.path).join("\n");
+          : content.kind === "poll"
+            ? [content.question, ...content.options].join("\n")
+            : content.kind === "diagram"
+              ? content.mermaid
+              : content.kind === "table"
+                ? [content.columns.join(" "), ...content.rows.map((r) => r.join(" "))].join("\n")
+                : content.files.map((f) => f.path).join("\n");
   return s.replace(/\s+/g, " ").trim().slice(0, 20_000);
 }
 
@@ -402,6 +455,7 @@ function view(a: ArtifactRow, canEdit: boolean): ArtifactView {
     updatedAt: a.updatedAt.toISOString(),
     canEdit,
     untrusted: a.untrusted,
+    inDrive: a.inDrive,
   };
 }
 
@@ -475,6 +529,8 @@ async function insertArtifact(
     channelId: string | null;
     threadId: string | null;
     untrusted: boolean;
+    /** False for what lives only in its conversation (ADR 0109): out of the Drive and of search. */
+    inDrive?: boolean;
     excerpt: string;
     stored: Stored;
     note?: string | null;
@@ -497,6 +553,7 @@ async function insertArtifact(
         channelId: input.channelId,
         threadId: input.threadId,
         untrusted: input.untrusted,
+        inDrive: input.inDrive ?? true,
         excerpt: input.excerpt,
         currentVersion: 1,
         createdByType: author.type,
@@ -521,7 +578,7 @@ async function insertArtifact(
       authorId: author.id,
       runId: actor.type === "agent" ? (actor.runId ?? null) : null,
     });
-    await enqueueIndex(tx, { orgId, kind: "file", sourceId: id });
+    if (input.inDrive !== false) await enqueueIndex(tx, { orgId, kind: "file", sourceId: id });
     await recordAudit(tx, {
       orgId,
       actor: authorOf(actor),
@@ -621,6 +678,52 @@ export async function createArtifact(
     stored: encode(content),
   });
   return { ...artifact, shownVersion: 1, content };
+}
+
+/**
+ * What an agent shows in its conversation (ADR 0109): a live block or a poll. Stored like any file, for its channel's
+ * visibility, versions and the card on the message, but out of the Drive and of search. Runs apart like a page.
+ */
+export async function createConversationArtifact(
+  deps: ArtifactDeps,
+  actor: Extract<ArtifactActor, { type: "agent" }>,
+  orgId: string,
+  input: { title: string; content: Extract<ArtifactContent, { kind: ConversationKind }> },
+): Promise<ArtifactDetailView> {
+  const place = await placeNew(deps.db, actor, orgId, input);
+  const content = validateContent(input.content) as Extract<ArtifactContent, { kind: ConversationKind }>;
+  const { artifact } = await insertArtifact(deps, actor, orgId, {
+    ...place,
+    kind: content.kind,
+    untrusted: true,
+    inDrive: false,
+    excerpt: excerptOf(content),
+    stored: encode(content),
+  });
+  return { ...artifact, shownVersion: 1, content };
+}
+
+/** "Guardar no Drive": a block a person wants to keep joins the Drive and search (ADR 0109). */
+export async function keepBlock(deps: ArtifactDeps, userId: string, orgId: string, artifactId: string) {
+  const actor: ArtifactActor = { type: "person", userId };
+  const current = await readable(deps, actor, orgId, artifactId);
+  if (current.kind !== "block") throw new ValidationError("only a block can be kept");
+  if (current.inDrive) return view(current, false);
+  const row = await deps.db.transaction(async (tx) => {
+    const [a] = await tx
+      .update(artifacts)
+      .set({ inDrive: true })
+      .where(and(eq(artifacts.id, artifactId), eq(artifacts.orgId, orgId)))
+      .returning();
+    if (!a) throw new NotFoundError("Artifact not found");
+    await enqueueIndex(tx, { orgId, kind: "file", sourceId: artifactId });
+    return a;
+  });
+  const artifact = view(row, false);
+  if (row.channelId) {
+    await publishChannelEvent(deps.pubsub, { type: "artifact.updated", channelId: row.channelId, artifact });
+  }
+  return artifact;
 }
 
 /**
@@ -859,6 +962,7 @@ export async function listArtifacts(
       and(
         eq(artifacts.orgId, orgId),
         isNull(artifacts.deletedAt),
+        eq(artifacts.inDrive, true),
         visible.length > 0
           ? or(isNull(artifacts.channelId), inArray(artifacts.channelId, visible))
           : isNull(artifacts.channelId),

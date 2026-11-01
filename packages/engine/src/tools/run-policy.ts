@@ -100,6 +100,8 @@ const HERE = new Set([
   "send_gif",
   "send_sticker",
   "ask_user",
+  "show_block",
+  "start_poll",
   "share_artifact",
   "suggest_forum_topic",
   "propose_mission",

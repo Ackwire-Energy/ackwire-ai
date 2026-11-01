@@ -1,5 +1,6 @@
 import type { ArtifactContent, ArtifactKind, ArtifactRef } from "../api/types";
 
+/** What the Drive filters by: a block or a poll lives in its conversation (ADR 0109). */
 export const ARTIFACT_KINDS: ArtifactKind[] = ["document", "table", "diff", "diagram", "html", "file"];
 
 /** Each kind's design system icon (names from `@agenteschat/ui`'s `IconName`). */
@@ -10,6 +11,8 @@ export const KIND_ICON = {
   diagram: "diagram",
   html: "page",
   file: "file",
+  block: "page",
+  poll: "check",
 } as const satisfies Record<ArtifactKind, string>;
 
 export const isArtifactKind = (v: unknown): v is ArtifactKind => ARTIFACT_KINDS.includes(v as ArtifactKind);
@@ -152,7 +155,9 @@ export function fileName(title: string, content: ArtifactContent | { kind: Artif
       .replace(/[^\w]+/g, "-")
       .replace(/^-|-$/g, "")
       .toLowerCase() || "arquivo";
-  const ext = { document: "md", table, diff: "patch", diagram: "mmd", html: "html" }[content.kind];
+  const ext = { document: "md", table, diff: "patch", diagram: "mmd", html: "html", block: "html", poll: "json" }[
+    content.kind
+  ];
   return `${slug}.${ext}`;
 }
 

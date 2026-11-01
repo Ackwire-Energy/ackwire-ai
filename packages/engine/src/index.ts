@@ -17,6 +17,7 @@ export * from "./approval-rules";
 export * from "./approvals";
 export * from "./artifact-tools";
 export * from "./artifacts";
+export * from "./blocks";
 export * from "./audience";
 export * from "./audit";
 export * from "./authority";

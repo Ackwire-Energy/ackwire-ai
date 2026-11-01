@@ -2558,6 +2558,42 @@ export const useArtifact = (orgId: string, id: string | null, version?: number) 
   });
 };
 
+/** A vote: the answers come in over the socket (`poll.updated`). */
+export const usePoll = (orgId: string, id: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.poll(orgId, id ?? ""),
+    queryFn: () => api.artifacts.poll(orgId, id ?? ""),
+    enabled: Boolean(id),
+  });
+};
+
+export const useVote = (orgId: string, id: string) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (options: number[]) => api.artifacts.vote(orgId, id, options),
+    onSuccess: (poll) => qc.setQueryData(keys.poll(orgId, id), poll),
+  });
+};
+
+export const useKeepBlock = (orgId: string, id: string) => {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.artifacts.keep(orgId, id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.artifacts(orgId) }),
+  });
+};
+
+export const useBlockReply = (orgId: string, id: string) => {
+  const api = useApi();
+  return useMutation({
+    mutationFn: ({ text, clientId }: { text: string; clientId: string }) =>
+      api.artifacts.reply(orgId, id, text, clientId),
+  });
+};
+
 export const useArtifactVersions = (orgId: string, id: string | null) => {
   const api = useApi();
   return useQuery({
