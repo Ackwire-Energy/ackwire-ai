@@ -77,8 +77,10 @@ const TASK_START_SECONDS = 60;
 const REPORT_DELAY_MS = 3600_000;
 
 /**
- * Words a message made only of is a thanks, an ok or a sign-off, in the languages people write here; laughter too.
- * Never a yes or a go-ahead ("sim", "pode", "yes", "go"): that asks an agent to act.
+ * Words and phrases a message made only of is a thanks, an ok or a sign-off, in the languages people write here;
+ * laughter too. Never a yes or a go-ahead ("sim", "pode", "yes", "go", "show"): that asks an agent to act. A word
+ * that is only a thanks or a goodbye inside a phrase ("até mais", "see ya", "copy that") is here as the phrase: alone
+ * it can be a request ("mais", "copy it", "see all").
  */
 // ponytail: a word list, so a thanks in a language it lacks reads as a request; a judge call per short trigger if it matters.
 const ACK_WORDS = [
@@ -103,8 +105,7 @@ const ACK_WORDS = [
   "mt",
   "demais",
   "top",
-  "show",
-  "bola",
+  "show de bola",
   "perfeit[oa]",
   "[óo]tim[oa]",
   "massa",
@@ -123,20 +124,16 @@ const ACK_WORDS = [
   "tchau",
   "falou",
   "flw",
+  "at[ée] (mais|logo|amanh[ãa]|breve)",
   "at[ée]",
-  "mais",
-  "amanh[ãa]",
-  "logo",
+  "bo[am] (dia|tarde|noite)",
   "boa",
   "bom",
-  "noite",
-  "tarde",
-  "dia",
   "abra[çc]os?",
   "abs",
-  "de",
+  "de nada",
   "nada",
-  "tudo",
+  "tudo (bem|certo)",
   "bem",
   "grat[oa]",
   "gratid[ãa]o",
@@ -161,22 +158,20 @@ const ACK_WORDS = [
   "cool",
   "perfect",
   "awesome",
-  "got",
-  "it",
+  "got (it|you|that)",
   "noted",
   "received",
-  "sounds",
+  "sounds (good|great)",
   "good",
   "alright",
-  "all",
+  "all (right|good|set)",
   "right",
   "bye",
-  "see",
-  "ya",
+  "see (ya|you)",
   "later",
   "night",
   "morning",
-  "have",
+  "have a (good|nice|great) (day|night|weekend|one)",
   "a",
   "day",
   "weekend",
@@ -188,8 +183,7 @@ const ACK_WORDS = [
   "many",
   "np",
   "roger",
-  "copy",
-  "that",
+  "copy that",
   "welcome",
   "lol",
   // es, fr, de, it
@@ -200,12 +194,10 @@ const ACK_WORDS = [
   "genial",
   "listo",
   "adi[óo]s",
-  "hasta",
+  "hasta (luego|ma[ñn]ana|pronto)",
   "luego",
-  "ma[ñn]ana",
   "chau",
-  "buenas",
-  "noches",
+  "buenas( noches)?",
   "merci",
   "beaucoup",
   "parfait",
@@ -233,7 +225,7 @@ const ACK_WORDS = [
 /** Runs of punctuation, symbols and emoji (Postgres ARE): what is left of a message without them are its words. */
 const NOT_WORDS =
   "[\\s\\u0021-\\u002f\\u003a-\\u0040\\u005b-\\u0060\\u007b-\\u007e\\u00a1-\\u00bf\\u2010-\\u206f\\u2190-\\u2bff\\u3000-\\u303f\\ufe0f\\uff01-\\uff0f\\U0001f000-\\U0001faff]+";
-/** Whole words of `ACK_WORDS`, each followed by a space or the end (Postgres ARE). */
+/** Whole words and phrases of `ACK_WORDS`, each followed by a space or the end (Postgres ARE). */
 const ACK_PATTERN = `^ *(?:(?:${ACK_WORDS.join("|")})(?: +|$))*$`;
 
 /**

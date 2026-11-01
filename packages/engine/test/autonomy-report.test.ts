@@ -396,7 +396,7 @@ describe("one workspace's day", () => {
     expect(table).toContain("$0.01");
   });
 
-  test("a thanks, an ok or a sign-off in any script counts; a yes, a question, more words or a file don't", async () => {
+  test("a thanks, an ok or a sign-off in any script counts; a yes, a question, more words, a word only a phrase makes a thanks, or a file don't", async () => {
     const other = "2026-10-20";
     const acks = [
       "👍",
@@ -408,6 +408,16 @@ describe("one workspace's day", () => {
       "kkkk",
       "Merci beaucoup",
       "gracias!!",
+      "copy that",
+      "see ya",
+      "até mais",
+      "have a good day!",
+      "all right",
+      "show de bola",
+      "Bom dia!",
+      "de nada",
+      "tudo bem",
+      "got it",
     ];
     const asks = [
       "?",
@@ -418,6 +428,14 @@ describe("one workspace's day", () => {
       "どうして",
       "",
       "спасибо, где логи",
+      "show it",
+      "copy it",
+      "mais",
+      "see all",
+      "have it",
+      "show all",
+      "amanhã",
+      "tudo",
     ];
     let n = 0;
     for (const body of [...acks, ...asks]) {
