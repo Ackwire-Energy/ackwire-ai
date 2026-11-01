@@ -6,6 +6,7 @@ import type { BrainPlan } from "./brains/select";
 import type { BrainKind } from "./brains/types";
 import { caches } from "./cache";
 import { usableCredentialRow } from "./credentials";
+import { cutText } from "./format";
 import type { Judge } from "./judge";
 import { missionOfThread } from "./missions";
 import { orgModelProvider } from "./router";
@@ -125,10 +126,10 @@ export async function chooseAutoModel(
           agent: {
             name: input.agent.name,
             role: input.agent.role,
-            instructions: input.agent.instructions.slice(0, 1500),
+            instructions: cutText(input.agent.instructions, 1500),
           },
-          message: input.message.slice(0, 2000),
-          recent: input.recent.map((m) => m.slice(0, 400)).join("\n"),
+          message: cutText(input.message, 2000),
+          recent: input.recent.map((m) => cutText(m, 400)).join("\n"),
           run: {
             started_by_a_routine: input.routine,
             part_of_a_mission: input.mission,

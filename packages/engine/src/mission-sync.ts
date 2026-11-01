@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { and, asc, desc, eq, inArray, lte, schema, sql } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
+import { cutText } from "./format";
 import { formatDuration, getTask, isAgentTask, type MachineTaskRow, taskEndNotice, taskSeconds } from "./machine-tasks";
 import { getMachineById } from "./machines";
 import {
@@ -234,8 +235,8 @@ export async function syncMissionFiles(deps: MissionDeps, missionId: string) {
     if (there !== null && row?.lastWrittenSha && thereSha !== row.lastWrittenSha) {
       await recordMissionEvent(deps.db, mission, "file_edited_on_machine", {
         name,
-        approved: (row.content ?? "").slice(0, EDIT_KEEP_CHARS),
-        edited: there.slice(0, EDIT_KEEP_CHARS),
+        approved: cutText(row.content ?? "", EDIT_KEEP_CHARS),
+        edited: cutText(there, EDIT_KEEP_CHARS),
         diff: smallDiff(row.content ?? "", there),
       });
       await publishMissionEvent(deps, mission, "file_edited", { file: name });

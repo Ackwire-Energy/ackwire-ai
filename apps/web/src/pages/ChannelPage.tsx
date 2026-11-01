@@ -67,7 +67,7 @@ import {
   useWikiTree,
 } from "@agenteschat/client";
 import { actionCardOf } from "@agenteschat/client/lib/action-cards";
-import { activityVerb, barEntries, isWriting, toolActivity } from "@agenteschat/client/lib/activity";
+import { activityVerb, barElapsed, barEntries, isWriting, toolActivity } from "@agenteschat/client/lib/activity";
 import { looksLikeApiKey } from "@agenteschat/client/lib/api-key-text";
 import { artifactRefs } from "@agenteschat/client/lib/artifacts";
 import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
@@ -103,7 +103,7 @@ import {
 import { noAiCardOf } from "@agenteschat/client/lib/no-ai";
 import { isTalkerReply, noticeOf, routineReportText } from "@agenteschat/client/lib/notices";
 import { brainUnavailableOf, isOfflineNotice } from "@agenteschat/client/lib/outages";
-import { can } from "@agenteschat/client/lib/permissions";
+import { can, managesChannel, setsAutoReply } from "@agenteschat/client/lib/permissions";
 import { localMeta, replyOf } from "@agenteschat/client/lib/reply";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
@@ -173,7 +173,6 @@ import { readingLanding } from "@/chat/reading";
 import {
   blockRowByRun,
   drawsBehind,
-  elapsedParts,
   nextSlots,
   openerDelayMs,
   openerOf,
@@ -2538,8 +2537,8 @@ function StoppedLine({
   byUserId: string | null | undefined;
   /** The server's line, for older messages without a person in the meta. */
   note?: string | null;
-  /** The run ended at its step limit (`meta.stepLimit`), nobody stopped it. */
-  limit?: boolean;
+  /** The run ended at its step limit, or because it got stuck (`meta.stepLimit`): nobody stopped it. */
+  limit?: "steps" | "stuck";
   /** Who may continue: the same people who may stop it. */
   owner: { agentId: string; channelId: string; threadId: string; triggerMessageId?: string | null } | null;
   /** The stopped reply, once it is saved (its meta says when it was continued). */
@@ -2553,7 +2552,7 @@ function StoppedLine({
   const continued = useWasContinued(runId, message);
   const stopper = byUserId ? dir.memberById.get(byUserId)?.name : undefined;
   const who = limit
-    ? t("run.stepLimit")
+    ? t(limit === "stuck" ? "run.stuck" : "run.stepLimit")
     : byUserId && byUserId === me.user.id
       ? t("run.stoppedByYou")
       : stopper
@@ -2762,7 +2761,7 @@ function ActivityBar({
   const firstAgent = agents[0];
   // The time, "Ver" and the stop are one agent's: with several, the line can't say whose (the composer still stops).
   const soloRun = agents.length === 1 && firstAgent ? runs.find((r) => r.agentId === firstAgent.id) : undefined;
-  const took = soloRun ? elapsedParts(now - (soloRun.startedAt ?? now)) : null;
+  const took = barElapsed(t, entries, runs, now);
   // Agents running code: "Ver código" with the live code and output.
   const coding = runs.filter(
     (r) => outOfView(r.runId) && r.code && (r.work ?? []).some((w) => w.kind === "call" && w.running),
@@ -2818,13 +2817,7 @@ function ActivityBar({
               <BarPhrase entries={entries} runs={runs} />
             </span>
             <ConsultClock entries={entries} now={now} />
-            {took && !entries.some((e) => e.consult?.status === "asking") && (
-              <span className="ac-typing__elapsed ac-num">
-                {took.m > 0
-                  ? t("run.elapsedMinutes", { m: took.m, s: took.s })
-                  : t("run.elapsedSeconds", { n: took.s })}
-              </span>
-            )}
+            {took && <span className="ac-typing__elapsed ac-num">{took}</span>}
             {openBrowser && (
               <Button
                 size="sm"
@@ -2962,8 +2955,9 @@ export const TimelineMessage = memo(function TimelineMessage({
   // A text the server wrote (`meta.bodyCode`, a deploy's notice) is shown in the person's language.
   const stopped = useMemo(() => splitCanceled(serverBody(t, m.body, m.meta), m.meta), [t, m.body, m.meta]);
   const body = reminderBody(stopped.body, m.meta);
-  // The reply of a run that reached its step limit: Continuar under it too.
-  const atLimit = !stopped.canceled && Boolean(m.meta?.stepLimit);
+  // The reply of a run that reached its step limit, or that stopped because it got stuck: Continuar under it too.
+  const ended = stopped.canceled ? undefined : (m.meta?.stepLimit as { stuck?: unknown } | undefined);
+  const atLimit = ended ? (ended.stuck === true ? "stuck" : "steps") : undefined;
 
   const channelName = useChannels(org.id).data?.find((c) => c.id === m.channelId)?.name;
   // A plain reminder: the agent's own message, with a small "Reminder" label.
@@ -3544,8 +3538,7 @@ function ChannelDetails({
   // What "on its own" means for my messages: who reads the ones that mention nobody.
   const routing = useAiStatus(org.id, open).data?.routing;
   const update = useUpdateChannel(org.id, channel.id);
-  // Who manages channels, and the channel's creator (as the server allows).
-  const editable = can(org, "manage_channels") || channel.createdByUserId === me.user.id;
+  const editable = managesChannel(channel, me.user.id, org);
   const navigate = useNavigate();
   const toast = useToast();
   const categories = useChannelCategories(org.id);
@@ -3662,17 +3655,8 @@ function ChannelDetails({
     },
   });
   const autoReply = useMutation({
-    mutationFn: async ({ agentId, on }: { agentId: string; on: boolean }) => {
-      // PUT replaces the agent's channel list: keep the others as they are.
-      const current = await api.agents.channels(org.id, agentId);
-      const next = current.some((c) => c.id === channel.id)
-        ? current.map((c) => ({ channelId: c.id, autoReply: c.id === channel.id ? on : c.autoReply }))
-        : [
-            ...current.map((c) => ({ channelId: c.id, autoReply: c.autoReply })),
-            { channelId: channel.id, autoReply: on },
-          ];
-      return api.agents.setChannels(org.id, agentId, next);
-    },
+    mutationFn: ({ agentId, on }: { agentId: string; on: boolean }) =>
+      api.chat.setAutoReply(org.id, channel.id, agentId, on),
     onSuccess: refresh,
   });
   const needle = q.trim().toLowerCase();
@@ -3684,6 +3668,7 @@ function ChannelDetails({
     handle: m.handle ?? "",
     email: m.type === "person" ? (dir.memberById.get(m.id)?.email ?? "") : "",
     autoReply: Boolean(m.autoReply),
+    setsReply: m.type === "agent" && setsAutoReply(channel, dir.agentById.get(m.id), me.user.id, org),
   }));
   const shown = all.filter((r) => !needle || `${r.name} ${r.handle} ${r.email}`.toLowerCase().includes(needle));
   const agents = shown.filter((r) => r.kind === "agent");
@@ -3788,12 +3773,14 @@ function ChannelDetails({
                 <span className="small muted">
                   {!r.autoReply
                     ? t("channelMembers.mentionLine", { handle: r.handle })
-                    : picksForMe(routing)
-                      ? t("channelMembers.aloneLine", agentGrammar(t, r.name))
-                      : t(replyAloneKey(routing), agentGrammar(t, r.name))}
+                    : !picksForMe(routing)
+                      ? t(replyAloneKey(routing), agentGrammar(t, r.name))
+                      : dir.agentById.get(r.id)?.coordinator
+                        ? t("channelMembers.coordinatorLine")
+                        : t("channelMembers.aloneLine", agentGrammar(t, r.name))}
                 </span>
               </span>
-              {editable && (
+              {r.setsReply && (
                 <Menu
                   align="end"
                   label={t("channelMembers.actions", { name: r.name })}
@@ -3835,10 +3822,18 @@ function ChannelDetails({
                       },
                     ]}
                   />
-                  <MenuSeparator />
-                  <MenuItem icon="close" danger onSelect={() => setRemoving({ kind: "agent", id: r.id, name: r.name })}>
-                    {t("channelMembers.remove")}
-                  </MenuItem>
+                  {editable && (
+                    <>
+                      <MenuSeparator />
+                      <MenuItem
+                        icon="close"
+                        danger
+                        onSelect={() => setRemoving({ kind: "agent", id: r.id, name: r.name })}
+                      >
+                        {t("channelMembers.remove")}
+                      </MenuItem>
+                    </>
+                  )}
                 </Menu>
               )}
             </div>

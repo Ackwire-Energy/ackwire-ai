@@ -27,6 +27,7 @@ import { requireChannelAccess } from "./channels";
 import { eligibleChannelAgents } from "./dispatch";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
+import { cutText } from "./format";
 import type { Judge } from "./judge";
 import { type MachineCaller, MachineRequestError } from "./machine-hub";
 import {
@@ -310,10 +311,8 @@ const visible = (text: string) =>
     return (c < 32 && ch !== "\n" && ch !== "\t") || c === 127 ? " " : ch;
   }).join("");
 const clean = (text: unknown, max: number) =>
-  visible(typeof text === "string" ? text.slice(0, max * 2) : "")
-    .trim()
-    .slice(0, max);
-const oneLine = (text: string, max: number) => text.replace(/\s+/g, " ").trim().slice(0, max);
+  cutText(visible(typeof text === "string" ? cutText(text, max * 2) : "").trim(), max);
+const oneLine = (text: string, max: number) => cutText(text.replace(/\s+/g, " ").trim(), max);
 
 async function namesOf(db: Executor, ids: (string | null | undefined)[]) {
   const wanted = [...new Set(ids.filter((x): x is string => Boolean(x)))];
@@ -1375,7 +1374,7 @@ export async function tellSession(
   const entry = {
     sessionId: target.sessionId,
     cwd: cwd ?? "",
-    text: text.slice(0, MISSION_LIMITS.sendText),
+    text: cutText(text, MISSION_LIMITS.sendText),
     at: new Date().toISOString(),
   };
   // Item sessions talk only while the mission is active.

@@ -1,4 +1,5 @@
 import { and, desc, type Executor, eq, inArray, schema } from "@agenteschat/db";
+import { cutText } from "./format";
 
 const { issues, issueActivity, users, agents } = schema;
 
@@ -73,7 +74,7 @@ export async function issueWorkBrief(db: Executor, orgId: string, issueId: strin
     .filter((c) => c.text.trim())
     .map(
       (c) =>
-        `- ${names.get(c.authorId) ?? (c.authorType === "agent" ? "an agent" : "someone")} (${c.createdAt.toISOString().slice(0, 16).replace("T", " ")}): ${c.text.trim().slice(0, COMMENT_CHARS)}`,
+        `- ${names.get(c.authorId) ?? (c.authorType === "agent" ? "an agent" : "someone")} (${c.createdAt.toISOString().slice(0, 16).replace("T", " ")}): ${cutText(c.text.trim(), COMMENT_CHARS)}`,
     );
   return [
     `# Your task: issue #${issue.number}`,

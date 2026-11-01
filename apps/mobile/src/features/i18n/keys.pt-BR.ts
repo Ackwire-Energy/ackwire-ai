@@ -312,6 +312,7 @@ export const featureKeysPtBR = {
       by: "Parado por {{name}}",
       plain: "Parado",
       limit: "No limite de passos",
+      stuck: "Parou porque travou",
       continue: "Continuar",
       failed: "Não deu para continuar. Tente de novo.",
     },
