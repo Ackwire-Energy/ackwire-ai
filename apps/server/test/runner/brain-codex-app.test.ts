@@ -12,6 +12,7 @@ import {
 } from "../../runner/brain-codex";
 import {
   approvalCalls,
+  CodexAppMapper,
   CodexAppServers,
   type CodexAppServersOptions,
   codexAppServerArgs,
@@ -577,4 +578,16 @@ test.skipIf(!posix)("a plan turn's approvals are refused on the computer, never 
   await read.done;
   expect(answerOf(read.events)).toBe("decision: accept");
   expect(asked).toEqual([]);
+});
+
+test("a refusal known by its words after a command says the turn worked", () => {
+  const m = new CodexAppMapper({ cwd: "" });
+  m.completed({ id: "c", type: "commandExecution", command: "git push", aggregatedOutput: "", status: "completed" });
+  const message = "Your workspace is out of credits.";
+  expect(m.end({ id: "t", status: "failed", error: { message } } as never, SESSION, []).at(-1)).toEqual({
+    type: "error",
+    code: "plan_limit",
+    message,
+    worked: true,
+  });
 });

@@ -336,8 +336,9 @@ export function codexFileChangeCall(item: {
  * account signed out, ADR 0041), anything else `codex_failed` (retryable
  * unless the turn itself failed).
  */
-export function codexProblem(problem: string, turnFailed: boolean): CodexBrainEvent[] {
-  if (USAGE_LIMIT.test(problem)) return [{ type: "limit" }, { type: "error", code: "plan_limit", message: problem }];
+export function codexProblem(problem: string, turnFailed: boolean, worked = false): CodexBrainEvent[] {
+  if (USAGE_LIMIT.test(problem))
+    return [{ type: "limit" }, { type: "error", code: "plan_limit", message: problem, worked }];
   if (CODEX_AUTH.test(problem)) return [{ type: "error", code: "not_logged_in", message: problem, retryable: true }];
   return [{ type: "error", code: "codex_failed", message: problem, ...(turnFailed ? {} : { retryable: true }) }];
 }
@@ -352,6 +353,8 @@ export class CodexEventMapper {
   completed = false;
   failed?: string;
   lastError?: string;
+  /** The turn ran a command, changed a file or called our bridge: a cut now loses work the API couldn't see. */
+  private worked = false;
 
   constructor(
     private readonly opts: { cwd: string; model?: string; redact?: (text: string) => string } = { cwd: "" },
@@ -411,6 +414,8 @@ export class CodexEventMapper {
       case "item.completed": {
         const item = (ev.item ?? {}) as Record<string, unknown>;
         const id = str(item.id) || `codex-${Math.random().toString(36).slice(2)}`;
+        if (item.type === "command_execution" || item.type === "file_change" || item.type === "mcp_tool_call")
+          this.worked = true;
         switch (item.type) {
           case "agent_message": {
             const t = str(item.text);
@@ -455,7 +460,7 @@ export class CodexEventMapper {
           (input.exitCode === 0
             ? "Codex ended without finishing the turn"
             : `Codex exited with code ${input.exitCode ?? "?"}${input.stderr ? `: ${this.clean(input.stderr)}` : ""}`)));
-    if (problem) return codexProblem(problem, this.failed !== undefined);
+    if (problem) return codexProblem(problem, this.failed !== undefined, this.worked);
     const text = this.answer ?? this.clean(input.lastFile?.trim() ?? "");
     return [
       ...(text ? [{ type: "text_delta" as const, text }] : []),

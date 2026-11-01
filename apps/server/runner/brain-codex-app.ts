@@ -523,7 +523,7 @@ export class CodexAppMapper {
     if (info === "usageLimitExceeded")
       return [{ type: "limit" }, { type: "error", code: "plan_limit", message, worked: this.worked }];
     if (info === "unauthorized") return [{ type: "error", code: "not_logged_in", message, retryable: true }];
-    return codexProblem(message, turn.status === "failed");
+    return codexProblem(message, turn.status === "failed", this.worked);
   }
 }
 
