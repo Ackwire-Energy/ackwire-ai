@@ -7,11 +7,13 @@ import {
   parseBaseBehind,
   type RunnerFrame,
   type RunnerTask,
+  TASK_ACCOUNTS_PROTOCOL,
   TASK_LIMITS,
   TASKS_PROTOCOL,
   type TaskExecutor,
 } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { createAgentRuns, eligibleChannelAgents } from "./dispatch";
 import { publishChannelEvent, publishMessageCreated } from "./events";
@@ -283,6 +285,82 @@ export class RunnerOutdatedError extends Error {
   }
 }
 
+/** A Claude Code or Codex task has nothing to sign in with on its computer: it would only fail "Not logged in". */
+export class TaskSignInError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TaskSignInError";
+  }
+}
+
+/** The CLI a task's executor runs: its accounts' kind, and the names people know it and its plans by. */
+const TASK_CLIS = {
+  claude: { kind: "claude_code", cli: "Claude Code", plan: "Claude" },
+  codex: { kind: "codex", cli: "Codex", plan: "ChatGPT" },
+} as const;
+
+/**
+ * What a Claude Code or Codex task signs in with (ADR 0041 §5.1), by its turns' rules (`computerBrainUnavailable`):
+ * the agent's own account for that CLI on that computer (`brainAccountFor`) where the runner takes one
+ * (`TASK_ACCOUNTS_PROTOCOL`), else the computer's own sign-in, as before, where that thinks for the agent (ADR 0059
+ * §3). Throws `TaskSignInError`, with what the agent can do, when the task has nothing to sign in with there.
+ */
+export async function taskSignIn(
+  db: Database,
+  input: Pick<QueuedTaskStart, "orgId" | "agent" | "machineId" | "executor">,
+): Promise<{ account?: string }> {
+  if (input.executor !== "claude" && input.executor !== "codex") return {};
+  const [agent, machine] = await Promise.all([
+    getAgentCached(db, input.orgId, input.agent.id),
+    getMachineById(db, input.machineId),
+  ]);
+  if (!agent || !machine) return {};
+  // Loaded here: the brains' selection builds on the missions, which build on this module.
+  const { brainAccountFor, planIsOwners } = await import("./brains/select");
+  const { kind, cli, plan } = TASK_CLIS[input.executor];
+  const own = await brainAccountFor(db, agent, kind, machine.id);
+  const account = own && machine.protocol >= TASK_ACCOUNTS_PROTOCOL ? own : undefined;
+  const refuse = (why: string, who: string) =>
+    new TaskSignInError(`${why} Tell the person: ${who} (until then do this work with run_code or a shell task).`);
+  // On a computer nobody connected, nobody signs its CLIs in: only an account of the agent's own can.
+  if (!account && machine.pairedByUserId === null) {
+    if (own) {
+      throw refuse(
+        `The runner on ${machine.name} is too old to sign tasks in with your ${plan} account.`,
+        "the computer's runner needs an update before tasks can use your account, so try again later",
+      );
+    }
+    const other = input.executor === "codex" ? "claude" : "codex";
+    const instead = await brainAccountFor(db, agent, TASK_CLIS[other].kind, machine.id);
+    throw refuse(
+      `${cli} has nothing to sign in with on ${machine.name}: you have no ${plan} account there, and nobody signs ${cli} in on that computer itself.${instead ? ` Your own account there signs in ${TASK_CLIS[other].cli}: start the task with executor "${other}".` : ""}`,
+      `your owner can connect a ${plan} account on your page`,
+    );
+  }
+  // The owner-only plan rule binds where turns already apply it: an account, or an agent that thinks with this CLI.
+  // Other agents' tasks keep the computer's own sign-in, as before this rule reached tasks.
+  const thinksWithIt = account || agent.brain === kind;
+  if (thinksWithIt && !(await planIsOwners(db, agent, machine.id, account))) {
+    throw refuse(
+      `${cli} on ${machine.name} would think with a plan that isn't your owner's (a plan thinks only for its owner's agents).`,
+      `your owner can connect a ${plan} account of their own on your page`,
+    );
+  }
+  if (account?.status === "signed_out") {
+    throw refuse(
+      `Your ${plan} account "${account.label}" on ${machine.name} is signed out, so ${cli} can't sign in for this task.`,
+      "its owner can sign in to it again in Settings, AI accounts",
+    );
+  }
+  if (!account && kind === "claude_code" && machine.executors?.claude?.loggedIn === false) {
+    throw refuse(
+      `${cli} isn't signed in on ${machine.name}.`,
+      `its owner can sign it in there, or your owner can connect a ${plan} account on your page`,
+    );
+  }
+  return account ? { account: account.id } : {};
+}
+
 /**
  * Records a task and asks the machine to start it. On failure the row is
  * kept as `failed` with the reason, and the error goes up.
@@ -354,6 +432,8 @@ export async function launchTask(
   options: { requeue?: boolean } = {},
 ): Promise<{ row: MachineTaskRow; queued: boolean; baseBehind?: number }> {
   try {
+    // Its CLI signs in with the agent's own account, as its turns (refused here when there's nothing to sign in with).
+    const signIn = await taskSignIn(deps.db, input);
     // The mission tools' token (ADR 0032): the runner sends it with each of the executor's calls.
     const mcpToken = input.mission
       ? await issueRunToolToken(deps.db, {
@@ -379,6 +459,7 @@ export async function launchTask(
       ...(input.commit ? { commit: input.commit } : {}),
       ...(input.baseCheck ? { baseCheck: input.baseCheck } : {}),
       ...(input.approved ? { approved: true } : {}),
+      ...signIn,
     });
     const at = new Date(started.startedAt);
     const [running] = await deps.db

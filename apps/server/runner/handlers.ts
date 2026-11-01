@@ -928,7 +928,7 @@ function handleTask(
     case "task.start":
       requireTool(ctx, req.executor === "claude" ? "claude" : req.executor === "codex" ? "codex" : "commands");
       if (!req.agent) throw new RunnerError("bad_request", "A task belongs to an agent");
-      return tasks.start(req.agent, req, ctx.grants ? { grants: ctx.grants } : undefined);
+      return tasks.start(req.agent, req, ctx.grants ? { grants: ctx.grants } : undefined, ctx.grant);
     case "task.status":
       return tasks.status(req.agent, typeof req.taskId === "string" ? req.taskId : undefined);
     case "task.cancel":
