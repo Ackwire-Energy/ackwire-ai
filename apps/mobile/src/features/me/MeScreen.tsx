@@ -96,6 +96,7 @@ export function MeScreen() {
     },
     { icon: "clock", label: t("routines.title"), href: "/routines" },
     { icon: "file", label: t("wiki.title"), href: "/wiki" },
+    { icon: "brain", label: t("mobile.memory.title"), href: "/memory" },
     { icon: "doc", label: t("mobile.me.drive"), href: "/drive" },
     { icon: "bolt", label: t("mobile.me.connectors"), href: "/connectors" },
     { icon: "chart", label: t("mobile.me.usage"), href: "/usage" },

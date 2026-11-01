@@ -1,4 +1,4 @@
-import type { Issue, IssueActivity, IssuePriority } from "@agenteschat/client";
+import type { Issue, IssuePriority } from "@agenteschat/client";
 import {
   keys,
   useChannels,
@@ -12,6 +12,7 @@ import { canTalk } from "@agenteschat/client/lib/audience";
 import { relativeTime, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { webUrl } from "@agenteschat/client/lib/guards";
+import { issueEventText } from "@agenteschat/client/lib/issues";
 import { foldSteps } from "@agenteschat/client/lib/work";
 import {
   Alert,
@@ -496,16 +497,6 @@ function Activity({ issue }: { issue: Issue }) {
     }),
     [t],
   );
-  // The event in the person's language from its code (`issues.event.*`); the server's words as the fallback.
-  const eventText = (a: IssueActivity) => {
-    if (!a.textCode) return a.text;
-    const p = a.textParams ?? {};
-    const extra = {
-      ...(p.status ? { status: t(`issues.status.${p.status}`, { defaultValue: p.status }) } : {}),
-      ...(p.priority ? { priority: t(`issues.priority.${p.priority}`, { defaultValue: p.priority }) } : {}),
-    };
-    return t(`issues.event.${a.textCode}`, { ...p, ...extra, defaultValue: a.text });
-  };
   const list = activity.data ?? [];
   return (
     <DetailsSection title={t("issues.activity")}>
@@ -518,7 +509,7 @@ function Activity({ issue }: { issue: Issue }) {
               size={16}
             />
             <span>
-              <b className="issue-event__who">{actors.name(a.author)}</b> {eventText(a)}
+              <b className="issue-event__who">{actors.name(a.author)}</b> {issueEventText(t, a)}
               {a.auto && (
                 <Chip icon="repeat" className="issue-event__auto" title={t("issues.autoHint")}>
                   {t("issues.auto")}

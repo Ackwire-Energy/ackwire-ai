@@ -286,3 +286,32 @@ test("memories and proposals: what came from a channel the viewer can't read sta
   expect(mine.status).toBe(200);
   expect(((await mine.json()) as Mem).supersedes).toBeNull();
 });
+
+test("memories of the whole workspace: current ones the viewer may see, of agents still here", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId, agentId } = await seedOrg(owner);
+  const save = (content: string, channelIds: string[]) =>
+    consolidateItem(t.db, {
+      orgId,
+      kind: "fact",
+      scopeType: "agent",
+      scopeId: agentId,
+      agentId,
+      content,
+      sourceIds: [],
+      channelIds,
+    });
+  const seen = await save("O relatório sai às sextas.", [channelId]);
+  await save("Combinado numa conversa que ninguém aqui lê.", [crypto.randomUUID()]);
+  const forgotten = await save("O servidor reinicia à noite.", [channelId]);
+  await owner(`/api/app/organizations/${orgId}/memories/${forgotten.item.id}`, {
+    method: "PATCH",
+    json: { archived: true },
+  });
+
+  const res = await owner(`/api/app/organizations/${orgId}/memories`);
+  expect(res.status).toBe(200);
+  const { memories } = (await res.json()) as { memories: { id: string; agentId: string }[] };
+  expect(memories).toEqual([expect.objectContaining({ id: seen.item.id, agentId })]);
+});
