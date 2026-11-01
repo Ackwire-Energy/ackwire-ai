@@ -5,7 +5,7 @@ import type { ModelRequest } from "@agenteschat/providers";
 import {
   addChannelMember,
   createAgent,
-  createFakeJudge,
+  type createFakeJudge,
   createJobHandlers,
   drainOutbox,
   enqueue,
@@ -189,7 +189,7 @@ describe("which runs list them", () => {
     const asked = await insertMessage(f.db, {
       orgId: f.org.id,
       channelId: agentsDm.id,
-      author: { type: "agent", agentId: infra.id, runId: null, hop: 1 },
+      author: { type: "agent", agentId: infra.id, runId: null, hop: 1, stretchId: null },
       body: "Dev, o deploy de ontem passou?",
     });
     expect(await mediaListed((await runFor(asked)).ctx)).toEqual([]);
@@ -441,7 +441,7 @@ describe("the step after a reply", () => {
     const { ctx } = await personRun();
     const sent = await call(ctx, "send_sticker", { mood: "wow" });
     if (sent.type !== "result") throw new Error("expected a result");
-    const { messageId } = sent.output.data?.mediaSent as { messageId: string };
+    const { messageId } = (sent.output.data as { mediaSent: { messageId: string } }).mediaSent;
     // What the run's own message brought (the sticker's notification, ana's message) is done first.
     await drainOutbox(f.db, f.handlers);
 

@@ -126,7 +126,9 @@ export function MediaSettingsSection() {
               />
             }
           />
-          {team.map((agent) => <AgentMediaRow key={agent.id} agent={agent} />)}
+          {team.map((agent) => (
+            <AgentMediaRow key={agent.id} agent={agent} />
+          ))}
         </div>
         {agentsNote && <CardFooter>{agentsNote}</CardFooter>}
       </Card>

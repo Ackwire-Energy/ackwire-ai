@@ -28,16 +28,16 @@ import { createJevJudge } from "../../src/judge";
 import { CASES, type MediaCase } from "./cases";
 
 const args = process.argv.slice(2);
-const valueOf = (flag: string) => {
+const flagValue = (flag: string) => {
   const i = args.indexOf(flag);
   return i >= 0 ? args[i + 1] : undefined;
 };
 const withGif = args.includes("--gif");
-const only = valueOf("--only")
+const only = flagValue("--only")
   ?.split(",")
   .map((id) => id.trim())
   .filter(Boolean);
-const repeat = Math.max(1, Number(valueOf("--repeat") ?? 1) || 1);
+const repeat = Math.max(1, Number(flagValue("--repeat") ?? 1) || 1);
 const CONCURRENCY = 4;
 const BARS = [0.6, 0.7, 0.8];
 const ORG = "00000000-0000-0000-0000-000000000000";

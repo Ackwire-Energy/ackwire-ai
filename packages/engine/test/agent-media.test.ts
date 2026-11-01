@@ -123,7 +123,7 @@ const agentSticker = (agentId: string, at: { threadId?: string; minutesAgo?: num
     orgId: f.org.id,
     channelId: f.general.id,
     threadId: at.threadId ?? null,
-    author: { type: "agent", agentId, runId: null, hop: 1 },
+    author: { type: "agent", agentId, runId: null, hop: 1, stretchId: null },
     body: "",
     meta: { media: { kind: "sticker", agentId, mood: "deal" }, mediaAfter: crypto.randomUUID() },
     ...(at.minutesAgo ? { createdAt: new Date(Date.now() - at.minutesAgo * 60_000) } : {}),
@@ -159,7 +159,7 @@ async function handMade(
     orgId: f.org.id,
     channelId: f.general.id,
     author: options.from
-      ? { type: "agent", agentId: options.from, runId: null, hop: 1 }
+      ? { type: "agent", agentId: options.from, runId: null, hop: 1, stretchId: null }
       : { type: "person", userId: f.owner.id },
     body: "Pode subir a versão nova",
     meta: options.triggerMeta,
@@ -246,7 +246,7 @@ describe("after a light reply", () => {
       .from(schema.messages)
       .where(eq(schema.messages.channelId, f.general.id))
       .orderBy(asc(schema.messages.createdAt));
-    expect(order.map((m) => m.id)).toEqual([asked.id, reply.id, media?.id]);
+    expect(order.map((m) => m.id)).toEqual([asked.id, reply.id, media?.id as string]);
     const created = events.filter((e) => e.type === "message.created").map((e) => e.messageId);
     expect(created.slice(-2)).toEqual([reply.id, media?.id]);
 
@@ -486,8 +486,9 @@ describe("GIFs", () => {
 
     expect(gifs.searches).toEqual([{ query: GIF_CATEGORIES.applause, rating: "pg", lang: "en", limit: 8, offset: 0 }]);
     const picked = gifs.gifs[pickGifIndex(reply.id, 5)];
+    if (!picked) throw new Error("no such fake GIF");
     expect((await mediaMessages()).map((m) => mediaOf(m.meta))).toEqual([
-      { kind: "gif", provider: "giphy", id: picked?.id, title: picked?.title, width: 480, height: picked?.height },
+      { kind: "gif", provider: "giphy", id: picked.id, title: picked.title, width: 480, height: picked.height },
     ]);
     const [judgment] = mediaJudgments();
     expect(Object.keys(judgment?.questions ?? {})).toEqual(["fits", "mood", "gif"]);

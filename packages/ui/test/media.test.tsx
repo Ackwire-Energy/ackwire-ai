@@ -324,7 +324,10 @@ describe("the GIFs tab", () => {
     const cols = masonryColumns(first, 2);
     expect(cols.map((c) => c.map((g) => g.id))).toEqual([["a"], ["b", "c", "d"]]);
     const more = masonryColumns([...first, gif("e", 100, 100)], 2);
-    expect(more.map((c) => c.map((g) => g.id))).toEqual([["a", "e"], ["b", "c", "d"]]);
+    expect(more.map((c) => c.map((g) => g.id))).toEqual([
+      ["a", "e"],
+      ["b", "c", "d"],
+    ]);
   });
 
   function Harness(props: Partial<Parameters<typeof GifPicker>[0]> & { log: string[] }) {

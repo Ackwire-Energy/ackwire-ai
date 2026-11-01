@@ -209,6 +209,7 @@ export function GifPicker({
     );
   } else {
     results = (
+      // biome-ignore lint/a11y/useSemanticElements: a named grid of buttons; a fieldset would need a legend and its box
       <div
         className="ac-gifs__grid"
         role="group"

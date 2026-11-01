@@ -39,9 +39,7 @@ export function PinsSheet({ channelId, onPick }: { channelId: string; onPick: (p
               leading={<Face who={p.message.author} size={30} live={false} />}
               title={dir.nameOf(p.message.author) || t("mobile.chat.someone")}
               // A pinned GIF or sticker says which (ADR 0091).
-              subtitle={
-                previewOf(textOrMedia(t, p.message.body, p.message.meta)) || t("mobile.chat.approvalPreview")
-              }
+              subtitle={previewOf(textOrMedia(t, p.message.body, p.message.meta)) || t("mobile.chat.approvalPreview")}
               meta={
                 <Text variant="caption" tone="faint">
                   {when.short(p.message.createdAt)}

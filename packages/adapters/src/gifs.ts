@@ -498,7 +498,10 @@ export function createFakeGifs(options: { gifs?: FakeGif[] } = {}) {
     async search(input) {
       calls.search.push(input);
       const words = input.query.toLowerCase().split(/\s+/).filter(Boolean);
-      return paged(all.filter((g) => words.some((w) => g.title.toLowerCase().includes(w))), input);
+      return paged(
+        all.filter((g) => words.some((w) => g.title.toLowerCase().includes(w))),
+        input,
+      );
     },
     async trending(input) {
       calls.trending.push(input);

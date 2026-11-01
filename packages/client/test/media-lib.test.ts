@@ -56,8 +56,8 @@ describe("what a message carries (ADR 0091)", () => {
     const source = await Bun.file(new URL("../../engine/src/media.ts", import.meta.url).pathname).text();
     const moods = /STICKER_MOODS = \[([^\]]*)\]/.exec(source)?.[1] ?? "";
     const categories = /GIF_CATEGORIES = \{([^}]*)\}/.exec(source)?.[1] ?? "";
-    expect([...STICKER_MOODS]).toEqual([...moods.matchAll(/"(\w+)"/g)].map((m) => m[1] ?? ""));
-    expect([...GIF_CATEGORY_IDS]).toEqual([...categories.matchAll(/^\s*(\w+):/gm)].map((m) => m[1] ?? ""));
+    expect<string[]>([...STICKER_MOODS]).toEqual([...moods.matchAll(/"(\w+)"/g)].map((m) => m[1] ?? ""));
+    expect<string[]>([...GIF_CATEGORY_IDS]).toEqual([...categories.matchAll(/^\s*(\w+):/gm)].map((m) => m[1] ?? ""));
   });
 
   test("messageMediaOf reads meta.media as the server does; anything malformed is none", () => {

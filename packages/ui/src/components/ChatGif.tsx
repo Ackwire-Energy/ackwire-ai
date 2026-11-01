@@ -98,10 +98,11 @@ export function ChatGif({ src, still, width, height, label, title, mark, source,
     );
   }
   return (
-    // biome-ignore lint/a11y/noNoninteractiveTabindex: with reduced motion the keyboard plays it by focusing it
+    // biome-ignore lint/a11y/noStaticElementInteractions: hovering or focusing only plays it, nothing to activate
     <span
       className={cx("ac-gif", className)}
       style={style}
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: with reduced motion the keyboard plays it by focusing it
       tabIndex={0}
       data-still={playing ? undefined : ""}
       onMouseEnter={() => setPlaying(true)}

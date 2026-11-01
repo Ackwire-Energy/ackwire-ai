@@ -413,7 +413,7 @@ async function runSkip(db: Executor, reply: Message): Promise<AgentMediaSkip | n
   const trigger = await getMessage(db, reply.orgId, run.triggerMessageId);
   // A person's own message. Another agent's, a notice (a consultation's answer, a routine's report, an email
   // watch) or a routine's brief written as its creator is not a person asking now.
-  if (!trigger || trigger.authorType !== "person" || !trigger.authorUserId) return "not_person";
+  if (trigger?.authorType !== "person" || !trigger.authorUserId) return "not_person";
   if (routineBriefOf(trigger.meta) || trigger.meta.background === true || trigger.meta.routine != null)
     return "not_person";
   if (trigger.meta.issueId != null) return "work";

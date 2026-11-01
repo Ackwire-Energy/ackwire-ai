@@ -86,11 +86,13 @@ describe("Configurações › GIFs e figurinhas (ADR 0091)", () => {
     const gifs = screen().getByRole("switch", { name: "GIFs" });
     expect(gifs.getAttribute("aria-checked")).toBe("false");
     expect(disabled(gifs)).toBe(true);
-    expect(document.getElementById("media-gifs-help")?.textContent).toBe("Este servidor ainda não tem busca de GIFs.");
+    expect(document.getElementById("media-gifs-help")?.textContent).toBe(
+      "A busca de GIFs ainda não está disponível aqui.",
+    );
     expect(gifs.getAttribute("aria-describedby")).toBe("media-gifs-help");
     expect(screen().getByRole("radio", { name: "Nunca" }).getAttribute("aria-checked")).toBe("true");
     expect(disabled(screen().getByRole("radio", { name: "Às vezes" }))).toBe(true);
-    expect(document.getElementById("media-level-help")?.textContent).toBe("Ainda não disponível neste servidor.");
+    expect(document.getElementById("media-level-help")?.textContent).toBe("Ainda não disponível aqui.");
     // Each agent's own switch still decides whether it sends one when asked (its sticker, here).
     expect(disabled(screen().getByRole("switch", { name: "Ada manda GIFs e figurinhas" }))).toBe(false);
     // Stickers need nothing from the server.
@@ -102,7 +104,7 @@ describe("Configurações › GIFs e figurinhas (ADR 0091)", () => {
 
   test("Nunca: none on their own; each agent's switch still says whether it sends one when asked", async () => {
     const { state } = await go(seedState({ media: { agentMedia: "never" } }));
-    const asked = "Quando alguém pede, eles mandam mesmo com Nunca.";
+    const asked = "Se alguém pedir, mandam mesmo em Nunca.";
     expect(document.getElementById("media-level-help")?.textContent?.endsWith(asked)).toBe(true);
     const ada = screen().getByRole("switch", { name: "Ada manda GIFs e figurinhas" });
     expect(ada.getAttribute("aria-checked")).toBe("true");

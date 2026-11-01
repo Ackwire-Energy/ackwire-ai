@@ -1,15 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createFakeGifs } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
-import {
-  type Browser,
-  browser,
-  createTestServer,
-  joinByInvitation,
-  seedOrg,
-  signUp,
-  type TestServer,
-} from "./harness";
+import { type Browser, browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
 /**
  * GIFs and stickers in chat (ADR 0091): search and files through the server, posting them, the workspace's switches

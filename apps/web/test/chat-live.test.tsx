@@ -593,8 +593,8 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
       await closePopover(pop);
     }
     for (const [text, routed] of [
-      ["ninguém pegou", { pickedBy: [], decidedBy: { step: "jev" } }],
       ["de antes", { pickedBy: [ADA_ID] }],
+      ["ninguém pegou", { pickedBy: [], decidedBy: { step: "jev" } }],
     ] as const) {
       await sendText(text);
       await settle(4);
@@ -604,6 +604,13 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
       await closePopover(pop);
     }
     expect(receiptOf("ninguém pegou").textContent).toContain("Nenhum agente vai responder·Chamar um agente");
+    // Only the newest message says it in words: an older one keeps the check, whose popover says it.
+    await sendText("e depois");
+    await settle(4);
+    expect(receiptOf("ninguém pegou").textContent).not.toContain("Nenhum agente vai responder");
+    const older = await popoverOf("ninguém pegou");
+    expect(older.textContent).toContain("Nenhum agente vai responder·Chamar um agente");
+    await closePopover(older);
   });
 });
 
