@@ -150,6 +150,7 @@ export function approvalRoutes(deps: AppDeps) {
         query: z.object({
           status: z.enum(["pending", "decided"]).optional(),
           agentId: z.uuid().optional(),
+          messageId: z.uuid().optional().openapi({ description: "The requests on one approval card." }),
           limit: z.coerce.number().int().min(1).max(500).optional(),
         }),
       },

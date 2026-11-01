@@ -636,7 +636,7 @@ export async function listApprovals(
   db: Database,
   actorId: string,
   orgId: string,
-  options: { status?: "pending" | "decided"; agentId?: string; limit?: number } = {},
+  options: { status?: "pending" | "decided"; agentId?: string; messageId?: string; limit?: number } = {},
 ): Promise<ApprovalView[]> {
   const membership = await requirePermission(db, actorId, orgId, "read");
   const admin = can(membership, "approve_actions");
@@ -656,6 +656,7 @@ export async function listApprovals(
             ? ne(approvals.status, "pending")
             : undefined,
         options.agentId ? eq(approvals.agentId, options.agentId) : undefined,
+        options.messageId ? eq(approvals.messageId, options.messageId) : undefined,
         admin ? undefined : or(eq(approvals.ownerUserId, actorId), inArray(approvals.channelId, myChannels)),
       ),
     )

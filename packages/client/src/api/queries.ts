@@ -1183,6 +1183,19 @@ export const useApproval = (orgId: string, approvalId: string, enabled = true) =
   });
 };
 
+/**
+ * The requests on one approval card, by its message: for a card older than the org's list reaches. Under the
+ * list's key, so whatever refreshes the list refreshes it.
+ */
+export const useCardApprovals = (orgId: string, messageId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: [...keys.approvals(orgId), "card", messageId],
+    queryFn: () => api.approvals.list(orgId, { messageId }),
+    enabled,
+  });
+};
+
 /** Puts a fresh approval in the caches (decision responses, WebSocket events). */
 export function cacheApproval(qc: ReturnType<typeof useQueryClient>, orgId: string, approval: Approval) {
   qc.setQueryData<Approval[]>(keys.approvals(orgId), (list) => {

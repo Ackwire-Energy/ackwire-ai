@@ -6,6 +6,7 @@ import {
   useApi,
   useApproval,
   useApprovals,
+  useCardApprovals,
   useDecideApproval,
   useDecideApprovals,
 } from "@agenteschat/client";
@@ -128,9 +129,17 @@ export function ApprovalInline({ approvalId, messageId }: { approvalId: string; 
   const orgId = useOrgId();
   const approval = useApproval(orgId, approvalId);
   const approvals = useApprovals(orgId);
+  // Older than the list reaches: its card's requests by the card (the list holds everything newer than the first).
+  const card = useCardApprovals(
+    orgId,
+    messageId,
+    approvals.isSuccess && !approvals.data.some((x) => x.id === approvalId),
+  );
   const a = approval.data;
   if (!a) return null;
-  const items = approvalCardItems(approvals.data, messageId, a).map((x) => asOfNow(x));
+  const items = approvalCardItems([...(approvals.data ?? []), ...(card.data ?? [])], messageId, a).map((x) =>
+    asOfNow(x),
+  );
   if (items.length > 1) {
     if (items.some((x) => x.status === "pending")) return <ApprovalGroupAsk items={items} />;
     return (

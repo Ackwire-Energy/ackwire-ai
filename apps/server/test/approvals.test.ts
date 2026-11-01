@@ -103,6 +103,16 @@ test("approvals API: 'Aprovar tudo' decides exactly the ids sent and resumes the
   expect(list.approvals).toHaveLength(2);
   // One card for both.
   expect(new Set(list.approvals.map((a) => a.messageId)).size).toBe(1);
+  // The card's requests by the card, wherever the org's list stops.
+  const cardId = list.approvals[0]?.messageId ?? "";
+  const onCard = (await (await owner(`/api/app/organizations/${orgId}/approvals?messageId=${cardId}`)).json()) as {
+    approvals: unknown[];
+  };
+  expect(onCard.approvals).toHaveLength(2);
+  const elsewhere = (await (
+    await owner(`/api/app/organizations/${orgId}/approvals?messageId=${crypto.randomUUID()}`)
+  ).json()) as { approvals: unknown[] };
+  expect(elsewhere.approvals).toHaveLength(0);
   const ids = list.approvals.map((a) => a.id);
   const res = await owner(`/api/app/organizations/${orgId}/approvals/decide`, {
     json: { ids, decision: "approve" },

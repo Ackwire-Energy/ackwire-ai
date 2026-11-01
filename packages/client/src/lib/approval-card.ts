@@ -5,9 +5,11 @@ import type { Approval } from "../api/types";
  * that joined it in that conversation (same `messageId`, server side `openApprovalCard`).
  */
 export function approvalCardItems(list: readonly Approval[] | undefined, messageId: string, first?: Approval) {
-  const items = (list ?? []).filter((a) => a.messageId === messageId);
-  if (first && !items.some((a) => a.id === first.id)) items.push(first);
-  return items.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const byId = new Map<string, Approval>();
+  // The first copy of an id wins: callers put the freshest list first.
+  for (const a of [...(list ?? []), ...(first ? [first] : [])])
+    if ((a.messageId === messageId || a === first) && !byId.has(a.id)) byId.set(a.id, a);
+  return [...byId.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
 /**

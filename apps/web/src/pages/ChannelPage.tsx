@@ -44,6 +44,7 @@ import {
   useApproval,
   useApprovals,
   useArchiveChannel,
+  useCardApprovals,
   useChannelCategories,
   useChannelMembers,
   useChannels,
@@ -3680,8 +3681,10 @@ function MessageApproval({
   const approvals = useApprovals(org.id);
   const listed: Approval | undefined = approvals.data?.find((a) => a.id === approvalId);
   const one = useApproval(org.id, approvalId, !listed && approvals.isSuccess);
+  // Older than the list reaches: its card's requests by the card (the list holds everything newer than the first).
+  const card = useCardApprovals(org.id, messageId, !listed && approvals.isSuccess);
   const approval = listed ?? one.data;
-  const items = approvalCardItems(approvals.data, messageId, approval);
+  const items = approvalCardItems([...(approvals.data ?? []), ...(card.data ?? [])], messageId, approval);
   // Past its deadline it has expired, even before the server's event says so.
   const expired = useExpired(approval?.status === "pending" ? approval.expiresAt : null);
   // Drawn again when the card's earliest deadline passes.

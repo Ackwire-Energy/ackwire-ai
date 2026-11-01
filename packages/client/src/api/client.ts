@@ -603,7 +603,10 @@ export interface ApiClient {
   };
 
   approvals: {
-    list(orgId: string, filter?: { status?: "pending" | "decided"; agentId?: string }): Promise<Approval[]>;
+    list(
+      orgId: string,
+      filter?: { status?: "pending" | "decided"; agentId?: string; messageId?: string },
+    ): Promise<Approval[]>;
     get(orgId: string, approvalId: string): Promise<Approval>;
     /** `always`: also approve this kind for good (409 `approval.always_unavailable` where it isn't offered). */
     approve(orgId: string, approvalId: string, reason?: string, always?: boolean): Promise<Approval>;

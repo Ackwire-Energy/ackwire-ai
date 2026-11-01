@@ -325,6 +325,12 @@ describe("several requests on one card", () => {
     expect(approvalCardItems(list, "card-1").map((a) => a.id)).toEqual(["g1", "g22", "g333", "g4444"]);
     // The card's own request is there even before the list has it.
     expect(approvalCardItems([], "card-1", goal("g1")).map((a) => a.id)).toEqual(["g1"]);
+    // The org's list and the card's own fetch together: each request once, the list's (fresher) copy kept.
+    const merged = approvalCardItems([goal("g1", { status: "approved" }), goal("g1"), goal("g22")], "card-1");
+    expect(merged.map((a) => [a.id, a.status])).toEqual([
+      ["g1", "approved"],
+      ["g22", "pending"],
+    ]);
     expect(approveAllScope(items, now)).toEqual({ ids: ["g1", "g22"], waiting: 3, blocked: 1 });
     // One past its deadline isn't covered, and reads as expired.
     expect(approveAllScope([goal("late", { expiresAt: at(-1) })], now).ids).toEqual([]);

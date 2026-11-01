@@ -229,6 +229,40 @@ describe("Canal", () => {
     expect(after.textContent).toContain("Aprovado por você");
   });
 
+  test("a card older than the approvals list reaches still lists all its requests, fetched by the card", async () => {
+    const state = seedState();
+    const [merge] = state.approvals;
+    if (!merge) throw new Error("no approval");
+    const goal = (id: string, month: string, days: number) => ({
+      ...merge,
+      id,
+      status: "approved" as const,
+      canDecide: false,
+      decidedByUserId: state.me?.user.id ?? null,
+      decidedAt: new Date(Date.now() - days * 86_400_000).toISOString(),
+      tool: "goal_upsert",
+      title: "Painel: Goal upsert",
+      detail: `panel.goal_upsert · month=${month}`,
+      connector: "panel",
+      params: { month },
+      createdAt: new Date(Date.now() - days * 86_400_000).toISOString(),
+    });
+    // A newer request elsewhere fills the list's window: the card's own fall outside it.
+    const newer = { ...merge, id: "ap-newer", messageId: null, createdAt: new Date().toISOString() };
+    state.approvals.splice(0, 1, goal("ap-g1", "2026-11", 3), goal("ap-g2", "2026-12", 2.9), newer);
+    state.approvalsWindow = 1;
+    const cardMessage = state.messages.find((m) => m.id === "msg-card");
+    if (cardMessage) cardMessage.meta = { ...cardMessage.meta, approvalId: "ap-g1" };
+    await open(state);
+    await settle(4);
+    expect(state.calls.some((c) => c.method === "approvals.list" && JSON.stringify(c.args).includes("msg-card"))).toBe(
+      true,
+    );
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("Month: 2026-11");
+    expect(text).toContain("Month: 2026-12");
+  });
+
   test("a request in the conversation: approve calls the API, shrinks to one line; events update it", async () => {
     const r0 = await open();
     const { state, socket } = r0;
