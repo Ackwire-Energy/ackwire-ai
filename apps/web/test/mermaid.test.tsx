@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
 import { MermaidDiagram, setMermaidRenderer } from "@/components/artifacts/Mermaid";
+import { ArtifactContentView } from "@/components/artifacts/views";
 import { createI18n } from "@/i18n";
 import { Markdown } from "@/lib/markdown";
 import {
@@ -315,6 +316,41 @@ describe("the frame mermaid draws in", () => {
     expect(made.posted).toHaveLength(1);
   });
 
+  test("the Drive viewer waits for Ver diagrama where the frame shares the page's thread, like a Markdown fence", async () => {
+    const el = render(<ArtifactContentView content={{ kind: "diagram", mermaid: FLOW }} title="Fluxo" />).container;
+    await settle();
+    await answerProbe(false);
+    await settle();
+    // The same card a ```mermaid fence gets: code, Ver diagrama and Copiar, nothing drawn, no drawing frame made.
+    expect(within(el).getByRole("button", { name: "Ver diagrama" })).toBeTruthy();
+    expect(within(el).getAllByRole("button", { name: "Copiar" }).length).toBeGreaterThan(0);
+    expect(el.querySelector(".code-card__code")?.textContent).toBe(FLOW);
+    expect(el.querySelector(".code-card__preview img")).toBeNull();
+    expect(frames).toHaveLength(1);
+    await act(async () => fireEvent.click(within(el).getByRole("button", { name: "Ver diagrama" })));
+    await settle();
+    const made = await readyFrame(1);
+    const [asked] = made.posted as Request[];
+    expect(asked?.source).toBe(FLOW);
+    post(made.win, { id: asked?.id, svg: SVG });
+    await settle();
+    expect(el.querySelector(".code-card__preview img")?.getAttribute("alt")).toBe("Fluxo");
+  });
+
+  test("the Drive viewer draws by itself where the frame runs apart from the page", async () => {
+    const el = render(<ArtifactContentView content={{ kind: "diagram", mermaid: FLOW }} title="Fluxo" />).container;
+    await settle();
+    await answerProbe(true);
+    await settle();
+    const made = await readyFrame(1);
+    const [asked] = made.posted as Request[];
+    expect(asked?.source).toBe(FLOW);
+    post(made.win, { id: asked?.id, svg: SVG });
+    await settle();
+    expect(el.querySelector(".code-card__preview img")?.getAttribute("alt")).toBe("Fluxo");
+    expect(within(el).queryByRole("button", { name: "Ver diagrama" })).toBeNull();
+  });
+
   test("after a drawing times out, the fences waiting behind it wait for the viewer, not for fresh frames", async () => {
     setMermaidFrame(fakeFrame, 200);
     const sources = [FLOW, "flowchart LR\n  C --> D", "flowchart LR\n  E --> F"];
@@ -459,6 +495,22 @@ const LABEL_HTML: [string, string][] = [
   ],
   ["an architecture service's text", `architecture-beta\n  service s1 "<img alt src=${LEAK}>"[S1]`],
   ["an architecture service's text, a backslash after <", `architecture-beta\n  service s1 "<\\img src=${LEAK}>"[S1]`],
+  // An <a href> loads nothing on its own, but Firefox resolves its host; the config drops the href, as it does src.
+  ["a link in a sequence message with math", `sequenceDiagram\n  A->>B: $$x$$ <a href=${LEAK}>a</a>`],
+];
+/**
+ * Tags the frames' CSP does not stop in every engine (measured, see mermaid.ts): a preconnect or prerender link and an
+ * iframe. mermaid strict and the DOMPurify config drop them before they reach the document, so no fence loads them, even
+ * though allowing the tag shows the label's HTML does reach the document with the URL in it. (A meta refresh has its own
+ * test: DOMPurify neutralizes it even when allowed, so there's no variant that loads.)
+ */
+const LABEL_HTML_CSP: [string, string][] = [
+  ["a preconnect link", `sequenceDiagram\n  A->>B: $$x$$ <link rel=preconnect href=${LEAK}>`],
+  [
+    "a prerender link (Chromium sends it as a GET)",
+    `sequenceDiagram\n  A->>B: $$x$$ <link rel=prerender href=${LEAK}>`,
+  ],
+  ["an iframe", `sequenceDiagram\n  A->>B: $$x$$ <iframe src=${LEAK}>`],
 ];
 /** A diagram's own settings that would reach the document's CSS. */
 const SETTINGS = [
@@ -468,14 +520,19 @@ const SETTINGS = [
   `---\n"\\x63onfig": {fontFamily: "x; mask-image: url(${LEAK})"}\n---\nflowchart LR\n  A --> B`,
 ];
 
-/** Mermaid with its own sanitizer settings instead of mermaid-frame.js's; what it leaves in <body> is then removed. */
-async function drawRaw(id: string, source: string) {
+/**
+ * Mermaid with its own sanitizer settings instead of mermaid-frame.js's; what it leaves in <body> is then removed.
+ * `dompurifyConfig` lets a case allow the tags mermaid's default list drops anyway (link, meta, iframe), to show the
+ * label's HTML does reach the document with the URL in it — so the frame's config, not mermaid, is what stops it.
+ */
+async function drawRaw(id: string, source: string, dompurifyConfig?: object) {
   const before = new Set(document.body.children);
   mermaid.initialize({
     startOnLoad: false,
     htmlLabels: false,
     flowchart: { htmlLabels: false },
     suppressErrorRendering: true,
+    ...(dompurifyConfig ? { dompurifyConfig } : {}),
   });
   await mermaid.mermaidAPI.render(id, source).catch(() => {});
   // It draws a participant's label without waiting for it.
@@ -635,6 +692,33 @@ describe("inside the frame, mermaid-frame.js", () => {
     expect(requested).not.toEqual([]);
   });
 
+  test.each(LABEL_HTML_CSP)(
+    "%s, which the CSP wouldn't stop, is dropped by the DOMPurify config",
+    async (_, source) => {
+      const frame = frameScript();
+      await frame.ask({ id: "csp", source, dark: false });
+      await settle();
+      expect(requested).toEqual([]);
+      // Allowing the tag shows the label's HTML reaches the document with the URL in it: the config is what stops it.
+      await drawRaw(`csp-${++labels}`, source, { ADD_TAGS: ["link", "iframe"], ADD_ATTR: ["rel", "href", "src"] });
+      expect(requested).not.toEqual([]);
+    },
+  );
+
+  test("a meta refresh in a label, which the CSP wouldn't stop, is dropped: the diagram draws and loads nothing", async () => {
+    // A class label keeps its quotes, where a sequence message's break the parse. DOMPurify neutralizes a meta refresh
+    // itself (it stays dropped even when the tag is allowed), so the pin is that the diagram still drew and loaded nothing.
+    const frame = frameScript();
+    const drawn = await frame.ask({
+      id: "meta",
+      source: `classDiagram\n  class A["$$x$$ <meta http-equiv=refresh content=0;url=${LEAK}>"]`,
+      dark: false,
+    });
+    await settle();
+    expect(drawn).toHaveProperty("svg");
+    expect(requested).toEqual([]);
+  });
+
   test("a diagram's own settings that would reach CSS are dropped", async () => {
     const frame = frameScript();
     for (const source of SETTINGS) expect(await frame.ask({ id: "s", source, dark: false })).toHaveProperty("svg");
@@ -753,6 +837,10 @@ describe("inside the frame, mermaid-frame.js", () => {
     for (const source of [
       `kanban\n  todo[A fazer]\n    t1[T]@{ ${chain} }`,
       `kanban\n  todo[A fazer]\n    t1[T]@%%{x}%%{ ${chain} }`,
+      // A single-quoted '"' or an escaped \" fences the chain off from a scan that pairs double quotes first; the raw
+      // scan still sees the anchors mermaid expands.
+      `kanban\n  todo[A fazer]\n    t1[T]@{ q: '"', ${chain}, r: '"' }`,
+      `kanban\n  todo[A fazer]\n    t1[T]@{ q: "\\"", ${chain}, r: "\\"" }`,
       `flowchart LR\n  A@{ label: "a } b", ${chain} }`,
       `flowchart LR\n  A@{\n    shape: rect\n    label: *l0\n  }`,
       `flowchart LR\n  A e1@--> B\n  e1@{ animation: *a }`,
@@ -767,6 +855,11 @@ describe("inside the frame, mermaid-frame.js", () => {
     expect((await mermaid.parse(`kanban\n  todo[A fazer]\n    t1[T]@{ x: [&a 1], assigned: *a }`))?.diagramType).toBe(
       "kanban",
     );
+    // Mermaid expands the alias behind the quoted '"', so the chain is real work, not drawable text.
+    expect(
+      (await mermaid.parse(`kanban\n  todo[A fazer]\n    t1[T]@{ q: '"', x: [&a 1], assigned: *a, r: '"' }`))
+        ?.diagramType,
+    ).toBe("kanban");
   });
 
   test("where a number sets mermaid's work, not the source's length, past a few the fence stays code", async () => {
@@ -789,6 +882,11 @@ describe("inside the frame, mermaid-frame.js", () => {
       gantt("weekends", ["01-01-2024, 31-12-2999"], "DD-MM-YYYY"),
       gantt("weekends", ["2024-01-01, 3d", "2999-01-01, 3d", "until t1"]),
       gantt("weekends", ["1700000000, 1d"], "X"),
+      // Mermaid matches `excludes` case-insensitively and at any token start, not only lowercase at a line's start.
+      "gantt\n  dateFormat YYYY-MM-DD\n  Excludes 1999-01-01\n  t :2024-01-01, 1000000d",
+      "gantt excludes 1999-01-01\n  t :2024-01-01, 1000000d",
+      // A task `until` a missing id ends today, a year the source never names, so each of these walks ~1,000 years.
+      `gantt\n  dateFormat YYYY-MM-DD\n  excludes nada\n${Array.from({ length: 4 }, (_, i) => `  t${i} :1000-01-01, until nada`).join("\n")}`,
       // Groups 4 levels deep with edges across them held Chrome's frame 13 s, and 10 levels WebKit 25 s.
       nested(4),
       nested(4, " %% sub"),
@@ -805,6 +903,16 @@ describe("inside the frame, mermaid-frame.js", () => {
       expect(mermaidDrawable(source)).toBe(true);
     await answersQuickly(`block-beta\n  columns 10\n${"  space:10\n".repeat(10)}`);
     await answersQuickly(gantt("weekends", Array(10).fill("2024-01-01, 1000d")));
+  });
+
+  test("a block diagram nested over 10 levels stays code; one 10 deep draws in a moment", async () => {
+    const blockNested = (levels: number) =>
+      `block-beta\n${Array.from({ length: levels }, (_, i) => `${" ".repeat(Math.min(i, 30) + 2)}block:g${i}`).join(
+        "\n",
+      )}\n  a b\n${Array.from({ length: levels }, () => "  end").join("\n")}`;
+    for (const levels of [11, 25]) expect(mermaidDrawable(blockNested(levels))).toBe(false);
+    expect(mermaidDrawable(blockNested(10))).toBe(true);
+    await answersQuickly(blockNested(10));
   });
 
   test("a mindmap over 100 lines or a venn diagram over 30 sets and unions stays code, its keyword split or not", async () => {

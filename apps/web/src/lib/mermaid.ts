@@ -10,11 +10,12 @@ import frameScript from "./mermaid-frame.js?url&no-inline";
  *
  * - An iframe sandboxed with `allow-scripts` only (an opaque origin: no cookies, storage or DOM of ours) holds a second
  *   one, sandboxed the same way, where mermaid draws. Both carry the CSP of `mermaidFrameDocument`: nothing loads but
- *   mermaid's bundle and mermaid-frame.js, plus inline styles and data: images. The outer one's `default-src 'none'`
- *   is also the inner one's frame-src, which refuses the inner frame navigating itself away (a `<meta
- *   http-equiv="refresh">`): CSP has no other say over a document's own navigations, and the sandbox allows them.
- *   Chromium 156 still opens a connection to a refused address, and preconnects and looks up `<link rel=preconnect>`
- *   and `dns-prefetch` hosts whatever the CSP says, so the tags that navigate and `<link>` are left to the second layer.
+ *   mermaid's bundle and mermaid-frame.js, plus inline styles and data: images. The CSP is not the only layer, because
+ *   it doesn't catch every way a tag reaches the network: measured in Chromium 156, Firefox 144 and WebKit 26 (Safari,
+ *   the desktop app), it stops neither `<link rel=preconnect>` nor `dns-prefetch`; Chromium also sends `<link
+ *   rel=prerender>` as a GET and opens a connection before it refuses an `<iframe>` or a `<meta http-equiv=refresh>`,
+ *   and Firefox resolves the host of any HTML `<a href>`. Those tags and `href` are stopped by the second layer below
+ *   (mermaid strict + the DOMPurify config) in every engine instead, which drops them before they reach the document.
  * - The page sends `{id, source, dark}` and takes `{id, svg}` or `{id, error}` back only from the inner frame's
  *   window, so another frame on the page (an agent's HTML page) can't post a drawing. The SVG still goes into an
  *   `<img>`, where nothing in it runs or loads.
@@ -44,6 +45,8 @@ const MERMAID_MAX_GANTT_DAYS = 10_000;
 const MERMAID_MAX_GANTT_YEARS = 30;
 /** Levels of an architecture diagram's groups inside groups. */
 const MERMAID_MAX_GROUP_DEPTH = 3;
+/** Levels of a block diagram's blocks inside blocks: its layout recurses twice per block, so its cost doubles a level. */
+const MERMAID_MAX_BLOCK_DEPTH = 10;
 /** A gantt duration's unit (mermaid's duration regex) in days, rounded up. */
 const GANTT_DAYS: Record<string, number> = { y: 366, M: 31, w: 7, d: 1, h: 1 / 24, m: 1 / 1440, s: 1 / 86_400 };
 /** Mermaid's directive regex, as 11.17.2 has it: the source its parsers read is the one without these. */
@@ -71,6 +74,8 @@ const YAML_ANCHOR_OR_ALIAS = /(?:^|[\s:?,[{-])[&*]\S/;
  * - Architecture groups at most 3 levels deep: the layout's time over edges across nested groups jumps with the edges'
  *   pattern, up to 1.5 s in WebKit and 3 s in Firefox at 3 levels (as people draw them: 50 ms), 13 s in Chrome at 4,
  *   25 s in WebKit and 38 s in Firefox at 10.
+ * - Block diagrams at most 10 levels of blocks inside blocks: the layout recurses twice per block, so its cost doubles
+ *   with each level (22 levels: 6.9 s in WebKit).
  *
  * Within the bounds a drawing still costs its size. The slowest measured in WebKit and Firefox: a block diagram that
  * packs 1,000 blocks into 5,000 characters, 1.4 s, a 499-edge flowchart 0.75 s, a 200-line class diagram 0.57 s.
@@ -107,17 +112,22 @@ export function mermaidDrawable(source: string): boolean {
   if (/^\s*mindmap/m.test(text) && read.length > MERMAID_MAX_MINDMAP_LINES) return false;
   if (/^\s*venn-beta/m.test(text) && (text.match(/^\s*(?:set|union)\b/gim)?.length ?? 0) > MERMAID_MAX_VENN_AREAS)
     return false;
-  // Node metadata runs to its first `}` outside a quoted string (mermaid's lexer), and is read as YAML.
+  // Node metadata runs to its first `}` outside a quoted string (mermaid's lexer), and is read as YAML. Tested on the
+  // raw text like the front matter above: a single-quoted '"' or an escaped \" can fence off an alias chain from a scan
+  // that strips "…" first, hiding anchors mermaid still expands.
   for (const [meta] of text.matchAll(/@\{(?:"[^"]*"|[^"}])*/g))
-    if (YAML_ANCHOR_OR_ALIAS.test(meta.slice(2).replace(/"[^"]*"/g, '""'))) return false;
+    if (YAML_ANCHOR_OR_ALIAS.test(meta.slice(2))) return false;
   let spaces = 0;
   for (const [, count] of text.matchAll(/\bspace:(\d+)/g)) spaces += Number(count);
   if (spaces > MERMAID_MAX_SPACES) return false;
-  if (/^\s*excludes\b/m.test(text)) {
+  // Mermaid matches `excludes` case-insensitively at any token start, the first gantt line included (`gantt excludes …`).
+  if (/^\s*gantt\b/m.test(text) && /(?:^|\s)excludes\s/i.test(text)) {
     let days = 0;
     for (const [, count, unit = ""] of text.matchAll(/(\d+(?:\.\d+)?)(ms|[Mdhmswy])\b/g))
       days += Number(count) * (GANTT_DAYS[unit] ?? 0);
-    const years = (text.match(/\b\d{4}\b/g) ?? []).map(Number);
+    // A task that ends on a date, `until` another or `until` a missing id (which ends today) walks there day by day. The
+    // current year is always compared, since a task ending today names no year the regex above could see.
+    const years = [...(text.match(/\b\d{4}\b/g) ?? []).map(Number), new Date().getFullYear()];
     if (days > MERMAID_MAX_GANTT_DAYS || /\d{5}/.test(text)) return false;
     if (Math.max(...years) - Math.min(...years) > MERMAID_MAX_GANTT_YEARS) return false;
   }
@@ -126,6 +136,18 @@ export function mermaidDrawable(source: string): boolean {
     for (let id = group; depth <= MERMAID_MAX_GROUP_DEPTH && groupParent.has(id); id = groupParent.get(id) ?? "")
       depth++;
     if (depth > MERMAID_MAX_GROUP_DEPTH) return false;
+  }
+  // A block diagram's nesting: `block:id` and a bare `block` both open a composite that an `end` closes; the diagram's
+  // own header (the first keyword) sits at depth 0. Counted over the whole source, in document order.
+  if (/^\s*block(?:-beta)?\b/.test(read.find((line) => line.trim()) ?? "")) {
+    const tokens = [...text.matchAll(/\bblock:|\bblock-beta\b|\bblock\b(?![:-])|\bend\b/g)].map(([token]) => token);
+    let depth = 0;
+    let max = 0;
+    for (let i = 1; i < tokens.length; i++) {
+      if (tokens[i] === "end") depth = Math.max(0, depth - 1);
+      else if (++depth > max) max = depth;
+    }
+    if (max > MERMAID_MAX_BLOCK_DEPTH) return false;
   }
   return true;
 }
