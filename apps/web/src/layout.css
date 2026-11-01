@@ -7355,11 +7355,6 @@ html:not([data-pointer]) .onb__step:focus-visible {
   padding: 0 clamp(18px, 3.4vw, 40px);
   box-sizing: border-box;
 }
-/* No preview yet (nothing typed, no template): the form has the width. Its content keeps its own max, so nothing
-   moves when the preview comes in. */
-.newag__work:not([data-preview]) {
-  grid-template-columns: minmax(0, 1fr);
-}
 .newag__main {
   display: flex;
   flex-direction: column;

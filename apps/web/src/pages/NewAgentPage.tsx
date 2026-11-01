@@ -1446,7 +1446,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
   return (
     <div className="onb newag" ref={root}>
       <NewAgentRail index={index} reached={reached} total={total} onGo={goTo} done={false} />
-      <div className="newag__work" data-preview={showPreview || undefined}>
+      <div className="newag__work">
         <main className="newag__main">
           <div className="newag__content" key={step}>
             {views[step]()}

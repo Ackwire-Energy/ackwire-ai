@@ -83,17 +83,13 @@ describe("Criar agente: steps", () => {
   test("the preview waits for something in it: a template, or the first thing typed; never all empty", async () => {
     await open();
     const preview = () => screen().queryByRole("complementary", { name: "Prévia do agente" });
-    const work = () => document.querySelector(".newag__work");
     expect(preview()).toBeNull();
-    expect(work()?.hasAttribute("data-preview")).toBe(false);
-    // Do zero alone has nothing to show yet: no preview, the form keeps the width.
+    // Do zero alone has nothing to show yet: no preview.
     await click(screen().getByRole("button", { name: /^Do zero/ }));
     expect(title()).toBe("Qual vai ser o papel?");
     expect(preview()).toBeNull();
-    expect(work()?.hasAttribute("data-preview")).toBe(false);
     await typeIn(screen().getByLabelText("Cargo"), "Pesquisa de preços");
     expect(preview()?.textContent).toContain("Pesquisa de preços");
-    expect(work()?.hasAttribute("data-preview")).toBe(true);
     // A template shows it on the role step itself: QA starts as Iris.
     await click(screen().getByRole("button", { name: /^QA/ }));
     expect(preview()?.textContent).toContain("Iris");
