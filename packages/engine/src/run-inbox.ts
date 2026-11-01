@@ -1,13 +1,17 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, gt, inArray, isNull, ne, or, schema, sql } from "@agenteschat/db";
+import { scalarParams } from "./approvals";
 import { mayJoin, type RunTrigger, startOrJoinRun } from "./dispatch";
 import { isAgentOnlyDm } from "./dms";
 import { publishChannelEvent } from "./events";
+import { cutText } from "./format";
 import type { Message } from "./messages";
+import { stripSentinel } from "./reply-policy";
 import { holdsMessages } from "./run-hold";
+import { inChannelRun } from "./run-scope";
 import { type AgentRun, addRunStep, replyThreadOf } from "./runs";
 
-const { agentConsultations, agentRuns, agents, channels, messages } = schema;
+const { agentConsultations, agentRunSteps, agentRuns, agents, approvals, channels, messages, users } = schema;
 
 /**
  * A run's inbox (`agent_runs.pending_message_ids`): messages sent to the agent's conversation while
@@ -134,6 +138,116 @@ export async function releaseHeldInbox(db: Database, pubsub: PubSub | undefined,
   const [row] = await db.select().from(agentRuns).where(eq(agentRuns.id, runId));
   if (!row || row.pendingMessageIds.length === 0 || !(await holdsMessages(db, row))) return null;
   return releaseInbox(db, pubsub, row, { reason: "held" });
+}
+
+/**
+ * What this agent's other runs in the same conversation still wait on (a person's approval). A run waiting
+ * on a decision takes no new message (`holdsMessages`: the decision may take hours), so a message sent
+ * meanwhile gets a run of its own: it must know what is already asked, so it neither asks for it again nor
+ * restates it; and the held run, once it resumes, must know what its sibling asked meanwhile. The
+ * conversation is the one `startOrJoinRun` finds a run by: its thread (a run asked in the main timeline
+ * also answers the replies under its trigger), plus the main timeline for a run asked there.
+ */
+export async function heldHere(
+  db: Executor,
+  run: Pick<AgentRun, "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId">,
+): Promise<string | null> {
+  const rows = await db
+    .select({ title: approvals.title, params: approvals.params })
+    .from(approvals)
+    .innerJoin(agentRuns, eq(agentRuns.id, approvals.runId))
+    .where(
+      and(
+        eq(approvals.orgId, run.orgId),
+        eq(approvals.agentId, run.agentId),
+        eq(approvals.channelId, run.channelId),
+        eq(approvals.status, "pending"),
+        ne(agentRuns.id, run.id),
+        eq(agentRuns.status, "waiting_approval"),
+        or(
+          eq(agentRuns.threadRootId, run.threadRootId),
+          replyThreadOf(run) ? undefined : inChannelRun(sql`${agentRuns}`),
+        ),
+      ),
+    )
+    .orderBy(asc(approvals.createdAt))
+    .limit(10);
+  if (rows.length === 0) return null;
+  const lines = rows.map((r) => {
+    const params = Object.entries(scalarParams(r.params))
+      .map(([k, v]) => `${k}=${v}`)
+      .join(", ");
+    return `- ${r.title}${params ? ` (${params})` : ""}`;
+  });
+  return [
+    "# Already waiting for approval here",
+    "Another run of yours in this conversation asked for these and waits for a person's decision; it carries on by itself once decided and says how it went:",
+    ...lines,
+    "Don't ask for them again, don't do them yourself and don't repeat their status: answer only what is new.",
+  ].join("\n");
+}
+
+/**
+ * What the agent's other runs did in this conversation while this one waited on a decision (`holdsMessages`):
+ * the messages that started them (handed on from here, or sent meanwhile), what they posted and what they
+ * still wait on (`heldHere`). The run resumes from its own transcript, so without this it would answer as if
+ * the conversation had stopped when it paused: restating what another run of its own already said, or
+ * redoing it. Read once, when it resumes; null when nothing happened.
+ */
+export async function whileHeld(
+  db: Executor,
+  run: Pick<AgentRun, "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId">,
+): Promise<string | null> {
+  // The pause: its last step of its own. Handing its inbox on (`handOn`) writes a step after the run it
+  // started, which would hide that run and its trigger.
+  const [paused] = await db
+    .select({ at: sql<string | null>`max(${agentRunSteps.createdAt})` })
+    .from(agentRunSteps)
+    .where(and(eq(agentRunSteps.runId, run.id), sql`not (${agentRunSteps.data} ? 'redispatchedMessageIds')`));
+  if (!paused?.at) return null;
+  const since = new Date(paused.at);
+  const threadId = replyThreadOf(run);
+  const rows = await db
+    .select({ body: messages.body, person: users.name, agent: agents.name })
+    .from(messages)
+    .leftJoin(users, eq(users.id, messages.authorUserId))
+    .leftJoin(agents, eq(agents.id, messages.authorAgentId))
+    .where(
+      and(
+        eq(messages.orgId, run.orgId),
+        eq(messages.channelId, run.channelId),
+        // Its conversation, as `startOrJoinRun` finds the run: its thread (a run asked in the main timeline
+        // answers there and in the replies under its trigger).
+        or(eq(messages.threadId, run.threadRootId), threadId ? undefined : isNull(messages.threadId)),
+        isNull(messages.deletedAt),
+        or(
+          and(eq(messages.authorAgentId, run.agentId), ne(messages.agentRunId, run.id), gt(messages.createdAt, since)),
+          // A run started since: its trigger may be older (queued here while it ran, then handed on).
+          sql`${messages.id} in (select r.trigger_message_id from agent_runs r where r.org_id = ${run.orgId}::uuid
+            and r.agent_id = ${run.agentId}::uuid and r.channel_id = ${run.channelId}::uuid and r.id <> ${run.id}::uuid
+            and r.created_at > ${since.toISOString()}::timestamptz)`,
+        ),
+      ),
+    )
+    .orderBy(asc(messages.createdAt))
+    .limit(10);
+  const lines = rows.flatMap((m) => {
+    const text = cutText(stripSentinel(m.body), 1500);
+    if (!text) return [];
+    return [m.agent ? `[You, in another run]: ${text}` : `[${m.person ?? "Someone"}]: ${text}`];
+  });
+  const pending = await heldHere(db, run);
+  if (lines.length === 0 && !pending) return null;
+  return [
+    ...(lines.length > 0
+      ? [
+          "While you waited, the conversation went on (another run of yours answered these; don't answer them again):",
+          ...lines,
+        ]
+      : []),
+    ...(pending ? [pending] : []),
+    "Don't redo or restate what another run of yours did or still waits on. Carry on with what is left of your own task, and say what your waiting call changed.",
+  ].join("\n\n");
 }
 
 /** Messages taken from a run's inbox go on: to a run of their own, or the agent's run already active there. */

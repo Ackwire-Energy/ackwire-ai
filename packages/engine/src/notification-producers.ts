@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, isNotNull, schema } from "@agenteschat/db";
-import { approvalCardThreads, approvalOriginOf } from "./approvals";
+import { approvalCardThreads, approvalOriginOf, approverIds } from "./approvals";
 import { accountablePerson, runAuthorityById } from "./authority";
 import { threadFollowChoices } from "./follows";
 import { isMediaAfterReply } from "./media";
@@ -11,6 +11,7 @@ import {
   notificationSnippet,
   notify,
   resolveNotifications,
+  retargetNotifications,
 } from "./notifications";
 import { maySql, type RolePermission } from "./permissions";
 import { stretchCardOf } from "./stretch";
@@ -35,6 +36,7 @@ const {
   missionParticipants,
   routines,
   messageReactions,
+  approvals,
 } = schema;
 
 type ApprovalRow = typeof schema.approvals.$inferSelect;
@@ -370,13 +372,34 @@ export async function resolveQuestionNotifications(deps: NotificationDeps, orgId
  * A sensitive action waits: everyone who may decide it, with the agent's why (short, in `text`) and,
  * asked while nobody watched, where it came from (`origin`: a routine, or no one): ADR 0053 §8.
  */
+/**
+ * One notification per approval card (`openApprovalCard`): a request joining a card that already waits
+ * updates that card's notification (its count, the newest title) instead of adding one.
+ */
+const approvalGroupKey = (approval: Pick<ApprovalRow, "id" | "messageId">) =>
+  approval.messageId ? `approval-card:${approval.messageId}` : `approval:${approval.id}`;
+
 export async function notifyApproval(deps: NotificationDeps, approval: ApprovalRow, deciders: string[]) {
-  const [[channel], cardThreads] = await Promise.all([
+  const [[channel], cardThreads, [first]] = await Promise.all([
     deps.db
       .select({ kind: channels.kind, name: channels.name })
       .from(channels)
       .where(eq(channels.id, approval.channelId)),
     approvalCardThreads(deps.db, [approval]),
+    approval.messageId
+      ? deps.db
+          .select({ id: approvals.id })
+          .from(approvals)
+          .where(
+            and(
+              eq(approvals.orgId, approval.orgId),
+              eq(approvals.messageId, approval.messageId),
+              eq(approvals.status, "pending"),
+            ),
+          )
+          .orderBy(asc(approvals.createdAt))
+          .limit(1)
+      : Promise.resolve([]),
   ]);
   // Where its card is (the main timeline has no thread).
   const threadId = cardThreads.get(approval.id) ?? null;
@@ -384,28 +407,57 @@ export async function notifyApproval(deps: NotificationDeps, approval: ApprovalR
     orgId: approval.orgId,
     userIds: deciders,
     kind: "approval",
-    groupKey: `approval:${approval.id}`,
+    groupKey: approvalGroupKey(approval),
     waiting: true,
     actor: agent(approval.agentId),
     source: {
-      approvalId: approval.id,
+      // The card's oldest waiting request: the notification opens the card, which lists the rest.
+      approvalId: first?.id ?? approval.id,
       channelId: approval.channelId,
       ...(threadId ? { threadId } : {}),
       ...(approval.messageId ? { messageId: approval.messageId } : {}),
       ...(approval.missionId ? { missionId: approval.missionId } : {}),
       ...(channel?.kind === "channel" ? { label: channel.name } : {}),
     },
-    latest: {
-      title: notificationSnippet(approval.title, 200),
-      text: notificationSnippet(approval.why, 200),
-      origin: approvalOriginOf(approval.origin) ?? undefined,
-      expiresAt: approval.expiresAt.toISOString(),
-    },
+    latest: approvalLatest(approval),
   });
 }
 
-export async function resolveApprovalNotifications(deps: NotificationDeps, orgId: string, approvalId: string) {
-  await resolveNotifications(deps, orgId, { groupKey: `approval:${approvalId}` });
+const approvalLatest = (approval: ApprovalRow) => ({
+  title: notificationSnippet(approval.title, 200),
+  text: notificationSnippet(approval.why, 200),
+  origin: approvalOriginOf(approval.origin) ?? undefined,
+  expiresAt: approval.expiresAt.toISOString(),
+});
+
+/**
+ * Out of the inbox once nothing on its card waits any more. Until then each person's entry describes the
+ * card's oldest request still waiting that they may decide, and leaves the inbox of whoever has none left.
+ */
+export async function resolveApprovalNotifications(
+  deps: NotificationDeps,
+  approval: Pick<ApprovalRow, "id" | "orgId" | "messageId">,
+) {
+  const groupKey = approvalGroupKey(approval);
+  const waiting = approval.messageId
+    ? await deps.db
+        .select()
+        .from(approvals)
+        .where(
+          and(
+            eq(approvals.orgId, approval.orgId),
+            eq(approvals.messageId, approval.messageId),
+            eq(approvals.status, "pending"),
+          ),
+        )
+        .orderBy(asc(approvals.createdAt))
+    : [];
+  if (waiting.length === 0) return resolveNotifications(deps, approval.orgId, { groupKey });
+  const deciders = await Promise.all(waiting.map(async (a) => new Set(await approverIds(deps.db, a))));
+  await retargetNotifications(deps, approval.orgId, groupKey, (userId) => {
+    const next = waiting.find((_, i) => deciders[i]?.has(userId));
+    return next ? { source: { approvalId: next.id }, latest: approvalLatest(next) } : null;
+  });
 }
 
 // ── Issues ────────────────────────────────────────────────────────────────────

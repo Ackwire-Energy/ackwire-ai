@@ -441,7 +441,7 @@ export const MessageRow = memo(function MessageRow({
         {isAgent ? <ProposalCard message={m} /> : null}
         {isAgent ? <InstructionProposals message={m} /> : null}
         {files.length > 0 ? <MessageFiles files={files} /> : null}
-        {approvalId ? <ApprovalInline approvalId={approvalId} /> : null}
+        {approvalId ? <ApprovalInline approvalId={approvalId} messageId={m.id} /> : null}
         {handoff ? <HandoffCard handoff={handoff} /> : null}
         {trails && m.author.id && trails.browser.length > 0 ? (
           <TrailCard

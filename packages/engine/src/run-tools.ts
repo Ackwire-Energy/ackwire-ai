@@ -2,7 +2,7 @@ import { PERMISSION_TOOL, type PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, inArray, type SQL, schema, sql } from "@agenteschat/db";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
 import { followWork } from "./agent-status";
-import { publishApproval } from "./approvals";
+import { openApprovalCard, publishApproval } from "./approvals";
 import type { BrainTool, ToolResult } from "./brains/types";
 import { consultationCardThread, consultationOrigin } from "./consultations";
 import { NotFoundError } from "./errors";
@@ -788,13 +788,23 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
             threadId: await consultationCardThread(tx, run.orgId, run.id, approval.threadRootId),
           }
         : home;
-    const message = await card(to, `Approval request: ${approval.title}`, meta);
+    // Several requests of the agent in one conversation share one card: this one joins it, live.
+    const joined = await openApprovalCard(tx, {
+      orgId: run.orgId,
+      agentId: run.agentId,
+      channelId: to.channelId,
+      threadId: to.threadId,
+      threadRootId: approval.threadRootId,
+      exceptId: approval.id,
+    });
+    if (joined && (await linkRunActions(tx, run.orgId, run.id, joined)) > 0) out.withReceipts.push(joined);
+    const messageId = joined ?? (await card(to, `Approval request: ${approval.title}`, meta)).id;
     const [linked] = await tx
       .update(approvals)
       .set({
-        messageId: message.id,
+        messageId,
         // A routine's approval lives where its card is: decided, announced and listed there.
-        ...(brief ? { channelId: home.channelId, threadRootId: home.threadId ?? message.id } : {}),
+        ...(brief ? { channelId: home.channelId, threadRootId: home.threadId ?? messageId } : {}),
       })
       .where(eq(approvals.id, approval.id))
       .returning();

@@ -186,6 +186,8 @@ export interface FakeState {
   /** The code a new key is refused with, as a provider's own check refuses it (`provider_key_invalid`). */
   keyRefusal?: string;
   approvals: Approval[];
+  /** How many of the newest the unfiltered list returns (the server's window); all when unset. */
+  approvalsWindow?: number;
   /** What each agent runs without asking ("Aprovar sempre"), by agent id; unset = none. */
   approvalRules?: Record<string, ApprovalRule[]>;
   connections: Connection[];
@@ -2310,12 +2312,17 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
     },
     approvals: {
-      list: async (_orgId, filter = {}) =>
-        structuredClone(state.approvals).filter(
+      list: async (_orgId, filter = {}) => {
+        log("approvals.list", filter);
+        const all = structuredClone(state.approvals).filter(
           (a) =>
             (!filter.agentId || a.agentId === filter.agentId) &&
+            (!filter.messageId || a.messageId === filter.messageId) &&
             (!filter.status || (filter.status === "pending") === (a.status === "pending")),
-        ),
+        );
+        if (filter.messageId || state.approvalsWindow === undefined) return all;
+        return all.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, state.approvalsWindow);
+      },
       get: async (_orgId, id) => {
         const a = state.approvals.find((x) => x.id === id);
         if (!a) throw new ApiError(404, "not_found", "Approval not found");
@@ -2345,6 +2352,26 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return decided;
       },
       refuse: async (orgId, id, reason) => decide(orgId, id, "refused", reason),
+      decideMany: async (orgId, input) => {
+        log("approvals.decideMany", orgId, input.ids, input.decision);
+        const out: Approval[] = [];
+        const skipped: string[] = [];
+        for (const approvalId of input.ids) {
+          const a = state.approvals.find((x) => x.id === approvalId);
+          if (a?.status !== "pending" || !a.canDecide) skipped.push(approvalId);
+          else {
+            Object.assign(a, {
+              status: input.decision === "approve" ? "approved" : "refused",
+              decidedByUserId: state.me?.user.id ?? null,
+              decidedAt: new Date().toISOString(),
+              reason: input.reason ?? null,
+              canDecide: false,
+            });
+            out.push({ ...a });
+          }
+        }
+        return { approvals: out, skipped };
+      },
       rules: async (orgId, agentId) => {
         log("approvals.rules", orgId, agentId);
         return structuredClone(state.approvalRules?.[agentId] ?? []);

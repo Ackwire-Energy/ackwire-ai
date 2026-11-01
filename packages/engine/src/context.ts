@@ -34,6 +34,7 @@ import { handoffGuidance, noticeForOthers, noticeText } from "./notices";
 import { reachNote, reachOf } from "./reach";
 import { byAnotherAgent, WHY_AN_AGENT_CALLED, WHY_YOU_WERE_CALLED } from "./reply-policy";
 import { isRoutineRoomKey, type RoutineBrief, routineAccessOf, routineBriefOf, routineReportOf } from "./routine-brief";
+import { heldHere } from "./run-inbox";
 import { type AgentRun, replyThreadOf } from "./runs";
 import { stretchCardOf } from "./stretch";
 import { loadTeam, rosterScopeNames, TEAM_IN_PROMPT, teammatesFor, teammatesNowPrompt, teamPrompt } from "./team";
@@ -77,6 +78,20 @@ export const finishWhatYouStart = (followUp: boolean) =>
       ? "If it has to wait (a build, a deploy, a job still running), set a follow_up to come back to it and say when."
       : "If it has to wait, say what is left and what it waits on."
   } After a person approves or answers what you waited on, go on with the task at once and tell them what came of it. When the person already asked for the outcome, do the work instead of asking whether to. In long work, keep them posted with a short line now and then.`;
+
+/**
+ * One conversation, not a series of fresh reports: a reply after an approval, a tool result or another of its
+ * own messages carries on from there, as a person texting would. Every brain reads it ("# How to reply").
+ */
+export const CONTINUE_THE_CONVERSATION =
+  "- It's one ongoing conversation: carry on from your last message. Don't open with the person's name and don't repeat what you or others already said here (the status so far, what is still waiting for approval). After an approval, a tool result or another message of yours, say only what changed, in a line ('October's goals are in. November's too, all done'), not the whole status again.";
+
+/**
+ * Several actions that each need a person's approval are asked in one go: they show as one card the person
+ * approves at once, instead of one card and one wait per action. Every brain reads it ("# How to reply").
+ */
+export const ASK_APPROVALS_TOGETHER =
+  "When a task needs several such actions (four monthly goals to record, three issues to close), plan them first and call them all in the same response, one tool call each: the person approves them together on one card. Don't ask for one, wait for the decision, then ask for the next.";
 
 /**
  * True when a reply is the old "nothing to report" word (tolerates spacing, a trailing period and
@@ -334,6 +349,7 @@ export async function buildRunContext(
   const rootIsTrigger = run.threadRootId === trigger.id;
   // Asked in the main timeline: the run answers there, not in a thread.
   const flat = rootIsTrigger;
+  const heldElsewhere = run.background ? null : heldHere(db, run).catch(() => null);
   // A routine's background run (ADR 0053 §4): its room's history (earlier briefs) is no conversation;
   // it reads its brief, and what people said where it reports comes in the routine block.
   const background = run.background;
@@ -627,10 +643,11 @@ export async function buildRunContext(
           "- Write like a colleague texting the team, not a report: plain sentences in short paragraphs, in a natural spoken tone. No headings, no bold, no labeled bullets ('Size:', 'Cause:', 'Logs:') and no numbered recommendations: say each thing in a sentence. A list only for a plain enumeration the reader will scan, like several files or ids.",
           '- Numbers to compare: a few rows go in a Markdown table (it shows as a real table). A trend, a ranking or the parts of a whole read better as a chart: a ```chart block holding only JSON data, like {"type":"bar","title":"Conversion by trigger","subtitle":"Purchases ÷ views, week of Oct 18","unit":"%","labels":["a","b"],"series":[{"name":"Rate","values":[15,6.7]}]}. Types: bar (rankings), line (over time), pie (parts of a whole), number (one big figure: "value" and an optional "delta" like "+0.8 pp vs last week", with labels/series for a small trend line or empty). Every series has one value per label, at most 24 labels; people can flip the chart to a table, so don\'t repeat every number in your text: say the takeaway around it. More data than that belongs in a table saved to the Drive.',
           "- Name what the data names, as it is: the person and where they are, the time with its zone, the version, the deploy ('Inês, from Braga, at 03:55', not 'a user'). Put news against what came before: is it new, the same pattern as always, how many so far.",
+          CONTINUE_THE_CONVERSATION,
           "- Keep it as short as the news: a report with nothing for the person to decide fits in one or two short paragraphs; leave out what didn't change and numbers that don't move the story.",
           "- When something is fine, say it in a few words ('the rest was quiet'). No ritual openings or closings ('I remain available', 'let me know if you need anything'); a greeting only when it is natural, like the first message here of the morning, yours or the person's ('Now' below gives the local time and when the previous message here was). Caveats about your own tools or data only when they change the answer. When something is the person's to decide, end with that one question, asked directly.",
           options.toolsAvailable
-            ? "- Actions marked sensitive (merge, deploy, rollback and similar) wait for a person's approval; you will be told the outcome. Write your findings and why you ask as text in the same response as the call: only that text is posted with the request, and without it the person sees an empty request."
+            ? `- Actions marked sensitive (merge, deploy, rollback and similar) wait for a person's approval; you will be told the outcome. Write your findings and why you ask as text in the same response as the call: only that text is posted with the request, and without it the person sees an empty request. ${ASK_APPROVALS_TOGETHER}`
             : "- You can only write chat messages for now; you cannot run tools or take actions outside this conversation. Say so if asked.",
           options.askUser
             ? "- When a request is still ambiguous after you have looked with your tools, when the decision is really the person's (a product choice, a priority), or before a sensitive or irreversible action, ask one short clarifying question with `ask_user` (offer 2 to 4 choices when the answer is one of a few options) and wait; like an approval, it posts only the text of that same turn. The card shows the question and its choices: don't write them in your text too, and after asking write nothing more. Never ask for something your tools can find, don't ask about simple requests you can just do (an issue to open, a priority to set, work to assign: do it, they can undo), and never ask more than you need."
@@ -773,6 +790,7 @@ export async function buildRunContext(
     // Per turn and read whole, like memory: it changes between runs, and a live computer session keeps the
     // system prompt it started with.
     ...(openTasks ? await openTasks.then((text) => (text ? [{ turn: true, found: true, text }] : [])) : []),
+    ...(heldElsewhere ? await heldElsewhere.then((text) => (text ? [{ turn: true, found: true, text }] : [])) : []),
     ...(handOffs
       ? await handOffs.then((rows) => {
           const text = rows && handOffsBlock(rows, zone);
