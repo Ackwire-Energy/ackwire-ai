@@ -5732,6 +5732,7 @@ export const en: Translations = {
       backOnApi: "{{name}} is back on the API and still answers only you.",
       letEveryone: "Let {{pronoun}} answer everyone",
       letPeople: "Let {{pronoun}} answer other people",
+      pickPeople: "{{name}} answers only the people picked, and nobody is picked yet. Pick them under Who can talk.",
     },
     errors: {
       planOwnerOnly:

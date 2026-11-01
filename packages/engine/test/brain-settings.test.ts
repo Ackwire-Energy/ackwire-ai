@@ -294,6 +294,18 @@ describe("a plan answers its owner until it answers other people (Atende outras 
     expect(await row()).toMatchObject({ audienceMode: "people", audienceUserIds: [] });
   });
 
+  test("restricted with nobody picked yet keeps its mode through the move onto a plan, and after", async () => {
+    const { fx, deps, row } = await world();
+    await setAgentAudience(fx.db, fx.owner.id, fx.org.id, fx.agent.id, { mode: "people", userIds: [] });
+    await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { brain: "claude_code" });
+    expect(await row()).toMatchObject({ audienceMode: "people", audienceUserIds: [] });
+    // A remembered "only me" changes nothing: it already answers its owner alone.
+    await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { onlyOwner: true });
+    expect(await row()).toMatchObject({ audienceMode: "people", audienceUserIds: [] });
+    await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { onlyOwner: false });
+    expect(await row()).toMatchObject({ audienceMode: "people", audienceUserIds: [] });
+  });
+
   test("only the plan's owner lets more people in; an admin only narrows; a member can't touch it", async () => {
     const { fx, deps, bia, caio, row } = await world();
     await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { brain: "claude_code" });
@@ -427,5 +439,12 @@ describe("a plan thinks only for its owner's agents, one account each", () => {
       .where(eq(schema.agents.id, fx.agent.id));
     await updateAgent(fx.db, fx.owner.id, fx.org.id, fx.agent.id, { ownerUserId: fx.owner.id });
     expect(await row()).toMatchObject({ brain: "claude_code", audienceMode: "owner" });
+    // Restricted with nobody picked already answers its owner alone: the handover keeps it restricted.
+    await fx.db
+      .update(schema.agents)
+      .set({ ownerUserId: bia.id, audienceMode: "people", audienceUserIds: [] })
+      .where(eq(schema.agents.id, fx.agent.id));
+    await updateAgent(fx.db, fx.owner.id, fx.org.id, fx.agent.id, { ownerUserId: fx.owner.id });
+    expect(await row()).toMatchObject({ brain: "claude_code", audienceMode: "people", audienceUserIds: [] });
   });
 });

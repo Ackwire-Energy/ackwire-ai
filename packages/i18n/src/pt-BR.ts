@@ -5781,6 +5781,9 @@ export const ptBR = {
       backOnApi: "{{The}} {{name}} voltou a pensar pela API e ainda só atende você.",
       letEveryone: "Deixar {{article}} {{name}} atender todos",
       letPeople: "Deixar {{article}} {{name}} atender outras pessoas",
+      /** "Só algumas pessoas" with nobody picked: the switch can't let anyone in, the people picker does. */
+      pickPeople:
+        "{{The}} {{name}} só atende as pessoas escolhidas, e ninguém foi escolhido ainda. Escolha em Quem pode falar.",
     },
     errors: {
       planOwnerOnly:
