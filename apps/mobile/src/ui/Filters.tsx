@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Pressable, Text as RNText, ScrollView, View } from "react-native";
 import { Count } from "./Count";
 import { haptics } from "./haptics";
@@ -5,6 +6,9 @@ import type { IconName } from "./icons.data";
 import { systemText } from "./Text";
 import { useTheme } from "./theme";
 import { CHROME_MAX_SCALE, weights } from "./type-scale";
+
+/** How much of the pill before stays in sight when the row follows the selected one. */
+const PEEK = 40;
 
 export interface FilterItem {
   key: string;
@@ -20,11 +24,18 @@ export interface FiltersProps {
   onChange: (key: string) => void;
 }
 
-/** Horizontal pills over a list; the selected one is ink. */
+/** Horizontal pills over a list; the selected one is ink, and the row follows it when it changes from outside. */
 export function Filters({ items, value, onChange }: FiltersProps) {
   const { colors } = useTheme();
+  const row = useRef<ScrollView>(null);
+  const lefts = useRef(new Map<string, number>());
+  useEffect(() => {
+    const left = lefts.current.get(value);
+    if (left !== undefined) row.current?.scrollTo({ x: Math.max(0, left - PEEK), animated: true });
+  }, [value]);
   return (
     <ScrollView
+      ref={row}
       horizontal
       showsHorizontalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
@@ -36,6 +47,7 @@ export function Filters({ items, value, onChange }: FiltersProps) {
         return (
           <Pressable
             key={item.key}
+            onLayout={(e) => lefts.current.set(item.key, e.nativeEvent.layout.x)}
             onPress={() => {
               if (!on) haptics.selection();
               onChange(item.key);

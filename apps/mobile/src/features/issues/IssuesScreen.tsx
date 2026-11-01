@@ -43,11 +43,20 @@ export function IssuesScreen() {
   const pull = usePullRefresh(issues.refetch);
   const pager = useRef<ScrollView>(null);
   const [tab, setTab] = useState(0);
+  // A tab tapped: where the pager is going, so the columns it passes on the way don't light up.
+  const going = useRef<number | null>(null);
   const board = useMemo(() => issueBoard(issues.data ?? [], columns.data ?? []), [issues.data, columns.data]);
   const openNew = () => router.push("/issues/new");
   const columnWidth = width - PEEK - 16;
   const step = columnWidth + COLUMN_GAP;
+  const columnAt = (x: number) => Math.max(0, Math.min(board.length - 1, Math.round(x / step)));
+  const onPagerScroll = (x: number) => {
+    const at = columnAt(x);
+    if (going.current === null) setTab(at);
+    else if (at === going.current && Math.abs(x - at * step) < 1) going.current = null;
+  };
   const go = (index: number) => {
+    going.current = index === tab ? null : index;
     setTab(index);
     pager.current?.scrollTo({ x: index * step, animated: true });
   };
@@ -105,9 +114,11 @@ export function IssuesScreen() {
               decelerationRate="fast"
               disableIntervalMomentum
               contentContainerStyle={styles.pager}
-              onMomentumScrollEnd={(e) =>
-                setTab(Math.max(0, Math.min(board.length - 1, Math.round(e.nativeEvent.contentOffset.x / step))))
-              }
+              scrollEventThrottle={32}
+              onScrollBeginDrag={() => {
+                going.current = null;
+              }}
+              onScroll={(e) => onPagerScroll(e.nativeEvent.contentOffset.x)}
             >
               {board.map((b) => (
                 <Column key={b.stage} column={b} width={columnWidth} pull={pull} />
