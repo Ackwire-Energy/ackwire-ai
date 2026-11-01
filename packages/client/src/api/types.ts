@@ -2916,6 +2916,8 @@ export type MachineKind = "connected" | "host" | "managed";
 /** `GET …/machines`: a computer connected with `agentes-runner`. */
 export interface Machine {
   id: string;
+  /** The public address measured through an agent process, absent on older runners. */
+  egress?: { ip: string; country?: string; at: string } | null;
   name: string;
   /**
    * Absent from a server that doesn't say: `connected`. A `managed` one can't be removed, and its hostname,

@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 32;
+export const MACHINE_PROTOCOL_VERSION = 33;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -1226,12 +1226,21 @@ export const TASK_LIMITS = {
   prUrl: 500,
 } as const;
 
+/** Protocol 33: the public address observed from an agent process, absent until measured. */
+export interface MachineEgress {
+  ip: string | null;
+  country?: string;
+}
+export const EGRESS_PROTOCOL = 33;
+
 /** An agent that uses this machine, as the `agents` frame lists it (protocol 9). */
 export interface MachineAgent {
   id: string;
   handle: string;
   name: string;
   look?: { color?: string; eyes?: string; accessory?: string };
+  /** Protocol 33: language of the responsible person; absent falls back to English. */
+  locale?: string;
   /** Protocol 20: the account on this machine it thinks with (system mode lends its folder to the agent's user). */
   account?: string;
 }
@@ -1732,7 +1741,7 @@ export type RunnerFrame =
    * Protocol 22: `load` after each new sample (absent until the first, and while it hasn't changed);
    * protocol 23: `browserTraffic` the same way.
    */
-  | { type: "pong"; at: number; load?: MachineLoad; browserTraffic?: BrowserTraffic }
+  | { type: "pong"; at: number; load?: MachineLoad; browserTraffic?: BrowserTraffic; egress?: MachineEgress }
   /** A task's progress: a human last line, files it touched, or elapsed time (throttled). */
   | {
       type: "task.event";
@@ -2171,7 +2180,25 @@ export function parseRunnerFrame(raw: string): RunnerFrame | null {
       if (typeof f.at !== "number") return null;
       const load = parseMachineLoad(f.load);
       const browserTraffic = parseBrowserTraffic(f.browserTraffic);
-      return { type: "pong", at: f.at, ...(load ? { load } : {}), ...(browserTraffic ? { browserTraffic } : {}) };
+      const rawEgress = isObject(f.egress) ? f.egress : null;
+      const egress =
+        rawEgress &&
+        (rawEgress.ip === null ||
+          (typeof rawEgress.ip === "string" && rawEgress.ip.length <= 45 && /^[0-9a-fA-F:.]+$/.test(rawEgress.ip)))
+          ? {
+              ip: rawEgress.ip as string | null,
+              ...(typeof rawEgress.country === "string" && /^[A-Z]{2}$/.test(rawEgress.country)
+                ? { country: rawEgress.country }
+                : {}),
+            }
+          : null;
+      return {
+        type: "pong",
+        at: f.at,
+        ...(load ? { load } : {}),
+        ...(browserTraffic ? { browserTraffic } : {}),
+        ...(egress ? { egress } : {}),
+      };
     }
     case "task.event": {
       if (!isString(f.taskId) || (f.kind !== "line" && f.kind !== "files" && f.kind !== "progress")) return null;

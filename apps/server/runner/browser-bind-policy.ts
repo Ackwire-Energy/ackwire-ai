@@ -1,12 +1,16 @@
 import { spawnSync } from "node:child_process";
-import type { AgentUser } from "./agent-users";
+import { type AgentUser, networkPrefix, networkRestrictions } from "./agent-users";
 import { BROWSER_PORT_FIRST, BROWSER_PORT_LAST, browserPortsForUid } from "./browser-ports";
 import { conflictingBrowserPorts } from "./loopback-guard";
 import { agentSlice, type RunCommand, systemdBooted } from "./service";
 
 /** A systemd unit property is only a claim until a process in its slice proves the kernel denied bind(2). */
 const runBounded: RunCommand = (file, args) => {
-  const result = spawnSync(file, args, { encoding: "utf8", timeout: 15_000 });
+  const result = spawnSync(file, args, {
+    encoding: "utf8",
+    timeout: 15_000,
+    env: { PATH: "/usr/sbin:/usr/bin:/sbin:/bin", LANG: "C.UTF-8" },
+  });
   if (result.error) return { code: 127, output: result.error.message };
   return { code: result.status ?? 1, output: `${result.stdout ?? ""}${result.stderr ?? ""}`.trim() };
 };
@@ -21,6 +25,11 @@ export function ensureBrowserBindPolicy(
     throw new Error("System agent browsers require systemd cgroup socket-bind enforcement");
   }
   const run = opts.run ?? runBounded;
+  const network = networkPrefix(user);
+  const socketsInNetwork = () =>
+    network.length
+      ? run(network[0] as string, [...network.slice(1), "/usr/bin/ss", "-Htln", "-e"])
+      : run("ss", ["-Htln", "-e"]);
   const { cdp, stream } = browserPortsForUid(user.uid);
   const slice = agentSlice(user.uid);
   // A newly allocated agent has no active slice yet. Start the empty slice as
@@ -51,7 +60,7 @@ export function ensureBrowserBindPolicy(
   }
   // Pick a currently unused reserved port. EADDRINUSE is not proof of
   // enforcement, and the child only succeeds for EPERM/EACCES on IPv4+6.
-  const sockets = run("ss", ["-Htln", "-e"]);
+  const sockets = socketsInNetwork();
   if (sockets.code !== 0) throw new Error(`Cannot inspect browser bind test ports: ${sockets.output.slice(0, 200)}`);
   const wrongOwner = conflictingBrowserPorts(sockets.output, [user.uid, user.uid]);
   if (wrongOwner.length)
@@ -77,6 +86,8 @@ export function ensureBrowserBindPolicy(
     "--collect",
     `--slice=${slice}`,
     "--",
+    ...network,
+    ...networkRestrictions(user),
     "/usr/sbin/runuser",
     "-u",
     user.user,
@@ -91,7 +102,7 @@ export function ensureBrowserBindPolicy(
   if (verified.code !== 0) {
     throw new Error(`Browser bind policy is not enforced in ${slice}: ${verified.output.slice(0, 200)}`);
   }
-  const finalSockets = run("ss", ["-Htln", "-e"]);
+  const finalSockets = socketsInNetwork();
   if (finalSockets.code !== 0)
     throw new Error(`Cannot recheck browser listener owners: ${finalSockets.output.slice(0, 200)}`);
   const finalWrongOwner = conflictingBrowserPorts(finalSockets.output, [user.uid, user.uid]);

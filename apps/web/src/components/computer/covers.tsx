@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Cover } from "../browser/BrowserCard";
 import { CommandBlock } from "../Machines";
+import { Egress } from "./Egress";
 
 /** The stage with nothing live on it: the screen's shape, and the cover that says why. */
 export function Stage({ children }: { children: ReactNode }) {
@@ -22,13 +23,14 @@ export function Stage({ children }: { children: ReactNode }) {
  * Watching, the line under the screen: what programs there can see. A cover the screen opens from by itself keeps it
  * too, so the screen opens where its cover was; a cover that stays until someone acts takes its room.
  */
-export function ScreenNotice({ name }: { name: string }) {
+export function ScreenNotice({ name, machine }: { name: string; machine?: Machine | null }) {
   const { t } = useTranslation();
   return (
     <div className="dsk-line">
       <span className="dsk-words">
         <span className="muted">{t("desktop.watch.notice", agentGrammar(t, name))}</span>
       </span>
+      <Egress machine={machine} compact />
     </div>
   );
 }

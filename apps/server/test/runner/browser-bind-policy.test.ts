@@ -93,3 +93,21 @@ test("a reserved browser port held by another UID fails before or after the kern
     expect(() => ensureBrowserBindPolicy(user, runner, { run, systemd: true })).toThrow("wrong listener owner");
   }
 });
+
+test.if(process.platform !== "win32")(
+  "network diagnostics and the kernel bind check enter the worker's configured namespace",
+  () => {
+    const calls: { file: string; args: string[] }[] = [];
+    const hook = "/usr/bin/true"; // A root-owned executable; the fake records it without executing it.
+    const run: RunCommand = (file, args) => {
+      calls.push({ file, args });
+      return { code: 0, output: "" };
+    };
+    ensureBrowserBindPolicy({ ...user, networkLauncher: hook }, runner, { run, systemd: true });
+    const look = calls.filter((c) => c.file === hook);
+    expect(look).toHaveLength(2);
+    expect(look[0]?.args).toEqual(["21000", "--", "/usr/bin/ss", "-Htln", "-e"]);
+    const check = calls.find((c) => c.file === "/usr/bin/systemd-run");
+    expect(check?.args.slice(5, 11)).toEqual([hook, "21000", "--", "/usr/sbin/runuser", "-u", user.user]);
+  },
+);

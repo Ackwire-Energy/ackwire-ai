@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useApi } from "../api/context";
 import { keys } from "../api/keys";
 import type { AgentBrowserSettings, BrowserHandoff, DesktopStatus, ScreenKind } from "../api/types";
+import { isBlankPage } from "../lib/sites";
 import type { LiveWork } from "../realtime/streams";
 import { noteHandoffPlace } from "./held";
 
@@ -172,7 +173,7 @@ export function screenSteps(work: LiveWork[] | undefined): ScreenStep[] {
  * site of its latest open (or new tab). Null before either exists.
  */
 export function browserSiteUrl(frameUrl: string | null | undefined, steps: BrowserStep[]): string | null {
-  if (frameUrl && !/^about:/i.test(frameUrl)) return frameUrl;
+  if (frameUrl && !isBlankPage(frameUrl)) return frameUrl;
   for (let i = steps.length - 1; i >= 0; i--) {
     const s = steps[i];
     if (s && (s.tool === "browser_open" || s.tool === "browser_tabs") && s.detail) return s.detail;

@@ -2,6 +2,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, w
 import os from "node:os";
 import path from "node:path";
 import { parseAccess, type RunnerAccess, type RunnerPause } from "@agenteschat/adapters/machine-protocol";
+import { validateNetworkMark } from "./network-mark";
 
 /** What `pair` writes and `start` reads (`~/.agentes-runner/config.json`, mode 600). */
 export interface RunnerConfig {
@@ -44,6 +45,10 @@ export interface RunnerConfig {
   mode?: "user" | "system";
   /** System mode: the uids agent users get, `[first, last]` (default `DEFAULT_AGENT_UID_RANGE`). */
   agentUidRange?: [number, number];
+  /** Optional root-owned launcher: <executable> <uid> -- <command>, for isolated agent networks. */
+  networkLauncher?: string;
+  /** Optional trusted packet bit for foreign traffic routed through loopback; no exception by default. */
+  networkMark?: number;
   /**
    * After "leave" (unpair): the token `machineId` had, never used to connect,
    * only sent as proof when pairing again with the same server reconnects
@@ -132,6 +137,16 @@ export function readStoredConfig(home = runnerHome()): StoredConfig | null {
 }
 
 export function normalizeStored(raw: Record<string, unknown>): StoredConfig {
+  if (raw.networkMark !== undefined) validateNetworkMark(raw.networkMark);
+  if (
+    raw.networkLauncher !== undefined &&
+    (typeof raw.networkLauncher !== "string" ||
+      !path.isAbsolute(raw.networkLauncher) ||
+      raw.networkLauncher.length > 4096 ||
+      raw.networkLauncher.includes("\0"))
+  ) {
+    throw new Error("networkLauncher must be an absolute executable path");
+  }
   const access = raw.access === undefined ? undefined : parseAccess(raw.access);
   const paused = parsePaused(raw.paused);
   const range = raw.agentUidRange;
@@ -154,6 +169,13 @@ export function normalizeStored(raw: Record<string, unknown>): StoredConfig {
     ...(text(raw.orgName, 200) ? { orgName: text(raw.orgName, 200) } : {}),
     ...(raw.mode === "system" || raw.mode === "user" ? { mode: raw.mode } : {}),
     ...(uids ? { agentUidRange: uids } : {}),
+    ...(typeof raw.networkLauncher === "string" &&
+    path.isAbsolute(raw.networkLauncher) &&
+    raw.networkLauncher.length <= 4096 &&
+    !raw.networkLauncher.includes("\0")
+      ? { networkLauncher: raw.networkLauncher }
+      : {}),
+    ...(typeof raw.networkMark === "number" ? { networkMark: raw.networkMark } : {}),
     ...(text(raw.previousToken, 4000) ? { previousToken: text(raw.previousToken, 4000) } : {}),
   };
 }

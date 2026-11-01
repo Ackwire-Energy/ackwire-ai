@@ -533,6 +533,7 @@ export function createMachineHub(deps: MachineHubDeps) {
       .update(machines)
       .set({
         online: true,
+        egress: null,
         connectedReplica: replicaId,
         lastSeenAt: now,
         hostname: frame.hostname,
@@ -803,23 +804,32 @@ export function createMachineHub(deps: MachineHubDeps) {
    * A `pong`: `last_seen_at` at most every 40 s, and the day's load (protocol 22) or its agents' browsers'
    * traffic (protocol 23) whenever the runner has a new one.
    */
-  async function touch(conn: MachineConnection, { load, browserTraffic }: Extract<RunnerFrame, { type: "pong" }>) {
+  async function touch(
+    conn: MachineConnection,
+    { load, browserTraffic, egress }: Extract<RunnerFrame, { type: "pong" }>,
+  ) {
     conn.lastPong = Date.now();
     if (!conn.machineId) return;
-    if (!load && !browserTraffic && Date.now() - conn.lastSeenWrite < Math.min(40_000, heartbeatMs * 1.6)) return;
+    if (!load && !browserTraffic && !egress && Date.now() - conn.lastSeenWrite < Math.min(40_000, heartbeatMs * 1.6))
+      return;
     conn.lastSeenWrite = Date.now();
     const now = new Date();
     const at = now.toISOString();
-    await db
+    const changed = await db
       .update(machines)
       .set({
         lastSeenAt: now,
         online: true,
         ...(load ? { load: { ...load, at } } : {}),
         ...(browserTraffic ? { browserTraffic: { ...browserTraffic, at } } : {}),
+        ...(egress ? { egress: { ...egress, at } } : {}),
       })
       .where(and(eq(machines.id, conn.machineId), eq(machines.connectedReplica, replicaId)))
-      .catch(() => undefined);
+      .returning({ id: machines.id })
+      .catch(() => []);
+    if (egress && changed.length && conn.orgId) {
+      await publishMachineUpdated(pubsub, conn.orgId, conn.machineId, { egress: egress.ip ? { ...egress, at } : null });
+    }
   }
 
   function callLocal<Op extends MachineOp>(

@@ -8185,6 +8185,10 @@ export const ptBR = {
     },
   },
   machines: {
+    egress: {
+      line: "IP de saída {{ip}}",
+      hint: "O endereço que os sites veem quando os agentes navegam. Ele acompanha as mudanças de rede do computador.",
+    },
     online: "Online",
     offline: "Offline",
     execOff: "Comandos desligados",
@@ -10205,6 +10209,11 @@ export const ptBR = {
   },
   /** The agent's screen (ADR 0058): watching it and taking control. */
   desktop: {
+    ask: {
+      watching: "Você está só assistindo.",
+      title: "Quer assumir o controle?",
+      working: "{{The}} {{name}} pausa enquanto você estiver no controle.",
+    },
     sub: {
       control: "Você no controle · {{article}}\u00a0{{name}} espera",
       controlAsked: "Você no controle · {{article}}\u00a0{{name}} pediu",

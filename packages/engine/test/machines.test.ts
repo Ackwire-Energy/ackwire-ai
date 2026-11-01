@@ -23,6 +23,7 @@ import {
   type MachineHub,
   MachineOfflineError,
   MachineRequestError,
+  machineAgents,
   NotFoundError,
   postPersonMessage,
   receiveMachineUpload,
@@ -33,6 +34,7 @@ import {
   type SecretRequestView,
   secretSite,
   setAgentComputerTarget,
+  setMyLocale,
   TASK_OFFLINE_GRACE_MS,
   type ToolContext,
 } from "../src";
@@ -1597,4 +1599,42 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     expect(old).toMatchObject({ type: "result", output: { isError: true } });
     expect(old?.type === "result" && old.output.content).toContain("agentes-runner update");
   });
+});
+
+test("measured egress is stored, updated, cleared and hidden while a computer is offline", async () => {
+  f = await setup({ machines: true });
+  const hub = f.machineHub as MachineHub;
+  const paired = await pair();
+  const runner = fakeRunner(hub);
+  await runner.hello(paired.token);
+  await runner.frame({ type: "pong", at: 1, egress: { ip: "8.8.8.8", country: "US" } });
+  const listed = () => listMachines(f.db, f.owner.id, f.org.id);
+  expect((await listed())[0]?.egress).toEqual({ ip: "8.8.8.8", country: "US", at: expect.any(String) });
+  await runner.frame({ type: "pong", at: 2, egress: { ip: "1.1.1.1" } });
+  expect((await listed())[0]?.egress?.ip).toBe("1.1.1.1");
+  await runner.frame({ type: "pong", at: 3, egress: { ip: null } });
+  expect((await listed())[0]?.egress).toBeNull();
+  await runner.frame({ type: "pong", at: 4, egress: { ip: "8.8.8.8" } });
+  await runner.disconnect();
+  expect((await listed())[0]?.egress).toBeNull();
+});
+
+test("the start-page language follows the responsible person and changes reach the runner", async () => {
+  f = await setup({ machines: true });
+  const paired = await pair();
+  const agent = await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: "Ada", handle: "ada-page" },
+    { model: "claude-sonnet-5-5" },
+  );
+  await setAgentComputerTarget(deps(), f.owner.id, f.org.id, agent.id, paired.machineId);
+  const signals: unknown[] = [];
+  f.pubsub.subscribe(MACHINE_CONTROL_TOPIC, (e) => signals.push(e));
+  await setMyLocale(f.db, f.owner.id, "pt-BR", f.pubsub);
+  expect((await machineAgents(f.db, f.org.id, paired.machineId)).find((a) => a.id === agent.id)?.locale).toBe("pt-BR");
+  expect(signals).toContainEqual({ type: "machine.agents", orgId: f.org.id });
+  await setMyLocale(f.db, f.owner.id, "en", f.pubsub);
+  expect((await machineAgents(f.db, f.org.id, paired.machineId)).find((a) => a.id === agent.id)?.locale).toBe("en");
 });

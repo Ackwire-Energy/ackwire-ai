@@ -312,3 +312,16 @@ test("old UIDs in another bucket or duplicate UIDs refuse startup before nft app
     expect(nft.calls.some((call) => call.startsWith("nft -f"))).toBe(false);
   }
 });
+
+test("a configured routing bit exempts only unchanged foreign destinations, keeping host addresses guarded", () => {
+  const plain = renderRuleset([A], "drop", RANGE);
+  expect(plain).not.toContain("meta mark &");
+  const marked = renderRuleset([A], "drop", RANGE, new Set(), 0x08000000);
+  const rule = "meta mark & 0x08000000 == 0x08000000 ct status != dnat fib daddr type != local return";
+  expect(marked).toContain(rule);
+  expect(marked.indexOf(rule)).toBeLessThan(marked.indexOf('oif "lo" meta skuid 0'));
+  expect(marked).not.toContain("fib daddr . mark");
+  expect(marked).toContain('oif "lo" tcp dport @browser_ports drop');
+  expect(marked).toContain('oif "lo" tcp dport @guarded drop');
+  expect(() => renderRuleset([], "drop", RANGE, new Set(), 0)).toThrow("networkMark");
+});

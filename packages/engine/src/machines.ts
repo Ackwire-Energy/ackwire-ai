@@ -358,6 +358,7 @@ async function machineViews(db: Database, actorId: string, orgId: string, only?:
       /** `connected` (a person paired it), `host` (the server's own) or `managed` (the workspace's, never removed here). */
       kind: m.kind,
       online: machineOnline(m, now),
+      egress: machineOnline(m, now) && m.egress?.ip ? { ...m.egress, ip: m.egress.ip } : null,
       lastSeenAt: m.lastSeenAt?.toISOString() ?? null,
       hostname: managed ? "" : m.hostname,
       os: managed ? "other" : m.os,
@@ -434,8 +435,10 @@ export async function machineAgents(db: Database, orgId: string, machineId: stri
       appearance: agents.appearance,
       brain: agents.brain,
       account: agents.brainAccountId,
+      locale: users.locale,
     })
     .from(agents)
+    .leftJoin(users, eq(users.id, agents.ownerUserId))
     .where(and(eq(agents.orgId, orgId), eq(agents.machineId, machineId), isNull(agents.archivedAt)))
     .orderBy(agents.createdAt);
   return rows.map((a) => {
@@ -444,6 +447,7 @@ export async function machineAgents(db: Database, orgId: string, machineId: stri
       id: a.id,
       handle: a.handle,
       name: a.name,
+      locale: /^pt(?:-|$)/i.test(a.locale ?? "") ? "pt-BR" : "en",
       ...(a.appearance
         ? { look: { color: a.appearance.color, eyes: a.appearance.eyes, accessory: a.appearance.accessory } }
         : {}),

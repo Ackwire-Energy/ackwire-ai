@@ -2068,6 +2068,7 @@ test.if(posix)(
       return s;
     };
     const daemon = new RunnerDaemon({
+      probeEgress: async () => null,
       home,
       mode: "start",
       log: () => {},
@@ -2195,6 +2196,7 @@ test.if(posix)(
     // Root never installs a browser: the installer shares one with every agent, or each agent's worker installs its own.
     const prepared = spyOn(BrowserManager.prototype, "prepareInBackground").mockImplementation(async () => {});
     const daemon = new RunnerDaemon({
+      probeEgress: async () => null,
       home,
       mode: "start",
       log: () => {},
@@ -2268,6 +2270,7 @@ test.if(posix)(
     const prepared = spyOn(BrowserManager.prototype, "prepareInBackground").mockImplementation(async () => {});
     const sockets: FakeSocket[] = [];
     const daemon = new RunnerDaemon({
+      probeEgress: async () => null,
       home,
       mode: "start",
       log: () => {},
@@ -2485,4 +2488,90 @@ test("lines: split across chunks, UTF-8 kept whole, and a line too long is skipp
   await waitFor(() => lines.length === 5);
   expect(lines).toEqual(["olá", "a", "bc", "after", "end"]);
   expect(tooLong).toBe(2);
+});
+
+test.if(posix)("route changes discard in-flight egress observations and reconnect starts unknown", async () => {
+  const home = newHome();
+  const ws = tempDir("egress-ws-");
+  dirs.push(ws);
+  writeConfig(
+    {
+      server: "https://agentes.test",
+      machineId: "m1",
+      name: "box",
+      token: "agm_test_observation_only",
+      workspace: ws,
+      exec: false,
+      mode: "system",
+      agentUidRange: [21000, 21099],
+    },
+    home,
+  );
+  const probes: { uid: number | undefined; resolve: (v: unknown) => void }[] = [];
+  const sockets: FakeSocket[] = [];
+  const daemon = new RunnerDaemon({
+    home,
+    mode: "start",
+    log: () => {},
+    watch: false,
+    executors: () => ({}),
+    caffeinate: false,
+    self: { command: ["/opt/agentes-runner/agentes-runner"], compiled: true },
+    fetch: async () => new Response("", { status: 404 }),
+    probeEgress: async (_server, user) => new Promise((resolve) => probes.push({ uid: user?.uid, resolve })),
+    workers: { user: userOf, start: (user) => new FakeWorker(user) },
+    dial: (_url, handlers) => {
+      const s = new FakeSocket(handlers);
+      sockets.push(s);
+      return s;
+    },
+  });
+  daemon.start();
+  try {
+    await waitFor(() => sockets.length === 1);
+    const s = sockets[0] as FakeSocket;
+    s.handlers.onOpen();
+    s.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25000 });
+    s.frame({ type: "agents", agents: [ANA] });
+    await waitFor(() => probes.length === 1);
+    expect(probes[0]?.uid).toBe(21000);
+    s.frame({ type: "agents", agents: [BIA] });
+    probes[0]?.resolve({ ip: "8.8.8.8", country: "US" });
+    await waitFor(() => probes.length === 2);
+    expect(probes[1]?.uid).toBe(21001);
+    probes[1]?.resolve({ ip: "1.1.1.1" });
+    await waitFor(() => s.of("pong").some((f) => JSON.stringify(f.egress ?? null).includes("1.1.1.1")));
+    expect(s.of("pong").some((f) => JSON.stringify(f.egress ?? null).includes("8.8.8.8"))).toBe(false);
+    daemon.reconnect();
+    await waitFor(() => sockets.length === 2);
+    const next = sockets[1] as FakeSocket;
+    next.handlers.onOpen();
+    next.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25000 });
+    next.frame({ type: "ping", at: 1 });
+    expect(next.of("pong").at(-1)?.egress).toBeUndefined();
+    await waitFor(() => probes.length === 3);
+    probes[2]?.resolve({ ip: "9.9.9.9" });
+    await waitFor(() => next.of("pong").some((f) => JSON.stringify(f.egress ?? null).includes("9.9.9.9")));
+  } finally {
+    for (const p of probes) p.resolve(null);
+    await daemon.stop();
+  }
+});
+
+test("workers restored before a server welcome inherit root network configuration", async () => {
+  const home = newHome();
+  writeFileSync(
+    path.join(home, "worker-tasks.json"),
+    JSON.stringify({
+      task1: { agentId: ANA.id, startedAt: new Date().toISOString() },
+    }),
+  );
+  const network = { networkLauncher: "/root/network-launcher", networkMark: 0x08000000 };
+  const t = setup({ network }, home);
+  t.sup.boot();
+  await waitFor(() => t.workers.length === 1);
+  expect(t.workers[0]?.user).toEqual({ ...(USERS[0] as AgentUser), ...network });
+  const stored = JSON.parse(readFileSync(path.join(home, AGENT_USERS_FILE), "utf8"));
+  expect(stored[0].networkLauncher).toBeUndefined();
+  expect(stored[0].networkMark).toBeUndefined();
 });

@@ -29,11 +29,13 @@ import {
   toolOnCommand,
 } from "@agenteschat/client/lib/machines";
 import { helpUrl } from "@agenteschat/client/lib/server";
+import { countryFlagSvg } from "@agenteschat/ui/brand/flags";
 import { useQueries } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { SvgXml } from "react-native-svg";
 import { ComputerPortrait } from "@/computer/ComputerPortrait";
 import { useOrg } from "@/providers/org";
 import {
@@ -43,6 +45,7 @@ import {
   GroupedHeader,
   GroupedList,
   GroupedRow,
+  Icon,
   type IconName,
   ProviderLogo,
   Text,
@@ -166,6 +169,18 @@ export function MachineScreen({ machineId }: { machineId: string }) {
             {line}
           </Text>
         ))}
+        {m.online && m.egress?.ip && (
+          <View style={{ flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center" }}>
+            {countryFlagSvg(m.egress.country) ? (
+              <SvgXml xml={countryFlagSvg(m.egress.country) as string} width={20} height={14} />
+            ) : (
+              <Icon name="globe" size={14} color={c.muted} />
+            )}
+            <Text variant="small" tone="muted">
+              {t("machines.egress.line", { ip: m.egress.ip })}
+            </Text>
+          </View>
+        )}
         {m.workspace && m.mode !== "system" ? (
           <Text variant="small" tone="muted" style={styles.center}>
             {t("machines.workspace")}{" "}

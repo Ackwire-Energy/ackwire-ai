@@ -5,6 +5,7 @@ import { existsSync, lstatSync, mkdirSync, readdirSync, statSync } from "node:fs
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { isStartPage, START_PAGE_URL } from "@agenteschat/adapters/browser-start";
 import { cgroupCounters } from "@agenteschat/adapters/host-stats";
 import {
   AGENT_BROWSER_SHA256,
@@ -35,6 +36,7 @@ import { readJson, writeJson } from "./json-file";
 import { acquireLock } from "./lock";
 import { agentFolderName, isInside, ownedSafely } from "./paths";
 import type { Spawn } from "./scope-gate";
+import { prepareStartPage, readStartLocale, type StartPageData } from "./start-page";
 
 /**
  * The agent browser (protocol 12, ADR 0040). The runner drives the pinned
@@ -343,6 +345,7 @@ export function defaultMaxSessions(totalBytes: number = os.totalmem()): number {
  * allowlist). `about:blank` and `data:` pages are always allowed.
  */
 export function domainAllowed(url: string, patterns: readonly string[]): boolean {
+  if (isStartPage(url)) return true;
   if (patterns.length === 0) return true;
   let host: string;
   try {
@@ -519,6 +522,8 @@ export function chromeLaunchArgs(
   headed = false,
   page = "about:blank",
   debuggingPort = 0,
+  startPage?: string,
+  privateNetwork = false,
 ): string[] {
   const ua = chromeUserAgent(exe, platform);
   return [
@@ -529,7 +534,9 @@ export function chromeLaunchArgs(
     `--user-data-dir=${profile}`,
     ...(ua ? [`--user-agent=${ua}`] : []),
     ...(lang ? [`--lang=${lang}`] : []),
-    page,
+    ...(startPage ? [`--load-extension=${startPage}`] : []),
+    ...(privateNetwork ? ["--force-webrtc-ip-handling-policy=disable_non_proxied_udp"] : []),
+    startPage && page === "about:blank" ? START_PAGE_URL : page,
   ];
 }
 
@@ -913,6 +920,11 @@ export interface BrowserManagerOptions {
   secret: (agent: AgentScope, name: string) => Promise<string | null>;
   /** System mode: root preguards this UID's fixed CDP and stream listener ports. */
   fixedPorts?: BrowserPorts;
+  /** Root-owned extension in system mode; absent uses the single-user runner home. */
+  startPageDirectory?: string;
+  startPageData?: (agent: AgentScope) => StartPageData;
+  /** Restrict WebRTC to the configured network path, without Chrome managed policies. */
+  privateNetwork?: () => boolean;
   /** Tests: how to start `agent-browser` (default: the sidecar or the downloaded binary). */
   command?: string[];
   /** The runner's executable (the sidecar sits next to it). */
@@ -974,6 +986,7 @@ const pageMeta = (stream: Stream) => ({
 });
 
 interface Session {
+  agent: AgentScope;
   agentId: string;
   name: string;
   folder: string;
@@ -1760,6 +1773,7 @@ export class BrowserManager {
     await mkdir(path.dirname(this.configFile), { recursive: true, mode: 0o700 });
     if (!existsSync(this.configFile)) await writeFile(this.configFile, "{}\n", { mode: 0o600 });
     const session: Session = {
+      agent,
       agentId,
       name: `agent-${agentFolderName(agent).suffix.slice(1)}`,
       folder,
@@ -1814,14 +1828,23 @@ export class BrowserManager {
       const start = this.opts.startChrome ?? launchChrome;
       const launch = async (on: ChromeDisplay | null) => {
         if (on) prepareProfile(profile);
+        const startPage =
+          this.opts.startPageDirectory ??
+          prepareStartPage(
+            path.join(this.opts.home, "start", agentFolderName(agent).suffix),
+            agent,
+            this.opts.startPageData?.(agent),
+          );
         const args = chromeLaunchArgs(
           exe,
           profile,
           process.platform,
-          osLang(),
+          readStartLocale(startPage),
           on !== null,
           page,
           this.opts.fixedPorts?.cdp ?? 0,
+          startPage,
+          this.opts.privateNetwork?.(),
         );
         try {
           const started = await start(exe, args, profile, on ? chromeEnv(on) : undefined);
@@ -2385,7 +2408,7 @@ export class BrowserManager {
         ? targets.find((t): t is { id: string } => isRecord(t) && t.type === "page" && typeof t.id === "string")
         : undefined;
       // Chrome takes a new tab only by PUT.
-      return (await (page ? call(`activate/${encodeURIComponent(page.id)}`) : call("new?about:blank", "PUT"))).ok;
+      return (await (page ? call(`activate/${encodeURIComponent(page.id)}`) : call(`new?${START_PAGE_URL}`, "PUT"))).ok;
     } catch {
       // It stays where it is: on the desktop, behind whatever is in front.
       return false;
@@ -2596,6 +2619,17 @@ export class BrowserManager {
     };
   }
 
+  updateStartPages() {
+    if (this.opts.startPageDirectory) return;
+    for (const session of this.sessions.values()) {
+      prepareStartPage(
+        path.join(this.opts.home, "start", agentFolderName(session.agent).suffix),
+        session.agent,
+        this.opts.startPageData?.(session.agent),
+      );
+    }
+  }
+
   private onStreamMessage(session: Session, stream: Stream, raw: unknown) {
     if (session.stream !== stream) return;
     let msg: unknown;
@@ -2804,6 +2838,7 @@ export class BrowserManager {
       if (k.startsWith("AGENT_BROWSER_") || k.startsWith("AI_GATEWAY_")) continue;
       env[k] = v;
     }
+    env.AGENT_BROWSER_STREAM_QUALITY = "60";
     if (this.opts.fixedPorts) env.AGENT_BROWSER_STREAM_PORT = String(this.opts.fixedPorts.stream);
     const [bin, ...pre] = command as [string, ...string[]];
     return new Promise((resolve) => {

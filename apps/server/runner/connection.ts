@@ -1,6 +1,7 @@
 import {
   type BrowserTraffic,
   HEARTBEAT_MS,
+  type MachineEgress,
   type MachineLoad,
   type MachineRequest,
   parseServerFrame,
@@ -22,6 +23,7 @@ export interface SocketHandlers {
 }
 
 export interface Socket {
+  readonly bufferedAmount?: number;
   send(data: string): void;
   close(): void;
 }
@@ -52,6 +54,9 @@ export const webSocketDial: Dial = (url, handlers) => {
   // An `error` is always followed by `close`; the watchdog covers the rest.
   ws.addEventListener("error", () => {});
   return {
+    get bufferedAmount() {
+      return ws.bufferedAmount;
+    },
     send: (data) => ws.send(data),
     close: () => {
       try {
@@ -112,6 +117,7 @@ export interface ConnectionOptions {
   load?: () => MachineLoad | null;
   /** Protocol 23: the agents' browsers' last day of traffic, the same way. */
   browserTraffic?: () => BrowserTraffic | null;
+  egress?: () => MachineEgress | null;
   /** Called after each `welcome` (frames sent from here on reach the server). */
   onWelcome?: (welcome: { machineId: string; name: string; heartbeatMs: number }) => void;
   /** Protocol 9: the server's `agents` frame (the agents that use this machine). */
@@ -229,11 +235,16 @@ export class RunnerConnection {
       let watchdog: ReturnType<typeof setTimeout> | undefined;
       let sentLoad: MachineLoad | null = null;
       let sentTraffic: BrowserTraffic | null = null;
+      let sentEgress: MachineEgress | null = null;
 
       const send = (frame: RunnerFrame) => {
         if (finished || !socket) return;
+        // Browser pictures are independent JPEG frames: skip stale pictures while the link is backed up.
+        // Results, heartbeats and input keep their normal ordered delivery.
+        if (frame.type === "browser.frame" && (socket.bufferedAmount ?? 0) > 2 * 1024 * 1024) return;
         try {
           socket.send(JSON.stringify(frame));
+          if (frame.type === "pong" && frame.egress) sentEgress = frame.egress;
         } catch {
           // closing; the session ends on `close`
         }
@@ -314,14 +325,17 @@ export class RunnerConnection {
           case "ping": {
             const load = opts.load?.() ?? null;
             const traffic = opts.browserTraffic?.() ?? null;
+            const egress = opts.egress?.() ?? null;
             send({
               type: "pong",
               at: frame.at,
               ...(load && load !== sentLoad ? { load } : {}),
               ...(traffic && traffic !== sentTraffic ? { browserTraffic: traffic } : {}),
+              ...(egress && egress !== sentEgress ? { egress } : {}),
             });
             sentLoad = load;
             sentTraffic = traffic;
+            sentEgress = egress;
             arm();
             return;
           }

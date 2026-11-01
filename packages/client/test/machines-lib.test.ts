@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { QueryClient } from "@tanstack/react-query";
 import { ApiError } from "../src/api/http";
 import { keys } from "../src/api/keys";
-import type { AccountLoginStatus, MachineAccount } from "../src/api/types";
+import type { AccountLoginStatus, Machine, MachineAccount } from "../src/api/types";
 import {
   type AccountLoginInput,
   allowFolderCommand,
@@ -304,4 +304,28 @@ describe("connected computers helpers (ADR 0036)", () => {
     for (const error of gone) expect(loginRead({ isError: true, error, errorUpdatedAt: first })).toBe("failed");
     expect(loginRead({ isError: false, error: null, errorUpdatedAt: first })).toBeNull();
   });
+});
+
+test("an observed exit address updates live and is cleared across connection changes", () => {
+  const qc = new QueryClient();
+  const list = keys.machines("o1");
+  qc.setQueryData(list, [{ id: "m1", online: true, egress: null }]);
+  const event = (value: Record<string, unknown>) =>
+    applyMachineEvent(qc, "o1", { type: "machine.updated", machineId: "m1", ...value } as { type: string });
+  const current = () => qc.getQueryData<Machine[]>(list)?.[0]?.egress;
+  const first = { ip: "8.8.8.8", country: "US", at: "2026-11-01T12:00:00Z" };
+  event({ egress: first });
+  expect(current()).toEqual(first);
+  event({ egress: { ip: "1.1.1.1", country: 42, at: first.at } });
+  expect(current()).toEqual({ ip: "1.1.1.1", at: first.at });
+  event({ egress: { ip: "<bad>", at: first.at } });
+  expect(current()?.ip).toBe("1.1.1.1");
+  event({ egress: null });
+  expect(current()).toBeNull();
+  event({ egress: first });
+  applyMachineEvent(qc, "o1", { type: "machine.status", machineId: "m1", online: false } as { type: string });
+  expect(current()).toBeNull();
+  applyMachineEvent(qc, "o1", { type: "machine.status", machineId: "m1", online: true } as { type: string });
+  expect(current()).toBeNull();
+  qc.clear();
 });

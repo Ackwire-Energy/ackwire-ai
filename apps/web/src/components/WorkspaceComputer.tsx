@@ -41,6 +41,7 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { usePrefersReducedMotion } from "@/hooks/useRevealedText";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
+import { Egress } from "./computer/Egress";
 
 /**
  * The workspace's own computer (ADR 0056 §10), where a provisioner prepares one for each workspace: how far it
@@ -307,6 +308,7 @@ export function WorkspaceComputerCard({ view }: { view: SetupView }) {
       {view.phase !== "ready" && <SetupProgress view={view} said />}
       <SetupWaitLines view={view} reader={reader} />
       <SetupFacts view={view} />
+      <Egress machine={machine} />
       {machine && machine.agents.length > 0 && (
         <span className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <span className="row" style={{ gap: 4 }}>

@@ -1321,3 +1321,41 @@ addresses are refused, so nobody can turn the server against its own network. Re
 through a connected computer instead.
 
 </details>
+
+### Browser start page and observed address
+
+The agent browser opens an offline agentes.chat new tab. Its language follows the agent's responsible person
+(Portuguese or English, with English as the fallback). The clock uses the computer's time zone. No external
+font, image or page request is needed. System installs keep the extension files outside agent-owned homes,
+under `/opt/agentes-runner/browser/start/<uid>`; a regular install uses the runner's own home. Existing profiles
+and sign-ins are kept. A running browser picks up changed names and observed addresses every 30 seconds.
+
+Computer settings and the screen's footer show the public address observed from an agent's route. The runner
+asks this server's `/api/machines/ip` without credentials every 30 seconds; configure `TRUSTED_PROXIES` for your
+reverse proxy as for other IP-based features. Private LAN and tailnet addresses are hidden, and three failed
+observations clear the display. A country mark appears only when the response includes a recognized country.
+
+A Linux system runner can optionally set `networkLauncher` in its root-owned `config.json` to an absolute
+executable path. The helper receives `<uid> -- <command> [arguments...]`, prepares or enters the network
+context synchronously, then executes the command. Root network diagnostics and the agent's `runuser` launch
+use the same helper. The executable and every parent must be root-owned, with no symlinks or group/other write
+permissions. A failed helper prevents the process from starting. No helper is configured by default. Apply
+changes during a planned runner restart; an existing process keeps its network context until it ends. The
+host loopback firewall remains active for existing processes. Helpers must preserve access to the runner's
+filesystem sockets and the read-only start-page directory. With this option, Chrome also disables non-proxied
+WebRTC UDP through its launch flag; no managed browser policy is installed.
+
+A deployment whose trusted routing hook redirects foreign traffic through loopback can set the root runner
+config's optional `networkMark` to one unsigned 32-bit packet bit. No exception is installed when it is absent.
+The mark must be distinct from the local-service ownership tag (`0x41000000`). The loopback guard exempts
+marked traffic only when it has no destination NAT and an unmarked FIB address-type lookup says the destination
+is not local. Host-owned public addresses and wildcard listeners therefore keep their normal protection.
+The deployment must filter private destinations before marking packets and prevent agent processes from gaining
+`CAP_NET_ADMIN` or `CAP_NET_RAW` (including through file capabilities). The mark never replaces those filters.
+Changes require a planned runner restart. The shared guard for `managedBy: host` does not use per-runner marks.
+
+When `networkMark` is configured, `systemLauncher` runs `setpriv --no-new-privs --bounding-set=-net_admin,-net_raw` immediately before `runuser`, after the optional network launcher.
+This also covers deployments using marked routing without a namespace launcher. The kernel bind self-check
+uses the same restriction. Existing processes must be drained or restarted before relying on it.
+
+With no-new-privileges enabled, Chrome needs a working user-namespace sandbox; verify it during Linux acceptance.

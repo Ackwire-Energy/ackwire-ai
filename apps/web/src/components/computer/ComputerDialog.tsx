@@ -182,6 +182,8 @@ export function ComputerDialog({ agent, open, onClose }: { agent: Agent; open: b
   const [sub, setSub] = useState<HTMLElement | null>(null);
   const [acts, setActs] = useState<HTMLElement | null>(null);
   const [full, setFull] = useState(false);
+  const [dismissAsk, setDismissAsk] = useState<(() => void) | null>(null);
+  const setAsk = useCallback((dismiss: (() => void) | null) => setDismissAsk(() => dismiss), []);
   useFullScreen(full, setFull);
   const g = agentGrammar(t, agent.name);
   const handoff = view.facts?.handoff ?? null;
@@ -237,6 +239,9 @@ export function ComputerDialog({ agent, open, onClose }: { agent: Agent; open: b
         else if (full) {
           e.preventDefault();
           setFull(false);
+        } else if (dismissAsk) {
+          e.preventDefault();
+          dismissAsk();
         } else if (mine) e.preventDefault();
       }}
     >
@@ -245,7 +250,7 @@ export function ComputerDialog({ agent, open, onClose }: { agent: Agent; open: b
         agent={agent}
         view={view}
         surface={surface}
-        slots={{ sub, actions: acts, full, setFull, say: (text) => say(text, true) }}
+        slots={{ sub, actions: acts, full, setFull, setAsk, say: (text) => say(text, true) }}
         onLeave={close}
       />
     </Dialog>
@@ -421,6 +426,7 @@ function ComputerStage({
             edition={f.edition}
             machine={machine}
             canTakeOver={canTakeOver}
+            working={Boolean(f.working) && !mine}
             onHeld={setScreenHeld}
             {...(manages && f.browser && !view.desktop?.canControl ? { onTakeBrowser: takeBrowser } : {})}
           />

@@ -36,7 +36,8 @@
     "./names": "./src/names.ts",
     "./plan-state": "./src/plan-state.ts",
     "./recurrence": "./src/recurrence.ts",
-    "./timezones": "./src/timezones.ts"
+    "./timezones": "./src/timezones.ts",
+    "./brand/flags": "./src/brand/flags.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { browserPortsForUid, checkEphemeralRange, validateBrowserUidRange } from "./browser-ports";
+import { networkMarkExemption } from "./network-mark";
 import { type RunCommand, runSync, systemdBooted } from "./service";
 
 /**
@@ -93,6 +94,7 @@ export function renderRuleset(
   reject: RejectVerb,
   uidRange: [number, number],
   conflictingPorts: ReadonlySet<number> = new Set(),
+  networkMark?: number,
 ): string {
   validateBrowserUidRange(uidRange);
   const browserOwner: string[] = [];
@@ -123,6 +125,7 @@ export function renderRuleset(
     `\tset guarded {\n\t\ttype inet_service${elementList(ports)}\n\t}`,
     "\tchain output {",
     "\t\ttype filter hook output priority 0; policy accept;",
+    ...networkMarkExemption(networkMark),
     '\t\toif "lo" meta skuid 0 accept',
     // A local TCP server's reply has the client's ephemeral destination port.
     '\t\toif "lo" ct direction reply accept',
@@ -143,6 +146,8 @@ export interface LoopbackGuardOptions {
   agentUids: () => number[];
   /** Entire configured system-agent UID range, including agents not yet created. */
   uidRange: [number, number];
+  /** Trusted earlier routing hook marks foreign traffic redirected through loopback. */
+  networkMark?: number;
   log: (line: string) => void;
   run?: RunCommand;
   /** Tests: the systemd and kernel state checked before the guard starts. */
@@ -217,7 +222,7 @@ export class LoopbackGuard {
     const blocked = new Set(this.conflicts);
     if (this.conflicts.length)
       this.warnOnce(`reserved browser ports have the wrong owner: ${this.conflicts.join(", ")}`);
-    const text = renderRuleset(listeners, this.verb, this.opts.uidRange, blocked);
+    const text = renderRuleset(listeners, this.verb, this.opts.uidRange, blocked, this.opts.networkMark);
     if (text === this.applied) return true;
     if (this.apply(text)) {
       this.applied = text;
@@ -227,7 +232,7 @@ export class LoopbackGuard {
     // The reject rule may be what nft refused (no nft_reject_inet): try drop once.
     if (this.verb !== "drop") {
       this.verb = "drop";
-      const dropText = renderRuleset(listeners, this.verb, this.opts.uidRange, blocked);
+      const dropText = renderRuleset(listeners, this.verb, this.opts.uidRange, blocked, this.opts.networkMark);
       if (this.apply(dropText)) {
         this.applied = dropText;
         this.warned = false;

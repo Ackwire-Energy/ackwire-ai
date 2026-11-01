@@ -14,7 +14,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { quoteExcerpt } from "@agenteschat/client/lib/reply";
 import { Button, cx, Icon, InfoHint, onScreenKeyboard, Textarea } from "@agenteschat/ui";
 import type RFB from "@novnc/novnc";
-import { type ReactNode, useContext, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { matchesNow, useMatchMedia } from "@/hooks/useMatchMedia";
@@ -23,10 +23,12 @@ import { useSaid } from "@/lib/toast";
 import { SocketFactoryContext } from "@/realtime/context";
 import { Cover } from "../browser/BrowserCard";
 import { CantShowCover, ScreenNotice } from "../computer/covers";
+import { Egress } from "../computer/Egress";
 import { DialogHead, FullButton, useDialogHead, useHandBack, useSayFailed } from "../computer/head";
 import { useOrg } from "../org-context";
 import { colorOf } from "../Sky";
 import { DesktopLink } from "./link";
+import { desktopEncoding, networkInfo } from "./quality";
 import { useScreenKeys } from "./screen-keys";
 import "../browser/browser.css";
 import "./desktop.css";
@@ -70,6 +72,7 @@ export function DesktopView({
   edition,
   machine,
   canTakeOver,
+  working = false,
   onTakeBrowser,
   onSettled,
   onHeld,
@@ -83,6 +86,7 @@ export function DesktopView({
   machine: Machine | null;
   /** Take control may show: no hold, pause or request waiting (the server still decides who may). */
   canTakeOver: boolean;
+  working?: boolean;
   /** Whoever may take over the agent's browser but not its screen takes the browser instead. */
   onTakeBrowser?: () => void;
   /** The person handed back or said it couldn't be done. */
@@ -105,6 +109,14 @@ export function DesktopView({
   const [handingBack, setHandingBack] = useState(false);
   // Control opening over the last picture it watched (`HOLD_MS`).
   const [taking, setTaking] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const [askPointer, setAskPointer] = useState(false);
+  const quietUntil = useRef(0);
+  const touchAskStart = useRef<{ x: number; y: number } | null>(null);
+  const dismissAsk = useCallback(() => {
+    setAsking(false);
+    quietUntil.current = Date.now() + 20_000;
+  }, []);
   const [backNote, setBackNote] = useState("");
   const screenRef = useRef<HTMLDivElement>(null);
   const rfbRef = useRef<RFB | null>(null);
@@ -215,6 +227,14 @@ export function DesktopView({
     let link: DesktopLink | null = null;
     let rfb: RFB | null = null;
     let session: DesktopMode = modeNow.current;
+    const network = networkInfo();
+    const adjustEncoding = () => {
+      if (!rfb) return;
+      const encoding = desktopEncoding(session === "control", network);
+      rfb.qualityLevel = encoding.quality;
+      rfb.compressionLevel = encoding.compression;
+    };
+    network?.addEventListener("change", adjustEncoding);
     void import("@novnc/novnc").then(
       ({ default: Rfb }) => {
         if (cancelled) return;
@@ -259,8 +279,9 @@ export function DesktopView({
           next.viewOnly = !control;
           // In control, a screen that draws no pointer of its own shows noVNC's dot, never none (watching, desktop.css).
           next.showDotCursor = control;
-          next.qualityLevel = control ? 6 : 3;
-          next.compressionLevel = 2;
+          const encoding = desktopEncoding(control, network);
+          next.qualityLevel = encoding.quality;
+          next.compressionLevel = encoding.compression;
           next.scaleViewport = true;
           next.resizeSession = false;
           // The person's keys go to the field over the screen (`useScreenKeys`), never to noVNC's canvas.
@@ -315,6 +336,7 @@ export function DesktopView({
     );
     const end = () => {
       cancelled = true;
+      network?.removeEventListener("change", adjustEncoding);
       clearTimeout(timer);
       clearInterval(looking);
       clearTimeout(stale);
@@ -362,6 +384,51 @@ export function DesktopView({
 
   const shown: DesktopViewState = blocked ?? view;
   const live = shown === "live";
+  const offer = live && !inControl && !taking && !head?.full && !s?.controllerUserId && canTakeOver;
+  const mayTake = Boolean(s?.canControl || onTakeBrowser);
+  useEffect(() => {
+    if (!offer) setAsking(false);
+  }, [offer]);
+  const setAsk = head?.setAsk;
+  useEffect(() => {
+    if (!asking || !offer) return;
+    setAsk?.(dismissAsk);
+    return () => setAsk?.(null);
+  }, [asking, offer, setAsk, dismissAsk]);
+  useEffect(() => {
+    if (!offer) return;
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && asking && !setAsk) {
+        e.preventDefault();
+        dismissAsk();
+        return;
+      }
+      if (
+        asking ||
+        Date.now() < quietUntil.current ||
+        e.key.length !== 1 ||
+        e.key === " " ||
+        e.ctrlKey ||
+        e.metaKey ||
+        e.altKey ||
+        e.isComposing
+      )
+        return;
+      const target = e.target as Element | null;
+      if (target?.closest?.('button,a,input,textarea,select,[contenteditable="true"],[role="button"],[role="textbox"]'))
+        return;
+      e.preventDefault();
+      setAskPointer(false);
+      setAsking(true);
+    };
+    document.addEventListener("keydown", key);
+    return () => document.removeEventListener("keydown", key);
+  }, [offer, asking, setAsk, dismissAsk]);
+  const askFromPointer = () => {
+    if (!offer || asking || Date.now() < quietUntil.current) return;
+    setAskPointer(true);
+    setAsking(true);
+  };
   const settled = SETTLED.includes(shown);
   // A cover only a person's own step changes (`SETTLED`): the window's foot keeps no line under it.
   const final = settled && !live;
@@ -548,6 +615,17 @@ export function DesktopView({
         onPointerDownCapture={(e) => {
           // noVNC cancels its own mousedown, so the field keeps the focus a click on the screen gives it.
           if (inControl && e.pointerType !== "touch") keysRef.current?.focus({ preventScroll: true });
+          else if (e.pointerType !== "touch" && e.button === 0) askFromPointer();
+          else if (e.pointerType === "touch") touchAskStart.current = { x: e.clientX, y: e.clientY };
+        }}
+        onPointerUp={(e) => {
+          const start = touchAskStart.current;
+          touchAskStart.current = null;
+          if (e.pointerType === "touch" && start && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 12)
+            askFromPointer();
+        }}
+        onPointerCancel={() => {
+          touchAskStart.current = null;
         }}
       >
         <div
@@ -575,6 +653,33 @@ export function DesktopView({
           : (taking || (inControl && screenMode === "watch")) && (
               <Cover color={color} spinner text={t("desktop.taking")} />
             )}
+        {asking && offer && (
+          <Cover
+            className="dsk-ask"
+            color={color}
+            icon={mayTake ? "person" : "eye"}
+            text={t(mayTake ? "desktop.ask.title" : "desktop.ask.watching")}
+            help={mayTake && working ? t("desktop.ask.working", g) : undefined}
+            onDismiss={dismissAsk}
+            action={
+              mayTake ? (
+                <Button
+                  size="sm"
+                  variant="primary"
+                  icon="person"
+                  autoFocus={askPointer}
+                  loading={actions.takeover.isPending}
+                  onClick={() => {
+                    if (s?.canControl) takeover();
+                    else onTakeBrowser?.();
+                  }}
+                >
+                  {t("desktop.takeover")}
+                </Button>
+              ) : undefined
+            }
+          />
+        )}
       </div>
       {inControl &&
         (handingBack ? (
@@ -650,12 +755,13 @@ export function DesktopView({
                 </button>
               </span>
             )}
+            <Egress machine={machine} compact />
           </div>
         ))}
       {/* Watching, under the screen and the covers it opens from by itself, so the window's foot is as deep as its
           sides and the screen opens in place. The ⓘ (what may be checked in control) comes with control;
           full screen keeps no line. */}
-      {!inControl && !final && !head?.full && <ScreenNotice name={name} />}
+      {!inControl && !final && !head?.full && <ScreenNotice name={name} machine={machine} />}
     </div>
   );
 }

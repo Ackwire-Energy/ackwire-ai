@@ -695,9 +695,14 @@ export const USER_LOCALES = ["pt-BR", "en"] as const;
 export type UserLocale = (typeof USER_LOCALES)[number];
 
 /** Saves the person's app language (picked up from the onboarding). */
-export async function setMyLocale(db: Database, userId: string, locale: UserLocale) {
+export async function setMyLocale(db: Database, userId: string, locale: UserLocale, pubsub?: PubSub) {
   if (!USER_LOCALES.includes(locale)) throw new ValidationError("locale must be pt-BR or en");
   await db.update(users).set({ locale }).where(eq(users.id, userId));
+  if (pubsub) {
+    const orgs = await db.selectDistinct({ id: agents.orgId }).from(agents).where(eq(agents.ownerUserId, userId));
+    const { publishMachineAgentsChanged } = await import("./machines");
+    await Promise.all(orgs.map((org) => publishMachineAgentsChanged(pubsub, org.id)));
+  }
 }
 
 /**

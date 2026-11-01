@@ -130,6 +130,7 @@ const busctl = (args: string[]) =>
 
 /** What a worker must know about its computer, sent after each hello and when it changes. */
 export interface WorkerState {
+  privateNetwork?: boolean;
   access: RunnerAccess;
   paused: RunnerPause;
   limits: { maxConcurrentTasks: number; taskMaxSeconds: number; brainIdleMinutes: number; brainMaxProcesses: number };
@@ -229,6 +230,8 @@ export interface SupervisorOptions {
   home: string;
   /** Real system installation: refuse to start the broker without root. Tests use in-memory workers. */
   requireRootBroker?: boolean;
+  /** Root runtime configuration also applies to workers restored from the persisted user list. */
+  network?: Pick<AgentUser, "networkLauncher" | "networkMark">;
   /** The agent's OS user, made on its first request (`AgentUsers.ensure`). */
   user: (agent: AgentScope) => AgentUser;
   /** Starts an agent's worker (`launchWorker`). */
@@ -611,7 +614,7 @@ export class Supervisor {
     let w = this.workers.get(user.id);
     if (!w) {
       w = {
-        user,
+        user: { ...user, ...this.opts.network },
         proc: null,
         ready: false,
         state: "",

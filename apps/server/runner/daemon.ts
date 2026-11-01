@@ -73,6 +73,7 @@ import {
 import { type ConnectionOutcome, type Dial, RunnerConnection } from "./connection";
 import { DesktopManager } from "./desktop";
 import { DesktopSessions, type DesktopUser, runnerUser, systemDesktopUser } from "./desktop-session";
+import { EgressObservation, probeEgress } from "./egress";
 import { RUNNER_VERSION, RunnerError } from "./errors";
 import { cachedExecutors } from "./executors";
 import type { HandlerContext, RequestObserver, RequestOutcome } from "./handlers";
@@ -85,6 +86,7 @@ import { type DeviceGrant, devicePair, type FetchFn, PairingError, uniqueWorkspa
 import { agentWorkspace } from "./paths";
 import { agentSecrets, secretValue } from "./secrets";
 import { AGENTS_CGROUP } from "./service";
+import { prepareSystemStartPage } from "./start-page";
 import { DataSockets, RELAYED_FILE, RelayCount } from "./streams";
 import {
   launchWorker,
@@ -169,6 +171,8 @@ export function configFromGrant(
   return {
     ...(prev?.mode ? { mode: prev.mode } : {}),
     ...(prev?.agentUidRange ? { agentUidRange: prev.agentUidRange } : {}),
+    ...(prev?.networkLauncher ? { networkLauncher: prev.networkLauncher } : {}),
+    ...(prev?.networkMark ? { networkMark: prev.networkMark } : {}),
     ...(prev?.maxConcurrentTasks ? { maxConcurrentTasks: prev.maxConcurrentTasks } : {}),
     ...(prev?.taskMaxSeconds ? { taskMaxSeconds: prev.taskMaxSeconds } : {}),
     ...(prev?.brainIdleMinutes ? { brainIdleMinutes: prev.brainIdleMinutes } : {}),
@@ -263,6 +267,8 @@ export interface DaemonOptions {
   /** Tests. */
   dial?: Dial;
   fetch?: FetchFn;
+  /** Tests: an address observation without network or a real agent process. */
+  probeEgress?: typeof probeEgress;
   executors?: () => RunnerInfo["executors"];
   /** How the accounts' CLIs start (default `claude` / `codex`). */
   accountCommands?: Partial<Record<AccountKind, string[]>>;
@@ -288,6 +294,9 @@ export class RunnerDaemon implements RequestObserver {
   private connState: ControlStatus["connection"] = "unpaired";
   private refused: { token: string; reason: ConnectionOutcome["reason"] } | null = null;
   private agents: MachineAgent[] = [];
+  private egress = new EgressObservation();
+  private probingEgress = false;
+  private egressGeneration = 0;
   private readonly jobs = new Map<string, ControlJob>();
   readonly activity: ActivityLog;
   private readonly requests: AccessRequests;
@@ -497,6 +506,9 @@ export class RunnerDaemon implements RequestObserver {
     const load = setInterval(sample, LOAD_SAMPLE_MS);
     load.unref?.();
     this.timers.push(load);
+    const egress = setInterval(() => void this.sampleEgress(), 30_000);
+    egress.unref?.();
+    this.timers.push(egress);
     // System mode: for the Cloud's guard, at most once a minute.
     const relayed = setInterval(() => {
       if (!this.session?.supervisor) return;
@@ -662,6 +674,7 @@ export class RunnerDaemon implements RequestObserver {
     return {
       access: this.access(),
       paused: this.pauseState(),
+      privateNetwork: Boolean(c?.networkLauncher || c?.networkMark),
       limits: {
         maxConcurrentTasks: c?.maxConcurrentTasks ?? DEFAULT_LIMITS.maxConcurrentTasks,
         taskMaxSeconds: c?.taskMaxSeconds ?? DEFAULT_LIMITS.taskMaxSeconds,
@@ -821,6 +834,10 @@ export class RunnerDaemon implements RequestObserver {
       secret: (agent, name) => secretValue(secretsDir, agent, name),
       onChange: () => queueMicrotask(() => this.browsersChanged()),
       desktops: this.desktops,
+      startPageData: (agent) => ({
+        locale: this.agents.find((a) => a.id === agent.id)?.locale,
+        egress: this.egress.current,
+      }),
     });
     // Browsers a previous run of this runner left open (a crash, a kill) close now.
     void browser.closeAll();
@@ -846,7 +863,15 @@ export class RunnerDaemon implements RequestObserver {
       const prepared = new Set<number>();
       const prepare = (user: AgentUser) => {
         if (prepared.has(user.uid)) return;
-        ensureBrowserBindPolicy(user, this.self.command);
+        ensureBrowserBindPolicy(
+          { ...user, networkLauncher: config.networkLauncher, networkMark: config.networkMark },
+          this.self.command,
+        );
+        const known = this.agents.find((agent) => agent.id === user.id);
+        prepareSystemStartPage(user, known ?? { name: user.user, handle: user.user }, {
+          locale: known?.locale,
+          egress: this.egress.current,
+        });
         prepared.add(user.uid);
       };
       // Desktops and terminals can start before a worker. The first use of a
@@ -856,7 +881,11 @@ export class RunnerDaemon implements RequestObserver {
         ((agent) => {
           const user = users.ensure(agent);
           prepare(user);
-          return user;
+          prepareSystemStartPage(user, agent, {
+            locale: this.agents.find((a) => a.id === agent.id)?.locale,
+            egress: this.egress.current,
+          });
+          return { ...user, networkLauncher: config.networkLauncher, networkMark: config.networkMark };
         });
       // Tests inject `workers`; a real guard (nft/ss as root) belongs only to the real supervisor. On the
       // server's own computer one guard covers every organization's agents (`host.ts`): a guard per runner
@@ -868,11 +897,13 @@ export class RunnerDaemon implements RequestObserver {
               home,
               agentUids: () => readAgentUsers(home).map((u) => u.uid),
               uidRange: config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE,
+              networkMark: config.networkMark,
               log,
             });
       supervisor = new Supervisor({
         home,
         requireRootBroker: !this.opts.workers,
+        network: { networkLauncher: config.networkLauncher, networkMark: config.networkMark },
         user: agentUser,
         start: launchWorker(this.self.command),
         ...(this.opts.workers || config.managedBy === "host"
@@ -960,6 +991,7 @@ export class RunnerDaemon implements RequestObserver {
       executors: () => this.helloExecutors(),
       load: () => this.load.summary(),
       browserTraffic: () => this.traffic.summary(),
+      egress: () => this.egress.current,
       context,
       // System mode: the agents' tasks and MCP calls are their workers'.
       ...(supervisor ? { tasks: supervisor, mcp: supervisor.mcp } : { mcp }),
@@ -978,6 +1010,10 @@ export class RunnerDaemon implements RequestObserver {
         this.setConnState(state);
       },
       onWelcome: () => {
+        this.egressGeneration++;
+        this.egress.reset();
+        this.updateStartPages();
+        void this.sampleEgress();
         this.flushDecisions();
         this.syncLogo(config);
         const accounts = this.accounts.snapshot();
@@ -1011,7 +1047,47 @@ export class RunnerDaemon implements RequestObserver {
     void connection.run().then((outcome) => this.sessionEnded(session, outcome));
   }
 
+  private async sampleEgress() {
+    const session = this.session;
+    if (!session || this.probingEgress || this.stopped) return;
+    const first = this.agents[0];
+    if (session.agentUser && !first) return;
+    this.probingEgress = true;
+    const before = this.egress.current;
+    const generation = this.egressGeneration;
+    try {
+      const user = session.agentUser && first ? session.agentUser(first) : undefined;
+      const result = await (this.opts.probeEgress ?? probeEgress)(session.config.server, user);
+      if (this.session === session && generation === this.egressGeneration) this.egress.record(result);
+    } catch {
+      if (this.session === session && generation === this.egressGeneration) this.egress.record(null);
+    } finally {
+      this.probingEgress = false;
+      if (this.session === session && generation === this.egressGeneration) {
+        const egress = this.egress.current;
+        if (egress && egress !== before) session.connection.send({ type: "pong", at: this.now(), egress });
+        this.updateStartPages();
+      } else if (this.session && !this.stopped) void this.sampleEgress();
+    }
+  }
+
+  private updateStartPages() {
+    if (!this.session) return;
+    try {
+      if (this.session.agentUser && !this.opts.workers) {
+        for (const user of readAgentUsers(this.opts.home)) {
+          const agent = this.agents.find((a) => a.id === user.id);
+          if (agent) prepareSystemStartPage(user, agent, { locale: agent.locale, egress: this.egress.current });
+        }
+      } else this.session.browser.updateStartPages();
+    } catch {
+      this.opts.log("Could not update the browser start page");
+    }
+  }
+
   private async closeSession(s: Session) {
+    this.egressGeneration++;
+    this.egress.reset();
     s.connection.stop();
     s.streams.closeAll();
     s.desktopUse.stopAll();
@@ -1166,7 +1242,15 @@ export class RunnerDaemon implements RequestObserver {
     // others take their agent's current name and handle.
     void this.desktops.serve(list).catch(() => undefined);
     if (JSON.stringify(list) === JSON.stringify(this.agents)) return;
+    const routeChanged = this.agents[0]?.id !== list[0]?.id;
     this.agents = list;
+    if (routeChanged) {
+      this.egressGeneration++;
+      this.egress.clear();
+      this.session?.connection.send({ type: "pong", at: this.now(), egress: { ip: null } });
+      void this.sampleEgress();
+    }
+    this.updateStartPages();
     try {
       writeAgents(this.opts.home, list);
     } catch {
