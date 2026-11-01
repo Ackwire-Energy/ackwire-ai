@@ -1,6 +1,5 @@
 import { useUpdateAgent } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { ROLE_MAX } from "@agenteschat/client/lib/new-agent";
 import { can } from "@agenteschat/client/lib/permissions";
 import { router, usePreventRemove } from "expo-router";
 import { useMemo, useRef, useState } from "react";
@@ -8,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import { Alert, StyleSheet, TextInput, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useOrg } from "@/providers/org";
-import { AgentAvatar, CharCount, EmptyState, fieldText, GroupedList, GroupedRow, Text, useToast } from "@/ui";
+import { AgentAvatar, EmptyState, fieldText, GroupedList, GroupedRow, Text, useToast } from "@/ui";
 import { useFailed } from "../routines/hooks";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { PushedHeader, successHaptic } from "../shared/parts";
@@ -16,6 +15,7 @@ import { TextArea } from "../shared/TextArea";
 import { openAgentDelete } from "./DeleteAgentScreen";
 import { type AgentDraft, agentChanges, editableFields, fullLook } from "./edit";
 import { LookPicker } from "./LookPicker";
+import { RoleInput } from "./RoleInput";
 
 /** Opens "Editar" for an agent. */
 export const openAgentEdit = (id: string) => router.push({ pathname: "/agent-edit", params: { id } });
@@ -139,28 +139,11 @@ export function AgentEditScreen({ id }: { id: string }) {
         )}
 
         {fields.has("role") ? (
-          <>
-            <View style={[styles.labelRow, styles.gapTop]}>
-              <Text variant="footnote" tone="faint">
-                {t("agent.roleLabel")}
-              </Text>
-              <CharCount
-                count={draft.role.length}
-                max={ROLE_MAX}
-                label={t("newAgent.roleCount", { count: draft.role.length, max: ROLE_MAX })}
-              />
-            </View>
-            {/* A longer one saved before the limit stays as it is until it's edited (it shows past the count). */}
-            <TextInput
-              value={draft.role}
-              onChangeText={(v) => set("role", v)}
-              maxLength={ROLE_MAX}
-              placeholder={t("mobile.agentEdit.rolePlaceholder")}
-              placeholderTextColor={c.faint}
-              accessibilityLabel={t("agent.roleLabel")}
-              style={field}
-            />
-          </>
+          <RoleInput
+            value={draft.role}
+            onChangeText={(v) => set("role", v)}
+            placeholder={t("mobile.agentEdit.rolePlaceholder")}
+          />
         ) : (
           <View style={styles.gapTop}>{readOnly(t("agent.roleLabel"), agent.role)}</View>
         )}
@@ -226,6 +209,5 @@ const styles = StyleSheet.create({
   hero: { alignItems: "center", gap: 6, paddingVertical: 12 },
   field: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, paddingVertical: 12 },
   gapTop: { marginTop: 10, gap: 8 },
-  labelRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
   section: { marginTop: 22, gap: 10 },
 });

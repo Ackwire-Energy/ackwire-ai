@@ -26,7 +26,6 @@ import {
   presetLevels,
   ROLE_DEFAULTS,
   ROLE_GROUPS,
-  ROLE_MAX,
   type RoleId,
 } from "@agenteschat/client/lib/new-agent";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -38,7 +37,7 @@ import { Alert, Pressable, ScrollView, type ScrollViewInstance, StyleSheet, Text
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import { AgentAvatar, Button, Card, CharCount, fieldText, Icon, Row, Text, Toggle, useToast } from "@/ui";
+import { AgentAvatar, Button, Card, fieldText, Icon, Row, Text, Toggle, useToast } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { suggestAgentName } from "../new/logic";
@@ -51,6 +50,7 @@ import { TextArea } from "../shared/TextArea";
 import { type FullLook, fullLook } from "./edit";
 import { LookPicker } from "./LookPicker";
 import { firstBlockedStep, NEW_AGENT_PHONE_STEPS, type PhoneStep, stepBlocked } from "./new-agent";
+import { RoleInput } from "./RoleInput";
 
 /**
  * "Criar agente" on the phone, the web's steps for a thumb: Papel (the presets, grouped), Quem é
@@ -379,27 +379,7 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
             desc={t("newAgent.roles.custom.desc")}
           />
           {role === "custom" ? (
-            <>
-              <View style={[styles.labelRow, styles.gapTop]}>
-                <Text variant="footnote" tone="faint">
-                  {t("agent.roleLabel")}
-                </Text>
-                <CharCount
-                  count={roleText.length}
-                  max={ROLE_MAX}
-                  label={t("newAgent.roleCount", { count: roleText.length, max: ROLE_MAX })}
-                />
-              </View>
-              <TextInput
-                value={roleText}
-                onChangeText={setRoleText}
-                maxLength={ROLE_MAX}
-                placeholder={t("agent.roleHelp")}
-                placeholderTextColor={c.faint}
-                accessibilityLabel={t("agent.roleLabel")}
-                style={input}
-              />
-            </>
+            <RoleInput value={roleText} onChangeText={setRoleText} placeholder={t("agent.roleHelp")} />
           ) : null}
         </View>
         {tried && !role ? <ErrorLine text={t("newAgent.errors.roleRequired")} /> : null}
@@ -798,7 +778,6 @@ const styles = StyleSheet.create({
   },
   affixInput: { flex: 1, paddingVertical: 12 },
   gapTop: { marginTop: 10 },
-  labelRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
   section: { marginTop: 22, gap: 10 },
   restore: { flexDirection: "row", alignItems: "center", gap: 10 },
   footer: {
