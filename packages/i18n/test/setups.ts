@@ -147,6 +147,10 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "onboarding.jev.",
     // The GIPHY key's card too, in Settings › GIFs and stickers (GET /api/app/gif-key is 404 elsewhere, ADR 0091).
     "settings.media.giphy.",
+    // The speech key's card, in Settings › Voice: only the owner of a self-hosted server gets it (ADR 0098).
+    "voice.settings.own",
+    "voice.settings.sealed",
+    "voice.settings.invalid",
     // Deleting: computers people connected, and the person who set up the server, only a self-hosted server has.
     "deleteOrg.goes.computers",
     "deleteAccount.computers_one",
