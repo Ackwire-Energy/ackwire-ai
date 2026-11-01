@@ -176,7 +176,7 @@ describe("an agent's @mention wakes the other agent unless the judge is sure it 
       .map((m) => m.body);
     expect(devSaid).toEqual(["@qa pode revisar o PR #12?"]);
   });
-  test("a judge that fails wakes every agent the message names, wherever the name is", async () => {
+  test("a judge that fails wakes only an agent the message opens with: no thanks loop while it is down", async () => {
     f = await setup({
       judge: (kind) => {
         if (kind === "mention_needs_nothing") throw new Error("judge timed out");
@@ -188,21 +188,28 @@ describe("an agent's @mention wakes the other agent unless the judge is sure it 
     await ask("@dev cuida da revisão com o QA");
     const [devRun] = await runsOf();
     if (!devRun) throw new Error("no run");
-    const verdict = await insertMessage(f.db, {
+    const thanks = await insertMessage(f.db, {
       orgId: f.org.id,
       channelId: f.general.id,
       author: { type: "agent", agentId: f.agent.id, runId: devRun.id, hop: 1 },
-      body: "#12, aprovar com ressalvas; #13, aprovar. @qa, o resumo é esse.",
+      body: "Valeu pela ajuda, @qa!",
+    });
+    const handOff = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "agent", agentId: f.agent.id, runId: devRun.id, hop: 1 },
+      body: "@qa, revisa o #13 por favor.",
     });
     await drainOutbox(f.db, f.handlers);
 
     const woken = (await runsOf()).filter((r) => r.agentId === qa.id).map((r) => r.triggerMessageId);
-    expect(woken).toEqual([verdict.id]);
-    const [decision] = (await f.db.select().from(schema.routingDecisions)).filter((d) => d.messageId === verdict.id);
-    expect(decision?.error).toBe("judge timed out");
-    expect(decision?.selectedAgentIds).toEqual([qa.id]);
+    expect(woken).toEqual([handOff.id]);
+    const decisions = await f.db.select().from(schema.routingDecisions);
+    const of = (id: string) => decisions.find((d) => d.messageId === id);
+    expect(of(thanks.id)?.error).toBe("judge timed out");
+    expect(of(thanks.id)?.selectedAgentIds).toEqual([]);
+    expect(of(handOff.id)?.selectedAgentIds).toEqual([qa.id]);
   });
-
   test("an agent another agent says it will ask does the work now instead of passing", async () => {
     f = await setup({
       toolSources: [createPassToolSource()],
