@@ -96,6 +96,12 @@ export const BROWSER_APT_PACKAGES = [
   "libxrandr2",
 ] as const;
 
+/**
+ * What system mode's isolation runs (`--system`): `nft` for the loopback guard, which won't start without it, and
+ * `ss` for the bind check.
+ */
+export const ISOLATION_APT_PACKAGES = ["nftables", "iproute2"] as const;
+
 /** System mode: the runner and its Bun (root's, readable by the agents' users), and the command on the PATH. */
 export const SYSTEM_RUNNER_DIR = "/opt/agentes-runner";
 export const SYSTEM_LAUNCHER = "/usr/local/bin/agentes-runner";
@@ -185,6 +191,7 @@ set -eu
 
 SERVER=${server}
 BUN_VERSION=${shQuote(RUNNER_BUN_VERSION)}
+ISOLATION_PACKAGES=${shQuote(ISOLATION_APT_PACKAGES.join(" "))}
 BROWSER_PACKAGES=${shQuote(BROWSER_APT_PACKAGES.join(" "))}
 DESKTOP_PACKAGES=${shQuote(DESKTOP_APT_PACKAGES.join(" "))}
 LOOK_PACKAGES=${shQuote(DESKTOP_LOOK_APT_PACKAGES.join(" "))}
@@ -337,10 +344,12 @@ apt_packages() {
   fi
 }
 
-# The libraries the agents' browser loads, and with --desktop the packages for their screens.
+# What keeps the agents apart, the libraries their browser loads, and with --desktop the packages for their screens.
 system_packages() {
-  PACKAGES=$BROWSER_PACKAGES WHAT="the agents' browser"
-  if [ "$DESKTOP" -eq 1 ]; then PACKAGES="$PACKAGES $DESKTOP_PACKAGES" WHAT="the agents' browser and screens"; fi
+  PACKAGES="$ISOLATION_PACKAGES $BROWSER_PACKAGES" WHAT="the agents' isolation and browser"
+  if [ "$DESKTOP" -eq 1 ]; then
+    PACKAGES="$PACKAGES $DESKTOP_PACKAGES" WHAT="the agents' isolation, browser and screens"
+  fi
   if command -v apt-get >/dev/null 2>&1; then
     t_run "Installing the packages for $WHAT" apt_packages || {
       t_tail "$T_LOG"
@@ -517,6 +526,10 @@ install_system() {
   [ "$(id -u)" -eq 0 ] ||
     die "--system installs the runner for the whole computer: run it as root (curl -fsSL $SERVER/api/machines/install.sh | sudo sh -s -- --system)"
   [ "$(uname -s)" = Linux ] || die "--system is for Linux"
+  # Each agent's slice keeps it off the others' browser ports with systemd's BPF programs: without them no agent's
+  # process starts.
+  systemctl --version 2>/dev/null | grep -q '+BPF_FRAMEWORK' ||
+    die "--system needs systemd built with BPF_FRAMEWORK (systemctl --version shows +BPF_FRAMEWORK), as on Debian 13; Ubuntu's isn't, so agents can't work on this computer as users of their own"
   SYSTEM_DIR=${shQuote(SYSTEM_RUNNER_DIR)}
   BROWSER_DIR=${shQuote(SYSTEM_BROWSER_DIR)}
   RUNNER_HOME=${shQuote(SYSTEM_RUNNER_HOME)}
