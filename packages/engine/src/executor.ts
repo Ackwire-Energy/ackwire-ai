@@ -602,13 +602,16 @@ async function executeRunInner(
         background: agentRuns.background,
         waitId: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`,
         code: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'code'`,
+        cut: sql<string | null>`${agentRuns.transcript}->'interruptedTurn'->>'cause'`,
       })
       .from(agentRuns)
       .where(eq(agentRuns.id, runId));
     if (row?.status !== "waiting_input" || row.waitId !== options.wait) return;
-    // A routine's slot that waited on usage for more than 12 hours doesn't run late: it is missed.
-    if (row.background && USAGE_WAIT_CODES.has(row.code ?? "")) {
-      if (await missStaleRoutineRun({ db, pubsub: deps.pubsub }, runId)) return;
+    // A routine's slot that waited on usage for more than 12 hours doesn't run late: it is missed. One the plan
+    // cut mid-work finishes what it started (only the next slot replaces it).
+    if (row.background && USAGE_WAIT_CODES.has(row.code ?? "") && row.cut !== "plan_limit") {
+      const late = row.code === "budget" ? "waiting_budget_late" : "waiting_plan_late";
+      if (await missStaleRoutineRun({ db, pubsub: deps.pubsub }, runId, new Date(), late)) return;
     }
     // Asking a busy computer again: nothing says it works until a turn starts (its first words do), or the
     // conversation would flash "thinking" every few seconds while it waits.

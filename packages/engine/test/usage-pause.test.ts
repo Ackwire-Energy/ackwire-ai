@@ -482,6 +482,51 @@ test("a routine waiting on the plan reads as running in Rotinas, and its people 
   expect(await heard()).toHaveLength(1);
 });
 
+test("a routine slot that waited on the plan past 12 hours is missed for the plan; one cut mid-work isn't", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  const machineId = await computerAgent(f);
+  await storeOwnUsage(f, machineId, {
+    windows: [{ kind: "five_hour", usedPercent: 100, resetsAt: later(3600_000).toISOString() }],
+    source: "turn",
+    at: new Date().toISOString(),
+  });
+  const { brain } = scripted(() => [{ type: "done", text: "ok" }]);
+  const handlers = handlersWith(f, brain);
+  const deps = { db: f.db, pubsub: f.pubsub, context: f.context };
+  const routine = await createRoutine(deps, f.owner.id, f.org.id, {
+    name: "Deploys",
+    agentId: f.agent.id,
+    prompt: "Check the deploys.",
+    target: { type: "channel", channelId: f.general.id },
+    trigger: { type: "schedule", phrase: "todo dia às 8h" },
+  });
+  await runRoutineNow(deps, f.owner.id, f.org.id, routine.id);
+  await drainOutbox(f.db, handlers);
+  const [run] = await runs(f);
+  expect(run?.status).toBe("waiting_input");
+  await f.db.update(schema.routineRuns).set({ at: new Date(Date.now() - 13 * 3600_000) });
+  const setCut = async (cut: boolean) => {
+    const [r] = await runs(f);
+    const t = r?.transcript as { interruptedTurn?: unknown };
+    if (cut) t.interruptedTurn = { prompt: "Check the deploys.", executed: [], drops: 0, cause: "plan_limit" };
+    else delete t.interruptedTurn;
+    await f.db
+      .update(schema.agentRuns)
+      .set({ transcript: t as never })
+      .where(eq(schema.agentRuns.id, r?.id ?? ""));
+  };
+  await setCut(true);
+  await drainOutbox(f.db, handlers, { now: later(3600_000 + RESUME_AFTER_MS + 1000) });
+  expect((await runs(f))[0]?.status).toBe("waiting_input");
+  const [open] = await f.db.select().from(schema.routineRuns);
+  expect(open?.status).not.toBe("missed");
+
+  await setCut(false);
+  await drainOutbox(f.db, handlers, { now: later(2 * 3600_000 + RESUME_AFTER_MS + 1000) });
+  const [missed] = await f.db.select().from(schema.routineRuns);
+  expect([missed?.status, missed?.code]).toEqual(["missed", "waiting_plan_late"]);
+});
+
 test("a refusal known only from its words holds until the first window resets, never the next window's", () => {
   const at = Date.parse("2026-11-02T10:00:00Z");
   const usage: PlanUsage = {

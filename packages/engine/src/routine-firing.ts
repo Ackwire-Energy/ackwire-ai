@@ -229,7 +229,13 @@ export async function makeWayForRun(deps: FiringDeps, routine: RoutineRow, run: 
  * The computer of a waiting routine run is back (§6.4): a run whose slot is more than 12 hours old
  * no longer runs; it is `missed` (`stale`) and its agent run ends quietly. Returns whether it was.
  */
-export async function missStaleRoutineRun(deps: FiringDeps, agentRunId: string, now = new Date()): Promise<boolean> {
+export async function missStaleRoutineRun(
+  deps: FiringDeps,
+  agentRunId: string,
+  now = new Date(),
+  /** Why it came too late: its computer (`stale`), or its plan or budget (`waiting_plan_late`, `waiting_budget_late`). */
+  code = "stale",
+): Promise<boolean> {
   const [row] = await deps.db
     .select({ rr: routineRuns, ar: agentRuns })
     .from(routineRuns)
@@ -242,7 +248,7 @@ export async function missStaleRoutineRun(deps: FiringDeps, agentRunId: string, 
       ),
     );
   if (!row?.ar.background || row.rr.at.getTime() > now.getTime() - ROUTINE_CATCH_UP_MS) return false;
-  await endWithRun(deps, row.rr, row.ar, { status: "missed", code: "stale" });
+  await endWithRun(deps, row.rr, row.ar, { status: "missed", code });
   return true;
 }
 

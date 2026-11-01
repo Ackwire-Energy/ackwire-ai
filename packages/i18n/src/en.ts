@@ -4156,6 +4156,8 @@ export const en: Translations = {
       waiting_budget: "Skipped: waiting for the budget to reset",
       superseded: "Gave way to the next run",
       stale: "Missed its time: the computer came back too late",
+      waiting_plan_late: "Missed its time: the plan reset too late",
+      waiting_budget_late: "Missed its time: the budget renewed too late",
       stopped: "Stopped by someone",
       stoppedBy: "Stopped by {{name}}",
       no_report: "Finished without telling the result",

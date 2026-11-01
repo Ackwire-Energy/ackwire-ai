@@ -45,6 +45,8 @@ export const ROUTINE_CODE_TEXT: Record<string, string> = {
   waiting_budget: "Replaced: it was waiting for the agent's budget to renew",
   superseded: "Replaced by the next run",
   stale: "Missed: the computer came back too late",
+  waiting_plan_late: "Missed: the plan reset too late",
+  waiting_budget_late: "Missed: the budget renewed too late",
   stopped: "Stopped",
   no_report: "Ended without a report",
   auto_report: "Reported its final answer",

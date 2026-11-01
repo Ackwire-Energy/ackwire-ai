@@ -4194,6 +4194,8 @@ export const ptBR = {
       waiting_budget: "Pulada: esperando o orçamento renovar",
       superseded: "Deu lugar à execução seguinte",
       stale: "Perdeu o horário: o computador voltou tarde demais",
+      waiting_plan_late: "Perdeu o horário: o plano renovou tarde demais",
+      waiting_budget_late: "Perdeu o horário: o orçamento renovou tarde demais",
       stopped: "Parada por alguém",
       stoppedBy: "Parada por {{name}}",
       no_report: "Terminou sem contar o resultado",

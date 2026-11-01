@@ -64,6 +64,8 @@ export const RUN_CODES = [
   "waiting_budget",
   "superseded",
   "stale",
+  "waiting_plan_late",
+  "waiting_budget_late",
   "stopped",
   "no_report",
   "handoff_blocked",
