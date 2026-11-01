@@ -1555,7 +1555,7 @@ export async function executeRoutineRun(deps: RoutineDeps, routineRunId: string)
  * their coded reason and one notification (creator gone or unable to post where it reports, agent
  * archived, out of the agent's audience, agent not in the conversation); one run at a time
  * (`makeWayForRun`); then the work: a forum topic, a reminder (no run), or the background run in the
- * routine's room, which reports through `hand_off` to the conversation it reports to (`deliverTo`).
+ * routine's room, which posts through `hand_off` in the conversation it reports to (`deliverTo`).
  */
 async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
   const { db } = deps;

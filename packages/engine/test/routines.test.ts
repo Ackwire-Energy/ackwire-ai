@@ -275,7 +275,7 @@ describe("routines", () => {
     const routinePrompt = systemText(f.provider.calls.at(-1)?.request.system ?? "");
     expect(routinePrompt).toContain("background work that nobody watches");
     expect(routinePrompt).toContain("check the real sources with your tools instead of restating status");
-    expect(routinePrompt).toContain("call hand_off once with the complete report");
+    expect(routinePrompt).toContain("call hand_off once with the message");
     expect(routinePrompt).not.toContain("NO_REPLY");
     expect(f.provider.calls.at(-1)?.request.tools?.map((t) => t.name)).toContain("hand_off");
     expect((await f.db.select().from(schema.messages)).filter((m) => m.authorAgentId === f.agent.id)).toEqual([]);
@@ -302,7 +302,7 @@ describe("routines", () => {
     });
   });
 
-  test("hand_off: a notice in the conversation, answered by a conversation run in the agent's voice; once per run", async () => {
+  test("hand_off with wake_me: a notice in the conversation, answered by a conversation run in the agent's voice; once per run", async () => {
     const isRoutine = (req: ModelRequest) => systemText(req.system).includes("# This is a routine run");
     const seen = (req: ModelRequest) => JSON.stringify(req.messages);
     f = await setup({
@@ -312,10 +312,15 @@ describe("routines", () => {
         if (!isRoutine(req)) return { chunks: ["Chegaram 3 avaliações novas; 2 negativas sobre o PDF."] };
         if (seen(req).includes("already handed off")) return { chunks: ["Checado: 3 avaliações novas, reportadas."] };
         if (seen(req).includes("Handed off"))
-          return { chunks: [], toolUses: [{ name: "hand_off", input: { message: "Outra versão." } }] };
+          return { chunks: [], toolUses: [{ name: "hand_off", input: { message: "Outra versão.", wake_me: true } }] };
         return {
           chunks: [],
-          toolUses: [{ name: "hand_off", input: { message: "3 avaliações novas: 2 negativas (PDF), 1 positiva." } }],
+          toolUses: [
+            {
+              name: "hand_off",
+              input: { message: "3 avaliações novas: 2 negativas (PDF), 1 positiva.", wake_me: true },
+            },
+          ],
         };
       },
     });
@@ -373,7 +378,7 @@ describe("routines", () => {
       .orderBy(schema.agentRunSteps.seq);
     const handOffs = steps.filter((s) => s.kind === "tool_result").map((s) => s.data);
     expect(handOffs).toMatchObject([{ isError: false }, { isError: true }]);
-    expect(String(handOffs[1]?.content)).toContain("You already handed off this run's report");
+    expect(String(handOffs[1]?.content)).toContain("You already handed off this run's message");
     // Reported, with its final text as the record. Its creator is in the DM: they see it there.
     expect(routineRun).toMatchObject({ status: "reported", summary: "Checado: 3 avaliações novas, reportadas." });
     expect(await f.db.select().from(schema.notifications)).toEqual([]);
@@ -433,7 +438,10 @@ describe("routines", () => {
       handOff: true,
       reply: (req) =>
         isRoutine(req) && !JSON.stringify(req.messages).includes("Handed off")
-          ? { chunks: [], toolUses: [{ name: "hand_off", input: { message: "2 pedidos travados no checkout." } }] }
+          ? {
+              chunks: [],
+              toolUses: [{ name: "hand_off", input: { message: "2 pedidos travados no checkout.", wake_me: true } }],
+            }
           : { chunks: ["ok"] },
     });
     const routine = await createRoutine(routineDeps(), f.owner.id, f.org.id, {
