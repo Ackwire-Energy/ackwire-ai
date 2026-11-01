@@ -24,7 +24,10 @@ export interface SearchResult {
   snippet: string;
 }
 
-/** A page read in the agent's own browser (`BrowserToolSource.readPage`); null when it may not or can't. */
+/**
+ * A page read in the agent's own browser (`BrowserToolSource.readPage`): null when the agent has no browser it may
+ * use, an empty text when the page didn't open.
+ */
 export type BrowserPageReader = (ctx: ToolContext, url: string) => Promise<{ text: string; url: string | null } | null>;
 
 export interface WebToolDeps {
@@ -131,7 +134,7 @@ export function createWebToolSource(deps: WebToolDeps = {}): ToolSource {
             return { page: page.text, url: page.url ?? engine };
           }
         }
-        throw new Error("every search engine showed a captcha or a block");
+        throw new Error("no search engine opened in the browser without a captcha or a block");
       },
     });
   }

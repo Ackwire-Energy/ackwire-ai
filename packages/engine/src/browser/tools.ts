@@ -1145,7 +1145,9 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
       { command: "open", args: [url], timeoutSeconds: OPEN_SECONDS },
       { command: "snapshot", args: [], timeoutSeconds: COMMAND_SECONDS },
     ]);
-    if (!opened?.ok || !look?.ok) return null;
+    // The agent has a browser, the page didn't open (a site off its list, a timeout): an empty page, so a search
+    // tries its next engine.
+    if (!opened?.ok || !look?.ok) return { text: "", url: null };
     return { text: dataText(look.data), url: urlOf(look.data) };
   }
 
