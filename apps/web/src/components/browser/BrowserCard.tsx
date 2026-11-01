@@ -85,6 +85,8 @@ import { SiteIcon, siteName } from "./SiteIcon";
 import "./browser.css";
 
 const FAIL_REASONS = ["code", "password", "blocked"] as const;
+/** The scroll hint goes this long after the wheel's last tick. */
+const SCROLL_HINT_IDLE_MS = 1200;
 const KEYS = ["Tab", "Enter", "Backspace", "Escape"] as const;
 /** The keycaps of the keys popover (symbols; the key names are their labels). */
 const KEYCAP: Record<(typeof KEYS)[number], string> = { Tab: "⇥", Enter: "↵", Backspace: "⌫", Escape: "esc" };
@@ -448,6 +450,14 @@ export function BrowserCard({
   // The wheel scrolls the conversation; a click into the page (in control) hands it to the page until Esc.
   const [capturing, setCapturing] = useState(false);
   const pageRef = useRef<HTMLDivElement>(null);
+  // The wheel is scrolling the page right now: only then the hint says how to give the wheel back.
+  const [scrolling, setScrolling] = useState(false);
+  const scrollIdle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stopScrolling = () => {
+    if (scrollIdle.current) clearTimeout(scrollIdle.current);
+    scrollIdle.current = null;
+    setScrolling(false);
+  };
 
   // The browser is closed (the server says so, or its stream ended), or a site the person typed is opening:
   // only a new frame ends either. Every retry's status clears the server's "closed" for a moment, so the
@@ -489,19 +499,20 @@ export function BrowserCard({
       if (document.fullscreenElement === el) document.exitFullscreen().catch(() => {});
     };
   }, [full]);
-  // Esc leaves full screen (after the page lets go of the wheel), before a dialog or the page hears it.
+  // Esc leaves full screen (a scroll's hint on screen goes first), before a dialog or the page hears it.
   useEffect(() => {
     if (!full) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.preventDefault();
       e.stopPropagation();
-      if (capturing) setCapturing(false);
-      else setFull(false);
+      const hinted = scrollIdle.current !== null;
+      setCapturing(false);
+      if (!hinted) setFull(false);
     };
     document.addEventListener("keydown", onKey, true);
     return () => document.removeEventListener("keydown", onKey, true);
-  }, [full, capturing]);
+  }, [full]);
 
   const send = (events: BrowserInputEvent[] | null) => {
     if (!inControl || !events?.length) return;
@@ -519,8 +530,6 @@ export function BrowserCard({
   // A mouse or a pen presses at once and drags while held, as on a computer; fingers go through
   // `createTouchInput` (a tap clicks, one moving finger drags, two scroll).
   const press = useRef<{ id: number; at: { x: number; y: number } } | null>(null);
-  // A mouse button held on the page: the scroll hint waits for its release, so a drag never reads as a scroll.
-  const [pressing, setPressing] = useState(false);
   const [fingers] = useState(() => createTouchInput((p, clamp) => toPageNow.current(p, clamp)));
   const landed = useRef({ x: 0, y: 0 });
   // A finger drags or scrolls: the hint says how to scroll.
@@ -552,7 +561,7 @@ export function BrowserCard({
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {}
     press.current = { id: e.pointerId, at };
-    setPressing(true);
+    stopScrolling();
     setCapturing(true);
     markAt(p);
     send(pressEvents(at, modifiersOf(e, remoteIsMac)));
@@ -565,7 +574,6 @@ export function BrowserCard({
     if (held && at && (e.buttons & 1) === 0) {
       // Its release went elsewhere (another window took it): this move is the release.
       press.current = null;
-      setPressing(false);
       send([releaseEvent(at)]);
       return;
     }
@@ -584,7 +592,6 @@ export function BrowserCard({
     const held = press.current;
     if (!held || held.id !== e.pointerId) return;
     press.current = null;
-    setPressing(false);
     const at = toPage(p, true) ?? held.at;
     const mods = modifiersOf(e, remoteIsMac);
     const moved = at.x !== held.at.x || at.y !== held.at.y;
@@ -600,7 +607,6 @@ export function BrowserCard({
     const held = press.current;
     if (!held || held.id !== e.pointerId) return;
     press.current = null;
-    setPressing(false);
     send([releaseEvent(held.at)]);
   };
 
@@ -613,7 +619,18 @@ export function BrowserCard({
     if (!capturing || !inControl || !imgRef.current || !live.frame) return;
     e.preventDefault();
     const at = toPage({ x: e.clientX, y: e.clientY });
-    if (at) send([wheelEvent(at, e.deltaX, e.deltaY)]);
+    if (!at) return;
+    send([wheelEvent(at, e.deltaX, e.deltaY)]);
+    setScrolling(true);
+    if (scrollIdle.current) clearTimeout(scrollIdle.current);
+    scrollIdle.current = setTimeout(stopScrolling, SCROLL_HINT_IDLE_MS);
+  };
+  useEffect(() => () => void (scrollIdle.current && clearTimeout(scrollIdle.current)), []);
+  // The mouse leaving the page gives the wheel back to the conversation.
+  const onPagePointerLeave = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "touch") return;
+    stopScrolling();
+    setCapturing(false);
   };
   // biome-ignore lint/correctness/useExhaustiveDependencies: the page element mounts with the first frame
   useEffect(() => {
@@ -624,13 +641,32 @@ export function BrowserCard({
     return () => el.removeEventListener("wheel", on);
   }, [Boolean(frame)]);
   useEffect(() => {
-    if (!capturing) return;
+    if (!capturing) {
+      if (scrollIdle.current) clearTimeout(scrollIdle.current);
+      scrollIdle.current = null;
+      setScrolling(false);
+      return;
+    }
     const out = (e: globalThis.PointerEvent) => {
       if (!pageRef.current?.contains(e.target as Node)) setCapturing(false);
     };
+    // Esc gives the wheel back wherever the focus is. It is the hint's own key only while the hint shows;
+    // otherwise it still reaches the page.
+    const esc = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== "Escape" || full) return;
+      if (scrollIdle.current) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      setCapturing(false);
+    };
     document.addEventListener("pointerdown", out, true);
-    return () => document.removeEventListener("pointerdown", out, true);
-  }, [capturing]);
+    document.addEventListener("keydown", esc, true);
+    return () => {
+      document.removeEventListener("pointerdown", out, true);
+      document.removeEventListener("keydown", esc, true);
+    };
+  }, [capturing, full]);
   useEffect(() => {
     if (inControl) return;
     setCapturing(false);
@@ -642,7 +678,6 @@ export function BrowserCard({
   useEffect(() => {
     if (pointing) return;
     press.current = null;
-    setPressing(false);
     fingers.cancel();
     setSliding(false);
   }, [pointing, fingers]);
@@ -652,11 +687,6 @@ export function BrowserCard({
 
   const onPageKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (!inControl) return;
-    if (capturing && e.key === "Escape") {
-      e.preventDefault();
-      setCapturing(false);
-      return;
-    }
     const events = keyboardEvents(e, remoteIsMac);
     if (!events) return;
     e.preventDefault();
@@ -1214,6 +1244,7 @@ export function BrowserCard({
               onPointerMove={onPagePointerMove}
               onPointerUp={onPagePointerUp}
               onPointerCancel={onPagePointerCancel}
+              onPointerLeave={onPagePointerLeave}
               onLostPointerCapture={onPagePointerCancel}
               onPaste={(e) => {
                 const pasted = e.clipboardData.getData("text");
@@ -1225,7 +1256,7 @@ export function BrowserCard({
             >
               <img ref={imgRef} src={src} alt={t("browser.live.page", g)} draggable={false} />
               {mark && <span key={mark.key} className="brw-mark" style={{ left: mark.x, top: mark.y }} />}
-              {(sliding || (capturing && !pressing)) && (
+              {(sliding || scrolling) && (
                 <span className="brw-ac__capture" role="status">
                   {sliding ? t("browser.inCard.touchHint") : t("browser.inCard.scrollHint")}
                 </span>
