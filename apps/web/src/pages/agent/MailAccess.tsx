@@ -1,8 +1,16 @@
 import type { AgentMailbox, MailAccount, MailPolicy } from "@agenteschat/client";
 import { ApiError, useAgentMail, useMailAccounts, useSetAgentMail } from "@agenteschat/client";
 import type { Level } from "@agenteschat/client/lib/access-levels";
+import { canTalk } from "@agenteschat/client/lib/audience";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
-import { choiceOf, defaultPolicy, MAIL_ACTIONS, normalizePolicy, toMailLevel } from "@agenteschat/client/lib/mail";
+import {
+  choiceOf,
+  defaultPolicy,
+  MAIL_ACTIONS,
+  mailAccessOf,
+  normalizePolicy,
+  toMailLevel,
+} from "@agenteschat/client/lib/mail";
 import { Alert, Button, Card, Chip, CountChip, Icon, Switch } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -11,6 +19,7 @@ import { LevelRow } from "@/components/AccessLevels";
 import { MailIcon, mailChoiceName } from "@/components/MailConnect";
 import { MailRulesPanel, rulesCount } from "@/components/MailRules";
 import { useOrg } from "@/components/org-context";
+import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { CardHead, useAgentEdit } from "./context";
 
@@ -20,10 +29,13 @@ import { CardHead, useAgentEdit } from "./context";
  * Ler e escrever), "Pode apagar emails" and the rules. Each mailbox saves on
  * its own ("Salvar"), outside the page's save bar. A mailbox still connecting
  * has no address and takes no access yet: its row says so and where to see it.
+ * Only who connected a mailbox gives access to it; on anyone else's the row is
+ * read-only, says who gives it, and admins and the agent's owner can remove it.
  */
 export function MailAccessCard() {
   const { t } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
   const { agent, can } = useAgentEdit();
   const accounts = useMailAccounts(org.id);
   const mail = useAgentMail(org.id, agent.id, (accounts.data?.length ?? 0) > 0);
@@ -41,6 +53,7 @@ export function MailAccessCard() {
       <ul className="level-list" aria-label={t("mail.agent.title")}>
         {list.map((account) => {
           const name = account.address || mailChoiceName(t, choiceOf(account));
+          const may = mailAccessOf(account, { userId: me.user.id, talks: canTalk(agent), managesAgent: can("levels") });
           return account.status === "pending" ? (
             <LevelRow
               key={account.id}
@@ -62,7 +75,11 @@ export function MailAccessCard() {
               name={name}
               saved={mail.data?.find((m) => m.accountId === account.id) ?? null}
               loading={mail.isLoading}
-              editable={can("levels")}
+              owner={
+                account.ownerUserId === me.user.id ? null : (dir.memberById.get(account.ownerUserId ?? "")?.name ?? "")
+              }
+              editable={may.gives}
+              removable={may.removes}
             />
           );
         })}
@@ -104,13 +121,18 @@ function MailboxRow({
   name,
   saved,
   loading,
+  owner,
   editable,
+  removable,
 }: {
   account: MailAccount;
   name: string;
   saved: AgentMailbox | null;
   loading: boolean;
+  /** Who connected it, when it isn't the viewer ("" = a name we don't know); null = the viewer's own. */
+  owner: string | null;
   editable: boolean;
+  removable: boolean;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -139,17 +161,21 @@ function MailboxRow({
       ? MAIL_ACTIONS.approval.map((a) => t(`mail.action.${a}.name`))
       : [];
   const reconnect = account.status === "needs_reconnect";
-  const save = () =>
+  const save = (next: Draft = draft) =>
     set.mutate(
       {
         agentId: agent.id,
         accountId: account.id,
-        input: { level: toMailLevel(draft.level), canDelete: draft.canDelete, policy: normalizePolicy(draft.policy) },
+        input: { level: toMailLevel(next.level), canDelete: next.canDelete, policy: normalizePolicy(next.policy) },
       },
       {
         onSuccess: () => {
           reset();
-          toast.show(t("mail.agent.saved", { name: agent.name }));
+          toast.show(
+            next.level === "none" && !editable
+              ? t("mail.agent.removed", { name: agent.name, address: name })
+              : t("mail.agent.saved", { name: agent.name }),
+          );
         },
         onError: (e) =>
           setError(
@@ -159,6 +185,12 @@ function MailboxRow({
       },
     );
   const count = rulesCount(draft.policy);
+  const ownerNote =
+    owner === null ? null : (
+      <span className="small muted">
+        {owner ? t("mail.agent.ownerOnly", { name: owner }) : t("mail.agent.ownerOnlyUnknown")}
+      </span>
+    );
   return (
     <LevelRow
       icon={<MailIcon choice={choiceOf(account)} />}
@@ -171,7 +203,7 @@ function MailboxRow({
         ) : undefined
       }
       description={draft.level === "none" ? t("access.noneText") : t(`mail.agent.levelText.${draft.level}`)}
-      extra={reconnect ? <SeeInConnectors text={t("mail.agent.needsReconnect")} /> : undefined}
+      extra={reconnect ? <SeeInConnectors text={t("mail.agent.needsReconnect")} /> : (ownerNote ?? undefined)}
       asks={asks}
       levels={["none", "read", "write"]}
       value={draft.level}
@@ -217,6 +249,18 @@ function MailboxRow({
                 </details>
               </>
             )}
+            {!editable && removable && saved && saved.level !== "none" && (
+              <div className="mail-agent__save">
+                <Button
+                  size="sm"
+                  disabled={set.isPending}
+                  loading={set.isPending}
+                  onClick={() => save({ ...draftOf(saved), level: "none", canDelete: false })}
+                >
+                  {t("mail.agent.remove")}
+                </Button>
+              </div>
+            )}
             {error && <Alert>{error}</Alert>}
             {dirty && editable && (
               <div className="mail-agent__save">
@@ -224,7 +268,13 @@ function MailboxRow({
                 <Button size="sm" onClick={reset}>
                   {t("common.cancel")}
                 </Button>
-                <Button size="sm" variant="primary" disabled={set.isPending} loading={set.isPending} onClick={save}>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  disabled={set.isPending}
+                  loading={set.isPending}
+                  onClick={() => save()}
+                >
                   {t("mail.agent.save")}
                 </Button>
               </div>

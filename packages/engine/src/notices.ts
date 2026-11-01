@@ -1,3 +1,4 @@
+import { type SQL, sql } from "@agenteschat/db";
 import { untrustedBlock } from "./untrusted";
 
 /**
@@ -25,6 +26,25 @@ export type NoticeKind =
   | "talker_reply"
   | "proposal_result"
   | "follow_up";
+
+/**
+ * Notices only for the agent they are for: another agent's note, the late result of a wait it stopped waiting on, what
+ * a person decided on its proposal (the card already says it). People never see them, nor hear of them (no unread
+ * count, no notification, no preview): what matters to them, the agent says in its reply. Mirrored by the apps'
+ * `AGENT_ONLY_NOTICES` (packages/client/src/lib/notices.ts).
+ */
+export const AGENT_ONLY_NOTICES: readonly NoticeKind[] = ["agent_note", "wait_result", "proposal_result"];
+
+/** Whether a message is a notice only its agent reads (`AGENT_ONLY_NOTICES`). */
+export const isAgentOnlyNotice = (meta: Record<string, unknown> | null | undefined) =>
+  AGENT_ONLY_NOTICES.includes((meta?.notice as { kind?: unknown } | undefined)?.kind as NoticeKind);
+
+/** The same, in SQL, on a message's `meta` (`sql\`m.meta\``). */
+export const agentOnlyNoticeSql = (meta: SQL): SQL =>
+  sql`coalesce(${meta}->'notice'->>'kind', '') in (${sql.join(
+    AGENT_ONLY_NOTICES.map((k) => sql`${k}`),
+    sql`, `,
+  )})`;
 
 export interface Notice {
   kind: NoticeKind;
@@ -123,6 +143,12 @@ export function noticeText(meta: Record<string, unknown> | null | undefined, cur
       const state = n.refs?.state === "canceled" ? "canceled" : n.refs?.state === "done" ? "came" : "still to come";
       return `[You set a follow-up for ${at} (${state})]: ${n.text}`;
     }
+    case "proposal_result":
+      return `[${from ?? "Your proposal"}]: ${n.text}${
+        current
+          ? "\nOnly you see this. Tell the people here in a line what it means for them (what the new agent does and when, what still waits on someone), then do what is left of what they asked."
+          : ""
+      }`;
     default:
       return `[${from ?? "Notice"}]: ${n.text}`;
   }

@@ -593,11 +593,39 @@ export interface AgentDraft {
   role: string;
   instructions: string;
   appearance: Required<AgentLookInput> | null;
-  /** Public channels it joins. */
+  /** Channels it joins: public ones, and private ones everyone who reads the card is in. */
   channelIds: string[];
   /** Its level on the workspace's connections (the connected apps' ids). */
   access: { connectionId: string; level: "read" | "write" }[];
+  /** Mailboxes of the person who asked: only a mailbox's owner gives an agent access to it. */
+  mail?: { accountId: string; address: string; level: "read" | "write"; ownerUserId: string }[];
+  /** A routine of its own, created with it. */
+  routine?: ProposedRoutine | null;
   ai: SuggestedAi;
+}
+
+/** The routine a proposal comes with, its schedule read when proposed (`rule`, else `cron`). */
+export interface ProposedRoutine {
+  name: string;
+  prompt: string;
+  /** As the agent wrote it. */
+  schedule: string;
+  rule: ApiRule | null;
+  cron: string;
+  timezone: string;
+  /** English (the agent's); the apps say `rule` in the reader's language. */
+  description: string;
+  report: RoutineReport;
+  access: RoutineAccess;
+  /** The channel it reports in, which the agent must be in first (null: the creator's DM; absent on older cards). */
+  reportsIn?: string | null;
+}
+
+/** What "Criar" on the card gave the agent of its draft (ids); the rest waits for who may give it. */
+export interface ProposalApplied {
+  channelIds: string[];
+  connectionIds: string[];
+  mailAccountIds: string[];
 }
 
 /** An agent's proposal of a new agent (`meta.actionCard` of its card, ADR 0081). A person creates it or says no. */
@@ -613,10 +641,17 @@ export interface AgentProposalCard {
   decidedAt: string | null;
   /** Past it, a pending one is expired. */
   expiresAt: string;
+  /** Created in one click: what it got. Absent when it was created from the review. */
+  applied?: ProposalApplied;
+  /** The routine made with it. */
+  routineId?: string | null;
 }
 
 /** What a person decided on a proposal: all that `agent.proposal.updated` carries of its card. */
-export type AgentProposalDecision = Pick<AgentProposalCard, "state" | "agentId" | "decidedByUserId" | "decidedAt">;
+export type AgentProposalDecision = Pick<
+  AgentProposalCard,
+  "state" | "agentId" | "decidedByUserId" | "decidedAt" | "applied" | "routineId"
+>;
 
 /** `GET …/agent-proposals/{messageId}`: the card, where it is and what the viewer may do. */
 export interface AgentProposal extends AgentProposalCard {
@@ -5031,6 +5066,8 @@ export interface MailAccount {
   aliases: string[];
   /** What new emails go out from; null = `address`. */
   defaultFrom: string | null;
+  /** Who connected it: the only person who gives agents access to it (absent on older servers). */
+  ownerUserId?: string | null;
   /** Agents with access, and how much. */
   agents: { agentId: string; level: MailLevel; canDelete: boolean }[];
 }

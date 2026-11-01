@@ -3,6 +3,7 @@ import { and, asc, type Database, type Executor, eq, gt, inArray, isNull, schema
 import { caches } from "./cache";
 import { cutText } from "./format";
 import type { ModelGateway } from "./gateway";
+import { isAgentOnlyNotice } from "./notices";
 import { requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { isRoutineRoomKey } from "./routine-brief";
@@ -30,7 +31,8 @@ registerDocumentBuilder("message", async (db, orgId, id) => {
     .select()
     .from(messages)
     .where(and(eq(messages.id, id), eq(messages.orgId, orgId)));
-  if (!m || m.deletedAt) return null;
+  // A notice only its agent reads is nobody's to find.
+  if (!m || m.deletedAt || isAgentOnlyNotice(m.meta)) return null;
   return { orgId, kind: "message", sourceId: m.id, channelIds: [m.channelId], body: m.body, createdAt: m.createdAt };
 });
 

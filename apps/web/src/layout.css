@@ -394,10 +394,47 @@ p {
   font-size: 13.5px;
   color: var(--ink-muted);
 }
+/*
+ * A chip beside the row's buttons ("Criado" by "Abrir perfil") shares their centre line, and in their type size their
+ * baseline too, whatever its height: a 22px chip sat 5px above a 32px button's middle.
+ */
 .waitcard__acts {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
+}
+.waitcard__acts > .ac-chip {
+  font-size: var(--control-fs-sm);
+}
+/* What a proposed agent gets, a line each, as quiet as the card's other lines. */
+.waitcard__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--ink2);
+}
+.waitcard__lines > li[data-given="true"] > .ac-icon {
+  color: var(--success);
+}
+.waitcard__needs {
+  color: var(--attention);
+}
+/* What each run of its routine is told, folded under its line. */
+.waitcard__prompt > summary {
+  cursor: pointer;
+}
+.waitcard__prompt > p {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+}
+/* Under the request card's well, on its 4px grid. */
+.rq > .waitcard__lines {
+  margin-top: 12px;
 }
 
 /* An agent waiting for its offline computer, in the sidebar: the clock and "esperando". */
@@ -7140,14 +7177,14 @@ html:not([data-pointer]) .machine-connect__toggle:focus-visible {
 .onb {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
-  min-height: 100dvh;
+  min-height: var(--onb-h, 100dvh);
   background: var(--pane);
   color: var(--ink);
 }
 .onb__rail {
   position: sticky;
   top: 0;
-  height: 100dvh;
+  height: var(--onb-h, 100dvh);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -7162,13 +7199,13 @@ html:not([data-pointer]) .machine-connect__toggle:focus-visible {
   padding: 0 6px;
 }
 /*
- * Under the steps, never behind them: 46% of the rail's height (100dvh) where the steps leave that much room, else the
- * room they leave (a short window), out to the rail's edges.
+ * Under the steps, never behind them: 46% of the rail's height (`--onb-h`: the window, or the dialog the flow opens
+ * in) where the steps leave that much room, else the room they leave (a short window), out to the rail's edges.
  */
 .onb__horizon {
   position: relative;
   flex: 1 1 0;
-  max-height: 46dvh;
+  max-height: calc(var(--onb-h, 100dvh) * 0.46);
   margin: auto -16px -24px;
   overflow: hidden;
   pointer-events: none;
@@ -7436,7 +7473,7 @@ html:not([data-pointer]) .onb__step:focus-visible {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 100dvh;
+  min-height: var(--onb-h, 100dvh);
   padding-top: 38px;
   box-sizing: border-box;
 }

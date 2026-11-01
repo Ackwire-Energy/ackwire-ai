@@ -860,28 +860,32 @@ describe("Criar agente: what gets created", () => {
     expect(createdWith(state)?.monthlyBudgetUsd).toBeNull();
   });
 
-  test("connected mailboxes are in 'Ferramentas e acesso', off by default; the chosen level is saved", async () => {
+  test("my connected mailboxes are in 'Ferramentas e acesso', off by default; the chosen level is saved", async () => {
     const state = seedState();
     const api = createFakeApi(state);
     const mail = fakeMailOf.get(api);
     if (!mail) throw new Error("no mail fake");
+    const box = (id: string, address: string, ownerUserId: string | null) => ({
+      id,
+      provider: "imap" as const,
+      via: "imap" as const,
+      address,
+      label: "Atendimento",
+      status: "active" as const,
+      lastError: null,
+      preset: "icloud",
+      createdAt: new Date().toISOString(),
+      offActions: [],
+      askActions: [],
+      aliases: [],
+      defaultFrom: null,
+      ownerUserId,
+      agents: [],
+    });
+    // João's mailbox is his to give: it isn't offered here.
     mail.accounts = [
-      {
-        id: "mail-1",
-        provider: "imap",
-        via: "imap",
-        address: "ola@acme.com.br",
-        label: "Atendimento",
-        status: "active",
-        lastError: null,
-        preset: "icloud",
-        createdAt: new Date().toISOString(),
-        offActions: [],
-        askActions: [],
-        aliases: [],
-        defaultFrom: null,
-        agents: [],
-      },
+      box("mail-1", "ola@acme.com.br", state.me?.user.id ?? null),
+      box("mail-2", "joao@acme.com.br", "u-joao"),
     ];
     await renderApp(`/org/${ORG_ID}/agents/new`, { api });
     await settle(8);
@@ -889,9 +893,10 @@ describe("Criar agente: what gets created", () => {
     await proceed(2);
     expect(title()).toBe("Ferramentas e acesso");
     const levels = within(screen().getByRole("list", { name: "Conectores e níveis" }));
-    const box = levels.getByRole("radiogroup", { name: "Nível em ola@acme.com.br" });
-    expect(within(box).getByRole("radio", { name: "Sem acesso" }).getAttribute("aria-checked")).toBe("true");
-    await click(within(box).getByRole("radio", { name: "Ler" }));
+    expect(levels.queryByRole("radiogroup", { name: "Nível em joao@acme.com.br" })).toBeNull();
+    const mine = levels.getByRole("radiogroup", { name: "Nível em ola@acme.com.br" });
+    expect(within(mine).getByRole("radio", { name: "Sem acesso" }).getAttribute("aria-checked")).toBe("true");
+    await click(within(mine).getByRole("radio", { name: "Ler" }));
     await proceed(3);
     await click(screen().getByRole("button", { name: "Criar Iris" }));
     await settle(8);

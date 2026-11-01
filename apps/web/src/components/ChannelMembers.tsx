@@ -265,7 +265,8 @@ function AgentRow({ agent, channelId, autoReply }: { agent: Agent; channelId: st
         {line ? (
           <StatusLine emoji={line.emoji} text={line.text} className="members-pop__meta" />
         ) : (
-          <span className="members-pop__meta">
+          // Cut to the popover's width: whole on hover.
+          <span className="members-pop__meta" title={agent.role ? `${doing} · ${agent.role}` : undefined}>
             {doing}
             {agent.role ? ` · ${agent.role}` : ""}
           </span>

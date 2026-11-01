@@ -16,6 +16,7 @@ import { TextArea } from "../shared/TextArea";
 import { openAgentDelete } from "./DeleteAgentScreen";
 import { type AgentDraft, agentChanges, editableFields, fullLook } from "./edit";
 import { LookPicker } from "./LookPicker";
+import { RoleInput } from "./RoleInput";
 
 /** Opens "Editar" for an agent. */
 export const openAgentEdit = (id: string) => router.push({ pathname: "/agent-edit", params: { id } });
@@ -147,20 +148,7 @@ export function AgentEditScreen({ id }: { id: string }) {
         )}
 
         {fields.has("role") ? (
-          <>
-            <Text variant="footnote" tone="faint" style={styles.gapTop}>
-              {t("agent.roleLabel")}
-            </Text>
-            <TextInput
-              value={draft.role}
-              onChangeText={(v) => set("role", v)}
-              maxLength={60}
-              placeholder={t("mobile.agentEdit.rolePlaceholder")}
-              placeholderTextColor={c.faint}
-              accessibilityLabel={t("agent.roleLabel")}
-              style={field}
-            />
-          </>
+          <RoleInput value={draft.role} onChangeText={(v) => set("role", v)} placeholder={t("agent.roleHelp")} />
         ) : (
           <View style={styles.gapTop}>{readOnly(t("agent.roleLabel"), agent.role)}</View>
         )}

@@ -1294,6 +1294,21 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
     expect((await agentRow(ada.id))?.role).toBe("Designer");
   });
 
+  test("a new role of 40 characters goes on the card whole", async () => {
+    f = await setup();
+    const ada = await teammate("ada");
+    const { proposals, skipped } = await proposeFor({
+      target: "agent_instructions",
+      agentIds: [],
+      change: "",
+      roles: [{ agentId: ada.id, role: "Assistente de e-mails, agenda e reuniões" }],
+    });
+    expect(skipped).toEqual([]);
+    expect(proposals.map((p) => [p.target, p.agentId, p.proposedText])).toEqual([
+      ["agent_role", ada.id, "Assistente de e-mails, agenda e reuniões"],
+    ]);
+  });
+
   test("apps on or off: the owner only takes them away, as on the Access tab; applied as the person; never the proposer's own", async () => {
     f = await setup();
     const bia = await addMember(f.db, f.org.id, "member", "bia");

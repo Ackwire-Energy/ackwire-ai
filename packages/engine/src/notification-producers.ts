@@ -5,6 +5,7 @@ import { threadFollowChoices } from "./follows";
 import { type TaskEnd, taskEndText } from "./machine-task-text";
 import { isMediaAfterReply } from "./media";
 import { previewMediaKind } from "./message-preview";
+import { isAgentOnlyNotice } from "./notices";
 import {
   type NotificationActor,
   type NotificationDeps,
@@ -133,6 +134,8 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   if (isMediaAfterReply(meta)) return;
   // An agent's follow-up line, and the notice that wakes it: the reply it brings notifies instead.
   if ((meta.notice as { kind?: unknown } | undefined)?.kind === "follow_up") return;
+  // Only for its agent: people never see it.
+  if (isAgentOnlyNotice(meta)) return;
   const [channel] = await db
     .select({ kind: channels.kind, name: channels.name, visibility: channels.visibility })
     .from(channels)

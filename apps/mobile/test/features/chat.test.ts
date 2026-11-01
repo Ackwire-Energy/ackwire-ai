@@ -87,6 +87,20 @@ describe("timeline", () => {
     const rows = buildRows([message({ id: "1" }), message({ id: "2", threadId: "t" })], (m) => m.threadId === "t");
     expect(rows.filter((r) => r.kind === "message")).toHaveLength(1);
   });
+
+  test("a notice only its agent reads (a proposal's result, a note, a wait's result) leaves no row", () => {
+    const agent = { type: "agent" as const, id: "dev" };
+    const notice = (id: string, kind: string) =>
+      message({ id, author: agent, meta: { notice: { kind, text: "ana created it: @caio (Caio)." } } });
+    const rows = buildRows([
+      message({ id: "1" }),
+      notice("2", "proposal_result"),
+      notice("3", "agent_note"),
+      notice("4", "wait_result"),
+      notice("5", "routine_handoff"),
+    ]);
+    expect(rows.flatMap((r) => (r.kind === "message" ? [r.message.id] : []))).toEqual(["1", "5"]);
+  });
 });
 
 describe("what a message carries", () => {
@@ -1043,7 +1057,7 @@ describe("automatic lines (notices) and fast replies", () => {
     const ada = { type: "agent" as const, id: "ada" };
     const rows = buildRows([
       message({ id: "a", author: ada, createdAt: at(10) }),
-      message({ id: "n", author: ada, meta: { notice: { kind: "agent_note", text: "x" } }, createdAt: at(9) }),
+      message({ id: "n", author: ada, meta: { notice: { kind: "routine_handoff", text: "x" } }, createdAt: at(9) }),
       message({ id: "b", author: ada, createdAt: at(8) }),
       message({ id: "t", author: ada, meta: { talker: { runId: "r1" } }, createdAt: at(7) }),
       message({ id: "c", author: ada, createdAt: at(6) }),

@@ -19,7 +19,7 @@ import {
   useSkills,
 } from "@agenteschat/client";
 import { LEVELS, type Level, saveLevels } from "@agenteschat/client/lib/access-levels";
-import { draftLevels } from "@agenteschat/client/lib/action-cards";
+import { draftLevels, draftMailLevels } from "@agenteschat/client/lib/action-cards";
 import {
   autonomyName,
   autonomyWords,
@@ -30,6 +30,7 @@ import {
 } from "@agenteschat/client/lib/agent-setup";
 import { ownSignInReady } from "@agenteschat/client/lib/ai-accounts";
 import { type ConnectedItem, itemName } from "@agenteschat/client/lib/connected";
+import { errorText as failureText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { choiceOf, defaultPolicy, MAIL_ACTIONS, toMailLevel } from "@agenteschat/client/lib/mail";
@@ -112,6 +113,7 @@ import {
   readBudget,
   stepErrors,
 } from "@/lib/new-agent";
+import { proposedRoutineWhen } from "@/lib/recurrence";
 import { useToast } from "@/lib/toast";
 import "./new-agent.css";
 
@@ -160,9 +162,10 @@ interface Created {
 
 /**
  * "Criar agente": the steps on a rail, a live preview of the agent on the right. With `proposalId` (an agent's
- * proposal card, ADR 0081) it opens filled in with the draft, on its last step, while the proposal is open.
+ * proposal card, ADR 0081) it opens filled in with the draft, on its last step, while the proposal is open. With
+ * `onClose` it is the card's review, in a dialog over the conversation: creating, saying no or leaving closes it.
  */
-export function NewAgentPage({ proposalId = null }: { proposalId?: string | null }) {
+export function NewAgentPage({ proposalId = null, onClose }: { proposalId?: string | null; onClose?: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const proposal = useAgentProposal(org.id, proposalId);
@@ -187,17 +190,24 @@ export function NewAgentPage({ proposalId = null }: { proposalId?: string | null
             <EmptyState
               icon="agent"
               actions={
-                <Button asChild>
-                  {proposal.data ? (
-                    <Link to="/org/$orgId/c/$channelId" params={{ orgId: org.id, channelId: proposal.data.channelId }}>
-                      {t("newAgent.backToChat")}
-                    </Link>
-                  ) : (
-                    <Link to="/org/$orgId" params={{ orgId: org.id }}>
-                      {t("newAgent.backToChat")}
-                    </Link>
-                  )}
-                </Button>
+                onClose ? (
+                  <Button onClick={onClose}>{t("newAgent.backToChat")}</Button>
+                ) : (
+                  <Button asChild>
+                    {proposal.data ? (
+                      <Link
+                        to="/org/$orgId/c/$channelId"
+                        params={{ orgId: org.id, channelId: proposal.data.channelId }}
+                      >
+                        {t("newAgent.backToChat")}
+                      </Link>
+                    ) : (
+                      <Link to="/org/$orgId" params={{ orgId: org.id }}>
+                        {t("newAgent.backToChat")}
+                      </Link>
+                    )}
+                  </Button>
+                )
               }
             >
               {proposal.error instanceof ApiError && proposal.error.status === 403
@@ -209,10 +219,10 @@ export function NewAgentPage({ proposalId = null }: { proposalId?: string | null
       </main>
     );
   }
-  return from ? <NewAgentFlow key={from.messageId} from={from} /> : <NewAgentFlow />;
+  return from ? <NewAgentFlow key={from.messageId} from={from} onClose={onClose} /> : <NewAgentFlow />;
 }
 
-function NewAgentFlow({ from }: { from?: AgentProposal }) {
+function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () => void }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const { org, me } = useOrg();
@@ -237,7 +247,11 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
   const connectedList = useMemo(() => [...connected.values()], [connected]);
   const mail = useMailAccounts(org.id);
   // Mailboxes (ADR 0038) start without access: email is always granted on purpose.
-  const mailboxes = useMemo(() => (mail.data ?? []).filter((a) => a.status === "active"), [mail.data]);
+  // Only my own: only who connected a mailbox gives an agent access to it (ADR 0038).
+  const mailboxes = useMemo(
+    () => (mail.data ?? []).filter((a) => a.status === "active" && a.ownerUserId === me.user.id),
+    [mail.data, me.user.id],
+  );
   const navigate = useNavigate();
   const mood = useDraftMood();
   const root = useRef<HTMLDivElement>(null);
@@ -268,7 +282,10 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
   );
   const [instructions, setInstructions] = useState(draft?.instructions ?? "");
   const [levels, setLevels] = useState<Record<string, Level>>(draft ? draftLevels(draft) : {});
-  const [mailLevels, setMailLevels] = useState<Record<string, Level>>({});
+  // A proposal's own mailboxes of mine come at its level: only a mailbox's owner gives an agent access to it.
+  const [mailLevels, setMailLevels] = useState<Record<string, Level>>(draft ? draftMailLevels(draft, me.user.id) : {});
+  // The routine a proposal came with: made once the agent is where it reports.
+  const [withRoutine, setWithRoutine] = useState(Boolean(draft?.routine));
   const [skillIds, setSkillIds] = useState<Set<string> | null>(null);
   const [channelIds, setChannelIds] = useState<Set<string>>(new Set(draft?.channelIds));
   const [owner, setOwner] = useState(me.user.id);
@@ -554,6 +571,14 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
     });
     mood.react("happy", 2200);
     scrollTop();
+    // The routine it came with, now that the agent is where it reports; the card says when it is made.
+    if (from?.params.draft.routine && withRoutine) {
+      void api.agents
+        .proposalRoutine(org.id, from.messageId)
+        .catch((error) => toast.show(t("newAgent.routineNotMade", { reason: failureText(t, error) }), "error"));
+    }
+    // Reviewed over the conversation: it closes on it, as it was.
+    onClose?.();
     if (plan && signIn) connect?.open({ agentId: agent.id, plan: planOfKind(plan.kind) });
     if (connectAfter) connect?.open({ agentId: agent.id, agentIds: [agent.id] });
   };
@@ -603,8 +628,8 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
   };
 
   // Keyboard: Enter goes on (⌘/Ctrl+Enter inside the instructions), Esc goes back (or leaves a field).
-  const keyboard = useRef({ next, back });
-  keyboard.current = { next, back };
+  const keyboard = useRef({ next, back, dialog: Boolean(onClose) });
+  keyboard.current = { next, back, dialog: Boolean(onClose) };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.isComposing) return;
@@ -621,6 +646,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
         e.preventDefault();
         keyboard.current.next();
       } else if (e.key === "Escape") {
+        if (keyboard.current.dialog) return;
         if (tag === "INPUT" || tag === "TEXTAREA") {
           target?.blur();
           return;
@@ -1367,6 +1393,26 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
               <span>{ownerMember?.name ?? t("newAgent.noOwnerAdmins")}</span>,
             )}
             {row("where", "message", t("audience.section"), <span>{audienceText()}</span>)}
+            {draft?.routine && (
+              <div className="newag__rv">
+                <span className="newag__rv-k">
+                  <Icon name="routines" size={16} />
+                  {t("newAgent.routine")}
+                </span>
+                <div className="newag__rv-v">
+                  <span>
+                    {draft.routine.name}{" "}
+                    <span className="muted">· {proposedRoutineWhen(t, locale, draft.routine)}</span>
+                  </span>
+                  <span className="newag__quote">{draft.routine.prompt}</span>
+                </div>
+                <Switch
+                  checked={withRoutine}
+                  onCheckedChange={setWithRoutine}
+                  aria-label={t("newAgent.routineKeep", { name: draft.routine.name })}
+                />
+              </div>
+            )}
             {row(
               "model",
               "bolt",
@@ -1445,7 +1491,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
 
   return (
     <div className="onb newag" ref={root}>
-      <NewAgentRail index={index} reached={reached} total={total} onGo={goTo} done={false} />
+      <NewAgentRail index={index} reached={reached} total={total} onGo={goTo} done={false} onLeave={onClose} />
       <div className="newag__work">
         <main className="newag__main">
           <div className="newag__content" key={step}>
@@ -1466,6 +1512,10 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
               <Button variant="ghost" size="lg" icon="chevronLeft" onClick={back}>
                 {t("common.back")}
               </Button>
+            ) : onClose ? (
+              <Button variant="ghost" size="lg" onClick={onClose}>
+                {t("common.cancel")}
+              </Button>
             ) : (
               <Button asChild variant="ghost" size="lg">
                 <Link to="/org/$orgId" params={{ orgId: org.id }}>
@@ -1481,10 +1531,12 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
                 onClick={() =>
                   deny.mutate(from.messageId, {
                     onSuccess: () =>
-                      void navigate({
-                        to: "/org/$orgId/c/$channelId",
-                        params: { orgId: org.id, channelId: from.channelId },
-                      }),
+                      onClose
+                        ? onClose()
+                        : void navigate({
+                            to: "/org/$orgId/c/$channelId",
+                            params: { orgId: org.id, channelId: from.channelId },
+                          }),
                   })
                 }
               >
@@ -1625,12 +1677,15 @@ function NewAgentRail({
   total,
   onGo,
   done,
+  onLeave,
 }: {
   index: number;
   reached: number;
   total: number;
   onGo: (i: number) => void;
   done: boolean;
+  /** Over the conversation: × closes the review there. */
+  onLeave?: () => void;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -1640,11 +1695,15 @@ function NewAgentRail({
         <span className="onb__brand">
           <Logo size={22} />
         </span>
-        <Button asChild variant="ghost" size="sm" iconOnly aria-label={t("newAgent.leave")}>
-          <Link to="/org/$orgId" params={{ orgId: org.id }} title={t("newAgent.leave")}>
-            <Icon name="close" />
-          </Link>
-        </Button>
+        {onLeave ? (
+          <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t("newAgent.leave")} onClick={onLeave} />
+        ) : (
+          <Button asChild variant="ghost" size="sm" iconOnly aria-label={t("newAgent.leave")}>
+            <Link to="/org/$orgId" params={{ orgId: org.id }} title={t("newAgent.leave")}>
+              <Icon name="close" />
+            </Link>
+          </Button>
+        )}
       </div>
       <div className="newag__rail-title">
         <b>{t("newAgent.title")}</b>

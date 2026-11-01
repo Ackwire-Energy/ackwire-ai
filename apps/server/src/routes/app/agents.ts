@@ -15,6 +15,8 @@ import {
   createAgentFromProposal,
   createAgentGroup,
   createCredential,
+  createProposedAgent,
+  createProposedRoutine,
   deleteAgent,
   deleteAgentGroup,
   deleteCredential,
@@ -162,6 +164,38 @@ const AgentProposal = z
         appearance: AgentAppearance.nullable(),
         channelIds: z.array(z.uuid()),
         access: z.array(z.object({ connectionId: z.uuid(), level: z.enum(["read", "write"]) })),
+        mail: z
+          .array(
+            z.object({
+              accountId: z.uuid(),
+              address: z.string(),
+              level: z.enum(["read", "write"]),
+              ownerUserId: z.string(),
+            }),
+          )
+          .optional()
+          .openapi({ description: "Mailboxes of the person who asked: only a mailbox's owner gives an agent access." }),
+        routine: z
+          .object({
+            name: z.string(),
+            prompt: z.string(),
+            schedule: z.string(),
+            rule: z.record(z.string(), z.unknown()).nullable(),
+            cron: z.string(),
+            timezone: z.string(),
+            description: z.string(),
+            report: z.enum(["always", "when_new"]),
+            access: z.enum(["read", "act"]),
+            reportsIn: z.uuid().nullable().optional().openapi({
+              description: "The channel it reports in, which the agent must be in first (null: the creator's DM).",
+            }),
+          })
+          .nullable()
+          .optional()
+          .openapi({
+            description:
+              "A routine of its own, created with it (its schedule read when proposed: `rule`, else `cron`). It reports where the card is (a DM: the creator's DM with it).",
+          }),
         ai: z.discriminatedUnion("kind", [
           z.object({
             kind: z.literal("account"),
@@ -181,6 +215,13 @@ const AgentProposal = z
     decidedByUserId: z.string().nullable(),
     decidedAt: z.string().nullable(),
     expiresAt: z.string(),
+    applied: z
+      .object({ channelIds: z.array(z.uuid()), connectionIds: z.array(z.uuid()), mailAccountIds: z.array(z.uuid()) })
+      .optional()
+      .openapi({
+        description: "Created in one click: the lines of its draft it got (the rest waits for who may give it).",
+      }),
+    routineId: z.string().nullable().optional().openapi({ description: "The routine made with it." }),
     expired: z.boolean(),
     canDecide: z.boolean(),
   })
@@ -594,6 +635,68 @@ export function agentRoutes(deps: AppDeps) {
       const { orgId, messageId } = c.req.valid("param");
       const gateway = deps.extras?.context?.gateway;
       return c.json(await getAgentProposal({ db, gateway }, c.get("user").id, orgId, messageId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/agent-proposals/{messageId}/create",
+      tags,
+      security,
+      summary: "Create a proposed agent as it is, in one click (who may create agents)",
+      description:
+        "The agent from the draft, owned by whoever creates it, with each line they may give it: its AI (an account of theirs), its channels, its access to the connected apps (an admin's), the mailboxes (only their owner's) and its routine. The card (`applied`, `routineId`) says what it got; the agent that proposed it is told what waits for whom.",
+      request: { params: ProposalParams },
+      responses: {
+        201: json(
+          z.object({
+            agent: Agent,
+            proposal: AgentProposal,
+            ai: z.enum(["account", "model", "none"]).openapi({
+              description: "What it thinks with now (the clicker's account, the workspace's model or nothing yet).",
+            }),
+          }),
+          "Created",
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, messageId } = c.req.valid("param");
+      const userId = c.get("user").id;
+      const gateway = deps.extras?.context?.gateway;
+      const made = await createProposedAgent({ db, pubsub: adapters.pubsub, gateway }, userId, orgId, messageId);
+      if (made.agent.machineId) await publishMachineAgentsChanged(adapters.pubsub, orgId);
+      return c.json(
+        {
+          agent: toAgent(made.agent, userId, await canViewCost(db, userId, orgId)),
+          proposal: made.proposal,
+          ai: made.ai,
+        },
+        201,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/agent-proposals/{messageId}/routine",
+      tags,
+      security,
+      summary: "Create the routine a proposal came with, for the agent created from it in the review",
+      description:
+        "After the review put the agent where the routine reports. Once (409 `agent_proposal.routine_made`); the routine's own rules apply (the agent's owner or an admin).",
+      request: { params: ProposalParams },
+      responses: { 200: json(AgentProposal), ...errors },
+    }),
+    async (c) => {
+      const { orgId, messageId } = c.req.valid("param");
+      return c.json(
+        await createProposedRoutine({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, messageId),
+        200,
+      );
     },
   );
 

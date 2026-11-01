@@ -19,8 +19,11 @@ const KNOWN = {
   "agent_proposal.decided": "errors.agentProposal.decided",
   "approval.always_unavailable": "errors.approval.alwaysUnavailable",
   "agent_proposal.expired": "errors.agentProposal.expired",
+  "agent_proposal.routine_made": "errors.agentProposal.routineMade",
+  "agent_proposal.no_routine": "errors.agentProposal.noRoutine",
   "mail.account_not_found": "errors.mail.accountNotFound",
   "mail.from_not_mailbox": "errors.mail.fromNotMailbox",
+  "mail.owner_only": "errors.mail.ownerOnly",
   send_without_recipients: "mail.agent.saveError.send_without_recipients",
   "artifact.file_too_large": "errors.artifact.fileTooLarge",
   "artifact.file_required": "errors.artifact.fileRequired",
@@ -305,6 +308,9 @@ export function knownErrorText(t: TFunction, error: unknown, locale = "en"): str
   if (restriction) return restriction;
   const limit = limitRefusalText(t, locale, error.code, error.params);
   if (limit) return limit;
+  // The person who connected the mailbox is gone or unnamed: no blank name in the sentence.
+  if (error.code === "mail.owner_only" && !error.params?.ownerName)
+    return t("errors.mail.ownerOnlyUnknown", error.params);
   const key = KNOWN[error.code as keyof typeof KNOWN];
   if (key) return t(key, { max: MAX_UPLOAD_MB, ...error.params });
   return error.status === 429 || error.code === "rate_limited" ? t("common.tooMany") : null;

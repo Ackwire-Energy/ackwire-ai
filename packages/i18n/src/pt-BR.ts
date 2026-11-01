@@ -1623,6 +1623,14 @@ export const ptBR = {
       aiAccount: "Pensa com {{account}}",
       aiModel: "Pensa pela API",
       aiNone: "Sem IA ainda. Conecte uma depois de criar",
+      reviewTitle: "Revisar {{name}}",
+      lines: "O que {{name}} recebe",
+      aChannel: "um canal",
+      anApp: "um app",
+      needsAdmin: "um admin libera",
+      needsPerson: "só {{name}} libera",
+      itsOwner: "quem conectou",
+      routineNotMade: "não criada",
     },
   },
   dm: {
@@ -3409,6 +3417,9 @@ export const ptBR = {
     proposalNoAccess: "Só quem está na conversa vê esta proposta.",
     backToChat: "Voltar para a conversa",
     and: " e ",
+    routine: "Rotina",
+    routineKeep: "Criar a rotina {{name}}",
+    routineNotMade: "A rotina não foi criada: {{reason}}",
   },
   members: {
     /** Before inviting, while every agent with an AI answers only the person. */
@@ -7978,6 +7989,10 @@ export const ptBR = {
       warning: "Lê emails de qualquer pessoa e envia sem pedir: um email malicioso pode tentar enganar o agente.",
       pending: "Ainda não terminou de conectar.",
       needsReconnect: "Os agentes só usam depois de reconectar.",
+      ownerOnly: "Só {{name}} pode dar acesso: foi quem conectou esta caixa.",
+      ownerOnlyUnknown: "Só quem conectou esta caixa pode dar acesso.",
+      remove: "Remover acesso",
+      removed: "{{name}} não tem mais acesso a {{address}}.",
       saveError: {
         send_without_recipients: "Para enviar sem pedir aprovação, preencha “Só enviar para”.",
         unknown: "Não deu para salvar. Tente de novo.",
@@ -8080,6 +8095,8 @@ export const ptBR = {
     agentProposal: {
       decided: "Alguém já decidiu esta proposta.",
       expired: "Esta proposta expirou: ninguém decidiu em um dia.",
+      routineMade: "A rotina deste agente já foi criada.",
+      noRoutine: "Esta proposta não tem rotina para criar.",
     },
     approval: {
       alwaysUnavailable: "Este pedido não pode ser aprovado para sempre. Aprove só este.",
@@ -8087,6 +8104,8 @@ export const ptBR = {
     mail: {
       accountNotFound: "Esta caixa de email não está mais conectada. Conecte de novo em Conectores.",
       fromNotMailbox: "“Enviar como” precisa ser um endereço desta caixa. Escolha outro.",
+      ownerOnly: "Só {{ownerName}} pode dar a um agente acesso a {{address}}: foi quem conectou a caixa.",
+      ownerOnlyUnknown: "Só quem conectou {{address}} pode dar a um agente acesso a ela.",
     },
     join: {
       linkClosed: "Este link não funciona mais. Peça um novo a quem mandou.",

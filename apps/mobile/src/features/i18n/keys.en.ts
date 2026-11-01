@@ -658,7 +658,6 @@ export const featureKeysEn: FeatureTranslations = {
   agentEdit: {
     missing: "This agent no longer exists.",
     saved: "Changes saved",
-    rolePlaceholder: "E.g. Support",
     adminsOnly: "Only admins change the name, role and instructions.",
     discardTitle: "Discard your changes?",
     discardText: "What you changed hasn't been saved yet.",

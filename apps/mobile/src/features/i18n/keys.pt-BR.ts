@@ -664,7 +664,6 @@ export const featureKeysPtBR = {
   agentEdit: {
     missing: "Este agente não existe mais.",
     saved: "Alterações salvas",
-    rolePlaceholder: "Ex.: Atendimento",
     adminsOnly: "Só admins mudam o nome, o cargo e as instruções.",
     discardTitle: "Descartar as alterações?",
     discardText: "O que você mudou ainda não foi salvo.",

@@ -18,10 +18,11 @@ import {
   useSkills,
 } from "@agenteschat/client";
 import { LEVELS, type Level, nextLevel, saveLevels } from "@agenteschat/client/lib/access-levels";
-import { draftLevels, suggestedAiText } from "@agenteschat/client/lib/action-cards";
+import { draftLevels, draftMailLevels, suggestedAiText } from "@agenteschat/client/lib/action-cards";
 import { newAgentStart, newAgentStartText } from "@agenteschat/client/lib/agent-setup";
 import { connectedItems, itemName } from "@agenteschat/client/lib/connected";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { defaultPolicy, toMailLevel } from "@agenteschat/client/lib/mail";
 import {
   cleanHandle,
   freeHandle,
@@ -49,6 +50,7 @@ import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { suggestAgentName } from "../new/logic";
 import { useOpenDm } from "../new/useOpenDm";
 import { useFailed } from "../routines/hooks";
+import { proposedRoutineWhen } from "../routines/rule";
 import { chooseAction } from "../settings/parts";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { PushedHeader, successHaptic, tapHaptic, useSurface } from "../shared/parts";
@@ -56,6 +58,7 @@ import { TextArea } from "../shared/TextArea";
 import { type FullLook, fullLook } from "./edit";
 import { LookPicker } from "./LookPicker";
 import { firstBlockedStep, NEW_AGENT_PHONE_STEPS, type PhoneStep, stepBlocked } from "./new-agent";
+import { RoleInput } from "./RoleInput";
 
 /**
  * "Criar agente" on the phone, the web's steps for a thumb: Papel (the presets, grouped), Quem é
@@ -146,6 +149,11 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
   const [proposedLevels, setProposedLevels] = useState<Record<string, Level>>(() =>
     proposed ? draftLevels(proposed) : {},
   );
+  // My own mailboxes it asked for, at its level (only a mailbox's owner gives an agent access to it), and its routine.
+  const [mailLevels, setMailLevels] = useState<Record<string, Level>>(() =>
+    proposed && meId ? draftMailLevels(proposed, meId) : {},
+  );
+  const [withRoutine, setWithRoutine] = useState(Boolean(proposed?.routine));
   // Who thinks (ADR 0094): the workspace's last setup where it can think for an agent of mine, unless a proposal says.
   const keys = credentials.data ?? [];
   const usable = usableModels(modelChoices(models.data?.models ?? [], keys, platform.data ?? false));
@@ -174,6 +182,7 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
     [proposed, proposedLevels, role, items],
   );
   const granted = items.filter((i) => (levels[i.id] ?? "none") !== "none");
+  const myMail = (proposed?.mail ?? []).filter((m) => m.accountId in mailLevels);
   // Revisar lists what a proposal asked for at any level, so a change can be taken back.
   const listedApps = proposed ? items.filter((i) => i.id in proposedLevels) : granted;
   // Mine, and the public ones a proposal names that I'm not in: whoever may create agents adds one to any of them.
@@ -307,8 +316,24 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
       } else if (thinks.contextTokens !== null) {
         await api.agents.setBrain(orgId, agent.id, { brain: "model", contextTokens: thinks.contextTokens });
       }
+      // My own mailboxes at the level chosen here (every send asks), then its routine, now that it is where it reports.
+      for (const [accountId, level] of Object.entries(mailLevels)) {
+        if (level === "none") continue;
+        await api.mail.setAgent(orgId, agent.id, accountId, {
+          level: toMailLevel(level),
+          canDelete: false,
+          policy: defaultPolicy(),
+        });
+      }
+      if (from && proposed?.routine && withRoutine) await api.agents.proposalRoutine(orgId, from.messageId);
       successHaptic();
       toast({ title: t("mobile.agents.created", { name: agent.name }), agentId: agent.id });
+      if (from) {
+        // From its card: back to that conversation as it was, Connect over it when it has nothing to think with.
+        router.back();
+        if (ai?.kind === "none") openConnectAi({ agentId: agent.id });
+        return;
+      }
       // Nothing to think with yet: Connect opens for it over its conversation.
       void openDm({ agentId: agent.id }).then(() => {
         if (ai?.kind === "none") openConnectAi({ agentId: agent.id });
@@ -372,20 +397,7 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
             desc={t("newAgent.roles.custom.desc")}
           />
           {role === "custom" ? (
-            <>
-              <Text variant="footnote" tone="faint" style={styles.gapTop}>
-                {t("agent.roleLabel")}
-              </Text>
-              <TextInput
-                value={roleText}
-                onChangeText={setRoleText}
-                maxLength={200}
-                placeholder={t("agent.roleHelp")}
-                placeholderTextColor={c.faint}
-                accessibilityLabel={t("agent.roleLabel")}
-                style={input}
-              />
-            </>
+            <RoleInput value={roleText} onChangeText={setRoleText} placeholder={t("agent.roleHelp")} />
           ) : null}
         </View>
         {ROLE_GROUPS.map((group) => (
@@ -585,17 +597,58 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
                 );
               })}
             </Card>
-          ) : (
+          ) : myMail.length === 0 ? (
             <Text variant="footnote" tone="faint">
               {t("newAgent.preview.onlyTalks")}
             </Text>
-          )}
+          ) : null}
+          {myMail.length > 0 ? (
+            <Card>
+              {myMail.map((box) => {
+                const level = mailLevels[box.accountId] ?? "none";
+                return (
+                  <Row
+                    key={box.accountId}
+                    leading={<Icon name="mail" size={20} color={c.muted} />}
+                    title={box.address}
+                    meta={
+                      <Text variant="small" tone="muted">
+                        {t(`access.level.${level}`)}
+                      </Text>
+                    }
+                    onPress={() => {
+                      tapHaptic();
+                      setMailLevels((p) => ({ ...p, [box.accountId]: nextLevel({ levels: LEVELS }, level) }));
+                    }}
+                  />
+                );
+              })}
+            </Card>
+          ) : null}
           <Text variant="footnote" tone="faint">
-            {proposed && listedApps.length > 0
+            {proposed && listedApps.length + myMail.length > 0
               ? `${t("mobile.settings.access.how")} ${t("newAgent.approvalsNote")}`
               : t("newAgent.approvalsNote")}
           </Text>
         </View>
+
+        {proposed?.routine ? (
+          <View style={styles.section}>
+            <Text variant="title" accessibilityRole="header">
+              {t("newAgent.routine")}
+            </Text>
+            <Card>
+              <Toggle
+                label={`${proposed.routine.name} · ${proposedRoutineWhen(t, i18n.language, proposed.routine)}`}
+                value={withRoutine}
+                onChange={setWithRoutine}
+              />
+            </Card>
+            <Text variant="footnote" tone="faint">
+              {proposed.routine.prompt}
+            </Text>
+          </View>
+        ) : null}
 
         <View style={styles.section}>
           <Text variant="title" accessibilityRole="header">
