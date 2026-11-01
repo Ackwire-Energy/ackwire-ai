@@ -995,6 +995,24 @@ describe("the team's coordinator (ADR 0093)", () => {
     expect((await route(scored({}, { needsAgent: 0.8 }), other.id)).selected).toEqual([theo.id]);
   });
 
+  test("what nobody took but speaks to one agent goes to that agent, as the step's pick, not to the coordinator", async () => {
+    const { theo, ada } = await coordinated();
+    const toAda = await post("ada, bom dia");
+    const low = (addressee: string) => scored({ ada: 0.3, theo: 0.3 }, { needsAgent: 0.3, addressee });
+    const result = await route(low(ada.id), toAda.id);
+    expect(result.selected).toEqual([ada.id]);
+    expect(result.decidedBy).toBeUndefined();
+    expect(result.runs.map((r) => [r.agentId, r.trigger])).toEqual([[ada.id, "router"]]);
+    const [decision] = await f.db
+      .select()
+      .from(schema.routingDecisions)
+      .where(eq(schema.routingDecisions.messageId, toAda.id));
+    expect(decision?.strategy).toBe("fixed");
+    // Spoken to, the coordinator itself is the agent spoken to: the continuity bar picks it, as for any agent.
+    const toTheo = await post("theo, bom dia");
+    expect((await route(low(theo.id), toTheo.id)).selected).toEqual([theo.id]);
+  });
+
   test("a message already answered, or for a person, gets nobody, also from a person alone with the agents", async () => {
     const { theo } = await coordinated();
     const needs = scored({}, { needsAgent: 0.9 });

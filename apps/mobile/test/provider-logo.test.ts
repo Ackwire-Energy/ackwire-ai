@@ -62,7 +62,9 @@ describe("Pensa com: the brain by its maker's mark", () => {
     expect(brainLine(en, others, "", { owner: "Walter" }).text).toBe("Sonnet on Walter's Claude plan");
     // Nobody chose a model: the plan alone, no "Automático".
     expect(brainLine(pt, { kind: "codex", model: "auto" }, "").text).toBe("Plano do ChatGPT");
-    expect(brainLine(en, { ...owner, model: "auto" }, "", { agents: two }).text).toBe("Claude plan on MacBook do Walter");
+    expect(brainLine(en, { ...owner, model: "auto" }, "", { agents: two }).text).toBe(
+      "Claude plan on MacBook do Walter",
+    );
     const opencode: AgentBrainLine = { kind: "claude_code", model: "DeepSeek V4.1 Flash", provider: "opencode" };
     expect(brainLine(pt, opencode, "").text).toBe("DeepSeek V4.1 Flash pelo OpenCode Go");
     expect(brainLine(en, opencode, "", { owner: "Walter" }).text).toBe("DeepSeek V4.1 Flash on Walter's OpenCode Go");

@@ -67,7 +67,12 @@ export function brainLine(
 ): { text: string; kind: EngineKind; mark: string | null } {
   if (!brain || brain.kind === "model") return { text: apiModelLabel, kind: "agent", mark: null };
   const plan = planOfAccount({ kind: brain.kind, provider: brain.provider ?? null });
-  const named = thinksWith(t, plan, brain.model && !isAuto(brain.model) ? brain.model : null, brain.computer ? null : owner);
+  const named = thinksWith(
+    t,
+    plan,
+    brain.model && !isAuto(brain.model) ? brain.model : null,
+    brain.computer ? null : owner,
+  );
   const computers = new Set(agents.flatMap((a) => (a.brain?.computer ? [a.brain.computer] : [])));
   const text =
     brain.computer && computers.size > 1 ? t("brain.line.on", { line: named, computer: brain.computer }) : named;
