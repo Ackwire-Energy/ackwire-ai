@@ -4082,6 +4082,7 @@ export const en: Translations = {
       waitingPerson: "Waiting for someone to answer",
       failing_one: "Failing ({{count}} in a row)",
       failing_other: "Failing ({{count}} in a row)",
+      needsWebhook: "Can't run yet: no {{provider}} webhook",
     },
     pausedReason: {
       creator_left: "Paused: whoever created it left the workspace",

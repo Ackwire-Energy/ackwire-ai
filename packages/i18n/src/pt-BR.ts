@@ -4120,6 +4120,7 @@ export const ptBR = {
       waitingPerson: "Esperando alguém responder",
       failing_one: "Falhando ({{count}} seguida)",
       failing_other: "Falhando ({{count}} seguidas)",
+      needsWebhook: "Ainda não roda: falta o webhook do {{provider}}",
     },
     pausedReason: {
       creator_left: "Pausada: quem criou saiu do workspace",

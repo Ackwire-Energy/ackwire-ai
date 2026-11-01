@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { type ActionRecord, type AgentActionParams, actWithUndo } from "./agent-actions";
 import { issueDiff, issueSnapshot } from "./agent-undo";
+import { currentHandles } from "./agents";
 import { cutText } from "./format";
 import {
   commentIssue,
@@ -84,7 +85,7 @@ async function find(deps: IssueDeps, ctx: ToolContext, ref: string) {
  * a person's handle (`@ada`), or a person's name or email.
  */
 async function assigneeOf(deps: IssueDeps, ctx: ToolContext, ref: string): Promise<WorkActor | null> {
-  const value = ref.trim().replace(/^@/, "").toLowerCase();
+  const [value = ""] = await currentHandles(deps.db, ctx.orgId, [ref.trim().replace(/^@/, "").toLowerCase()]);
   if (value === "me") return { type: "agent", id: ctx.agentId };
   if (value === "none" || value === "") return null;
   const [agent] = await deps.db

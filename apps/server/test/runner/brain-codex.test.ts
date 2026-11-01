@@ -1,6 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
+import { spawn } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import type { MachineRequest } from "@agenteschat/adapters";
 import {
   type CodexBrainEvent,
   CodexEventMapper,
@@ -16,8 +18,10 @@ import {
   handleCodexBrainTurn,
   runCodexTurn,
 } from "../../runner/brain-codex";
+import { handleRequest } from "../../runner/handlers";
 import { CODEX_MCP_SERVER } from "../../runner/mcp";
 import { agentWorkspace } from "../../runner/paths";
+import type { Spawn } from "../../runner/scope-gate";
 import { errorCode, removeDirs, tempDir } from "./helpers";
 
 const dirs: string[] = [];
@@ -227,7 +231,7 @@ test.skipIf(!posix)(
     mkdirSync(path.join(folder, "app"), { recursive: true });
     const events: CodexBrainEvent[] = [];
     const ctx = {
-      workspaceReal: ws,
+      folder,
       exec: true,
       runnerHome: home,
       mcp: { socketPath: path.join(home, "mcp.sock"), command: ["/usr/bin/env", "/r/runner.js"] },
@@ -311,7 +315,7 @@ test.skipIf(!posix)("refuses an old or missing Codex without starting it; bad re
   expect(existsSync(path.join(root, "started"))).toBe(true);
   expect(events[2]).toMatchObject({ type: "error", code: "codex_failed" });
 
-  const ctx = { workspaceReal: root, exec: true, runnerHome: root, codexVersion: () => "codex-cli 0.163.0", bin };
+  const ctx = { folder: root, exec: true, runnerHome: root, codexVersion: () => "codex-cli 0.163.0", bin };
   const req = {
     runId: RUN,
     kind: "codex" as const,
@@ -394,7 +398,7 @@ test.skipIf(!posix)(
     );
     chmodSync(bin, 0o755);
     const ctx = {
-      workspaceReal: ws,
+      folder: await agentWorkspace(ws, AGENT),
       exec: true,
       runnerHome: home,
       codexVersion: () => "codex-cli 0.163.0",
@@ -431,6 +435,51 @@ test.skipIf(!posix)(
     );
     expect(events).toMatchObject([{ type: "error", code: "account_missing", retryable: false }]);
     expect(existsSync(path.join(fake, "home"))).toBe(false);
+  },
+  15_000,
+);
+
+test.skipIf(!posix)(
+  "a turn the handler dispatches starts in the checkout of the agent's own folder, never a folder nested in it",
+  async () => {
+    const root = tempDir("brain-codex-");
+    dirs.push(root);
+    const fake = path.join(root, "fake");
+    const ws = path.join(root, "ws");
+    const home = path.join(root, "home");
+    for (const d of [fake, ws, home]) mkdirSync(d, { recursive: true });
+    const bin = fakeCodex(fake);
+    const folder = await agentWorkspace(ws, AGENT);
+    // Where `prepareAgentCode` starts a turn: a checkout `git.sync` keeps in the agent's folder.
+    mkdirSync(path.join(folder, "repos", "acme", "app"), { recursive: true });
+    const req = {
+      op: "brain.turn",
+      runId: RUN,
+      kind: "codex",
+      session: { id: SESSION, resume: false },
+      cwd: "repos/acme/app",
+      system: "",
+      prompt: "oi",
+      mcp: { token: "tok" },
+      agent: AGENT,
+    } as MachineRequest;
+    const ctx = {
+      workspaceReal: ws,
+      exec: true,
+      token: "agm_x",
+      // Never the computer's own codex: the fake answers whatever the runner finds on the PATH.
+      codex: { runnerHome: home, runs: new Map(), spawn: ((_, args, options) => spawn(bin, args, options)) as Spawn },
+    };
+    process.env.FAKE_DIR = fake;
+    try {
+      const reply = (await handleRequest(ctx, req, { signal: new AbortController().signal, output: () => {} })) as {
+        final: CodexBrainEvent;
+      };
+      expect(reply.final.type === "error" ? reply.final.code : "done").not.toBe("not_found");
+      expect(existsSync(path.join(folder, path.basename(folder)))).toBe(false);
+    } finally {
+      delete process.env.FAKE_DIR;
+    }
   },
   15_000,
 );

@@ -76,7 +76,7 @@ async function setup(
   });
   servers.push(app);
   const ctx = {
-    workspaceReal: ws,
+    folder,
     exec: true,
     runnerHome: home,
     mcp: { socketPath: path.join(home, "mcp.sock"), command: ["/usr/bin/env", "/r/runner.js"] },

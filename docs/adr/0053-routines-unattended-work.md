@@ -1,6 +1,6 @@
 # 0053. Routines and unattended work: safe and dependable on every brain
 
-- Status: Accepted. Amended 2026-10-30: §3 (one command policy on every path that runs a command on a computer; where a push goes is read with git there). Amended 2026-10-31: §3 (through our git proxy, what it refuses never runs from the computer), §2 (a routine set to act reaches other agents and posts where its creator can); by ADR 0089 §9 (a chain stays a person's for 1000 links, each message's root remembered)
+- Status: Accepted. Amended 2026-10-30: §3 (one command policy on every path that runs a command on a computer; where a push goes is read with git there). Amended 2026-10-31: §3 (through our git proxy, what it refuses never runs from the computer), §2 (a routine set to act reaches other agents and posts where its creator can); by ADR 0089 §9 (a chain stays a person's for 1000 links, each message's root remembered). Addendum 2026-10-31: a routine whose event has no webhook here says it can't run yet (`needs_webhook`)
 - Date: 2026-10-23
 - Builds on: ADR 0032 (one engine, swappable brains), ADR 0034 (agents consult each other), ADR 0037 (agents investigate first, act with undo), the chat-delivery work (background runs, `hand_off`, run inbox)
 - Evaluates: ADRs 0045–0052 and the `feat/agent-runtime` branch (taken where they fit, see the end)
@@ -176,3 +176,9 @@ This replaces the `unattended` row of §1, the unattended bullet of §2 (and the
 What doesn't change: stretches still bound what agents start on their own (ADR 0089), with the lower limit when an agent wrote a stretch's first message; a chain nobody is behind still wakes only agents open to everyone (audience); a routine's report joins only a run such news woke; `issue.created` routines don't fire for issues a routine or a run nobody is behind created; a run woken by a note may pass.
 
 Consequences: outside content that reaches a run nobody is behind (a routine's report, a task's output) can make it act within the agent's permissions, as the same content can a person's run, except that when a routine brought it (§4) no credential leaves and nothing reaches a connected app or a mailbox without a person. It stays inside its envelope (`untrustedBlock`), a sensitive action still asks a person, and the command policy still holds on the computer. A routine that only looks reads as before.
+
+## Addendum (2026-10-31): a routine whose event never comes says so
+
+GitHub's and Sentry's events reach routines only through the workspace's own webhook (`webhook_endpoints`, `webhooks.ts`); the GitHub App's webhook keeps installations in step and fires no routine. A routine on `github.pr_opened`, `deploy.succeeded` or `sentry.issue_created` in a workspace without one never ran, and the chat tools took it silently.
+
+Its state is `needs_webhook` (`EVENT_WEBHOOK`), after a run at work and a pause, before failing. Rotinas says "Ainda não roda: falta o webhook do GitHub", `list_routines` says it can't run yet, and `create_routine` and `update_routine` tell the agent what it needs, for the person, in their terms: a GitHub (or Sentry) webhook for this workspace, which a workspace admin sets up (the app can't create one yet), or a schedule that checks instead. The tools never name our app API: it is private to our own apps, and nobody can call it from a terminal. The routine is still made: the webhook may come after. `issue.created` needs none; an email trigger keeps its mailbox's own state.

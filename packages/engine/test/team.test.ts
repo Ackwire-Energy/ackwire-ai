@@ -6,8 +6,10 @@ import {
   addChannelMember,
   agentScopeNames,
   createAgent,
+  createCredential,
   drainOutbox,
   enableCaches,
+  insertMessage,
   type MachineStatus,
   postPersonMessage,
   rosterScopeNames,
@@ -76,6 +78,70 @@ test("an agent knows the org's other agents it can work with, even outside its c
   expect(prompt).not.toContain("@secret");
   // QA is a channel member: described in "Where you are", not repeated in the team.
   expect(prompt).not.toMatch(/Other agents in this organization:[^\n]*@qa/);
+});
+
+test("an agent reads how its teammates are now, not what older messages say: no AI yet, busy, or ready when called", async () => {
+  const requests: ModelRequest[] = [];
+  f = await setup({
+    askAgent: true,
+    reply: (req) => {
+      requests.push(req);
+      return { chunks: ["ok"] };
+    },
+  });
+  const rui = await addAgent("Rui", "rui", "Backend");
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: rui.id });
+  // Her card from before she had an AI is still in the channel.
+  await insertMessage(f.db, {
+    orgId: f.org.id,
+    channelId: f.general.id,
+    author: { type: "agent", agentId: rui.id, runId: null, hop: 0, stretchId: null },
+    body: "I can't answer yet: I have no AI connected.",
+    meta: { bodyCode: "no_ai" },
+  });
+  // On heavy work now: a run going for five minutes.
+  await f.db.insert(schema.agentRuns).values({
+    orgId: f.org.id,
+    agentId: rui.id,
+    channelId: f.general.id,
+    threadRootId: crypto.randomUUID(),
+    triggerMessageId: crypto.randomUUID(),
+    trigger: "mention",
+    hop: 0,
+    status: "running",
+    startedAt: new Date(Date.now() - 5 * 60_000),
+    heartbeatAt: new Date(),
+  });
+  // Otto's own key was revoked: he has no AI.
+  const key = await createCredential(f.db, f.keyWrapper, f.owner.id, f.org.id, {
+    provider: "anthropic",
+    label: "otto",
+    apiKey: "sk-ant-test-key-otto-5678",
+  });
+  await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: "Otto", handle: "otto", role: "Front", instructions: "", credentialId: key.id },
+    { model: "claude-sonnet-5-5" },
+  );
+  await f.db
+    .update(schema.providerCredentials)
+    .set({ revokedAt: new Date() })
+    .where(eq(schema.providerCredentials.id, key.id));
+  // Lia has an AI and hasn't worked for a while: idle, which for an agent means a mention wakes her at once.
+  await addAgent("Lia", "lia", "Revisora de código");
+
+  await post("@dev o Rui e o Otto já têm IA?");
+  await drainOutbox(f.db, f.handlers);
+
+  const prompt = systemText(requests[0]?.system ?? []);
+  expect(prompt).toContain("# Your teammates now\n");
+  expect(prompt).toContain("@rui: busy, on heavy work");
+  expect(prompt).toContain("@otto: no AI connected yet");
+  expect(prompt).toContain("- @lia: has an AI, answers when called\n");
+  expect(prompt).not.toMatch(/@[a-z]+: away/);
+  expect(prompt).toContain("This is how they are now: it outweighs what older messages here say about them");
 });
 
 test("find_agent searches by what agents do and shows what they can do", async () => {

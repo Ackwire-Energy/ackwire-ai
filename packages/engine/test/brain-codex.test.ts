@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { CODEX_FOLDER_PROTOCOL } from "@agenteschat/adapters";
 import { type BrainTurnRequest, CodexBrain, type ComputerBrainLink, codexVersionOk } from "../src/brains/codex";
 import { computerPrompt } from "../src/brains/prompt";
 import type { BrainEvent, BrainTurn } from "../src/brains/types";
@@ -275,4 +276,31 @@ test("live steering (protocol 15): the turn on its way takes messages through br
     }).run(turn(), { ...io(), steerable: (s) => old.push(s) }),
   );
   expect(old).toEqual([]);
+});
+
+test("a runner before CODEX_FOLDER_PROTOCOL: the turn stays in the agent's folder and its session, no checkout", async () => {
+  const code = { cwd: "repos/acme/app", prompt: "# Your code\nacme/app is checked out." };
+  const run = async (protocol: number) => {
+    const l = link({ protocol, events: [{ type: "done", text: "ok" }] });
+    let prepared = 0;
+    const brain = new CodexBrain({
+      link: l,
+      mcp: async () => ({ token: "t" }),
+      prepare: async () => {
+        prepared++;
+        return code;
+      },
+    });
+    await collect(brain.run(turn({ session: { id: SESSION, resume: true, machineId: "m1", cwd: "" } }), io()));
+    return { sent: l.sent[0], prepared };
+  };
+  // Such a runner reads a checkout in a folder nested in the agent's own, where it isn't: refused every turn.
+  expect(await run(CODEX_FOLDER_PROTOCOL - 1)).toMatchObject({
+    sent: { cwd: "", system: "You are Dev.", session: { id: SESSION, resume: true } },
+    prepared: 0,
+  });
+  expect(await run(CODEX_FOLDER_PROTOCOL)).toMatchObject({
+    sent: { cwd: "repos/acme/app", system: `You are Dev.\n\n${code.prompt}` },
+    prepared: 1,
+  });
 });

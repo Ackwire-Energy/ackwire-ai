@@ -2516,9 +2516,17 @@ export type RoutineReport = "always" | "when_new";
 /**
  * Where a routine stands (ADR 0053 §11): `paused` (with `pausedReason`), `running` (a run working now),
  * `waiting_computer` (its run waits for the agent's computer: `waitingFor`), `waiting_person` (an approval
- * or an answer), `failing` (its last runs failed: `failuresInRow`).
+ * or an answer), `failing` (its last runs failed: `failuresInRow`), `needs_webhook` (its event comes through a
+ * GitHub or Sentry webhook the workspace doesn't have: it can't run yet).
  */
-export type RoutineState = "active" | "paused" | "running" | "waiting_computer" | "waiting_person" | "failing";
+export type RoutineState =
+  | "active"
+  | "paused"
+  | "running"
+  | "waiting_computer"
+  | "waiting_person"
+  | "failing"
+  | "needs_webhook";
 
 /** Why the server paused a routine (the app says it, with its one-tap fix); null: a person paused it. */
 export type RoutinePausedReason =

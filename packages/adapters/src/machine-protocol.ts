@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 31;
+export const MACHINE_PROTOCOL_VERSION = 32;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -389,6 +389,12 @@ export function browserSetupOf(v: unknown): BrowserSetup | null {
  * sends `shared` to an older runner.
  */
 export const SHARED_ACCOUNTS_PROTOCOL = 29;
+/**
+ * From this protocol on, a Codex turn's `cwd` is read in the agent's own folder. An older runner read it in a
+ * folder nested there, so a turn sent into one of the agent's checkouts was refused ("The folder … doesn't
+ * exist"): the server sends an older runner's Codex turns to the agent's own folder, never a checkout.
+ */
+export const CODEX_FOLDER_PROTOCOL = 32;
 
 /**
  * From this protocol on (ADR 0058 §17): a desktop stream changes mode in place, on its own data socket, when its

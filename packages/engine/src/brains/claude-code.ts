@@ -268,6 +268,13 @@ export function toolOff(
 }
 
 /**
+ * The folder a computer turn was to start in, when the runner refused the turn because it isn't on the computer
+ * (`not_found`, which a Claude Code runner answers as `bad_request`, in every runner version); else null.
+ */
+export const missingTurnFolder = (message: string): string | null =>
+  /^The folder (.+) doesn't exist$/.exec(message)?.[1] ?? null;
+
+/**
  * The runner refused the turn before starting it, for lack of room (`no_slot`) or at its request ceiling
  * (`internal` "busy", every runner version): `busy`, and the engine waits for room.
  */
