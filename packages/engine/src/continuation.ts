@@ -31,6 +31,8 @@ export interface ContinuationState {
   /** The run's executed tool calls when it was last told to continue: the next continue needs more. */
   executedAtNudge?: number;
   askNudged?: boolean;
+  /** The last turn was told to ask: this one is judged past the cap, and turns into the question if it didn't. */
+  askPending?: boolean;
 }
 
 export type ContinuationVerdict = "done" | "continue" | "ask";
@@ -141,7 +143,8 @@ export async function decideTurnEnd(t: TurnEnd): Promise<TurnEndDecision> {
   // A hand-off by mention to an agent that isn't here is an unkept hand-off: it goes on and hands it over.
   if (t.unreached && canNudge) return { outcome: "continue", rule: "unreached", nudge: t.unreached };
   if (!t.judged || !t.verdict) return { outcome: "done", rule: t.verdict ? "nothing_to_judge" : "no_judge" };
-  if (!canNudge && (t.state.askNudged || t.kind !== "conversation")) return { outcome: "done", rule: "cap" };
+  if (!canNudge && !t.state.askPending && (t.state.askNudged || t.kind !== "conversation"))
+    return { outcome: "done", rule: "cap" };
   if (await t.wakesLater().catch(() => false)) return { outcome: "waiting", rule: "wakes_later" };
   let verdict: ContinuationVerdict;
   try {
@@ -172,9 +175,10 @@ export async function decideTurnEnd(t: TurnEnd): Promise<TurnEndDecision> {
 
 /** Moves the state on for a `continue` decision (the ask nudge has its own once-flag). */
 export function advance(state: ContinuationState, d: TurnEndDecision, executed: number): ContinuationState {
-  if (d.outcome !== "continue") return state;
-  if (d.rule === "ask") return { ...state, askNudged: true };
-  return { ...state, count: state.count + 1, executedAtNudge: executed };
+  const { askPending: _, ...rest } = state;
+  if (d.outcome !== "continue") return rest;
+  if (d.rule === "ask") return { ...rest, askNudged: true, askPending: true };
+  return { ...rest, count: state.count + 1, executedAtNudge: executed };
 }
 
 /** Run errors the person already sees explained elsewhere, or that no one can act on. */
