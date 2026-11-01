@@ -426,6 +426,9 @@ describe("browser_ask_person", () => {
       handoffId: h?.id,
       agentId: f.agent.id,
     });
+    // The computer's desktop app links to that DM, which has no channel page of its own.
+    if (!h) throw new Error("no handoff");
+    expect((await handoffInfo(f.db, h))?.link).toBe(`/org/${f.org.id}/dm/agent/${f.agent.id}`);
     // Its take control works from there.
     expect(await claimHandoff(deps(), f.owner.id, f.org.id, h?.id ?? "")).toMatchObject({ status: "active" });
   });

@@ -55,7 +55,7 @@ import {
   DESKTOP_TOOL_INFO,
 } from "./types";
 
-const { browserHandoffs, agentRuns, agents, channelMembers, machines, messages, users } = schema;
+const { browserHandoffs, agentRuns, agents, channelMembers, channels, machines, messages, users } = schema;
 
 export type BrowserHandoffRow = typeof browserHandoffs.$inferSelect;
 export type BrowserHandoffStatus = BrowserHandoffRow["status"];
@@ -598,13 +598,20 @@ export async function handoffInfo(db: Executor, row: BrowserHandoffRow): Promise
     ? await db.select({ name: users.name }).from(users).where(eq(users.id, row.controllerUserId))
     : [];
   const where = await handoffPlace(db, row);
+  // A DM has no channel page of its own (`/c/<id>` says it doesn't exist): the web opens it by the agent.
+  const [conversation] =
+    where && !where.threadId
+      ? await db.select({ kind: channels.kind }).from(channels).where(eq(channels.id, where.channelId))
+      : [];
   // The conversation holding its card (an ask's message, a take over's run), else the agent's page with its browser open.
   const link = where
     ? where.threadId
       ? `/org/${row.orgId}/threads/${where.threadId}`
-      : row.kind === "ask"
-        ? `/org/${row.orgId}/c/${where.channelId}?m=${row.id}`
-        : `/org/${row.orgId}/c/${where.channelId}`
+      : conversation?.kind === "dm"
+        ? `/org/${row.orgId}/dm/agent/${row.agentId}`
+        : row.kind === "ask"
+          ? `/org/${row.orgId}/c/${where.channelId}?m=${row.id}`
+          : `/org/${row.orgId}/c/${where.channelId}`
     : agentBrowserLink(row.orgId, row.agentId);
   return {
     status: row.status === "active" && row.controllerUserId ? "active" : "pending",
