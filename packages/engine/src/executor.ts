@@ -3290,7 +3290,15 @@ async function thinkOnce(
       void events.return?.()?.catch(() => {});
       throw limitFailure(`The plan limit was reached${limit?.resetsAt ? ` until ${limit.resetsAt}` : ""}.`);
     }
-    if (next.done) break;
+    if (next.done) {
+      // Ended after a `limit` without an answer: the plan cut it (it worked only if a call ran in it).
+      if (limit && text === null)
+        throw limitFailure(
+          `The plan limit was reached${limit.resetsAt ? ` until ${limit.resetsAt}` : ""}.`,
+          executedCount > 0 || toolCalls.length > 0,
+        );
+      break;
+    }
     const event: BrainEvent = next.value;
     if (event.type === "text_delta") onDelta(event.text);
     else if (event.type === "tool_call") {
