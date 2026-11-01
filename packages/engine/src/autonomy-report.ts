@@ -17,8 +17,7 @@ import { REFUSALS } from "./tools/run-policy";
  *   (ADR 0053), from the run's first `context` step (`heldBack`), and runs with a tool call refused for that
  *   (`tool.call` audit rows with a run-policy refusal).
  * - `promiseUnkept`: runs the follow-through judge found ending on work left undone (the `nudged: promise` step);
- *   `promiseIgnored`: those that ended after the nudge without doing anything (no tool call, no command on the
- *   computer).
+ *   `promiseIgnored`: those that ended after the nudge without doing anything (`ACTED`).
  * - `handoffUnanswered`: notes (`tell_agent`) with no reply in the agents' DM, questions (`ask_agent`) not answered,
  *   and @mentions that reached the agent without a word from it in the conversation, each within 30 minutes.
  * - `limitStops`: runs whose reply offers Continuar after a limit (`meta.stepLimit`: at the cap, or told to wrap up
@@ -239,8 +238,14 @@ const isAck = (column: string) => {
       ~ ${ACK_PATTERN}, false)`;
 };
 
-/** SQL: a run step that did something (a tool call other than reacting or passing, an approval, a computer command). */
-const ACTED = sql.raw(`((s.kind = 'tool_call' and coalesce(s.data->>'name', '') not in ('react', 'pass'))
+/**
+ * SQL: a run step that did something: an approval, a command the computer ran itself, any tool call but those that
+ * never are the work (reacting, passing, its own status line, a tool directory's search, loading a skill). A look-up
+ * counts: it is often what was promised or asked ("I'll check the logs").
+ */
+const ACTED = sql.raw(`((s.kind = 'tool_call' and coalesce(s.data->>'name', '') not in
+    ('react', 'pass', 'set_status', 'load_skill', 'read_skill_file')
+    and coalesce(s.data->>'name', '') not like '%find_tools')
   or s.kind = 'approval' or (s.kind = 'model_call' and coalesce((s.data->>'executed')::int, 0) > 0))`);
 
 /**

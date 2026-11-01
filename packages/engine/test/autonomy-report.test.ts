@@ -447,6 +447,19 @@ describe("one workspace's day", () => {
     expect(day?.ackReplies).toBe(acks.length);
   });
 
+  test("after the nudge, a tool directory's search or a skill isn't doing it; a look-up is", async () => {
+    const other = "2026-10-14";
+    const nudged: Step = ["context", { nudged: "promise" }];
+    const searched: Step[] = [
+      ["tool_call", { name: "github_find_tools" }],
+      ["tool_call", { name: "load_skill" }],
+    ];
+    await run({ at: at("10:00:00", other), steps: [posted, nudged, ...searched, posted] });
+    await run({ at: at("11:00:00", other), steps: [posted, nudged, ["tool_call", { name: "read_channel" }], posted] });
+    const [day] = await autonomyRows(f.db, { from: other, days: 1 });
+    expect(day).toMatchObject({ promiseUnkept: 2, promiseIgnored: 1 });
+  });
+
   test("a mention the judge failed to read woke nobody; one it read as only a reference didn't count", async () => {
     const other = "2026-10-16";
     const dev = f.agent.id;
@@ -583,8 +596,8 @@ describe("what runs record for it", () => {
     expect(first.some((s) => s.trigger !== line.id && "heldBack" in s.data)).toBe(false);
   });
 
-  test("a computer turn's own calls are counted on its model call", async () => {
-    f = await setup();
+  test("a computer turn's own calls are counted on its model call, not ours through its bridge", async () => {
+    f = await setup({ react: true });
     const paired = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, {
       name: "MacBook",
       os: "darwin",
@@ -600,6 +613,7 @@ describe("what runs record for it", () => {
     const events: BrainEvent[] = [
       { type: "tool_call", id: "t1", name: "Bash", input: { command: "bun test" }, executed: { content: "ok" } },
       { type: "tool_call", id: "t2", name: "Edit", input: { file_path: "a.ts" }, executed: { content: "ok" } },
+      { type: "tool_call", id: "t3", name: "react", input: { emoji: "👍" }, executed: { content: "ok" } },
       { type: "done", text: "Fixed and tested." },
     ];
     const brain: Brain = {
