@@ -136,7 +136,11 @@ export function approvalValues(
     locale?: string;
   } = {},
 ): [string, string][] {
-  const number = locale ? new Intl.NumberFormat(locale, { maximumFractionDigits: 4, useGrouping: "min2" }) : null;
+  // Grouped from five digits by hand: Hermes reads `useGrouping` as a boolean, so "min2" would group a year.
+  const formatNumber = locale
+    ? (v: number) =>
+        new Intl.NumberFormat(locale, { maximumFractionDigits: 4, useGrouping: Math.abs(v) >= 10000 }).format(v)
+    : null;
   // An email is said by its sentence and its letter; its fields aren't values.
   if (approval.email) return [];
   const skip = innerTool(approval) ? "name" : null;
@@ -146,7 +150,7 @@ export function approvalValues(
     for (const [k, v] of Object.entries(obj)) {
       if (top && k === skip) continue;
       if (plain(v)) {
-        const text = typeof v === "number" && number ? number.format(v) : String(v).trim();
+        const text = typeof v === "number" && formatNumber ? formatNumber(v) : String(v).trim();
         if (text && (long || text.length <= 60)) out.push([humanize(k), text]);
       } else if (Array.isArray(v) && v.length > 0 && v.every(plain)) {
         // A list of names (the branches to delete) is one value; on a card it is cut, never left out.

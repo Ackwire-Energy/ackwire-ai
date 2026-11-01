@@ -107,6 +107,21 @@ describe("an approval's values", () => {
     );
   });
 
+  test("on an engine whose Intl takes useGrouping as a boolean (Hermes), a year still reads as is", () => {
+    const Real = Intl.NumberFormat;
+    function hermes(locale?: string | string[], options?: Intl.NumberFormatOptions) {
+      return new Real(locale, options && { ...options, useGrouping: Boolean(options.useGrouping ?? true) });
+    }
+    Intl.NumberFormat = hermes as unknown as typeof Intl.NumberFormat;
+    try {
+      expect(approvalSummary({ params: { year: 2026, revenue: 97000 }, connector: "x" }, "pt-BR")).toBe(
+        "Year: 2026 · Revenue: 97.000",
+      );
+    } finally {
+      Intl.NumberFormat = Real;
+    }
+  });
+
   test("a list of names is one value: whole in the details, cut on a card, never left out", () => {
     const branches = ["feat/login-google", "fix/old-header", "chore/bump-deps", "spike/x", "feat/y", "old-1", "old-2"];
     const a = { params: { repo: "acme/app", branches }, connector: "github", email: null };
