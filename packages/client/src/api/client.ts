@@ -55,6 +55,7 @@ import type {
   CalendarEventPatch,
   CalendarRange,
   Channel,
+  ChannelCard,
   ChannelCategory,
   ChannelMember,
   CodeSent,
@@ -545,6 +546,8 @@ export interface ApiClient {
       input: { categoryId: string | null; beforeChannelId?: string | null },
     ): Promise<void>;
     join(orgId: string, channelId: string): Promise<void>;
+    /** A `#channel` link's card; 404 for a channel I can't see (private and not mine). Archived ones too. */
+    card(orgId: string, channelId: string): Promise<ChannelCard>;
     update(
       orgId: string,
       channelId: string,

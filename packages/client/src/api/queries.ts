@@ -788,6 +788,18 @@ export function usePrefetchRecent(orgId: string, count = RECENT_PREFETCH) {
   }, [ready, orgId, count, api, qc]);
 }
 
+/** A `#channel` link's card, when it opens (or when the link names a channel the list doesn't have). */
+export const useChannelCard = (orgId: string, channelId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.channelCard(orgId, channelId),
+    queryFn: () => api.chat.card(orgId, channelId),
+    enabled,
+    staleTime: 30_000,
+    retry: false,
+  });
+};
+
 export function useJoinChannel(orgId: string, channelId: string) {
   const api = useApi();
   const qc = useQueryClient();

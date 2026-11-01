@@ -9,6 +9,7 @@ import type {
 } from "@agenteschat/client";
 import { agentProposalOf, stretchCardOf } from "@agenteschat/client/lib/action-cards";
 import { type ActivityEntry, barEntries, type barWords } from "@agenteschat/client/lib/activity";
+import { splitChannelRefs } from "@agenteschat/client/lib/channel-refs";
 import { type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
 import {
   answeredNotices,
@@ -548,7 +549,9 @@ export function threadFaces<T extends { type: string; id: string | null }>(parti
 
 export type Inline =
   | { kind: "text" | "bold" | "italic" | "code" | "mention"; text: string }
-  | { kind: "link"; text: string; href: string };
+  | { kind: "link"; text: string; href: string }
+  /** `#name` (`name` lower case): a channel link when it means a channel the viewer sees, else its text. */
+  | { kind: "channel"; text: string; name: string };
 export type Block =
   | { kind: "paragraph"; inline: Inline[] }
   | { kind: "heading"; inline: Inline[] }
@@ -559,7 +562,15 @@ export type Block =
 
 const MENTION = /(^|[^\w@.])@([a-zA-Z0-9][a-zA-Z0-9_-]{1,31})(?![\w@-])/g;
 
+/** `#channel` references, then @mentions in the words between them. */
 function mentions(text: string, out: Inline[], kind: "text" | "bold" | "italic") {
+  for (const part of splitChannelRefs(text)) {
+    if (part.name === undefined) atMentions(part.text, out, kind);
+    else out.push({ kind: "channel", text: part.text, name: part.name });
+  }
+}
+
+function atMentions(text: string, out: Inline[], kind: "text" | "bold" | "italic") {
   let last = 0;
   for (const match of text.matchAll(MENTION)) {
     const prefix = match[1] ?? "";

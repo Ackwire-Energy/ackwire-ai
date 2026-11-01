@@ -676,6 +676,20 @@ export interface Channel {
   lastMessage?: ChannelLastMessage | null;
 }
 
+/** A `#channel` link's card (`chat.card`): what the channel is and who is in it. */
+export interface ChannelCard {
+  id: string;
+  name: string;
+  topic: string;
+  visibility: "public" | "private";
+  isMember: boolean;
+  archived: boolean;
+  /** People in it. */
+  people: number;
+  /** Agents in it. */
+  agents: number;
+}
+
 /** A named group of channels in the sidebar, the same for everyone in the organization (ADR 0080). */
 export interface ChannelCategory {
   id: string;

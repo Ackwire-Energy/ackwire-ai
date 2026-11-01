@@ -3,10 +3,14 @@ import { Text } from "@/ui";
 import { openPage } from "../ai/parts";
 import { useColors } from "../shared/hooks";
 import { MONO } from "../shared/parts";
+import { ChannelRefText } from "./ChannelRefText";
 import type { Block, Inline } from "./logic";
 
-/** Inline marks of a message (bold, italic, `code`, links, @mentions), inside a Text. */
-export function Spans({ inline }: { inline: Inline[] }) {
+/**
+ * Inline marks of a message (bold, italic, `code`, links, @mentions, #channels), inside a Text. `channelRefs`: the
+ * message's `meta.channelRefs` (a renamed channel still links).
+ */
+export function Spans({ inline, channelRefs }: { inline: Inline[]; channelRefs?: Record<string, string> }) {
   const c = useColors();
   return (
     <>
@@ -38,6 +42,8 @@ export function Spans({ inline }: { inline: Inline[] }) {
                 {s.text}
               </RNText>
             );
+          case "channel":
+            return <ChannelRefText key={key} name={s.name} text={s.text} refs={channelRefs} />;
           case "mention":
             return (
               <RNText key={key} style={[styles.bold, { color: c.ink }]}>

@@ -145,6 +145,8 @@ export interface ComposerProps {
   commands?: ComposerCommands;
   /** `[[` autocompletes (e.g. wiki pages): `insert` is the title put inside `[[…]]`. */
   links?: ComposerMentions;
+  /** "#" autocompletes channels: `insert` is the name put after the "#". */
+  channels?: ComposerMentions;
   /** Context pills under the text (the target agent, the active skill). */
   pills?: ReactNode;
   /**
@@ -327,6 +329,14 @@ export function mentionQuery(text: string, caret: number): { start: number; quer
   return { start: caret - query.length - 1, query };
 }
 
+/** "#que" right before the caret (start of text or after a space or bracket); same rule as `channelQuery` in the client. */
+export function channelQuery(text: string, caret: number): { start: number; query: string } | null {
+  const m = text.slice(0, caret).match(/(^|[\s(])#([a-zA-Z0-9_-]{0,80})$/);
+  if (!m) return null;
+  const query = m[2] ?? "";
+  return { start: caret - query.length - 1, query };
+}
+
 /** The chat message box: attach on the left, send (primary, icon only) on the right, focus on the whole box. */
 export function Composer({
   value,
@@ -344,6 +354,7 @@ export function Composer({
   mentions,
   commands,
   links,
+  channels,
   pills,
   inlinePills,
   sendText,
@@ -368,6 +379,8 @@ export function Composer({
   const [token, setToken] = useState<{ start: number; query: string } | null>(null);
   // `[[que` being typed (wiki links).
   const [linkToken, setLinkToken] = useState<{ start: number; query: string } | null>(null);
+  // "#que" being typed (channels).
+  const [channelToken, setChannelToken] = useState<{ start: number; query: string } | null>(null);
   const [dismissed, setDismissed] = useState<number | null>(null);
   const [active, setActive] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -434,9 +447,19 @@ export function Composer({
       : [];
   const mentionItems = mentions && token && token.start !== dismissed ? mentions.search(token.query) : [];
   const linkItems = links && linkToken && linkToken.start !== dismissed ? links.search(linkToken.query) : [];
-  const items = slashItems.length > 0 ? slashItems : linkItems.length > 0 ? linkItems : mentionItems;
+  const channelItems =
+    channels && channelToken && channelToken.start !== dismissed ? channels.search(channelToken.query) : [];
+  const items =
+    slashItems.length > 0
+      ? slashItems
+      : linkItems.length > 0
+        ? linkItems
+        : channelItems.length > 0
+          ? channelItems
+          : mentionItems;
   const isSlash = slashItems.length > 0;
   const isLink = !isSlash && linkItems.length > 0;
+  const isChannel = !isSlash && !isLink && channelItems.length > 0;
   const open = items.length > 0;
   const current = Math.min(active, Math.max(0, items.length - 1));
 
@@ -448,13 +471,22 @@ export function Composer({
         setActive(0);
       }
     }
-    if (!mentions) return;
+    const nextChannel = channels ? channelQuery(text, caret) : null;
+    if (channels && (nextChannel?.start !== channelToken?.start || nextChannel?.query !== channelToken?.query)) {
+      setChannelToken(nextChannel);
+      setActive(0);
+    }
+    if (!mentions) {
+      if (channels && dismissed !== null && dismissed !== -1 && nextChannel?.start !== dismissed) setDismissed(null);
+      return;
+    }
     const next = mentionQuery(text, caret);
     if (next?.start !== token?.start || next?.query !== token?.query) {
       setToken(next);
       setActive(0);
     }
-    if (dismissed !== null && next?.start !== dismissed) setDismissed(null);
+    // A closed "@" or "#" list stays closed while its token is still being typed.
+    if (dismissed !== null && next?.start !== dismissed && nextChannel?.start !== dismissed) setDismissed(null);
   };
 
   const pick = (item: ComposerSuggestion) => {
@@ -473,6 +505,16 @@ export function Composer({
       setLinkToken(null);
       onChange(next);
       links?.onPick?.(item);
+      return;
+    }
+    if (isChannel && channelToken) {
+      const end = channelToken.start + 1 + channelToken.query.length;
+      const inserted = `#${item.insert} `;
+      const next = value.slice(0, channelToken.start) + inserted + value.slice(end).replace(/^ /, "");
+      caretAfter.current = channelToken.start + inserted.length;
+      setChannelToken(null);
+      onChange(next);
+      channels?.onPick?.(item);
       return;
     }
     if (!token) return;
@@ -513,7 +555,16 @@ export function Composer({
     ref.current?.focus();
   };
 
-  const dismiss = () => setDismissed(isSlash ? -1 : isLink ? (linkToken?.start ?? null) : (token?.start ?? null));
+  const dismiss = () =>
+    setDismissed(
+      isSlash
+        ? -1
+        : isLink
+          ? (linkToken?.start ?? null)
+          : isChannel
+            ? (channelToken?.start ?? null)
+            : (token?.start ?? null),
+    );
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     // A layer above already closed on this Esc: the suggestions, or a card that opened under the pointer and left the
@@ -539,7 +590,8 @@ export function Composer({
       }
       const item = items[current];
       // Already typed in full ("oi @ada" + Enter): Enter sends; Tab still completes.
-      const typedInFull = !isLink && item && token && item.insert.toLowerCase() === token.query.toLowerCase();
+      const typed = isChannel ? channelToken : token;
+      const typedInFull = !isLink && item && typed && item.insert.toLowerCase() === typed.query.toLowerCase();
       if (e.key === "Tab" || (e.key === "Enter" && !typedInFull)) {
         e.preventDefault();
         if (item) pick(item);
@@ -589,7 +641,7 @@ export function Composer({
         e.preventDefault();
         onFiles(pasted);
       }}
-      {...(mentions || commands || links
+      {...(mentions || commands || links || channels
         ? {
             role: "combobox",
             "aria-autocomplete": "list" as const,
@@ -779,7 +831,7 @@ export function Composer({
             </div>
           </div>
         </RPopover.Anchor>
-        {(mentions || commands || links) && (
+        {(mentions || commands || links || channels) && (
           <RPopover.Portal>
             <RPopover.Content
               className={cx("ac-menu ac-suggest", isSlash && "ac-suggest--commands")}
@@ -801,7 +853,9 @@ export function Composer({
                     ? (commands?.listLabel ?? "")
                     : isLink
                       ? (links?.listLabel ?? "")
-                      : (mentions?.listLabel ?? "")
+                      : isChannel
+                        ? (channels?.listLabel ?? "")
+                        : (mentions?.listLabel ?? "")
                 }
               >
                 {items.map((item, i) => {

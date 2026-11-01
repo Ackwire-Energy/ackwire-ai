@@ -72,6 +72,7 @@ import { activityVerb, barElapsed, barEntries, isWriting, toolActivity } from "@
 import { looksLikeApiKey } from "@agenteschat/client/lib/api-key-text";
 import { artifactRefs } from "@agenteschat/client/lib/artifacts";
 import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
+import { channelRefsOf } from "@agenteschat/client/lib/channel-refs";
 import {
   entersWithMotion,
   greetingSuggestions,
@@ -282,6 +283,7 @@ import {
 } from "@/components/threads/ThreadLines";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import { BarPhrase, ConsultClock, WorkingStack } from "@/components/WorkingLine";
+import { useChannelSearch } from "@/hooks/useChannelSearch";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
@@ -657,6 +659,7 @@ function ChannelView({
   // An agent mentioned from outside the channel: offer to add it.
   const [offer, setOffer] = useState<string | null>(null);
   const mentionSearch = useMentionSearch(members.data);
+  const channelSearch = useChannelSearch();
   const composer = useRef<HTMLTextAreaElement>(null);
   const emojiPicker = useEmojiLabels();
   const emojiLabels = useMemo(() => ({ ...emojiPicker, button: t("channel.emoji") }), [emojiPicker, t]);
@@ -1986,6 +1989,7 @@ function ChannelView({
                         commands={
                           commands.length > 0 ? { listLabel: t("composer.commands"), list: commands } : undefined
                         }
+                        channels={{ search: channelSearch, listLabel: t("channelRefs.list") }}
                         mentions={{
                           search: mentionSearch,
                           listLabel: t("mentions.list"),
@@ -3493,6 +3497,7 @@ export const TimelineMessage = memo(function TimelineMessage({
                   resolveMention={dir.mentionName}
                   renderMention={renderMention}
                   wikiLink={wikiLink}
+                  channelRefs={channelRefsOf(m.meta)}
                   accent={colorOf(agent)}
                 />
               </MessageText>

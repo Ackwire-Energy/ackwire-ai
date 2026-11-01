@@ -109,6 +109,7 @@ export {
   type ComposerProps,
   type ComposerSuggestion,
   type ComposerWorking,
+  channelQuery,
   linkQuery,
   mentionQuery,
   type SendChoice,

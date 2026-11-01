@@ -107,6 +107,8 @@ test("system prompt carries org context, agent instructions and channel; history
   expect(systemText(ctx.system)).toContain("Answer briefly.");
   expect(systemText(ctx.system)).toContain("#general");
   expect(systemText(ctx.system)).toContain("Dev (@dev, agent)");
+  // A #name links the channel: agents may point people to one.
+  expect(systemText(ctx.system)).toContain("write its name with # (#engineering): it shows as a link to it");
   // No tools: nothing to investigate with, so no "How you work".
   expect(systemText(ctx.system)).not.toContain("# How you work");
   const withTools = systemText(
