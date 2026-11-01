@@ -27,6 +27,7 @@ import {
   CheckCancelled,
   earlyAccessRequests,
   lookUpFailureText,
+  lookUpStep,
   refusalOf,
   refusalText,
   signUpClosed,
@@ -44,7 +45,17 @@ import { signInPurpose } from "./links";
 /** The e-mail this phone last signed in with: the next sign-in starts with it (kept on signing out). */
 const LAST_EMAIL = "last-email";
 
-type Step = "email" | "password" | "social" | "noPassword" | "name" | "newPassword" | "closed" | "forgot" | "sent";
+type Step =
+  | "email"
+  | "password"
+  | "social"
+  | "noPassword"
+  | "name"
+  | "newPassword"
+  | "closed"
+  | "expired"
+  | "forgot"
+  | "sent";
 
 /** Where the back button goes from each step (`null`: leave the screen, if there is somewhere to go). */
 const BACK: Record<Step, Step | null> = {
@@ -55,6 +66,7 @@ const BACK: Record<Step, Step | null> = {
   name: "email",
   newPassword: "name",
   closed: "email",
+  expired: "email",
   forgot: "password",
   sent: "password",
 };
@@ -133,8 +145,7 @@ export function AuthFlow({
       // app): the web's "noPassword" step says where to add one, instead of an empty provider list.
       const on = config.data?.socialProviders as Partial<Record<string, boolean>> | undefined;
       const usable = found.providers.some((p) => on?.[p] === true);
-      if (found.account) go(found.password ? "password" : usable ? "social" : "noPassword");
-      else go(found.canSignUp ? "name" : "closed");
+      go(lookUpStep(found, usable));
     } catch (e) {
       if (!(e instanceof CheckCancelled)) setError(lookUpFailureText(t, e));
     } finally {
@@ -308,6 +319,12 @@ export function AuthFlow({
     name: [t("auth.flow.name"), t("auth.flow.nameLead")],
     newPassword: [first ? t("auth.flow.newPasswordNamed", { name: first }) : t("auth.flow.newPassword")],
     closed: [t("auth.flow.closed"), t("auth.flow.closedLead")],
+    expired: [
+      t("auth.flow.expired"),
+      config.data?.supportEmail
+        ? t("auth.flow.expiredLead", { email: config.data.supportEmail })
+        : t("auth.flow.expiredLeadAsk"),
+    ],
     forgot: [t("auth.flow.forgot"), t("auth.flow.forgotLead")],
     sent: [t("auth.flow.sent", { email: email.trim() }), t("auth.flow.sentLead")],
   };
@@ -356,7 +373,7 @@ export function AuthFlow({
         // Where the e-mail can't sign up, "Usar outro e-mail" below already changes it: the chip only says which.
         <Who
           email={email.trim()}
-          onChange={step === "closed" || step === "noPassword" ? undefined : () => go("email")}
+          onChange={step === "closed" || step === "expired" || step === "noPassword" ? undefined : () => go("email")}
         />
       ) : null}
 
@@ -452,7 +469,7 @@ export function AuthFlow({
         </>
       ) : null}
 
-      {step === "closed" || step === "noPassword" ? (
+      {step === "closed" || step === "expired" || step === "noPassword" ? (
         <Button variant="secondary" wide label={t("auth.flow.otherEmail")} onPress={() => go("email")} />
       ) : null}
 

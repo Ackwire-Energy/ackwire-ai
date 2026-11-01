@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { ApiError } from "@agenteschat/client";
 import { createHumanCheck, withHumanCheck } from "@agenteschat/client/lib/human-check";
+import appConfig from "../../app.config";
 import {
   checkEvent,
   earlyAccessRequests,
@@ -12,11 +15,13 @@ import {
   humanCheckUrl,
   loadsAgain,
   lookUpFailureText,
+  lookUpStep,
   refusalOf,
   refusalText,
   signUpClosed,
   socialRefusalText,
 } from "../../src/features/auth/human-check";
+import { signUpLinkTarget } from "../../src/features/auth/links";
 import { translator } from "./fixtures";
 
 const SERVER = "https://app.agentes.chat";
@@ -299,5 +304,41 @@ describe("an early-access link on the phone", () => {
       idToken: { token: "apple.id.token" },
       fetchOptions: { headers: {} },
     });
+  });
+
+  test("Android hands the email's link (/signup) to the app, whose route has it", () => {
+    // biome-ignore lint/suspicious/noExplicitAny: the config's own type is loose here.
+    const config = appConfig({ config: {} } as any);
+    const host = new URL(config.extra?.apiUrl).host;
+    const links = (config.android?.intentFilters ?? []).flatMap((filter) => [filter.data ?? []].flat());
+    expect(links).toContainEqual({ scheme: "https", host, path: "/signup" });
+    expect(existsSync(join(import.meta.dir, "..", "..", "app", "signup.tsx"))).toBe(true);
+  });
+
+  test("the link opens Criar conta with its address and token once the session is known; signed in, the app", () => {
+    const token = "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8S9t0U1v";
+    const link = { email: "ana@acme.com", access: token };
+    // Before then the root gate would send Criar conta on to Entrar, without the token.
+    expect(signUpLinkTarget({ pending: true, signedIn: false }, link)).toBeNull();
+    expect(signUpLinkTarget({ pending: false, signedIn: false }, link)).toEqual({
+      pathname: "/sign-up",
+      params: { email: "ana@acme.com", access: token },
+    });
+    expect(signUpLinkTarget({ pending: false, signedIn: true }, link)).toBe("/");
+    // Only a token's shape goes on.
+    expect(signUpLinkTarget({ pending: false, signedIn: false }, { access: "x" })).toEqual({
+      pathname: "/sign-up",
+      params: {},
+    });
+  });
+
+  test("after the lookup, an expired link says so, as on the web; without one, sign-up is closed", () => {
+    const none = { account: false, password: false, providers: [], canSignUp: false };
+    expect(lookUpStep({ ...none, accessExpired: true }, false)).toBe("expired");
+    expect(lookUpStep(none, false)).toBe("closed");
+    expect(lookUpStep({ ...none, canSignUp: true }, false)).toBe("name");
+    expect(lookUpStep({ ...none, account: true, password: true }, false)).toBe("password");
+    expect(lookUpStep({ ...none, account: true, providers: ["google"] }, true)).toBe("social");
+    expect(lookUpStep({ ...none, account: true, providers: ["google"] }, false)).toBe("noPassword");
   });
 });

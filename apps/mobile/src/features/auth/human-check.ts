@@ -1,4 +1,4 @@
-import { ApiError, type SignInProvider } from "@agenteschat/client";
+import { ApiError, type SignInOptions, type SignInProvider } from "@agenteschat/client";
 import {
   EARLY_ACCESS_OTHER_EMAIL,
   knownErrorText,
@@ -179,6 +179,16 @@ export function socialRefusalText(
     (code ? providerRefusalText(t, code, emails) : null) ??
     t("mobile.auth.social.failed")
   );
+}
+
+/**
+ * The step after the e-mail lookup, as the web's sign-in takes it: the account's way in, else a name for a new
+ * account, an early-access link that expired, or sign-up closed. `usable`: the account signs in with a provider
+ * this server has.
+ */
+export function lookUpStep(found: SignInOptions, usable: boolean) {
+  if (found.account) return found.password ? "password" : usable ? "social" : "noPassword";
+  return found.canSignUp ? "name" : found.accessExpired ? "expired" : "closed";
 }
 
 /**
