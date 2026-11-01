@@ -169,6 +169,7 @@ const ImportPlan = z
             "channel_not_picked",
             "invalid",
             "failed",
+            "too_many_routines",
           ])
           .optional()
           .openapi({

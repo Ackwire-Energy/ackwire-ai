@@ -277,6 +277,8 @@ export interface RoutineInput {
   access?: RoutineAccess;
   /** When it speaks (default `when_new`). */
   report?: RoutineReport;
+  /** Created paused: no next run, so the active-routine cap doesn't apply. */
+  paused?: boolean;
 }
 
 export type RoutineTriggerInput =
@@ -1069,7 +1071,7 @@ export async function createRoutine(
   await checkTarget(db, orgId, agent.id, input.target, actorId);
   const trigger = await resolveTrigger(deps, actorId, orgId, input.trigger);
   checkFrequency(trigger, input.target);
-  if (startsRuns(trigger.triggerType, input.target)) await checkRoutineCap(db, orgId, agent.id);
+  if (!input.paused && startsRuns(trigger.triggerType, input.target)) await checkRoutineCap(db, orgId, agent.id);
   if (input.trigger.type === "email") await checkWatchable(db, orgId, agent.id, input.trigger.accountId);
   const name = input.name?.trim().slice(0, 120) || prompt.split("\n")[0]?.slice(0, 60) || "Routine";
   const [row] = await db
@@ -1081,6 +1083,7 @@ export async function createRoutine(
       prompt,
       target: input.target as unknown as Record<string, unknown>,
       ...trigger,
+      ...(input.paused ? { active: false, nextRunAt: null } : {}),
       access: routineAccessOf(input.access),
       report: routineReportOf(input.report),
       createdByUserId: actorId,

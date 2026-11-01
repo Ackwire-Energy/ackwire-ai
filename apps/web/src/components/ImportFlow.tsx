@@ -1205,6 +1205,7 @@ export function ImportReport({
   const kept = [...(flow.planned?.items ?? []).filter((i) => !sent.has(itemId(i))), ...report].filter(
     (i) => i.action === "unchanged",
   ).length;
+  const capped = made.filter((i) => i.reason === "too_many_routines").length;
   const agentId = new Map(report.filter((i) => i.kind === "agent" && i.targetId).map((i) => [i.key, i.targetId]));
   const sub = (level + 1) as 3 | 4;
 
@@ -1348,6 +1349,7 @@ export function ImportReport({
         )}
       </ul>
       {kept > 0 && <p className="small muted">{t("onboarding.import.report.kept", { count: kept })}</p>}
+      {capped > 0 && <p className="small muted">{t("onboarding.import.report.capped", { count: capped })}</p>}
 
       {copy?.result && copy.result.left.length > 0 && (
         <section className="imp-block" aria-labelledby="imp-files-left-title">

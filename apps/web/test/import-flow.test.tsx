@@ -372,6 +372,27 @@ describe("Configurações → Importar e exportar", () => {
     expect(document.activeElement?.textContent).toContain("Solte aqui a pasta, o arquivo ou o .zip");
   });
 
+  test("routines that arrived paused at their agent's limit are counted in the report", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const apply = api.imports.apply;
+    api.imports.apply = async (orgId, input) => {
+      const plan = await apply(orgId, input);
+      if (input.dryRun) return plan;
+      const items = plan.items.map((i) => (i.kind === "routine" ? { ...i, reason: "too_many_routines" as const } : i));
+      return { ...plan, items };
+    };
+    await go(state, api);
+    await pick("Pasta para importar", folder("paperclip-company"));
+    const importIt = screen()
+      .getAllByRole("button")
+      .find((b) => /^Importar \d+ itens$/.test(b.textContent ?? ""));
+    if (!importIt) throw new Error("no Importar");
+    await click(importIt, 8);
+    const report = screen().getByRole("region", { name: "Chegou tudo" });
+    expect(report.textContent).toMatch(/\d+ rotinas? cheg(ou|aram) pausadas?: /);
+  });
+
   test("dropping a file, or a whole folder (walked through its entries), reads it the same way", async () => {
     await go();
     await drop({ files: [fixture("sales-desk.openmaus.json")], items: [] });

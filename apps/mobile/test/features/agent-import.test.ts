@@ -177,8 +177,16 @@ describe("Importar agentes on the phone: after the import", () => {
       item("routine", "daily", "create", { targetId: "r1" }),
     ];
     expect(arrivedAgents(report)).toEqual(["a1"]);
-    expect(reportCounts(report, 3)).toEqual({ done: 2, total: 3, partial: true });
+    expect(reportCounts(report, 3)).toEqual({ done: 2, total: 3, partial: true, capped: 0 });
     expect(reportCounts(report.slice(0, 1), 1).partial).toBe(false);
+  });
+
+  test("routines that arrived paused at their agent's limit are counted for the toast", () => {
+    const report = [
+      item("routine", "daily", "create", { targetId: "r1" }),
+      item("routine", "extra", "create", { targetId: "r2", reason: "too_many_routines" }),
+    ];
+    expect(reportCounts(report, 2)).toEqual({ done: 2, total: 2, partial: false, capped: 1 });
   });
 
   test("offline is a request that never got an answer", () => {

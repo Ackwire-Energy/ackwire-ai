@@ -731,6 +731,7 @@ export const ptBR = {
         channel_not_picked: "O canal dela não vem.",
         invalid: "Veio incompleto ou num formato que não dá para usar aqui.",
         failed: "Não deu para criar agora. Tente de novo.",
+        too_many_routines: "Chega pausada: o agente já está no limite de rotinas ativas.",
       },
       whyExists: {
         skill: "Já existe uma skill com esse nome aqui. Ela fica como está.",
@@ -835,6 +836,8 @@ export const ptBR = {
         openSkills: "Abrir Skills",
         kept_one: "{{count}} item já estava aqui e ficou como está.",
         kept_other: "{{count}} itens já estavam aqui e ficaram como estão.",
+        capped_one: "{{count}} rotina chegou pausada: o agente já estava no limite de rotinas ativas.",
+        capped_other: "{{count}} rotinas chegaram pausadas: os agentes já estavam no limite de rotinas ativas.",
         notCame: "Não vieram",
         another: "Importar outro arquivo",
       },

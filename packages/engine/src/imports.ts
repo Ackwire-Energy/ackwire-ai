@@ -99,7 +99,9 @@ export type ImportSkipReason =
   | "agent_not_picked"
   | "channel_not_picked"
   | "invalid"
-  | "failed";
+  | "failed"
+  /** A note on a created routine: its agent already had the most active routines, so it arrived paused. */
+  | "too_many_routines";
 
 export interface ImportItemResult {
   kind: ImportItemKind;
@@ -781,7 +783,11 @@ export async function applyImport(
           await remember(item, item.targetId);
           return;
         }
-        const routine = await createRoutine(routineDeps, actorId, orgId, fields);
+        const routine = await createRoutine(routineDeps, actorId, orgId, fields).catch((error) => {
+          if (!(error instanceof ValidationError && error.code === "routine.too_many")) throw error;
+          item.reason = "too_many_routines";
+          return createRoutine(routineDeps, actorId, orgId, { ...fields, paused: true });
+        });
         await remember(item, routine.id);
         return;
       }

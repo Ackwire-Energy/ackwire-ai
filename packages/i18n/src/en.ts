@@ -735,6 +735,7 @@ export const en: Translations = {
         channel_not_picked: "Its channel isn't coming.",
         invalid: "It came incomplete, or in a shape we can't use here.",
         failed: "Couldn't be created right now. Try again.",
+        too_many_routines: "Arrives paused: its agent is at the limit of active routines.",
       },
       whyExists: {
         skill: "A skill with this name already exists here. It stays as it is.",
@@ -840,6 +841,8 @@ export const en: Translations = {
         openSkills: "Open Skills",
         kept_one: "{{count}} item was already here and stays as it is.",
         kept_other: "{{count}} items were already here and stay as they are.",
+        capped_one: "{{count}} routine arrived paused: its agent was at the limit of active routines.",
+        capped_other: "{{count}} routines arrived paused: their agents were at the limit of active routines.",
         notCame: "Didn't come",
         another: "Import another file",
       },

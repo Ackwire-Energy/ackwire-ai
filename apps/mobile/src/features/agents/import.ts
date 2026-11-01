@@ -165,8 +165,9 @@ export const phoneOffline = (e: unknown) => e instanceof TypeError;
 
 /** What the apply brought against what was asked: everything arrived, or how much did. */
 export function reportCounts(report: readonly ImportItemResult[], asked: number) {
-  const done = report.filter((i) => i.action === "create" || i.action === "update").length;
-  return { done, total: asked, partial: done < asked };
+  const made = report.filter((i) => i.action === "create" || i.action === "update");
+  const capped = made.filter((i) => i.reason === "too_many_routines").length;
+  return { done: made.length, total: asked, partial: made.length < asked, capped };
 }
 
 /** Where a to-do's action opens on the phone: Conectores or the Drive. A key is asked in the chat; a model has no page. */

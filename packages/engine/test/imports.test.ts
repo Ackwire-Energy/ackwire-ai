@@ -370,6 +370,35 @@ describe("planning and applying an import", () => {
     expect(once?.rule).toMatchObject({ freq: "daily", count: 1, start: day, times: ["10:00"] });
   });
 
+  test("routines past the agent's active limit still arrive, paused, with a note saying why", async () => {
+    f = await setup();
+    const routines = Array.from({ length: 22 }, (_, i) => ({
+      key: `r${i}`,
+      name: `r${i}`,
+      agent: "scout",
+      prompt: `Faça r${i}.`,
+      channel: null,
+      trigger: { cron: "0 9 * * *", timezone: null },
+    }));
+    const plan = await run({ bundle: bundle({ routines }) });
+    const items = byKey(plan.items);
+    const rows = await f.db.select().from(schema.routines);
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    for (let i = 0; i < 22; i++) {
+      const item = items.get(`routine:r${i}`);
+      expect(item?.action).toBe("create");
+      const row = byId.get(item?.targetId ?? "");
+      if (i < 20) {
+        expect(item?.reason).toBeUndefined();
+        expect(row?.active).toBe(true);
+      } else {
+        expect(item?.reason).toBe("too_many_routines");
+        expect(row?.active).toBe(false);
+        expect(row?.nextRunAt).toBeNull();
+      }
+    }
+  });
+
   test("admins only; one apply takes at most 200 writes (a dry run any size)", async () => {
     f = await setup();
     const member = await addPerson(f.db, f.org.id, "member");
