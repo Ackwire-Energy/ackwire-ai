@@ -23,7 +23,15 @@ import { Text } from "@/ui/Text";
 import { useTheme } from "@/ui/theme";
 import { rememberConfirmationSent } from "./confirmation";
 import { useHumanCheck } from "./HumanCheck";
-import { CheckCancelled, lookUpFailureText, refusalOf, refusalText, signUpClosed } from "./human-check";
+import {
+  CheckCancelled,
+  earlyAccessRequests,
+  lookUpFailureText,
+  lookUpStep,
+  refusalOf,
+  refusalText,
+  signUpClosed,
+} from "./human-check";
 import { pendingInvite } from "./invite";
 import { signInPurpose } from "./links";
 
@@ -37,7 +45,17 @@ import { signInPurpose } from "./links";
 /** The e-mail this phone last signed in with: the next sign-in starts with it (kept on signing out). */
 export const LAST_EMAIL = "last-email";
 
-type Step = "email" | "password" | "social" | "noPassword" | "name" | "newPassword" | "closed" | "forgot" | "sent";
+type Step =
+  | "email"
+  | "password"
+  | "social"
+  | "noPassword"
+  | "name"
+  | "newPassword"
+  | "closed"
+  | "expired"
+  | "forgot"
+  | "sent";
 
 /** Where the back button goes from each step (`null`: leave the screen, if there is somewhere to go). */
 const BACK: Record<Step, Step | null> = {
@@ -48,6 +66,7 @@ const BACK: Record<Step, Step | null> = {
   name: "email",
   newPassword: "name",
   closed: "email",
+  expired: "email",
   forgot: "password",
   sent: "password",
 };
@@ -64,7 +83,16 @@ const STEP_ACTIONS: Partial<Record<Step, HumanAction>> = {
   forgot: "password-reset",
 };
 
-export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; email?: string }) {
+/** `access`: an early-access link's token, for the sign-up it opens (as the web's `/signup?access=`). */
+export function AuthFlow({
+  start,
+  email: initialEmail,
+  access,
+}: {
+  start: "in" | "up";
+  email?: string;
+  access?: string;
+}) {
   const { t } = useTranslation();
   const api = useApi();
   const config = useAuthConfig();
@@ -87,6 +115,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
   const linkedProviders = useSocialProviders(options?.providers);
   const allProviders = useSocialProviders();
   const canReset = config.data?.passwordReset === true;
+  const requests = earlyAccessRequests(access);
   // Where this sign-in leads, in place of the general line: the invitation opened before it (its workspace, by its
   // token), as the web's sign-in says it.
   const [waiting] = useState(pendingInvite);
@@ -110,7 +139,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
     setError(null);
     try {
       const found = await withHumanCheck(human.check, (token) =>
-        api.account.signInOptions({ email: value.trim() }, token),
+        api.account.signInOptions(requests.lookUp(value.trim()), token),
       );
       setOptions(found);
       setPassword("");
@@ -118,8 +147,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
       // app): the web's "noPassword" step says where to add one, instead of an empty provider list.
       const on = config.data?.socialProviders as Partial<Record<string, boolean>> | undefined;
       const usable = found.providers.some((p) => on?.[p] === true);
-      if (found.account) go(found.password ? "password" : usable ? "social" : "noPassword");
-      else go(found.canSignUp ? "name" : "closed");
+      go(lookUpStep(found, usable));
     } catch (e) {
       if (!(e instanceof CheckCancelled)) setError(lookUpFailureText(t, e));
     } finally {
@@ -142,6 +170,12 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
   useEffect(() => {
     if (launched && focused && step === "email" && !initialEmail) emailField.current?.focus();
   }, [launched, focused]);
+
+  /** A provider refused: its words, and the address an unconfirmed account's refusal was for, in the field. */
+  const socialRefused = (text: string, address?: string) => {
+    setError(text);
+    if (address && text === t("auth.unconfirmed")) setEmail(address);
+  };
 
   /** Better Auth's refusal → the sentence to show (never the server's raw text). */
   const failed = (refusal: { status: number; code?: string }) =>
@@ -201,7 +235,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
             name: name.trim(),
             email: email.trim(),
             password,
-            fetchOptions: { headers: humanCheckHeaders(token) },
+            fetchOptions: { headers: { ...humanCheckHeaders(token), ...requests.headers } },
           }),
         ),
       );
@@ -287,6 +321,12 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
     name: [t("auth.flow.name"), t("auth.flow.nameLead")],
     newPassword: [first ? t("auth.flow.newPasswordNamed", { name: first }) : t("auth.flow.newPassword")],
     closed: [t("auth.flow.closed"), t("auth.flow.closedLead")],
+    expired: [
+      t("auth.flow.expired"),
+      config.data?.supportEmail
+        ? t("auth.flow.expiredLead", { email: config.data.supportEmail })
+        : t("auth.flow.expiredLeadAsk"),
+    ],
     forgot: [t("auth.flow.forgot"), t("auth.flow.forgotLead")],
     sent: [t("auth.flow.sent", { email: email.trim() }), t("auth.flow.sentLead")],
   };
@@ -335,7 +375,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
         // Where the e-mail can't sign up, "Usar outro e-mail" below already changes it: the chip only says which.
         <Who
           email={email.trim()}
-          onChange={step === "closed" || step === "noPassword" ? undefined : () => go("email")}
+          onChange={step === "closed" || step === "expired" || step === "noPassword" ? undefined : () => go("email")}
         />
       ) : null}
 
@@ -409,11 +449,18 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
         </Text>
       ) : null}
 
+      {/* A provider refused an unconfirmed account: a new password by email, never a new confirmation (ADR 0006). */}
+      {canReset && error === t("auth.unconfirmed") && isEmail(email) ? (
+        <Quiet label={t("auth.unconfirmedReset")} onPress={() => go("forgot")} />
+      ) : null}
+
       {submitLabel[step] ? (
         <Button variant="primary" wide label={submitLabel[step]} disabled={!ready || pending} onPress={submit} />
       ) : null}
 
-      {step === "email" ? <SocialButtons providers={allProviders} onError={setError} /> : null}
+      {step === "email" ? (
+        <SocialButtons providers={allProviders} onError={socialRefused} earlyAccess={access} />
+      ) : null}
 
       {step === "password" && canReset ? <Quiet label={t("auth.forgotPassword")} onPress={() => go("forgot")} /> : null}
 
@@ -424,7 +471,7 @@ export function AuthFlow({ start, email: initialEmail }: { start: "in" | "up"; e
         </>
       ) : null}
 
-      {step === "closed" || step === "noPassword" ? (
+      {step === "closed" || step === "expired" || step === "noPassword" ? (
         <Button variant="secondary" wide label={t("auth.flow.otherEmail")} onPress={() => go("email")} />
       ) : null}
 

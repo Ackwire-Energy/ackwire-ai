@@ -19,6 +19,7 @@ import { createAgentRuns, eligibleChannelAgents } from "./dispatch";
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import { cutText } from "./format";
 import { routineDeliveryBlock } from "./hand-off";
+import { taskEndText } from "./machine-task-text";
 import {
   getMachineById,
   MachineDroppedError,
@@ -193,13 +194,7 @@ export function taskSeconds(row: Pick<MachineTaskRow, "seconds" | "startedAt" | 
   return Math.max(row.seconds ?? 0, Math.round(((row.endedAt?.getTime() ?? now) - row.startedAt.getTime()) / 1000));
 }
 
-/** `3 min`, `1 h 05 min`, `40 s`. */
-export function formatDuration(seconds: number) {
-  if (seconds < 60) return `${seconds} s`;
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} min`;
-  return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")} min`;
-}
+export { formatDuration } from "./machine-task-text";
 
 /** Titles go into the thread as plain text: no mentions. */
 const plainTitle = (title: string) =>
@@ -1247,19 +1242,11 @@ export async function checkCutTaskStart(
 }
 
 /** The text of a task's end, for the thread (English; the app uses the code). */
-function endText(row: MachineTaskRow, computer: string) {
-  const took = formatDuration(taskSeconds(row));
-  switch (row.status) {
-    case "done":
-      return `Task "${row.title}" finished on ${computer} after ${took}.`;
-    case "canceled":
-      return `Task "${row.title}" was canceled on ${computer} after ${took}.`;
-    case "interrupted":
-      return `Task "${row.title}" was interrupted on ${computer} after ${took} (the computer went away) and couldn't resume by itself.`;
-    default:
-      return `Task "${row.title}" failed on ${computer} after ${took} (exit code ${row.exitCode ?? "none"}).`;
-  }
-}
+const endText = (row: MachineTaskRow, computer: string, blocked: { command: string }[] = []) =>
+  taskEndText(
+    { title: row.title, status: row.status, seconds: taskSeconds(row), exitCode: row.exitCode, blocked },
+    computer,
+  );
 
 /** A task's end as the notice the agent reads (`meta.machineTask` with the result) and people see. */
 export function taskEndNotice(row: MachineTaskRow, computer: string) {
@@ -1416,9 +1403,7 @@ async function claimMissionTaskEnd(deps: TaskDeps, row: MachineTaskRow) {
           channelId: row.channelId,
           threadId: row.threadRootId,
           author: { type: "agent", agentId: row.agentId, runId: null, hop: 0, stretchId: null },
-          body: blocked.length
-            ? `${endText(row, computer)} Blocked: ${blocked.map((d) => `\`${d.command}\``).join(", ")}.`
-            : endText(row, computer),
+          body: endText(row, computer, blocked),
           meta: {
             machineTask: {
               id: row.id,

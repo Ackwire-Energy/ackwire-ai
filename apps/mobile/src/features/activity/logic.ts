@@ -4,6 +4,7 @@ import { namesText } from "@agenteschat/client/lib/format";
 import { mediaKindOf } from "@agenteschat/client/lib/media";
 import { askersOf } from "@agenteschat/client/lib/notifications";
 import { routineNotificationWords, type Words } from "@agenteschat/client/lib/routine-view";
+import { secretNoticeLine } from "@agenteschat/client/lib/secret-requests";
 import type { TFunction } from "i18next";
 import { daysAgo } from "../shared/logic";
 
@@ -16,11 +17,18 @@ import { daysAgo } from "../shared/logic";
 export type ActivityFilter = "all" | "waiting";
 
 /**
- * Waiting ones in this order: an agent stuck in its browser (it expires in minutes), an agent's question, my
- * turn at the table, an approval, then someone asking to join (nobody's work waits on it); newest first within a
- * kind.
+ * Waiting ones in this order: an agent stuck in its browser or waiting for a secret (both expire in minutes), an
+ * agent's question, my turn at the table, an approval, then someone asking to join (nobody's work waits on it);
+ * newest first within a kind.
  */
-const WAITING_ORDER: string[] = ["browser_handoff", "agent_question", "forum_turn", "approval", "join_request"];
+const WAITING_ORDER: string[] = [
+  "browser_handoff",
+  "secret_request",
+  "agent_question",
+  "forum_turn",
+  "approval",
+  "join_request",
+];
 
 export const isVisible = (n: Pick<AppNotification, "doneAt" | "snoozedUntil">, now = Date.now()) =>
   !n.doneAt && !(n.snoozedUntil && new Date(n.snoozedUntil).getTime() > now);
@@ -110,10 +118,10 @@ export const emojisOf = (n: AppNotification) => (n.kind === "reaction" ? (n.late
 // ── Esperando você as cards, and what comes next ─────────────────────────────────────────────────
 
 /**
- * What a waiting item asks of you: approve, answer an agent, take your turn at the table, help in a browser, or let
- * someone in.
+ * What a waiting item asks of you: approve, answer an agent, take your turn at the table, help in a browser, give
+ * a secret, or let someone in.
  */
-export type WaitingCardKind = "approval" | "question" | "forum" | "browser" | "join";
+export type WaitingCardKind = "approval" | "question" | "forum" | "browser" | "secret" | "join";
 
 export interface WaitingCard {
   kind: WaitingCardKind;
@@ -121,7 +129,7 @@ export interface WaitingCard {
   title: string;
   /** Only requests expire. */
   expiresAt: string | null;
-  /** The one button: "Revisar" (a request), "Responder" or "Abrir" (the agent's browser). */
+  /** The one button: "Revisar" (a request), "Responder" or "Abrir" (the agent's browser, a secret's card). */
   action: "review" | "answer" | "open";
 }
 
@@ -130,6 +138,9 @@ export function waitingCardOf(n: Pick<AppNotification, "kind" | "count" | "lates
   const l = n.latest;
   if (n.kind === "browser_handoff")
     return { kind: "browser", title: l.text ?? l.title ?? "", expiresAt: l.expiresAt ?? null, action: "open" };
+  // Its name and what it is for, as its card says: typed there, in the conversation, never here.
+  if (n.kind === "secret_request")
+    return { kind: "secret", title: secretNoticeLine(n), expiresAt: l.expiresAt ?? null, action: "open" };
   if (n.kind === "approval")
     return { kind: "approval", title: l.title ?? l.text ?? "", expiresAt: l.expiresAt ?? null, action: "review" };
   if (n.kind === "forum_turn")

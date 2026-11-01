@@ -532,6 +532,10 @@ export type ChannelEvent =
       agentId: string | null;
       decidedByUserId: string | null;
       decidedAt: string | null;
+      /** Created in one click: the lines of its draft it got (ids only). */
+      applied?: { channelIds: string[]; connectionIds: string[]; mailAccountIds: string[] };
+      /** The routine made with it. */
+      routineId?: string | null;
     };
 
 const INLINE_LIMIT = 6000;

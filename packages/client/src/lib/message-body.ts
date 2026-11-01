@@ -19,9 +19,11 @@ type Meta = Record<string, unknown> | undefined;
  * cards, "Done.", "File saved.", memory lines, a run cut by a deploy), in the
  * person's language: `meta.bodyCode` + `meta.bodyParams` → `chat.body.*`, and
  * `meta.interrupted` / `meta.brainInterrupted` → what the agent wrote plus the notice. Anything else (the
- * model's own text) is shown as is; the server's English body is the fallback.
+ * model's own text) is shown as is; the server's English body is the fallback. A body that says where something ran
+ * (a task's end, a mission's plan: `bodyParams.computer`) names the computer only with `namesComputer`
+ * (`namesComputers`), else it reads in its code's `…NoComputer` words. `locale` formats a usage wait's reset time.
  */
-export function serverBody(t: TFunction, body: string, meta: Meta, locale?: string): string {
+export function serverBody(t: TFunction, body: string, meta: Meta, locale?: string, namesComputer = false): string {
   const m = meta ?? {};
   const interrupted = m.interrupted as { text?: unknown } | undefined;
   if (interrupted && typeof interrupted === "object" && typeof interrupted.text === "string") {
@@ -74,13 +76,16 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
     return t("chat.body.plan_limit_wait_unknown", { plan, defaultValue: body });
   }
   const shown = busy ? "brain_busy" : signedOut ? "no_ai_signed_out" : code;
-  return t(`chat.body.${shown}`, { ...params, defaultValue: body });
+  const key = `chat.body.${shown}`;
+  // i18next takes the first key that exists: a body with no `…NoComputer` words keeps its own.
+  return t(params.computer && !namesComputer ? [`${key}NoComputer`, key] : key, { ...params, defaultValue: body });
 }
 
 /**
  * A conversation list's last-message line: a body the server wrote (`meta` from the list, same keys as
- * the message's) in the reader's language, as the chat shows it, on one plain line; a GIF or a sticker with no
- * text as its word (ADR 0091: the list's `mediaKind`, or a kind its meta carries); else the text as is.
+ * the message's) in the reader's language, as the chat shows it, on one plain line, never naming a computer; a GIF
+ * or a sticker with no text as its word (ADR 0091: the list's `mediaKind`, or a kind its meta carries); else the text
+ * as is.
  */
 export function previewBody(t: TFunction, text: string, meta: Meta | null, mediaKind?: unknown): string {
   if (!text.trim()) {

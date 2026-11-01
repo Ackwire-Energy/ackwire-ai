@@ -1,6 +1,8 @@
 import {
+  ARTIFACT_LIMITS,
   applyImport,
   attachmentDisposition,
+  copyImportedFile,
   exportBundle,
   IMPORT_KINDS,
   IMPORT_LIMITS,
@@ -8,11 +10,22 @@ import {
   NEW_AGENT_DEFAULTS,
   NOTE_KINDS,
   readGithubImport,
+  ValidationError,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { bodyLimit } from "hono/body-limit";
 import { apiError, errorResponse } from "../../http/errors";
-import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSession, security } from "./context";
+import {
+  type AppDeps,
+  body,
+  createAppRouter,
+  errors,
+  json,
+  MULTIPART_SLACK_BYTES,
+  OrgParams,
+  requireSession,
+  security,
+} from "./context";
 
 const tags = ["Agents"];
 
@@ -171,6 +184,17 @@ const ImportPlan = z
   })
   .openapi("ImportPlan");
 
+const ImportedFile = z
+  .object({
+    status: z.enum(["created", "exists"]).openapi({
+      description: "`exists`: the folder had a file with that name already, and it stays as it was.",
+    }),
+    artifactId: z.uuid(),
+    title: z.string().openapi({ description: "`<folder>/<path>`." }),
+    folder: z.string().openapi({ description: "The agent's folder in the Drive: its name." }),
+  })
+  .openapi("ImportedFile");
+
 const ImportedSources = z
   .object({
     sources: z.array(
@@ -204,6 +228,16 @@ export function agentImportRoutes(deps: AppDeps) {
     bodyLimit({
       maxSize: IMPORT_LIMITS.bodyBytes,
       onError: (c) => apiError(c, 413, "import.too_large", "The import is too large (max 32 MB)"),
+    }),
+  );
+  app.use(
+    "/organizations/:orgId/imports/files",
+    bodyLimit({
+      maxSize: ARTIFACT_LIMITS.fileBytes + MULTIPART_SLACK_BYTES,
+      onError: (c) => {
+        const maxMb = ARTIFACT_LIMITS.fileBytes / 1024 / 1024;
+        return apiError(c, 413, "artifact.file_too_large", `The file is too large (max ${maxMb} MB)`, { maxMb });
+      },
     }),
   );
 
@@ -287,6 +321,57 @@ export function agentImportRoutes(deps: AppDeps) {
         NEW_AGENT_DEFAULTS,
       );
       return c.json(plan, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/imports/files",
+      tags,
+      security,
+      summary: "Copy one of an imported agent's files into its folder in the Drive (admins)",
+      description:
+        "The file lands as `<agent's name>/<path>`, keeping the source's folders, made by the agent and seen by the whole workspace. A name the folder already has is never overwritten (`exists`). Files with keys or sign-ins are refused (`import.secret_file`). The Drive's limits apply: 50 MB a file, the workspace's storage and daily uploads (409).",
+      request: {
+        params: OrgParams,
+        body: {
+          required: true,
+          content: {
+            "multipart/form-data": {
+              schema: z.object({
+                file: z.any().openapi({ type: "string", format: "binary", description: "The file (≤ 50 MB)." }),
+                agentId: z.uuid(),
+                path: z.string().min(1).max(1000).openapi({ description: "Where it goes in the agent's folder." }),
+                note: z.string().max(500).optional().openapi({ description: "For its first version." }),
+              }),
+            },
+          },
+        },
+      },
+      responses: {
+        200: json(ImportedFile, "Already there: it stays as it was"),
+        201: json(ImportedFile, "Copied"),
+        413: errorResponse("The file is too large"),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const artifacts = deps.extras?.artifacts;
+      if (!artifacts) throw new Error("storage is not configured on this server");
+      const form = c.req.valid("form");
+      if (!(form.file instanceof File)) {
+        throw new ValidationError("send the file in the field file", "artifact.file_required");
+      }
+      const copied = await copyImportedFile(artifacts, c.get("user").id, c.req.valid("param").orgId, {
+        agentId: form.agentId,
+        path: form.path,
+        name: form.file.name,
+        bytes: new Uint8Array(await form.file.arrayBuffer()),
+        contentType: form.file.type || null,
+        note: form.note ?? null,
+      });
+      return c.json(copied, copied.status === "created" ? 201 : 200);
     },
   );
 

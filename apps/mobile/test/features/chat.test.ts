@@ -3,6 +3,7 @@ import type { LiveConsult, LiveRun, LiveWork, Message, RunConsultation } from "@
 import { activitySentence, barElapsed, barFaces, barWords, PHRASE_TURN_MS } from "@agenteschat/client/lib/activity";
 import { consultBlocksNearEnd, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
+import { secretRequestOf, secretValueProblem, secretWhere } from "@agenteschat/client/lib/secret-requests";
 import { toolCalls, toolNow, toolPhrase, toolWhy } from "@agenteschat/client/lib/work";
 import {
   AGENT_WORDS_MIN,
@@ -86,6 +87,20 @@ describe("timeline", () => {
   test("hidden messages leave no row", () => {
     const rows = buildRows([message({ id: "1" }), message({ id: "2", threadId: "t" })], (m) => m.threadId === "t");
     expect(rows.filter((r) => r.kind === "message")).toHaveLength(1);
+  });
+
+  test("a notice only its agent reads (a proposal's result, a note, a wait's result) leaves no row", () => {
+    const agent = { type: "agent" as const, id: "dev" };
+    const notice = (id: string, kind: string) =>
+      message({ id, author: agent, meta: { notice: { kind, text: "ana created it: @caio (Caio)." } } });
+    const rows = buildRows([
+      message({ id: "1" }),
+      notice("2", "proposal_result"),
+      notice("3", "agent_note"),
+      notice("4", "wait_result"),
+      notice("5", "routine_handoff"),
+    ]);
+    expect(rows.flatMap((r) => (r.kind === "message" ? [r.message.id] : []))).toEqual(["1", "5"]);
   });
 });
 
@@ -1053,11 +1068,71 @@ describe("automatic lines (notices) and fast replies", () => {
     const ada = { type: "agent" as const, id: "ada" };
     const rows = buildRows([
       message({ id: "a", author: ada, createdAt: at(10) }),
-      message({ id: "n", author: ada, meta: { notice: { kind: "agent_note", text: "x" } }, createdAt: at(9) }),
+      message({ id: "n", author: ada, meta: { notice: { kind: "routine_handoff", text: "x" } }, createdAt: at(9) }),
       message({ id: "b", author: ada, createdAt: at(8) }),
       message({ id: "t", author: ada, meta: { talker: { runId: "r1" } }, createdAt: at(7) }),
       message({ id: "c", author: ada, createdAt: at(6) }),
     ]).flatMap((r) => (r.kind === "message" ? [r.grouped] : []));
     expect(rows).toEqual([false, false, false, false, true]);
+  });
+});
+
+describe("an agent's secret request (ADR 0027), as its card reads it", () => {
+  const request = {
+    id: "s1",
+    agentId: "theo",
+    channelId: "c1",
+    threadId: null,
+    messageId: "m1",
+    requestedForUserId: "u1",
+    name: "SHOP_PASSWORD",
+    purpose: "entrar na loja (shop.example.com)",
+    target: { kind: "site", site: "https://shop.example.com" },
+    site: "https://shop.example.com",
+    machineId: "mac1",
+    publicKey: "BPk",
+    status: "pending",
+    expiresAt: at(-15),
+    deliveredAt: null,
+    removed: false,
+  } as const;
+
+  test("its card stands alone, and its message's text isn't repeated above it", () => {
+    const card = message({ id: "m1", author: { type: "agent", id: "theo" }, body: "Secret request: SHOP_PASSWORD" });
+    const asked = { ...card, meta: { secretRequest: request } };
+    expect(secretRequestOf(asked.meta)).toEqual(request);
+    expect(hidesBody(asked)).toBe(true);
+    expect(standsAlone(asked)).toBe(true);
+    expect(hidesBody(card)).toBe(false);
+    // Anything else under its name is no card.
+    expect(secretRequestOf({ secretRequest: { ...request, target: { kind: "ssh" } } })).toBeNull();
+    expect(secretRequestOf({ secretRequest: { ...request, status: "opened" } })).toBeNull();
+    expect(secretRequestOf({ secretRequest: "SHOP_PASSWORD" })).toBeNull();
+    expect(secretRequestOf(undefined)).toBeNull();
+  });
+
+  test("where the value goes, said truly for each kind, in both languages", async () => {
+    const en = await translator("en");
+    const pt = await translator("pt-BR");
+    expect(secretWhere(en, request, "Theo")).toBe(
+      "Only Theo's browser types it, on shop.example.com. It stays out of Theo's commands.",
+    );
+    expect(secretWhere(pt, request, "Theo")).toBe(
+      "Só o navegador de Theo digita, em shop.example.com. Fica fora dos comandos de Theo.",
+    );
+    expect(secretWhere(en, { ...request, name: "NPM_TOKEN", target: { kind: "env" } }, "Theo")).toBe(
+      "Goes in as the variable NPM_TOKEN on Theo's computer.",
+    );
+    expect(secretWhere(pt, { ...request, target: { kind: "file", path: ".npmrc" } }, "Theo")).toBe(
+      "Vai para o arquivo .npmrc no computador de Theo.",
+    );
+  });
+
+  test("an empty or too large value is caught before it is sealed", async () => {
+    const en = await translator("en");
+    expect(secretValueProblem("")).toBe("secret.empty");
+    expect(secretValueProblem("é".repeat(8 * 1024 + 1))).toBe("secret.tooLarge");
+    expect(secretValueProblem("hunter2")).toBeNull();
+    expect(en("secret.tooLarge")).toBe("Too large (16 KB at most).");
   });
 });

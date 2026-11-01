@@ -22,7 +22,8 @@ import type { StreamSocket } from "./browser";
  *
  * The same connection says when a tab's page died (`Inspector.targetCrashed`
  * on its session: Chrome's sad tab) and opens it again or shows another page
- * there (`onCrash`), so each Chrome has one socket of ours.
+ * there (`onCrash`), and asks Chrome to quit (`quit`), so each Chrome has one
+ * socket of ours.
  */
 
 const AUTO_ATTACH = {
@@ -48,6 +49,8 @@ export interface TrafficCounter {
   attached: Promise<void>;
   /** The bytes counted since the last call. */
   take(): { up: number; down: number };
+  /** Asks Chrome to quit as a person quits it (`Browser.close`): it writes what it holds to its profile first. */
+  quit(): void;
   close(): void;
 }
 
@@ -244,6 +247,9 @@ export function countChromeTraffic(
       up = 0;
       down = 0;
       return out;
+    },
+    quit() {
+      send("Browser.close", {});
     },
     close() {
       try {

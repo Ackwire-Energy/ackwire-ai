@@ -419,3 +419,66 @@ test("agent policies are normalised; sending without asking needs allowed recipi
     giveMail({ ...m, f: { ...m.f, owner: member } } as MailFixture, account.id, "read"),
   ).rejects.toBeInstanceOf(ForbiddenError);
 });
+
+test("only who connected a mailbox gives an agent access to it; admins and the agent's owner only take it away", async () => {
+  m = await mailSetup();
+  const account = await imapAccount(m);
+  const { db, org, agent } = m.f;
+  const as = (who: { id: string }) => ({ ...m, f: { ...m.f, owner: who } }) as MailFixture;
+  const level = async () => (await getAgentMail(db, m.f.owner.id, org.id, agent.id))[0]?.level;
+  // A member's own mailbox: theirs to give, admin or not, to an agent they can talk to.
+  const ana = await addMember(db, org.id, "member", "Ana Mock");
+  await db.update(schema.mailAccounts).set({ createdByUserId: ana.id }).where(eq(schema.mailAccounts.id, account.id));
+  await giveMail(as(ana), account.id, "read_write", { dailySendCap: 7 });
+  expect(await level()).toBe("read_write");
+  // An admin can't give or widen it, and the refusal names who can.
+  const admin = await addMember(db, org.id, "admin");
+  await expect(giveMail(as(admin), account.id, "read_write", {}, true)).rejects.toMatchObject({
+    code: "mail.owner_only",
+    params: { ownerUserId: ana.id, ownerName: "Ana Mock" },
+  });
+  await expect(giveMail(m, account.id, "read_write", {}, true)).rejects.toBeInstanceOf(ForbiddenError);
+  // Lowering it is allowed, and their looser rules are ignored (the owner's stay).
+  const lowered = await giveMail(as(admin), account.id, "read", { dailySendCap: 1000 });
+  expect([lowered.level, lowered.policy.dailySendCap]).toEqual(["read", 7]);
+  // A member who neither owns the mailbox nor the agent takes nothing away.
+  const bia = await addMember(db, org.id, "member", "Bia Mock");
+  await expect(giveMail(as(bia), account.id, "none")).rejects.toBeInstanceOf(ForbiddenError);
+  // The agent's owner removes it.
+  await db.update(schema.agents).set({ ownerUserId: bia.id }).where(eq(schema.agents.id, agent.id));
+  await giveMail(as(bia), account.id, "none");
+  expect(await level()).toBe("none");
+  // Its owner can't give it to an agent that doesn't answer them.
+  await db.update(schema.agents).set({ audienceMode: "owner" }).where(eq(schema.agents.id, agent.id));
+  await expect(giveMail(as(ana), account.id, "read")).rejects.toMatchObject({ code: "audience.only" });
+  // …but they can still lower what it has there, keeping the rules it had.
+  await db.update(schema.agents).set({ audienceMode: "everyone" }).where(eq(schema.agents.id, agent.id));
+  await giveMail(as(ana), account.id, "read_write", { dailySendCap: 9 });
+  await db.update(schema.agents).set({ audienceMode: "owner" }).where(eq(schema.agents.id, agent.id));
+  const down = await giveMail(as(ana), account.id, "read", { dailySendCap: 1000 });
+  expect([down.level, down.policy.dailySendCap]).toEqual(["read", 9]);
+});
+
+test("only who connected a mailbox loosens its actions or adds addresses; admins only tighten them", async () => {
+  m = await mailSetup();
+  const { f, deps } = m;
+  const account = await imapAccount(m);
+  const ana = await addMember(f.db, f.org.id, "admin", "Ana Mock");
+  await f.db.update(schema.mailAccounts).set({ createdByUserId: ana.id }).where(eq(schema.mailAccounts.id, account.id));
+  await updateMailAccount(deps, ana.id, f.org.id, account.id, {
+    offActions: ["delete"],
+    askActions: ["organize"],
+    aliases: ["sales@acme.com"],
+  });
+  const admin = await addMember(f.db, f.org.id, "admin");
+  const update = (input: Parameters<typeof updateMailAccount>[4]) =>
+    updateMailAccount(deps, admin.id, f.org.id, account.id, input);
+  for (const widen of [{ offActions: [] }, { askActions: [] }, { aliases: ["sales@acme.com", "ceo@acme.com"] }]) {
+    await expect(update(widen)).rejects.toMatchObject({ code: "mail.owner_only", params: { ownerName: "Ana Mock" } });
+  }
+  // Tightening, and the label, stay open to admins: organizing moves from asking to off.
+  const r = await update({ offActions: ["delete", "organize"], askActions: [], aliases: [], label: "Vendas" });
+  expect(r).toMatchObject({
+    account: { offActions: ["delete", "organize"], askActions: [], aliases: [], label: "Vendas" },
+  });
+});

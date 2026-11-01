@@ -90,7 +90,7 @@ export interface ModelRow {
   label: string;
   /** What it does or is sold as. */
   sub?: string;
-  /** What the plan's account must allow before it answers. */
+  /** What the plan's account must allow before it answers, behind the row's ⓘ. */
   note?: string;
   /** That need's id: chosen, the agent's page says how to give it (`brain.modelHow`). */
   needs?: PlanModelNeed;

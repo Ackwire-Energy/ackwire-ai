@@ -35,6 +35,11 @@ export interface DialogProps {
    * an autoFocus field the focus before this dialog's trap is up, and the trap of the dialog under it takes it back.
    */
   initialFocus?: RefObject<HTMLElement | null>;
+  /**
+   * The content is a screen of its own with its own way out (a flow's ×): no head, the title for screen readers only,
+   * `closeLabel` unused.
+   */
+  bare?: boolean;
 }
 
 /**
@@ -56,6 +61,7 @@ export function Dialog({
   subtitle,
   actions,
   initialFocus,
+  bare = false,
 }: DialogProps) {
   // Controlled dialogs have no Radix Trigger to return focus to, so remember
   // what had focus when it opened and give focus back on close.
@@ -117,32 +123,36 @@ export function Dialog({
           // Without a description, tell Radix there is none (it warns otherwise).
           {...(description ? {} : { "aria-describedby": undefined })}
         >
-          <div className="ac-dialog__head">
-            {leading && <span className="ac-dialog__lead">{leading}</span>}
-            {subtitle === undefined ? (
-              <RDialog.Title className="ac-dialog__title">{title}</RDialog.Title>
-            ) : (
-              <span className="ac-dialog__titles">
+          {bare ? (
+            <RDialog.Title className="ac-visually-hidden">{title}</RDialog.Title>
+          ) : (
+            <div className="ac-dialog__head">
+              {leading && <span className="ac-dialog__lead">{leading}</span>}
+              {subtitle === undefined ? (
                 <RDialog.Title className="ac-dialog__title">{title}</RDialog.Title>
-                <span className="ac-dialog__sub" aria-live="polite">
-                  {subtitle}
+              ) : (
+                <span className="ac-dialog__titles">
+                  <RDialog.Title className="ac-dialog__title">{title}</RDialog.Title>
+                  <span className="ac-dialog__sub" aria-live="polite">
+                    {subtitle}
+                  </span>
                 </span>
+              )}
+              <span className="ac-dialog__acts ac-acts">
+                {actions}
+                <RDialog.Close asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
+                    icon="close"
+                    className="ac-btn--glyph"
+                    aria-label={closeLabel}
+                  />
+                </RDialog.Close>
               </span>
-            )}
-            <span className="ac-dialog__acts ac-acts">
-              {actions}
-              <RDialog.Close asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  icon="close"
-                  className="ac-btn--glyph"
-                  aria-label={closeLabel}
-                />
-              </RDialog.Close>
-            </span>
-          </div>
+            </div>
+          )}
           {description &&
             (descriptionAside ? (
               <p className="ac-dialog__desc">

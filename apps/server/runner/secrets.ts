@@ -8,6 +8,7 @@ import {
   redactSecrets,
   SECRET_NAME,
 } from "@agenteschat/adapters/secret-box";
+import { originOf } from "./browser";
 import { errnoCode, RunnerError } from "./errors";
 import { touchesGitInternals } from "./git-guard";
 import { agentFolderName, normalizeRequestPath, resolveInWorkspace } from "./paths";
@@ -20,7 +21,8 @@ import { agentFolderName, normalizeRequestPath, resolveInWorkspace } from "./pat
  */
 interface Stored {
   name: string;
-  target: { kind: "env" } | { kind: "file"; path: string };
+  /** `site`: only the agent browser types it, on that site; never a command's environment. */
+  target: { kind: "env" } | { kind: "file"; path: string } | { kind: "site"; site: string };
   value: string;
   deliveredAt: string;
   requestId?: string;
@@ -137,10 +139,20 @@ async function cancelStaged(dir: string, requestId: string) {
   await rm(stagedFile(dir, requestId), { force: true });
 }
 
+/** A delivery's target as it was asked for: a site is an origin (`https://host`), or the request is refused. */
+function targetOf(raw: Stored["target"] | undefined): Stored["target"] {
+  if (raw?.kind === "file") return { kind: "file", path: String(raw.path) };
+  if (raw?.kind !== "site") return { kind: "env" };
+  const site = String(raw.site);
+  if (originOf(site) !== site)
+    throw new RunnerError("bad_request", "A site secret's site must be its origin (https://host)");
+  return { kind: "site", site };
+}
+
 /** `agentes-secret|v1|<request>|<org>|<name>|<target>`: the server's AAD must name this request, secret and target. */
 function checkAad(aad: string, requestId: string, name: string, target: Stored["target"]) {
   const parts = String(aad).split("|");
-  const want = target.kind === "file" ? `file:${target.path}` : "env";
+  const want = target.kind === "file" ? `file:${target.path}` : target.kind === "site" ? `site:${target.site}` : "env";
   if (
     parts.length !== 6 ||
     parts[0] !== "agentes-secret" ||
@@ -192,14 +204,14 @@ async function handleSecretLocked(
       await pruneKeys(path.dirname(file));
       const pair = await generateSecretKeyPair();
       await writeFile(file, pair.privateKey, { mode: 0o600 });
-      return { publicKey: pair.publicKey };
+      // This runner keeps a site's password for its browser alone.
+      return { publicKey: pair.publicKey, sites: true };
     }
     case "deliver": {
       if (!SECRET_NAME.test(String(req.name)) || isReservedSecretName(String(req.name))) {
         throw new RunnerError("bad_request", "Invalid secret name");
       }
-      const target: Stored["target"] =
-        req.target?.kind === "file" ? { kind: "file", path: String(req.target.path) } : { kind: "env" };
+      const target = targetOf(req.target);
       checkAad(req.aad, req.requestId, req.name, target);
       const file = keyFile(dir, req.requestId);
       let privateKey: string;
@@ -277,8 +289,7 @@ async function handleSecretLocked(
       const file = keyFile(dir, req.requestId);
       const privateKey = await readFile(file, "utf8");
       const value = await openSecret(privateKey, delivery.box, delivery.aad);
-      const target: Stored["target"] =
-        delivery.target.kind === "file" ? { kind: "file", path: delivery.target.path } : { kind: "env" };
+      const target = targetOf(delivery.target);
       checkAad(delivery.aad, delivery.requestId, delivery.name, target);
       const current = (await readStore(dir)).filter((s) => s.name === delivery.name).at(-1);
       if ((await removedThrough(dir, delivery.name)) >= req.order) {
@@ -370,8 +381,7 @@ async function installLocked(
     throw new RunnerError("bad_request", "Invalid secret name");
   if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z\|[a-zA-Z0-9-]{8,64}$/.test(req.order))
     throw new RunnerError("bad_request", "Invalid secret delivery order");
-  const target =
-    req.target.kind === "file" ? { kind: "file" as const, path: req.target.path } : { kind: "env" as const };
+  const target = targetOf(req.target);
   const current = (await readStore(dir)).filter((s) => s.name === req.name).at(-1);
   if ((await latestOrder(dir, req.name, current)) > req.order) return { superseded: true };
   let fileTarget: string | null = null;
@@ -441,7 +451,10 @@ export async function activatedSecret(
   };
 }
 
-/** What commands of this agent get: env values, and a redactor for everything that leaves the machine. */
+/**
+ * What commands of this agent get: env values (never a site's password: that one only its browser types), and a
+ * redactor for everything that leaves the machine (every value, a site's password too).
+ */
 export async function agentSecrets(root: string | undefined, agent: AgentScope | undefined) {
   if (!root || !agent) return null;
   const secrets = await readStore(dirOf(root, agent)).catch(() => []);
@@ -457,9 +470,17 @@ export async function agentSecrets(root: string | undefined, agent: AgentScope |
   };
 }
 
-/** One delivered secret's value by name (the agent browser types it into a password field), or null. */
-export async function secretValue(root: string | undefined, agent: AgentScope, name: string): Promise<string | null> {
+/**
+ * One delivered secret by name, for the agent browser to type into a password field: its value, and the one site
+ * it was given for when the person sealed it to that site (`site`). Null when there is none.
+ */
+export async function secretValue(
+  root: string | undefined,
+  agent: AgentScope,
+  name: string,
+): Promise<{ value: string; site: string | null } | null> {
   if (!root) return null;
   const secrets = await readStore(dirOf(root, agent)).catch(() => [] as Stored[]);
-  return secrets.filter((s) => s.name === name).at(-1)?.value ?? null;
+  const held = secrets.filter((s) => s.name === name).at(-1);
+  return held ? { value: held.value, site: held.target.kind === "site" ? held.target.site : null } : null;
 }

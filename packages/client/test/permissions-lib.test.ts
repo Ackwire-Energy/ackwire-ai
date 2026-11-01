@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { managesChannel, setsAutoReply } from "../src/lib/permissions";
+import { addsAgentsTo, managesChannel, setsAutoReply } from "../src/lib/permissions";
 
 const member = { permissions: ["read", "post"] };
 const manager = { permissions: ["read", "post", "manage_channels"] };
@@ -21,4 +21,15 @@ test("an agent's reply mode in a channel: who manages the channel, or the agent'
   expect(setsAutoReply(room, bot, "davi", member)).toBe(false);
   expect(setsAutoReply(room, { ownerUserId: null }, null, member)).toBe(false);
   expect(setsAutoReply(room, undefined, "caio", member)).toBe(false);
+});
+
+test("an agent goes in or out of a channel its person is in and may post in, or manages", () => {
+  const joined = { ...room, isMember: true };
+  const other = { ...room, isMember: false };
+  expect(addsAgentsTo(joined, "caio", member)).toBe(true);
+  expect(addsAgentsTo(joined, "caio", { permissions: ["read"] })).toBe(false);
+  expect(addsAgentsTo(other, "caio", member)).toBe(false);
+  expect(addsAgentsTo(other, "bia", member)).toBe(true);
+  expect(addsAgentsTo(other, "caio", manager)).toBe(true);
+  expect(addsAgentsTo(undefined, "caio", member)).toBe(false);
 });

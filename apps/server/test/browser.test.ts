@@ -28,6 +28,21 @@ describe("parseBrowserClientFrame", () => {
       type: "browser.input",
       events: [{ kind: "mouse" }, { kind: "text", text: "olá ção" }],
     });
+    // When the person made a mouse event goes on to the computer (it keeps a drag's gaps); a time that isn't one doesn't.
+    const timed = parseBrowserClientFrame(
+      JSON.stringify({
+        type: "browser.input",
+        agentId: AGENT,
+        events: [
+          { kind: "mouse", type: "mouseMoved", x: 1, y: 2, button: "left", at: 1234.5 },
+          { kind: "mouse", type: "mouseMoved", x: 1, y: 2, at: -1 },
+        ],
+      }),
+    );
+    expect(timed?.type === "browser.input" && timed.events).toEqual([
+      { kind: "mouse", type: "mouseMoved", x: 1, y: 2, button: "left", at: 1234.5 },
+      { kind: "mouse", type: "mouseMoved", x: 1, y: 2 },
+    ]);
     expect(parseBrowserClientFrame(JSON.stringify({ type: "browser.input", agentId: AGENT, events: [] }))).toBeNull();
     expect(
       parseBrowserClientFrame(JSON.stringify({ type: "browser.input", agentId: AGENT, events: [{ kind: "nope" }] })),

@@ -47,6 +47,7 @@ import {
   Text,
   useTheme,
 } from "@/ui";
+import { IMPORT_LOGO } from "../agents/import-logos";
 import { openPage } from "../ai/parts";
 import { confirmationSentTo, forgetConfirmationSent } from "../auth/confirmation";
 import { chatHref } from "../links/logic";
@@ -63,7 +64,6 @@ import {
   HOST,
   IMPORT_BRAND,
   IMPORT_ROWS,
-  type ImportRow,
   introducesAt,
   inviteEach,
   joiningLeft,
@@ -696,16 +696,6 @@ export function OnboardingFlow({ onLeave }: { onLeave?: () => void } = {}) {
 
 /** How often Done asks again about an agent waiting for its computer (no socket is open here), as the web does. */
 const AI_POLL_MS = 5000;
-
-/** Each app's official logo (assets/images/brands/README.md); a dark file where the maker has one. */
-const IMPORT_LOGO: Record<ImportRow, { light: number; dark?: number }> = {
-  "grok-bot": {
-    light: require("../../../assets/images/brands/grok-bot.png"),
-    dark: require("../../../assets/images/brands/grok-bot-dark.png"),
-  },
-  "chatgpt-dots": { light: require("../../../assets/images/brands/chatgpt-dots.png") },
-  openbotrun: { light: require("../../../assets/images/brands/openbotrun.png") },
-};
 
 /**
  * Trazer agentes: the three most used apps the web brings agents from, with where the file is behind the ⓘ. Grok Bot

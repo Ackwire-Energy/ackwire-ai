@@ -4,7 +4,7 @@ import { setupDom } from "../testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
-import { CardHeader, Dialog, DialogBody, Field, hoverPointer, InfoHint, Input } from "../src";
+import { CardHeader, Dialog, DialogBody, Field, HOVER_CLOSE_MS, hoverPointer, InfoHint, Input } from "../src";
 
 afterEach(cleanup);
 
@@ -90,9 +90,11 @@ describe("InfoHint", () => {
     expect(tip()).toBeNull();
     await wait(220);
     expect(tip()?.textContent).toBe(TEXT);
-    // Leaving closes it, a moment later.
+    // Leaving closes it a moment later: time to come back.
     await act(async () => fireEvent.pointerLeave(hintButton(), { pointerType: "mouse" }));
-    await wait(220);
+    await wait(HOVER_CLOSE_MS - 100);
+    expect(tip()?.textContent).toBe(TEXT);
+    await wait(120);
     expect(tip()).toBeNull();
   });
 
@@ -108,7 +110,7 @@ describe("InfoHint", () => {
     await wait(400);
     expect(tip()?.textContent).toBe(TEXT);
     await act(async () => fireEvent.pointerLeave(bubble as HTMLElement, { pointerType: "mouse" }));
-    await wait(220);
+    await wait(HOVER_CLOSE_MS + 20);
     expect(tip()).toBeNull();
   });
 

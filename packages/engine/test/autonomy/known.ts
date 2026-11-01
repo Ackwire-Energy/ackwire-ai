@@ -7,9 +7,7 @@ import { test } from "bun:test";
  * its branch merges. `AUTONOMY_BRANCHES=a,b` treats those branches as merged (their scenarios must pass);
  * `AUTONOMY_STRICT=1` runs every scenario as a plain test.
  */
-export const KNOWN: Record<string, string[]> = {
-  S40: ["handle-follows-name"],
-};
+export const KNOWN: Record<string, string[]> = {};
 
 export const merged = new Set(
   (process.env.AUTONOMY_BRANCHES ?? "")

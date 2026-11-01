@@ -6,7 +6,7 @@
  * @agenteschat/ui (their holders are `position: relative`).
  */
 .issues {
-  max-width: 1440px;
+  max-width: none;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: start;
@@ -642,7 +642,6 @@ html:not([data-pointer]) .issues-dest:focus-visible {
 }
 .issue-description {
   margin: 0;
-  max-width: 68ch;
 }
 .issue-criterion {
   display: flex;

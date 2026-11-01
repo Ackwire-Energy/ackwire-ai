@@ -4,6 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { ApiError, type MailAccount, type RoutineInput } from "@agenteschat/client";
+import { defaultPolicy } from "@agenteschat/client/lib/mail";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { setNavigateAway } from "@/lib/navigate";
 import { pick, service } from "./catalog";
@@ -45,6 +46,7 @@ function mailApi(accounts: Partial<MailAccount>[] = []) {
     lastError: null,
     preset: "icloud",
     createdAt: new Date(Date.now() - (10 - i) * 60_000).toISOString(),
+    ownerUserId: state.me?.user.id ?? null,
     agents: [],
     ...a,
   }));
@@ -430,6 +432,38 @@ describe("Conectores → Email", () => {
     ]);
   });
 
+  test("someone else's mailbox: 'O que faz' read-only, and lowering who uses it ends there, without rules to set", async () => {
+    const { api, state, mail } = mailApi([
+      {
+        address: "joao@example.com",
+        ownerUserId: "u-joao",
+        agents: [{ agentId: ADA_ID, level: "read_write", canDelete: false }],
+      },
+    ]);
+    mail.agentMail.set(
+      ADA_ID,
+      new Map([["mail-1", { accountId: "mail-1", level: "read_write", canDelete: false, policy: defaultPolicy() }]]),
+    );
+    await renderApp(`/org/${ORG_ID}/settings/connectors?mail=connected&account=mail-1`, { api });
+    await settle(8);
+    const actions = screen().getByRole("dialog", { name: "O que joao@example.com faz" });
+    expect(actions.textContent).toContain("Só João pode dar acesso: foi quem conectou esta caixa.");
+    expect(within(actions).queryByRole("radiogroup", { name: "Nível de Enviar" })).toBeNull();
+    await click(within(actions).getByRole("button", { name: "Continuar" }));
+    await settle(4);
+    expect(state.calls.some((c) => c.method === "mail.update")).toBe(false);
+    const who = screen().getByRole("dialog", { name: "Quem pode usar joao@example.com" });
+    await click(
+      within(within(who).getByRole("radiogroup", { name: "Nível de Ada" })).getByRole("radio", { name: "Ler" }),
+    );
+    await click(within(who).getByRole("button", { name: "Continuar" }));
+    await settle(6);
+    expect(
+      state.calls.filter((c) => c.method === "mail.setAgent").map((c) => (c.args[3] as { level: string }).level),
+    ).toEqual(["read"]);
+    expect(screen().queryByRole("dialog", { name: "Regras em joao@example.com" })).toBeNull();
+  });
+
   test("'Precisa reconectar': a new app password (PATCH), or Gmail signs in again", async () => {
     const left: string[] = [];
     setNavigateAway((url) => left.push(url));
@@ -523,6 +557,32 @@ describe("the agent's email rules", () => {
       },
     });
     expect(screen().getByText("Email de Ada salvo.")).toBeTruthy();
+  });
+
+  test("someone else's mailbox: read-only, says who gives it, and an admin removes the agent's access", async () => {
+    const { api, state, mail } = mailApi([{ address: "joao@example.com", ownerUserId: "u-joao" }]);
+    mail.agentMail.set(
+      ADA_ID,
+      new Map([["mail-1", { accountId: "mail-1", level: "read", canDelete: false, policy: defaultPolicy() }]]),
+    );
+    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=access`, { api });
+    await settle(10);
+    // The level is shown, not picked.
+    expect(screen().queryByRole("radiogroup", { name: "Nível em joao@example.com" })).toBeNull();
+    const [row] = within(screen().getByRole("list", { name: "Email" })).getAllByRole("listitem") as [HTMLElement];
+    expect(row.textContent).toContain("Só João pode dar acesso: foi quem conectou esta caixa.");
+    expect(within(row).queryByRole("button", { name: "Salvar" })).toBeNull();
+    expect(
+      within(row)
+        .getByRole("switch", { name: /Pode apagar emails/ })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    await click(within(row).getByRole("button", { name: "Remover acesso" }));
+    await settle(4);
+    const call = state.calls.find((c) => c.method === "mail.setAgent");
+    expect(call?.args.slice(1, 3)).toEqual([ADA_ID, "mail-1"]);
+    expect(call?.args[3]).toEqual({ level: "none", canDelete: false, policy: defaultPolicy() });
+    expect(screen().getByText("Ada não tem mais acesso a joao@example.com.")).toBeTruthy();
   });
 
   test("a Gmail still connecting: its name, 'Conectando' and the way to Conectores, no level to pick", async () => {

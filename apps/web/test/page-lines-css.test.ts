@@ -71,8 +71,8 @@ test("the built stylesheet keeps what places the Settings header, the bucket's h
     "grid-template-columns",
     "repeat(auto-fit,minmax(min(100%,280px),1fr))",
   ]);
-  // A tile beside a name leads it as a face does, from the name's capitals, however the line under it wraps.
-  expect(declarations(shipped, ".newag__role--blank")).toContainEqual(["align-items", "flex-start"]);
+  // A template's tile and its name and line sit centred on one row (Do zero's too).
+  expect(declarations(shipped, ".newag__role-head")).toContainEqual(["align-items", "center"]);
   // No word alone on a description's last line.
   for (const selector of [
     ".ac-optrow__desc",

@@ -478,12 +478,14 @@ async function insertArtifact(
     excerpt: string;
     stored: Stored;
     note?: string | null;
+    /** Whose file it is, when not the actor's (an imported agent's own files); the audit keeps the actor. */
+    author?: ArtifactAuthor;
   },
 ) {
   const { db } = deps;
   const id = Bun.randomUUIDv7();
   const blob = await writeBlob(deps, orgId, id, 1, input.stored);
-  const author = authorOf(actor);
+  const author = input.author ?? authorOf(actor);
   const row = await db.transaction(async (tx) => {
     const [a] = await tx
       .insert(artifacts)
@@ -522,7 +524,7 @@ async function insertArtifact(
     await enqueueIndex(tx, { orgId, kind: "file", sourceId: id });
     await recordAudit(tx, {
       orgId,
-      actor: author,
+      actor: authorOf(actor),
       action: "artifact.created",
       target: { type: "artifact", id },
       details: { kind: input.kind, version: 1, size: blob.size },
@@ -681,6 +683,7 @@ export async function createFileArtifact(
     channelId?: string | null;
     threadId?: string | null;
     note?: string | null;
+    author?: ArtifactAuthor;
   },
 ): Promise<ArtifactDetailView> {
   const place = await placeNew(deps.db, actor, orgId, input);
@@ -692,6 +695,7 @@ export async function createFileArtifact(
     excerpt: file.name,
     stored: file.stored,
     note: input.note,
+    author: input.author,
   });
   return { ...artifact, shownVersion: 1, content: storedFileContent(file.name, blob, input.bytes) };
 }

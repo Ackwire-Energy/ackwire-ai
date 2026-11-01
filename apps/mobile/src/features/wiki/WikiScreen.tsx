@@ -285,7 +285,7 @@ function PinCard({ page, by }: { page: WikiPageSummary; by: string }) {
 
 interface MenuItem {
   key: string;
-  icon: "copy" | "pen" | "pin" | "lock" | "clock" | "x";
+  icon: "copy" | "pen" | "pin" | "eye" | "lock" | "clock" | "x";
   label: string;
   danger?: boolean;
   run: () => void;
@@ -317,6 +317,8 @@ function WikiPage({ slug }: { slug: string }) {
   // Writing is `edit_wiki`; a locked page, and locking, only for who configures the workspace (ADR 0085).
   const writes = can(org, "edit_wiki");
   const admin = can(org, "configure");
+  // Who sees a page: people who write the wiki and manage roles (the server checks the same).
+  const choosesAudience = writes && can(org, "manage_roles");
   const page = useWikiPage(orgId, slug);
   const tree = useWikiTree(orgId);
   const action = useWikiAction(orgId);
@@ -395,6 +397,13 @@ function WikiPage({ slug }: { slug: string }) {
             { onSuccess: (x) => toast({ title: x.pinned ? t("wiki.pinned") : t("wiki.unpinned") }), onError: failed },
           ),
       });
+    if (choosesAudience)
+      items.push({
+        key: "audience",
+        icon: "eye",
+        label: t("wiki.audience"),
+        run: () => router.push({ pathname: "/wiki-audience", params: { slug: p.slug } }),
+      });
     if (admin)
       items.push({
         key: "lock",
@@ -470,7 +479,11 @@ function WikiPage({ slug }: { slug: string }) {
       >
         {page.isLoading ? <ActivityIndicator color={c.muted} style={styles.loading} /> : null}
         {page.isError && !p ? (
-          <EmptyState icon="file" title={t("wiki.missingTitle")} subtitle={t("mobile.wiki.missing")} />
+          (page.error as { code?: string } | null)?.code === "wiki.no_access" ? (
+            <EmptyState icon="lock" title={t("wiki.noAccessTitle")} subtitle={t("wiki.noAccessText")} />
+          ) : (
+            <EmptyState icon="file" title={t("wiki.missingTitle")} subtitle={t("mobile.wiki.missing")} />
+          )
         ) : null}
         {p ? (
           <>
@@ -489,6 +502,11 @@ function WikiPage({ slug }: { slug: string }) {
                   {by} · {relativeTime(t, i18n.language, p.updatedAt)} · v{p.version}
                 </Text>
               </View>
+              {p.audience ? (
+                <View style={styles.note}>
+                  <Note icon="eye">{t("wiki.restrictedHint")}</Note>
+                </View>
+              ) : null}
               {p.locked ? (
                 <View style={styles.note}>
                   <Note icon="lock">{t("wiki.lockedHint")}</Note>

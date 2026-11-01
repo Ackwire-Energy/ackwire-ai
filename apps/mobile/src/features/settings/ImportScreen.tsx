@@ -2,6 +2,7 @@ import { useApi } from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
 import { helpUrl } from "@agenteschat/client/lib/server";
 import { Directory, File, Paths } from "expo-file-system";
+import { router } from "expo-router";
 import * as Sharing from "expo-sharing";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -17,7 +18,7 @@ import { SettingsPage } from "./parts";
 /**
  * Importar e exportar (who creates agents; the export, who manages them), as the web's, as far as a phone goes: this
  * workspace as a file (the share sheet saves it to Arquivos or sends it on), with what it never carries and what goes
- * in it. Bringing a workspace from another app reads its folders and archives on the computer: the screen says where.
+ * in it. Bringing agents from another app opens Criar agente on that step.
  */
 export function ImportScreen() {
   const { t, i18n } = useTranslation();
@@ -87,7 +88,12 @@ export function ImportScreen() {
           ) : null}
           <GroupedHeader>{t("settings.import.title")}</GroupedHeader>
           <GroupedList>
-            <GroupedRow icon="laptop" label={t("mobile.settings.import.onComputer")} labelLines={4} />
+            <GroupedRow
+              icon="archive"
+              label={t("shell.importAgents")}
+              chevron
+              onPress={() => router.push("/new-agent?import=1" as never)}
+            />
           </GroupedList>
         </>
       )}

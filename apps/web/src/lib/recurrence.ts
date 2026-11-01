@@ -1,5 +1,5 @@
-import type { ApiRule } from "@agenteschat/client";
-import { joinNames } from "@agenteschat/client/lib/format";
+import type { ApiRule, ProposedRoutine } from "@agenteschat/client";
+import { joinNames, toYmd } from "@agenteschat/client/lib/format";
 import { timezoneName } from "@agenteschat/client/lib/routines";
 import {
   BUSINESS_DAYS,
@@ -232,3 +232,7 @@ export function toApiRule(rule: RecurrenceRule): ApiRule {
     ...(rule.bySetPos ? { bySetPos: rule.bySetPos } : {}),
   };
 }
+
+/** When a proposed agent's routine runs, in the reader's words; a schedule no rule holds, as the agent wrote it. */
+export const proposedRoutineWhen = (t: TFunction, locale: string, r: ProposedRoutine, now = new Date()) =>
+  r.rule ? ruleSentence(t, locale, fromApiRule(r.rule, toYmd(now)), now) : r.schedule;

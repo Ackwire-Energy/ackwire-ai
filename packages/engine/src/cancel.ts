@@ -297,7 +297,7 @@ export async function stopRun(
     });
     if (done) {
       run = done;
-      for (const r of closedSecrets) await publishSecret(deps.pubsub, r, "secret.updated");
+      for (const r of closedSecrets) await publishSecret(deps, r, "secret.updated");
       for (const q of closedQuestions) await publishQuestion(deps.pubsub, q, "question.answered");
       break;
     }

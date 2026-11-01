@@ -4,6 +4,7 @@ import {
   AREA_PERMISSIONS,
   acceptInvitation,
   can,
+  createAgent,
   createInvitation,
   createRole,
   deleteRole,
@@ -204,6 +205,32 @@ describe("where the keys land", () => {
     await expect(
       createInvitation(f.db, lead.id, f.org.id, { email: "x@example.com", roleIds: [admin] }),
     ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  test("creating agents makes your own: someone else, or nobody, as its owner takes editing any agent", async () => {
+    const ana = await addMember(f.db, f.org.id, "member", "ana");
+    const makers = await createRole(f.db, f.owner.id, f.org.id, { name: "Makers", permissions: ["create_agents"] });
+    await setMemberRoles(f.db, f.owner.id, f.org.id, ana.id, [makers.id]);
+    const make = (handle: string, owner?: { ownerUserId: string | null }) =>
+      createAgent(f.db, ana.id, f.org.id, { name: handle, handle, ...owner }, { model: "claude-haiku-5-5" });
+    for (const ownerUserId of [f.owner.id, null]) {
+      await expect(make("iris", { ownerUserId })).rejects.toBeInstanceOf(ForbiddenError);
+    }
+    // Refused before anything is made: the @ stays free.
+    const iris = await f.db
+      .select({ id: schema.agents.id })
+      .from(schema.agents)
+      .where(and(eq(schema.agents.orgId, f.org.id), eq(schema.agents.handle, "iris")));
+    expect(iris).toEqual([]);
+    expect((await make("iris", { ownerUserId: ana.id })).ownerUserId).toBe(ana.id);
+    expect((await make("lia")).ownerUserId).toBe(ana.id);
+    const leads = await createRole(f.db, f.owner.id, f.org.id, {
+      name: "Leads",
+      permissions: ["create_agents", "manage_agents"],
+    });
+    await setMemberRoles(f.db, f.owner.id, f.org.id, ana.id, [leads.id]);
+    expect((await make("otto", { ownerUserId: f.owner.id })).ownerUserId).toBe(f.owner.id);
+    expect((await make("dora", { ownerUserId: null })).ownerUserId).toBeNull();
   });
 
   test("approving actions follows the key, not a role's name", async () => {

@@ -68,6 +68,11 @@ export function useSheet(): SheetHost {
   return host;
 }
 
+/** The screen's sheet host, or null on a screen without one (a text shown outside a conversation). */
+export function useSheetIfAny(): SheetHost | null {
+  return useContext(SheetContext);
+}
+
 const styles = StyleSheet.create({
   in: { gap: 12 },
 });

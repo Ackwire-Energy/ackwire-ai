@@ -119,11 +119,18 @@ describe("a routine's state and its one-tap fix", () => {
       tone: "waiting",
     });
     const mac = { machineId: "m", machineName: "MacBook do Walter", since: "2026-10-23T08:00:00.000Z" };
-    expect(routineStateWords(state({ state: "waiting_computer", waitingFor: mac }), "08:00")).toMatchObject({
+    expect(routineStateWords(state({ state: "waiting_computer", waitingFor: mac }), "08:00", true)).toMatchObject({
       key: "routines.state.waitingComputerSince",
       values: { machine: "MacBook do Walter", since: "08:00" },
     });
-    expect(routineStateWords(state({ state: "waiting_computer" })).key).toBe("routines.state.waitingAnyComputer");
+    // The workspace's only computer (the Cloud's own): "Esperando o computador desde 08:00".
+    expect(routineStateWords(state({ state: "waiting_computer", waitingFor: mac }), "08:00")).toMatchObject({
+      key: "routines.state.waitingAnyComputerSince",
+      values: { since: "08:00" },
+    });
+    expect(routineStateWords(state({ state: "waiting_computer" }), "", true).key).toBe(
+      "routines.state.waitingAnyComputer",
+    );
     expect(routineStateWords(state({ state: "waiting_person" })).key).toBe("routines.state.waitingPerson");
     // Its event comes through a webhook the workspace doesn't have: it can't run yet, and says whose.
     const pr = { type: "event", event: "github.pr_opened" } as const;
@@ -180,15 +187,10 @@ describe("a routine's week", () => {
   });
 
   test("where it runs, and its usage: tokens on a plan, cost on the API, never money for members", () => {
-    expect(whereItRuns({ kind: "claude_code", machineName: "MacBook do Walter" })).toEqual({
-      key: "routines.runsOn.machine",
-      values: { product: "Claude Code", machine: "MacBook do Walter" },
-    });
-    expect(whereItRuns({ kind: "codex", machineName: null })).toEqual({
-      key: "routines.runsOn.anyMachine",
-      values: { product: "Codex" },
-    });
-    expect(whereItRuns({ kind: "model", machineName: null }).key).toBe("routines.runsOn.cloud");
+    // The computer by its name alone, only where the workspace has more than one; else nothing to say.
+    expect(whereItRuns({ kind: "claude_code", machineName: "MacBook do Walter" }, true)).toBe("MacBook do Walter");
+    expect(whereItRuns({ kind: "claude_code", machineName: "Computador da Acme" }, false)).toBeNull();
+    expect(whereItRuns({ kind: "model", machineName: null }, true)).toBeNull();
     const usage = (billedTo: Routine["usage"]["billedTo"]) => ({
       runs: 7,
       tokens: 50_000,
@@ -210,15 +212,23 @@ describe("a routine's week", () => {
     expect(runsPerDay(null, "*/15 * * * *")).toBe(96);
     expect(runsPerDay(null, "0 9 * * 1-5")).toBe(1);
     const mac = { kind: "claude_code", machineName: "MacBook do Walter" };
-    expect(busyOnComputer(mac, 24)).toEqual({
+    const two = { selfHost: true, namesComputer: true };
+    expect(busyOnComputer(mac, 24, two)).toEqual({
       key: "routines.busyComputer",
       values: { count: 24, machine: "MacBook do Walter" },
     });
-    expect(busyOnComputer({ kind: "codex", machineName: null }, 96)?.key).toBe("routines.busyAnyComputer");
-    expect(busyOnComputer(mac, 8)).toBeNull();
+    // A server with one computer: it still has to stay on, unnamed.
+    expect(busyOnComputer(mac, 24, { selfHost: true, namesComputer: false })).toEqual({
+      key: "routines.busyAnyComputer",
+      values: { count: 24 },
+    });
+    expect(busyOnComputer({ kind: "codex", machineName: null }, 96, two)?.key).toBe("routines.busyAnyComputer");
+    expect(busyOnComputer(mac, 8, two)).toBeNull();
+    // The Cloud's own computer is always on.
+    expect(busyOnComputer(mac, 24, { selfHost: false, namesComputer: false })).toBeNull();
     // The API doesn't wake anyone's computer.
-    expect(busyOnComputer({ kind: "model", machineName: null }, 96)).toBeNull();
-    expect(busyOnComputer(undefined, 96)).toBeNull();
+    expect(busyOnComputer({ kind: "model", machineName: null }, 96, two)).toBeNull();
+    expect(busyOnComputer(undefined, 96, two)).toBeNull();
   });
 });
 

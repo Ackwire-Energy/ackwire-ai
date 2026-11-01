@@ -70,7 +70,7 @@ export function IssuePage({ number }: { number: number }) {
   const { org } = useOrg();
   const issue = useIssue(org.id, number);
   return (
-    <div className="page page--xwide">
+    <div className="page page--full">
       <Link to="/org/$orgId/issues" params={{ orgId: org.id }} className="ac-back">
         <Icon name="chevronLeft" />
         {t("issues.back")}

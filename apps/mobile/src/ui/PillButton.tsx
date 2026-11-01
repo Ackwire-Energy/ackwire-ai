@@ -6,15 +6,19 @@ import { CHROME_MAX_SCALE, weights } from "./type-scale";
 
 /**
  * A small raised pill beside a line (Desfazer under an agent's change, Abrir on a team check): the whole pill
- * presses, its word centered in it. `onPress` brings its own haptic, if any.
+ * presses, its word centered in it, quiet figures after it when it has a `detail` (the time left to undo).
+ * `onPress` brings its own haptic, if any.
  */
 export function PillButton({
   label,
+  detail,
   onPress,
   accessibilityLabel,
   accessibilityRole = "button",
 }: {
   label: string;
+  /** After the word, quieter, in tabular figures ("4:31"). */
+  detail?: string;
   onPress: () => void;
   /** Read aloud instead of the label (the time left to undo). */
   accessibilityLabel?: string;
@@ -38,6 +42,9 @@ export function PillButton({
           style={[systemText("footnote", weights.semibold), styles.word, { color: colors.ink }]}
         >
           {label}
+          {detail ? (
+            <RNText style={[systemText("caption"), styles.detail, { color: colors.faint }]}>{` ${detail}`}</RNText>
+          ) : null}
         </RNText>
       </View>
     </PressScale>
@@ -48,4 +55,5 @@ const styles = StyleSheet.create({
   pill: { height: 32, borderRadius: 16 },
   face: { flexGrow: 1, paddingHorizontal: 13, alignItems: "center", justifyContent: "center" },
   word: { fontSize: 14 },
+  detail: { fontVariant: ["tabular-nums"] },
 });
