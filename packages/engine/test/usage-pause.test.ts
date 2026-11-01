@@ -180,6 +180,28 @@ test("a cut whose turn used only the computer's own tools never falls back, even
   expect(f.provider.calls).toHaveLength(0);
 });
 
+test("a cut that may have worked never falls back on a resume while the plan is still limited", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  await computerAgent(f);
+  // An older runner: no `worked`, no reset.
+  const { brain } = scripted(() => [
+    { type: "limit" },
+    { type: "error", code: "plan_limit", message: "usage limit reached" },
+  ]);
+  const handlers = handlersWith(f, brain);
+  await post(f, "@dev roda a migração");
+  await drainOutbox(f.db, handlers);
+  const [run] = await runs(f);
+  expect(run?.status).toBe("waiting_input");
+  expect((run?.transcript as { interruptedTurn?: { cause?: string } }).interruptedTurn?.cause).toBe("plan_limit");
+
+  await drainOutbox(f.db, handlers, { now: later(3.5 * 60_000) });
+  const [again] = await runs(f);
+  expect(again?.status).toBe("waiting_input");
+  expect(f.provider.calls).toHaveLength(0);
+  expect((again?.transcript as { fallback?: unknown }).fallback).toBeUndefined();
+});
+
 test("a refusal before any work falls back to the API as before", async () => {
   f = await setup({ reply: () => ({ chunks: ["Respondi pela API."] }) });
   await computerAgent(f);
