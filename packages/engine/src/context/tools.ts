@@ -1,7 +1,7 @@
 import { and, arrayContained, type Database, desc, eq, inArray, isNull, or, type SQL, schema } from "@agenteschat/db";
 import { resolveApps } from "../access";
 import { recordAgentActions } from "../agent-actions";
-import { agentsByHandle, handleOf, ROLE_MAX } from "../agents";
+import { agentsByHandle, handleOf } from "../agents";
 import { caches } from "../cache";
 import type { MemoryUpdate } from "../events";
 import { cutText } from "../format";
@@ -350,12 +350,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               type: "object",
               properties: {
                 agent: { type: "string", minLength: 1, maxLength: 40 },
-                role: {
-                  type: "string",
-                  minLength: 1,
-                  maxLength: ROLE_MAX,
-                  description: "A short label, one or two words (PM, Dev, Design, E-mail).",
-                },
+                role: { type: "string", minLength: 1, maxLength: 200 },
               },
               required: ["agent", "role"],
               additionalProperties: false,

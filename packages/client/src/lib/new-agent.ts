@@ -151,9 +151,6 @@ const foldName = (s: string) =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
-/** An agent's role is a short label the sidebar shows whole (PM, Dev, Design, E-mail): the server's `ROLE_MAX`. */
-export const ROLE_MAX = 16;
-
 /* ---------- @handle ---------- */
 
 /** Same rule as the server (HANDLE_PATTERN in the engine): 2–32 of a-z, 0-9, - or _, not starting with - or _. */

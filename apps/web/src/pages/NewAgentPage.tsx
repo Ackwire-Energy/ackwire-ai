@@ -44,7 +44,6 @@ import {
   type AgentColor,
   Button,
   Card,
-  CharCount,
   CheckboxPill,
   EmptyState,
   type Expression,
@@ -107,7 +106,6 @@ import {
   presetChannels,
   presetLevels,
   ROLE_GROUPS,
-  ROLE_MAX,
   ROLE_PRESETS,
   type RoleGroupId,
   type RoleId,
@@ -858,21 +856,10 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
         </div>
         {role === "custom" && (
           <Card as="div" className="newag__card">
-            <Field
-              label={t("agent.roleLabel")}
-              id="ag-role"
-              help={t("agent.roleHelp")}
-              labelAside={
-                <CharCount
-                  count={roleText.length}
-                  max={ROLE_MAX}
-                  label={t("newAgent.roleCount", { count: roleText.length, max: ROLE_MAX })}
-                />
-              }
-            >
+            <Field label={t("agent.roleLabel")} id="ag-role" help={t("agent.roleHelp")}>
               <Input
                 value={roleText}
-                maxLength={ROLE_MAX}
+                maxLength={200}
                 autoComplete="off"
                 onChange={(e) => {
                   setRoleText(e.target.value);

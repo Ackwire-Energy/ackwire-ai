@@ -11,7 +11,7 @@ import {
   type SuggestedAi,
   suggestAgentAi,
 } from "./agent-proposals";
-import { agentsByHandle, getAgentCached, ROLE_MAX } from "./agents";
+import { agentsByHandle, getAgentCached } from "./agents";
 import type { AiStatusDeps } from "./ai-status";
 import { AGENT_LOOK } from "./appearance";
 import { addChannelMember, createChannel } from "./channels";
@@ -308,8 +308,8 @@ export function createSetupToolSource(deps: {
           },
           role: {
             type: "string",
-            maxLength: ROLE_MAX,
-            description: `A short label, one or two words (PM, Dev, Design, E-mail): at most ${ROLE_MAX} characters, in the person's language.`,
+            maxLength: 200,
+            description: "What it does for the team, e.g. Email and calendar assistant, in the person's language.",
           },
           instructions: {
             type: "string",

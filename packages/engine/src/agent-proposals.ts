@@ -2,7 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, inArray, isNotNull, isNull, notInArray, schema, sql } from "@agenteschat/db";
 import { AUTO_MODEL } from "@agenteschat/providers";
 import { orgToolCatalog, setAgentAccess } from "./access";
-import { type Agent, createAgent, getAgent, HANDLE_PATTERN, NEW_AGENT_DEFAULTS, ROLE_MAX, roleTooLong } from "./agents";
+import { type Agent, createAgent, getAgent, HANDLE_PATTERN, NEW_AGENT_DEFAULTS } from "./agents";
 import { type AiStatusDeps, agentAiState } from "./ai-status";
 import { type AgentAppearance, setAgentAppearance, validateAppearance } from "./appearance";
 import { canTalkTo, talksToAgents } from "./audience";
@@ -389,7 +389,6 @@ export async function checkAgentDraft(
     throw new ValidationError(`@${handle} is already taken: pick another handle.`);
   }
   const role = str(input.role);
-  if (role.length > ROLE_MAX) throw roleTooLong();
   const instructions = str(input.instructions);
   if (!instructions || instructions.length > 50_000) {
     throw new ValidationError("Say what it does in `instructions` (up to 50,000 characters).");

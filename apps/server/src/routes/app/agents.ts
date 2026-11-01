@@ -38,7 +38,6 @@ import {
   orgRouting,
   pickerModels,
   publishMachineAgentsChanged,
-  ROLE_MAX,
   requirePermission,
   revokeCredential,
   SETUP_AGENTS_MAX,
@@ -116,13 +115,7 @@ const toAgent = (
 
 const AgentFields = z.object({
   name: z.string().trim().min(1).max(80),
-  role: z
-    .string()
-    .max(200)
-    .optional()
-    .openapi({
-      description: `A short label, one or two words (PM, Dev, Design): a role sent has at most ${ROLE_MAX} characters (\`agent.role_too_long\`). A longer one saved before stays while it isn't sent.`,
-    }),
+  role: z.string().max(200).optional(),
   instructions: z.string().max(50_000).optional(),
   model: z.string().optional().openapi({
     description:

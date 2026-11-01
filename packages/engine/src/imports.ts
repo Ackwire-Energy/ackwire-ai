@@ -2,7 +2,7 @@ import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
 import { isKnownModel, isOpenRouterModel } from "@agenteschat/providers";
 import { isIdHandle } from "@agenteschat/ui/names";
-import { createAgent, HANDLE_PATTERN, ROLE_MAX, updateAgent } from "./agents";
+import { createAgent, HANDLE_PATTERN, updateAgent } from "./agents";
 import { type AgentAppearance, setAgentAppearance, validateAppearance } from "./appearance";
 import { recordAudit } from "./audit";
 import { addChannelMember, CHANNEL_NAME_PATTERN, createChannel } from "./channels";
@@ -10,7 +10,6 @@ import { addContextItemByPerson, editContextItem, looksLikeSecret } from "./cont
 import { nextCronTime, zonedParts } from "./cron";
 import { sha256 } from "./crypto";
 import { ConflictError, ValidationError } from "./errors";
-import { fitWords } from "./format";
 import { requirePermission } from "./organizations";
 import {
   createRoutine,
@@ -148,7 +147,7 @@ export const IMPORT_LIMITS = {
 /** Our field limits (the create routes'): longer text is cut and reported in `trimmed`. */
 const FIELD = {
   agentName: 80,
-  role: ROLE_MAX,
+  role: 200,
   instructions: 50_000,
   channelName: 80,
   topic: 500,
@@ -371,24 +370,11 @@ export function planImport(input: ImportInput, state: ImportState): { items: Pla
   const readAgent = (a: BundleAgent) => {
     const trimmed: string[] = [];
     const name = fit(a.name.trim(), FIELD.agentName, "name", trimmed);
-    // A short label, cut after a whole word ("Assistente de e-mails" → "Assistente de"); the handle made from it and
-    // the secret check read it whole.
-    const fullRole = a.role.trim();
-    const role = fitWords(fullRole, FIELD.role);
-    if (role !== fullRole) trimmed.push("role");
+    const role = fit(a.role.trim(), FIELD.role, "role", trimmed);
     const instructions = fit(a.instructions.trim(), FIELD.instructions, "instructions", trimmed);
     const look = lookOf(a.appearance, trimmed);
     const wanted = a.handle.trim().replace(/^@/, "").toLowerCase();
-    return {
-      trimmed,
-      name,
-      role,
-      fullRole,
-      instructions,
-      look,
-      wanted,
-      secretLike: secret(name, fullRole, instructions),
-    };
+    return { trimmed, name, role, instructions, look, wanted, secretLike: secret(name, role, instructions) };
   };
   // Every agent is read first, picked or not, so the handle a new one gets never depends on the pick.
   const read = new Map<string, ReturnType<typeof readAgent>>();
@@ -400,9 +386,7 @@ export function planImport(input: ImportInput, state: ImportState): { items: Pla
   for (const fromName of [false, true]) {
     for (const [key, r] of read) {
       if (!r.name || r.secretLike || made("agent", key)?.live || isIdHandle(r.wanted) !== fromName) continue;
-      const base = fromName
-        ? handleFromName(r.name, r.fullRole, r.instructions)
-        : fit(r.wanted, 32, "handle", r.trimmed);
+      const base = fromName ? handleFromName(r.name, r.role, r.instructions) : fit(r.wanted, 32, "handle", r.trimmed);
       if (!HANDLE_PATTERN.test(base)) continue;
       const handle = handles.has(base) ? freeHandle(base, handles) : base;
       handles.add(handle);

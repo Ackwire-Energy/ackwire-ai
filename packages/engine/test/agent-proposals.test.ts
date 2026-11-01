@@ -182,7 +182,7 @@ describe("propose_agent", () => {
       "No channel #board you can name here. Channels you can name here: #general.",
     );
     await refused({ access: [{ connector: "jira", level: "read" }] }, 'No connected app or mailbox "jira"');
-    await refused({ role: "Assistente de e-mails" }, "input.role: too long (at most 16 characters)");
+    await refused({ role: "a".repeat(201) }, "input.role: too long (at most 200 characters)");
     await refused({ look: { color: "gold", eyes: "round" } }, "color");
     await refused({ why: "  " }, "why");
     expect(await proposals(f)).toHaveLength(0);
@@ -726,34 +726,35 @@ describe("one request, one card: channels, mailboxes and a routine", () => {
   });
 });
 
-describe("an agent's role is a short label", () => {
-  test("at most 16 characters when it is set or changed; one saved before stays until edited", async () => {
+describe("an agent's role says what it does, in as many words as it takes", () => {
+  const LONG_ROLE = "Assistente de e-mails, agenda e reuniões";
+
+  test("a 40-character role is taken when it is set or changed", async () => {
     f = await setup();
-    await expect(
-      createAgent(
-        f.db,
-        f.owner.id,
-        f.org.id,
-        { name: "Caio", handle: "caio", role: "Assistente de e-mails" },
-        NEW_AGENT_DEFAULTS,
-      ),
-    ).rejects.toMatchObject({ code: "agent.role_too_long", params: { max: 16 } });
+    expect(LONG_ROLE).toHaveLength(40);
     const caio = await createAgent(
       f.db,
       f.owner.id,
       f.org.id,
-      { name: "Caio", handle: "caio", role: "E-mail" },
+      { name: "Caio", handle: "caio", role: LONG_ROLE },
       NEW_AGENT_DEFAULTS,
     );
-    await expect(
-      updateAgent(f.db, f.owner.id, f.org.id, caio.id, { role: "Gerente de produto" }),
-    ).rejects.toMatchObject({
-      code: "agent.role_too_long",
-    });
-    // A long role from before: other fields still save.
-    await f.db.update(schema.agents).set({ role: "Assistente de e-mails" }).where(eq(schema.agents.id, caio.id));
-    expect(await updateAgent(f.db, f.owner.id, f.org.id, caio.id, { name: "Caio Prado" })).toMatchObject({
-      role: "Assistente de e-mails",
-    });
+    expect(caio.role).toBe(LONG_ROLE);
+    const edited = await updateAgent(f.db, f.owner.id, f.org.id, caio.id, { role: `${LONG_ROLE.slice(0, 39)}!` });
+    expect(edited.role).toBe(`${LONG_ROLE.slice(0, 39)}!`);
+  });
+
+  test("propose_agent takes a 40-character role, and the agent made from the card has it", async () => {
+    f = await setup();
+    const out = await propose(f, await runFor(f, f.owner.id, "cria um agente"), { ...CAIO, role: LONG_ROLE });
+    expect(out.isError).toBeUndefined();
+    const id = (out.data as { agentProposal: { messageId: string } }).agentProposal.messageId;
+    const made = await createProposedAgent(
+      { db: f.db, pubsub: f.pubsub, gateway: f.gateway },
+      f.owner.id,
+      f.org.id,
+      id,
+    );
+    expect(made.agent.role).toBe(LONG_ROLE);
   });
 });

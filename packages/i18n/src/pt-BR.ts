@@ -2431,7 +2431,7 @@ export const ptBR = {
     identityHelp: "É como todo mundo vê o agente. As menções continuam por @{{handle}}.",
     nameLabel: "Nome",
     roleLabel: "Cargo",
-    roleHelp: "Uma ou duas palavras, ex.: PM, Dev, E-mail.",
+    roleHelp: "O que ele faz pelo time, ex.: Assistente de e-mails e agenda.",
     edit: "Editar",
     chat: "Conversar",
     moreActions: "Mais ações",
@@ -3396,7 +3396,6 @@ export const ptBR = {
     routine: "Rotina",
     routineKeep: "Criar a rotina {{name}}",
     routineNotMade: "A rotina não foi criada: {{reason}}",
-    roleCount: "{{count}} de {{max}} caracteres",
   },
   members: {
     /** Before inviting, while every agent with an AI answers only the person. */
@@ -8056,9 +8055,6 @@ export const ptBR = {
       expired: "Esta proposta expirou: ninguém decidiu em um dia.",
       routineMade: "A rotina deste agente já foi criada.",
       noRoutine: "Esta proposta não tem rotina para criar.",
-    },
-    agent: {
-      roleTooLong: "O cargo tem até {{max}} caracteres: uma ou duas palavras, como PM ou Design.",
     },
     approval: {
       alwaysUnavailable: "Este pedido não pode ser aprovado para sempre. Aprove só este.",

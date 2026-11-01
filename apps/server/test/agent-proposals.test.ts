@@ -114,7 +114,7 @@ test("an agent's proposal of a new agent: created from the card with what the pe
   expect((await api(`/agent-proposals/${crypto.randomUUID()}`)).status).toBe(404);
 });
 
-test("Criar on the card: the agent as proposed in one click, with its channel and routine; a role is a short label", async () => {
+test("Criar on the card: the agent as proposed in one click, with its channel and routine; a 40-character role is taken", async () => {
   const owner = browser(t);
   await signUp(owner, "owner@example.com");
   const { orgId, channelId } = await seedOrg(owner);
@@ -157,7 +157,10 @@ test("Criar on the card: the agent as proposed in one click, with its channel an
   expect(again.status).toBe(409);
   expect(((await again.json()) as { error: { code: string } }).error.code).toBe("agent_proposal.routine_made");
 
-  const long = await api(`/agents/${agent.id}`, { method: "PATCH", json: { role: "Assistente de e-mails" } });
-  expect(long.status).toBe(400);
-  expect(((await long.json()) as { error: { code: string } }).error.code).toBe("agent.role_too_long");
+  const role = "Assistente de e-mails, agenda e reuniões";
+  const long = await api(`/agents/${agent.id}`, { method: "PATCH", json: { role } });
+  expect(long.status).toBe(200);
+  expect(((await long.json()) as { role: string }).role).toBe(role);
+  // The API's cap stays.
+  expect((await api(`/agents/${agent.id}`, { method: "PATCH", json: { role: "r".repeat(201) } })).status).toBe(400);
 });

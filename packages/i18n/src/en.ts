@@ -2413,7 +2413,7 @@ export const en: Translations = {
     identityHelp: "It's how everyone sees the agent. Mentions keep using @{{handle}}.",
     nameLabel: "Name",
     roleLabel: "Role",
-    roleHelp: "One or two words, e.g. PM, Dev, Email.",
+    roleHelp: "What it does for the team, e.g. Email and calendar assistant.",
     edit: "Edit",
     chat: "Chat",
     moreActions: "More actions",
@@ -3361,7 +3361,6 @@ export const en: Translations = {
     routine: "Routine",
     routineKeep: "Create the routine {{name}}",
     routineNotMade: "The routine wasn't created: {{reason}}",
-    roleCount: "{{count}} of {{max}} characters",
   },
   members: {
     agentsOnlyYou: "Your agents answer only you.",
@@ -8001,9 +8000,6 @@ export const en: Translations = {
       expired: "This proposal expired: nobody decided it in a day.",
       routineMade: "This agent's routine was already created.",
       noRoutine: "This proposal has no routine to create.",
-    },
-    agent: {
-      roleTooLong: "A role has up to {{max}} characters: one or two words, like PM or Design.",
     },
     approval: {
       alwaysUnavailable: "This request can't be approved for good. Approve just this one.",

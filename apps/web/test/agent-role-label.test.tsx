@@ -10,45 +10,35 @@ import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
 
-/** The count beside a field's label: what shows ("6/16") and what a screen reader hears. */
-const count = (input: HTMLInputElement) => {
-  const box = input.closest(".ac-field")?.querySelector(".ac-field__count");
-  return {
-    shown: box?.querySelector("[aria-hidden='true']")?.textContent,
-    said: box?.querySelector(".ac-visually-hidden")?.textContent,
-    over: box?.hasAttribute("data-over"),
-  };
-};
+const LONG_ROLE = "Assistente de e-mails, agenda e reuniões";
 
-test("Criar agente › Do zero: the role is one or two words, 16 characters at most, counted as typed", async () => {
+test("Criar agente › Do zero: a 40-character role types whole, with no count beside it", async () => {
   await renderApp(`/org/${ORG_ID}/agents/new`, { api: createFakeApi(seedState()) });
   await settle(8);
   await click(screen().getByRole("button", { name: /^Do zero/ }));
   const role = screen().getByLabelText("Cargo") as HTMLInputElement;
-  expect(role.maxLength).toBe(16);
-  expect(count(role)).toEqual({ shown: "0/16", said: "0 de 16 caracteres", over: false });
-  await typeIn(role, "E-mail");
-  expect(count(role)).toEqual({ shown: "6/16", said: "6 de 16 caracteres", over: false });
+  expect(role.maxLength).toBe(200);
+  await typeIn(role, LONG_ROLE);
+  expect(role.value).toBe(LONG_ROLE);
+  expect(role.closest(".ac-field")?.textContent).toContain(
+    "O que ele faz pelo time, ex.: Assistente de e-mails e agenda.",
+  );
+  expect(role.closest(".ac-field")?.textContent).not.toContain("/16");
 });
 
-test("a role saved before roles were short: whole in the field, past the count, and kept when another field saves", async () => {
+test("Editar: a 40-character role saves whole", async () => {
   const state = seedState();
   const api = createFakeApi(state);
-  const ada = state.agents.find((a) => a.id === ADA_ID);
-  if (ada) ada.role = "Assistente de e-mails";
   await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=settings&sec=identity`, { api });
   await settle(10);
   const role = screen().getByLabelText("Cargo") as HTMLInputElement;
-  expect(role.value).toBe("Assistente de e-mails");
-  expect(role.maxLength).toBe(16);
-  expect(count(role)).toEqual({ shown: "21/16", said: "21 de 16 caracteres", over: true });
-  await typeIn(screen().getByLabelText("Nome") as HTMLInputElement, "Ada Lovelace");
+  expect(role.maxLength).toBe(200);
+  await typeIn(role, LONG_ROLE);
   await settle(2);
   await act(async () => fireEvent.click(screen().getByRole("button", { name: /^Salvar/ })));
   await settle(6);
   const saved = state.calls.find((c) => c.method === "agents.update")?.args[2] as Record<string, unknown> | undefined;
-  expect(saved).toMatchObject({ name: "Ada Lovelace" });
-  expect(saved && "role" in saved).toBe(false);
+  expect(saved?.role).toBe(LONG_ROLE);
 });
 
 test("where a role is cut to the line, it shows whole on hover", async () => {

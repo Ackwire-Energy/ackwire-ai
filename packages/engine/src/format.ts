@@ -30,13 +30,6 @@ export function dayAndTime(at: Date, timeZone: string, locale: "en" | "pt-BR") {
   };
 }
 
-/** `text` in at most `max` characters, cut after the last whole word that fits (a first word longer than that, inside it). */
-export function fitWords(text: string, max: number) {
-  if (text.length <= max) return text;
-  const space = text.slice(0, max + 1).lastIndexOf(" ");
-  return (space > 0 ? text.slice(0, space) : text.slice(0, max)).replace(/[\s,;:·-]+$/, "");
-}
-
 /** Levenshtein distance: the fewest one-character insertions, deletions or substitutions from `a` to `b`. */
 export function editDistance(a: string, b: string): number {
   let prev = Array.from({ length: b.length + 1 }, (_, j) => j);

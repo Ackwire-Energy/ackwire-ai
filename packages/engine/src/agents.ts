@@ -33,26 +33,11 @@ export interface AgentInput {
   mediaReplies?: boolean;
 }
 
-/**
- * An agent's role is a short label (PM, Dev, Design, E-mail). The sidebar's agent row gives it at most 99px at 12px
- * beside the audience lock (117px without), and ordinary words take about 6px a character there. Mirrored by the
- * apps' `ROLE_MAX` (packages/client/src/lib/new-agent.ts). Roles saved before it stay until someone edits them.
- */
-export const ROLE_MAX = 16;
-
-export const roleTooLong = () =>
-  new ValidationError(
-    `Keep the role to ${ROLE_MAX} characters: one or two words (PM, Dev, Design, E-mail).`,
-    "agent.role_too_long",
-    { max: ROLE_MAX },
-  );
-
 /** An agent's fields as the API takes them: its handle, model, key (of the model's provider), budget and owner. */
 export async function validateAgentFields(db: Database, orgId: string, input: Partial<AgentInput>) {
   if (input.handle !== undefined && !HANDLE_PATTERN.test(input.handle)) {
     throw new ValidationError("handle must be 2–32 characters: lower-case letters, digits, - or _");
   }
-  if (input.role !== undefined && input.role.trim().length > ROLE_MAX) throw roleTooLong();
   // "auto": each run picks the model from the line of the agent's key (any provider).
   const model = input.model && !isAutoModel(input.model) ? await modelInfoFor(db, input.model) : undefined;
   if (input.model !== undefined && !isAutoModel(input.model) && !model) {

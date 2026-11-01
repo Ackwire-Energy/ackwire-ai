@@ -21,7 +21,6 @@ const KNOWN = {
   "agent_proposal.expired": "errors.agentProposal.expired",
   "agent_proposal.routine_made": "errors.agentProposal.routineMade",
   "agent_proposal.no_routine": "errors.agentProposal.noRoutine",
-  "agent.role_too_long": "errors.agent.roleTooLong",
   "mail.account_not_found": "errors.mail.accountNotFound",
   "mail.from_not_mailbox": "errors.mail.fromNotMailbox",
   "mail.owner_only": "errors.mail.ownerOnly",
