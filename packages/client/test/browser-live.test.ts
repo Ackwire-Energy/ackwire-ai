@@ -185,6 +185,23 @@ describe("fingers on the page (ADR 0040 §13)", () => {
     expect(said(touch.up(1, { x: 420, y: 70 }))).toEqual(["released@640,100"]);
   });
 
+  test("a slider captcha: a finger held still, then moved slowly 100 px right, drags the whole way, never scrolls", () => {
+    const touch = createTouchInput(toPage);
+    touch.down(1, { x: 50, y: 70 });
+    // A long press: the finger rests, trembling within the slop.
+    expect(touch.move(1, { x: 51, y: 70 })).toEqual([]);
+    expect(touch.move(1, { x: 50, y: 71 })).toEqual([]);
+    const out: string[] = [];
+    for (let x = 51; x <= 150; x += 1) out.push(...said(touch.move(1, { x, y: 70 })));
+    out.push(...said(touch.up(1, { x: 150, y: 70 })));
+    expect(out.slice(0, 2)).toEqual(["moved+none@100,100", "pressed@100,100"]);
+    expect(out.at(-1)).toBe("released@300,100");
+    const moves = out.slice(2, -1);
+    expect(moves.every((m) => m.startsWith("moved+left@"))).toBe(true);
+    expect(moves.at(-1)).toBe("moved+left@300,100");
+    expect(out.some((m) => m.startsWith("wheel"))).toBe(false);
+  });
+
   test("two fingers scroll the page as they move, and nothing is pressed or clicked", () => {
     const touch = createTouchInput(toPage);
     touch.down(1, { x: 100, y: 150 });

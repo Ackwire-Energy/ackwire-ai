@@ -6,9 +6,9 @@ setupDom();
 import { BROWSER_STUCK_MS, type BrowserHandoff } from "@agenteschat/client";
 import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { titleKind } from "@/components/browser/BrowserCard";
+import { BrowserCard, titleKind } from "@/components/browser/BrowserCard";
 import { ADA_ID, createFakeApi, ENG_ID, fakeBrowserOf, ORG_ID, seedState } from "./fake-api";
-import { onScreen, renderApp, screen, settle } from "./render";
+import { onScreen, renderApp, renderPage, screen, settle } from "./render";
 
 afterEach(() => cleanup());
 
@@ -190,16 +190,31 @@ describe("the card in the message", () => {
    * The person in control of Ada's page (1280×800, shown at 640×400 from the window's corner: twice as small), and
    * what the card sends the page from here on ("pressed@200,200", "moved+left@…", "wheel@…:dx,dy").
    */
-  async function inControlOfPage() {
+  async function inControlOfPage(view: "card" | "dialog" = "card") {
     const { state, handoff } = seedRequest();
     const api = createFakeApi(state);
     fakeBrowserOf.get(api)?.handoffs.set(handoff.id, handoff);
-    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
-    await settle(6);
-    const socket = r.sockets.last();
-    await act(async () => socket.open());
-    await act(async () => fireEvent.click(within(waitingRequest()).getByRole("button", { name: "Abrir aqui" })));
-    await settle(4);
+    let socket: ReturnType<Awaited<ReturnType<typeof renderApp>>["sockets"]["last"]>;
+    if (view === "card") {
+      const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+      await settle(6);
+      socket = r.sockets.last();
+      await act(async () => socket.open());
+      await act(async () => fireEvent.click(within(waitingRequest()).getByRole("button", { name: "Abrir aqui" })));
+      await settle(4);
+    } else {
+      // The computer dialog's page: the same card, bigger (`surface`), with the request already taken.
+      const active: BrowserHandoff = { ...handoff, kind: "takeover", status: "active", controllerUserId: "u-walter" };
+      fakeBrowserOf.get(api)?.handoffs.set(handoff.id, active);
+      const r = await renderPage(<BrowserCard agentId={ADA_ID} name="Ada" handoff={active} surface canTakeOver />, {
+        api,
+        org: true,
+      });
+      await settle(6);
+      socket = r.sockets.last();
+      await act(async () => socket.open());
+      await settle(4);
+    }
     await act(async () =>
       socket.push({
         type: "browser.frame",
@@ -287,6 +302,29 @@ describe("the card in the message", () => {
     await act(async () => fireEvent.pointerUp(page, pointer(1, 10, 20)));
     expect(sentToPage().slice(5)).toEqual(["moved+none@20,40", "pressed@20,40", "released@20,40"]);
   });
+
+  for (const view of ["card", "dialog"] as const) {
+    test(`a slider captcha in the ${view}: a slow press-and-drag 200 px right reaches the page held, never as a scroll`, async () => {
+      const { card, page, sentToPage, flushed } = await inControlOfPage(view);
+      if (view === "dialog") expect(card.classList.contains("is-surface")).toBe(true);
+      await act(async () => fireEvent.pointerDown(page, pointer(1, 50, 100)));
+      // 100 px of the shown frame (200 of the page) in 5 px steps, a person's pace.
+      for (let x = 55; x <= 150; x += 5) {
+        await act(async () => fireEvent.pointerMove(page, pointer(1, x, 100)));
+        await flushed();
+      }
+      await act(async () => fireEvent.pointerUp(page, pointer(1, 150, 100)));
+      await flushed();
+      const sent = sentToPage();
+      expect(sent.slice(0, 2)).toEqual(["moved+none@100,200", "pressed@100,200"]);
+      expect(sent.at(-1)).toBe("released@300,200");
+      const moves = sent.slice(2, -1);
+      expect(moves).toHaveLength(20);
+      expect(moves.every((m) => m.startsWith("moved+left@"))).toBe(true);
+      expect(moves.at(-1)).toBe("moved+left@300,200");
+      expect(sent.some((m) => m.startsWith("wheel"))).toBe(false);
+    });
+  }
 
   test("on a touch screen a finger that moves drags, two fingers scroll the page, and the hint says so", async () => {
     const { card, page, sentToPage, flushed } = await inControlOfPage();
