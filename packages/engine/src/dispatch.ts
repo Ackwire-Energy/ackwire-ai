@@ -105,8 +105,13 @@ export async function startOrJoinRun(
           eq(agentRuns.channelId, message.channelId),
           inArray(agentRuns.status, [...ACTIVE_RUN_STATUSES]),
           eq(agentRuns.background, false),
-          sql`(${agentRuns.threadRootId} = ${message.threadId ?? message.id}::uuid or exists (
-            select 1 from channels c where c.id = ${message.channelId}::uuid and c.kind = 'dm')
+          // In a DM the main timeline is one conversation; each thread (a mission's) is its own.
+          sql`(${agentRuns.threadRootId} = ${message.threadId ?? message.id}::uuid or ${
+            message.threadId
+              ? sql`false`
+              : sql`(${inChannelRun(sql`${agentRuns}`)} and exists (
+            select 1 from channels c where c.id = ${message.channelId}::uuid and c.kind = 'dm'))`
+          }
             or ${
               options.joinChannelRun && !message.threadId
                 ? sql`(${agentRuns.status} in ('queued', 'running') and ${inChannelRun(sql`${agentRuns}`)})`

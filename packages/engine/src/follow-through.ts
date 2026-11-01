@@ -98,6 +98,13 @@ export async function followThroughVerdict(
 export const FOLLOW_THROUGH_NUDGE =
   "You ended saying you would do more, and nothing you set up brings you back to it. Do it now with your tools and tell them what came of it. If it has to wait (a build, a deploy, a job still running), set a follow_up to come back to it and say when, in one line.";
 
+/**
+ * What a mission's run reads, once, when it ended waiting on a person without a card: asked in a card, the thread
+ * shows the mission waits on them, the answer resumes the session, and the mission doesn't go on by itself meanwhile.
+ */
+export const MISSION_ASK_NUDGE =
+  "You ended waiting on a person, but you didn't ask them in a card. Ask now, directly: ask_user with one clear question (request_secret for a credential or a key, a blocking ask_decision for a choice between options), mark the plan item waiting_you with update_plan, then end your turn. Don't repeat the question in your text.";
+
 // ── Coming back by itself (`follow_up`) ──────────────────────────────────────
 
 /** A follow-up notice's refs: the run that set it, when, the people's words for it, and its state. */

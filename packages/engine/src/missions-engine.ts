@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, desc, type Executor, eq, inArray, rowsOf, schema, sql } from "@agenteschat/db";
+import { and, desc, type Executor, eq, gte, inArray, rowsOf, schema, sql } from "@agenteschat/db";
 import type { BrainKind, BrainSession, BrainTurn, ToolResult } from "./brains/types";
 import { abortLocalRun, RUN_CANCEL_TOPIC } from "./cancel";
 import { publishChannelEvent, publishMessageCreated } from "./events";
@@ -8,10 +8,11 @@ import { cutText } from "./format";
 import { insertMessage, messageView } from "./messages";
 import { MISSION_LIMITS } from "./mission-limits";
 import { enqueueRunJob } from "./mission-runs";
-import { missionCwd, worktreeBlocksWork } from "./mission-worktree";
+import { hasLiveTasks, missionCwd, worktreeBlocksWork } from "./mission-worktree";
 import {
   agentAnswers,
   getMissionRow,
+  latestPlan,
   MISSION_STUCK,
   type MissionDeps,
   type MissionRow,
@@ -24,11 +25,23 @@ import {
   recordMissionEvent,
   type WakeKind,
 } from "./missions";
+import { enqueue } from "./outbox";
 import { resumeRunWithResult } from "./run-resume";
 import { revokeRunToolTokens } from "./run-tool-tokens";
 import { isTerminal, type RunStatus, transitionRun } from "./runs";
 
-const { missions, missionEvents, agentRuns, approvals, agentQuestions, outbox } = schema;
+const {
+  missions,
+  missionEvents,
+  agentRuns,
+  approvals,
+  agentQuestions,
+  outbox,
+  messages,
+  missionDecisions,
+  missionReviews,
+  missionDeliveries,
+} = schema;
 
 /**
  * Missions on the agent engine (ADR 0032 §6, block 4).
@@ -390,6 +403,111 @@ export async function deliverMissionInbox(
   }
   sent += await deliverItemInbox(deps, mission, mission.mainSessionId);
   return sent;
+}
+
+// ── Keeping the work going between messages ──────────────────────────────────
+
+/** The outbox job that checks, a while after a mission run ended, whether the work goes on by itself. */
+export const KEEP_GOING_JOB = "mission.keep_going";
+/** How long after a mission run ends it goes on by itself (a person writing meanwhile starts a run first). */
+export const KEEP_GOING_DELAY_MS = 60_000;
+
+/** What the main session reads when its turn ended with plan items open and nothing waiting on a person. */
+export const KEEP_GOING_PROMPT =
+  "Your last turn ended with plan items still open and nothing waiting on a person: go on with the next one now. If you can't go on without something only a person can give (a credential, an access, a decision, a test only they can run), ask for it directly now: ask_user with one clear question (request_secret for a credential, a blocking ask_decision for a choice), and mark that item waiting_you. A list of what is missing is not a question. If the plan is out of date, fix it with update_plan.";
+
+/** Schedules the keep-going check of a mission whose run just ended (`keepMissionGoing`). */
+export async function scheduleKeepGoing(db: Executor, mission: { id: string; orgId: string }) {
+  const at = Date.now() + KEEP_GOING_DELAY_MS;
+  await enqueue(db, {
+    orgId: mission.orgId,
+    kind: KEEP_GOING_JOB,
+    payload: { missionId: mission.id },
+    dedupeKey: `${KEEP_GOING_JOB}:${mission.id}:${Math.floor(at / 10_000)}`,
+    runAt: new Date(at),
+    maxAttempts: 3,
+  });
+}
+
+/**
+ * Why the mission doesn't go on by itself now, or null when it should: it isn't active or can't work, no plan item
+ * is open (todo or doing), the agent works or waits in the thread, a decision, review or delivery waits on a person,
+ * an item runs on the computer (its end wakes the session), a follow-up of the agent is due there, or its last run
+ * ended waiting on a person (the follow-through verdict).
+ */
+export async function keepGoingBlocker(db: Executor, mission: MissionRow): Promise<string | null> {
+  if (mission.status !== "active" || !canWork(mission)) return "not_working";
+  const plan = await latestPlan(db, mission.id);
+  const items = Array.isArray(plan?.items) ? (plan.items as { status?: string }[]) : [];
+  if (!items.some((i) => i.status === "todo" || i.status === "doing")) return "no_open_items";
+  const [row] = rowsOf<{
+    run: boolean | string;
+    asks: boolean | string;
+    follow: boolean | string;
+    last: string | null;
+  }>(
+    await db.execute(sql`select
+      exists (select 1 from ${agentRuns} r where r.org_id = ${mission.orgId}::uuid and r.agent_id = ${mission.agentId}::uuid
+        and r.channel_id = ${mission.channelId}::uuid and r.thread_root_id = ${mission.threadRootId}::uuid
+        and r.status in ('queued', 'running', 'waiting_input', 'waiting_approval')) as run,
+      (exists (select 1 from ${missionDecisions} d where d.mission_id = ${mission.id}::uuid and d.status = 'pending')
+        or exists (select 1 from ${missionReviews} v where v.mission_id = ${mission.id}::uuid and v.status = 'pending')
+        or exists (select 1 from ${missionDeliveries} l where l.mission_id = ${mission.id}::uuid and l.status = 'pending'))
+        as asks,
+      exists (select 1 from ${messages} m where m.org_id = ${mission.orgId}::uuid and m.channel_id = ${mission.channelId}::uuid
+        and m.thread_id = ${mission.threadRootId}::uuid and m.author_agent_id = ${mission.agentId}::uuid
+        and m.deleted_at is null and m.meta->'notice'->>'kind' = 'follow_up'
+        and m.meta->'notice'->'refs'->>'state' = 'pending') as follow,
+      (select r.transcript->>'followThroughVerdict' from ${agentRuns} r where r.org_id = ${mission.orgId}::uuid
+        and r.agent_id = ${mission.agentId}::uuid and r.channel_id = ${mission.channelId}::uuid
+        and r.thread_root_id = ${mission.threadRootId}::uuid order by r.created_at desc limit 1) as last`),
+  );
+  const yes = (v: unknown) => v === true || v === "t";
+  if (yes(row?.run)) return "run_active";
+  if (yes(row?.asks)) return "waiting_person";
+  if (row?.last === "waiting") return "asked_person";
+  if (yes(row?.follow)) return "follow_up";
+  if (await hasLiveTasks(db, mission.id)) return "task_running";
+  return null;
+}
+
+/** The text of the last report card the run's agent posted in its thread since the run started (`report`). */
+export async function missionReportSince(
+  db: Executor,
+  run: { orgId: string; agentId: string; channelId: string; createdAt: Date },
+  threadId: string | null,
+) {
+  if (!threadId) return "";
+  const [row] = await db
+    .select({ body: messages.body })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.orgId, run.orgId),
+        eq(messages.channelId, run.channelId),
+        eq(messages.threadId, threadId),
+        eq(messages.authorAgentId, run.agentId),
+        gte(messages.createdAt, run.createdAt),
+        sql`${messages.meta}->'missionReport' is not null`,
+      ),
+    )
+    .orderBy(desc(messages.createdAt))
+    .limit(1);
+  return row?.body ?? "";
+}
+
+/**
+ * Job `mission.keep_going`: a mission run ended a while ago. With plan items open and nothing waiting on a person,
+ * the main session is told to go on (`tellMainSession`): a wake-up of the mission's own, so the stuck guard counts it
+ * (wake-ups in a row with no plan item moving pause the mission) and the budget brakes it. Returns whether it woke.
+ */
+export async function keepMissionGoing(deps: MissionDeps, missionId: string) {
+  const mission = await getMissionRow(deps.db, missionId);
+  // What waits in its inbox goes out with the inbox's own delivery.
+  if (!mission || mission.inbox.some((e) => e.sessionId === mission.mainSessionId)) return false;
+  if (await keepGoingBlocker(deps.db, mission)) return false;
+  const out = await tellMainSession(deps, mission, KEEP_GOING_PROMPT, { kind: "system", from: "the mission" });
+  return out.delivered;
 }
 
 /** Stop, close or a new brain: the main session's runs in the thread are canceled. */

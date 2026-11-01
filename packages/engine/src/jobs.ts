@@ -47,7 +47,7 @@ import { checkMissionDone } from "./mission-delivery";
 import { onMissionTaskEnded, syncMissionFiles } from "./mission-sync";
 import { afterMachineTaskEnded, afterMissionRunEnded, startQueuedMissionTasks } from "./mission-worktree";
 import { type MissionDeps, missionOfThread, missionRole, reactivateMission } from "./missions";
-import type { MissionEngine } from "./missions-engine";
+import { KEEP_GOING_JOB, keepMissionGoing, type MissionEngine } from "./missions-engine";
 import { notifyMessage } from "./notification-producers";
 import { ORG_FILES_PURGE_ATTEMPTS, ORG_FILES_PURGE_JOB, USER_FILES_PURGE_JOB } from "./organizations";
 import { enqueue, type JobHandlers, type OutboxJob, PermanentJobError } from "./outbox";
@@ -602,6 +602,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     // A mission's plan finished or its work stopped: is everything done (then it waits to be concluded)?
     "mission.check_done": async (job) => {
       await checkMissionDone(missions, String(job.payload.missionId), Number(job.payload.attempt ?? 0) || 0);
+    },
+    // A mission run ended a while ago: with plan items open and nothing waiting on a person, the work goes on.
+    [KEEP_GOING_JOB]: async (job) => {
+      await keepMissionGoing(missions, String(job.payload.missionId));
     },
     // The person at a connected computer answered an agent's folder request (ADR 0036 §8): the agent wakes.
     "machine.access_decided": async (job) => {

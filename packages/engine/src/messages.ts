@@ -587,9 +587,16 @@ export async function insertMessageWithRuns(
           and r.agent_id <> all(${referenced}::uuid[])
           and (
             (r.agent_id in (select agent_id from answering)
-              and (r.thread_root_id = coalesce(${threadId}::uuid, ${id}::uuid) or exists (
-                select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'dm')
-                or ${threadId ? sql`false` : sql`(r.status in ('queued', 'running') and ${inChannelRun(sql`r`)})`}))
+              and (r.thread_root_id = coalesce(${threadId}::uuid, ${id}::uuid)
+                -- In a DM the main timeline is one conversation; each thread (a mission's) is its own, so the
+                -- agent works in both at once instead of one taking the other's messages.
+                or ${
+                  threadId
+                    ? sql`false`
+                    : sql`(${inChannelRun(sql`r`)} and exists (
+                select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'dm'))
+                or (r.status in ('queued', 'running') and ${inChannelRun(sql`r`)})`
+                }))
             or (${threadId}::uuid is not null and r.thread_root_id = ${threadId}::uuid
               and ${audienceSql("ra", sql`${userId}::text`)})
             -- The floor (a follow-up without @ in a channel's main timeline): it goes to the agent still
