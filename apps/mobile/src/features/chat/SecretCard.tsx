@@ -7,8 +7,8 @@ import { sealSecret } from "@/lib/secret-box";
 import { Button, Icon, Text, useToast } from "@/ui";
 import { IconTile } from "../connectors/ConnectorIcon";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
-import { successHaptic, useSurface } from "../shared/parts";
-import { AskButtons, AskCard, AskFoot, ExpiryLine, useAskStore, useExpired } from "./asks";
+import { successHaptic } from "../shared/parts";
+import { AskButtons, AskCard, AskDone, AskFoot, ExpiryLine, useAskStore, useExpired } from "./asks";
 
 /**
  * An agent asks for a secret for its computer (`request_secret`, ADR 0027), as the request card. Only the
@@ -23,7 +23,6 @@ export function SecretCard({ request }: { request: SecretRequest }) {
   const dir = useDirectory();
   const c = useColors();
   const toast = useToast();
-  const surface = useSurface();
   const when = useWhen();
   const asks = useAskStore();
   // What this phone did to it (the message's copy changes only when the server says so).
@@ -79,7 +78,6 @@ export function SecretCard({ request }: { request: SecretRequest }) {
   };
 
   if (!pending) {
-    const ok = r.status === "delivered";
     const line =
       r.status === "delivered"
         ? r.deliveredAt
@@ -92,14 +90,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
           : r.status === "canceled"
             ? t("secret.canceled")
             : t("secret.expired");
-    return (
-      <View style={[styles.done, surface]}>
-        <Icon name={ok ? "checkc" : "x"} size={16} color={ok ? c.ok : c.muted} />
-        <Text variant="small" tone="muted" style={styles.grow}>
-          {line}
-        </Text>
-      </View>
-    );
+    return <AskDone done={r.status === "delivered"} words={line} />;
   }
 
   const where =
@@ -194,15 +185,6 @@ export function SecretCard({ request }: { request: SecretRequest }) {
 
 const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0 },
-  done: {
-    marginTop: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 20,
-  },
   field: {
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,

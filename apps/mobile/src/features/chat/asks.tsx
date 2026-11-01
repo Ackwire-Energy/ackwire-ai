@@ -45,7 +45,7 @@ import { Sky } from "@/sky/Sky";
 import { CHROME_MAX_SCALE, Fuse, Icon, Text, useReducedMotion, useTheme } from "@/ui";
 import { approvalTitleText } from "../approvals/parts";
 import { AgentFace } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useNow, useOrgId } from "../shared/hooks";
+import { useColors, useDirectory, useMeId, useNow, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook, fuseRemaining } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
 import {
@@ -67,8 +67,8 @@ import { approvalIdOf, lineStops, markedParts, markName, questionOf, workingEntr
  * A request in the conversation (an approval, a secret, a question, help in the agent's browser or on its
  * computer, a proposal) is one card for all: what it asks in a small label with its state, the agent's own
  * words, the thing it is about in a well (whole under "Ver …"), then a strip with when it expires and the
- * decision. While one waits out of view, the line above the composer says so and takes the person to it. What
- * waits and what shows is kept in `ask-store.ts`.
+ * decision. Decided, it is one quiet line (`AskDone`). While one waits out of view, the line above the composer
+ * says so and takes the person to it. What waits and what shows is kept in `ask-store.ts`.
  */
 
 const AskStoreContext = createContext<AskStore | null>(null);
@@ -534,6 +534,73 @@ export function ExpiryLine({ createdAt, expiresAt }: { createdAt?: string | null
   );
 }
 
+/**
+ * A decided request: no card, one quiet line in the conversation. A pixel mark (a green square when it went through,
+ * a bar when it didn't), its words (what `markName` wraps in bold) and, with `at`, when it ended. The words wrap
+ * rather than lose the outcome. With `more`, the line opens the rest under it; the line has no room for `label`, so
+ * it reaches screen readers as the hint.
+ */
+export function AskDone({
+  done,
+  words,
+  at,
+  more,
+}: {
+  done: boolean;
+  words: string;
+  at?: string | null;
+  more?: { label: string; content: ReactNode };
+}) {
+  const c = useColors();
+  const when = useWhen();
+  const reduced = useReducedMotion();
+  const [open, setOpen] = useState(false);
+  const line = (
+    <>
+      <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.doneMark}>
+        <View style={[done ? styles.donePixel : styles.doneBar, { backgroundColor: done ? c.ok : c.faint }]} />
+      </View>
+      <Text variant="small" tone="muted" maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.doneWords}>
+        {markedParts(words).map((p, i) =>
+          p.bold ? (
+            // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
+            <RNText key={i} style={[styles.semibold, { color: c.ink2 }]}>
+              {p.text}
+            </RNText>
+          ) : (
+            p.text
+          ),
+        )}
+        {at ? ` · ${when.short(at)}` : null}
+      </Text>
+    </>
+  );
+  if (!more) return <View style={styles.done}>{line}</View>;
+  return (
+    <>
+      <Pressable
+        onPress={() => {
+          tapHaptic();
+          setOpen((o) => !o);
+        }}
+        accessibilityRole="button"
+        accessibilityHint={more.label}
+        accessibilityState={{ expanded: open }}
+        hitSlop={8}
+        style={({ pressed }) => [styles.done, pressed && styles.pressed]}
+      >
+        {line}
+        <View style={open ? styles.flip : undefined}>
+          <Icon name="chev" size={13} color={c.muted} />
+        </View>
+      </Pressable>
+      {open ? (
+        <Animated.View entering={reduced ? undefined : FadeIn.duration(220)}>{more.content}</Animated.View>
+      ) : null}
+    </>
+  );
+}
+
 // ── The bar ──────────────────────────────────────────────────────────────────
 
 /**
@@ -701,6 +768,19 @@ const styles = StyleSheet.create({
   expiry: { flexDirection: "row", alignItems: "center", gap: 8 },
   fuse: { width: 56 },
   expiryText: { fontWeight: "500", fontVariant: ["tabular-nums"] },
+  // A decided request: a line on the conversation itself, nothing around it.
+  done: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    alignSelf: "flex-start",
+    maxWidth: "100%",
+    marginTop: 6,
+  },
+  doneMark: { width: 14, height: 14, alignItems: "center", justifyContent: "center" },
+  donePixel: { width: 5, height: 5 },
+  doneBar: { width: 8, height: 2 },
+  doneWords: { flexShrink: 1, fontSize: 14, lineHeight: 19 },
   // The bar: the working line's shape (WorkingLine), so one replaces the other without moving.
   dock: { paddingHorizontal: 4, paddingBottom: 6 },
   pill: {

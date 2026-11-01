@@ -21,12 +21,13 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, Chip, DiffView, haptics, Icon, Text, ToggleSwitch, useTheme, useToast } from "@/ui";
 import { boldRuns } from "../chat/actions";
-import { AskButtons, AskCard, AskFoot } from "../chat/asks";
+import { lastDecidedAt } from "../chat/ask-store";
+import { AskButtons, AskCard, AskDone, AskFoot } from "../chat/asks";
+import { markName } from "../chat/logic";
 import { IconTile } from "../connectors/ConnectorIcon";
 import { useFailed } from "../routines/hooks";
 import { Face } from "../shared/Face";
 import { useDirectory } from "../shared/hooks";
-import { useSurface } from "../shared/parts";
 
 /** The proposal cards an agent's message carries (`meta.memoryUpdates`, or an older `meta.proposalId`). */
 export function InstructionProposals({ message: m }: { message: Message }) {
@@ -54,8 +55,6 @@ function InstructionProposalCard({ ids }: { ids: string[] }) {
   const rows = useCardProposals(orgId, ids);
   const decide = useDecideProposals(orgId);
   const [off, setOff] = useState<ReadonlySet<string>>(new Set());
-  const [open, setOpen] = useState(false);
-  const surface = useSurface();
   const [first] = rows;
   if (!first) return null;
   const agentName = (id: string) => dir.anyAgent(id)?.name || t("channel.unknownAgent");
@@ -239,28 +238,16 @@ function InstructionProposalCard({ ids }: { ids: string[] }) {
   if (rows.some(isOpen)) return card;
   // Decided: one line like a decided approval, the card when asked for.
   const outcome = cardOutcome(t, rows);
-  const what = many ? runs.map((r) => r.text).join("") : proposalTitle(t, first, orgName, agentName);
+  const what = many
+    ? runs.map((r) => (r.bold ? markName(r.text) : r.text)).join("")
+    : markName(proposalTitle(t, first, orgName, agentName));
   return (
-    <>
-      <Pressable
-        onPress={() => {
-          haptics.selection();
-          setOpen((v) => !v);
-        }}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
-        style={[styles.done, surface]}
-      >
-        <Icon name={outcome.accepted ? "checkc" : "x"} size={16} color={outcome.accepted ? colors.ok : colors.muted} />
-        <Text variant="small" tone="muted" style={styles.fill}>
-          {`${what} · ${outcome.label}`}
-        </Text>
-        <View style={open ? styles.flip : undefined}>
-          <Icon name="chev" size={14} color={colors.muted} />
-        </View>
-      </Pressable>
-      {open ? card : null}
-    </>
+    <AskDone
+      done={outcome.accepted}
+      words={`${outcome.label}: ${what}`}
+      at={lastDecidedAt(rows)}
+      more={{ label: t("ask.seeChange"), content: card }}
+    />
   );
 }
 
@@ -301,16 +288,6 @@ function SettingChange({ p }: { p: Proposal }) {
 }
 
 const styles = StyleSheet.create({
-  done: {
-    marginTop: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 20,
-  },
-  flip: { transform: [{ rotate: "180deg" }] },
   card: { marginTop: 10, borderRadius: 14, padding: 12, gap: 10, alignItems: "stretch" },
   head: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   section: { gap: 8 },
