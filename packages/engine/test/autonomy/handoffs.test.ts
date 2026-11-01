@@ -168,4 +168,3 @@ scenario("S38", "a teammate's AI status in the context is the live one, not a st
   expect(await w.runs("fred")).toHaveLength(1);
   await assertInvariants(w);
 });
-

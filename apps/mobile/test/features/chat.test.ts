@@ -973,7 +973,9 @@ describe("automatic lines (notices) and fast replies", () => {
 
   test("a mention that couldn't wake its agents says whose mention and whom, by name", () => {
     const line = eventLineOf(
-      agentMsg("n1", { notice: { kind: "wake_skipped", text: "@infra wasn't woken", refs: { agentHandles: "infra,zed" } } }),
+      agentMsg("n1", {
+        notice: { kind: "wake_skipped", text: "@infra wasn't woken", refs: { agentHandles: "infra,zed" } },
+      }),
       names,
     );
     expect(line).toMatchObject({ key: "chat.notice.wakeSkipped", values: { name: "Ada", agents: "Infra, zed" } });

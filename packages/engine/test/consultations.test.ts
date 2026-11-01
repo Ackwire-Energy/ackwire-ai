@@ -475,7 +475,10 @@ describe("ask_agent", () => {
     expect(await consultationsIn(f.db, f.org.id, other[0]?.id ?? "")).toEqual([]);
 
     // What the consulted run posts in the agents' DM meanwhile shows here as its progress (ADR 0096).
-    const [target] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, row?.targetRunId ?? ""));
+    const [target] = await f.db
+      .select()
+      .from(schema.agentRuns)
+      .where(eq(schema.agentRuns.id, row?.targetRunId ?? ""));
     if (!target) throw new Error("no consulted run");
     const before = list[0]?.progress?.posts ?? 0;
     for (const body of ["Gerei a imagem 1.", "Gerei a imagem 2."])
