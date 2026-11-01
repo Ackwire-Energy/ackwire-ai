@@ -22,6 +22,7 @@ import { BrowserCard } from "../browser/BrowserCard";
 import { openSwitchComputer } from "../outages/OutageNotice";
 import { useMachineOutages } from "../outages/queries";
 import { useColors, useDirectory, useMeId, useNow } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
 import { goBack } from "../shared/parts";
 import { SheetHostProvider } from "../shared/SheetHost";
 import { AgentScreen } from "./AgentScreen";
@@ -175,7 +176,7 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
   let sub = "";
   let body: ReactNode;
   if (!f || !view.ready) {
-    body = <Cover spinner text={t("agentComputer.state.opening", g)} />;
+    body = <Cover sky spinner color={agentLook(agent).color} text={t("agentComputer.state.opening", g)} />;
   } else if (view.forbidden) {
     body = <Cover icon="lock" text={t("agentComputer.state.forbidden")} />;
   } else if (flashing) {
@@ -237,7 +238,7 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
     }
   } else if (stage === "joining") {
     // The workspace's computer is ready and this agent gets it at its first hello: a moment more.
-    body = <Cover spinner text={t("agentComputer.state.opening", g)} />;
+    body = <Cover sky spinner color={agentLook(agent).color} text={t("agentComputer.state.opening", g)} />;
   } else if (stage === "noComputer") {
     sub = t("agentComputer.status.noComputer");
     // The phone has no computer picker: who may choose one is told where.

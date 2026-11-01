@@ -45,6 +45,7 @@ import { type LiveKey, stepText } from "../browser/logic";
 import { TypeBar } from "../browser/parts";
 import { useFinishHandoff } from "../browser/useFinishHandoff";
 import { useColors, useDirectory, useNow } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
 import { useActiveWork } from "../shared/queries";
 import { Cover } from "./Cover";
@@ -258,7 +259,8 @@ export function AgentScreen({
     void view.desktopQ.refetch();
   };
   const again = <Button variant="secondary" size="sm" label={t("desktop.retry")} onPress={retry} />;
-  const opening = <Cover fill spinner text={t("agentComputer.state.opening", g)} />;
+  const { color } = agentLook(agent);
+  const opening = <Cover fill sky spinner color={color} text={t("agentComputer.state.opening", g)} />;
   const cantShow = (
     <Cover
       fill
@@ -272,8 +274,17 @@ export function AgentScreen({
   const covers: Record<Exclude<DesktopViewState, "live">, ReactNode> = {
     connecting: stuck ? cantShow : opening,
     hidden: <Cover fill icon="eyeoff" text={t("browser.inCard.hiddenHelp", g)} />,
-    offline: <Cover fill spinner text={t("agentComputer.state.opening", g)} help={t("desktop.state.retrying")} />,
-    busy: <Cover fill spinner text={t("desktop.state.busy")} help={t("desktop.state.retrying")} />,
+    offline: (
+      <Cover
+        fill
+        sky
+        spinner
+        color={color}
+        text={t("agentComputer.state.opening", g)}
+        help={t("desktop.state.retrying")}
+      />
+    ),
+    busy: <Cover fill spinner color={color} text={t("desktop.state.busy")} help={t("desktop.state.retrying")} />,
     noRoom: <Cover fill icon="clock" text={t("agentComputer.state.noRoom", { computer })} action={again} />,
     paused: <Cover fill icon="pause" text={t("agentComputer.state.pausedPlain", { computer })} />,
     held: <Cover fill icon="pause" text={t("agentComputer.state.held", g)} help={t("agentComputer.state.heldHelp")} />,
