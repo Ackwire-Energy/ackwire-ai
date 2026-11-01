@@ -26,10 +26,10 @@ import { issueWorkBrief, issueWorkOf } from "./issue-work";
 import { openTasksBrief } from "./issues";
 import type { MachineCaller } from "./machine-hub";
 import { type MessageMedia, mediaOf } from "./media";
-import type { Message } from "./messages";
+import { type Message, unreachedNote } from "./messages";
 import { missionBrief } from "./mission-brief";
 import { handoffGuidance, noticeForOthers, noticeText } from "./notices";
-import { WHY_YOU_WERE_CALLED } from "./reply-policy";
+import { byAnotherAgent, WHY_AN_AGENT_CALLED, WHY_YOU_WERE_CALLED } from "./reply-policy";
 import { isRoutineRoomKey, type RoutineBrief, routineAccessOf, routineBriefOf, routineReportOf } from "./routine-brief";
 import { type AgentRun, replyThreadOf } from "./runs";
 import { stretchCardOf } from "./stretch";
@@ -694,8 +694,10 @@ export async function buildRunContext(
       now: nowFor,
     },
     ...(routine ? [{ turn: true, text: routine.timeLine }] : []),
-    // Brought in without being named (reply-policy.ts): staying quiet is an answer.
-    ...(options.mayPass ? [{ turn: true, text: WHY_YOU_WERE_CALLED }] : []),
+    // Brought in without being named, or by another agent (reply-policy.ts): staying quiet is an answer.
+    ...(options.mayPass
+      ? [{ turn: true, text: byAnotherAgent(run, trigger) ? WHY_AN_AGENT_CALLED : WHY_YOU_WERE_CALLED }]
+      : []),
     {
       turn: true,
       text: routine
@@ -743,7 +745,7 @@ export async function buildRunContext(
 
   return {
     system,
-    messages: toTurns(history, agent.id, names, trigger.id),
+    messages: toTurns(history, agent.id, names, trigger.id, { canAddAgents: channel.kind === "channel" }),
     stats: { historyMessages: history.length, systemChars, truncated: thread.length >= options.maxMessages },
     issueId: workIssueId ?? (typeof trigger.meta?.issueId === "string" ? trigger.meta.issueId : null),
   };
@@ -1325,21 +1327,37 @@ function undoNotes(meta: Record<string, unknown> | undefined): string {
   return notes.map((n) => `[Undo]: ${n}. Don't redo it unless asked.`).join("\n");
 }
 
+/** `meta.unreachedAgents` (the agents its mentions didn't reach: not in this conversation) as a line; "" when none. */
+function unreachedLine(meta: Record<string, unknown> | undefined, canAdd: boolean): string {
+  const handles = Array.isArray(meta?.unreachedAgents)
+    ? meta.unreachedAgents.filter((h): h is string => typeof h === "string")
+    : [];
+  const note = unreachedNote(handles, "this conversation", canAdd);
+  return note ? `[Not delivered]: ${note}` : "";
+}
+
 /**
  * Turns channel history into alternating user/assistant turns. The agent's
  * own messages are `assistant`; everything else is `user`, prefixed with the
  * author. Consecutive turns of one role are merged; the list starts and ends
  * with `user` (current models reject assistant prefill). When the last turn
  * holds more than the message being answered (`currentId`), that one is
- * marked `(current message)`: the others are context only.
+ * marked `(current message)`: the others are context only. `canAddAgents`:
+ * a channel, where the line about an agent its latest mention didn't reach
+ * says it can be added.
  */
 export function toTurns(
   history: Message[],
   agentId: string,
   names: Map<string, string>,
   currentId?: string,
+  options: { canAddAgents?: boolean } = {},
 ): ModelMessage[] {
   const turns: { role: "user" | "assistant"; parts: { id: string; text: string }[] }[] = [];
+  // Only the agent's latest message with text carries the line about a mention that missed: older ones are settled.
+  const latestOwn = [...history]
+    .reverse()
+    .find((m) => m.authorAgentId === agentId && !m.meta?.notice && !taskNotice(m) && m.body.trim())?.id;
   for (const m of history) {
     // A notice is its agent's own (its author): another agent reads a neutral line or nothing (ADR 0053 §9).
     if (m.meta?.notice && m.authorAgentId !== agentId) {
@@ -1387,9 +1405,17 @@ export function toTurns(
       if (last && last.role === role) last.parts.push({ id: m.id, text });
       else turns.push({ role, parts: [{ id: m.id, text }] });
     }
-    // Its own sticker or GIF, and someone undoing (or redoing) what this reply did: news for the agent, on the
-    // people's side.
-    const news = own ? [media ? ownMediaNote(media, names) : "", notes].filter(Boolean).join("\n") : "";
+    // Its own sticker or GIF, someone undoing (or redoing) what this reply did, or its mention missing an agent
+    // that wasn't here: news for the agent, on the people's side.
+    const news = own
+      ? [
+          media ? ownMediaNote(media, names) : "",
+          notes,
+          m.id === latestOwn ? unreachedLine(m.meta, options.canAddAgents === true) : "",
+        ]
+          .filter(Boolean)
+          .join("\n")
+      : "";
     if (news) {
       const last = turns.at(-1);
       if (last && last.role === "user") last.parts.push({ id: `${m.id}:notes`, text: news });

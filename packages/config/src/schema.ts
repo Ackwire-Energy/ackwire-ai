@@ -317,9 +317,9 @@ export const envVars = {
     section: "Agents",
   },
   ROUTER_MENTION_THRESHOLD: {
-    schema: z.coerce.number().min(0).max(1).default(0.6),
+    schema: z.coerce.number().min(0).max(1).default(0.2),
     description:
-      "When an agent @mentions another, minimum Jev probability (0–1) that it is asking that agent to act now for it to answer.",
+      "When an agent @mentions another, minimum probability (0–1) that the message needs something from that agent for it to answer. Low on purpose: only a judge sure the message needs nothing (a thanks, an ok, a quote) leaves the agent asleep.",
     section: "Agents",
   },
   AGENT_MAX_OUTPUT_TOKENS: {

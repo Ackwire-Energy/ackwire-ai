@@ -5,7 +5,7 @@ import { recordAudit } from "./audit";
 import { addAgentReaction, isValidReaction, normalizeReaction } from "./context/feedback";
 import { openPersonAgentDm } from "./dms";
 import { publishMessageCreated } from "./events";
-import { getMessage, insertMessage, MAX_MESSAGE_LENGTH, messageView } from "./messages";
+import { getMessage, insertMessage, MAX_MESSAGE_LENGTH, messageView, unreachedAgents, unreachedNote } from "./messages";
 import { enqueue } from "./outbox";
 import { personBehindCall } from "./requester";
 import { isRoutineRoomKey } from "./routine-brief";
@@ -152,13 +152,23 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             .select({ hop: schema.agentRuns.hop })
             .from(schema.agentRuns)
             .where(eq(schema.agentRuns.id, ctx.runId));
+          // A mention reaches only that channel's members: the result names the agents it missed.
+          const unreached = await unreachedAgents(ctx.db, {
+            orgId: ctx.orgId,
+            channelId: channel.id,
+            authorAgentId: ctx.agentId,
+            body: text,
+          });
           const message = await insertMessage(ctx.db, {
             orgId: ctx.orgId,
             channelId: channel.id,
             threadId: null,
             author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: run?.hop ?? 0 },
             body: text,
-            meta: files.length > 0 ? { artifacts: files } : undefined,
+            meta: {
+              ...(files.length > 0 ? { artifacts: files } : {}),
+              ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
+            },
           });
           await recordAudit(ctx.db, {
             orgId: ctx.orgId,
@@ -176,8 +186,9 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             const [view] = await withWikiLinks(ctx.db, ctx.orgId, [messageView(message)]);
             if (view) await publishMessageCreated(deps.pubsub, view);
           }
+          const note = unreachedNote(unreached, `#${channel.name}`, true);
           return {
-            content: `Posted in #${channel.name}${files.length > 0 ? ` with ${files.length} file(s)` : ""}. Tell the person it's there.`,
+            content: `Posted in #${channel.name}${files.length > 0 ? ` with ${files.length} file(s)` : ""}. Tell the person it's there.${note ? ` ${note}` : ""}`,
             data: { message: { id: message.id, channelId: channel.id } },
           };
         } catch (error) {
@@ -234,6 +245,12 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             .select({ hop: schema.agentRuns.hop })
             .from(schema.agentRuns)
             .where(eq(schema.agentRuns.id, ctx.runId));
+          const unreached = await unreachedAgents(ctx.db, {
+            orgId: ctx.orgId,
+            channelId: dm.id,
+            authorAgentId: ctx.agentId,
+            body: text,
+          });
           const message = await insertMessage(ctx.db, {
             orgId: ctx.orgId,
             channelId: dm.id,
@@ -241,7 +258,10 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: run?.hop ?? 0 },
             body: text,
             // Started by the agent on someone's behalf: the person is notified (an agent's reply isn't).
-            meta: { agentDm: { requesterUserId: requester, fromChannelId: ctx.channelId } },
+            meta: {
+              agentDm: { requesterUserId: requester, fromChannelId: ctx.channelId },
+              ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
+            },
           });
           await enqueue(ctx.db, {
             orgId: ctx.orgId,
@@ -261,8 +281,9 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
             const [view] = await withWikiLinks(ctx.db, ctx.orgId, [messageView(message)]);
             if (view) await publishMessageCreated(deps.pubsub, view);
           }
+          const note = unreachedNote(unreached, `your DM with ${to.name}`, false);
           return {
-            content: `Sent to ${to.name} in your DM with them. Tell the person who asked.`,
+            content: `Sent to ${to.name} in your DM with them. Tell the person who asked.${note ? ` ${note}` : ""}`,
             data: { message: { id: message.id, channelId: dm.id } },
           };
         } catch (error) {

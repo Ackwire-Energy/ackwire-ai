@@ -30,7 +30,7 @@ import { cutText } from "./format";
 import { advanceForumTopic } from "./forum";
 import { FILE_JOIN_REQUEST_JOB, fileJoinRequest } from "./invite-requests";
 import type { JevKey, JevKeySource } from "./jev-key";
-import { mentionHandoffs } from "./judge";
+import { MENTION_WAKE_THRESHOLD, mentionNeedsNothing } from "./judge";
 import { platformCapReached } from "./limits";
 import { wakeForAccessDecision } from "./machine-access";
 import type { MachineCaller } from "./machine-hub";
@@ -132,7 +132,7 @@ export interface JobDeps extends RunExecutorDeps {
     /** The small model on another provider's key (e.g. `{ openai: "gpt-6-luna" }`); else its catalog pick. */
     cheapModels?: Record<string, string>;
     minScore?: number;
-    /** Jev probability needed for an agent's @mention of another agent to start it (default 0.6). */
+    /** Probability that an agent's @mention needs the agent it names for it to wake (`MENTION_WAKE_THRESHOLD`). */
     mentionThreshold?: number;
     /** Replaces the core small-model step (e.g. an optional external classifier). */
     strategy?: RouterStrategy;
@@ -218,13 +218,14 @@ async function jevPicks(key: JevKeySource | undefined): Promise<boolean> {
 export function createJobHandlers(deps: JobDeps): JobHandlers {
   const routing = messageRouter(deps);
 
-  // An agent's @mention starts the other agent only when it hands it something to act on now (the judge decides).
-  const mentionThreshold = deps.router?.mentionThreshold ?? 0.6;
+  // An agent's @mention wakes the other agent unless the judge is sure it needs nothing from it.
+  const mentionThreshold = deps.router?.mentionThreshold ?? MENTION_WAKE_THRESHOLD;
   /**
-   * Which agents an agent's @mentions actually hand off to (ADR 0089): the judge asks, per mentioned agent,
-   * whether it is handed work or a question to act on now, in any language, reading the message being answered
-   * too. Thanks, an "ok" or a sign-off hand nothing off. Only without a judge, or when it fails, does a message
-   * that opens with "@handle" count by itself. Every decision is recorded in `routing_decisions` for audit.
+   * Which agents an agent's @mentions wake (ADR 0089): the judge asks, per mentioned agent, whether the message
+   * needs nothing from it, in any language, reading the message being answered too; it wakes unless the judge is
+   * sure (`MENTION_WAKE_THRESHOLD`). Thanks, an "ok", a sign-off or a quote need nothing. When the judge fails, every
+   * agent it names wakes; only with no judge at all does a message that opens with "@handle" count by itself. Each decision goes in
+   * `routing_decisions`, its score the chance the message needs the agent (1 − the judge's "nothing").
    */
   async function delegatedAgents(message: NonNullable<Awaited<ReturnType<typeof getMessage>>>) {
     const targets = await deps.db
@@ -240,7 +241,6 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     const scores = new Map<string, number>();
     let strategy = "mention-judge";
     let error: string | null = null;
-    let judged = false;
     const judge = deps.context ? judgeOf(deps.context) : null;
     if (judge && others.length > 0) {
       const [[author], answering] = await Promise.all([
@@ -253,7 +253,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         answeredBy(message),
       ]);
       try {
-        const out = await mentionHandoffs(judge, {
+        const out = await mentionNeedsNothing(judge, {
           orgId: message.orgId,
           agentId: message.authorAgentId,
           body: message.body,
@@ -261,15 +261,16 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           answering,
           targets: others.map((t) => ({ agentId: t.id, handle: t.handle, name: t.name, role: t.role || null })),
         });
-        for (const [id, p] of out) scores.set(id, p);
+        for (const [id, nothing] of out) scores.set(id, 1 - nothing);
         strategy = `mention-${judge.name}`;
-        judged = true;
       } catch (e) {
         error = e instanceof Error ? e.message.slice(0, 300) : String(e);
+        // Nobody could say it needs nothing: every agent it names wakes, and one woken for nothing passes.
+        for (const t of others) scores.set(t.id, 1);
       }
     }
-    // Nobody could read it: a message that opens by addressing an agent ("@ada já postei…") is a reply to it.
-    if (!judged) for (const t of others) if (opensWith(message.body, t.handle)) scores.set(t.id, 1);
+    // No judge at all: a message that opens by addressing an agent ("@ada já postei…") is a reply to it.
+    if (!judge) for (const t of others) if (opensWith(message.body, t.handle)) scores.set(t.id, 1);
     const allowed = others.filter((t) => (scores.get(t.id) ?? 0) >= mentionThreshold).map((t) => t.id);
     await deps.db
       .insert(schema.routingDecisions)
