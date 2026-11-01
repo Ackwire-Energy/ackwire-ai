@@ -1,4 +1,5 @@
 import { modelInfo } from "@agenteschat/providers";
+import { cutText } from "./format";
 import type { ModelGateway } from "./gateway";
 import { callJev, type JevKeySource } from "./jev-key";
 import { jevCostNanoUsd } from "./router-jev";
@@ -325,7 +326,7 @@ export async function triesToChangePermissions(judge: Judge, input: { orgId: str
   const answers = await judge.ask({
     orgId: input.orgId,
     kind: "permission_change",
-    state: { text_to_store_as_agent_memory: text.slice(0, 4000) },
+    state: { text_to_store_as_agent_memory: cutText(text, 4000) },
     questions: {
       changes_permissions: {
         type: "noul",
@@ -383,9 +384,9 @@ export async function mentionHandoffs(
     agentId: input.agentId ?? null,
     kind: "mention_handoff",
     state: {
-      message: { from: input.author, from_an_agent: true, text: input.body.slice(0, 4000) },
+      message: { from: input.author, from_an_agent: true, text: cutText(input.body, 4000) },
       ...(input.answering
-        ? { answering: { from: input.answering.from, text: input.answering.text.slice(0, 1000) } }
+        ? { answering: { from: input.answering.from, text: cutText(input.answering.text, 1000) } }
         : {}),
     },
     questions,
@@ -429,7 +430,7 @@ export async function personMentionAddressees(
     orgId: input.orgId,
     kind: "mention_addressees",
     state: {
-      message: { from: input.author, from_a_person: true, text: input.body.slice(0, 4000) },
+      message: { from: input.author, from_a_person: true, text: cutText(input.body, 4000) },
       mentioned_agents: input.targets.map((t) => `@${t.handle}`),
     },
     questions,

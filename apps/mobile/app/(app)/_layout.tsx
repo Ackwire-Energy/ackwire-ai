@@ -35,7 +35,7 @@ export function ErrorBoundary(props: ErrorBoundaryProps) {
 export default function AppLayout() {
   const { colors } = useTheme();
   const org = useOrgGate();
-  // Signed in, the organization not known yet (the splash covers this) or none (the first run, `OnboardingFlow`, covers it):
+  // Signed in, the organization not known yet (the splash or `Entering` covers this) or none (the first run, `OnboardingFlow`, covers it):
   // the screens need one, so they mount once it's chosen, at the URL the app opened with.
   if (!org.state) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
   return <AppStack />;
@@ -119,6 +119,10 @@ function AppStack() {
       <Stack.Screen name="me/zone" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/workspaces" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/members" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="invite-people" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="invite-channels" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="invite-note" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="suggest-person" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/notifications" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/sounds" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="me/appearance" options={{ ...pushed, ...scrollUnder }} />
@@ -140,6 +144,7 @@ function AppStack() {
       <Stack.Screen name="settings/computers/agent" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/audit/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/audit/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="settings/media" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/storage" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="settings/import" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="push-ask" options={pushSheet} />

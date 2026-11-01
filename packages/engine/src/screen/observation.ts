@@ -1,4 +1,5 @@
 import type { ScreenKind } from "@agenteschat/adapters";
+import { cutText } from "../format";
 
 /**
  * What an agent sees on a screen (ADR 0054): the page or window as text, one
@@ -175,12 +176,12 @@ export function observeSnapshot(input: {
   const placeOf = (i: number, via: number): string | null => {
     const n = nodes[i] as Node;
     if (!PLACES.has(n.role)) return null;
-    if (n.name) return `${n.role} "${n.name.slice(0, 80)}"`;
+    if (n.name) return `${n.role} "${cutText(n.name, 80)}"`;
     if (!ROWS.has(n.role)) return null;
     const cells = (children[i] as number[])
       .filter((c) => c !== via && CELLS.has((nodes[c] as Node).role) && (nodes[c] as Node).name)
       .map((c) => (nodes[c] as Node).name as string);
-    return cells.length > 0 ? `${n.role} "${cells.join(" · ").slice(0, 80)}"` : null;
+    return cells.length > 0 ? `${n.role} "${cutText(cells.join(" · "), 80)}"` : null;
   };
   const elements: ScreenElement[] = [];
   nodes.forEach((n, index) => {
@@ -227,7 +228,7 @@ export function describeElement(e: ScreenElement, max = 220): string {
   const own = e.line.replace(/^-\s+/, "").replace(/\s*\[ref=e\d+\]/, "");
   const where = e.context.length > 0 ? ` — in ${e.context.join(" › ")}` : "";
   const text = `${own}${where}`;
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+  return text.length > max ? `${cutText(text, max - 1)}…` : text;
 }
 
 /** A look this recent is the screen as it is: a plan's first target can be found on it. */

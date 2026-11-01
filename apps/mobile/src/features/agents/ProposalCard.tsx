@@ -24,6 +24,7 @@ import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { AgentAvatar, Button, Icon, Text, useTheme } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
+import { AskButtons, AskCard, AskFoot, ExpiryLine, useAskStore } from "../chat/asks";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { useFailed } from "../routines/hooks";
 import { proposedRoutineWhen } from "../routines/rule";
@@ -31,10 +32,10 @@ import { useDirectory, useMeId } from "../shared/hooks";
 import { fullLook } from "./edit";
 
 /**
- * The web's card for an agent's proposal of a new agent (ADR 0081): the draft at a glance and what it gets, a line
- * each (who gives a line the viewer can't). Criar makes it as it is in one tap, Revisar opens "Criar agente" filled
- * in with it, Recusar says no, for who may create agents while it is open; then what was decided, the lines it got
- * and the new agent's page once created.
+ * An agent's proposal of a new agent (ADR 0081): while it is open, the request card (the agent's reason, the draft
+ * in the well, the AI it would think with under "Ver a mudança", what it gets a line each with who gives a line the
+ * viewer can't). Criar makes it as it is in one tap, Revisar opens "Criar agente" filled in with it, Recusar says no,
+ * for who may create agents. Then what was decided, the lines it got and the new agent's page once created.
  */
 export function ProposalCard({ message: m }: { message: Message }) {
   const { t } = useTranslation();
@@ -45,6 +46,7 @@ export function ProposalCard({ message: m }: { message: Message }) {
   const create = useCreateProposedAgent(orgId);
   const deny = useDenyAgentProposal(orgId);
   const failed = useFailed();
+  const asks = useAskStore();
   const card = agentProposalOf(m.meta);
   if (!card || m.author.type !== "agent") return null;
   const { draft, why } = card.params;
@@ -63,6 +65,82 @@ export function ProposalCard({ message: m }: { message: Message }) {
             ? null
             : t("proposals.waitingAdmin");
   const busy = create.isPending || deny.isPending;
+  if (status === "open") {
+    return (
+      <AskCard
+        id={m.id}
+        kind="agent"
+        agentId={m.author.id ?? ""}
+        waitsFor={decides ? "you" : null}
+        lead={why || t("actionCard.agentProposal.title", { agent: proposer })}
+        well={{
+          tile: <AgentAvatar agent={fullLook(draft.appearance)} size={32} name={draft.name} live={false} />,
+          title: draft.name,
+          detail: [`@${draft.handle}`, draft.role].filter(Boolean).join(" · "),
+          more: {
+            label: t("ask.seeChange"),
+            content: (
+              <Text variant="footnote" tone="muted">
+                {suggestedAiText(t, draft.ai)}
+              </Text>
+            ),
+          },
+        }}
+        body={lines.length > 0 ? <Lines lines={lines} draft={draft} /> : undefined}
+        foot={
+          <AskFoot expiry={<ExpiryLine expiresAt={card.expiresAt} />}>
+            {decides ? (
+              <>
+                <AskButtons
+                  primary={
+                    <Button
+                      variant="primary"
+                      size="card"
+                      wide
+                      label={t("newAgent.create", { name: draft.name })}
+                      disabled={busy}
+                      onPress={() =>
+                        create.mutate(m.id, {
+                          onSuccess: ({ agent }) => {
+                            asks?.settle(m.id);
+                            // Nothing to think with yet: it is created all the same, and Connect opens for it here.
+                            if (draft.ai.kind === "none") openConnectAi({ agentId: agent.id });
+                          },
+                          onError: failed,
+                        })
+                      }
+                    />
+                  }
+                  secondary={
+                    <Button
+                      variant="secondary"
+                      size="card"
+                      wide
+                      label={t("actionCard.agentProposal.review")}
+                      disabled={busy}
+                      onPress={() => router.push(`/new-agent?proposal=${encodeURIComponent(m.id)}` as never)}
+                    />
+                  }
+                />
+                <Button
+                  variant="ghost"
+                  size="card"
+                  wide
+                  label={t("approval.refuse")}
+                  disabled={busy}
+                  onPress={() => deny.mutate(m.id, { onSuccess: () => asks?.settle(m.id), onError: failed })}
+                />
+              </>
+            ) : (
+              <Text variant="small" tone="muted">
+                {outcome}
+              </Text>
+            )}
+          </AskFoot>
+        }
+      />
+    );
+  }
   return (
     <View style={[styles.card, { backgroundColor: colors.sunken }]}>
       <View style={styles.row}>
@@ -91,55 +169,21 @@ export function ProposalCard({ message: m }: { message: Message }) {
       <Text variant="footnote" tone="muted">
         {suggestedAiText(t, draft.ai)}
       </Text>
-      {decides ? (
-        <View style={styles.acts}>
-          <Button
-            variant="primary"
-            size="sm"
-            label={t("newAgent.create", { name: draft.name })}
-            disabled={busy}
-            onPress={() =>
-              create.mutate(m.id, {
-                // Nothing to think with yet: it is created all the same, and Connect opens for it here.
-                onSuccess: ({ agent }) => {
-                  if (draft.ai.kind === "none") openConnectAi({ agentId: agent.id });
-                },
-                onError: failed,
-              })
-            }
-          />
+      <View style={styles.acts}>
+        {outcome ? (
+          <Text variant="footnote" tone="faint">
+            {outcome}
+          </Text>
+        ) : null}
+        {status === "created" && card.agentId ? (
           <Button
             variant="secondary"
             size="sm"
-            label={t("actionCard.agentProposal.review")}
-            disabled={busy}
-            onPress={() => router.push(`/new-agent?proposal=${encodeURIComponent(m.id)}` as never)}
+            label={t("newAgent.openProfile")}
+            onPress={() => router.push(`/agent/${encodeURIComponent(card.agentId ?? "")}` as never)}
           />
-          <Button
-            variant="secondary"
-            size="sm"
-            label={t("approval.refuse")}
-            disabled={busy}
-            onPress={() => deny.mutate(m.id, { onError: failed })}
-          />
-        </View>
-      ) : (
-        <View style={styles.acts}>
-          {outcome ? (
-            <Text variant="footnote" tone="faint">
-              {outcome}
-            </Text>
-          ) : null}
-          {status === "created" && card.agentId ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              label={t("newAgent.openProfile")}
-              onPress={() => router.push(`/agent/${encodeURIComponent(card.agentId ?? "")}` as never)}
-            />
-          ) : null}
-        </View>
-      )}
+        ) : null}
+      </View>
     </View>
   );
 }

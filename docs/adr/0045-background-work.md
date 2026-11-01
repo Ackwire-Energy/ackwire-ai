@@ -7,7 +7,7 @@
 
 ## Context
 
-A run holds its conversation for up to `AGENT_MAX_TOOL_TURNS` (25) model calls (`executor.ts`). While it works:
+A run holds its conversation for up to `AGENT_MAX_TOOL_TURNS` (25 then, a backstop of 200 since the ADR 0015 addendum of 2026-10-31) model calls (`executor.ts`). While it works:
 
 - New messages only reach it between steps, as "[Nova mensagem de X, enquanto você trabalhava]" (`pending_message_ids`, `dispatch.ts`). The agent can't answer a quick side question without first finishing or abandoning the long task.
 - "Stop and send" (ADR 0029) can cut a model call, but the agent still carries the whole task in the same loop.

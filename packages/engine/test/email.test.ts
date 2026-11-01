@@ -791,11 +791,13 @@ describe("outbox delivery", () => {
     await f.db.update(schema.users).set({ email: inviterEmail }).where(eq(schema.users.id, f.owner.id));
     await queueInvitationEmail(f.db, {
       orgId: f.org.id,
-      invitationId: "i1",
+      // An id, as the function reads the invitation's note and expiry (none here: no note, keyed by the link).
+      invitationId: crypto.randomUUID(),
       email: "new@example.com",
       role: "member",
       url: "https://x/invite/abcdefghijklmnop",
       inviterId: f.owner.id,
+      secret: "test-secret",
     });
     const [job] = (await f.db.select().from(schema.outbox)).filter((j) => j.kind === "email.send");
     // The workspace's agents for its picture: the fixture's one, with no look (its face is sky).

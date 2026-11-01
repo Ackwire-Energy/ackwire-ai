@@ -67,36 +67,43 @@ const click = async (el: HTMLElement, rounds = 6) => {
   await act(async () => fireEvent.click(el));
   await settle(rounds);
 };
-const cardOf = (name: string) =>
+/** The proposal's card in its message: the request card while it is open, then what was decided. */
+const cardOf = (text: string) =>
   screen()
     .getAllByRole("article")
-    .filter((a) => a.querySelector(".waitcard")?.textContent?.includes(name))
-    .map((a) => a.querySelector(".waitcard") as HTMLElement);
+    .map((a) => a.querySelector<HTMLElement>(".rq, .waitcard"))
+    .filter((card): card is HTMLElement => Boolean(card?.textContent?.includes(text)));
 const asMember = (state: State) => {
   const org = state.me?.organizations[0];
   if (org) org.role = "member";
 };
 
 describe("an agent's proposal of a new agent, in the chat", () => {
-  test("the draft at a glance; Revisar opens Criar agente over the conversation and Recusar says no", async () => {
+  test("a request card: its reason, the draft in the well; Revisar opens Criar agente over the conversation, Recusar says no", async () => {
     const state = seedState();
     state.messages.push(proposal("p-1"));
     const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(5);
-    const [card] = cardOf("Atlas propõe um novo agente");
-    if (!card) throw new Error("no card");
+    const card = screen().getByRole("group", { name: "Atlas propõe um novo agente" });
+    // Waiting for who may create agents, like every other request (the bar can bring it back).
+    expect(card.getAttribute("data-ask-kind")).toBe("agent");
+    expect(card.hasAttribute("data-ask-mine")).toBe(true);
     for (const shown of [
-      "Nina",
-      "@nina · Designer",
-      "Pensa com o modelo do workspace",
+      "esperando você",
       "Você pediu alguém para o design.",
+      "Nina",
+      "@nina · Designer · Pensa com o modelo do workspace",
+      "para decidir",
     ])
       expect(card.textContent).toContain(shown);
+    expect(card.querySelector(".ac-expiry-fuse")).not.toBeNull();
     expect(card.textContent).not.toContain("server text");
     // Its name on one line, the handle and role on the next: never run together.
-    const who = card.querySelector(".ac-faceline > .list-col");
-    expect(who?.querySelector(":scope > b.ac-captop")?.textContent).toBe("Nina");
-    expect(who?.textContent).toBe("Nina @nina · Designer");
+    const who = card.querySelector(".rq__wt");
+    expect(who?.querySelector(":scope > b")?.textContent).toBe("Nina");
+    expect(who?.querySelector(":scope > small")?.textContent).toBe(
+      "@nina · Designer · Pensa com o modelo do workspace",
+    );
     // Revisar: the review in a dialog over the conversation, which stays as it was.
     await click(within(card).getByRole("button", { name: "Revisar" }), 10);
     const dialog = screen().getByRole("dialog", { name: "Revisar Nina" });
@@ -107,10 +114,29 @@ describe("an agent's proposal of a new agent, in the chat", () => {
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
     await click(within(card).getByRole("button", { name: "Recusar" }));
     expect(state.calls.some((c) => c.method === "agents.denyProposal" && c.args[1] === "p-1")).toBe(true);
+    // Decided: what was decided takes its place.
     const [after] = cardOf("Atlas propõe um novo agente");
     expect(after?.textContent).toContain("Recusada");
     expect(within(after as HTMLElement).queryByRole("button", { name: "Recusar" })).toBeNull();
+    expect(document.querySelector('[data-ask-id="p-1"]')).toBeNull();
   });
+
+  // Real time passes in it (the request's own timer), so it gets more than the default 5 s.
+  test("open until its time, even with no event: then it reads as expired", async () => {
+    const state = seedState();
+    const expiresAt = Date.now() + 3_000;
+    state.messages.push(proposal("p-1", { expiresAt: new Date(expiresAt).toISOString() }));
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(5);
+    expect(document.querySelector('[data-ask-id="p-1"]')?.hasAttribute("data-ask-mine")).toBe(true);
+    // Nothing comes from the server: the card's own timer closes it at that moment.
+    await act(() => new Promise((r) => setTimeout(r, Math.max(0, expiresAt - Date.now()) + 50)));
+    await settle(2);
+    expect(document.querySelector('[data-ask-id="p-1"]')).toBeNull();
+    const [card] = cardOf("@nina");
+    expect(card?.textContent).toContain("Expirou");
+    expect(within(card as HTMLElement).queryByRole("link", { name: "Revisar" })).toBeNull();
+  }, 15_000);
 
   test("read-only for who can't create agents; created links to the agent; expired after a day", async () => {
     const state = seedState();
@@ -134,6 +160,8 @@ describe("an agent's proposal of a new agent, in the chat", () => {
     const [open] = cardOf("@nina");
     expect(open?.textContent).toContain("Pensa com Claude Max");
     expect(open?.textContent).toContain("Aguardando um admin");
+    // Not the viewer's to decide: the bar never brings it back.
+    expect(open?.hasAttribute("data-ask-mine")).toBe(false);
     expect(within(open as HTMLElement).queryByRole("link", { name: "Revisar" })).toBeNull();
     expect(within(open as HTMLElement).queryByRole("button", { name: "Recusar" })).toBeNull();
     const [made] = cardOf("@otto");

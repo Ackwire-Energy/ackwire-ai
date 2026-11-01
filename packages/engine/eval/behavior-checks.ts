@@ -35,7 +35,12 @@ export const NON_READ_TOOLS = new Set([
   "tell_agent",
   "post_message",
   "share_artifact",
+  "send_gif",
+  "send_sticker",
 ]);
+
+/** Tools that are an answer on their own, with no text after them. */
+const ANSWER_TOOLS = new Set(["react", "send_gif", "send_sticker"]);
 
 /** Names of tools that write or act (best effort, by verb); everything else that isn't chat counts as reading. */
 const WRITE_VERB =
@@ -358,7 +363,9 @@ export function deterministicChecks(expect: Expectations, run: RunObservation): 
     const passed = run.passed === true && !text.trim();
     out.push({
       id: expect.pass ? "passes_when_nothing_to_add" : "answers_when_called",
-      pass: expect.pass ? passed : !passed && (text.trim().length > 0 || run.calls.some((c) => c.name === "react")),
+      pass: expect.pass
+        ? passed
+        : !passed && (text.trim().length > 0 || run.calls.some((c) => ANSWER_TOOLS.has(c.name))),
       detail: passed ? "passed (nothing posted)" : text.trim() ? "answered" : "posted nothing",
     });
   }

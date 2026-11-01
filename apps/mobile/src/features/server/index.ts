@@ -1,6 +1,6 @@
 import { isTailnet, type ServerProblem } from "@agenteschat/client/lib/server";
 import { signOut } from "@/features/account";
-import { authClient, forgetSession } from "@/lib/auth";
+import { forgetSession, signInOneTime } from "@/lib/auth";
 import { serverUrl, setServer } from "@/lib/server";
 import { connectPlan } from "@/lib/server-choice";
 
@@ -30,9 +30,5 @@ export async function connectToServer(target: { server: string; token?: string }
   if (plan.signOut) await signOut();
   if (plan.forget) await forgetSession();
   if (plan.move) await setServer(target.server);
-  if (!plan.token) return true;
-  const res = await authClient()
-    .$fetch("/sign-in/one-time-token", { method: "POST", body: { token: plan.token } })
-    .catch(() => null);
-  return Boolean(res && !res.error);
+  return plan.token ? signInOneTime(plan.token) : true;
 }

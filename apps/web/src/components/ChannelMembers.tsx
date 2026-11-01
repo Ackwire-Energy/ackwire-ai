@@ -270,7 +270,11 @@ function AgentRow({ agent, channelId, autoReply }: { agent: Agent; channelId: st
           </span>
         )}
       </span>
-      {autoReply && <span className="members-pop__chip">{t("channel.autoReplyChip")}</span>}
+      {autoReply && (
+        <span className="members-pop__chip">
+          {t(agent.coordinator ? "channel.coordinatorChip" : "channel.autoReplyChip")}
+        </span>
+      )}
     </ProfileTrigger>
   );
 }

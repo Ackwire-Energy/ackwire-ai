@@ -6,7 +6,7 @@ import { caches } from "./cache";
 import { sha256 } from "./crypto";
 import { NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
-import { type PreviewMeta, previewMeta } from "./message-preview";
+import { type PreviewMeta, previewMediaKind, previewMeta } from "./message-preview";
 import { agentOnlyNoticeSql } from "./notices";
 import { resolveNotifications } from "./notifications";
 import { can, getMembership, requirePermission } from "./organizations";
@@ -187,6 +187,8 @@ export interface DmSummary {
     body: string;
     /** What the app needs to show a server-written body in the reader's language; null for a plain message. */
     meta: PreviewMeta | null;
+    /** A GIF or a sticker sent with no text (ADR 0091): the app says which where `body` is empty; else null. */
+    mediaKind: "gif" | "sticker" | null;
     createdAt: Date;
     authorType: string;
   } | null;
@@ -245,6 +247,8 @@ export async function listDms(db: Database, actorId: string, orgId: string): Pro
           sql`not (${messages.authorType} = 'person' and ${messages.meta}->'routine' is not null)`,
           // Nor what only its agent reads.
           sql`not ${agentOnlyNoticeSql(sql`${messages.meta}`)}`,
+          // An agent's sticker or GIF after its own reply (ADR 0091) is part of that reply: the reply is the preview.
+          sql`${messages.meta}->>'mediaAfter' is null`,
         ),
       )
       .orderBy(messages.channelId, desc(messages.createdAt)),
@@ -263,6 +267,8 @@ export async function listDms(db: Database, actorId: string, orgId: string): Pro
             sql`(${messages.authorUserId} is null or ${messages.authorUserId} <> ${actorId})`,
             sql`not ${agentOnlyNoticeSql(sql`${messages.meta}`)}`,
             gt(messages.createdAt, readAt.get(id) ?? new Date(0)),
+            // Nor one more unread (ADR 0091): it is silent.
+            sql`${messages.meta}->>'mediaAfter' is null`,
           ),
         );
       return [id, row?.n ?? 0] as const;
@@ -286,6 +292,7 @@ export async function listDms(db: Database, actorId: string, orgId: string): Pro
                 id: m.id,
                 body: m.body.slice(0, 200),
                 meta: previewMeta(m.meta as Record<string, unknown> | null),
+                mediaKind: previewMediaKind(m.body, m.meta as Record<string, unknown> | null),
                 createdAt: m.createdAt,
                 authorType: m.authorType,
               }

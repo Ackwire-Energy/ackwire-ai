@@ -2,6 +2,7 @@ import type { ThreadInfo } from "@agenteschat/client";
 import { useChannels, useDms, useThreadMutation, useThreadRange } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatTime, joinNames, relativeTime } from "@agenteschat/client/lib/format";
+import { textOrMedia } from "@agenteschat/client/lib/media";
 import { quoteExcerpt } from "@agenteschat/client/lib/reply";
 import { threadTitle, timeSpan } from "@agenteschat/client/lib/threads";
 import { AvatarStack, Button, Chip, cx, Icon, Menu, MenuItem, MenuSeparator } from "@agenteschat/ui";
@@ -371,7 +372,7 @@ export function ContextBlock({ thread }: { thread: ThreadInfo }) {
                     <b>{name}</b>
                     <span>{formatTime(i18n.language, m.createdAt)}</span>
                   </span>
-                  <span className="thread-context__excerpt">{quoteExcerpt(m.body)}</span>
+                  <span className="thread-context__excerpt">{quoteExcerpt(textOrMedia(t, m.body, m.meta))}</span>
                 </span>
               </Link>
             );

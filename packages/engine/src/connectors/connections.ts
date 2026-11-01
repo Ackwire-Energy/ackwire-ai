@@ -572,7 +572,7 @@ export const connectorGrantValidator = async (
   }
   const def = CONNECTOR_CATALOG[c.connector];
   const [prefix, scope] = grant.scope.split(":");
-  if (!def || prefix !== c.connector || !scope || !def.scopes[scope]) {
+  if (!def || prefix !== c.connector || !scope || !Object.hasOwn(def.scopes, scope)) {
     return `Unknown scope ${grant.scope} for ${c.connector}`;
   }
   return null;

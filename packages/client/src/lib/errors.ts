@@ -135,6 +135,8 @@ const KNOWN = {
   human_check_blocked: "errors.humanCheckBlocked",
   // TypeSafe refused the key pasted for Jev: said under its field, nothing kept.
   jev_key_invalid: "jev.steps.invalid",
+  // GIPHY refused the key pasted for GIFs (ADR 0091): said under its field, nothing kept.
+  gif_key_invalid: "settings.media.giphy.invalid",
   // A provider's own check refused a key on save (OpenRouter's): nothing kept.
   provider_key_invalid: "settings.keyRefused",
   provider_key_management: "settings.keyManagement",
@@ -148,6 +150,12 @@ const KNOWN = {
   "skill.invalid_description": "errors.skill.invalidDescription",
   "skill.too_large": "errors.skill.tooLarge",
   "skill.too_many_files": "errors.skill.tooManyFiles",
+  // GIFs and stickers (ADR 0091): off in the workspace (or no GIF search on this server), a GIF gone, or the GIF
+  // search not answering.
+  "message.media_off": "errors.media.off",
+  "message.media_not_found": "errors.media.notFound",
+  "gifs.off": "errors.media.gifsOff",
+  "gifs.unavailable": "errors.media.gifsUnavailable",
 } as const;
 
 /** Better Auth's code when a blocked account tries to sign in (the server's `session.create.before` hook). */

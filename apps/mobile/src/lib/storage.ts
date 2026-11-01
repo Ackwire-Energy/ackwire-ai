@@ -50,6 +50,8 @@ export const STORED = {
   agentGroupsCollapsed: "agent-groups-collapsed",
   /** An invitation opened before signing in: dealt with once the person is in (features/auth/invite.ts). */
   invite: "invite",
+  /** The request this phone made through a link, with the key that signs in once approved (features/auth/invite.ts). */
+  joinAsked: "join-asked",
   /** The app's sounds on this phone: "tactile" (default), "sky", "pixel" or "off" (lib/sounds.ts). */
   sounds: "sounds",
   /** Offline-computer notices the person closed, by outage (JSON list; features/outages). */

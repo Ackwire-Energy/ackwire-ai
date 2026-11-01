@@ -1,7 +1,9 @@
 import { elapsedClock, type LiveConsult, type LiveRun, usesBrowser } from "@agenteschat/client";
 import {
+  type ActivityEntry,
   activitySentence,
   barAsking,
+  barElapsed,
   barFaces,
   barWords,
   isWriting,
@@ -10,7 +12,7 @@ import {
 import { initialReveal, rebaseReveal, revealStep } from "@agenteschat/client/lib/reveal";
 import { formatDuration } from "@agenteschat/client/lib/work";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
@@ -18,10 +20,18 @@ import {
   Text as RNText,
   type StyleProp,
   StyleSheet,
+  type TextLayoutEvent,
   type TextStyle,
   View,
 } from "react-native";
-import Animated, { FadeIn, FadeInDown, ZoomIn } from "react-native-reanimated";
+import Animated, {
+  Easing,
+  FadeIn,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  ZoomIn,
+} from "react-native-reanimated";
 import { useFrameTime } from "@/agent/live";
 import { Dither } from "@/sky/Dither";
 import { softTones } from "@/sky/math";
@@ -29,7 +39,20 @@ import { CHROME_MAX_SCALE, haptics, Icon, PixelOrbit, PixelStop, Text, useReduce
 import { AgentFace, Face } from "../shared/Face";
 import { useDirectory, useNow } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import { markedParts, markName, stoppableInLine, workingEntries } from "./logic";
+import {
+  type LineDrawn,
+  type LineWords,
+  leavingWords,
+  lineFit,
+  lineStops,
+  markedParts,
+  markName,
+  narrowDrawn,
+  PHRASE_FADE_MS,
+  type PhraseTurn,
+  turnPhrase,
+  workingEntries,
+} from "./logic";
 import { MessageText } from "./MessageText";
 import { TurnTools } from "./ToolCalls";
 import {
@@ -210,10 +233,11 @@ export function browsingRuns(runs: LiveRun[]): LiveRun[] {
  * as the box whatever it says, with a dithered band sweeping in the first agent's color behind it while
  * agents work; the pixel orbit (three dots while only people type); a few small faces, each on a plate
  * and popping in (an agent on its own asking another shows both, with an arrow); one line with names in
- * ink, fading in whenever it changes ("Theo e mais 2 estão trabalhando · Marina está digitando…"); the
- * clock of a question that is out; and, for one agent on its own, after a thin rule, "Parar" when I may
- * stop it (one tap, no question: what it did stays and can continue). One agent on its own gets a turning
- * phrase (a light line while it thinks, what it does, an aside on a long step, what it said last).
+ * ink, crossfading whenever it changes ("Theo e mais 2 estão trabalhando · Marina está digitando…"); the
+ * clock of a question that is out; and, for one agent on its own, its time ("16 s") and, after a thin rule,
+ * "Parar" when I may stop it (one tap, no question: what it did stays and can continue). One agent on its
+ * own gets a turning phrase (a light line while it thinks, what it does, an aside on a long step, what it
+ * said last).
  * Nothing moves with Reduce Motion or off screen.
  */
 export function WorkingLine({
@@ -240,26 +264,30 @@ export function WorkingLine({
   const agentName = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
   const entries = workingEntries(runs, consults, agentName, typing, (id) => dir.memberById.get(id)?.name);
   const asking = barAsking(entries);
-  const now = useNow(asking ? 1000 : 60_000);
-  const turning = entries.length === 1 && entries[0]?.type === "agent";
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    if (!turning) return;
-    const timer = setInterval(() => setTick((n) => n + 1), PHRASE_TURN_MS);
-    return () => clearInterval(timer);
-  }, [turning]);
-  if (entries.length === 0) return null;
   const agents = entries.filter((e) => e.type === "agent");
   const lead = agents[0];
-  const color = lead ? agentLook(dir.agentById.get(lead.id)).color : null;
-  // "Parar" is one agent's: with several at work the line can't say whose (the box's own stop stops them all).
+  // "Parar" and the time are one agent's: with several at work the line can't say whose (the box's own stop stops
+  // them all).
   const solo = agents.length === 1 ? lead : undefined;
-  const stoppable = solo ? stoppableInLine(runs).filter((r) => r.agentId === solo.id && canStop(r)) : [];
+  // One clock for the time and a question's clock, moving each second while one counts: a redraw in between (the
+  // phrase turning, an event) reads the same second, so both step evenly; narrowing to one agent changes the pace, and a
+  // new pace reads the clock afresh (`useNow`).
+  const now = useNow(asking || solo ? 1000 : 60_000);
+  if (entries.length === 0) return null;
+  const color = lead ? agentLook(dir.agentById.get(lead.id)).color : null;
+  const stoppable = lineStops(entries, runs, canStop);
   const sentence = activitySentence(t, entries, markName);
-  const [agentWords, sep, typers, typingWords] = barWords(t, entries, runs, tick, Date.now(), markName);
+  const took = barElapsed(t, entries, runs, now);
   // A piece of the line, on one line, names in ink.
-  const piece = (text: string, style?: StyleProp<TextStyle>) => (
-    <Text variant="caption" tone="muted" numberOfLines={1} maxFontSizeMultiplier={CHROME_MAX_SCALE} style={style}>
+  const piece: LinePiece = (text, style, onTextLayout) => (
+    <Text
+      variant="caption"
+      tone="muted"
+      numberOfLines={1}
+      maxFontSizeMultiplier={CHROME_MAX_SCALE}
+      style={style}
+      onTextLayout={onTextLayout}
+    >
       {markedParts(text).map((p, i) =>
         p.bold ? (
           // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
@@ -274,11 +302,6 @@ export function WorkingLine({
   );
   const clock = asking ? elapsedClock(now - asking.since) : null;
   const pop = reduced ? undefined : ZoomIn.springify().damping(11).stiffness(320).mass(0.6);
-  // Right away, nothing asked: what it did stays and "Continuar" picks it up again.
-  const stopNow = (run: LiveRun) => {
-    haptics.firm();
-    onStop(run);
-  };
   const plate = [styles.tok, { backgroundColor: c.glassSolid }];
   // An agent working in its browser: the line says so, and a tap opens its browser card in the conversation.
   const browsing = browsingRuns(runs)[0];
@@ -334,25 +357,12 @@ export function WorkingLine({
           accessibilityLabel={browsing ? t("browser.watch.open") : undefined}
           style={styles.wordsTap}
         >
-          {/* The phrase turns: the new one comes up from below. */}
-          <Animated.View
-            key={agentWords + typers + typingWords}
-            entering={reduced ? undefined : FadeInDown.duration(380)}
-            style={styles.words}
-          >
-            {agentWords ? (
-              <View style={styles.agents}>
-                {piece(agentWords, styles.shrink)}
-                {sep ? piece(sep) : null}
-              </View>
-            ) : null}
-            {typingWords ? (
-              <View style={styles.people}>
-                {piece(typers, styles.shrink)}
-                {piece(typingWords)}
-              </View>
-            ) : null}
-          </Animated.View>
+          <TurningWords entries={entries} runs={runs} piece={piece} reduced={reduced} />
+          {took ? (
+            <Text variant="caption" tone="faint" maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.took}>
+              {took}
+            </Text>
+          ) : null}
           {browsing ? (
             <View style={[styles.browser, { backgroundColor: c.raised }]}>
               <Icon name="globe" size={14} color={c.ink2} />
@@ -368,30 +378,155 @@ export function WorkingLine({
             {clock}
           </RNText>
         ) : null}
-        {stoppable.length > 0 ? <View style={[styles.sep, { backgroundColor: c.line }]} /> : null}
-        {stoppable.map((r) =>
-          r.stopping ? (
-            <View key={r.runId} style={styles.stopping} accessible accessibilityLabel={t("run.stopping")}>
-              <ActivityIndicator size="small" color={c.muted} />
-              <Text variant="caption" tone="muted">
-                {t("run.stopping")}
-              </Text>
-            </View>
-          ) : (
-            <Pressable
-              key={r.runId}
-              onPress={() => stopNow(r)}
-              accessibilityRole="button"
-              accessibilityLabel={`${t("run.stop")} · ${agentName(r.agentId)}`}
-              hitSlop={8}
-              style={({ pressed }) => [styles.stop, pressed && { backgroundColor: `${c.danger}1F` }]}
-            >
-              {({ pressed }) => <PixelStop size={11} color={pressed ? c.danger : c.muted} />}
-            </Pressable>
-          ),
-        )}
+        <LineStop runs={stoppable} onStop={onStop} />
       </Animated.View>
     </View>
+  );
+}
+
+/**
+ * The line's own "Parar", last in its pill after a thin rule (the working line's, and the requests' line's while it
+ * takes its place): one tap stops the agent, nothing asked, and "Parando…" while it stops.
+ */
+export function LineStop({ runs, onStop }: { runs: LiveRun[]; onStop: (run: LiveRun) => void }) {
+  const { t } = useTranslation();
+  const dir = useDirectory();
+  const c = useTheme().colors;
+  if (runs.length === 0) return null;
+  const nameOf = (run: LiveRun) => dir.agentById.get(run.agentId)?.name ?? t("channel.unknownAgent");
+  // Right away, nothing asked: what it did stays and "Continuar" picks it up again.
+  const stopNow = (run: LiveRun) => {
+    haptics.firm();
+    onStop(run);
+  };
+  return (
+    <>
+      <View style={[styles.sep, { backgroundColor: c.line }]} />
+      {runs.map((r) =>
+        r.stopping ? (
+          <View key={r.runId} style={styles.stopping} accessible accessibilityLabel={t("run.stopping")}>
+            <ActivityIndicator size="small" color={c.muted} />
+            <Text variant="caption" tone="muted">
+              {t("run.stopping")}
+            </Text>
+          </View>
+        ) : (
+          <Pressable
+            key={r.runId}
+            onPress={() => stopNow(r)}
+            accessibilityRole="button"
+            accessibilityLabel={`${t("run.stop")} · ${nameOf(r)}`}
+            hitSlop={8}
+            style={({ pressed }) => [styles.stop, pressed && { backgroundColor: `${c.danger}1F` }]}
+          >
+            {({ pressed }) => <PixelStop size={11} color={pressed ? c.danger : c.muted} />}
+          </Pressable>
+        ),
+      )}
+    </>
+  );
+}
+
+type LinePiece = (text: string, style?: StyleProp<TextStyle>, onTextLayout?: (e: TextLayoutEvent) => void) => ReactNode;
+
+// The phrase turns as on the web (`.ac-turn`): the old one leaves upward while the new one comes up from below,
+// crossfading, so some words always show; a short rise keeps both inside the pill.
+const TURN = { duration: PHRASE_FADE_MS, easing: Easing.bezier(0.2, 0.7, 0.2, 1) };
+
+/**
+ * The phrase as it turns (`turnPhrase`): the one shown and, over it, the one leaving, the only two drawn. A phrase
+ * keeps its key from coming in to leaving, so the words on screen are the ones that leave, at the widths they drew.
+ * The first comes with the pill, and the words go with it at once; with Reduce Motion each phrase just takes the last
+ * one's place. The phrase's tick mounts with the pill too, as on the web (`BarPhrase`): the line stays mounted while the
+ * bar is gone, and a tick kept from the last turn would open the next on a light line instead of who is at work.
+ */
+function TurningWords({
+  entries,
+  runs,
+  piece,
+  reduced,
+}: {
+  entries: ActivityEntry[];
+  runs: LiveRun[];
+  piece: LinePiece;
+  reduced: boolean;
+}) {
+  const { t } = useTranslation();
+  const turning = entries.length === 1 && entries[0]?.type === "agent";
+  // The phrase reads the time of its tick, so a redraw between ticks (each second) never turns it.
+  const [tick, setTick] = useState(() => ({ n: 0, at: Date.now() }));
+  useEffect(() => {
+    if (!turning) return;
+    const timer = setInterval(() => setTick((k) => ({ n: k.n + 1, at: Date.now() })), PHRASE_TURN_MS);
+    return () => clearInterval(timer);
+  }, [turning]);
+  const words = barWords(t, entries, runs, tick.n, tick.at, markName);
+  const [shown, setShown] = useState<PhraseTurn>(() => ({ now: words, was: null, n: 0, since: Date.now() }));
+  const [, wake] = useState(0);
+  const next = turnPhrase(shown, words, Date.now());
+  if (next.shown !== shown) setShown(next.shown);
+  const leaving = leavingWords(next.shown, reduced, Date.now());
+  useEffect(() => {
+    if (next.wait === 0) return;
+    const timer = setTimeout(() => wake((k) => k + 1), next.wait);
+    return () => clearTimeout(timer);
+  }, [next.wait]);
+  return (
+    <View style={styles.words}>
+      {leaving ? <BarWords key={shown.n - 1} words={leaving} piece={piece} leaving /> : null}
+      <BarWords key={shown.n} words={shown.now} piece={piece} enter={shown.n > 0 && !reduced} />
+    </View>
+  );
+}
+
+/**
+ * The line's words in the pieces that give way in turn (`barWords`): the agents' and the " · " after them, then
+ * who is typing, whose names alone end in "…". Each piece that can end in "…" keeps to the width it drew
+ * (`lineFit`), so what follows comes right after it; the agents' words cut to a sliver leave the line.
+ */
+function BarWords({
+  words: [agents, sep, typers, typing],
+  piece,
+  enter = false,
+  leaving = false,
+}: {
+  words: LineWords;
+  piece: LinePiece;
+  /** Comes up from below. */
+  enter?: boolean;
+  /** Rises and fades over the phrase taking its place. */
+  leaving?: boolean;
+}) {
+  const [drawn, setDrawn] = useState<LineDrawn>({});
+  // 0 below, 1 in place, 2 gone above.
+  const at = useSharedValue(enter ? 0 : 1);
+  useEffect(() => {
+    at.value = withTiming(leaving ? 2 : 1, TURN);
+  }, [leaving, at]);
+  const turn = useAnimatedStyle(() => ({
+    opacity: 1 - Math.abs(1 - at.value),
+    transform: [{ translateY: 6 * (1 - at.value) }],
+  }));
+  const measure = (part: keyof LineDrawn) => (e: TextLayoutEvent) => {
+    const width = e.nativeEvent.lines[0]?.width ?? 0;
+    setDrawn((d) => narrowDrawn(d, part, width));
+  };
+  const fit = lineFit(drawn, Boolean(typing));
+  return (
+    <Animated.View style={[styles.words, leaving && StyleSheet.absoluteFill, turn]}>
+      {agents && fit.agents !== null ? (
+        <View style={styles.agents}>
+          {piece(agents, [styles.shrink, { maxWidth: fit.agents }], measure("agents"))}
+          {sep ? piece(sep) : null}
+        </View>
+      ) : null}
+      {typing ? (
+        <View style={styles.people}>
+          {piece(typers, [styles.shrink, { maxWidth: fit.typers }], measure("typers"))}
+          {piece(typing)}
+        </View>
+      ) : null}
+    </Animated.View>
   );
 }
 
@@ -462,6 +597,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   ink: { fontWeight: "600" },
+  took: { fontVariant: ["tabular-nums"] },
   clock: { fontSize: 12, fontWeight: "600", fontVariant: ["tabular-nums"] },
   sep: { width: StyleSheet.hairlineWidth * 2, height: 16, marginLeft: 4, marginRight: 2 },
   // Last in the pill, in its round end: 2px from the edge all around.

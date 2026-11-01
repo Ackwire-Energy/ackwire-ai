@@ -145,6 +145,8 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     // (GET /api/app/jev is 404 elsewhere).
     "jev.",
     "onboarding.jev.",
+    // The GIPHY key's card too, in Settings › GIFs and stickers (GET /api/app/gif-key is 404 elsewhere, ADR 0091).
+    "settings.media.giphy.",
     // Deleting: computers people connected, and the person who set up the server, only a self-hosted server has.
     "deleteOrg.goes.computers",
     "deleteAccount.computers_one",

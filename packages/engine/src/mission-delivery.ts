@@ -2,6 +2,7 @@ import { and, desc, type Executor, eq, rowsOf, schema, sql } from "@agenteschat/
 import { recordAudit } from "./audit";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import { publishMessageCreated, publishUserEvent } from "./events";
+import { cutText } from "./format";
 import type { MachineTaskRow } from "./machine-tasks";
 import { messageView } from "./messages";
 import { pendingCommandsSql } from "./mission-command-rules";
@@ -167,7 +168,7 @@ async function createDelivery(
       mission,
       input.auto
         ? "Everything in the plan is done. Conclude the mission, or ask for changes."
-        : `Delivered: ${input.summary.split("\n")[0]?.slice(0, 300) ?? ""}`,
+        : `Delivered: ${cutText(input.summary.split("\n")[0] ?? "", 300)}`,
       {
         // "O que mudou": the mission's whole change (`baseSha..branch`, ADR 0044) when it has a branch.
         missionDelivery: {
@@ -179,7 +180,7 @@ async function createDelivery(
         },
         ...(input.artifactIds.length ? { artifacts: input.artifactIds.map((id) => ({ id })) } : {}),
         bodyCode: input.auto ? "mission_all_done" : "mission_delivery",
-        bodyParams: input.auto ? {} : { summary: input.summary.split("\n")[0]?.slice(0, 300) ?? "" },
+        bodyParams: input.auto ? {} : { summary: cutText(input.summary.split("\n")[0] ?? "", 300) },
       },
       tx,
     );

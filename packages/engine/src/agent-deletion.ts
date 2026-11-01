@@ -48,7 +48,7 @@ export async function deleteAgent(deps: AgentDeletionDeps, actorId: string, orgI
   await requirePermission(db, actorId, orgId, "manage_agents");
   const [agent] = await db
     .update(agents)
-    .set({ archivedAt: sql`coalesce(${agents.archivedAt}, now())` })
+    .set({ archivedAt: sql`coalesce(${agents.archivedAt}, now())`, coordinator: false })
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId), isNull(agents.deletedAt)))
     .returning({ name: agents.name, handle: agents.handle });
   if (!agent) throw new NotFoundError("Agent not found");

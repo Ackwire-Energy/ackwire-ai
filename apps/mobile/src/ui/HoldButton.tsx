@@ -11,7 +11,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
-import { BUTTON_SIZES, primaryLook } from "./Button";
+import { BUTTON_SIZES, type ButtonSize, primaryLook } from "./Button";
 import { haptics } from "./haptics";
 import { Icon } from "./Icon";
 import { systemText } from "./Text";
@@ -28,17 +28,26 @@ export interface HoldButtonProps {
   durationMs?: number;
   /** Not yet: dimmed, and holding does nothing (as `Button`'s). */
   disabled?: boolean;
+  /** The button's height and type (default `md`); a request card's footer uses `card`. */
+  size?: ButtonSize;
 }
 
 /**
  * Hold to confirm (high-risk approvals): the button fills from the left while held, ticks a haptic,
  * confirms with a success haptic when full, and cancels when released early.
  */
-export function HoldButton({ label, holdLabel, onConfirm, durationMs = 1100, disabled = false }: HoldButtonProps) {
+export function HoldButton({
+  label,
+  holdLabel,
+  onConfirm,
+  durationMs = 1100,
+  disabled = false,
+  size = "md",
+}: HoldButtonProps) {
   const theme = useTheme();
   const { t } = useTranslation();
   const look = primaryLook(theme);
-  const s = BUTTON_SIZES.md;
+  const s = BUTTON_SIZES[size];
   const fill = useSharedValue(0);
   const press = useSharedValue(0);
   const [holding, setHolding] = useState(false);
@@ -114,7 +123,7 @@ export function HoldButton({ label, holdLabel, onConfirm, durationMs = 1100, dis
           />
         </Animated.View>
         <View style={[styles.edge, { backgroundColor: look.highlight }]} />
-        <Icon name="check" size={18} color={look.text} />
+        <Icon name="check" size={s.icon} color={look.text} />
         <RNText
           numberOfLines={1}
           maxFontSizeMultiplier={CHROME_MAX_SCALE}

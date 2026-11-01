@@ -11,7 +11,7 @@ import {
   requireSession,
   security,
 } from "./context";
-import { PreviewMeta } from "./schemas";
+import { MediaKind, PreviewMeta } from "./schemas";
 
 const tags = ["Chat"];
 
@@ -25,9 +25,22 @@ const Dm = z
       handle: z.string().nullable(),
     }),
     lastMessage: z
-      .object({ id: z.uuid(), body: z.string(), meta: PreviewMeta, createdAt: z.string(), authorType: z.string() })
-      .nullable(),
-    unread: z.number(),
+      .object({
+        id: z.uuid(),
+        body: z.string(),
+        meta: PreviewMeta,
+        mediaKind: MediaKind,
+        createdAt: z.string(),
+        authorType: z.string(),
+      })
+      .nullable()
+      .openapi({
+        description:
+          "The latest message (an agent's sticker or GIF after its own reply is part of that reply, so the reply shows).",
+      }),
+    unread: z.number().openapi({
+      description: "Messages since you last read it, not yours; an agent's sticker or GIF after its reply never.",
+    }),
   })
   .openapi("DirectMessage");
 

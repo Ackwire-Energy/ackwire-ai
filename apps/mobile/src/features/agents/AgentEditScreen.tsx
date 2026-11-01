@@ -1,4 +1,5 @@
 import { useUpdateAgent } from "@agenteschat/client";
+import { coordinatorNote } from "@agenteschat/client/lib/coordinator";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
 import { router, usePreventRemove } from "expo-router";
@@ -21,8 +22,9 @@ import { RoleInput } from "./RoleInput";
 export const openAgentEdit = (id: string) => router.push({ pathname: "/agent-edit", params: { id } });
 
 /**
- * "Editar agente", as the web's Configurações › Identidade and Instruções: name, role, look and
- * instructions for admins; the look only for the agent's own person (the server's rules). One Salvar.
+ * "Editar agente", as the web's Configurações › Identidade and Instruções: name, role, look, whether it
+ * coordinates the team and instructions for admins; the look only for the agent's own person (the server's
+ * rules). One Salvar.
  */
 export function AgentEditScreen({ id }: { id: string }) {
   const { t } = useTranslation();
@@ -42,7 +44,13 @@ export function AgentEditScreen({ id }: { id: string }) {
   const saved = useMemo<AgentDraft | null>(
     () =>
       agent
-        ? { name: agent.name, role: agent.role, instructions: agent.instructions, look: fullLook(agent.appearance) }
+        ? {
+            name: agent.name,
+            role: agent.role,
+            instructions: agent.instructions,
+            look: fullLook(agent.appearance),
+            coordinator: agent.coordinator === true,
+          }
         : null,
     [agent],
   );
@@ -84,6 +92,7 @@ export function AgentEditScreen({ id }: { id: string }) {
     });
   };
   const field = [styles.field, fieldText("body"), { backgroundColor: c.raised, color: c.ink, borderColor: c.line }];
+  const coordination = coordinatorNote(t, dir.agents, id, draft.coordinator);
   const readOnly = (label: string, value: string) => (
     <>
       <Text variant="footnote" tone="faint">
@@ -156,6 +165,25 @@ export function AgentEditScreen({ id }: { id: string }) {
             <LookPicker look={draft.look} onChange={(look) => set("look", look)} />
           </View>
         ) : null}
+
+        <View style={styles.section}>
+          <GroupedList>
+            <GroupedRow
+              icon="flag"
+              label={t("coordinator.chip")}
+              sub={t("coordinator.help", agentGrammar(t, agent.name))}
+              subLines={4}
+              toggle={draft.coordinator}
+              disabled={!fields.has("coordinator")}
+              onPress={() => set("coordinator", !draft.coordinator)}
+            />
+          </GroupedList>
+          {coordination ? (
+            <Text variant="footnote" tone="faint">
+              {coordination}
+            </Text>
+          ) : null}
+        </View>
 
         <View style={styles.section}>
           <Text variant="title" accessibilityRole="header">

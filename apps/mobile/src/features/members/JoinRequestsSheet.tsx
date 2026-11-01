@@ -5,9 +5,11 @@ import {
   useDenyJoinRequest,
   useJoinRequests,
   useRoles,
+  useWorkspaceLimits,
 } from "@agenteschat/client";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { approvalNews, JOIN_REASON_MAX } from "@agenteschat/client/lib/join-requests";
+import { membersFull } from "@agenteschat/client/lib/limits";
 import { can } from "@agenteschat/client/lib/permissions";
 import { sortRoles } from "@agenteschat/client/lib/roles";
 import { type ReactNode, useState } from "react";
@@ -19,21 +21,24 @@ import { useColors } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { successHaptic, useSurface } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
-import { requestChips } from "./logic";
+import { focusedFirst, requestChips } from "./logic";
+import { MembersFullNote } from "./MembersFullNote";
 
 /**
  * Requests to join through the invitation link (ADR 0068), as a native form sheet: the web's Members › Requests on
  * the phone, opened by the push, Atividade's card and `agenteschat://join-requests`. Each is approved, with any of
  * the roles the approver may give (ADR 0085; none: only what everyone may do), or denied with a reason the person
  * reads in the email. On a server that sends no email, approving hands the approver the invitation's link to share.
+ * `focus`: the request tapped on Membros, on top. With no room left nobody can be approved, as on the web.
  */
-export function JoinRequestsSheet({ onClose }: { onClose: () => void }) {
+export function JoinRequestsSheet({ focus, onClose }: { focus?: string | undefined; onClose: () => void }) {
   const { t } = useTranslation();
   const { orgId, org } = useOrg();
   const c = useColors();
   const allowed = can(org, "invite_people");
   const list = useJoinRequests(orgId, allowed);
   const roles = useRoles(orgId);
+  const full = membersFull(useWorkspaceLimits(orgId).data) !== null;
   // The roles the approver may give: the custom ones below their own (`givable`), top first.
   const givable = sortRoles((roles.data?.roles ?? []).filter((r) => r.givable));
   // Every link handed over stays until the sheet closes: each is returned once, and the Share sheet can be dismissed.
@@ -54,11 +59,12 @@ export function JoinRequestsSheet({ onClose }: { onClose: () => void }) {
       </>
     );
   else
-    body = list.data.map((r) => (
+    body = focusedFirst(list.data, focus).map((r) => (
       <RequestCard
         key={r.id}
         request={r}
         roles={givable}
+        full={full}
         onSend={(url) => {
           setHandOffs((all) => [...all, { name: r.name, url }]);
           share(url);
@@ -72,6 +78,7 @@ export function JoinRequestsSheet({ onClose }: { onClose: () => void }) {
       {handOffs.map((h) => (
         <HandOff key={h.url} name={h.name} onShare={() => share(h.url)} />
       ))}
+      <MembersFullNote />
       {body}
     </SheetScreen>
   );
@@ -81,11 +88,14 @@ export function JoinRequestsSheet({ onClose }: { onClose: () => void }) {
 function RequestCard({
   request: r,
   roles,
+  full,
   onSend,
 }: {
   request: JoinRequest;
   /** The roles the approver may give; none chosen at first. */
   roles: readonly OrgRole[];
+  /** No one more fits: only denying is left. */
+  full: boolean;
   onSend: (url: string) => void;
 }) {
   const { t, i18n } = useTranslation();
@@ -151,7 +161,7 @@ function RequestCard({
       </View>
       <View style={styles.chips}>
         {chips.unverified ? <Chip icon="mail" label={chips.unverified} /> : null}
-        <Chip icon="clock" label={chips.asked} />
+        <Chip icon={r.suggestedBy ? "person" : "clock"} label={chips.asked} />
       </View>
       {/* Their note, in their words. */}
       {r.note ? (
@@ -222,7 +232,7 @@ function RequestCard({
                 wide
                 icon="check"
                 label={t("members.requests.approve")}
-                disabled={busy}
+                disabled={busy || full}
                 onPress={() => void approveIt()}
               />
             </View>
