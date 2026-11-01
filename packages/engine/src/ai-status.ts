@@ -1,4 +1,4 @@
-import { and, asc, type Executor, eq, isNull, schema } from "@agenteschat/db";
+import { and, asc, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
 import { ensureOpenRouterModels, isAutoModel, routerModelOf } from "@agenteschat/providers";
 import type { Agent } from "./agents";
 import { autoModelFor, autoProvider } from "./auto-model";
@@ -114,6 +114,20 @@ export async function orgAiStatus(deps: AiStatusDeps, orgId: string) {
     (await activeAgents(deps.db, orgId)).map(async (a) => ({ agentId: a.id, ...(await agentAiState(deps, a)) })),
   );
   return { any: states.some((s) => s.state !== "no_ai"), agents: states };
+}
+
+/** These agents' states (`agentAiState`) by id; archived agents and other organizations' are left out. */
+export async function agentAiStates(deps: AiStatusDeps, orgId: string, agentIds: string[]) {
+  const rows =
+    agentIds.length === 0
+      ? []
+      : await deps.db
+          .select(agentFields)
+          .from(schema.agents)
+          .where(
+            and(eq(schema.agents.orgId, orgId), inArray(schema.agents.id, agentIds), isNull(schema.agents.archivedAt)),
+          );
+  return new Map(await Promise.all(rows.map(async (a) => [a.id, await agentAiState(deps, a)] as const)));
 }
 
 /** `orgAiStatus(…).any`, stopping at the first agent that has an AI (it runs before routing every message). */

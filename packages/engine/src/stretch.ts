@@ -3,6 +3,7 @@ import { and, type Database, desc, type Executor, eq, gt, inArray, isNull, rowsO
 import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { messageRoot } from "./authority";
+import { routineBriefOfRun } from "./background";
 import { eligibleChannelAgents, type RunTrigger, startOrJoinRun } from "./dispatch";
 import { isAgentOnlyDm } from "./dms";
 import { ForbiddenError } from "./errors";
@@ -31,6 +32,12 @@ const { agentConsultations, agentRuns, agents, channels, messages, usageRecords 
  */
 export const STRETCH = { runs: 50, unattendedRuns: 10, budgetShare: 0.2 } as const;
 
+/**
+ * How many links up a chain of questions and hand-offs between agents the walks to where people read go
+ * (`peopleRun`, `consultationOrigin`): notes have no depth cap of their own, the stretch bounds them.
+ */
+export const MAX_HANDOFF_LINKS = 10;
+
 /** The outbox job that posts (or extends) a stretch's pause card. */
 export const STRETCH_JOB = "stretch.paused";
 
@@ -50,7 +57,8 @@ export type StretchStop = { reason: "runs" | "spend"; limit: number };
 /**
  * Whether one more run of `agentId` that agents started would pass its stretch's limits: the stretch's runs at hop
  * 2 or more (the ones agents or their events started; a person's message starts hop 1) against `STRETCH.runs`, or
- * `STRETCH.unattendedRuns` when an agent wrote the stretch's first message; and this agent's spend on its own such
+ * `STRETCH.unattendedRuns` when nobody asked for the work (an agent wrote the stretch's first message, or it is a
+ * routine's brief: what a routine's run starts counts like its report's); and this agent's spend on its own such
  * runs, billed to the workspace (a plan costs it nothing), against `STRETCH.budgetShare` of its monthly budget.
  * A wake-up on `triggerId` that already has its run (a redelivered event) is never held.
  */
@@ -70,7 +78,7 @@ export async function stretchStop(
           and s.trigger_message_id = ${triggerId}::uuid and s.agent_id = ${agentId}::uuid) as started,
         (select count(*) from runs)::int as runs,
         exists (select 1 from ${messages} m where m.org_id = ${orgId}::uuid and m.id = ${stretchId}::uuid
-          and m.author_type = 'agent') as unattended,
+          and (m.author_type = 'agent' or m.meta ? 'routineBrief')) as unattended,
         (select sum(u.cost_nano_usd) from ${usageRecords} u
           where u.org_id = ${orgId}::uuid and u.agent_id = ${agentId}::uuid and u.billed_to = 'org'
             and u.created_at >= (select min(created_at) from mine) and u.run_id in (select id from mine)) as spent`),
@@ -120,44 +128,76 @@ export async function pauseStretch(tx: Executor, orgId: string, hold: StretchHol
   });
 }
 
-/** What `startOrJoinRun` holds: `agentId` woken by `message` (an agent's, at hop 1 or more) past its stretch. */
-export const holdOf = (
-  message: Pick<Message, "id" | "channelId" | "threadId" | "hop" | "stretchId" | "authorAgentId" | "agentRunId">,
+/**
+ * What `startOrJoinRun` holds: `agentId` woken by `message` (an agent's, at hop 1 or more) past its stretch. Held
+ * inside the agents' private DM, its card goes where the people of this work read: with the run that wrote the
+ * message, up the chain (`peopleRun`). Continuar still starts the held run in that DM.
+ */
+export async function holdOf(
+  tx: Executor,
+  message: Pick<
+    Message,
+    "id" | "orgId" | "channelId" | "threadId" | "hop" | "stretchId" | "authorAgentId" | "agentRunId"
+  >,
   agentId: string,
   trigger: RunTrigger,
   stop: StretchStop,
-): StretchHold => ({
-  stretchId: stretchOf(message),
-  channelId: message.channelId,
-  threadId: message.threadId,
-  authorAgentId: message.authorAgentId ?? agentId,
-  runId: message.agentRunId,
-  hop: message.hop,
-  agentId,
-  messageId: message.id,
-  trigger,
-  stop,
-});
+): Promise<StretchHold> {
+  const hold: StretchHold = {
+    stretchId: stretchOf(message),
+    channelId: message.channelId,
+    threadId: message.threadId,
+    authorAgentId: message.authorAgentId ?? agentId,
+    runId: message.agentRunId,
+    hop: message.hop,
+    agentId,
+    messageId: message.id,
+    trigger,
+    stop,
+  };
+  const [channel] = await tx
+    .select({ kind: channels.kind, dmKey: channels.dmKey })
+    .from(channels)
+    .where(and(eq(channels.orgId, message.orgId), eq(channels.id, message.channelId)));
+  const [writer] =
+    channel && isAgentOnlyDm(channel) && message.agentRunId
+      ? await tx
+          .select()
+          .from(agentRuns)
+          .where(and(eq(agentRuns.orgId, message.orgId), eq(agentRuns.id, message.agentRunId)))
+      : [];
+  if (!writer) return hold;
+  const at = await peopleRun(tx, writer);
+  return {
+    ...hold,
+    channelId: at.channelId,
+    threadId: replyThreadOf(at),
+    authorAgentId: at.agentId,
+    runId: at.id,
+    hop: at.hop,
+  };
+}
 
 type ToolRun = Pick<
   AgentRun,
-  "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId" | "hop" | "stretchId"
+  "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId" | "hop" | "stretchId" | "background"
 >;
 
 /**
  * A tool that would wake an agent (`ask_agent`, `tell_agent`: the other one; `follow_up`: this one later) when
- * the stretch is at its limit: the pause card goes out, where the people of this work read (its Continuar wakes
- * the agent there again), and the tool is refused. Null: it may go on.
+ * the stretch is at its limit: the pause card goes out, where the people of this work read (a routine's run: where
+ * it reports; its Continuar wakes the agent there again), and the tool is refused. Null: it may go on.
  */
 export async function refusedAtLimit(db: Database, run: ToolRun, wakes: string): Promise<ToolOutput | null> {
   const stretchId = runStretchOf(run);
   const stop = await stretchStop(db, run.orgId, stretchId, wakes);
   if (!stop) return null;
   const at = await peopleRun(db, run);
+  const report = at.background ? (await routineBriefOfRun(db, at))?.deliverTo : undefined;
   await pauseStretch(db, run.orgId, {
     stretchId,
-    channelId: at.channelId,
-    threadId: replyThreadOf(at),
+    channelId: report?.channelId ?? at.channelId,
+    threadId: report ? report.threadId : replyThreadOf(at),
     authorAgentId: at.agentId,
     runId: at.id,
     hop: at.hop,
@@ -174,9 +214,9 @@ export async function refusedAtLimit(db: Database, run: ToolRun, wakes: string):
  * The run whose conversation people read: this one, or for a run in the agents' private DM (answering another
  * agent's question or note) the run that asked, up the chain.
  */
-async function peopleRun(db: Database, run: ToolRun): Promise<ToolRun> {
+async function peopleRun(db: Executor, run: ToolRun): Promise<ToolRun> {
   let at = run;
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < MAX_HANDOFF_LINKS; i++) {
     const [channel] = await db
       .select({ kind: channels.kind, dmKey: channels.dmKey })
       .from(channels)
@@ -256,11 +296,16 @@ function cardText(card: StretchCard, names: string[]) {
   };
 }
 
-/** Who hears of a pause and may go on first: the person behind `messageId`'s work, else its routine's creator. */
-async function accountableFor(db: Database, orgId: string, messageId: string): Promise<string | null> {
+/**
+ * Who hears of a pause and may go on first: the person behind `messageId`'s work, else its routine's creator (of
+ * the report it started from, or of the brief that opened the stretch: work a routine's run started).
+ */
+async function accountableFor(db: Database, orgId: string, messageId: string, stretchId: string) {
   const root = await messageRoot(db, orgId, messageId);
   if (root.kind === "person") return root.personId;
-  if (root.kind !== "routine_report" || !root.backgroundRunId) return null;
+  if (root.kind !== "routine_report" || !root.backgroundRunId) {
+    return routineBriefOf((await getMessage(db, orgId, stretchId))?.meta)?.creatorUserId ?? null;
+  }
   const [row] = await db
     .select({ meta: messages.meta })
     .from(agentRuns)
@@ -277,7 +322,7 @@ async function accountableFor(db: Database, orgId: string, messageId: string): P
 export async function postStretchCard(deps: { db: Database; pubsub?: PubSub }, orgId: string, hold: StretchHold) {
   const { db } = deps;
   const behind = hold.messageId ?? (await runTriggerOf(db, orgId, hold.runId));
-  const forUserId = behind ? await accountableFor(db, orgId, behind) : null;
+  const forUserId = behind ? await accountableFor(db, orgId, behind, hold.stretchId) : null;
   const entry = { agentId: hold.agentId, messageId: hold.messageId, trigger: hold.trigger };
   const stopped = hold.stoppedAgentId ?? hold.agentId;
   const card = await db.transaction(async (tx) => {
@@ -432,6 +477,18 @@ export async function continueStretch(
       if (!active) continue;
       const out = await startOrJoinRun(tx, trigger, h.agentId, h.trigger, { granted: stretchId });
       if (!out) continue;
+      // A question or a note the stretch held is answered by the run that takes it now (ADR 0095).
+      await tx
+        .update(agentConsultations)
+        .set({ targetRunId: "created" in out ? out.created.id : out.joined })
+        .where(
+          and(
+            eq(agentConsultations.orgId, message.orgId),
+            eq(agentConsultations.messageId, trigger.id),
+            eq(agentConsultations.status, "open"),
+            isNull(agentConsultations.targetRunId),
+          ),
+        );
       if ("joined" in out) {
         await rerootRun(tx, { id: out.joined }, stretchId);
         // Should that run end before reading it, the run it is handed on to counts in the new stretch, not in the

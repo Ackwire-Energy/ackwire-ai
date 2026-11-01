@@ -200,6 +200,11 @@ export function accessWithNeeds(
     : { state: own, of: tool };
 }
 
+/** Whether the agent holds some access to a connection (a scope, a tool, all of it), denials aside. */
+export const holdsConnection = (granted: Set<string>, connectionId: string | null | undefined) =>
+  !!connectionId &&
+  [...granted].some((k) => k.startsWith(grantKey(connectionId, "")) && !k.startsWith(grantKey(connectionId, "deny:")));
+
 /** The agent's grants straight from the database (no cache): for checks right before a call runs. */
 export async function freshGrantedKeys(db: Executor, orgId: string, agentId: string) {
   return loadScopeKeys(db, orgId, agentId);

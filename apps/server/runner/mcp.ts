@@ -53,8 +53,8 @@ import { RUNNER_VERSION } from "./errors";
  *   gives the task (or a computer-brain run) its own token; the daemon sends
  *   it with every call, `tools/list` is asked from the server (cached per
  *   run in the MCP process, refreshed in the background: a change tells the
- *   executor `notifications/tools/list_changed`), and any tool the server
- *   listed can be called. Without a server token: the fixed mission tools.
+ *   executor `notifications/tools/list_changed`), and any tool name goes to
+ *   the server, which decides. Without a server token: the fixed mission tools.
  */
 
 /** Daemon side: what a task needs to call through the bridge. */
@@ -141,9 +141,12 @@ export interface IpcRequest {
   kind?: "call" | "list";
 }
 
-/** `transient`: the link to the runner or to agentes.chat was down; asking again later may work. `tools`: a list's answer. */
+/**
+ * `transient`: the link to the runner or to agentes.chat was down; asking again later may work. `tools`: a list's
+ * answer. `memo`: a list the daemon answers again by itself for the same run (`LIST_MEMO_MS`), so asking often is free.
+ */
 export type IpcReply =
-  | { ok: true; text: string; tools?: McpToolInfo[] }
+  | { ok: true; text: string; tools?: McpToolInfo[]; memo?: boolean }
   | { ok: false; error: string; transient?: boolean; idle?: boolean };
 
 /** What a tool name may look like (the Tool Gateway's rule). */
@@ -228,6 +231,8 @@ export class McpBridge {
   >();
   /** Calls made while the connection is down (a restart, a reconnect): relayed once it is back. */
   private readonly waiting = new Map<string, { frame: RunnerFrame; tool: string }>();
+  /** The list each MCP process got last (by its task or process id), for the run it was for. */
+  private readonly lists = new Map<string, { run: string; at: number; reply: IpcReply }>();
 
   constructor(
     private readonly opts: {
@@ -360,13 +365,24 @@ export class McpBridge {
     if (req.kind === "list") {
       // An older server gave no token: the fixed mission tools.
       if (!info.serverToken) return { ok: true, text: "", tools: [...MISSION_MCP_TOOLS] };
+      // Each MCP process asks every second: the same run's list is answered here, the server asked for a new run
+      // (a brain process's next turn) or once the last answer is `LIST_MEMO_MS` old.
+      const run = `${info.runId ?? taskId}:${info.serverToken}`;
+      const now = Date.now();
+      const last = this.lists.get(taskId);
+      if (last && last.run === run && now - last.at < LIST_MEMO_MS) return last.reply;
       const callId = randomBytes(12).toString("hex");
-      return this.relayAndWait(
+      const reply = await this.relayAndWait(
         callId,
         LIST,
         { type: "mcp.list", callId, taskId: info.runId ?? taskId, token: info.serverToken },
         true,
       );
+      if (!reply.ok) return reply;
+      for (const [id, l] of this.lists) if (now - l.at >= LIST_MEMO_MS) this.lists.delete(id);
+      const kept: IpcReply = { ...reply, memo: true };
+      this.lists.set(taskId, { run, at: now, reply: kept });
+      return kept;
     }
     const tool = typeof req.tool === "string" ? req.tool.slice(0, 64) : "";
     // A bridge (server token): any tool the server lists; the server decides. Else the fixed mission tools.
@@ -529,23 +545,37 @@ export type ToolLister = () => Promise<readonly McpToolInfo[]>;
 
 /** How long the MCP process trusts its list before asking again (a `tools/list` within this is answered locally). */
 export const TOOLS_CACHE_MS = 30_000;
-/** How often the MCP process re-reads the list in the background (a change notifies the executor). */
+/** How long the daemon answers an MCP process's list for the same run by itself (`McpBridge`). */
+export const LIST_MEMO_MS = TOOLS_CACHE_MS;
+/**
+ * How often the MCP process asks again in the background while the daemon answers by itself (between a brain
+ * process's turns, or the same run's list): a turn's new tools (a grant, a connector, another run's groups) are
+ * announced within this of its start. A change notifies the executor.
+ */
+export const TOOLS_POLL_MS = 1000;
+/** …and while each ask reaches the server (a daemon that doesn't answer by itself). */
 export const TOOLS_REFRESH_MS = 60_000;
 
 /**
  * The run's tool list in the MCP process (one process per task or run, so
  * the cache is per run). `get` answers from the cache while fresh; `refresh`
- * asks the server and says whether the list changed. A failed ask keeps the
- * last list (or, never loaded, the fixed mission tools).
+ * asks the server (one ask at a time) and says whether the list changed. A
+ * failed ask keeps the last list (or, never loaded, the fixed mission tools).
+ * Every change it sees, whichever asked, goes to `onChange` (the executor is
+ * told to list again): one first seen by a call's `get` was never announced,
+ * so a kept-alive Claude Code went on with the list it started with.
  */
 export class McpToolCache {
   private list: readonly McpToolInfo[] | null = null;
   private loadedAt = 0;
   private key = "";
+  private asking: Promise<boolean> | null = null;
+  /** The daemon answered the last ask by itself (between turns, or the same run's list): asking often is free. */
+  local = false;
 
   constructor(
     private readonly fetch: () => Promise<IpcReply>,
-    private readonly opts: { ttlMs?: number; now?: () => number } = {},
+    private readonly opts: { ttlMs?: number; now?: () => number; onChange?: () => void } = {},
   ) {}
 
   get loaded() {
@@ -560,16 +590,26 @@ export class McpToolCache {
   }
 
   /** Asks the server; true when the list differs from the one before (not on the first load). */
-  async refresh(): Promise<boolean> {
+  refresh(): Promise<boolean> {
+    this.asking ??= this.ask().finally(() => {
+      this.asking = null;
+    });
+    return this.asking;
+  }
+
+  private async ask(): Promise<boolean> {
     const reply = await this.fetch().catch(() => null);
     // A brain process between turns: the next turn is another run, so the list is asked again then.
-    if (reply && !reply.ok && reply.idle) this.loadedAt = 0;
+    const idle = Boolean(reply && !reply.ok && reply.idle);
+    this.local = idle || Boolean(reply?.ok && reply.memo);
+    if (idle) this.loadedAt = 0;
     if (!reply?.ok || !reply.tools) return false;
     const key = JSON.stringify(reply.tools);
     const changed = this.list !== null && key !== this.key;
     this.list = reply.tools;
     this.key = key;
     this.loadedAt = (this.opts.now ?? Date.now)();
+    if (changed) this.opts.onChange?.();
     return changed;
   }
 }
@@ -638,7 +678,10 @@ export async function handleMcpMessage(
     case "tools/call": {
       const name = typeof params.name === "string" ? params.name : "";
       const tools = list ? await list() : MISSION_MCP_TOOLS;
-      if (!tools.some((t) => t.name === name)) return rpcError(id, -32602, `Unknown tool: ${name}`);
+      // With the server's list, a name it lacks still goes there: the executor may list what it had before (a
+      // kept-alive one), and the server runs any tool the agent may use, or says why not and what to call instead.
+      const served = Boolean(list) && !context.local;
+      if (!served && !tools.some((t) => t.name === name)) return rpcError(id, -32602, `Unknown tool: ${name}`);
       const args =
         typeof params.arguments === "object" && params.arguments !== null && !Array.isArray(params.arguments)
           ? (params.arguments as Record<string, unknown>)
@@ -784,6 +827,8 @@ export async function runMcpServer(options: {
   /** The turn's permission profile (default: `AGENTES_MCP_PROFILE`, else `work`). */
   profile?: CommandProfile;
   refreshMs?: number;
+  /** Tests: `TOOLS_POLL_MS`. */
+  pollMs?: number;
 }): Promise<number> {
   const token =
     options.token ??
@@ -801,19 +846,28 @@ export async function runMcpServer(options: {
   const call: ToolCaller = context.local
     ? async () => ({ ok: false, error: NOBODY_TO_ASK })
     : (tool, args) => ipcCall(options.socketPath, { taskId: options.taskId, token, tool, args });
-  // The run's tools, asked from the server through the daemon (cached here: one process per task or run).
-  const cache = new McpToolCache(() =>
-    ipcCall(options.socketPath, { taskId: options.taskId, token, tool: "", args: {}, kind: "list" }),
+  // The run's tools, asked from the server through the daemon (cached here: one process per task or run). A list
+  // that changed (a scope granted, a connector added, a mission thread, another run's groups): the executor re-reads
+  // it (Claude Code 2.1.316 does, between the tool calls of a turn; Codex 0.165.0 doesn't, `brain-codex-app.ts`).
+  const cache = new McpToolCache(
+    () => ipcCall(options.socketPath, { taskId: options.taskId, token, tool: "", args: {}, kind: "list" }),
+    { onChange: () => write({ jsonrpc: "2.0", method: "notifications/tools/list_changed" }) },
   );
   const list: ToolLister = context.local ? async () => PROMPT_ONLY : () => cache.get();
-  // A list that changed (a scope granted, a connector added, a mission thread): the executor re-reads it.
-  const refresher = setInterval(() => {
-    if (!cache.loaded) return;
-    void cache.refresh().then((changed) => {
-      if (changed) write({ jsonrpc: "2.0", method: "notifications/tools/list_changed" });
-    });
-  }, options.refreshMs ?? TOOLS_REFRESH_MS);
-  refresher.unref?.();
+  let stopped = false;
+  let refresher: ReturnType<typeof setTimeout> | undefined;
+  const refreshLater = () => {
+    if (stopped) return;
+    // Before the executor's first list there is nothing to ask about: looked at again soon, for free.
+    const often = !cache.loaded || cache.local;
+    const ms = often ? (options.pollMs ?? TOOLS_POLL_MS) : (options.refreshMs ?? TOOLS_REFRESH_MS);
+    refresher = setTimeout(() => {
+      if (!cache.loaded) refreshLater();
+      else void cache.refresh().finally(refreshLater);
+    }, ms);
+    refresher.unref?.();
+  };
+  refreshLater();
   const scope = options.scope ?? mcpScopeFromEnv(process.env);
   const profile = options.profile ?? mcpProfileFromEnv(process.env);
   const rl = createInterface({ input: options.input ?? process.stdin, crlfDelay: Number.POSITIVE_INFINITY });
@@ -836,7 +890,8 @@ export async function runMcpServer(options: {
     inflight.add(p);
   }
   await Promise.all(inflight);
-  clearInterval(refresher);
+  stopped = true;
+  clearTimeout(refresher);
   return 0;
 }
 

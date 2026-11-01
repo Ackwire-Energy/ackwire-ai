@@ -39,6 +39,7 @@ import {
   machineTaskView,
   publishTaskEvent,
   startMachineTask,
+  TaskSignInError,
   taskRequester,
   taskResumesByItself,
   taskSeconds,
@@ -944,6 +945,9 @@ export function createSandboxToolSource(
         } catch (error) {
           const held = heldForApproval(error, "Not started");
           if (held) return held;
+          if (error instanceof TaskSignInError) {
+            return { content: `Not started: ${error.message}`, isError: true, data: { code: "task.no_sign_in" } };
+          }
           if (error instanceof MachineRequestError && error.code === "no_slot") {
             return { content: `Not started: ${error.message}.`, isError: true, data: { code: "task.no_slot" } };
           }

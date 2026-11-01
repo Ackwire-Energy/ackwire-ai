@@ -1,6 +1,6 @@
 # 0055. Imports from other apps, and our own export, through one bundle
 
-- Status: Accepted (2026-10-21)
+- Status: Accepted (2026-10-21). Addendum 2026-10-31: an old id handle still reaches its agent
 - Date: 2026-10-21
 - Extends: ADR 0020 (skills), ADR 0016 (connectors), ADR 0017 (context items), ADR 0019 (SSRF guard)
 - Out of scope for now: chat history, a CLI, a scan of `~/.openclaw` / `~/.hermes` on a connected computer, the Manus API, rollback
@@ -106,3 +106,9 @@ The frontmatter is read with Bun's own YAML parser (`Bun.YAML`, in the pinned Bu
 - **A runner scan** of `~/.openclaw*` and `~/.hermes` on a connected computer, read-only and confirmed by its owner, preferring their own redacted `--json` CLIs.
 - **The Manus API**.
 - **Rollback** of what an import made (the table already says what that is, and never adopted channels).
+
+## Addendum (2026-10-31): an old id handle still reaches its agent
+
+Migration 0132 gave imported agents a handle from their names instead of the other app's id cut to 32 characters (`agent-e9665a97-c8d5-423f-ae59-25`). What was written before still cites the old one: routines' instructions, memory items, older messages, other agents' notes. Mentions, `tell_agent` and `ask_agent` resolve by the exact handle, so those hand-offs reached nobody, and rewriting what people and agents wrote was not an option.
+
+The old handle is read again from what the import kept (`import_items.key`, cut to 32 characters as the import did), never stored: `currentHandles` gives the agent's handle now for a handle that holds the start of a UUID, unless an agent has that handle as its own; with two imports of the same file, the first holds it. Everything that resolves a handle goes through it: a message's mentions and the addressee check, `ask_agent`, `tell_agent`, and the tools that take an agent's handle (forum, setup, calendar participants, an issue's assignee, adding an agent to a channel, `list_routines`, a proposal to teammates through `agentsByHandle`'s `rowOf`). A run whose instructions, brief, notes or conversation cite an old handle reads "# Renamed agents" with the handle it has now, next to "# Archived agents". Only a handle that looks like an id costs a query. The apps still draw such a mention as plain text.

@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { CODEX_FOLDER_PROTOCOL } from "@agenteschat/adapters";
 import { type BrainTurnRequest, CodexBrain, type ComputerBrainLink, codexVersionOk } from "../src/brains/codex";
 import { computerPrompt } from "../src/brains/prompt";
 import type { BrainEvent, BrainTurn } from "../src/brains/types";
@@ -105,6 +106,25 @@ test("a first turn sends the context and the conversation; events pass through; 
   expect(l.sent[0]?.prompt).toBe(
     "The conversation so far:\n\nUser: hi\n\nYou: hello\n\nNow answer this:\n\nrun the tests",
   );
+});
+
+test("each turn sends its tool names, sorted: a kept-alive Codex starts again when one is new", async () => {
+  const l = link({ events: [{ type: "done", text: "ok" }] });
+  const brain = new CodexBrain({ link: l, mcp: async () => ({ token: "tok" }) });
+  const tool = (name: string) => ({ name, description: name, inputSchema: { type: "object" } });
+  for (const tools of [
+    [tool("find_tools"), tool("use_tool")],
+    [tool("use_tool"), tool("find_tools")],
+    [tool("find_tools"), tool("use_tool"), tool("vega_crm_find_tools")],
+  ]) {
+    await collect(brain.run(turn({ tools }), io()));
+  }
+  const keys = l.sent.map((r) => r.mcp.tools);
+  expect(keys[0]).toBe("find_tools use_tool");
+  // The same names in another order are the same tools; one more is another list.
+  expect(keys[1]).toBe(keys[0] as string);
+  expect(keys[2]).toBe("find_tools use_tool vega_crm_find_tools");
+  expect(l.sent[0]?.mcp.token).toBe("tok");
 });
 
 test("a resumed turn sends only what came after the brain's last reply", () => {
@@ -256,4 +276,31 @@ test("live steering (protocol 15): the turn on its way takes messages through br
     }).run(turn(), { ...io(), steerable: (s) => old.push(s) }),
   );
   expect(old).toEqual([]);
+});
+
+test("a runner before CODEX_FOLDER_PROTOCOL: the turn stays in the agent's folder and its session, no checkout", async () => {
+  const code = { cwd: "repos/acme/app", prompt: "# Your code\nacme/app is checked out." };
+  const run = async (protocol: number) => {
+    const l = link({ protocol, events: [{ type: "done", text: "ok" }] });
+    let prepared = 0;
+    const brain = new CodexBrain({
+      link: l,
+      mcp: async () => ({ token: "t" }),
+      prepare: async () => {
+        prepared++;
+        return code;
+      },
+    });
+    await collect(brain.run(turn({ session: { id: SESSION, resume: true, machineId: "m1", cwd: "" } }), io()));
+    return { sent: l.sent[0], prepared };
+  };
+  // Such a runner reads a checkout in a folder nested in the agent's own, where it isn't: refused every turn.
+  expect(await run(CODEX_FOLDER_PROTOCOL - 1)).toMatchObject({
+    sent: { cwd: "", system: "You are Dev.", session: { id: SESSION, resume: true } },
+    prepared: 0,
+  });
+  expect(await run(CODEX_FOLDER_PROTOCOL)).toMatchObject({
+    sent: { cwd: "repos/acme/app", system: `You are Dev.\n\n${code.prompt}` },
+    prepared: 1,
+  });
 });

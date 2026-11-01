@@ -4,6 +4,7 @@ import { messageRoot, personOfMessage, runAuthorityById } from "./authority";
 import { dmAgents, isAgentOnlyDm } from "./dms";
 import { getMessage, type Message } from "./messages";
 import { enqueue } from "./outbox";
+import { routineCreatorOf } from "./requester";
 import { holdsMessages } from "./run-hold";
 import { ACTIVE_RUN_STATUSES, queueOnRun } from "./run-inbox";
 import { inChannelRun } from "./run-scope";
@@ -105,8 +106,13 @@ export async function startOrJoinRun(
           eq(agentRuns.channelId, message.channelId),
           inArray(agentRuns.status, [...ACTIVE_RUN_STATUSES]),
           eq(agentRuns.background, false),
-          sql`(${agentRuns.threadRootId} = ${message.threadId ?? message.id}::uuid or exists (
-            select 1 from channels c where c.id = ${message.channelId}::uuid and c.kind = 'dm')
+          // In a DM the main timeline is one conversation; each thread (a mission's) is its own.
+          sql`(${agentRuns.threadRootId} = ${message.threadId ?? message.id}::uuid or ${
+            message.threadId
+              ? sql`false`
+              : sql`(${inChannelRun(sql`${agentRuns}`)} and exists (
+            select 1 from channels c where c.id = ${message.channelId}::uuid and c.kind = 'dm'))`
+          }
             or ${
               options.joinChannelRun && !message.threadId
                 ? sql`(${agentRuns.status} in ('queued', 'running') and ${inChannelRun(sql`${agentRuns}`)})`
@@ -132,7 +138,7 @@ export async function startOrJoinRun(
   if (!options.granted && trigger !== "forum" && !options.background && message.hop >= 1) {
     const stop = await stretchStop(tx, message.orgId, stretchOf(message), agentId, message.id);
     if (stop) {
-      await pauseStretch(tx, message.orgId, holdOf(message, agentId, trigger, stop));
+      await pauseStretch(tx, message.orgId, await holdOf(tx, message, agentId, trigger, stop));
       return null;
     }
   }
@@ -165,10 +171,10 @@ export async function startOrJoinRun(
 /**
  * Whether a message may join a run active in its conversation (ADR 0053 §4, §9). A person's own words
  * steer the agent's run there (and put them behind an unattended one), except in the agents' DM, where a
- * run works for one person. Another agent's message for a person joins only a run working for that same
- * person. A routine's report or another agent's note joins only a run such news woke: never one working
- * for a person, nor the agent's own work (a mission's); it starts a run of its own. The agent's own
- * events (a task that ended, a folder decision) still go to whatever run is working there.
+ * run works for one person. Another agent's message for a person, and work coming back to a person's run (a
+ * note's reply, a task that ended, a folder decision), joins only a run working for that same person. A
+ * routine's report joins only a run such news woke: never one working for a person, nor the agent's own work
+ * (a mission's); it starts a run of its own. What nobody is behind still goes to whatever run works there.
  */
 export async function mayJoin(
   tx: Executor,
@@ -246,9 +252,13 @@ export async function dispatchMentions(
   if (await hopLimitReached(db, message, options.maxHops)) return { runs: [], skipped: "hop_limit" };
 
   // Re-check at dispatch time: the agent may have been archived or removed from the channel since.
-  // An agent asking another one acts for the person behind its run, who must be allowed to talk to it.
+  // An agent asking another one acts for the person behind its run, who must be allowed to talk to it;
+  // a routine set to act wakes only agents its creator can talk to.
+  const requester =
+    (await requesterOf(db, message)) ??
+    (message.agentRunId ? routineCreatorOf(await runAuthorityById(db, message.orgId, message.agentRunId)) : null);
   const eligible = await eligibleChannelAgents(db, message.orgId, message.channelId, candidates, {
-    requesterUserId: await requesterOf(db, message),
+    requesterUserId: requester,
   });
   const runs = await db.transaction((tx) =>
     createAgentRuns(

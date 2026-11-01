@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 30;
+export const MACHINE_PROTOCOL_VERSION = 32;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -389,6 +389,12 @@ export function browserSetupOf(v: unknown): BrowserSetup | null {
  * sends `shared` to an older runner.
  */
 export const SHARED_ACCOUNTS_PROTOCOL = 29;
+/**
+ * From this protocol on, a Codex turn's `cwd` is read in the agent's own folder. An older runner read it in a
+ * folder nested there, so a turn sent into one of the agent's checkouts was refused ("The folder … doesn't
+ * exist"): the server sends an older runner's Codex turns to the agent's own folder, never a checkout.
+ */
+export const CODEX_FOLDER_PROTOCOL = 32;
 
 /**
  * From this protocol on (ADR 0058 §17): a desktop stream changes mode in place, on its own data socket, when its
@@ -906,6 +912,14 @@ export type TaskExecutor = "claude" | "codex" | "shell";
 export const TASK_EXECUTORS: readonly TaskExecutor[] = ["claude", "codex", "shell"];
 
 /**
+ * From this protocol on (ADR 0041 §5.1): a Claude Code or Codex `task.start` carries `account`, and the task's CLI
+ * signs in with it exactly as the agent's turns do (the account's folder, or what root keeps for it), never with
+ * the computer's own sign-in instead. Its credential is never written to the task's files. An older runner never
+ * gets `account` and starts every task on the computer's own sign-in, as before.
+ */
+export const TASK_ACCOUNTS_PROTOCOL = 31;
+
+/**
  * A background task (protocol 4): started detached on the machine, so it
  * survives the runner restarting and the socket dropping; its output goes to
  * files in `<runner home>/tasks/<taskId>/` and its state to the runner's
@@ -977,6 +991,11 @@ export interface TaskStart {
    * command policy would hold it (`approval_needed`).
    */
   approved?: boolean;
+  /**
+   * Protocol 31 (`TASK_ACCOUNTS_PROTOCOL`), `claude` / `codex`: the agent's account its CLI signs in with
+   * (`accounts/<kind>/<id>`), as `BrainTurnRequest.account`; absent: the computer's own sign-in.
+   */
+  account?: string;
 }
 
 /** A coding CLI on the machine, as `hello` reports it (protocol 7). */
@@ -1068,8 +1087,11 @@ export interface BrainTurnRequest {
   system: string;
   /** What this turn says (the new user message). */
   prompt: string;
-  /** The MCP bridge for this run: `token` identifies the run to the server (per run). */
-  mcp: { token: string; url?: string };
+  /**
+   * The MCP bridge for this run: `token` identifies the run to the server (per run). `tools`: the names of the run's
+   * tools, space-separated; a kept-alive Codex, which lists them once when its thread opens, starts again when one is new.
+   */
+  mcp: { token: string; url?: string; tools?: string };
   /** Keep one process per (agent, session) alive between turns (default true; false for a background turn). Codex: protocol 16. */
   keepAlive?: boolean;
   /** Also load the machine owner's own MCP servers (default false: `--strict-mcp-config`; never in a `plan` turn). */
