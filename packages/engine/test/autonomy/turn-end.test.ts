@@ -181,3 +181,29 @@ scenario("S41", "a follow-up waits with no nudge, then wakes the agent for the s
   expect((await w.posts("otto")).at(-1)?.body).toContain("concluído");
   await assertInvariants(w);
 });
+
+scenario("S45", "a second promise after real tool work gets its second continue, not an ask", async () => {
+  const w = await world({
+    agents: ["otto"],
+    judge: {
+      followThrough: (s) => (/vou criar|criar a do export/.test(String(s.reply)) ? "continue" : "done"),
+    },
+    script: {
+      otto: [
+        { text: "Agora vou criar as issues." },
+        { calls: [{ name: "create_issue", input: { title: "Login falha com SSO" } }] },
+        { text: "Criei a do login; agora vou criar a do export." },
+        { calls: [{ name: "create_issue", input: { title: "Export trava com 10 mil linhas" } }] },
+        { text: "Criei as duas issues: login e export." },
+      ],
+    },
+  });
+  await w.grant("otto", ["issues:write"]);
+  await w.say("@otto cria as issues do login e do export");
+  await w.settle();
+  expect(await nudges(w, "promise")).toBe(2);
+  expect(await nudges(w, "ask")).toBe(0);
+  expect(await openQuestions(w)).toHaveLength(0);
+  expect((await w.calls("otto")).map((c) => c.name)).toEqual(["create_issue", "create_issue"]);
+  await assertInvariants(w);
+});

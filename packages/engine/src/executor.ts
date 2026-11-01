@@ -325,6 +325,8 @@ export interface Transcript {
    * it over (they are the bound); another agent's answer doesn't.
    */
   continuation?: ContinuationState;
+  /** Tool calls the run made so far, every brain and turn (the controller's progress check reads it). */
+  executedCalls?: number;
   /** The last judged turn end: `waiting` holds a mission from going on by itself (`keepGoingBlocker`). */
   followThroughVerdict?: "done" | "unkept" | "waiting";
   /**
@@ -2218,6 +2220,7 @@ async function executeRunInner(
           // Before anything reads the inbox again (the next step, a failure's redispatch): what the turn
           // was handed and never confirmed reading goes back there.
         ).finally(() => live.endTurn());
+        transcript.executedCalls = (transcript.executedCalls ?? 0) + result.toolCalls.length + result.executedCount;
         if (turnPlan.kind !== "model") {
           computerTurns++;
           nextPrompt = null;
@@ -2577,7 +2580,7 @@ async function executeRunInner(
         const decision = await decideTurnEnd({
           state,
           kind: "routine",
-          executed: result.executedCount,
+          executed: transcript.executedCalls ?? 0,
           bound: run.turns + 1 >= maxTurns ? "turn_cap" : null,
           quiet: !record,
           decided: null,
@@ -2599,7 +2602,7 @@ async function executeRunInner(
                 })
             : null,
         });
-        transcript.continuation = advanceContinuation(state, decision, result.executedCount);
+        transcript.continuation = advanceContinuation(state, decision, transcript.executedCalls ?? 0);
         const { nudge, ...recorded } = { ...decision, count: transcript.continuation.count };
         later(() =>
           addRunStep(db, run, "context", {
@@ -2681,7 +2684,7 @@ async function executeRunInner(
       const decision = await decideTurnEnd({
         state,
         kind: betweenAgents ? "agents_dm" : "conversation",
-        executed: result.executedCount,
+        executed: transcript.executedCalls ?? 0,
         bound: t.stuck?.endAt !== undefined ? "stuck" : t.wrapUpNoted ? "step_limit" : null,
         quiet: silent && !judged,
         decided: decided && !silent && !said && !capped && !closingSummary(t, true) ? decided : null,
@@ -2726,7 +2729,7 @@ async function executeRunInner(
       });
       turnEnd = decision;
       if (decision.verdict) t.followThroughVerdict = verdictRecord(decision.verdict);
-      t.continuation = advanceContinuation(state, decision, result.executedCount);
+      t.continuation = advanceContinuation(state, decision, transcript.executedCalls ?? 0);
       const nudgedAs = {
         decision: "decision",
         answer: sentinelOnly ? "sentinel" : "empty",
