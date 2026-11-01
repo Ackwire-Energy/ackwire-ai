@@ -1,3 +1,12 @@
+import {
+  AGENT_ACCESSORIES,
+  AGENT_COLORS,
+  AGENT_EYES,
+  type AgentAppearance,
+  type AgentColor,
+} from "@agenteschat/ui/agent/look";
+import { isSecretPath, setsCredential } from "@agenteschat/ui/names";
+import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import type {
   ApiRule,
   BundleAgent,
@@ -6,11 +15,8 @@ import type {
   BundleRoutine,
   BundleSkill,
   BundleTodo,
-} from "@agenteschat/client";
-import { handleFrom } from "@agenteschat/client/lib/text";
-import { AGENT_ACCESSORIES, AGENT_COLORS, AGENT_EYES, type AgentAppearance, type AgentColor } from "@agenteschat/ui";
-import { isSecretPath, setsCredential } from "@agenteschat/ui/names";
-import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
+} from "../../api/types";
+import { handleFrom } from "../text";
 
 /** A file to read: `name` is its path relative to the dropped folder, the archive root or the GitHub link. */
 export interface ImportFile {
@@ -26,6 +32,11 @@ export interface ImportFile {
 }
 
 export type ImportErrorCode = "empty" | "tooLarge" | "unknown" | "newerVersion" | "noAgents" | "unsafe" | "corrupt";
+
+/** An archive the import unpacks (on the web; the phone opens none). */
+export const ARCHIVE_PATH = /\.(zip|tar\.gz|tgz|tar)$/i;
+/** The text files the formats use: the only ones read. */
+export const TEXT_PATH = /\.(md|markdown|json|json5|yaml|yml|txt)$/i;
 
 export class ImportError extends Error {
   constructor(readonly code: ImportErrorCode) {

@@ -1,5 +1,13 @@
+import {
+  ARCHIVE_PATH,
+  IMPORT_MAX_BYTES,
+  ImportError,
+  type ImportFile,
+  isSecretPath,
+  normalizePath,
+  TEXT_PATH,
+} from "@agenteschat/client/lib/import/shared";
 import { readZip, ZipError } from "@agenteschat/client/lib/zip";
-import { IMPORT_MAX_BYTES, ImportError, type ImportFile, isSecretPath, normalizePath } from "./shared";
 
 /**
  * The async step before `parseImport`: picked or dropped files (a folder keeps
@@ -29,8 +37,6 @@ export const ARCHIVE_LIMITS = {
   peek: 32 * 1024 * 1024,
 };
 
-const ARCHIVE = /\.(zip|tar\.gz|tgz|tar)$/i;
-const TEXT = /\.(md|markdown|json|json5|yaml|yml|txt)$/i;
 /** System files, and what tools make and fetch again (dependencies, caches, builds): never an agent's own. */
 const JUNK =
   /(^|\/)(__MACOSX\/|\.DS_Store$|\._[^/]*$|Thumbs\.db$|desktop\.ini$|\.git\/|node_modules\/|__pycache__\/|\.?venv\/|site-packages\/|\.cache\/|\.next\/|\.tox\/)/;
@@ -54,7 +60,7 @@ export async function readImportFiles(
       : { path: normalizePath(p.webkitRelativePath || p.name), blob: p },
   );
   const [only] = items;
-  if (items.length === 1 && only && ARCHIVE.test(only.path)) return readArchive(only.blob, only.path);
+  if (items.length === 1 && only && ARCHIVE_PATH.test(only.path)) return readArchive(only.blob, only.path);
   const { wants, peeks } = budget();
   const read: Read = { files: [], junk: [] };
   for (const { path, blob } of items) {
@@ -88,7 +94,7 @@ function budget() {
   let peeked = 0;
   return {
     wants: (path: string, size: number) => {
-      if (isSecretPath(path) || !TEXT.test(path) || size > IMPORT_MAX_BYTES || total + size > ARCHIVE_LIMITS.text) {
+      if (isSecretPath(path) || !TEXT_PATH.test(path) || size > IMPORT_MAX_BYTES || total + size > ARCHIVE_LIMITS.text) {
         return false;
       }
       total += size;

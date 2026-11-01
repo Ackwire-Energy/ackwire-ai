@@ -46,7 +46,7 @@ export function normalizeAppearance(raw: unknown): AgentAppearance {
 
 /** A random look ("Aleatório"), different from `current` when possible. */
 export function randomAppearance(current: AgentAppearance = {}, rand: () => number = Math.random): AgentAppearance {
-  const one = <T,>(list: readonly T[]) => list[Math.floor(rand() * list.length)] as T;
+  const one = <T>(list: readonly T[]) => list[Math.floor(rand() * list.length)] as T;
   for (let i = 0; i < 5; i++) {
     const next = { color: one(AGENT_COLORS), eyes: one(AGENT_EYES), accessory: one(AGENT_ACCESSORIES) };
     if (next.color !== current.color || next.eyes !== current.eyes || next.accessory !== current.accessory) return next;

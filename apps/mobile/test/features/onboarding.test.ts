@@ -148,13 +148,19 @@ test("the import step names the three most used apps, in the web's order, each b
   const brands = new URL("../../assets/images/brands/", import.meta.url).pathname;
   const web = (name: string) => Bun.file(new URL(`../../../web/public/brands/${name}`, import.meta.url).pathname);
   // Each mark is the web's SVG (a dark one where the maker has one), rendered for the phone at 96 px (the PNG
-  // header's width and height). No other import logo is left in the folder (Gemini's mark there is the AI
+  // header's width and height). Create agent's import step shows the rest. No other import logo is left in the folder (Gemini's mark there is the AI
   // pickers').
   const rendered: [phone: string, web: string][] = [
     ["chatgpt-dots.png", "chatgpt-dots.svg"],
     ["grok-bot-dark.png", "grok-bot-dark.svg"],
     ["grok-bot.png", "grok-bot.svg"],
+    ["hermes-dark.png", "hermes-dark.svg"],
+    ["hermes.png", "hermes.svg"],
     ["openbotrun.png", "openbotrun.svg"],
+    ["openclaw.png", "openclaw.svg"],
+    ["openmausbot.png", "openmausbot.svg"],
+    ["paperclip-dark.png", "paperclip-dark.svg"],
+    ["paperclip.png", "paperclip.svg"],
   ];
   const pngs = readdirSync(brands).filter((f) => f.endsWith(".png") && f !== "gemini.png");
   expect(pngs.sort()).toEqual(rendered.map(([png]) => png));
