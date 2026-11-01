@@ -599,7 +599,7 @@ export function agentRoutes(deps: AppDeps) {
             }),
             autonomy: CommandApproval.optional().openapi({
               description:
-                "The Autonomia it starts with (ADR 0094, the last setup's): only from an admin or its own owner, else 403. Default: low_risk_auto.",
+                "The Autonomia it starts with (ADR 0094, the last setup's). Default: low_risk_auto. Whoever may create it may set it: an admin, or its owner (without Manage agents, only your own agent).",
             }),
           }),
         ),

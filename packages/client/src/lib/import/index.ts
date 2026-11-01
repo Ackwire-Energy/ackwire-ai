@@ -1,4 +1,4 @@
-import { isSecretFile } from "@agenteschat/ui/names";
+import { isSecretFile } from "@agenteschat/tokens/names";
 import type { MigrationBundle } from "../../api/types";
 import { MAX_UPLOAD_BYTES } from "../files";
 import { excerpt } from "../text";

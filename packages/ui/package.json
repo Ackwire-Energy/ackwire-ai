@@ -50,6 +50,7 @@
   },
   "license": "AGPL-3.0-only",
   "dependencies": {
+    "@agenteschat/tokens": "workspace:*",
     "radix-ui": "^1.8.1"
   },
   "devDependencies": {

@@ -1,48 +1,23 @@
+import {
+  AGENT_ACCESSORIES,
+  AGENT_COLORS,
+  AGENT_EYES,
+  type AgentAppearance,
+  type AgentColor,
+} from "@agenteschat/tokens/look";
 import type { CSSProperties } from "react";
 import { AGENT_GRADIENTS } from "../agent/engine.js";
 
-/** The agent symbol's colors (sky is the default identity). */
-export const AGENT_COLORS = ["sky", "indigo", "violet", "rose", "amber", "green", "teal", "graphite"] as const;
-export type AgentColor = (typeof AGENT_COLORS)[number];
-
-export const AGENT_EYES = ["round", "dots", "wide", "happy", "sleepy"] as const;
-export type AgentEyes = (typeof AGENT_EYES)[number];
-
-/** Pixel accessories drawn by the agent engine (ACCESSORIES in ../agent/engine.js; same list, "none" first). */
-export const AGENT_ACCESSORIES = [
-  "none",
-  "hat",
-  "cap",
-  "headphones",
-  "bow",
-  "crown",
-  "antenna",
-  "headset",
-  "beanie",
-  "party",
-  "flower",
-  "scarf",
-] as const;
-export type AgentAccessory = (typeof AGENT_ACCESSORIES)[number];
-
-export interface AgentAppearance {
-  color?: AgentColor;
-  eyes?: AgentEyes;
-  accessory?: AgentAccessory;
-}
-
-const pick = <T extends string>(list: readonly T[], v: unknown): T | undefined =>
-  typeof v === "string" && (list as readonly string[]).includes(v) ? (v as T) : undefined;
-
-/** Only known values (the backend's allow-list); anything else falls back to the default look. */
-export function normalizeAppearance(raw: unknown): AgentAppearance {
-  const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  return {
-    color: pick(AGENT_COLORS, o.color),
-    eyes: pick(AGENT_EYES, o.eyes),
-    accessory: pick(AGENT_ACCESSORIES, o.accessory),
-  };
-}
+export {
+  AGENT_ACCESSORIES,
+  AGENT_COLORS,
+  AGENT_EYES,
+  type AgentAccessory,
+  type AgentAppearance,
+  type AgentColor,
+  type AgentEyes,
+  normalizeAppearance,
+} from "@agenteschat/tokens/look";
 
 /** A random look ("Aleatório"), different from `current` when possible. */
 export function randomAppearance(current: AgentAppearance = {}, rand: () => number = Math.random): AgentAppearance {

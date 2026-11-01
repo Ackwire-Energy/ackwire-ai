@@ -1,4 +1,4 @@
-import { normalizeAppearance } from "@agenteschat/ui/agent/look";
+import { normalizeAppearance } from "@agenteschat/tokens/look";
 import type { ApiRule, BundleNote, BundleTodo } from "../../api/types";
 import {
   cleanUrl,

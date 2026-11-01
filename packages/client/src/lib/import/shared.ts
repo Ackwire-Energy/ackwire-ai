@@ -4,8 +4,8 @@ import {
   AGENT_EYES,
   type AgentAppearance,
   type AgentColor,
-} from "@agenteschat/ui/agent/look";
-import { isSecretPath, setsCredential } from "@agenteschat/ui/names";
+} from "@agenteschat/tokens/look";
+import { isSecretPath, setsCredential } from "@agenteschat/tokens/names";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import type {
   ApiRule,

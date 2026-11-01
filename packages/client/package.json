@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@agenteschat/providers": "workspace:*",
-    "@agenteschat/ui": "workspace:*",
+    "@agenteschat/tokens": "workspace:*",
     "yaml": "^2.9.1"
   },
   "peerDependencies": {

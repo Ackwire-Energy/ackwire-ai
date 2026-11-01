@@ -51,14 +51,11 @@ test("the # picker: query at the caret, names starting with it first, then mine;
 });
 
 test("one rule for the composers, the renderer and the server", async () => {
-  const shared = await import("@agenteschat/ui/channel-refs");
-  // By a variable, so this package's typecheck (no DOM lib) doesn't follow the UI kit's whole index.
-  const uiKit = "@agenteschat/ui";
-  const ui: typeof shared = await import(uiKit);
+  // The UI kit's composer and the engine read the same module through `@agenteschat/ui/channel-refs`.
+  const shared = await import("@agenteschat/tokens/channel-refs");
   const lib = await import("../src/lib/channel-refs");
   expect(lib.CHANNEL_REF).toBe(shared.CHANNEL_REF);
   expect([lib.channelQuery, lib.insertChannelRef]).toEqual([shared.channelQuery, shared.insertChannelRef]);
-  expect([ui.channelQuery, ui.insertChannelRef]).toEqual([shared.channelQuery, shared.insertChannelRef]);
 });
 
 test("a channel card's facts: people, agents, and whether I'm in it (web card and phone sheet)", () => {

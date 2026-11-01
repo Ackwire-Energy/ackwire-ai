@@ -172,16 +172,13 @@ export async function createAgent(
   const membership = await requirePermission(db, actorId, orgId, "create_agents");
   const { autonomy, ...fields } = input;
   // `create_agents` makes the creator's own agent (ADR 0085 §5): another owner, or none, is for who edits any agent.
+  // So whoever gets this far may also set its Autonomia (ADR 0094): an admin or the new agent's owner.
   if (input.ownerUserId !== undefined && input.ownerUserId !== actorId && !can(membership, "manage_agents")) {
     throw new ForbiddenError("Only an admin can create an agent for someone else or with no owner");
   }
   const values = { ...fields, handle: fields.handle.toLowerCase(), model: fields.model ?? defaults.model };
   await validateAgentFields(db, orgId, values);
   const ownerUserId = input.ownerUserId === undefined ? actorId : input.ownerUserId;
-  // The Autonomia it starts with, only from someone who may set it on the agent: an admin or its owner.
-  if (autonomy && !can(membership, "manage_agents") && ownerUserId !== actorId) {
-    throw new ForbiddenError("Only an admin or the agent's owner can choose its autonomy", "agent.not_owner");
-  }
   // Another agent's old handle still names that agent.
   const [held] = await db
     .select({ id: agents.id })

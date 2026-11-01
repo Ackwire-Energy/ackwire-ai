@@ -11,6 +11,10 @@ import { box, mouse, place, step, tick } from "../testing";
 beforeEach(() => jest.useFakeTimers());
 afterEach(() => {
   cleanup();
+  // happy-dom's window (shared by every DOM file) runs its 0 ms timeouts as one batch on a timer of its own: dropped
+  // while fake, that batch never runs and no later file's window timeout fires again (Radix's outside-press
+  // listener, a smooth scroll).
+  jest.runOnlyPendingTimers();
   jest.useRealTimers();
 });
 

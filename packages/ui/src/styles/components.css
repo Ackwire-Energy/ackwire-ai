@@ -4463,7 +4463,10 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   text-align: start;
 }
 
-/* A select option's ⓘ, at the row's end; its note is drawn over the page (the list clips), above the ⓘ. */
+/*
+ * A select option's ⓘ, at the row's end; its note is drawn over the page (the list clips), above the ⓘ. Portaled
+ * after the open list, so the list's own layer puts it on top.
+ */
 .ac-hint.ac-menu__hint {
   align-self: center;
   margin: -5px -5px -5px auto;
@@ -4471,7 +4474,7 @@ html:not([data-pointer]) .ac-hint:focus-visible {
 }
 .ac-menu__tip {
   position: fixed;
-  z-index: calc(var(--z-floating) + 1);
+  z-index: var(--z-floating);
   translate: 0 -100%;
   pointer-events: none;
 }

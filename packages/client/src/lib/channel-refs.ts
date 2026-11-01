@@ -5,11 +5,11 @@
  * store resolves by the channel's current name. Only channels the viewer can see become links.
  */
 
-import { CHANNEL_REF } from "@agenteschat/ui/channel-refs";
+import { CHANNEL_REF } from "@agenteschat/tokens/channel-refs";
 import type { TFunction } from "i18next";
 import type { ChannelCard } from "../api/types";
 
-export { CHANNEL_REF, channelQuery, insertChannelRef } from "@agenteschat/ui/channel-refs";
+export { CHANNEL_REF, channelQuery, insertChannelRef } from "@agenteschat/tokens/channel-refs";
 
 /** A piece of text: words, or a `#name` reference (`name` lower case, as channels are named). */
 export type ChannelRefPart = { text: string; name?: undefined } | { text: string; name: string };
