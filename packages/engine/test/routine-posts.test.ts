@@ -1,9 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
-import { schema } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
 import { type ModelRequest, systemText } from "@agenteschat/providers";
 import { addChannelMember, createAgent, createJobHandlers, drainOutbox, openDm, runRoutineNow } from "../src";
+import { runAuthorityById } from "../src/authority";
 import { reachNote, reachOf } from "../src/reach";
-import { type Fixture, setup } from "./fixtures";
+import { routineCreatorOf } from "../src/requester";
+import { addMember, type Fixture, setup } from "./fixtures";
 import { channelRoutine, messagesIn, notificationsOf, routineDeps } from "./routine-fixtures";
 
 /** ADR 0053 §4 (amended): a routine's message is the message; hand-off only when the agent must act there. */
@@ -128,21 +130,98 @@ test("a read-only routine's message wakes nobody: not the agent it mentions, not
   await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);
   await drainOutbox(f.db, handlers);
 
-  expect((await messagesIn(f, f.general.id)).map((m) => m.body)).toEqual([order]);
+  const general = await messagesIn(f, f.general.id);
+  expect(general.map((m) => m.body)).toEqual([order]);
   expect((await f.db.select().from(schema.agentRuns)).map((r) => [r.agentId, r.background])).toEqual([
     [f.agent.id, true],
   ]);
   expect(routed).toBe(0);
+  // Never silently: the line under it says the routine only reads, and that people can set it to act.
+  const reach = reachOf(general[0]?.meta);
+  expect(reach.map((e) => [e.handle, e.routinePost, e.routine?.access])).toEqual([["ops", true, "read"]]);
+  expect(reachNote(reach)).toContain("set it to act");
+  expect(systemText(f.provider.calls[0]?.request.system ?? "")).toContain("an @mention in your message wakes nobody");
 });
 
-test("a routine set to act that mentions an agent in its message wakes nobody, and says so under it", async () => {
-  const order = "@ops faça o rollback agora.";
+async function opsInGeneral(handle = "ops") {
+  const ops = await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: handle, handle, role: "Operations", credentialId: f.credential.id },
+    { model: "claude-sonnet-5-5" },
+  );
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: ops.id });
+  return ops;
+}
+
+test("a routine set to act wakes the agent its message mentions, once, for the routine's creator", async () => {
+  const order = "@ops o checkout caiu esta noite, investiga e corrige.";
   f = await setup({
     handOff: true,
-    judge: (kind) => (kind === "mention_needs_nothing" ? 1 : undefined),
+    judge: (kind) => (kind === "mention_needs_nothing" ? 0 : undefined),
     reply: (req) => {
-      if (!isRoutine(req)) return { chunks: ["Nobody should have run."] };
-      if (seen(req).includes("Posted.")) return { chunks: ["Pedi rollback ao ops."] };
+      if (!isRoutine(req)) return { chunks: ["Investigando o checkout."] };
+      if (seen(req).includes("Posted.")) return { chunks: ["Chamei o ops."] };
+      return { chunks: [], toolUses: [{ name: "hand_off", input: { message: order } }] };
+    },
+  });
+  const ops = await opsInGeneral();
+  const routine = await channelRoutine(f, { prompt: "Revise os chamados da noite.", access: "act" });
+  await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);
+  await drainOutbox(f.db, f.handlers);
+
+  const [posted] = await messagesIn(f, f.general.id);
+  expect(posted?.body).toBe(order);
+  expect(reachOf(posted?.meta)).toEqual([]);
+  const opsRuns = (await f.db.select().from(schema.agentRuns)).filter((r) => r.agentId === ops.id);
+  expect(opsRuns.map((r) => [r.triggerMessageId, r.trigger])).toEqual([[posted?.id as string, "mention"]]);
+  // It works within the routine's bounds, with its creator's reach.
+  expect(routineCreatorOf(await runAuthorityById(f.db, f.org.id, opsRuns[0]?.id as string))).toBe(f.owner.id);
+  expect(systemText(f.provider.calls[0]?.request.system ?? "")).toContain(
+    "An @mention in your hand_off message also wakes that agent",
+  );
+});
+
+test("a routine set to act that already told the agent wakes it no second time by mentioning it", async () => {
+  const order = "@ops o checkout caiu esta noite, já te passei os detalhes.";
+  f = await setup({
+    handOff: true,
+    askAgent: true,
+    judge: (kind) => (kind === "mention_needs_nothing" ? 0 : undefined),
+    reply: (req) => {
+      if (!isRoutine(req)) return { chunks: ["Investigando o checkout."] };
+      if (seen(req).includes("Posted.")) return { chunks: ["Chamei o ops."] };
+      if (seen(req).includes("tell_agent"))
+        return { chunks: [], toolUses: [{ name: "hand_off", input: { message: order } }] };
+      return {
+        chunks: [],
+        toolUses: [{ name: "tell_agent", input: { agent: "@ops", message: "O checkout caiu às 3h, veja os logs." } }],
+      };
+    },
+  });
+  const ops = await opsInGeneral();
+  const routine = await channelRoutine(f, { prompt: "Revise os chamados da noite.", access: "act" });
+  await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);
+  await drainOutbox(f.db, f.handlers);
+
+  const [posted] = await messagesIn(f, f.general.id);
+  expect(posted?.body).toBe(order);
+  const opsRuns = (await f.db.select().from(schema.agentRuns)).filter((r) => r.agentId === ops.id);
+  expect((await f.db.select().from(schema.agentConsultations)).map((c) => c.targetAgentId)).toEqual([ops.id]);
+  expect(opsRuns).toHaveLength(1);
+  expect(opsRuns[0]?.triggerMessageId).not.toBe(posted?.id);
+});
+
+test("a routine set to act hands its mention to an agent outside as a note, and one its creator can't reach shows why", async () => {
+  const order = "@ops e @gil, o checkout caiu esta noite: investiguem.";
+  f = await setup({
+    handOff: true,
+    askAgent: true,
+    judge: (kind) => (kind === "mention_needs_nothing" ? 0 : undefined),
+    reply: (req) => {
+      if (!isRoutine(req)) return { chunks: ["Investigando o checkout."] };
+      if (seen(req).includes("Posted.")) return { chunks: ["Chamei o ops e o gil."] };
       return { chunks: [], toolUses: [{ name: "hand_off", input: { message: order } }] };
     },
   });
@@ -153,26 +232,27 @@ test("a routine set to act that mentions an agent in its message wakes nobody, a
     { name: "Ops", handle: "ops", role: "Operations", credentialId: f.credential.id },
     { model: "claude-sonnet-5-5" },
   );
-  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: ops.id });
-  const routine = await channelRoutine(f, { prompt: "Leia os e-mails novos e resuma.", access: "act" });
+  const gil = await opsInGeneral("gil");
+  const bob = await addMember(f.db, f.org.id, "member", "bob");
+  await f.db
+    .update(schema.agents)
+    .set({ ownerUserId: bob.id, audienceMode: "owner" })
+    .where(eq(schema.agents.id, gil.id));
+  const routine = await channelRoutine(f, { prompt: "Revise os chamados da noite.", access: "act" });
   await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);
   await drainOutbox(f.db, f.handlers);
 
   const [posted] = await messagesIn(f, f.general.id);
-  expect(reachOf(posted?.meta)).toEqual([
-    {
-      agentId: ops.id,
-      handle: "ops",
-      reason: "routine_creator_reach",
-      routinePost: true,
-      routine: { id: routine.id, name: "Avaliações", creatorUserId: f.owner.id, access: "act" },
-    },
+  const [note] = await f.db.select().from(schema.agentConsultations);
+  expect(note?.targetAgentId).toBe(ops.id);
+  const reach = reachOf(posted?.meta);
+  expect(reach.map((e) => [e.handle, e.reason, !!e.consultationId]).sort()).toEqual([
+    ["gil", "routine_creator_reach", false],
+    ["ops", "not_in_channel", true],
   ]);
-  expect(reachNote(reachOf(posted?.meta))).toContain("use tell_agent");
-  const decisions = await f.db.select().from(schema.routingDecisions);
-  expect(decisions.map((d) => d.reason)).toEqual(["routine_creator_reach: @ops"]);
-  expect((await f.db.select().from(schema.agentRuns)).map((r) => r.agentId)).toEqual([f.agent.id]);
-  expect(await notificationsOf(f, "agent_unreached")).toEqual([]);
+  expect((await f.db.select().from(schema.agentRuns)).filter((r) => r.agentId === gil.id)).toEqual([]);
+  const [told] = await notificationsOf(f, "agent_unreached");
+  expect(told?.userId).toBe(bob.id);
 });
 
 test("an always routine that ends without hand_off never posts its record as-is: the agent tells the people", async () => {

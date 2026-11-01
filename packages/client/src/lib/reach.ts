@@ -17,11 +17,11 @@ export interface ReachEntry {
   consultationId?: string;
   /** Not a member of the conversation either. */
   outside?: true;
-  /** `not_in_channel` from a private conversation: not forwarded, so what's said there stays there. */
+  /** `not_in_channel` from a private conversation, on messages from before such mentions were forwarded too. */
   private?: true;
   /** `not_in_channel` to an agent with no AI connected: nothing could answer it. */
   noAi?: true;
-  /** A routine's own message named it: such a message wakes nobody. */
+  /** The own message of a routine set to only look and tell named it: such a message wakes nobody. */
   routinePost?: true;
   /** Whose reach fell short: the agent's owner may let them talk to it. */
   userId?: string;

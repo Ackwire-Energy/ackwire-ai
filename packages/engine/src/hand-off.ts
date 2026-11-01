@@ -2,7 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
 import { routineBriefOfRun } from "./background";
 import { deliverNotice, publishDelivery } from "./delivery";
-import { insertMessage, type Message } from "./messages";
+import { insertMessage, type Message, unreachedAgents } from "./messages";
 import type { RoutineBrief } from "./routine-brief";
 import { personCanPost } from "./routine-state";
 import type { AgentRun } from "./runs";
@@ -80,6 +80,14 @@ export async function deliverRoutineReport(
     .returning({ id: routineRuns.id });
   if (!open) return null;
   if (!input.wake) {
+    // Agents it names outside that conversation: a routine set to act hands it to them (`settleReach`).
+    const unreached = await unreachedAgents(tx, {
+      orgId: run.orgId,
+      channelId: brief.deliverTo.channelId,
+      authorAgentId: run.agentId,
+      body: text,
+      handedTo: run.id,
+    });
     const message = await insertMessage(tx, {
       orgId: run.orgId,
       channelId: brief.deliverTo.channelId,
@@ -87,7 +95,10 @@ export async function deliverRoutineReport(
       // Nobody is behind it (authority.ts) and it wakes nobody: a root at hop 0, like a reminder.
       author: { type: "agent", agentId: run.agentId, runId: null, hop: 0, stretchId: null },
       body: text,
-      meta: { routine: { id: brief.routineId, name: brief.name, runId: brief.routineRunId } },
+      meta: {
+        routine: { id: brief.routineId, name: brief.name, runId: brief.routineRunId },
+        ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
+      },
     });
     await tx.update(routineRuns).set({ messageId: message.id }).where(eq(routineRuns.id, brief.routineRunId));
     return { message, runs: [] };
@@ -148,7 +159,7 @@ export function createHandOffToolSource(deps: { pubsub?: PubSub }): ToolSource {
   const tool: ToolDefinition = {
     name: HAND_OFF_TOOL,
     description:
-      "Post this routine's message where it reports, once. `message` is posted as-is as your own message to the people there: write the message itself (the greeting, the digest, the reminder, what you found and what you recommend), in their language, never about this routine or its runs. It wakes nobody, not even the agents it @mentions: to get another agent to act, use tell_agent. Set `wake_me` only when what you found needs you to act or decide in that conversation: then `message` is a note to you there (you'll be woken with it and tell the people yourself), not posted as-is. Without it nothing is posted.",
+      "Post this routine's message where it reports, once. `message` is posted as-is as your own message to the people there: write the message itself (the greeting, the digest, the reminder, what you found and what you recommend), in their language, never about this routine or its runs. When the routine may act, an agent it @mentions wakes and works on it (one outside that conversation gets it as a note); when it only looks and tells, it wakes nobody, not even the agents it @mentions. Set `wake_me` only when what you found needs you to act or decide in that conversation: then `message` is a note to you there (you'll be woken with it and tell the people yourself), not posted as-is. Without it nothing is posted.",
     scope: "",
     inputSchema: {
       type: "object",

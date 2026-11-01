@@ -8,6 +8,7 @@ import {
   createJobHandlers,
   drainOutbox,
   insertMessage,
+  openDm,
   postPersonMessage,
   type RouterStrategy,
   runRoutineNow,
@@ -227,7 +228,7 @@ describe("never silent, the edges", () => {
     expect((await decisionOf(sent.id))?.reason).toContain("not_in_channel: @ivo");
   });
 
-  test("from a private channel the words stay there: no note, a line, and the author is told to write its own", async () => {
+  test("from a private channel too it goes as a note, with the line under it", async () => {
     f = await setup({
       askAgent: true,
       judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined),
@@ -239,11 +240,38 @@ describe("never silent, the edges", () => {
     const sent = await devWrites("Como o @ivo pediu, segue a planilha de salários.", ["ivo"], rh.id);
     await drainOutbox(f.db, f.handlers);
 
-    expect(await f.db.select().from(schema.agentConsultations)).toEqual([]);
+    const [note] = await f.db.select().from(schema.agentConsultations);
+    expect(note?.targetAgentId).toBe(ivo.id);
     const reach = reachOf((await messageOf(sent.id))?.meta);
-    expect(reach).toEqual([{ agentId: ivo.id, handle: "ivo", reason: "not_in_channel", private: true }]);
+    expect(reach).toEqual([{ agentId: ivo.id, handle: "ivo", reason: "not_in_channel", consultationId: note?.id }]);
     expect((await decisionOf(sent.id))?.reason).toContain("not_in_channel: @ivo");
-    expect(reachNote(reach)).toContain("tell_agent in a note you write yourself");
+    expect(reachNote(reach)).toContain("[Delivered as a note]");
+  });
+
+  test("from a DM too it goes as a note, but only to an agent the person behind it may talk to", async () => {
+    f = await setup({
+      askAgent: true,
+      judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : undefined),
+      reply: (req) => (req.outputSchema ? NO_ROUTE : { chunks: ["ok"] }),
+    });
+    const ivo = await agentOf("Ivo", "ivo", { inGeneral: false });
+    const eva = await agentOf("Eva", "eva", { inGeneral: false });
+    const bob = await addMember(f.db, f.org.id, "member", "bob");
+    await f.db
+      .update(schema.agents)
+      .set({ ownerUserId: bob.id, audienceMode: "owner" })
+      .where(eq(schema.agents.id, eva.id));
+    const dm = await openDm(f.db, f.owner.id, f.org.id, { agentId: f.agent.id });
+    const sent = await devWrites("@ivo e @eva, revisem o resumo.", ["eva", "ivo"], dm.id);
+    await drainOutbox(f.db, f.handlers);
+
+    const notes = await f.db.select().from(schema.agentConsultations);
+    expect(notes.map((c) => c.targetAgentId)).toEqual([ivo.id]);
+    const reach = reachOf((await messageOf(sent.id))?.meta);
+    expect(reach.map((e) => [e.handle, e.reason, !!e.consultationId]).sort()).toEqual([
+      ["eva", "audience", false],
+      ["ivo", "not_in_channel", true],
+    ]);
   });
 
   test("an agent with no AI isn't shown as handed: the line says nothing could answer", async () => {

@@ -257,18 +257,13 @@ scenario("S12", "a handover by mention wakes the agent, and it can act on it", a
   await assertInvariants(w);
 });
 
-scenario("S37", "a mention of an agent outside the conversation is not lost: the agent hands it over", async () => {
+scenario("S37", "a mention of an agent outside a DM is not lost: it goes as a note, at no extra turn", async () => {
   const w = await world({
     agents: ["ada", "nina"],
     dmWith: "ada",
     judge: { followThrough: (s) => (s.unreached ? "continue" : "done") },
     script: {
-      ada: [
-        { text: "@nina revisa o PR #227" },
-        { calls: [{ name: "tell_agent", input: { agent: "@nina", message: "Revisa o PR #227, por favor." } }] },
-        { text: "Pedi à Nina para revisar." },
-        { text: "A Nina aprovou o #227." },
-      ],
+      ada: [{ text: "@nina revisa o PR #227" }, { text: "A Nina aprovou o #227." }],
       nina: [{ text: "Aprovado." }],
     },
   });
@@ -283,7 +278,10 @@ scenario("S48", "an agent outside the conversation only named in an answer costs
   const w = await world({
     agents: ["otto", "vera"],
     dmWith: "otto",
-    judge: { followThrough: (s) => (String(s.reply).includes("Quem cuida") && s.unreached ? "done" : "continue") },
+    judge: {
+      followThrough: (s) => (String(s.reply).includes("Quem cuida") ? "done" : "continue"),
+      mention: { vera: { handoff: 0.05, needsNothing: 0.95 } },
+    },
     script: { otto: [{ text: "Quem cuida do deploy é a @vera." }] },
   });
   await w.say("quem cuida do deploy?");
