@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Pressable, Text as RNText, ScrollView, View } from "react-native";
+import { Pressable, Text as RNText, ScrollView, type ScrollViewInstance, View } from "react-native";
 import { Count } from "./Count";
 import { haptics } from "./haptics";
 import type { IconName } from "./icons.data";
@@ -27,7 +27,7 @@ export interface FiltersProps {
 /** Horizontal pills over a list; the selected one is ink, and the row follows it when it changes from outside. */
 export function Filters({ items, value, onChange }: FiltersProps) {
   const { colors } = useTheme();
-  const row = useRef<ScrollView>(null);
+  const row = useRef<ScrollViewInstance>(null);
   const lefts = useRef(new Map<string, number>());
   useEffect(() => {
     const left = lefts.current.get(value);

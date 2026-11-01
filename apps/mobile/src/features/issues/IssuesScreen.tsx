@@ -8,6 +8,7 @@ import {
   Platform,
   RefreshControl,
   ScrollView,
+  type ScrollViewInstance,
   StyleSheet,
   useWindowDimensions,
   View,
@@ -41,7 +42,7 @@ export function IssuesScreen() {
   const issues = useIssues(orgId);
   const columns = useIssueColumns(orgId);
   const pull = usePullRefresh(issues.refetch);
-  const pager = useRef<ScrollView>(null);
+  const pager = useRef<ScrollViewInstance>(null);
   const [tab, setTab] = useState(0);
   // A tab tapped: where the pager is going, so the columns it passes on the way don't light up.
   const going = useRef<number | null>(null);
@@ -63,10 +64,7 @@ export function IssuesScreen() {
   const empty = issues.isSuccess && (issues.data ?? []).length === 0;
   return (
     <View style={[styles.screen, { backgroundColor: c.bg, paddingTop: Platform.OS === "ios" ? headerHeight : 0 }]}>
-      <PushedHeader
-        solid={false}
-        right={<IconButton icon="plus" label={t("mobile.issues.new")} onPress={openNew} />}
-      />
+      <PushedHeader solid={false} right={<IconButton icon="plus" label={t("mobile.issues.new")} onPress={openNew} />} />
       <Text variant="display" accessibilityRole="header" numberOfLines={1} style={styles.title}>
         {t("mobile.issues.title")}
       </Text>

@@ -135,7 +135,12 @@ export interface Placed {
  * everything drifts to the center. Deterministic (starts on a circle), so
  * the same graph always lands the same way.
  */
-export function layoutGraph(graph: { nodes: { slug: string }[]; edges: { from: string; to: string }[] }, width = 720, height = 460, steps = 240): Placed[] {
+export function layoutGraph(
+  graph: { nodes: { slug: string }[]; edges: { from: string; to: string }[] },
+  width = 720,
+  height = 460,
+  steps = 240,
+): Placed[] {
   const n = graph.nodes.length;
   if (n === 0) return [];
   const pos = graph.nodes.map((node, i) => {

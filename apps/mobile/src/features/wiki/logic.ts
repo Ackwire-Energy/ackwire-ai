@@ -1,6 +1,5 @@
-import { type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
 import type { WikiPageSummary } from "@agenteschat/client";
-import { parseWikiToken } from "@agenteschat/client/lib/markdown";
+import { parseWikiToken, type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
 import { type WikiFolder, wikiTree } from "@agenteschat/client/lib/wiki";
 
 /**

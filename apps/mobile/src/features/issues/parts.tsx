@@ -100,6 +100,7 @@ export function CriteriaTrack({ issue, color, going }: { issue: Issue; color: Ag
       <View style={styles.cells}>
         {Array.from({ length: p.total }, (_, k) => (
           <View
+            // biome-ignore lint/suspicious/noArrayIndexKey: the cells have no identity, only a position
             key={`cell-${k + 1}`}
             style={[
               styles.cell,

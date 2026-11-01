@@ -116,9 +116,7 @@ export function MemoryScreen() {
             onSelect={setPicked}
             title={selected.title}
             subtitle={subtitle}
-            onOpen={() =>
-              selected.kind === "agent" ? router.push(`/agent/${selected.id}`) : openMemory(selected.id)
-            }
+            onOpen={() => (selected.kind === "agent" ? router.push(`/agent/${selected.id}`) : openMemory(selected.id))}
           />
           <SectionHeader title={t("mobile.memory.recent")} />
           {justLearned(shown).map(row)}

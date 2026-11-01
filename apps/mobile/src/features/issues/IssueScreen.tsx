@@ -21,7 +21,16 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import {
+  ActivityIndicator,
+  Linking,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  type ScrollViewInstance,
+  StyleSheet,
+  View,
+} from "react-native";
 import { Button, Chip, Icon, IconButton, type IconName, PixelOrbit, Text, useToast } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
 import { MessageText } from "../chat/MessageText";
@@ -40,6 +49,7 @@ import {
   useSurface,
 } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
+import { IssueActivityFeed, IssueComposer } from "./IssueActivity";
 import {
   columnChoices,
   columnOfIssue,
@@ -50,7 +60,6 @@ import {
   stageCustomized,
   workLines,
 } from "./logic";
-import { IssueActivityFeed, IssueComposer } from "./IssueActivity";
 import { StateChip, useColumnLabel, useStepText } from "./parts";
 
 /**
@@ -71,7 +80,7 @@ function IssueView({ number }: { number: number }) {
   const { t } = useTranslation();
   const c = useColors();
   const orgId = useOrgId();
-  const scroll = useRef<ScrollView>(null);
+  const scroll = useRef<ScrollViewInstance>(null);
   const issue = useIssue(orgId, number);
   const pull = usePullRefresh(issue.refetch);
   const sheet = useSheet();

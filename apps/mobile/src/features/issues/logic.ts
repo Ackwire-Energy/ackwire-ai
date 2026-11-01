@@ -148,10 +148,7 @@ export interface BoardColumn {
 
 /** The board: each stage with its tasks, canceled ones in "Feito"; a stage with nothing stays as an empty column. */
 export function issueBoard(list: Issue[], columns: IssueColumn[] = []): BoardColumn[] {
-  const sections = [
-    ...issueSections(list, "open", null, columns),
-    ...issueSections(list, "done", null, columns),
-  ];
+  const sections = [...issueSections(list, "open", null, columns), ...issueSections(list, "done", null, columns)];
   return BOARD_STAGES.map((stage) => {
     const here = sections.filter((s) => s.key === stage || (stage === "done" && s.key === "canceled"));
     return {

@@ -138,18 +138,13 @@ export function placeStars(map: StarMap): Map<string, Point> {
   const sx = (side - margin * 2) / (Math.max(...xs) - x0 || 1);
   const sy = (side - margin * 2) / (Math.max(...ys) - y0 || 1);
   return new Map(
-    placed.map((p) => [
-      p.slug,
-      { x: Math.round(margin + (p.x - x0) * sx), y: Math.round(margin + (p.y - y0) * sy) },
-    ]),
+    placed.map((p) => [p.slug, { x: Math.round(margin + (p.x - x0) * sx), y: Math.round(margin + (p.y - y0) * sy) }]),
   );
 }
 
 /** Names that fit without covering each other: the selected, the agents, its neighbors, then the most used. */
 export function namedStars(map: StarMap, at: Map<string, Point>, selected: string | null): Set<string> {
-  const near = new Set(
-    map.links.flatMap((l) => (l.from === selected ? [l.to] : l.to === selected ? [l.from] : [])),
-  );
+  const near = new Set(map.links.flatMap((l) => (l.from === selected ? [l.to] : l.to === selected ? [l.from] : [])));
   const rank = (s: Star) => (s.id === selected ? 0 : s.kind === "agent" ? 1 : near.has(s.id) ? 2 : 3);
   const order = [...map.stars].sort((a, b) => rank(a) - rank(b) || b.weight - a.weight);
   const taken: Point[] = [];

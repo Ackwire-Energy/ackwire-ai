@@ -2,14 +2,9 @@ import { AGENT_GRADIENTS, type AgentColorName } from "@agenteschat/ui/agent/engi
 import { Canvas, Path, Skia } from "@shopify/react-native-skia";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { type LayoutChangeEvent, Pressable, StyleSheet, Text as RNText, View } from "react-native";
+import { type LayoutChangeEvent, Pressable, Text as RNText, StyleSheet, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useLivePaused } from "@/agent/live";
 import { Dither } from "@/sky/Dither";
 import { Icon, Text } from "@/ui";
@@ -20,9 +15,9 @@ import { agentLook } from "../shared/logic";
 import {
   frameStars,
   namedStars,
+  type Point,
   pixelsAlong,
   placeStars,
-  type Point,
   ringAround,
   type Star,
   type StarLink,

@@ -65,15 +65,7 @@ import { StatusCard } from "../status/StatusCard";
 import { PlanMeter } from "../usage/parts";
 import { openAgentUsage } from "../usage/UsageScreen";
 import { openAgentEdit } from "./AgentEditScreen";
-import {
-  canEditMemories,
-  type DidLine,
-  didLines,
-  knownAboutMe,
-  plainRole,
-  spendOf,
-  usesOf,
-} from "./logic";
+import { canEditMemories, type DidLine, didLines, knownAboutMe, plainRole, spendOf, usesOf } from "./logic";
 import { MonthPixels } from "./MonthPixels";
 import { useMemoryOriginText } from "./useMemoryOriginText";
 import { workTitle } from "./work";

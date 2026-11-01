@@ -166,9 +166,7 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
                     ? t("mobile.wiki.mapAgent")
                     : [star.folder, t("mobile.wiki.reads", { count: star.weight })].filter(Boolean).join(" · ")
                 }
-                onOpen={() =>
-                  star.kind === "agent" ? router.push(`/agent/${star.id}`) : openWikiPage(star.id)
-                }
+                onOpen={() => (star.kind === "agent" ? router.push(`/agent/${star.id}`) : openWikiPage(star.id))}
               />
             ) : null}
             {home.pinned.length > 0 ? (
