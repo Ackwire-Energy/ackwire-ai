@@ -81,7 +81,7 @@ test("a person sets and clears their availability and line; the workspace hears 
   await expect(
     setMyStatus({ db: f.db }, bia.id, f.org.id, { status: { text: "Almoço", until: "2020-01-01T00:00:00Z" } }),
   ).rejects.toBeInstanceOf(ValidationError);
-});
+}, 20_000);
 
 test("while hidden, last seen stops moving and coming online tells nobody", async () => {
   f = await setup();

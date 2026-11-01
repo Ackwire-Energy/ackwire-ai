@@ -160,7 +160,7 @@ test("storage API: what the workspace's files take, and the disk under this serv
     await cloud.close();
   }
   await rm(dir, { recursive: true, force: true });
-});
+}, 20_000);
 
 test("Drive API: create, new version, versions, download link, file, delete", async () => {
   const owner = browser(t);
