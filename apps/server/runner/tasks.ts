@@ -20,9 +20,11 @@ import os from "node:os";
 import path from "node:path";
 import { ASK_AGAIN, MISSION_DENY_RULES, PUSH_ASK_RULES } from "@agenteschat/adapters/command-policy";
 import {
+  type AccountKind,
   type AgentScope,
   commandOf,
   findPullRequestUrl,
+  isAccountId,
   isRunToolToken,
   type MachineReplies,
   MISSION_RULES_NO_GIT,
@@ -35,7 +37,21 @@ import {
   type TaskExecutor,
   type TaskStart,
 } from "@agenteschat/adapters/machine-protocol";
-import { yieldRoute } from "./accounts";
+import { claudeCodeModel, planOf } from "@agenteschat/providers/plans";
+import {
+  ACCOUNT_MISSING_MESSAGE,
+  ACCOUNT_SIGNED_OUT,
+  type AccountFolders,
+  type AccountGrant,
+  accountEnv,
+  accountSettingsEnv,
+  accountSignIn,
+  handToken,
+  TOKEN_FD_ENV,
+  withSignIn,
+  yieldRoute,
+} from "./accounts";
+import { codexThreadKey } from "./brain-codex";
 import { commandApproval, ownBranches } from "./command-gate";
 import { RunnerError } from "./errors";
 import { shellCommand } from "./exec";
@@ -83,6 +99,12 @@ export { excludeLocally };
  *   the same human lines the watcher derives ("Ver saída"), redacted.
  * - `task.done` goes once per task and again after each reconnect until the
  *   server acknowledges it (`task.ack`).
+ * - Claude Code and Codex sign in as the agent's turns do (protocol 31, ADR
+ *   0041 §5.1): with `account`, that account's folder is the CLI's home, a
+ *   plan's key goes in its env, and a token root keeps reaches the wrapper on
+ *   its descriptor 3 and the CLI on its own, never a file or an environment.
+ *   Without `account`, the computer's own sign-in. A CLI that found nothing to
+ *   sign in with ends with what its agent can do instead (`noSignInResult`).
  */
 
 export const DEFAULT_MAX_CONCURRENT_TASKS = 3;
@@ -159,6 +181,12 @@ interface Entry {
   /** Protocol 14: commit what changed at the end with this message; `HEAD` when it started. */
   commit?: string;
   startSha?: string;
+  /** Protocol 31: the agent's account its CLI signs in with (absent: the computer's own sign-in). */
+  account?: string;
+  /** Its env holds that account's coding plan key, which its redaction must hide (never the key itself). */
+  planKey?: boolean;
+  /** Why the runner canceled it: what its agent reads first in the result. */
+  canceledWhy?: string;
 }
 
 interface Journal {
@@ -198,6 +226,8 @@ export interface SettledTask {
   cwd: string;
   startedAt: string;
   done?: TaskDone;
+  /** The agent's account its CLI signs in with (absent: the computer's own sign-in). */
+  account?: string;
 }
 
 export interface TaskManagerOptions {
@@ -211,6 +241,8 @@ export interface TaskManagerOptions {
   agentFolder: (agent: AgentScope) => Promise<string>;
   /** The agent's secrets: env for the command, redaction for what leaves the machine. */
   secrets?: (agent: AgentScope) => Promise<TaskSecrets | null>;
+  /** Protocol 31: the accounts' folders, as for turns; without it a task on an account is refused. */
+  accounts?: AccountFolders;
   /**
    * How the wrapper starts, before the task folder: default this runtime and
    * `wrap.mjs` next to the journal. A compiled runner (ADR 0036) has no
@@ -279,18 +311,26 @@ const beat = setInterval(touch, ${ALIVE_EVERY_MS});
 const out = openSync(file("stdout.log"), "a");
 const err = openSync(file("stderr.log"), "a");
 const input = existsSync(file("stdin.txt")) ? openSync(file("stdin.txt"), "r") : "ignore";
+// A token root keeps for the agent's account (spec.tokenFd): read whole off this wrapper's descriptor 3, then handed
+// on the command's own descriptor 3, which Claude Code reads and closes. Never in a file, nor in an environment.
+let token = spec.tokenFd ? readFileSync(3, "utf8") : "";
 let child;
 try {
   child = spawn(spec.file, spec.args, {
     cwd: spec.cwd,
     env: process.env,
-    stdio: [input, out, err],
+    stdio: token ? [input, out, err, "pipe"] : [input, out, err],
     detached: process.platform !== "win32",
     windowsHide: true,
     windowsVerbatimArguments: spec.verbatim,
   });
 } catch (e) {
   finish({ exitCode: 127, signal: null, error: String(e && e.message || e) });
+}
+if (token) {
+  child.stdio[3].on("error", () => {});
+  child.stdio[3].end(token);
+  token = "";
 }
 writeFileSync(file("child.pid"), String(child.pid ?? ""));
 const kill = (signal) => {
@@ -384,6 +424,29 @@ export function claudeSessionExists(claudeHome: string, cwd: string, session: st
 export const WRONG_SESSION_FLAG = /already in use|no conversation found|session .* not found/i;
 /** A start that ends within this long with that answer is retried once with the other flag. */
 export const FAST_FAIL_SECONDS = 30;
+
+/** What a coding CLI says when it has nothing to sign in with (Claude Code: "Not logged in · Please run /login"). */
+const NOT_SIGNED_IN = {
+  claude: /not logged in|please run \/login/i,
+  // Not `CODEX_AUTH`'s "401 unauthorized": a command the task ran can print that about some other API.
+  codex:
+    /not logged in|codex login|refresh token (?:was )?(?:expired|revoked|already used)|access token could not be refreshed/i,
+} as const;
+
+/**
+ * A Claude Code or Codex task that ended at once because its CLI had nothing to sign in with: what its agent reads
+ * instead of the CLI's "Please run /login", which no agent can do. Null: it ended some other way.
+ */
+function noSignInResult(t: Entry, exit: ExitFile | null, seconds: number, said: string): string | null {
+  if (t.executor === "shell" || !exit || exit.exitCode === 0 || exit.reason || seconds > FAST_FAIL_SECONDS) return null;
+  if (!NOT_SIGNED_IN[t.executor].test(said)) return null;
+  const cli = t.executor === "codex" ? "Codex" : "Claude Code";
+  const plan = t.executor === "codex" ? "ChatGPT" : "Claude";
+  const instead = "until then, do this work in your own turn (run_code) instead of a background task.";
+  return t.account
+    ? `${cli} couldn't sign in with this agent's ${plan} account on this computer, so the task stopped before doing anything. Its owner can sign in to that account again in Settings, AI accounts; ${instead}`
+    : `${cli} has no sign-in for this agent on this computer (the agent has no ${plan} account here), so the task stopped before doing anything. Its owner can connect a ${plan} account on the agent's page; ${instead}`;
+}
 
 /** The same command with the other session flag (`--resume` ↔ `--session-id`). */
 export function flipSessionFlag(command: string, session: string, resumed: boolean) {
@@ -739,6 +802,8 @@ interface Watch {
 export class TaskManager {
   private journal: Journal = { tasks: [] };
   private readonly watches = new Map<string, Watch>();
+  /** How each task this runner started was launched, for its retry (`retryOtherFlag`); in memory only, until it ends. */
+  private readonly launches = new Map<string, { env: NodeJS.ProcessEnv; token?: string }>();
   private send: ((frame: RunnerFrame) => void) | null = null;
   private caffeinate: ChildProcess | null = null;
   private readonly log: (line: string) => void;
@@ -778,10 +843,28 @@ export class TaskManager {
       }
     }
     for (const t of this.journal.tasks) {
-      if (t.status === "running") await this.watch(t, true);
+      if (t.status === "running") await this.watch(t, true, await this.reattachRedact(t));
     }
     this.save();
     this.updateCaffeinate();
+  }
+
+  /**
+   * After a restart, the redaction of a task whose env holds a coding plan's key: the key read again from the
+   * account's folder, else (root kept it) the task is canceled and nothing it says leaves the computer.
+   */
+  private async reattachRedact(t: Entry): Promise<((text: string) => string) | undefined> {
+    if (!t.planKey || !t.account) return undefined;
+    const kind: AccountKind = t.executor === "codex" ? "codex" : "claude_code";
+    const signIn = await accountSignIn(this.opts.accounts, kind, t.account).catch(() => "missing" as const);
+    if (typeof signIn === "object" && signIn.planKey) {
+      const secrets = await this.opts.secrets?.({ id: t.agentId, handle: t.agentHandle }).catch(() => null);
+      return withSignIn(secrets, signIn)?.redact;
+    }
+    t.canceledWhy =
+      "Stopped: the runner restarted and could no longer hide this account's key from what the task says. Start it again.";
+    this.cancel(undefined, t.taskId);
+    return () => "";
   }
 
   /** For `hello`: every task the server may not know the end of. */
@@ -856,7 +939,22 @@ export class TaskManager {
       cwd: t.cwd,
       startedAt: t.startedAt,
       ...(t.done ? { done: t.done } : {}),
+      ...(t.account ? { account: t.account } : {}),
     };
+  }
+
+  /**
+   * System mode, in a worker: the account its agent thinks with now (null: none), as root says on each change. A
+   * task on any other account is canceled (`BrainManager.keepAccount` closes its turns' processes alike), so no
+   * process of this agent's user keeps a sign-in the agent left or one that was removed.
+   */
+  keepAccount(account: string | null) {
+    for (const t of this.journal.tasks) {
+      if (t.status === "running" && t.account && t.account !== account && !t.canceling) {
+        t.canceledWhy = "Stopped: this agent's AI account changed. Start it again to use the new one.";
+        this.cancel(undefined, t.taskId);
+      }
+    }
   }
 
   /** New limits from the config (the app's Preferences, or an edit): they apply to the next start. */
@@ -865,8 +963,8 @@ export class TaskManager {
     if (limits.defaultMaxSeconds !== undefined) this.opts.defaultMaxSeconds = limits.defaultMaxSeconds;
   }
 
-  /** Starts the wrapper for a task folder, detached (it outlives this runner). */
-  private spawnWrapper(dir: string, env: NodeJS.ProcessEnv, executor: TaskExecutor): ChildProcess {
+  /** Starts the wrapper for a task folder, detached (it outlives this runner); a token goes on its descriptor 3. */
+  private spawnWrapper(dir: string, env: NodeJS.ProcessEnv, executor: TaskExecutor, token?: string): ChildProcess {
     let command = this.opts.wrapperCommand;
     if (!command?.length) {
       const wrapper = path.join(this.opts.root, "wrap.mjs");
@@ -875,18 +973,42 @@ export class TaskManager {
     }
     const [file, ...args] = command;
     const start = (executor !== "shell" && this.opts.spawnCli) || spawn;
-    return start(file as string, [...args, dir], { cwd: dir, env, stdio: "ignore", detached: true, windowsHide: true });
+    const child = start(file as string, [...args, dir], {
+      cwd: dir,
+      env,
+      stdio: token ? ["ignore", "ignore", "ignore", "pipe"] : "ignore",
+      detached: true,
+      windowsHide: true,
+    });
+    if (token) handToken(child, token);
+    return child;
+  }
+
+  /**
+   * ADR 0041 §5.1: a Claude Code or Codex task on the agent's account signs in as its turns do
+   * (`accountSignIn`), refused at once when that account has no sign-in here. Null: the computer's own sign-in.
+   */
+  private async signIn(executor: "claude" | "codex", account: unknown, grant?: AccountGrant) {
+    if (account === undefined || account === null || account === "") return null;
+    if (!isAccountId(account)) throw new RunnerError("bad_request", "Invalid account id");
+    const kind: AccountKind = executor === "codex" ? "codex" : "claude_code";
+    const signIn = await accountSignIn(this.opts.accounts, kind, account, grant);
+    if (signIn === "signed_out") throw new RunnerError("not_found", ACCOUNT_SIGNED_OUT);
+    if (signIn === "missing") throw new RunnerError("not_found", ACCOUNT_MISSING_MESSAGE[kind]);
+    return { ...signIn, kind, account };
   }
 
   /**
    * Starts a task. `allowed.grants` (protocol 10): the folders allowed for the
    * agent besides its own (real paths): `cwd` may be absolute inside one,
    * and Claude Code / Codex get them all (`--add-dir`, writable roots).
+   * `grant` (system mode, protocol 29): what root handed over for `req.account`.
    */
   async start(
     agent: AgentScope,
     req: TaskStart,
     allowed?: { grants?: string[] },
+    grant?: AccountGrant,
   ): Promise<MachineReplies["task.start"]> {
     if (this.closed) throw new RunnerError("internal", "The runner is stopping");
     const taskId = String(req.taskId ?? "");
@@ -904,6 +1026,8 @@ export class TaskManager {
     const prompt = typeof req.prompt === "string" ? req.prompt : "";
     if (executor !== "shell" && !prompt.trim())
       throw new RunnerError("bad_request", `A ${executor} task needs a prompt`);
+    const signIn = executor === "shell" ? null : await this.signIn(executor, req.account, grant);
+    const plan = executor === "claude" && signIn?.planKey ? planOf(signIn.planKey.provider) : undefined;
     const folder = await this.opts.agentFolder(agent);
     let cwd = folder;
     if (typeof req.cwd === "string" && req.cwd.trim() !== "") {
@@ -961,15 +1085,19 @@ export class TaskManager {
         : undefined;
     const startSha = commitMessage ? headSha(cwd) : undefined;
     const baseBehind = req.baseCheck ? commitsBehind(cwd, req.baseCheck) : undefined;
-    // Claude Code resumes a session it has (this folder, or any project folder), else starts it with that id.
+    // Claude Code resumes a session it has (this folder, or any project folder), else starts it with that id. On an
+    // account its sessions are in the account's folder: one with none there has none to resume.
     let resume = req.resume === true;
     if (executor === "claude" && session) {
-      const home = this.opts.claudeHome ?? process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), ".claude");
-      const found = claudeSessionExists(home, cwd, session);
-      if (found !== null) resume = found;
+      const home =
+        signIn?.home ?? this.opts.claudeHome ?? process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), ".claude");
+      resume = claudeSessionExists(home, cwd, session) ?? (signIn ? false : resume);
     }
-    // Codex resumes the thread it opened for this session before (by id), else starts a new one.
-    const codexThread = executor === "codex" && session ? this.journal.codexThreads?.[session] : undefined;
+    // Codex resumes the thread it opened for this session before (by id, in the same Codex home), else a new one.
+    const codexThread =
+      executor === "codex" && session
+        ? this.journal.codexThreads?.[codexThreadKey(session, signIn?.account)]
+        : undefined;
     if (executor === "codex") resume = Boolean(codexThread);
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     // A mission task (protocol 5): our MCP server for its executor, bound to this task by a token.
@@ -982,6 +1110,9 @@ export class TaskManager {
     let extra: string[] = [];
     let mcpToken: string | undefined;
     const input = where ? `${where}\n\n${prompt}` : prompt;
+    // On an account, Claude Code's endpoint and proxies are pinned in its own `--settings`, as a turn's: a project's
+    // settings never send its sign-in elsewhere.
+    const accountSettings = executor === "claude" && signIn ? { env: accountSettingsEnv(plan, undefined) } : {};
     if (missionId && this.opts.mcp) {
       mcpToken = newMcpToken();
       writeFileSync(path.join(dir, MCP_TOKEN_FILE), mcpToken, { mode: 0o600 });
@@ -1009,11 +1140,17 @@ export class TaskManager {
         const away = missionTask && path.resolve(cwd) !== path.resolve(missionRoot);
         writeFileSync(
           settingsFile,
-          JSON.stringify(
-            claudePermissionSettings(readOnly ? "plan" : "work", allow, away ? path.resolve(missionRoot) : undefined, {
-              runnerHome: path.dirname(this.opts.root),
-            }),
-          ),
+          JSON.stringify({
+            ...claudePermissionSettings(
+              readOnly ? "plan" : "work",
+              allow,
+              away ? path.resolve(missionRoot) : undefined,
+              {
+                runnerHome: path.dirname(this.opts.root),
+              },
+            ),
+            ...accountSettings,
+          }),
           { mode: 0o600 },
         );
       }
@@ -1054,7 +1191,10 @@ export class TaskManager {
       writeFileSync(configFile, JSON.stringify(config), { mode: 0o600 });
       writeFileSync(
         settingsFile,
-        JSON.stringify({ permissions: { ask: [...PUSH_ASK_RULES], deny: [...MISSION_DENY_RULES] } }),
+        JSON.stringify({
+          permissions: { ask: [...PUSH_ASK_RULES], deny: [...MISSION_DENY_RULES] },
+          ...accountSettings,
+        }),
         { mode: 0o600 },
       );
       extra = missionExecutorArgs("claude", {
@@ -1067,6 +1207,13 @@ export class TaskManager {
         promptTool: true,
       });
     }
+    if (executor === "claude" && signIn && !this.opts.mcp) {
+      const settingsFile = path.join(dir, "settings.json");
+      writeFileSync(settingsFile, JSON.stringify(accountSettings), { mode: 0o600 });
+      extra.push("--settings", shellArg(settingsFile));
+    }
+    // A coding plan serves only its own models: Claude Code asks for one by the alias the plan maps (as a turn).
+    if (executor === "claude" && plan) extra.push("--model", claudeCodeModel(plan, undefined));
     const command = executorCommand(executor, {
       command: req.command,
       ...(readOnly && executor === "claude" ? { permissionMode: "dontAsk" as const } : {}),
@@ -1098,13 +1245,21 @@ export class TaskManager {
       verbatim: shell.verbatim,
       cwd,
       maxSeconds,
+      ...(signIn?.token ? { tokenFd: true } : {}),
     });
     if (executor !== "shell") writeFileSync(path.join(dir, "stdin.txt"), input, { mode: 0o600 });
     const secrets = (await this.opts.secrets?.(agent)) ?? null;
-    // Claude Code and Codex tasks run on the computer's own sign-in: a route there stops first (two processes on
-    // one sign-in race on its refresh token), right before the task starts.
-    if (executor !== "shell") await yieldRoute(executor === "codex" ? "codex" : "claude_code");
+    const base: NodeJS.ProcessEnv = { ...process.env, ...(secrets?.env ?? {}) };
+    // As a turn's (ADR 0041 §5): the account's folder is the CLI's home and nothing else signs it in; a plan's key
+    // goes in the env under the plan's name, a token only on descriptor 3 (`spawnWrapper`).
+    const env = signIn ? accountEnv(signIn.kind, signIn.home, base) : base;
+    if (plan && signIn?.planKey) env[plan.claudeCode.tokenEnv] = signIn.planKey.key;
+    if (signIn?.token) Object.assign(env, TOKEN_FD_ENV);
+    // Claude Code and Codex tasks run on their sign-in (the account's, or the computer's own): a route there stops
+    // first (two processes on one sign-in race on its refresh token), right before the task starts.
+    if (executor !== "shell") await yieldRoute(executor === "codex" ? "codex" : "claude_code", signIn?.home);
     let child: ChildProcess;
+    let launch: { env: NodeJS.ProcessEnv; token?: string };
     try {
       // Codex hands our MCP process these by name (`env_vars`): the token never goes on a command line.
       const mcpEnv: Record<string, string> =
@@ -1119,7 +1274,8 @@ export class TaskManager {
               { MCP_TOOL_TIMEOUT: String(PERMISSION_WAIT_MS + 5 * 60_000) }
             : {};
       // The agent's secrets (ADR 0027) through the environment only, never on disk here.
-      child = this.spawnWrapper(dir, { ...process.env, ...(secrets?.env ?? {}), ...mcpEnv }, executor);
+      launch = { env: { ...env, ...mcpEnv }, ...(signIn?.token ? { token: signIn.token } : {}) };
+      child = this.spawnWrapper(dir, launch.env, executor, launch.token);
     } catch (err) {
       throw new RunnerError("internal", `Couldn't start the task: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -1127,6 +1283,7 @@ export class TaskManager {
     child.unref();
     const pid = child.pid;
     if (!pid) throw new RunnerError("internal", "Couldn't start the task");
+    this.launches.set(taskId, launch);
     // An allowed folder outside the agent's own (protocol 10) is reported by its absolute path.
     const rel = isInside(folder, cwd) ? path.relative(folder, cwd).split(path.sep).join("/") : cwd;
     const entry: Entry = {
@@ -1145,6 +1302,8 @@ export class TaskManager {
       ...(mcpToken ? { mcpToken } : {}),
       ...(mcpToken && isRunToolToken(req.mission?.mcpToken) ? { serverToken: req.mission.mcpToken } : {}),
       ...(commitMessage && startSha ? { commit: commitMessage, startSha } : {}),
+      ...(signIn ? { account: signIn.account } : {}),
+      ...(plan && signIn?.planKey ? { planKey: true } : {}),
       status: "running",
       pid,
       startedAt: new Date(this.now()).toISOString(),
@@ -1153,7 +1312,7 @@ export class TaskManager {
     };
     this.journal.tasks.push(entry);
     this.save();
-    await this.watch(entry, false, secrets?.redact);
+    await this.watch(entry, false, (signIn ? withSignIn(secrets, signIn) : secrets)?.redact);
     this.updateCaffeinate();
     this.log(`[${entry.agentHandle}] task ${taskId} started: ${command.slice(0, 80)}`);
     return {
@@ -1340,7 +1499,8 @@ export class TaskManager {
     // Claude Code's events are on stdout; its stderr (and every other executor's output) is plain text.
     const parsed = parseOutputLine(raw, stream === "stdout" ? t.executor : "shell", t.cwd);
     if (parsed.thread && t.session && t.executor === "codex") {
-      this.journal.codexThreads = { ...(this.journal.codexThreads ?? {}), [t.session]: parsed.thread };
+      const key = codexThreadKey(t.session, t.account);
+      this.journal.codexThreads = { ...(this.journal.codexThreads ?? {}), [key]: parsed.thread };
       this.save();
     }
     if (parsed.session && !t.session) t.session = parsed.session;
@@ -1351,8 +1511,8 @@ export class TaskManager {
         w.denials.push({ tool: d.tool, command });
       }
     }
-    if (parsed.line) {
-      const line = w.redact(parsed.line).slice(0, TASK_LIMITS.line);
+    const line = parsed.line ? w.redact(parsed.line).slice(0, TASK_LIMITS.line) : "";
+    if (line) {
       w.pendingLine = line;
       t.lastLine = line;
       w.tail.push(line);
@@ -1428,6 +1588,10 @@ export class TaskManager {
     const command = flipSessionFlag(t.command, session, t.resumed === true);
     if (command === t.command) return this.settle(t, w, exit);
     const dir = this.dirOf(t.taskId);
+    // The same sign-in as its start. A runner restarted since has lost an account's sign-in (it is never stored): no
+    // retry, rather than one on the computer's own sign-in.
+    const launch = this.launches.get(t.taskId);
+    if (t.account && !launch) return this.settle(t, w, exit);
     try {
       const shell = shellCommand(command);
       writeJson(path.join(dir, "spec.json"), {
@@ -1436,11 +1600,13 @@ export class TaskManager {
         verbatim: shell.verbatim,
         cwd: t.cwd,
         maxSeconds: t.maxSeconds,
+        ...(launch?.token ? { tokenFd: true } : {}),
       });
       for (const f of ["exit.json", "alive", "child.pid", "cancel"]) rmSync(path.join(dir, f), { force: true });
       for (const f of ["stdout.log", "stderr.log"]) writeFileSync(path.join(dir, f), "", { mode: 0o600 });
       const secrets = (await this.opts.secrets?.({ id: t.agentId, handle: t.agentHandle }).catch(() => null)) ?? null;
-      const child = this.spawnWrapper(dir, secrets ? { ...process.env, ...secrets.env } : process.env, t.executor);
+      const env = launch?.env ?? (secrets ? { ...process.env, ...secrets.env } : process.env);
+      const child = this.spawnWrapper(dir, env, t.executor, launch?.token);
       (child as unknown as EventEmitter).on("error", () => {});
       child.unref();
       if (!child.pid) throw new Error("no pid");
@@ -1452,7 +1618,8 @@ export class TaskManager {
       t.lastLine = undefined;
       this.save();
       this.log(`[${t.agentHandle}] task ${t.taskId}: retrying with ${t.resumed ? "--resume" : "--session-id"}`);
-      await this.watch(t, false, secrets?.redact ?? w.redact);
+      // On an account, the redaction that also hides its key or token.
+      await this.watch(t, false, t.account ? w.redact : (secrets?.redact ?? w.redact));
     } catch {
       this.settle(t, w, exit);
     }
@@ -1493,6 +1660,7 @@ export class TaskManager {
     exit: ExitFile | null,
     commit?: { startSha: string; endSha: string; error?: string },
   ) {
+    this.launches.delete(t.taskId);
     const endedAt = exit?.endedAt ?? new Date(this.now()).toISOString();
     const seconds = Math.max(0, Math.round((Date.parse(endedAt) - Date.parse(t.startedAt)) / 1000));
     // Gone without an exit, or stopped from outside: interrupted, unless we were canceling it.
@@ -1512,9 +1680,14 @@ export class TaskManager {
         : undefined;
     // A commit that failed (a hook said no): the changes stay in the folder and the reason goes with the result.
     const note = commit?.error ? `\n\nThe changes were not committed: ${commit.error}`.slice(0, 600) : "";
-    const text = w.result ?? codexLast ?? w.tail.join("\n");
-    const result = w
-      .redact(note ? `${text.slice(0, TASK_LIMITS.result - note.length)}${note}`.trim() : text)
+    const said = w.result ?? codexLast ?? w.tail.join("\n");
+    const noSignIn = noSignInResult(t, exit, seconds, said);
+    const why = canceled ? t.canceledWhy : undefined;
+    if (noSignIn || why) t.lastLine = (why ?? noSignIn ?? "").slice(0, TASK_LIMITS.line);
+    const text = noSignIn ?? said;
+    const result = [why, w.redact(note ? `${text.slice(0, TASK_LIMITS.result - note.length)}${note}`.trim() : text)]
+      .filter(Boolean)
+      .join("\n\n")
       .slice(0, TASK_LIMITS.result);
     t.status = interrupted ? "interrupted" : "done";
     t.endedAt = endedAt;
@@ -1583,6 +1756,7 @@ export class TaskManager {
     this.closed = true;
     for (const w of this.watches.values()) clearInterval(w.timer);
     this.watches.clear();
+    this.launches.clear();
     if (this.caffeinate) {
       try {
         this.caffeinate.kill();

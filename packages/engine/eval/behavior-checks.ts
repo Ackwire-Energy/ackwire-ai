@@ -253,6 +253,14 @@ export interface Expectations {
   missionFindings?: boolean;
   /** Every approval request carries the reason people see on its card (`approvals.why`, ADR 0053 §8). */
   approvalWhy?: boolean;
+  /** Work handed off with `tell_agent` (ADR 0095): exactly this many for each `"from>to"` pair of handles listed. */
+  handOffs?: Record<string, number>;
+  /** What the person saw in the case's conversation: at most this many agent messages, "Nota de…" lines. */
+  personSees?: { maxAgentMessages?: number; noteLines?: number };
+  /** At most this many agent runs in the case: all of them, or a record by handle (`all`: every agent's). */
+  maxAgentRuns?: number | Record<string, number>;
+  /** A `conversation.note` case: whether what came of the note went back to its sender as a notice. */
+  reported?: boolean;
 }
 
 export interface RunObservation {
@@ -276,6 +284,14 @@ export interface RunObservation {
   cards?: string;
   /** Names of the tools the agent had (when known). */
   tools?: string[];
+  /** Notes handed off in the case, by `"from>to"` handles. */
+  handOffs?: Record<string, number>;
+  /** In the case's conversation: the agents' messages (notices aside) and the "Nota de…" lines. */
+  personSaw?: { agentMessages: number; noteLines: number };
+  /** Agent runs in the case by handle, and `all`. */
+  agentRuns?: Record<string, number>;
+  /** A `conversation.note` case: what came of the note went back to its sender. */
+  reported?: boolean;
 }
 
 /** A `propose_mission` input that arrives investigated: at least one read/data finding, at most one decision. */
@@ -419,6 +435,47 @@ export function deterministicChecks(expect: Expectations, run: RunObservation): 
           : short.length
             ? `${short.join(", ")} without a why of ${WHY_MIN_CHARS}+ characters`
             : `why: "${first.length > 120 ? `${first.slice(0, 120)}…` : first}"`,
+    });
+  }
+  if (expect.handOffs) {
+    const made = run.handOffs ?? {};
+    const off = Object.entries(expect.handOffs).filter(([pair, n]) => (made[pair] ?? 0) !== n);
+    out.push({
+      id: "hands_off",
+      pass: off.length === 0,
+      detail: off.length
+        ? `handed off ${JSON.stringify(made)}, expected ${JSON.stringify(expect.handOffs)}`
+        : JSON.stringify(made),
+    });
+  }
+  if (expect.personSees) {
+    const saw = run.personSaw ?? { agentMessages: 0, noteLines: 0 };
+    const { maxAgentMessages, noteLines } = expect.personSees;
+    const tooMany = maxAgentMessages !== undefined && saw.agentMessages > maxAgentMessages;
+    const lines = noteLines !== undefined && saw.noteLines > noteLines;
+    out.push({
+      id: "person_sees",
+      pass: !tooMany && !lines,
+      detail: `${saw.agentMessages} agent message(s), ${saw.noteLines} note line(s)`,
+    });
+  }
+  if (expect.maxAgentRuns !== undefined) {
+    const counts = run.agentRuns ?? {};
+    const caps = typeof expect.maxAgentRuns === "number" ? { all: expect.maxAgentRuns } : expect.maxAgentRuns;
+    const over = Object.entries(caps).filter(([who, max]) => (counts[who] ?? 0) > max);
+    out.push({
+      id: "agent_runs",
+      pass: over.length === 0,
+      detail: over.length
+        ? over.map(([who, max]) => `${who}: ${counts[who]} runs (at most ${max})`).join(", ")
+        : JSON.stringify(counts),
+    });
+  }
+  if (expect.reported !== undefined) {
+    out.push({
+      id: expect.reported ? "result_went_back" : "nothing_went_back",
+      pass: run.reported === expect.reported,
+      detail: run.reported ? "its sender heard what came of it" : "nothing went back to its sender",
     });
   }
   if (expect.ask) {

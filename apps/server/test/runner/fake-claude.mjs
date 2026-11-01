@@ -18,6 +18,11 @@
 // With `--json-schema` it is a route (`brain.route`): the prompt on stdin, one JSON result whose
 // `structured_output` gives the schema's first handle 0.9, and a line with the system prompt and the
 // prompt in the log. "SLOW_ROUTE" never answers, "BAD_ROUTE" answers no JSON.
+// Without `--input-format` it is a background task (`task.start`): the prompt as plain text on stdin, one
+// result, then it exits. Like Claude Code, it is signed in only with a token, a key, or a sign-in in its
+// config folder ($CLAUDE_CONFIG_DIR, else ~/.claude: a `.credentials.json` there); otherwise its result is
+// "Not logged in · Please run /login" (exit 1). "SLOWTASK" takes 30 s, "SLOWKEY" 3 s, "ECHOKEY" answers with
+// $ANTHROPIC_AUTH_TOKEN, "NOSESSION" refuses its session flag after 1.5 s (exit 1).
 import { appendFileSync, closeSync, existsSync, readFileSync, readSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline";
@@ -66,6 +71,32 @@ const flag = (name) => {
 };
 if (flag("--json-schema") !== undefined) {
   await route();
+  process.exit(0);
+}
+if (flag("--input-format") === undefined) await task();
+
+async function task() {
+  let prompt = "";
+  process.stdin.setEncoding("utf8");
+  for await (const chunk of process.stdin) prompt += chunk;
+  const id = flag("--resume") ?? flag("--session-id") ?? "none";
+  const say = (o) => process.stdout.write(`${JSON.stringify({ ...o, session_id: id })}\n`);
+  say({ type: "system", subtype: "init" });
+  const home = process.env.CLAUDE_CONFIG_DIR ?? path.join(process.env.HOME ?? "/nonexistent", ".claude");
+  const key = process.env.ANTHROPIC_AUTH_TOKEN ?? process.env.ANTHROPIC_API_KEY;
+  if (!heldToken && !key && !existsSync(path.join(home, ".credentials.json"))) {
+    say({ type: "result", subtype: "success", is_error: true, result: "Not logged in · Please run /login" });
+    process.exit(1);
+  }
+  if (prompt.includes("SLOWTASK")) await new Promise((resolve) => setTimeout(resolve, 30_000));
+  if (prompt.includes("SLOWKEY")) await new Promise((resolve) => setTimeout(resolve, 3000));
+  if (prompt.includes("NOSESSION")) {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    say({ type: "result", subtype: "error_during_execution", is_error: true, result: `No conversation found: ${id}` });
+    process.exit(1);
+  }
+  const result = prompt.includes("ECHOKEY") ? `key ${key}` : `done: ${prompt.trim()}`;
+  say({ type: "result", subtype: "success", is_error: false, result });
   process.exit(0);
 }
 

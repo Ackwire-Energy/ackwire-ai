@@ -1,5 +1,5 @@
 {
-  "id": "54559322-7250-4e6b-9dcd-12eda6e81822",
+  "id": "2b9f1d76-dd6c-40a9-b10d-06ce76ed2230",
   "prevId": "124b9f74-233f-4f46-bab9-ecf33e98a78b",
   "version": "7",
   "dialect": "postgresql",
@@ -10287,6 +10287,14 @@
           "notNull": true,
           "default": "'open'"
         },
+        "kind": {
+          "name": "kind",
+          "type": "agent_consultation_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'question'"
+        },
         "answer": {
           "name": "answer",
           "type": "text",
@@ -10295,6 +10303,12 @@
         },
         "answered_at": {
           "name": "answered_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reported_at": {
+          "name": "reported_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -10341,6 +10355,48 @@
           ],
           "isUnique": false,
           "where": "\"agent_consultations\".\"status\" = 'open'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "agent_consultations_target_run_id_index": {
+          "name": "agent_consultations_target_run_id_index",
+          "columns": [
+            {
+              "expression": "target_run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "agent_consultations_org_id_asker_agent_id_created_at_index": {
+          "name": "agent_consultations_org_id_asker_agent_id_created_at_index",
+          "columns": [
+            {
+              "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "asker_agent_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -16078,13 +16134,6 @@
           "notNull": true,
           "default": "'{}'::jsonb"
         },
-        "sidebar_items": {
-          "name": "sidebar_items",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -18746,6 +18795,14 @@
         "done",
         "canceled",
         "awaiting_close"
+      ]
+    },
+    "public.agent_consultation_kind": {
+      "name": "agent_consultation_kind",
+      "schema": "public",
+      "values": [
+        "question",
+        "note"
       ]
     },
     "public.agent_consultation_status": {

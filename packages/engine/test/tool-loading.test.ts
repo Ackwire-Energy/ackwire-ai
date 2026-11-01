@@ -70,7 +70,7 @@ test("find_tools ranks the loaded tools too: those that match best come first, t
   const find = presentTools(tools(), undefined, ["issues"]).find((t) => t.name === "find_tools");
   const text = (await find?.execute({ query: "list issues" }, {} as ToolContext))?.content ?? "";
   expect(text).toStartWith(
-    'Already in your tool list for "list issues": call them directly, not through use_tool.\n- list_issues: list issues.\n- create_issue: create issue.',
+    'Already in your tool list for "list issues": call them directly (if your list doesn\'t show them yet, use_tool runs them too).\n- list_issues: list issues.\n- create_issue: create issue.',
   );
   expect(text).toContain('\n\nother tools for "list issues" (call one with use_tool):\n- sentry_search_issues');
 });

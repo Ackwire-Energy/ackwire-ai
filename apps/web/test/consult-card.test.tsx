@@ -124,6 +124,57 @@ describe("the consultation card (meta.consulted)", () => {
   });
 });
 
+describe("what came of work handed off (a `consult_reply` notice with `kind` `note`)", () => {
+  /** Ada's conversation got what Atlas did with the work she handed it. */
+  const withResult = (status: string, answer: string | null) => {
+    const state = seedState();
+    state.messages.push({
+      id: "msg-result",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ADA_ID },
+      body: answer ?? "",
+      mentionedAgentIds: [],
+      agentRunId: null,
+      meta: {
+        notice: {
+          kind: "consult_reply",
+          text: answer ?? "",
+          from: "@atlas",
+          refs: {
+            kind: "note",
+            consultationId: "k9",
+            runId: "r-handed",
+            askerAgentId: ADA_ID,
+            agentId: ATLAS_ID,
+            status,
+            question: "Passa a pasta ao Diogo e confirma que ele abre.",
+            ...(answer ? { answer } : {}),
+          },
+        },
+      },
+      createdAt: new Date().toISOString(),
+    });
+    return state;
+  };
+
+  test("its card says what Ada wrote, not what she asked", async () => {
+    await open(withResult("answered", "Passei a pasta; o Diogo abriu."));
+    const card = document.querySelector(".ac-consult") as HTMLElement;
+    const head = within(card).getByRole("button", { name: /Atlas respondeu/ });
+    await act(async () => fireEvent.click(head));
+    const body = card.querySelector(".ac-consult__body") as HTMLElement;
+    expect(body.textContent).toContain("Ada escreveu");
+    expect(body.textContent).not.toContain("Ada perguntou");
+    expect(body.textContent).toContain("Passa a pasta ao Diogo");
+  });
+
+  test("one that couldn't be finished says so", async () => {
+    await open(withResult("failed", null));
+    expect(document.querySelector(".ac-consult")?.textContent).toContain("O Atlas não conseguiu terminar");
+  });
+});
+
 describe("an agent that joined on its own (meta.joined)", () => {
   test("a faint 'entrou na conversa' next to the time, with a tip that says why", async () => {
     await open(withReply({ joined: true }, "Só um ponto: o vídeo fica pronto no dia 26."));

@@ -4134,6 +4134,7 @@ export const ptBR = {
       waitingPerson: "Esperando alguém responder",
       failing_one: "Falhando ({{count}} seguida)",
       failing_other: "Falhando ({{count}} seguidas)",
+      needsWebhook: "Ainda não roda: falta o webhook do {{provider}}",
     },
     pausedReason: {
       creator_left: "Pausada: quem criou saiu do workspace",
@@ -4172,7 +4173,7 @@ export const ptBR = {
     access: {
       read: "Só olhar e contar",
       act: "Pode agir",
-      hint: "Só olhar e contar: ela lê e conta o que achou. Para mudar alguma coisa, pede a alguém. Pode agir: também pode criar e mudar tarefas, a memória, a wiki e arquivos do Drive, e trabalhar no próprio código. Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.",
+      hint: "Só olhar e contar: ela lê e conta o que achou. Para mudar alguma coisa, pede a alguém. Pode agir: também pode criar e mudar tarefas, a memória, a wiki e arquivos do Drive, trabalhar no próprio código, falar com outros agentes e postar onde quem a criou posta. Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.",
     },
     report: {
       always: "Toda vez",
@@ -8149,6 +8150,7 @@ export const ptBR = {
       tooFrequent: "Uma rotina roda no máximo a cada 15 minutos. Escolha um intervalo maior.",
       tooMany: "Este agente já tem 20 rotinas ativas. Pause ou apague uma antes.",
       creatorCannotPost: "Quem cria a rotina precisa estar na conversa e poder escrever nela.",
+      actTakeOver: "Assuma a rotina antes de mudar o que ela faz quando pode agir.",
       takeOverNoAccess: "Entre na conversa da rotina antes de assumi-la.",
       agentNotInChannel: "Adicione o agente à conversa antes.",
     },
@@ -8971,28 +8973,45 @@ export const ptBR = {
       answered: "{{name}} respondeu",
       expired: "{{The}} {{name}} não respondeu a tempo",
       failed: "{{The}} {{name}} não conseguiu responder",
+      /** Work handed off (`tell_agent`) that its agent couldn't finish. */
+      failedNote: "{{The}} {{name}} não conseguiu terminar",
       waited: "Esperou {{minutes}} min",
       wentOn: "Seguiu sem a resposta",
       asked: "{{name}} perguntou",
+      /** Over the work an agent handed off, as it went to the other agent. */
+      wrote: "{{name}} escreveu",
       answerOf: "Resposta {{of}} {{name}}",
       answer: "Resposta",
       noAnswer: "Sem resposta em {{minutes}} min. {{theFrom}} {{from}} respondeu sem ela.",
       couldNot: "{{theTo}} {{to}} não conseguiu responder. {{theFrom}} {{from}} seguiu sem ela.",
       private: "Conversa só entre {{articleFrom}} {{from}} e {{articleTo}} {{to}}",
     },
-    /** Inside the reply that asked: the questions the agent asked other agents in that turn, one line each. */
+    /**
+     * Inside the reply that asked: the questions the agent asked other agents in that turn, and the work it handed
+     * them, one line each.
+     */
     consultGroup: {
       asked_one: "Perguntou a {{count}} colega",
       asked_other: "Perguntou a {{count}} colegas",
+      /** Only work handed off (`tell_agent`). */
+      handed_one: "Passou para {{count}} colega",
+      handed_other: "Passou para {{count}} colegas",
+      /** Questions and work handed off together. */
+      brought_one: "Chamou {{count}} colega",
+      brought_other: "Chamou {{count}} colegas",
       progress: "{{done}} de {{total}}",
       label: "Perguntas {{of}} {{name}} a outros agentes",
+      labelRequests: "Pedidos {{of}} {{name}} a outros agentes",
       working: "{{name}} está trabalhando",
       waitingApproval: "{{The}} {{name}} espera uma aprovação",
       waitingInput: "{{The}} {{name}} espera uma resposta",
       /** The consulted agent's computer is away: paused, not on a person (as the computer screen says it). */
       waitingComputer: "{{The}} {{name}} espera o computador voltar",
+      /** Its part done, the agent waits on what it handed to other agents. */
+      waitingAgents: "{{The}} {{name}} passou uma parte adiante e espera o retorno",
       /** An answer whose question is in a reply farther up: one line where it arrived, "Ver" goes to that reply. */
       answeredFar: "{{to}} respondeu à pergunta {{of}} {{from}}",
+      answeredRequestFar: "{{to}} respondeu ao pedido {{of}} {{from}}",
       see: "Ver",
     },
     /** A question opened in the panel over the conversation ("Theo ⇄ Iris"): what the two agents said, read only. */
@@ -9006,6 +9025,8 @@ export const ptBR = {
       messages_other: "{{count}} mensagens",
       origin: "{{from}} perguntou {{toArticle}} {{to}} em #{{channel}} · {{time}}",
       originDm: "{{from}} perguntou {{toArticle}} {{to}} · {{time}}",
+      originNote: "{{from}} fez um pedido {{toArticle}} {{to}} em #{{channel}} · {{time}}",
+      originNoteDm: "{{from}} fez um pedido {{toArticle}} {{to}} · {{time}}",
       readOnly: "Só leitura.",
       steer: "Para mudar o rumo, fale com {{article}} {{name}}.",
       talk: "Falar com {{article}} {{name}}",
