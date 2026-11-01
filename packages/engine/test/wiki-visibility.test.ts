@@ -106,7 +106,7 @@ describe("restricted wiki pages", () => {
       text: "qual a margem mínima dos contratos?",
     });
     expect(run.pageIds).toContain(secret.id);
-    const [linked] = await withWikiLinks(f.db, f.org.id, [{ body: "veja [[Margens]]", meta: {} }]);
+    const [linked] = await withWikiLinks(f.db, f.org.id, [{ body: "veja [[Margens]]", meta: {} as Record<string, unknown> }]);
     expect(linked?.meta.wikiLinks).toEqual([
       {
         target: "Margens",
