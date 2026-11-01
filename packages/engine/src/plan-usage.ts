@@ -293,8 +293,8 @@ interface FoundAccount {
   usage: PlanUsage | null;
 }
 
-/** An account by its key, as the viewer may see it, with its last windows; null when it is no longer there. */
-function accountOf(ctx: Context, key: string, viewerId: string): FoundAccount | null {
+/** An account by its key, as the viewer (null: nobody) may see it, with its last windows; null once it is gone. */
+function accountOf(ctx: Context, key: string, viewerId: string | null): FoundAccount | null {
   const [machineId = "", kind, ref] = key.split(":");
   const machine = ctx.machines.get(machineId);
   if (!machine || !isAccountKind(kind)) return null;
@@ -310,7 +310,7 @@ function accountOf(ctx: Context, key: string, viewerId: string): FoundAccount | 
         plan: kind === "claude_code" ? machine.claudePlan : null,
         provider: null,
         ownerName: machine.pairerName,
-        mine: machine.pairer === viewerId,
+        mine: viewerId !== null && machine.pairer === viewerId,
         email: null,
         signedOut: kind === "claude_code" && machine.claudeOut,
       },
@@ -320,7 +320,7 @@ function accountOf(ctx: Context, key: string, viewerId: string): FoundAccount | 
   const found = ref ? ctx.accounts.get(ref) : undefined;
   if (!found || found.row.machineId !== machineId || found.row.kind !== kind) return null;
   const { row, ownerName } = found;
-  const mine = row.createdBy === viewerId;
+  const mine = viewerId !== null && row.createdBy === viewerId;
   return {
     info: {
       key,
@@ -445,6 +445,23 @@ export interface ApiAgentUsage {
   budgetIsDefault?: boolean;
 }
 
+/** An agent's API month as Uso shows it: tokens and budget use for everyone, money only with `view_usage`. */
+const apiUsageOf = (
+  agentId: string,
+  name: string,
+  tokens: number,
+  b: { spentNanoUsd: number; budgetNanoUsd: number; isDefault: boolean },
+  money: boolean,
+): ApiAgentUsage => ({
+  agentId,
+  name,
+  tokens,
+  budgetPercent: budgetPercent(b.spentNanoUsd, b.budgetNanoUsd),
+  ...(money
+    ? { costUsd: nanoUsdToUsd(b.spentNanoUsd), budgetUsd: nanoUsdToUsd(b.budgetNanoUsd), budgetIsDefault: b.isDefault }
+    : {}),
+});
+
 export interface OrgPlanUsageView {
   /** `YYYY-MM` (UTC). */
   month: string;
@@ -498,19 +515,9 @@ export async function orgPlanUsage(
   for (const r of month) if (!r.plan) apiTokens.set(r.agentId, (apiTokens.get(r.agentId) ?? 0) + tokensOf(r));
   const api = [...budgets]
     .filter(([id, b]) => b.spentNanoUsd > 0 || (apiTokens.get(id) ?? 0) > 0)
-    .map(([agentId, b]) => ({
-      agentId,
-      name: ctx.agents.get(agentId)?.name ?? "",
-      tokens: apiTokens.get(agentId) ?? 0,
-      budgetPercent: budgetPercent(b.spentNanoUsd, b.budgetNanoUsd),
-      ...(money
-        ? {
-            costUsd: nanoUsdToUsd(b.spentNanoUsd),
-            budgetUsd: nanoUsdToUsd(b.budgetNanoUsd),
-            budgetIsDefault: b.isDefault,
-          }
-        : {}),
-    }))
+    .map(([agentId, b]) =>
+      apiUsageOf(agentId, ctx.agents.get(agentId)?.name ?? "", apiTokens.get(agentId) ?? 0, b, money),
+    )
     .sort((a, b) => b.budgetPercent - a.budgetPercent || b.tokens - a.tokens || a.name.localeCompare(b.name));
   return { month: since.toISOString().slice(0, 7), money, accounts, api };
 }
@@ -562,10 +569,24 @@ export async function agentPlanUsage(
   now = new Date(),
 ): Promise<AgentPlanUsageView> {
   await requirePermission(db, userId, orgId, "read");
+  return (await agentUsageFor(db, userId, orgId, agentId, now)).view;
+}
+
+/**
+ * The agent's "Uso" tab as `viewer` sees it (null: nobody, so no money), with the brain it thinks with and its API
+ * month against its budget (null: an archived agent has none). The caller checks the viewer may read.
+ */
+export async function agentUsageFor(
+  db: Database,
+  viewer: string | null,
+  orgId: string,
+  agentId: string,
+  now = new Date(),
+): Promise<{ view: AgentPlanUsageView; brain: string; api: ApiAgentUsage | null }> {
   const since = monthStartUtc(now);
   const [ctx, money, rows, budgets] = await Promise.all([
     loadContext(db, orgId),
-    canViewCost(db, userId, orgId),
+    viewer ? canViewCost(db, viewer, orgId) : false,
     readUsage(db, orgId, since, { agentId }),
     agentBudgetsThisMonth(db, orgId, now),
   ]);
@@ -605,7 +626,7 @@ export async function agentPlanUsage(
     }
     const nano = equivalentNano(list);
     if (nano !== null) equivalent = (equivalent ?? 0) + nano;
-    const account = accountOf(ctx, key, userId)?.info ?? null;
+    const account = accountOf(ctx, key, viewer)?.info ?? null;
     return {
       ...base,
       type: "plan" as const,
@@ -637,7 +658,7 @@ export async function agentPlanUsage(
   }
 
   // The account it thinks with now: every agent's use of it, for its windows and who shares it.
-  const found = curKey ? accountOf(ctx, curKey, userId) : null;
+  const found = curKey ? accountOf(ctx, curKey, viewer) : null;
   let current: PlanAccountUsage | null = null;
   if (found) {
     const [month, hourly] = await Promise.all([
@@ -646,7 +667,7 @@ export async function agentPlanUsage(
     ]);
     current = accountUsage(ctx, found, money, month, hourly, now);
   }
-  return {
+  const view: AgentPlanUsageView = {
     month: since.toISOString().slice(0, 7),
     money,
     tokens: total,
@@ -654,5 +675,12 @@ export async function agentPlanUsage(
     sources,
     days,
     current,
+  };
+  const agent = ctx.agents.get(agentId);
+  const apiTokens = sources.find((s) => s.type === "api")?.tokens ?? 0;
+  return {
+    view,
+    brain: agent?.brain ?? "model",
+    api: budget ? apiUsageOf(agentId, agent?.name ?? "", apiTokens, budget, money) : null,
   };
 }

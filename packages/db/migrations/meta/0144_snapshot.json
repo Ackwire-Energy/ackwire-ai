@@ -1,5 +1,5 @@
 {
-  "id": "673d6c57-fa50-4777-9244-666a099f76ce",
+  "id": "124b9f74-233f-4f46-bab9-ecf33e98a78b",
   "prevId": "1fcf4ab9-f111-4092-ae68-82f97993c093",
   "version": "7",
   "dialect": "postgresql",
@@ -577,6 +577,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'sometimes'"
+        },
+        "agent_setup": {
+          "name": "agent_setup",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         },
         "updated_at": {
           "name": "updated_at",
@@ -16985,27 +16991,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
-        },
-        "restricted": {
-          "name": "restricted",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "audience_role_ids": {
-          "name": "audience_role_ids",
-          "type": "uuid[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::uuid[]"
-        },
-        "audience_user_ids": {
-          "name": "audience_user_ids",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::text[]"
         },
         "source": {
           "name": "source",

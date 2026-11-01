@@ -132,7 +132,7 @@
 .routines-horizon__label:hover b {
   color: var(--ink);
 }
-.routines-horizon__label:focus-visible {
+html:not([data-pointer]) .routines-horizon__label:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -280,7 +280,7 @@
   cursor: pointer;
   border-radius: 4px;
 }
-.routine-row__title:focus-visible {
+html:not([data-pointer]) .routine-row__title:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -607,7 +607,7 @@
   transform: translateY(-1px);
   box-shadow: var(--e2), var(--top);
 }
-.routine-preset:focus-visible {
+html:not([data-pointer]) .routine-preset:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }

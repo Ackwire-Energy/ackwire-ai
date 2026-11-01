@@ -46,6 +46,7 @@ import type {
   AgentMailbox,
   AgentMailboxInput,
   AgentProposalDecision,
+  AgentSetup,
   AiStatus,
   ApiRule,
   AppNotification,
@@ -2759,6 +2760,30 @@ export const useBrainMachines = (orgId: string) => {
     queryKey: keys.brainMachines(orgId),
     queryFn: () => api.agents.brainMachines(orgId),
     retry: false,
+  });
+};
+
+/** "Criar agente": what a new agent starts thinking with (ADR 0094), for whoever creates agents. */
+export const useNewAgentSetup = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.newAgentSetup(orgId),
+    queryFn: () => api.agents.newAgentSetup(orgId),
+    enabled,
+    retry: false,
+  });
+};
+
+/** "Usar em outros agentes": what the setup would do to each agent, nothing kept; asked again when either changes. */
+export const useSetupPreview = (orgId: string, setup: AgentSetup | null, agentIds: readonly string[]) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.setupPreview(orgId, JSON.stringify([setup, agentIds])),
+    queryFn: () => api.agents.applySetup(orgId, { setup: setup as AgentSetup, agentIds: [...agentIds], preview: true }),
+    enabled: setup !== null && agentIds.length > 0,
+    retry: false,
+    // Each run walks every agent through its rules: once per opening is enough.
+    refetchOnWindowFocus: false,
   });
 };
 

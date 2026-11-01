@@ -84,6 +84,7 @@ export type ActivityKind =
   | "requestingAccess"
   | "requestingSecret"
   | "queryingDatabase"
+  | "checkingUsage"
   | "usingTool";
 
 /** The computer's own permission check before a command (`PERMISSION_TOOL` in `@agenteschat/adapters`). */
@@ -194,6 +195,7 @@ const BUILTIN: Record<string, ActivityKind> = {
   request_secret: "requestingSecret",
   use_tool: "findingTools",
   follow_up: "followingUp",
+  get_my_usage: "checkingUsage",
   cancel_follow_up: "cancelingFollowUp",
 };
 

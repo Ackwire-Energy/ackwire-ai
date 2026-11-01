@@ -149,7 +149,8 @@ export async function setMissionResumeTasks(
 
 /**
  * "Usar como padrão": the autonomy the agent's next missions start with (its
- * current ones don't change). An admin or the agent's owner. Audited.
+ * current ones don't change). An admin or the agent's owner. Audited, with
+ * `options.audit` added to the entry.
  */
 export async function setAgentMissionApproval(
   deps: Pick<MissionDeps, "db">,
@@ -157,6 +158,7 @@ export async function setAgentMissionApproval(
   orgId: string,
   agentId: string,
   value: unknown,
+  options: { audit?: Record<string, unknown> } = {},
 ): Promise<{ commandApproval: CommandApproval }> {
   if (!isCommandApproval(value)) {
     throw new ValidationError("Choose always, low_risk_auto or never", "mission.invalid_command_approval");
@@ -176,7 +178,7 @@ export async function setAgentMissionApproval(
     actor: { type: "person", id: userId },
     action: "agent.mission_command_approval",
     target: { type: "agent", id: agentId },
-    details: { from, to: value },
+    details: { from, to: value, ...options.audit },
   });
   return { commandApproval: value };
 }

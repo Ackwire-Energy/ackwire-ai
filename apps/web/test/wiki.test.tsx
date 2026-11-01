@@ -302,6 +302,46 @@ describe("links everywhere", () => {
     expect(within(list).getAllByRole("option")[0]?.textContent).toContain("Onboarding");
     await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
     expect(box.value).toBe("leia [[Onboarding]] ");
+    // Esc closes the list and leaves the text.
+    await type(box, "leia [[Onb");
+    expect(screen().getByRole("listbox", { name: "Páginas" })).toBeTruthy();
+    await act(async () => fireEvent.keyDown(box, { key: "Escape" }));
+    expect(screen().queryByRole("listbox", { name: "Páginas" })).toBeNull();
+    expect(box.value).toBe("leia [[Onb");
+  });
+
+  test("a [[link]]'s preview, from the mouse or the keys, leaves the focus where it was", async () => {
+    const state = seedState();
+    state.messages.push({
+      id: "m-wiki",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ADA_ID },
+      body: "Está no [[Onboarding]].",
+      mentionedAgentIds: [],
+      agentRunId: null,
+      createdAt: new Date().toISOString(),
+    });
+    await go(`c/${ENG_ID}`, state);
+    const box = screen().getByRole("combobox", { name: /Mensagem para/ });
+    box.focus();
+    const row = screen()
+      .getAllByRole("article")
+      .find((a) => a.textContent?.includes("Está no")) as HTMLElement;
+    const link = within(row).getByRole("link", { name: "Onboarding" });
+    const preview = () => screen().queryByRole("dialog", { name: /Onboarding/ });
+    await act(async () => fireEvent.pointerEnter(link, { pointerType: "mouse" }));
+    await settle(2);
+    expect(preview()).not.toBeNull();
+    expect(document.activeElement).toBe(box);
+    await act(async () => fireEvent.pointerLeave(link, { pointerType: "mouse" }));
+    await settle(2);
+    expect(preview()).toBeNull();
+    expect(document.activeElement).toBe(box);
+    await act(async () => link.focus());
+    await settle(2);
+    expect(preview()).not.toBeNull();
+    expect(document.activeElement).toBe(link);
   });
 
   test("Salvar na wiki from an agent's message appends it with the source", async () => {

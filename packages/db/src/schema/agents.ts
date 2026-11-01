@@ -262,5 +262,27 @@ export const organizationSettings = pgTable("organization_settings", {
   agentStickers: boolean().notNull().default(true),
   /** How often agents follow a light reply with a sticker or a GIF: `never`, `sometimes` or `often` (ADR 0091). */
   agentMedia: text().$type<"never" | "sometimes" | "often">().notNull().default("sometimes"),
+  /** What a new agent starts thinking with, and its Autonomia (ADR 0094); null = "Automático" on the API. */
+  agentSetup: jsonb().$type<AgentSetup>(),
   updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * An agent's "Quem pensa" and its Autonomia as a value (ADR 0094): the last one someone saved, or used on other
+ * agents, is what new agents start with. Validated in code (`agent-setup.ts`).
+ */
+export interface AgentSetup {
+  brain: "model" | "claude_code" | "codex";
+  /** The API brain: the agent's model (`auto` included). A computer brain: its model as stored (null: the default). */
+  model: string | null;
+  /** The API brain's key (null: the workspace's default). */
+  key?: string | null;
+  /** A computer brain: the computer it thinks on, and its account there (null: that computer's own sign-in). */
+  machineId?: string | null;
+  account?: string | null;
+  effort?: string | null;
+  contextTokens?: number | null;
+  fallback?: boolean;
+  /** Its Autonomia (`agents.mission_command_approval`); null: the default. */
+  autonomy?: string | null;
+}

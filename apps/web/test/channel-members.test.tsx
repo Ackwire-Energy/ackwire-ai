@@ -102,6 +102,25 @@ describe("channel header: who's here", () => {
     await settle(2);
     expect(screen().getByRole("region", { name: "Pessoas" })).toBeTruthy();
   });
+
+  test("hover opens it without taking the focus, open or closed; a press brings the focus in", async () => {
+    await open();
+    const box = screen().getByRole("combobox", { name: /Mensagem para/ });
+    box.focus();
+    const stack = screen().getByRole("button", { name: "Membros do canal (4)" });
+    await act(async () => fireEvent.pointerEnter(stack, { pointerType: "mouse" }));
+    await act(() => new Promise((r) => setTimeout(r, 220)));
+    await settle(2);
+    expect(screen().getByRole("region", { name: "Pessoas" })).toBeTruthy();
+    expect(document.activeElement).toBe(box);
+    await act(async () => fireEvent.pointerLeave(stack, { pointerType: "mouse" }));
+    await act(() => new Promise((r) => setTimeout(r, 300)));
+    expect(screen().queryByRole("region", { name: "Pessoas" })).toBeNull();
+    expect(document.activeElement).toBe(box);
+    await act(async () => fireEvent.click(stack));
+    await settle(2);
+    expect(screen().getByRole("dialog", { name: "Membros do canal (4)" }).contains(document.activeElement)).toBe(true);
+  });
 });
 
 describe("answering without a mention, as true for my own messages as who picks them", () => {
