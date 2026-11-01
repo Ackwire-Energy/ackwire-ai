@@ -545,4 +545,17 @@ describe("an imported agent's own files into the Drive", () => {
     const theirs = (await (await copy("plan.md", other.items[0]?.targetId)).json()) as Copied;
     expect(theirs.status).toBe("created");
   });
+
+  test("a file at the folder's top is its own, not a deeper one with the same name", async () => {
+    const { b, orgId } = await owner({});
+    const base = `/api/app/organizations/${orgId}`;
+    const applied = (await (await b(`${base}/imports`, { json: { bundle: BUNDLE, dryRun: false } })).json()) as Plan;
+    const scout = applied.items.find((i) => i.kind === "agent")?.targetId as string;
+    const copy = (path: string) =>
+      send(b, `${base}/imports/files`, { file: new File(["x"], "plan.md"), agentId: scout, path });
+    expect((await copy("notes/plan.md")).status).toBe(201);
+    const top = await copy("plan.md");
+    expect(top.status).toBe(201);
+    expect(((await top.json()) as Copied).title).toBe("Scout/plan.md");
+  });
 });

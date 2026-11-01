@@ -980,6 +980,7 @@ export async function copyImportedFile(
   // Trimmed as the Drive stores titles. What the agent already has at this path, whatever its folder is named now.
   const title = driveTitle(folder, path).trim();
   const tail = title.slice(folder.length);
+  const tailChars = [...tail].length;
   const [existing] = await db
     .select({ id: schema.artifacts.id, title: schema.artifacts.title })
     .from(schema.artifacts)
@@ -988,7 +989,10 @@ export async function copyImportedFile(
         eq(schema.artifacts.orgId, orgId),
         eq(schema.artifacts.createdByType, "agent"),
         eq(schema.artifacts.createdById, input.agentId),
-        sql`right(${schema.artifacts.title}, ${[...tail].length}) = ${tail}`,
+        // The whole path below one folder (names never hold a `/`), not any deeper file that ends the same.
+        sql`right(${schema.artifacts.title}, ${tailChars}) = ${tail}`,
+        sql`char_length(${schema.artifacts.title}) > ${tailChars}`,
+        sql`strpos(left(${schema.artifacts.title}, char_length(${schema.artifacts.title}) - ${tailChars}), '/') = 0`,
         isNull(schema.artifacts.channelId),
         isNull(schema.artifacts.deletedAt),
       ),
