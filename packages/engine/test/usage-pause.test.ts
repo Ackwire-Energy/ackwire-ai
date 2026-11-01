@@ -402,6 +402,29 @@ test("the budget's wall: the run waits for the next month or a raise, and goes o
   expect((await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).at(-1)?.body).toBe("Feito pela API.");
 });
 
+test("other runs' reservations filling the budget: the run looks again in minutes, quietly", async () => {
+  f = await setup({ budgetNanoUsd: 1_000_000_000, reply: () => ({ chunks: ["ok"] }) });
+  const first = await post(f, "@dev um");
+  await drainOutbox(f.db, f.handlers);
+  await f.db.insert(schema.budgetReservations).values({
+    orgId: f.org.id,
+    agentId: f.agent.id,
+    periodStart: `${new Date().toISOString().slice(0, 8)}01`,
+    amountNanoUsd: 999_900_000,
+    expiresAt: later(60_000),
+  });
+  await f.db.update(schema.agentBudgetPeriods).set({ reservedNanoUsd: 999_900_000 });
+  const before = Date.now();
+  await post(f, "@dev dois", first.id);
+  await drainOutbox(f.db, f.handlers);
+  const [, run] = await runs(f);
+  expect(run?.status).toBe("waiting_input");
+  const at = (await resumeJob(f, run?.id ?? ""))?.nextAttemptAt.getTime() ?? 0;
+  expect(at).toBeGreaterThanOrEqual(before + 2 * 60_000);
+  expect(at).toBeLessThan(Date.now() + 2 * 60_000 + RESUME_AFTER_MS + 1000);
+  expect(await notes(f, "budget_wait", first.id)).toHaveLength(0);
+});
+
 test("a refusal known only from its words holds until the first window resets, never the next window's", () => {
   const at = Date.parse("2026-11-02T10:00:00Z");
   const usage: PlanUsage = {

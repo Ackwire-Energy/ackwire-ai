@@ -1951,14 +1951,20 @@ async function executeRunInner(
    * (`resumeBudgetWaits`). Every resume checks again: still limited, it parks again quietly (one note per run and
    * wait). A turn cut mid-work (`interruptedTurn.cause: plan_limit`) is sent again in the same session.
    */
-  const waitForUsage = async (u: { code: "plan_limit" | "budget"; message: string; resetsAt?: string }) => {
+  const waitForUsage = async (u: {
+    code: "plan_limit" | "budget";
+    message: string;
+    resetsAt?: string;
+    /** A budget wall made only of other runs' reservations: looked at again soon (the ladder), quietly. */
+    soon?: boolean;
+  }) => {
     await deferred;
     const t = transcript as Transcript;
     const now = Date.now();
     const budget = u.code === "budget";
     const machineId = plan.session?.machineId ?? agent.machineId ?? "";
     const wait = t.usageWait ?? { since: now, step: 0 };
-    let at = budget ? nextMonthStart(now) : u.resetsAt ? Date.parse(u.resetsAt) : Number.NaN;
+    let at = budget ? (u.soon ? Number.NaN : nextMonthStart(now)) : u.resetsAt ? Date.parse(u.resetsAt) : Number.NaN;
     if (!budget && !(at > now) && machineId) {
       const stored = await storedPlanUsage(db, run.orgId, machineId, plan.kind, plan.account?.id).catch(() => null);
       at = bindingReset(stored, now) ?? Number.NaN;
@@ -1979,7 +1985,7 @@ async function executeRunInner(
     const name = planName(plan.kind, plan.account?.provider);
     const resetsAt = known ? new Date(at).toISOString() : undefined;
     // A routine's run waits quietly (Rotinas says so); any other says it once per wait.
-    const say = !(run.background || viaRoutine !== null) && t.brainNotice !== u.code;
+    const say = !(run.background || viaRoutine !== null || u.soon) && t.brainNotice !== u.code;
     const note = say
       ? await db.transaction(async (tx) => {
           const [code, text] = budget
@@ -2010,7 +2016,7 @@ async function executeRunInner(
         })
       : null;
     t.postedUpTo = t.messages.length;
-    t.brainNotice = u.code;
+    if (!u.soon) t.brainNotice = u.code;
     delete t.roomWaitSince;
     const waitId = Bun.randomUUIDv7();
     t.waitingForBrain = {
@@ -2370,7 +2376,7 @@ async function executeRunInner(
         // The agent's monthly budget: the run waits for the next month or a raise. A forum's turn fails instead:
         // the topic's order moves on without it.
         if (error instanceof BudgetExceededError && !forum) {
-          return waitForUsage({ code: "budget", message: error.message });
+          return waitForUsage({ code: "budget", message: error.message, soon: error.byReservations });
         }
         // Held or suspended meanwhile: that is why, whatever the brain made of the refusal.
         const paused = await standingRefusal(db, run.orgId, run.agentId);

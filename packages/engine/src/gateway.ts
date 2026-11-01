@@ -401,7 +401,12 @@ export function createModelGateway(deps: ModelGatewayDeps) {
               .update(agentBudgetPeriods)
               .set({ reservedNanoUsd: Math.max(0, reserved) })
               .where(and(eq(agentBudgetPeriods.agentId, agent.id), eq(agentBudgetPeriods.periodStart, period)));
-          throw new BudgetExceededError(agent.id, row.spentNanoUsd, agent.monthlyBudgetNanoUsd);
+          const room = agent.monthlyBudgetNanoUsd - row.spentNanoUsd;
+          const byReservations =
+            reserved > 0 &&
+            room > 0 &&
+            outputTokensWithin(model, promptTokens, room) >= Math.min(MIN_OUTPUT_TOKENS, maxTokens);
+          throw new BudgetExceededError(agent.id, row.spentNanoUsd, agent.monthlyBudgetNanoUsd, byReservations);
         }
       }
       const amount = maxCostNanoUsd(model, promptTokens, cap);
@@ -603,7 +608,8 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       const { reservation, maxTokens } = await reserve(agent, agent.model, promptTokens, request.maxTokens).catch(
         async (error: unknown) => {
           // The refusal itself is when the budget ran out for the owner (spend rarely crosses it on a call).
-          if (error instanceof BudgetExceededError) await budgetExhausted(agent, error.spentNanoUsd).catch(() => {});
+          if (error instanceof BudgetExceededError && !error.byReservations)
+            await budgetExhausted(agent, error.spentNanoUsd).catch(() => {});
           throw error;
         },
       );
