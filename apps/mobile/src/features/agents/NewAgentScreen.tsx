@@ -26,6 +26,7 @@ import {
   ROLE_DEFAULTS,
   ROLE_GROUPS,
   type RoleId,
+  takenHandles,
 } from "@agenteschat/client/lib/new-agent";
 import { can } from "@agenteschat/client/lib/permissions";
 import { AUTO } from "@agenteschat/client/lib/providers";
@@ -46,6 +47,7 @@ import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { PushedHeader, successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { type FullLook, fullLook } from "./edit";
+import { ErrorLine, HandleInput } from "./HandleInput";
 import { LookPicker } from "./LookPicker";
 import { firstBlockedStep, NEW_AGENT_PHONE_STEPS, type PhoneStep, stepBlocked } from "./new-agent";
 
@@ -155,14 +157,7 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
       (ch) => (ch.isMember || proposed?.channelIds.includes(ch.id)) && !dmIds.has(ch.id),
     );
   }, [channels.data, dms.data, proposed]);
-  const taken = useMemo(
-    () =>
-      new Set([
-        ...dir.agents.map((a) => a.handle.toLowerCase()),
-        ...[...dir.memberById.values()].map((m) => m.handle.toLowerCase()).filter(Boolean),
-      ]),
-    [dir.agents, dir.memberById],
-  );
+  const taken = useMemo(() => takenHandles(dir.agents, [...dir.memberById.values()]), [dir.agents, dir.memberById]);
   const draft = { role, name, handle, taken };
   const shownName = name.trim() || t("newAgent.previewName");
   const g = agentGrammar(t, name.trim() || t("newAgent.defaultName"));
@@ -396,25 +391,15 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
         <Text variant="footnote" tone="faint" style={styles.gapTop}>
           {t("newAgent.handle")}
         </Text>
-        <View style={[styles.affix, { backgroundColor: c.raised, borderColor: c.line }]}>
-          <Text variant="body" tone="faint">
-            @
-          </Text>
-          <TextInput
-            value={handle}
-            onChangeText={(v) => {
-              setHandleTouched(true);
-              setHandle(cleanHandle(v));
-            }}
-            maxLength={32}
-            autoCapitalize="none"
-            autoCorrect={false}
-            placeholder={t("newAgent.handlePlaceholder")}
-            placeholderTextColor={c.faint}
-            accessibilityLabel={t("newAgent.handle")}
-            style={[styles.affixInput, fieldText("body"), { color: c.ink }]}
-          />
-        </View>
+        <HandleInput
+          value={handle}
+          onChangeText={(v) => {
+            setHandleTouched(true);
+            setHandle(cleanHandle(v));
+          }}
+          label={t("newAgent.handle")}
+          placeholder={t("newAgent.handlePlaceholder")}
+        />
         {handleIssue ? (
           <ErrorLine text={handleText} />
         ) : (
@@ -678,15 +663,6 @@ function RoleCard({
   );
 }
 
-function ErrorLine({ text }: { text: string }) {
-  const c = useColors();
-  return (
-    <Text variant="footnote" style={{ color: c.danger }} accessibilityLiveRegion="polite">
-      {text}
-    </Text>
-  );
-}
-
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   body: { paddingHorizontal: 18, paddingBottom: 32, gap: 8 },
@@ -715,15 +691,6 @@ const styles = StyleSheet.create({
   pressed: { transform: [{ scale: 0.98 }] },
   hero: { alignItems: "center", paddingVertical: 8 },
   input: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, paddingVertical: 12 },
-  affix: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 14,
-  },
-  affixInput: { flex: 1, paddingVertical: 12 },
   gapTop: { marginTop: 10 },
   section: { marginTop: 22, gap: 10 },
   restore: { flexDirection: "row", alignItems: "center", gap: 10 },

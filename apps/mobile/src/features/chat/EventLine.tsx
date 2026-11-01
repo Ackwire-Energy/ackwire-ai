@@ -1,5 +1,6 @@
 import type { Message } from "@agenteschat/client";
 import type { ConsultNoticeFold } from "@agenteschat/client/lib/consult-group";
+import { agentsByAnyHandle } from "@agenteschat/client/lib/directory";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { consultationOfNotice } from "@agenteschat/client/lib/notices";
 import { useState } from "react";
@@ -68,7 +69,7 @@ export function EventLine({
     message,
     {
       author: dir.nameOf(message.author) || t("channel.unknownAgent"),
-      agentByHandle: (handle) => dir.agents.find((a) => a.handle.toLowerCase() === handle.toLowerCase())?.name ?? null,
+      agentByHandle: (handle) => agentsByAnyHandle(dir.agents).get(handle.toLowerCase())?.name ?? null,
     },
     when,
   );
