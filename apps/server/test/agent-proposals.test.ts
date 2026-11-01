@@ -6,6 +6,24 @@ import { browser, createTestServer, joinByInvitation, seedOrg, signUp, type Test
 function reply(req: ModelRequest) {
   const last = JSON.stringify(req.messages.at(-1)?.content);
   if (last.includes("tool_result")) return { chunks: ["Propus a Ada no card."] };
+  if (last.includes("cria um agente que checa meus emails")) {
+    return {
+      chunks: [],
+      toolUses: [
+        {
+          name: "propose_agent",
+          input: {
+            name: "Caio",
+            handle: "caio",
+            role: "E-mail",
+            instructions: "Cuida dos e-mails.",
+            routine: { schedule: "0 12 * * *", prompt: "Lê a caixa de entrada e resume o que chegou." },
+            why: "Você pediu alguém para checar seus e-mails ao meio-dia.",
+          },
+        },
+      ],
+    };
+  }
   if (last.includes("cria um agente")) {
     return {
       chunks: [],
@@ -94,4 +112,49 @@ test("an agent's proposal of a new agent: created from the card with what the pe
   expect(denied.status).toBe(200);
   expect(await denied.json()).toMatchObject({ state: "denied", agentId: null });
   expect((await api(`/agent-proposals/${crypto.randomUUID()}`)).status).toBe(404);
+});
+
+test("Criar on the card: the agent as proposed in one click, with its channel and routine; a role is a short label", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId, channelId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  await api(`/channels/${channelId}/messages`, {
+    json: { body: "@dev cria um agente que checa meus emails todo dia" },
+  });
+  await t.drain();
+  const timeline = (await (await api(`/channels/${channelId}/messages`)).json()) as {
+    messages: { id: string; meta?: { actionCard?: { kind?: string } } }[];
+  };
+  const card = timeline.messages.find((m) => m.meta?.actionCard?.kind === "agent_proposal")?.id;
+  if (!card) throw new Error("no card");
+
+  const member = await joinByInvitation(t, owner, orgId, "bia@example.com");
+  await member(`/api/app/organizations/${orgId}/channels/${channelId}/join`, { json: {} });
+  expect((await member(`/api/app/organizations/${orgId}/agent-proposals/${card}/create`, { json: {} })).status).toBe(
+    403,
+  );
+
+  const made = await api(`/agent-proposals/${card}/create`, { json: {} });
+  expect(made.status).toBe(201);
+  const { agent, proposal } = (await made.json()) as {
+    agent: { id: string; name: string; handle: string; role: string };
+    proposal: { state: string; agentId: string; applied: { channelIds: string[] }; routineId: string | null };
+  };
+  expect(agent).toMatchObject({ name: "Caio", handle: "caio", role: "E-mail" });
+  // Its routine reports where it was asked: it joined that channel to do it.
+  expect(proposal).toMatchObject({ state: "created", agentId: agent.id, applied: { channelIds: [channelId] } });
+  expect(typeof proposal.routineId).toBe("string");
+  const routines = (await (await api("/routines")).json()) as { routines: { id: string; agentId: string }[] };
+  expect(routines.routines.find((r) => r.id === proposal.routineId)?.agentId).toBe(agent.id);
+  // Once: a second click, or the review's routine after it, is refused.
+  expect((await api(`/agent-proposals/${card}/create`, { json: {} })).status).toBe(409);
+  const again = await api(`/agent-proposals/${card}/routine`, { json: {} });
+  expect(again.status).toBe(409);
+  expect(((await again.json()) as { error: { code: string } }).error.code).toBe("agent_proposal.routine_made");
+
+  const long = await api(`/agents/${agent.id}`, { method: "PATCH", json: { role: "Assistente de e-mails" } });
+  expect(long.status).toBe(400);
+  expect(((await long.json()) as { error: { code: string } }).error.code).toBe("agent.role_too_long");
 });

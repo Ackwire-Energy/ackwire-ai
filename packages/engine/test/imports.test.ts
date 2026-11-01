@@ -307,6 +307,26 @@ describe("planning and applying an import", () => {
     expect(closer?.name).toHaveLength(80);
   });
 
+  test("a long role comes as the short label an agent's role is, cut after a whole word, and reported", async () => {
+    f = await setup();
+    const b = bundle();
+    (b.agents[0] as MigrationBundle["agents"][number]).role = "Assistente de e-mails";
+    (b.agents[1] as MigrationBundle["agents"][number]).role = "Desenvolvedor-backend-sênior";
+    const plan = await run({ bundle: b, pick: ["agent:scout", "agent:closer"] });
+    expect(plan.items.map((i) => [i.key, i.action, i.trimmed])).toEqual([
+      ["scout", "create", ["role"]],
+      ["closer", "create", ["role"]],
+    ]);
+    const made = await f.db
+      .select()
+      .from(schema.agents)
+      .where(inArray(schema.agents.handle, ["scout", "closer"]));
+    expect(Object.fromEntries(made.map((a) => [a.handle, a.role]))).toEqual({
+      scout: "Assistente de",
+      closer: "Desenvolvedor-ba",
+    });
+  });
+
   test("schedules: a one-off and the picker's once land as one-time rules (paused, still fire once on); the past and nonsense are skipped", async () => {
     f = await setup();
     const soon = new Date(Date.now() + 3 * 86_400_000);
@@ -611,7 +631,7 @@ describe("agents another app knows by an id", () => {
     const file = openbot([
       { name: "Otávio Ofertas" },
       { name: "Rita Revisão" },
-      { role: "Account executive" },
+      { role: "Sales executive" },
       { instructions: "Você revisa contratos. Nunca assina nada." },
       {},
       {},
@@ -644,7 +664,7 @@ describe("agents another app knows by an id", () => {
     // Another workspace's handles don't count here.
     const bia = await addUser(f.db, "bia");
     const { organization: other } = await createOrganization(f.db, bia.id, { name: "Outra" });
-    await createAgent(f.db, bia.id, other.id, { name: "AE", handle: "accountexecutive" }, { model: DEFAULT_MODEL });
+    await createAgent(f.db, bia.id, other.id, { name: "SE", handle: "salesexecutive" }, { model: DEFAULT_MODEL });
     // A message that mentioned Otávio by his old handle.
     await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: ids[0] ?? "" });
     const said = await insertMessage(f.db, {
@@ -665,7 +685,7 @@ describe("agents another app knows by an id", () => {
     expect(ids.map((id) => handleOf.get(id))).toEqual([
       "otavioofertas-2",
       "ritarevisao-2",
-      "accountexecutive",
+      "salesexecutive",
       "vocerevisacontratos",
       "newagent",
       "newagent-2",
