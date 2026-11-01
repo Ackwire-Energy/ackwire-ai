@@ -1,5 +1,6 @@
 import { afterEach, expect } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
+import { ProviderError } from "@agenteschat/providers";
 import { expireConsultations, runAuthority, updateAgent } from "../../src";
 import { closeWorlds, type Script, type World, world } from "./harness";
 import { assertInvariants } from "./invariants";
@@ -168,3 +169,29 @@ scenario("S38", "a teammate's AI status in the context is the live one, not a st
   expect(await w.runs("fred")).toHaveLength(1);
   await assertInvariants(w);
 });
+
+scenario(
+  "S49",
+  "a hand-off's failed run is told where the work came from, not as a notice into the agents' DM",
+  async () => {
+    const w = await world({
+      agents: ["bia", "vera"],
+      script: {
+        bia: [
+          { calls: [{ name: "tell_agent", input: { agent: "@vera", message: "Gera as imagens do release." } }] },
+          { text: "Pedi à Vera as imagens." },
+          { text: "A Vera não conseguiu gerar as imagens; faço eu." },
+        ],
+        vera: () => ({ error: new ProviderError("invalid request", false, 400) }),
+      },
+    });
+    await w.say("@bia pede para a vera gerar as imagens do release");
+    await w.settle();
+    expect((await w.runs("vera")).map((r) => r.status)).toEqual(["failed"]);
+    expect((await consultations(w)).map((c) => c.status)).toEqual(["failed"]);
+    const failed = (await w.db.select().from(schema.notifications)).filter((n) => n.kind === "run_failed");
+    expect(failed).toEqual([]);
+    expect((await w.posts("bia")).at(-1)?.body).toContain("não conseguiu");
+    await assertInvariants(w);
+  },
+);

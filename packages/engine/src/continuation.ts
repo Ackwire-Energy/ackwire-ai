@@ -196,13 +196,16 @@ const UNREPORTED = new Set(["agent_archived", "no_ai", "canceled"]);
  * creator, else the agent's owner) gets one `run_failed` notification per agent and conversation, resolved by the
  * agent's next run there that ends well. A run another agent's @mention woke tells that agent once ("couldn't
  * finish"), so it tries another way or tells the person; hand-offs in an agents' DM close through their own rows
- * (`onConsultedRunFinished`). Never throws.
+ * (`onConsultedRunFinished`) and notify nobody here. Never throws.
  */
 export async function reportRunFailure(deps: { db: Database; pubsub?: PubSub }, run: AgentRun, reason: string) {
   if (run.background || UNREPORTED.has(reason)) return;
   try {
     const channel = await getChannelCached(deps.db, run.orgId, run.channelId);
     if (!channel || channel.kind === "forum") return;
+    // A hand-off's run in the agents' DM: no person can open that DM, and its failure already reaches the asker
+    // and the hand-off's line where the work came from (`onConsultedRunFinished`).
+    if (isAgentOnlyDm(channel) && (await handedOffRun(deps.db, run))) return;
     const person = accountablePerson(await runAuthority(deps.db, run));
     await notifyRunFailed(deps, run, person, reason);
     if (isAgentOnlyDm(channel)) return;
@@ -237,6 +240,15 @@ export async function reportRunFailure(deps: { db: Database; pubsub?: PubSub }, 
     // The failure itself is on the run; a report that couldn't go out leaves it there.
   }
 }
+
+const handedOffRun = async (db: Database, run: AgentRun) =>
+  (
+    await db
+      .select({ id: schema.agentConsultations.id })
+      .from(schema.agentConsultations)
+      .where(and(eq(schema.agentConsultations.orgId, run.orgId), eq(schema.agentConsultations.targetRunId, run.id)))
+      .limit(1)
+  ).length > 0;
 
 /**
  * Agents an agent's @mention selected that dispatch couldn't wake because only certain people may talk to them and

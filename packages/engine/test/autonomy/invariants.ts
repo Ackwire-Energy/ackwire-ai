@@ -97,12 +97,22 @@ export async function violations(w: World): Promise<string[]> {
   }
 
   // I5: a failed run reaches someone who can act (a notification naming it or its agent), or waits to resume.
+  // A hand-off's run reaches the agent that handed it the work: its consultation failed and the asker ran again.
   const notifications = await w.db.select().from(schema.notifications).where(eq(schema.notifications.orgId, w.org.id));
+  const handOffs = await w.db.select().from(schema.agentConsultations);
   for (const r of runs.filter((r) => r.status === "failed" && !r.background)) {
-    const told = notifications.some((n) => {
-      const text = JSON.stringify([n.source, n.latest]);
-      return /fail|error|stopp/i.test(n.kind) && (text.includes(r.id) || text.includes(r.agentId));
-    });
+    const relayed = handOffs.some(
+      (c) =>
+        c.targetRunId === r.id &&
+        c.status === "failed" &&
+        runs.some((a) => a.agentId === c.askerAgentId && a.id !== c.askerRunId && a.createdAt >= r.createdAt),
+    );
+    const told =
+      relayed ||
+      notifications.some((n) => {
+        const text = JSON.stringify([n.source, n.latest]);
+        return /fail|error|stopp/i.test(n.kind) && (text.includes(r.id) || text.includes(r.agentId));
+      });
     if (!told) out.push(`I5: ${who(r.agentId)}'s run failed (${r.error}) and nobody was told`);
   }
 
