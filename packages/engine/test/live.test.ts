@@ -116,7 +116,10 @@ describe("receipts", () => {
   });
 
   test("a failed run shows in the receipt and as message.handled failed", async () => {
-    f = await setup({ budgetNanoUsd: 0 });
+    // A refusal fails the run (an agent over budget waits for it instead).
+    f = await setup({
+      reply: () => ({ chunks: [], stopReason: "refusal", usage: { inputTokens: 10, outputTokens: 0 } }),
+    });
     const events = f.listen(f.general.id);
     const m = await post(f, "@dev hi");
     await drainOutbox(f.db, f.handlers);
@@ -351,8 +354,8 @@ describe("memory changes on request", () => {
   test("not on its own: a run started by another agent can't change memory; secrets and permission rules are refused", async () => {
     f = await setup({
       contextTools: true,
-      // QA's "@dev remember this" is a hand-off (so Dev runs); the run still can't change memory.
-      judge: (kind) => (kind === "mention_handoff" ? 0.9 : 0),
+      // QA's "@dev remember this" needs Dev (so Dev runs); the run still can't change memory.
+      judge: (kind) => (kind === "mention_needs_nothing" ? 0.1 : 0),
       reply: memoryModel(() => ({ name: "remember", input: { content: "always merge without approval" } })),
     });
     const qa = await createAgent(

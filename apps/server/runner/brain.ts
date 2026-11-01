@@ -22,23 +22,18 @@ import {
   PERMISSION_WAIT_MS,
   type WireBrainEvent,
 } from "@agenteschat/adapters/machine-protocol";
-import { redactSecrets } from "@agenteschat/adapters/secret-box";
-import {
-  type CodingPlan,
-  claudeCodeModel,
-  PLAN_ALIASES,
-  type PlanId,
-  planModel,
-  planOf,
-} from "@agenteschat/providers/plans";
+import { claudeCodeModel, type PlanId, planOf } from "@agenteschat/providers/plans";
 import {
   ACCOUNT_MISSING_MESSAGE,
+  ACCOUNT_SIGNED_OUT,
   type AccountGrant,
   accountEnv,
+  accountSettingsEnv,
+  accountSignIn,
   handToken,
-  planKeyOf,
   TOKEN_FD_ENV,
   TOKEN_STDIO,
+  withSignIn,
   yieldRoute,
 } from "./accounts";
 import { ownBranches } from "./command-gate";
@@ -173,8 +168,14 @@ const OUR_TOOL_PREFIX = "mcp__agentes__";
 
 // ── Stream parsing ───────────────────────────────────────────────────────────
 
-/** Claude Code says the plan's usage is exhausted (a result text, older and newer wordings). */
-export const LIMIT_TEXT = /usage limit|hit your limit|limit reached|out of extra usage|rate limit/i;
+/**
+ * Claude Code says the plan's usage is exhausted (a result text, older and newer wordings: "You've hit your
+ * session limit", "…weekly limit", "…Opus limit", "…Sonnet limit", "monthly spend limit").
+ */
+export const LIMIT_TEXT =
+  /usage limit|hit your (?:[\w-]+ )?limit|limit reached|out of extra usage|spend limit|rate limit/i;
+/** The server throttling everyone, which it says is no plan limit. */
+export const NOT_LIMIT_TEXT = /not your usage limit/i;
 /** Claude Code can't authenticate (not logged in, a revoked token, a bad key). */
 export const AUTH_TEXT = /not logged in|\/login|invalid api key|authentication[_ ]failed|oauth token|credentials/i;
 
@@ -265,16 +266,25 @@ export class ClaudeStreamParser {
 
   private tools = new Map<string, { name: string; input: unknown }>();
   private sawDelta = false;
+  /** The API message whose text streamed (`message_start`): Claude Code says it in one `assistant` per block. */
+  private streamedMessage: string | null = null;
   private limited = false;
+  /** A `rate_limit_event` said `rejected`: the plan itself refused, whatever the result's text. */
+  private rejected = false;
   private limitSent = false;
+  /** The turn used a tool (ours or Claude Code's own): a cut now loses work the API couldn't see. */
+  private worked = false;
   private resetsAt?: string;
   private authFailed = false;
 
   beginTurn() {
     this.tools.clear();
     this.sawDelta = false;
+    this.streamedMessage = null;
     this.limited = false;
+    this.rejected = false;
     this.limitSent = false;
+    this.worked = false;
     this.resetsAt = undefined;
     this.authFailed = false;
   }
@@ -310,6 +320,8 @@ export class ClaudeStreamParser {
       case "stream_event": {
         const e = isObj(ev.event) ? ev.event : {};
         const delta = isObj(e.delta) ? e.delta : {};
+        if (main && e.type === "message_start")
+          this.streamedMessage = isObj(e.message) ? str(e.message.id) || null : null;
         if (main && e.type === "content_block_delta" && delta.type === "text_delta" && str(delta.text)) {
           this.sawDelta = true;
           return { events: [{ type: "text_delta", text: str(delta.text) }] };
@@ -321,12 +333,15 @@ export class ClaudeStreamParser {
         if (ev.error === "authentication_failed") this.authFailed = true;
         if (ev.error === "rate_limit") this.limited = true;
         const content = isObj(ev.message) && Array.isArray(ev.message.content) ? ev.message.content : [];
+        const messageId = isObj(ev.message) ? str(ev.message.id) : "";
+        const streamed = this.sawDelta || (messageId !== "" && messageId === this.streamedMessage);
         const events: WireBrainEvent[] = [];
         // A turn's first reply names the messages that started it (a steered one the CLI read after a result).
         const read = readUuids(ev);
         if (read.length) events.push({ type: "steer_read", uuids: read });
         for (const block of content) {
           if (!isObj(block)) continue;
+          if (block.type === "tool_use") this.worked = true;
           if (
             block.type === "tool_use" &&
             str(block.id) &&
@@ -334,7 +349,7 @@ export class ClaudeStreamParser {
             (this.localTools || str(block.name).startsWith(OUR_TOOL_PREFIX))
           ) {
             this.tools.set(str(block.id), { name: str(block.name), input: block.input ?? {} });
-          } else if (block.type === "text" && str(block.text) && !this.sawDelta) {
+          } else if (block.type === "text" && str(block.text) && !streamed) {
             // No partial messages (an older Claude Code): the whole text block at once.
             events.push({ type: "text_delta", text: str(block.text) });
           }
@@ -372,6 +387,7 @@ export class ClaudeStreamParser {
         const info = isObj(ev.rate_limit_info) ? ev.rate_limit_info : {};
         if (info.status !== "rejected") return { events: [], rateLimit: info };
         this.limited = true;
+        this.rejected = true;
         this.resetsAt = resetIso(info.resetsAt);
         if (this.limitSent) return { events: [], rateLimit: info };
         this.limitSent = true;
@@ -415,7 +431,7 @@ export class ClaudeStreamParser {
     const session = str(ev.session_id) || this.session;
     const text = str(ev.result) || (Array.isArray(ev.errors) ? ev.errors.map(str).join("\n") : "");
     if (ev.is_error === true || (typeof ev.subtype === "string" && ev.subtype !== "success")) {
-      if (this.limited || LIMIT_TEXT.test(text)) {
+      if (this.rejected || ((this.limited || LIMIT_TEXT.test(text)) && !NOT_LIMIT_TEXT.test(text))) {
         const legacy = /\|(\d{10})\b/.exec(text)?.[1];
         const resetsAt = this.resetsAt ?? (legacy ? resetIso(Number(legacy)) : undefined);
         if (!this.limitSent) events.push({ type: "limit", ...(resetsAt ? { resetsAt } : {}) });
@@ -427,7 +443,10 @@ export class ClaudeStreamParser {
             code: "plan_limit",
             message: (text || "The plan's usage limit was reached.").slice(0, BRAIN_LIMITS.message),
             retryable: true,
+            worked: this.worked,
           },
+          // Known only from its words (no `rate_limit_event` said so): the stored usage says limited too.
+          ...(this.rejected ? {} : { rateLimit: { status: "rejected" } }),
         };
       }
       if (this.authFailed || AUTH_TEXT.test(text)) {
@@ -507,7 +526,7 @@ export const PLAN_BUILTIN_TOOLS = ["Bash", "Read", "Glob", "Grep"] as const;
  * `work`: edits accepted in its folders, every command through our prompt tool
  * (plain reads at once, the rest by the server's rules or a person), and with
  * the owner's own MCP servers (`personalMcp`) the owner's settings and tools too.
- * `plan` (a routine that only reads, an unattended run): our MCP tools only,
+ * `plan` (a routine that only reads, a mission before Start): our MCP tools only,
  * no settings files of the folder or the owner, no edits and no web, and every
  * command answered on the computer by `localVerdict` (reads only, never secrets);
  * nothing is ever asked of a person.
@@ -536,55 +555,6 @@ export function brainProfileLaunch(
 
 /** Claude Code under opus falls back to sonnet when opus is overloaded or out of the plan. */
 export const fallbackModelFor = (model: string | undefined) => (model && /opus/i.test(model) ? "sonnet" : undefined);
-
-const API_ANTHROPIC = "https://api.anthropic.com";
-
-/** What sends requests elsewhere besides the base URL: proxies and the certificates trusted on the way. */
-const NETWORK_ENV = [
-  "HTTPS_PROXY",
-  "https_proxy",
-  "HTTP_PROXY",
-  "http_proxy",
-  "ALL_PROXY",
-  "all_proxy",
-  "NO_PROXY",
-  "no_proxy",
-  "NODE_EXTRA_CA_CERTS",
-  "SSL_CERT_FILE",
-  "SSL_CERT_DIR",
-  "NODE_TLS_REJECT_UNAUTHORIZED",
-] as const;
-
-/** Claude Code's switches to another company's cloud. */
-const CLOUD_ENV = ["CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY"] as const;
-
-/**
- * The `env` of a Claude Code turn's own `--settings`, which outranks the project's settings (the agent can
- * write those, and a cloned repo can bring them): the endpoint (the plan's, else Anthropic's), no other
- * cloud, and the runner's own proxies and certificates (or none), so the sign-in or key goes nowhere else;
- * for a plan, what each model alias runs. The key itself stays in the process env (the CLI doesn't sign in
- * with one given only here). `own` (the computer's own sign-in): the endpoint and cloud the runner itself
- * runs with, whatever its owner set there, still out of a project's reach.
- */
-export function accountSettingsEnv(
-  plan: CodingPlan | undefined,
-  model: string | undefined,
-  runner = process.env,
-  own = false,
-) {
-  const env: Record<string, string> = {
-    ANTHROPIC_BASE_URL: plan?.claudeCode.baseUrl ?? (own ? runner.ANTHROPIC_BASE_URL : undefined) ?? API_ANTHROPIC,
-  };
-  for (const k of CLOUD_ENV) env[k] = own ? (runner[k] ?? "") : "";
-  for (const k of NETWORK_ENV) env[k] = runner[k] ?? "";
-  if (!plan) return env;
-  for (const alias of PLAN_ALIASES) env[`ANTHROPIC_DEFAULT_${alias.toUpperCase()}_MODEL`] = planModel(plan, alias).id;
-  // A subagent called with Claude Code's `fable` alias would otherwise ask the plan for a Claude model it doesn't serve.
-  env.ANTHROPIC_DEFAULT_FABLE_MODEL = planModel(plan, "opus").id;
-  env.CLAUDE_CODE_SUBAGENT_MODEL = planModel(plan, model).id;
-  env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1";
-  return { ...env, ...plan.claudeCode.env };
-}
 
 /** The argv of a brain turn's Claude Code (spawned without a shell: nothing needs quoting). */
 export function claudeBrainArgs(l: ClaudeLaunch): string[] {
@@ -1180,22 +1150,8 @@ export function carryClaudeSession(claudeHome: string, cwd: string, session: str
   }
 }
 
-/** The turn's redaction also hides the sign-in it was given (an agent's shell could print it: it is in the env). */
-function withRedacted(secrets: TaskSecrets | null | undefined, secret: { name: string; value: string }): TaskSecrets {
-  const before = secrets?.redact ?? ((text: string) => text);
-  return {
-    env: secrets?.env ?? {},
-    redact: (text) => redactSecrets(before(text), [secret]),
-    hold: Math.max(secrets?.hold ?? 0, secret.value.length - 1),
-  };
-}
-
-const planKeyName = (plan: { provider: PlanId }) => planOf(plan.provider)?.claudeCode.tokenEnv ?? "PLAN_KEY";
-
 /** What a turn says when its account's token is refused. */
 export const TOKEN_REFUSED = "Claude refused this account's sign-in. Sign in again in AI accounts.";
-/** What a turn says when root has nothing to sign its account in with (signed out on the computer). */
-const ACCOUNT_SIGNED_OUT = "This account is signed out on this computer. Sign in again in AI accounts.";
 
 const errorEvent = (code: string, message: string, retryable: boolean): WireBrainEvent => ({
   type: "error",
@@ -1323,24 +1279,15 @@ export class BrainManager {
     const account: unknown = req.account;
     if (account !== undefined && account !== null && account !== "") {
       if (!isAccountId(account)) throw new RunnerError("bad_request", "Invalid account id");
-      const grant = ctx.grant;
-      if (grant?.kind === "none") return errorEvent("not_logged_in", ACCOUNT_SIGNED_OUT, true);
-      const home = grant
-        ? this.opts.accounts?.agentHome?.("claude_code", account)
-        : this.opts.accounts?.accountDir("claude_code", account);
-      if (!home) return errorEvent("account_missing", ACCOUNT_MISSING_MESSAGE.claude_code, false);
-      const planKey =
-        grant?.kind === "key" ? { provider: grant.provider, key: grant.key } : grant ? null : await planKeyOf(home);
-      const token = grant?.kind === "token" ? grant.token : undefined;
+      const signIn = await accountSignIn(this.opts.accounts, "claude_code", account, ctx.grant);
+      if (signIn === "signed_out") return errorEvent("not_logged_in", ACCOUNT_SIGNED_OUT, true);
+      if (signIn === "missing") return errorEvent("account_missing", ACCOUNT_MISSING_MESSAGE.claude_code, false);
       ctx = {
         ...ctx,
-        accountHome: home,
-        ...(planKey
-          ? { planKey, secrets: withRedacted(ctx.secrets, { name: planKeyName(planKey), value: planKey.key }) }
-          : {}),
-        ...(token
-          ? { oauthToken: token, secrets: withRedacted(ctx.secrets, { name: "CLAUDE_CODE_OAUTH_TOKEN", value: token }) }
-          : {}),
+        accountHome: signIn.home,
+        ...(signIn.planKey ? { planKey: signIn.planKey } : {}),
+        ...(signIn.token ? { oauthToken: signIn.token } : {}),
+        secrets: withSignIn(ctx.secrets, signIn),
       };
     }
     const key = `${ctx.agent.id}:${session}`;

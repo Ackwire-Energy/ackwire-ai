@@ -2,20 +2,21 @@ import type { Message, MessageMemory } from "@agenteschat/client";
 import { cacheMessageMemories, keys } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { AgentReadingBook, Button, hoverPointer, Input, Popover } from "@agenteschat/ui";
+import { AgentReadingBook, Button, Input, Popover, useHoverCard } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
+import { inPlaceClick } from "@/lib/navigate";
 import { useToast } from "@/lib/toast";
 import { AgentAvatar } from "./AgentAvatar";
+import { useOpenAgentPanel } from "./agent-panel-context";
 import { useOrg } from "./org-context";
 
 const HOVER_OPEN_MS = 250;
-const HOVER_CLOSE_MS = 220;
 /** The tooltip's short version of what was saved. */
 const short = (text: string, n = 90) => (text.length > n ? `${text.slice(0, n - 1).trimEnd()}…` : text);
 
@@ -48,31 +49,16 @@ function MemoryMark({ message, memory }: { message: Message; memory: MessageMemo
   const api = useApi();
   const qc = useQueryClient();
   const toast = useToast();
+  const openPanel = useOpenAgentPanel();
   const agent = dir.agentById.get(memory.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
   const canEdit = can(org, "review_memory") || agent?.ownerUserId === me.user.id;
-  const [mode, setMode] = useState<"tip" | "card" | "edit" | null>(null);
+  // Hover shows the tip; a press, a key or Corrigir in the tip brings the card.
+  const card = useHoverCard(HOVER_OPEN_MS);
+  const [editing, setEditing] = useState(false);
+  const mode = card.open === "hover" ? "tip" : card.open ? (editing ? "edit" : "card") : null;
   const [draft, setDraft] = useState(memory.text);
   const [active, setActive] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const clear = () => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-  };
-  // Drop a pending hover timer on unmount.
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
-  const later = (next: typeof mode, ms: number) => {
-    clear();
-    timer.current = setTimeout(() => {
-      timer.current = null;
-      setMode(next);
-    }, ms);
-  };
 
   const setMarks = (next: MessageMemory[]) => cacheMessageMemories(qc, org.id, message.channelId, message.id, next);
   const current = () => message.memories ?? [];
@@ -84,7 +70,7 @@ function MemoryMark({ message, memory }: { message: Message; memory: MessageMemo
       // A fix is a new version: the mark now points at it.
       setMarks(current().map((m) => (m.id === memory.id ? { ...m, id: saved.id, text: saved.text } : m)));
       afterChange();
-      setMode(null);
+      card.close();
       toast.show(t("memoryMark.fixed"), "info", undefined, t("memoryMark.fixedDetail", { name }));
     },
   });
@@ -94,7 +80,7 @@ function MemoryMark({ message, memory }: { message: Message; memory: MessageMemo
       const before = current();
       setMarks(before.filter((m) => m.id !== memory.id));
       afterChange();
-      setMode(null);
+      card.close();
       toast.show(t("memoryMark.forgot", { name }), "info", {
         label: t("memoryMark.undo"),
         run: () => {
@@ -110,7 +96,20 @@ function MemoryMark({ message, memory }: { message: Message; memory: MessageMemo
   const label = t("memoryMark.label", { name, text: short(memory.text) });
   const memoryLink = (
     <Button asChild size="sm" variant="ghost">
-      <Link to="/org/$orgId/agents/$agentId/memory" params={{ orgId: org.id, agentId: memory.agentId }}>
+      {/* In a conversation: the agent's Memória in the panel beside it. */}
+      <Link
+        to="/org/$orgId/agents/$agentId/memory"
+        params={{ orgId: org.id, agentId: memory.agentId }}
+        onClick={
+          openPanel
+            ? (e) =>
+                inPlaceClick(e, () => {
+                  card.close();
+                  openPanel(memory.agentId, "memory");
+                })
+            : undefined
+        }
+      >
         {t("memoryMark.view")}
       </Link>
     </Button>
@@ -121,9 +120,9 @@ function MemoryMark({ message, memory }: { message: Message; memory: MessageMemo
       variant={mode === "card" ? "default" : "ghost"}
       icon="edit"
       onClick={() => {
-        clear();
+        card.onOpenChange(true);
         setDraft(memory.text);
-        setMode("edit");
+        setEditing(true);
       }}
     >
       {t("memoryMark.fix")}
@@ -132,32 +131,19 @@ function MemoryMark({ message, memory }: { message: Message; memory: MessageMemo
 
   return (
     <Popover
-      open={mode !== null}
-      onOpenChange={(o) => {
-        clear();
-        setMode(o ? "card" : null);
-      }}
+      hover={card}
+      onOpenChange={() => setEditing(false)}
       label={t("memoryMark.title", { name })}
       side={mode === "tip" ? "top" : "bottom"}
       className={mode === "tip" ? "msg-mem__tip ac-glass" : "msg-mem__pop"}
-      onContentPointerEnter={(e) => hoverPointer(e.pointerType) && clear()}
-      onContentPointerLeave={(e) => hoverPointer(e.pointerType) && mode === "tip" && later(null, HOVER_CLOSE_MS)}
       trigger={
         <button
           type="button"
           className="msg-mem"
           aria-label={label}
           aria-haspopup="dialog"
-          onPointerEnter={(e) => {
-            setActive(true);
-            if (hoverPointer(e.pointerType) && mode === null) later("tip", HOVER_OPEN_MS);
-          }}
-          onPointerLeave={(e) => {
-            setActive(false);
-            if (!hoverPointer(e.pointerType)) return;
-            if (mode === "tip") later(null, HOVER_CLOSE_MS);
-            else if (mode === null) clear();
-          }}
+          onPointerEnter={() => setActive(true)}
+          onPointerLeave={() => setActive(false)}
           onFocus={() => setActive(true)}
           onBlur={() => setActive(false)}
         >
@@ -191,7 +177,7 @@ function MemoryMark({ message, memory }: { message: Message; memory: MessageMemo
                 e.preventDefault();
                 const text = draft.trim();
                 if (text && text !== memory.text) fix.mutate(text);
-                else setMode("card");
+                else setEditing(false);
               }}
             >
               <Input
@@ -202,7 +188,7 @@ function MemoryMark({ message, memory }: { message: Message; memory: MessageMemo
                 autoFocus
               />
               <div className="msg-mem__actions msg-mem__actions--end">
-                <Button size="sm" variant="ghost" onClick={() => setMode("card")}>
+                <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
                   {t("common.cancel")}
                 </Button>
                 <Button type="submit" size="sm" variant="primary" loading={fix.isPending}>

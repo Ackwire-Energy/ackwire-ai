@@ -17,7 +17,8 @@ const variant = process.env.APP_VARIANT ?? "production";
 const suffix = variant === "production" ? "" : `.${variant}`;
 const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "https://app.agentes.chat";
 // Invitation and password reset links on this host open the app (universal links / App Links); the server
-// publishes the matching /.well-known files (apps/server/src/app-links.ts).
+// publishes the matching /.well-known files (apps/server/src/app-links.ts). An early-access sign-up (`/signup`) opens
+// the app on Android only, until the server lists it for iOS (app-links.ts says when).
 const linkHost = new URL(apiUrl).host;
 // Our EAS project on expo.dev (not a secret: it only names the project).
 const projectId = process.env.EAS_PROJECT_ID ?? "8514d5b3-87e0-4980-89a0-4c692f6f4702";
@@ -70,6 +71,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         data: [
           { scheme: "https", host: linkHost, pathPrefix: "/invite/" },
           { scheme: "https", host: linkHost, path: "/reset-password" },
+          { scheme: "https", host: linkHost, path: "/signup" },
         ],
         category: ["BROWSABLE", "DEFAULT"],
       },
@@ -120,7 +122,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       { cameraPermission: CAMERA_USE, microphonePermission: false, recordAudioAndroid: false },
     ],
     [
-      // Mensagens de voz (ADR 0094): the app records only while the person holds or locks the button.
+      // Mensagens de voz (ADR 0098): the app records only while the person holds or locks the button.
       "expo-audio",
       { microphonePermission: "To record voice messages in your conversations.", recordAudioAndroid: true },
     ],

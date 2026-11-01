@@ -47,12 +47,12 @@ export interface GifKey {
   state: "off" | "ok" | "invalid";
 }
 
-/** Who can turn voice into text on this server (ADR 0094). */
+/** Who can turn voice into text on this server (ADR 0098). */
 export type SpeechProvider = "assemblyai" | "elevenlabs" | "soniox" | "groq" | "openai" | "local";
 
 /**
  * The installation's speech engine, for its pinned owner on a server that isn't agentes.chat's own (`GET
- * /api/app/speech-key`, ADR 0094): with one, every workspace has voice messages (`OrgSettings.voiceAvailable`).
+ * /api/app/speech-key`, ADR 0098): with one, every workspace has voice messages (`OrgSettings.voiceAvailable`).
  */
 export interface SpeechKey {
   /** The one chosen in Settings. Null: none. */
@@ -481,6 +481,8 @@ export interface Agent {
   id: string;
   name: string;
   handle: string;
+  /** Handles it had before a rename: mentions still reach it by them, and no one else may take them. */
+  previousHandles?: string[];
   role: string;
   instructions: string;
   model: string;
@@ -600,6 +602,8 @@ export interface AgentInput {
   proposal?: string;
   /** Its stickers and GIFs after a light reply (ADR 0091); same permission as editing the agent. */
   mediaReplies?: boolean;
+  /** The Autonomia it starts with (the last setup's, ADR 0094): only an admin or its own owner sends it. */
+  autonomy?: CommandApproval;
 }
 
 /**
@@ -618,11 +622,39 @@ export interface AgentDraft {
   role: string;
   instructions: string;
   appearance: Required<AgentLookInput> | null;
-  /** Public channels it joins. */
+  /** Channels it joins: public ones, and private ones everyone who reads the card is in. */
   channelIds: string[];
   /** Its level on the workspace's connections (the connected apps' ids). */
   access: { connectionId: string; level: "read" | "write" }[];
+  /** Mailboxes of the person who asked: only a mailbox's owner gives an agent access to it. */
+  mail?: { accountId: string; address: string; level: "read" | "write"; ownerUserId: string }[];
+  /** A routine of its own, created with it. */
+  routine?: ProposedRoutine | null;
   ai: SuggestedAi;
+}
+
+/** The routine a proposal comes with, its schedule read when proposed (`rule`, else `cron`). */
+export interface ProposedRoutine {
+  name: string;
+  prompt: string;
+  /** As the agent wrote it. */
+  schedule: string;
+  rule: ApiRule | null;
+  cron: string;
+  timezone: string;
+  /** English (the agent's); the apps say `rule` in the reader's language. */
+  description: string;
+  report: RoutineReport;
+  access: RoutineAccess;
+  /** The channel it reports in, which the agent must be in first (null: the creator's DM; absent on older cards). */
+  reportsIn?: string | null;
+}
+
+/** What "Criar" on the card gave the agent of its draft (ids); the rest waits for who may give it. */
+export interface ProposalApplied {
+  channelIds: string[];
+  connectionIds: string[];
+  mailAccountIds: string[];
 }
 
 /** An agent's proposal of a new agent (`meta.actionCard` of its card, ADR 0081). A person creates it or says no. */
@@ -638,10 +670,17 @@ export interface AgentProposalCard {
   decidedAt: string | null;
   /** Past it, a pending one is expired. */
   expiresAt: string;
+  /** Created in one click: what it got. Absent when it was created from the review. */
+  applied?: ProposalApplied;
+  /** The routine made with it. */
+  routineId?: string | null;
 }
 
 /** What a person decided on a proposal: all that `agent.proposal.updated` carries of its card. */
-export type AgentProposalDecision = Pick<AgentProposalCard, "state" | "agentId" | "decidedByUserId" | "decidedAt">;
+export type AgentProposalDecision = Pick<
+  AgentProposalCard,
+  "state" | "agentId" | "decidedByUserId" | "decidedAt" | "applied" | "routineId"
+>;
 
 /** `GET …/agent-proposals/{messageId}`: the card, where it is and what the viewer may do. */
 export interface AgentProposal extends AgentProposalCard {
@@ -699,6 +738,20 @@ export interface Channel {
   unreadCount?: number;
   /** Channel list only: the latest top-level message; null when empty or not a member. */
   lastMessage?: ChannelLastMessage | null;
+}
+
+/** A `#channel` link's card (`chat.card`): what the channel is and who is in it. */
+export interface ChannelCard {
+  id: string;
+  name: string;
+  topic: string;
+  visibility: "public" | "private";
+  isMember: boolean;
+  archived: boolean;
+  /** People in it. */
+  people: number;
+  /** Agents in it. */
+  agents: number;
 }
 
 /** A named group of channels in the sidebar, the same for everyone in the organization (ADR 0080). */
@@ -765,13 +818,21 @@ export interface Message {
   createdAt: string;
 }
 
-/** How an agent's question to another agent (`ask_agent`) ended. */
+/** How an agent's question to another agent (`ask_agent`), or the work it handed it (`tell_agent`), ended. */
 export type ConsultationStatus = "answered" | "expired" | "failed";
+
+/**
+ * A question to another agent (`ask_agent`), or work handed to one (`note`, `tell_agent`). Absent from servers
+ * before notes were tracked: a question.
+ */
+export type ConsultationKind = "question" | "note";
 
 /** `message.meta.consulted` on the asking agent's reply: one entry per agent it asked. */
 export interface MessageConsultation {
   agentId: string;
   consultationId: string;
+  /** A `consult_reply` notice of work handed off carries `note`. */
+  kind?: ConsultationKind;
   status: ConsultationStatus;
   question: string;
   /** Only when answered. */
@@ -788,6 +849,8 @@ export interface MessageReceipts {
     status: RunStatus | "waiting_input" | "canceled";
     /** `no_ai`: it couldn't answer, it has no AI connected. */
     reason?: string;
+    /** `waiting_input` because its AI provider is down: it retries by itself. */
+    outage?: true;
   }[];
   /** Agents it mentions that won't answer (they don't reply to this person). */
   blocked?: string[];
@@ -812,7 +875,7 @@ export type DecidedBy =
   | { step: "jev" }
   | { step: "model"; model: string; provider: string }
   | { step: "plan"; brand: "claude" | "chatgpt"; ownerId: string }
-  | { step: "rule"; rule: "reply" | "only_agent" | "follow_up" | "coordinator" };
+  | { step: "rule"; rule: "reply" | "only_agent" | "follow_up" | "coordinator" | "default" };
 
 /**
  * Who picks the agents for a message nobody mentioned (`ai-status`, ADR 0074): `by` for the workspace, `mine` for
@@ -865,16 +928,18 @@ export interface OpenConsult {
 
 /**
  * What a consulted agent waits on before it can answer: an approval, or a person's answer or secret (a person);
- * `computer`: its computer coming back (no one to ask).
+ * `computer`: its computer coming back (no one to ask); `agents`: its part done, what it handed on to other agents.
  */
-export type ConsultationWait = "approval" | "input" | "computer";
+export type ConsultationWait = "approval" | "input" | "computer" | "agents" | "outage";
 
 /**
- * A question an agent asked another agent from a conversation (`GET …/channels/{id}/consultations`): drawn inside
- * the reply of the run that asked ("Perguntou a 3 colegas"), each with where it is and, once closed, the answer.
+ * A question an agent asked another agent from a conversation, or work it handed one (`GET
+ * …/channels/{id}/consultations`): drawn inside the reply of the run that asked ("Perguntou a 3 colegas", "Passou
+ * para 1 colega"), each with where it is and, once closed, the answer.
  */
 export interface RunConsultation {
   id: string;
+  kind?: ConsultationKind;
   /** The asking run: its reply (`agentRunId`) shows the list. */
   runId: string;
   agentId: string;
@@ -887,6 +952,8 @@ export interface RunConsultation {
   question: string;
   /** The answer once answered; why it couldn't once failed. */
   answer: string | null;
+  /** Open: what the consulted agent posted in the agents' DM so far (ADR 0097). Older servers send none. */
+  progress?: { posts: number; latest: string; at: string } | null;
   createdAt: string;
   answeredAt: string | null;
   expiresAt: string;
@@ -980,6 +1047,8 @@ export type ChannelEvent =
       startedAt?: string | null;
       /** A routine's background run: never the conversation's working indicator. */
       background?: boolean;
+      /** `waiting_input` parked on a provider outage: it retries by itself, nobody is asked. */
+      outage?: true;
     }
   | { type: "approval.created" | "approval.decided"; channelId: string; approval: Approval }
   /** An agent's forum suggestion card was accepted or dismissed: its `meta.forumSuggestion` now. */
@@ -1008,7 +1077,10 @@ export type ChannelEvent =
       /** A routine's background run: never the conversation's working indicator. */
       background?: boolean;
     }
-  /** An agent asked another agent (`ask_agent`) and waits for it: "Dev está perguntando ao Infra…". */
+  /**
+   * An agent asked another agent (`ask_agent`) and waits for it: "Dev está perguntando ao Infra…". `note`: it
+   * handed it work (`tell_agent`): the reply that handed it shows it, not the working line.
+   */
   | {
       type: "agent.consulting";
       channelId: string;
@@ -1016,8 +1088,9 @@ export type ChannelEvent =
       runId: string;
       agentId: string;
       consultedAgentId: string;
+      kind?: "note";
     }
-  /** That question came back (answered, expired or failed): the asking run resumes and writes. */
+  /** That question, or that work (`note`), came back (answered, expired or failed). */
   | {
       type: "agent.consulted";
       channelId: string;
@@ -1026,8 +1099,12 @@ export type ChannelEvent =
       agentId: string;
       consultedAgentId: string;
       status: ConsultationStatus;
+      kind?: "note";
     }
-  /** A question still out changed without closing (the consulted agent waits on a person): reload the list. */
+  /**
+   * A question or a hand-off still out changed without closing (the consulted agent waits on a person, is back at
+   * work, or got more time while still at it): reload the list.
+   */
   | {
       type: "agent.consultation";
       channelId: string;
@@ -1045,7 +1122,9 @@ export type ChannelEvent =
       threadId: string;
       agentId: string;
       runId: string;
-      status: "done" | "failed" | "waiting_approval";
+      status: "done" | "failed" | "waiting_approval" | "waiting_input";
+      /** `waiting_input` parked on a provider outage. */
+      outage?: true;
       error?: string;
       /** The error as a code (`run.org_paused`…) and its values, to say it in the person's language. */
       errorCode?: string;
@@ -1129,9 +1208,11 @@ export type ChannelEvent =
       messageId: string;
       agentId: string;
       runId?: string;
-      status?: "done" | "failed" | "waiting_approval";
+      status?: "done" | "failed" | "waiting_approval" | "waiting_input";
       /** `no_ai`: the agent has no AI to think with. */
       reason?: string;
+      /** `waiting_input` parked on a provider outage. */
+      outage?: true;
     }
   /** An agent asked a person something and waits (expected: `ask_user` tool; shape to confirm). */
   | {
@@ -1492,7 +1573,7 @@ export interface OrgSettings {
   agentStickers: boolean;
   /** How often agents follow a light reply with a sticker or a GIF. */
   agentMedia: AgentMediaLevel;
-  /** People can send voice messages (ADR 0094); only with `voiceAvailable` too. On by default. */
+  /** People can send voice messages (ADR 0098); only with `voiceAvailable` too. On by default. */
   voiceMessages: boolean;
   /** Read only: this server has a speech engine. */
   voiceAvailable: boolean;
@@ -1581,7 +1662,10 @@ export type AgentStatusKind =
   | "computer"
   | "waiting_approval"
   | "waiting_answer"
-  | "waiting_computer";
+  | "waiting_computer"
+  | "waiting_plan"
+  | "waiting_budget"
+  | "provider_down";
 
 /** An agent's line: its own words (`by: "self"`, `text`), or one the server picked for the run (`kind` + `subject`). */
 export interface AgentStatusLine {
@@ -1867,7 +1951,7 @@ export interface ReplyRef {
 export type MediaKind = "gif" | "sticker" | "voice";
 
 /**
- * `message.meta.voice` (ADR 0094): the message is this recording. `message.body` holds its words for the agents; people
+ * `message.meta.voice` (ADR 0098): the message is this recording. `message.body` holds its words for the agents; people
  * read them only by opening them in the player.
  */
 export interface MessageVoice {
@@ -2159,8 +2243,11 @@ export interface AgentQuestion {
   answeredByUserId: string | null;
 }
 
-/** Where a secret goes on the agent's computer (ADR 0027). */
-export type SecretTarget = { kind: "env" } | { kind: "file"; path: string };
+/**
+ * Where a secret goes on the agent's computer (ADR 0027): a variable of its commands, a file in its folder, or
+ * (`site`) only its browser's typing on that site (`https://host`), never its commands.
+ */
+export type SecretTarget = { kind: "env" } | { kind: "file"; path: string } | { kind: "site"; site: string };
 
 /**
  * An agent asked a person for a secret for its computer (`request_secret`,
@@ -2569,9 +2656,17 @@ export type RoutineReport = "always" | "when_new";
 /**
  * Where a routine stands (ADR 0053 §11): `paused` (with `pausedReason`), `running` (a run working now),
  * `waiting_computer` (its run waits for the agent's computer: `waitingFor`), `waiting_person` (an approval
- * or an answer), `failing` (its last runs failed: `failuresInRow`).
+ * or an answer), `failing` (its last runs failed: `failuresInRow`), `needs_webhook` (its event comes through a
+ * GitHub or Sentry webhook the workspace doesn't have: it can't run yet).
  */
-export type RoutineState = "active" | "paused" | "running" | "waiting_computer" | "waiting_person" | "failing";
+export type RoutineState =
+  | "active"
+  | "paused"
+  | "running"
+  | "waiting_computer"
+  | "waiting_person"
+  | "failing"
+  | "needs_webhook";
 
 /** Why the server paused a routine (the app says it, with its one-tap fix); null: a person paused it. */
 export type RoutinePausedReason =
@@ -2613,6 +2708,8 @@ export interface Routine {
   canSeeDetails: boolean;
   /** The viewer may change, pause, run, stop or delete it. */
   canManage: boolean;
+  /** Its creator, whose reach it has (kept on edit); null once they left. Absent from older servers. */
+  createdByUserId?: string | null;
   lastRun: RoutineRun | null;
   /** The last runs, newest first (at most 14): the row's pixel strip and the horizon. */
   recentRuns: RoutineRun[];
@@ -3513,6 +3610,12 @@ export interface WikiAuthor {
   onBehalfOf?: string | null;
 }
 
+/** Who sees a restricted wiki page besides agents and owners: roles (`OrgRole` ids) and people. */
+export interface WikiAudience {
+  roleIds: string[];
+  userIds: string[];
+}
+
 export interface WikiPageSummary {
   id: string;
   /** URL key ("processos/onboarding"); changes when the page is renamed. */
@@ -3527,6 +3630,8 @@ export interface WikiPageSummary {
   locked?: boolean;
   /** "Fixadas": at the top of the wiki for everyone. */
   pinned?: boolean;
+  /** Limited to these roles and people (agents and owners always read it); null or missing = every member. */
+  audience?: WikiAudience | null;
   /** The start of the text, plain, for cards. */
   excerpt?: string;
   /** `obsidian` for an imported page. */
@@ -3704,6 +3809,29 @@ export interface ImportInput {
 
 export interface ImportPlan {
   items: ImportItemResult[];
+}
+
+/** One of an imported agent's own files, copied into its folder in the Drive (`POST …/imports/files`). */
+export interface ImportFileInput {
+  file: Blob;
+  /** The file's name, for its download. */
+  name: string;
+  /** The agent the import made (or an earlier one did). */
+  agentId: string;
+  /** Where it goes in the agent's folder, keeping the source's folders. */
+  path: string;
+  /** For its first version (the importer's language). */
+  note?: string;
+}
+
+export interface ImportedFile {
+  /** `exists`: the folder had a file with that name already, and it stays as it was. */
+  status: "created" | "exists";
+  artifactId: string;
+  /** `<folder>/<path>`. */
+  title: string;
+  /** The agent's folder in the Drive: its name. */
+  folder: string;
 }
 
 /** A source package this workspace brought things from, with how many of each kind came. */
@@ -4195,6 +4323,8 @@ export interface AgentBrain {
   ownSignIn: boolean;
   /** "Conta deste computador"'s plan usage, by brain (absent: not known). */
   ownUsage: Partial<Record<MachineAccountKind, PlanUsage>>;
+  /** Its Autonomia (its new missions' autonomy), copied with its setup (ADR 0094); absent on older servers. */
+  autonomy?: CommandApproval;
 }
 
 /** ADR 0041 §5: `xhigh` may be stored; the page offers low, medium, high and max. */
@@ -4293,6 +4423,68 @@ export interface AgentBrainInput {
   effort?: BrainEffortSetting | null;
   /** 200K, 400K or 1M tokens; null = the model's window; omitted = keep. */
   contextTokens?: number | null;
+}
+
+/** One agent's "Quem pensa" as a value, to use on other agents (ADR 0094, `POST …/agent-setup`). */
+export interface AgentSetup {
+  brain: BrainKind;
+  /** The API brain: the agent's model (`auto` included). A computer brain: its model as stored (null: the default). */
+  model: string | null;
+  /** The API brain's key; null = the workspace's default; omitted = each agent keeps its own. */
+  key?: string | null;
+  /** A computer brain: the computer it thinks on, and its account there (null: that computer's own sign-in). */
+  machineId?: string | null;
+  account?: string | null;
+  effort?: BrainEffortSetting | null;
+  contextTokens?: number | null;
+  fallback?: boolean;
+  /** "Atende outras pessoas" off, for the agents that move onto the plan. */
+  onlyOwner?: boolean;
+  /** Its Autonomia, wherever the caller may set it by hand, whatever the AI takes; omitted = each keeps its own. */
+  autonomy?: CommandApproval;
+}
+
+/** Why an agent can't take a setup. */
+export type AgentSetupReason =
+  | "not_allowed"
+  | "admins_only"
+  | "account_owner"
+  | "account_single"
+  | "other_computer"
+  | "model_missing"
+  | "failed";
+
+/** What a setup does to one agent (in a preview, would do). */
+export interface AgentSetupResult {
+  agentId: string;
+  /** Its AI. `same`: it already thinks this way; `skipped`: it takes none of the AI (`reason`), maybe the Autonomia. */
+  status: "applied" | "same" | "skipped";
+  /** It keeps the account it has (another person's plan) and takes the rest: its name; null = its computer's own. */
+  keeps?: { account: string | null };
+  reason?: AgentSetupReason;
+  /** `owner` (account_owner, not the caller's), `agent` (account_single), `computer`, `plan` and `model`. */
+  params?: Record<string, string>;
+  /** Its Autonomia changes, whatever its AI does: wherever the caller may set it by hand, `skipped` agents too. */
+  autonomy?: { from: CommandApproval; to: CommandApproval };
+}
+
+/** `GET …/agent-setup`: what a new agent starts thinking with (the last setup saved or used on others). */
+export interface NewAgentSetup {
+  brain: BrainKind;
+  model: string | null;
+  /** The API brain's key, still the workspace's; null = the workspace's default. */
+  key: string | null;
+  contextTokens: number | null;
+  /** A computer brain: where it thinks. */
+  computer?: { machineId: string; name: string };
+  /** Its account there; null = that computer's own sign-in. */
+  account?: { id: string; label: string; provider: string | null; mine: boolean; free: boolean } | null;
+  /** The computer's own sign-in thinks for the caller's agents there (they connected it). */
+  ownSignIn?: boolean;
+  effort?: BrainEffortSetting | null;
+  fallback?: boolean;
+  /** Its Autonomia; null or absent = the default. */
+  autonomy?: CommandApproval | null;
 }
 
 /** `POST …/machines/{id}/account-logins` (201): what the person needs to sign in. */
@@ -4642,15 +4834,30 @@ export type NotificationKind =
   | "routine_finished"
   /** A routine's failure streak began (one per streak; the next good run resolves it). Opens it in Rotinas. */
   | "routine_failed"
+  /** ADR 0097: an agent's run in a conversation failed for good (`latest.reason` coded). Opens that conversation. */
+  | "run_failed"
   /** The server paused a routine (`latest.reason`: its coded `pausedReason`). Opens it in Rotinas. */
   | "routine_paused"
   /** A routine waits for its computer (once per outage; `source.machineId`). Opens it in Rotinas. */
   | "routine_stalled"
+  /**
+   * A routine set to act couldn't call an agent its creator can't talk to (the agent's owner, else who manages
+   * agents). Opens the agent's page; `source.userId` is the creator, whom its action lets talk to it.
+   */
+  | "agent_unreached"
+  /** A routine's run waits for its agent's plan to reset (once per outage). Opens it in Rotinas. */
+  | "routine_waiting_plan"
+  | "plan_reset_unknown"
   | "reaction"
   /** ADR 0036 §5: a new computer joined the organization (admins). `source.machineId`; `source.label` = its name. */
   | "machine_connected"
   /** ADR 0040 §6: an agent needs a person in its browser (sign in, a code). `source.handoffId`. */
   | "browser_handoff"
+  /**
+   * ADR 0027: an agent waits for a secret only this person can give (`latest.title` its name, `latest.text` what it
+   * is for, `latest.expiresAt`). Opens the conversation at its card, where it is typed: never answered in the inbox.
+   */
+  | "secret_request"
   /**
    * ADR 0056 §8: the workspace was held, suspended or restored (owners and admins). `latest.statusTo`, `latest.text`:
    * why. On agentes.chat Cloud also an agent held (`statusTo: "agent_hold"`, `latest.holdKind`, `source.agentId`).
@@ -4694,6 +4901,8 @@ export interface NotificationSource {
   handoffId?: string;
   /** `browser_handoff`: the agent's screen it is on, when not its browser (ADR 0058: `desktop`). */
   screen?: ScreenKind;
+  /** `agent_unreached`: the routine's creator, whom the agent's owner may let talk to `agentId`. */
+  userId?: string;
   /** `org_standing` to `agent_hold`: the agent held (its name in `label`). */
   agentId?: string;
   /** Channel name, thread title, issue title, topic title, mission or routine name (or the computer's name). */
@@ -4837,6 +5046,13 @@ export interface NoticePrefs {
   phones: number;
 }
 
+/** A tool at the top of the sidebar (`SIDEBAR_ITEMS` in packages/engine/src/sidebar-items.ts). */
+export type SidebarItem = "approvals" | "threads" | "issues" | "wiki" | "drive" | "routines" | "calendar" | "forum";
+/** `always` in the list, `more` only in the More menu, `auto` in the list while its count is above zero. */
+export type SidebarPlace = "always" | "more" | "auto";
+/** Where I put each tool I moved, in one workspace (`GET …/me/sidebar`); the others keep their default. */
+export type SidebarItems = Partial<Record<SidebarItem, SidebarPlace>>;
+
 export interface NotificationCount {
   unread: number;
   waiting: number;
@@ -4973,6 +5189,8 @@ export interface MailAccount {
   aliases: string[];
   /** What new emails go out from; null = `address`. */
   defaultFrom: string | null;
+  /** Who connected it: the only person who gives agents access to it (absent on older servers). */
+  ownerUserId?: string | null;
   /** Agents with access, and how much. */
   agents: { agentId: string; level: MailLevel; canDelete: boolean }[];
 }

@@ -41,15 +41,18 @@ export type DecidedBy =
   | { step: "model"; model: string; provider: string }
   /** The author's own plan: `ownerId` is the author. */
   | { step: "plan"; brand: "claude" | "chatgpt"; ownerId: string }
-  /** `coordinator`: nobody else took it, so the team's coordinator did (ADR 0093). */
+  /**
+   * `coordinator`: nobody else took it, so the team's coordinator did (ADR 0093). `default`: nobody was picked, so
+   * the agent the person talks with, or the best placed one, answered (ADR 0074, R5).
+   */
   | { step: "rule"; rule: RouterRule };
 
-type RouterRule = "reply" | "only_agent" | "follow_up" | "coordinator";
+type RouterRule = "reply" | "only_agent" | "follow_up" | "coordinator" | "default";
 
 /** Why a routed message reached no agent: no step could read it, and no rule fit (`strategy` `none`). */
 export const MENTION_NEEDED = "mention_needed";
 
-const RULES = new Set(["reply", "only_agent", "follow_up", "coordinator"]);
+const RULES = new Set(["reply", "only_agent", "follow_up", "coordinator", "default"]);
 
 /**
  * `DecidedBy` from a stored decision's `strategy` (`jev`, `llm:<model>`, `plan:<kind>`, `rule:<name>`). Undefined
@@ -112,6 +115,8 @@ export type ChannelEvent =
       status: RunStatus;
       /** Background work (a routine's run): not the conversation's "working" indicator. */
       background?: true;
+      /** `waiting_input` parked on a provider outage: it retries by itself, nobody is asked. */
+      outage?: true;
       error?: string;
       /** Stable code of `error` (`run.budget_exceeded`, `run.provider_error`…) and its params. */
       errorCode?: string;
@@ -131,7 +136,10 @@ export type ChannelEvent =
       /** Background work (a routine's run): not the conversation's "working" indicator. */
       background?: true;
     }
-  /** An agent asked another agent (`ask_agent`, ADR 0034); the answer comes later as a notice: "Dev asked Infra…". */
+  /**
+   * An agent asked another agent (`ask_agent`, ADR 0034), or handed it work (`kind` `note`, `tell_agent`, ADR 0095);
+   * what comes of it arrives later as a notice: "Dev asked Infra…".
+   */
   | {
       type: "agent.consulting";
       channelId: string;
@@ -139,10 +147,11 @@ export type ChannelEvent =
       runId: string;
       agentId: string;
       consultedAgentId: string;
+      kind?: "note";
     }
   /**
-   * An agent's question to another agent (`ask_agent`, ADR 0034) came back:
-   * `status` answered, expired or failed. The asking run resumes.
+   * An agent's question to another agent (`ask_agent`, ADR 0034), or the work it handed it (`kind` `note`), came
+   * back: `status` answered, expired or failed.
    */
   | {
       type: "agent.consulted";
@@ -152,11 +161,12 @@ export type ChannelEvent =
       agentId: string;
       consultedAgentId: string;
       status: "answered" | "expired" | "failed";
+      kind?: "note";
     }
   /**
-   * A question still out changed without closing: the consulted agent stopped on a person (an approval, a
-   * question, a secret) or on its computer, or went back to work. The app reloads the conversation's questions
-   * (`GET …/consultations`).
+   * A question or hand-off still out changed without closing: the consulted agent stopped on a person (an approval,
+   * a question, a secret) or on its computer, went back to work, or got more time while still at it. The app reloads
+   * the conversation's questions (`GET …/consultations`).
    */
   | {
       type: "agent.consultation";
@@ -235,6 +245,8 @@ export type ChannelEvent =
       background?: true;
       runId: string;
       status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled";
+      /** `waiting_input` parked on a provider outage. */
+      outage?: true;
       error?: string;
       errorCode?: string;
       errorParams?: Record<string, string>;
@@ -374,6 +386,8 @@ export type ChannelEvent =
       status: "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled";
       /** `no_ai`: the agent has no AI to think with. */
       reason?: string;
+      /** `waiting_input` parked on a provider outage. */
+      outage?: true;
     }
   /** An agent changed its memory because a person asked (with an undo). */
   | {
@@ -518,6 +532,10 @@ export type ChannelEvent =
       agentId: string | null;
       decidedByUserId: string | null;
       decidedAt: string | null;
+      /** Created in one click: the lines of its draft it got (ids only). */
+      applied?: { channelIds: string[]; connectionIds: string[]; mailAccountIds: string[] };
+      /** The routine made with it. */
+      routineId?: string | null;
     };
 
 const INLINE_LIMIT = 6000;

@@ -5,9 +5,23 @@ import {
   type ThreadInfo,
   useApi,
   useApproval,
+  useApprovals,
+  useCardApprovals,
   useDecideApproval,
+  useDecideApprovals,
 } from "@agenteschat/client";
+import {
+  approvalCardItems,
+  approveAllScope,
+  approveAlwaysOn,
+  asOfNow,
+  cardDeadline,
+  itemOwnWords,
+} from "@agenteschat/client/lib/approval-card";
 import { approvalWhy } from "@agenteschat/client/lib/approval-origin";
+import { approvalSummary, decisionOutcome } from "@agenteschat/client/lib/approval-words";
+import { consultAskedKey } from "@agenteschat/client/lib/consult-group";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -30,8 +44,9 @@ import { genderOf, previewOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
 import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
-import { AskButtons, AskCard, AskFoot, ExpiryLine, useAskStore } from "./asks";
-import { threadFaces } from "./logic";
+import { askEndedAt } from "./ask-store";
+import { AskButtons, AskCard, AskDone, AskFoot, ExpiryLine, useAskStore } from "./asks";
+import { markName, threadFaces } from "./logic";
 
 /**
  * The cards inside a message: the agent it consulted, the approval it asks for, an agent's question and a change
@@ -62,7 +77,9 @@ export function ConsultationCard({
       ? t("mobile.chat.consult.answered", { name })
       : cs.status === "expired"
         ? t(`mobile.chat.consult.expired${gn}`, { name })
-        : t(`mobile.chat.consult.failed${gn}`, { name });
+        : cs.kind === "note"
+          ? t("chat.consultation.failedNote", { name, The: agentGrammar(t, name).The })
+          : t(`mobile.chat.consult.failed${gn}`, { name });
   return (
     <View style={[styles.box, styles.cs, surface]}>
       <Pressable
@@ -85,7 +102,7 @@ export function ConsultationCard({
       {open ? (
         <View style={styles.csBody}>
           <Text variant="caption" tone="faint" style={styles.bold}>
-            {t("mobile.chat.consult.asked", { name: asker })}
+            {t(consultAskedKey(cs), { name: asker })}
           </Text>
           <Text variant="small" tone="muted">
             {cs.question}
@@ -112,25 +129,279 @@ export function ConsultationCard({
 
 /**
  * An approval in the conversation: while it waits, the request card (`ApprovalAsk`); after, one line with
- * what happened.
+ * what happened. Requests the agent asked later in this conversation join its card (`messageId`): then one card
+ * lists them all (`ApprovalGroupAsk`).
  */
-export function ApprovalInline({ approvalId }: { approvalId: string }) {
-  const { t } = useTranslation();
+export function ApprovalInline({ approvalId, messageId }: { approvalId: string; messageId: string }) {
   const orgId = useOrgId();
-  const c = useColors();
-  const surface = useSurface();
   const approval = useApproval(orgId, approvalId);
+  const approvals = useApprovals(orgId);
+  // Older than the list reaches: its card's requests by the card (the list holds everything newer than the first).
+  const card = useCardApprovals(
+    orgId,
+    messageId,
+    approvals.isSuccess && !approvals.data.some((x) => x.id === approvalId),
+  );
   const a = approval.data;
   if (!a) return null;
+  const items = approvalCardItems([...(approvals.data ?? []), ...(card.data ?? [])], messageId, a).map((x) =>
+    asOfNow(x),
+  );
+  if (items.length > 1) {
+    if (items.some((x) => x.status === "pending")) return <ApprovalGroupAsk items={items} />;
+    return (
+      <>
+        {items.map((x) => (
+          <ApprovalDone key={x.id} approval={x} />
+        ))}
+      </>
+    );
+  }
   if (a.status === "pending") return <ApprovalAsk approval={a} />;
-  const ok = a.status === "approved";
+  return <ApprovalDone approval={a} />;
+}
+
+/** One decided request, as one line: how it ended and its values, so several of one tool are told apart. */
+function ApprovalDone({ approval: a }: { approval: Approval }) {
+  const { t, i18n } = useTranslation();
+  const meId = useMeId();
+  const dir = useDirectory();
+  const outcome = decisionOutcome(t, a, meId, (id) => dir.memberById.get(id)?.name);
   return (
-    <View style={[styles.done, surface]}>
-      <Icon name={ok ? "checkc" : "x"} size={16} color={ok ? c.ok : c.muted} />
-      <Text variant="small" tone="muted" style={styles.grow}>
-        {t(`mobile.chat.approval.${a.status}`, { title: approvalTitleText(t, a) })}
-      </Text>
-    </View>
+    <AskDone
+      done={a.status === "approved"}
+      words={[`${outcome}: ${markName(approvalTitleText(t, a))}`, approvalSummary(a, i18n.language)]
+        .filter(Boolean)
+        .join(" · ")}
+      at={askEndedAt(a)}
+      more={
+        a.reason
+          ? {
+              label: t("approval.seeDetails"),
+              content: (
+                <Text variant="small" tone="muted">
+                  {t("approval.reasonLine", { reason: a.reason })}
+                </Text>
+              ),
+            }
+          : undefined
+      }
+    />
+  );
+}
+
+/**
+ * Several requests of one agent in one conversation on one card: each with its values and its own Aprovar /
+ * "Agora não" while it waits, how it ended once decided, then "Aprovar tudo" / "Agora não para todos" over the
+ * ones listed now (held when any is high risk) and the earliest deadline. Someone who may decide only some reads
+ * that "Aprovar tudo" covers only those.
+ */
+function ApprovalGroupAsk({ items }: { items: Approval[] }) {
+  const { t, i18n } = useTranslation();
+  const orgId = useOrgId();
+  const meId = useMeId();
+  const dir = useDirectory();
+  const c = useColors();
+  const toast = useToast();
+  const asks = useAskStore();
+  const one = useDecideApproval(orgId);
+  const all = useDecideApprovals(orgId);
+  const first = items[0];
+  if (!first) return null;
+  const name = dir.agentById.get(first.agentId)?.name ?? "";
+  const g = genderOf(name);
+  const waiting = items.filter((a) => a.status === "pending");
+  const { ids, waiting: count, blocked } = approveAllScope(items);
+  const high = items.some((a) => ids.includes(a.id) && approvalRisk(a) === "high");
+  const ownerId = first.ownerUserId ?? dir.agentById.get(first.agentId)?.ownerUserId ?? null;
+  const owner = ownerId ? dir.memberById.get(ownerId)?.name : undefined;
+  const deadline = cardDeadline(items);
+  const leadItem = waiting[0] ?? first;
+  const always = approveAlwaysOn(items);
+  const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
+  const done = (title: string) => {
+    successHaptic();
+    toast({ title, subtitle: t(`mobile.approval.approvedSub${g}`, { name }), agentId: first.agentId });
+  };
+  const failed = () => toast({ title: t("mobile.app.failed"), icon: "x" });
+  const approveAll = () =>
+    all.mutate(
+      { ids, decision: "approve" },
+      {
+        onSuccess: () => {
+          for (const id of ids) asks?.settle(id);
+          done(t("mobile.approval.approved"));
+        },
+        onError: failed,
+      },
+    );
+  const refuseAll = () =>
+    all.mutate(
+      { ids, decision: "refuse" },
+      {
+        onSuccess: () => {
+          for (const id of ids) asks?.settle(id);
+        },
+        onError: failed,
+      },
+    );
+  return (
+    <AskCard
+      id={first.id}
+      kind="approval"
+      agentId={first.agentId}
+      waitsFor={ids.length > 0 ? "you" : owner ? t("ask.waitingFor", { name: owner }) : null}
+      lead={approvalWhy(leadItem) ?? t("approval.askMany", { count: waiting.length })}
+      body={
+        <View style={styles.items}>
+          {items.map((a) => {
+            const pending = a.status === "pending";
+            const detail = a.email
+              ? [a.email.to.join(", "), a.email.subject].filter(Boolean).join(" · ")
+              : !a.connector
+                ? a.detail
+                : approvalSummary(a, i18n.language) || null;
+            const own = itemOwnWords(a, leadItem);
+            return (
+              <View key={a.id} style={[styles.item, { backgroundColor: c.sunken }, !pending && styles.itemDone]}>
+                <View style={styles.itemRow}>
+                  <ApprovalMark approval={a} size={24} />
+                  <View style={styles.grow}>
+                    <Text variant="subhead" tone="ink" numberOfLines={1} style={styles.bold}>
+                      {approvalTitleText(t, a)}
+                    </Text>
+                    {detail ? (
+                      <Text variant="footnote" tone="muted" numberOfLines={1}>
+                        {detail}
+                      </Text>
+                    ) : null}
+                    {own.why ? (
+                      <Text variant="footnote" tone="ink">
+                        {own.why}
+                      </Text>
+                    ) : null}
+                    {own.origin ? (
+                      <Text variant="footnote" tone="muted">
+                        {tt(own.origin.key, own.origin.values)}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+                {pending ? (
+                  a.canDecide ? (
+                    <View style={styles.itemActs}>
+                      {approvalRisk(a) === "high" ? (
+                        <HoldButton
+                          size="sm"
+                          label={t("mobile.approval.hold")}
+                          holdLabel={t("mobile.approval.holding")}
+                          onConfirm={() =>
+                            one.mutate(
+                              { id: a.id, decision: "approve" },
+                              { onSuccess: () => asks?.settle(a.id), onError: failed },
+                            )
+                          }
+                        />
+                      ) : (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          icon="check"
+                          label={t("mobile.approval.approve")}
+                          disabled={one.isPending || all.isPending}
+                          onPress={() =>
+                            one.mutate(
+                              { id: a.id, decision: "approve" },
+                              { onSuccess: () => asks?.settle(a.id), onError: failed },
+                            )
+                          }
+                        />
+                      )}
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        label={t("approval.notNow")}
+                        onPress={() => router.push(`/approval/${a.id}?mode=refuse`)}
+                      />
+                    </View>
+                  ) : null
+                ) : (
+                  <Text variant="footnote" tone="muted">
+                    {decisionOutcome(t, a, meId, (id) => dir.memberById.get(id)?.name)}
+                  </Text>
+                )}
+                {always.has(a.id) ? (
+                  <ApproveAlways
+                    approval={a}
+                    name={name}
+                    disabled={one.isPending || all.isPending}
+                    onPress={() =>
+                      one.mutate(
+                        { id: a.id, decision: "approve", always: true },
+                        {
+                          onSuccess: () => {
+                            asks?.settle(a.id);
+                            toast({ ...approveAlwaysToast(t, name), agentId: a.agentId });
+                          },
+                          onError: failed,
+                        },
+                      )
+                    }
+                  />
+                ) : null}
+              </View>
+            );
+          })}
+          {blocked > 0 && ids.length > 0 ? (
+            <Text variant="footnote" tone="muted">
+              {t("approval.all.partial", {
+                mine: ids.length,
+                count,
+                who: owner ?? t("approval.all.partialAdmin"),
+              })}
+            </Text>
+          ) : null}
+        </View>
+      }
+      foot={
+        <AskFoot expiry={deadline ? <ExpiryLine createdAt={first.createdAt} expiresAt={deadline} /> : undefined}>
+          {ids.length > 1 ? (
+            <AskButtons
+              primary={
+                high ? (
+                  <HoldButton
+                    size="card"
+                    label={t("approval.all.approve")}
+                    holdLabel={t("mobile.approval.holding")}
+                    onConfirm={approveAll}
+                  />
+                ) : (
+                  <Button
+                    variant="primary"
+                    size="card"
+                    wide
+                    icon="check"
+                    label={t("approval.all.approve")}
+                    disabled={all.isPending}
+                    onPress={approveAll}
+                  />
+                )
+              }
+              secondary={
+                <Button
+                  variant="secondary"
+                  size="card"
+                  wide
+                  label={t("approval.all.refuse")}
+                  disabled={all.isPending}
+                  onPress={refuseAll}
+                />
+              }
+            />
+          ) : null}
+        </AskFoot>
+      }
+    />
   );
 }
 
@@ -142,7 +413,7 @@ export function ApprovalInline({ approvalId }: { approvalId: string }) {
  * for the agent). Who can't decide sees who it waits for.
  */
 function ApprovalAsk({ approval: a }: { approval: Approval }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const orgId = useOrgId();
   const dir = useDirectory();
   const c = useColors();
@@ -173,12 +444,12 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
       },
     );
   // An email says to whom and about what; a connector's detail is its raw call (`tool · key=value`), so its
-  // values wait under "Ver detalhes".
+  // values in words instead, the call under "Ver detalhes".
   const detail = a.email
     ? [a.email.to.join(", "), a.email.subject].filter(Boolean).join(" · ")
     : !a.connector
       ? a.detail
-      : null;
+      : approvalSummary(a, i18n.language) || null;
   return (
     <AskCard
       id={a.id}
@@ -278,7 +549,6 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
   const c = useColors();
   const toast = useToast();
   const sheet = useSheet();
-  const surface = useSurface();
   const asks = useAskStore();
   const [answered, setAnswered] = useState<AgentQuestion | null>(null);
   const [picking, setPicking] = useState<string | null>(null);
@@ -305,15 +575,18 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
 
   if (q.status === "answered") {
     const who = q.answeredByUserId && q.answeredByUserId !== meId ? dir.memberById.get(q.answeredByUserId)?.name : null;
+    const said = markName(q.answer ?? "");
     return (
-      <View style={[styles.qdone, surface]}>
-        <Icon name="checkc" size={16} color={c.ok} />
-        <Text variant="small" tone="muted" style={styles.shrink}>
-          {who
-            ? t("mobile.chat.question.answered", { name: who, answer: q.answer ?? "" })
-            : t("mobile.chat.question.answeredByYou", { answer: q.answer ?? "" })}
-        </Text>
-      </View>
+      <AskDone
+        done
+        words={
+          q.answer === null
+            ? t("mobile.chat.question.closed")
+            : who
+              ? t("mobile.chat.question.answered", { name: who, answer: said })
+              : t("mobile.chat.question.answeredByYou", { answer: said })
+        }
+      />
     );
   }
   // A free answer in a sheet: "Outra resposta" beside the choices, or the question's only button.
@@ -446,16 +719,13 @@ const styles = StyleSheet.create({
   hidden: { opacity: 0 },
   flip: { transform: [{ rotate: "180deg" }] },
   pressed: { opacity: 0.85 },
-  done: {
-    marginTop: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 20,
-  },
   origin: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  // Requests sharing one card: each a well of its own, decided ones quieter.
+  items: { gap: 8, marginTop: 10 },
+  item: { gap: 8, padding: 10, borderRadius: 12 },
+  itemDone: { opacity: 0.7 },
+  itemRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  itemActs: { flexDirection: "row", gap: 8 },
   // A question's answers: full-width rows in the card's strip.
   opts: { gap: 8 },
   opt: {
@@ -469,17 +739,6 @@ const styles = StyleSheet.create({
   },
   optPressed: { transform: [{ scale: 0.98 }] },
   other: { backgroundColor: "transparent", borderWidth: 1 },
-  qdone: {
-    marginTop: 12,
-    alignSelf: "flex-start",
-    maxWidth: "100%",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 13,
-    paddingVertical: 9,
-    borderRadius: 16,
-  },
   tlink: {
     marginTop: 8,
     alignSelf: "flex-start",

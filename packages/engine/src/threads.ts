@@ -9,6 +9,7 @@ import { followsThreadSql } from "./follows";
 import { type PreviewMeta, previewMeta, readableBody } from "./message-preview";
 import { type Message, messageView, replyExcerpt } from "./messages";
 import { pendingCommandsSql } from "./mission-command-rules";
+import { agentOnlyNoticeSql } from "./notices";
 import { can, type Membership, requirePermission } from "./organizations";
 import { maySql } from "./permissions";
 
@@ -1017,6 +1018,7 @@ async function queryThreads(
         from ${messages} m
         where m.org_id = ${orgId}::uuid and m.channel_id in (select id from visible)
           and m.thread_id is not null and m.deleted_at is null
+          and not ${agentOnlyNoticeSql(sql`m.meta`)}
           -- An agent's sticker or GIF after its own reply (ADR 0091) is part of that reply: no reply, no activity.
           and m.meta->>'mediaAfter' is null
           ${input.rootId ? sql`and m.thread_id = ${input.rootId}::uuid` : sql``}
@@ -1097,7 +1099,12 @@ async function queryThreads(
 async function threadExtras(db: Database, orgId: string, rows: ThreadSqlRow[]) {
   const ids = rows.map((r) => r.id);
   if (ids.length === 0) return { authors: new Map<string, Actor[]>(), latest: new Map<string, Message>() };
-  const scope = and(eq(messages.orgId, orgId), inArray(messages.threadId, ids), isNull(messages.deletedAt));
+  const scope = and(
+    eq(messages.orgId, orgId),
+    inArray(messages.threadId, ids),
+    isNull(messages.deletedAt),
+    sql`not ${agentOnlyNoticeSql(sql`${messages.meta}`)}`,
+  );
   const [authorRows, latestRows] = await Promise.all([
     db
       .selectDistinct({

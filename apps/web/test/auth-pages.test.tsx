@@ -476,9 +476,68 @@ describe("Acesso antecipado (o link do convite)", () => {
     expect(screen().getByRole("alert").textContent).toBe(
       "O cadastro está fechado. Peça um convite a quem administra o seu workspace.",
     );
+    // Nothing is wrong with a field nobody typed in.
+    expect(screen().getByLabelText("E-mail").getAttribute("aria-invalid")).toBeNull();
     cleanup();
     await renderApp("/login?error=state_mismatch", { api, auth: createFakeAuth().auth });
     expect(screen().queryByRole("alert")).toBeNull();
+  });
+});
+
+describe("Google para um e-mail com senha não confirmada", () => {
+  const BACK = "/login?error=account_not_linked&email=ana%40acme.com";
+  const UNCONFIRMED =
+    "Este e-mail já tem uma conta com senha que ainda não foi confirmada. Entre com a senha ou crie uma nova pelo e-mail.";
+
+  test("says so with the address filled in, and makes a new password by email from there, never a new confirmation", async () => {
+    const { api, state } = authApi(ACCOUNT, { reset: true });
+    const { auth, calls } = createFakeAuth();
+    await renderApp(BACK, { api, auth });
+    await settle(6);
+    expect(state.calls.some((c) => c.method === "account.signInOptions")).toBe(false);
+    const field = screen().getByLabelText("E-mail") as HTMLInputElement;
+    // The address is right: the field isn't marked wrong.
+    expect([field.value, field.getAttribute("aria-invalid")]).toEqual(["ana@acme.com", null]);
+    expect(screen().getByRole("alert").textContent).toBe(`${UNCONFIRMED}Criar uma senha nova`);
+
+    await press("Criar uma senha nova");
+    expect(heading()).toBe("Te mando um link para criar outra senha.");
+    // The pressed link is gone with its step: the keyboard lands on the address, which is already filled in.
+    const address = screen().getByLabelText("E-mail") as HTMLInputElement;
+    expect([address.value, document.activeElement === address]).toEqual(["ana@acme.com", true]);
+    expect(screen().queryByRole("alert")).toBeNull();
+    await press(/^Enviar link/);
+    expect(calls.map((c) => c.method)).toEqual(["requestPasswordReset"]);
+    expect((calls[0]?.args[0] as { email: string } | undefined)?.email).toBe("ana@acme.com");
+    expect(heading()).toBe("Pronto. Mandei o link para ana@acme.com.");
+  });
+
+  test("Continuar asks the password", async () => {
+    const { api } = authApi(ACCOUNT, { reset: true });
+    await renderApp(BACK, { api, auth: createFakeAuth().auth });
+    await settle(6);
+    await press(/^Continuar(?! com)/);
+    expect(heading()).toBe("Bom te ver de novo.");
+    expect(screen().queryByRole("alert")).toBeNull();
+  });
+
+  test("a provider that hasn't confirmed its own address is told so, with no new password to make", async () => {
+    const { api } = authApi(ACCOUNT, { reset: true });
+    await renderApp("/login?error=provider_email_unverified", { api, auth: createFakeAuth().auth });
+    await settle(6);
+    expect(screen().getByRole("alert").textContent).toBe(
+      "Seu provedor de login ainda não confirmou este endereço. Confirme lá, ou entre com o e-mail.",
+    );
+    expect(screen().queryByRole("button", { name: "Criar uma senha nova" })).toBeNull();
+    expect(screen().getByLabelText("E-mail").getAttribute("aria-invalid")).toBeNull();
+  });
+
+  test("on a server that sends no email: only the password, and no new one", async () => {
+    const { api } = authApi(ACCOUNT);
+    await renderApp(BACK, { api, auth: createFakeAuth().auth });
+    await settle(6);
+    expect(screen().getByRole("alert").textContent).toBe("Este e-mail já tem uma conta com senha. Entre com a senha.");
+    expect(screen().queryByRole("button", { name: "Criar uma senha nova" })).toBeNull();
   });
 });
 

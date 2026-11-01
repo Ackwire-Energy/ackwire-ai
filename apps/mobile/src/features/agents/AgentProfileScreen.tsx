@@ -65,6 +65,7 @@ import { StatusCard } from "../status/StatusCard";
 import { PlanMeter } from "../usage/parts";
 import { openAgentUsage } from "../usage/UsageScreen";
 import { openAgentEdit } from "./AgentEditScreen";
+import { AgentMailSection } from "./AgentMailSection";
 import {
   canEditMemories,
   type DidLine,
@@ -170,8 +171,10 @@ function Profile({ id }: { id: string }) {
   const memories = knownAboutMe(knows.data);
   const uses = usesOf(access.data);
   const connected = useConnectedById();
-  // A computer brain: its maker's mark and line ("Claude Code · Sonnet no MacBook"; where only for its owner and admins).
-  const thinks = agent?.brain && agent.brain.kind !== "model" ? brainLine(t, agent.brain, "") : null;
+  // A computer brain: its maker's mark and the model by the plan that pays for it ("Sonnet pelo plano do Claude"; its
+  // computer only where it tells two apart).
+  const thinks =
+    agent?.brain && agent.brain.kind !== "model" ? brainLine(t, agent.brain, "", { agents: dir.agents }) : null;
   const spend = detail.data
     ? spendOf({
         budgetUsedPercent: detail.data.budgetUsedPercent,
@@ -520,6 +523,8 @@ function Profile({ id }: { id: string }) {
             ) : null}
           </Section>
         ) : null}
+
+        <AgentMailSection agentId={id} />
 
         <AlwaysApproved agentId={id} name={name} mayRemove={mine || can(org, "approve_actions")} />
 

@@ -4,9 +4,11 @@ import { caches } from "./cache";
 import { cutText } from "./format";
 import type { ModelGateway } from "./gateway";
 import { readableBody } from "./message-preview";
+import { isAgentOnlyNotice } from "./notices";
 import { requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { isRoutineRoomKey } from "./routine-brief";
+import { visibleWikiPageIds } from "./wiki-links";
 
 const { messages, channelMembers, channels, contextItems } = schema;
 
@@ -31,7 +33,8 @@ registerDocumentBuilder("message", async (db, orgId, id) => {
     .select()
     .from(messages)
     .where(and(eq(messages.id, id), eq(messages.orgId, orgId)));
-  if (!m || m.deletedAt) return null;
+  // A notice only its agent reads is nobody's to find.
+  if (!m || m.deletedAt || isAgentOnlyNotice(m.meta)) return null;
   return { orgId, kind: "message", sourceId: m.id, channelIds: [m.channelId], body: m.body, createdAt: m.createdAt };
 });
 
@@ -240,7 +243,16 @@ export async function searchForUser(
   input: { text: string; kinds?: SearchKind[]; limit?: number },
 ) {
   await requirePermission(deps.db, userId, orgId, "read");
-  return searchVisible(deps, { orgId, ...input, visibleChannelIds: await userVisibleChannels(deps.db, orgId, userId) });
+  const hits = await searchVisible(deps, {
+    orgId,
+    ...input,
+    visibleChannelIds: await userVisibleChannels(deps.db, orgId, userId),
+  });
+  // Wiki pages are indexed for the whole workspace; a restricted one only reaches its audience.
+  const pages = hits.filter((h) => h.kind === "wiki").map((h) => h.sourceId);
+  if (pages.length === 0) return hits;
+  const seen = await visibleWikiPageIds(deps.db, userId, pages);
+  return hits.filter((h) => h.kind !== "wiki" || seen.has(h.sourceId));
 }
 
 export interface HitSource {
@@ -297,7 +309,7 @@ export async function describeHits<H extends SearchHit>(
     }
     const m = h.kind === "message" ? byId.get(h.sourceId) : undefined;
     if (!m) return { ...h, messageId: null, threadId: null, author: null };
-    // A voice message is found by its words, and shows as its audio (ADR 0094).
+    // A voice message is found by its words, and shows as its audio (ADR 0098).
     const snippet = readableBody(h.snippet, m.meta);
     const author =
       m.authorType === "agent" && m.agentId

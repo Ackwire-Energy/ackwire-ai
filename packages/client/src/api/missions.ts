@@ -30,6 +30,9 @@ export function cacheMission(qc: QC, orgId: string, mission: Mission) {
   void qc.invalidateQueries({ queryKey: keys.threads(orgId), predicate: (q) => q.queryKey[3] !== "one" });
 }
 
+/** The sidebar's count of the missions waiting for me (`counts.waitingYou`): the device's snapshot keeps it. */
+export const MISSIONS_WAITING_COUNT: MissionListQuery = { status: "waiting_you", limit: 1 };
+
 /** The Missões tab (server filters) and the sidebar's count (`counts.waitingYou`): open missions by default. */
 export function useMissionList(orgId: string, query: MissionListQuery = { status: "open" }, enabled = true) {
   const api = useApi();

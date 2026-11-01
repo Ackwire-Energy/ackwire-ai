@@ -2,11 +2,17 @@ import { describe, expect, test } from "bun:test";
 import type { RunConsultation } from "../src/api/types";
 import {
   CONSULT_REQUEST_FRESH_MS,
+  consultAskedKey,
   consultBlocksNearEnd,
+  consultFarKey,
+  consultGroupKeys,
   consultGroupSummary,
+  consultLineKey,
   consultLineState,
   consultLineTarget,
   consultNoticeFolds,
+  consultOriginKey,
+  consultProgress,
   consultSeconds,
   consultsForLine,
   firstOfRun,
@@ -47,6 +53,10 @@ describe("consultLineState", () => {
     expect(consultLineState(q({ waiting: "computer" }), now)).toBe("offline");
     expect(consultLineState(q({ waiting: "computer" }), T0 + 901_000)).toBe("expired");
   });
+  test("open, parked because its AI provider is down: still out, not working and not on a person", () => {
+    expect(consultLineState(q({ waiting: "outage" }), now)).toBe("offline");
+    expect(consultLineKey("offline", q({ waiting: "outage" }))).toBe("chat.consultGroup.waitingProvider");
+  });
   test("open past its deadline reads as expired before the worker closes it", () => {
     expect(consultLineState(q(), T0 + 901_000)).toBe("expired");
   });
@@ -55,6 +65,49 @@ describe("consultLineState", () => {
     expect(consultLineState(q({ status: "answered", answer: "  " }), now)).toBe("failed");
     expect(consultLineState(q({ status: "failed", answer: "no reply" }), now)).toBe("failed");
     expect(consultLineState(q({ status: "expired" }), now)).toBe("expired");
+  });
+  test("open, its part done, on what it handed to other agents: still out, on no person", () => {
+    expect(consultLineState(q({ waiting: "agents" }), now)).toBe("handedOn");
+    expect(consultGroupSummary([q({ waiting: "agents" })], now)).toMatchObject({ open: true, waiting: false });
+  });
+});
+
+describe("the words of a block, by what its run asked or handed off (ADR 0095)", () => {
+  const note = (over: Partial<RunConsultation> = {}) => q({ kind: "note", ...over });
+  test("its head and label: questions, work handed off, or both", () => {
+    expect(consultGroupKeys([q(), q({ kind: "question" })])).toEqual({
+      head: "chat.consultGroup.asked",
+      label: "chat.consultGroup.label",
+    });
+    expect(consultGroupKeys([note(), note()])).toEqual({
+      head: "chat.consultGroup.handed",
+      label: "chat.consultGroup.labelRequests",
+    });
+    expect(consultGroupKeys([q(), note()])).toEqual({
+      head: "chat.consultGroup.brought",
+      label: "chat.consultGroup.labelRequests",
+    });
+  });
+  test("each line by its state; only a note that couldn't finish says so its own way", () => {
+    expect(consultLineKey("working", note())).toBe("chat.consultGroup.working");
+    expect(consultLineKey("waiting", note({ waiting: "approval" }))).toBe("chat.consultGroup.waitingApproval");
+    expect(consultLineKey("waiting", note({ waiting: "input" }))).toBe("chat.consultGroup.waitingInput");
+    expect(consultLineKey("offline", note())).toBe("chat.consultGroup.waitingComputer");
+    expect(consultLineKey("handedOn", note())).toBe("chat.consultGroup.waitingAgents");
+    expect(consultLineKey("answered", note())).toBe("chat.consultation.answered");
+    expect(consultLineKey("expired", note())).toBe("chat.consultation.expired");
+    expect(consultLineKey("failed", note())).toBe("chat.consultation.failedNote");
+    expect(consultLineKey("failed", q())).toBe("chat.consultation.failed");
+  });
+  test("what was asked or handed, where it came from, and the line of an answer farther up", () => {
+    expect(consultAskedKey(note())).toBe("chat.consultation.wrote");
+    expect(consultAskedKey(q())).toBe("chat.consultation.asked");
+    expect(consultOriginKey(note(), true)).toBe("chat.consultPanel.originNote");
+    expect(consultOriginKey(note(), false)).toBe("chat.consultPanel.originNoteDm");
+    expect(consultOriginKey(q(), true)).toBe("chat.consultPanel.origin");
+    expect(consultOriginKey(q(), false)).toBe("chat.consultPanel.originDm");
+    expect(consultFarKey(note())).toBe("chat.consultGroup.answeredRequestFar");
+    expect(consultFarKey(q())).toBe("chat.consultGroup.answeredFar");
   });
 });
 
@@ -262,4 +315,15 @@ describe("requestConsultBlock ('Ver' on an answer's line)", () => {
     expect(takeConsultBlockRequest("r1", T0 + CONSULT_REQUEST_FRESH_MS + 1)).toBeNull();
     expect(takeConsultBlockRequest("r1", T0)).toBeNull();
   });
+});
+
+test("an open line shows the work handed off so far; none before it posts, none once answered", () => {
+  const progress = { posts: 12, latest: "Gerei a imagem 40.\nSegue o lote.", at: iso(60) };
+  expect(consultProgress(q({ kind: "note", progress }))).toEqual({
+    key: "chat.consultGroup.posted",
+    values: { count: 12, latest: "Gerei a imagem 40. Segue o lote." },
+  });
+  expect(consultProgress(q({ progress: null }))).toBeNull();
+  expect(consultProgress(q({ progress: { ...progress, posts: 0 } }))).toBeNull();
+  expect(consultProgress(q({ status: "answered", answer: "ok", progress }))).toBeNull();
 });

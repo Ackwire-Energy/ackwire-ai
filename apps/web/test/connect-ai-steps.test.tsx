@@ -637,7 +637,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     expect(dimmed("ChatGPT")).toBe(true);
     expect(dimmed("Kimi Code")).toBe(true);
     await click(tile("ChatGPT"));
-    expect(dialog.textContent).toContain("Não está instalado no MacBook.");
+    expect(dialog.textContent).toContain("O Codex não está instalado no MacBook.");
     await click(tile("Kimi Code"));
     expect(dialog.textContent).toContain("Atualize o agentes no computador para usar a chave de um plano");
     await click(within(dialog).getByRole("button", { name: "Usar uma chave de API agora" }));
@@ -658,10 +658,10 @@ describe("Conectar uma IA: one picker, plans first", () => {
       return dialog.textContent;
     };
     expect(await reason("linux", "Servidor")).toContain(
-      "Desligado no Servidor. Ligue lá, no app do agentes.chat ou com sudo agentes-runner tools enable codex.",
+      "O Codex está desligado no Servidor. Ligue lá, no app do agentes.chat ou com sudo agentes-runner tools enable codex.",
     );
     expect(await reason("darwin", "MacBook")).toContain(
-      "Desligado no MacBook. Ligue lá, no app do agentes.chat: Preferências → Ferramentas.",
+      "O Codex está desligado no MacBook. Ligue lá, no app do agentes.chat: Preferências → Ferramentas.",
     );
   });
 

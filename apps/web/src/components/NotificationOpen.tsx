@@ -3,9 +3,10 @@ import { cacheNotification, keys, useApi } from "@agenteschat/client";
 import { type OpenTarget, opensConnectAi, openTarget } from "@agenteschat/client/lib/notifications";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useContext, useEffect, useRef } from "react";
 import { requestBrowserCard } from "@/components/browser/open";
 import { useConnectAi } from "@/components/ConnectAi";
+import { OpenDetailsContext } from "@/components/details-link";
 import { LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { fallbackTarget, type PushOpenData, setPushOpenHandler } from "@/lib/push-open";
@@ -31,6 +32,8 @@ export function goToTarget(navigate: Navigate, orgId: string, target: OpenTarget
       });
     case "/org/$orgId/dm/agent/$agentId":
       return void navigate({ to: target.to, params: { orgId, ...target.params }, replace });
+    case "/org/$orgId/agents/$agentId":
+      return void navigate({ to: target.to, params: { orgId, ...target.params }, replace });
     case "/org/$orgId/dm/person/$userId":
       return void navigate({ to: target.to, params: { orgId, ...target.params }, replace });
     case "/org/$orgId/issues/$number":
@@ -53,7 +56,12 @@ export function goToTarget(navigate: Navigate, orgId: string, target: OpenTarget
 
 /** The inbox itself, with nothing to open. */
 function goToInbox(navigate: Navigate, orgId: string, replace: boolean) {
-  void navigate({ to: "/org/$orgId/notifications", params: { orgId }, search: {}, replace });
+  return navigate({ to: "/org/$orgId/notifications", params: { orgId }, search: {}, replace });
+}
+
+/** The routine whose details a target opens, when it is one. */
+function routineOf(target: OpenTarget): string | null {
+  return target.to === "/org/$orgId/routines" && target.search ? target.search.open : null;
 }
 
 /** What opening did: moved to a page, opened a dialog over this one, or found nowhere to go. */
@@ -67,6 +75,7 @@ export type Opened = "page" | "dialog" | null;
 export function useNotificationOpener() {
   const navigate = useNavigate();
   const connect = useConnectAi();
+  const openDetails = useContext(OpenDetailsContext);
   return useCallback(
     (n: AppNotification, orgId: string, options: { ai?: AiStatus; replace?: boolean } = {}): Opened => {
       if (connect && opensConnectAi(n, options.ai)) {
@@ -75,12 +84,18 @@ export function useNotificationOpener() {
       }
       const target = openTarget(n);
       if (!target) return null;
+      // A routine's trouble: its details over the page the person is on, its state and fix in view.
+      const routineId = routineOf(target);
+      if (openDetails && routineId) {
+        openDetails({ kind: "routine", id: routineId });
+        return "dialog";
+      }
       // An agent asked for help in its browser: its card opens there, in control (no page of its own).
       if (n.kind === "browser_handoff" && n.source.handoffId) requestBrowserCard({ handoffId: n.source.handoffId });
       goToTarget(navigate, orgId, target, options.replace ?? false);
       return "page";
     },
-    [navigate, connect],
+    [navigate, connect, openDetails],
   );
 }
 
@@ -110,10 +125,14 @@ export function useOpenPushed() {
                 })
                 .catch(() => undefined)
             : undefined;
+        // A dialog over the inbox: the inbox first (without `?open`, so a reload doesn't redo it), since any
+        // navigation after it would close the dialog (`DetailsHost`).
+        const target = openTarget(n);
+        const overInbox = replace && target && routineOf(target);
+        if (overInbox) await goToInbox(navigate, orgId, true);
         const opened = open(n, orgId, { ai, replace });
-        if (opened === "page") return;
-        // A dialog over the inbox, or nowhere of its own: the inbox (without `?open`, so a reload doesn't redo it).
-        if (opened === null || replace) goToInbox(navigate, orgId, replace);
+        if (!overInbox && (opened === null || (opened === "dialog" && replace)))
+          void goToInbox(navigate, orgId, replace);
         return;
       }
       const target = fallbackTarget(data);

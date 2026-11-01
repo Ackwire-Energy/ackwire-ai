@@ -35,7 +35,7 @@ const PROVIDERS: { id: SpeechProvider; name: string }[] = [
   { id: "openai", name: "OpenAI" },
 ];
 
-/** Configurações › Voz (ADR 0094). Who configures the workspace changes it; everyone else reads it. */
+/** Configurações › Voz (ADR 0098). Who configures the workspace changes it; everyone else reads it. */
 export function VoiceSettingsSection() {
   const { org } = useOrg();
   const settings = useSettings(org.id);
@@ -62,7 +62,7 @@ export function VoiceSettingsSection() {
 }
 
 /**
- * The card of Configurações › Voz (ADR 0094): the workspace's switch, and on a server that isn't agentes.chat's own, for
+ * The card of Configurações › Voz (ADR 0098): the workspace's switch, and on a server that isn't agentes.chat's own, for
  * its owner, who turns voice into text (the API answers null to everyone else). A key is tried with the provider
  * before it is kept, sealed on the server and never shown again.
  */

@@ -86,6 +86,7 @@ function AppStack() {
       <Stack.Screen name="agent-ai/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-model/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-advanced/[id]" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="agent-setup/[id]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-edit" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="agent-delete" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="new-agent" options={{ ...pushed, ...scrollUnder }} />
@@ -97,6 +98,7 @@ function AppStack() {
       <Stack.Screen name="wiki/[slug]" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki-history" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki-move" options={{ ...pushed, ...scrollUnder }} />
+      <Stack.Screen name="wiki-audience" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="wiki-write" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/index" options={{ ...pushed, ...scrollUnder }} />
       <Stack.Screen name="routines/[id]" options={{ ...pushed, ...scrollUnder }} />

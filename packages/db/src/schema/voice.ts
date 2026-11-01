@@ -4,7 +4,7 @@ import { channels } from "./chat";
 import { organizations } from "./tenancy";
 
 /**
- * A voice message's recording (ADR 0094), on the workspace's storage but outside the Drive: it belongs to its message.
+ * A voice message's recording (ADR 0098), on the workspace's storage but outside the Drive: it belongs to its message.
  * `pending`: stored, waiting for its words. `sent`: the message went out. `dropped`: nothing was said, or the channel
  * can't take it. Rows stay after the recording is gone (`audioDeletedAt`): they are what fair use counts.
  */

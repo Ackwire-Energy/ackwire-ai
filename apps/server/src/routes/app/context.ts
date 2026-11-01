@@ -63,8 +63,11 @@ export function requestOriginAllowed(origins: Set<string>, headers: Headers): bo
  */
 const MULTIPART_PATHS = [
   /\/organizations\/[^/]+\/artifacts(\/[^/]+)?\/files$/,
+  /\/organizations\/[^/]+\/imports\/files$/,
   /\/organizations\/[^/]+\/channels\/[^/]+\/voice$/,
 ];
+/** Multipart overhead allowed on top of an uploaded file itself. */
+export const MULTIPART_SLACK_BYTES = 64 * 1024;
 
 export function createAppRouter(deps: AppDeps) {
   const app = new OpenAPIHono<AppEnv>({ defaultHook: validationHook<AppEnv>() });

@@ -226,7 +226,9 @@ const Routine = z
         "Why it paused itself (`creator_left`, `creator_no_access`, `agent_archived`, `agent_not_in_channel`, `audience`, `failing`); null when a person paused it.",
     }),
     failuresInRow: z.number().int(),
-    state: z.enum(["active", "paused", "running", "waiting_computer", "waiting_person", "failing"]),
+    state: z
+      .enum(["active", "paused", "running", "waiting_computer", "waiting_person", "failing", "needs_webhook"])
+      .openapi({ description: "`needs_webhook`: its event comes through a webhook this workspace doesn't have yet." }),
     waitingFor: z
       .object({ machineId: z.uuid(), machineName: z.string(), since: z.string() })
       .nullable()
@@ -250,6 +252,10 @@ const Routine = z
       }),
     canSeeDetails: z.boolean().openapi({ description: "You read its prompt, records and reports." }),
     canManage: z.boolean().openapi({ description: "You may change, pause, stop or delete it." }),
+    createdByUserId: z
+      .string()
+      .nullable()
+      .openapi({ description: "Its creator, whose reach it has (kept on edit); null once they left." }),
     lastRun: RoutineRun.nullable(),
     recentRuns: z.array(RoutineRun).openapi({ description: "The last runs, newest first (at most 14)." }),
     usage: z

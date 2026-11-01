@@ -1,6 +1,6 @@
 # 0041. Claude and Codex accounts on a connected computer, chosen per agent; effort per agent
 
-- Status: Accepted (2026-10-20). Superseded in part by ADR 0059 (§2 who adds accounts, §4 who decides, §7 removing). Amended 2026-10-30: §1 (the computer's own sign-in is offered only where it is signed in), §2.7 (a sign-in through a restart of the server or a reconnect of its computer)
+- Status: Accepted (2026-10-20). Superseded in part by ADR 0059 (§2 who adds accounts, §4 who decides, §7 removing). Amended 2026-10-30: §1 (the computer's own sign-in is offered only where it is signed in), §2.7 (a sign-in through a restart of the server or a reconnect of its computer); 2026-10-31: §5.1 (a background task signs in with the agent's account, as its turns)
 - Date: 2026-10-20
 - Extends: ADR 0025 (connected computers), ADR 0027 (secrets, end to end), ADR 0032 (Claude Code and Codex as brains), ADR 0036 (desktop app)
 - Out of scope for now: cloud computers, switching accounts by itself when a plan runs out
@@ -67,6 +67,27 @@ The subscription is personal: only the **computer's owner** adds or removes acco
 - Effort: `--effort <level>` (Claude Code), `-c model_reasoning_effort="<level>"` (Codex; `xhigh` and `max` map to `high`). The page offers Baixo, Médio, Alto, Máximo (`low`, `medium`, `high`, `max`). Effort for the organization's model brain (provider effort parameters through the Model Gateway) comes later.
 - A live process is keyed by (agent, session, account, effort).
 - Plan limit events carry the account, so the page says which account hit its limit.
+
+### 5.1 A background task (amended 2026-10-31)
+
+Background tasks (`start_task`, mission items, resumes) ran their Claude Code or Codex on the computer's own sign-in, while the agent's account went only to its turns and routes. Where each agent is its own OS user (the Cloud) that user has no sign-in of its own, so every such task failed within seconds with "Not logged in · Please run /login" (all 8 in one workspace in one evening), and the run woken by the failure read "run /login", which no agent can do. Now a task signs in as its agent's turns do.
+
+- **Which account.** From runner protocol 31 (`TASK_ACCOUNTS_PROTOCOL`) a Claude Code or Codex `task.start` carries `account`: the account the agent's own turns of that CLI think with on that computer (`brainAccountFor`). Only that agent's own tasks carry it: never another agent's, a shell task, or a task of the other CLI. An older runner never gets it and starts the task on the computer's own sign-in, as before.
+- **On the computer.** The runner signs the task's CLI in with the same code as a turn (`accountSignIn`): the account's folder as `CLAUDE_CONFIG_DIR` / `CODEX_HOME` and nothing else in the environment signing it in, a coding plan's key in the env under the plan's name with one of the plan's models, and Claude Code's endpoint and proxies pinned in the task's own `--settings` (`accountSettingsEnv`), so a project's settings can't send the sign-in elsewhere. In system mode root lends the folder to the agent's user, or hands over what it keeps for the account, as for a turn (ADR 0059 §2).
+  - A token root keeps reaches the task's wrapper on its descriptor 3 and the CLI on its own descriptor 3, which Claude Code reads and closes. It is never in `spec.json`, the journal or any other file of the task, nor in an environment. The runner holds it in memory only while the task runs, for a retry with the other session flag, and the task's redaction hides it, and a plan's key too.
+  - A folder that isn't there, or an account root has nothing for, refuses the start at once, in the turns' words.
+  - A route on that sign-in answers `busy` while the task runs (ADR 0074 §3), and a task starting on a sign-in stops a route there first. A task on an account no longer makes a route on the computer's own sign-in busy.
+  - When root says the agent thinks with another account or none, its worker cancels its tasks on any other account, as it closes its turns' processes: no process of that agent keeps a credential it no longer thinks with.
+  - Sessions and Codex threads live in the CLI's home: on an account, a task resumes only one in that account's folder, and Codex threads are kept per account, as turns keep them.
+- **Refused at once, by the turns' rules** (`computerBrainUnavailable`). Before anything reaches the runner, a task with nothing to sign in with doesn't start, and the agent reads why and what it can do (`TaskSignInError`: "Not started: …", `task.no_sign_in`):
+  - on a computer nobody connected, no account of its own for that CLI (it hears which executor to use when it has an account for the other CLI there), or an account there on a runner before protocol 31, which would start the task on a sign-in that computer doesn't have;
+  - a plan that isn't its owner's (ADR 0059 §3), where turns already check it: a task on an account of the agent's own, or of an agent that thinks with that CLI, on a computer someone connected whose own sign-in would think for another person's agent. An agent that thinks with something else (the platform model, the other CLI) keeps running tasks on that computer's own sign-in, as before;
+  - its account signed out, or no account where `claude auth status` said the computer's own Claude Code is signed out.
+
+  The refused start stays as a failed task saying why. A mission's queued item refused this way fails as any refused start does, and the mission hears it.
+- **Still not signed in.** A CLI that finds nothing to sign in with anyway (the computer's own sign-in expired, an account refused) ends at once with "Not logged in". The runner puts what the agent can do in the task's result and last line instead: its owner signs in again or connects an account, and meanwhile the agent does the work in its own turn.
+- **After a runner restart.** A task whose environment holds a coding plan's key (the journal says so, never the key) is watched with the key read again from the account's folder. When root kept the key, the restarted runner can't have it: it cancels the task, sends nothing the task says, and the agent reads why. A task on an account isn't retried with the other session flag (that needs the account's sign-in again, which the runner never stores); it ends as it ended.
+- **Canceled for an account change.** A task canceled because its agent switched or removed the account says so first in its result and last line, so the agent knows to start it again.
 
 ### 6. No automatic rotation
 

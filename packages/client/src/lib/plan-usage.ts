@@ -43,6 +43,28 @@ function resetWhen(locale: string, iso: string, now: Date): { day: string | null
   return { day, time };
 }
 
+/**
+ * When a waiting agent goes on, in the reader's zone, as a note says it ("às 15:40", "sexta às 10:00",
+ * "em 1º de dezembro"): the time today, the weekday this week, else the date.
+ */
+export function usageWhen(t: TFunction, locale: string | undefined, iso: string, now = new Date()): string {
+  const loc = locale ?? "en";
+  const ahead = -daysBetween(iso, now);
+  const time = formatTime(loc, iso);
+  if (ahead <= 0) return t("chat.usageWhen.at", { time });
+  if (ahead < 7) {
+    const day = new Intl.DateTimeFormat(loc, { weekday: "long" }).format(new Date(iso)).replace(/-feira$/, "");
+    return t("chat.usageWhen.on", { day, time });
+  }
+  const date = new Intl.DateTimeFormat(loc, { day: "numeric", month: "long" }).format(new Date(iso));
+  return t("chat.usageWhen.date", { date: loc.startsWith("pt") ? date.replace(/^1 /, "1º ") : date });
+}
+
+/** When the next month starts (UTC): an agent's monthly budget renews then. */
+export function nextMonthIso(now = new Date()): string {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
+}
+
 /** What `PlanMeter` says, in the viewer's language. */
 export function planMeterText(
   t: TFunction,

@@ -2,8 +2,8 @@ import type { Agent, Member } from "@agenteschat/client";
 import { agentStateIn, useAiStatus, useRoster } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { picksForMe } from "@agenteschat/client/lib/routing";
-import { Avatar, AvatarStack, Button, Popover } from "@agenteschat/ui";
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { Avatar, AvatarStack, Button, Popover, useHoverCard } from "@agenteschat/ui";
+import type { KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
@@ -15,7 +15,6 @@ import { useStreams } from "@/realtime/context";
 
 /** Opening on hover waits a little (a pointer just passing by doesn't open it). */
 export const MEMBERS_OPEN_MS = 150;
-const MEMBERS_CLOSE_MS = 200;
 /** Avatars in the stack before "+N". */
 const STACKED = 3;
 /** Up to here the details' words and the faces don't both fit beside the channel's name: the words fold. */
@@ -57,26 +56,8 @@ export function ChannelMembersStack({
   onDetails: () => void;
 }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const clear = () => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-  };
-  // Drop a pending hover timer on unmount.
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
-  const later = (next: boolean, ms: number) => {
-    clear();
-    timer.current = setTimeout(() => {
-      timer.current = null;
-      setOpen(next);
-    }, ms);
-  };
+  // Hover leaves the focus where it is (the box someone types in), a press or a key brings it in.
+  const card = useHoverCard(MEMBERS_OPEN_MS);
   const total = people.length + agents.length;
   const all: ({ kind: "person"; m: Member } | { kind: "agent"; a: Agent })[] = [
     ...people.map((m) => ({ kind: "person" as const, m })),
@@ -87,31 +68,13 @@ export function ChannelMembersStack({
   if (total === 0) return null;
   return (
     <Popover
-      open={open}
-      onOpenChange={(o) => {
-        clear();
-        setOpen(o);
-      }}
+      hover={card}
       label={t("channel.membersButton", { count: total })}
       side="bottom"
       align="end"
       className="members-pop"
-      onContentPointerEnter={clear}
-      onContentPointerLeave={() => later(false, MEMBERS_CLOSE_MS)}
       trigger={
-        <button
-          type="button"
-          className="members-stack"
-          aria-label={t("channel.membersButton", { count: total })}
-          onPointerEnter={(e) => {
-            if (e.pointerType !== "touch" && !open) later(true, MEMBERS_OPEN_MS);
-          }}
-          onPointerLeave={(e) => {
-            if (e.pointerType === "touch") return;
-            if (open) later(false, MEMBERS_CLOSE_MS);
-            else clear();
-          }}
-        >
+        <button type="button" className="members-stack" aria-label={t("channel.membersButton", { count: total })}>
           <AvatarStack aria-hidden="true">
             {shown.map((x) =>
               x.kind === "person" ? (
@@ -125,13 +88,13 @@ export function ChannelMembersStack({
         </button>
       }
     >
-      {open && (
+      {card.open && (
         <MembersList
           channelId={channelId}
           people={people}
           agents={agents}
           onDetails={() => {
-            setOpen(false);
+            card.close();
             onDetails();
           }}
         />
@@ -263,7 +226,8 @@ function AgentRow({ agent, channelId, autoReply }: { agent: Agent; channelId: st
         {line ? (
           <StatusLine emoji={line.emoji} text={line.text} className="members-pop__meta" />
         ) : (
-          <span className="members-pop__meta">
+          // Cut to the popover's width: whole on hover.
+          <span className="members-pop__meta" title={agent.role ? `${doing} · ${agent.role}` : undefined}>
             {doing}
             {agent.role ? ` · ${agent.role}` : ""}
           </span>

@@ -1,5 +1,12 @@
-import { ApiError } from "@agenteschat/client";
-import { knownErrorText, type RestrictionFacts, restrictionLine } from "@agenteschat/client/lib/errors";
+import { ApiError, type SignInOptions, type SignInProvider } from "@agenteschat/client";
+import {
+  EARLY_ACCESS_OTHER_EMAIL,
+  knownErrorText,
+  providerRefusalText,
+  type RestrictionFacts,
+  restrictionLine,
+} from "@agenteschat/client/lib/errors";
+import { earlyAccessHeaders, earlyAccessState } from "@agenteschat/client/lib/guards";
 import {
   type createHumanCheck,
   HUMAN_CHECK_BLOCKED,
@@ -156,12 +163,62 @@ export const refusalOf = ({ error }: { error: ({ status: number; code?: string }
   error ? { status: error.status, code: error.code, kind: error.kind, cloud: error.cloud } : null;
 
 /**
- * A social sign-in Better Auth refused: a blocked account's line (its kind on agentes.chat Cloud), since Apple's
- * native sign-in gets the server's answer itself, else that it didn't work.
+ * A social sign-in Better Auth refused, as Apple's native sign-in gets the server's answer itself: a blocked account's
+ * line (its kind on agentes.chat Cloud), a refusal the web's sign-in says too, else that it didn't work. Better Auth
+ * names a provider's own refusal in an `OAUTH_LINK_ERROR`'s message ("account not linked" is the web's
+ * `account_not_linked`). `emails`: the server sends email.
  */
-export const socialRefusalText = (t: TFunction, error: { code?: string } & RestrictionFacts) =>
-  restrictionLine(t, error.code, error) ?? t("mobile.auth.social.failed");
+export function socialRefusalText(
+  t: TFunction,
+  error: { code?: string; message?: string } & RestrictionFacts,
+  emails: boolean,
+): string {
+  const code = error.code === "OAUTH_LINK_ERROR" ? error.message?.replace(/ /g, "_") : error.code;
+  return (
+    restrictionLine(t, code, error) ??
+    (code ? providerRefusalText(t, code, emails) : null) ??
+    t("mobile.auth.social.failed")
+  );
+}
 
-/** A refused sign-up means sign-up is closed only when it is a 403 that isn't the bot check's. */
+/**
+ * The step after the e-mail lookup, as the web's sign-in takes it: the account's way in, else a name for a new
+ * account, an early-access link that expired, or sign-up closed. `usable`: the account signs in with a provider
+ * this server has.
+ */
+export function lookUpStep(found: SignInOptions, usable: boolean) {
+  if (found.account) return found.password ? "password" : usable ? "social" : "noPassword";
+  return found.canSignUp ? "name" : found.accessExpired ? "expired" : "closed";
+}
+
+/**
+ * A refused sign-up means sign-up is closed only when it is a 403 that isn't the bot check's, nor an early-access
+ * link's for another address (said in its own words, as on the web).
+ */
 export const signUpClosed = (refusal: { status: number; code?: string | null }) =>
-  refusal.status === 403 && !isHumanCheckRefusal(refusal.code ?? undefined);
+  refusal.status === 403 &&
+  !isHumanCheckRefusal(refusal.code ?? undefined) &&
+  refusal.code !== EARLY_ACCESS_OTHER_EMAIL;
+
+/**
+ * What the phone's sign-in requests carry of an early-access link's token (ADR 0078 §3), as the web's do: the e-mail
+ * lookup sends it as `access`, the password sign-up and Apple's native sign-in as the header, a provider's sign-in
+ * through the browser in its state. `access` is required, so a screen without a link says `undefined`.
+ */
+export function earlyAccessRequests(access: string | undefined) {
+  const headers = earlyAccessHeaders(access);
+  return {
+    lookUp: (email: string) => ({ email, ...(access ? { access } : {}) }),
+    headers,
+    browser: (provider: SignInProvider, callbackURL: string) => ({
+      provider,
+      callbackURL,
+      ...earlyAccessState(access),
+    }),
+    apple: (idToken: string) => ({
+      provider: "apple" as const,
+      idToken: { token: idToken },
+      fetchOptions: { headers },
+    }),
+  };
+}

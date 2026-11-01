@@ -9,18 +9,22 @@ import type {
 } from "@agenteschat/client";
 import { agentProposalOf, stretchCardOf } from "@agenteschat/client/lib/action-cards";
 import { type ActivityEntry, barEntries, type barWords } from "@agenteschat/client/lib/activity";
+import { splitChannelRefs } from "@agenteschat/client/lib/channel-refs";
 import { type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
 import {
   answeredNotices,
   followUpLine,
+  isAgentOnlyNotice,
   isAnsweredNotice,
   isEventLine,
   isTalkerReply,
   noticeAgentHandle,
   noticeOf,
   noticeRoutineName,
+  skippedHandles,
 } from "@agenteschat/client/lib/notices";
 import { isRoutineCall, routineReplyOf } from "@agenteschat/client/lib/routines";
+import { secretRequestOf } from "@agenteschat/client/lib/secret-requests";
 import { voiceOf } from "@agenteschat/client/lib/voice";
 import { previewOf } from "../shared/logic";
 import { continuesReply } from "./media";
@@ -80,6 +84,7 @@ export function standsAlone(m: Message) {
       meta.issueWork ||
       meta.issueTaken ||
       questionOf(meta) ||
+      secretRequestOf(meta) ||
       consultationsOf(meta).length > 0 ||
       routineReplyOf(m) ||
       isEventLine(meta),
@@ -98,7 +103,7 @@ export function buildRows(messages: Message[], hidden: (m: Message) => boolean =
   let prev: Message | null = null;
   const answered = answeredNotices(messages);
   for (const m of [...messages].sort(byTime)) {
-    if (hidden(m) || isRoutineCall(m) || isAnsweredNotice(m, answered)) continue;
+    if (hidden(m) || isRoutineCall(m) || isAnsweredNotice(m, answered) || isAgentOnlyNotice(m.meta)) continue;
     const day = dayKey(m.createdAt);
     if (day !== lastDay) {
       rows.push({ kind: "day", key: `day-${day}`, iso: m.createdAt });
@@ -171,6 +176,13 @@ export function eventLineOf(
       return from ? line("chat.notice.agentNote", { from }) : line("chat.notice.agentNoteAnon");
     case "wait_result":
       return line("chat.notice.waitResult", { name: names.author });
+    case "wake_skipped":
+      return line("chat.notice.wakeSkipped", {
+        name: names.author,
+        agents: skippedHandles(notice)
+          .map((h) => names.agentByHandle(h) ?? h)
+          .join(", "),
+      });
     case "follow_up": {
       const followUp = followUpLine(notice, names.author, when);
       return followUp ? line(followUp.key, followUp.values) : null;
@@ -281,13 +293,13 @@ export function questionOf(meta: Message["meta"]): AgentQuestion | null {
 export const hidesBody = (m: Message) =>
   Boolean(
     approvalIdOf(m.meta) ||
+      secretRequestOf(m.meta) ||
       agentProposalOf(m.meta) ||
       stretchCardOf(m.meta) ||
       m.meta?.missionStart ||
       m.meta?.threadStart ||
       m.meta?.issueWork ||
       m.meta?.browserHandoff ||
-      m.meta?.secretRequest ||
       m.meta?.missionSetup ||
       voiceOf(m.meta) ||
       questionOf(m.meta)?.text.trim() === m.body.trim(),
@@ -550,7 +562,9 @@ export function threadFaces<T extends { type: string; id: string | null }>(parti
 
 export type Inline =
   | { kind: "text" | "bold" | "italic" | "code" | "mention"; text: string }
-  | { kind: "link"; text: string; href: string };
+  | { kind: "link"; text: string; href: string }
+  /** `#name` (`name` lower case): a channel link when it means a channel the viewer sees, else its text. */
+  | { kind: "channel"; text: string; name: string };
 export type Block =
   | { kind: "paragraph"; inline: Inline[] }
   | { kind: "heading"; inline: Inline[] }
@@ -561,7 +575,15 @@ export type Block =
 
 const MENTION = /(^|[^\w@.])@([a-zA-Z0-9][a-zA-Z0-9_-]{1,31})(?![\w@-])/g;
 
+/** `#channel` references, then @mentions in the words between them. */
 function mentions(text: string, out: Inline[], kind: "text" | "bold" | "italic") {
+  for (const part of splitChannelRefs(text)) {
+    if (part.name === undefined) atMentions(part.text, out, kind);
+    else out.push({ kind: "channel", text: part.text, name: part.name });
+  }
+}
+
+function atMentions(text: string, out: Inline[], kind: "text" | "bold" | "italic") {
   let last = 0;
   for (const match of text.matchAll(MENTION)) {
     const prefix = match[1] ?? "";

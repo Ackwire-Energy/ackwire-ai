@@ -38,6 +38,7 @@ export const keys = {
   aiStatus: (orgId: string) => ["org", orgId, "credentials", "ai-status"] as const,
   usage: (orgId: string) => ["org", orgId, "usage"] as const,
   channels: (orgId: string) => ["org", orgId, "channels"] as const,
+  channelCard: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "card"] as const,
   channelCategories: (orgId: string) => ["org", orgId, "channel-categories"] as const,
   channelMembers: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "members"] as const,
   messages: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "messages"] as const,
@@ -107,6 +108,10 @@ export const keys = {
   machines: (orgId: string) => ["org", orgId, "machines"] as const,
   /** Under `machines`: a computer that changes refreshes what a new agent could think with. */
   brainMachines: (orgId: string) => ["org", orgId, "machines", "brains"] as const,
+  /** What a new agent starts thinking with (ADR 0094). */
+  newAgentSetup: (orgId: string) => ["org", orgId, "agent-setup"] as const,
+  /** What a setup would do to each agent (`sig`: the setup and the agents, as JSON). */
+  setupPreview: (orgId: string, sig: string) => ["org", orgId, "setup-preview", sig] as const,
   /** The server's own computer here (under `machines`: a machines refetch refreshes it too). */
   hostComputer: (orgId: string) => ["org", orgId, "machines", "host"] as const,
   /** Offline computers agents wait for (under `machines`: a machines refetch refreshes it too). */
@@ -161,6 +166,7 @@ export const keys = {
   notificationList: (orgId: string, filter: string) => ["org", orgId, "notifications", "list", filter] as const,
   notificationCount: (orgId: string) => ["org", orgId, "notifications", "count"] as const,
   noticePrefs: (orgId: string) => ["org", orgId, "notice-prefs"] as const,
+  sidebarItems: (orgId: string) => ["org", orgId, "sidebar-items"] as const,
   forum: (orgId: string) => ["org", orgId, "forum"] as const,
   forumTopic: (orgId: string, topicId: string) => ["org", orgId, "forum", topicId] as const,
   wiki: (orgId: string) => ["org", orgId, "wiki"] as const,

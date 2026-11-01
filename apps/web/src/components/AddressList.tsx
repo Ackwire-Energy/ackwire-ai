@@ -1,13 +1,14 @@
 import { splitAddresses } from "@agenteschat/client/lib/mail";
 import { Button, Field, Input, Token, TokenList } from "@agenteschat/ui";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /**
  * A list of email addresses or `@domains` (email rules, routine filters), or
  * of other values with their own `split` (a database's hidden columns):
  * type one or several (commas or spaces), Enter or "Adicionar"; each shows
- * as a chip with a remove button.
+ * as a chip with a remove button. `clearable` adds "Remover tudo" for two or
+ * more chips, undone in place.
  */
 export function AddressList({
   id,
@@ -20,6 +21,7 @@ export function AddressList({
   placeholder,
   invalidText,
   inputMode = "email",
+  clearable,
 }: {
   id: string;
   label: string;
@@ -32,10 +34,17 @@ export function AddressList({
   placeholder?: string;
   invalidText?: string;
   inputMode?: "email" | "text";
+  clearable?: boolean;
 }) {
   const { t } = useTranslation();
   const [text, setText] = useState("");
   const [invalid, setInvalid] = useState(false);
+  const [cleared, setCleared] = useState<string[] | null>(null);
+  const undoRef = useRef<HTMLButtonElement>(null);
+  // "Remover tudo" unmounts with the chips; focus lands on "Desfazer" instead of the page.
+  useEffect(() => {
+    if (cleared) undoRef.current?.focus();
+  }, [cleared]);
   const add = () => {
     const { valid, invalid: wrong } = split(text);
     if (wrong.length > 0 || valid.length === 0) {
@@ -44,6 +53,7 @@ export function AddressList({
     }
     onChange([...new Set([...values, ...valid])]);
     setText("");
+    setCleared(null);
   };
   return (
     <div className="mail-list">
@@ -90,6 +100,44 @@ export function AddressList({
           ))}
         </TokenList>
       )}
+      {clearable && values.length > 1 && (
+        <span className="mail-list__clear">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={disabled}
+            aria-label={t("mail.list.clearName", { name: label })}
+            onClick={() => {
+              setCleared(values);
+              onChange([]);
+            }}
+          >
+            {t("mail.list.clear")}
+          </Button>
+        </span>
+      )}
+      {/* Always mounted: screen readers skip a live region inserted already filled. */}
+      <span className="mail-list__status" role="status">
+        {cleared && values.length === 0 && (
+          <span className="mail-list__clear small muted">
+            {t("mail.list.cleared", { count: cleared.length })}
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={disabled}
+              ref={undoRef}
+              onClick={() => {
+                onChange(cleared);
+                setCleared(null);
+              }}
+            >
+              {t("mail.list.undo")}
+            </Button>
+          </span>
+        )}
+      </span>
     </div>
   );
 }

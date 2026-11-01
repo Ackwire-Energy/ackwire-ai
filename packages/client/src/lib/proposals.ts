@@ -104,6 +104,15 @@ export function rowStatus(t: TFunction, p: Proposal): string | null {
   return p.decider.type === "user" ? t("proposals.waitingFor", { name: p.decider.name }) : t("proposals.waitingAdmin");
 }
 
+/** How a decided card ended, in a word: each row's status when they all agree, else how many were accepted. */
+export function cardOutcome(t: TFunction, rows: Proposal[]): { accepted: boolean; label: string } {
+  const done = rows.filter((p) => p.status === "accepted" && !p.stale).length;
+  const states = [...new Set(rows.map((p) => rowStatus(t, p)))];
+  const label =
+    states.length === 1 && states[0] ? states[0] : t("proposals.acceptedSome", { done, total: rows.length });
+  return { accepted: done > 0, label };
+}
+
 /** Rows a decision couldn't apply because what they were made against changed since (409). */
 export const staleCount = (failed: { error: unknown }[]) =>
   failed.filter((f) => (f.error as { status?: unknown } | null)?.status === 409).length;

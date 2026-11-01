@@ -5,6 +5,7 @@ import { serveStatic } from "hono/bun";
 import composeFile from "../../../docker-compose.yml" with { type: "text" };
 import installScript from "../../../install.sh" with { type: "text" };
 import { registerAppLinks } from "./app-links";
+import { authHandler } from "./auth";
 import { apiError, domainErrorResponse, validationHook } from "./http/errors";
 import { createLogger, type Logger } from "./logger";
 import { accessRoutes } from "./routes/app/access";
@@ -125,8 +126,9 @@ export function createApp(options: AppOptions) {
   });
 
   if (options.services) {
-    const { auth } = options.services;
-    api.on(["GET", "POST"], "/auth/*", (c) => auth.handler(c.req.raw));
+    const { auth, db } = options.services;
+    const handleAuth = authHandler(auth, db);
+    api.on(["GET", "POST"], "/auth/*", (c) => handleAuth(c.req.raw));
     const deps: AppDeps = { log, ...options.services };
     registerInstance(api, deps, options.version);
     api.route("/app", accountRoutes(deps));

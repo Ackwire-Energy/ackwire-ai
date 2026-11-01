@@ -6,6 +6,8 @@ import {
   callLogo,
   formatDuration,
   formatLineTime,
+  oneCall,
+  savedOneLine,
   type ToolItem,
   type ToolLine,
   toolApps,
@@ -18,6 +20,7 @@ import {
   workApps,
   workFromSteps,
   workMeta,
+  workSteps,
 } from "@agenteschat/client/lib/work";
 import {
   type AgentColor,
@@ -81,6 +84,7 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   browsing: "globe",
   pcFiles: "file",
   checkingComputer: "computer",
+  checkingUsage: "chart",
   proposingMission: "flag",
   messagingMission: "flag",
   updatingPlan: "flag",
@@ -184,8 +188,8 @@ function useBlockItems(items: ToolItem[]): ToolBlockItem[] {
 
 /**
  * The tools of a reply while it works (and kept after, `done`): one line saying what it does now, the apps'
- * logos and the steps, opening into every call. What it said between calls is inside; the
- * messages it read stay outside, under the block, so "Leu seu recado" is always in sight.
+ * logos and the steps, opening into every call; a single call is that call's own line. What it said between calls
+ * is inside; the messages it read stay outside, under the block, so "Leu seu recado" is always in sight.
  */
 export function LiveTools({
   work,
@@ -228,6 +232,7 @@ export function LiveTools({
       </div>
     ) : null;
   }
+  const one = oneCall(items);
   const total = items.reduce((n, i) => n + (i.kind === "call" ? (i.line.ms ?? 0) : 0), 0);
   const head = done
     ? {
@@ -245,9 +250,15 @@ export function LiveTools({
       <ToolBlock
         logos={toolApps(items).map((a) => <span key={appKey(a)}>{logo(a)}</span>)}
         head={head}
-        items={blockItems}
+        // Its own line is closed until clicked, as the block it stands for (code that runs shows when opened).
+        items={
+          one
+            ? blockItems.map((i) => (i.kind === "line" ? { ...i, line: { ...i.line, defaultOpen: false } } : i))
+            : blockItems
+        }
         color={color}
         label={t("chat.work.block", agentGrammar(t, agentName))}
+        one={one}
       />
       {steers.map((s) => (
         <SteerWell key={s.key} now={s.now} note={steerNote?.(s.messageId)} />
@@ -258,7 +269,8 @@ export function LiveTools({
 
 /**
  * The tools of a saved reply: closed, "Usou 4 ferramentas · 12 s" with the apps' logos from `meta.work`; its
- * steps load from `GET …/runs/{id}` only when opened (one request per opened message).
+ * steps load from `GET …/runs/{id}` only when opened (one request per opened message). A single call is its own
+ * line from `meta.work` ("Criou uma rotina"), opening on what it was given and answered.
  */
 export function SavedTools({
   runId,
@@ -274,7 +286,7 @@ export function SavedTools({
   /** Screens whose calls have their own card on the message (`BrowserTrailCard`): left out here. */
   skipScreens?: ScreenKind[];
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const [open, setOpen] = useState(false);
   const run = useRun(org.id, open ? runId : null);
@@ -289,9 +301,32 @@ export function SavedTools({
     : null;
   const items = work ? toolItemsSaved(work) : [];
   const blockItems = useBlockItems(items);
-  // Nothing to say: the server says it used no tools.
-  if (compact && compact.steps === 0) return null;
+  // Nothing to say: the server says it used no tools (lookups and reactions aren't counted).
+  if (compact && workSteps(compact) === 0) return null;
   const calls = work ? toolCalls(items) : (compact?.steps ?? 0);
+  const lone = savedOneLine(meta);
+  // Its only call has a card of its own on the message (where it browsed): the card says it.
+  if (lone && onCard(lone.tool)) return null;
+  if (lone && (!work || oneCall(items) || !items.some((i) => i.kind === "call"))) {
+    const line = blockLine(t, i18n.language, lone, logo(lone));
+    const wait = run.isError ? (
+      t("chat.work.failed")
+    ) : !work ? (
+      <PixelSpinner size={14} color={color} label={t("common.loading")} />
+    ) : undefined;
+    return (
+      <ToolBlock
+        one
+        logos={[]}
+        head={{ text: line.label }}
+        items={work && oneCall(items) ? blockItems : [{ kind: "line", line: { ...line, detail: wait } }]}
+        color={color}
+        label={t("chat.work.block", agentGrammar(t, agentName))}
+        // Its steps stay once loaded: closing the line doesn't change what it says.
+        onToggle={(o) => o && setOpen(true)}
+      />
+    );
+  }
   const durationMs = work?.durationMs ?? compact?.durationMs ?? null;
   const apps = work ? toolApps(items) : workApps((compact?.calls ?? []).filter((c) => !onCard(c.name)));
   const status: ToolBlockItem[] = run.isError

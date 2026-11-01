@@ -69,6 +69,8 @@ function stepLine(kind: string, data: Record<string, unknown>): string | null {
     case "approval":
       return "asked for an approval";
     case "error":
+      if (data.reason === "usage_wait")
+        return data.code === "budget" ? "ran out of its monthly budget" : "hit its plan's limit";
       return typeof data.reason === "string" ? `hit a problem: ${data.reason}` : "hit a problem";
     case "context":
       return Array.isArray(data.steeredMessageIds) ? "read new messages from people" : null;
@@ -80,8 +82,13 @@ function stepLine(kind: string, data: Record<string, unknown>): string | null {
 /** What a waiting run waits on, from the rows it waits for. */
 async function waitsOf(db: Database, run: AgentRun): Promise<string[]> {
   const out: string[] = [];
-  if (run.waitingMachineId) {
-    const code = (run.transcript as { waitingForBrain?: { code?: string } } | null)?.waitingForBrain?.code;
+  const brainWait = (run.transcript as { waitingForBrain?: { code?: string; until?: string } } | null)?.waitingForBrain;
+  // A usage wait has no computer to wait for: never "its computer is offline".
+  if (brainWait?.code === "plan_limit" || brainWait?.code === "budget") {
+    const what = brainWait.code === "budget" ? "its monthly budget to renew" : "its plan's usage limit to reset";
+    out.push(`${what} (it picks up by itself${brainWait.until ? ` around ${brainWait.until}` : ""})`);
+  } else if (run.waitingMachineId) {
+    const code = brainWait?.code;
     out.push(
       code === "busy"
         ? "room on its computer (busy with other tasks)"
@@ -100,7 +107,7 @@ async function waitsOf(db: Database, run: AgentRun): Promise<string[]> {
       .from(browserHandoffs)
       .where(and(eq(browserHandoffs.runId, run.id), inArray(browserHandoffs.status, ["pending", "active"]))),
     db
-      .select({ question: agentConsultations.question, name: agents.name })
+      .select({ kind: agentConsultations.kind, question: agentConsultations.question, name: agents.name })
       .from(agentConsultations)
       .innerJoin(agents, eq(agents.id, agentConsultations.targetAgentId))
       .where(and(eq(agentConsultations.askerRunId, run.id), eq(agentConsultations.status, "open"))),
@@ -111,7 +118,12 @@ async function waitsOf(db: Database, run: AgentRun): Promise<string[]> {
       `a person to help in its browser: "${clip(h.instructions, 200)}" (${h.status === "active" ? "a person has control now" : "nobody opened it yet"})`,
     );
   }
-  for (const c of consults) out.push(`an answer from ${c.name}, whom it asked: "${clip(c.question, 200)}"`);
+  for (const c of consults)
+    out.push(
+      c.kind === "note"
+        ? `${c.name} to finish the work it handed over: "${clip(c.question, 200)}"`
+        : `an answer from ${c.name}, whom it asked: "${clip(c.question, 200)}"`,
+    );
   return out;
 }
 

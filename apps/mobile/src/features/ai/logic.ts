@@ -7,6 +7,7 @@ import type {
   MachineAccountKind,
   PlanUsage,
 } from "@agenteschat/client";
+import { autonomyWords, type NewAgentStart } from "@agenteschat/client/lib/agent-setup";
 import {
   type AccountChoice,
   accountAbout,
@@ -14,10 +15,18 @@ import {
   type ExistingAi,
   existingAi,
 } from "@agenteschat/client/lib/ai-accounts";
-import { isClaudeAlias } from "@agenteschat/client/lib/brain-advanced";
+import { thinksWith } from "@agenteschat/client/lib/brain";
+import { type Advanced, advancedParts, isClaudeAlias } from "@agenteschat/client/lib/brain-advanced";
+import { lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import type { PlanGate } from "@agenteschat/client/lib/no-ai";
-import { brainModelChoice, brainModelChoices, type CodingPlan } from "@agenteschat/client/lib/plans";
+import { aiChoiceOf, type PlanGate, planOfAccount } from "@agenteschat/client/lib/no-ai";
+import {
+  brainModelChoice,
+  brainModelChoices,
+  brainPlan,
+  type CodingPlan,
+  type PlanModelNeed,
+} from "@agenteschat/client/lib/plans";
 import { AUTO, isAuto, providerLabel } from "@agenteschat/client/lib/providers";
 import type { TFunction } from "i18next";
 
@@ -81,8 +90,10 @@ export interface ModelRow {
   label: string;
   /** What it does or is sold as. */
   sub?: string;
-  /** What the plan's account must allow before it answers. */
+  /** What the plan's account must allow before it answers, behind the row's ⓘ. */
   note?: string;
+  /** That need's id: chosen, the agent's page says how to give it (`brain.modelHow`). */
+  needs?: PlanModelNeed;
   /** Who makes it, on a plan of several makers' models: a provider's id or the maker's name. */
   maker?: string;
   checked: boolean;
@@ -111,7 +122,7 @@ export function modelRows(
         : !plan && view.brain === "claude_code" && isClaudeAlias(value)
           ? { sub: t(`agentPage.work.brain.modelLine.${value}`) }
           : {}),
-      ...(needs ? { note: t(`brain.modelNeeds.${needs}`) } : {}),
+      ...(needs ? { note: t(`brain.modelNeeds.${needs}`), needs } : {}),
       ...(maker ? { maker } : {}),
     })),
   ];
@@ -127,6 +138,50 @@ export function modelSections(rows: ModelRow[]): { maker?: string; rows: ModelRo
     else sections.push({ ...(r.maker ? { maker: r.maker } : {}), rows: [r] });
   }
   return sections;
+}
+
+/**
+ * What picking an account saves on the agent's page (null: the computer's own sign-in), where the account list is the
+ * plan choice: the account, and on another plan that plan's default model (its models aren't this one's), Automático
+ * staying Automático, as the web's cards do.
+ */
+export function accountInput(
+  view: Pick<AgentBrain, "brain" | "account" | "accounts" | "effectiveModel">,
+  a: Pick<MachineAccount, "id" | "kind" | "provider"> | null,
+): Pick<AgentBrainInput, "account" | "model"> {
+  const kind = accountKindOf(view.brain);
+  const next = a ? planOfAccount(a) : kind ? planOfAccount({ kind, provider: null }) : null;
+  if (next === aiChoiceOf(view)) return { account: a?.id ?? null };
+  return { account: a?.id ?? null, model: isAuto(view.effectiveModel) ? AUTO : null };
+}
+
+type ThinkingView = Pick<AgentBrain, "brain" | "effectiveModel" | "options" | "accounts" | "account">;
+
+/** What thinks, in the one sentence every place says it: the model by the plan that pays for it, or the API's model. */
+function thinksNow(t: TFunction, view: ThinkingView): string | undefined {
+  const model = modelRows(t, view, brainPlan(view)).find((r) => r.checked)?.label;
+  const ai = aiChoiceOf(view);
+  return ai === "key" || !model ? model : thinksWith(t, ai, model);
+}
+
+/**
+ * What the agent's page says once an account is saved (`saved`: the view the save returned): the account it now uses
+ * (the computer's own sign-in as the account its owner's agents share), or, when the account was another plan's, what
+ * thinks now, since its model changed with it (`accountInput`), as the web's cards say it.
+ */
+export function accountSaved(
+  t: TFunction,
+  language: string,
+  agentName: string,
+  a: Pick<MachineAccount, "label"> | null,
+  input: Pick<AgentBrainInput, "model">,
+  saved: ThinkingView,
+): string {
+  const g = agentGrammar(t, agentName);
+  if ("model" in input) return t("agentPage.work.saved.brain", { ...g, brain: thinksNow(t, saved) ?? "" });
+  return a
+    ? t("agentPage.work.saved.account", { ...g, account: a.label })
+    : t("aiAccounts.done.savedAgent", { agent: agentName, label: lowerFirst(t("connectAi.own.shared"), language) });
 }
 
 /** What picking a model saves, as the web's dialog does: Automático picks the effort too; a fixed one after it, Médio. */
@@ -170,4 +225,44 @@ export function existingRows(
         }
       : { key: row.choice.login.id, row, ...accountRow(t, row.choice, agentName) },
   );
+}
+
+/**
+ * "Usar em outros agentes" on the phone (ADR 0094): the agent's saved setup in words, as the web's dialog says it
+ * ("Opus pelo plano do Claude · Esforço alto · Autonomia: Não pergunta"): the model by the plan that pays for it (the
+ * API's model alone), what differs in its advanced settings and its Autonomia.
+ */
+export function setupWords(
+  t: TFunction,
+  language: string,
+  view: Pick<AgentBrain, "brain" | "effectiveModel" | "options" | "accounts" | "account" | "autonomy">,
+  o: { apiKey: boolean; now: Advanced },
+): string {
+  const parts = advancedParts(t, language, {
+    kind: view.brain,
+    autoModel: isAuto(view.effectiveModel),
+    apiKey: o.apiKey,
+    now: o.now,
+  });
+  const autonomy = view.autonomy ? autonomyWords(t, view.autonomy) : null;
+  return [thinksNow(t, view), ...parts, autonomy].filter(Boolean).join(" · ");
+}
+
+/**
+ * What the phone's Criar agente sends for who thinks (ADR 0094): the last setup's API model and key at creation, and
+ * its context window right after; or Automático there and the last setup's plan saved on it right after; with no
+ * setup, Automático on the API. The setup's Autonomia goes at creation either way.
+ */
+export function newAgentAi(thinks: NewAgentStart | null) {
+  const autonomy = thinks?.autonomy;
+  if (thinks?.brain === "model") {
+    return { model: thinks.model, credentialId: thinks.key, contextTokens: thinks.contextTokens, plan: null, autonomy };
+  }
+  return {
+    model: AUTO,
+    credentialId: null,
+    contextTokens: null,
+    plan: thinks ? { machineId: thinks.machineId, input: thinks.input } : null,
+    autonomy,
+  };
 }

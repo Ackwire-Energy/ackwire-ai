@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { guardSql, type SqlRules } from "../src";
+import { guardSql, normalizeDatabasePolicy, type SqlRules } from "../src";
 
 const open: SqlRules = { tables: [], hiddenColumns: [] };
 const reason = async (sql: string, rules = open) => {
@@ -96,4 +96,84 @@ test("an unqualified pg_* name is a catalog only when it is one; other pg_* name
     ok: true,
     relations: ["public.pg_accounts"],
   });
+});
+
+test("names with capitals, spaces, slashes, dots or quotes are stored exact and checked as Postgres resolves them", async () => {
+  const policy = normalizeDatabasePolicy({
+    tables: ['dbo."Invoices 2024"', "Orders", 'dbo."a.b"'],
+    hiddenColumns: ['dbo.invoices."Tax ID/Number"', 'dbo."Invoices 2024"."Say ""hi"""', "customers.cpf"],
+    dailyQueryCap: null,
+    timeoutSeconds: 15,
+  });
+  expect(policy.tables).toEqual(['dbo."Invoices 2024"', "public.orders", 'dbo."a.b"']);
+  expect(policy.hiddenColumns).toEqual([
+    'dbo.invoices."Tax ID/Number"',
+    'dbo."Invoices 2024"."Say ""hi"""',
+    "public.customers.cpf",
+  ]);
+  expect(() => normalizeDatabasePolicy({ ...policy, hiddenColumns: ['dbo.invoices."open'] })).toThrow(
+    "is not schema.table.column",
+  );
+
+  const rules = { tables: [], hiddenColumns: policy.hiddenColumns };
+  expect(await reason('select "Tax ID/Number" from dbo.invoices', rules)).toContain('"Tax ID/Number" is hidden');
+  expect(await reason('select i."Tax ID/Number" from dbo.invoices i', rules)).toContain("is hidden");
+  expect(await reason("select * from dbo.invoices", rules)).toContain("instead of *");
+  expect(await reason('select "Say ""hi""" from dbo."Invoices 2024"', rules)).toContain("is hidden");
+  expect(await reason("select id, total from dbo.invoices", rules)).toBeNull();
+
+  const allowed = { tables: policy.tables, hiddenColumns: [] };
+  expect(
+    await reason('select * from dbo."Invoices 2024" join orders on true join dbo."a.b" on true', allowed),
+  ).toBeNull();
+  // Unquoted, Postgres folds the name: dbo.invoices 2024 is another table.
+  expect(await reason("select * from DBO.INVOICES", allowed)).toContain("may only read the tables");
+  expect(await guardSql('select 1 from dbo."Invoices 2024"', open)).toMatchObject({
+    ok: true,
+    relations: ['dbo."Invoices 2024"'],
+  });
+});
+
+test("rules saved before names were kept exact (lowercase, unquoted) still hide the column", async () => {
+  const rules = { tables: [], hiddenColumns: ["dbo.invoices.tax id/number", "dbo.clients.cpf"] };
+  expect(normalizeDatabasePolicy({ ...rules, dailyQueryCap: null, timeoutSeconds: 15 }).hiddenColumns).toEqual([
+    'dbo.invoices."tax id/number"',
+    "dbo.clients.cpf",
+  ]);
+  expect(await reason('select "Tax ID/Number" from dbo.invoices', rules)).toContain("is hidden");
+  expect(await reason('select "CPF" from dbo."Clients"', rules)).toContain("is hidden");
+});
+
+test("a whole row written as schema.table is a whole-row reference too", async () => {
+  const rules = { tables: [], hiddenColumns: ['dbo.t."CPF/CNPJ"', "public.t.cpf"] };
+  for (const sql of [
+    "select to_json(dbo.t) from dbo.t",
+    "select to_json(public.t) from t",
+    'select (dbo.t)."CPF/CNPJ" from dbo.t',
+    "select (public.t).cpf from t",
+  ])
+    expect(await reason(sql, rules)).toContain("hidden");
+  expect(await reason("select t.id from dbo.t", rules)).toBeNull();
+});
+
+test("saved columns with dots or quotes in their names stay hidden and still save", async () => {
+  const rules = { tables: [], hiddenColumns: ['dbo.t.my"col', "dbo.t.tel. celular"] };
+  expect(await reason('select "my""col" from dbo.t', rules)).toContain("hidden");
+  expect(await reason('select "Tel. Celular" from dbo.t', rules)).toContain("hidden");
+  expect(normalizeDatabasePolicy({ ...rules, dailyQueryCap: null, timeoutSeconds: 15 }).hiddenColumns).toEqual([
+    'dbo.t."my""col"',
+    'dbo.t."tel. celular"',
+  ]);
+  // An entry that still doesn't parse hides its last part everywhere rather than nothing.
+  expect(await reason("select secret from dbo.other", { tables: [], hiddenColumns: ["secret"] })).toContain("hidden");
+});
+
+test("a table allowlist saved lowercase still allows the table with capitals", async () => {
+  const rules = { tables: ["dbo.clientesnfse"], hiddenColumns: [] };
+  expect(await reason('select * from dbo."ClientesNFSe"', rules)).toBeNull();
+  expect(await reason('select * from dbo."Other"', rules)).toContain("may only read the tables");
+  // A quoted entry is exact.
+  expect(
+    await reason('select * from dbo."ClientesNFSe"', { tables: ['dbo."clientesNFSe"'], hiddenColumns: [] }),
+  ).toContain("may only read the tables");
 });

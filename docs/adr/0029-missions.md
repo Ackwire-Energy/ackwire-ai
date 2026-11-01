@@ -1,6 +1,6 @@
 # 0029. Missions: long work driven by the executor on the agent's computer
 
-- Status: Proposed. Superseded in part by ADR 0077 (2026-10-28): the `cloud_computer` reason and missions on the agent's cloud computer
+- Status: Proposed. Superseded in part by ADR 0077 (2026-10-28): the `cloud_computer` reason and missions on the agent's cloud computer. Amended 2026-10-31: §8 (the computer is named only where the workspace has more than one)
 - Date: 2026-10-16
 - Extends: ADR 0025 (connected computers and the runner), ADR 0015 (tools, approvals, resumable runs), ADR 0008 (agent runs)
 
@@ -104,7 +104,7 @@ An `--append-system-prompt` (and a `CLAUDE.md`/`AGENTS.md` line) tells the execu
 
 ### 8. Our agent's role and context
 
-- The agent (e.g. Dev) routes and relays: decides whether a request goes to the executor or is a short chat reply, answers non-code questions, and speaks in the thread when a person addresses it. Cards from executor tools are rendered by code; they read "via Claude Code no MacBook do Walter".
+- The agent (e.g. Dev) routes and relays: decides whether a request goes to the executor or is a short chat reply, answers non-code questions, and speaks in the thread when a person addresses it. Cards from executor tools are rendered by code; they read "via Claude Code no MacBook do Walter". *Amended 2026-10-31:* the computer is named only where the workspace has more than one (`namesComputers`); with one (always on the Cloud) they read "via Claude Code", and the same holds for the mission's chip, its plan card, its sessions, a task's end in the chat and Nova missão.
 - When the agent runs, its context gets a **compact mission brief** (plan progress, running tasks, decisions taken and pending, links) instead of the whole thread; the thread summary covers the rest. Artifacts are referenced by id. A mission's context only enters runs in its own thread.
 - A finished mission can become a memory summary or a wiki page ("App mobile: decisões e lições").
 
@@ -216,7 +216,7 @@ Verified with codex-cli 0.163.0 on a real machine (two turns captured) and again
 - **Events** (`--json`, JSONL): `thread.started { thread_id }`, `turn.started`, `turn.completed { usage }`, `turn.failed { error.message }`, `error { message }`, `item.started|updated|completed { item: { id, type, … } }` with `agent_message { text }` (a human line and, last one wins, the result; only when completed; several per turn), `reasoning` (skipped), `command_execution { command, aggregated_output, exit_code, status }` ("Running: …" with the login-shell wrapper removed, a failure line, a pull request URL from its output), `file_change { changes: [{ path, kind }] }` (files), `mcp_tool_call`, `todo_list`, `error`. `-o last.txt` is the result when the stream had none. Stderr is never a failure by itself (the person's own MCP servers from `~/.codex/config.toml` start too and a failing one only logs there): exit code and `turn.failed`/`error` decide.
 - **MCP.** `-c mcp_servers.agenteschat_agentes.command=…`, `.args=[…, "mcp", "--task", <id>]`, `.env_vars=["AGENTES_MCP_TOKEN","AGENTES_MCP_SOCKET","AGENTES_RUNNER_HOME"]` (names only: the values are in the task's environment), `.default_tools_approval_mode="approve"` (without it, under `approval_policy=never`, every tool without `readOnlyHint` is denied as "requires approval"), `.startup_timeout_sec=60`, `.tool_timeout_sec=300`, `.required=true`. A unique server name, so one of the same name in the person's config isn't merged. `get_context` carries `readOnlyHint`.
 - **Version.** `hello.executors.codex.version` (`codex-cli X.Y.Z`); missions offer Codex only from `CODEX_MIN_VERSION` = 0.163.0 (the verified release); an older one shows "Codex (experimental)" with "update it there". The UI always labels it experimental.
-- **Auth.** We don't touch keys now: `CODEX_API_KEY` in the runner's environment takes precedence over the person's ChatGPT login in `exec`.
+- **Auth.** We don't touch keys now: `CODEX_API_KEY` in the runner's environment takes precedence over the person's ChatGPT login in `exec`. *Amended 2026-10-31 (ADR 0041 §5.1):* a task of an agent with its own account signs in with that account's folder alone, as its turns: no key in the runner's environment reaches it.
 - **Risks.** No token streaming in `exec` (only completed messages, so the live line moves per item); network is on for every command when the work needs to push or install; the sandbox is Codex's own, not ours (ADR 0030); untested on Windows (quoting of `-c` values).
 
 ### Polish round after the first live run (2026-10-16)

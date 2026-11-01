@@ -2,11 +2,13 @@ import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { LiveRun, LiveWork } from "../src/index";
 import { applyChannelEvent, emptyStreams, isQuiet, QUIET_AFTER_MS } from "../src/index";
-import { type Activity, barEntries } from "../src/lib/activity";
+import { type Activity, barEntries, toolActivity } from "../src/lib/activity";
 import {
   callLogo,
   foldSteps,
   formatLineTime,
+  oneCall,
+  savedOneLine,
   stepPhrase,
   type ToolItem,
   toolApps,
@@ -20,6 +22,7 @@ import {
   workApps,
   workFromSteps,
   workMeta,
+  workSteps,
 } from "../src/lib/work";
 
 type Ev = Parameters<typeof applyChannelEvent>[1];
@@ -141,11 +144,43 @@ describe("the block's lines", () => {
     expect(saved.steps.map((s) => s.kind)).toEqual(["creatingIssue"]);
   });
 
-  test("looking up a tool on demand is ours, not an app called find", () => {
-    const items = toolItemsLive([call("1", "find_tools"), call("2", "github_find_tools", { connector: "GitHub" })]);
-    expect(items.map((i) => (i.kind === "call" ? `${i.line.kind}×${i.line.count}` : i.kind))).toEqual([
-      "findingTools×2",
+  test("looking a tool up is ours and never a line: alone there is no block; beside others, only they count", () => {
+    // The bar above the box still says it: ours, not an app called find.
+    expect(toolActivity("find_tools").kind).toBe("findingTools");
+    expect(toolActivity("github_find_tools", "GitHub").kind).toBe("findingTools");
+    expect(toolItemsLive([call("1", "find_tools"), call("2", "github_find_tools", { connector: "GitHub" })])).toEqual(
+      [],
+    );
+    const items = toolItemsLive([
+      call("1", "find_tools"),
+      call("2", "use_tool", { failed: true }),
+      call("3", "list_issues"),
     ]);
+    expect(items.map((i) => (i.kind === "call" ? `${i.line.kind}×${i.line.count}` : i.kind))).toEqual([
+      "readingIssues×1",
+    ]);
+    expect(toolCalls(items)).toBe(1);
+    const at = (s: number) => new Date(Date.UTC(2026, 9, 31, 10, 0, s)).toISOString();
+    const saved = workFromSteps([
+      {
+        seq: 1,
+        kind: "tool_call",
+        data: { toolUseId: "t1", name: "find_tools", input: { query: "x" } },
+        createdAt: at(0),
+      },
+      { seq: 2, kind: "tool_result", data: { toolUseId: "t1", content: "list_issues" }, createdAt: at(1) },
+      { seq: 3, kind: "tool_call", data: { toolUseId: "t2", name: "list_issues", input: {} }, createdAt: at(2) },
+      { seq: 4, kind: "tool_result", data: { toolUseId: "t2", content: "[]" }, createdAt: at(3) },
+    ]);
+    expect(saved.steps.map((s) => s.kind)).toEqual(["readingIssues"]);
+    // A reply saved before the server left lookups out: lookups alone are no block, and never a logo.
+    expect(workSteps({ steps: 2, calls: [{ name: "find_tools" }], durationMs: 900 })).toBe(0);
+    expect(workSteps({ steps: 3, calls: [{ name: "find_tools" }, { name: "list_issues" }], durationMs: 900 })).toBe(3);
+    expect(workApps([{ name: "find_tools" }, { name: "list_issues" }])).toEqual([{ kind: "readingIssues" }]);
+    // A big connector's lookup was counted with that app's calls: it may stand for them too.
+    expect(
+      workSteps({ steps: 2, calls: [{ name: "tiktok_find_tools", connector: "TikTok Ads" }], durationMs: 0 }),
+    ).toBe(2);
   });
 
   test("coming back later is ours, not apps called follow and cancel", () => {
@@ -159,6 +194,13 @@ describe("the block's lines", () => {
       "cancelingFollowUp×1",
     ]);
     expect(toolApps(items)).toEqual([{ kind: "followingUp" }, { kind: "cancelingFollowUp" }]);
+  });
+
+  test("checking its own usage is ours, not a tool named get my usage", () => {
+    const items = toolItemsLive([call("1", "get_my_usage"), call("2", "mcp__agentes__get_my_usage")]);
+    expect(items.map((i) => (i.kind === "call" ? `${i.line.kind}×${i.line.count}` : i.kind))).toEqual([
+      "checkingUsage×2",
+    ]);
   });
 
   test("grey words: a built-in's label, or a connector tool's own name without its app; never its input", () => {
@@ -542,5 +584,48 @@ describe("each call's service and its logo", () => {
       app: "Gmail",
       service: "gmail",
     });
+  });
+});
+
+describe("one call is its own line (no 'Usou 1 ferramenta' to open)", () => {
+  test("one call stands alone; two or more keep the block, a folded line counting each", () => {
+    expect(oneCall(toolItemsLive([call("1", "create_routine")]))).toBe(true);
+    // What it said and the messages it read are not calls.
+    expect(
+      oneCall(
+        toolItemsLive([
+          { kind: "say", text: "Vou criar a rotina." },
+          call("1", "create_routine"),
+          { kind: "steer", messageId: "m9" },
+        ]),
+      ),
+    ).toBe(true);
+    // Two browser steps fold into one line ("×2"): still two calls, the block.
+    expect(oneCall(toolItemsLive([call("1", "browser_open"), call("2", "browser_click")]))).toBe(false);
+    expect(oneCall(toolItemsLive([call("1", "create_routine"), call("2", "create_issue")]))).toBe(false);
+    expect(oneCall([])).toBe(false);
+  });
+
+  test("a saved reply's lone call is its line from meta.work: what it did, its own time, whether it failed", () => {
+    const line = savedOneLine({ work: { steps: 1, calls: [{ name: "create_routine" }], durationMs: 4000, ms: 870 } });
+    expect(line).toMatchObject({ kind: "creatingRoutine", tool: "create_routine", state: "done", ms: 870, count: 1 });
+    expect(line && toolPhrase(t, line)).toBe('chat.work.step.creatingRoutine|{"app":"","tool":"create routine"}');
+    const failed = savedOneLine({
+      work: { steps: 1, calls: [{ name: "create_routine" }], durationMs: 4000, ms: 300, failed: true },
+    });
+    expect(failed?.state).toBe("fail");
+    // A connector's call keeps its app and its own tool's name in grey.
+    expect(
+      savedOneLine({
+        work: { steps: 1, calls: [{ name: "github_search_issues", connector: "GitHub" }], durationMs: 900, ms: 640 },
+      }),
+    ).toMatchObject({ kind: "consulting", app: "GitHub", hint: "search issues", ms: 640 });
+    // Saved before the server wrote the call's own time: the reply's, as the block said it.
+    expect(savedOneLine({ work: { steps: 1, calls: [{ name: "create_issue" }], durationMs: 4000 } })?.ms).toBe(4000);
+    // Two calls, none, or no work at all: no lone line.
+    expect(savedOneLine({ work: { steps: 2, calls: [{ name: "create_issue" }], durationMs: 900 } })).toBeNull();
+    expect(savedOneLine({ work: { steps: 0, calls: [], durationMs: 900 } })).toBeNull();
+    expect(savedOneLine({})).toBeNull();
+    expect(savedOneLine(undefined)).toBeNull();
   });
 });

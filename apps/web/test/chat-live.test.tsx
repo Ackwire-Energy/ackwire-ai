@@ -380,6 +380,163 @@ describe("bottom anchoring", () => {
     expect(log.scrollTop).toBe(1960);
     expect(screen().getByRole("button", { name: /Novas mensagens/ })).not.toBeNull();
   });
+
+  test("the end shrinking right after a wheel down or a click on a row keeps the list at the bottom", async () => {
+    const { socket } = await open();
+    const log = screen().getByRole("region", { name: "Mensagens" });
+    const height = (value: number) => Object.defineProperty(log, "scrollHeight", { configurable: true, value });
+    height(2000);
+    Object.defineProperty(log, "clientHeight", { configurable: true, value: 500 });
+    await sendText("primeira");
+    await settle(3);
+    await act(async () => fireEvent.scroll(log));
+    const said = (id: string) =>
+      push(socket, {
+        type: "message.created",
+        messageId: id,
+        message: {
+          id,
+          channelId: ENG_ID,
+          threadId: null,
+          author: { type: "person", id: "u-joao" },
+          body: `mensagem ${id}`,
+          mentionedAgentIds: [],
+          agentRunId: null,
+          createdAt: new Date().toISOString(),
+        },
+      });
+    // Wheel down at the bottom, then something at the end gets shorter: the browser clamps scrollTop lower.
+    await act(async () => fireEvent.wheel(log, { deltaY: 40 }));
+    height(1800);
+    log.scrollTop = 1300;
+    await act(async () => fireEvent.scroll(log));
+    height(2400);
+    await said("m-after-wheel");
+    await settle();
+    expect(log.scrollTop).toBe(2400);
+    // A click inside a row (a tools block folding) then the same clamp.
+    const row = rowsWith("primeira")[0] as HTMLElement;
+    await act(async () => fireEvent.pointerDown(row));
+    height(2000);
+    log.scrollTop = 1500;
+    await act(async () => fireEvent.scroll(log));
+    height(2600);
+    await said("m-after-click");
+    await settle();
+    expect(log.scrollTop).toBe(2600);
+    expect(screen().queryByRole("button", { name: /Novas mensagens/ })).toBeNull();
+  });
+
+  test("a window without focus still scrolled by the wheel is being read: a new message doesn't pull the list", async () => {
+    const { socket } = await open();
+    const log = screen().getByRole("region", { name: "Mensagens" });
+    Object.defineProperty(log, "scrollHeight", { configurable: true, value: 2000 });
+    Object.defineProperty(log, "clientHeight", { configurable: true, value: 500 });
+    await sendText("primeira");
+    await settle(3);
+    // Past the opening, when a new message may bring an idle list to it.
+    await act(() => new Promise((r) => setTimeout(r, 1600)));
+    const hasFocus = document.hasFocus;
+    document.hasFocus = () => false;
+    try {
+      log.scrollTop = 100;
+      await act(async () => {
+        fireEvent.wheel(log, { deltaY: -1900 });
+        fireEvent.scroll(log);
+      });
+      await push(socket, {
+        type: "message.created",
+        messageId: "m-unfocused",
+        message: {
+          id: "m-unfocused",
+          channelId: ENG_ID,
+          threadId: null,
+          author: { type: "person", id: "u-joao" },
+          body: "enquanto lia",
+          mentionedAgentIds: [],
+          agentRunId: null,
+          createdAt: new Date().toISOString(),
+        },
+      });
+      await settle();
+      expect(log.scrollTop).toBe(100);
+    } finally {
+      document.hasFocus = hasFocus;
+    }
+  });
+});
+
+describe("bottom anchoring: reading without a wheel", () => {
+  const said = (socket: Parameters<typeof push>[0], id: string) =>
+    push(socket, {
+      type: "message.created",
+      messageId: id,
+      message: {
+        id,
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "person", id: "u-joao" },
+        body: `mensagem ${id}`,
+        mentionedAgentIds: [],
+        agentRunId: null,
+        createdAt: new Date().toISOString(),
+      },
+    });
+
+  test("dragging a selection up from a row lets go of the bottom, even inside the near-bottom band", async () => {
+    const { socket } = await open();
+    const log = screen().getByRole("region", { name: "Mensagens" });
+    const height = (value: number) => Object.defineProperty(log, "scrollHeight", { configurable: true, value });
+    height(2000);
+    Object.defineProperty(log, "clientHeight", { configurable: true, value: 500 });
+    await sendText("primeira");
+    await settle(3);
+    await act(async () => fireEvent.scroll(log));
+    const row = rowsWith("primeira")[0] as HTMLElement;
+    const selection = window.getSelection() as Selection;
+    try {
+      await act(async () => fireEvent.pointerDown(row));
+      const range = document.createRange();
+      range.selectNodeContents(row);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      // The browser's selection autoscroll moves the list up a little.
+      log.scrollTop = 1960;
+      await act(async () => fireEvent.scroll(log));
+      height(2400);
+      await said(socket, "m-while-selecting");
+      await settle();
+      expect(log.scrollTop).toBe(1960);
+    } finally {
+      selection.removeAllRanges();
+    }
+  });
+
+  test("a click on a row doesn't count as reading a window without focus: a new message still brings the list to it", async () => {
+    const { socket } = await open();
+    const log = screen().getByRole("region", { name: "Mensagens" });
+    Object.defineProperty(log, "scrollHeight", { configurable: true, value: 2000 });
+    Object.defineProperty(log, "clientHeight", { configurable: true, value: 500 });
+    await sendText("primeira");
+    await settle(3);
+    await act(() => new Promise((r) => setTimeout(r, 1600)));
+    // Up by the keys (no wheel), then a click inside a row, then the window loses focus.
+    log.scrollTop = 100;
+    await act(async () => {
+      fireEvent.keyDown(log, { key: "PageUp" });
+      fireEvent.scroll(log);
+    });
+    await act(async () => fireEvent.pointerDown(rowsWith("primeira")[0] as HTMLElement));
+    const hasFocus = document.hasFocus;
+    document.hasFocus = () => false;
+    try {
+      await said(socket, "m-away");
+      await settle(3);
+      expect(log.scrollTop).toBe(2000);
+    } finally {
+      document.hasFocus = hasFocus;
+    }
+  });
 });
 
 describe("receipts: a check with a popover", () => {
@@ -751,24 +908,24 @@ describe("direct messages with an agent", () => {
     expect(document.activeElement).toBe(composer());
   });
 
-  test("a computer brain thinks for the agent: the DM header says Claude Code · Sonnet no MacBook, with its mark", async () => {
+  test("a plan thinks for the agent: the DM header says its model by that plan, with its mark", async () => {
     const state = seedState();
     const ada = state.agents.find((a) => a.id === ADA_ID);
     if (ada) ada.brain = { kind: "claude_code", model: "Sonnet", computer: "MacBook" };
     await open(state, `dm/agent/${ADA_ID}`);
     await settle(4);
-    expect(document.body.textContent).toContain("Dev · de João · Claude Code · Sonnet no MacBook");
+    expect(document.body.textContent).toContain("Dev · de João · Sonnet pelo plano do Claude");
     expect(document.body.textContent).not.toContain("Claude Sonnet 5.5");
     const brain = document.querySelector(".channel__brain") as HTMLElement;
     expect(brain.querySelector(".ac-brand[data-mark='claude']")).not.toBeNull();
     cleanup();
-    // Without the computer's name (a member): just the brain and its model.
+    // Who doesn't see its computer (a member) reads whose plan it is.
     const member = seedState();
     const codex = member.agents.find((a) => a.id === ADA_ID);
     if (codex) codex.brain = { kind: "codex", model: "GPT-6 Sol" };
     await open(member, `dm/agent/${ADA_ID}`);
     await settle(4);
-    expect(document.body.textContent).toContain("Dev · de João · Codex · GPT-6 Sol");
+    expect(document.body.textContent).toContain("Dev · de João · GPT-6 Sol pelo plano do ChatGPT de João");
   });
 
   test("sidebar agent → DM via POST /dms: header with role, owner and model; empty state; the agent answers without a mention", async () => {
@@ -913,9 +1070,10 @@ describe("memory changes and proposals in the chat", () => {
       "prop-1",
       "Só PRs pequenos.",
     ]);
-    // Decided: the settled card takes its place (another element).
+    // Decided: one line takes its place (another element).
     const done = screen().getByRole("group", { name: "Proposta de mudança de Ada" });
-    expect(done.querySelector(".ac-chip--done")?.textContent).toBe("Aceita");
+    expect(done.querySelector(".rq-done__mark[data-done]")).not.toBeNull();
+    expect(done.textContent).toContain("Aceita");
   });
 });
 

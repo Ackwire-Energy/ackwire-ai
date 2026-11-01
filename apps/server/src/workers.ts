@@ -8,6 +8,7 @@ import {
   createOutboxPump,
   type DesktopControl,
   enqueue,
+  enqueueAutonomyReport,
   enqueueIdleReflections,
   enqueueOverdueDeletions,
   enqueueWaitlistContacts,
@@ -46,7 +47,7 @@ export interface WorkerDeps {
   context?: ContextDeps;
   /** Drive files (purging deleted ones after 30 days). */
   artifacts?: ArtifactDeps;
-  /** Voice recordings (deleting them past their retention, ADR 0094). */
+  /** Voice recordings (deleting them past their retention, ADR 0098). */
   voice?: VoiceDeps;
   /** Approval reminder emails. */
   approvalDigest?: { publicUrl: string; afterHours: number };
@@ -56,6 +57,8 @@ export interface WorkerDeps {
   browserLive?: BrowserLive;
   /** Agents' desktops (ADR 0058): the ones with an open handoff stay up. */
   desktops?: Pick<DesktopControl, "keepAlive">;
+  /** The daily stall-and-noise report (`OPS_REPORT_EMAIL`); absent: none. */
+  opsReport?: { to: string[]; publicUrl: string };
   log: Logger;
   workerId?: string;
 }
@@ -87,6 +90,8 @@ export const WORKER_INTERVALS_MS = {
   mailReconcile: 15 * 60_000,
   /** Workspaces past their deletion's date that nothing keeps any more (a hold lifted, a job lost): also at boot. */
   deletions: 3600_000,
+  /** Yesterday's stall-and-noise report, queued for an hour after the UTC day ended (once per day: its dedupe key). */
+  opsReport: 3600_000,
 };
 
 /**
@@ -256,6 +261,9 @@ export function startWorkers(deps: WorkerDeps) {
       for (const failure of r.failed) log.warn("mail account check failed", failure);
     });
   }
+
+  const ops = deps.opsReport;
+  if (ops) every("opsReport", WORKER_INTERVALS_MS.opsReport, () => enqueueAutonomyReport(db, ops));
 
   const digest = deps.approvalDigest;
   if (digest) {

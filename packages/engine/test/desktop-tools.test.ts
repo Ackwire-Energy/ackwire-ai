@@ -264,7 +264,14 @@ test("desktop_screenshot with share: sent to the Drive and attached to the reply
   };
   const kept = await d.call("desktop_screenshot", { path: "shots/kept.jpg" });
   expect(kept.content).toBe(
-    "Saved shots/kept.jpg in your folder: the whole screen as a JPEG (1280×800). Open it with your own Read tool to look at it. To show a screenshot in this conversation, take it with share: true.",
+    "Saved shots/kept.jpg in your folder: the whole screen as a JPEG (1280×800). You can't see pictures from here: desktop_read tells what the screen says. To show a screenshot in this conversation, take it with share: true.",
+  );
+  // A computer brain (through the bridge) opens it with its own Read.
+  const bridged = { ...d.ctx, bridge: { machineId: d.machineId } };
+  const shotTool = (await d.source.tools(bridged)).find((t) => t.name === "desktop_screenshot");
+  const own = await shotTool?.execute({ path: "shots/own.jpg" }, bridged);
+  expect(own?.content).toStartWith(
+    "Saved shots/own.jpg in your folder: the whole screen as a JPEG (1280×800). Open it with your own Read tool to look at it.",
   );
 
   const sent = d.since();
@@ -310,7 +317,7 @@ test("desktop_screenshot with share but without Write files: saved, and the answ
   const out = await d.call("desktop_screenshot", { path: "shots/b.jpg", share: true });
   expect(out.isError).toBeUndefined();
   expect(out.content).toBe(
-    `Saved shots/b.jpg in your folder: the whole screen as a JPEG (1280×800). Open it with your own Read tool to look at it. It isn't shown in this conversation: that needs "Write files" (drive:write), which you don't have. Ask for it with request_permission, then take it again with share: true.`,
+    `Saved shots/b.jpg in your folder: the whole screen as a JPEG (1280×800). You can't see pictures from here: desktop_read tells what the screen says. It isn't shown in this conversation: that needs "Write files" (drive:write), which you don't have. Ask for it with request_permission, then take it again with share: true.`,
   );
   expect(out.data).toEqual({ path: "shots/b.jpg" });
   expect(sent().map((c) => c.op)).toEqual(["desktop.capture", "write"]);
@@ -370,7 +377,7 @@ test("a plan that stops with the agent's browser on the screen says its window i
   expect(acts(d.calls)).toEqual([]);
 });
 
-test("routines that only read, and runs nobody asked for, can't use the desktop; the prompt says how to", () => {
+test("routines that only read can't use the desktop, a run nobody is behind can; the prompt says how to", () => {
   const brief = (access: "read" | "act") => ({
     routineId: "00000000-0000-4000-8000-000000000001",
     routineRunId: "00000000-0000-4000-8000-000000000002",
@@ -383,11 +390,11 @@ test("routines that only read, and runs nobody asked for, can't use the desktop;
     dueAt: new Date().toISOString(),
   });
   const routine = (access: "read" | "act"): RunAuthority => ({ kind: "routine", personId: null, brief: brief(access) });
-  const unattended: RunAuthority = { kind: "unattended", personId: null, reason: "routine_report" };
+  const unattended: RunAuthority = { kind: "unattended", personId: null, reason: "agent" };
   for (const name of TOOLS) {
     const tool = { name, scope: DESKTOP_SCOPE, connectionId: null };
     expect(toolPolicy(routine("read"), tool)).toEqual({ action: "refuse", reason: REFUSALS.routineDesktopReadOnly });
-    expect(toolPolicy(unattended, tool).action).toBe("refuse");
+    expect(toolPolicy(unattended, tool).action).toBe("allow");
     expect(toolPolicy(routine("act"), tool).action).toBe("allow");
   }
   const prompt = describeCapabilities(TOOLS.map((name) => ({ name, description: "", scope: DESKTOP_SCOPE })));

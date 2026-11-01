@@ -31,9 +31,17 @@ import { useTheme } from "./theme";
 import { CHROME_MAX_SCALE, weights } from "./type-scale";
 
 /** The "@" being typed and how to finish it (the screen draws the picker). */
-export interface ComposerMentionState {
-  /** What follows "@" ("th"). */
+/** The "@" (or, with `sigil: "#"`, the channel) being typed right before the caret. */
+export interface ComposerToken {
+  start: number;
   query: string;
+  sigil?: "#";
+}
+
+export interface ComposerMentionState {
+  /** What follows "@" ("th"), or "#" when `sigil` says so. */
+  query: string;
+  sigil?: "#";
   /** Replaces "@th" with "@handle " and puts the caret after it. */
   pick: (handle: string) => void;
 }
@@ -73,14 +81,10 @@ export interface ComposerProps {
   face?: ReactNode;
   /** While "@…" is typed right before the caret (and the field is focused): the card above the field. */
   mention?: (state: ComposerMentionState) => ReactNode;
-  /** The "@" token at the caret (`mentionQuery`); the composer doesn't know the rules itself. */
-  mentionAt?: (text: string, caret: number) => { start: number; query: string } | null;
+  /** The "@" (or "#") token at the caret (`mentionQuery`); the composer doesn't know the rules itself. */
+  mentionAt?: (text: string, caret: number) => ComposerToken | null;
   /** The text after a pick (`insertMention`). */
-  insertMention?: (
-    text: string,
-    token: { start: number; query: string },
-    handle: string,
-  ) => { text: string; caret: number };
+  insertMention?: (text: string, token: ComposerToken, handle: string) => { text: string; caret: number };
   /**
    * Text handed in from another screen ("Falar com o Theo" leaves "@theo " here): put in the field when it is
    * empty, and the field focused. Once per request (`at`).
@@ -194,7 +198,7 @@ export function Composer({
 
   return (
     <View>
-      {token && mention ? mention({ query: token.query, pick }) : null}
+      {token && mention ? mention({ query: token.query, sigil: token.sigil, pick }) : null}
       {suggestions && suggestions.length > 0 && !token && !has ? (
         <ScrollView
           horizontal

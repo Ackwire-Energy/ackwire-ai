@@ -1,8 +1,11 @@
 import { keys, type Message, type RunConsultation, useConsultations } from "@agenteschat/client";
 import {
   type ConsultLineState,
+  consultGroupKeys,
   consultGroupSummary,
+  consultLineKey,
   consultLineState,
+  consultProgress,
   consultSeconds,
   firstOfRun,
   groupsByRun,
@@ -24,38 +27,21 @@ import { type BlockItem, ToolBlock } from "./ToolCalls";
 const BLOCK_STATE: Record<ConsultLineState, ToolState> = {
   working: "run",
   waiting: "run",
-  // Paused until its computer comes back, still out: the same mark as at work.
+  // Paused until its computer comes back, or on what it handed on, still out: the same mark as at work.
   offline: "run",
+  handedOn: "run",
   answered: "done",
   failed: "fail",
   expired: "fail",
 };
 
 /** A question's state in words, the same in the reply's block and on the conversation's screen. */
-export function consultLineLabel(
+export const consultLineLabel = (
   t: TFunction,
   state: ConsultLineState,
   c: RunConsultation,
   to: ReturnType<typeof agentGrammar>,
-) {
-  switch (state) {
-    case "working":
-      return t("chat.consultGroup.working", { name: to.name, The: to.The });
-    case "waiting":
-      return t(c.waiting === "approval" ? "chat.consultGroup.waitingApproval" : "chat.consultGroup.waitingInput", {
-        name: to.name,
-        The: to.The,
-      });
-    case "offline":
-      return t("chat.consultGroup.waitingComputer", { name: to.name, The: to.The });
-    case "answered":
-      return t("chat.consultation.answered", { name: to.name });
-    case "expired":
-      return t("chat.consultation.expired", { name: to.name, The: to.The });
-    default:
-      return t("chat.consultation.failed", { name: to.name, The: to.The });
-  }
-}
+) => t(consultLineKey(state, c), { name: to.name, The: to.The });
 
 /** A clock for the open questions' times; still once none is out. */
 function useTick(active: boolean) {
@@ -70,10 +56,10 @@ function useTick(active: boolean) {
 }
 
 /**
- * The questions the agent asked other agents in this turn, inside its reply, as on the web (`ConsultGroup.tsx`):
- * the tool block's card, "Perguntou a 3 colegas" (open while answers are out), a line per agent that opens the two
- * agents' conversation on a screen of its own, read only (`ConsultationScreen`). The run's first message shows it
- * when the run posted several.
+ * The questions the agent asked other agents in this turn, and the work it handed them, inside its reply, as on the
+ * web (`ConsultGroup.tsx`): the tool block's card, "Perguntou a 3 colegas" or "Passou para 1 colega" (open while
+ * answers are out), a line per agent that opens the two agents' conversation on a screen of its own, read only
+ * (`ConsultationScreen`). The run's first message shows it when the run posted several.
  */
 export function ConsultGroup({ message: m, color }: { message: Message; color: AgentColorName }) {
   const { t, i18n } = useTranslation();
@@ -96,11 +82,13 @@ export function ConsultGroup({ message: m, color }: { message: Message; color: A
   const now = useTick(live);
   if (!draws || !group || !m.author.id) return null;
   const summary = consultGroupSummary(group, now);
+  const words = consultGroupKeys(group);
   const from = agentGrammar(t, dir.agentById.get(m.author.id)?.name ?? t("mobile.chat.someone"));
   const items: BlockItem[] = group.map((c) => {
     const state = consultLineState(c, now);
     const to = agentGrammar(t, dir.agentById.get(c.consultedAgentId)?.name ?? t("mobile.chat.someone"));
     const answer = state === "answered" ? (c.answer ?? "") : null;
+    const progress = consultProgress(c);
     return {
       kind: "line",
       line: {
@@ -110,7 +98,7 @@ export function ConsultGroup({ message: m, color }: { message: Message; color: A
         label: consultLineLabel(t, state, c, to),
         hint: null,
         // The start of the answer, as the web shows it next to the phrase: no tap needed to know what came back.
-        preview: answer ? previewOf(answer) : null,
+        preview: answer ? previewOf(answer) : progress ? t(progress.key, progress.values) : null,
         time: formatLineTime(i18n.language, consultSeconds(c, now) * 1000),
         onOpen: () => router.push(consultationHref(c.id, m.channelId)),
       },
@@ -127,15 +115,17 @@ export function ConsultGroup({ message: m, color }: { message: Message; color: A
       head={{
         // The phone's head has no room for a separate count: "Perguntou a 3 colegas · 1 de 3" in its words.
         text: summary.open
-          ? `${t("chat.consultGroup.asked", { count: summary.total })} · ${t("chat.consultGroup.progress", { done: summary.closed, total: summary.total })}`
-          : t("chat.consultGroup.asked", { count: summary.total }),
+          ? `${t(words.head, { count: summary.total })} · ${t("chat.consultGroup.progress", { done: summary.closed, total: summary.total })}`
+          : t(words.head, { count: summary.total }),
         textKey: `consult-${summary.closed}`,
         state: summary.open ? "run" : undefined,
       }}
       items={items}
       color={color}
-      label={t("chat.consultGroup.label", { name: from.name, of: from.of })}
+      label={t(words.label, { name: from.name, of: from.of })}
       defaultOpen={summary.open}
+      // One question: its own line ("Atlas respondeu"), with no "Perguntou a 1 colega" to open.
+      one={group.length === 1}
     />
   );
 }

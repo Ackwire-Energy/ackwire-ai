@@ -90,10 +90,27 @@ export interface GroupedRowProps {
   faint?: boolean;
   disabled?: boolean;
   onPress?: () => void;
+  /** An ⓘ at the row's end: a tap on it shows the note under the row and never presses the row. */
+  hint?: { name: string; text: string };
 }
 
 /** One row of a group: icon tile, label, the value in faint, a chevron, a check or a switch. */
-export function GroupedRow({
+export function GroupedRow(props: GroupedRowProps) {
+  return props.hint ? <HintedRow {...props} hint={props.hint} /> : <Row {...props} />;
+}
+
+/** VoiceOver merges a button inside the row's button into it: the row reads the note out with its label. */
+function HintedRow({ hint, ...props }: GroupedRowProps & { hint: { name: string; text: string } }) {
+  const info = useInfoHint(hint);
+  return (
+    <View>
+      <Row {...props} said={hint.text} after={info.button} />
+      <View style={[styles.hint, info.open ? styles.hintOpen : null]}>{info.text}</View>
+    </View>
+  );
+}
+
+function Row({
   label,
   labelLines = 1,
   sub,
@@ -111,7 +128,9 @@ export function GroupedRow({
   faint = false,
   disabled = false,
   onPress,
-}: GroupedRowProps) {
+  said,
+  after,
+}: Omit<GroupedRowProps, "hint"> & { said?: string; after?: ReactNode }) {
   const { colors: c } = useTheme();
   const tone = danger ? c.danger : faint ? c.faint : c.ink;
   return (
@@ -119,7 +138,7 @@ export function GroupedRow({
       onPress={onPress}
       disabled={disabled || !onPress}
       accessibilityRole={toggle !== undefined ? "switch" : "button"}
-      accessibilityLabel={[label, belowText, value].filter(Boolean).join(", ")}
+      accessibilityLabel={[label, belowText, said, value].filter(Boolean).join(", ")}
       accessibilityState={{
         disabled,
         ...(toggle !== undefined ? { checked: toggle } : {}),
@@ -154,6 +173,7 @@ export function GroupedRow({
           {value}
         </Text>
       ) : null}
+      {after}
       {checked ? <Icon name="check" size={18} color={c.ink} /> : null}
       {toggle !== undefined ? <ToggleSwitch value={toggle} /> : null}
       {chevron ? <Icon name="right" size={15} color={c.faint} /> : null}

@@ -630,6 +630,33 @@ describe("an agent asks for a hand (ADR 0040, ADR 0058)", () => {
   });
 });
 
+describe("an agent asks for a secret (ADR 0027)", () => {
+  test("one row: who asks, the secret's name and what for, the expiry chip, and a click goes to its card's conversation", async () => {
+    const ask = notification({
+      id: "n-secret",
+      kind: "secret_request",
+      waiting: true,
+      actors: [{ type: "agent", id: ADA_ID }],
+      source: { channelId: ENG_ID, messageId: "msg-s" },
+      latest: {
+        title: "NPM_TOKEN",
+        text: "publicar o pacote no npm",
+        expiresAt: new Date(Date.now() + 12 * 60_000).toISOString(),
+      },
+      updatedAt: ago(1),
+    });
+    const { router } = await go(seedState({ notifications: [ask] }));
+    const row = document.querySelector('[data-n="n-secret"]') as HTMLElement;
+    expect(row.classList.contains("nt-wr")).toBe(true);
+    expect(row.querySelector(".nt-what")?.textContent).toBe("Ada pediu um segredo a você");
+    expect(row.querySelector(".nt-wr__sub")?.textContent).toBe("NPM_TOKEN · publicar o pacote no npm");
+    expect(row.querySelector(".nt-wr__l1 > .nt-wr__left.ac-chip--waiting")?.textContent).toMatch(/^expira em /);
+    await click(row.querySelector(".nt-wr__sub") as HTMLElement);
+    await settle(4);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
+  });
+});
+
 describe("Esperando você: what only points somewhere is one row", () => {
   const asks = (over: Partial<AppNotification> = {}) =>
     notification({
@@ -751,7 +778,7 @@ describe("Esperando você: what only points somewhere is one row", () => {
     const wraps = block(css, "(max-width: 1023px)");
     /** The body of a rule written at the top level of `sheet` (two-space indented inside a media block). */
     const rule = (selector: string, sheet = css) =>
-      new RegExp(`\\n *${selector.replace(/[.()>:*]/g, "\\$&")} \\{([^}]*)\\}`).exec(sheet)?.[1] ?? "";
+      new RegExp(`\\n *${selector.replace(/[.()>:*[\]]/g, "\\$&")} \\{([^}]*)\\}`).exec(sheet)?.[1] ?? "";
     const value = (selector: string, prop: string, sheet = css) =>
       new RegExp(`(?:^|[;\\s])${prop}: ([^;]+);`).exec(rule(selector, sheet))?.[1];
     const px = (selector: string, prop: string, sheet = css) => Number.parseFloat(value(selector, prop, sheet) ?? "");
@@ -795,9 +822,9 @@ describe("Esperando você: what only points somewhere is one row", () => {
     expect(rule(".nt-av40", phone)).toBe("");
     expect(value(".nt-wi", "grid-template-columns", phone)).toBeUndefined();
     // A ghost reaches into the item's padding and the item clips: its ring goes inside, as the item's own does.
-    const ring = value(".nt-item:focus-visible", "box-shadow");
+    const ring = value("html:not([data-pointer]) .nt-item:focus-visible", "box-shadow");
     expect(ring).toStartWith("inset ");
-    expect(value(".nt-wi .ac-acts > .ac-btn--ghost:focus-visible", "box-shadow")).toBe(ring);
+    expect(value("html:not([data-pointer]) .nt-wi .ac-acts > .ac-btn--ghost:focus-visible", "box-shadow")).toBe(ring);
   });
 });
 
@@ -812,6 +839,19 @@ describe("a click on a browser notification (ADR 0071)", () => {
     ]);
   });
 
+  test("no tab open, a routine's trouble: its details over the inbox, without ?open", async () => {
+    const state = seedState({ notifications: inbox() });
+    const api = createFakeApi(state);
+    const failed = (await api.routines.list(ORG_ID))[0];
+    if (!failed) throw new Error("no routine seeded");
+    for (const n of state.notifications ?? []) if (n.id === "n-routine") n.source.routineId = failed.id;
+    const { router } = await renderApp(`/org/${ORG_ID}/notifications?open=n-routine`, { api });
+    await settle(8);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/notifications`);
+    expect(router.state.location.search).toEqual({});
+    expect(screen().getByRole("dialog", { name: failed.name })).toBeTruthy();
+  });
+
   test("one that is gone: the inbox, without ?open", async () => {
     const state = seedState({ notifications: inbox() });
     const { router } = await renderApp(`/org/${ORG_ID}/notifications?open=n-gone`, { api: createFakeApi(state) });
@@ -823,7 +863,12 @@ describe("a click on a browser notification (ADR 0071)", () => {
 
   test("a tab open in the workspace: it opens there at once, no stop at the inbox", async () => {
     const state = seedState({ notifications: inbox() });
-    const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    const api = createFakeApi(state);
+    // The routine that failed: its details open over the page the person is on.
+    const failed = (await api.routines.list(ORG_ID))[0];
+    if (!failed) throw new Error("no routine seeded");
+    for (const n of state.notifications ?? []) if (n.id === "n-routine") n.source.routineId = failed.id;
+    const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(8);
     const seen: string[] = [];
     const unsubscribe = router.subscribe("onResolved", (e) => seen.push(e.toLocation.pathname));
@@ -838,7 +883,8 @@ describe("a click on a browser notification (ADR 0071)", () => {
     );
     await settle(8);
     unsubscribe();
-    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/routines`);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
+    expect(screen().getByRole("dialog", { name: failed.name })).toBeTruthy();
     expect(seen).not.toContain(`/org/${ORG_ID}/notifications`);
     expect(state.calls.find((c) => c.method === "notifications.read")?.args).toEqual([ORG_ID, "n-routine", true]);
   });

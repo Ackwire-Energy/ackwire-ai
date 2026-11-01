@@ -7,16 +7,17 @@ import {
   noticeAgentHandle,
   noticeOf,
   noticeRoutineName,
+  skippedHandles,
 } from "@agenteschat/client/lib/notices";
 import type { RoutineReply } from "@agenteschat/client/lib/routines";
 import { cx, Icon, type IconName } from "@agenteschat/ui";
-import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { MessageBody } from "@/chat/MessageBody";
 import { ConsultationCard } from "@/components/ConsultationCard";
+import { DetailsLink } from "@/components/details-link";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import "./chat-notices.css";
@@ -27,6 +28,7 @@ const NOTICE_ICON: Record<string, IconName> = {
   agent_note: "message",
   wait_result: "check",
   follow_up: "clock",
+  wake_skipped: "alert",
 };
 
 /** The line's words: the app's own, never the agent-facing `from` ("Routine «…»") as is. */
@@ -50,6 +52,13 @@ function noticeLabel(
       return from ? t("chat.notice.agentNote", { from }) : t("chat.notice.agentNoteAnon");
     case "wait_result":
       return t("chat.notice.waitResult", { name: agentName });
+    case "wake_skipped":
+      return t("chat.notice.wakeSkipped", {
+        name: agentName,
+        agents: skippedHandles(notice)
+          .map((h) => nameOfHandle(h) ?? h)
+          .join(", "),
+      });
     default:
       return t("chat.notice.other", { name: agentName });
   }
@@ -182,7 +191,7 @@ function CancelFollowUp({ messageId }: { messageId: string }) {
 
 /**
  * The routine an agent's message answers (ADR 0053 §7): a small tag next to its name, "Rotina «X»",
- * that opens the routine in Rotinas; with the report it answers loaded here, "Ver relatório" unfolds it
+ * that opens the routine's details in place (`DetailsLink`); with the report it answers loaded here, "Ver relatório" unfolds it
  * (the report's own line is folded into this message).
  */
 export function RoutineTag({
@@ -197,19 +206,16 @@ export function RoutineTag({
   onToggle: () => void;
 }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
   return (
     <>
-      <Link
-        to="/org/$orgId/routines"
-        params={{ orgId: org.id }}
-        search={{ open: routine.id }}
+      <DetailsLink
+        item={{ kind: "routine", id: routine.id }}
         className="msg-reminder msg-reminder--link"
         title={t("channel.routineTagTip")}
       >
         <Icon name="routines" size={14} />
         {t("channel.routineTag", { name: routine.name })}
-      </Link>
+      </DetailsLink>
       {report && (
         <button type="button" className="cn-line__toggle cn-report__toggle" aria-expanded={open} onClick={onToggle}>
           {open ? t("channel.routineReportHide") : t("channel.routineReport")}

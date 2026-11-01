@@ -88,11 +88,8 @@ export function parse(files: ImportFile[], d: Draft) {
       d.used.add(folder(a.avatar));
       d.left("picture", name);
     }
-    if (files) {
-      const rest = d.under(files).filter((f) => !d.used.has(f.name));
-      for (const f of rest) d.used.add(f.name);
-      if (rest.length) d.left("file", `${files}/ (${rest.length})`);
-    }
+    // The rest of the folder is the agent's own files: they can go to its folder in the Drive.
+    if (files) d.filesIn(key, files);
     for (const r of [...list(a.routines), ...list(a.oneTimeRoutines)].map(obj)) routine(r, key, null, name, d);
     list(a.memories).forEach((m, i) => {
       d.note({ key: `${key}/memory-${i + 1}`, agent: key, kind: "fact", content: str(m) || str(obj(m).text) });

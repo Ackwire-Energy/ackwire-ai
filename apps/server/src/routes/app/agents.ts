@@ -5,6 +5,7 @@ import {
   agentBudgetsThisMonth,
   agentStatuses,
   agentView,
+  applyAgentSetup,
   archiveAgent,
   audienceOf,
   budgetPercent,
@@ -14,6 +15,8 @@ import {
   createAgentFromProposal,
   createAgentGroup,
   createCredential,
+  createProposedAgent,
+  createProposedRoutine,
   deleteAgent,
   deleteAgentGroup,
   deleteCredential,
@@ -21,6 +24,7 @@ import {
   getAgent,
   getAgentBrain,
   getAgentProposal,
+  getNewAgentSetup,
   getTeam,
   listAgentGroups,
   listAgents,
@@ -30,12 +34,14 @@ import {
   NEW_AGENT_DEFAULTS,
   NotFoundError,
   newAgentBrainMachines,
+  oldHandlesByAgent,
   orgAiStatus,
   orgRouting,
   pickerModels,
   publishMachineAgentsChanged,
   requirePermission,
   revokeCredential,
+  SETUP_AGENTS_MAX,
   setAgentAppearance,
   setAgentAudience,
   setAgentBrain,
@@ -65,13 +71,17 @@ import {
   AgentAppearance,
   AgentAudience,
   AgentBrain,
+  AgentSetup,
+  AgentSetupResult,
   BrainEffortSetting,
   BrainKind,
   BrainMachine,
+  CommandApproval,
   ContextLimit,
   Credential,
   FormerAgent,
   Model,
+  NewAgentSetup,
   ProviderId,
   Usage,
 } from "./schemas";
@@ -155,6 +165,38 @@ const AgentProposal = z
         appearance: AgentAppearance.nullable(),
         channelIds: z.array(z.uuid()),
         access: z.array(z.object({ connectionId: z.uuid(), level: z.enum(["read", "write"]) })),
+        mail: z
+          .array(
+            z.object({
+              accountId: z.uuid(),
+              address: z.string(),
+              level: z.enum(["read", "write"]),
+              ownerUserId: z.string(),
+            }),
+          )
+          .optional()
+          .openapi({ description: "Mailboxes of the person who asked: only a mailbox's owner gives an agent access." }),
+        routine: z
+          .object({
+            name: z.string(),
+            prompt: z.string(),
+            schedule: z.string(),
+            rule: z.record(z.string(), z.unknown()).nullable(),
+            cron: z.string(),
+            timezone: z.string(),
+            description: z.string(),
+            report: z.enum(["always", "when_new"]),
+            access: z.enum(["read", "act"]),
+            reportsIn: z.uuid().nullable().optional().openapi({
+              description: "The channel it reports in, which the agent must be in first (null: the creator's DM).",
+            }),
+          })
+          .nullable()
+          .optional()
+          .openapi({
+            description:
+              "A routine of its own, created with it (its schedule read when proposed: `rule`, else `cron`). It reports where the card is (a DM: the creator's DM with it).",
+          }),
         ai: z.discriminatedUnion("kind", [
           z.object({
             kind: z.literal("account"),
@@ -174,6 +216,13 @@ const AgentProposal = z
     decidedByUserId: z.string().nullable(),
     decidedAt: z.string().nullable(),
     expiresAt: z.string(),
+    applied: z
+      .object({ channelIds: z.array(z.uuid()), connectionIds: z.array(z.uuid()), mailAccountIds: z.array(z.uuid()) })
+      .optional()
+      .openapi({
+        description: "Created in one click: the lines of its draft it got (the rest waits for who may give it).",
+      }),
+    routineId: z.string().nullable().optional().openapi({ description: "The routine made with it." }),
     expired: z.boolean(),
     canDecide: z.boolean(),
   })
@@ -328,18 +377,24 @@ export function agentRoutes(deps: AppDeps) {
       const { orgId } = c.req.valid("param");
       const actor = c.get("user").id;
       const list = await listAgents(db, actor, orgId);
-      const [seesCost, budgets, brains, talks] = await Promise.all([
+      const [seesCost, budgets, brains, talks, old] = await Promise.all([
         canViewCost(db, actor, orgId),
         agentBudgetsThisMonth(db, orgId),
         agentBrainSummaries(db, actor, orgId, list),
         talksToAgents(db, orgId, actor),
+        oldHandlesByAgent(db, orgId),
       ]);
       const percent = (id: string) => {
         const b = budgets.get(id);
         return b ? budgetPercent(b.spentNanoUsd, b.budgetNanoUsd) : 0;
       };
       return c.json(
-        { agents: list.map((a) => toAgent(a, actor, seesCost, percent(a.id), brains.get(a.id), talks)) },
+        {
+          agents: list.map((a) => ({
+            ...toAgent(a, actor, seesCost, percent(a.id), brains.get(a.id), talks),
+            previousHandles: old.get(a.id) ?? [],
+          })),
+        },
         200,
       );
     },
@@ -449,6 +504,9 @@ export function agentRoutes(deps: AppDeps) {
                         "waiting_approval",
                         "waiting_answer",
                         "waiting_computer",
+                        "waiting_plan",
+                        "waiting_budget",
+                        "provider_down",
                       ])
                       .nullable()
                       .openapi({ description: "With `auto`/`wait`: what it does, worded by the app." }),
@@ -539,6 +597,10 @@ export function agentRoutes(deps: AppDeps) {
             proposal: z.uuid().optional().openapi({
               description: "The card of an agent's proposal it comes from (ADR 0081): it is marked created.",
             }),
+            autonomy: CommandApproval.optional().openapi({
+              description:
+                "The Autonomia it starts with (ADR 0094, the last setup's). Default: low_risk_auto. Whoever may create it may set it: an admin, or its owner (without Manage agents, only your own agent).",
+            }),
           }),
         ),
       },
@@ -555,6 +617,8 @@ export function agentRoutes(deps: AppDeps) {
           { ...input, monthlyBudgetNanoUsd: budget(monthlyBudgetUsd) },
           // New agents start on "Automático".
           NEW_AGENT_DEFAULTS,
+          // The person's Criar agente: what they pick is what the next one starts with (ADR 0094).
+          { remember: true },
         );
       let agent = proposal
         ? await createAgentFromProposal({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, proposal, make)
@@ -587,6 +651,68 @@ export function agentRoutes(deps: AppDeps) {
   app.openapi(
     createRoute({
       method: "post",
+      path: "/organizations/{orgId}/agent-proposals/{messageId}/create",
+      tags,
+      security,
+      summary: "Create a proposed agent as it is, in one click (who may create agents)",
+      description:
+        "The agent from the draft, owned by whoever creates it, with each line they may give it: its AI (an account of theirs), its channels, its access to the connected apps (an admin's), the mailboxes (only their owner's) and its routine. The card (`applied`, `routineId`) says what it got; the agent that proposed it is told what waits for whom.",
+      request: { params: ProposalParams },
+      responses: {
+        201: json(
+          z.object({
+            agent: Agent,
+            proposal: AgentProposal,
+            ai: z.enum(["account", "model", "none"]).openapi({
+              description: "What it thinks with now (the clicker's account, the workspace's model or nothing yet).",
+            }),
+          }),
+          "Created",
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, messageId } = c.req.valid("param");
+      const userId = c.get("user").id;
+      const gateway = deps.extras?.context?.gateway;
+      const made = await createProposedAgent({ db, pubsub: adapters.pubsub, gateway }, userId, orgId, messageId);
+      if (made.agent.machineId) await publishMachineAgentsChanged(adapters.pubsub, orgId);
+      return c.json(
+        {
+          agent: toAgent(made.agent, userId, await canViewCost(db, userId, orgId)),
+          proposal: made.proposal,
+          ai: made.ai,
+        },
+        201,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/agent-proposals/{messageId}/routine",
+      tags,
+      security,
+      summary: "Create the routine a proposal came with, for the agent created from it in the review",
+      description:
+        "After the review put the agent where the routine reports. Once (409 `agent_proposal.routine_made`); the routine's own rules apply (the agent's owner or an admin).",
+      request: { params: ProposalParams },
+      responses: { 200: json(AgentProposal), ...errors },
+    }),
+    async (c) => {
+      const { orgId, messageId } = c.req.valid("param");
+      return c.json(
+        await createProposedRoutine({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, messageId),
+        200,
+      );
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
       path: "/organizations/{orgId}/agent-proposals/{messageId}/deny",
       tags,
       security,
@@ -612,6 +738,10 @@ export function agentRoutes(deps: AppDeps) {
         params: AgentParams,
         body: body(
           AgentFields.partial().extend({
+            handle: z.string().min(2).max(32).optional().openapi({
+              description:
+                "Its new @handle (admins): the one it leaves keeps reaching it. Taken by another agent (now or before) or a person: 409 `agent.handle_taken` with a free `suggestion`.",
+            }),
             coordinator: z.boolean().optional().openapi({
               description:
                 "It coordinates the team (ADR 0093): true takes it from whoever had it, false leaves the team with none. Admins (audited); the workspace's open apps hear `agent.coordinator`.",
@@ -646,19 +776,30 @@ export function agentRoutes(deps: AppDeps) {
         agent = await getAgent(db, orgId, agentId);
         if (!agent) throw new NotFoundError("Agent not found");
       }
-      // Its computer shows its name and look (the desktop app, ADR 0036), and a new owner may take its plan away.
+      // Its computer shows its name and look (the desktop app, ADR 0036) and names its folder by its handle, and a new
+      // owner may take its plan away.
       if (
         agent.machineId &&
-        (input.name !== undefined || appearance !== undefined || input.ownerUserId !== undefined)
+        (input.name !== undefined ||
+          input.handle !== undefined ||
+          appearance !== undefined ||
+          input.ownerUserId !== undefined)
       ) {
         await publishMachineAgentsChanged(adapters.pubsub, orgId);
       }
-      const [seesCost, brains, talks] = await Promise.all([
+      const [seesCost, brains, talks, old] = await Promise.all([
         canViewCost(db, actor, orgId),
         agentBrainSummaries(db, actor, orgId, [agent]),
         talksToAgents(db, orgId, actor),
+        oldHandlesByAgent(db, orgId),
       ]);
-      return c.json(toAgent(agent, actor, seesCost, undefined, brains.get(agent.id), talks), 200);
+      return c.json(
+        {
+          ...toAgent(agent, actor, seesCost, undefined, brains.get(agent.id), talks),
+          previousHandles: old.get(agent.id) ?? [],
+        },
+        200,
+      );
     },
   );
 
@@ -903,6 +1044,55 @@ export function agentRoutes(deps: AppDeps) {
       // Its computer hears which account each agent thinks with (system mode lends the folders by it).
       if (view.computer) await publishMachineAgentsChanged(adapters.pubsub, orgId);
       return c.json(view, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/agent-setup",
+      tags,
+      security,
+      summary:
+        'What a new agent starts thinking with (ADR 0094): the last "Quem pensa" someone saved or used on other agents, with its Autonomia, as it stands now. Whoever creates agents.',
+      request: { params: OrgParams },
+      responses: { 200: json(z.object({ setup: NewAgentSetup.nullable() })), ...errors },
+    }),
+    async (c) => {
+      const setup = await getNewAgentSetup({ db }, c.get("user").id, c.req.valid("param").orgId);
+      return c.json({ setup }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/agent-setup",
+      tags,
+      security,
+      summary:
+        'Use one agent\'s "Quem pensa" and its Autonomia on these agents (ADR 0094), each by its own rules: who may change it, whose plan thinks for it. Each change is audited as its own (`agent.brain`, `agent.mission_command_approval`, `via: setup`); `preview` says what each would do and keeps nothing. Applied, it is what new agents start with.',
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            setup: AgentSetup,
+            agentIds: z.array(z.uuid()).min(1).max(SETUP_AGENTS_MAX),
+            preview: z.boolean().optional(),
+          }),
+        ),
+      },
+      responses: { 200: json(z.object({ results: z.array(AgentSetupResult) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const input = c.req.valid("json");
+      const results = await applyAgentSetup({ db }, c.get("user").id, orgId, input);
+      // Their computers hear which account each agent thinks with now (system mode lends the folders by it).
+      if (!input.preview && results.some((r) => r.status === "applied")) {
+        await publishMachineAgentsChanged(adapters.pubsub, orgId);
+      }
+      return c.json({ results }, 200);
     },
   );
 

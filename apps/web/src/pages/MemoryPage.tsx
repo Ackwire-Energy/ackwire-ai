@@ -113,7 +113,7 @@ function MemoryView({ agent }: { agent: Agent }) {
   const pendingProposals = (proposals.data ?? []).filter((p) => p.agentId === agent.id && p.status === "pending");
 
   return (
-    <div className="page page--tight" style={{ maxWidth: 880 }}>
+    <div className="page page--full page--tight">
       <Link to="/org/$orgId/agents/$agentId" params={{ orgId: org.id, agentId: agent.id }} className="ac-back">
         <Icon name="chevronLeft" />
         {t("memory.back", g)}

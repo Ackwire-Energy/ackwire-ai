@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 29;
+export const MACHINE_PROTOCOL_VERSION = 32;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -389,6 +389,21 @@ export function browserSetupOf(v: unknown): BrowserSetup | null {
  * sends `shared` to an older runner.
  */
 export const SHARED_ACCOUNTS_PROTOCOL = 29;
+/**
+ * From this protocol on, a Codex turn's `cwd` is read in the agent's own folder. An older runner read it in a
+ * folder nested there, so a turn sent into one of the agent's checkouts was refused ("The folder … doesn't
+ * exist"): the server sends an older runner's Codex turns to the agent's own folder, never a checkout.
+ */
+export const CODEX_FOLDER_PROTOCOL = 32;
+
+/**
+ * From this protocol on (ADR 0058 §17): a desktop stream changes mode in place, on its own data socket, when its
+ * person takes control or hands it back. The server sends `{"type":"mode","mode"}` there; the runner logs in to the
+ * desktop again with that mode's password, sends the same frame back where the old session's bytes end, and a new
+ * RFB session follows on the same sockets. The server never sends it to an older runner, whose streams close and
+ * open again in the new mode.
+ */
+export const DESKTOP_SWITCH_PROTOCOL = 30;
 
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex";
@@ -655,9 +670,10 @@ export const STREAM_CLOSE = {
  * server may add a desktop's `keyboard` (a layout): it is ignored, as Xvnc types what the person's own layout made
  * (ADR 0058 §16).
  */
-export type StreamRequest =
-  | { kind: "desktop"; mode: "watch" | "control" }
-  | { kind: "terminal"; cols: number; rows: number };
+export type StreamRequest = { kind: "desktop"; mode: DesktopMode } | { kind: "terminal"; cols: number; rows: number };
+
+/** A desktop stream's mode: `watch` logs in with the view-only password, `control` with the full one. */
+export type DesktopMode = "watch" | "control";
 
 /**
  * `stream.open` (protocol 18): one viewer of the request's agent's desktop
@@ -683,9 +699,12 @@ export interface StreamHello {
 /**
  * Text frames on a stream once it is ready (binary frames are the bytes): a
  * terminal's new size (viewer → runner) and how its shell ended (runner →
- * viewer).
+ * viewer); a desktop's mode (protocol 30, `DESKTOP_SWITCH_PROTOCOL`).
  */
-export type StreamControl = { type: "resize"; cols: number; rows: number } | { type: "exit"; code: number | null };
+export type StreamControl =
+  | { type: "resize"; cols: number; rows: number }
+  | { type: "exit"; code: number | null }
+  | { type: "mode"; mode: DesktopMode };
 
 /**
  * A person's turn in an agent's browser (`browser.handoff`, ADR 0040 §6), as
@@ -721,6 +740,8 @@ export type BrowserInputEvent =
       deltaX?: number;
       deltaY?: number;
       modifiers?: BrowserModifiers;
+      /** When the person made it (ms, the sender's clock): the runner keeps a drag's gaps (ADR 0040 §14). */
+      at?: number;
     }
   | {
       kind: "key";
@@ -871,13 +892,17 @@ export interface WireSecretBox {
   iv: string;
   ct: string;
 }
-export type WireSecretTarget = { kind: "env" } | { kind: "file"; path: string };
+export type WireSecretTarget = { kind: "env" } | { kind: "file"; path: string } | { kind: "site"; site: string };
 
 /**
  * Secrets of the request's agent (ADR 0027): `keypair` makes the key for a
  * request (the private key stays on the machine), `deliver` validates and stages
  * only the sealed box, `activate` opens it after the server commits delivery,
  * `discard` drops a request's key and staged box, `remove` forgets a secret.
+ * A runner that keeps a site's password for its browser alone (target `site`:
+ * typed on that site, never in a command's environment) says so in its
+ * `keypair` answer (`sites`); the server asks an older one for an environment
+ * variable instead, as before.
  */
 export type SecretRequest =
   | { action: "keypair"; requestId: string }
@@ -891,6 +916,14 @@ export type MachineOs = "linux" | "darwin" | "windows" | "other";
 /** What runs a background task: Claude Code, Codex, or a plain shell command. */
 export type TaskExecutor = "claude" | "codex" | "shell";
 export const TASK_EXECUTORS: readonly TaskExecutor[] = ["claude", "codex", "shell"];
+
+/**
+ * From this protocol on (ADR 0041 §5.1): a Claude Code or Codex `task.start` carries `account`, and the task's CLI
+ * signs in with it exactly as the agent's turns do (the account's folder, or what root keeps for it), never with
+ * the computer's own sign-in instead. Its credential is never written to the task's files. An older runner never
+ * gets `account` and starts every task on the computer's own sign-in, as before.
+ */
+export const TASK_ACCOUNTS_PROTOCOL = 31;
 
 /**
  * A background task (protocol 4): started detached on the machine, so it
@@ -964,6 +997,11 @@ export interface TaskStart {
    * command policy would hold it (`approval_needed`).
    */
   approved?: boolean;
+  /**
+   * Protocol 31 (`TASK_ACCOUNTS_PROTOCOL`), `claude` / `codex`: the agent's account its CLI signs in with
+   * (`accounts/<kind>/<id>`), as `BrainTurnRequest.account`; absent: the computer's own sign-in.
+   */
+  account?: string;
 }
 
 /** A coding CLI on the machine, as `hello` reports it (protocol 7). */
@@ -1003,7 +1041,11 @@ export type WireBrainEvent =
     }
   | { type: "limit"; resetsAt?: string }
   | { type: "done"; text: string; session?: { id: string } }
-  | { type: "error"; code: string; message: string; retryable?: boolean }
+  /**
+   * `worked`: on a `plan_limit`, whether the turn used any tool before it was cut (an older runner leaves it out:
+   * the engine counts that as worked).
+   */
+  | { type: "error"; code: string; message: string; retryable?: boolean; worked?: boolean }
   /** Protocol 15: messages handed with `brain.steer` that the turn read (their `uuid`s). */
   | { type: "steer_read"; uuids: string[] };
 
@@ -1055,8 +1097,11 @@ export interface BrainTurnRequest {
   system: string;
   /** What this turn says (the new user message). */
   prompt: string;
-  /** The MCP bridge for this run: `token` identifies the run to the server (per run). */
-  mcp: { token: string; url?: string };
+  /**
+   * The MCP bridge for this run: `token` identifies the run to the server (per run). `tools`: the names of the run's
+   * tools, space-separated; a kept-alive Codex, which lists them once when its thread opens, starts again when one is new.
+   */
+  mcp: { token: string; url?: string; tools?: string };
   /** Keep one process per (agent, session) alive between turns (default true; false for a background turn). Codex: protocol 16. */
   keepAlive?: boolean;
   /** Also load the machine owner's own MCP servers (default false: `--strict-mcp-config`; never in a `plan` turn). */
@@ -1483,8 +1528,11 @@ export interface MachineReplies {
   list: { entries: FileEntry[] };
   /** What was sent: the uploaded name (`report.pdf`, or `folder.zip`), bytes and SHA-256 (hex). */
   push: { name: string; size: number; sha256: string; contentType: string };
-  /** `keypair`: public key; `deliver`/`activate`: size; an older activation may be superseded. */
-  secret: { publicKey?: string; size?: number; superseded?: boolean };
+  /**
+   * `keypair`: public key, and `sites` from a runner that keeps a `site` target out of its commands; `deliver`/
+   * `activate`: size; an older activation may be superseded.
+   */
+  secret: { publicKey?: string; sites?: boolean; size?: number; superseded?: boolean };
   /**
    * `begin`: what the person needs (`url`; Claude Code: `publicKey`; Codex: `userCode`);
    * `status`: `state` and, when done, `account`; `list`: `accounts`; `code`, `cancel`, `remove`: `{}`.
@@ -1974,6 +2022,7 @@ export function parseBrainEvent(v: unknown): WireBrainEvent | null {
         code: v.code.slice(0, 64),
         message: (isString(v.message) ? v.message : "").slice(0, BRAIN_LIMITS.message),
         ...(typeof v.retryable === "boolean" ? { retryable: v.retryable } : {}),
+        ...(typeof v.worked === "boolean" ? { worked: v.worked } : {}),
       };
     case "steer_read": {
       if (!Array.isArray(v.uuids)) return null;
@@ -2757,6 +2806,7 @@ export function parseStreamControl(raw: string): StreamControl | null {
   if (f.type === "exit" && (f.code === null || Number.isInteger(f.code))) {
     return { type: "exit", code: f.code as number | null };
   }
+  if (f.type === "mode" && (f.mode === "watch" || f.mode === "control")) return { type: "mode", mode: f.mode };
   return null;
 }
 
@@ -2782,6 +2832,7 @@ export function parseBrowserInputEvent(v: unknown): BrowserInputEvent | null {
       const clickCount = finite(v.clickCount);
       const deltaX = coord(v.deltaX);
       const deltaY = coord(v.deltaY);
+      const at = finite(v.at);
       return {
         kind: "mouse",
         type,
@@ -2792,6 +2843,7 @@ export function parseBrowserInputEvent(v: unknown): BrowserInputEvent | null {
         ...(deltaX !== undefined ? { deltaX } : {}),
         ...(deltaY !== undefined ? { deltaY } : {}),
         ...modifiers,
+        ...(at !== undefined && at >= 0 ? { at } : {}),
       };
     }
     case "key": {

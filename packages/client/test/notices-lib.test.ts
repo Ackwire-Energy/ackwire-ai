@@ -5,6 +5,7 @@ import {
   answeredNotices,
   consultationOfNotice,
   followUpLine,
+  isAgentOnlyNotice,
   isTalkerReply,
   noticeAgentHandle,
   noticeOf,
@@ -25,6 +26,29 @@ const msg = (id: string, minute: number, author: Message["author"], meta?: Recor
   agentRunId: null,
   createdAt: new Date(Date.UTC(2026, 9, 14, 10, minute)).toISOString(),
   ...(meta ? { meta } : {}),
+});
+
+describe("notices only their agent reads", () => {
+  test("a proposal's result, another agent's note, a wait's late result: never in the conversation", () => {
+    const notice = (kind: string) => ({ notice: { kind, text: "ana created it: @caio (Caio).", from: "x" } });
+    const shown = buildTimeline(
+      [
+        msg("asked", 0, walter),
+        msg("result", 1, ada, notice("proposal_result")),
+        msg("note", 2, ada, notice("agent_note")),
+        msg("late", 3, ada, notice("wait_result")),
+        msg("report", 4, ada, notice("routine_handoff")),
+        msg("later", 5, ada, notice("follow_up")),
+        msg("answer", 6, ada),
+      ],
+      [],
+      [],
+    ).flatMap((i) => (i.kind === "message" ? [i.message.id] : []));
+    expect(shown).toEqual(["asked", "report", "later", "answer"]);
+    expect(isAgentOnlyNotice(notice("proposal_result"))).toBe(true);
+    expect(isAgentOnlyNotice(notice("consult_reply"))).toBe(false);
+    expect(isAgentOnlyNotice({})).toBe(false);
+  });
 });
 
 describe("notices in a conversation", () => {
@@ -183,5 +207,20 @@ describe("consultationOfNotice", () => {
   test("no answer yet (expired): the answer is null", () => {
     const meta = notice({ askerAgentId: "dev", agentId: "infra", status: "expired", question: "Onde?" });
     expect(consultationOfNotice(meta)?.consultation.answer).toBeNull();
+  });
+
+  test("what came of work handed off says so: its card words it as a request", () => {
+    const meta = notice({
+      kind: "note",
+      askerAgentId: "dev",
+      agentId: "infra",
+      status: "failed",
+      question: "Limpa a fila.",
+    });
+    expect(consultationOfNotice(meta)?.consultation).toMatchObject({ kind: "note", status: "failed" });
+    expect(
+      consultationOfNotice(notice({ askerAgentId: "dev", agentId: "infra", status: "failed", question: "Q?" }))
+        ?.consultation.kind,
+    ).toBeUndefined();
   });
 });

@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { Agent, AgentDraft, AgentProposalCard, AiStatus, SuggestedAi } from "../api/types";
+import type { Agent, AgentDraft, AgentProposalCard, AiStatus, ProposedRoutine, SuggestedAi } from "../api/types";
 import type { Level } from "./access-levels";
 import { joinNames } from "./format";
 import { aiStateOf, PLAN_BRAIN } from "./no-ai";
@@ -103,15 +103,99 @@ export function proposalStatus(card: AgentProposalCard, now = Date.now()): "open
   return Date.parse(card.expiresAt) <= now ? "expired" : "open";
 }
 
-/** "Pensa com Claude Max", "Pensa com o modelo do workspace", "Sem IA ainda…": the AI a proposal suggests. */
+/** "Pensa com Claude Max", "Pensa pela API", "Sem IA ainda…": the AI a proposal suggests. */
 export const suggestedAiText = (t: TFunction, ai: SuggestedAi) =>
   ai.kind === "account"
     ? t("actionCard.agentProposal.aiAccount", { account: ai.label })
     : t(ai.kind === "model" ? "actionCard.agentProposal.aiModel" : "actionCard.agentProposal.aiNone");
 
+/** "Pode agir", "Só olhar e contar": what a proposed routine may do on its own. */
+export const routineAccessText = (t: TFunction, routine: ProposedRoutine) =>
+  t(routine.access === "act" ? "routines.access.act" : "routines.access.read");
+
+/** A created proposal's routine nobody made yet (its agent wasn't where it reports): it can still be made. */
+export const routineLeft = (card: AgentProposalCard) =>
+  card.state === "created" && !!card.agentId && !!card.params.draft.routine && !card.routineId;
+
 /** The draft's connector levels as "Criar agente" keeps them (by connection; the rest none). */
 export const draftLevels = (draft: AgentDraft): Record<string, Level> =>
   Object.fromEntries(draft.access.map((a) => [a.connectionId, a.level]));
+
+/**
+ * The draft's mailbox levels the reviewer gives (their own mailboxes: only a mailbox's owner gives an agent access to
+ * it), as "Criar agente" keeps them.
+ */
+export const draftMailLevels = (draft: AgentDraft, meId: string): Record<string, Level> =>
+  Object.fromEntries((draft.mail ?? []).filter((m) => m.ownerUserId === meId).map((m) => [m.accountId, m.level]));
+
+/** Who gives a line of a proposal: an admin (a channel, an app), or only one person (their mailbox). */
+export type LineGiver = { who: "admin" } | { who: "person"; userId: string };
+
+/**
+ * A line of what a proposed agent gets, as its card lists it: a channel, an app or a mailbox at a level, its routine.
+ * `given`: created in one click, whether it got it (null while open, or when it was created from the review). `needs`:
+ * who gives it when the viewer can't (open), or when nobody did yet (created in one click).
+ */
+export interface ProposalLine {
+  key: string;
+  kind: "channel" | "app" | "mail" | "routine";
+  /** The channel's, connection's or mailbox's id (the routine: its name). */
+  id: string;
+  level?: "read" | "write";
+  given: boolean | null;
+  needs: LineGiver | null;
+}
+
+/** The lines of a proposal's card for this viewer (who may manage agents: `admin`). */
+export function proposalLines(card: AgentProposalCard, viewer: { userId: string; admin: boolean }): ProposalLine[] {
+  const { draft } = card.params;
+  const status = proposalStatus(card);
+  const applied = status === "created" ? card.applied : undefined;
+  const admin: LineGiver = { who: "admin" };
+  const line = (
+    kind: ProposalLine["kind"],
+    id: string,
+    given: string[] | undefined,
+    giver: LineGiver,
+    viewerGives: boolean,
+    level?: "read" | "write",
+  ): ProposalLine => {
+    const got = applied && given ? given.includes(id) : null;
+    const needs = status === "open" ? (viewerGives ? null : giver) : got === false ? giver : null;
+    return { key: `${kind}:${id}`, kind, id, ...(level ? { level } : {}), given: got, needs };
+  };
+  return [
+    ...draft.channelIds.map((id) => line("channel", id, applied?.channelIds, admin, viewer.admin)),
+    ...draft.access.map((a) => line("app", a.connectionId, applied?.connectionIds, admin, viewer.admin, a.level)),
+    ...(draft.mail ?? []).map((m) =>
+      line(
+        "mail",
+        m.accountId,
+        applied?.mailAccountIds,
+        { who: "person", userId: m.ownerUserId },
+        // Only its owner gives it, admin or not; an admin who isn't sees who must.
+        m.ownerUserId === viewer.userId,
+        m.level,
+      ),
+    ),
+    ...(draft.routine ? [routineLine(card, draft.routine, status, viewer.admin)] : []),
+  ];
+}
+
+/** Its routine waits for whoever puts the agent in the channel it reports in (an admin), when nobody did yet. */
+function routineLine(
+  card: AgentProposalCard,
+  routine: ProposedRoutine,
+  status: ReturnType<typeof proposalStatus>,
+  admin: boolean,
+): ProposalLine {
+  const applied = status === "created" ? card.applied : undefined;
+  const given = status === "created" && (applied || card.routineId) ? Boolean(card.routineId) : null;
+  const where = routine.reportsIn;
+  const waits = !!where && !(applied ? applied.channelIds.includes(where) : admin);
+  const needs = (status === "open" || given === false) && waits ? ({ who: "admin" } as const) : null;
+  return { key: "routine", kind: "routine", id: routine.name, given, needs };
+}
 
 export function actionCardOf(meta: Record<string, unknown> | null | undefined): ActionCard | null {
   const proposal = agentProposalOf(meta) ?? stretchCardOf(meta);

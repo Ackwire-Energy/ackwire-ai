@@ -25,6 +25,8 @@ import type {
   AgentProposal,
   AgentQuestion,
   AgentSecret,
+  AgentSetup,
+  AgentSetupResult,
   AgentSkill,
   AgentStatus,
   AgentUsage,
@@ -53,6 +55,7 @@ import type {
   CalendarEventPatch,
   CalendarRange,
   Channel,
+  ChannelCard,
   ChannelCategory,
   ChannelMember,
   CodeSent,
@@ -93,7 +96,9 @@ import type {
   GitHubRepositories,
   Health,
   HostComputer,
+  ImportedFile,
   ImportedSource,
+  ImportFileInput,
   ImportInput,
   ImportPlan,
   Instance,
@@ -155,6 +160,7 @@ import type {
   MoveAgentsInput,
   MoveAgentsResult,
   MySuggestion,
+  NewAgentSetup,
   NoticeCategory,
   NoticePrefs,
   NotificationCount,
@@ -197,6 +203,9 @@ import type {
   SecretRequest,
   SeriesScope,
   ServerTelemetry,
+  SidebarItem,
+  SidebarItems,
+  SidebarPlace,
   SignInOptions,
   Skill,
   SkillDetail,
@@ -209,6 +218,7 @@ import type {
   StorageConfig,
   StorageMigration,
   StorageTestResult,
+  SuggestedAi,
   TaskOutput,
   Team,
   ThreadAction,
@@ -222,6 +232,7 @@ import type {
   TrashedArtifact,
   UndoAllResult,
   UsageReport,
+  WikiAudience,
   WikiGraph,
   WikiImportInput,
   WikiImportResult,
@@ -258,13 +269,13 @@ export interface ApiClient {
     /** Checked with GIPHY first: `gif_key_invalid` (422) when it refuses, `gif_key_env` (409) with an env key. */
     saveGifKey(apiKey: string): Promise<GifKey>;
     removeGifKey(): Promise<GifKey>;
-    /** The speech engine (ADR 0094): `null` unless I am the installation's owner on a self-hosted server. */
+    /** The speech engine (ADR 0098): `null` unless I am the installation's owner on a self-hosted server. */
     speechKey(): Promise<SpeechKey | null>;
     /** Tried with the provider first: `speech_key_invalid` (422) when it refuses. */
     saveSpeechKey(input: SpeechKeyInput): Promise<SpeechKey>;
     removeSpeechKey(): Promise<SpeechKey>;
   };
-  /** Voice messages (ADR 0094). */
+  /** Voice messages (ADR 0098). */
   voice: {
     /** Whether I may record now: fair use, on agentes.chat's own servers. */
     allowed(orgId: string): Promise<{ allowed: boolean }>;
@@ -360,6 +371,12 @@ export interface ApiClient {
     updateMe(orgId: string, input: { handle?: string; timezone?: string | null }): Promise<Person>;
     /** Your availability (auto, busy, hidden) and what you are doing (ADR 0084). */
     setStatus(orgId: string, input: StatusInput): Promise<Person>;
+    /** Where I put the tools at the top of my sidebar here (only the ones I moved). */
+    sidebarItems(orgId: string): Promise<SidebarItems>;
+    /** Moves one tool (`null`: back on its default), my others as the server has them. Answers with every choice. */
+    setSidebarItem(orgId: string, item: SidebarItem, place: SidebarPlace | null): Promise<SidebarItems>;
+    /** Replaces my choices (`{}`: every tool back on its default). */
+    setSidebarItems(orgId: string, items: SidebarItems): Promise<SidebarItems>;
     /** My profile photo: a square image (JSON only: base64), already cropped. */
     setAvatar(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ avatarUrl: string }>;
     removeAvatar(orgId: string): Promise<void>;
@@ -447,9 +464,16 @@ export interface ApiClient {
     create(orgId: string, input: AgentInput): Promise<Agent>;
     /** An agent's proposal of a new agent, by its card's message (ADR 0081). */
     proposal(orgId: string, messageId: string): Promise<AgentProposal>;
+    /** "Criar" on the card: the agent as proposed, with each line the person may give it. */
+    createProposed(
+      orgId: string,
+      messageId: string,
+    ): Promise<{ agent: Agent; proposal: AgentProposal; ai: SuggestedAi["kind"] }>;
+    /** The routine it came with, for the agent created from the review (once it is where it reports). */
+    proposalRoutine(orgId: string, messageId: string): Promise<AgentProposal>;
     /** Says no to it (who may create agents): the card stays, marked denied. */
     denyProposal(orgId: string, messageId: string): Promise<AgentProposal>;
-    update(orgId: string, agentId: string, input: Partial<Omit<AgentInput, "handle">>): Promise<Agent>;
+    update(orgId: string, agentId: string, input: Partial<AgentInput>): Promise<Agent>;
     archive(orgId: string, agentId: string): Promise<void>;
     /** Deletes it for good (ADR 0082): owners and admins, archived or not. */
     purge(orgId: string, agentId: string): Promise<void>;
@@ -505,6 +529,16 @@ export interface ApiClient {
     setBrain(orgId: string, agentId: string, input: AgentBrainInput): Promise<AgentBrain>;
     /** "Quem pensa" for an agent still being created: the workspace's computers and what each offers (admins). */
     brainMachines(orgId: string): Promise<BrainMachine[]>;
+    /**
+     * "Usar em outros agentes": the setup on each agent, by its own rules, one result each in the order asked; with
+     * `preview`, what each would do and nothing kept.
+     */
+    applySetup(
+      orgId: string,
+      input: { setup: AgentSetup; agentIds: string[]; preview?: boolean },
+    ): Promise<AgentSetupResult[]>;
+    /** What a new agent starts thinking with (whoever creates agents); null: "Automático" on the API. */
+    newAgentSetup(orgId: string): Promise<NewAgentSetup | null>;
     runs(
       orgId: string,
       filter?: { agentId?: string; status?: string; before?: string; since?: string; limit?: number },
@@ -533,6 +567,11 @@ export interface ApiClient {
     apply(orgId: string, input: ImportInput): Promise<ImportPlan>;
     /** What this workspace brought from other apps, by source package (admins). */
     sources(orgId: string): Promise<ImportedSource[]>;
+    /**
+     * One of an imported agent's files into its folder in the Drive (multipart, ≤ 50 MB). A name already in the
+     * folder is never overwritten (`exists`); a credential store is refused (`import.secret_file`).
+     */
+    copyFile(orgId: string, input: ImportFileInput): Promise<ImportedFile>;
     /** Same-origin URL that downloads this workspace as a bundle (`.json`). */
     exportUrl(orgId: string): string;
   };
@@ -558,6 +597,8 @@ export interface ApiClient {
       input: { categoryId: string | null; beforeChannelId?: string | null },
     ): Promise<void>;
     join(orgId: string, channelId: string): Promise<void>;
+    /** A `#channel` link's card; 404 for a channel I can't see (private and not mine). Archived ones too. */
+    card(orgId: string, channelId: string): Promise<ChannelCard>;
     update(
       orgId: string,
       channelId: string,
@@ -616,11 +657,19 @@ export interface ApiClient {
   };
 
   approvals: {
-    list(orgId: string, filter?: { status?: "pending" | "decided"; agentId?: string }): Promise<Approval[]>;
+    list(
+      orgId: string,
+      filter?: { status?: "pending" | "decided"; agentId?: string; messageId?: string },
+    ): Promise<Approval[]>;
     get(orgId: string, approvalId: string): Promise<Approval>;
     /** `always`: also approve this kind for good (409 `approval.always_unavailable` where it isn't offered). */
     approve(orgId: string, approvalId: string, reason?: string, always?: boolean): Promise<Approval>;
     refuse(orgId: string, approvalId: string, reason?: string): Promise<Approval>;
+    /** A card's "Aprovar tudo" / "Agora não para todos": exactly these ids; `skipped` the ones not decided. */
+    decideMany(
+      orgId: string,
+      input: { ids: string[]; decision: "approve" | "refuse"; reason?: string },
+    ): Promise<{ approvals: Approval[]; skipped: string[] }>;
     /** What the agent runs without asking ("Aprovar sempre"), oldest first. */
     rules(orgId: string, agentId: string): Promise<ApprovalRule[]>;
     /** The agent asks again for that kind (admins and the agent's owner). */
@@ -1037,6 +1086,8 @@ export interface ApiClient {
     lock(orgId: string, slug: string, locked: boolean): Promise<WikiPage>;
     /** "Fixadas": at the top of the wiki for everyone. */
     pin(orgId: string, slug: string, pinned: boolean): Promise<WikiPage>;
+    /** Who sees it (null = every member); for people who edit the wiki and manage roles. */
+    audience(orgId: string, slug: string, audience: WikiAudience | null): Promise<WikiPage>;
     /** To the trash (the server can restore it). */
     remove(orgId: string, slug: string): Promise<void>;
     /** What the agents read most in the last 7 days. */

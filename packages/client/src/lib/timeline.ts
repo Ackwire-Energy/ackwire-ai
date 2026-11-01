@@ -1,10 +1,10 @@
 import type { Approval, Message, ReplyRef } from "../api/types";
 import type { LiveRun } from "../realtime/streams";
 import { messageMediaOf } from "./media";
-import { voiceOf } from "./voice";
-import { answeredNotices, isAnsweredNotice, isEventLine, isTalkerReply } from "./notices";
+import { answeredNotices, isAgentOnlyNotice, isAnsweredNotice, isEventLine, isTalkerReply } from "./notices";
 import { quoteExcerpt } from "./reply";
 import { isRoutineCall, routineReplyOf } from "./routines";
+import { voiceOf } from "./voice";
 
 const byTime = (a: { createdAt: string; id: string }, b: { createdAt: string; id: string }) =>
   a.createdAt === b.createdAt ? a.id.localeCompare(b.id) : a.createdAt < b.createdAt ? -1 : 1;
@@ -119,8 +119,9 @@ export function buildTimeline(messages: Message[], approvals: Approval[], runs: 
     }
     if (entry.item.kind === "message") {
       const m = entry.item.message;
-      // A routine's call written as its creator, and a report the agent already told people about: not shown.
-      if (isRoutineCall(m) || isAnsweredNotice(m, answered)) continue;
+      // A routine's call written as its creator, a report the agent already told people about, a notice only its agent
+      // reads: not shown.
+      if (isRoutineCall(m) || isAnsweredNotice(m, answered) || isAgentOnlyNotice(m.meta)) continue;
       // A routine's answer (or an automatic line: a notice) always shows its own header, and nothing groups under it.
       const routine = Boolean(routineReplyOf(m)) || isEventLine(m.meta);
       const prevRoutine = Boolean(prev && (routineReplyOf(prev) || isEventLine(prev.meta)));

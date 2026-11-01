@@ -1,5 +1,5 @@
-import type { ApiRule, BundleNote, BundleTodo } from "@agenteschat/client";
-import { normalizeAppearance } from "@agenteschat/ui";
+import { normalizeAppearance } from "@agenteschat/tokens/look";
+import type { ApiRule, BundleNote, BundleTodo } from "../../api/types";
 import {
   cleanUrl,
   cronTrigger,

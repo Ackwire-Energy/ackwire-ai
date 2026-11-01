@@ -6,6 +6,7 @@ setupDom();
 import type { LiveRun } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import type { TFunction } from "i18next";
+import { HOVER_OPEN_MS } from "@/components/ProfileCard";
 import { runContext } from "@/components/StopRun";
 import { createI18n } from "@/i18n";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
@@ -70,6 +71,37 @@ describe("Parar is immediate", () => {
     await esc();
     await settle(2);
     expect(screen().queryByRole("dialog")).toBeNull();
+    expect(cancels(state)).toHaveLength(1);
+  });
+
+  test("Esc that closes a card opened under the pointer stops nothing and goes no further; the next one stops", async () => {
+    const { state, ev } = await open();
+    await ev({ type: "agent.run", ...ids, status: "running" });
+    await settle(2);
+    const box = screen().getByRole("combobox", { name: /Mensagem para/ });
+    box.focus();
+    const face = screen().getAllByRole("button", { name: "Perfil de Ada" })[0] as HTMLElement;
+    await act(async () => fireEvent.pointerEnter(face, { pointerType: "mouse" }));
+    await act(() => new Promise((r) => setTimeout(r, HOVER_OPEN_MS + 100)));
+    await settle(2);
+    const card = () => screen().queryByRole("dialog", { name: "Perfil" });
+    expect(card()).not.toBeNull();
+    expect(document.activeElement).toBe(box);
+    // What the page's own Esc handlers (an inbox reply that closes) would see.
+    const reached: string[] = [];
+    const onKey = (e: KeyboardEvent) => reached.push(e.key);
+    window.addEventListener("keydown", onKey);
+    try {
+      await act(async () => fireEvent.keyDown(box, { key: "Escape" }));
+      await settle(2);
+      expect(card()).toBeNull();
+      expect(cancels(state)).toHaveLength(0);
+      expect(reached).toEqual([]);
+    } finally {
+      window.removeEventListener("keydown", onKey);
+    }
+    await act(async () => fireEvent.keyDown(box, { key: "Escape" }));
+    await settle(2);
     expect(cancels(state)).toHaveLength(1);
   });
 

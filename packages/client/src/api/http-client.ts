@@ -26,6 +26,7 @@ import type {
   AgentProposal,
   AgentQuestion,
   AgentSecret,
+  AgentSetupResult,
   AgentSkill,
   AgentStatus,
   AgentUsage,
@@ -46,6 +47,7 @@ import type {
   CalendarEvent,
   CalendarRange,
   Channel,
+  ChannelCard,
   ChannelCategory,
   ChannelMember,
   CodeSent,
@@ -76,6 +78,7 @@ import type {
   GitHubRepositories,
   Health,
   HostComputer,
+  ImportedFile,
   ImportedSource,
   ImportPlan,
   Instance,
@@ -122,6 +125,7 @@ import type {
   Model,
   MoveAgentsResult,
   MySuggestion,
+  NewAgentSetup,
   NoticePrefs,
   NotificationCount,
   NotificationPage,
@@ -149,6 +153,7 @@ import type {
   SearchHit,
   SecretRequest,
   ServerTelemetry,
+  SidebarItems,
   SignInOptions,
   Skill,
   SkillDetail,
@@ -158,6 +163,7 @@ import type {
   StorageConfig,
   StorageMigration,
   StorageTestResult,
+  SuggestedAi,
   TaskOutput,
   Team,
   ThreadFilters,
@@ -178,6 +184,8 @@ import type {
 } from "./types";
 
 const org = (orgId: string) => `/api/app/organizations/${enc(orgId)}`;
+/** The most agents one `POST …/agent-setup` takes (the server's `SETUP_AGENTS_MAX`). */
+const SETUP_AGENTS_PER_CALL = 200;
 
 /** The list's query string (booleans as "true"; nothing for what isn't set). */
 const threadQuery = (f: Partial<ThreadFilters>) => ({
@@ -417,6 +425,12 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       limits: (orgId) => request<WorkspaceLimits>(`${org(orgId)}/limits`),
       updateMe: (orgId, input) => request<Person>(`${org(orgId)}/me`, { method: "PATCH", json: input }),
       setStatus: (orgId, input) => request<Person>(`${org(orgId)}/me/status`, { method: "PUT", json: input }),
+      sidebarItems: async (orgId) => (await request<{ items: SidebarItems }>(`${org(orgId)}/me/sidebar`)).items,
+      setSidebarItem: async (orgId, item, place) =>
+        (await request<{ items: SidebarItems }>(`${org(orgId)}/me/sidebar`, { method: "PATCH", json: { item, place } }))
+          .items,
+      setSidebarItems: async (orgId, items) =>
+        (await request<{ items: SidebarItems }>(`${org(orgId)}/me/sidebar`, { method: "PUT", json: { items } })).items,
       update: (orgId, input) => request<void>(org(orgId), { method: "PATCH", json: input }),
       members: async (orgId) => (await request<{ members: Member[] }>(`${org(orgId)}/members`)).members,
       changeRole: (orgId, userId, role) =>
@@ -506,6 +520,15 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       proposal: (orgId, messageId) => request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}`),
       denyProposal: (orgId, messageId) =>
         request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}/deny`, { json: {} }),
+      createProposed: (orgId, messageId) =>
+        request<{ agent: Agent; proposal: AgentProposal; ai: SuggestedAi["kind"] }>(
+          `${org(orgId)}/agent-proposals/${enc(messageId)}/create`,
+          {
+            json: {},
+          },
+        ),
+      proposalRoutine: (orgId, messageId) =>
+        request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}/routine`, { json: {} }),
       update: (orgId, agentId, input) =>
         request<Agent>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "PATCH", json: input }),
       archive: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "DELETE" }),
@@ -546,6 +569,21 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<AgentBrain>(`${org(orgId)}/agents/${enc(agentId)}/brain`, { method: "PUT", json: input }),
       brainMachines: async (orgId) =>
         (await request<{ machines: BrainMachine[] }>(`${org(orgId)}/brain-machines`)).machines,
+      // ponytail: past 200 agents each call is its own transaction, so a preview's later calls don't see a one-agent
+      // sign-in an earlier one took (the real run does). One transaction over all of them if workspaces grow so big.
+      applySetup: async (orgId, input) => {
+        const results: AgentSetupResult[] = [];
+        for (let i = 0; i < input.agentIds.length; i += SETUP_AGENTS_PER_CALL) {
+          const agentIds = input.agentIds.slice(i, i + SETUP_AGENTS_PER_CALL);
+          const page = await request<{ results: AgentSetupResult[] }>(`${org(orgId)}/agent-setup`, {
+            json: { ...input, agentIds },
+          });
+          results.push(...page.results);
+        }
+        return results;
+      },
+      newAgentSetup: async (orgId) =>
+        (await request<{ setup: NewAgentSetup | null }>(`${org(orgId)}/agent-setup`)).setup,
       runs: async (orgId, filter = {}) =>
         (await request<{ runs: Run[] }>(`${org(orgId)}/runs`, { query: filter })).runs,
       run: (orgId, runId) => request<{ run: Run; steps: RunStep[] }>(`${org(orgId)}/runs/${enc(runId)}`),
@@ -585,6 +623,14 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     imports: {
       apply: (orgId, input) => request<ImportPlan>(`${org(orgId)}/imports`, { json: input }),
       sources: async (orgId) => (await request<{ sources: ImportedSource[] }>(`${org(orgId)}/imports`)).sources,
+      copyFile: (orgId, input) => {
+        const form = new FormData();
+        form.append("file", input.file, input.name);
+        form.append("agentId", input.agentId);
+        form.append("path", input.path);
+        if (input.note) form.append("note", input.note);
+        return files.upload<ImportedFile>(`${org(orgId)}/imports/files`, form);
+      },
       exportUrl: (orgId) => `${base}${org(orgId)}/export`,
     },
     voice: {
@@ -623,6 +669,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       place: (orgId, channelId, input) =>
         request<void>(`${org(orgId)}/channels/${enc(channelId)}/place`, { method: "PUT", json: input }),
       join: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}/join`, { json: {} }),
+      card: (orgId, channelId) => request<ChannelCard>(`${org(orgId)}/channels/${enc(channelId)}/card`),
       update: (orgId, channelId, input) =>
         request<Channel>(`${org(orgId)}/channels/${enc(channelId)}`, { method: "PATCH", json: input }),
       reactions: async (orgId, messageId) =>
@@ -693,6 +740,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }),
       refuse: (orgId, id, reason) =>
         request<Approval>(`${org(orgId)}/approvals/${enc(id)}/refuse`, { json: reason ? { reason } : {} }),
+      decideMany: (orgId, input) =>
+        request<{ approvals: Approval[]; skipped: string[] }>(`${org(orgId)}/approvals/decide`, { json: input }),
       rules: async (orgId, agentId) =>
         (await request<{ rules: ApprovalRule[] }>(`${org(orgId)}/agents/${enc(agentId)}/approval-rules`)).rules,
       removeRule: (orgId, agentId, ruleId) =>
@@ -1169,6 +1218,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<WikiPage>(`${org(orgId)}/wiki/pages/${enc(slug)}/lock`, { json: { locked } }),
       pin: (orgId, slug, pinned) =>
         request<WikiPage>(`${org(orgId)}/wiki/pages/${enc(slug)}/pin`, { json: { pinned } }),
+      audience: (orgId, slug, audience) =>
+        request<WikiPage>(`${org(orgId)}/wiki/pages/${enc(slug)}/audience`, { method: "PUT", json: { audience } }),
       remove: async (orgId, slug) => {
         await request<void>(`${org(orgId)}/wiki/pages/${enc(slug)}`, { method: "DELETE" });
       },

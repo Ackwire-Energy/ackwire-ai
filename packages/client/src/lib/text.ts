@@ -60,6 +60,20 @@ export function emailsFrom(text: string, already: readonly string[] = []): { val
   };
 }
 
+/**
+ * The address in a JWT's `email` claim (an ID token's), read without checking its signature: only to name the address
+ * a sign-in was refused for, never to trust it. Undefined when there is none.
+ */
+export function jwtEmail(token: string): string | undefined {
+  const payload = (token.split(".")[1] ?? "").replace(/-/g, "+").replace(/_/g, "/");
+  try {
+    const { email } = JSON.parse(atob(payload.padEnd(Math.ceil(payload.length / 4) * 4, "=")));
+    return typeof email === "string" && isEmail(email) ? email : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Password rules from Better Auth (8–128 characters, nothing else). */
 export function passwordState(password: string): "empty" | "short" | "long" | "ok" {
   if (password.length === 0) return "empty";
@@ -168,3 +182,6 @@ const typedForm = (value: string) =>
  * so a name that is only those needs nothing typed.
  */
 export const matchesName = (typed: string, name: string) => typedForm(typed) === typedForm(name);
+
+/** Text made safe inside HTML, as text or as an attribute value (quoted either way). */
+export const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);

@@ -4,6 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { AiStatus } from "@agenteschat/client";
+import { HOVER_CLOSE_MS } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -101,6 +102,25 @@ describe("channel header: who's here", () => {
     await act(() => new Promise((r) => setTimeout(r, 220)));
     await settle(2);
     expect(screen().getByRole("region", { name: "Pessoas" })).toBeTruthy();
+  });
+
+  test("hover opens it without taking the focus, open or closed; a press brings the focus in", async () => {
+    await open();
+    const box = screen().getByRole("combobox", { name: /Mensagem para/ });
+    box.focus();
+    const stack = screen().getByRole("button", { name: "Membros do canal (4)" });
+    await act(async () => fireEvent.pointerEnter(stack, { pointerType: "mouse" }));
+    await act(() => new Promise((r) => setTimeout(r, 220)));
+    await settle(2);
+    expect(screen().getByRole("region", { name: "Pessoas" })).toBeTruthy();
+    expect(document.activeElement).toBe(box);
+    await act(async () => fireEvent.pointerLeave(stack, { pointerType: "mouse" }));
+    await act(() => new Promise((r) => setTimeout(r, HOVER_CLOSE_MS + 50)));
+    expect(screen().queryByRole("region", { name: "Pessoas" })).toBeNull();
+    expect(document.activeElement).toBe(box);
+    await act(async () => fireEvent.click(stack));
+    await settle(2);
+    expect(screen().getByRole("dialog", { name: "Membros do canal (4)" }).contains(document.activeElement)).toBe(true);
   });
 });
 

@@ -1,7 +1,9 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, schema, sql } from "@agenteschat/db";
+import { routineBriefOfRun } from "./background";
 import type { ToolResult } from "./brains/types";
 import { deliverNotice, publishDelivery } from "./delivery";
+import { pgSafeJson } from "./format";
 import type { Message } from "./messages";
 import type { Notice } from "./notices";
 import { enqueue } from "./outbox";
@@ -93,7 +95,7 @@ export async function resumeRunWithResult(
     if (input.consulted) t.consulted = [...(t.consulted ?? []), input.consulted];
     await tx
       .update(agentRuns)
-      .set({ transcript: t as Record<string, unknown>, updatedAt: new Date() })
+      .set({ transcript: pgSafeJson(t) as Record<string, unknown>, updatedAt: new Date() })
       .where(eq(agentRuns.id, row.id));
     await enqueue(tx, {
       orgId: row.orgId,
@@ -143,37 +145,56 @@ const ACTIVE: AgentRun["status"][] = ["queued", "running", "waiting_approval", "
  * run is still active it reads it at its next step (queued on that run, in
  * its conversation); once it ended (or while it is held by a decision), the notice goes to its conversation and
  * joins the agent's run there or starts one, in the run's stretch: past its limits the run is held for the pause
- * card (ADR 0089), and the notice is still read by the agent's next run there. In the caller's transaction;
- * publish with `publishDelivery` after the commit.
+ * card (ADR 0089), and the notice is still read by the agent's next run there. A routine's run that ended hears
+ * it where the routine reports, like its approval cards: nobody reads its room. `wake: false`: only written there,
+ * for a notice that wakes the agent right after it (`reportHandOffs`) or that no run should read. `joinRun: false`:
+ * never read by the run itself, even while it is active (a routine's hand-offs, which come back where it reports). In the caller's
+ * transaction; publish with `publishDelivery` after the commit.
  */
 export async function deliverNoticeToRun(
   tx: Executor,
   run: Pick<
     AgentRun,
-    "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId" | "hop" | "trigger" | "stretchId"
+    | "id"
+    | "orgId"
+    | "agentId"
+    | "channelId"
+    | "threadRootId"
+    | "triggerMessageId"
+    | "hop"
+    | "trigger"
+    | "stretchId"
+    | "background"
   >,
   notice: Notice,
+  options: { wake?: boolean; joinRun?: boolean } = {},
 ): Promise<{ message: Message; runs: AgentRun[] }> {
-  const [current] = await tx
-    .select({ id: agentRuns.id, orgId: agentRuns.orgId, status: agentRuns.status })
-    .from(agentRuns)
-    .where(eq(agentRuns.id, run.id))
-    .for("update");
-  // A run held by a decision (an approval, a secret, a mission's) reads nothing new until it comes: the
-  // notice wakes the agent in a run of its own instead.
-  const active = Boolean(current && ACTIVE.includes(current.status) && !(await holdsMessages(tx, current)));
-  const delivered = await deliverNotice(tx, {
+  const wake = options.wake !== false;
+  let active = false;
+  if (wake && options.joinRun !== false) {
+    const [current] = await tx
+      .select({ id: agentRuns.id, orgId: agentRuns.orgId, status: agentRuns.status })
+      .from(agentRuns)
+      .where(eq(agentRuns.id, run.id))
+      .for("update");
+    // A run held by a decision (an approval, a secret, a mission's) reads nothing new until it comes: the
+    // notice wakes the agent in a run of its own instead.
+    active = Boolean(current && ACTIVE.includes(current.status) && !(await holdsMessages(tx, current)));
+  }
+  const report = !active && run.background ? (await routineBriefOfRun(tx, run))?.deliverTo : undefined;
+  const into = {
     orgId: run.orgId,
     agentId: run.agentId,
-    channelId: run.channelId,
-    threadId: replyThreadOf(run),
+    channelId: report?.channelId ?? run.channelId,
+    threadId: report ? report.threadId : replyThreadOf(run),
     hop: run.hop,
     stretchId: runStretchOf(run),
     notice,
     body: forPeople(notice),
-    wake: !active,
-    trigger: run.trigger === "dm" ? "dm" : "mention",
-  });
+    trigger: run.trigger === "dm" ? ("dm" as const) : ("mention" as const),
+  };
+  if (!wake) return deliverNotice(tx, { ...into, wake: false });
+  const delivered = await deliverNotice(tx, { ...into, wake: !active });
   if (active) {
     await tx
       .update(agentRuns)
@@ -216,7 +237,14 @@ export async function resumeRunsWaitingForMachine(
       updatedAt: agentRuns.updatedAt,
     })
     .from(agentRuns)
-    .where(and(eq(agentRuns.waitingMachineId, machineId), eq(agentRuns.status, "waiting_input")))
+    .where(
+      and(
+        eq(agentRuns.waitingMachineId, machineId),
+        eq(agentRuns.status, "waiting_input"),
+        // The computer coming back says nothing about a plan's limit or a budget.
+        sql`coalesce(${agentRuns.transcript}->'waitingForBrain'->>'code', '') not in ('plan_limit', 'budget')`,
+      ),
+    )
     .limit(200);
   const resumed: string[] = [];
   for (const r of rows) {

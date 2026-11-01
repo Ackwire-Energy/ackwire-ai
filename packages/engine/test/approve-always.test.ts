@@ -543,6 +543,46 @@ describe("Aprovar sempre", () => {
     ]);
   });
 
+  test("a run nobody is behind asks as a person's run would, and a rule approved for good covers it too", async () => {
+    f = await setup();
+    const { mcp, gateway } = await world(f);
+    // An agent's own line woke it: nobody is behind the run, and it works as the agent itself.
+    const line = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
+      body: "Lembrete: responder no #40",
+    });
+    const [run] = await f.db
+      .insert(schema.agentRuns)
+      .values({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        channelId: f.general.id,
+        threadRootId: line.id,
+        triggerMessageId: line.id,
+        trigger: "mention",
+        hop: 1,
+      })
+      .returning();
+    const ctx: ToolContext = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: run?.id ?? "",
+      channelId: f.general.id,
+      threadRootId: line.id,
+      triggerMessageId: line.id,
+    };
+    const first = asked(await invoke(gateway, ctx, EXEC, { ...exec("GITHUB_CREATE_AN_ISSUE_COMMENT"), why: WHY }));
+    expect(first.origin).toEqual({ kind: "unattended" });
+    expect(first.approveAlways).not.toBeNull();
+    await decide(f, f.owner.id, first.id, { decision: "approve", always: true });
+    // The same kind again runs at once (the approved call itself runs when its run resumes).
+    expect((await invoke(gateway, ctx, EXEC, exec("GITHUB_CREATE_AN_ISSUE_COMMENT"))).type).toBe("result");
+    expect(mcp.calls.map((c) => c.tool)).toEqual([COMPOSIO_EXECUTOR]);
+  });
+
   test("only who decides the agent's approvals approves for good, and only where it's offered", async () => {
     f = await setup();
     const { gateway } = await world(f);

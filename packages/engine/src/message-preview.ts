@@ -1,6 +1,6 @@
 import { type MessageMedia, mediaOf } from "./media";
 
-/** `meta.voice` of a message (ADR 0094): all the apps need to draw and play it. */
+/** `meta.voice` of a message (ADR 0098): all the apps need to draw and play it. */
 export interface MessageVoice {
   clipId: string;
   durationMs: number;
@@ -25,7 +25,7 @@ export function voiceOf(meta: Record<string, unknown> | null | undefined): Messa
     : null;
 }
 
-/** A message's text for what lists it (previews, notifications, quotes, snippets): none for a voice message (ADR 0094). */
+/** A message's text for what lists it (previews, notifications, quotes, snippets): none for a voice message (ADR 0098). */
 export const readableBody = (body: string, meta: Record<string, unknown> | null | undefined) =>
   voiceOf(meta) ? "" : body;
 
@@ -49,7 +49,7 @@ export interface PreviewMeta {
   noAi?: { reason: string; own?: string };
   /** A GIF or a sticker (ADR 0091), as `meta.media`: a message of only that has no text to preview. */
   media?: MessageMedia;
-  /** A voice message (ADR 0094): its length, never its words. */
+  /** A voice message (ADR 0098): its length, never its words. */
   voice?: { durationMs: number };
 }
 

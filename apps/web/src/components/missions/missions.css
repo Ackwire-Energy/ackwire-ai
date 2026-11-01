@@ -107,7 +107,7 @@ button.mi-pill {
 button.mi-pill:hover {
   background: color-mix(in srgb, var(--ink) 10%, var(--sunken));
 }
-button.mi-pill:focus-visible {
+html:not([data-pointer]) button.mi-pill:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -365,6 +365,10 @@ a.mi-ref:hover code {
   margin: 14px 16px 0;
   padding-top: 14px;
   border-top: 1px solid var(--line);
+}
+/* Nothing to say there (one computer, online, no branch, no choices): no rule above nothing. */
+.mi-plan__metas:empty {
+  display: none;
 }
 .mi-plan__meta {
   display: grid;
@@ -814,7 +818,6 @@ a.mi-pr:hover {
   letter-spacing: -0.015em;
 }
 .mi-q p {
-  max-width: 70ch;
   margin-top: 4px;
   font-size: 13.5px;
   color: var(--muted);
@@ -1306,7 +1309,7 @@ a.mi-pr:hover {
   text-decoration-color: var(--line2);
   text-underline-offset: 3px;
 }
-.mi-quiet:focus-visible {
+html:not([data-pointer]) .mi-quiet:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -1479,7 +1482,7 @@ a.mi-pr:hover {
 
 /* ── The mission's link card, in the conversation where it was asked ─────── */
 .mi-linkcard {
-  max-width: 560px;
+  max-width: var(--msg-card-w);
   padding: 14px 16px;
 }
 .mi-linkcard__foot {
@@ -1498,7 +1501,7 @@ a.mi-pr:hover {
 
 /* ── Command approvals (MissionCommandCard): the executor asks to run a command ── */
 .mi-cmd {
-  max-width: 600px;
+  max-width: var(--msg-card-w);
 }
 .mi-cmd__line {
   margin: 0;

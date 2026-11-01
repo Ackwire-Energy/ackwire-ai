@@ -12,15 +12,18 @@ import { BROWSER_SIGN_IN_PATH } from "@/lib/desktop";
  * when it comes back (`done`), shows the request's code and asks the person to
  * confirm it matches the code on their computer. The hand-over happens only after
  * that explicit confirmation, so a link that jumps straight here signs no one in.
+ * `access`: an early-access link's token the app's window had, for the sign-up this makes.
  */
 export function DesktopSignInPage({
   provider,
   request,
   done,
+  access,
 }: {
   provider?: SignInProvider;
   request?: string;
   done: boolean;
+  access?: string;
 }) {
   const { t } = useTranslation();
   const auth = useAuth();
@@ -38,7 +41,7 @@ export function DesktopSignInPage({
     }
     if (!done) {
       const back = `${BROWSER_SIGN_IN_PATH}?${new URLSearchParams({ provider, request, done: "1" })}`;
-      void auth.signInSocial(provider, back).then((r) => {
+      void auth.signInSocial(provider, back, access).then((r) => {
         if (!r.ok) setState("expired");
       });
       return;
@@ -50,7 +53,7 @@ export function DesktopSignInPage({
         setState("confirm");
       }
     });
-  }, [auth, provider, request, done]);
+  }, [auth, provider, request, done, access]);
 
   const confirm = async () => {
     if (!request || working) return;

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { eq, schema } from "@agenteschat/db";
+import type { PubSub } from "@agenteschat/adapters";
+import { and, eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import { systemText, textOf } from "@agenteschat/providers";
 import {
@@ -26,6 +27,7 @@ import {
   ensureThreadSummary,
   ForbiddenError,
   grantScopes,
+  holdsSecret,
   insertMessage,
   isVerified,
   listAgentMemoryRows,
@@ -93,6 +95,32 @@ describe("guardrails", () => {
     expect(looksLikeSecret("token: ghp_abcdefghijklmnopqrstuvwxyz0123")).toBe(true);
     expect(looksLikeSecret("senha = hunter22secret")).toBe(true);
     expect(looksLikeSecret("we use tokens to price calls")).toBe(false);
+    // A placeholder in a doc or a skill is not a key.
+    expect(looksLikeSecret("export OPENAI_API_KEY=your-key-here")).toBe(false);
+    expect(looksLikeSecret('{ "api_key": "YOUR_API_KEY" }')).toBe(false);
+  });
+
+  test("a file holds a key when one is set in it, whatever its type; never a placeholder or code", () => {
+    const file = (text: string) => holdsSecret(new TextEncoder().encode(text));
+    for (const text of [
+      '{"gmail":{"password":"hunter22-fixture"}}',
+      "#!/bin/sh\nDB_PASSWORD=fixture-never-stored ./run",
+      "users:\n- name: ci\n  user:\n    token: fixture-never-stored\n",
+      "use sk-ant-api03-abcdefghijklmnopqrstuvwxyz",
+    ]) {
+      expect([text, file(text)]).toEqual([text, true]);
+    }
+    for (const text of [
+      "export OPENAI_API_KEY=your-key-here",
+      '{ "api_key": "YOUR_API_KEY" }',
+      "token = get_token()",
+      'password = input("Senha: ")',
+      'token = os.environ["NORTHWIND_TOKEN"]',
+      `export API_KEY=${"$"}{NORTHWIND_KEY}`,
+      "password: <your password>",
+    ]) {
+      expect([text, file(text)]).toEqual([text, false]);
+    }
   });
 
   test("permission-bending text is the judge's call (any language); a failing judge never blocks memory", async () => {
@@ -1136,6 +1164,22 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
     );
   });
 
+  test("an agent named by the handle it had before a rename gets the change", async () => {
+    f = await setup();
+    const ada = await teammate("ada");
+    await updateAgent(f.db, f.owner.id, f.org.id, ada.id, { name: "Claudio", handle: "claudio" });
+    const out = await propose(await runOn("person"), {
+      target: "agents",
+      agents: ["@ada"],
+      change: "Responder em português.",
+      roles: [{ agent: "@ada", role: "Revisora" }],
+    });
+    expect(out.isError).toBeUndefined();
+    const made = await rows();
+    expect(made.length).toBeGreaterThan(0);
+    expect(made.every((r) => r.agentId === ada.id)).toBe(true);
+  });
+
   test("only agents the person who asked can talk to: one out of their reach refuses the card, naming it", async () => {
     f = await setup();
     const bia = await addMember(f.db, f.org.id, "member", "bia");
@@ -1291,6 +1335,21 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
       decideProposal(f.db, f.owner.id, f.org.id, again.proposals[0]?.id ?? "", "accept"),
     ).rejects.toBeInstanceOf(ConflictError);
     expect((await agentRow(ada.id))?.role).toBe("Designer");
+  });
+
+  test("a new role of 40 characters goes on the card whole", async () => {
+    f = await setup();
+    const ada = await teammate("ada");
+    const { proposals, skipped } = await proposeFor({
+      target: "agent_instructions",
+      agentIds: [],
+      change: "",
+      roles: [{ agentId: ada.id, role: "Assistente de e-mails, agenda e reuniões" }],
+    });
+    expect(skipped).toEqual([]);
+    expect(proposals.map((p) => [p.target, p.agentId, p.proposedText])).toEqual([
+      ["agent_role", ada.id, "Assistente de e-mails, agenda e reuniões"],
+    ]);
   });
 
   test("apps on or off: the owner only takes them away, as on the Access tab; applied as the person; never the proposer's own", async () => {
@@ -1483,5 +1542,169 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
     const ids = [oldest, waiting?.id ?? ""];
     const card = await listProposals(f.db, f.owner.id, f.org.id, { ids });
     expect(card.map((p) => p.id).sort()).toEqual(ids.sort());
+  });
+
+  describe("the agent that proposed is told what was decided", () => {
+    const notices = async () =>
+      (await f.db.select().from(schema.messages))
+        .filter((m) => (m.meta.notice as { kind?: string } | undefined)?.kind === "proposal_result")
+        .map((m) => ({ channelId: m.channelId, ...(m.meta.notice as { text: string; refs: Record<string, string> }) }));
+    const woken = () =>
+      f.db
+        .select()
+        .from(schema.agentRuns)
+        .where(and(eq(schema.agentRuns.agentId, f.agent.id), eq(schema.agentRuns.status, "queued")));
+    /** Proposes, then posts the reply that shows the card, as the run does at its end. */
+    const proposeOnCard = async (input: Record<string, unknown>) => {
+      const ctx = await runOn("person");
+      await propose(ctx, input);
+      const ids = (await rows()).filter((r) => r.status === "pending").map((r) => r.id);
+      await insertMessage(f.db, {
+        orgId: f.org.id,
+        channelId: ctx.channelId,
+        author: { type: "agent", agentId: f.agent.id, runId: ctx.runId, hop: 0 },
+        body: "Propus.",
+        meta: {
+          memoryUpdates: [{ action: "proposed", itemId: ids[0], text: "x", proposalId: ids[0], proposalIds: ids }],
+        },
+      });
+    };
+    const decide = (id: string, decision: "accept" | "reject" = "accept") =>
+      decideProposal(f.db, f.owner.id, f.org.id, id, decision, { pubsub: f.pubsub });
+
+    test("accepting wakes it once, in the conversation it proposed in, already applied", async () => {
+      f = await setup();
+      await proposeOnCard({ target: "my_instructions", change: "Sempre em português." });
+      const [row] = await rows();
+      const events = f.listen(f.general.id);
+      await decide(row?.id ?? "");
+      const [notice, ...more] = await notices();
+      expect(more).toEqual([]);
+      expect(notice).toMatchObject({
+        channelId: f.general.id,
+        kind: "proposal_result",
+        refs: { proposalCardId: row?.id },
+      });
+      expect(notice?.text).toContain("accepted: your instructions: - Sempre em português.");
+      expect(notice?.text).toContain("already applied");
+      expect(await woken()).toHaveLength(1);
+      expect(events.some((e) => e.type === "agent.thinking")).toBe(true);
+    });
+
+    test("a card of two rows sends one notice, after the last, about both", async () => {
+      f = await setup();
+      await teammate("ada");
+      await teammate("lia");
+      await proposeOnCard({
+        target: "agents",
+        agents: ["ada", "lia"],
+        change: "Sempre em português.",
+      });
+      const [first, second] = await rows();
+      await decide(first?.id ?? "");
+      expect(await notices()).toEqual([]);
+      expect(await woken()).toEqual([]);
+      await decide(second?.id ?? "");
+      const [notice, ...more] = await notices();
+      expect(more).toEqual([]);
+      expect(notice?.text).toContain("@ada's instructions");
+      expect(notice?.text).toContain("@lia's instructions");
+      expect(await woken()).toHaveLength(1);
+    });
+
+    test("two rows decided at once still send one notice", async () => {
+      f = await setup();
+      await teammate("ada");
+      await teammate("lia");
+      await proposeOnCard({
+        target: "agents",
+        agents: ["ada", "lia"],
+        change: "Sempre em português.",
+      });
+      await Promise.all((await rows()).map((r) => decide(r.id)));
+      expect(await notices()).toHaveLength(1);
+    });
+
+    test("rows that end differently: one notice says what became of each, a stale last row included", async () => {
+      f = await setup();
+      const ada = await teammate("ada");
+      const lia = await teammate("lia");
+      const atlas = await teammate("atlas");
+      await proposeOnCard({
+        target: "agents",
+        roles: [
+          { agent: "ada", role: "Revisora" },
+          { agent: "lia", role: "Designer" },
+          { agent: "atlas", role: "Infra" },
+        ],
+      });
+      const of = async (id: string) => (await rows()).find((r) => r.agentId === id)?.id ?? "";
+      await decide(await of(ada.id));
+      await decide(await of(lia.id), "reject");
+      await f.db.update(schema.agents).set({ role: "Outro" }).where(eq(schema.agents.id, atlas.id));
+      await expect(decide(await of(atlas.id))).rejects.toThrow("changed since");
+      const [notice, ...more] = await notices();
+      expect(more).toEqual([]);
+      expect(notice?.text).toContain("accepted: @ada's role: Revisora.");
+      expect(notice?.text).toContain("refused: @lia's role: Designer. Don't propose it again unless someone asks.");
+      expect(notice?.text).toContain("Not applied, what it was made against changed since: @atlas's role: Infra.");
+    });
+
+    test("refusing says so, and not to propose it again", async () => {
+      f = await setup();
+      await proposeOnCard({ target: "my_instructions", change: "Sempre em português." });
+      const [row] = await rows();
+      await decide(row?.id ?? "", "reject");
+      const [notice] = await notices();
+      expect(notice?.text).toContain("refused: your instructions: - Sempre em português.");
+      expect(notice?.text).toContain("Don't propose it again unless someone asks.");
+      expect(notice?.text).not.toContain("accepted");
+      expect(await woken()).toHaveLength(1);
+    });
+
+    test("a text a person adjusted is not quoted as it was proposed", async () => {
+      f = await setup();
+      await proposeOnCard({ target: "my_instructions", change: "Sempre em português." });
+      const [row] = await rows();
+      await decideProposal(f.db, f.owner.id, f.org.id, row?.id ?? "", "accept", { finalText: "Seja breve e educado." });
+      expect((await notices())[0]?.text).toContain("with the wording a person adjusted");
+    });
+
+    test("a stale proposal changed nothing: no notice, nobody woken", async () => {
+      f = await setup();
+      await proposeOnCard({ target: "my_instructions", change: "Sempre em português." });
+      const [row] = await rows();
+      await f.db.update(schema.agents).set({ instructions: "Outra coisa." }).where(eq(schema.agents.id, f.agent.id));
+      await expect(decide(row?.id ?? "")).rejects.toThrow("changed since");
+      expect(await notices()).toEqual([]);
+      expect(await woken()).toEqual([]);
+    });
+
+    test("no message shows it (a memory promotion, a card not posted yet): no notice and the decision stands", async () => {
+      f = await setup();
+      const ada = await teammate("ada");
+      const {
+        proposals: [row],
+      } = await proposeFor({ target: "agent_instructions", agentIds: [ada.id], change: "Sempre em português." });
+      expect(await decide(row?.id ?? "")).toMatchObject({ status: "accepted" });
+      await propose(await runOn("person"), { target: "my_instructions", change: "Outra regra." });
+      const open = (await rows()).find((r) => r.status === "pending");
+      expect(await decide(open?.id ?? "")).toMatchObject({ status: "accepted" });
+      expect(await notices()).toEqual([]);
+    });
+
+    test("a pub/sub that fails never fails the decision", async () => {
+      f = await setup();
+      await proposeOnCard({ target: "my_instructions", change: "Sempre em português." });
+      const [row] = await rows();
+      const down = {
+        publish: async () => {
+          throw new Error("down");
+        },
+      } as unknown as PubSub;
+      const decided = await decideProposal(f.db, f.owner.id, f.org.id, row?.id ?? "", "accept", { pubsub: down });
+      expect(decided.status).toBe("accepted");
+      expect(await notices()).toHaveLength(1);
+    });
   });
 });

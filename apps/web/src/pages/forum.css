@@ -26,7 +26,7 @@
   padding-bottom: 120px;
 }
 .forum {
-  max-width: 1120px;
+  max-width: none;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -136,7 +136,7 @@
   transform: translateY(-2px);
   box-shadow: var(--e2), var(--top);
 }
-.forum-lv:focus-visible {
+html:not([data-pointer]) .forum-lv:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -210,7 +210,7 @@
 .forum-nd:hover {
   background: color-mix(in srgb, var(--sunken) 45%, transparent);
 }
-.forum-nd:focus-visible {
+html:not([data-pointer]) .forum-nd:focus-visible {
   outline: none;
   box-shadow: inset var(--focus-ring);
 }
@@ -289,7 +289,7 @@
 .forum-tr:hover {
   background: color-mix(in srgb, var(--sunken) 45%, transparent);
 }
-.forum-tr:focus-visible {
+html:not([data-pointer]) .forum-tr:focus-visible {
   outline: none;
   box-shadow: inset var(--focus-ring);
 }
@@ -420,7 +420,7 @@
   transform: translateY(-2px);
   box-shadow: var(--e2), var(--top);
 }
-.forum-tpl:focus-visible {
+html:not([data-pointer]) .forum-tpl:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -590,7 +590,7 @@
 .forum-pickrow button:active {
   transform: scale(0.96);
 }
-.forum-pickrow button:focus-visible {
+html:not([data-pointer]) .forum-pickrow button:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -635,7 +635,7 @@
 
 /* ── Topic page ─────────────────────────────────────────────────────────── */
 .forum-topic {
-  max-width: 1540px;
+  max-width: none;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 380px;
   align-items: start;
@@ -643,9 +643,6 @@
 }
 .forum-topic__main {
   min-width: 0;
-  max-width: 1040px;
-  width: 100%;
-  margin: 0 auto;
 }
 .forum-topic__side {
   position: sticky;
@@ -673,7 +670,6 @@
 }
 .forum-th__goal {
   margin: 8px 0 0;
-  max-width: 64ch;
   font-size: 15px;
   color: var(--ink2);
 }
@@ -882,7 +878,7 @@ a.forum-facts__lnk:hover {
   background: color-mix(in srgb, var(--ink) 8%, transparent);
   color: var(--ink);
 }
-.forum-rl:focus-visible {
+html:not([data-pointer]) .forum-rl:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -1030,7 +1026,7 @@ a.forum-facts__lnk:hover {
   background: color-mix(in srgb, var(--ink) 6%, transparent);
   color: var(--ink);
 }
-.forum-qref:focus-visible {
+html:not([data-pointer]) .forum-qref:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -1605,7 +1601,7 @@ a.forum-facts__lnk:hover {
 .forum-wrow:hover {
   background: color-mix(in srgb, var(--sunken) 70%, var(--ink) 6%);
 }
-.forum-wrow:focus-visible {
+html:not([data-pointer]) .forum-wrow:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -1740,7 +1736,7 @@ a.forum-facts__lnk:hover {
   color: var(--bg);
   box-shadow: none;
 }
-.forum-rpick input:focus-visible + .forum-ck {
+html:not([data-pointer]) .forum-rpick input:focus-visible + .forum-ck {
   box-shadow: var(--focus-ring);
 }
 .forum-plist {

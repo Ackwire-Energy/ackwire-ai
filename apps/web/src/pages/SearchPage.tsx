@@ -44,7 +44,7 @@ export function SearchPage() {
   const channel = (id: string | undefined) => channels.data?.find((c) => c.id === id);
 
   return (
-    <div className="page page--mid">
+    <div className="page page--full">
       <header className="page__header">
         <h1 className="page-title">{t("searchPage.title")}</h1>
       </header>
@@ -130,7 +130,7 @@ function HitBody({ snippet, meta }: { snippet: string; meta: string }) {
   const { t } = useTranslation();
   return (
     <span className="list-col">
-      {/* A voice message comes with no snippet: it is found by its words, and shows as audio (ADR 0094). */}
+      {/* A voice message comes with no snippet: it is found by its words, and shows as audio (ADR 0098). */}
       <span>{snippet || t("voice.word")}</span>
       <span className="small muted">{meta}</span>
     </span>

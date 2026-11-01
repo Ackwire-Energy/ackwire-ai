@@ -590,10 +590,13 @@ export const agentConsultationStatusEnum = pgEnum("agent_consultation_status", [
   "failed",
 ]);
 
+/** A question (`ask_agent`) or work handed off (`tell_agent`): both come back by themselves (ADR 0095). */
+export const agentConsultationKindEnum = pgEnum("agent_consultation_kind", ["question", "note"]);
+
 /**
- * One agent asking another (`ask_agent`, ADR 0034): the question goes to a
- * private DM between the two agents, the consulted agent runs there, and its
- * reply resumes the asking run (the tool call's `waitId`).
+ * One agent asking another (`ask_agent`, ADR 0034) or handing it work (`tell_agent`, ADR 0095): the message goes to
+ * a private DM between the two agents, the other agent runs there, and what comes of it goes back to the
+ * conversation of the run that sent it.
  */
 export const agentConsultations = pgTable(
   "agent_consultations",
@@ -602,7 +605,7 @@ export const agentConsultations = pgTable(
       .primaryKey()
       .$defaultFn(() => Bun.randomUUIDv7()),
     orgId: uuid().notNull(),
-    /** The asking run, paused on `waitId` until the answer. */
+    /** The run that asked or handed it off. */
     askerRunId: uuid()
       .notNull()
       .references(() => agentRuns.id, { onDelete: "cascade" }),
@@ -610,7 +613,7 @@ export const agentConsultations = pgTable(
     targetAgentId: uuid().notNull(),
     /** The private DM between the two agents. */
     channelId: uuid().notNull(),
-    /** The question as posted there (the consulted run's trigger). */
+    /** The question or the note as posted there (the other agent's run's trigger). */
     messageId: uuid().notNull(),
     targetRunId: uuid(),
     waitId: text().notNull(),
@@ -618,8 +621,12 @@ export const agentConsultations = pgTable(
     /** Agents already in this chain of consultations (no cycles). */
     chain: uuid().array().notNull(),
     status: agentConsultationStatusEnum().notNull().default("open"),
+    kind: agentConsultationKindEnum().notNull().default("question"),
+    /** Once closed, what came of it; while open, what came back so far from agents its run handed part to. */
     answer: text(),
     answeredAt: timestamp({ withTimezone: true }),
+    /** The sender heard what came of it, or there was nothing worth telling it (a note's acknowledgement). */
+    reportedAt: timestamp({ withTimezone: true }),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
@@ -629,6 +636,8 @@ export const agentConsultations = pgTable(
     unique().on(t.messageId),
     index().on(t.askerRunId),
     index().on(t.expiresAt).where(sql`${t.status} = 'open'`),
+    index().on(t.targetRunId),
+    index().on(t.orgId, t.askerAgentId, t.createdAt),
   ],
 );
 
@@ -668,7 +677,11 @@ export const secretRequests = pgTable(
     /** `GITHUB_TOKEN`… */
     name: text().notNull(),
     purpose: text().notNull(),
-    targetKind: text().notNull().$type<"env" | "file">(),
+    /**
+     * `site`: only the agent browser types it, on `site`, never its commands (a runner that says it can, ADR 0027);
+     * a site's password on an older runner is `env`, with `site` set.
+     */
+    targetKind: text().notNull().$type<"env" | "file" | "site">(),
     targetPath: text(),
     /** The connected machine holding the key (ADR 0025). */
     machineId: uuid(),

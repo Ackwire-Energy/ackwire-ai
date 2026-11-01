@@ -96,3 +96,13 @@ test("extra keys merge deeply into the app's strings", () => {
   expect(mobile.auth?.extra).toBe("x");
   expect((mobile.auth?.social as Record<string, string> | undefined)?.failed).toBe(mobilePtBR.auth.social.failed);
 });
+
+test("the plan's notifications have their own Activity line in both languages, not the agent's name alone", () => {
+  for (const keys of [featureKeysEn, featureKeysPtBR]) {
+    const kind = keys.activity.kind as Record<string, string>;
+    for (const k of ["plan_reset_unknown", "routine_waiting_plan"]) {
+      expect(kind[`${k}_one`]).toBeString();
+      expect(kind[`${k}_other`]).toBeString();
+    }
+  }
+});

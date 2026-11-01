@@ -9,12 +9,15 @@ import {
   inArray,
   isNull,
   lt,
+  ne,
   or,
   rowsOf,
   schema,
   sql,
 } from "@agenteschat/db";
+import { CHANNEL_REF } from "@agenteschat/ui/channel-refs";
 import { type AgentActionView, actionsFor } from "./agent-actions";
+import { currentHandles } from "./agents";
 import { withDeletedArtifacts } from "./artifacts";
 import { audienceSql, notifyBlocked } from "./audience";
 import { requireChannelAccess } from "./channels";
@@ -33,10 +36,11 @@ import { PLATFORM_CAP } from "./limits";
 import { isMediaAfterReply, isStickerMood, type MessageMedia, mediaOf, mediaSettings, type StickerMood } from "./media";
 import { type MessageMemory, memoriesFor } from "./message-memories";
 import { readableBody, voiceOf } from "./message-preview";
+import { agentOnlyNoticeSql } from "./notices";
 import { can } from "./organizations";
 import { afterReplyAnswered } from "./questions";
 import { inChannelRun } from "./run-scope";
-import { NO_AI } from "./runs";
+import { NO_AI, outageParkedSql } from "./runs";
 import { afterSteered } from "./steering";
 import type { Talker } from "./talker";
 import { syncWikiLinks, withWikiLinks } from "./wiki-links";
@@ -119,7 +123,7 @@ export interface ReplyRef {
   author: { type: "person" | "agent"; id: string | null };
   authorName: string;
   excerpt: string;
-  /** The quoted message's GIF, sticker (ADR 0091) or voice (ADR 0094): a quote of one with no text still says what it was. */
+  /** The quoted message's GIF, sticker (ADR 0091) or voice (ADR 0098): a quote of one with no text still says what it was. */
   mediaKind?: MessageMedia["kind"] | "voice";
 }
 
@@ -177,6 +181,8 @@ export interface Receipts {
     status: "queued" | "running" | "waiting_approval" | "waiting_input" | "done" | "failed" | "canceled";
     /** `no_ai`: it failed for want of an AI to think with. */
     reason?: typeof NO_AI;
+    /** `waiting_input` parked on a provider outage: it retries by itself. */
+    outage?: true;
   }[];
   /** Agents it mentions that won't answer (they don't reply to this person, or a mission's agent). */
   blocked: string[];
@@ -219,6 +225,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
     agentId: schema.agentRuns.agentId,
     status: schema.agentRuns.status,
     error: schema.agentRuns.error,
+    outage: outageParkedSql,
   };
   const [decisions, runs, steeredRuns, answeredRuns] = await Promise.all([
     db
@@ -253,7 +260,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
   const noAi = new Set(decisions.filter((d) => d.error === NO_AI).map((d) => d.messageId));
   const capped = new Set(decisions.filter((d) => d.error === PLATFORM_CAP).map((d) => d.messageId));
   const strategyOf = new Map(decisions.map((d) => [d.messageId, d.strategy]));
-  // An agent's mentions the judge read as no hand-off (`delegatedAgents`); the ones it picked that a stretch's limit
+  // An agent's mentions the judge was sure need nothing (`delegatedAgents`); the ones it woke that a stretch's limit
   // held are its pause card's to explain.
   const handedOff = new Map(
     decisions.filter((d) => d.strategy.startsWith("mention-")).map((d) => [d.messageId, d.selected]),
@@ -283,6 +290,7 @@ export async function receiptsFor(db: Database, orgId: string, list: Message[]):
         runId: r.id,
         status: r.status,
         ...(r.error === NO_AI ? { reason: NO_AI } : {}),
+        ...(r.outage ? { outage: true as const } : {}),
       })),
       // A person's mention always starts, steers or resumes a run, unless that agent can't answer them
       // or the message only references it.
@@ -314,6 +322,82 @@ export function parseMentionHandles(body: string): string[] {
     if (match[2]) found.add(match[2].toLowerCase());
   }
   return [...found];
+}
+
+/**
+ * `#name` channel references in a message, lower-cased and de-duplicated, outside code and links (they stay as
+ * typed), by the rule the apps share (`CHANNEL_REF`).
+ */
+export function parseChannelNames(body: string): string[] {
+  const prose = body
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`[^`\n]+`/g, " ")
+    .replace(/\[[^\]]*\]\([^)\s]*\)|https?:\/\/\S+/g, " ");
+  const found = new Set<string>();
+  for (const match of prose.matchAll(CHANNEL_REF)) {
+    if (match[2]) found.add(match[2].toLowerCase());
+  }
+  return [...found];
+}
+
+/**
+ * `{ channelRefs }` for a new message's meta: each `#name` it writes → the channel's id (`{}` when none), so the link
+ * survives a rename. Archived channels count (they show as archived). A private channel only when the message is
+ * posted in it: `meta` reaches every reader, and only then are they all its members. Elsewhere its members' apps
+ * match the channel by its current name.
+ */
+function channelRefsSql(orgId: string, channelId: string, names: string[]) {
+  // Names match [a-z0-9_-]: safe as an array literal.
+  return sql`coalesce((select jsonb_build_object('channelRefs', jsonb_object_agg(c.name, c.id)) from ${channels} c
+      where c.org_id = ${orgId}::uuid and c.kind = 'channel' and c.name = any(${`{${names.join(",")}}`}::text[])
+        and (c.visibility = 'public' or c.id = ${channelId}::uuid)
+      having count(*) > 0), '{}'::jsonb)`;
+}
+
+/**
+ * The org's agents an agent's text @mentions that aren't members of `channelId`: a mention reaches only members
+ * (`insertMessageWithRuns`), so for them it is plain text that wakes nobody. Handles, lower case; never the author,
+ * an archived agent or a handle a person holds (the @ is theirs).
+ */
+export async function unreachedAgents(
+  db: Executor,
+  input: { orgId: string; channelId: string; authorAgentId: string; body: string; handedTo?: string },
+): Promise<string[]> {
+  const handles = parseMentionHandles(input.body);
+  if (handles.length === 0) return [];
+  const rows = await db
+    .select({ handle: agents.handle })
+    .from(agents)
+    .where(
+      and(
+        eq(agents.orgId, input.orgId),
+        isNull(agents.archivedAt),
+        inArray(agents.handle, handles),
+        ne(agents.id, input.authorAgentId),
+        sql`not exists (select 1 from ${channelMembers} cm
+          where cm.channel_id = ${input.channelId}::uuid and cm.agent_id = ${agents.id})`,
+        sql`not exists (select 1 from ${schema.organizationMembers} om
+          where om.org_id = ${input.orgId}::uuid and om.handle = ${agents.handle})`,
+        input.handedTo
+          ? sql`not exists (select 1 from ${schema.agentConsultations} c
+              where c.asker_run_id = ${input.handedTo}::uuid and c.target_agent_id = ${agents.id})`
+          : undefined,
+      ),
+    );
+  return rows.map((r) => r.handle).sort();
+}
+
+/**
+ * What the agent reads about its mentions that reached nobody (`unreachedAgents`): who, and how to reach them if it
+ * meant to (a mention may only name an agent). `canAdd`: a channel, where `add_agent_to_channel` brings an agent in
+ * with the rights of the person behind the run; a DM keeps its participants. In the past tense: the line stays under
+ * the message, also after the agent joins.
+ */
+export function unreachedNote(handles: string[], where: string, canAdd: boolean): string {
+  if (handles.length === 0) return "";
+  const one = handles.length === 1;
+  const it = one ? "it" : "them";
+  return `${handles.map((h) => `@${h}`).join(", ")} ${one ? "wasn't" : "weren't"} in ${where}, so your mention didn't reach ${it}. If you meant ${it} to act or answer, use tell_agent or ask_agent${canAdd ? `, or add ${it} to ${where} with add_agent_to_channel (it works with the rights of the person you work for)` : ""}.`;
 }
 
 /** An agent's message may bring in one more agent only up to this hop (ADR 0034); `router.ts` enforces it too. */
@@ -468,7 +552,8 @@ export async function insertMessageWithRuns(
   const silent = isMediaAfterReply(input.meta);
   if (body.length > MAX_MESSAGE_LENGTH)
     throw new ValidationError(`Message is longer than ${MAX_MESSAGE_LENGTH} characters`);
-  const handles = `{${parseMentionHandles(body).join(",")}}`; // handles match [a-z0-9_-]: safe as an array literal
+  // Handles match [a-z0-9_-]: safe as an array literal.
+  const handles = `{${(await currentHandles(tx, input.orgId, parseMentionHandles(body))).join(",")}}`;
   const id = Bun.randomUUIDv7();
   const person = input.author.type === "person";
   const userId = input.author.type === "person" ? input.author.userId : null;
@@ -478,6 +563,7 @@ export async function insertMessageWithRuns(
   const stretchId =
     (input.author.type === "agent" && input.author.runId === null ? input.author.stretchId : null) ?? null;
   const threadId = input.threadId ?? null;
+  const channelNames = parseChannelNames(body);
   const startRuns = options.startRuns && person && !mediaOnly;
   const deliver = person && options.deliver !== false && !mediaOnly;
   // Agents the person only referenced (`classifyAddressees`): mentioned, but no run and no steering.
@@ -588,9 +674,16 @@ export async function insertMessageWithRuns(
           and r.agent_id <> all(${referenced}::uuid[])
           and (
             (r.agent_id in (select agent_id from answering)
-              and (r.thread_root_id = coalesce(${threadId}::uuid, ${id}::uuid) or exists (
-                select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'dm')
-                or ${threadId ? sql`false` : sql`(r.status in ('queued', 'running') and ${inChannelRun(sql`r`)})`}))
+              and (r.thread_root_id = coalesce(${threadId}::uuid, ${id}::uuid)
+                -- In a DM the main timeline is one conversation; each thread (a mission's) is its own, so the
+                -- agent works in both at once instead of one taking the other's messages.
+                or ${
+                  threadId
+                    ? sql`false`
+                    : sql`(${inChannelRun(sql`r`)} and exists (
+                select 1 from ${channels} c where c.id = ${input.channelId}::uuid and c.kind = 'dm'))
+                or (r.status in ('queued', 'running') and ${inChannelRun(sql`r`)})`
+                }))
             or (${threadId}::uuid is not null and r.thread_root_id = ${threadId}::uuid
               and ${audienceSql("ra", sql`${userId}::text`)})
             -- The floor (a follow-up without @ in a channel's main timeline): it goes to the agent still
@@ -640,6 +733,7 @@ export async function insertMessageWithRuns(
           coalesce((select array_agg(id) from mentioned), '{}'::uuid[]),
           coalesce((select array_agg(user_id) from mentioned_people), '{}'::text[]),
           ${JSON.stringify(input.meta ?? {})}::jsonb
+            || ${channelNames.length > 0 ? channelRefsSql(input.orgId, input.channelId, channelNames) : sql`'{}'::jsonb`}
             || coalesce((select jsonb_build_object('answersQuestionId', id) from answered), '{}'::jsonb)
             -- Delivered to a task in progress: nobody routes it again (no second run).
             || coalesce((select jsonb_build_object('steeredRunIds', jsonb_agg(st.id)) from steered st
@@ -1068,7 +1162,7 @@ export async function classifyAddressees(
   input: { orgId: string; channelId: string; userId: string; body: string },
   options: { timeoutMs?: number } = {},
 ): Promise<AddresseeDecision | null> {
-  const handles = parseMentionHandles(input.body);
+  const handles = await currentHandles(db, input.orgId, parseMentionHandles(input.body));
   if (handles.length < 2) return null;
   const targets = await db
     .select({ id: agents.id, handle: agents.handle, name: agents.name, role: agents.role })
@@ -1314,13 +1408,21 @@ async function withReplies(db: Database, orgId: string, roots: MessageView[]): P
         isNull(messages.deletedAt),
         // An agent's sticker or GIF after its own reply (ADR 0091) is part of that reply: not one more.
         sql`${messages.meta}->>'mediaAfter' is null`,
+        sql`not ${agentOnlyNoticeSql(sql`${messages.meta}`)}`,
       ),
     )
     .groupBy(messages.threadId);
   const recent = await db
     .select()
     .from(messages)
-    .where(and(eq(messages.orgId, orgId), inArray(messages.threadId, ids), isNull(messages.deletedAt)))
+    .where(
+      and(
+        eq(messages.orgId, orgId),
+        inArray(messages.threadId, ids),
+        isNull(messages.deletedAt),
+        sql`not ${agentOnlyNoticeSql(sql`${messages.meta}`)}`,
+      ),
+    )
     .orderBy(desc(messages.createdAt), desc(messages.id))
     .limit(Math.min(600, ids.length * 20));
   const latestByThread = new Map<string, Message[]>();

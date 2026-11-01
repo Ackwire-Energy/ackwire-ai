@@ -1,13 +1,12 @@
 import type { CalItem, RunEntry, RunStatus } from "@agenteschat/client/lib/calendar";
 import { formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { Chip, cx, type IconName, Popover, RunMark } from "@agenteschat/ui";
-import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useActors } from "@/components/actors";
-import { useOrg } from "@/components/org-context";
+import { DetailsLink } from "@/components/details-link";
 import { lookOf } from "@/lib/look";
 
 /** Marks drawn side by side in one hour slot of the day/week grid; past that, "+N". */
@@ -62,7 +61,6 @@ export function RunMarks({
   onOpenChange: (open: boolean) => void;
 }) {
   const { t, i18n } = useTranslation();
-  const { org } = useOrg();
   const actors = useActors();
   const time = (r: RunEntry) => formatTime(i18n.language, r.at.toISOString());
   const agentName = (it: CalItem) => actors.name({ type: "agent", id: it.agentId ?? "" });
@@ -136,14 +134,9 @@ export function RunMarks({
                       </Chip>
                     )}
                     {it.routineId && (
-                      <Link
-                        to="/org/$orgId/routines"
-                        params={{ orgId: org.id }}
-                        search={{ open: it.routineId }}
-                        className="ac-link small"
-                      >
+                      <DetailsLink item={{ kind: "routine", id: it.routineId }} className="ac-link small">
                         {t("calendar.openRoutine")}
-                      </Link>
+                      </DetailsLink>
                     )}
                   </span>
                 </span>

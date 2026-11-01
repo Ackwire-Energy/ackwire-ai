@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 
 /**
- * A voice message (ADR 0094): the recording's player. Its words stay closed until opened there; one still on its way
+ * A voice message (ADR 0098): the recording's player. Its words stay closed until opened there; one still on its way
  * plays from this device. An expired one says so, by its date or by the server's 410.
  */
 export function ChatVoice({ message, voice }: { message: Message; voice: MessageVoice }) {

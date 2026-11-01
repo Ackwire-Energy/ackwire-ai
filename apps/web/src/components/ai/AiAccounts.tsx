@@ -5,6 +5,7 @@ import {
   agentsToGive,
   endsOnClaude,
   groupPlans,
+  onSeveralComputers,
   ownSignIns,
   ownSignInTitle,
   type PlanAccount,
@@ -74,7 +75,7 @@ export function AiAccountsSection() {
   const rows = ai.data?.accounts ?? [];
   const accounts = groupPlans(rows);
   const own = ownSignIns(ai.data);
-  const several = new Set(rows.map((r) => r.machineId)).size > 1;
+  const several = onSeveralComputers(rows);
   const names = (list: string[]) => joinNames(list, t("newAgent.and"));
   const meterText = planMeterText(t, i18n.language);
   const refetch = () => void qc.invalidateQueries({ queryKey: keys.aiAccounts(org.id) });

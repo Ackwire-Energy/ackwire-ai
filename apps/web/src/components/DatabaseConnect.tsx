@@ -23,6 +23,7 @@ import {
   Alert,
   AvatarStack,
   Button,
+  CheckboxPill,
   Chip,
   Dialog,
   DialogBody,
@@ -542,6 +543,21 @@ function RulesStep({
             connection={connection}
             policy={edits[agent.id]}
             onChange={(policy) => setEdits((e) => ({ ...e, [agent.id]: policy }))}
+            others={agents.filter((a) => a.id !== agent.id)}
+            onCopy={(ids, policy) => {
+              const before = edits;
+              setEdits((e) => ({ ...e, ...Object.fromEntries(ids.map((id) => [id, policy])) }));
+              return () =>
+                setEdits((e) => {
+                  const next = { ...e };
+                  for (const id of ids) {
+                    const was = before[id];
+                    if (was) next[id] = was;
+                    else delete next[id];
+                  }
+                  return next;
+                });
+            }}
           />
         )}
         {save.isError && <Alert>{t("mail.agent.saveError.unknown")}</Alert>}
@@ -556,20 +572,32 @@ function RulesStep({
   );
 }
 
-/** One agent's rules in step 4, starting from what it has. */
+/**
+ * One agent's rules in step 4, starting from what it has. "Usar as mesmas
+ * regras em" copies them to other agents in the step; each is still saved and
+ * checked on its own.
+ */
 function AgentRules({
   agent,
   connection,
   policy,
   onChange,
+  others,
+  onCopy,
 }: {
   agent: Agent;
   connection: DatabaseConnection;
   policy: DatabasePolicy | undefined;
   onChange: (policy: DatabasePolicy) => void;
+  others: Agent[];
+  /** Returns the undo: the targets' entries as they were before the copy. */
+  onCopy: (agentIds: string[], policy: DatabasePolicy) => () => void;
 }) {
+  const { t } = useTranslation();
   const { org } = useOrg();
   const saved = useAgentDatabases(org.id, agent.id);
+  const [copyTo, setCopyTo] = useState<string[]>([]);
+  const [copied, setCopied] = useState<{ ids: string[]; undo: () => void } | null>(null);
   if (saved.isLoading) return <LoadingList count={2} />;
   const mine = saved.data?.find((d) => d.connectionId === connection.id);
   const shown = policy ?? mine?.policy ?? defaultDatabasePolicy(connection);
@@ -579,7 +607,68 @@ function AgentRules({
         <AgentAvatar agentId={agent.id} name={agent.name} size="sm" />
         <b>{agent.name}</b>
       </span>
-      <DatabaseRulesPanel connectionId={connection.id} policy={shown} onChange={onChange} />
+      <DatabaseRulesPanel
+        connectionId={connection.id}
+        policy={shown}
+        onChange={(next) => {
+          setCopied(null);
+          onChange(next);
+        }}
+      />
+      {others.length > 0 && (
+        <div className="mail-rules-copy">
+          <fieldset className="mail-rules__group">
+            <legend className="ac-field__label">{t("database.copy.label", { name: agent.name })}</legend>
+            <div className="newag__pills">
+              {others.map((a) => (
+                <CheckboxPill
+                  key={a.id}
+                  id={`db-copy-${a.id}-${connection.id}`}
+                  checked={copyTo.includes(a.id)}
+                  onCheckedChange={(on) => setCopyTo((ids) => (on ? [...ids, a.id] : ids.filter((x) => x !== a.id)))}
+                >
+                  {a.name}
+                </CheckboxPill>
+              ))}
+            </div>
+            <span className="mail-list__clear">
+              <Button
+                size="sm"
+                disabled={copyTo.length === 0}
+                onClick={() => {
+                  setCopied({ ids: copyTo, undo: onCopy(copyTo, shown) });
+                  setCopyTo([]);
+                }}
+              >
+                {t("database.copy.apply")}
+              </Button>
+              <span className="mail-list__status" role="status">
+                {copied && (
+                  <span className="mail-list__clear small muted">
+                    {t("database.copy.done", {
+                      names: others
+                        .filter((a) => copied.ids.includes(a.id))
+                        .map((a) => a.name)
+                        .join(", "),
+                    })}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        copied.undo();
+                        setCopied(null);
+                      }}
+                    >
+                      {t("mail.list.undo")}
+                    </Button>
+                  </span>
+                )}
+              </span>
+            </span>
+          </fieldset>
+        </div>
+      )}
     </div>
   );
 }

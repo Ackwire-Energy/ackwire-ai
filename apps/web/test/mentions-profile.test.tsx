@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import { mentionQuery } from "@agenteschat/ui";
+import { HOVER_CLOSE_MS, mentionQuery } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -141,16 +141,30 @@ describe("profile card", () => {
     expect(screen().getByRole("complementary", { name: "Perfil da Ada" })).toBeTruthy();
   });
 
-  test("agent thinking with Claude Code: the card says so instead of the API model", async () => {
-    const state = seedState();
-    const ada = state.agents.find((a) => a.id === ADA_ID);
-    if (ada) ada.brain = { kind: "claude_code", model: "Opus", computer: "MacBook" };
-    await go(`c/${ENG_ID}`, state);
-    await click(screen().getAllByRole("button", { name: "Perfil de Ada" })[0] as HTMLElement);
-    await settle(6);
-    const c = card();
-    expect(c.textContent).toContain("Claude Code · Opus no MacBook");
-    expect(c.textContent).not.toContain("sonnet 5.5");
+  test("agent thinking with Claude Code: the card says the model by its plan instead of the API model, its computer only beside another", async () => {
+    type Brain = NonNullable<ReturnType<typeof seedState>["agents"][number]["brain"]>;
+    const model = async (brains: Record<string, Brain>) => {
+      const state = seedState();
+      for (const a of state.agents) if (brains[a.id]) a.brain = brains[a.id];
+      await go(`c/${ENG_ID}`, state);
+      await click(screen().getAllByRole("button", { name: "Perfil de Ada" })[0] as HTMLElement);
+      await settle(6);
+      const line = card().querySelector(".profile-card__brain")?.textContent;
+      expect(card().textContent).not.toContain("sonnet 5.5");
+      cleanup();
+      return line;
+    };
+    // The workspace's one computer tells nothing apart.
+    expect(await model({ [ADA_ID]: { kind: "claude_code", model: "Opus", computer: "MacBook" } })).toBe(
+      "Opus pelo plano do Claude",
+    );
+    // Beside an agent on another computer it does; nobody chose Ada's model, so the plan alone.
+    expect(
+      await model({
+        [ADA_ID]: { kind: "claude_code", model: "auto", computer: "MacBook" },
+        [ATLAS_ID]: { kind: "codex", model: "GPT-6 Sol", computer: "Servidor" },
+      }),
+    ).toBe("Plano do Claude no MacBook");
   });
 
   test("agent on a plan: its plan's limits and no budget until it spends through the API, then the budget after them", async () => {
@@ -240,6 +254,25 @@ describe("profile card", () => {
     await wait(350);
     await settle(3);
     expect(card().textContent).toContain("João");
+  });
+
+  test("hover opens it without taking the focus, open or closed; a press brings the focus in", async () => {
+    await go(`c/${ENG_ID}`);
+    const box = composer();
+    box.focus();
+    const name = screen().getAllByRole("button", { name: "Perfil de Ada" })[0] as HTMLElement;
+    await act(async () => fireEvent.pointerEnter(name, { pointerType: "mouse" }));
+    await wait(500);
+    await settle(3);
+    expect(within(card()).getByRole("button", { name: "Ver perfil" })).toBeTruthy();
+    expect(document.activeElement).toBe(box);
+    await act(async () => fireEvent.pointerLeave(name, { pointerType: "mouse" }));
+    await wait(HOVER_CLOSE_MS + 50);
+    expect(screen().queryByRole("dialog", { name: "Perfil" })).toBeNull();
+    expect(document.activeElement).toBe(box);
+    await click(name);
+    await settle(3);
+    expect(card().contains(document.activeElement)).toBe(true);
   });
 
   test("mention chips in messages open the card too", async () => {

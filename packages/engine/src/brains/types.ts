@@ -31,6 +31,8 @@ export interface BrainSession {
   machineId: string;
   /** Folder on the machine (relative to the agent folder), e.g. "" or a mission repo dir. */
   cwd: string;
+  /** Start in the agent's own folder, never one of its checkouts: the folder of its session before was gone. */
+  ownFolder?: boolean;
 }
 
 export interface BrainTurn {
@@ -120,6 +122,8 @@ export type BrainEvent =
       retryable?: boolean;
       /** The computer dropped because our own server stopped (a restart): never from the runner's wire. */
       serverStop?: boolean;
+      /** A `plan_limit`: whether the turn used a tool before it was cut (absent: an older runner, counted as worked). */
+      worked?: boolean;
     }
   /** Messages handed mid-turn (`BrainIO.steerable`) that the turn read, by their `uuid`. */
   | { type: "steer_read"; uuids: string[] };

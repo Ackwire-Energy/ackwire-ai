@@ -8,10 +8,10 @@ import { clearsText } from "@agenteschat/client/lib/presence";
 import { isAuto } from "@agenteschat/client/lib/providers";
 import { rolesOf } from "@agenteschat/client/lib/roles";
 import { timezoneName } from "@agenteschat/client/lib/routines";
-import { Avatar, Button, hoverPointer, Meter, PlanMeter, Popover, ProviderLogo } from "@agenteschat/ui";
+import { Avatar, Button, Meter, PlanMeter, Popover, ProviderLogo, useHoverCard } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOpenAgentPanel } from "@/components/agent-panel-context";
@@ -24,7 +24,6 @@ import { planMeterText, usageShown } from "@/lib/plan-usage";
 
 /** Hover delay before the card opens (mouse and pen only; touch opens on tap). */
 export const HOVER_OPEN_MS = 400;
-const HOVER_CLOSE_MS = 200;
 
 /**
  * Wraps an avatar, author name or mention so it opens the profile card:
@@ -46,38 +45,14 @@ export function ProfileTrigger({
   decorative?: boolean;
 }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const clear = () => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-  };
-  // Drop a pending hover timer on unmount.
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
-  const later = (next: boolean, ms: number) => {
-    clear();
-    timer.current = setTimeout(() => {
-      timer.current = null;
-      setOpen(next);
-    }, ms);
-  };
+  // Hover leaves the focus where it is (the box someone types in), a press or a key brings it in.
+  const card = useHoverCard(HOVER_OPEN_MS);
   return (
     <Popover
-      open={open}
-      onOpenChange={(o) => {
-        clear();
-        setOpen(o);
-      }}
+      hover={card}
       label={t("profile.cardLabel")}
       side="bottom"
       className="profile-card"
-      onContentPointerEnter={(e) => hoverPointer(e.pointerType) && clear()}
-      onContentPointerLeave={(e) => hoverPointer(e.pointerType) && later(false, HOVER_CLOSE_MS)}
       trigger={
         <button
           type="button"
@@ -86,22 +61,14 @@ export function ProfileTrigger({
           aria-haspopup="dialog"
           tabIndex={decorative ? -1 : undefined}
           aria-hidden={decorative || undefined}
-          onPointerEnter={(e) => {
-            if (hoverPointer(e.pointerType) && !open) later(true, HOVER_OPEN_MS);
-          }}
-          onPointerLeave={(e) => {
-            if (!hoverPointer(e.pointerType)) return;
-            if (open) later(false, HOVER_CLOSE_MS);
-            else clear();
-          }}
         >
           {children}
         </button>
       }
     >
-      {open &&
+      {card.open &&
         (actor.type === "agent" ? (
-          <AgentCard agentId={actor.id} onDone={() => setOpen(false)} />
+          <AgentCard agentId={actor.id} onDone={card.close} />
         ) : (
           <PersonCard userId={actor.id} />
         ))}
@@ -240,7 +207,9 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
     ? t("brain.auto.label")
     : (models.data?.models.find((m) => m.id === agent.model)?.label ?? agent.model);
   const thinks =
-    agent.brain && agent.brain.kind !== "model" ? brainLine(t, agent.brain, model, owner?.split(" ")[0]) : null;
+    agent.brain && agent.brain.kind !== "model"
+      ? brainLine(t, agent.brain, model, { owner: owner?.split(" ")[0], agents: dir.agents })
+      : null;
   // Its presence from its work and its line (ADR 0084): its own words or what it is doing now.
   const shown = useAgentPresence(agent.id);
   const line = agentLine(t, shown?.line ?? null);

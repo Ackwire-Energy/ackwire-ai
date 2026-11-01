@@ -92,6 +92,15 @@ const open = async (list: Routine[], runs?: Record<string, RoutineRun[]>, state?
   await settle(8);
   return r;
 };
+/** Rotinas in a workspace with these computers (`GET …/machines`); on the Cloud, its own one. */
+const openOn = async (list: Routine[], computers: string[], runs?: Record<string, RoutineRun[]>, cloud = false) => {
+  const r = withRoutines(list, runs);
+  if (cloud) r.machines?.setSetup({ state: "ready" });
+  for (const name of computers) r.machines?.pair({ name, ...(cloud ? { kind: "managed" as const } : {}) });
+  const view = await renderApp(`/org/${ORG_ID}/routines`, { api: r.api });
+  await settle(8);
+  return view;
+};
 const card = (name: string) => screen().getByRole("article", { name });
 const details = async (name: string) => {
   await click(within(card(name)).getByRole("button", { name }));
@@ -137,19 +146,25 @@ describe("Rotinas: each routine's state, with its one-tap fix", () => {
   });
 
   test("failing, waiting for the computer: said on the row; a plain pause stays quiet", async () => {
+    const waiting = routine({
+      id: "rt-mac",
+      name: "Relatório de vendas",
+      state: "waiting_computer",
+      waitingFor: { machineId: "mac-1", machineName: "MacBook do Walter", since: ago(40) },
+      brain: { kind: "claude_code", machineName: "MacBook do Walter" },
+    });
+    // The computer by its name only where the workspace has more than one.
+    const two = await openOn([structuredClone(waiting)], ["MacBook do Walter", "Mac mini"]);
+    expect(card("Relatório de vendas").textContent).toContain("Esperando o MacBook do Walter desde");
+    two.unmount();
     await open([
       routine({ id: "rt-fail", name: "Caixa de entrada", state: "failing", failuresInRow: 3 }),
-      routine({
-        id: "rt-mac",
-        name: "Relatório de vendas",
-        state: "waiting_computer",
-        waitingFor: { machineId: "mac-1", machineName: "MacBook do Walter", since: ago(40) },
-        brain: { kind: "claude_code", machineName: "MacBook do Walter" },
-      }),
+      waiting,
       routine({ id: "rt-off", name: "Pausada à mão", active: false, state: "paused", nextRunAt: null }),
     ]);
     expect(card("Caixa de entrada").textContent).toContain("Falhando (3 seguidas)");
-    expect(card("Relatório de vendas").textContent).toContain("Esperando o MacBook do Walter desde");
+    expect(card("Relatório de vendas").textContent).toContain("Esperando o computador desde");
+    expect(card("Relatório de vendas").textContent).not.toContain("MacBook");
     // Paused by a person: "Pausada" as before, no fix button on the row.
     const off = card("Pausada à mão");
     expect(off.querySelector(".ac-chip--waiting")).toBeNull();
@@ -253,17 +268,34 @@ describe("Rotinas: a routine's details", () => {
   });
 
   test("the week, where it runs, how it works and each run in plain words", async () => {
-    await open([busy], runs);
+    await openOn([busy], ["MacBook do Walter", "Mac mini"], runs);
     const panel = await details("Revisar PRs");
     const text = panel.textContent ?? "";
+    const region = (name: string) => within(panel).getByRole("region", { name });
     expect(text).toContain("12 de 14 OK esta semana · 2 puladas");
     expect(text).toContain("14 execuções · 120 mil tokens do plano");
-    expect(text).toContain("Claude Code no MacBook do Walter");
-    // Hourly on someone's computer: how often it wakes it.
-    expect(text).toContain("Roda 24 vezes por dia no MacBook do Walter");
+    // Two computers: where it runs is the computer, by its name alone.
+    expect(region("Onde roda").querySelector("p")?.textContent).toBe("MacBook do Walter");
+    expect(text).not.toContain("Claude Code no");
+    // Hourly on someone's computer: how often it wakes it, with when it runs.
+    expect(region("Quando").textContent).toContain("Roda 24 vezes por dia no MacBook do Walter");
     expect(text).toContain("Pode agir");
     expect(text).toContain("Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.");
-    expect(text).toContain("Toda vez");
+    // When it posts: the answer, and what the choice means behind its ⓘ.
+    const posts = region("Quando posta");
+    expect(posts.textContent).toContain("Toda vez");
+    const about = within(posts).getByRole("button", { name: "Sobre Quando posta" });
+    expect(document.getElementById(about.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
+      "Posta depois de toda execução, mesmo quando nada mudou, ou só quando encontra algo novo.",
+    );
+    // Short sections two to a row when there's room: the week with where it delivers, then the two rules.
+    const pairs = [...panel.querySelectorAll(".routine-details__pair")].map((p) =>
+      [...p.querySelectorAll("section")].map((x) => x.getAttribute("aria-label")),
+    );
+    expect(pairs).toEqual([
+      ["Esta semana", "Onde entrega"],
+      ["O que pode fazer sozinha", "Quando posta"],
+    ]);
     expect(text).toContain("Trabalhando agora");
     expect(text).toContain("Contou o que achou");
     expect(text).toContain("3 erros novos no checkout");
@@ -279,6 +311,27 @@ describe("Rotinas: a routine's details", () => {
     );
     // No internal names anywhere.
     expect(text).not.toMatch(/runner|MCP|Jev/);
+  });
+
+  test("one computer says nothing about where it runs; the Cloud's, always on, no busy note either", async () => {
+    const one = await openOn([structuredClone(busy)], ["MacBook do Walter"], runs);
+    let panel = await details("Revisar PRs");
+    expect(within(panel).queryByRole("region", { name: "Onde roda" })).toBeNull();
+    // Still someone's computer, which has to stay on: unnamed.
+    expect(within(panel).getByRole("region", { name: "Quando" }).textContent).toContain(
+      "Roda 24 vezes por dia no computador, que precisa ficar ligado.",
+    );
+    expect(panel.textContent).not.toContain("MacBook");
+    one.unmount();
+    const cloud = {
+      ...structuredClone(busy),
+      brain: { kind: "claude_code" as const, machineName: "Computador da Acme" },
+    };
+    await openOn([cloud], ["Computador da Acme"], runs, true);
+    panel = await details("Revisar PRs");
+    expect(within(panel).queryByRole("region", { name: "Onde roda" })).toBeNull();
+    expect(panel.textContent).not.toContain("Computador da Acme");
+    expect(panel.textContent).not.toContain("Roda 24 vezes");
   });
 
   test("running: Parar stops it quietly", async () => {
@@ -301,11 +354,13 @@ describe("Rotinas: a routine's details", () => {
     expect(panel.textContent).toContain("Só quem criou, o dono do agente, admins e quem está na conversa veem isto.");
     expect(panel.textContent).toContain("Contou o que achou");
     expect(within(panel).queryByRole("button", { name: "Editar" })).toBeNull();
-    // What it may do on its own: the answer, and its meaning behind the section's ⓘ; when it speaks: the answer alone.
-    const access = within(panel).getByRole("region", { name: "O que pode fazer sozinha" });
-    expect(within(access).getByRole("button", { name: "Sobre O que pode fazer sozinha" })).toBeTruthy();
-    expect(access.querySelector(".small.muted")).toBeNull();
-    expect(within(panel).getByRole("region", { name: "Quando falar" }).querySelectorAll("p")).toHaveLength(1);
+    // What it may do on its own and when it posts: each answer, and its meaning behind the section's ⓘ.
+    for (const name of ["O que pode fazer sozinha", "Quando posta"]) {
+      const section = within(panel).getByRole("region", { name });
+      expect(within(section).getByRole("button", { name: `Sobre ${name}` })).toBeTruthy();
+      expect(section.querySelector(".small.muted")).toBeNull();
+      expect(section.querySelectorAll("p")).toHaveLength(1);
+    }
   });
 });
 
@@ -379,7 +434,7 @@ describe("Rotinas: the form's two plain questions", () => {
     expect(document.querySelector(".routines-head")?.querySelectorAll("p")).toHaveLength(1);
   });
 
-  test("Quando falar and O que pode fazer sozinha, sent with the routine", async () => {
+  test("Quando posta and O que pode fazer sozinha, sent with the routine", async () => {
     const api = createFakeApi(seedState());
     await renderApp(`/org/${ORG_ID}/routines`, { api });
     await settle(8);
@@ -391,11 +446,15 @@ describe("Rotinas: the form's two plain questions", () => {
       "true",
     );
     expect(within(dialog).getByRole("radio", { name: "Só olhar e contar" }).getAttribute("aria-checked")).toBe("true");
-    // What each answer allows is one ⓘ beside "O que pode fazer sozinha"; no line under either question.
+    // What each answer means is one ⓘ beside each question; no line under either.
+    const posts = within(dialog).getByRole("button", { name: "Sobre Quando posta" });
+    expect(document.getElementById(posts.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
+      "Posta depois de toda execução, mesmo quando nada mudou, ou só quando encontra algo novo.",
+    );
     const about = within(dialog).getByRole("button", { name: "Sobre O que pode fazer sozinha" });
     const hint = document.getElementById(about.getAttribute("aria-describedby") ?? "");
     expect(hint?.textContent).toBe(
-      "Só olhar e contar: ela lê e conta o que achou. Para mudar alguma coisa, pede a alguém. Pode agir: também pode criar e mudar tarefas, a memória, a wiki e arquivos do Drive, e trabalhar no próprio código. Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.",
+      "Só olhar e contar: ela lê e conta o que achou. Para mudar alguma coisa, pede a alguém. Pode agir: também pode criar e mudar tarefas, a memória, a wiki e arquivos do Drive, trabalhar no próprio código, falar com outros agentes e postar onde quem a criou posta. Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.",
     );
     await click(within(dialog).getByRole("radio", { name: "Toda vez" }));
     await click(within(dialog).getByRole("radio", { name: "Pode agir" }));
@@ -470,7 +529,8 @@ describe("Chat: what a routine found", () => {
         createdAt: at(2),
       },
     );
-    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    const { api } = withRoutines([routine({ id: "rt-s", name: "Sentry diário" })], {}, state);
+    const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(6);
     // The report's own line is folded into the message that tells it.
     expect(screen().queryByText(/Rotina «Sentry diário» entregou um relatório/)).toBeNull();
@@ -478,9 +538,58 @@ describe("Chat: what a routine found", () => {
       .getAllByRole("article")
       .find((a) => a.textContent?.includes("Achei 3 erros novos")) as HTMLElement;
     const tag = within(row).getByRole("link", { name: "Rotina «Sentry diário»" });
+    // A new tab still lands on Rotinas with the routine open; a click opens it here, over the conversation.
     expect(tag.getAttribute("href")).toContain("open=rt-s");
+    await click(tag);
+    await settle(4);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
+    const dialog = screen().getByRole("dialog", { name: "Sentry diário" });
+    expect(within(dialog).getByRole("button", { name: "Editar" })).toBeTruthy();
+    await click(within(dialog).getByRole("button", { name: "Fechar detalhes" }));
+    expect(screen().queryByRole("dialog", { name: "Sentry diário" })).toBeNull();
+    expect(
+      screen()
+        .getAllByRole("article")
+        .some((a) => a === row),
+    ).toBe(true);
     expect(row.textContent).not.toContain("Relatório: 3 erros novos");
     await click(within(row).getByRole("button", { name: "Ver relatório" }));
     expect(row.textContent).toContain("Relatório: 3 erros novos no checkout desde ontem.");
+  });
+
+  test("a run's Abrir na conversa into the conversation underneath closes the details over it", async () => {
+    const state = seedState();
+    state.messages.push({
+      id: "m-told",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ATLAS_ID },
+      body: "Bom dia, time!",
+      mentionedAgentIds: [],
+      agentRunId: null,
+      meta: { routine: { id: "rt-bd", name: "Bom dia diário", runId: "rr-1" } },
+      createdAt: ago(2),
+    });
+    const runs = {
+      "rt-bd": [
+        routineRun({
+          at: ago(2),
+          status: "reported",
+          summary: "Bom dia",
+          link: { channelId: ENG_ID, threadId: null, messageId: "m-told" },
+        }),
+      ],
+    };
+    const { api } = withRoutines([routine({ id: "rt-bd", name: "Bom dia diário" })], runs, state);
+    const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(6);
+    await click(screen().getByRole("link", { name: "Rotina «Bom dia diário»" }));
+    await settle(4);
+    const dialog = screen().getByRole("dialog", { name: "Bom dia diário" });
+    await click(within(dialog).getByRole("link", { name: "Abrir na conversa" }));
+    await settle(4);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
+    expect(router.state.location.search).toEqual({ m: "m-told" });
+    expect(screen().queryByRole("dialog", { name: "Bom dia diário" })).toBeNull();
   });
 });

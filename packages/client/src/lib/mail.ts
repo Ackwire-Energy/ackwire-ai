@@ -112,6 +112,18 @@ export const DEFAULT_DAILY_CAP = 25;
 /** The connectors' level (Sem acesso · Ler · Ler e escrever) as the mail API says it. */
 export const toMailLevel = (level: Level): AgentMailbox["level"] => (level === "write" ? "read_write" : level);
 
+/**
+ * What a viewer may do with an agent's access to a mailbox (same rule as the backend): only who connected it gives
+ * or widens it, to an agent that talks to them; whoever manages the agent (admins, its owner) may also take it away.
+ */
+export function mailAccessOf(
+  account: Pick<MailAccount, "ownerUserId">,
+  viewer: { userId: string | null; talks: boolean; managesAgent: boolean },
+): { gives: boolean; removes: boolean } {
+  const owns = !!viewer.userId && account.ownerUserId === viewer.userId;
+  return { gives: owns && viewer.talks, removes: owns || viewer.managesAgent };
+}
+
 /** A new agent's rules for a mailbox: every folder, anyone, asks before each send. */
 export const defaultPolicy = (): MailPolicy => ({
   folders: [],

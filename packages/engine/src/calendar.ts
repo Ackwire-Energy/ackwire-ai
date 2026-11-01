@@ -1,6 +1,6 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, gte, inArray, isNull, lte, or, schema, sql } from "@agenteschat/db";
-import { getAgent } from "./agents";
+import { currentHandles, getAgent } from "./agents";
 import { zonedParts, zonedTime } from "./cron";
 import { type EmailLocale, emailLocale, queueEmail } from "./email";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
@@ -1165,7 +1165,11 @@ export async function dismissCalendarProposal(deps: CalendarDeps, userId: string
 
 /** Resolves `@ana` / `@dev` handles (or ids) to people and agents of the org. */
 export async function resolveParticipants(db: Database, orgId: string, refs: string[]): Promise<CalendarActor[]> {
-  const handles = refs.map((r) => r.trim().replace(/^@/, "").toLowerCase()).filter(Boolean);
+  const handles = await currentHandles(
+    db,
+    orgId,
+    refs.map((r) => r.trim().replace(/^@/, "").toLowerCase()).filter(Boolean),
+  );
   if (handles.length === 0) return [];
   const [people, bots] = await Promise.all([
     db

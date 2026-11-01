@@ -395,8 +395,8 @@ const usageDiff = (a: TokenUsageBreakdown, b: TokenUsageBreakdown): TokenUsageBr
 export class CodexAppMapper {
   /** The last agent message of the Codex turn running now. */
   private answer?: string;
-  /** Agent messages streamed so far (by item id): a message that came whole is sent whole. */
-  private readonly streamed = new Set<string>();
+  /** Agent messages already sent, streamed or whole (by item id): Codex may complete one twice. */
+  private readonly sent = new Set<string>();
   private lastDeltaItem: string | null = null;
   private anyText = false;
   /** The thread's totals before this `brain.turn`, and now. */
@@ -404,6 +404,8 @@ export class CodexAppMapper {
   private total?: TokenUsageBreakdown;
   /** An `error` notification Codex won't retry (the turn's own error says more). */
   lastError?: string;
+  /** The turn ran a command, changed a file or called our bridge: a cut now loses work the API couldn't see. */
+  private worked = false;
 
   constructor(private readonly opts: { cwd: string; model?: string; redact?: (text: string) => string }) {}
 
@@ -430,19 +432,23 @@ export class CodexAppMapper {
     const itemId = str(params.itemId);
     const delta = str(params.delta);
     if (!delta) return "";
-    this.streamed.add(itemId);
+    this.sent.add(itemId);
     return this.textOf(itemId, delta);
   }
 
   /** `item/completed`: executed tool calls, the answer, and the text of a message that wasn't streamed. */
   completed(item: Record<string, unknown>): { events: CodexBrainEvent[]; text?: string } {
     const id = str(item.id) || `codex-${randomUUID()}`;
+    if (item.type === "commandExecution" || item.type === "fileChange" || item.type === "mcpToolCall")
+      this.worked = true;
     switch (item.type) {
       case "agentMessage": {
         const t = str(item.text);
         if (!t.trim()) return { events: [] };
         this.answer = this.clean(t);
-        return this.streamed.has(id) ? { events: [] } : { events: [], text: this.textOf(id, t) };
+        if (this.sent.has(id)) return { events: [] };
+        this.sent.add(id);
+        return { events: [], text: this.textOf(id, t) };
       }
       case "commandExecution":
         return {
@@ -516,9 +522,10 @@ export class CodexAppMapper {
         this.lastError ||
         (turn.status === "interrupted" ? "Codex stopped the turn" : "The turn failed"),
     );
-    if (info === "usageLimitExceeded") return [{ type: "limit" }, { type: "error", code: "plan_limit", message }];
+    if (info === "usageLimitExceeded")
+      return [{ type: "limit" }, { type: "error", code: "plan_limit", message, worked: this.worked }];
     if (info === "unauthorized") return [{ type: "error", code: "not_logged_in", message, retryable: true }];
-    return codexProblem(message, turn.status === "failed");
+    return codexProblem(message, turn.status === "failed", this.worked);
   }
 }
 
@@ -613,6 +620,8 @@ interface AppLive {
   client: CodexAppClient;
   sig: string;
   threadId: string | null;
+  /** The tool names its thread opened with (`mcp.tools`): what its Codex listed, once. */
+  tools: Set<string> | null;
   busy: boolean;
   lastUsed: number;
   idleTimer: ReturnType<typeof setTimeout> | null;
@@ -785,7 +794,14 @@ export class CodexAppServers implements CodexAppRunner {
     }
     const sig = this.signature(input, opts);
     let live = this.live.get(key);
-    if (live && (live.client.exited || live.sig !== sig)) {
+    // Codex lists our tools when its thread opens and never again (codex-cli 0.165.0 doesn't follow
+    // `tools/list_changed`: its `mcp_tool_list_changed` feature is under development and off): other tool names
+    // start the process again, resumed, so the turn can call what the agent may use now. Only a new name does: a
+    // dropped one stays listed, and the server answers a call to it.
+    const listed = live?.tools;
+    const stale = !!listed && !!input.mcp.tools && input.mcp.tools.split(" ").some((n) => !listed.has(n));
+    if (live && (live.client.exited || live.sig !== sig || stale)) {
+      if (stale) this.log(`codex app-server for ${input.sessionId.slice(0, 8)}: its tools changed; starting it again`);
       this.drop(live);
       live = undefined;
     }
@@ -897,6 +913,7 @@ export class CodexAppServers implements CodexAppRunner {
       client,
       sig,
       threadId: null,
+      tools: null,
       busy: false,
       lastUsed: Date.now(),
       idleTimer: null,
@@ -936,6 +953,7 @@ export class CodexAppServers implements CodexAppRunner {
     this.running.set(input.runId, live);
     try {
       if (!live.threadId) {
+        live.tools = input.mcp.tools ? new Set(input.mcp.tools.split(" ")) : null;
         const opened = await this.openThread(live, input, opts);
         if (opened !== true) return opened;
       }

@@ -44,16 +44,30 @@ describe("Pensa com: the brain by its maker's mark", () => {
     for (const id of Object.keys(PROVIDER_MARKS)) expect(markOf(id)).toBe(id as keyof typeof PROVIDER_MARKS);
   });
 
-  test("the owner and admins also read where it runs; everyone else, the brain and its model", async () => {
+  test("the model by the plan that pays for it; where it runs only when the agents think on two computers; whose plan for who doesn't see that computer", async () => {
     const pt = await translator("pt-BR");
     const en = await translator("en");
     // The server sends `computer` only to the agent's owner and the admins.
     const owner: AgentBrainLine = { kind: "claude_code", model: "Sonnet", computer: "MacBook do Walter" };
     const others: AgentBrainLine = { kind: "claude_code", model: "Sonnet" };
-    expect(brainLine(pt, owner, "").text).toBe("Claude Code · Sonnet no MacBook do Walter");
-    expect(brainLine(pt, others, "").text).toBe("Claude Code · Sonnet");
-    expect(brainLine(en, owner, "").text).toBe("Claude Code · Sonnet on MacBook do Walter");
-    expect(brainLine(pt, { kind: "codex", model: "auto" }, "").text).toBe("Codex · Automático");
+    const one = [{ brain: owner }, { brain: { kind: "codex", model: "GPT-6 Sol", computer: "MacBook do Walter" } }];
+    const two = [...one, { brain: { kind: "codex", model: "GPT-6 Sol", computer: "Servidor" } }];
+    // The workspace's one computer (the Cloud's, or a server's only one) tells nothing apart.
+    expect(brainLine(pt, owner, "", { agents: one }).text).toBe("Sonnet pelo plano do Claude");
+    expect(brainLine(pt, owner, "", { agents: two }).text).toBe("Sonnet pelo plano do Claude no MacBook do Walter");
+    expect(brainLine(en, owner, "", { agents: two }).text).toBe("Sonnet on the Claude plan on MacBook do Walter");
+    expect(brainLine(pt, others, "", { agents: two }).text).toBe("Sonnet pelo plano do Claude");
+    expect(brainLine(pt, others, "", { owner: "Walter" }).text).toBe("Sonnet pelo plano do Claude de Walter");
+    expect(brainLine(en, owner, "").text).toBe("Sonnet on the Claude plan");
+    expect(brainLine(en, others, "", { owner: "Walter" }).text).toBe("Sonnet on Walter's Claude plan");
+    // Nobody chose a model: the plan alone, no "Automático".
+    expect(brainLine(pt, { kind: "codex", model: "auto" }, "").text).toBe("Plano do ChatGPT");
+    expect(brainLine(en, { ...owner, model: "auto" }, "", { agents: two }).text).toBe(
+      "Claude plan on MacBook do Walter",
+    );
+    const opencode: AgentBrainLine = { kind: "claude_code", model: "DeepSeek V4.1 Flash", provider: "opencode" };
+    expect(brainLine(pt, opencode, "").text).toBe("DeepSeek V4.1 Flash pelo OpenCode Go");
+    expect(brainLine(en, opencode, "", { owner: "Walter" }).text).toBe("DeepSeek V4.1 Flash on Walter's OpenCode Go");
     expect(pt("mobile.intentAgents.thinks")).toBe("Pensa com");
     expect(en("mobile.intentAgents.thinks")).toBe("Thinks with");
   });

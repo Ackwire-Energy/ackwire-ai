@@ -248,8 +248,21 @@ export const AGENT_WORKER_HOMES = "/var/lib/agentes-runner-agents";
  */
 export const SYSTEM_RUNNER_HOME = "/var/lib/agentes-runner";
 
-/** In the person's home only: the native install (the app, its `.env`, its database). Agents' own folders have a `.agentes` of theirs. */
+/**
+ * In the person's home only: the native install (the app, its `.env`, its database). An agent's own folder has a
+ * `.agentes` of its own: its mission's files, which it reads, and its browser's profile, which it never does.
+ */
 const HOME_SECRET_DIRS = [".agentes"] as const;
+
+/**
+ * The agent browser's profile, in the agent's folder: its Chrome keeps the agent's logins there (cookies that
+ * Chrome on Linux encrypts with a key anyone can read, so a copy is a working login elsewhere). Only the runner
+ * and that Chrome use it.
+ */
+export const AGENT_BROWSER_PROFILE = ".agentes/browser";
+
+/** Whether a path (either separator) is an agent browser's profile or inside one, whoever's folder it is in. */
+export const inBrowserProfile = (p: string) => /(^|[\\/])\.agentes[\\/]browser([\\/]|$)/i.test(p);
 
 /**
  * Folders that hold keys and tokens, anywhere (the runner's own home and its agents' workers' too): nothing
@@ -257,6 +270,7 @@ const HOME_SECRET_DIRS = [".agentes"] as const;
  * (`SECRET_READ_DENY_RULES`).
  */
 const SECRET_DIRS = [
+  AGENT_BROWSER_PROFILE,
   ".ssh",
   ".aws",
   ".gnupg",
@@ -943,7 +957,9 @@ export const SECRET_BASH_DENY_RULES: readonly string[] = [
   "Library/Keychains",
 ]
   .flatMap((p) => [`Bash(*~/${p}*)`, `Bash(*/${p}/*)`])
-  .concat(HOME_SECRET_DIRS.map((p) => `Bash(*~/${p}*)`));
+  .concat(HOME_SECRET_DIRS.map((p) => `Bash(*~/${p}*)`))
+  // Named from the agent's own folder too, where its commands run.
+  .concat(`Bash(*${AGENT_BROWSER_PROFILE}*)`);
 
 /**
  * The same secrets for Claude Code's own read tools (Read, and best effort Glob and Grep), from the

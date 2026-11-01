@@ -1,5 +1,7 @@
+import { splitChannelRefs } from "@agenteschat/client/lib/channel-refs";
 import { headingId, INLINE, MENTION, parseMarkdown, parseWikiToken, SAFE_URL } from "@agenteschat/client/lib/markdown";
 import { type ReactNode, useMemo } from "react";
+import { MermaidOrCode } from "@/components/artifacts/Mermaid";
 import { ChartOrCode } from "@/components/ChartBlock";
 import { CodeBlock } from "@/components/CodeBlock";
 
@@ -13,6 +15,8 @@ import { CodeBlock } from "@/components/CodeBlock";
 export * from "@agenteschat/client/lib/markdown";
 
 export type MentionRenderer = (handle: string, key: string) => ReactNode;
+/** `#name` (lower case): a channel link, or the text as written (`#Name`) when it means no channel. */
+export type ChannelRenderer = (name: string, text: string, key: string) => ReactNode;
 /** `[[Título]]` or `[[Título|texto]]`: how a wiki link shows (a chip, a dashed missing link…). */
 export type WikiLinkRenderer = (title: string, label: string, key: string) => ReactNode;
 /** `![[foto.png]]`: how an embed shows (`block` alone on its line, else inside a sentence). */
@@ -37,6 +41,22 @@ function wordSpans(text: string, key: string): ReactNode[] {
       );
   }
   return out;
+}
+
+/** `#channel` references first (`channel`), then @mentions in the words between them. */
+function withRefs(
+  text: string,
+  key: string,
+  mention?: MentionRenderer,
+  words?: boolean,
+  channel?: ChannelRenderer,
+): ReactNode[] {
+  if (!channel) return withMentions(text, key, mention, words);
+  return splitChannelRefs(text).flatMap((part, i) =>
+    part.name === undefined
+      ? withMentions(part.text, `${key}-c${i}`, mention, words)
+      : [channel(part.name, part.text, `${key}-ch${i}`)],
+  );
 }
 
 function withMentions(text: string, key: string, mention?: MentionRenderer, words?: boolean): ReactNode[] {
@@ -69,15 +89,16 @@ export function renderInline(
   embed?: EmbedRenderer,
   /** Each plain word in its own `.ac-word` span (a streaming answer's words fade in). */
   words?: boolean,
+  channel?: ChannelRenderer,
 ): ReactNode[] {
   const out: ReactNode[] = [];
   let rest = text;
   let n = 0;
-  const inner = (t: string, k: string) => renderInline(t, k, mention, wiki, embed, words);
+  const inner = (t: string, k: string) => renderInline(t, k, mention, wiki, embed, words, channel);
   while (rest) {
     const m = rest.match(INLINE);
     if (!m || m.index === undefined) {
-      out.push(...withMentions(rest, `${key}-t${n}`, mention, words));
+      out.push(...withRefs(rest, `${key}-t${n}`, mention, words, channel));
       break;
     }
     const tok = m[0];
@@ -88,7 +109,7 @@ export function renderInline(
     // `![[…]]` inside a sentence: the "!" belongs to the embed.
     const isEmbed = Boolean(m[6] && embed && m.index > 0 && rest[m.index - 1] === "!");
     const before = rest.slice(0, isEmbed ? m.index - 1 : m.index);
-    if (before) out.push(...withMentions(before, textKey, mention, words));
+    if (before) out.push(...withRefs(before, textKey, mention, words, channel));
     if (isEmbed && embed) {
       out.push(embed(parseWikiToken(tok).title, k, false));
       rest = rest.slice(m.index + tok.length);
@@ -127,6 +148,8 @@ export interface MarkdownProps {
    */
   variant?: "document" | "message";
   mention?: MentionRenderer;
+  /** `#channel` references (chat); without it they stay text. */
+  channel?: ChannelRenderer;
   wikiLink?: WikiLinkRenderer;
   /** Obsidian embeds (`![[file]]`); without it they show as a plain link. */
   embed?: EmbedRenderer;
@@ -134,6 +157,8 @@ export interface MarkdownProps {
   title?: string;
   /** Plain words in `.ac-word` spans: a streaming answer's newest block, whose words fade in. */
   words?: boolean;
+  /** The first lines of a page (a link's hover card): its ```mermaid blocks stay code, the cut may have split one. */
+  excerpt?: boolean;
   /** Added to the wrapper (`md--tail` on a streaming answer's last block). */
   className?: string;
 }
@@ -152,14 +177,16 @@ export function Markdown({
   source,
   variant = "document",
   mention,
+  channel,
   wikiLink,
   embed,
   title,
   words,
+  excerpt,
   className,
 }: MarkdownProps) {
   const message = variant === "message";
-  const inline = (text: string, k: string) => renderInline(text, k, mention, wikiLink, embed, words);
+  const inline = (text: string, k: string) => renderInline(text, k, mention, wikiLink, embed, words, channel);
   // Parsed once per source (a streaming row re-renders every reveal frame); never mutated.
   const all = useMemo(() => parseMarkdown(source, { breaks: message }), [source, message]);
   const [first] = all;
@@ -186,12 +213,16 @@ export function Markdown({
       }
       case "paragraph":
         return <p key={k}>{inline(b.text, k)}</p>;
-      case "code":
-        return b.lang.toLowerCase() === "chart" ? (
-          <ChartOrCode key={k} text={b.text} writing={Boolean(words)} />
-        ) : (
-          <CodeBlock key={k} lang={b.lang} text={b.text} />
-        );
+      case "code": {
+        const lang = b.lang.toLowerCase();
+        if (lang === "chart") return <ChartOrCode key={k} text={b.text} writing={Boolean(words)} />;
+        // Drawn once its block is done. Only the last block of an answer still being written can grow (an open
+        // fence always runs to the end): it keeps the code, so the diagram isn't drawn again on every word. A
+        // diagram before it stays drawn even when the whole answer is the tail for a frame (it ends on a blank line).
+        if (lang === "mermaid" && !excerpt && !(words && i === parsed.length - 1))
+          return <MermaidOrCode key={k} text={b.text} />;
+        return <CodeBlock key={k} lang={b.lang} text={b.text} />;
+      }
       case "list": {
         const L = b.ordered ? "ol" : "ul";
         return (

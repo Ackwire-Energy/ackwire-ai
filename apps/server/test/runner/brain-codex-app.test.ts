@@ -12,6 +12,7 @@ import {
 } from "../../runner/brain-codex";
 import {
   approvalCalls,
+  CodexAppMapper,
   CodexAppServers,
   type CodexAppServersOptions,
   codexAppServerArgs,
@@ -76,7 +77,7 @@ async function setup(
   });
   servers.push(app);
   const ctx = {
-    workspaceReal: ws,
+    folder,
     exec: true,
     runnerHome: home,
     mcp: { socketPath: path.join(home, "mcp.sock"), command: ["/usr/bin/env", "/r/runner.js"] },
@@ -377,7 +378,7 @@ test.skipIf(!posix)("a usage limit is limit + plan_limit, as exec's", async () =
   await turn.done;
   expect(notDeltas(turn.events)).toEqual([
     { type: "limit" },
-    { type: "error", code: "plan_limit", message: "You've hit your usage limit. Try again later." },
+    { type: "error", code: "plan_limit", message: "You've hit your usage limit. Try again later.", worked: false },
   ]);
 });
 
@@ -577,4 +578,59 @@ test.skipIf(!posix)("a plan turn's approvals are refused on the computer, never 
   await read.done;
   expect(answerOf(read.events)).toBe("decision: accept");
   expect(asked).toEqual([]);
+});
+
+test.skipIf(!posix)(
+  "an app-server whose turn brings a new tool name starts again, resumed: Codex lists our tools only as its thread opens",
+  async () => {
+    const t = await setup();
+    const turn = (n: number, tools?: string) =>
+      start(t.ctx, request(n, "hi", { mcp: { token: `tok_run_${n}`, ...(tools ? { tools } : {}) } })).done;
+    await turn(21, "browser_open find_tools");
+    // A dropped name stays listed: the server answers a call to it, so the process stays.
+    await turn(22, "find_tools");
+    expect(t.starts()).toHaveLength(1);
+    // A connector given between turns: a new name, so it runs on a new process, same thread.
+    await turn(23, "find_tools vega_crm_find");
+    expect(t.starts()).toHaveLength(2);
+    expect(t.rpcs("thread/start")).toHaveLength(1);
+    expect(t.rpcs("thread/resume")).toEqual([expect.objectContaining({ threadId: THREAD })]);
+    await turn(24, "find_tools vega_crm_find");
+    // A server that sends no names: nothing to compare, the process stays.
+    await turn(25);
+    expect(t.starts()).toHaveLength(2);
+    expect(t.app.size).toBe(1);
+  },
+  20_000,
+);
+
+test("a refusal known by its words after a command says the turn worked", () => {
+  const m = new CodexAppMapper({ cwd: "" });
+  m.completed({ id: "c", type: "commandExecution", command: "git push", aggregatedOutput: "", status: "completed" });
+  const message = "Your workspace is out of credits.";
+  expect(m.end({ id: "t", status: "failed", error: { message } } as never, SESSION, []).at(-1)).toEqual({
+    type: "error",
+    code: "plan_limit",
+    message,
+    worked: true,
+  });
+});
+
+test("an agent message completed twice is sent once", () => {
+  const m = new CodexAppMapper({ cwd: "" });
+  const sent: string[] = [];
+  const text = (t: string | undefined) => t && sent.push(t);
+  text(m.completed({ id: "msg_b", type: "agentMessage", text: "Achei a chave." }).text);
+  text(m.completed({ id: "msg_b", type: "agentMessage", text: "Achei a chave." }).text);
+  expect(sent).toEqual(["Achei a chave."]);
+});
+
+test("two different messages that read alike are both sent", () => {
+  const m = new CodexAppMapper({ cwd: "" });
+  const sent: string[] = [];
+  for (const id of ["msg_1", "msg_2"]) {
+    sent.push(m.delta({ itemId: id, delta: "Feito." }));
+    expect(m.completed({ id, type: "agentMessage", text: "Feito." }).text).toBeUndefined();
+  }
+  expect(sent.join("")).toBe("Feito.\n\nFeito.");
 });

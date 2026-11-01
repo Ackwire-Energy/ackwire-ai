@@ -61,14 +61,33 @@ export const NOTIFICATION_KINDS = [
   "mission_stopped",
   "routine_finished",
   "routine_failed",
+  /**
+   * A conversation run failed for good (ADR 0097): the person accountable for it, else the agent's owner, once per
+   * agent and conversation, its coded reason in `latest.reason`. Resolved by the agent's next good run there.
+   */
+  "run_failed",
   /** A routine paused itself (its reason in `latest.reason`), ADR 0053. */
   "routine_paused",
   /** A routine waits for its computer (once per outage), ADR 0053. */
   "routine_stalled",
+  /**
+   * A routine set to act named an agent its creator can't talk to (`reach.ts`): the agent's owner, once per routine
+   * and agent, `source.agentId` the agent, opening the message.
+   */
+  "agent_unreached",
+  /** A routine's run waits for its agent's plan to reset (once per outage, like `routine_stalled`). */
+  "routine_waiting_plan",
+  /**
+   * An agent's work waited a day on its plan's limit and the plan never said when it resets (the agent's owner,
+   * once per wait): `latest.title` the plan's name, `source.label` the agent's.
+   */
+  "plan_reset_unknown",
   "reaction",
   "machine_connected",
   /** An agent needs a person in its browser (ADR 0040 §6). */
   "browser_handoff",
+  /** An agent waits for a secret only that person can give (ADR 0027): `latest.title` its name, `text` its purpose. */
+  "secret_request",
   /**
    * The workspace was held, suspended or restored, with the notice shown (owners and admins, ADR 0056 §8), or on
    * agentes.chat Cloud one of its agents was held (`statusTo: "agent_hold"`, also its responsible person, §9).
@@ -116,6 +135,8 @@ export interface NotificationSource {
   handoffId?: string;
   /** Which of the agent's screens it is on, when not its browser (ADR 0058). */
   screen?: ScreenKind;
+  /** `agent_unreached`: the routine's creator, whom the agent's owner may let talk to `agentId`. */
+  userId?: string;
   /** The agent held on agentes.chat Cloud (`org_standing` to `agent_hold`, its name in `label`). */
   agentId?: string;
   /** Channel name, thread title, issue title, topic title, mission or routine name. */
@@ -125,7 +146,7 @@ export interface NotificationSource {
 export interface NotificationLatest {
   /** Snippet of the latest message, comment, question or summary (plain text, ≤ 280 chars); an approval's why. */
   text?: string;
-  /** A message with only a GIF or a sticker (ADR 0091), or a voice message (ADR 0094): which one, so the apps say it in the person's language. */
+  /** A message with only a GIF or a sticker (ADR 0091), or a voice message (ADR 0098): which one, so the apps say it in the person's language. */
   media?: "gif" | "sticker" | "voice";
   title?: string;
   emojis?: string[];
@@ -197,6 +218,8 @@ const MERGING: ReadonlySet<NotificationKind> = new Set([
   "issue_comment",
   "reaction",
   "join_request",
+  // One per approval card: requests joining it update it, read or not (`notifyApproval`).
+  "approval",
 ]);
 /** "Menções" in the inbox: what was said to me. */
 const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_reply", "agent_question"];
@@ -372,9 +395,14 @@ async function upsertOne(deps: NotificationDeps, input: NotifyInput, userId: str
         and(
           sameGroup,
           isNull(notifications.doneAt),
-          reaction
-            ? or(isNull(notifications.readAt), gt(notifications.updatedAt, new Date(now.getTime() - REACTION_MERGE_MS)))
-            : isNull(notifications.readAt),
+          input.kind === "approval"
+            ? undefined
+            : reaction
+              ? or(
+                  isNull(notifications.readAt),
+                  gt(notifications.updatedAt, new Date(now.getTime() - REACTION_MERGE_MS)),
+                )
+              : isNull(notifications.readAt),
         ),
       )
       .orderBy(sql`${notifications.readAt} is not null`, desc(notifications.updatedAt))
@@ -438,6 +466,42 @@ export async function resolveNotifications(
   }
   for (const userId of users) await publishCounts(deps, orgId, userId);
   return rows.length;
+}
+
+/**
+ * A group's open notifications describe something else now (an approval card whose first waiting request was
+ * decided): each person's row gets what `pick` says for them, in place (no new count, no push, same order), or
+ * is resolved when `pick` has nothing left for them.
+ */
+export async function retargetNotifications(
+  deps: NotificationDeps,
+  orgId: string,
+  groupKey: string,
+  pick: (userId: string) => { source: Partial<NotificationSource>; latest: NotificationLatest } | null,
+): Promise<void> {
+  const rows = await deps.db
+    .select()
+    .from(notifications)
+    .where(and(eq(notifications.orgId, orgId), eq(notifications.groupKey, groupKey), isNull(notifications.doneAt)));
+  const done: string[] = [];
+  for (const r of rows) {
+    const next = pick(r.userId);
+    if (!next) {
+      done.push(r.userId);
+      continue;
+    }
+    const [row] = await deps.db
+      .update(notifications)
+      .set({ source: { ...r.source, ...next.source }, latest: compact({ ...r.latest, ...next.latest }) })
+      .where(eq(notifications.id, r.id))
+      .returning();
+    if (row)
+      await publishUserEvent(deps.pubsub, orgId, r.userId, {
+        type: "notification.upserted",
+        notification: notificationView(row),
+      });
+  }
+  if (done.length) await resolveNotifications(deps, orgId, { groupKey, userIds: done });
 }
 
 const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);

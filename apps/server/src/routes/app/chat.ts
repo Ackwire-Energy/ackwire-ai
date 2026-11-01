@@ -3,6 +3,7 @@ import {
   addChannelMember,
   answerNow,
   cancelFollowUp,
+  channelCard,
   consultationConversation,
   consultationsIn,
   createChannel,
@@ -38,9 +39,12 @@ import { Channel, Message } from "./schemas";
 const tags = ["Chat"];
 const ChannelParams = OrgParams.extend({ channelId: z.uuid() });
 
-/** A question an agent asked another from a conversation (`consultationsIn`). */
+/** A question an agent asked another from a conversation, or work it handed one (`consultationsIn`). */
 const Consultation = z.object({
   id: z.uuid(),
+  kind: z
+    .enum(["question", "note"])
+    .openapi({ description: "`question`: `ask_agent`. `note`: work or news handed off with `tell_agent`." }),
   runId: z.uuid().openapi({ description: "The asking run: its reply (`agentRunId`) shows the list." }),
   agentId: z.uuid(),
   consultedAgentId: z.uuid(),
@@ -49,12 +53,16 @@ const Consultation = z.object({
     .nullable()
     .openapi({ description: "The consulted agent's run: the cards it posts here carry it (`agentRunId`)." }),
   status: z.enum(["open", "answered", "expired", "failed"]),
-  waiting: z.enum(["approval", "input", "computer"]).nullable().openapi({
+  waiting: z.enum(["approval", "input", "computer", "agents", "outage"]).nullable().openapi({
     description:
-      "Open, and the consulted agent waits: on a person (`approval`; `input`: an answer or a secret), or for its computer to come back online (`computer`).",
+      "Open, and the consulted agent waits: on a person (`approval`; `input`: an answer or a secret), for its computer to come back online (`computer`), for its AI provider to come back (`outage`: it retries by itself), or, its part done, on agents it handed some to (`agents`).",
   }),
   question: z.string(),
   answer: z.string().nullable().openapi({ description: "The answer once answered; why it couldn't once failed." }),
+  progress: z.object({ posts: z.number().int(), latest: z.string(), at: z.string() }).nullable().openapi({
+    description:
+      "Open: what the consulted agent posted in the agents' DM so far (how many messages, the start of the latest, when). Null when nothing yet.",
+  }),
   createdAt: z.string(),
   answeredAt: z.string().nullable(),
   expiresAt: z.string(),
@@ -207,6 +215,36 @@ export function chatRoutes(deps: AppDeps) {
   app.openapi(
     createRoute({
       method: "get",
+      path: "/organizations/{orgId}/channels/{channelId}/card",
+      tags,
+      security,
+      summary: "A #channel link's card: name, topic, counts, whether I'm in it (404 for a channel I can't see)",
+      request: { params: ChannelParams },
+      responses: {
+        200: json(
+          z.object({
+            id: z.uuid(),
+            name: z.string(),
+            topic: z.string(),
+            visibility: z.enum(["public", "private"]),
+            isMember: z.boolean(),
+            archived: z.boolean(),
+            people: z.number().int(),
+            agents: z.number().int(),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, channelId } = c.req.valid("param");
+      return c.json(await channelCard(db, c.get("user").id, orgId, channelId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
       path: "/organizations/{orgId}/channels/{channelId}/members",
       tags,
       security,
@@ -333,7 +371,8 @@ export function chatRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/channels/{channelId}/consultations",
       tags,
       security,
-      summary: "Questions agents asked other agents from here, latest first (drawn inside the reply that asked)",
+      summary:
+        "Questions agents asked other agents from here, and work they handed them, latest first (drawn inside the reply that asked)",
       request: { params: ChannelParams },
       responses: {
         200: json(
@@ -352,6 +391,7 @@ export function chatRoutes(deps: AppDeps) {
         {
           consultations: list.map((q) => ({
             ...q,
+            progress: q.progress ? { ...q.progress, at: q.progress.at.toISOString() } : null,
             createdAt: q.createdAt.toISOString(),
             answeredAt: q.answeredAt?.toISOString() ?? null,
             expiresAt: q.expiresAt.toISOString(),
@@ -384,6 +424,7 @@ export function chatRoutes(deps: AppDeps) {
         {
           consultation: {
             ...q,
+            progress: q.progress ? { ...q.progress, at: q.progress.at.toISOString() } : null,
             createdAt: q.createdAt.toISOString(),
             answeredAt: q.answeredAt?.toISOString() ?? null,
             expiresAt: q.expiresAt.toISOString(),

@@ -17,7 +17,7 @@ import { RunnerError } from "./errors";
 import { killTree } from "./exec";
 import { cachedExecutors, resolveCommand } from "./executors";
 import { CODEX_MCP_ENV, CODEX_MCP_SERVER, codexWritableRoots } from "./mcp";
-import { agentWorkspace, isInside, resolveForAgent } from "./paths";
+import { isInside, resolveForAgent } from "./paths";
 import type { Spawn } from "./scope-gate";
 import { agentSecrets } from "./secrets";
 
@@ -87,7 +87,7 @@ export type CodexBrainEvent =
     }
   | { type: "limit"; resetsAt?: string }
   | { type: "done"; text: string; session?: { id: string } }
-  | { type: "error"; code: string; message: string; retryable?: boolean }
+  | { type: "error"; code: string; message: string; retryable?: boolean; worked?: boolean }
   /** Protocol 15 (app-server only): messages handed with `brain.steer` that the turn read. */
   | { type: "steer_read"; uuids: string[] };
 
@@ -101,7 +101,7 @@ export interface CodexBrainTurnRequest {
   model?: string;
   system: string;
   prompt: string;
-  mcp: { token: string; url?: string };
+  mcp: { token: string; url?: string; tools?: string };
   agent?: AgentScope;
   /** Protocol 13: the account folder to run in (`accounts/codex/<id>`); absent: the machine's own sign-in. */
   account?: string;
@@ -278,9 +278,9 @@ export function unwrapShell(command: string) {
   return (m ? (m[2] ?? "") : command).replace(/\s+/g, " ").trim();
 }
 
-const USAGE_LIMIT = /hit your usage limit|usage limit reached|usage_limit/i;
+const USAGE_LIMIT = /hit your usage limit|usage limit reached|usage_limit|workspace is out of credits|spend cap/i;
 /** Codex can't authenticate (signed out, a revoked or expired sign-in). */
-const CODEX_AUTH =
+export const CODEX_AUTH =
   /not logged in|codex login|401 unauthorized|refresh token (?:was )?(?:expired|revoked|already used)|access token could not be refreshed/i;
 
 /** A command Codex ran (exec's `command_execution`, app-server's `commandExecution`), as an executed `tool_call`. */
@@ -336,8 +336,9 @@ export function codexFileChangeCall(item: {
  * account signed out, ADR 0041), anything else `codex_failed` (retryable
  * unless the turn itself failed).
  */
-export function codexProblem(problem: string, turnFailed: boolean): CodexBrainEvent[] {
-  if (USAGE_LIMIT.test(problem)) return [{ type: "limit" }, { type: "error", code: "plan_limit", message: problem }];
+export function codexProblem(problem: string, turnFailed: boolean, worked = false): CodexBrainEvent[] {
+  if (USAGE_LIMIT.test(problem))
+    return [{ type: "limit" }, { type: "error", code: "plan_limit", message: problem, worked }];
   if (CODEX_AUTH.test(problem)) return [{ type: "error", code: "not_logged_in", message: problem, retryable: true }];
   return [{ type: "error", code: "codex_failed", message: problem, ...(turnFailed ? {} : { retryable: true }) }];
 }
@@ -352,6 +353,8 @@ export class CodexEventMapper {
   completed = false;
   failed?: string;
   lastError?: string;
+  /** The turn ran a command, changed a file or called our bridge: a cut now loses work the API couldn't see. */
+  private worked = false;
 
   constructor(
     private readonly opts: { cwd: string; model?: string; redact?: (text: string) => string } = { cwd: "" },
@@ -411,6 +414,8 @@ export class CodexEventMapper {
       case "item.completed": {
         const item = (ev.item ?? {}) as Record<string, unknown>;
         const id = str(item.id) || `codex-${Math.random().toString(36).slice(2)}`;
+        if (item.type === "command_execution" || item.type === "file_change" || item.type === "mcp_tool_call")
+          this.worked = true;
         switch (item.type) {
           case "agent_message": {
             const t = str(item.text);
@@ -455,7 +460,7 @@ export class CodexEventMapper {
           (input.exitCode === 0
             ? "Codex ended without finishing the turn"
             : `Codex exited with code ${input.exitCode ?? "?"}${input.stderr ? `: ${this.clean(input.stderr)}` : ""}`)));
-    if (problem) return codexProblem(problem, this.failed !== undefined);
+    if (problem) return codexProblem(problem, this.failed !== undefined, this.worked);
     const text = this.answer ?? this.clean(input.lastFile?.trim() ?? "");
     return [
       ...(text ? [{ type: "text_delta" as const, text }] : []),
@@ -501,7 +506,8 @@ export interface CodexTurnInput {
   model?: string;
   system: string;
   prompt: string;
-  mcp: { token: string; url?: string };
+  /** `tools`: the run's tool names, space-separated (`BrainTurnRequest.mcp.tools`). */
+  mcp: { token: string; url?: string; tools?: string };
   /** Protocol 10: folders allowed for the agent besides its own. */
   writableRoots?: string[];
   /** Protocol 13: the account (its threads are its own) and its folder (`CODEX_HOME`). */
@@ -661,7 +667,8 @@ async function runCodexExec(input: CodexTurnInput, opts: CodexTurnOptions): Prom
 
 /** What the runner's `brain.turn` handler hands the Codex branch. */
 export interface CodexBrainContext {
-  workspaceReal: string;
+  /** The agent's own folder (real path), as `handleRequest` resolved it for the request. */
+  folder: string;
   /** `false`: started with `--no-exec`. */
   exec: boolean;
   /** The runner home (threads file, per-turn scratch, bridge env). */
@@ -684,9 +691,10 @@ export interface CodexBrainContext {
 const threadStores = new Map<string, CodexThreads>();
 
 /**
- * The dispatch hook: `brain.turn` with `kind: "codex"` → resolves the folder
- * in the agent's workspace, loads its secrets and runs the turn, emitting
- * each event (the caller wraps them in `brain.event` and sends `brain.done`).
+ * The dispatch hook: `brain.turn` with `kind: "codex"` → resolves the turn's
+ * folder in the agent's own folder, loads its secrets and runs the turn,
+ * emitting each event (the caller wraps them in `brain.event` and sends
+ * `brain.done`).
  */
 export async function handleCodexBrainTurn(
   ctx: CodexBrainContext,
@@ -708,7 +716,7 @@ export async function handleCodexBrainTurn(
   }
   if (typeof req.mcp?.token !== "string" || !req.mcp.token)
     throw new RunnerError("bad_request", "mcp.token is required");
-  const folder = await agentWorkspace(ctx.workspaceReal, req.agent);
+  const folder = ctx.folder;
   let cwd = folder;
   if (typeof req.cwd === "string" && req.cwd.trim() !== "") {
     const resolved = await resolveForAgent(folder, ctx.grants, req.cwd);
@@ -741,7 +749,11 @@ export async function handleCodexBrainTurn(
       ...(typeof req.model === "string" && req.model ? { model: req.model } : {}),
       system: typeof req.system === "string" ? req.system : "",
       prompt: typeof req.prompt === "string" ? req.prompt : "",
-      mcp: { token: req.mcp.token, ...(typeof req.mcp.url === "string" && req.mcp.url ? { url: req.mcp.url } : {}) },
+      mcp: {
+        token: req.mcp.token,
+        ...(typeof req.mcp.url === "string" && req.mcp.url ? { url: req.mcp.url } : {}),
+        ...(typeof req.mcp.tools === "string" && req.mcp.tools ? { tools: req.mcp.tools.slice(0, 64_000) } : {}),
+      },
       ...(writableRoots.length ? { writableRoots } : {}),
       ...(account ? { account } : {}),
       ...(isBrainEffort(req.effort) ? { effort: req.effort } : {}),

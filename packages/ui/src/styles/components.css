@@ -31,6 +31,21 @@ samp {
 }
 
 /*
+ * Focus rings only for the keys: from a press of a mouse, a finger or a pen until a key moves the focus, <html> has
+ * data-pointer (`trackInput`). A browser's :focus-visible also matches what a script focuses after any key, typing
+ * included (the button a dialog gives the focus back to once Enter sent its form), so every rule that draws a ring
+ * starts with html:not([data-pointer]): with the pointer, a focused control looks as it does unfocused.
+ */
+html[data-pointer] :focus-visible {
+  outline: none;
+}
+/* Whatever has no ring of its own takes the design system's, never the browser's (no weight: any rule wins). */
+:where(html:not([data-pointer])) :where(:focus-visible) {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 1px;
+}
+
+/*
  * Scrollbars, ours wherever something scrolls under a mouse or a trackpad. A touch screen keeps the platform's
  * indicator, which shows while scrolling and takes no room: ours would take 8px there, and one shown only on hover
  * (the sidebar's) would never show. WebKit and Blink draw ours from the pseudo-elements; the standard properties go
@@ -254,14 +269,15 @@ samp {
 .ac-btn--ghost.ac-btn--glyph > * {
   position: relative;
 }
-.ac-btn--ghost.ac-btn--glyph:is(:hover, :focus-visible) {
+.ac-btn--ghost.ac-btn--glyph:hover,
+html:not([data-pointer]) .ac-btn--ghost.ac-btn--glyph:focus-visible {
   background: transparent;
   box-shadow: none;
 }
 .ac-btn--ghost.ac-btn--glyph:hover::before {
   background: var(--plate);
 }
-.ac-btn--ghost.ac-btn--glyph:focus-visible::before {
+html:not([data-pointer]) .ac-btn--ghost.ac-btn--glyph:focus-visible::before {
   box-shadow: var(--focus-ring);
 }
 
@@ -292,7 +308,7 @@ samp {
 .ac-btn:hover {
   background: var(--surface);
 }
-.ac-btn:focus-visible {
+html:not([data-pointer]) .ac-btn:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -392,7 +408,7 @@ samp {
 .ac-link--muted:hover {
   color: var(--ink);
 }
-.ac-link:focus-visible {
+html:not([data-pointer]) .ac-link:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: var(--radius-cut);
@@ -885,6 +901,21 @@ textarea.ac-input {
 .ac-msg--grouped {
   padding-top: 2px;
 }
+/*
+ * The cards in a message (its tools, what it changed, a request, a file): one width, short of the text's. The row's
+ * hover plate must never match what sits on it: a card's face is a step up (`--raised-2`, white in light), a well
+ * (code, a quote, "Leu seu recado") is `--msg-well`, darker than the row whether it is hovered or not.
+ */
+:root {
+  --msg-card-w: 560px;
+}
+.ac-msg > * {
+  --raised: var(--raised-2);
+  --surface-raised: var(--raised-2);
+  --sunken: var(--msg-well);
+  --surface-sunken: var(--msg-well);
+  --card-well: var(--msg-well);
+}
 /* The face is 32px in the feed. */
 .ac-msg__avatar,
 .ac-msg__gutter {
@@ -959,7 +990,7 @@ textarea.ac-input {
   cursor: default;
   border-radius: var(--radius-cut);
 }
-.ac-msg__time--details:focus-visible {
+html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -1143,7 +1174,7 @@ textarea.ac-input {
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   border-bottom-left-radius: var(--radius-cut);
-  max-width: 520px;
+  max-width: var(--msg-card-w);
   box-sizing: border-box;
   position: relative;
 }
@@ -1410,7 +1441,7 @@ textarea.ac-input {
 .ac-select__trigger:hover {
   border-color: var(--line-strong);
 }
-.ac-select__trigger:focus-visible,
+html:not([data-pointer]) .ac-select__trigger:focus-visible,
 .ac-select__trigger[aria-expanded="true"] {
   outline: none;
   background: var(--raised);
@@ -1563,7 +1594,7 @@ textarea.ac-input {
   user-select: none;
 }
 .ac-menu__item:hover,
-.ac-menu__item:focus-visible,
+html:not([data-pointer]) .ac-menu__item:focus-visible,
 .ac-menu__item[data-highlighted] {
   background: var(--surface-sunken);
   outline: none;
@@ -1724,8 +1755,8 @@ textarea.ac-input {
   background: var(--action);
   border-color: var(--action);
 }
-.ac-check:focus-visible,
-.ac-radio:focus-visible {
+html:not([data-pointer]) .ac-check:focus-visible,
+html:not([data-pointer]) .ac-radio:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -1803,14 +1834,14 @@ textarea.ac-input {
 [data-theme="dark"] .ac-option[aria-pressed="true"]::after {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23111110' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4L18 8.5'/%3E%3C/svg%3E");
 }
-.ac-option:focus-visible,
-.ac-option:has(:focus-visible) {
+html:not([data-pointer]) .ac-option:focus-visible,
+html:not([data-pointer]) .ac-option:has(:focus-visible) {
   outline: none;
   box-shadow: var(--e1), var(--field-ring);
 }
-.ac-option[aria-pressed="true"]:has(:focus-visible),
-.ac-option[data-state="checked"]:has(:focus-visible),
-.ac-option[aria-pressed="true"]:focus-visible {
+html:not([data-pointer]) .ac-option[aria-pressed="true"]:has(:focus-visible),
+html:not([data-pointer]) .ac-option[data-state="checked"]:has(:focus-visible),
+html:not([data-pointer]) .ac-option[aria-pressed="true"]:focus-visible {
   box-shadow: var(--pressed), var(--field-ring);
 }
 .ac-option__text {
@@ -1880,10 +1911,10 @@ textarea.ac-input {
 .ac-pill .ac-check {
   margin: 0;
 }
-.ac-pill:has(:focus-visible) {
+html:not([data-pointer]) .ac-pill:has(:focus-visible) {
   box-shadow: var(--focus-ring);
 }
-.ac-pill:has(:focus-visible) .ac-check {
+html:not([data-pointer]) .ac-pill:has(:focus-visible) .ac-check {
   box-shadow: none;
 }
 
@@ -1909,7 +1940,7 @@ textarea.ac-input {
   border-bottom-color: var(--ink);
   color: var(--ink);
 }
-.ac-tab:focus-visible {
+html:not([data-pointer]) .ac-tab:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
@@ -2083,23 +2114,40 @@ textarea.ac-input {
 }
 .ac-meter__bar {
   height: 100%;
-  background: var(--ink);
+  background: var(--meter-fill, var(--ink));
   border-radius: var(--radius-full);
 }
-/* One part in full ink over the rest of the use (an agent's share of its plan's window). */
+/* One part in full tone over the rest of the use (an agent's share of its plan's window). */
 .ac-meter--parts .ac-meter__bar {
-  background: color-mix(in srgb, var(--ink) 30%, transparent);
+  background: color-mix(in srgb, var(--meter-fill, var(--ink)) 30%, transparent);
 }
 .ac-meter__part {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
-  background: var(--ink);
+  background: var(--meter-fill, var(--ink));
   border-radius: var(--radius-full);
 }
 
-/* Plan usage: a bar per window (ink, like every meter); the state in words above */
+/*
+ * Plan usage: a bar per window, ink until it nears its limit (`planLevel`): amber from 80%, red from 90% and at the
+ * limit, each window by its own level and the state in words above by the plan's (a plan that refused a request reads
+ * red over ink bars). Only here: every other meter stays ink.
+ */
+.ac-planmeter[data-level="almost"],
+.ac-planmeter__window[data-level="almost"] {
+  --meter-fill: var(--warn);
+}
+.ac-planmeter[data-level="critical"],
+.ac-planmeter[data-level="limited"],
+.ac-planmeter__window[data-level="critical"],
+.ac-planmeter__window[data-level="limited"] {
+  --meter-fill: var(--danger);
+}
+.ac-planmeter__window[data-level="ok"] {
+  --meter-fill: var(--ink);
+}
 .ac-planmeter {
   display: grid;
   gap: 8px;
@@ -2109,7 +2157,7 @@ textarea.ac-input {
   margin: 0;
   font-size: 13px;
   font-weight: 600;
-  color: var(--attention);
+  color: var(--meter-fill, var(--attention));
 }
 .ac-planmeter__windows {
   display: grid;
@@ -2136,6 +2184,9 @@ textarea.ac-input {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   color: var(--ink-muted);
+}
+.ac-planmeter__window:not([data-level="ok"]) .ac-planmeter__pct {
+  color: var(--meter-fill);
 }
 .ac-planmeter__reset,
 .ac-planmeter__note,
@@ -2252,7 +2303,7 @@ textarea.ac-input {
 a.ac-list__row:hover {
   background: var(--surface);
 }
-a.ac-list__row:focus-visible {
+html:not([data-pointer]) a.ac-list__row:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -2276,7 +2327,7 @@ a.ac-list__row:focus-visible {
 .ac-row:hover {
   background: var(--plate-soft);
 }
-.ac-row:focus-visible {
+html:not([data-pointer]) .ac-row:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -2463,7 +2514,7 @@ a.ac-list__row:focus-visible {
 .ac-back:hover {
   color: var(--ink);
 }
-.ac-back:focus-visible {
+html:not([data-pointer]) .ac-back:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: var(--radius-cut);
@@ -2695,7 +2746,7 @@ a.ac-list__row:focus-visible {
   box-shadow: var(--chosen-shadow);
   transform: var(--chosen-lift);
 }
-.ac-navcard:focus-visible {
+html:not([data-pointer]) .ac-navcard:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -2802,7 +2853,7 @@ a.ac-list__row:focus-visible {
   text-decoration: underline;
   cursor: pointer;
 }
-.ac-receipt__action:focus-visible {
+html:not([data-pointer]) .ac-receipt__action:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: var(--radius-cut);
@@ -3019,7 +3070,7 @@ a.ac-list__row:focus-visible {
 .ac-receipt__check:hover {
   color: var(--ink);
 }
-.ac-receipt__check:focus-visible {
+html:not([data-pointer]) .ac-receipt__check:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -3155,7 +3206,7 @@ a.ac-list__row:focus-visible {
   color: var(--surface-raised);
   font-weight: 600;
 }
-.ac-date__day:focus-visible {
+html:not([data-pointer]) .ac-date__day:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -3218,7 +3269,7 @@ a.ac-list__row:focus-visible {
   color: var(--ink);
   background: var(--surface-raised);
 }
-.ac-token__remove:focus-visible {
+html:not([data-pointer]) .ac-token__remove:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -3256,7 +3307,7 @@ a.ac-list__row:focus-visible {
 .ac-switch[data-state="checked"] {
   background: var(--action);
 }
-.ac-switch:focus-visible {
+html:not([data-pointer]) .ac-switch:focus-visible {
   box-shadow: var(--focus-ring);
 }
 .ac-switch[data-disabled] {
@@ -3683,6 +3734,8 @@ a.ac-list__row:focus-visible {
   --card-key: none;
   --card-well: #f6f6f3;
   --card-well-shadow: inset 0 1px 2px rgba(23, 23, 22, 0.07), inset 0 0 0 1px rgba(23, 23, 22, 0.05), 0 1px 0 #ffffff;
+  /* A well in a message (code, a table's band): a tint over the row, so the row's hover plate darkens it too. */
+  --msg-well: var(--plate-soft);
 }
 [data-theme="dark"] {
   --person-a: #3a3a37;
@@ -3697,6 +3750,8 @@ a.ac-list__row:focus-visible {
   --card-well: #121211;
   --card-well-shadow:
     inset 0 1px 3px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 1px 0 rgba(255, 255, 255, 0.05);
+  /* Darker than the row and than its hover plate as it is. */
+  --msg-well: var(--sunken);
 }
 
 /* Buttons: b1 (primary), b2 (default), ghost. Sizes follow the control ruler (tokens.css --control-*). */
@@ -3739,7 +3794,7 @@ a.ac-list__row:focus-visible {
   background: var(--plate);
   box-shadow: none;
 }
-.ac-btn:focus-visible {
+html:not([data-pointer]) .ac-btn:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -3762,7 +3817,7 @@ a.ac-list__row:focus-visible {
     0 1px 2px rgba(0, 0, 0, 0.18),
     0 10px 22px -8px rgba(0, 0, 0, 0.5);
 }
-.ac-btn--primary:focus-visible {
+html:not([data-pointer]) .ac-btn--primary:focus-visible {
   box-shadow: var(--focus-ring);
 }
 .ac-btn--ghost {
@@ -4037,7 +4092,7 @@ a.ac-list__row:focus-visible {
   font-size: 12px;
   color: var(--faint);
 }
-.ac-seg__item:focus-visible {
+html:not([data-pointer]) .ac-seg__item:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -4390,8 +4445,8 @@ a.ac-list__row:focus-visible {
  * The target reaches 1px into the label, so the ring is drawn well inside it (20px across, clear of the glyph), not
  * around it, where it would cover the label's last letter.
  */
-.ac-hint:focus-visible {
-  outline: 2px solid var(--ink);
+html:not([data-pointer]) .ac-hint:focus-visible {
+  outline: 2px solid var(--focus-color);
   outline-offset: -4px;
 }
 .ac-hint__bubble {
@@ -4406,6 +4461,22 @@ a.ac-list__row:focus-visible {
   line-height: 18px;
   font-weight: 400;
   text-align: start;
+}
+
+/*
+ * A select option's ⓘ, at the row's end; its note is drawn over the page (the list clips), above the ⓘ. Portaled
+ * after the open list, so the list's own layer puts it on top.
+ */
+.ac-hint.ac-menu__hint {
+  align-self: center;
+  margin: -5px -5px -5px auto;
+  translate: none;
+}
+.ac-menu__tip {
+  position: fixed;
+  z-index: var(--z-floating);
+  translate: 0 -100%;
+  pointer-events: none;
 }
 
 /* Checkbox: the mark pops in; switch: the thumb springs */
@@ -4654,19 +4725,18 @@ a.ac-list__row:focus-visible {
 .ac-msg:focus-within {
   z-index: var(--z-lifted);
 }
-/* Reading: 15.5px / 1.7 in the ink color, about 68 characters a line (72 in a team chat). */
+/* Reading: 15.5px / 1.7 in the ink color, across the whole column (a code block or a table scrolls in its own box). */
 .ac-msg__text {
   font-size: 15.5px;
   line-height: 1.7;
   color: var(--ink);
-  max-width: 68ch;
 }
 
 /* Work under an agent message: a quiet 32px button ("Ver o que ela fez · 7 passos · 38 s");
    the steps open in a hairline card below it. */
 .ac-work {
   margin-top: 16px;
-  max-width: 560px;
+  max-width: var(--msg-card-w);
 }
 .ac-work__head {
   display: inline-flex;
@@ -4698,7 +4768,7 @@ a.ac-list__row:focus-visible {
   background: var(--plate-soft);
   color: var(--ink);
 }
-.ac-work__head:focus-visible {
+html:not([data-pointer]) .ac-work__head:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -4814,7 +4884,7 @@ a.ac-list__row:focus-visible {
     inset 0 1px 3px rgba(23, 23, 22, 0.12),
     inset 0 0 0 1px var(--line);
 }
-.ac-react:focus-visible {
+html:not([data-pointer]) .ac-react:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -4941,7 +5011,7 @@ a.ac-list__row:focus-visible {
 .ac-composer__send:active:not([disabled]) {
   transform: scale(0.96);
 }
-.ac-composer__send:focus-visible {
+html:not([data-pointer]) .ac-composer__send:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5044,7 +5114,7 @@ a.ac-list__row:focus-visible {
   gap: 8px;
   padding: 6px 14px;
 }
-/* Voice messages (ADR 0094). The recording sits on the text's first line and hides nothing but the text, which keeps
+/* Voice messages (ADR 0098). The recording sits on the text's first line and hides nothing but the text, which keeps
    its place: the box never changes height, whatever was typed. */
 .ac-composer__text {
   position: relative;
@@ -5375,7 +5445,7 @@ button.ac-voice__play:active {
 .ac-composer__format-btn:active {
   transform: scale(0.94);
 }
-.ac-composer__format-btn:focus-visible {
+html:not([data-pointer]) .ac-composer__format-btn:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5487,7 +5557,7 @@ button.ac-voice__play:active {
 .ac-composer__file-remove:hover {
   background: var(--raised);
 }
-.ac-composer__file-remove:focus-visible {
+html:not([data-pointer]) .ac-composer__file-remove:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5524,7 +5594,10 @@ button.ac-voice__play:active {
   color: var(--faint);
 }
 .ac-emoji__search:focus-within {
-  box-shadow: var(--focus-ring);
+  background: var(--raised);
+  box-shadow:
+    inset 0 0 0 1px var(--field-line),
+    var(--field-ring);
 }
 .ac-emoji__search input {
   flex: 1;
@@ -5606,7 +5679,7 @@ button.ac-voice__play:active {
 .ac-emoji__cell:hover {
   transform: scale(1.12);
 }
-.ac-emoji__cell:focus-visible {
+html:not([data-pointer]) .ac-emoji__cell:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5657,7 +5730,7 @@ button.ac-voice__play:active {
   min-height: 0;
   border-radius: var(--radius-item);
 }
-.ac-picker__panel:focus-visible {
+html:not([data-pointer]) .ac-picker__panel:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5757,7 +5830,7 @@ button.ac-voice__play:active {
   object-fit: cover;
 }
 .ac-gifs__cell:hover,
-.ac-gifs__cell:focus-visible {
+html:not([data-pointer]) .ac-gifs__cell:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5800,7 +5873,7 @@ button.ac-voice__play:active {
 .ac-stickers__cell:hover {
   background: rgba(127, 127, 127, 0.12);
 }
-.ac-stickers__cell:focus-visible {
+html:not([data-pointer]) .ac-stickers__cell:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5846,7 +5919,7 @@ button.ac-voice__play:active {
   height: 100%;
   object-fit: cover;
 }
-.ac-gif:focus-visible {
+html:not([data-pointer]) .ac-gif:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -6051,7 +6124,7 @@ button.ac-voice__play:active {
  */
 .ac-tools {
   margin: 10px 0 12px;
-  max-width: 560px;
+  max-width: var(--msg-card-w);
   border-radius: var(--radius-item) var(--radius-item) var(--radius-item) 4px;
   background: var(--surface-raised);
   box-shadow: var(--card-shadow);
@@ -6077,8 +6150,8 @@ button.ac-voice__play:active {
   background: var(--plate-soft);
 }
 /* Inside the card's clip: the ring goes inward. */
-.ac-tools__head:focus-visible {
-  outline: 2px solid var(--ink);
+html:not([data-pointer]) .ac-tools__head:focus-visible {
+  outline: 2px solid var(--focus-color);
   outline-offset: -2px;
 }
 .ac-tools__logos {
@@ -6163,24 +6236,37 @@ button.ac-voice__play:active {
   list-style: none;
   border-top: 1px solid var(--line);
 }
+/* One call: its line is the card, as tall as the head it stands in for. */
+.ac-tools--one > .ac-tools__lines {
+  padding: 2px;
+  border-top: 0;
+}
 .ac-tools__line {
   border-radius: var(--radius-item);
 }
+/* A line's words wrap: the logo, the time and the mark stay on its first 20px line. */
 .ac-tools__row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   width: 100%;
   min-height: 36px;
   margin: 0;
-  padding: 6px 8px;
+  padding: 8px;
   border: 0;
   border-radius: var(--radius-item);
   background: transparent;
   font: inherit;
   font-size: 13px;
+  line-height: 20px;
   color: var(--ink2);
   text-align: left;
+}
+.ac-tools__row > .ac-tools__mark {
+  margin-block: 2px;
+}
+.ac-tools__row > .ac-tools__linechev {
+  margin-block: 4px;
 }
 button.ac-tools__row {
   cursor: pointer;
@@ -6192,7 +6278,7 @@ button.ac-tools__row:hover {
 button.ac-tools__row[aria-pressed="true"] {
   background: var(--plate);
 }
-button.ac-tools__row:focus-visible {
+html:not([data-pointer]) button.ac-tools__row:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -6200,25 +6286,22 @@ button.ac-tools__row:focus-visible {
   display: inline-grid;
   place-items: center;
   flex: none;
+  min-height: 20px;
   line-height: 0;
 }
 .ac-tools__label {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 7px;
+  column-gap: 7px;
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .ac-tools__label b {
-  overflow: hidden;
-  text-overflow: ellipsis;
   font-weight: 500;
 }
 .ac-tools__label small {
-  overflow: hidden;
-  text-overflow: ellipsis;
   font-size: 12px;
   color: var(--faint);
 }
@@ -6233,6 +6316,10 @@ button.ac-tools__row:focus-visible {
 }
 .ac-tools__detail {
   margin: 0 8px 8px 38px;
+}
+/* What a lone call's agent said before it, on top of what it was given and answered. */
+.ac-tools__detail > .ac-tools__note {
+  margin: 0 0 8px;
 }
 /* What it was given and answered: the code well's look (mono only for this). */
 .ac-tools__io {
@@ -6407,7 +6494,7 @@ button.ac-tools__row:focus-visible {
   box-shadow: var(--chosen-shadow);
   transform: var(--chosen-lift);
 }
-.ac-recur__day:focus-visible {
+html:not([data-pointer]) .ac-recur__day:focus-visible {
   outline: none;
   box-shadow: var(--field-ring);
 }
@@ -6815,7 +6902,7 @@ button.ac-tools__row:focus-visible {
 .ac-searchfield__clear:hover {
   background: var(--plate);
 }
-.ac-searchfield__clear:focus-visible {
+html:not([data-pointer]) .ac-searchfield__clear:focus-visible {
   outline: none;
   box-shadow: var(--field-ring);
 }
@@ -6853,7 +6940,7 @@ button.ac-tools__row:focus-visible {
 .ac-filtertoggle:active {
   transform: scale(0.97);
 }
-.ac-filtertoggle:focus-visible {
+html:not([data-pointer]) .ac-filtertoggle:focus-visible {
   outline: none;
   box-shadow: var(--field-ring);
 }
@@ -6928,8 +7015,8 @@ button.ac-tools__row:focus-visible {
 .ac-filter--active .ac-filter__trigger {
   padding-right: 4px;
 }
-.ac-filter__trigger:focus-visible,
-.ac-filter__clear:focus-visible {
+html:not([data-pointer]) .ac-filter__trigger:focus-visible,
+html:not([data-pointer]) .ac-filter__clear:focus-visible {
   outline: none;
   box-shadow: var(--field-ring);
 }
@@ -6991,7 +7078,7 @@ button.ac-tools__row:focus-visible {
   cursor: pointer;
 }
 .ac-filter__option:hover,
-.ac-filter__option:focus-visible {
+html:not([data-pointer]) .ac-filter__option:focus-visible {
   background: var(--plate-soft);
   outline: none;
 }
@@ -7441,7 +7528,7 @@ button.ac-tools__row:focus-visible {
 .ac-optrow:active {
   transform: scale(0.993);
 }
-.ac-optrow:focus-visible {
+html:not([data-pointer]) .ac-optrow:focus-visible {
   outline: none;
   box-shadow:
     inset 0 0 0 1px var(--line2),
@@ -7452,7 +7539,7 @@ button.ac-tools__row:focus-visible {
   background: var(--chosen-bg);
   transform: var(--chosen-lift);
 }
-.ac-optrow[data-state="checked"]:focus-visible {
+html:not([data-pointer]) .ac-optrow[data-state="checked"]:focus-visible {
   box-shadow: var(--chosen-shadow), var(--field-ring);
 }
 .ac-optrow__dot {
@@ -7557,7 +7644,7 @@ button.ac-tools__row:focus-visible {
   box-shadow: none;
   transform: none;
 }
-.ac-optcard > .ac-optrow:focus-visible {
+html:not([data-pointer]) .ac-optcard > .ac-optrow:focus-visible {
   box-shadow: var(--field-ring);
 }
 .ac-optlist--attached .ac-optrow--lead {
@@ -7609,7 +7696,7 @@ button.ac-tools__row:focus-visible {
 .ac-effort__ramp:active {
   cursor: grabbing;
 }
-.ac-effort:focus-visible .ac-effort__ramp {
+html:not([data-pointer]) .ac-effort:focus-visible .ac-effort__ramp {
   border-radius: 4px;
   box-shadow: var(--field-ring);
 }
@@ -7908,9 +7995,9 @@ label.ac-setrow__title {
 .ac-setmore__toggle:hover {
   background: var(--plate-soft);
 }
-.ac-setmore__toggle:focus-visible {
+html:not([data-pointer]) .ac-setmore__toggle:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--ink);
+  box-shadow: var(--focus-ring);
 }
 .ac-setmore__text {
   flex: 1;
@@ -7975,7 +8062,7 @@ label.ac-setrow__title {
 /* What the other agent said, folded into one neutral line at the top of the reply; it opens to the exchange. */
 .ac-consult {
   margin: 6px 0 8px;
-  max-width: 520px;
+  max-width: var(--msg-card-w);
   border-radius: 12px;
   background: var(--raised);
   box-shadow: var(--e1), var(--top);
@@ -8000,7 +8087,7 @@ label.ac-setrow__title {
 .ac-consult__head:hover {
   background: rgba(127, 127, 127, 0.05);
 }
-.ac-consult__head:focus-visible {
+html:not([data-pointer]) .ac-consult__head:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -8109,7 +8196,7 @@ label.ac-setrow__title {
   border-bottom: 1px dotted var(--line2);
   cursor: default;
 }
-.ac-msg__note:focus-visible {
+html:not([data-pointer]) .ac-msg__note:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: 4px;
@@ -8439,7 +8526,7 @@ label.ac-setrow__title {
   opacity: 0;
   pointer-events: none;
 }
-.ac-carousel__arrow:focus-visible {
+html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   outline: none;
   box-shadow: var(--e1), var(--field-ring);
 }

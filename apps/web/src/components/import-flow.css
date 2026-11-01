@@ -146,7 +146,7 @@
   border-color: var(--line-strong);
   background: var(--raised);
 }
-.imp-drop__area:focus-visible {
+html:not([data-pointer]) .imp-drop__area:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -256,6 +256,17 @@
 }
 .imp-group__more {
   margin: 4px 10px 8px;
+}
+/* The agents' files: the switch to copy them takes the place of "bring all", so the help line starts after it. */
+.imp-group__head > .ac-switch ~ .imp-group__help {
+  padding-left: 44px;
+}
+.imp-group__title label {
+  cursor: pointer;
+}
+.imp-group__foot {
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
 }
 .imp-rows {
   margin: 0;
@@ -462,7 +473,7 @@ label.imp-row__text {
 .imp-link:hover {
   background: var(--sunken);
 }
-.imp-link:focus-visible {
+html:not([data-pointer]) .imp-link:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }

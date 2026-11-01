@@ -36,10 +36,11 @@ const click = async (el: HTMLElement, rounds = 6) => {
   await act(async () => fireEvent.click(el));
   await settle(rounds);
 };
+/** The message with this card: a card while it can be acted on, one line once done. */
 const cardRow = (title: string) =>
   screen()
     .getAllByRole("article")
-    .find((a) => a.querySelector(".waitcard")?.textContent?.includes(title)) as HTMLElement;
+    .find((a) => a.querySelector(".waitcard, .rq-done")?.textContent?.includes(title)) as HTMLElement;
 const dialog = (name: string) => screen().queryByRole("dialog", { name });
 const withBrain = (state: State, agentId: string, kind: NonNullable<Agent["brain"]>["kind"]) => {
   const agent = state.agents.find((a) => a.id === agentId);
@@ -108,6 +109,9 @@ describe("an agent's Connect card", () => {
     const claude = cardRow("Conectar o plano do Claude para Ada");
     expect(within(claude).queryByRole("button", { name: "Conectar" })).toBeNull();
     expect(claude.textContent).toContain("Conectado");
+    // One line, no card.
+    expect(claude.querySelector(".waitcard")).toBeNull();
+    expect(claude.querySelector(".rq-done__mark[data-done]")).not.toBeNull();
     // Ada thinks, but not with a ChatGPT plan; Atlas has no AI yet.
     for (const title of ["Conectar o plano do ChatGPT para Ada", "Conectar uma IA para Atlas"]) {
       const row = cardRow(title);

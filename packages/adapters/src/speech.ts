@@ -1,5 +1,5 @@
 /**
- * Speech to text behind one interface (ADR 0094): a provider is a small adapter that turns a stored recording into
+ * Speech to text behind one interface (ADR 0098): a provider is a small adapter that turns a stored recording into
  * words, so swapping one or chaining several touches nothing else. `file` works on the finished recording; an engine
  * for live audio would add its own method next to it.
  */

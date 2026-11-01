@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import {
   and,
+  arrayContains,
   asc,
   type Database,
   desc,
@@ -12,6 +13,7 @@ import {
   ne,
   not,
   or,
+  rowsOf,
   schema,
   sql,
 } from "@agenteschat/db";
@@ -622,12 +624,15 @@ export async function assignHandle(db: Executor, orgId: string, userId: string) 
     .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
   if (!row || row.handle) return row?.handle ?? null;
   const base = handleBase(row.name, row.email);
+  const like = `${base}%`;
+  // Agents' handles too, the ones they had before a rename included: those still reach the agent.
   const taken = new Set(
-    (
-      await db
-        .select({ handle: organizationMembers.handle })
-        .from(organizationMembers)
-        .where(and(eq(organizationMembers.orgId, orgId), sql`${organizationMembers.handle} like ${`${base}%`}`))
+    rowsOf<{ handle: string }>(
+      await db.execute(sql`select handle from ${organizationMembers}
+          where org_id = ${orgId}::uuid and handle like ${like}
+        union select handle from ${agents} where org_id = ${orgId}::uuid and handle like ${like}
+        union select h from ${agents} cross join unnest(previous_handles) as u(h)
+          where org_id = ${orgId}::uuid and h like ${like}`),
     ).map((r) => r.handle),
   );
   let handle = base;
@@ -656,10 +661,17 @@ export async function updateMyProfile(
         max: 32,
       });
     }
+    // An agent's handle, or one it had before a rename: that one still names it.
     const [agent] = await db
       .select({ id: schema.agents.id })
       .from(schema.agents)
-      .where(and(eq(schema.agents.orgId, orgId), eq(schema.agents.handle, handle), isNull(schema.agents.archivedAt)));
+      .where(
+        and(
+          eq(schema.agents.orgId, orgId),
+          or(eq(schema.agents.handle, handle), arrayContains(schema.agents.previousHandles, [handle])),
+          isNull(schema.agents.archivedAt),
+        ),
+      );
     if (agent) throw new ConflictError(`@${handle} belongs to an agent`, "handle.taken_by_agent", { handle });
     const [other] = await db
       .select({ userId: organizationMembers.userId })
@@ -841,6 +853,11 @@ export async function removeMember(
     await tx
       .delete(channelMembers)
       .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.userId, targetUserId)));
+    // And the wiki pages they were named on: rejoining later doesn't give a restricted page back.
+    await tx
+      .update(schema.wikiPages)
+      .set({ audienceUserIds: sql`array_remove(${schema.wikiPages.audienceUserIds}, ${targetUserId})` })
+      .where(and(eq(schema.wikiPages.orgId, orgId), sql`${targetUserId} = any(${schema.wikiPages.audienceUserIds})`));
     const action = actorId === targetUserId ? "member.left" : "member.removed";
     await auditMember(tx, orgId, actorId, action, targetUserId, { role: target.role });
     // Their AI accounts on the organization's computers are signed out and removed (ADR 0059 §1).
@@ -936,7 +953,7 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
     await tx.delete(users).where(eq(users.id, userId));
     // The owner's own TypeSafe account would go on getting, and paying for, every workspace's Jev calls; and their
     // GIPHY key would go on serving every workspace's GIFs, with nobody left who could remove it (ADR 0091); so would
-    // the speech provider's key (ADR 0094).
+    // the speech provider's key (ADR 0098).
     if (userId === owner) {
       await deleteJevKey(tx, { type: "system", id: null });
       await deleteGifKey(tx, { type: "system", id: null });

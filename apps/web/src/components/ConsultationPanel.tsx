@@ -1,5 +1,5 @@
 import { type Message, useConsultationConversation } from "@agenteschat/client";
-import { consultLineState } from "@agenteschat/client/lib/consult-group";
+import { consultLineState, consultOriginKey } from "@agenteschat/client/lib/consult-group";
 import { dayLabel, formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { buildTimeline } from "@agenteschat/client/lib/timeline";
@@ -63,7 +63,7 @@ export function ConsultationPanel({
     articleTo: to.article,
   });
   const state = c ? consultLineState(c, now) : null;
-  // The cards keep their buttons ("Responder" on a question goes to the conversation's composer); nothing else acts
+  // The cards keep their buttons (a question answers in its own field); nothing else acts
   // here: no reply, no thread, no quote (the messages live in the agents' DM). Stable: rows don't redraw for it.
   const latest = useRef({ onTalk, onAnswer });
   latest.current = { onTalk, onAnswer };
@@ -154,7 +154,7 @@ export function ConsultationPanel({
                 <p className="thread-origin ac-iconline">
                   <Icon name="agent" size={14} />
                   <span>
-                    {t(channelName ? "chat.consultPanel.origin" : "chat.consultPanel.originDm", {
+                    {t(consultOriginKey(c, Boolean(channelName)), {
                       from: from.name,
                       toArticle: to.to,
                       to: to.name,
@@ -178,7 +178,10 @@ export function ConsultationPanel({
                   {state === "working" ? (
                     <PixelSpinner size={14} color={colorOf(consulted)} />
                   ) : (
-                    <Icon name={state === "waiting" || state === "offline" ? "waiting" : "clock"} size={14} />
+                    <Icon
+                      name={state === "waiting" || state === "offline" || state === "handedOn" ? "waiting" : "clock"}
+                      size={14}
+                    />
                   )}
                   <span className="cn-line__text">{consultLineLabel(t, state, c, to)}</span>
                 </p>

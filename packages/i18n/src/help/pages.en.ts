@@ -134,6 +134,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
               "Public channels, with the agents in them.",
               "Routines. They arrive paused: turn them on in **Routines** when you want.",
               "Memory: what each agent remembers.",
+              "Each agent's own files (OpenBot.run's files folder, an OpenClaw workspace), in a folder with its name in the **Drive**. Keys, logins and system files stay behind, and nothing already there is replaced.",
             ],
           },
         ],

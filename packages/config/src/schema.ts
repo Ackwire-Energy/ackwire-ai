@@ -317,9 +317,9 @@ export const envVars = {
     section: "Agents",
   },
   ROUTER_MENTION_THRESHOLD: {
-    schema: z.coerce.number().min(0).max(1).default(0.6),
+    schema: z.coerce.number().min(0).max(1).default(0.2),
     description:
-      "When an agent @mentions another, minimum Jev probability (0–1) that it is asking that agent to act now for it to answer.",
+      "When an agent @mentions another, minimum probability (0–1) that the message needs something from that agent for it to answer. Low on purpose: only a judge sure the message needs nothing (a thanks, an ok, a quote) leaves the agent asleep.",
     section: "Agents",
   },
   AGENT_MAX_OUTPUT_TOKENS: {
@@ -405,44 +405,44 @@ export const envVars = {
   SPEECH_ENGINES: {
     schema: z.string().optional(),
     description:
-      "Speech engines for voice messages, in the order they are tried (ADR 0094): comma-separated, from assemblyai, elevenlabs, soniox, groq, openai and local. Empty: every one with a key, in that order. With none, the microphone stays hidden, unless the installation's owner sets one in Settings.",
+      "Speech engines for voice messages, in the order they are tried (ADR 0098): comma-separated, from assemblyai, elevenlabs, soniox, groq, openai and local. Empty: every one with a key, in that order. With none, the microphone stays hidden, unless the installation's owner sets one in Settings.",
     section: "Chat",
     example: "assemblyai,groq",
   },
   ASSEMBLYAI_API_KEY: {
     schema: z.string().optional(),
-    description: "AssemblyAI key for voice messages, optional (ADR 0094). The audio goes to AssemblyAI to become text.",
+    description: "AssemblyAI key for voice messages, optional (ADR 0098). The audio goes to AssemblyAI to become text.",
     section: "Chat",
     secret: true,
   },
   ELEVENLABS_API_KEY: {
     schema: z.string().optional(),
-    description: "ElevenLabs key for voice messages, optional (ADR 0094). The audio goes to ElevenLabs to become text.",
+    description: "ElevenLabs key for voice messages, optional (ADR 0098). The audio goes to ElevenLabs to become text.",
     section: "Chat",
     secret: true,
   },
   SONIOX_API_KEY: {
     schema: z.string().optional(),
-    description: "Soniox key for voice messages, optional (ADR 0094). The audio goes to Soniox to become text.",
+    description: "Soniox key for voice messages, optional (ADR 0098). The audio goes to Soniox to become text.",
     section: "Chat",
     secret: true,
   },
   GROQ_API_KEY: {
     schema: z.string().optional(),
-    description: "Groq key for voice messages, optional (ADR 0094). The audio goes to Groq to become text.",
+    description: "Groq key for voice messages, optional (ADR 0098). The audio goes to Groq to become text.",
     section: "Chat",
     secret: true,
   },
   OPENAI_SPEECH_API_KEY: {
     schema: z.string().optional(),
-    description: "OpenAI key for voice messages, optional (ADR 0094). The audio goes to OpenAI to become text.",
+    description: "OpenAI key for voice messages, optional (ADR 0098). The audio goes to OpenAI to become text.",
     section: "Chat",
     secret: true,
   },
   LOCAL_SPEECH_URL: {
     schema: z.url().optional(),
     description:
-      "A speech server of your own that speaks the OpenAI format, for voice messages (ADR 0094): Speaches, a local Whisper or Parakeet. The audio stays with you.",
+      "A speech server of your own that speaks the OpenAI format, for voice messages (ADR 0098): Speaches, a local Whisper or Parakeet. The audio stays with you.",
     section: "Chat",
     example: "http://whisper:8000/v1",
   },
@@ -454,19 +454,19 @@ export const envVars = {
   VOICE_RETENTION_DAYS: {
     schema: z.coerce.number().int().min(0).default(90),
     description:
-      "Days a voice message's recording is kept (ADR 0094). After that its audio is deleted; the message and its words stay. 0 = keep it forever.",
+      "Days a voice message's recording is kept (ADR 0098). After that its audio is deleted; the message and its words stay. 0 = keep it forever.",
     section: "Chat",
   },
   VOICE_LIMIT_PERSON_MINUTES_PER_DAY: {
     schema: z.coerce.number().int().min(0).default(60),
     description:
-      "agentes.chat's own servers: minutes of voice messages one person may send in 24 hours (ADR 0094). 0 = no limit. Never applies on a self-hosted server.",
+      "agentes.chat's own servers: minutes of voice messages one person may send in 24 hours (ADR 0098). 0 = no limit. Never applies on a self-hosted server.",
     section: "Chat",
   },
   VOICE_LIMIT_ORG_MINUTES_PER_MEMBER: {
     schema: z.coerce.number().int().min(0).default(20),
     description:
-      "agentes.chat's own servers: minutes of voice messages a workspace may send in 24 hours, per member (ADR 0094). 0 = no limit for the workspace.",
+      "agentes.chat's own servers: minutes of voice messages a workspace may send in 24 hours, per member (ADR 0098). 0 = no limit for the workspace.",
     section: "Chat",
   },
   VOICE_LIMIT_ORG_MIN_MINUTES_PER_DAY: {
@@ -784,6 +784,22 @@ export const envVars = {
       "Where people write to whoever runs this server, shown with a workspace's hold notice, its suspended screen and the workspace's own computer when something on it doesn't work. Unset (default): they are told to ask the people who run the server.",
     section: "Operator",
     example: "support@example.com",
+  },
+  OPS_REPORT_EMAIL: {
+    schema: z
+      .string()
+      .optional()
+      .transform((value) =>
+        value
+          ?.split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean),
+      )
+      .pipe(z.array(z.email()).optional()),
+    description:
+      "Where the daily stall-and-noise report goes, one address or several separated by commas: for each workspace, where agents stopped although someone waited on them and where they acted for nothing, over the previous UTC day and against the 7 days before it. Workspace names and counts only, never what anyone wrote. Needs email (`MILLIONSEND_API_KEY` or `SMTP_URL`). Unset (default): no report. `bun run report:autonomy` prints the same table at any time.",
+    section: "Operator",
+    example: "ops@example.com",
   },
   BILLING_URL: {
     schema: z.url({ protocol: /^https$/ }).optional(),

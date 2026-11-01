@@ -1,7 +1,17 @@
 import type { TFunction } from "i18next";
 import { previewOf } from "./consultations";
 import { mediaKindOf, mediaWord } from "./media";
+import { usageWhen } from "./plan-usage";
 import { isVoiceMeta, voiceLength, voiceWord } from "./voice";
+
+/** Notes of an agent waiting on its plan's limit or its budget (`meta.usageWait`): `{{when}}` from its reset. */
+const USAGE_NOTES = new Set([
+  "plan_limit_cut",
+  "plan_limit_cut_unknown",
+  "plan_limit_wait",
+  "plan_limit_wait_unknown",
+  "budget_wait",
+]);
 
 type Meta = Record<string, unknown> | undefined;
 
@@ -10,9 +20,11 @@ type Meta = Record<string, unknown> | undefined;
  * cards, "Done.", "File saved.", memory lines, a run cut by a deploy), in the
  * person's language: `meta.bodyCode` + `meta.bodyParams` → `chat.body.*`, and
  * `meta.interrupted` / `meta.brainInterrupted` → what the agent wrote plus the notice. Anything else (the
- * model's own text) is shown as is; the server's English body is the fallback.
+ * model's own text) is shown as is; the server's English body is the fallback. A body that says where something ran
+ * (a task's end, a mission's plan: `bodyParams.computer`) names the computer only with `namesComputer`
+ * (`namesComputers`), else it reads in its code's `…NoComputer` words. `locale` formats a usage wait's reset time.
  */
-export function serverBody(t: TFunction, body: string, meta: Meta): string {
+export function serverBody(t: TFunction, body: string, meta: Meta, locale?: string, namesComputer = false): string {
   const m = meta ?? {};
   const interrupted = m.interrupted as { text?: unknown } | undefined;
   if (interrupted && typeof interrupted === "object" && typeof interrupted.text === "string") {
@@ -54,17 +66,30 @@ export function serverBody(t: TFunction, body: string, meta: Meta): string {
     const brain = own === "codex" ? "Codex" : "Claude Code";
     return t("chat.body.no_ai_not_signed_in", { brain, defaultValue: body });
   }
+  if (USAGE_NOTES.has(code)) {
+    const resetsAt = (m.usageWait as { resetsAt?: unknown } | undefined)?.resetsAt;
+    const when = typeof resetsAt === "string" ? usageWhen(t, locale, resetsAt) : "";
+    return t(`chat.body.${code}`, { ...params, when, defaultValue: body });
+  }
+  // An older note about a plan's limit (sent as the computer brain being unavailable): the plan's words.
+  if (code === "brain_unavailable" && (m.brainUnavailable as { code?: unknown } | undefined)?.code === "plan_limit") {
+    const plan = params.brain === "Codex" ? "ChatGPT" : "Claude";
+    return t("chat.body.plan_limit_wait_unknown", { plan, defaultValue: body });
+  }
   const shown = busy ? "brain_busy" : signedOut ? "no_ai_signed_out" : code;
-  return t(`chat.body.${shown}`, { ...params, defaultValue: body });
+  const key = `chat.body.${shown}`;
+  // i18next takes the first key that exists: a body with no `…NoComputer` words keeps its own.
+  return t(params.computer && !namesComputer ? [`${key}NoComputer`, key] : key, { ...params, defaultValue: body });
 }
 
 /**
  * A conversation list's last-message line: a body the server wrote (`meta` from the list, same keys as
- * the message's) in the reader's language, as the chat shows it, on one plain line; a GIF or a sticker with no
- * text as its word (ADR 0091: the list's `mediaKind`, or a kind its meta carries); else the text as is.
+ * the message's) in the reader's language, as the chat shows it, on one plain line, never naming a computer; a GIF
+ * or a sticker with no text as its word (ADR 0091: the list's `mediaKind`, or a kind its meta carries); else the text
+ * as is.
  */
 export function previewBody(t: TFunction, text: string, meta: Meta | null, mediaKind?: unknown): string {
-  // Never a voice message's words, even from a server that sent them (ADR 0094).
+  // Never a voice message's words, even from a server that sent them (ADR 0098).
   if (isVoiceMeta(meta) || mediaKindOf(mediaKind) === "voice") return voiceWord(t, voiceLength(meta));
   if (!text.trim()) {
     const kind = mediaKindOf(mediaKind) ?? mediaKindOf(meta?.mediaKind) ?? mediaKindOf(meta?.media);

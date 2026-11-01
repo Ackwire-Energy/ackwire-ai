@@ -7,6 +7,8 @@ import {
   callLogo,
   formatDuration,
   formatLineTime,
+  oneCall,
+  savedOneLine,
   type ToolItem,
   type ToolLine,
   type ToolState,
@@ -19,6 +21,7 @@ import {
   workApps,
   workFromSteps,
   workMeta,
+  workSteps,
 } from "@agenteschat/client/lib/work";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import type { TFunction } from "i18next";
@@ -100,6 +103,7 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   runningCode: "code",
   browsing: "globe",
   checkingComputer: "laptop",
+  checkingUsage: "chart",
   proposingMission: "flag",
   messagingMission: "flag",
   updatingPlan: "flag",
@@ -203,7 +207,8 @@ function useFlash(at: number | null, ms: number) {
 
 /**
  * The card: a hairline and the app's cut corner (bottom left small), one line that opens on a tap. `live`:
- * new logos pop in and the line's words come up when they change; a saved block draws still.
+ * new logos pop in and the line's words come up when they change; a saved block draws still. A single call (`one`)
+ * is its own line, with nothing to open around it: what was said goes in that line's open view.
  */
 export function ToolBlock({
   logos,
@@ -215,6 +220,7 @@ export function ToolBlock({
   defaultOpen = false,
   flash = null,
   onToggle,
+  one = false,
 }: {
   logos: { key: string; node: ReactNode }[];
   head: BlockHead;
@@ -227,24 +233,50 @@ export function ToolBlock({
   defaultOpen?: boolean;
   /** When someone was led here ("Ver" on an answer's line): the card wears a plate a moment, as the web does. */
   flash?: number | null;
-  /** Opened (load the saved steps) or closed. */
+  /** Opened (load the saved steps) or closed; with `one`, its line. */
   onToggle?: (open: boolean) => void;
+  /** The work is one call: its line in place of the head ("Criou uma rotina", not "Usou 1 ferramenta"). */
+  one?: boolean;
 }) {
   const c = useColors();
   const reduced = useReducedMotion();
   const [open, setOpen] = useState(defaultOpen);
   const flashing = useFlash(flash, reduced ? FLASH_MS : FLASH_HOLD_MS);
   const moving = live && !reduced;
+  const only = one ? items.find((i) => i.kind === "line") : undefined;
+  const plate = flashing ? (
+    // Under the card's words (drawn first), never over them.
+    <Animated.View
+      pointerEvents="none"
+      exiting={reduced ? undefined : FadeOut.duration(FLASH_MS - FLASH_HOLD_MS)}
+      style={[StyleSheet.absoluteFill, { backgroundColor: c.plate }]}
+    />
+  ) : null;
+  if (only?.kind === "line") {
+    const notes = items.flatMap((i) => (i.kind === "note" ? [i] : []));
+    const detail =
+      notes.length > 0 ? (
+        <>
+          {notes.map((n) => (
+            <View key={n.key}>{n.node}</View>
+          ))}
+          {only.line.detail}
+        </>
+      ) : (
+        only.line.detail
+      );
+    return (
+      <View style={[styles.block, { backgroundColor: c.raised, borderColor: c.line2 }]}>
+        {plate}
+        <View style={styles.one}>
+          <Line line={{ ...only.line, detail }} color={color} onToggle={onToggle} />
+        </View>
+      </View>
+    );
+  }
   return (
     <View style={[styles.block, { backgroundColor: c.raised, borderColor: c.line2 }]}>
-      {/* Under the card's words (drawn first), never over them. */}
-      {flashing ? (
-        <Animated.View
-          pointerEvents="none"
-          exiting={reduced ? undefined : FadeOut.duration(FLASH_MS - FLASH_HOLD_MS)}
-          style={[StyleSheet.absoluteFill, { backgroundColor: c.plate }]}
-        />
-      ) : null}
+      {plate}
       <Pressable
         onPress={() => {
           tapHaptic();
@@ -309,8 +341,19 @@ export function ToolBlock({
   );
 }
 
-/** One call: logo, phrase, time, mark; a tap opens what it ran or was given and answered. */
-function Line({ line, color }: { line: BlockLine; color: AgentColorName }) {
+/**
+ * One call: logo, phrase, time, mark; a tap opens what it ran or was given and answered. The phrase wraps, whole:
+ * the logo, the time and the mark stay level with its first line.
+ */
+function Line({
+  line,
+  color,
+  onToggle,
+}: {
+  line: BlockLine;
+  color: AgentColorName;
+  onToggle?: (open: boolean) => void;
+}) {
   const c = useColors();
   const [open, setOpen] = useState(line.defaultOpen === true);
   // Open while it runs (its code), it folds when the call ends; a tap opens it again.
@@ -321,14 +364,12 @@ function Line({ line, color }: { line: BlockLine; color: AgentColorName }) {
   }, [line.state]);
   const opens = Boolean(line.detail) && !line.onOpen;
   const said = [line.label, line.hint, line.preview, line.count, line.time].filter(Boolean).join(", ");
-  // With a preview under the phrase: logo, time and mark stay level with the phrase.
-  const top = line.preview ? styles.rowTop : null;
   const row = (
     <>
       <View style={styles.logo}>{line.logo}</View>
       <View style={styles.grow}>
         <Breathing on={line.state === "run"}>
-          <Text variant="footnote" tone="ink2" numberOfLines={1} style={styles.medium}>
+          <Text variant="footnote" tone="ink2" style={[styles.medium, styles.firstLine]}>
             {line.label}
           </Text>
         </Breathing>
@@ -339,17 +380,33 @@ function Line({ line, color }: { line: BlockLine; color: AgentColorName }) {
         ) : null}
       </View>
       {line.count ? (
-        <Text variant="caption" tone="faint" style={styles.num} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
+        <Text
+          variant="caption"
+          tone="faint"
+          style={[styles.num, styles.level]}
+          maxFontSizeMultiplier={CHROME_MAX_SCALE}
+        >
           {line.count}
         </Text>
       ) : null}
       {line.time ? (
-        <Text variant="caption" tone="faint" style={styles.num} maxFontSizeMultiplier={CHROME_MAX_SCALE}>
+        <Text
+          variant="caption"
+          tone="faint"
+          style={[styles.num, styles.level]}
+          maxFontSizeMultiplier={CHROME_MAX_SCALE}
+        >
           {line.time}
         </Text>
       ) : null}
-      <Mark state={line.state} color={color} />
-      {line.onOpen ? <Icon name="right" size={14} color={c.faint} /> : null}
+      <View style={styles.level}>
+        <Mark state={line.state} color={color} />
+      </View>
+      {line.onOpen ? (
+        <View style={styles.chevLevel}>
+          <Icon name="right" size={14} color={c.faint} />
+        </View>
+      ) : null}
     </>
   );
   return (
@@ -363,7 +420,7 @@ function Line({ line, color }: { line: BlockLine; color: AgentColorName }) {
           }}
           accessibilityRole="button"
           accessibilityLabel={said}
-          style={({ pressed }) => [styles.row, top, pressed && { backgroundColor: c.plateSoft }]}
+          style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.plateSoft }]}
         >
           {row}
         </Pressable>
@@ -371,17 +428,18 @@ function Line({ line, color }: { line: BlockLine; color: AgentColorName }) {
         <Pressable
           onPress={() => {
             tapHaptic();
-            setOpen((o) => !o);
+            setOpen(!open);
+            onToggle?.(!open);
           }}
           accessibilityRole="button"
           accessibilityState={{ expanded: open }}
           accessibilityLabel={said}
-          style={({ pressed }) => [styles.row, top, pressed && { backgroundColor: c.plateSoft }]}
+          style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.plateSoft }]}
         >
           {row}
         </Pressable>
       ) : (
-        <View style={[styles.row, top]} accessible accessibilityLabel={said}>
+        <View style={styles.row} accessible accessibilityLabel={said}>
           {row}
         </View>
       )}
@@ -575,6 +633,7 @@ export function TurnTools({
     );
   }
   const calls = toolCalls(items);
+  const one = oneCall(items);
   const total = items.reduce((n, i) => n + (i.kind === "call" ? (i.line.ms ?? 0) : 0), 0);
   const head: BlockHead = done
     ? { text: t("chat.work.used", { count: calls }), time: total > 0 ? formatDuration(t, total) : undefined }
@@ -589,10 +648,16 @@ export function TurnTools({
       <ToolBlock
         logos={toolApps(items).map((a) => ({ key: appKey(a), node: logo(a, 18) }))}
         head={head}
-        items={blockItems}
+        // Its own line is closed until tapped, as the block it stands for (code that runs shows when opened).
+        items={
+          one
+            ? blockItems.map((i) => (i.kind === "line" ? { ...i, line: { ...i.line, defaultOpen: false } } : i))
+            : blockItems
+        }
         color={color}
         label={t("chat.work.block", agentGrammar(t, agentName))}
         live={!done && !settled}
+        one={one}
       />
       {items.map((i) =>
         i.kind === "steer" ? (
@@ -606,7 +671,8 @@ export function TurnTools({
 /**
  * The tools of a saved reply: closed, "Usou 4 ferramentas · 12 s" with the apps' logos from `meta.work`; its
  * steps load from `GET …/runs/{id}` only when opened (one request per opened message). Nothing when the
- * server says it used no tools.
+ * server says it used no tools. A single call is its own line from `meta.work` ("Criou uma rotina"), opening on what
+ * it was given and answered.
  */
 export function SavedTools({
   runId,
@@ -622,7 +688,7 @@ export function SavedTools({
   /** Screens whose calls have their own card on the message (`TrailCard`): left out here. */
   skipScreens?: ScreenKind[];
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const orgId = useOrgId();
   const [open, setOpen] = useState(false);
   const run = useRun(orgId, open ? runId : null);
@@ -637,42 +703,56 @@ export function SavedTools({
     : null;
   const items = work ? toolItemsSaved(work) : [];
   const blockItems = useBlockItems(items);
-  if (!compact || compact.steps === 0) return null;
+  if (!compact || workSteps(compact) === 0) return null;
   const calls = work ? toolCalls(items) : compact.steps;
+  const lone = savedOneLine(meta);
+  // Its only call has a card of its own on the message (where it browsed): the card says it.
+  if (lone && onCard(lone.tool)) return null;
   const durationMs = work?.durationMs ?? compact.durationMs;
   const apps = work ? toolApps(items) : workApps(compact.calls.filter((c) => !onCard(c.name)));
   const note = (key: string, node: ReactNode): BlockItem => ({ kind: "note", key, node });
-  const status: BlockItem[] = run.isError
-    ? [
-        note(
-          "error",
-          <Text variant="footnote" tone="muted">
-            {t("chat.work.failed")}
-          </Text>,
-        ),
-      ]
-    : !work
+  // The steps loading, or not come: said in the block, or in a lone call's open line.
+  const pending = run.isError ? (
+    <Text variant="footnote" tone="muted">
+      {t("chat.work.failed")}
+    </Text>
+  ) : !work ? (
+    <View style={styles.loading}>
+      <PixelOrbit color={color} size={14} />
+      <Text variant="footnote" tone="faint">
+        {t("mobile.common.loading")}
+      </Text>
+    </View>
+  ) : null;
+  if (lone && (!work || oneCall(items) || !items.some((i) => i.kind === "call"))) {
+    const line = blockLine(t, i18n.language, lone, logo(lone));
+    return (
+      <ToolBlock
+        one
+        logos={[]}
+        head={{ text: line.label }}
+        items={
+          work && oneCall(items) ? blockItems : [{ kind: "line", line: { ...line, detail: pending ?? undefined } }]
+        }
+        color={color}
+        label={t("chat.work.block", agentGrammar(t, agentName))}
+        // Its steps stay once loaded: closing the line doesn't change what it says.
+        onToggle={(o) => o && setOpen(true)}
+      />
+    );
+  }
+  const status: BlockItem[] = pending
+    ? [note(run.isError ? "error" : "loading", pending)]
+    : items.length === 0
       ? [
           note(
-            "loading",
-            <View style={styles.loading}>
-              <PixelOrbit color={color} size={14} />
-              <Text variant="footnote" tone="faint">
-                {t("mobile.common.loading")}
-              </Text>
-            </View>,
+            "none",
+            <Text variant="footnote" tone="muted">
+              {t("chat.work.none")}
+            </Text>,
           ),
         ]
-      : items.length === 0
-        ? [
-            note(
-              "none",
-              <Text variant="footnote" tone="muted">
-                {t("chat.work.none")}
-              </Text>,
-            ),
-          ]
-        : [];
+      : [];
   return (
     <ToolBlock
       logos={apps.map((a) => ({ key: appKey(a), node: logo(a, 18) }))}
@@ -739,16 +819,21 @@ const styles = StyleSheet.create({
   flip: { transform: [{ rotate: "180deg" }] },
   lines: { borderTopWidth: StyleSheet.hairlineWidth, padding: 4 },
   line: { borderRadius: 10 },
+  // Its 20px first line in the middle of 40: the logo's height; the phrase's 18px line, the time's 16px and the
+  // mark's 16px are brought down onto it (`firstLine`, `level`).
   row: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 9,
     minHeight: 40,
     paddingHorizontal: 8,
-    paddingVertical: 6,
+    paddingVertical: 10,
     borderRadius: 10,
   },
-  rowTop: { alignItems: "flex-start" },
+  firstLine: { marginTop: 1 },
+  level: { marginTop: 2 },
+  chevLevel: { marginTop: 3 },
+  one: { padding: 2 },
   logo: { width: 20, alignItems: "center" },
   why: { marginTop: -4, paddingLeft: 37, paddingRight: 8, paddingBottom: 8 },
   detail: { marginHorizontal: 8, marginBottom: 8, gap: 8 },
