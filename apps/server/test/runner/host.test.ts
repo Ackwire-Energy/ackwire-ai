@@ -263,7 +263,7 @@ test("its service: the root unit runs `host` (the token from a file), starts wit
   );
   expect(launchdPlist(launch, args)).toContain("<string>host</string>\n    <string>--server</string>");
   const calls: string[] = [];
-  const unitPath = path.join(state, "systemd", "agentes-runner.service");
+  const unitPath = path.join(state, "etc/systemd/system/agentes-runner.service");
   const code = installSystemService({
     print: () => {},
     run: (file, a) => {

@@ -18,5 +18,15 @@ export default defineConfig({
   ],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   server: { port: 5173, proxy: { "/api": { target: "http://localhost:3000", ws: true } } },
-  build: { outDir: "dist", sourcemap: true },
+  // `screen.html`: the agent's screen for the phone app (ADR 0098), a small page of its own, not the web app.
+  build: {
+    outDir: "dist",
+    sourcemap: true,
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL("./index.html", import.meta.url)),
+        screen: fileURLToPath(new URL("./screen.html", import.meta.url)),
+      },
+    },
+  },
 });

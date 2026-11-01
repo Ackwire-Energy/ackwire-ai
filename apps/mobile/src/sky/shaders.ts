@@ -7,7 +7,17 @@
  * the bottom like the web's mask; 2 = no fade), `clear` (1 = the first tone is see-through, for a drawing
  * over glass). Arrays are only read with loop indices (SkSL rule).
  */
-export type DitherKind = "sky" | "fuse" | "bar" | "track" | "sweep" | "pill" | "pillwork" | "horizon" | "workspace";
+export type DitherKind =
+  | "sky"
+  | "computer"
+  | "fuse"
+  | "bar"
+  | "track"
+  | "sweep"
+  | "pill"
+  | "pillwork"
+  | "horizon"
+  | "workspace";
 
 const PRELUDE = `
 uniform float2 size;
@@ -163,6 +173,12 @@ float field(float u, float v, float x, float y) {
   float hh = hash2(x, y);
   if (f < 0.12 && hh > 0.988 && v < 0.7) f = 0.45 + 0.4 * sin(t * 1.6 + hh * 90.0);
   return f;
+}
+`,
+  // Behind an agent's computer while its screen opens: the web's `ComputerSky`, the same field.
+  computer: `
+float field(float u, float v, float x, float y) {
+  return 0.78 - 0.18 * u - 0.4 * v + 0.06 * sin(u * 5.0 + t * 0.5);
 }
 `,
   // The launch splash: the sky up to `level` (share of the height from the

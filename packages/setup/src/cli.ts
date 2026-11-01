@@ -119,7 +119,8 @@ It asks only for what it needs and fills in only what's missing, so running it a
   --email-api-url <url>               That API's address (default ${DEFAULT_EMAIL_API_URL})
   --email-from <sender>               "${senderAt("example.com")}"
   --computer <yes|no>                 This machine as your agents' computer. Default yes on a Mac, and
-                                      on Linux as root with systemd, apt-get and 4 GB of memory or more.
+                                      on Linux as root with systemd (built with BPF_FRAMEWORK), apt-get
+                                      and 4 GB of memory or more.
   --computer-commands <yes|no>        Whether agents may run commands there (default no on a Mac,
                                       where they work as you, and yes on Linux, where each agent is
                                       its own user)
@@ -705,6 +706,7 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
     memory: totalmem(),
     root: process.getuid?.() === 0,
     systemd: existsSync("/run/systemd/system"),
+    bpf: /\+BPF_FRAMEWORK\b/.test(spawnSync("systemctl", ["--version"], { encoding: "utf8" }).stdout ?? ""),
     apt: spawnSync("sh", ["-c", "command -v apt-get"], { stdio: "ignore" }).status === 0,
     connected: connectedConfig(readOrNull(join(mac ? RUNNER_HOME : SYSTEM_RUNNER_HOME, "config.json"))),
   };
