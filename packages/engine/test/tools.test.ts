@@ -419,11 +419,11 @@ describe("approval flow (end to end)", () => {
     const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
     expect(main.at(-1)?.meta?.work).toMatchObject({ steps: tools.length });
     expect((main.at(-1)?.meta?.work as { calls?: unknown } | undefined)?.calls).toEqual([
-      { name: "github_tool_00", connector: "GitHub", service: "github" },
-      { name: "browser_open" },
-      { name: "mail_suporte_read", connector: "Email", service: "gmail" },
-      { name: "create_note" },
-      { name: "linear_list_issues", connector: "Linear", service: "linear" },
+      { name: "github_tool_00", n: 13, connector: "GitHub", service: "github" },
+      { name: "browser_open", n: 2 },
+      { name: "mail_suporte_read", n: 2, connector: "Email", service: "gmail" },
+      { name: "create_note", n: 1 },
+      { name: "linear_list_issues", n: 1, connector: "Linear", service: "linear" },
     ]);
   });
 
@@ -439,7 +439,12 @@ describe("approval flow (end to end)", () => {
       },
     });
     const calling = (...names: string[]): Parameters<typeof setup>[0] => ({
-      toolSources: [{ name: "fake", tools: async () => [tool("make_note", false), tool("make_broken", true)] }],
+      toolSources: [
+        {
+          name: "fake",
+          tools: async () => [tool("make_note", false), tool("make_broken", true), tool("browser_open", false)],
+        },
+      ],
       reply: (req) => {
         const last = req.messages.at(-1);
         if (typeof last?.content !== "string" && last?.content.some((b) => b.type === "tool_result"))
@@ -467,8 +472,17 @@ describe("approval flow (end to end)", () => {
     // Two calls keep the block, which says how many: no lone call to time.
     const two = await workOf("make_note", "make_note");
     expect(two).toMatchObject({ steps: 2 });
+    // Each call says how many steps it stands for: the apps take off the ones another card shows (the browser's).
+    expect(two?.calls).toEqual([{ name: "make_note", n: 2 }]);
     expect(two?.ms).toBeUndefined();
     expect(two?.failed).toBeUndefined();
+    // Beside the browser's steps (its card shows them), the one call left carries its own time and outcome.
+    const beside = await workOf("browser_open", "browser_open", "make_broken");
+    expect(beside?.calls).toEqual([
+      { name: "browser_open", n: 2 },
+      { name: "make_broken", n: 1, ms: expect.any(Number), failed: true },
+    ]);
+    expect(beside?.ms).toBeUndefined();
   });
 
   test("mention → tool call → approval → approve → resumed run → merged", async () => {

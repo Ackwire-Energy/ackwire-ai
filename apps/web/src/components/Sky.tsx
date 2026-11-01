@@ -420,8 +420,8 @@ export function AgentGlow({ color }: { color: AgentColor }) {
   );
 }
 
-/** The sky rising from the sidebar's bottom: fuller the more agents are working. `clear`: the faces on it. */
-export function SidebarHorizon({ working, total, clear }: { working: number; total: number; clear?: Clear }) {
+/** The sky rising from the sidebar's bottom: fuller the more agents are working. No pixel agents (product decision: they drew the eye for nothing). */
+export function SidebarHorizon({ working, total }: { working: number; total: number }) {
   const share = total > 0 ? Math.min(1, working / Math.min(total, 3)) : 0;
   const target = 0.2 + 0.6 * share;
   // Eases toward the new level frame by frame (at once with reduced motion, followed as it changes, as the sky does).
@@ -433,12 +433,10 @@ export function SidebarHorizon({ working, total, clear }: { working: number; tot
     pixel: 4,
     surface: "--side",
     palette: (bg) => softTones("sky", bg),
-    body: spriteTone("sky"),
     near: 0,
     ceil: 0.3,
     light: 0.06,
-    sprites: Math.min(8, working * 2),
-    clear,
+    sprites: 0,
     base: (u, v, tt) => {
       const s = Math.max(0, (v - 0.1) / 0.9);
       const e = s * s * (3 - 2 * s);

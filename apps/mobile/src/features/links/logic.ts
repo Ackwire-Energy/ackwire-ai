@@ -160,7 +160,9 @@ export function notificationHref(
   if (n.kind === "computer_ready") return computerReadyHref(ai);
   if (ROUTINE_TROUBLE.has(n.kind) || (n.kind === "routine_finished" && !s.messageId && !s.threadId))
     return routineHref(s.routineId);
-  if (n.kind === "agent_unreached") return isSafeId(s.agentId) ? `/agent/${s.agentId}` : null;
+  // Asking for one more browser profile: the agent's page, where its browsers are.
+  if (n.kind === "agent_unreached" || n.kind === "browser_profile_request")
+    return isSafeId(s.agentId) ? `/agent/${s.agentId}` : null;
   if (n.kind === "approval") return isSafeId(s.approvalId) ? `/approval/${s.approvalId}` : null;
   if (n.kind === "join_request") return "/join-requests";
   // The month's Composio calls are counted in Uso.

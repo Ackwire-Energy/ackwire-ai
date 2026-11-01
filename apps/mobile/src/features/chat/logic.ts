@@ -8,7 +8,7 @@ import type {
   ReactionCount,
 } from "@agenteschat/client";
 import { agentProposalOf, stretchCardOf } from "@agenteschat/client/lib/action-cards";
-import { type ActivityEntry, barEntries, type barWords } from "@agenteschat/client/lib/activity";
+import { type ActivityEntry, barEntries, type barWords, markedPieces, markInk } from "@agenteschat/client/lib/activity";
 import { splitChannelRefs } from "@agenteschat/client/lib/channel-refs";
 import { type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
 import {
@@ -356,24 +356,11 @@ export function mayStopRun(
   return root?.author.type === "person" && root.author.id === who.meId;
 }
 
-// Names travel through i18n wrapped in these, then come back bold (the web's WorkingLine does the same).
-export const NAME_OPEN = "\u0001";
-export const NAME_CLOSE = "\u0002";
-export const markName = (name: string) => `${NAME_OPEN}${name}${NAME_CLOSE}`;
+/** Names in a sentence: in ink, or with the agent's face (shared with the web's `WorkingLine`). */
+export const markName = markInk;
 
-/** A marked sentence split into plain and bold (name) pieces. */
-export function markedParts(text: string): { text: string; bold: boolean }[] {
-  const [head = "", ...rest] = text.split(NAME_OPEN);
-  const out: { text: string; bold: boolean }[] = head ? [{ text: head, bold: false }] : [];
-  for (const part of rest) {
-    const at = part.indexOf(NAME_CLOSE);
-    const name = at < 0 ? part : part.slice(0, at);
-    const after = at < 0 ? "" : part.slice(at + 1);
-    if (name) out.push({ text: name, bold: true });
-    if (after) out.push({ text: after, bold: false });
-  }
-  return out;
-}
+/** A marked sentence split into plain and bold (name) pieces; a faced name carries its agent's id. */
+export const markedParts = markedPieces;
 
 /** How wide the working line's pieces that can end in "…" drew their text (`onTextLayout`). */
 export interface LineDrawn {

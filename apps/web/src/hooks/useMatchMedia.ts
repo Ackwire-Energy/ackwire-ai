@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 
+/** A touch screen: the main pointer is a finger. */
+export const TOUCH = "(pointer: coarse)";
+
 /** Whether `query` (a CSS media query) matches at this moment. */
 export const matchesNow = (query: string) =>
   typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia(query).matches;

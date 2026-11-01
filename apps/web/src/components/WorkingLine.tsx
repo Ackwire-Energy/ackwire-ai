@@ -1,17 +1,18 @@
-import { elapsedClock, type LiveRun } from "@agenteschat/client";
+import { elapsedClock, type LiveWork } from "@agenteschat/client";
 import {
   type ActivityEntry,
   activitySentence,
   barAsking,
   barFaces,
   barWords,
-  type MarkName,
-  PHRASE_TURN_MS,
+  markedPieces,
+  markInk,
 } from "@agenteschat/client/lib/activity";
-import { Avatar, Icon } from "@agenteschat/ui";
-import { Fragment, type ReactNode, useEffect, useState } from "react";
+import { waitStep } from "@agenteschat/client/lib/work";
+import { type AgentColor, Avatar, agentGradient, Icon } from "@agenteschat/ui";
+import { type CSSProperties, Fragment, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AgentAvatar } from "@/components/AgentAvatar";
+import { AgentAvatar, AgentWho } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 
@@ -22,47 +23,40 @@ import { useDirectory } from "@/hooks/useDirectory";
  * perguntando ao Infra…") and the clock of a question that is out.
  */
 
-// Names travel through i18n wrapped in these, then come back as <b>.
-const OPEN = "\u0001";
-const CLOSE = "\u0002";
-const mark: MarkName = (name) => `${OPEN}${name}${CLOSE}`;
+/** A marked sentence as plain text (what the leaving phrase reads). */
+const plainText = (text: string) =>
+  markedPieces(text)
+    .map((p) => p.text)
+    .join("");
 
-/** Splits a marked sentence into text and bold names. */
+/** Splits a marked sentence into text, bold names and faced names. */
 export function boldNames(text: string): ReactNode[] {
-  const [head = "", ...rest] = text.split(OPEN);
-  const out: ReactNode[] = head ? [head] : [];
-  rest.forEach((part, i) => {
-    const at = part.indexOf(CLOSE);
-    const name = at < 0 ? part : part.slice(0, at);
-    const after = at < 0 ? "" : part.slice(at + 1);
-    // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
-    out.push(<b key={i}>{name}</b>);
-    if (after) out.push(after);
-  });
-  return out;
+  return markedPieces(text).map((p, i) =>
+    p.agentId ? (
+      // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
+      <AgentWho key={i} agentId={p.agentId} name={p.text} />
+    ) : p.bold ? (
+      // biome-ignore lint/suspicious/noArrayIndexKey: same
+      <b key={i}>{p.text}</b>
+    ) : (
+      p.text
+    ),
+  );
 }
 
 /** The sentence with names in bold (its text content equals `activityText`). */
 export function WorkingWords({ entries }: { entries: ActivityEntry[] }) {
   const { t } = useTranslation();
-  return <>{boldNames(activitySentence(t, entries, mark))}</>;
+  return <>{boldNames(activitySentence(t, entries, markInk))}</>;
 }
 
 /**
- * The card's phrase, turning: one agent on its own gets a light line
- * while it only thinks, then what it does, an aside on a long step and what it said last, in turn.
- * Who is typing comes last, in a piece of its own that keeps its width (`barWords`).
+ * The card's phrase: one agent on its own is just its name (its row in the conversation says what it does), several
+ * the sentence. Who is typing comes last, in a piece of its own that keeps its width (`barWords`).
  */
-export function BarPhrase({ entries, runs }: { entries: ActivityEntry[]; runs: LiveRun[] }) {
+export function BarPhrase({ entries }: { entries: ActivityEntry[] }) {
   const { t } = useTranslation();
-  const [tick, setTick] = useState(0);
-  const turning = entries.length === 1 && entries[0]?.type === "agent";
-  useEffect(() => {
-    if (!turning) return;
-    const timer = setInterval(() => setTick((n) => n + 1), PHRASE_TURN_MS);
-    return () => clearInterval(timer);
-  }, [turning]);
-  const [agents, sep, typers, typing] = barWords(t, entries, runs, tick, Date.now(), mark);
+  const [agents, sep, typers, typing] = barWords(t, entries, markInk);
   return (
     <>
       {agents && (
@@ -95,7 +89,7 @@ function TurnText({ text }: { text: string }) {
           key={`was-${shown.n}`}
           className="ac-turn__out"
           aria-hidden="true"
-          data-text={shown.was.split(OPEN).join("").split(CLOSE).join("")}
+          data-text={plainText(shown.was)}
           onAnimationEnd={() => setShown((s) => (s.n === shown.n ? { ...s, was: null } : s))}
         />
       )}
@@ -103,6 +97,28 @@ function TurnText({ text }: { text: string }) {
         {boldNames(shown.now)}
       </span>
     </span>
+  );
+}
+
+/**
+ * The waiting row's body, beside the agent's face until its first words arrive: three pixels in its color lighting up
+ * in turn, then a muted line saying what it does now (`waitStep`), turning like the bar's phrase. In the dark theme
+ * the pixels take the color's light tone.
+ */
+export function WaitLine({ work, color }: { work: LiveWork[] | undefined; color?: AgentColor }) {
+  const { t } = useTranslation();
+  const [light, deep] = agentGradient(color);
+  return (
+    <div className="ac-wait" style={{ "--wait-deep": deep, "--wait-light": light } as CSSProperties}>
+      <span className="ac-wait__dots" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </span>
+      <span className="ac-wait__step">
+        <TurnText text={waitStep(t, work)} />
+      </span>
+    </div>
   );
 }
 

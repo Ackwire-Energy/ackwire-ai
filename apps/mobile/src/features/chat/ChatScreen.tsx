@@ -169,7 +169,7 @@ import {
   type PlusPick,
   ThreadOptions,
 } from "./sheets";
-import { openingRuns, turnRuns, withOpacity } from "./turn";
+import { turnOrder, turnRuns, withOpacity } from "./turn";
 
 /** A run's messages this recent are asked whether a take over still holds the agent's browser. */
 const HELD_RECENT_MS = 12 * 60 * 60_000;
@@ -522,7 +522,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
         ...asTurns(buildRows(replies, (m) => superseded.has(m.id))),
         ...browsing.map((run) => ({ kind: "browser" as const, key: `browser-${run.agentId}`, run })),
         ...held.map((h) => ({ kind: "browser" as const, key: `browser-${h.agentId}`, run: null, handoff: h })),
-        ...runRowsOf(openingRuns(shownRuns)),
+        ...runRowsOf(turnOrder(shownRuns)),
       ];
     }
     // A thread's replies live in the thread; the channel shows its link.
@@ -531,7 +531,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       ...asTurns(buildRows(list, hidden)),
       ...browsing.map((run) => ({ kind: "browser" as const, key: `browser-${run.agentId}`, run })),
       ...held.map((h) => ({ kind: "browser" as const, key: `browser-${h.agentId}`, run: null, handoff: h })),
-      ...runRowsOf(openingRuns(shownRuns)),
+      ...runRowsOf(turnOrder(shownRuns)),
     ];
   }, [isThread, threadId, list, thread.data, channel?.name, dm, shownRuns, turnKeyOf, browsing, held, superseded, t]);
   const shownMessages = useMemo(() => rows.flatMap((r) => (r.kind === "message" ? [r.message] : [])), [rows]);

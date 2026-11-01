@@ -1,6 +1,5 @@
 import type { Database, schema } from "@agenteschat/db";
 import type { OutcomeKind } from "../context/outcomes";
-import type { RoutineAccess } from "../routine-brief";
 import type { JsonSchema } from "./json-schema";
 
 type ApprovalRow = typeof schema.approvals.$inferSelect;
@@ -11,8 +10,6 @@ export interface AheadRequest {
   tool: string;
   input: Record<string, unknown>;
   why: string;
-  /** What the routine may do at its time (a new one-off acts). */
-  access: RoutineAccess;
   /** Makes or finds the run it is for, called only once the call passed every check. */
   slot(): Promise<{ routineId: string; runAt: Date }>;
 }

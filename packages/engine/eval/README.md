@@ -61,3 +61,14 @@ Checkers are unit-tested in `test/behavior-checks.test.ts`; `test/behavior-eval.
 ### Hand-offs between agents (ADR 0095)
 
 `handoff-before-delete`, `status-while-colleague-works`, `note-announces-work`, `nested-handoff-one-report`, `fyi-note-no-report` and `colleague-cannot-finish` run agents working together: colleagues that really run, production's judge for how they work together (Jev, the cheap model without `TYPESAFE_API_KEY`), and production's depth backstop. On every prompt change run `bun run eval:mentions` and `bun run eval:behavior --only <these> --repeat 3` with `--lang pt` and `--lang en`; before a release, in all six languages. Each case must pass most of its runs in every language, and the rest of the suite must not regress at `--repeat 3` (the "How you work" and team lines changed with it). About US$ 0.5 to 1 per case and language.
+
+## Resilience eval
+
+`bun run eval:resilience [--only id,id] [--model …] [--repeat 3] [--concurrency 4] [--no-computer]` (ADR 0109):
+cases with an obstacle (no dedicated tool, an empty first search, a site that blocks, a dead link, a page that
+errors, a missing connector, a teammate holding the information), a real blocker (a code only the person has) and no
+obstacle at all. `resilience-cases.json` adds to a behavior case `web` (the fake web: search results by words, pages by
+address, `behavior-fakes.ts` `fakeWebFetch`), `facts` (words the answer must have), `never` (words an invented answer
+would have), `blocker` and `maxCalls`. API-brain cases run the real engine path with the real turn-end judge; a
+`"brain": "claude_code"` case runs this computer's `claude` headless with the agents' prompt rules and our web tools
+over MCP. It prints the success and give-up rates and the cost per success; `--repeat` passes a case on a majority.

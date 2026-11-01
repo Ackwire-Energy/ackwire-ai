@@ -53,7 +53,7 @@ function Root() {
   return (
     <>
       {inDesktopApp() && !inWorkspace && <DesktopDragStrip />}
-      {inDesktopApp() && <ContextMenuHost />}
+      <ContextMenuHost />
       <Outlet />
     </>
   );

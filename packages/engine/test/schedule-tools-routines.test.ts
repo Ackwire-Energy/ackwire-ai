@@ -87,7 +87,7 @@ const routineOf = async (id: string) =>
 const receipts = (runId: string) => f.db.select().from(schema.agentActions).where(eq(schema.agentActions.runId, runId));
 
 describe("schedule tools: routines", () => {
-  test("create_routine with an event trigger, report and access; the receipt carries no English schedule", async () => {
+  test("create_routine with an event trigger and report, every routine acting; the receipt carries no English schedule", async () => {
     f = await setup();
     const ctx = await runContext(f);
     const call = await tools(f, ctx);
@@ -96,7 +96,6 @@ describe("schedule tools: routines", () => {
       prompt: "Investigue o erro novo e diga o que fazer.",
       trigger: { type: "event", event: "sentry.issue_created" },
       report: "always",
-      access: "act",
     });
     expect(out.isError).toBeFalsy();
     expect(out.content).toContain("when a new error comes in from Sentry");
@@ -122,7 +121,7 @@ describe("schedule tools: routines", () => {
       trigger: "schedule",
       timezone: "UTC",
       rule: { freq: "weekly", byWeekday: ["MO"], times: ["09:00"] },
-      access: "read",
+      access: "act",
       report: "when_new",
     });
     expect(receipt?.params).not.toHaveProperty("schedule");

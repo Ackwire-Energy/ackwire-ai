@@ -26,6 +26,7 @@
     "composio:check": "bun --env-file=.env apps/server/scripts/composio-check.ts",
     "eval:memory": "bun --env-file=.env packages/engine/eval/memory.ts",
     "eval:behavior": "bun --env-file=.env packages/engine/eval/behavior.ts",
+    "eval:resilience": "bun --env-file=.env packages/engine/eval/resilience.ts",
     "eval:mentions": "bun --env-file=.env packages/engine/eval/mention-handoff.ts",
     "eval:router": "bun --env-file=.env packages/engine/eval/router.ts",
     "eval:conversation": "bun --env-file=.env packages/engine/eval/conversation.ts",

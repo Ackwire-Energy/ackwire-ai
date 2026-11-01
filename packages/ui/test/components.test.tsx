@@ -714,7 +714,7 @@ describe("Message aside and foot", () => {
     }
   });
 
-  test("the action bar sits on the first line, left of the check, clear of the lines around it", async () => {
+  test("the action bar is small and sits on the row's top edge, left of the check", async () => {
     const css = (await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text()).replace(
       /\/\*[\s\S]*?\*\//g,
       "",
@@ -733,27 +733,18 @@ describe("Message aside and foot", () => {
     expect(value(".ac-msg:hover .ac-msg__actions", "transform")).toBe("translateY(-50%)");
     expect(value(".ac-msg:focus-within .ac-msg__actions", "transform")).toBe("translateY(-50%)");
     expect(bodies(bar)).not.toMatch(/(^|;)\s*(bottom|translate):/);
-    // The name's 20px line starts at the row's top padding, and the bar sits on its capitals' middle. A grouped row's
-    // first line is its text's, under the row's and the text's top margins.
-    expect(value(".ac-msg", "padding")).toBe("6px var(--msg-inline)");
-    expect(value(bar, "top")).toBe("calc(16px - var(--cap-mid))");
-    const line =
-      Number.parseFloat(value(".ac-msg__text", "font-size") ?? "") * Number(value(".ac-msg__text", "line-height"));
-    expect(line).toBeCloseTo(26.35, 3);
-    expect(value(".ac-msg--grouped", "padding-top")).toBe("2px");
-    expect(value(".ac-msg__text", "margin")).toBe("2px 0 0");
-    expect(value(".ac-msg--grouped > .ac-msg__body > .ac-msg__actions", "top")).toBe(
-      "calc(4px + 13.175px - var(--cap-mid))",
-    );
-    // A grouped row with a line under one line of text: between the row above's last line (its 6px bottom padding
-    // up) and that line (2px under the text), the room holds the bar (its 32px buttons, 3px around them) whole, and
-    // the bar takes its middle.
-    const footed =
-      ".ac-msg--grouped:has(> .ac-msg__body > .ac-msg__foot:not(:empty)) > .ac-msg__body > .ac-msg__actions";
-    const above = -6;
-    const under = 2 + 2 + line + 2;
-    expect(Number.parseFloat(value(footed, "top") ?? "")).toBeCloseTo((above + under) / 2, 3);
-    expect(under - above).toBeGreaterThanOrEqual(32 + 2 * 3);
+    // Its middle on the row's top edge, grouped or not: half of it in the gap above, never over the first line.
+    expect(value(bar, "top")).toBe("0");
+    expect(value(".ac-msg--grouped > .ac-msg__body > .ac-msg__actions", "top")).toBe("0");
+    expect(
+      bodies(".ac-msg--grouped:has(> .ac-msg__body > .ac-msg__foot:not(:empty)) > .ac-msg__body > .ac-msg__actions"),
+    ).toBe("");
+    // 26px buttons with 16px icons, 2px around them, no gap: a 30px bar.
+    for (const decl of [/gap:\s*0\s*(;|$)/, /padding:\s*2px\s*(;|$)/, /border-radius:\s*10px\s*(;|$)/])
+      expect(bodies(bar)).toMatch(decl);
+    expect(value(".ac-msg__actions .ac-btn--sm", "width")).toBe("26px");
+    expect(value(".ac-msg__actions .ac-btn--sm", "height")).toBe("26px");
+    expect(value(".ac-msg__actions .ac-btn--sm .ac-icon", "width")).toBe("16px");
     // On touch too, where small buttons grow to 40px: the bar's keep their 32px plates, and each target reaches 4px
     // past its plate to the ruler's 40px, the plates 8px apart so no two targets overlap.
     const touch = [...css.matchAll(/@media \(pointer: coarse\) \{((?:[^{}]*\{[^{}]*\})*[^{}]*)\}/g)]

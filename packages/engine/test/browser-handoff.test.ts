@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { type BrowserInputEvent, channelTopic, type MachineRequest, type RealtimeEvent } from "@agenteschat/adapters";
+import {
+  type BrowserInputEvent,
+  channelTopic,
+  createFakePushSender,
+  type MachineRequest,
+  type RealtimeEvent,
+} from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import {
@@ -15,6 +21,7 @@ import {
   coalesceInput,
   createBrowserHandoffToolSource,
   createBrowserLive,
+  createJobHandlers,
   drainOutbox,
   endHandoffForRestart,
   expireBrowserHandoffs,
@@ -22,6 +29,7 @@ import {
   ForbiddenError,
   finishHandoff,
   grantScopes,
+  HANDOFF_REMIND_AFTER_MS,
   handoffInfo,
   handoffResultText,
   listMessages,
@@ -31,6 +39,8 @@ import {
   markPageRead,
   openPageInControl,
   postPersonMessage,
+  registerPushDevice,
+  remindBrowserHandoff,
   renderPush,
   requireBrowserAccess,
   requireBrowserControl,
@@ -319,8 +329,8 @@ describe("browser_ask_person", () => {
     await start();
     await post("@dev sign in please");
     await drainOutbox(f.db, f.handlers);
-    expect(await expireBrowserHandoffs(deps())).toBe(0);
-    expect(await expireBrowserHandoffs(deps(), new Date(Date.now() + 31 * 60_000))).toBe(1);
+    expect(await expireBrowserHandoffs(deps(), new Date(Date.now() + 23 * 3600_000))).toBe(0);
+    expect(await expireBrowserHandoffs(deps(), new Date(Date.now() + 24 * 3600_000 + 60_000))).toBe(1);
     await drainOutbox(f.db, f.handlers);
     expect((await handoffs())[0]?.status).toBe("expired");
     expect((await runs())[0]?.status).toBe("done");
@@ -371,13 +381,13 @@ describe("browser_ask_person", () => {
     );
   });
 
-  test("pending it waits 10 min by default; in control there's no deadline, only the grace while they're away", async () => {
+  test("pending it waits 24 hours by default; in control there's no deadline, only the grace while they're away", async () => {
     await start();
     await post("@dev sign in please");
     await drainOutbox(f.db, f.handlers);
     const [pending] = await handoffs();
     const waited = (pending?.expiresAt.getTime() ?? 0) - (pending?.createdAt.getTime() ?? 0);
-    expect(Math.round(waited / 60_000)).toBe(10);
+    expect(Math.round(waited / 60_000)).toBe(24 * 60);
     const claimed = await claimHandoff(deps(), f.owner.id, f.org.id, pending?.id ?? "");
     expect(claimed.expiresAt).toBeNull();
     // While they're there (watching or typing) the grace keeps moving; once away, it ends after the grace.
@@ -553,6 +563,77 @@ describe("browser_ask_person", () => {
       title: "Dev precisa de você no navegador",
       body: "Entrar no Stripe",
     });
+    const reminder = { kind: "browser_handoff", waiting: true, actorName: "Ada", reminder: true };
+    expect(renderPush("pt-BR", reminder).title).toBe("Ada ainda precisa de você no navegador");
+    expect(renderPush("en", reminder).title).toBe("Ada still needs you in the browser");
+    expect(renderPush("en", { ...reminder, screen: "desktop" }).title).toBe("Ada still needs you on the computer");
+  });
+});
+
+describe("the reminder an hour later", () => {
+  const PHONE = "ExponentPushToken[owner-phone-0001]";
+  /** The owner, with a phone, asks the agent to sign in; `at(ms)` runs the jobs due `ms` from now. */
+  async function askedWithPhone() {
+    await start();
+    await registerPushDevice(f.db, f.owner.id, { token: PHONE, platform: "ios", locale: "pt-BR" });
+    const push = createFakePushSender();
+    const handlers = createJobHandlers({ ...f.jobDeps, push });
+    const at = (ms: number) => drainOutbox(f.db, handlers, { now: new Date(Date.now() + ms) });
+    await post("@dev sign in please");
+    await drainOutbox(f.db, handlers);
+    const [h] = await handoffs();
+    const titles = () => push.sent.map((m) => m.title);
+    const row = async () =>
+      (
+        await f.db
+          .select()
+          .from(schema.notifications)
+          .where(eq(schema.notifications.groupKey, `browser_handoff:${h?.id}`))
+      )[0];
+    return { id: h?.id ?? "", at, titles, row };
+  }
+  const reminded = "Dev ainda precisa de você no navegador";
+
+  test("unanswered after an hour, the person asked hears it once more, once: back unread, on their phone", async () => {
+    const { at, titles, row } = await askedWithPhone();
+    expect(titles()).toContain("Dev precisa de você no navegador");
+    await f.db.update(schema.notifications).set({ readAt: new Date() });
+    await at(HANDOFF_REMIND_AFTER_MS - 60_000);
+    expect(titles()).not.toContain(reminded);
+    await at(HANDOFF_REMIND_AFTER_MS + 60_000);
+    expect(titles().filter((x) => x === reminded)).toHaveLength(1);
+    const n = await row();
+    expect(n?.readAt).toBeNull();
+    expect(n?.latest).toMatchObject({ reminder: true, text: "Sign in to Stripe" });
+    await at(3 * HANDOFF_REMIND_AFTER_MS);
+    expect(titles().filter((x) => x === reminded)).toHaveLength(1);
+  });
+
+  test.each([["done"], ["failed"], ["in control"]] as const)(
+    "no reminder once it's answered or given back (%s)",
+    async (how) => {
+      const { id, at, titles, row } = await askedWithPhone();
+      if (how === "in control") await claimHandoff(deps(), f.owner.id, f.org.id, id);
+      else await finishHandoff(deps(), f.owner.id, f.org.id, id, { result: how });
+      await at(HANDOFF_REMIND_AFTER_MS + 60_000);
+      expect(titles()).not.toContain(reminded);
+      expect((await row())?.latest.reminder).toBeUndefined();
+    },
+  );
+
+  test("no reminder once it expired, even before the sweep ended it", async () => {
+    const { id, at, titles, row } = await askedWithPhone();
+    // Past its deadline but not yet swept: still pending in the database.
+    await f.db
+      .update(schema.browserHandoffs)
+      .set({ expiresAt: new Date(Date.now() - 1000) })
+      .where(eq(schema.browserHandoffs.id, id));
+    expect(await remindBrowserHandoff(deps(), f.org.id, id)).toBe(0);
+    await at(HANDOFF_REMIND_AFTER_MS + 60_000);
+    expect(titles()).not.toContain(reminded);
+    expect((await row())?.latest.reminder).toBeUndefined();
+    expect(await expireBrowserHandoffs(deps())).toBe(1);
+    expect((await handoffs())[0]?.status).toBe("expired");
   });
 });
 

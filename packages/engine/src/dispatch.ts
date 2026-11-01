@@ -258,7 +258,7 @@ export async function dispatchMentions(
 
   // Re-check at dispatch time: the agent may have been archived or removed from the channel since.
   // An agent asking another one acts for the person behind its run, who must be allowed to talk to it;
-  // a routine set to act wakes only agents its creator can talk to.
+  // a routine wakes only agents its creator can talk to.
   const behind = message.agentRunId ?? (await routinePostRun(db, message));
   const requester =
     (await requesterOf(db, message)) ??

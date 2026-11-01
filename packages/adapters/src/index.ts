@@ -17,6 +17,7 @@ export * from "./blob-disk";
 export * from "./blob-postgres";
 export * from "./command-policy";
 export * from "./composio";
+export { decodeEntities, htmlToText } from "./composio-mail";
 export * from "./database";
 export * from "./email";
 export * from "./error-reports";

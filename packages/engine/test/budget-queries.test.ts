@@ -83,13 +83,18 @@ test("claim → model request stays within 15 statements; a whole mention run wi
   // 23 with the open tasks, 24 with the work handed off, 25 with what other runs here hold.
   // 30 since every turn's end is decided and recorded (ADR 0097): the judgment through the gateway, its step, and
   // clearing the agent's `run_failed` notification there.
-  expect(run.total).toBeLessThanOrEqual(30);
+  // 31 since a run's browser profile turns end with it (ADR 0110 §4): one update on its terminal transition, which
+  // can't wait for the turn's own expiry or the profile stays held from the people and agents who share it.
+  expect(run.total).toBeLessThanOrEqual(31);
 });
 
-test("with tools, as every production run has them (find_agent among them): within 19 before the model call, 34 in all", async () => {
+test("with tools, as every production run has them (find_agent among them): within 19 before the model call, 36 in all", async () => {
   const run = await mentionRun({ askAgent: true });
   // 4 more, all for the tool list and the prompt: who is behind the run (2, the Tool Gateway's policy), the connectors
   // it lacks (1) and whether the person may talk to agents ("# Your team", 1, beside the context's other reads).
   expect(run.beforeModel).toBeLessThanOrEqual(19);
-  expect(run.total).toBeLessThanOrEqual(34);
+  // 36: the browser profile release above, and the turn-end judge naming the teammates the person may reach (ADR 0109):
+  // whether they may talk to agents, read again because a resumed run has no context of its own to carry it from.
+  // Who is behind the run comes from the run in memory, and the calls it tried are read only when it made some.
+  expect(run.total).toBeLessThanOrEqual(36);
 });

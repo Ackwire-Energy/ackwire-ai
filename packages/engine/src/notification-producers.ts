@@ -12,6 +12,7 @@ import {
   type NotificationSource,
   notificationSnippet,
   notify,
+  remindNotifications,
   resolveNotifications,
   retargetNotifications,
 } from "./notifications";
@@ -753,7 +754,7 @@ export async function notifyRoutineFailed(
 }
 
 /**
- * A routine set to act couldn't call an agent its creator can't talk to (`reach.ts`, and its own tell_agent or
+ * A routine couldn't call an agent its creator can't talk to (`reach.ts`, and its own tell_agent or
  * ask_agent, `consultations.ts`): the agent's owner hears it once per routine and agent, or who manages agents when
  * it has none. It opens the agent's page (who talks to it), the place they may not otherwise reach being private;
  * `source.userId` is the routine's creator, whom its one-click action lets talk to the agent.
@@ -1163,6 +1164,10 @@ export async function notifyBrowserHandoff(
     latest: { text: notificationSnippet(h.instructions), expiresAt: h.expiresAt.toISOString() },
   });
 }
+
+/** Still unanswered an hour later: back on top, unread, and pushed once more saying the agent still needs them. */
+export const remindBrowserHandoffNotifications = (deps: NotificationDeps, orgId: string, handoffId: string) =>
+  remindNotifications(deps, orgId, `browser_handoff:${handoffId}`, { reminder: true }, "reminder");
 
 /** Done, couldn't, canceled or expired: out of everyone's inbox. */
 export async function resolveBrowserHandoffNotifications(deps: NotificationDeps, orgId: string, handoffId: string) {

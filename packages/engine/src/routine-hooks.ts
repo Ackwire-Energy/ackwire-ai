@@ -254,7 +254,7 @@ const SAMPLE = { test: true, text: "A sample call sent with Testar on the routin
 
 /**
  * "Testar": a sample call down the same path as a real one (its limit, its run), without a signature (the person is
- * signed in) and marked as a test: its run only reads (`testOnlyEvent`), and the agent reports what it would do. A
+ * signed in) and marked as a test (`testOnlyEvent`): the agent is told so and reports what it would do. A
  * routine turned off is refused, as its address would refuse a real call.
  */
 export async function sendRoutineHookTest(deps: RoutineHookDeps, routine: RoutineRef & { active: boolean }) {
@@ -463,7 +463,7 @@ function callOf(call: CallInput): HookCall {
 const callsOf = (e: Record<string, unknown>) => (Array.isArray(e.calls) ? (e.calls as HookCall[]) : []);
 const extraOf = (e: Record<string, unknown>) => (typeof e.extra === "number" ? e.extra : 0);
 
-/** A run that carries only Testar's samples: it only reads, whatever the routine may do, since nothing real came. */
+/** A run that carries only Testar's samples: nothing real came, so the agent is told to report, not act (ADR 0109). */
 export function testOnlyEvent(event: Record<string, unknown> | null | undefined) {
   if (event?.type !== WEBHOOK_EVENT || extraOf(event) > 0) return false;
   const calls = callsOf(event);
@@ -510,7 +510,7 @@ export function webhookEventText(event: Record<string, unknown>): string {
     })
     .join("\n\n");
   const lead = testOnlyEvent(event)
-    ? "A person pressed Testar on this routine's page: the call below is a sample, not a real event, so this run only looks. Report what you would do with a real call like it, and say it was a test."
+    ? "A person pressed Testar on this routine's page: the call below is a sample, not a real event, so don't act on it: change nothing and reach no one for it. Report what you would do with a real call like it, and say it was a test."
     : `What was POSTed to this routine's webhook address${
         calls.length > 1
           ? ` (${calls.length} calls, oldest first${extra > 0 ? `, ${extra} earlier ones not shown` : ""})`

@@ -410,6 +410,19 @@ export const envVars = {
     description: "Embedding model (1024 dimensions). After changing it, reindex (`search.reindex`).",
     section: "Search",
   },
+  BRAVE_SEARCH_API_KEY: {
+    schema: z.string().optional(),
+    description:
+      "Brave Search API key (https://brave.com/search/api), optional. Agents' `web_search` uses it first when set. Without it: `SEARXNG_URL` when set, else the agent's own browser on its computer (Google, then Bing or DuckDuckGo), else DuckDuckGo's HTML page, with no key.",
+    section: "Search",
+    secret: true,
+  },
+  SEARXNG_URL: {
+    schema: z.url().optional(),
+    description:
+      "Base URL of a SearXNG instance with the JSON format turned on (`search.formats: [html, json]`), optional. Agents' `web_search` uses it when `BRAVE_SEARCH_API_KEY` isn't set. It may be on your own network: only this server calls it.",
+    section: "Search",
+  },
   GIPHY_API_KEY: {
     schema: z.string().optional(),
     description:

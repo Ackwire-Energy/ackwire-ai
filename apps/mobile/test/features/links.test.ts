@@ -119,6 +119,16 @@ describe("inbox items", () => {
     });
     expect(notificationHref(n)).toBe("/agent/a1");
   });
+
+  test("asking for one more browser profile opens the agent's page", () => {
+    const n = notification({
+      id: "n",
+      kind: "browser_profile_request",
+      actors: [{ type: "user" as const, id: "u1" }],
+      source: { agentId: "a1", label: "Ada" },
+    });
+    expect(notificationHref(n)).toBe("/agent/a1");
+  });
 });
 
 describe("the workspace's computer is ready", () => {

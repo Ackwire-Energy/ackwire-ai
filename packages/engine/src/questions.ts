@@ -5,6 +5,7 @@ import { consultedFor } from "./consultations";
 import { isAgentOnlyDm } from "./dms";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
+import type { ResourcefulDeps } from "./hand-off";
 import { resolveQuestionNotifications } from "./notification-producers";
 import { enqueue } from "./outbox";
 import type { ToolDefinition, ToolSource } from "./tools/types";
@@ -67,8 +68,10 @@ export const questionCardMeta = (q: AgentQuestionRow, why: string) => ({
  * to the executor, which posts it in the thread and suspends the run
  * (`waiting_input`). A consulted agent asks from the agents' DM, which no
  * person reads: its card goes where the person behind it asked (ADR 0034).
+ * With a judge, a question for something the run could find, or a secret asked in the chat, is held first
+ * (`holdAsk`, ADR 0109 addendum).
  */
-export function createAskUserToolSource(): ToolSource {
+export function createAskUserToolSource(deps: ResourcefulDeps = {}): ToolSource {
   const tool: ToolDefinition = {
     name: ASK_USER_TOOL,
     description:
@@ -97,6 +100,9 @@ export function createAskUserToolSource(): ToolSource {
         };
       }
       const text = typeof input.question === "string" ? input.question.trim() : "";
+      // Loaded here: the check pulls in the controller, which imports most of the engine.
+      const held = await (await import("./hand-off")).holdAsk(deps, ctx, text);
+      if (held) return { content: held, data: { held: true } };
       const choices = Array.isArray(input.choices)
         ? [...new Set((input.choices as unknown[]).map((c) => String(c).trim()).filter(Boolean))]
         : [];

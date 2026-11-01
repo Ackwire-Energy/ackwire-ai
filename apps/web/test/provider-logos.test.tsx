@@ -71,7 +71,7 @@ describe("provider marks where a provider is named", () => {
     expect(marks(card(/^GPT-5/) as Element)).toEqual(["openai"]);
   });
 
-  test("the brain line: Claude's mark for Claude Code, Z.ai's for a GLM plan account, none for the API", async () => {
+  test("the brain line: Claude's mark for Claude Code, Z.ai's for a GLM plan account, the model's maker's for the API", async () => {
     const withBrain = (brain: NonNullable<ReturnType<typeof seedState>["agents"][number]["brain"]> | undefined) => {
       const state = seedState();
       const ada = state.agents.find((a) => a.id === ADA_ID);
@@ -97,11 +97,10 @@ describe("provider marks where a provider is named", () => {
     expect(marks(brainLine())).toEqual(["openai"]);
     cleanup();
 
-    // Thinking through the API: the agent's own icon, no maker's mark.
+    // Thinking through the API: its model's maker's mark.
     await open(`dm/agent/${ADA_ID}`, withBrain(undefined));
     expect(brainLine().textContent).toBe("Claude Sonnet 5.5");
-    expect(marks(brainLine())).toEqual([]);
-    expect(brainLine().querySelector(".ac-icon")).not.toBeNull();
+    expect(marks(brainLine())).toEqual(["claude"]);
   });
 
   test("several makers in one line: the API key row, by four marks, overlapped", () => {

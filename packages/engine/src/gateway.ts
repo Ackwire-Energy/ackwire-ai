@@ -679,7 +679,8 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       /** The agent and run the call was for (recorded, not billed to its budget). */
       agentId?: string | null;
       runId?: string;
-      kind: "router";
+      /** `agent`: a tool's own service for an agent's run (web search), never billed to its budget. */
+      kind: "router" | "agent";
       provider: string;
       model: string;
       inputTokens: number;

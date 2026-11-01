@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 32;
+export const MACHINE_PROTOCOL_VERSION = 34;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -344,6 +344,14 @@ export const DESKTOP_TEXT_MAX = 16_000;
  * no `setup`.
  */
 export const BROWSER_WARM_PROTOCOL = 27;
+
+/**
+ * Protocol 34: browser profiles (ADR 0110). Every `browser.*` op may carry `profile: { id }`: it runs in that
+ * profile's session (one Chrome per profile, in `<runner home>/browser-profiles/<id>`, always headless) instead of
+ * the agent's; `agent` still says who acts. `browser.profile.delete` stops its Chrome and removes its folder. Frames
+ * of a profile's stream carry `agentId: "profile:<id>"`. A system-mode runner refuses profiles (phase 2).
+ */
+export const BROWSER_PROFILE_PROTOCOL = 34;
 
 /**
  * From this protocol on: `brain.turn` carries `contextTokens`, the most context the agent's model reads
@@ -1451,6 +1459,8 @@ export type MachineRequest = (
   | { op: "browser.capture"; allowedDomains?: string[] }
   /** Protocol 27: start the agent's Chrome before its first command (`desktop`: as on `browser.act`). */
   | { op: "browser.warm"; desktop?: boolean }
+  /** Protocol 34: stops a browser profile's Chrome and removes its folder (the profile was deleted). */
+  | { op: "browser.profile.delete" }
   /** Protocol 18: starts the agent's desktop; when it runs already, only marks it used (idempotent). */
   | { op: "desktop.session.start" }
   /** Protocol 18: ends the agent's desktop, and its browser on it. */
@@ -1468,7 +1478,11 @@ export type MachineRequest = (
   | { op: "desktop.apps" }
   /** Protocol 25: the text on the agent's screen, read on the computer. */
   | { op: "desktop.text" }
-) & { agent?: AgentScope };
+) & {
+  agent?: AgentScope;
+  /** Protocol 34: a `browser.*` op in this browser profile's session instead of the agent's (ADR 0110). */
+  profile?: { id: string };
+};
 
 /** One command of a `browser.batch` (protocol 17). */
 export interface BrowserBatchCommand {
@@ -1508,6 +1522,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "browser.batch",
   "browser.capture",
   "browser.warm",
+  "browser.profile.delete",
   "desktop.session.start",
   "desktop.session.stop",
   "desktop.session.status",
@@ -1585,6 +1600,7 @@ export interface MachineReplies {
   "browser.batch": { answers: { success: boolean; data: unknown; error?: string }[]; setup?: BrowserSetup };
   /** `false`: nothing was started (it runs or starts already, a person has the browser, or no room). */
   "browser.warm": { started: boolean; setup?: BrowserSetup };
+  "browser.profile.delete": { deleted: boolean };
   /**
    * The page as a JPEG (base64), its size in pixels, the page's size in CSS
    * pixels, and its numbered elements with their boxes (CSS pixels).

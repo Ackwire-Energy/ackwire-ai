@@ -279,8 +279,8 @@ describe("Rotinas: a routine's details", () => {
     expect(text).not.toContain("Claude Code no");
     // Hourly on someone's computer: how often it wakes it, with when it runs.
     expect(region("Quando").textContent).toContain("Roda 24 vezes por dia no MacBook do Walter");
-    expect(text).toContain("Pode agir");
-    expect(text).toContain("Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.");
+    // Every routine does what its agent can (ADR 0109): no access section.
+    expect(text).not.toContain("Pode agir");
     // When it posts: the answer, and what the choice means behind its ⓘ.
     const posts = region("Quando posta");
     expect(posts.textContent).toContain("Toda vez");
@@ -288,14 +288,11 @@ describe("Rotinas: a routine's details", () => {
     expect(document.getElementById(about.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
       "Posta depois de toda execução, mesmo quando nada mudou, ou só quando encontra algo novo.",
     );
-    // Short sections two to a row when there's room: the week with where it delivers, then the two rules.
+    // Short sections two to a row when there's room: the week with where it delivers.
     const pairs = [...panel.querySelectorAll(".routine-details__pair")].map((p) =>
       [...p.querySelectorAll("section")].map((x) => x.getAttribute("aria-label")),
     );
-    expect(pairs).toEqual([
-      ["Esta semana", "Onde entrega"],
-      ["O que pode fazer sozinha", "Quando posta"],
-    ]);
+    expect(pairs).toEqual([["Esta semana", "Onde entrega"]]);
     expect(text).toContain("Trabalhando agora");
     expect(text).toContain("Contou o que achou");
     expect(text).toContain("3 erros novos no checkout");
@@ -354,13 +351,12 @@ describe("Rotinas: a routine's details", () => {
     expect(panel.textContent).toContain("Só quem criou, o dono do agente, admins e quem está na conversa veem isto.");
     expect(panel.textContent).toContain("Contou o que achou");
     expect(within(panel).queryByRole("button", { name: "Editar" })).toBeNull();
-    // What it may do on its own and when it posts: each answer, and its meaning behind the section's ⓘ.
-    for (const name of ["O que pode fazer sozinha", "Quando posta"]) {
-      const section = within(panel).getByRole("region", { name });
-      expect(within(section).getByRole("button", { name: `Sobre ${name}` })).toBeTruthy();
-      expect(section.querySelector(".small.muted")).toBeNull();
-      expect(section.querySelectorAll("p")).toHaveLength(1);
-    }
+    // Every routine does what its agent can (ADR 0109): no access section; when it posts: the answer, its meaning behind the ⓘ.
+    expect(within(panel).queryByRole("region", { name: "O que pode fazer sozinha" })).toBeNull();
+    const section = within(panel).getByRole("region", { name: "Quando posta" });
+    expect(within(section).getByRole("button", { name: "Sobre Quando posta" })).toBeTruthy();
+    expect(section.querySelector(".small.muted")).toBeNull();
+    expect(section.querySelectorAll("p")).toHaveLength(1);
   });
 });
 
@@ -434,30 +430,25 @@ describe("Rotinas: the form's two plain questions", () => {
     expect(document.querySelector(".routines-head")?.querySelectorAll("p")).toHaveLength(1);
   });
 
-  test("Quando posta and O que pode fazer sozinha, sent with the routine", async () => {
+  test("Quando posta, sent with the routine; no access choice", async () => {
     const api = createFakeApi(seedState());
     await renderApp(`/org/${ORG_ID}/routines`, { api });
     await settle(8);
     await click(screen().getByRole("button", { name: "Nova rotina" }));
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Nova rotina" });
-    // The defaults: only when there's news, only look and tell.
+    // The default: only when there's news. Every routine does what its agent can: nothing to choose there.
     expect(within(dialog).getByRole("radio", { name: "Só quando tiver novidade" }).getAttribute("aria-checked")).toBe(
       "true",
     );
-    expect(within(dialog).getByRole("radio", { name: "Só olhar e contar" }).getAttribute("aria-checked")).toBe("true");
-    // What each answer means is one ⓘ beside each question; no line under either.
+    expect(within(dialog).queryByRole("radio", { name: "Só olhar e contar" })).toBeNull();
+    expect(within(dialog).queryByRole("radio", { name: "Pode agir" })).toBeNull();
+    // What each answer means is one ⓘ beside the question; no line under it.
     const posts = within(dialog).getByRole("button", { name: "Sobre Quando posta" });
     expect(document.getElementById(posts.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
       "Posta depois de toda execução, mesmo quando nada mudou, ou só quando encontra algo novo.",
     );
-    const about = within(dialog).getByRole("button", { name: "Sobre O que pode fazer sozinha" });
-    const hint = document.getElementById(about.getAttribute("aria-describedby") ?? "");
-    expect(hint?.textContent).toBe(
-      "Só olhar e contar: ela lê e conta o que achou. Para mudar alguma coisa, pede a alguém. Pode agir: também pode criar e mudar tarefas, a memória, a wiki e arquivos do Drive, trabalhar no próprio código, falar com outros agentes e postar onde quem a criou posta. Mudanças em apps conectados, merge e deploy sempre pedem aprovação antes.",
-    );
     await click(within(dialog).getByRole("radio", { name: "Toda vez" }));
-    await click(within(dialog).getByRole("radio", { name: "Pode agir" }));
     expect(dialog.querySelectorAll(".routine-kind p")).toHaveLength(0);
     await act(async () =>
       fireEvent.change(within(dialog).getByLabelText("O que fazer"), { target: { value: "Revise os PRs abertos." } }),
@@ -468,7 +459,8 @@ describe("Rotinas: the form's two plain questions", () => {
     await click(within(dialog).getByRole("button", { name: "Criar rotina" }));
     await settle(6);
     const made = (await api.routines.list(ORG_ID)).find((r) => r.name === "PRs abertos");
-    expect(made).toMatchObject({ access: "act", report: "always" });
+    expect(made).toMatchObject({ report: "always" });
+    expect(made?.access).toBe("act");
   });
 });
 

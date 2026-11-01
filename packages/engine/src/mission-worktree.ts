@@ -2,7 +2,6 @@ import { MISSION_WORKTREE_PROTOCOL, parseMissionWorktreeEnsured } from "@agentes
 import { and, desc, type Executor, eq, inArray, schema, sql } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
-import { runAuthorityById } from "./authority";
 import { ConflictError } from "./errors";
 import { publishUserEvent } from "./events";
 import { cutTextEnd } from "./format";
@@ -882,33 +881,19 @@ const readsOnly = async (db: Executor, mission: MissionRow) =>
   mission.status === "proposed" || (await writeItemLive(db, mission.id));
 
 /**
- * A routine's run set to only look and tell (ADR 0053 §3): it reads in the mission's thread as anywhere else.
- * Any other run there works with the mission's profile, whoever woke it (the addendum of 2026-10-31).
- */
-async function onlyLooks(db: Executor, turn: Turn) {
-  if (!turn.runId) return false;
-  const authority = await runAuthorityById(db, turn.orgId, turn.runId);
-  return authority.kind === "routine" && authority.brief?.access !== "act";
-}
-
-/**
  * A mission run's command policy for a computer brain's turn (`brain.turn`
  * `permissions`): plan before Start, while a write item of the mission is
  * live (ADR 0044: the item's end-of-item commit takes every change there, so
- * the main session only reads until it ends), and for a routine's run that
- * only looks (`onlyLooks`); work otherwise. Its branches and allowed commands.
+ * the main session only reads until it ends); work otherwise, whoever woke
+ * the run (ADR 0109). Its branches and allowed commands.
  * Null: not a mission run.
  */
 export async function missionTurnPermissions(db: Executor, turn: Turn) {
   const mission = await turnMission(db, turn);
   if (!mission) return null;
-  const [plan, allow, looks] = await Promise.all([
-    readsOnly(db, mission),
-    missionAllowRules(db, mission.id),
-    onlyLooks(db, turn),
-  ]);
+  const [plan, allow] = await Promise.all([readsOnly(db, mission), missionAllowRules(db, mission.id)]);
   return {
-    mode: plan || looks ? ("plan" as const) : ("work" as const),
+    mode: plan ? ("plan" as const) : ("work" as const),
     branchPrefix: missionBranchPrefix(mission.id),
     allow,
   };

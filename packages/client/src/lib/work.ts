@@ -4,7 +4,7 @@ import type { LiveCode, LiveOutput, LiveWork } from "../realtime/streams";
 import { type Activity, type ActivityKind, activityVerb, appLabel, PERMISSION_TOOL, toolActivity } from "./activity";
 import { appConnector } from "./connected";
 import { POSTGRES_MARK } from "./databases";
-import { joinNames } from "./format";
+import { joinNames, shortTarget } from "./format";
 import { MAIL_BRANDS } from "./mail";
 
 /** Fallback when a tool has no label: "github_merge_pull_request" → "github merge pull request". */
@@ -58,6 +58,11 @@ export interface WorkCall {
   connector?: string;
   service?: string;
   serviceIcon?: string;
+  /** How many calls it stands for (absent on replies saved before it was written). */
+  n?: number;
+  /** The one call beside the screens' (their cards show those steps): its time and whether it failed. */
+  ms?: number;
+  failed?: true;
 }
 
 /** The compact form the backend puts on the message (`meta.work`), before the steps are loaded. */
@@ -97,8 +102,15 @@ const onlyLookups = (c: WorkCall) => !c.connector && !c.service && UNLISTED.has(
 export const workApps = (calls: WorkCall[]) =>
   uniqueApps(calls.filter((c) => !onlyLookups(c)).map((c) => toolActivity(c.name, c.connector, null, c)));
 
-/** How many calls a saved reply shows (0: no block). A reply saved before lookups were left out counted them. */
-export const workSteps = (w: WorkMeta) => (w.calls.length > 0 && w.calls.every(onlyLookups) ? 0 : w.steps);
+/**
+ * How many calls a saved reply's block shows (0: no block). A reply saved before lookups were left out counted them.
+ * `skip`: calls another card on the message already shows (where it browsed); a reply saved before the calls carried
+ * their count shows its total unless every call is skipped.
+ */
+export function workSteps(w: WorkMeta, skip: (name: string) => boolean = () => false) {
+  if (w.calls.length > 0 && w.calls.every((c) => onlyLookups(c) || skip(c.name))) return 0;
+  return w.calls.reduce((n, c) => (skip(c.name) && typeof c.n === "number" ? n - c.n : n), w.steps);
+}
 
 const DRIVE: ActivityKind[] = ["readingDrive", "writingDrive", "exportingFile", "importingFile"];
 const time = (iso: string) => new Date(iso).getTime();
@@ -602,6 +614,23 @@ export function toolPhrase(t: TFunction, l: Pick<ToolLine, "kind" | "app" | "too
 
 const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
 
+/**
+ * The waiting row's step line: what the agent does right now, verb first ("Usando o navegador · console.example.com…",
+ * "Mexendo nos arquivos do PC · refresh.ts…"), from the same live work as its tool block; "Pensando…" while no step
+ * runs; "Esperando aprovação…" while its last call waits on a person.
+ */
+export function waitStep(t: TFunction, work: LiveWork[] | undefined): string {
+  const last = (work ?? []).findLast((w) => w.kind === "call");
+  if (last?.kind === "call" && last.held) return t("chat.wait.held");
+  const now = toolNow(toolItemsLive(work ?? []));
+  if (now?.state !== "run") return t("chat.wait.thinking");
+  const verb = capitalize(activityVerb(t, now));
+  // The folded line keeps its first call's hint; the step line names the call running now.
+  const hint = last?.kind === "call" && last.running ? toolHint(last.tool, now, last.detail) : now.hint;
+  const target = hint ? shortTarget(hint) : "";
+  return target ? `${verb} · ${target}…` : `${verb}…`;
+}
+
 /** "1,2 s", "760 ms": a line's time, finer than the block's. */
 export function formatLineTime(locale: string, ms: number) {
   if (ms < 1000) return `${Math.max(1, Math.round(ms))} ms`;
@@ -615,15 +644,69 @@ export function formatLineTime(locale: string, ms: number) {
 export const oneCall = (items: ToolItem[]) => toolCalls(items) === 1;
 
 /**
- * A saved reply's lone call (`meta.work` of one step) as its line, before the run's steps load: what it did, from
- * `meta.work.calls`; how long it took and whether it failed, from `meta.work.ms` and `failed`. A reply saved before
- * the server wrote those reads as done, in the reply's own time. Null when the reply made no call, or several.
+ * Our own reads that only feed the answer: the reply states what they found, so a card saying "Conferiu o próprio
+ * uso" adds nothing. Anything that changes something, reaches an app, a file, the PC or a screen is not here.
  */
-export function savedOneLine(meta: Record<string, unknown> | undefined): ToolLine | null {
+const QUIET_READS: ReadonlySet<ActivityKind> = new Set([
+  "checkingUsage",
+  "gettingContext",
+  "searchingMemory",
+  "findingAgent",
+  "checkingComputer",
+  "checkingCalendar",
+  "readingIssues",
+  "listingTasks",
+  "checkingTask",
+  "listingReminders",
+  "listingRoutines",
+  "readingWiki",
+  "readingForum",
+  "consultingSkill",
+  "openingSkill",
+]);
+
+/** A step running this long is no quick read: its card stays. */
+const LONG_STEP_MS = 4000;
+
+/**
+ * One quick internal read that ended well, with nothing of its own to show (no code, no output). Ours only: another
+ * MCP server's `list_issues` takes our kind's name (`toolActivity`) but reached an outside app.
+ */
+export const quietLine = (
+  l: Pick<ToolLine, "tool" | "service" | "kind" | "state" | "count" | "ms" | "code" | "output">,
+) =>
+  l.count === 1 &&
+  !l.service &&
+  (!/^mcp__/i.test(l.tool) || /^mcp__agentes__/i.test(l.tool)) &&
+  l.state === "done" &&
+  QUIET_READS.has(l.kind) &&
+  !l.code &&
+  !l.output?.length &&
+  (l.ms === null || l.ms < LONG_STEP_MS);
+
+/** The turn's only tool work is a quiet read (`quietLine`): no card, live, kept or saved. */
+export const quietWork = (items: ToolItem[]) => {
+  const lines = linesOf(items);
+  return lines.length === 1 && lines[0] !== undefined && quietLine(lines[0]);
+};
+
+/**
+ * A saved reply's lone call (`meta.work` of one step) as its line, before the run's steps load: what it did, from
+ * `meta.work.calls`; how long it took and whether it failed, from `meta.work.ms` and `failed` (the call's own, when
+ * the screens' steps sit beside it). A reply saved before the server wrote those reads as done, in the reply's own
+ * time (unknown, `ms: null`, beside other calls). Null when the reply made no call, or several.
+ */
+export function savedOneLine(
+  meta: Record<string, unknown> | undefined,
+  skip: (name: string) => boolean = () => false,
+): ToolLine | null {
   const w = workMeta(meta);
-  const call = w?.steps === 1 ? w.calls[0] : undefined;
-  if (!w || !call) return null;
-  const { ms, failed } = (meta?.work ?? {}) as { ms?: unknown; failed?: unknown };
+  if (!w) return null;
+  // Besides the calls another card shows, one call left: its line.
+  const rest = w.calls.filter((c) => !skip(c.name));
+  const call = workSteps(w, skip) === 1 && rest.length === 1 ? rest[0] : undefined;
+  if (!call) return null;
+  const { ms, failed } = (w.steps === 1 ? (meta?.work ?? {}) : call) as { ms?: unknown; failed?: unknown };
   const a = toolActivity(call.name, call.connector, null, call);
   return {
     key: `one-${call.name}`,
@@ -631,7 +714,7 @@ export function savedOneLine(meta: Record<string, unknown> | undefined): ToolLin
     tool: call.name,
     state: failed === true ? "fail" : "done",
     hint: toolHint(call.name, a),
-    ms: typeof ms === "number" ? ms : w.durationMs,
+    ms: typeof ms === "number" ? ms : w.steps === 1 ? w.durationMs : null,
     count: 1,
     why: null,
     input: null,

@@ -342,6 +342,15 @@ html:not([data-pointer]) .drive-row:has(.drive-hit:focus-visible) {
 .drive-details__actions > .ac-btn--primary {
   flex: 1 1 auto;
 }
+.drive-audience {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.drive-group__hint {
+  font-size: 12px;
+  color: var(--muted);
+}
 .drive-author {
   display: flex;
   align-items: center;
@@ -629,7 +638,7 @@ html:not([data-pointer]) button.drive-where:focus-visible {
 }
 .drive-trash__row {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) auto auto;
+  grid-template-columns: 40px minmax(0, 1fr) auto auto auto;
   gap: 14px;
   align-items: center;
   padding: 10px 12px;
@@ -763,7 +772,7 @@ html:not([data-pointer]) button.drive-where:focus-visible {
     max-width: none;
   }
   .drive-trash__row {
-    grid-template-columns: 40px minmax(0, 1fr) auto;
+    grid-template-columns: 40px minmax(0, 1fr) auto auto;
   }
   .drive-trash__row .ac-chip {
     display: none;
