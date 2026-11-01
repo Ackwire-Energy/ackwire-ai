@@ -133,3 +133,22 @@ describe("bringing agents from another app, where agents are made", () => {
     expect(toImport()).toBeNull();
   });
 });
+
+describe("an agent's row", () => {
+  test("the role on its own line under the name, and the lock alone at the row's end", async () => {
+    const state = acme("owner");
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.role = "Assistente de e-mails e agenda da diretoria";
+    await go(state);
+    const row = nav().querySelector(`[data-agent-row="${ADA_ID}"] .sidebar__item`);
+    const text = row?.querySelector(":scope > .sidebar__item-text");
+    expect([...(text?.children ?? [])].map((el) => [el.className, el.textContent])).toEqual([
+      ["sidebar__item-label", "Ada"],
+      ["sidebar__item-role", "Assistente de e-mails e agenda da diretoria"],
+    ]);
+    // Nothing at the row's end shares the name's line with the role: only the lock.
+    const end = row?.querySelector(":scope > .sidebar__item-meta");
+    expect(end?.textContent).toBe("");
+    expect(end?.querySelector(".sidebar__lock")).not.toBeNull();
+  });
+});

@@ -1264,7 +1264,10 @@ function AgentRow({
           presenceLabel={word ?? undefined}
           {...(waitingFor ? { state: "idle" as const, expression: "closed" as const } : {})}
         />
-        <span className="sidebar__item-label">{a.name}</span>
+        <span className="sidebar__item-text">
+          <span className="sidebar__item-label">{a.name}</span>
+          {a.role && <span className="sidebar__item-role">{a.role}</span>}
+        </span>
         {unread > 0 ? (
           <UnreadCount count={unread} />
         ) : waitingFor ? (
@@ -1275,10 +1278,8 @@ function AgentRow({
         ) : busy ? (
           <span className="sidebar__item-meta sidebar__busy">{t(`sky.busy.${state}`)}</span>
         ) : (
-          (chip ?? a.role) &&
-          (chip ? (
+          chip && (
             <span className="sidebar__item-meta sidebar__item-meta--audience">
-              {a.role && <span>{a.role}</span>}
               <span
                 className="sidebar__lock"
                 role="img"
@@ -1288,9 +1289,7 @@ function AgentRow({
                 <Icon name="lock" size={14} />
               </span>
             </span>
-          ) : (
-            <span className="sidebar__item-meta">{a.role}</span>
-          ))
+          )
         )}
       </Link>
       {menu}

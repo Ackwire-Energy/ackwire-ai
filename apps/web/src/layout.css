@@ -581,8 +581,8 @@ p {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* The label grows from nothing (`flex: 1`), so a long agent role would take the whole row and hide the name: it gets
-   at most half, on one line (the row's title has it whole). */
+/* The label grows from nothing (`flex: 1`), so a long state at the row's end would hide the name: it gets at most
+   half, on one line (the row's title has it whole). */
 .sidebar__item-meta {
   font-size: 12px;
   color: var(--ink-muted);
@@ -894,16 +894,33 @@ p {
   font-size: 13px;
   color: var(--ink-muted);
 }
-/* The role, then a lock when not everyone can talk to the agent (the tooltip says who). */
+/* A lock when not everyone can talk to the agent (the tooltip says who). */
 .sidebar__item-meta--audience {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
 }
-.sidebar__item-meta--audience > span:first-child {
+/* An agent's name over its role, like a two-line list item: the name has the row less the lock or count, the role
+   the line under it, up to two lines (the row's title has it whole). */
+.sidebar__item-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   min-width: 0;
+}
+.sidebar__item-role {
+  display: -webkit-box;
   overflow: hidden;
-  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+  color: var(--ink-muted);
+}
+.sidebar__item[data-status="active"] .sidebar__item-role {
+  color: var(--ink2);
 }
 .sidebar__lock {
   display: inline-flex;
@@ -5668,9 +5685,14 @@ p {
 .sidebar[data-rail="true"] .sidebar__org-button > .ac-icon,
 .sidebar[data-rail="true"] .sidebar__jump .ac-kbd,
 .sidebar[data-rail="true"] .sidebar__item-meta,
+.sidebar[data-rail="true"] .sidebar__item-role,
 .sidebar[data-rail="true"] .sidebar__user-text,
 .sidebar[data-rail="true"] .sidebar__label-row .ac-btn {
   display: none;
+}
+/* The name out of its column, so the face stays centred in the rail. */
+.sidebar[data-rail="true"] .sidebar__item-text {
+  display: contents;
 }
 /* Names stay for screen readers; the title shows them on hover. */
 .sidebar[data-rail="true"] .sidebar__item-label,
@@ -10070,6 +10092,23 @@ html[data-menu-overlay] .shell {
 .sidebar:not([data-rail="true"]) .sidebar__item:has(> .ac-avatar) {
   padding-left: 6px;
   gap: 6px;
+}
+/* An agent with a role: the face at the top beside the name (20px line, 2px down, centred on the 24px face), the role
+   under the name, 4px above and below like a 30px row's face; the count, lock or state stays centred at the end. */
+.sidebar:not([data-rail="true"]) .sidebar__item:has(> .sidebar__item-text > .sidebar__item-role) {
+  align-items: flex-start;
+  padding-block: 4px;
+}
+.sidebar:not([data-rail="true"]) .sidebar__item:has(> .sidebar__item-text > .sidebar__item-role) > .sidebar__item-text {
+  padding-top: 2px;
+}
+.sidebar:not([data-rail="true"]) .sidebar__item-text > .sidebar__item-label {
+  line-height: 20px;
+}
+.sidebar:not([data-rail="true"])
+  .sidebar__item:has(> .sidebar__item-text > .sidebar__item-role)
+  > :not(.ac-avatar, .sidebar__item-text, .sidebar__trail, .sidebar__glow) {
+  align-self: center;
 }
 .sidebar:not([data-rail="true"]) .sidebar__item > .sidebar__more-chevron {
   width: 16px;
