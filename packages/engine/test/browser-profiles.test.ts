@@ -298,6 +298,33 @@ test("a revoke stops the holder's very next command and sends its run back to it
   expect(row?.heldByRunId).toBeNull();
 });
 
+test("revoking or deleting an agent's default profile tells its next command, not its own browser", async () => {
+  for (const how of ["revoke", "delete"] as const) {
+    const b = await profilesSetup();
+    const p = await b.profile([f.agent.id]);
+    await setAgentBrowserProfile(f.db, f.owner.id, f.org.id, f.agent.id, p.id);
+    const ada = await runOf(f.agent.id);
+    expect((await b.call(ada, "browser_open", { url: "https://chat.example/" })).isError).toBeFalsy();
+    if (how === "revoke") await setBrowserProfileAgents(f.db, f.owner.id, f.org.id, p.id, []);
+    else await deleteBrowserProfile({ db: f.db, hub: b.hub }, f.owner.id, f.org.id, p.id);
+    const n = b.ops().length;
+    const out = await b.call(ada, "browser_click", { target: "e1" });
+    expect(out.isError).toBe(true);
+    expect(out.content).toContain(how === "revoke" ? "was removed" : "was deleted");
+    expect(b.ops().length).toBe(n);
+    // Told once: from now on its commands go to its own browser.
+    await b.call(ada, "browser_open", { url: "https://chat.example/" });
+    expect(
+      b
+        .ops()
+        .slice(n)
+        .every((c) => c.profile === undefined),
+    ).toBe(true);
+    await f.close();
+  }
+  f = undefined as never;
+});
+
 test("a run that lost its turn to another doesn't run its command: it looks at the page and decides again", async () => {
   const b = await profilesSetup();
   const p = await b.profile([f.agent.id, b.bia.id]);

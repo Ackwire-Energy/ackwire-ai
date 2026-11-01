@@ -1,5 +1,5 @@
 import { type AgentScope, BROWSER_PROFILE_PROTOCOL, type PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, inArray, isNull, notInArray, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "../audit";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import type { MachineCaller } from "../machine-hub";
@@ -255,8 +255,9 @@ export async function renameBrowserProfile(
 }
 
 /**
- * Agents taken off a profile: their turn ends at once, and a default on it goes back to their own browser, so
- * the holder's next command is told its access was removed.
+ * Agents taken off a profile: their turn ends at once, and a default on it goes back to their own browser. Their
+ * unfinished runs that followed that default are pinned to the profile first, so the next command reaches the turn
+ * check and is told the access was removed, instead of landing silently in the agent's own browser.
  */
 async function dropAgents(tx: Executor, orgId: string, profileId: string, agentIds: string[]) {
   if (agentIds.length === 0) return;
@@ -267,6 +268,19 @@ async function dropAgents(tx: Executor, orgId: string, profileId: string, agentI
     .update(browserProfiles)
     .set({ heldByRunId: null, heldByAgentId: null, heldUntil: null, heldSince: null })
     .where(and(eq(browserProfiles.id, profileId), inArray(browserProfiles.heldByAgentId, agentIds)));
+  await tx
+    .update(agentRuns)
+    .set({ browserProfileId: profileId })
+    .where(
+      and(
+        eq(agentRuns.orgId, orgId),
+        notInArray(agentRuns.status, ["done", "failed", "canceled"]),
+        isNull(agentRuns.browserProfileId),
+        sql`${agentRuns.browserProfileOwn} is not true`,
+        inArray(agentRuns.agentId, agentIds),
+        sql`exists (select 1 from ${agents} a where a.id = ${agentRuns.agentId} and a.browser_profile_id = ${profileId})`,
+      ),
+    );
   await tx
     .update(agents)
     .set({ browserProfileId: null })
