@@ -273,6 +273,19 @@ describe("a mention of an agent that isn't in the conversation is told to its au
     );
   });
 
+  test("only while it is the agent's latest message: a later reply settles it", async () => {
+    f = await setup({ reply: asksVera });
+    await agent("Vera", "vera", { inGeneral: false });
+    await ask("@dev pede a revisão do PR #12");
+    await drainOutbox(f.db, f.handlers);
+    await ask("@dev e aí, ela revisou?");
+    await drainOutbox(f.db, f.handlers);
+    await ask("@dev outra coisa: o deploy saiu?");
+    await drainOutbox(f.db, f.handlers);
+    expect(lastContext()).toContain("@vera pode revisar o PR #12?");
+    expect(lastContext()).not.toContain("[Not delivered]");
+  });
+
   test("in a DM, which keeps its participants, only tell_agent and ask_agent", async () => {
     f = await setup({ reply: asksVera });
     await agent("Vera", "vera", { inGeneral: false });

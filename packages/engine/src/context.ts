@@ -1329,8 +1329,8 @@ function unreachedLine(meta: Record<string, unknown> | undefined, canAdd: boolea
  * with `user` (current models reject assistant prefill). When the last turn
  * holds more than the message being answered (`currentId`), that one is
  * marked `(current message)`: the others are context only. `canAddAgents`:
- * a channel, where the line about an agent its mention didn't reach says it
- * can be added.
+ * a channel, where the line about an agent its latest mention didn't reach
+ * says it can be added.
  */
 export function toTurns(
   history: Message[],
@@ -1340,6 +1340,10 @@ export function toTurns(
   options: { canAddAgents?: boolean } = {},
 ): ModelMessage[] {
   const turns: { role: "user" | "assistant"; parts: { id: string; text: string }[] }[] = [];
+  // Only the agent's latest message with text carries the line about a mention that missed: older ones are settled.
+  const latestOwn = [...history]
+    .reverse()
+    .find((m) => m.authorAgentId === agentId && !m.meta?.notice && !taskNotice(m) && m.body.trim())?.id;
   for (const m of history) {
     // A notice is its agent's own (its author): another agent reads a neutral line or nothing (ADR 0053 §9).
     if (m.meta?.notice && m.authorAgentId !== agentId) {
@@ -1390,7 +1394,11 @@ export function toTurns(
     // Its own sticker or GIF, someone undoing (or redoing) what this reply did, or its mention missing an agent
     // that wasn't here: news for the agent, on the people's side.
     const news = own
-      ? [media ? ownMediaNote(media, names) : "", notes, unreachedLine(m.meta, options.canAddAgents === true)]
+      ? [
+          media ? ownMediaNote(media, names) : "",
+          notes,
+          m.id === latestOwn ? unreachedLine(m.meta, options.canAddAgents === true) : "",
+        ]
           .filter(Boolean)
           .join("\n")
       : "";
