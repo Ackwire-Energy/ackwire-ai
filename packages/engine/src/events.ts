@@ -41,15 +41,18 @@ export type DecidedBy =
   | { step: "model"; model: string; provider: string }
   /** The author's own plan: `ownerId` is the author. */
   | { step: "plan"; brand: "claude" | "chatgpt"; ownerId: string }
-  /** `coordinator`: nobody else took it, so the team's coordinator did (ADR 0093). */
+  /**
+   * `coordinator`: nobody else took it, so the team's coordinator did (ADR 0093). `default`: nobody was picked, so
+   * the agent the person talks with, or the best placed one, answered (ADR 0074, R5).
+   */
   | { step: "rule"; rule: RouterRule };
 
-type RouterRule = "reply" | "only_agent" | "follow_up" | "coordinator";
+type RouterRule = "reply" | "only_agent" | "follow_up" | "coordinator" | "default";
 
 /** Why a routed message reached no agent: no step could read it, and no rule fit (`strategy` `none`). */
 export const MENTION_NEEDED = "mention_needed";
 
-const RULES = new Set(["reply", "only_agent", "follow_up", "coordinator"]);
+const RULES = new Set(["reply", "only_agent", "follow_up", "coordinator", "default"]);
 
 /**
  * `DecidedBy` from a stored decision's `strategy` (`jev`, `llm:<model>`, `plan:<kind>`, `rule:<name>`). Undefined

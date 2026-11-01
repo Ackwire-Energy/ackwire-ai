@@ -1431,6 +1431,7 @@ export const en: Translations = {
       only_agent: "Only {{name}} answers here without a mention",
       follow_up: "Follows the talk with {{name}}",
       coordinator: "{{name}} coordinates the team",
+      default: "Nobody was called, so {{name}} answered",
     },
   },
   coordinator: {

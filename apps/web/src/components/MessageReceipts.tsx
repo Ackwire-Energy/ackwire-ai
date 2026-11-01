@@ -32,6 +32,7 @@ const RULE_ICON: Record<Extract<DecidedBy, { step: "rule" }>["rule"], IconName> 
   only_agent: "person",
   follow_up: "thread",
   coordinator: "flag",
+  default: "check",
 };
 
 /** A dot and the action after it: one piece, which wraps whole. */

@@ -1435,6 +1435,7 @@ export const ptBR = {
       only_agent: "Só {{article}} {{name}} responde aqui sem menção",
       follow_up: "Segue a conversa com {{article}} {{name}}",
       coordinator: "{{The}} {{name}} coordena o time",
+      default: "Ninguém foi chamado, então {{article}} {{name}} respondeu",
     },
   },
   /** The agent that coordinates the team (ADR 0093): its switch, its chip and the lines about it. */

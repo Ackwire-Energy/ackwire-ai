@@ -111,3 +111,30 @@ test("the harness: a reply case quotes the agent's message or answers in its thr
     await evaluation.close();
   }
 });
+
+test("the harness: the default cases pass on a Jev that gives every agent too little (R5)", async () => {
+  // Every agent under the bar and a low need, as Jev answered "vocês se enrolaram muito" (2026-11-01).
+  const low = (needs: number) =>
+    createJevRouterStrategy({
+      key: "k",
+      recordUsage: async () => {},
+      fetch: (async (_url: string, init: RequestInit) => {
+        const { questions } = JSON.parse(String(init.body)) as {
+          questions: Record<string, { instructions: { agent?: { handle: string } } }>;
+        };
+        const answers: Record<string, unknown> = { needs_agent: { noul: needs }, for_everyone: { noul: 0.1 } };
+        for (const [id, q] of Object.entries(questions))
+          if (id.startsWith("agent_")) answers[id] = { noul: q.instructions.agent?.handle === "@atlas" ? 0.3 : 0.2 };
+        return Response.json({ answers });
+      }) as unknown as typeof fetch,
+    });
+  const evaluation = await routerEval();
+  try {
+    for (const c of ROUTER_CASES.filter((r) => r.kind === "default")) {
+      const r = await evaluation.run(c, low(c.id === "pt-default-ack" ? 0.1 : 0.3));
+      expect(r.picked, c.id).toEqual(c.answers);
+    }
+  } finally {
+    await evaluation.close();
+  }
+});

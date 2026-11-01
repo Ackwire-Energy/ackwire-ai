@@ -384,7 +384,10 @@ const MessageBase = z.object({
           z.object({ step: z.literal("jev") }),
           z.object({ step: z.literal("model"), model: z.string(), provider: z.string() }),
           z.object({ step: z.literal("plan"), brand: z.enum(["claude", "chatgpt"]), ownerId: z.string() }),
-          z.object({ step: z.literal("rule"), rule: z.enum(["reply", "only_agent", "follow_up", "coordinator"]) }),
+          z.object({
+            step: z.literal("rule"),
+            rule: z.enum(["reply", "only_agent", "follow_up", "coordinator", "default"]),
+          }),
         ])
         .optional()
         .openapi({
