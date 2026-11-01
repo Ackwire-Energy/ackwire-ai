@@ -1825,6 +1825,8 @@ export async function createReminder(
       prompt: message,
       target: target as unknown as Record<string, unknown>,
       triggerType: "once",
+      // Asked to do something at that time, not only to look and tell (ADR 0053, addendum of 2026-10-31).
+      ...(input.askAgent ? { access: "act" } : {}),
       timezone: input.timezone,
       description: input.description,
       nextRunAt: input.at,

@@ -2,7 +2,7 @@ import { PERMISSION_TOOL } from "@agenteschat/adapters";
 import { and, eq, schema, sql } from "@agenteschat/db";
 import { auditsCall, callTitle, recordToolCall } from "../agent-audit";
 import { coveringRules, type RememberedKind } from "../approval-rules";
-import { type RunAuthority, runAuthorityById } from "../authority";
+import { fedByRoutine, type RunAuthority, runAuthorityById } from "../authority";
 import { actionLevel, nameWords, openEnded } from "../connectors/classify";
 import { missingConnectors, type ServerCatalog } from "../connectors/listing";
 import { consultationOrigin } from "../consultations";
@@ -77,11 +77,11 @@ const alwaysAsks = (name: string) => {
 
 /**
  * The kind "Aprovar sempre" would cover for this call (`approval_rules`), or null when it is never offered: only
- * on a person's run whose policy didn't make the call ask, for a tool its source lets be remembered (`rememberAs`),
- * whose wrapped actions, when it runs others, are a shape we know with none sensitive, and with nothing in its
- * names that always asks (merge, deploy, rollback and the rest above, GraphQL, SQL, a raw request). A tool that
- * names one exact target per call (`rememberTarget`) is remembered by that target, without the name checks: they
- * read connector actions, and a branch named release-x is still only that branch.
+ * on a run that isn't a routine's, whose policy didn't make the call ask, for a tool its source lets be
+ * remembered (`rememberAs`), whose wrapped actions, when it runs others, are a shape we know with none sensitive,
+ * and with nothing in its names that always asks (merge, deploy, rollback and the rest above, GraphQL, SQL, a raw
+ * request). A tool that names one exact target per call (`rememberTarget`) is remembered by that target, without
+ * the name checks: they read connector actions, and a branch named release-x is still only that branch.
  */
 export function rememberable(
   tool: ToolDefinition,
@@ -89,7 +89,7 @@ export function rememberable(
   authority: RunAuthority | null,
   decision: PolicyDecision,
 ): RememberedKind | null {
-  if (authority?.kind !== "person" || decision.action === "approve") return null;
+  if (!authority || authority.kind === "routine" || decision.action === "approve") return null;
   if (tool.rememberTarget && tool.connectionId) {
     const target = tool.rememberTarget(input);
     return target ? { tool: tool.name, actions: [target] } : null;
@@ -141,9 +141,9 @@ const ranBefore = (approval: { result: unknown }): ToolOutput =>
     isError: true,
   };
 
-/** The answer to a call of a run nobody is behind that carries a credential (`carriesCredential`). */
+/** The answer to a call that carries a credential (`carriesCredential`) on a run a routine's reading feeds (`fedByRoutine`). */
 export const CREDENTIAL_REFUSAL =
-  "Refused: this call carries what looks like a key, token or private key. Work no person asked for never sends credentials anywhere: leave the value out (you may say one was found, and where).";
+  "Refused: this call carries what looks like a key, token or private key. Work that comes from a routine's background work never sends credentials anywhere: leave the value out (you may say one was found, and where).";
 
 /** `ask_user` (questions.ts): it waits for a person, so it carries a `why` like an approval. */
 const ASK_USER = "ask_user";
@@ -526,9 +526,10 @@ export function createToolGateway(deps: {
         const schemaHint = viaDirectory ? `\nInput schema of ${tool.name}: ${compactSchema(tool.inputSchema)}` : "";
         return finish({ content: `Invalid input: ${problems.join("; ")}${schemaHint}`, isError: true });
       }
-      // A run nobody is behind never sends a credential anywhere (ADR 0053 §3): a key it read on its computer
-      // (a sandbox that can't keep it from being read) can't leave through any tool, on any brain.
-      if (authority && authority.kind !== "person" && carriesCredential(call.input)) {
+      // A run a routine's reading feeds never sends a credential anywhere (ADR 0053 §3): a key it read on its
+      // computer (a sandbox that can't keep it from being read) can't leave through any tool, on any brain. Any
+      // other run uses the agent's own grants, as a person's does.
+      if (fedByRoutine(authority) && carriesCredential(call.input)) {
         return finish({ content: CREDENTIAL_REFUSAL, isError: true, data: { code: "tool.credential" } }, "refused");
       }
       // The call's arguments (GitHub repositories, mail folders and recipients…), before running or asking anyone.

@@ -165,10 +165,10 @@ export async function startOrJoinRun(
 /**
  * Whether a message may join a run active in its conversation (ADR 0053 §4, §9). A person's own words
  * steer the agent's run there (and put them behind an unattended one), except in the agents' DM, where a
- * run works for one person. Another agent's message for a person joins only a run working for that same
- * person. A routine's report or another agent's note joins only a run such news woke: never one working
- * for a person, nor the agent's own work (a mission's); it starts a run of its own. The agent's own
- * events (a task that ended, a folder decision) still go to whatever run is working there.
+ * run works for one person. Another agent's message for a person, and work coming back to a person's run (a
+ * note's reply, a task that ended, a folder decision), joins only a run working for that same person. A
+ * routine's report joins only a run such news woke: never one working for a person, nor the agent's own work
+ * (a mission's); it starts a run of its own. What nobody is behind still goes to whatever run works there.
  */
 export async function mayJoin(
   tx: Executor,

@@ -31,7 +31,7 @@ import { announceAgentStatus, askRunStatus, startRunStatus, statusCandidates } f
 import { type Agent, getAgentCached } from "./agents";
 import { type AgentAi, agentAiState, type NoAiReason, noAiReasonOf, ownNotSignedIn } from "./ai-status";
 import { publishApproval } from "./approvals";
-import { runAuthority } from "./authority";
+import { fedByRoutine, runAuthority } from "./authority";
 import {
   type AutoChoice,
   type AutoModelRecord,
@@ -909,13 +909,12 @@ async function executeRunInner(
     note = false,
   ) => {
     const tagged = report && !note ? { routine: report } : {};
-    // What a run nobody is behind writes holds no credential it may have read (ADR 0053 §3); one a person
-    // wrote into since (`steeredBy`, in the transcript as it is now) answers that person.
+    // What a run a routine's reading feeds writes holds no credential it may have read (ADR 0053 §3); one a person
+    // wrote into since (`steeredBy`, in the transcript as it is now) answers that person. Any other run writes as
+    // the agent, with its own grants, as a person's does.
     const current = { ...run, transcript: transcript as unknown as Record<string, unknown> | null };
     const said =
-      !note && carriesCredential(body) && (await runAuthority(tx, current)).kind !== "person"
-        ? maskCredentials(body)
-        : body;
+      !note && carriesCredential(body) && fedByRoutine(await runAuthority(tx, current)) ? maskCredentials(body) : body;
     // Team actions (ADR 0064): what the run didn't repeat because the team already did it rides on its reply.
     const teamChecks = note ? [] : await runChecksForReply(tx, run.orgId, run.id);
     // "Ver o que ele fez" under the reply: how many tool calls so far, so the apps leave it out at 0, and one call
@@ -3126,6 +3125,8 @@ export function continuedTranscript(stopped: Transcript, line: string): Transcri
     ...(stopped.toolGroups ? { toolGroups: stopped.toolGroups } : {}),
     ...(stopped.passListed ? { passListed: true } : {}),
     ...(stopped.autoModel ? { autoModel: stopped.autoModel } : {}),
+    // The person who wrote into the stopped run is still behind the work it goes on with (`authority.ts`).
+    ...(stopped.steeredBy ? { steeredBy: stopped.steeredBy } : {}),
   };
   const last = t.messages.at(-1);
   const unanswered =

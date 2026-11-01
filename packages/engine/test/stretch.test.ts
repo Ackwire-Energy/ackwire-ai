@@ -23,7 +23,7 @@ import {
   stretchCardOf,
 } from "../src";
 import { deliverNotice } from "../src/delivery";
-import { type Fixture, setup } from "./fixtures";
+import { addMember, type Fixture, setup } from "./fixtures";
 
 /**
  * Agents keep going until the work is done (ADR 0089): no cap on hand-offs between them, a judge that reads intent
@@ -249,6 +249,9 @@ describe("the fuse: 50 runs agents start on their own, then one card with Contin
   test("work nobody asked for (a routine's report) gets 10", async () => {
     f = await setup({ judge: (kind) => (kind === "mention_handoff" ? 0.9 : undefined), reply: pingPong });
     const { theo } = await team(f);
+    // The agents' owner never joined #general.
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await f.db.update(schema.agents).set({ ownerUserId: bia.id }).where(eq(schema.agents.orgId, f.org.id));
     const report = await f.db.transaction((tx) =>
       deliverNotice(tx, {
         orgId: f.org.id,
@@ -271,6 +274,9 @@ describe("the fuse: 50 runs agents start on their own, then one card with Contin
     expect(runs.every((r) => r.stretchId === report.message.id)).toBe(true);
     const [card] = await cardsOf(f);
     expect(card?.meta.actionCard).toMatchObject({ reason: "runs", limit: STRETCH.unattendedRuns, forUserId: null });
+    // Nobody is behind the work: the owner of the agent it stopped at hears of the pause, in a channel they didn't join.
+    const told = await f.db.select().from(schema.notifications);
+    expect(told.some((n) => n.userId === bia.id && n.source.messageId === card?.id)).toBe(true);
     await expectStretched(f);
   });
 });

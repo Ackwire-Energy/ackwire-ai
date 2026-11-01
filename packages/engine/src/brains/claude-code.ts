@@ -52,23 +52,19 @@ import type { Brain, BrainAccount, BrainEvent, BrainIO, BrainTurn, SteerMessage,
  */
 
 /**
- * The permission profile of a computer turn (ADR 0053 §3), from who is behind
- * its run: a person's run works (`work`: edits, commands by the command policy
- * and a person); a routine works only with access `act`; a routine that only
- * reads (`read`, the default, also a legacy brief-less one) and every
- * unattended run read (`plan`: no edits, read-only shell, no web, our tools
- * only). Missions keep their own profile (`missionTurnPermissions`).
+ * The permission profile of a computer turn (ADR 0053 §3 and its addendum of
+ * 2026-10-31), from who is behind its run: every run works (`work`: edits,
+ * commands by the command policy and a person), whoever woke it, except a
+ * routine set to only look and tell (`read`, the default, also a legacy
+ * brief-less one), which reads (`plan`: no edits, read-only shell, no web, our
+ * tools only; its context says why). Missions keep their own profile
+ * (`missionTurnPermissions`).
  */
 export function computerProfile(authority: RunAuthority): "plan" | "work" {
-  if (authority.kind === "person") return "work";
-  if (authority.kind === "routine") return authority.brief?.access === "act" ? "work" : "plan";
-  return "plan";
+  return authority.kind === "routine" && authority.brief?.access !== "act" ? "plan" : "work";
 }
 
-/**
- * A turn's profile, read again for every turn: a person who writes into an
- * unattended run while it works puts them behind it (`steeredBy`) from then on.
- */
+/** A turn's profile (`computerProfile`), from its run. */
 export async function computerTurnProfile(
   db: Executor,
   turn: Pick<BrainTurn, "orgId" | "runId">,

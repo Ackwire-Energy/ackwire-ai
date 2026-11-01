@@ -1,34 +1,40 @@
 import { and, type Executor, eq, schema } from "@agenteschat/db";
 import { caches } from "./cache";
-import { type RoutineAccess, type RoutineBrief, routineBriefOf } from "./routine-brief";
+import { type RoutineBrief, routineBriefOf } from "./routine-brief";
 
 const { agentRuns, messages } = schema;
 
 /**
- * Who is behind a run (ADR 0053): the one gate every "who asked?" check goes through, on every brain.
+ * Who is behind a run (ADR 0053, addendum of 2026-10-31): the one gate every "who asked?" check goes
+ * through, on every brain. Whoever woke it, a run works within the agent's own permissions: this says on
+ * whose behalf, and who hears about its approvals and pauses.
  *
  * - `person`: a person asked, directly or through a chain of agents (an agent's message counts for the
- *   person behind the run that wrote it; an answer to another agent's question, for the person behind
- *   the run that asked). Tools act on their behalf, within their permissions and the agent's scopes.
+ *   person behind the run that wrote it), or work came back to a run of theirs (an answer, a note's
+ *   reply, the end of a wait or of a background task, a decision on a folder or on a proposed agent, a
+ *   follow-up). Tools act on their behalf, within their permissions and the agent's scopes.
  * - `routine`: a routine's background run. Nobody is behind it: its creator set it up and stays
  *   accountable (notifications, approvals), but the run never acts as them. What it may do comes only
- *   from the routine's access level (`brief.access`).
- * - `unattended`: no person at the root: the conversation run a routine's report woke, a note from
- *   another agent, an agent's own message. It may read and talk where it is, never act for anyone.
- *   One a routine's report woke works within that routine's access (`routineAccess`): the report of a
- *   routine that only looks wakes a run that only looks and proposes. A person writing into such a
- *   run (`steeredBy`) puts that person behind it from then on.
+ *   from the routine's access level (`brief.access`): one set to only look and tell reads.
+ * - `unattended`: no person at the root: the conversation run a routine's report woke, an agent's own
+ *   message, work either started. It works as the agent itself, with the tools a person's run has; what
+ *   needs a person's request (their channels, their reminders) is refused, and its approvals and pauses
+ *   go to the agent's owner. A person writing into such a run (`steeredBy`) puts that person behind it
+ *   from then on.
  *
- * Message metadata alone never proves a person: only authorship and server-set links (a message's run,
- * a notice's run) are followed.
+ * Message metadata alone never proves a person: only authorship and server-set links (a message's run, a
+ * notice's run, the run on a task's or a folder request's line) are followed, within the workspace.
  */
 export type RunAuthority =
   | { kind: "person"; personId: string }
   | { kind: "routine"; personId: null; brief: RoutineBrief | null }
-  | { kind: "unattended"; personId: null; reason: UnattendedReason; routineAccess?: RoutineAccess };
+  | { kind: "unattended"; personId: null; reason: UnattendedReason };
 
-/** Why nobody is behind an unattended run (for its refusal reasons and its card's words). */
-export type UnattendedReason = "routine_report" | "agent_note" | "agent";
+/**
+ * Why nobody is behind an unattended run: a routine's report woke it (`routine_report`), its chain roots in a
+ * routine's background run (`routine`: the end of a task one started), or an agent's own work (`agent`).
+ */
+export type UnattendedReason = "routine_report" | "routine" | "agent";
 
 /** What a message's chain roots in. */
 export type MessageRoot =
@@ -36,7 +42,6 @@ export type MessageRoot =
   | { kind: "routine" }
   /** `backgroundRunId`: the routine's run that handed it off (the notice's `refs.runId`). */
   | { kind: "routine_report"; backgroundRunId: string | null }
-  | { kind: "agent_note" }
   | { kind: "agent" };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -58,9 +63,22 @@ const noticeOf = (meta: Record<string, unknown>) =>
   meta.notice as { kind?: unknown; refs?: Record<string, unknown> } | undefined;
 
 /**
- * What a message's chain roots in: a person (its author, or the person behind the run that wrote it),
- * a routine (its brief, or a run that is a routine's background work), a routine's report, a note
- * from another agent, or nothing (an agent's own message with no run, a broken or too long chain).
+ * The run a line brings work back to, as the server wrote it: a notice's `refs.runId` (an answer, a note's
+ * reply, a wait's result, a follow-up, a decision on a proposed agent), or the run that started the task
+ * (`machineTask`) or asked for the folder (`machineAccess`) the line ends. Null when it names none.
+ */
+function returnsTo(meta: Record<string, unknown>): string | null {
+  for (const link of [noticeOf(meta)?.refs, meta.machineTask, meta.machineAccess]) {
+    const runId = (link as { runId?: unknown } | undefined)?.runId;
+    if (typeof runId === "string" && UUID.test(runId)) return runId;
+  }
+  return null;
+}
+
+/**
+ * What a message's chain roots in: a person (its author, or the person behind the run that wrote it or
+ * that the work comes back to), a routine (its brief, or a run that is a routine's background work), a
+ * routine's report, or nothing (an agent's own message with no run, a broken or too long chain).
  *
  * Each message's root is remembered (`caches.messageRoots`): a message's links never change, so the walk
  * stops at the first link it already knows, and a long chain costs what its newest link does.
@@ -100,15 +118,8 @@ async function walkRoot(db: Executor, orgId: string, messageId: string, walked: 
       const runId = notice.refs?.runId;
       return { kind: "routine_report", backgroundRunId: typeof runId === "string" ? runId : null };
     }
-    if (notice?.kind === "agent_note") return { kind: "agent_note" };
-    // The answer to a question this agent asked, the result it waited for, or the follow-up it set: it
-    // continues the work of the run that asked (its `refs.runId`), for whoever is behind that run.
-    const resumes =
-      (notice?.kind === "consult_reply" || notice?.kind === "wait_result" || notice?.kind === "follow_up") &&
-      typeof notice.refs?.runId === "string"
-        ? notice.refs.runId
-        : null;
-    const runId = resumes ?? m.agentRunId;
+    // Work that comes back to the agent continues the run it came back to, for whoever is behind that run.
+    const runId = returnsTo(m.meta) ?? m.agentRunId;
     if (!runId) return { kind: "agent" };
     const [run] = await db
       .select({ triggerMessageId: agentRuns.triggerMessageId, background: agentRuns.background })
@@ -153,23 +164,16 @@ export async function runAuthority(db: Executor, run: AuthorityRun): Promise<Run
   if (root.kind === "person") return { kind: "person", personId: root.personId };
   const steeredBy = steeredByOf(run.transcript);
   if (steeredBy) return { kind: "person", personId: steeredBy };
-  if (root.kind === "routine_report") {
-    const routineAccess = await accessOfReport(db, run.orgId, root.backgroundRunId);
-    return { kind: "unattended", personId: null, reason: "routine_report", routineAccess };
-  }
-  return { kind: "unattended", personId: null, reason: root.kind === "agent_note" ? "agent_note" : "agent" };
+  return { kind: "unattended", personId: null, reason: root.kind };
 }
 
-/** The access a routine's run handed off with (its brief); `read` when it can't be told. */
-async function accessOfReport(db: Executor, orgId: string, backgroundRunId: string | null): Promise<RoutineAccess> {
-  if (!backgroundRunId || !UUID.test(backgroundRunId)) return "read";
-  const [row] = await db
-    .select({ meta: messages.meta })
-    .from(agentRuns)
-    .innerJoin(messages, and(eq(messages.orgId, agentRuns.orgId), eq(messages.id, agentRuns.triggerMessageId)))
-    .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.id, backgroundRunId), eq(agentRuns.background, true)));
-  return routineBriefOf(row?.meta)?.access === "act" ? "act" : "read";
-}
+/**
+ * Whether what a routine read feeds this run: a routine's own run, or a run nobody is behind that its report or its
+ * work woke. Such text may come from outside (inbound mail, a webhook) through a routine set to only read, so the run
+ * never sends a credential, its writes to connected apps and its mail sends always ask a person (ADR 0038, 0053 §3).
+ */
+export const fedByRoutine = (authority: RunAuthority | null): boolean =>
+  authority?.kind === "routine" || (authority?.kind === "unattended" && authority.reason !== "agent");
 
 /** Who is behind a run, by its id (the tool context's `runId`); unattended when the run is gone. */
 export async function runAuthorityById(db: Executor, orgId: string, runId: string): Promise<RunAuthority> {
@@ -190,7 +194,7 @@ export async function runAuthorityById(db: Executor, orgId: string, runId: strin
 
 /**
  * Who answers for a run's requests (approvals, questions, failures): the person behind it, else the
- * routine's creator. Null for other unattended runs (the caller falls back to the agent's owner).
+ * routine's creator. Null for an unattended run: the caller falls back to the agent's owner.
  */
 export const accountablePerson = (authority: RunAuthority): string | null =>
   authority.kind === "person"
