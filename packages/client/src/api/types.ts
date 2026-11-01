@@ -4953,6 +4953,8 @@ export interface MailAccount {
   aliases: string[];
   /** What new emails go out from; null = `address`. */
   defaultFrom: string | null;
+  /** Who connected it: the only person who gives agents access to it (absent on older servers). */
+  ownerUserId?: string | null;
   /** Agents with access, and how much. */
   agents: { agentId: string; level: MailLevel; canDelete: boolean }[];
 }

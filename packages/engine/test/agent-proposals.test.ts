@@ -653,6 +653,20 @@ describe("one request, one card: channels, mailboxes and a routine", () => {
     expect(texts[1]).toContain("GitHub (an admin)");
   });
 
+  test("a member who only creates agents gives the new agent her own mailbox in one click", async () => {
+    f = await setup();
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: bia.id });
+    const makers = await createRole(f.db, f.owner.id, f.org.id, { name: "Makers", permissions: ["create_agents"] });
+    await setMemberRoles(f.db, f.owner.id, f.org.id, bia.id, [makers.id]);
+    const inbox = await mailbox(f, bia.id, "bia@acme.com");
+    const ctx = await runFor(f, bia.id, "cria um agente que lê meus emails");
+    const out = await propose(f, ctx, { ...CAIO, access: [{ connector: "bia@acme.com", level: "read" }] });
+    const id = (out.data as { agentProposal: { messageId: string } }).agentProposal.messageId;
+    await createProposedAgent({ db: f.db, pubsub: f.pubsub, gateway: f.gateway }, bia.id, f.org.id, id);
+    expect((await cardOf(f, id)).applied?.mailAccountIds).toEqual([inbox.id]);
+  });
+
   test("created from the review, its routine comes once it is where it reports: once", async () => {
     f = await setup();
     const ctx = await runFor(f, f.owner.id, "cria um agente que resume o dia");

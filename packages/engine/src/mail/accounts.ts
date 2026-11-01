@@ -58,6 +58,8 @@ export interface MailAccountView {
   aliases: string[];
   /** What new mail goes out from; null = `address`. */
   defaultFrom: string | null;
+  /** Who connected it: the only person who gives agents access to it (ADR 0038). */
+  ownerUserId: string | null;
   agents: { agentId: string; level: "read" | "read_write"; canDelete: boolean }[];
 }
 
@@ -146,6 +148,7 @@ export function mailAccountView(row: MailAccountRow, grants?: Map<string, Set<st
     askActions: row.askActions.filter((a): a is MailAction => (ASKABLE_MAIL_ACTIONS as readonly string[]).includes(a)),
     aliases: row.aliases,
     defaultFrom: row.defaultFrom,
+    ownerUserId: row.createdByUserId,
     agents,
   };
 }
@@ -824,10 +827,12 @@ export async function openAccount(deps: MailDeps, row: MailAccountRow): Promise<
   return connector.open(await accountRef(deps, row));
 }
 
-/** Folders of a mailbox, for the agent settings screen (admins). */
+/** Folders of a mailbox, for an agent's rules there (its owner, who sets them, and admins). */
 export async function listMailFolders(deps: MailDeps, actorId: string, orgId: string, accountId: string) {
-  await requirePermission(deps.db, actorId, orgId, "manage_agents");
-  const provider = await openMailProvider(deps, orgId, accountId);
+  await requirePermission(deps.db, actorId, orgId, "read");
+  const row = await loadAccount(deps.db, orgId, accountId);
+  if (row.createdByUserId !== actorId) await requirePermission(deps.db, actorId, orgId, "manage_agents");
+  const provider = await openAccount(deps, row);
   try {
     return await provider.listFolders();
   } finally {
