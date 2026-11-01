@@ -7,13 +7,16 @@ import {
   type BrainTurn,
   clearPlanLimits,
   createJobHandlers,
+  createRoutine,
   drainOutbox,
   listMessages,
+  listRoutines,
   type MachineStatus,
   nextMonthStart,
   postPersonMessage,
   RESUME_AFTER_MS,
   RESUME_GAP_MS,
+  runRoutineNow,
   storedPlanLimit,
   updateAgent,
 } from "../src";
@@ -444,6 +447,39 @@ test("other runs' reservations filling the budget: the run looks again in minute
   expect(at).toBeGreaterThanOrEqual(before + 2 * 60_000);
   expect(at).toBeLessThan(Date.now() + 2 * 60_000 + RESUME_AFTER_MS + 1000);
   expect(await notes(f, "budget_wait", first.id)).toHaveLength(0);
+});
+
+test("a routine waiting on the plan reads as running in Rotinas, and its people hear it once", async () => {
+  f = await setup({ reply: () => ({ chunks: ["pela API"] }) });
+  await computerAgent(f);
+  const { brain } = scripted(() => [
+    { type: "limit", resetsAt: later(3600_000).toISOString() },
+    { type: "error", code: "plan_limit", message: "You've hit your session limit", worked: false },
+  ]);
+  const handlers = handlersWith(f, brain);
+  const deps = { db: f.db, pubsub: f.pubsub, context: f.context };
+  const routine = await createRoutine(deps, f.owner.id, f.org.id, {
+    name: "Deploys",
+    agentId: f.agent.id,
+    prompt: "Check the deploys.",
+    target: { type: "channel", channelId: f.general.id },
+    trigger: { type: "schedule", phrase: "todo dia às 8h" },
+  });
+  await runRoutineNow(deps, f.owner.id, f.org.id, routine.id);
+  await drainOutbox(f.db, handlers);
+  const [run] = await runs(f);
+  expect(run?.status).toBe("waiting_input");
+  expect(f.provider.calls).toHaveLength(0);
+  const [view] = await listRoutines(f.db, f.owner.id, f.org.id);
+  expect(view?.state).toBe("running");
+  const heard = () =>
+    f.db.select().from(schema.notifications).where(eq(schema.notifications.kind, "routine_waiting_plan"));
+  expect((await heard()).map((n) => n.userId)).toEqual([f.owner.id]);
+  // Its resume finds the plan still limited: it parks again, and nobody hears it twice.
+  await drainOutbox(f.db, handlers, { now: later(3600_000 + RESUME_AFTER_MS + 1000) });
+  expect((await runs(f))[0]?.status).toBe("waiting_input");
+  expect((await heard())[0]?.count ?? 1).toBe(1);
+  expect(await heard()).toHaveLength(1);
 });
 
 test("a refusal known only from its words holds until the first window resets, never the next window's", () => {

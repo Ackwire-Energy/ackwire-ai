@@ -65,6 +65,8 @@ interface Strings {
   routinePausedBody: string;
   routineStalledTitle: string;
   routineStalledBody: (computer: string) => string;
+  routineWaitingPlanTitle: string;
+  routineWaitingPlanBody: string;
   planResetUnknownTitle: (plan: string) => string;
   planResetUnknownBody: (agent: string) => string;
   machineConnectedTitle: string;
@@ -105,6 +107,8 @@ export const PUSH_STRINGS: Record<PushLocale, Strings> = {
     routinePausedBody: "Toque para ver o motivo.",
     routineStalledTitle: "Uma rotina está esperando o computador",
     routineStalledBody: (c) => `Ela roda quando ${c} voltar.`,
+    routineWaitingPlanTitle: "Uma rotina está esperando o plano renovar",
+    routineWaitingPlanBody: "Ela roda quando ele renovar.",
     planResetUnknownTitle: (p) => `O ${p} não disse quando o limite renova`,
     planResetUnknownBody: (a) => `O trabalho de ${a} segue esperando.`,
     machineConnectedTitle: "Um computador novo entrou no workspace",
@@ -142,6 +146,8 @@ export const PUSH_STRINGS: Record<PushLocale, Strings> = {
     routinePausedBody: "Tap to see why.",
     routineStalledTitle: "A routine is waiting for its computer",
     routineStalledBody: (c) => `It runs when ${c} is back.`,
+    routineWaitingPlanTitle: "A routine is waiting for its plan to reset",
+    routineWaitingPlanBody: "It runs when the plan resets.",
     planResetUnknownTitle: (p) => `${p} didn't say when its limit resets`,
     planResetUnknownBody: (a) => `${a}'s work is still waiting.`,
     machineConnectedTitle: "A new computer joined the workspace",
@@ -209,6 +215,9 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
     case "routine_stalled":
       // The computer's name (what the person calls it), else the routine's.
       return out(s.routineStalledTitle, text ? s.routineStalledBody(text) : what || s.openBody);
+    case "routine_waiting_plan":
+      // The routine's name, then when it runs (the push has no time zone to say the hour in).
+      return out(s.routineWaitingPlanTitle, [what, s.routineWaitingPlanBody].filter(Boolean).join(" · "));
     case "plan_reset_unknown":
       // `title`: the plan's name; `label`: the agent's.
       return out(

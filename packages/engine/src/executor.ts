@@ -130,7 +130,7 @@ import {
   visibleText,
 } from "./reply-policy";
 import { routineBriefOf } from "./routine-brief";
-import { missStaleRoutineRun, routineRunWaitingForComputer } from "./routine-firing";
+import { missStaleRoutineRun, routineRunWaitingForComputer, routineRunWaitingForPlan } from "./routine-firing";
 import { closeRoutineRun, type RoutineRunEnd, recordRoutineReportMessage, routineFailureEnd } from "./routine-ledger";
 import { type ReleaseReason, releaseHeldInbox, releaseInbox, takeInbox } from "./run-inbox";
 import { issueRunToolToken, revokeRunToolTokens } from "./run-tool-tokens";
@@ -1991,7 +1991,8 @@ async function executeRunInner(
     const cut = t.interruptedTurn?.cause === "plan_limit";
     const name = planName(plan.kind, plan.account?.provider);
     // A routine's run waits quietly (Rotinas says so); any other says it once per wait.
-    const say = !(run.background || viaRoutine !== null || u.soon) && t.brainNotice !== u.code;
+    const firstPark = t.brainNotice !== u.code;
+    const say = !(run.background || viaRoutine !== null || u.soon) && firstPark;
     const note = say
       ? await db.transaction(async (tx) => {
           const [code, text] = budget
@@ -2058,6 +2059,8 @@ async function executeRunInner(
       const [view] = await withWikiLinks(db, run.orgId, [messageView(note)]);
       if (view) await publishMessageCreated(deps.pubsub, view);
     }
+    // A routine's run says nothing in the conversation: its people hear it once per outage instead.
+    if (firstPark && !budget) await routineRunWaitingForPlan({ db, pubsub: deps.pubsub }, run).catch(() => {});
     if (tellOwner) {
       await notifyPlanResetUnknown(
         { db, pubsub: deps.pubsub },

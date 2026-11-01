@@ -2191,6 +2191,7 @@ export const en: Translations = {
       routineFailed: "<b>{{name}}</b> couldn't run a routine",
       routinePaused: "A routine of <b>{{name}}</b> was paused",
       routineStalled: "<b>{{name}}</b> is waiting for the computer to run a routine",
+      routineWaitingPlan: "<b>{{name}}</b> is waiting for its plan to reset to run a routine",
       planResetUnknown: "{{plan}} didn't say when its limit resets. <b>{{name}}</b>'s work is still waiting.",
       machineConnected: "<b>{{name}}</b> connected the computer <b>{{label}}</b>",
       machineConnectedAny: "<b>{{name}}</b> connected a computer",

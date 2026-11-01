@@ -65,6 +65,8 @@ export const NOTIFICATION_KINDS = [
   "routine_paused",
   /** A routine waits for its computer (once per outage), ADR 0053. */
   "routine_stalled",
+  /** A routine's run waits for its agent's plan to reset (once per outage, like `routine_stalled`). */
+  "routine_waiting_plan",
   /**
    * An agent's work waited a day on its plan's limit and the plan never said when it resets (the agent's owner,
    * once per wait): `latest.title` the plan's name, `source.label` the agent's.

@@ -2209,6 +2209,7 @@ export const ptBR = {
       routineFailed: "<b>{{name}}</b> não conseguiu rodar uma rotina",
       routinePaused: "Uma rotina de <b>{{name}}</b> foi pausada",
       routineStalled: "<b>{{name}}</b> espera o computador para rodar uma rotina",
+      routineWaitingPlan: "<b>{{name}}</b> espera o plano renovar para rodar uma rotina",
       planResetUnknown: "O {{plan}} não disse quando o limite renova. O trabalho de <b>{{name}}</b> segue esperando.",
       machineConnected: "<b>{{name}}</b> conectou o computador <b>{{label}}</b>",
       machineConnectedAny: "<b>{{name}}</b> conectou um computador",

@@ -4659,6 +4659,8 @@ export type NotificationKind =
   | "routine_paused"
   /** A routine waits for its computer (once per outage; `source.machineId`). Opens it in Rotinas. */
   | "routine_stalled"
+  /** A routine's run waits for its agent's plan to reset (once per outage). Opens it in Rotinas. */
+  | "routine_waiting_plan"
   | "plan_reset_unknown"
   | "reaction"
   /** ADR 0036 §5: a new computer joined the organization (admins). `source.machineId`; `source.label` = its name. */

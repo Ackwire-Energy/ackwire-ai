@@ -1,7 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, eq, inArray, isNull, lt, ne, schema, sql } from "@agenteschat/db";
 import { stopRun } from "./cancel";
-import { notifyRoutineStalled } from "./notification-producers";
+import { notifyRoutineStalled, notifyRoutineWaitingPlan } from "./notification-producers";
 import { deferEventRun } from "./routine-events";
 import { endRoutineRun } from "./routine-ledger";
 import { endOpenRoutineRun, pauseRoutine, ROUTINE_CATCH_UP_MS, routineJobAlive } from "./routine-state";
@@ -100,18 +100,38 @@ async function agentRunOfRoutineRun(db: Database, routineRunId: string): Promise
  */
 async function stalled(deps: FiringDeps, routineId: string, orgId: string, machineId: string) {
   const [m] = await deps.db.select({ name: machines.name }).from(machines).where(eq(machines.id, machineId));
+  await notifyRoutineStalled(deps, {
+    orgId,
+    routineId,
+    machineId,
+    machineName: m?.name ?? "",
+    outageKey: await outageKey(deps, routineId),
+  }).catch(() => {});
+}
+
+/** An outage of a routine lasts until one of its runs really runs again: the last such run names it. */
+async function outageKey(deps: FiringDeps, routineId: string) {
   const [ran] = await deps.db
     .select({ id: routineRuns.id })
     .from(routineRuns)
     .where(and(eq(routineRuns.routineId, routineId), inArray(routineRuns.status, ["reported", "silent", "failed"])))
     .orderBy(desc(routineRuns.createdAt))
     .limit(1);
-  await notifyRoutineStalled(deps, {
-    orgId,
-    routineId,
-    machineId,
-    machineName: m?.name ?? "",
-    outageKey: ran?.id ?? "none",
+  return ran?.id ?? "none";
+}
+
+/** A background run started waiting for its agent's plan to reset: the routine's people hear it once per outage. */
+export async function routineRunWaitingForPlan(deps: FiringDeps, run: Pick<AgentRun, "id" | "orgId" | "background">) {
+  if (!run.background) return;
+  const [rr] = await deps.db
+    .select({ routineId: routineRuns.routineId })
+    .from(routineRuns)
+    .where(and(eq(routineRuns.orgId, run.orgId), eq(routineRuns.agentRunId, run.id)));
+  if (!rr) return;
+  await notifyRoutineWaitingPlan(deps, {
+    orgId: run.orgId,
+    routineId: rr.routineId,
+    outageKey: await outageKey(deps, rr.routineId),
   }).catch(() => {});
 }
 
