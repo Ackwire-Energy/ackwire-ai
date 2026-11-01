@@ -2,6 +2,7 @@ import {
   keys,
   useApi,
   useWikiAction,
+  useWikiGraph,
   useWikiHistory,
   useWikiPage,
   useWikiReads,
@@ -34,6 +35,8 @@ import {
   useToast,
 } from "@/ui";
 import { Note } from "../ai/parts";
+import { StarCard, StarStrip } from "../constellation/Constellation";
+import { aroundStar, wikiMap } from "../constellation/logic";
 import { chatHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
 import { Face } from "../shared/Face";
@@ -72,6 +75,8 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
   const insets = useSafeAreaInsets();
   const tree = useWikiTree(orgId);
   const reads = useWikiReads(orgId, folder === "");
+  const graph = useWikiGraph(orgId, folder === "");
+  const [picked, setPicked] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const search = useDeferredValue(q.trim());
   const pages = useMemo(() => tree.data ?? [], [tree.data]);
@@ -80,6 +85,14 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
     () => searchWiki(folder ? pages.filter((p) => inFolder(p, folder)) : pages, search),
     [pages, folder, search],
   );
+  const map = useMemo(
+    () => (graph.data ? wikiMap(graph.data, reads.data ?? [], dir.agents) : null),
+    [graph.data, reads.data, dir.agents],
+  );
+  const star =
+    map?.stars.find((s) => s.id === picked) ??
+    map?.stars.find((s) => s.id === home?.pinned[0]?.slug) ??
+    map?.stars.find((s) => s.kind === "page");
   const when = (iso: string) => relativeTime(t, i18n.language, iso);
   const title = folder ? (folder.split("/").pop() ?? folder) : t("wiki.title");
   const pageRow = (p: WikiPageSummary, i: number, sub?: string) => (
@@ -140,6 +153,22 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
           )
         ) : home ? (
           <>
+            {map && star && !folder && map.stars.length > 1 ? (
+              <StarCard
+                label={t("mobile.wiki.map")}
+                count={pages.length}
+                map={map}
+                selected={star.id}
+                onSelect={setPicked}
+                title={star.title}
+                subtitle={
+                  star.kind === "agent"
+                    ? t("mobile.wiki.mapAgent")
+                    : [star.folder, t("mobile.wiki.reads", { count: star.weight })].filter(Boolean).join(" · ")
+                }
+                onOpen={() => (star.kind === "agent" ? router.push(`/agent/${star.id}`) : openWikiPage(star.id))}
+              />
+            ) : null}
             {home.pinned.length > 0 ? (
               <>
                 <SectionHeader title={t("wiki.pinnedPages")} count={home.pinned.length} />
@@ -322,10 +351,20 @@ function WikiPage({ slug }: { slug: string }) {
   const page = useWikiPage(orgId, slug);
   const tree = useWikiTree(orgId);
   const action = useWikiAction(orgId);
+  const graph = useWikiGraph(orgId, true);
   const insets = useSafeAreaInsets();
   const p = page.data;
   const editable = p ? writes && (!p.locked || admin) : false;
   const pages = useMemo(() => tree.data ?? [], [tree.data]);
+  const readers = useMemo(() => p?.reads?.agents ?? [], [p?.reads?.agents]);
+  const around = useMemo(() => {
+    if (!graph.data || !p) return null;
+    const near = aroundStar(
+      wikiMap(graph.data, [{ slug: p.slug, total: p.reads?.total ?? 0, agents: readers }], dir.agents),
+      p.slug,
+    );
+    return near.stars.length > 1 ? near : null;
+  }, [graph.data, p, readers, dir.agents]);
 
   const toggle = (line: number) => {
     if (!p) return;
@@ -441,9 +480,10 @@ function WikiPage({ slug }: { slug: string }) {
     );
   };
 
+  const person = p?.updatedBy.onBehalfOf ? dir.memberById.get(p.updatedBy.onBehalfOf)?.name : undefined;
   const by = p
-    ? p.updatedBy.onBehalfOf
-      ? t("wiki.byFor", { name: dir.nameOf(p.updatedBy), person: p.updatedBy.onBehalfOf })
+    ? person
+      ? t("wiki.byFor", { name: dir.nameOf(p.updatedBy), person })
       : t("wiki.by", { name: dir.nameOf(p.updatedBy) })
     : "";
   return (
@@ -487,6 +527,7 @@ function WikiPage({ slug }: { slug: string }) {
         ) : null}
         {p ? (
           <>
+            {around ? <StarStrip map={around} selected={p.slug} /> : null}
             <View style={styles.page}>
               {p.folder ? (
                 <Text variant="subhead" tone="faint">
@@ -527,6 +568,16 @@ function WikiPage({ slug }: { slug: string }) {
                 )}
               </View>
             </View>
+            {readers.length > 0 ? (
+              <>
+                <SectionHeader title={t("mobile.wiki.usedBy")} />
+                <Row
+                  leading={<Face who={{ type: "agent", id: readers[0]?.agentId ?? null }} size={36} live={false} />}
+                  title={readers.map((r) => dir.nameOf({ type: "agent", id: r.agentId })).join(", ")}
+                  subtitle={t("mobile.wiki.readsWeek", { count: p.reads?.total ?? 0 })}
+                />
+              </>
+            ) : null}
             <SectionHeader title={t("wiki.backlinks")} count={p.backlinks.length} />
             {p.backlinks.length === 0 ? (
               <Text variant="footnote" tone="faint" style={styles.lead}>
@@ -642,9 +693,8 @@ export function WikiHistoryScreen({ slug }: { slug: string }) {
       </Text>
       {history.isLoading ? <ActivityIndicator color={c.muted} style={styles.loading} /> : null}
       {(history.data ?? []).map((v, i) => {
-        const who = v.author.onBehalfOf
-          ? t("wiki.byFor", { name: dir.nameOf(v.author), person: v.author.onBehalfOf })
-          : dir.nameOf(v.author);
+        const person = v.author.onBehalfOf ? dir.memberById.get(v.author.onBehalfOf)?.name : undefined;
+        const who = person ? t("wiki.byFor", { name: dir.nameOf(v.author), person }) : dir.nameOf(v.author);
         const note = noteOf(v);
         return (
           <View key={v.version}>

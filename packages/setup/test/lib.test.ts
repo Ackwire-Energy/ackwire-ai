@@ -632,10 +632,19 @@ describe("the agents' computer", () => {
     memory: 8 * GB,
     root: true,
     systemd: true,
+    bpf: true,
     apt: true,
     connected: false,
   };
-  const mac: ThisMachine = { ...server, platform: "darwin", memory: 16 * GB, root: false, systemd: false, apt: false };
+  const mac: ThisMachine = {
+    ...server,
+    platform: "darwin",
+    memory: 16 * GB,
+    root: false,
+    systemd: false,
+    bpf: false,
+    apt: false,
+  };
 
   test("yes by default on a Linux server with room for agents' screens, and on a Mac", () => {
     expect(computerOffer(server, null, false)).toEqual({ mac: false, yes: true, why: null });
@@ -679,6 +688,13 @@ describe("the agents' computer", () => {
     expect(why(server, "MACHINE_PROVISIONING=off\n")).toBeNull();
     expect(why({ ...server, root: false })?.error).toContain("needs root");
     expect(why({ ...server, systemd: false })?.error).toContain("systemd isn't running");
+    // Ubuntu's systemd: no agent's process would start.
+    expect(why({ ...server, bpf: false })).toEqual({
+      check: "computer",
+      error:
+        "This machine's systemd isn't built with BPF_FRAMEWORK (Ubuntu's isn't), which keeps each agent's user off the others' ports.",
+      fix: "Use Debian 13 for it, or connect a computer later in Settings → Computers.",
+    });
     expect(why(server, null, true)?.fix).toContain("This server as the agents' computer");
     expect(why({ ...server, platform: "win32" })?.error).toBe("The agents' computer runs on Linux or a Mac.");
     // Already a computer of some server: its service would be replaced.
