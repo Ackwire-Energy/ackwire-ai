@@ -60,7 +60,8 @@ export function Cover({
               {help}
             </Text>
           ) : null}
-          {action}
+          {/* A button keeps to its own start; its box is what the card centers. */}
+          {action ? <View>{action}</View> : null}
         </Glass>
       </View>
     </View>
