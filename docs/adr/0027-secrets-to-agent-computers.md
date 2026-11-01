@@ -1,6 +1,6 @@
 # 0027. Secrets delivered to an agent's computer, end to end
 
-- Status: Accepted (built 2026-10-16). Superseded in part by ADR 0077 (2026-10-28): the cloud computer's helper (`packages/engine/src/secret-helper.ts`) and its command wrapper; secrets reach connected computers through the runner (protocol 3)
+- Status: Accepted (built 2026-10-16). Superseded in part by ADR 0077 (2026-10-28): the cloud computer's helper (`packages/engine/src/secret-helper.ts`) and its command wrapper; secrets reach connected computers through the runner (protocol 3). Amended 2026-10-31 (§7): a site's password is the browser's alone, and a request reaches the person where they wait and on the phone
 - Date: 2026-10-16
 
 ## Context
@@ -49,6 +49,7 @@ The person's browser and the agent's computer. Our server, database, logs, outbo
 
 - **`env`**: one line in `~/.agentes/secrets/env` (mode 600). Commands the agent runs see it as an environment variable: on Daytona our exec wrapper sources that file; the runner adds it to the child's environment.
 - **`file`**: a path in the agent's workspace (e.g. `.npmrc`, `.env`), mode 600; paths outside it are refused.
+- **`site`** (2026-10-31, §7): a password the agent's browser types on one site (ADR 0040 §5), never in a command's environment or a file.
 - **`stdin`** (later): the input of a process that is waiting (a CLI sign-in in a session kept by the computer). Until then, interactive sign-ins use the computer's terminal shown in the app, which talks to the computer directly (Claude Code sign-in must complete through Anthropic's own flow).
 
 ### 5. Keeping the value away from the model afterwards
@@ -64,6 +65,15 @@ The agent has a shell on its computer, so it can read a secret it was given. We 
 - The agent page lists the secrets on its computer (name, target, delivered by, when), never values, with **Remover** (deletes them on the computer). A cloud computer that is recreated loses its secrets, and the page says so. To rotate a secret, request it again.
 - Audit entries: `secret.requested`, `secret.delivered`, `secret.declined`, `secret.expired`, `secret.removed`, with name and target, never the value.
 - Limits: at most 3 pending requests per run and 50 secrets per computer.
+
+### 7. A site's password for the browser alone; asked where people wait, on the phone too (2026-10-31)
+
+- **Its own target.** A secret asked for a site (`request_secret` with `site`, the password the browser types, ADR 0040 §5) went in as `env`, like any other: a variable in every command the agent ran, Claude Code's and Codex's included, kept from being printed only by what the prompt says. It is now `{ kind: "site", site }` (the origin, `https://host[:port]`), bound in the AAD (`…|site:https://host`): the runner keeps it out of every command's environment and of every file, and only the browser's password typing gets it (`browser_type_secret`, a `type_secret` step of `browser_do`), on that origin. The runner checks the origin against the one sealed with it, not only against the server's word. Redaction still covers its value. Secrets for commands (no `site`: API keys, CLI tokens, `.env` files) stay as they were, since agents use them in their commands.
+- **Older runners.** A runner that keeps a site's password apart says so in its `keypair` answer (`sites: true`); only then does the server make the request `site`. An older runner gets `env` as before, and its card says so. No protocol bump: an older runner never sees the new target, and one whose runner was swapped for an older one between the key and the delivery refuses the box (its AAD names the site).
+- **Said truly.** The card says where each kind goes: "Goes in as the variable NPM_TOKEN on Theo's computer", "Goes to the file .npmrc on Theo's computer", "Only Theo's browser types it, on shop.example.com. It stays out of Theo's commands." The agent's result says the same, and that a command needs it asked again without `site`. The agent's page lists it as "password for shop.example.com".
+- Left out: what was delivered before keeps its kind until it is asked again (the runner can't tell an old site password from a command's variable, and moving one would take it from a command that uses it).
+- **Asked where people wait.** Nothing but the card told the person, so requests expired unseen (24 of 120 in production by 2026-10-31). A request now notifies the one person who can answer (`secret_request`, in "Waiting for you", with a push, as `browser_ask_person` does): the secret's name and what it is for, never a field. It leaves the inbox when it is delivered, declined, expired or canceled, or its agent is deleted. Its push, its inbox row and the desktop app's notice open its conversation, where its card is.
+- **On the phone.** The phone shows the web's card instead of the message's text ("Secret request: NAME" with nothing to type into): who is asked, what for, the name, where it goes, a secure field with Paste, Send and Decline, and the fuse to its deadline; everyone else sees who may answer. It seals on the phone with the same algorithm and bytes (pure-JS `@noble`, `apps/mobile/src/lib/secret-seal.ts`, as for AI sign-in codes, ADR 0041), so the server still only relays a box it can't open.
 
 ## Consequences
 
