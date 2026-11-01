@@ -74,7 +74,7 @@ export function zip(
       : enc.encode(name);
     const raw = typeof content === "string" ? enc.encode(content) : content;
     const size = sizes[name] ?? raw.length;
-    const d = options.deflate ? Bun.deflateSync(raw) : raw;
+    const d = options.deflate ? Bun.deflateSync(raw.slice()) : raw;
     const method = options.deflate ? 8 : 0;
     const local = new Uint8Array([
       ...u32(0x04034b50),
