@@ -1638,8 +1638,7 @@ async function executeRunInner(
     // Tools already ran in a turn cut off by its computer: only that computer may finish it (the model
     // brain would redo them), so the run waits for it. A turn the plan cut after it worked parks with no
     // executed tools when the runner can't name them (Claude Code's own tools, an older runner): the same.
-    const onlyThisComputer =
-      (t.interruptedTurn?.executed.length ?? 0) > 0 || t.interruptedTurn?.cause === "plan_limit";
+    const onlyThisComputer = (t.interruptedTurn?.executed.length ?? 0) > 0 || t.interruptedTurn?.cause === "plan_limit";
     // A background run never stands in on the model brain (`mayFallBack`): it waits for its computer.
     if (
       !onlyThisComputer &&

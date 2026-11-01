@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { MACHINE_PROTOCOL_VERSION } from "@agenteschat/adapters";
+import { MACHINE_PROTOCOL_VERSION, type PlanUsage } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
   type Brain,
@@ -14,6 +14,7 @@ import {
   postPersonMessage,
   RESUME_AFTER_MS,
   RESUME_GAP_MS,
+  storedPlanLimit,
   updateAgent,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
@@ -27,7 +28,10 @@ import { pairMachine } from "./machine-fixtures";
 let f: Fixture;
 afterEach(() => {
   clearPlanLimits();
-  return f?.close();
+  const fx: Fixture | undefined = f;
+  // A test with no database leaves nothing to close (not the previous test's again).
+  f = undefined as unknown as Fixture;
+  return fx?.close();
 });
 
 const RUNNER = {
@@ -193,13 +197,15 @@ test("a cut that may have worked never falls back on a resume while the plan is 
   await drainOutbox(f.db, handlers);
   const [run] = await runs(f);
   expect(run?.status).toBe("waiting_input");
-  expect((run?.transcript as { interruptedTurn?: { cause?: string } }).interruptedTurn?.cause).toBe("plan_limit");
+  expect((run?.transcript as { interruptedTurn?: { cause?: string } } | undefined)?.interruptedTurn?.cause).toBe(
+    "plan_limit",
+  );
 
   await drainOutbox(f.db, handlers, { now: later(3.5 * 60_000) });
   const [again] = await runs(f);
   expect(again?.status).toBe("waiting_input");
   expect(f.provider.calls).toHaveLength(0);
-  expect((again?.transcript as { fallback?: unknown }).fallback).toBeUndefined();
+  expect((again?.transcript as { fallback?: unknown } | undefined)?.fallback).toBeUndefined();
 });
 
 test("a refusal before any work falls back to the API as before", async () => {
@@ -394,4 +400,23 @@ test("the budget's wall: the run waits for the next month or a raise, and goes o
   expect(f.provider.calls).toHaveLength(1);
   expect(f.provider.calls[0]?.request.messages.slice(0, messagesBefore.length)).toEqual(messagesBefore as never);
   expect((await listMessages(f.db, f.owner.id, f.org.id, f.general.id)).at(-1)?.body).toBe("Feito pela API.");
+});
+
+test("a refusal known only from its words holds until the first window resets, never the next window's", () => {
+  const at = Date.parse("2026-11-02T10:00:00Z");
+  const usage: PlanUsage = {
+    windows: [
+      { kind: "five_hour", usedPercent: 97, resetsAt: "2026-11-02T14:00:00Z" },
+      { kind: "seven_day", usedPercent: 40, resetsAt: "2026-11-07T10:00:00Z" },
+    ],
+    limited: true,
+    source: "turn",
+    at: new Date(at).toISOString(),
+  };
+  expect(storedPlanLimit(usage, at)).toEqual({ until: Date.parse("2026-11-02T14:00:00Z") });
+  expect(storedPlanLimit(usage, Date.parse("2026-11-02T15:00:00Z"))).toBeNull();
+  // No window known: it holds a while, then a turn asks the plan again.
+  const bare: PlanUsage = { windows: [], limited: true, source: "turn", at: new Date(at).toISOString() };
+  expect(storedPlanLimit(bare, at + 60_000)).toEqual({ until: null });
+  expect(storedPlanLimit(bare, at + 3600_000)).toBeNull();
 });

@@ -2,7 +2,7 @@ import { BRAIN_PROTOCOL, type BrainEffort, isBrainEffort, type PlanUsage } from 
 import { and, desc, type Executor, eq, isNotNull, ne, schema, sql } from "@agenteschat/db";
 import { isAutoModel } from "@agenteschat/providers";
 import { claudeCodeModel, planOf } from "@agenteschat/providers/plans";
-import { planState, planWindows } from "@agenteschat/ui/plan-state";
+import { planState } from "@agenteschat/ui/plan-state";
 import type { Agent } from "../agents";
 import type { MachineStatus } from "../machine-hub";
 import { pausedMessage } from "../machines";
@@ -91,20 +91,24 @@ export function clearPlanLimits() {
 }
 
 /**
- * When the binding window of a stored reading resets (ms): the latest reset of its full windows, else the
- * tightest window's that is still ahead. Null: none known.
+ * When the binding window of a stored reading resets (ms): the latest reset of its full windows, else (a refusal
+ * known only from its words, no window full) the first window reset after the reading, while it is still ahead.
+ * Later windows didn't refuse anything: once that first reset passed, a turn asks the plan again. Null: none known.
  */
 export function bindingReset(usage: PlanUsage | null | undefined, now = Date.now()): number | null {
   if (!usage) return null;
   const { until } = planState(usage, now);
   if (until) return Date.parse(until);
-  const next = planWindows(usage, now).find((w) => w.resetsAt && Date.parse(w.resetsAt) > now);
-  return next?.resetsAt ? Date.parse(next.resetsAt) : null;
+  const at = Date.parse(usage.at);
+  const first = Math.min(
+    ...usage.windows.map((w) => (w.resetsAt ? Date.parse(w.resetsAt) : Number.NaN)).filter((r) => r > at),
+  );
+  return first > now && Number.isFinite(first) ? first : null;
 }
 
 /**
  * Whether a stored reading says the plan is at its limit now (`planState`), and until when (null: unknown).
- * A limit with no known reset holds for `UNKNOWN_LIMIT_MS` after its reading.
+ * A limit with no known reset holds for `UNKNOWN_LIMIT_MS` after its reading, and never past a window's reset.
  */
 export function storedPlanLimit(
   usage: PlanUsage | null | undefined,
@@ -112,9 +116,12 @@ export function storedPlanLimit(
 ): { until: number | null } | null {
   if (!usage || planState(usage, now).state !== "limited") return null;
   const until = bindingReset(usage, now);
-  if (until !== null && until > now) return { until };
+  if (until !== null) return { until };
   const at = Date.parse(usage.at);
-  return Number.isFinite(at) && now - at < UNKNOWN_LIMIT_MS ? { until: null } : null;
+  const resetSince = usage.windows.some(
+    (w) => w.resetsAt && Date.parse(w.resetsAt) > at && Date.parse(w.resetsAt) <= now,
+  );
+  return Number.isFinite(at) && now - at < UNKNOWN_LIMIT_MS && !resetSince ? { until: null } : null;
 }
 
 /** The plan limit of this sign-in now, from this process's cache or the stored reading. */
