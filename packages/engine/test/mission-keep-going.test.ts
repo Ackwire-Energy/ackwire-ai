@@ -171,7 +171,15 @@ describe("a mission keeps going between people's messages", () => {
         if (last.includes("didn't ask them in a card")) {
           return {
             chunks: [],
-            toolUses: [{ name: "ask_user", input: { question: "Pode me passar uma credencial read-only do banco?" } }],
+            toolUses: [
+              {
+                name: "ask_user",
+                input: {
+                  question: "Pode me passar uma credencial read-only do banco?",
+                  why: "The daily report reads the database, and only a person can give that access.",
+                },
+              },
+            ],
           };
         }
         if (last.includes("tool_result")) return { chunks: [""] };
