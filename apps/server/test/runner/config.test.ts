@@ -7,6 +7,7 @@ import {
   configPath,
   effectiveAccess,
   normalizeStored,
+  parseService,
   pauseOf,
   readConfig,
   readStoredConfig,
@@ -86,6 +87,18 @@ test("a home paired before protocol 10 keeps its behaviour: every tool follows e
   });
   expect(effectiveAccess({ ...base, exec: false }).tools).toEqual({ claude: false, codex: false, commands: false });
   expect(effectiveAccess(null).tools.commands).toBe(false);
+});
+
+test("services: what of the computer agents may reach, one TCP or UDP port each, kept as written once", () => {
+  expect(["tcp/11434", " UDP/8125 ", "tcp/0", "tcp/65536", "sctp/5", "11434", "tcp/11434/x"].map(parseService)).toEqual(
+    ["tcp/11434", "udp/8125", null, null, null, null, null],
+  );
+  expect(normalizeStored({ services: ["tcp/11434", "TCP/11434", "udp/8125", 5, "nope"] }).services).toEqual([
+    "tcp/11434",
+    "udp/8125",
+  ]);
+  expect(normalizeStored({ services: [] })).toEqual({});
+  expect(normalizeStored({ services: "tcp/11434" })).toEqual({});
 });
 
 test("pause: until null holds until resumed; an until in the past counts as resumed", () => {

@@ -50,6 +50,11 @@ export interface RunnerConfig {
   /** Optional trusted packet bit for foreign traffic routed through loopback; no exception by default. */
   networkMark?: number;
   /**
+   * System mode: what of this computer's own listeners agents may reach besides DNS, as `tcp/11434` or
+   * `udp/8125` (`agentes-runner services allow`). Each agent reaches its own local ports anyway, never another's.
+   */
+  services?: string[];
+  /**
    * After "leave" (unpair): the token `machineId` had, never used to connect,
    * only sent as proof when pairing again with the same server reconnects
    * that machine (ADR 0036 §5). Dropped by the next pairing.
@@ -73,6 +78,13 @@ function agentUidRange(first: unknown, last: unknown): [number, number] | null {
 export function parseUidRange(text: string): [number, number] | null {
   const m = /^(\d{1,9})-(\d{1,9})$/.exec(text.trim());
   return m ? agentUidRange(Number(m[1]), Number(m[2])) : null;
+}
+
+/** `TCP/11434` → `tcp/11434`; null when it isn't one TCP or UDP port. */
+export function parseService(text: string): string | null {
+  const m = /^(tcp|udp)\/(\d{1,5})$/.exec(text.trim().toLowerCase());
+  const port = Number(m?.[2]);
+  return m && port >= 1 && port <= 65_535 ? `${m[1]}/${port}` : null;
 }
 
 /** The file as stored: a home that isn't paired (or was unpaired) keeps only some fields. */
@@ -151,6 +163,9 @@ export function normalizeStored(raw: Record<string, unknown>): StoredConfig {
   const paused = parsePaused(raw.paused);
   const range = raw.agentUidRange;
   const uids = Array.isArray(range) && range.length === 2 ? agentUidRange(range[0], range[1]) : null;
+  const services = Array.isArray(raw.services)
+    ? [...new Set(raw.services.flatMap((s) => (typeof s === "string" ? (parseService(s) ?? []) : [])))]
+    : [];
   return {
     ...(text(raw.server) ? { server: text(raw.server) } : {}),
     ...(text(raw.machineId) ? { machineId: text(raw.machineId) } : {}),
@@ -176,6 +191,7 @@ export function normalizeStored(raw: Record<string, unknown>): StoredConfig {
       ? { networkLauncher: raw.networkLauncher }
       : {}),
     ...(typeof raw.networkMark === "number" ? { networkMark: raw.networkMark } : {}),
+    ...(services.length ? { services } : {}),
     ...(text(raw.previousToken, 4000) ? { previousToken: text(raw.previousToken, 4000) } : {}),
   };
 }

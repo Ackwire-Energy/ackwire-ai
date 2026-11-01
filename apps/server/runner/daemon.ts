@@ -53,6 +53,7 @@ import {
   type AgentUser,
   AgentUsers,
   agentGid,
+  denySchedulers,
   readAgentUsers,
   systemLauncher,
   trustedNetworkLauncher,
@@ -60,7 +61,7 @@ import {
 import { BrainManager } from "./brain";
 import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager } from "./browser";
-import { ensureBrowserBindPolicy } from "./browser-bind-policy";
+import { ensureBrowserBindPolicy, prepareAgents } from "./browser-bind-policy";
 import {
   configPath,
   connectUrl,
@@ -86,7 +87,7 @@ import { cachedExecutors } from "./executors";
 import type { HandlerContext, RequestObserver, RequestOutcome } from "./handlers";
 import { currentProcess, isCompiled, selfCommand } from "./launch";
 import { tailLines } from "./logfile";
-import { LoopbackGuard } from "./loopback-guard";
+import { LoopbackGuard, loopbackEndpoints, runnerEndpoints } from "./loopback-guard";
 import { McpBridge, type McpTaskInfo, mcpSocketPath } from "./mcp";
 import {
   AgentNetworks,
@@ -951,9 +952,14 @@ export class RunnerDaemon implements RequestObserver {
         this.persistNetworkPins(network);
         return effective;
       };
+      const policy = {
+        uidRange: config.managedBy === "host" ? DEFAULT_AGENT_UID_RANGE : (config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE),
+        refresh: () => void guard?.reconcile(),
+      };
       const prepare = (user: AgentUser, effective = resolveNetwork(user)) => {
         if (this.opts.workers || prepared.get(user.uid) === networkKey(effective)) return;
-        ensureBrowserBindPolicy({ ...user, ...effective }, this.self.command);
+        denySchedulers(user.user);
+        ensureBrowserBindPolicy({ ...user, ...effective }, this.self.command, policy);
         const known = this.agents.find((agent) => agent.id === user.id);
         prepareSystemStartPage(user, known ?? { name: user.user, handle: user.user }, {
           locale: known?.locale,
@@ -984,6 +990,11 @@ export class RunnerDaemon implements RequestObserver {
               agentUids: () => readAgentUsers(home).map((u) => u.uid),
               uidRange: config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE,
               networkMark: config.networkMark,
+              services: () => [
+                ...(readStoredConfig(home)?.services ?? []),
+                ...runnerEndpoints(),
+                ...loopbackEndpoints([config.server]),
+              ],
               log,
             });
       supervisor = new Supervisor({
@@ -1000,13 +1011,11 @@ export class RunnerDaemon implements RequestObserver {
           return this.networkScopesBusy(agentId) || (!!user && this.networkProcessesBusy(user));
         },
         user: agentUser,
-        start: launchWorker(this.self.command),
+        start: launchWorker(this.self.command, policy),
         ...(this.opts.workers || config.managedBy === "host"
           ? {}
           : {
-              prepareExisting: (existing: AgentUser[]) => {
-                for (const user of existing) prepare(user);
-              },
+              prepareExisting: (existing: AgentUser[]) => prepareAgents(existing, prepare, policy, log),
             }),
         lend: (kind, accountId, uid) => this.accounts.lendTo(kind, accountId, uid),
         grant: (kind, accountId) => this.accounts.grant(kind, accountId),

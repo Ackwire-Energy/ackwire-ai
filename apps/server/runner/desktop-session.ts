@@ -29,7 +29,7 @@ import { BROWSER_SOCKET, closeBrowser, serveBrowser } from "./desktop-browser";
 import { desktopName, type LookOptions, lookCommand, lookDock, lookTheme } from "./desktop-look";
 import { RunnerError } from "./errors";
 import { resolveCommand } from "./executors";
-import { readJson, writeJson } from "./json-file";
+import { readJson, readSmallJson, writeJson } from "./json-file";
 import { hasBunTerminal, runtimeName, thisRunner } from "./launch";
 import { seconds, tailLines } from "./logfile";
 import { agentFolderName } from "./paths";
@@ -271,6 +271,8 @@ export interface DesktopUser {
   dir: string;
   /** System mode: the agent's uid and gid; the password file is then the runner's (root), readable by that group. */
   ids?: { uid: number; gid: number };
+  /** Where the agent's own /tmp is on the computer, when it has one: its X server's display lock is there. */
+  tmp?: string;
 }
 
 /** The agent's id as it names files on the machine (`<handle>-<id8>`'s part). */
@@ -350,6 +352,19 @@ export interface DesktopSystem {
   kill(pid: number, signal: NodeJS.Signals): void;
   /** Every process on the computer (none where there is no `/proc`). */
   processes(): ProcessStat[];
+  /** The computer's Unix sockets as `/proc/net/unix` lists them (none known: empty). */
+  unixSockets?(): string;
+}
+
+/**
+ * The displays whose abstract X socket (`@/tmp/.X11-unix/X<n>`, in `/proc/net/unix`) someone holds. An agent's X
+ * server keeps its lock in the agent's own /tmp, out of sight of the others, but that name is the whole computer's:
+ * held by an X server, or squatted by an agent, it keeps the display taken.
+ */
+export function abstractDisplays(unix: string): Set<number> {
+  const held = new Set<number>();
+  for (const m of unix.matchAll(/ @\/tmp\/\.X11-unix\/X(\d+)$/gm)) held.add(Number(m[1]));
+  return held;
 }
 
 /** A process as `/proc/<pid>/stat` has it: `start` in seconds since the computer booted, `cpu` in seconds it ran. */
@@ -440,6 +455,13 @@ export const hostSystem = (): DesktopSystem => ({
         return [];
       }
     });
+  },
+  unixSockets() {
+    try {
+      return readFileSync("/proc/net/unix", "utf8");
+    } catch {
+      return "";
+    }
   },
 });
 
@@ -918,7 +940,7 @@ export class DesktopSessions {
             detached: true,
             log,
           });
-          pid = await this.waitForXvnc(x, display, files.socket, logFile);
+          pid = await this.waitForXvnc(x, display, files.socket, logFile, user.tmp);
         } catch (err) {
           // Its next start's prepare renames files the look still writes (xfwm4's settings among them).
           await looking;
@@ -1127,19 +1149,25 @@ export class DesktopSessions {
   }
 
   /** Xvnc's own pid once it holds the display and its socket is there; its output says why when it doesn't. */
-  private async waitForXvnc(x: DesktopProcess, display: number, socket: string, logFile: string): Promise<number> {
+  private async waitForXvnc(
+    x: DesktopProcess,
+    display: number,
+    socket: string,
+    logFile: string,
+    lockDir?: string,
+  ): Promise<number> {
     let gone = !x.pid;
     void x.exited.then(() => {
       gone = true;
     });
     const deadline = Date.now() + XVNC_START_MS;
     while (!gone && Date.now() < deadline) {
-      const pid = this.lockPid(display);
+      const pid = this.lockPid(display, lockDir);
       if (pid !== null && this.isXvnc(pid, display) && existsSync(socket)) return pid;
       await sleep(25);
     }
     if (x.pid) this.sys.kill(x.pid, "SIGTERM");
-    const pid = this.lockPid(display);
+    const pid = this.lockPid(display, lockDir);
     if (pid !== null && this.isXvnc(pid, display)) this.sys.kill(pid, "SIGTERM");
     throw new RunnerError(
       "internal",
@@ -1230,17 +1258,18 @@ export class DesktopSessions {
     return pid > 0 && (this.sys.cmdline(pid)?.some((a) => path.basename(a) === "xfce4-session") ?? false);
   }
 
-  private lockPid(display: number): number | null {
-    try {
-      const pid = Number(readFileSync(path.join(this.opts.lockDir ?? X_LOCK_DIR, `.X${display}-lock`), "utf8").trim());
-      return isPid(pid) ? pid : null;
-    } catch {
-      return null;
-    }
+  /** The pid in a display's lock (an agent's own /tmp, or the computer's): never a link or a pipe an agent put there. */
+  private lockPid(display: number, dir = this.opts.lockDir ?? X_LOCK_DIR): number | null {
+    const pid = readSmallJson(path.join(dir, `.X${display}-lock`), 64);
+    return isPid(pid) ? pid : null;
   }
 
-  /** Nobody holds the display. A lock whose server is gone is removed, with its socket. */
-  private displayFree(display: number): boolean {
+  /**
+   * Nobody holds the display (`held`: whose abstract socket someone holds). A lock whose server is gone is removed,
+   * with its socket.
+   */
+  private displayFree(display: number, held: ReadonlySet<number>): boolean {
+    if (held.has(display)) return false;
     const lockDir = this.opts.lockDir ?? X_LOCK_DIR;
     const lock = path.join(lockDir, `.X${display}-lock`);
     if (!existsSync(lock)) return true;
@@ -1258,8 +1287,9 @@ export class DesktopSessions {
   /** The display slots no desktop of ours and no other process holds. */
   private freeSlots(): number[] {
     const ours = new Set([...this.claimed, ...[...this.desktops.values()].map((d) => d.display)]);
+    const held = abstractDisplays(this.sys.unixSockets?.() ?? "");
     return [...Array(SLOT_COUNT).keys()].filter(
-      (slot) => !ours.has(FIRST_DISPLAY + slot) && this.displayFree(FIRST_DISPLAY + slot),
+      (slot) => !ours.has(FIRST_DISPLAY + slot) && this.displayFree(FIRST_DISPLAY + slot, held),
     );
   }
 

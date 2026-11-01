@@ -36,7 +36,7 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import type { AccountGrant } from "./accounts";
 import { type AgentUser, readAgentUsers, systemLauncher } from "./agent-users";
-import { ensureBrowserBindPolicy } from "./browser-bind-policy";
+import { type BindPolicyOptions, ensureBrowserBindPolicy } from "./browser-bind-policy";
 import { backoffDelay } from "./connection";
 import { DESKTOP_USE_OPS } from "./desktop";
 import { SHOW_MS } from "./desktop-browser";
@@ -253,7 +253,10 @@ export interface SupervisorOptions {
   fetch?: FetchLike;
   /** System mode: the loopback firewall (root), started with the supervisor. Absent in single-user and in tests. */
   guard?: { start(): void; stop(): void };
-  /** System mode: apply socket bind policy to every persisted UID before restoring or serving workers. */
+  /**
+   * System mode: apply socket bind policy to every persisted UID before restoring or serving workers
+   * (`prepareAgents`: an agent whose check fails is left out, never the whole boot).
+   */
   prepareExisting?: (users: AgentUser[]) => void;
   /** A brain turn's account folder becomes its agent's user's before the turn reaches the worker (`AccountManager.lendTo`). */
   lend?: (kind: "claude_code" | "codex", accountId: string, uid: number) => Promise<unknown>;
@@ -718,7 +721,6 @@ export class Supervisor {
   private ready(w: Worker, signal: AbortSignal): Promise<void> {
     if (w.ready) return Promise.resolve();
     if (signal.aborted) return Promise.reject(new RunnerError("internal", "Canceled"));
-    this.launch(w);
     return new Promise((resolve, reject) => {
       const waiter = {
         resolve: () => {
@@ -741,6 +743,8 @@ export class Supervisor {
       };
       w.waiters.add(waiter);
       signal.addEventListener("abort", abort, { once: true });
+      // After it waits: a start that fails at once tells it why.
+      this.launch(w);
     });
   }
 
@@ -761,7 +765,11 @@ export class Supervisor {
       w.user = this.withNetwork(w.user);
       proc = this.opts.start(w.user);
     } catch (err) {
-      this.opts.log(`couldn't start the worker of ${w.user.user}: ${err instanceof Error ? err.message : String(err)}`);
+      const why = err instanceof Error ? err.message : String(err);
+      this.opts.log(`couldn't start the worker of ${w.user.user}: ${why}`);
+      // What waits for it learns why now, not from the start's timeout.
+      const failed = new RunnerError("internal", `The agent's worker couldn't start on this computer: ${why}`);
+      for (const waiter of [...w.waiters]) waiter.reject(failed);
       this.stopped(w, null);
       return;
     }
@@ -1348,10 +1356,10 @@ export function workerCommand(user: AgentUser, runner: string[], home: string, s
   };
 }
 
-/** Starts each agent's worker as a process (`runner`: how this runner starts itself). */
-export function launchWorker(runner: string[], base = AGENT_WORKER_HOMES): StartWorker {
+/** Starts each agent's worker as a process (`runner`: how this runner starts itself), its bind check passed first. */
+export function launchWorker(runner: string[], policy: BindPolicyOptions, base = AGENT_WORKER_HOMES): StartWorker {
   return (user) => {
-    ensureBrowserBindPolicy(user, runner);
+    ensureBrowserBindPolicy(user, runner, policy);
     const home = workerHome(base, user);
     retireLegacyPending(base, home, user);
     const { argv, cwd, env } = workerCommand(user, runner, home);

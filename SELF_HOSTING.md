@@ -246,8 +246,8 @@ curl -fsSL https://agentes.chat/install | AGENTES_SETUP_TAILSCALE_KEY='tskey-cli
 - Every answer is a flag or an `AGENTES_SETUP_<OPTION>` variable; `--help` lists them, and a flag
   wins over a variable. With `--json` nothing is asked: a missing answer is a failed check, and the
   two yes/no questions take their defaults. The server becomes its agents' computer where it can be
-  (on Linux as root, with systemd, apt-get and 4 GB of memory or more, and on a Mac; `--computer no`
-  says otherwise), and the usage statistics are on (`--telemetry off` says otherwise).
+  (on Linux as root, with systemd built with `BPF_FRAMEWORK`, apt-get and 4 GB of memory or more, and on a
+  Mac; `--computer no` says otherwise), and the usage statistics are on (`--telemetry off` says otherwise).
 - stdout is one JSON object, and progress goes to stderr. Exit code 0: done; 1: a check failed;
   2: a wrong option.
 - `--dry-run --json` returns the plan and changes nothing.
@@ -942,6 +942,38 @@ what's missing at its browser's first use, which takes about a minute. Since its
 person who connected it, a computer leaves the organization with them when they leave, are removed or
 delete their account; one installed with `--system` is the team's and stays.
 
+**What an agent reaches on its computer (`--system`).** Each agent reaches the local ports its own
+processes open (any port, port 0 included, on 127.0.0.1, ::1 or the computer's own addresses), and
+nobody else's: another agent's listeners refuse it at once, so two agents can run dev servers, test
+databases or Gradle on the same computer without seeing each other. The computer's own services refuse
+agents too, except DNS: a database, an Ollama or a proxy you run there for them takes
+`sudo agentes-runner services allow tcp/11434` (also `list` and `remove`; it applies within 2 seconds).
+The address the runner connects to, when it is this computer's loopback (`http://127.0.0.1:3000`), the
+proxies the runner itself runs behind, and ports Docker publishes on the computer's other addresses
+(Caddy's 80 and 443) stay open. agentes.chat reached through something running natively on this
+computer (`tailscale serve`, an nginx or a Caddy outside Docker) takes
+`sudo agentes-runner services allow tcp/443` too, or agents can't push to its git. Container and VM
+networks on the computer are closed to agents, except ports published on an address other than
+loopback. Each agent also has its own `/tmp`, `/dev/shm` and `/run/lock`, in memory as the computer's
+are (a tmpfs of its own, which counts in its memory limit), and its own `/var/tmp` on disk (in
+`/var/lib/agentes-runner-tmp`), cleared of what is 10 days old (30 in `/var/tmp`), so a socket or file
+another agent leaves there is out of its reach, and its own adb server port
+(`ANDROID_ADB_SERVER_PORT`). Agents can't schedule cron or at jobs, which would run outside their own
+folders: the runner adds their users to `/etc/cron.deny` and `/etc/at.deny` (a job one scheduled before
+may keep running: `crontab -r -u ag-…` removes it). This needs Linux 5.13 or newer, nftables
+(`--system` installs it) and systemd built with `BPF_FRAMEWORK` (`systemctl --version` shows
+`+BPF_FRAMEWORK`, as on Debian 13; Ubuntu's doesn't, so `--system` refuses to install there): the runner
+checks it at each agent's start and starts nothing of that agent's where it doesn't hold, and the
+agent's work fails saying why. For Android builds, install with `--agent-uid-range 20000-20999`: that
+leaves the Kotlin compile daemon's ports (17001-17999) free; with the default range it compiles inside
+Gradle instead, slower. This server's own computer always keeps the default range, which its
+organizations share, so Kotlin compiles inside Gradle there. Two things stay shared between agents: a
+server an agent binds to `0.0.0.0` is as reachable from outside the computer as your firewall lets it
+be, so agents should bind private servers to `127.0.0.1`; and abstract Unix sockets (a name, not a file)
+have no owner, so a program an agent runs that listens on one without checking who connects is open to
+the other agents, and an agent can take a name another agent's program wants (an X display's: its
+desktop then starts on another one).
+
 Mac and Windows computers get no agents' desktops: the agent's browser runs headless, and its card
 shows it live. A Mac connected with the command above opens terminals
 (`agentes-runner tools enable terminal`); the desktop app doesn't have them yet.
@@ -987,7 +1019,8 @@ agent's home. Mac and Windows computers have no desktop use.
 **This server as the agents' computer.** The machine agentes.chat runs on can be a computer too, for
 the organizations the installation's first account made and is an owner or an admin of. The setup
 does it by default, after asking: on Linux each agent gets a user of its own with a screen (as root,
-with systemd: yes by default with apt-get and 4 GB of memory or more, no by default otherwise, saying why),
+with systemd built with `BPF_FRAMEWORK`: yes by default with apt-get and 4 GB of memory or more, no by
+default otherwise, saying why),
 and on a Mac agents work as you, in folders of their own, with a browser, Claude Code and Codex, and
 commands off unless you say yes. It writes `HOST_COMPUTER_TOKEN` to `.env` and to
 `host-computer-token` beside it (readable by you only), installs what runs the agents there from the
@@ -1016,7 +1049,11 @@ curl -fsSL http://127.0.0.1:3000/api/machines/install.sh | sh -s -- --system --d
 Within a minute it shows as "This server's computer" in each of those organizations, and agents
 without a computer start using it; admins stop it per organization there. `HOST_COMPUTER_TOKEN` can't
 be set with `ALLOW_SIGNUP=true`, and a new token retires the old one's connections when the server
-restarts.
+restarts. Its agents reach the app at the address the runner connects to and the ports Docker publishes
+on public addresses (Caddy's 80 and 443), never Postgres or the containers' network; a service you run
+natively on this machine for them takes `sudo agentes-runner services allow tcp/<port>` (`tcp/443` for
+agentes.chat behind a `tailscale serve`, an nginx or a Caddy outside Docker). The Kotlin compile daemon
+doesn't run there: the computer keeps the default uid range, and Kotlin compiles inside Gradle.
 
 </details>
 
