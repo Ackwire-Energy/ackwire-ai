@@ -28,6 +28,10 @@ describe("web app serving", () => {
     const res = await app.request("/assets/app.js");
     expect(res.status).toBe(200);
     expect(await res.text()).toBe("console.log(1)");
+    // Mermaid's bundle is one of them, run by a sandboxed frame (an opaque origin) as a classic script: it must be
+    // JavaScript and loadable from another origin.
+    expect(res.headers.get("content-type")).toContain("text/javascript");
+    expect(res.headers.get("cross-origin-resource-policy")).toBeNull();
   });
 
   test("hashed assets open from disk; index.html is always revalidated", async () => {

@@ -8,7 +8,7 @@ import {
   approveAlwaysOffered,
 } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalWhy } from "@agenteschat/client/lib/approval-origin";
-import { approvalTitle, approveAlwaysHint } from "@agenteschat/client/lib/approval-words";
+import { approvalTitle, approveAlwaysHint, decisionOutcome } from "@agenteschat/client/lib/approval-words";
 import { timeLeft, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { ApprovalCard, Button } from "@agenteschat/ui";
@@ -16,6 +16,7 @@ import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { Trans, useTranslation } from "react-i18next";
 import { EmailLetter } from "@/components/EmailLetter";
+import { RequestDone } from "@/components/RequestCard";
 import { CardSky, colorOf, prepareBurst } from "@/components/Sky";
 import { TYPED_VALUES } from "@/i18n";
 import { useToast } from "@/lib/toast";
@@ -143,8 +144,6 @@ function Actions({ approval, secondary }: { approval: Approval; secondary?: Reac
   );
 }
 
-const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
-
 /** The approval card inside the channel: full while waiting, one line once decided. */
 export function InlineApproval({
   approval,
@@ -160,11 +159,12 @@ export function InlineApproval({
   const name = agent?.name ?? t("channel.unknownAgent");
 
   if (approval.status !== "pending") {
+    // No one decided one that ran out: it expired at its deadline.
+    const ended = approval.decidedAt ?? (approval.status === "expired" ? approval.expiresAt : null);
     return (
-      <ApprovalCard
-        compact
-        status={approval.status === "approved" ? "approved" : "refused"}
-        aria-label={t(
+      <RequestDone
+        done={approval.status === "approved"}
+        label={t(
           approval.status === "approved"
             ? "approval.groupDone"
             : approval.status === "expired"
@@ -173,17 +173,15 @@ export function InlineApproval({
                 ? "approval.groupCanceled"
                 : "approval.groupRefused",
         )}
-        who={
-          <Trans
-            i18nKey="approval.doneWho"
-            values={{ agent: name, title: lowerFirst(approvalTitle(t, approval)) }}
-            components={{ b: <b /> }}
-            {...TYPED_VALUES}
-          />
+        more={
+          approval.reason
+            ? { label: t("approval.seeDetails"), content: t("approval.reasonLine", { reason: approval.reason }) }
+            : undefined
         }
-        statusLabel={decisionLabel(t, i18n.language, approval, me.user.id, members)}
-        detail={approval.reason ? t("approval.reasonLine", { reason: approval.reason }) : undefined}
-      />
+      >
+        {decisionOutcome(t, approval, me.user.id, (id) => members.get(id)?.name)}: <b>{approvalTitle(t, approval)}</b>
+        {ended && ` · ${whenAt(t, i18n.language, ended)}`}
+      </RequestDone>
     );
   }
   const left = timeLeft(t, approval.expiresAt);

@@ -195,3 +195,22 @@ export const approvalRuleWords = (t: TFunction, rule: Pick<ApprovalRule, "tool" 
     : rule.action
       ? actionName(t, rule.action)
       : rule.toolLabel;
+
+/**
+ * How a decided approval ended, as the line that takes its card's place says it, the same on the web and the
+ * phone: "Aprovado por você", "Recusado por Ana", "Expirou", "Cancelado".
+ */
+export function decisionOutcome(
+  t: TFunction,
+  a: Pick<Approval, "status" | "decidedByUserId">,
+  meId: string | null,
+  nameOf: (userId: string) => string | undefined,
+): string {
+  if (a.status === "expired" || a.status === "canceled") return t(`approvals.status.${a.status}`);
+  const approved = a.status === "approved";
+  const by = a.decidedByUserId;
+  if (by && by === meId) return t(approved ? "approval.outcomeApprovedByYou" : "approval.outcomeRefusedByYou");
+  const name = by ? nameOf(by) : undefined;
+  if (name) return t(approved ? "approval.outcomeApprovedBy" : "approval.outcomeRefusedBy", { name });
+  return t(approved ? "approvals.status.approved" : "approvals.status.refused");
+}

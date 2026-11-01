@@ -14,6 +14,17 @@ plugin({
     build.onLoad({ filter: /\.css$/ }, () => ({ contents: "export default {};", loader: "js" }));
   },
 });
+// A Vite `?url` import (a file the build serves as is, like mermaid's bundle) is only its address: tests never run it.
+plugin({
+  name: "url-import",
+  setup(build) {
+    build.onResolve({ filter: /[?&]url\b/ }, (args) => ({ path: args.path, namespace: "url-import" }));
+    build.onLoad({ filter: /.*/, namespace: "url-import" }, (args) => ({
+      contents: `export default ${JSON.stringify(`/assets/${args.path.replace(/\?.*$/, "").split("/").pop()}`)};`,
+      loader: "js",
+    }));
+  },
+});
 
 attachDom();
 await import("react-dom/client");
