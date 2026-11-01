@@ -259,7 +259,7 @@ export const MessageRow = memo(function MessageRow({
       </View>
     ) : media ? (
       <View style={styles.grow}>
-        <ChatMedia media={media} align="end" />
+        <ChatMedia media={media} align="end" liveId={m.id} />
       </View>
     ) : files.length > 0 ? (
       <View style={styles.grow}>
@@ -291,7 +291,7 @@ export const MessageRow = memo(function MessageRow({
         ) : null}
         {body && media ? (
           <View style={styles.meFiles}>
-            <ChatMedia media={media} align="end" />
+            <ChatMedia media={media} align="end" liveId={m.id} />
           </View>
         ) : null}
         {(body || media) && files.length > 0 ? (
@@ -417,7 +417,7 @@ export const MessageRow = memo(function MessageRow({
         ) : body ? (
           <MessageText body={body} muted={m.local === "pending"} selectable={false} accent={accent} />
         ) : null}
-        {media ? <ChatMedia media={media} /> : null}
+        {media ? <ChatMedia media={media} liveId={m.id} /> : null}
         {(stopped || atLimit) && m.agentRunId ? (
           <StoppedLine
             message={m}

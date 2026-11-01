@@ -1,5 +1,6 @@
 import type { Agent, AgentMediaLevel, GifRating, OrgSettings } from "@agenteschat/client";
 import { useAgents, useSettings, useUpdateAgent, useUpdateSettings } from "@agenteschat/client";
+import { shownMediaSettings } from "@agenteschat/client/lib/media";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Card, CardFooter, CardHeader, Segmented, Switch } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
@@ -40,9 +41,7 @@ export function MediaSettingsSection() {
   const save = (patch: MediaPatch) => {
     if (editable) update.mutate(patch);
   };
-  const gifsOn = shown.gifsAvailable && shown.gifs;
-  // Without what decides when, agents send nothing on their own: the choice reads Nunca, whatever is stored.
-  const level: AgentMediaLevel = shown.agentMediaAvailable ? shown.agentMedia : "never";
+  const { gifsOn, level } = shownMediaSettings(shown);
   const team = (agents.data ?? []).filter((a) => !a.former);
   const agentsNote =
     team.length === 0 && agents.isSuccess

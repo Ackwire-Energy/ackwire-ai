@@ -32,6 +32,7 @@
     "./sky/avatar": "./src/sky/avatar.ts",
     "./sky/workspace": "./src/sky/workspace.ts",
     "./diff": "./src/diff.ts",
+    "./media-grid": "./src/media-grid.ts",
     "./names": "./src/names.ts",
     "./plan-state": "./src/plan-state.ts",
     "./recurrence": "./src/recurrence.ts",

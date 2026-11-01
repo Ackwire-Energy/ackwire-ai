@@ -5335,6 +5335,8 @@ export const en: Translations = {
     },
     picker: {
       button: "Emoji, GIFs and stickers",
+      /** The phone composer's button (emojis stay on the system keyboard there). */
+      send: "Send a GIF or a sticker",
       tabs: "What to send",
       gifs: "GIFs",
       stickers: "Stickers",

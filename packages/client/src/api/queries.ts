@@ -8,7 +8,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { moveInGroups } from "../lib/agent-groups";
 import { artifactRefs } from "../lib/artifacts";
 import { newerSetup } from "../lib/computer";
@@ -3590,6 +3590,17 @@ export function useReminderAction(orgId: string) {
 }
 
 // ── GIFs (ADR 0091) ─────────────────────────────────────────────────────────
+
+/** What a search box holds, once it has been still for `ms` (at once when it is emptied). */
+export function useSettled(value: string, ms: number) {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    if (value === settled) return;
+    const timer = setTimeout(() => setSettled(value), value.trim() ? ms : 0);
+    return () => clearTimeout(timer);
+  }, [value, settled, ms]);
+  return settled;
+}
 
 /**
  * The picker's GIF search, a page at a time (`fetchNextPage` while `hasNextPage`): free text, a category, or

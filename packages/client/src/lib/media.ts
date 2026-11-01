@@ -1,11 +1,15 @@
 import type { TFunction } from "i18next";
 import type {
+  AgentMediaLevel,
   Gif,
   GifCategory,
   GifMedia,
+  GifPage,
   GifSize,
   MediaKind,
+  Message,
   MessageMedia,
+  OrgSettings,
   PostMedia,
   ReplyRef,
   StickerMedia,
@@ -47,6 +51,12 @@ export const GIF_CATEGORY_IDS = [
 
 /** GIFs per page of the picker's search. */
 export const GIF_PAGE = 24;
+
+/** The search waits this long after the last key: the server limits searches per person. */
+export const GIF_SEARCH_DELAY_MS = 300;
+
+/** The picker's tabs besides the emojis, each where it can work. */
+export type MediaTab = "gifs" | "stickers";
 
 /**
  * `meta.mediaAfter` on the sticker or GIF an agent added after its own reply (the reply's id): a silent message of
@@ -93,6 +103,52 @@ export function messageMediaOf(meta: Meta): MessageMedia | null {
  */
 export const isMediaAfterReply = (meta: Meta) =>
   typeof meta?.[MEDIA_AFTER_KEY] === "string" || meta?.[MEDIA_IN_RUN_KEY] === true;
+
+/**
+ * True for a GIF or a sticker with no words: it routes to nobody and starts no run (ADR 0091), so no agent is about
+ * to answer it.
+ */
+export const isMediaAlone = (m: Pick<Message, "body" | "meta">) => !m.body.trim() && messageMediaOf(m.meta) !== null;
+
+/**
+ * What the picker offers here: GIFs where this client can search, this server has GIF search and the workspace has
+ * them on; stickers where the workspace has them on and has agents. Before the settings load, or with neither: none,
+ * and the apps show no way in.
+ */
+export function mediaTabsOf(
+  settings: Pick<OrgSettings, "gifs" | "gifsAvailable" | "agentStickers"> | null | undefined,
+  agents: number,
+  gifSearch: boolean,
+): MediaTab[] {
+  if (!settings) return [];
+  const tabs: MediaTab[] = [];
+  if (gifSearch && settings.gifsAvailable && settings.gifs) tabs.push("gifs");
+  if (settings.agentStickers && agents > 0) tabs.push("stickers");
+  return tabs;
+}
+
+/**
+ * What the settings show: GIFs read off where this server has no GIF search, and without what decides when, agents
+ * send nothing on their own, so the level reads Nunca, whatever is stored.
+ */
+export const shownMediaSettings = (
+  s: Pick<OrgSettings, "gifs" | "gifsAvailable" | "agentMedia" | "agentMediaAvailable">,
+): { gifsOn: boolean; level: AgentMediaLevel } => ({
+  gifsOn: s.gifsAvailable && s.gifs,
+  level: s.agentMediaAvailable ? s.agentMedia : "never",
+});
+
+/** A search's pages as one list: a GIF a later page repeats shows once. */
+export function gifsOfPages(pages: readonly GifPage[] | undefined): Gif[] {
+  const seen = new Set<string>();
+  return (pages ?? [])
+    .flatMap((page) => page.gifs)
+    .filter((g) => {
+      if (seen.has(g.id)) return false;
+      seen.add(g.id);
+      return true;
+    });
+}
 
 /**
  * Where a GIF's file loads from: our server's media route, never the provider (the viewer's address stays with us).
@@ -154,6 +210,13 @@ export function quoteText(t: TFunction, reply: Pick<ReplyRef, "excerpt" | "media
 
 /** A mood's name, as the picker and a sticker's name say it ("comemorando"). */
 export const moodLabel = (t: TFunction, mood: StickerMood) => t(`media.moods.${mood}`);
+
+/** The words the stickers tab's search goes by: each mood's name and the other words it is found by. */
+export function stickerWords(t: TFunction) {
+  const byMood = (word: (mood: StickerMood) => string) =>
+    Object.fromEntries(STICKER_MOODS.map((mood) => [mood, word(mood)])) as Record<StickerMood, string>;
+  return { moods: byMood((mood) => moodLabel(t, mood)), moodWords: byMood((mood) => t(`media.moodWords.${mood}`)) };
+}
 
 /** A sticker's name for screen readers: "Figurinha do Dev: comemorando". */
 export const stickerLabel = (t: TFunction, agentName: string, mood: StickerMood) =>

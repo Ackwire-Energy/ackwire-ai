@@ -1,16 +1,18 @@
 import type { GifCategory, MessageMedia, StickerMood } from "@agenteschat/client";
-import { useGifSearch, useSettings } from "@agenteschat/client";
+import { useGifSearch, useSettings, useSettled } from "@agenteschat/client";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import {
   GIF_CATEGORY_IDS,
+  GIF_SEARCH_DELAY_MS,
   gifLabel,
   gifMedia,
   gifMediaUrl,
+  gifsOfPages,
   isGifCategory,
-  moodLabel,
-  STICKER_MOODS,
+  mediaTabsOf,
   stickerLabel,
   stickerMedia,
+  stickerWords,
 } from "@agenteschat/client/lib/media";
 import {
   GifPicker,
@@ -21,7 +23,7 @@ import {
   StickerPicker,
   type StickerPickerLabels,
 } from "@agenteschat/ui";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -29,8 +31,6 @@ import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
 
-/** The search waits this long after the last key: the server limits searches per person. */
-export const GIF_SEARCH_DELAY_MS = 300;
 /** A sticker's side in the picker (CSS pixels): four to a row. */
 const PICKER_STICKER = 72;
 
@@ -52,8 +52,9 @@ export function useMediaTabs(onSend: (media: MessageMedia) => void): MediaTabs |
   const api = useApi();
   const settings = useSettings(org.id).data;
   const dir = useDirectory(org.id);
-  const gifs = Boolean(api.gifs) && settings?.gifsAvailable === true && settings.gifs;
-  const stickers = settings?.agentStickers === true && dir.agents.length > 0;
+  const open = mediaTabsOf(settings, dir.agents.length, Boolean(api.gifs));
+  const gifs = open.includes("gifs");
+  const stickers = open.includes("stickers");
   return useMemo(() => {
     const tabs: PickerTab[] = [];
     if (gifs) {
@@ -118,17 +119,6 @@ function useGifLabels(): GifPickerLabels {
   );
 }
 
-/** What the search box holds, once it has been still for `ms`. */
-function useSettled(value: string, ms: number) {
-  const [settled, setSettled] = useState(value);
-  useEffect(() => {
-    if (value === settled) return;
-    const timer = setTimeout(() => setSettled(value), value.trim() ? ms : 0);
-    return () => clearTimeout(timer);
-  }, [value, settled, ms]);
-  return settled;
-}
-
 /** The GIFs tab: the search through our server, a page at a time, in the person's language. */
 function GifTab({ autoFocus, onPick }: { autoFocus: boolean; onPick: (media: MessageMedia) => void }) {
   const { t, i18n } = useTranslation();
@@ -138,17 +128,7 @@ function GifTab({ autoFocus, onPick }: { autoFocus: boolean; onPick: (media: Mes
   const [category, setCategory] = useState<GifCategory | null>(null);
   const q = useSettled(query, GIF_SEARCH_DELAY_MS);
   const search = useGifSearch(org.id, { q, category, lang: i18n.language.slice(0, 2) });
-  // A GIF a later page repeats shows once.
-  const found = useMemo(() => {
-    const seen = new Set<string>();
-    return (search.data?.pages ?? [])
-      .flatMap((page) => page.gifs)
-      .filter((g) => {
-        if (seen.has(g.id)) return false;
-        seen.add(g.id);
-        return true;
-      });
-  }, [search.data]);
+  const found = useMemo(() => gifsOfPages(search.data?.pages), [search.data]);
   const gifs: PickerGif[] = useMemo(
     () =>
       found.map((g) => ({
@@ -196,10 +176,6 @@ function GifTab({ autoFocus, onPick }: { autoFocus: boolean; onPick: (media: Mes
   );
 }
 
-/** A word for each mood. */
-const byMood = (word: (mood: StickerMood) => string) =>
-  Object.fromEntries(STICKER_MOODS.map((mood) => [mood, word(mood)])) as Record<StickerMood, string>;
-
 /** The words of the stickers tab. */
 function useStickerLabels(): StickerPickerLabels {
   const { t } = useTranslation();
@@ -209,8 +185,7 @@ function useStickerLabels(): StickerPickerLabels {
       clearSearch: t("media.stickers.clear"),
       empty: t("media.stickers.empty"),
       foot: t("media.stickers.foot"),
-      moods: byMood((mood) => moodLabel(t, mood)),
-      moodWords: byMood((mood) => t(`media.moodWords.${mood}`)),
+      ...stickerWords(t),
       sticker: (name: string, mood: StickerMood) => stickerLabel(t, name, mood),
     }),
     [t],

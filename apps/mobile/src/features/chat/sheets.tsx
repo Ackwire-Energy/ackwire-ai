@@ -316,7 +316,8 @@ export function ThreadOptions({
   };
   const control = useMissionControl(orgId);
   const close = useCloseMission(orgId);
-  const title = thread.title?.trim() || previewOf(thread.rootText);
+  // A thread on a GIF or a sticker has no words of its own to title it (ADR 0091).
+  const title = thread.title?.trim() || previewOf(thread.rootText) || t("mobile.chat.thread");
   const name = mission ? (dir.agentById.get(mission.agentId)?.name ?? "") : "";
   const g = genderOf(name);
   const fail = () => toast({ title: t("mobile.app.failed"), icon: "x" });

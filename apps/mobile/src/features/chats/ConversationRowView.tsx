@@ -107,7 +107,8 @@ export const ConversationRowView = memo(function ConversationRowView({
     ) : (
       <Tile icon="hash" size={AVATAR} />
     );
-  const name = r.kind === "channel" ? r.name : r.kind === "dm" ? r.with.name : r.title;
+  // A thread on a GIF or a sticker has no words of its own to title it (ADR 0091).
+  const name = r.kind === "channel" ? r.name : r.kind === "dm" ? r.with.name : r.title || t("mobile.chat.thread");
   // Whose orbit: the DM's agent, or the mission's.
   const orbitAgent = r.kind === "dm" ? r.with.id : r.kind === "mission" ? r.mission?.agentId : null;
   const orbitColor = agentLook(orbitAgent ? dir.agentById.get(orbitAgent) : undefined).color;

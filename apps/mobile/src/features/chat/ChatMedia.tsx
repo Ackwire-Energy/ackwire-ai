@@ -1,12 +1,10 @@
-import type { GifMedia, MessageMedia, StickerMedia } from "@agenteschat/client";
+import type { GifMedia, GifSize, MessageMedia, StickerMedia } from "@agenteschat/client";
 import { gifLabel, gifMediaUrl, stickerLabel } from "@agenteschat/client/lib/media";
-import { Canvas, createPicture, Picture } from "@shopify/react-native-skia";
 import { Image } from "expo-image";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { replay } from "@/agent/skia-ctx";
-import { stickerFrame } from "@/agent/sticker";
+import { StickerCanvas, useStickerLive } from "@/agent/StickerCanvas";
 import { appHeaders, lastCookie } from "@/lib/auth";
 import { serverUrl } from "@/lib/server";
 import { CHROME_MAX_SCALE, Text } from "@/ui";
@@ -16,16 +14,37 @@ import { agentLook } from "../shared/logic";
 import { gifBox, MESSAGE_STICKER } from "./media";
 
 /**
- * A message's GIF or sticker (ADR 0091). `align="end"`: my own message, on the right.
+ * A message's GIF or sticker (ADR 0091). `align="end"`: my own message, on the right. `liveId`: the name a sticker
+ * goes by on the conversation's stage (`StickerStageContext`, the message's id); without one it stands still.
  */
-export function ChatMedia({ media, align = "start" }: { media: MessageMedia; align?: "start" | "end" }) {
-  return media.kind === "gif" ? <ChatGif media={media} align={align} /> : <ChatSticker media={media} align={align} />;
+export function ChatMedia({
+  media,
+  align = "start",
+  liveId,
+}: {
+  media: MessageMedia;
+  align?: "start" | "end";
+  liveId?: string;
+}) {
+  return media.kind === "gif" ? (
+    <ChatGif media={media} align={align} />
+  ) : (
+    <ChatSticker media={media} align={align} liveId={liveId} />
+  );
 }
 
 /**
- * A GIF: its file always from our server's media route (never the provider: the viewer's address stays with us),
- * with the session like every other picture of ours (cookie + `X-Agentes-Client`), at its own proportions up to
- * 260pt in the app's cut-corner frame, a small "GIF" mark on its corner; with reduced motion, its still frame. A file
+ * A GIF's file as `expo-image` loads it: from our server's media route (never the provider: the viewer's address stays
+ * with us), with the session like every other picture of ours (cookie + `X-Agentes-Client`).
+ */
+export const gifImageSource = (orgId: string, id: string, size: GifSize) => ({
+  uri: gifMediaUrl(orgId, id, size, serverUrl()),
+  headers: appHeaders(lastCookie()),
+  cacheKey: `gif:${orgId}:${id}:${size}`,
+});
+
+/**
+ * A GIF (`gifImageSource`), at its own proportions up to 260pt in the app's cut-corner frame, a small "GIF" mark on its corner; with reduced motion, its still frame. A file
  * that no longer loads (an admin turned GIFs off, the GIF gone) leaves a quiet card of its size with its title and
  * the mark, never a broken picture.
  */
@@ -37,14 +56,7 @@ function ChatGif({ media, align }: { media: GifMedia; align: "start" | "end" }) 
   const [room, setRoom] = useState(0);
   const size = reduced ? "still" : "full";
   // Stable per file, so it isn't fetched again on every render.
-  const source = useMemo(
-    () => ({
-      uri: gifMediaUrl(orgId, media.id, size, serverUrl()),
-      headers: appHeaders(lastCookie()),
-      cacheKey: `gif:${orgId}:${media.id}:${size}`,
-    }),
-    [orgId, media.id, size],
-  );
+  const source = useMemo(() => gifImageSource(orgId, media.id, size), [orgId, media.id, size]);
   const [failed, setFailed] = useState<string | null>(null);
   const off = failed === source.uri;
   const box = gifBox(media.width, media.height, room);
@@ -96,19 +108,22 @@ function ChatGif({ media, align }: { media: GifMedia; align: "start" | "end" }) 
 
 /**
  * One of an agent's stickers: the agent itself in its mood, drawn from its look by the shared agent engine on Skia
- * (`stickerFrame`, as avatars are), at its still frame (ADR 0091: the phone shows them still), no frame and no
+ * (`StickerCanvas`, as avatars are), alive while its row is one of the few the stage lets play, no frame and no
  * background. A former agent's sticker keeps its look; its name and mood are what screen readers say.
  */
-function ChatSticker({ media, align }: { media: StickerMedia; align: "start" | "end" }) {
+function ChatSticker({
+  media,
+  align,
+  liveId,
+}: {
+  media: StickerMedia;
+  align: "start" | "end";
+  liveId: string | undefined;
+}) {
   const { t } = useTranslation();
   const dir = useDirectory();
   const agent = dir.anyAgent(media.agentId);
-  const look = agentLook(agent);
-  const { color, eyes, accessory } = look;
-  const picture = useMemo(() => {
-    const ops = stickerFrame({ color, eyes, accessory }, media.mood, MESSAGE_STICKER);
-    return createPicture((canvas) => replay(canvas, ops), { width: MESSAGE_STICKER, height: MESSAGE_STICKER });
-  }, [color, eyes, accessory, media.mood]);
+  const live = useStickerLive(liveId);
   return (
     <View
       accessible
@@ -116,9 +131,13 @@ function ChatSticker({ media, align }: { media: StickerMedia; align: "start" | "
       accessibilityLabel={stickerLabel(t, agent?.name ?? t("mobile.chat.someone"), media.mood)}
       style={[styles.sticker, align === "end" && styles.endSelf]}
     >
-      <Canvas style={styles.stickerCanvas}>
-        <Picture picture={picture} />
-      </Canvas>
+      <StickerCanvas
+        look={agentLook(agent)}
+        mood={media.mood}
+        size={MESSAGE_STICKER}
+        seed={media.agentId}
+        live={live}
+      />
     </View>
   );
 }
@@ -154,5 +173,4 @@ const styles = StyleSheet.create({
   markOff: { borderWidth: 1.5 },
   markText: { fontSize: 10.5, lineHeight: 14, fontWeight: "700", letterSpacing: 0.5 },
   sticker: { width: MESSAGE_STICKER, height: MESSAGE_STICKER, marginTop: 4 },
-  stickerCanvas: { width: MESSAGE_STICKER, height: MESSAGE_STICKER },
 });

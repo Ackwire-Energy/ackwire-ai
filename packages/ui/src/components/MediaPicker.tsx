@@ -1,13 +1,15 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { STICKER_MOODS, type StickerMood } from "../agent/stickers";
+import type { StickerMood } from "../agent/stickers";
 import { cx } from "../cx";
-import { fold } from "../search";
+import { masonryColumns, stickerMoodsFor } from "../media-grid";
 import type { AgentAppearance } from "./AgentLook";
 import { AgentSticker } from "./AgentSticker";
 import { Button } from "./Button";
 import { Carousel } from "./Carousel";
 import { Skeleton, SkeletonGroup, Spinner } from "./Skeleton";
 import { FilterToggle, SearchField } from "./Toolbar";
+
+export { masonryColumns, stickerMoodsFor };
 
 /*
  * The composer picker's GIFs and stickers tabs (ADR 0091). Both only draw what the app gives them: the app searches
@@ -57,22 +59,6 @@ export interface GifPickerLabels {
   attribution: string;
   /** Beside it, what a click does ("Um clique envia"). */
   hint?: string;
-}
-
-/**
- * Splits items into `count` columns, each into the shortest one so far (by height over width): the masonry's
- * order. A new page goes after the ones placed, so nothing on screen moves when more arrive.
- */
-export function masonryColumns<T extends { width: number; height: number }>(items: T[], count: number): T[][] {
-  const columns: T[][] = Array.from({ length: count }, () => []);
-  const heights: number[] = Array.from({ length: count }, () => 0);
-  for (const item of items) {
-    let at = 0;
-    for (let i = 1; i < count; i++) if ((heights[i] ?? 0) < (heights[at] ?? 0)) at = i;
-    columns[at]?.push(item);
-    heights[at] = (heights[at] ?? 0) + (item.width > 0 && item.height > 0 ? item.height / item.width : 1);
-  }
-  return columns;
 }
 
 /**
@@ -335,17 +321,6 @@ export interface StickerPickerLabels {
   moodWords?: Partial<Record<StickerMood, string>>;
   /** A sticker's accessible name ("Figurinha do Dev: comemorando"). */
   sticker: (agentName: string, mood: StickerMood) => string;
-}
-
-/** The moods a search finds for an agent: all of an agent whose name matches, else those whose words do. */
-export function stickerMoodsFor(
-  query: string,
-  name: string,
-  words: { moods: Record<StickerMood, string>; moodWords?: Partial<Record<StickerMood, string>> },
-): StickerMood[] {
-  const q = fold(query.trim());
-  if (!q || fold(name).includes(q)) return [...STICKER_MOODS];
-  return STICKER_MOODS.filter((m) => fold(`${words.moods[m]} ${words.moodWords?.[m] ?? ""}`).includes(q));
 }
 
 /**

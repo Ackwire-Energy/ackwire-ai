@@ -5382,6 +5382,8 @@ export const ptBR = {
     picker: {
       /** The composer's button and the picker it opens. */
       button: "Emojis, GIFs e figurinhas",
+      /** The phone composer's button (emojis stay on the system keyboard there). */
+      send: "Mandar GIF ou figurinha",
       tabs: "O que mandar",
       gifs: "GIFs",
       stickers: "Figurinhas",

@@ -1,8 +1,8 @@
 # 0091. GIFs and stickers in chat, and agents that send them
 
-- Status: Proposed (built on the server and the web; the phone app shows them still and has no picker yet). Addendum 2026-10-31: the GIPHY key from Settings, off agentes.chat's own servers
+- Status: Proposed (built on the server, the web and the phone app). Addendum 2026-10-31: the GIPHY key from Settings, off agentes.chat's own servers
 - Date: 2026-10-31
-- Code: `packages/engine/src/media.ts`, `packages/engine/src/agent-media.ts`, `packages/engine/src/media-tools.ts`, `packages/adapters/src/gifs.ts`, `apps/server/src/routes/app/gifs.ts`, `packages/ui` (`AgentSticker`, the composer's picker), `packages/client/src/lib/media.ts`
+- Code: `packages/engine/src/media.ts`, `packages/engine/src/agent-media.ts`, `packages/engine/src/media-tools.ts`, `packages/adapters/src/gifs.ts`, `apps/server/src/routes/app/gifs.ts`, `packages/ui` (`AgentSticker`, the composer's picker, `media-grid.ts`), `packages/client/src/lib/media.ts`, `apps/mobile/src/features/chat/MediaPickerSheet.tsx`, `apps/mobile/src/agent/StickerCanvas.tsx`, `apps/mobile/src/features/settings/MediaSettingsScreen.tsx`
 
 ## Context
 
@@ -13,6 +13,7 @@ People wanted to answer with a GIF, and agents had no light way to show they wer
 ### 1. One picker, three tabs
 
 - The composer's emoji button opens one picker: Emojis (unchanged), GIFs and Stickers. One click sends. The reaction picker stays emoji-only.
+- On the phone, emojis stay on the system keyboard: a button at the empty field's end opens a short sheet with the two other tabs, each only where it can work, and no button where neither can. One tap sends, through the same optimistic path as any message. A person's DM or a channel with no agents offers the whole team's stickers; elsewhere, the conversation's agents'.
 - A message may have media and no text. `messages.meta.media` is `{ kind: "gif", provider: "giphy", id, title, width, height }` or `{ kind: "sticker", agentId, mood }` (`mediaOf`). A GIF is stored without a URL.
 - A GIF or a sticker alone is like a reaction: it routes to nobody, starts no run, doesn't reach a run in progress (nor answers its question) and reopens no thread; agents read it in the conversation later.
 - `POST …/channels/{channelId}/messages` takes `media: { kind: "gif", id } | { kind: "sticker", agentId, mood }`. The server looks a GIF up again (`gifs.get` at the workspace's rating) and stores what the provider says, never what the app sent; a sticker's agent must be the workspace's.
@@ -28,6 +29,7 @@ People wanted to answer with a GIF, and agents had no light way to show they wer
 
 - Every agent has six stickers, one per mood (`STICKER_MOODS`: celebrate, love, deal, thinking, wow, dizzy), drawn by each app from the agent's look with the agent engine (`packages/ui/src/agent/engine.js`). Nothing is uploaded or stored but the agent and the mood, a new agent has its stickers at once, and a changed look changes them.
 - They animate while on screen, and stand still with reduced motion.
+- On the phone, a frame is a recording of the engine's drawing replayed on Skia, on the JS thread, so only a few play: the newest three rows in view of a conversation (from the list's viewability), the first eight of the picker, none under a sheet, on a screen that isn't showing or in the background. All of them run on the app's one frame clock, at half its rate (`useFrameTime` with `fps`, `STICKER_FPS`), and the others hold their still frame.
 
 ### 4. Agents send them in a second step, not in their prompt
 
@@ -41,6 +43,7 @@ People wanted to answer with a GIF, and agents had no light way to show they wer
 
 - Workspace (admins): GIFs on or off, their rating (`g` for any age, the default, or `pg`), the agents' stickers on or off, and how often agents send one on their own (`never`, `sometimes`, the default, or `often`; only this step's, addendum below): `organization_settings.gifs`, `gif_rating`, `agent_stickers`, `agent_media`. Per agent: `agents.media_replies`.
 - The settings say what the server can't do (no GIF provider, no Jev key) instead of offering switches that do nothing.
+- The phone app has the same section (Workspace › GIFs and stickers) with native rows, read-only for who can't configure the workspace. The server's GIPHY key (addendum below) is set up on the web only.
 
 ### 6. What the agents read
 
@@ -50,7 +53,7 @@ People wanted to answer with a GIF, and agents had no light way to show they wer
 
 - A self-hosted server without the two keys still has stickers for people; agents send nothing on their own, and their stickers when asked.
 - GIF files cost the server's bandwidth; browsers keep them (`immutable`), and the media route checks membership.
-- The phone app shows GIFs and stickers (stickers still) and has no picker yet; animated stickers there need the engine on Skia.
+- Two stickers side by side on the phone can differ: one plays while another, past the limit of §3, holds its still frame. A conversation stays smooth instead.
 - Uploading the workspace's own stickers is left for later.
 
 ## Addendum (2026-10-31): the GIPHY key from Settings
