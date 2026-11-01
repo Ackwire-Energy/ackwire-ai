@@ -102,6 +102,12 @@ describe("wiki text", () => {
     expect(docRuns("![[diagrama.png]]")).toEqual([{ kind: "text", text: "_diagrama.png_" }]);
   });
 
+  test("tables and rules are blocks of their own, also right under a sentence", () => {
+    const blocks = docBlocks("Antes\n| PR | Estado |\n|---|---|\n| #75 | Aberto |\n\n---\n\nDepois");
+    expect(blocks.map((b) => b.kind)).toEqual(["paragraph", "table", "rule", "paragraph"]);
+    expect(blocks[1]).toMatchObject({ header: ["PR", "Estado"], rows: [["#75", "Aberto"]] });
+  });
+
   test("blocks, with each task's line in the text", () => {
     const blocks = docBlocks("Intro\n\n## Passos\n- [x] Abrir o PR\n- [ ] Aprovar\n- solto\n```\ncode\n```");
     expect(blocks.map((b) => b.kind)).toEqual(["paragraph", "heading", "task", "task", "bullet", "code"]);
