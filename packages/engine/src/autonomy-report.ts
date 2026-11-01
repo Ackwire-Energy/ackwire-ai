@@ -20,8 +20,9 @@ import { REFUSALS } from "./tools/run-policy";
  *   computer).
  * - `handoffUnanswered`: notes (`tell_agent`) with no reply in the agents' DM, questions (`ask_agent`) not answered,
  *   and @mentions that reached the agent without a word from it in the conversation, each within 30 minutes.
- * - `limitStops`: runs ended at the step limit or as stuck, runs failed on a limit (steps, budget, stuck), and
- *   stretches paused at their limit (one card each).
+ * - `limitStops`: runs whose reply offers Continuar after a limit (`meta.stepLimit`: at the cap, or told to wrap up
+ *   near it), runs told to wrap up (a routine's hands off instead), runs failed on a limit (steps, budget, stuck),
+ *   and stretches paused at their limit (one card each).
  * - `personUnanswered`: a person's message meant for agents (a mention, a DM with an agent, the router's pick, or a
  *   channel message the router never decided on) with no agent message there within 10 minutes.
  * - `taskStartFailed`: background tasks that failed within a minute ("Not logged in", a missing CLI).
@@ -296,16 +297,18 @@ export function autonomySql(range: AutonomyRange) {
       select o.id, o.name from organizations o where ${orgs}
     ),
     runs as (
-      select r.id, r.org_id, r.trigger_message_id, r.reply_message_id, r.trigger, r.status, r.error, r.background,
-        (r.created_at at time zone 'UTC')::date as day, f.*
+      select r.id, r.org_id, r.trigger_message_id, r.trigger, r.status, r.error, r.background,
+        (r.created_at at time zone 'UTC')::date as day, rm.body as reply_body,
+        coalesce(rm.meta ? 'stepLimit', false) as reply_limit, f.*
       from agent_runs r
       join orgs o on o.id = r.org_id
+      left join messages rm on rm.org_id = r.org_id and rm.id = r.reply_message_id
       cross join lateral (
         select coalesce(bool_or(s.kind = 'message'), false) as posted,
           coalesce(bool_or(${ACTED}), false) as acted,
           min(s.seq) filter (where s.kind = 'context' and s.data->>'nudged' = 'promise') as nudged_at,
           coalesce(bool_or(s.kind = 'context' and s.data->>'behind' = 'unattended'), false) as unattended,
-          coalesce(bool_or(s.kind = 'message' and s.data ? 'stepLimit'), false) as step_limit
+          coalesce(bool_or(s.kind = 'context' and s.data ? 'wrapUp'), false) as wrapped_up
         from agent_run_steps s where s.run_id = r.id
       ) f
       where r.created_at >= ${start}::timestamptz and r.created_at < ${end}::timestamptz
@@ -322,10 +325,9 @@ export function autonomySql(range: AutonomyRange) {
         r.status = 'done' and not r.posted as quiet,
         r.posted and not r.acted and ${isAck("t.body")} as ack,
         r.status = 'done' and r.trigger = 'mention' and t.author_type = 'agent' and not r.acted
-          and (not r.posted or ${isAck("rm.body")}) as idle
+          and (not r.posted or ${isAck("r.reply_body")}) as idle
       from runs r
       left join messages t on t.org_id = r.org_id and t.id = r.trigger_message_id
-      left join messages rm on rm.org_id = r.org_id and rm.id = r.reply_message_id
       where not r.background
     ),
     noise_runs as (select id, org_id, day from noise where quiet or ack or idle),
@@ -386,7 +388,7 @@ export function autonomySql(range: AutonomyRange) {
         group by 1, 2
       union all
       select day, org_id, 'limitStops', count(*) from runs
-        where step_limit or (status = 'failed' and error in ('too_many_tool_calls', 'budget_exceeded', 'stuck'))
+        where wrapped_up or reply_limit or (status = 'failed' and error in ('too_many_tool_calls', 'budget_exceeded', 'stuck'))
         group by 1, 2
       union all
       select (m.created_at at time zone 'UTC')::date, m.org_id, 'limitStops', count(*) from messages m
@@ -505,7 +507,7 @@ const COLUMNS: { key: keyof AutonomyCounts; head: string; means: string }[] = [
   { key: "promiseUnkept", head: "promise", means: "runs the follow-through judge found ending on work undone" },
   { key: "promiseIgnored", head: "ignored", means: "...that did nothing after being told to do it" },
   { key: "handoffUnanswered", head: "handoff", means: "notes, questions and @mentions unanswered in 30 min" },
-  { key: "limitStops", head: "limit", means: "runs stopped by the step limit, stuck, budget; stretches paused" },
+  { key: "limitStops", head: "limit", means: "runs at or near the step limit, stuck, out of budget; stretches paused" },
   { key: "personUnanswered", head: "person", means: "people's messages for agents unanswered in 10 min" },
   { key: "taskStartFailed", head: "task", means: 'background tasks failed in their first minute ("Not logged in")' },
   { key: "noiseRuns", head: "noise", means: "runs in any noise column, once each" },

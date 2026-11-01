@@ -24,6 +24,8 @@ import {
   postPersonMessage,
   REFUSALS,
   renderEmail,
+  type ToolSource,
+  WRAP_UP_REPLY_NOTE,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
@@ -253,7 +255,12 @@ async function seed() {
   await run({ at: at("08:40:00"), status: "failed", error: "provider_error: 529", steps: [posted, nudged] });
 
   // limitStops
-  await run({ at: at("09:00:00"), steps: [["message", { stepLimit: true }]] });
+  const capped = await message({ at: at("09:00:05"), by: dev, body: "I ran out of steps.", meta: { stepLimit: {} } });
+  await run({
+    at: at("09:00:00"),
+    replyMessageId: capped.id,
+    steps: [["message", { messageId: capped.id, stepLimit: true }]],
+  });
   await run({ at: at("09:10:00"), status: "failed", error: "too_many_tool_calls", background: true });
   await run({ at: at("09:20:00"), status: "failed", error: "provider_error: 529" });
   await message({ at: at("09:30:00"), by: dev, meta: { actionCard: { kind: "stretch_paused", state: "paused" } } });
@@ -581,5 +588,38 @@ describe("rows as the server writes them", () => {
     expect(closed.every((q) => q.answeredAt)).toBe(true);
     const [day] = await autonomyRows(f.db, { from: asked.toISOString().slice(0, 10), days: 1 });
     expect(day?.handoffUnanswered).toBe(3);
+  });
+
+  test("a run told to wrap up near its cap stopped at a limit: its reply offers Continuar, a routine's hands off", async () => {
+    const look: ToolSource = {
+      name: "work",
+      tools: async () => [
+        {
+          name: "look",
+          description: "Look at the open pull requests",
+          scope: "context:read",
+          inputSchema: { type: "object", properties: {} },
+          execute: async () => ({ content: "3 PRs open" }),
+        },
+      ],
+    };
+    f = await setup({
+      toolSources: [look],
+      reply: (request) =>
+        JSON.stringify(request.messages.at(-1)?.content ?? "").includes(WRAP_UP_REPLY_NOTE)
+          ? { chunks: ["Vi 3 PRs. Falta revisar o #42."] }
+          : { chunks: [], toolUses: [{ name: "look", input: {} }] },
+    });
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev revisa os PRs",
+    });
+    await drainOutbox(f.db, createJobHandlers({ ...f.jobDeps, maxToolTurns: 4 }));
+    const [wrapped] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.trigger, "mention"));
+    expect(wrapped?.status).toBe("done");
+    const when = wrapped?.createdAt ?? new Date();
+    await run({ at: when, background: true, steps: [["context", { wrapUp: true }]] });
+    await run({ at: when, background: true });
+    const [day] = await autonomyRows(f.db, { from: when.toISOString().slice(0, 10), days: 1 });
+    expect(day?.limitStops).toBe(2);
   });
 });
