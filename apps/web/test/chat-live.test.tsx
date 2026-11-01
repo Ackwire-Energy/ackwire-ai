@@ -150,15 +150,15 @@ const bar = () => ({ textContent: typingBar().querySelector(".ac-typing__text")?
 const lastPerson = (state: ReturnType<typeof seedState>) => state.messages[state.messages.length - 1];
 
 describe("typing bar above the composer", () => {
-  test("mention → the bar says 'Atlas' (no face of its own); its block from the start, last in the timeline", async () => {
+  test("mention → the bar says 'Atlas' (its face only until its row shows); its block, last in the timeline", async () => {
     const { socket } = await open();
     await sendText("@atlas olha o deploy");
     expect(bar().textContent).toBe("Atlas");
     // Agents at work: the pixel orbit (the dots are for people typing).
     expect(typingBar().querySelector(".ac-pixspin")).not.toBeNull();
     expect(typingBar().querySelector(".ac-typing__dots")).toBeNull();
-    // One agent on its own: its face is on its row in the conversation, not in the bar.
-    expect(typingBar().querySelector(".ac-avatar--agent")).toBeNull();
+    // Its row isn't in the conversation yet: the bar keeps its face meanwhile.
+    expect(typingBar().querySelector(".ac-avatar--agent")).not.toBeNull();
     // The words are the bar's.
     expect(rowsWith("Atlas está")).toHaveLength(0);
     await settle(4);
@@ -174,6 +174,8 @@ describe("typing bar above the composer", () => {
     const rows = screen().getAllByRole("article");
     expect(rows[rows.length - 1]).toBe(streaming);
     expect(bar().textContent).toBe("Atlas");
+    // One agent on its own with its row in the conversation: its face is there, not in the bar again.
+    expect(typingBar().querySelector(".ac-avatar--agent")).toBeNull();
     await push(socket, { type: "agent.idle", ...run });
     await settle();
     expect(document.querySelector(".ac-msg--streaming")).toBeNull();
