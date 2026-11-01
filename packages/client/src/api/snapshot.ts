@@ -1,4 +1,5 @@
 import { type DehydratedState, dehydrate, hashKey, hydrate, type Query, type QueryClient } from "@tanstack/react-query";
+import { MISSIONS_WAITING_COUNT } from "./missions";
 import type { Me, Message } from "./types";
 
 /**
@@ -8,9 +9,10 @@ import type { Me, Message } from "./types";
  * (IndexedDB on the web, a file on the phone).
  *
  * Only an allow-list is kept: the signed-in person, the conversation lists,
- * agents and people, and the latest messages of the most recent chats. It
- * belongs to one person: dropped when `me` leaves the cache (`qc.clear()` on
- * sign-out, sign-in or a 401) or comes back as someone else.
+ * agents and people, the sidebar's tools and counts, and the latest messages
+ * of the most recent chats. It belongs to one person: dropped when `me` leaves
+ * the cache (`qc.clear()` on sign-out, sign-in or a 401) or comes back as
+ * someone else.
  */
 export interface SnapshotStorage {
   read(): Promise<string | null>;
@@ -35,8 +37,21 @@ interface Snapshot {
   state: DehydratedState;
 }
 
-/** `["org", orgId, <list>]`: the lists the shell and the chat need right away. */
-const ORG_LISTS = new Set(["channels", "channel-categories", "dms", "agents", "members", "team", "detail"]);
+/**
+ * `["org", orgId, <list>]`: the lists the shell and the chat need right away. Where I put the sidebar's tools too, and
+ * the overview with its count of the approvals waiting for me, so no tool moves in once the server answers.
+ */
+const ORG_LISTS = new Set([
+  "channels",
+  "channel-categories",
+  "dms",
+  "agents",
+  "members",
+  "team",
+  "detail",
+  "sidebar-items",
+  "overview",
+]);
 /** `["org", orgId, "channel", channelId, <part>]`: kept for the chats in the snapshot. */
 const CHAT_PARTS = new Set(["messages", "roster", "members"]);
 const ME_HASH = hashKey(["me"]);
@@ -47,6 +62,12 @@ const chatPart = (key: readonly unknown[]) =>
     ? { chat: `${key[1]}/${key[3]}`, part: key[4] as string }
     : null;
 const isOrgList = (key: readonly unknown[]) => key.length === 3 && key[0] === "org" && ORG_LISTS.has(key[2] as string);
+/** `["org", orgId, "missions", "list", <query>]`: only the sidebar's count of the missions waiting for me. */
+const WAITING_COUNT = JSON.stringify(MISSIONS_WAITING_COUNT);
+const isWaitingCount = (key: readonly unknown[]) =>
+  key.length === 5 && key[0] === "org" && key[2] === "missions" && key[3] === "list" && key[4] === WAITING_COUNT;
+/** Always kept (a chat's parts only for the most recent chats). */
+const isKept = (key: readonly unknown[]) => isMe(key) || isOrgList(key) || isWaitingCount(key);
 
 /** The queries worth keeping: the allow-list, loaded, and only the chats most recently updated. */
 export function pickSnapshotQueries(queries: Query[], chats = SNAPSHOT_CHATS): Query[] {
@@ -58,7 +79,7 @@ export function pickSnapshotQueries(queries: Query[], chats = SNAPSHOT_CHATS): Q
     .map((q) => chatPart(q.queryKey)?.chat);
   const kept = new Set(recent);
   return loaded.filter((q) => {
-    if (isMe(q.queryKey) || isOrgList(q.queryKey)) return true;
+    if (isKept(q.queryKey)) return true;
     const c = chatPart(q.queryKey);
     return c !== null && kept.has(c.chat);
   });
@@ -132,7 +153,7 @@ export function createSnapshot(qc: QueryClient, storage: SnapshotStorage) {
           }
         }
         if (event.type !== "updated" && event.type !== "added") return;
-        if (!isMe(q.queryKey) && !isOrgList(q.queryKey) && !chatPart(q.queryKey)) return;
+        if (!isKept(q.queryKey) && !chatPart(q.queryKey)) return;
         if (!timer) timer = setTimeout(() => void save(), SAVE_DELAY_MS);
       });
     },

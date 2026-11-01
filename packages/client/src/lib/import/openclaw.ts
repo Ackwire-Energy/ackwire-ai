@@ -215,6 +215,8 @@ function workspaceAgent(
   }
   d.note({ key: `${key}/MEMORY.md`, agent: key, kind: "note", content: own("MEMORY.md") });
   heartbeat(key, name, own("HEARTBEAT.md"), str(obj(entry.heartbeat).every) || str(obj(defaults.heartbeat).every), d);
+  // The rest of the workspace is what the agent made there: it can go to its folder in the Drive.
+  if (dir !== null) d.filesIn(key, dir, ["skills", ".agents"]);
 }
 
 /** HEARTBEAT.md is what the agent checks on every heartbeat: a routine at the configured cadence. */
@@ -271,10 +273,12 @@ function fromClaw(claw: NonNullable<ReturnType<typeof clawOf>>, d: Draft) {
   for (const p of list(manifest.packages).map(obj)) {
     d.left(str(p.kind) === "plugin" ? "plugin" : "skill", [str(p.ref), str(p.version)].filter(Boolean).join("@"));
   }
+  // Files the package puts in the agent's workspace are its own: they can go to its folder in the Drive.
   for (const f of list(workspace.files).map(obj)) {
     const source = resolvePath(dir, str(f.source));
-    if (source) d.used.add(source);
-    d.left("file", str(f.path) || str(f.source));
+    const to = resolvePath("", str(f.path) || baseName(str(f.source)));
+    if (source && to) d.fileAt(id, source, to);
+    else d.left("file", str(f.path) || str(f.source));
   }
   for (const [server, spec] of Object.entries(obj(manifest.mcpServers))) {
     d.connection(server, str(obj(spec).url), [], [id]);

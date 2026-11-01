@@ -27,7 +27,7 @@ import {
   WorkSweep,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import { type DragEvent, type MouseEvent, useDeferredValue, useEffect, useRef, useState } from "react";
+import { type DragEvent, useDeferredValue, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { actorFromKey, NO_ACTOR, useActors } from "@/components/actors";
@@ -52,6 +52,7 @@ import {
   useStageName,
   useStepText,
 } from "@/lib/issues";
+import { inPlaceClick } from "@/lib/navigate";
 import { useOpenParam } from "@/lib/open-param";
 import { useToast } from "@/lib/toast";
 import { AddColumnDialog, Board } from "./IssueBoard";
@@ -488,13 +489,6 @@ function WhoLine({ issue: i }: { issue: Issue }) {
   );
 }
 
-/** Opens the panel on a plain click; the link still goes to the issue's page (new tab, middle click). */
-const panelClick = (e: MouseEvent, open: () => void) => {
-  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-  e.preventDefault();
-  open();
-};
-
 function IssueCard({
   issue: i,
   selected,
@@ -520,7 +514,7 @@ function IssueCard({
       draggable
       onDragStart={drag.onDragStart}
       onDragEnd={drag.onDragEnd}
-      onClick={(e) => panelClick(e, onOpen)}
+      onClick={(e) => inPlaceClick(e, onOpen)}
       data-status={i.status}
       data-card={i.number}
     >
@@ -618,7 +612,7 @@ function IssueRows({
             to="/org/$orgId/issues/$number"
             params={{ orgId: org.id, number: String(i.number) }}
             className={cx("issue-list__row", i.number === openNumber && "is-on")}
-            onClick={(e) => panelClick(e, () => onOpen(i.number))}
+            onClick={(e) => inPlaceClick(e, () => onOpen(i.number))}
           >
             <span className="issue-list__num tabular">#{i.number}</span>
             <span className="issue-list__title">

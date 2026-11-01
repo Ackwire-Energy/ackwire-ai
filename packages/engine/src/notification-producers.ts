@@ -1,9 +1,11 @@
-import { and, asc, eq, inArray, isNotNull, schema } from "@agenteschat/db";
+import { and, asc, eq, inArray, isNotNull, isNull, schema } from "@agenteschat/db";
 import { approvalCardThreads, approvalOriginOf, approverIds } from "./approvals";
 import { accountablePerson, runAuthorityById } from "./authority";
 import { threadFollowChoices } from "./follows";
+import { type TaskEnd, taskEndText } from "./machine-task-text";
 import { isMediaAfterReply } from "./media";
 import { previewMediaKind } from "./message-preview";
+import { isAgentOnlyNotice } from "./notices";
 import {
   type NotificationActor,
   type NotificationDeps,
@@ -36,6 +38,7 @@ const {
   missionParticipants,
   routines,
   messageReactions,
+  machines,
   approvals,
 } = schema;
 
@@ -133,6 +136,8 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   if (isMediaAfterReply(meta)) return;
   // An agent's follow-up line, and the notice that wakes it: the reply it brings notifies instead.
   if ((meta.notice as { kind?: unknown } | undefined)?.kind === "follow_up") return;
+  // Only for its agent: people never see it.
+  if (isAgentOnlyNotice(meta)) return;
   const [channel] = await db
     .select({ kind: channels.kind, name: channels.name, visibility: channels.visibility })
     .from(channels)
@@ -140,7 +145,7 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   if (!channel || channel.kind === "forum") return;
   const actor = message.authorType === "person" ? person(message.authorUserId) : agent(message.authorAgentId);
   const authorUser = message.authorUserId;
-  const text = notificationSnippet(message.body);
+  const text = notificationSnippet(await quotedBody(deps, orgId, message));
   // Only a GIF or a sticker (ADR 0091): the apps and the push say which, in the person's language.
   const media = previewMediaKind(message.body, meta);
   const latest = media ? { text, media } : { text };
@@ -269,6 +274,21 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   });
 }
 
+/**
+ * What a notification quotes of a message: its body, but a task's end (`meta.machineTask`) names its computer only
+ * where the workspace has more than one, the apps' rule (`namesComputers`). The agent still reads where it ran.
+ */
+async function quotedBody(deps: NotificationDeps, orgId: string, message: typeof messages.$inferSelect) {
+  const task = message.meta.machineTask as (TaskEnd & { computer?: string }) | undefined;
+  if (typeof task?.title !== "string") return message.body;
+  const computers = await deps.db
+    .select({ id: machines.id })
+    .from(machines)
+    .where(and(eq(machines.orgId, orgId), isNull(machines.deletedAt)))
+    .limit(2);
+  return taskEndText(task, computers.length > 1 ? (task.computer ?? null) : null);
+}
+
 async function threadTitle(deps: NotificationDeps, orgId: string, rootId: string) {
   const [t] = await deps.db
     .select({ title: threads.title })
@@ -364,6 +384,41 @@ export async function notifyQuestion(deps: NotificationDeps, q: QuestionRow) {
 /** Answered (by anyone) or expired: out of everyone's inbox. */
 export async function resolveQuestionNotifications(deps: NotificationDeps, orgId: string, questionId: string) {
   await resolveNotifications(deps, orgId, { groupKey: `agent_question:${questionId}` });
+}
+
+// ── Secret requests (ADR 0027) ────────────────────────────────────────────────
+
+/**
+ * An agent waits for a secret (`request_secret`): the one person who can answer it, in their "Waiting for you" and
+ * with a push, as a browser handoff asks. Only its name and what it is for travel, never a field: it is typed in
+ * the card, where it is sealed for the computer.
+ */
+export async function notifySecretRequest(deps: NotificationDeps, r: typeof schema.secretRequests.$inferSelect) {
+  const [channel] = await deps.db
+    .select({ kind: channels.kind, name: channels.name })
+    .from(channels)
+    .where(eq(channels.id, r.channelId));
+  await notify(deps, {
+    orgId: r.orgId,
+    userIds: [r.requestedForUserId],
+    kind: "secret_request",
+    groupKey: `secret_request:${r.id}`,
+    waiting: true,
+    actor: agent(r.agentId),
+    source: {
+      channelId: r.channelId,
+      ...(r.threadId ? { threadId: r.threadId } : {}),
+      ...(r.messageId ? { messageId: r.messageId } : {}),
+      ...(channel?.kind === "dm" ? { dmId: r.channelId } : {}),
+      ...(channel?.kind === "channel" ? { label: channel.name } : {}),
+    },
+    latest: { title: r.name, text: notificationSnippet(r.purpose), expiresAt: r.expiresAt.toISOString() },
+  });
+}
+
+/** Delivered, declined, expired or its run stopped: out of the inbox. */
+export async function resolveSecretRequestNotifications(deps: NotificationDeps, orgId: string, requestId: string) {
+  await resolveNotifications(deps, orgId, { groupKey: `secret_request:${requestId}` });
 }
 
 // ── Approvals ─────────────────────────────────────────────────────────────────

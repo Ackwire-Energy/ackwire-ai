@@ -47,6 +47,7 @@ import type {
   CalendarEvent,
   CalendarRange,
   Channel,
+  ChannelCard,
   ChannelCategory,
   ChannelMember,
   CodeSent,
@@ -77,6 +78,7 @@ import type {
   GitHubRepositories,
   Health,
   HostComputer,
+  ImportedFile,
   ImportedSource,
   ImportPlan,
   Instance,
@@ -151,6 +153,7 @@ import type {
   SearchHit,
   SecretRequest,
   ServerTelemetry,
+  SidebarItems,
   SignInOptions,
   Skill,
   SkillDetail,
@@ -158,6 +161,7 @@ import type {
   StorageConfig,
   StorageMigration,
   StorageTestResult,
+  SuggestedAi,
   TaskOutput,
   Team,
   ThreadFilters,
@@ -416,6 +420,12 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       limits: (orgId) => request<WorkspaceLimits>(`${org(orgId)}/limits`),
       updateMe: (orgId, input) => request<Person>(`${org(orgId)}/me`, { method: "PATCH", json: input }),
       setStatus: (orgId, input) => request<Person>(`${org(orgId)}/me/status`, { method: "PUT", json: input }),
+      sidebarItems: async (orgId) => (await request<{ items: SidebarItems }>(`${org(orgId)}/me/sidebar`)).items,
+      setSidebarItem: async (orgId, item, place) =>
+        (await request<{ items: SidebarItems }>(`${org(orgId)}/me/sidebar`, { method: "PATCH", json: { item, place } }))
+          .items,
+      setSidebarItems: async (orgId, items) =>
+        (await request<{ items: SidebarItems }>(`${org(orgId)}/me/sidebar`, { method: "PUT", json: { items } })).items,
       update: (orgId, input) => request<void>(org(orgId), { method: "PATCH", json: input }),
       members: async (orgId) => (await request<{ members: Member[] }>(`${org(orgId)}/members`)).members,
       changeRole: (orgId, userId, role) =>
@@ -505,6 +515,15 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       proposal: (orgId, messageId) => request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}`),
       denyProposal: (orgId, messageId) =>
         request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}/deny`, { json: {} }),
+      createProposed: (orgId, messageId) =>
+        request<{ agent: Agent; proposal: AgentProposal; ai: SuggestedAi["kind"] }>(
+          `${org(orgId)}/agent-proposals/${enc(messageId)}/create`,
+          {
+            json: {},
+          },
+        ),
+      proposalRoutine: (orgId, messageId) =>
+        request<AgentProposal>(`${org(orgId)}/agent-proposals/${enc(messageId)}/routine`, { json: {} }),
       update: (orgId, agentId, input) =>
         request<Agent>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "PATCH", json: input }),
       archive: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}`, { method: "DELETE" }),
@@ -599,6 +618,14 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     imports: {
       apply: (orgId, input) => request<ImportPlan>(`${org(orgId)}/imports`, { json: input }),
       sources: async (orgId) => (await request<{ sources: ImportedSource[] }>(`${org(orgId)}/imports`)).sources,
+      copyFile: (orgId, input) => {
+        const form = new FormData();
+        form.append("file", input.file, input.name);
+        form.append("agentId", input.agentId);
+        form.append("path", input.path);
+        if (input.note) form.append("note", input.note);
+        return files.upload<ImportedFile>(`${org(orgId)}/imports/files`, form);
+      },
       exportUrl: (orgId) => `${base}${org(orgId)}/export`,
     },
     chat: {
@@ -622,6 +649,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       place: (orgId, channelId, input) =>
         request<void>(`${org(orgId)}/channels/${enc(channelId)}/place`, { method: "PUT", json: input }),
       join: (orgId, channelId) => request<void>(`${org(orgId)}/channels/${enc(channelId)}/join`, { json: {} }),
+      card: (orgId, channelId) => request<ChannelCard>(`${org(orgId)}/channels/${enc(channelId)}/card`),
       update: (orgId, channelId, input) =>
         request<Channel>(`${org(orgId)}/channels/${enc(channelId)}`, { method: "PATCH", json: input }),
       reactions: async (orgId, messageId) =>
@@ -1170,6 +1198,8 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<WikiPage>(`${org(orgId)}/wiki/pages/${enc(slug)}/lock`, { json: { locked } }),
       pin: (orgId, slug, pinned) =>
         request<WikiPage>(`${org(orgId)}/wiki/pages/${enc(slug)}/pin`, { json: { pinned } }),
+      audience: (orgId, slug, audience) =>
+        request<WikiPage>(`${org(orgId)}/wiki/pages/${enc(slug)}/audience`, { method: "PUT", json: { audience } }),
       remove: async (orgId, slug) => {
         await request<void>(`${org(orgId)}/wiki/pages/${enc(slug)}`, { method: "DELETE" });
       },

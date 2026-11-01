@@ -3,6 +3,7 @@ import {
   addChannelMember,
   answerNow,
   cancelFollowUp,
+  channelCard,
   consultationConversation,
   consultationsIn,
   createChannel,
@@ -208,6 +209,36 @@ export function chatRoutes(deps: AppDeps) {
       const { orgId, channelId } = c.req.valid("param");
       await joinChannel(db, c.get("user").id, orgId, channelId);
       return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/channels/{channelId}/card",
+      tags,
+      security,
+      summary: "A #channel link's card: name, topic, counts, whether I'm in it (404 for a channel I can't see)",
+      request: { params: ChannelParams },
+      responses: {
+        200: json(
+          z.object({
+            id: z.uuid(),
+            name: z.string(),
+            topic: z.string(),
+            visibility: z.enum(["public", "private"]),
+            isMember: z.boolean(),
+            archived: z.boolean(),
+            people: z.number().int(),
+            agents: z.number().int(),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, channelId } = c.req.valid("param");
+      return c.json(await channelCard(db, c.get("user").id, orgId, channelId), 200);
     },
   );
 

@@ -13,14 +13,14 @@ import { and, asc, type Database, eq, inArray, isNull, like, ne, notInArray, sch
 import { recordAudit } from "../audit";
 import { caches } from "../cache";
 import { openSecret, sealSecret, sha256 } from "../crypto";
-import { ConflictError, NotFoundError, ValidationError } from "../errors";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { isBlockedAddress, type ResolveHost, resolveHostDns } from "../net-guard";
 import { requirePermission } from "../organizations";
 import { closedRefusal, orgStanding } from "../standing";
 import { isEmailAddress, normalizeAddress } from "./text";
 import { restartMailWatches } from "./watches";
 
-const { mailAccounts, mailAgentPolicies, mailWatches, agentScopes } = schema;
+const { mailAccounts, mailAgentPolicies, mailWatches, agentScopes, users } = schema;
 
 export type MailAccountRow = typeof mailAccounts.$inferSelect;
 
@@ -58,6 +58,8 @@ export interface MailAccountView {
   aliases: string[];
   /** What new mail goes out from; null = `address`. */
   defaultFrom: string | null;
+  /** Who connected it: the only person who gives agents access to it (ADR 0038). */
+  ownerUserId: string | null;
   agents: { agentId: string; level: "read" | "read_write"; canDelete: boolean }[];
 }
 
@@ -146,6 +148,7 @@ export function mailAccountView(row: MailAccountRow, grants?: Map<string, Set<st
     askActions: row.askActions.filter((a): a is MailAction => (ASKABLE_MAIL_ACTIONS as readonly string[]).includes(a)),
     aliases: row.aliases,
     defaultFrom: row.defaultFrom,
+    ownerUserId: row.createdByUserId,
     agents,
   };
 }
@@ -191,6 +194,18 @@ export async function listMailAccounts(db: Database, actorId: string, orgId: str
     rows.map((r) => r.id),
   );
   return rows.map((r) => mailAccountView(r, grants.get(r.id)));
+}
+
+/** The refusal when someone other than who connected a mailbox would widen what agents do with it (ADR 0038). */
+export async function mailOwnerOnlyError(db: Database, account: { address: string; createdByUserId: string | null }) {
+  const [owner] = account.createdByUserId
+    ? await db.select({ name: users.name }).from(users).where(eq(users.id, account.createdByUserId))
+    : [];
+  return new ForbiddenError(
+    `Only ${owner?.name ?? "the person who connected it"} can give an agent access to ${account.address}`,
+    "mail.owner_only",
+    { address: account.address, ownerUserId: account.createdByUserId ?? "", ownerName: owner?.name ?? "" },
+  );
 }
 
 async function loadAccount(db: Database, orgId: string, id: string) {
@@ -624,6 +639,16 @@ export async function updateMailAccount(
       throw new ValidationError(`These actions can't be made to ask: ${wrong.join(", ")}`, "mail.action");
     set.askActions = [...new Set(input.askActions)];
   }
+  if (row.createdByUserId !== actorId) {
+    // Narrowing (more off, more asking, fewer aliases) is anyone's; widening is giving access.
+    const off = set.offActions ?? row.offActions;
+    const ask = set.askActions ?? row.askActions;
+    const widens =
+      row.offActions.some((a) => !off.includes(a)) ||
+      row.askActions.some((a) => !ask.includes(a) && !off.includes(a)) ||
+      aliases.some((a) => !row.aliases.includes(a));
+    if (widens) throw await mailOwnerOnlyError(deps.db, row);
+  }
   if (input.password !== undefined) {
     if (row.via !== "imap") throw new ValidationError("Only IMAP mailboxes have a password", "mail.no_password");
     const imap = imapOf(deps);
@@ -824,10 +849,12 @@ export async function openAccount(deps: MailDeps, row: MailAccountRow): Promise<
   return connector.open(await accountRef(deps, row));
 }
 
-/** Folders of a mailbox, for the agent settings screen (admins). */
+/** Folders of a mailbox, for an agent's rules there (its owner, who sets them, and admins). */
 export async function listMailFolders(deps: MailDeps, actorId: string, orgId: string, accountId: string) {
-  await requirePermission(deps.db, actorId, orgId, "manage_agents");
-  const provider = await openMailProvider(deps, orgId, accountId);
+  await requirePermission(deps.db, actorId, orgId, "read");
+  const row = await loadAccount(deps.db, orgId, accountId);
+  if (row.createdByUserId !== actorId) await requirePermission(deps.db, actorId, orgId, "manage_agents");
+  const provider = await openAccount(deps, row);
   try {
     return await provider.listFolders();
   } finally {

@@ -70,6 +70,7 @@ import type {
   SearchHit,
   SecretRequest,
   ServerTelemetry,
+  SidebarItems,
   SignInOptions,
   StoragePlatform,
   StorageUsage,
@@ -78,8 +79,10 @@ import type {
 import { ApiError } from "@agenteschat/client";
 import { moveInGroups } from "@agenteschat/client/lib/agent-groups";
 import { answersOthers, audienceOf } from "@agenteschat/client/lib/audience";
+import { freeHandle, takenHandles } from "@agenteschat/client/lib/new-agent";
 import { stepIndex } from "@agenteschat/client/lib/onboarding";
 import { grants, SUMMARY_ORDER } from "@agenteschat/client/lib/roles";
+import { driveFolder, isSecretFile } from "@agenteschat/ui/names";
 import { createFakeAccess } from "./fakes/access";
 import { createMockArtifacts } from "./fakes/artifacts";
 import { createFakeBrowser, type FakeBrowser } from "./fakes/browser";
@@ -158,6 +161,8 @@ function fakePlanAccount(money: boolean): PlanAccountUsage {
 
 export interface FakeState {
   me: Me | null;
+  /** What a one-click proposed agent thinks with (default: what its draft suggested). */
+  proposalAi?: "account" | "model" | "none";
   /** Overrides `account.authConfig` (default: GitHub only, sign-up open). */
   authConfig?: Partial<AuthConfig>;
   /** Overrides `account.signInOptions` (default: no account, sign-up allowed). */
@@ -250,6 +255,8 @@ export interface FakeState {
   actionErrors?: Record<string, ApiError>;
   /** Set by `createFakeApi`: `chat.post` with `openThread` marks the thread (the threads fake). */
   openThread?: (orgId: string, threadId: string, at: string) => Promise<void>;
+  /** Set by `createFakeApi`: the Drive an import copies the agents' files into (the artifacts fake). */
+  drive?: ApiClient["artifacts"];
   /** Make `chat.post` fail (optimistic send tests): `true` is the server refusing it, or this error. */
   failPosts?: boolean | ApiError;
   /** `chat.post` waits for this (to see the pending state). */
@@ -330,6 +337,10 @@ export interface FakeState {
   codeError?: ApiError;
   /** The workspace's roles (ADR 0085, `roles.*`); unset: a new workspace's (`seedRoles`). */
   roles?: OrgRole[];
+  /** Where I put the sidebar's tools (`orgs.sidebarItems`); unset = none moved. */
+  sidebarItems?: SidebarItems;
+  /** Make `orgs.setSidebarItem` and `orgs.setSidebarItems` fail with this error. */
+  sidebarItemsError?: ApiError;
 }
 
 /** A new workspace's "Admin" role (ADR 0085); João holds it. */
@@ -376,6 +387,17 @@ export function meAsAdmin(state: FakeState) {
   if (org) org.role = "member";
   const me = state.members.find((m) => m.userId === state.me?.user.id);
   if (me) me.roleIds = [ADMIN_ROLE_ID];
+}
+
+/** Me as a member whose one role, "Criadores", holds `permissions` past what `everyone` gives ("Criar agentes"…). */
+export function meWithRole(state: FakeState, permissions: string[]) {
+  const [admin, everyone] = seedRoles() as [OrgRole, OrgRole];
+  const makers = { ...admin, id: "role-makers", name: "Criadores", icon: "bolt", color: "amber", position: 1 };
+  state.roles = [admin, { ...makers, permissions }, { ...everyone, position: 2 }];
+  const org = state.me?.organizations[0];
+  if (org) org.role = "member";
+  const me = state.members.find((m) => m.userId === state.me?.user.id);
+  if (me) Object.assign(me, { role: "member", roleIds: [makers.id] });
 }
 
 /** The permission areas `roles.list` sends (the server's `PERMISSION_AREAS`). */
@@ -1357,6 +1379,22 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         });
         return { ...m, ...presenceOf(state, m.userId), lastSeenAt: new Date().toISOString() };
       },
+      sidebarItems: async () => structuredClone(state.sidebarItems ?? {}),
+      setSidebarItem: async (orgId, item, place) => {
+        log("orgs.setSidebarItem", orgId, item, place);
+        if (state.sidebarItemsError) throw state.sidebarItemsError;
+        const items = { ...state.sidebarItems };
+        if (place === null) delete items[item];
+        else items[item] = place;
+        state.sidebarItems = items;
+        return structuredClone(items);
+      },
+      setSidebarItems: async (orgId, items) => {
+        log("orgs.setSidebarItems", orgId, items);
+        if (state.sidebarItemsError) throw state.sidebarItemsError;
+        state.sidebarItems = structuredClone(items);
+        return structuredClone(items);
+      },
       setAvatar: async (orgId, input) => {
         log("orgs.setAvatar", orgId, { contentType: input.contentType, bytes: input.imageBase64.length });
         const m = state.members.find((x) => x.userId === state.me?.user.id);
@@ -1718,10 +1756,61 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         Object.assign(proposalCard(messageId).card, { state: "denied", decidedByUserId: state.me?.user.id ?? null });
         return proposalView(messageId);
       },
+      // As the server: the draft as it is, owned by me, with the lines I may give (my own mailboxes).
+      createProposed: async (orgId, messageId) => {
+        log("agents.createProposed", orgId, messageId);
+        const { card } = proposalCard(messageId);
+        if (card.state !== "pending") throw new ApiError(409, "agent_proposal.decided", "Already decided");
+        const me = state.me?.user.id ?? null;
+        const { draft } = card.params;
+        const agent: Agent = {
+          id: id("agent"),
+          name: draft.name,
+          handle: draft.handle,
+          role: draft.role,
+          instructions: draft.instructions,
+          model: "auto",
+          ownerUserId: me,
+          hasCredential: false,
+          monthlyBudgetUsd: null,
+          createdAt: NOW.toISOString(),
+          audience: { mode: "everyone", userIds: [] },
+          ...(draft.appearance ? { appearance: draft.appearance } : {}),
+        };
+        state.agents.push(agent);
+        Object.assign(card, {
+          state: "created",
+          agentId: agent.id,
+          decidedByUserId: me,
+          applied: {
+            channelIds: draft.channelIds,
+            connectionIds: draft.access.map((a) => a.connectionId),
+            mailAccountIds: (draft.mail ?? []).filter((m) => m.ownerUserId === me).map((m) => m.accountId),
+          },
+          routineId: draft.routine ? id("routine") : null,
+        });
+        return { agent: { ...agent }, proposal: proposalView(messageId), ai: state.proposalAi ?? draft.ai.kind };
+      },
+      proposalRoutine: async (orgId, messageId) => {
+        log("agents.proposalRoutine", orgId, messageId);
+        Object.assign(proposalCard(messageId).card, { routineId: id("routine") });
+        return proposalView(messageId);
+      },
       update: async (orgId, agentId, input) => {
         log("agents.update", orgId, agentId, input);
         const agent = state.agents.find((a) => a.id === agentId);
         if (!agent) throw new ApiError(404, "not_found", "Agent not found");
+        // As the backend: a taken handle is refused with a free one; the one it leaves keeps naming it.
+        if (input.handle !== undefined && input.handle !== agent.handle) {
+          const taken = takenHandles(state.agents, state.members, agentId);
+          if (taken.has(input.handle)) {
+            throw new ApiError(409, "agent.handle_taken", `@${input.handle} is already taken`, {
+              handle: input.handle,
+              suggestion: freeHandle(input.handle, taken),
+            });
+          }
+          agent.previousHandles = [...(agent.previousHandles ?? []).filter((h) => h !== input.handle), agent.handle];
+        }
         // One agent coordinates the team at a time (ADR 0093).
         if (input.coordinator) for (const a of state.agents) a.coordinator = false;
         Object.assign(agent, input);
@@ -2067,6 +2156,20 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return sources;
       },
       exportUrl: (orgId) => `/api/app/organizations/${orgId}/export`,
+      // Like the backend: `<agent's name>/<path>` in the Drive, never over a name already there, never a key file.
+      copyFile: async (orgId, { file, ...input }) => {
+        log("imports.copyFile", orgId, input);
+        if (isSecretFile(input.path)) throw new ApiError(400, "import.secret_file", "Never copied to the Drive");
+        const agent = state.agents.find((a) => a.id === input.agentId);
+        const drive = state.drive;
+        if (!agent || !drive) throw new ApiError(404, "not_found", "Agent not found");
+        const folder = driveFolder(agent.name);
+        const title = `${folder}/${input.path}`;
+        const there = (await drive.list(orgId)).find((a) => a.title === title && a.channelId === null);
+        if (there) return { status: "exists", artifactId: there.id, title, folder };
+        const created = await drive.upload(orgId, new File([file], input.name), { title });
+        return { status: "created", artifactId: created.id, title, folder };
+      },
     },
     chat: {
       channels: async () => state.channels,
@@ -2132,6 +2235,22 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("chat.join", orgId, channelId);
         const c = state.channels.find((x) => x.id === channelId);
         if (c) c.isMember = true;
+      },
+      card: async (_orgId, channelId) => {
+        const c = state.channels.find((x) => x.id === channelId);
+        if (!c || (c.visibility === "private" && !c.isMember))
+          throw new ApiError(404, "not_found", "Channel not found");
+        const members = state.channelMembers[channelId] ?? [];
+        return {
+          id: c.id,
+          name: c.name,
+          topic: c.topic,
+          visibility: c.visibility,
+          isMember: c.isMember,
+          archived: false,
+          people: members.filter((m) => m.type === "person").length,
+          agents: members.filter((m) => m.type === "agent").length,
+        };
       },
       members: async (_orgId, channelId) => state.channelMembers[channelId] ?? [],
       archive: async (orgId, channelId) => {
@@ -2780,9 +2899,15 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
     (method, ...args) => state.calls.push({ method, args }),
     (orgId) => customConnectors.list(orgId),
   );
-  const mail = createFakeMail((method, ...args) => state.calls.push({ method, args }), ctx.now);
+  const mail = createFakeMail(
+    (method, ...args) => state.calls.push({ method, args }),
+    ctx.now,
+    () => state.me?.user.id ?? null,
+  );
   const databases = createFakeDatabases((method, ...args) => state.calls.push({ method, args }), ctx.now);
   const browser = createFakeBrowser((method, ...args) => state.calls.push({ method, args }), ctx.now);
+  const artifacts = createMockArtifacts(ctx, (method, ...args) => state.calls.push({ method, args }));
+  state.drive = artifacts;
   const client: ApiClient = {
     ...http,
     sandbox: createFakeSandbox(ctx, (method, ...args) => state.calls.push({ method, args }), machines),
@@ -2939,7 +3064,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
       () => state.storagePlatform,
       () => state.storageUsage,
     ),
-    artifacts: createMockArtifacts(ctx, (method, ...args) => state.calls.push({ method, args })),
+    artifacts,
     ...createMockPlanning(ctx, (method, ...args) => state.calls.push({ method, args })),
     customConnectors,
     mail: mail.client,

@@ -25,6 +25,7 @@ import {
   createAppRouter,
   errors,
   json,
+  MULTIPART_SLACK_BYTES,
   noContent,
   OrgParams,
   requireSession,
@@ -63,8 +64,6 @@ const Content = z.discriminatedUnion("kind", [...textContents, FileContent]).ope
 
 /** A file upload (multipart): at most 50 MB. */
 const fileField = z.any().openapi({ type: "string", format: "binary", description: "The file (≤ 50 MB)." });
-/** Multipart overhead allowed on top of the file itself. */
-const MULTIPART_SLACK_BYTES = 64 * 1024;
 const multipart = <T extends z.ZodType>(schema: T) => ({
   required: true,
   content: { "multipart/form-data": { schema } },

@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { MigrationBundle } from "@agenteschat/client";
+import { cronOf, everyMinutes, sha256, splitNote } from "@agenteschat/client/lib/import/shared";
 import {
   detectSource,
   EXPORT_PROMPT,
@@ -12,10 +13,10 @@ import {
   importedModel,
   interpolateEnv,
   parseImport,
+  parsePackage,
   scrubSecrets,
   uniqueHandle,
 } from "@/lib/import";
-import { cronOf, everyMinutes, sha256, splitNote } from "@/lib/import/shared";
 
 /**
  * Fixtures: the projects' own files where their license allows (upstream paths,
@@ -412,7 +413,11 @@ describe("OpenBot.run", () => {
     expect(groupLeftOut(b.leftOut)).toEqual([
       { kind: "routine", labels: ["Pulse (Scout)"] },
       { kind: "picture", labels: ["Scout"] },
-      { kind: "file", labels: ["agents/scout/skills/price-watch/ (1)", "agents/scout/files/ (1)"] },
+      { kind: "file", labels: ["agents/scout/skills/price-watch/ (1)"] },
+    ]);
+    // The rest of files/ is the agent's own, for its folder in the Drive.
+    expect(parsePackage(files).files.map((f) => [f.agent, f.path, f.skip ?? "copy"])).toEqual([
+      ["scout", "rivals.txt", "copy"],
     ]);
   });
 
@@ -537,7 +542,11 @@ describe("OpenClaw", () => {
     ]);
     expect(groupLeftOut(b.leftOut)).toEqual([
       { kind: "picture", labels: ["Pinch"] },
-      { kind: "file", labels: ["skills/grocery-list/ (1)", "notes/ (1)"] },
+      { kind: "file", labels: ["skills/grocery-list/ (1)"] },
+    ]);
+    // What the agent made in its workspace is its own, for its folder in the Drive; its skills' files aren't.
+    expect(parsePackage(files, { root: "workspace" }).files.map((f) => [f.agent, f.path])).toEqual([
+      ["pinch", "notes/ideas.md"],
     ]);
   });
 

@@ -15,6 +15,7 @@ import {
   useToggleReaction,
   useWaiting,
 } from "@agenteschat/client";
+import { channelRefsOf } from "@agenteschat/client/lib/channel-refs";
 import { CONTINUE_ERRORS, errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
@@ -44,7 +45,7 @@ import { consultationHref, routineHref } from "../links/logic";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard, SetupFailedCard } from "../missions/cards";
 import { BrainWait } from "../outages/WaitCard";
 import { AgentFace, Face } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
+import { useColors, useDirectory, useMeId, useNamesComputers, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
 import { ReceiptMark } from "./AgentReceipts";
@@ -85,7 +86,8 @@ const MARK_ROOM = 48;
  * One message: the face and name (dropped when grouped), a pin mark when
  * pinned, what it consulted, its text, the cards it carries and the reactions. Long press opens its
  * actions (the screen's sheet). An agent's reply takes its live block's place: its tools stay one closed
- * line above the words ("Usou N ferramentas"), and a stopped one says so with "Continuar". A person's message's
+ * line under its words and what it changed ("Usou N ferramentas"), the same place live, kept and saved, and a
+ * stopped one says so with "Continuar". A person's message's
  * receipt is a mark in room the row already has (`ReceiptMark`), so it never changes the row's height: beside my
  * bubble, whether an agent read it ("lê na próxima pausa", "leu") or who read it in a DM; at the end of someone
  * else's name line, the agents' receipt of their latest message.
@@ -147,10 +149,12 @@ export const MessageRow = memo(function MessageRow({
   const reminder = isReminderMessage(meta);
   // A short reply it gave while its task kept working (the talker): its message, "enquanto trabalha".
   const talker = isAgent && isTalkerReply(meta);
-  // What the server wrote itself is said in the person's language; a stopped reply drops the server's note.
+  // What the server wrote itself is said in the person's language; a stopped reply drops the server's note. Where a
+  // task ran is said only where the workspace has more than one computer.
+  const names = useNamesComputers();
   const body = hidesBody(m)
     ? ""
-    : reminderBody(splitCanceled(serverBody(t, m.body, meta, i18n.language), meta).body, meta);
+    : reminderBody(splitCanceled(serverBody(t, m.body, meta, i18n.language, names), meta).body, meta);
   const consulted = isAgent && m.author.id ? consultationsOf(meta) : [];
   // A GIF or a sticker (ADR 0091); with no words, the message is the picture alone (no empty bubble).
   const media = messageMediaOf(meta);
@@ -219,21 +223,16 @@ export const MessageRow = memo(function MessageRow({
   // My own message: a light bubble on the right, no face or name.
   const mine = m.author.type === "person" && Boolean(meId) && m.author.id === meId;
 
+  // The cards it carries: above an agent's tools, which come last.
   const cards = (
     <>
       {issueWork ? (
         <IssueWorkCard work={issueWork} authorId={m.author.type === "person" ? (m.author.id ?? null) : null} />
       ) : null}
-      {thread && !meta?.missionStart ? (
-        <View style={mine ? styles.meEnd : undefined}>
-          <ThreadLink thread={thread} />
-        </View>
-      ) : null}
       {meta?.missionStart ? <MissionCard threadId={m.id} /> : null}
       {link ? <MissionCard missionId={link.missionId} /> : null}
       {plan ? <PlanCard missionId={plan.missionId} goal={plan.goal} /> : null}
       {review ? <ReviewCard missionId={review.missionId} reviewId={review.id} /> : null}
-      {decision ? <DecisionCard missionId={decision.missionId} decisionId={decision.id} /> : null}
       {setup ? (
         <SetupFailedCard
           {...(setup.missionId ? { missionId: setup.missionId } : {})}
@@ -241,6 +240,17 @@ export const MessageRow = memo(function MessageRow({
           error={setup.error}
           {...(setup.reason === "branch_missing" ? { lostBranch: setup.branch ?? null } : {})}
         />
+      ) : null}
+    </>
+  );
+  const missionDecision = decision ? <DecisionCard missionId={decision.missionId} decisionId={decision.id} /> : null;
+  // Under everything: the thread it started, its reactions and whether it went out.
+  const foot = (
+    <>
+      {thread && !meta?.missionStart ? (
+        <View style={mine ? styles.meEnd : undefined}>
+          <ThreadLink thread={thread} />
+        </View>
       ) : null}
       {readOnly ? null : (
         <View style={mine ? styles.meEnd : undefined}>
@@ -264,7 +274,13 @@ export const MessageRow = memo(function MessageRow({
     // beside it.
     const lead = body ? (
       <View style={[styles.bubble, styles.lead, { backgroundColor: c.bubble }]}>
-        <MessageText body={body} muted={m.local === "pending"} selectable={false} accent={accent} />
+        <MessageText
+          body={body}
+          muted={m.local === "pending"}
+          selectable={false}
+          accent={accent}
+          channelRefs={channelRefsOf(m.meta)}
+        />
       </View>
     ) : media ? (
       <View style={styles.grow}>
@@ -308,7 +324,11 @@ export const MessageRow = memo(function MessageRow({
             <MessageFiles files={files} align="end" />
           </View>
         ) : null}
-        <View style={styles.meCards}>{cards}</View>
+        <View style={styles.meCards}>
+          {cards}
+          {missionDecision}
+          {foot}
+        </View>
       </Pressable>
     );
   }
@@ -394,37 +414,30 @@ export const MessageRow = memo(function MessageRow({
         {consulted.map((cs) => (
           <ConsultationCard key={cs.consultationId} askerId={m.author.id ?? ""} consultation={cs} />
         ))}
-        {isAgent && m.agentRunId && !m.local && !readOnly && !mediaAfter && consulted.length === 0 ? (
-          <ConsultGroup message={m} color={color} />
-        ) : null}
         {opened?.said ? <MessageText body={opened.said} selectable={false} accent={accent} /> : null}
-        {kept ? (
-          <TurnTools
-            items={opened?.lines ?? kept.items}
-            agentName={agent?.name ?? name}
-            color={color}
-            quoteOf={(id) => kept.quotes[id]}
-            done
-            settled
-          />
-        ) : steps && m.agentRunId ? (
-          <SavedTools
-            runId={m.agentRunId}
-            meta={meta}
-            agentName={agent?.name ?? name}
-            color={color}
-            skipScreens={onCards}
-          />
-        ) : null}
         {brainWait ? (
           <BrainWait
             message={m}
             fallback={
-              body ? <MessageText body={body} muted={m.local === "pending"} selectable={false} accent={accent} /> : null
+              body ? (
+                <MessageText
+                  body={body}
+                  muted={m.local === "pending"}
+                  selectable={false}
+                  accent={accent}
+                  channelRefs={channelRefsOf(m.meta)}
+                />
+              ) : null
             }
           />
         ) : body ? (
-          <MessageText body={body} muted={m.local === "pending"} selectable={false} accent={accent} />
+          <MessageText
+            body={body}
+            muted={m.local === "pending"}
+            selectable={false}
+            accent={accent}
+            channelRefs={channelRefsOf(m.meta)}
+          />
         ) : null}
         {media ? <ChatMedia media={media} liveId={m.id} /> : null}
         {(stopped || atLimit) && m.agentRunId ? (
@@ -438,13 +451,7 @@ export const MessageRow = memo(function MessageRow({
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
         {isAgent ? <TeamChecks message={m} /> : null}
         {isAgent ? <ReachLines message={m} /> : null}
-        {isAgent ? <NoAiCard message={m} /> : null}
-        {isAgent ? <StretchCard message={m} /> : null}
-        {isAgent ? <ProposalCard message={m} /> : null}
-        {isAgent ? <InstructionProposals message={m} /> : null}
         {files.length > 0 ? <MessageFiles files={files} /> : null}
-        {approvalId ? <ApprovalInline approvalId={approvalId} messageId={m.id} /> : null}
-        {handoff ? <HandoffCard handoff={handoff} /> : null}
         {trails && m.author.id && trails.browser.length > 0 ? (
           <TrailCard
             agentId={m.author.id}
@@ -463,9 +470,40 @@ export const MessageRow = memo(function MessageRow({
             screen="desktop"
           />
         ) : null}
+        {cards}
+        {/* Its tools after its words, what it changed and its cards: the same place live, kept and saved. */}
+        {isAgent && m.agentRunId && !m.local && !readOnly && !mediaAfter && consulted.length === 0 ? (
+          <ConsultGroup message={m} color={color} />
+        ) : null}
+        {kept ? (
+          <TurnTools
+            items={opened?.lines ?? kept.items}
+            agentName={agent?.name ?? name}
+            color={color}
+            quoteOf={(id) => kept.quotes[id]}
+            done
+            settled
+          />
+        ) : steps && m.agentRunId ? (
+          <SavedTools
+            runId={m.agentRunId}
+            meta={meta}
+            agentName={agent?.name ?? name}
+            color={color}
+            skipScreens={onCards}
+          />
+        ) : null}
+        {/* What waits for a person's click comes last, after the words and the tools. */}
+        {isAgent ? <NoAiCard message={m} /> : null}
+        {isAgent ? <StretchCard message={m} /> : null}
+        {isAgent ? <ProposalCard message={m} /> : null}
+        {isAgent ? <InstructionProposals message={m} /> : null}
+        {approvalId ? <ApprovalInline approvalId={approvalId} messageId={m.id} /> : null}
+        {handoff ? <HandoffCard handoff={handoff} /> : null}
         {question ? <QuestionCard key={`${question.id}:${question.status}`} question={question} /> : null}
         {secret ? <SecretCard key={`${secret.id}:${secret.status}`} request={secret} /> : null}
-        {cards}
+        {missionDecision}
+        {foot}
       </View>
     </Pressable>
   );

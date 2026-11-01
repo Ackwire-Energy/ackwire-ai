@@ -15,10 +15,12 @@ import {
   runMatches,
   type Saved,
 } from "@/lib/agent-edit";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, NOW, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
+
+const DESIGN_ID = "00000000-0000-4000-8000-0000000000c9";
 
 const go = async (query = "", state = seedState()) => {
   const r = await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}${query}`, { api: createFakeApi(state) });
@@ -376,6 +378,33 @@ describe("agent page: who edits what", () => {
     await settle(6);
     expect(updates(state)).toEqual([{ appearance: { color: "rose", eyes: "round", accessory: "none" } }]);
   });
+
+  test("the owner puts it in and takes it out of the channels they're in; the others show as they are", async () => {
+    const state = asOwner();
+    // An admin put Ada in #design, which I'm not in.
+    state.channels.push({
+      id: DESIGN_ID,
+      name: "design",
+      topic: "",
+      visibility: "public",
+      isMember: false,
+      createdAt: NOW.toISOString(),
+    });
+    state.channelMembers[DESIGN_ID] = [{ type: "agent", id: ADA_ID }];
+    await go("?tab=settings&sec=channels", state);
+    const card = document.getElementById("agp-sec-channels") as HTMLElement;
+    expect(within(card).queryByRole("checkbox", { name: "#design" })).toBeNull();
+    expect(card.querySelector(".agp-chips")?.textContent).toBe("design");
+    expect(hintText(card, "Canais")).toBe("Você muda só os canais em que está. Para mexer em outro, entre nele antes.");
+    await click(within(card).getByRole("checkbox", { name: "#general" }));
+    await click(within(card).getByRole("checkbox", { name: "#eng" }));
+    await click(within(saveBar() as HTMLElement).getByRole("button", { name: /^Salvar/ }));
+    await settle(8);
+    expect(state.calls.find((c) => c.method === "agents.setChannels")?.args[2]).toEqual([
+      { channelId: DESIGN_ID, autoReply: true },
+      { channelId: GENERAL_ID },
+    ]);
+  });
 });
 
 describe("agent page: who coordinates the team (ADR 0093)", () => {
@@ -433,12 +462,14 @@ describe("agent page: inline editing and the save bar", () => {
     await openTab(/^Configurações/);
     await type(screen().getByLabelText("Nome"), "Ada Lovelace");
     const bar = saveBar() as HTMLElement;
-    expect(bar.textContent).toContain("2 alterações");
-    expect(bar.textContent).toContain("Nome e Instruções");
+    // A new name moves the @ too.
+    expect(bar.textContent).toContain("3 alterações");
+    expect(bar.textContent).toContain("Nome, Menções e Instruções");
     await click(within(bar).getByRole("button", { name: "Ver" }));
     const list = screen().getByRole("dialog", { name: "O que mudou" });
     expect(list.textContent).toContain("1 linha nova");
     expect(list.textContent).toContain("Ada → Ada Lovelace");
+    expect(list.textContent).toContain("@ada → @adalovelace");
     await click(within(list).getByRole("button", { name: "Desfazer: Nome" }));
     expect((screen().getByLabelText("Nome") as HTMLInputElement).value).toBe("Ada");
     expect(saveBar()?.textContent).toContain("1 alteração");
@@ -692,6 +723,7 @@ describe("agent page: activity", () => {
 describe("agent page rules", () => {
   const saved: Saved = {
     name: "Ada",
+    handle: "ada",
     role: "Dev",
     look: { color: "sky", eyes: "round", accessory: "none" },
     instructions: "a\nb",
@@ -707,8 +739,9 @@ describe("agent page rules", () => {
   test("only real differences count; undo removes one", () => {
     expect(changedKeys(saved, { name: "Ada", budget: "" })).toEqual([]);
     const edits = { name: "Ada L", levels: { "connector:gh": "write" as const, "area:skills": "read" as const } };
-    expect(changedKeys(saved, edits).map((c) => c.key)).toEqual(["name", "levels:connector:gh"]);
-    expect(changedKeys(saved, revertKey(edits, "levels:connector:gh")).map((c) => c.key)).toEqual(["name"]);
+    // A new name moves the @ too (`handleAfterRename`).
+    expect(changedKeys(saved, edits).map((c) => c.key)).toEqual(["name", "handle", "levels:connector:gh"]);
+    expect(changedKeys(saved, revertKey(edits, "levels:connector:gh")).map((c) => c.key)).toEqual(["name", "handle"]);
     expect(changedKeys(saved, { budget: "40" }).map((c) => c.key)).toEqual(["budget"]);
     expect(changedKeys(saved, { audience: { mode: "people", userIds: [] } }).map((c) => c.key)).toEqual(["audience"]);
   });

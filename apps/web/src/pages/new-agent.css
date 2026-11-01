@@ -56,7 +56,7 @@
   flex-direction: column;
   gap: 10px;
   min-width: 0;
-  height: 100dvh;
+  height: var(--onb-h, 100dvh);
   padding: 38px 0 16px;
   box-sizing: border-box;
   animation: newag-in 0.32s var(--out) both;
@@ -386,5 +386,32 @@
   .newag__pv-cover {
     animation: none;
     transition: none;
+  }
+}
+
+/*
+ * The card's review, over the conversation (`NewAgentPage` with `onClose`): the flow in a dialog as tall as the window
+ * allows, scrolling inside it. `--onb-h` is that height, which the flow's rail, preview and steps fill as they fill the
+ * window on its own page. A phone gets the whole screen.
+ */
+.newag-dialog {
+  --onb-h: min(880px, calc(100dvh - 48px));
+  height: var(--onb-h);
+  overflow: hidden;
+}
+.newag-dialog > .onb,
+.newag-dialog > .shell__main {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+@media (max-width: 760px) {
+  .newag-dialog {
+    --onb-h: 100dvh;
+    width: 100%;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
   }
 }

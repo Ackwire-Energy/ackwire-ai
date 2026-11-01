@@ -465,7 +465,7 @@ test("the Autonomia goes with the setup (ADR 0094); a new agent starts with one 
   expect(last.setup.autonomy).toBe("never");
   expect((await use({ setup: { ...setup, autonomy: "sometimes" }, agentIds: [eva.id] })).status).toBe(400);
 
-  // Bia creates agents: an Autonomia only on her own, as she could set it by hand.
+  // Bia creates agents: only her own (ADR 0085 §5), so she sets its Autonomia; nobody's is refused, Autonomia or not.
   const role = await api("/roles", { json: { name: "Criadores", permissions: ["create_agents"] } });
   const biaId = ((await (await member("/api/app/me")).json()) as { user: { id: string } }).user.id;
   await api(`/members/${biaId}/roles`, {
@@ -476,7 +476,10 @@ test("the Autonomia goes with the setup (ADR 0094); a new agent starts with one 
     asBia("/agents", { json: { name: handle, handle, ownerUserId, autonomy: "never" } });
   expect((await make("ivo", biaId)).status).toBe(201);
   expect((await make("rui", null)).status).toBe(403);
-  expect((await asBia("/agents", { json: { name: "Lua", handle: "lua", ownerUserId: null } })).status).toBe(201);
+  expect((await asBia("/agents", { json: { name: "Lua", handle: "lua", ownerUserId: null } })).status).toBe(403);
+  const lua = await asBia("/agents", { json: { name: "Lua", handle: "lua", autonomy: "never" } });
+  expect(lua.status).toBe(201);
+  expect(await autonomyOf(((await lua.json()) as { id: string }).id)).toBe("never");
 });
 
 test("mission brain: from the executor by default; the brain before Start, the model any time; who may", async () => {

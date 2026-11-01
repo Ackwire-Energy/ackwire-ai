@@ -16,11 +16,13 @@ import type { AiStatusDeps } from "./ai-status";
 import { AGENT_LOOK } from "./appearance";
 import { addChannelMember, createChannel } from "./channels";
 import { findMember } from "./chat-tools";
+import type { ContextDeps } from "./context/summaries";
 import { publishMessageCreated } from "./events";
 import { insertMessage, messageView } from "./messages";
 import { personBehindCall } from "./requester";
 import { bodyCode } from "./run-tools";
 import { replyThreadOf } from "./runs";
+import { ACCESS_SCHEMA, REPORT_SCHEMA, SCHEDULE_INPUT } from "./schedule-tools";
 import { noAgentText } from "./team";
 import { APPROVAL_TTL_MS } from "./tools/gateway";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
@@ -115,6 +117,8 @@ export function createSetupToolSource(deps: {
   pubsub?: PubSub;
   /** The model gateway's key check, for the AI a proposed agent starts with. */
   ai?: { gateway: AiStatusDeps["gateway"] };
+  /** Reads the schedule of the routine a proposed agent comes with (cron needs none). */
+  context?: ContextDeps;
 }): ToolSource {
   const tools: ToolDefinition[] = [
     {
@@ -291,7 +295,7 @@ export function createSetupToolSource(deps: {
     {
       name: PROPOSE_AGENT_TOOL,
       description:
-        "Propose a new agent for the team with a card in this conversation: a person reviews it in the app, edits it and creates it, or says no. Use it when someone asks for a new agent or bot, or when work needs a role nobody on the team has. It creates nothing: never say the agent exists until you are told it was created. The card suggests an AI for it by itself.",
+        "Propose a new agent for the team with one card in this conversation: a person creates it in one click (or reviews and edits it first), or says no. Use it when someone asks for a new agent or bot, or when work needs a role nobody on the team has. Put in this one call everything the request implies, so the agent works as soon as it is created: the channels it joins, its access to the connected apps and to the asker's own mailbox (by its address) when the job reads or sends their email, and `routine` when the job runs on a schedule ('todo dia ao meio-dia'). It creates nothing: never say the agent exists until you are told it was created. The card suggests an AI for it by itself.",
       scope: SETUP_SCOPE,
       inputSchema: {
         type: "object",
@@ -302,7 +306,12 @@ export function createSetupToolSource(deps: {
             pattern: "^@?[a-z0-9][a-z0-9_-]{1,31}$",
             description: "Its @handle: 2–32 lower-case letters, digits, - or _ (e.g. ada).",
           },
-          role: { type: "string", maxLength: 200, description: "What it is, in a few words (e.g. Designer)." },
+          role: {
+            type: "string",
+            maxLength: 200,
+            description:
+              "What it does for the team, said plainly in the person's language (e.g. Email and calendar assistant).",
+          },
           instructions: {
             type: "string",
             minLength: 1,
@@ -323,7 +332,8 @@ export function createSetupToolSource(deps: {
             type: "array",
             items: { type: "string", minLength: 1, maxLength: 81 },
             maxItems: 20,
-            description: "Public channels it joins, by name (e.g. design).",
+            description:
+              "Channels it joins, by name (e.g. design): public ones, and private ones of the person who asked that everyone here is in (this conversation, when it should work here). Its routine's conversation is added by itself.",
           },
           access: {
             type: "array",
@@ -333,8 +343,9 @@ export function createSetupToolSource(deps: {
                 connector: {
                   type: "string",
                   minLength: 1,
-                  maxLength: 80,
-                  description: "A connected app: github, linear…",
+                  maxLength: 320,
+                  description:
+                    "A connected app (github, linear…) or a mailbox of the person who asked, by its address.",
                 },
                 level: { type: "string", enum: ["read", "write"] },
               },
@@ -343,7 +354,26 @@ export function createSetupToolSource(deps: {
             },
             maxItems: 20,
             description:
-              "What it may use of the apps the workspace connected. Writing that matters still asks a person.",
+              "What it may use of the apps the workspace connected and of the asker's mailboxes. Writing that matters still asks a person. Only a mailbox's owner gives an agent access to it.",
+          },
+          routine: {
+            type: "object",
+            description:
+              "Work it does on its own on a schedule, created with it: each run gets `prompt` and reports in this conversation (in a DM, in its creator's DM with it).",
+            properties: {
+              schedule: SCHEDULE_INPUT,
+              prompt: {
+                type: "string",
+                minLength: 1,
+                maxLength: 10_000,
+                description: "What each run does, in the person's language.",
+              },
+              title: { type: "string", maxLength: 120 },
+              report: REPORT_SCHEMA,
+              access: ACCESS_SCHEMA,
+            },
+            required: ["schedule", "prompt"],
+            additionalProperties: false,
           },
           why: {
             type: "string",
@@ -369,8 +399,9 @@ export function createSetupToolSource(deps: {
             };
           }
           const forUserId = await personBehindCall(ctx);
+          const place = { orgId: ctx.orgId, channelId: ctx.channelId, personId: forUserId };
           const draft = {
-            ...(await checkAgentDraft(ctx.db, ctx.orgId, input)),
+            ...(await checkAgentDraft({ db: ctx.db, context: deps.context }, place, input)),
             ai: await suggestAgentAi({ db: ctx.db, gateway: deps.ai?.gateway }, ctx.orgId, forUserId),
           };
           const card: AgentProposalCard = {
@@ -393,7 +424,7 @@ export function createSetupToolSource(deps: {
           });
           if (deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(message));
           return {
-            content: `Posted the proposal of ${draft.name} (@${draft.handle}). A person reviews it from the card: nothing exists until they create it, and you'll be told what they decided.${(await mayCreateAgents(ctx.db, ctx.orgId, forUserId)) ? "" : " The person who asked can't create agents: an admin or owner reviews it."} Suggested AI: ${aiWords(draft.ai)}.`,
+            content: `Posted the proposal of ${draft.name} (@${draft.handle}). A person creates it from the card, in one click or after reviewing it: nothing exists until they do, and you'll be told what they decided and what it got.${(await mayCreateAgents(ctx.db, ctx.orgId, forUserId)) ? "" : " The person who asked can't create agents: an admin or owner reviews it."}${draft.routine ? ` Its routine «${draft.routine.name}» runs: ${draft.routine.description}.` : ""} Suggested AI: ${aiWords(draft.ai)}.`,
             data: { agentProposal: { messageId: message.id } },
           };
         } catch (error) {

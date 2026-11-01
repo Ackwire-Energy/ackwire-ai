@@ -381,7 +381,7 @@ async function ownRoutine(ctx: ToolContext, id: string) {
   return { row, error: "" };
 }
 
-const SCHEDULE_INPUT = {
+export const SCHEDULE_INPUT = {
   type: "string",
   minLength: 1,
   maxLength: 300,
@@ -409,12 +409,12 @@ const TRIGGER_SCHEMA = {
   required: ["type"],
   additionalProperties: false,
 };
-const REPORT_SCHEMA = {
+export const REPORT_SCHEMA = {
   type: "string",
   enum: ROUTINE_REPORT,
   description: '"when_new" (default): only when there is something new; "always": a report every run.',
 };
-const ACCESS_SCHEMA = {
+export const ACCESS_SCHEMA = {
   type: "string",
   enum: ROUTINE_ACCESS,
   description:

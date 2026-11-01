@@ -1,5 +1,18 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, type Executor, eq, inArray, isNotNull, isNull, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  arrayContains,
+  asc,
+  type Database,
+  type Executor,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  rowsOf,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { AUTO_MODEL, isAutoModel, MODEL_CATALOG } from "@agenteschat/providers";
 import { isIdHandle } from "@agenteschat/ui/names";
 import type { AgentAppearance } from "./appearance";
@@ -16,11 +29,46 @@ import { DEFAULT_AGENT_SCOPES, grantScopes } from "./tools/scopes";
 import { resyncBudgetCounter } from "./usage";
 import { resumeBudgetWaits } from "./usage-pause";
 
-const { agents, importItems, machines, providerCredentials } = schema;
+const { agents, importItems, machines, organizationMembers, providerCredentials } = schema;
 
 export type Agent = typeof agents.$inferSelect;
 
 export const HANDLE_PATTERN = /^[a-z0-9][a-z0-9_-]{1,31}$/;
+
+/** Every handle an agent can't take: the other agents' (archived and deleted ones too), the ones they had, people's. */
+export async function takenHandles(db: Executor, orgId: string, exceptAgentId?: string): Promise<Set<string>> {
+  const [bots, people] = await Promise.all([
+    db
+      .select({ id: agents.id, handle: agents.handle, previous: agents.previousHandles })
+      .from(agents)
+      .where(eq(agents.orgId, orgId)),
+    db
+      .select({ handle: organizationMembers.handle })
+      .from(organizationMembers)
+      .where(eq(organizationMembers.orgId, orgId)),
+  ]);
+  return new Set([
+    ...bots.flatMap((b) => (b.id === exceptAgentId ? [] : [b.handle, ...b.previous])),
+    ...people.flatMap((p) => (p.handle ? [p.handle] : [])),
+  ]);
+}
+
+/** `base` with the first free number after a dash (`scout` → `scout-2`) in 32 characters, as the apps suggest. */
+export function freeHandle(base: string, taken: Set<string>) {
+  for (let n = 2; ; n++) {
+    const handle = `${base.slice(0, 31 - String(n).length).replace(/[-_]+$/, "")}-${n}`;
+    if (!taken.has(handle)) return handle;
+  }
+}
+
+/** "@ada is taken", with the first free one (`ada-2`) for the apps to offer. */
+const handleTaken = (handle: string, taken: Set<string>) => {
+  const suggestion = freeHandle(handle, taken);
+  return new ConflictError(`@${handle} is already taken. How about @${suggestion}?`, "agent.handle_taken", {
+    handle,
+    suggestion,
+  });
+};
 
 export interface AgentInput {
   name: string;
@@ -123,13 +171,20 @@ export async function createAgent(
 ): Promise<Agent> {
   const membership = await requirePermission(db, actorId, orgId, "create_agents");
   const { autonomy, ...fields } = input;
+  // `create_agents` makes the creator's own agent (ADR 0085 §5): another owner, or none, is for who edits any agent.
+  // So whoever gets this far may also set its Autonomia (ADR 0094): an admin or the new agent's owner.
+  if (input.ownerUserId !== undefined && input.ownerUserId !== actorId && !can(membership, "manage_agents")) {
+    throw new ForbiddenError("Only an admin can create an agent for someone else or with no owner");
+  }
   const values = { ...fields, handle: fields.handle.toLowerCase(), model: fields.model ?? defaults.model };
   await validateAgentFields(db, orgId, values);
   const ownerUserId = input.ownerUserId === undefined ? actorId : input.ownerUserId;
-  // The Autonomia it starts with, only from someone who may set it on the agent: an admin or its owner.
-  if (autonomy && !can(membership, "manage_agents") && ownerUserId !== actorId) {
-    throw new ForbiddenError("Only an admin or the agent's owner can choose its autonomy", "agent.not_owner");
-  }
+  // Another agent's old handle still names that agent.
+  const [held] = await db
+    .select({ id: agents.id })
+    .from(agents)
+    .where(and(eq(agents.orgId, orgId), arrayContains(agents.previousHandles, [values.handle])));
+  if (held) throw handleTaken(values.handle, await takenHandles(db, orgId));
   // An agent born on "Automático" is automatic on every brain: switched to Claude Code or Codex later, it
   // starts with the model and effort picked per run (written here, so agents made before Automático keep theirs).
   const brainAuto = isAutoModel(values.model) ? { brainModel: AUTO_MODEL, brainEffort: AUTO_MODEL } : {};
@@ -229,7 +284,7 @@ export async function createAgent(
     }
     return first ?? agent;
   } catch (error) {
-    if (isUniqueViolation(error)) throw new ConflictError(`@${values.handle} is already taken`);
+    if (isUniqueViolation(error)) throw handleTaken(values.handle, await takenHandles(db, orgId));
     throw error;
   }
 }
@@ -255,11 +310,18 @@ export async function updateAgent(
   actorId: string,
   orgId: string,
   agentId: string,
-  input: Partial<Omit<AgentInput, "handle">>,
+  patch: Partial<AgentInput>,
   options: { remember?: boolean } = {},
 ): Promise<Agent> {
   const membership = await requirePermission(db, actorId, orgId, "manage_agents");
+  const input =
+    patch.handle === undefined ? patch : { ...patch, handle: patch.handle.trim().replace(/^@/, "").toLowerCase() };
   await validateAgentFields(db, orgId, input);
+  const handle = input.handle;
+  if (handle !== undefined) {
+    const taken = await takenHandles(db, orgId, agentId);
+    if (taken.has(handle)) throw handleTaken(handle, taken);
+  }
   const owner = input.ownerUserId;
   const before = owner !== undefined ? await getAgent(db, orgId, agentId) : null;
   // A plan thinks only for its owner's agents (ADR 0059 §3): a new owner who doesn't own it sends the agent back
@@ -270,14 +332,35 @@ export async function updateAgent(
         ? { audienceMode: "owner" as const }
         : { brain: "model", brainAccountId: null }
       : {};
-  const [agent] = await db
-    .update(agents)
-    .set({ ...input, ...handover, updatedAt: new Date() })
-    .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId), isNull(agents.deletedAt)))
-    .returning();
+  // The handle it leaves joins the ones it had, so what names it there still reaches it; taking one back takes it out.
+  const previous =
+    handle === undefined
+      ? {}
+      : {
+          previousHandles: sql`case when ${agents.handle} = ${handle} then ${agents.previousHandles}
+            else array_append(array_remove(${agents.previousHandles}, ${handle}::text), ${agents.handle}) end`,
+        };
+  let agent: Agent | undefined;
+  try {
+    [agent] = await db
+      .update(agents)
+      .set({ ...input, ...handover, ...previous, updatedAt: new Date() })
+      .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId), isNull(agents.deletedAt)))
+      .returning();
+  } catch (error) {
+    if (handle !== undefined && isUniqueViolation(error))
+      throw handleTaken(handle, await takenHandles(db, orgId, agentId));
+    throw error;
+  }
   if (!agent) throw new NotFoundError("Agent not found");
   caches.agents.delete(`${orgId}:${agentId}`);
   caches.agents.delete(`${orgId}:team`);
+  if (input.name !== undefined || handle !== undefined) {
+    // What other runs read of it (who is in a channel, archived and old handles) names it as it is now.
+    caches.agents.delete(`${orgId}:archived`);
+    caches.agents.delete(`${orgId}:old-handles`);
+    caches.channelMembers.deletePrefix(`${orgId}:`);
+  }
   if (before && "brain" in handover) {
     await recordAudit(db, {
       orgId,
@@ -336,6 +419,7 @@ export async function archiveAgent(db: Database, actorId: string, orgId: string,
   caches.agents.delete(`${orgId}:${agentId}`);
   caches.agents.delete(`${orgId}:team`);
   caches.agents.delete(`${orgId}:archived`);
+  caches.agents.delete(`${orgId}:old-handles`);
   // Its channel memberships stay: what runs read of a channel's members leaves it out from now on.
   caches.channelMembers.deletePrefix(`${orgId}:`);
 }
@@ -457,12 +541,12 @@ export const agentView = (a: Agent) => ({
 export const handleOf = (raw: unknown) => String(raw).replace(/^@/, "").trim().toLowerCase();
 
 /**
- * `handles` (lower case, without the @) as their agents have them now. An import gave an agent the other app's id
+ * `handles` with the import ids they were written as read as their agents' handles now. An import gave an agent the other app's id
  * cut to 32 characters (`agent-e9665a97-c8d5-423f-ae59-25`, OpenBot.run's) until migration 0132 named it, and
  * routines, memory and messages written before still cite it: that handle is read again from the import's key
  * (`import_items.key`), never stored, and names the agent while no agent here has it as its own.
  */
-export async function currentHandles(db: Executor, orgId: string, handles: string[]): Promise<string[]> {
+async function importedHandles(db: Executor, orgId: string, handles: string[]): Promise<string[]> {
   const old = handles.filter((h) => HANDLE_PATTERN.test(h) && isIdHandle(h));
   if (old.length === 0) return handles;
   const key = sql<string>`left(lower(${importItems.key}), 32)`;
@@ -485,14 +569,58 @@ export async function currentHandles(db: Executor, orgId: string, handles: strin
   return handles.map((h) => now.get(h) ?? h);
 }
 
+type Named = { id: string; handle: string };
+
 /**
- * `@handles` (a tool's input) → the organization's agents that aren't archived; the missing ones by handle. `rowOf`:
- * the agent one of those inputs names, an old handle too (`currentHandles`).
+ * Every handle that names an agent besides its own, with that agent and its handle now: the ones it had before a
+ * rename (`previous_handles`), not an archived agent's, and not one an agent or a person has as their own (that @ is
+ * theirs). The one place an old handle is read as an agent's: `currentHandles` maps by it, and the agent list gives
+ * the apps each agent's (`oldHandlesByAgent`) for the mentions in old messages. Per process: a rename or an archive
+ * here drops it, another replica's within the cache's TTL.
  */
+function loadOldHandles(db: Executor, orgId: string): Promise<Map<string, Named>> {
+  return caches.agents.getOrLoad(`${orgId}:old-handles`, async () => {
+    const rows = rowsOf<Named & { old: string }>(
+      await db.execute(sql`select distinct on (u.old) u.old, ag.id, ag.handle
+        from ${agents} ag cross join unnest(ag.previous_handles) as u(old)
+        where ag.org_id = ${orgId}::uuid and ag.archived_at is null
+          and not exists (select 1 from ${agents} held where held.org_id = ${orgId}::uuid and held.handle = u.old)
+          and not exists (select 1 from ${organizationMembers} om
+            where om.org_id = ${orgId}::uuid and om.handle = u.old)
+        order by u.old, ag.created_at`),
+    );
+    return new Map(rows.map((r) => [r.old, { id: r.id, handle: r.handle }]));
+  }) as Promise<Map<string, Named>>;
+}
+
+/**
+ * `handles` (lower case, without the @) as their agents have them now, in the same order (`loadOldHandles`, then
+ * `importedHandles`). What
+ * reads a handle someone wrote asks here (a message's mentions, a tool's input, a routine's or a note's text), so an
+ * agent renamed from @ada to @claudio still answers to @ada.
+ */
+export async function currentHandles(db: Executor, orgId: string, handles: string[]): Promise<string[]> {
+  if (handles.length === 0) return handles;
+  const old = await loadOldHandles(db, orgId);
+  return importedHandles(
+    db,
+    orgId,
+    handles.map((h) => old.get(h)?.handle ?? h),
+  );
+}
+
+/** The old handles that still name each agent (`loadOldHandles`), by its id. */
+export async function oldHandlesByAgent(db: Executor, orgId: string): Promise<Map<string, string[]>> {
+  const out = new Map<string, string[]>();
+  for (const [old, a] of await loadOldHandles(db, orgId)) out.set(a.id, [...(out.get(a.id) ?? []), old]);
+  return out;
+}
+
+/** `@handles` (a tool's input, old ones too) → the organization's agents that aren't archived; the missing ones by handle. */
 export async function agentsByHandle(db: Executor, orgId: string, raw: unknown) {
-  const asked = (Array.isArray(raw) ? raw : []).map(handleOf);
-  const now = await currentHandles(db, orgId, asked);
-  const handles = [...new Set(now)];
+  const written = (Array.isArray(raw) ? raw : []).map(handleOf);
+  const current = await currentHandles(db, orgId, written);
+  const handles = [...new Set(current)];
   const rows =
     handles.length === 0
       ? []
@@ -501,7 +629,11 @@ export async function agentsByHandle(db: Executor, orgId: string, raw: unknown) 
           .from(agents)
           .where(and(eq(agents.orgId, orgId), inArray(agents.handle, handles), isNull(agents.archivedAt)));
   const missing = handles.filter((h) => !rows.some((r) => r.handle === h));
-  const rowOf = (input: unknown) => rows.find((r) => r.handle === now[asked.indexOf(handleOf(input))]);
+  /** The row a handle as written names, an old one included. */
+  const rowOf = (h: unknown) => {
+    const now = current[written.indexOf(handleOf(h))] ?? handleOf(h);
+    return rows.find((r) => r.handle === now);
+  };
   return { handles, rows, missing, rowOf };
 }
 

@@ -21,10 +21,16 @@ export const NOTIFICATION_FILTERS: NotificationFilter[] = ["all", "mentions", "w
 const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_question"];
 
 /**
- * Waiting ones in this order: an agent's question, my turn at the table, an approval, then someone asking to join
- * (nobody's work waits on it).
+ * Waiting ones in this order: an agent's secret request (it expires in minutes), an agent's question, my turn at the
+ * table, an approval, then someone asking to join (nobody's work waits on it).
  */
-const WAITING_ORDER: NotificationKind[] = ["agent_question", "forum_turn", "approval", "join_request"];
+const WAITING_ORDER: NotificationKind[] = [
+  "secret_request",
+  "agent_question",
+  "forum_turn",
+  "approval",
+  "join_request",
+];
 
 export const isSnoozed = (n: Pick<AppNotification, "snoozedUntil">, now = Date.now()) =>
   !!n.snoozedUntil && new Date(n.snoozedUntil).getTime() > now;

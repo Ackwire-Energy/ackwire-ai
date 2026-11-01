@@ -36,6 +36,7 @@ import {
   fromApiRule,
   onceAt,
   onceRule,
+  proposedRoutineWhen,
   type RecurrenceRule,
   ruleSentence,
   runLabel,
@@ -493,6 +494,25 @@ describe("the rule in words (the web's sentence, on the phone)", () => {
     );
     expect(ruleSentence(t, "pt-BR", defaultRule(SP, new Date(2026, 9, 28, 15)), now, false)).toBe(
       "Toda semana, qua, às 09:00",
+    );
+  });
+
+  test("a proposed agent's routine: its rule in words, else the schedule as the agent wrote it", async () => {
+    const t = await translator("pt-BR");
+    const routine = {
+      name: "E-mails do dia",
+      prompt: "Resume a caixa de entrada.",
+      schedule: "todo dia ao meio-dia",
+      rule: { freq: "daily" as const, interval: 1, times: ["12:00"], timezone: SP },
+      cron: "0 12 * * *",
+      timezone: SP,
+      description: "Every day, at 12:00 (Brasília time)",
+      report: "when_new" as const,
+      access: "read" as const,
+    };
+    expect(proposedRoutineWhen(t, "pt-BR", routine, now)).toBe("Todos os dias, às 12:00 (horário de Brasília)");
+    expect(proposedRoutineWhen(t, "pt-BR", { ...routine, rule: null, schedule: "*/15 9-18 * * 1-5" }, now)).toBe(
+      "*/15 9-18 * * 1-5",
     );
   });
 

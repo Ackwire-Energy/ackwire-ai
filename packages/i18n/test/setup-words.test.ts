@@ -54,3 +54,9 @@ describe("words true in every setup", () => {
     expect(misplaced([["connectFlow.needsKey", "Connect with this server's API key."]], "en")).toEqual([]);
   });
 });
+
+test("the new-agent form asks for what the agent does, not a one-word role", () => {
+  for (const help of [en.agent.roleHelp, ptBR.agent.roleHelp]) {
+    expect(help).not.toMatch(/PM, Dev|One line|Uma linha/);
+  }
+});

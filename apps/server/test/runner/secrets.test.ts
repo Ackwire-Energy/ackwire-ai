@@ -1,8 +1,9 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { MachineRequest } from "@agenteschat/adapters/machine-protocol";
 import { type SecretTarget, sealSecret, secretAad } from "@agenteschat/adapters/secret-box";
+import { readZip } from "@agenteschat/engine";
 import { describeRequest, handleRequest, type RequestScope } from "../../runner/handlers";
 import { handleSecret } from "../../runner/secrets";
 import { errorCode, removeDirs, tempDir } from "./helpers";
@@ -110,6 +111,49 @@ test("a file secret is written 600 in the agent's folder and can't be read or up
   // Removed: the file goes too.
   await call({ agent: dev, op: "secret", action: "remove", name: "NPM_TOKEN" });
   expect(existsSync(file)).toBe(false);
+});
+
+test("the agent browser's profile (its logins) never leaves through the file tools; the rest of its folder does", async () => {
+  const { ws, ctx } = setup();
+  const uploads: Uint8Array[] = [];
+  const call = (req: MachineRequest) =>
+    handleRequest(
+      {
+        ...ctx,
+        fetch: async (_url, init) => {
+          uploads.push(init.body as Uint8Array);
+          return new Response(null, { status: 204 });
+        },
+      },
+      req,
+      scope(),
+    );
+  const folder = path.join(ws, "dev-01a142cb");
+  mkdirSync(path.join(folder, ".agentes", "browser", "Default"), { recursive: true });
+  writeFileSync(path.join(folder, ".agentes", "browser", "Default", "Cookies"), "sid=a-working-login");
+  writeFileSync(path.join(folder, ".agentes", "notes.md"), "next: auth");
+  symlinkSync(path.join(folder, ".agentes", "browser"), path.join(folder, "profile-link"));
+  const read = (p: string) => call({ agent: dev, op: "read", path: p, maxBytes: 1000 });
+  const push = (p: string) =>
+    call({ agent: dev, op: "push", path: p, url: "https://x/u", uploadId: "u1", maxBytes: 1e6 });
+  for (const p of [
+    ".agentes/browser/Default/Cookies",
+    "./.agentes/browser/Default/Cookies",
+    ".agentes/browser",
+    "profile-link/Default/Cookies",
+  ]) {
+    expect([p, await errorCode(() => read(p))]).toEqual([p, "bad_request"]);
+    expect([p, await errorCode(() => push(p))]).toEqual([p, "bad_request"]);
+  }
+  expect(uploads).toHaveLength(0);
+  // A folder that holds it goes as a zip without it.
+  for (const p of [".agentes", "."]) {
+    await push(p);
+    const names = readZip(uploads.at(-1) as Uint8Array, { maxFiles: 100, maxBytes: 1e6 }).map((e) => e.path);
+    expect([p, names.some((n) => n.endsWith(".agentes/notes.md"))]).toEqual([p, true]);
+    expect([p, names.filter((n) => n.includes("browser"))]).toEqual([p, []]);
+  }
+  expect(await read(".agentes/notes.md")).toMatchObject({ base64: Buffer.from("next: auth").toString("base64") });
 });
 
 test("replacing a file secret removes its old path before it becomes untracked", async () => {

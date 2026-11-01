@@ -1,11 +1,21 @@
 import { describe, expect, test } from "bun:test";
-import type { ApiClient, ImportInput, ImportItemResult, MigrationBundle } from "@agenteschat/client";
+import type {
+  ApiClient,
+  ImportedFile,
+  ImportFileInput,
+  ImportInput,
+  ImportItemResult,
+  MigrationBundle,
+} from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
-import { ImportError } from "@/lib/import";
+import { type AgentFile, ImportError } from "@/lib/import";
 import {
+  agentsArrived,
   applyInChunks,
   blockedItems,
   bundleOrigin,
+  copyAgentFiles,
+  filesNotes,
   githubRoot,
   isGithubLink,
   NOT_GITHUB,
@@ -228,5 +238,156 @@ describe("applying in chunks", () => {
     expect(report).toHaveLength(450);
     // The first 200 come back unchanged from the server on the second try: still counted as made.
     expect(report.every((i) => i.action === "create")).toBe(true);
+  });
+});
+
+describe("the agents' files to the Drive", () => {
+  const file = (agent: string, path: string, text = path, extra: Partial<AgentFile> = {}): AgentFile => ({
+    agent,
+    path,
+    size: text.length,
+    read: async () => new Blob([text]),
+    ...extra,
+  });
+  /** The backend's answer: `<folder>/<path>` once, `exists` after; `fail` decides a file's error. */
+  const drive = (fail: (input: ImportFileInput) => Error | null = () => null) => {
+    const titles = new Map<string, string>();
+    const sent: { path: string; agentId: string; name: string; note?: string; text: string }[] = [];
+    const api = {
+      imports: {
+        copyFile: async (_orgId: string, input: ImportFileInput): Promise<ImportedFile> => {
+          const error = fail(input);
+          if (error) throw error;
+          sent.push({
+            path: input.path,
+            agentId: input.agentId,
+            name: input.name,
+            note: input.note,
+            text: await input.file.text(),
+          });
+          const folder = input.agentId === "id-scout" ? "Scout" : "Closer";
+          const title = `${folder}/${input.path}`;
+          const there = titles.get(title);
+          if (there) return { status: "exists", artifactId: there, title, folder };
+          titles.set(title, `art-${titles.size + 1}`);
+          return { status: "created", artifactId: `art-${titles.size}`, title, folder };
+        },
+      },
+    } as unknown as ApiClient;
+    return { api, sent };
+  };
+  const agentIds = new Map([
+    ["scout", "id-scout"],
+    ["closer", "id-closer"],
+  ]);
+
+  test("only the agents that came; what was set aside stays, with why; a name already there is never sent over", async () => {
+    const { api, sent } = drive();
+    const files = [
+      file("scout", "rivals.txt", "northwind"),
+      file("scout", "notes/pricing.md"),
+      { agent: "scout", path: ".env", size: 12, skip: "secret" as const },
+      { agent: "scout", path: ".DS_Store", size: 0, skip: "junk" as const },
+      file("ghost", "never.md"),
+    ];
+    const progress: number[] = [];
+    const first = await copyAgentFiles(api, "org", { files, agentIds, note: "Trazido do OpenBot.run" }, (n) =>
+      progress.push(n),
+    );
+    expect(sent.map((x) => [x.agentId, x.path, x.name, x.note])).toEqual([
+      ["id-scout", "rivals.txt", "rivals.txt", "Trazido do OpenBot.run"],
+      ["id-scout", "notes/pricing.md", "pricing.md", "Trazido do OpenBot.run"],
+    ]);
+    expect(sent[0]?.text).toBe("northwind");
+    expect(progress).toEqual([1, 2]);
+    expect(first.copied).toBe(2);
+    expect([...first.folders]).toEqual([["scout", "Scout"]]);
+    expect(first.left.map((l) => [l.file.path, l.why])).toEqual([
+      [".env", "secret"],
+      [".DS_Store", "junk"],
+    ]);
+
+    // The same export again: nothing is overwritten, and the agent's folder is still where its files are.
+    const again = await copyAgentFiles(api, "org", { files, agentIds, note: "" });
+    expect(again.copied).toBe(0);
+    expect([...again.folders]).toEqual([["scout", "Scout"]]);
+    expect(again.left.map((l) => [l.file.path, l.why])).toEqual([
+      [".env", "secret"],
+      [".DS_Store", "junk"],
+      ["rivals.txt", "exists"],
+      ["notes/pricing.md", "exists"],
+    ]);
+  });
+
+  test("the backend's refusals say why each file stayed behind", async () => {
+    const files = [file("closer", "id_rsa.pub.txt"), file("closer", "huge.mov"), file("closer", "flaky.md")];
+    const { api, sent } = drive(({ path }) => {
+      if (path === "id_rsa.pub.txt") return new ApiError(400, "import.secret_file", "never");
+      if (path === "huge.mov") return new ApiError(413, "artifact.file_too_large", "too large");
+      return new Error("network");
+    });
+    const result = await copyAgentFiles(api, "org", { files, agentIds, note: "" });
+    expect(sent).toEqual([]);
+    expect(result.left.map((l) => [l.file.path, l.why])).toEqual([
+      ["id_rsa.pub.txt", "secret"],
+      ["huge.mov", "too_large"],
+      ["flaky.md", "failed"],
+    ]);
+  });
+
+  test("once the workspace's storage is full, the files not sent yet stay behind too", async () => {
+    const files = ["full.md", "b.md", "c.md", "d.md", "e.md", "f.md"].map((path) => file("scout", path));
+    const { api, sent } = drive(({ path }) => (path === "full.md" ? new ApiError(409, "storage.full", "full") : null));
+    const result = await copyAgentFiles(api, "org", { files, agentIds, note: "" });
+    const why = Object.fromEntries(result.left.map((l) => [l.file.path, l.why]));
+    expect(why["full.md"]).toBe("storage_full");
+    // Sent before the answer came, or kept back with that reason: never lost, never sent after it.
+    for (const path of ["b.md", "c.md", "d.md", "e.md", "f.md"]) {
+      expect(sent.some((x) => x.path === path) !== (why[path] === "storage_full")).toBe(true);
+    }
+    expect(why["f.md"]).toBe("storage_full");
+  });
+
+  test("files go for the agents the preview shows coming, each once: never an unchecked update, a failed one on the next try", () => {
+    const agent = (key: string, action: ImportItemResult["action"], targetId?: string): ImportItemResult => ({
+      kind: "agent",
+      key,
+      label: key,
+      action,
+      ...(targetId ? { targetId } : {}),
+    });
+    const planned = [
+      agent("scout", "update", "id-scout"),
+      agent("closer", "create"),
+      agent("pinch", "create"),
+      agent("ana", "unchanged", "id-ana"),
+    ];
+    const pick = new Set(["agent:closer", "agent:pinch"]);
+    // Scout's update unchecked; Pinch failed this time.
+    const first = agentsArrived(
+      planned,
+      [agent("closer", "create", "id-closer"), agent("pinch", "skip")],
+      pick,
+      new Set(),
+    );
+    expect([...first]).toEqual([
+      ["closer", "id-closer"],
+      ["ana", "id-ana"],
+    ]);
+    // Tentar de novo: Pinch arrives, the others were sent already.
+    const again = agentsArrived(
+      planned,
+      [agent("closer", "unchanged", "id-closer"), agent("pinch", "create", "id-pinch")],
+      pick,
+      new Set(first.keys()),
+    );
+    expect([...again]).toEqual([["pinch", "id-pinch"]]);
+  });
+
+  test("each agent keeps one line about where its files are", () => {
+    const notes = filesNotes(new Map([["scout", "Scout"]]), (folder) => `Seus arquivos estão em Drive › ${folder}.`);
+    expect(notes).toEqual([
+      { key: "scout/drive-files", agent: "scout", kind: "fact", content: "Seus arquivos estão em Drive › Scout." },
+    ]);
   });
 });

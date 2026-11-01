@@ -1,4 +1,5 @@
 import type { MachineTask, Mission, MissionDecision, MissionReview, PlanItem } from "@agenteschat/client";
+import type { TFunction } from "i18next";
 
 /**
  * Missions (ADR 0029) on the phone: the plan as pixel cells, what waits on
@@ -99,3 +100,17 @@ export const recommendedOption = (d: Pick<MissionDecision, "recommendation" | "o
 /** "MacBook do Walter · ligado": where a mission works. The Cloud's computer is never off: it isn't answering. */
 export const missionComputerKey = (online: boolean, cloud: boolean) =>
   online ? "mobile.mission.computerOn" : cloud ? "mobile.mission.computerNotAnswering" : "mobile.mission.computerOff";
+
+/**
+ * Where a mission works, said by the computer's name only where the workspace has more than one (`names`, from
+ * `namesComputers`). Else only one that isn't working says so ("Computador sem resposta"), and null when it works.
+ */
+export function missionComputerText(
+  t: TFunction,
+  machine: { name: string; online: boolean },
+  { cloud, names }: { cloud: boolean; names: boolean },
+): string | null {
+  if (names) return t(missionComputerKey(machine.online, cloud), { name: machine.name });
+  if (machine.online) return null;
+  return t(cloud ? "mobile.mission.computerNotAnsweringPlain" : "mobile.mission.computerOffPlain");
+}

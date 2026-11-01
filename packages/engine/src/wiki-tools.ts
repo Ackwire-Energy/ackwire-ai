@@ -1,5 +1,5 @@
 import { and, eq, schema } from "@agenteschat/db";
-import { actWithUndo } from "./agent-actions";
+import { type ActionRecord, actWithUndo } from "./agent-actions";
 import { cutText } from "./format";
 import { personBehindCall } from "./requester";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
@@ -7,7 +7,9 @@ import {
   appendToWikiPage,
   createWikiPage,
   getWikiPage,
+  RESTRICTED_WIKI_RULE,
   recordWikiReads,
+  restrictedOutsiders,
   searchWiki,
   updateWikiPage,
   type WikiActor,
@@ -38,19 +40,31 @@ async function requester(ctx: ToolContext): Promise<string | null> {
   return personBehindCall(ctx);
 }
 
-/** The receipt of a wiki edit (none when the text came out the same). */
-const wikiEdit = (p: { id: string; title: string; slug: string; version: number }, before: number) =>
+/**
+ * The receipt of a wiki edit (none when the text came out the same). Everyone in the channel sees it, so a restricted
+ * page goes without its title or slug.
+ */
+const wikiEdit = (
+  p: { id: string; title: string; slug: string; version: number; audience: unknown },
+  before: number,
+): ActionRecord | null =>
   p.version === before
     ? null
     : {
         kind: "wiki.page_edited" as const,
-        target: { type: "wiki_page" as const, id: p.id, title: p.title, slug: p.slug },
-        params: { title: p.title, slug: p.slug },
+        target: p.audience
+          ? { type: "wiki_page" as const, id: p.id }
+          : { type: "wiki_page" as const, id: p.id, title: p.title, slug: p.slug },
+        params: p.audience ? { restricted: true } : { title: p.title, slug: p.slug },
         before: { version: before },
         after: { version: p.version },
       };
 
 const reader = (ctx: ToolContext): WikiActor => ({ type: "agent", agentId: ctx.agentId, requestedByUserId: null });
+
+/** Of these restricted pages, the ones someone who reads this call's conversation doesn't see. */
+const unseen = async (ctx: ToolContext, ids: string[]) =>
+  (await restrictedOutsiders(ctx.db, ids, { channelId: ctx.channelId, person: () => personBehindCall(ctx) })).some;
 
 /**
  * The org wiki for agents (ADR 0023): `search_wiki` and `read_wiki_page`
@@ -83,11 +97,15 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
         try {
           const pages = await searchWiki(wiki(ctx), reader(ctx), ctx.orgId, str(input.query), 8);
           if (pages.length === 0) return { content: "No wiki pages match." };
+          const hidden = await unseen(
+            ctx,
+            pages.filter((p) => p.restricted).map((p) => p.id),
+          );
           return {
             content: pages
               .map(
                 (p) =>
-                  `- [[${p.title}]] (${p.folder ? `${p.folder}/` : ""}${p.slug}, v${p.version}): ${cutText(p.body.replace(/\s+/g, " "), 200)}`,
+                  `- [[${p.title}]] (${p.folder ? `${p.folder}/` : ""}${p.slug}, v${p.version}): ${hidden.has(p.id) ? RESTRICTED_WIKI_RULE : cutText(p.body.replace(/\s+/g, " "), 200)}`,
               )
               .join("\n"),
           };
@@ -117,9 +135,11 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
             pageIds: [p.id],
           });
           const backlinks = p.backlinks.filter((b) => b.kind === "page").map((b) => `[[${b.title}]]`);
+          const hidden = p.audience ? (await unseen(ctx, [p.id])).has(p.id) : false;
           return {
             content: [
               `# ${p.title} (slug ${p.slug}, version ${p.version}${p.folder ? `, folder ${p.folder}` : ""}${p.locked ? ", locked" : ""})`,
+              hidden ? RESTRICTED_WIKI_RULE : "",
               p.tags.length ? `Tags: ${p.tags.join(", ")}` : "",
               cutText(p.body, 40_000),
               backlinks.length ? `Linked from: ${backlinks.join(", ")}` : "",
