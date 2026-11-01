@@ -219,6 +219,8 @@ export async function setup(
      * own stickers only.
      */
     gifs?: GifProvider | null;
+    /** How long a run started on a person's message waits for their next one (`waitForBurst`). None: no wait. */
+    quietMs?: number;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -364,6 +366,7 @@ export async function setup(
     toolsOnDemand: options.toolsOnDemand ?? false,
     ...(options.warmBrowser ? { warmBrowser: options.warmBrowser } : {}),
     ...(options.gifs ? { gifs: options.gifs } : {}),
+    ...(options.quietMs ? { quietMs: options.quietMs } : {}),
   };
   const handlers = createJobHandlers(jobDeps);
 

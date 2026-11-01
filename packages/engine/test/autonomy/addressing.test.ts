@@ -347,3 +347,80 @@ scenario("S43", "a mention dispatch can't wake is recorded and told to the agent
   expect((await w.posts("ada")).at(-1)?.body).toContain("Bia");
   await assertInvariants(w);
 });
+
+/** Starts the outbox in the background and waits until a run is working (inside its quiet window, ADR 0112). */
+async function settleOnceRunning(w: Awaited<ReturnType<typeof world>>) {
+  const settled = w.settle();
+  const start = Date.now();
+  while (!(await w.runs()).some((r) => r.status === "running")) {
+    if (Date.now() - start > 5000) throw new Error("no run started");
+    await Bun.sleep(5);
+  }
+  return settled;
+}
+
+scenario("S54", "three messages in a row in a DM get one run and one answer that read them all", async () => {
+  const w = await world({
+    agents: ["otto"],
+    dmWith: "otto",
+    setup: { quietMs: 400 },
+    script: {
+      otto: ({ request }) =>
+        JSON.stringify(request.messages).includes("se bate com o quadro")
+          ? { text: "Bate: 42 tarefas no relatório e no quadro." }
+          : { text: "Oi! Em que posso ajudar?" },
+    },
+  });
+  await w.say("oi");
+  const settled = settleOnceRunning(w);
+  await w.say("preciso de uma coisa");
+  await w.say("olha o relatório de ontem e me diz se bate com o quadro");
+  await settled;
+  await w.settle();
+  expect(await w.runs()).toHaveLength(1);
+  expect((await w.posts("otto")).map((m) => m.body)).toEqual(["Bate: 42 tarefas no relatório e no quadro."]);
+  await assertInvariants(w);
+});
+
+scenario(
+  "S55",
+  "a mention then follow-ups without @, two agents in the channel: only that agent, one run",
+  async () => {
+    const w = await world({
+      agents: ["otto", "ada"],
+      setup: { quietMs: 400 },
+      script: { otto: [{ text: "Bate: 42 tarefas no relatório e no quadro." }] },
+    });
+    await w.say("@otto oi");
+    const settled = settleOnceRunning(w);
+    await w.say("preciso de uma coisa");
+    await w.say("olha o relatório de ontem e me diz se bate com o quadro");
+    await settled;
+    await w.settle();
+    expect((await w.runs()).map((r) => w.handleOf(r.agentId))).toEqual(["otto"]);
+    expect(await w.posts("ada")).toEqual([]);
+    await assertInvariants(w);
+  },
+);
+
+scenario("S56", "an update sent while the agent works joins its run and the next turn takes it", async () => {
+  let update: Promise<unknown> = Promise.resolve();
+  const w = await world({
+    agents: ["otto"],
+    dmWith: "otto",
+    script: {
+      otto: ({ n, last }) =>
+        n === 1
+          ? { text: "Montando o relatório desta semana.", hold: update }
+          : last.includes("inclui a semana passada")
+            ? { text: "Pronto, com a semana passada também." }
+            : undefined,
+    },
+  });
+  await w.say("monta o relatório desta semana");
+  update = new Promise((resolve) => setTimeout(resolve, 0)).then(() => w.say("ah, e inclui a semana passada também"));
+  await w.settle();
+  expect(await w.runs()).toHaveLength(1);
+  expect((await w.posts("otto")).at(-1)?.body).toBe("Pronto, com a semana passada também.");
+  await assertInvariants(w);
+});

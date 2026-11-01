@@ -83,9 +83,16 @@ export interface SteeredText {
 /**
  * Messages people (or events) sent while the run worked, oldest first, as the
  * agent reads them: "[New message from Ada, while you were working]: …", or
- * the notice a task or event carries. Deleted ones are left out.
+ * the notice a task or event carries. Deleted ones are left out. `beforeStart`:
+ * read before its first model call (the rest of a burst, `waitForBurst`), they
+ * are plain conversation lines, "[Ada]: …", part of the same request.
  */
-export async function renderSteered(db: Executor, orgId: string, ids: string[]): Promise<SteeredText[]> {
+export async function renderSteered(
+  db: Executor,
+  orgId: string,
+  ids: string[],
+  options: { beforeStart?: boolean } = {},
+): Promise<SteeredText[]> {
   if (ids.length === 0) return [];
   const rows = await db
     .select({
@@ -106,7 +113,9 @@ export async function renderSteered(db: Executor, orgId: string, ids: string[]):
     // A background task that ended while it worked: the notice with its result.
     text:
       taskNotice({ body: m.body, meta: m.meta }, true) ??
-      `[New message from ${m.name ?? "someone"}, while you were working]: ${m.body}`,
+      (options.beforeStart
+        ? `[${m.name ?? "someone"}]: ${m.body}`
+        : `[New message from ${m.name ?? "someone"}, while you were working]: ${m.body}`),
   }));
 }
 

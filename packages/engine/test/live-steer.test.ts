@@ -189,6 +189,45 @@ test("a message during a computer turn is handed to it live; read ones join it, 
   ]);
 });
 
+test("a burst before the first computer turn (ADR 0112): one turn whose prompt has all of it, as conversation lines", async () => {
+  f = await setup({ quietMs: 400 });
+  const fx = f;
+  await computerAgent(fx);
+  const seen: BrainTurn[] = [];
+  const brain: Brain = {
+    kind: "claude_code",
+    async *run(turn: BrainTurn) {
+      seen.push({ ...turn, system: "", messages: [] });
+      yield { type: "done", text: "Bate: 42 nos dois." };
+    },
+  };
+  const handlers = createJobHandlers({
+    ...fx.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(fx, "@dev oi");
+  const drained = drainOutbox(fx.db, handlers);
+  const start = Date.now();
+  while (!(await fx.db.select().from(schema.agentRuns)).some((r) => r.status === "running")) {
+    if (Date.now() - start > 5000) throw new Error("the run never started");
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  // No @ needed: the same person's follow-ups go to the agent still answering them (the floor).
+  await post(fx, "preciso de uma coisa");
+  await post(fx, "olha o relatório de ontem e me diz se bate com o quadro");
+  await drained;
+  await drainOutbox(fx.db, handlers);
+  expect(seen).toHaveLength(1);
+  expect(seen[0]?.trigger).toContain("@dev oi");
+  expect(seen[0]?.trigger).toContain("[ana]: preciso de uma coisa");
+  expect(seen[0]?.trigger).toContain("[ana]: olha o relatório de ontem");
+  expect(seen[0]?.trigger).not.toContain("while you were working");
+  const all = await fx.db.select().from(schema.agentRuns);
+  expect(all).toHaveLength(1);
+  expect(all[0]?.status).toBe("done");
+});
+
 test("a turn that can't take messages: not live, the message waits for the turn's end (asked once per turn)", async () => {
   f = await setup();
   const fx = f;

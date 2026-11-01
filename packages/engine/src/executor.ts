@@ -64,6 +64,7 @@ import {
 } from "./brains/select";
 import type { Brain, BrainEvent, BrainIO, BrainKind, BrainTool, BrainTurn, ToolResult } from "./brains/types";
 import { BROWSER_SCOPE } from "./browser/types";
+import { waitForBurst } from "./burst";
 import {
   canceledBy,
   isShutdown,
@@ -253,6 +254,11 @@ export interface EngineDeps {
   tools?: ToolGateway;
   /** Model calls one run may make (tool loops). */
   maxToolTurns?: number;
+  /**
+   * How long a run started on a person's message waits for their next one before its first model call
+   * (`waitForBurst`, `ROUTER_QUIET_MS` on a server); absent: no wait.
+   */
+  quietMs?: number;
   /** Memory and summaries (ADR 0017). Without it the context is the recent conversation only. */
   context?: ContextDeps;
   /** Latency measurements (`trigger_to_claim_ms`, `claim_to_first_delta_ms`, `run_ms`), for logs. */
@@ -1546,20 +1552,25 @@ async function executeRunInner(
     if (!run.background) await rerootRun(db, run, person.messageId);
     return true;
   };
+  /** What the person added (the rest of a burst, an update mid-task) is part of what the judges hold the reply to. */
+  const widenRequest = (t: Transcript, text: string) => {
+    t.request = [t.request ?? triggerMessage?.body ?? triggerText, text].filter(Boolean).join("\n\n");
+  };
   /**
    * Appends them to the conversation as "New message from …" (a step records it), so the model
    * reads them next, and tells the channel they were read ("Ada leu"). Returns the text.
    */
-  const deliverSteering = async (): Promise<string | null> => {
+  const deliverSteering = async (beforeStart: boolean): Promise<string | null> => {
     const ids = await takeSteering();
     if (ids.length === 0) return null;
     for (const id of ids) readIds.add(id);
     // Rendered as live steering renders them mid-turn (`live-steer.ts`).
-    const rows = await renderSteered(db, run.orgId, ids);
+    const rows = await renderSteered(db, run.orgId, ids, { beforeStart });
     if (rows.length === 0) return null;
     const text = rows.map((m) => m.text).join("\n\n");
     const t = transcript as Transcript;
     appendUserText(t, text);
+    widenRequest(t, text);
     await oweAnswer(
       t,
       rows.map((m) => m.id),
@@ -2333,6 +2344,7 @@ async function executeRunInner(
     onRead: async (read) => {
       const t = transcript as Transcript;
       appendUserText(t, read.map((m) => m.text).join("\n\n"));
+      widenRequest(t, read.map((m) => m.text).join("\n\n"));
       later(() => addRunStep(db, run, "context", { steeredMessageIds: read.map((m) => m.id), live: true }));
       // Read mid-turn: owed now (a `pass` later in this turn is refused), written without the rest of
       // the transcript (the bridge may be writing it).
@@ -2346,6 +2358,10 @@ async function executeRunInner(
       }
     },
   });
+  // A person who writes in a few messages gets one answer: what they add in the next seconds is read with the first.
+  if (deps.quietMs && run.turns === 0 && !run.background && triggerMessage?.authorType === "person") {
+    await waitForBurst(db, triggerMessage, deps.quietMs);
+  }
   try {
     for (;;) {
       if (await isCanceled()) return stopCanceled("");
@@ -2357,7 +2373,7 @@ async function executeRunInner(
         if (run.background || forum) return fail(stuck ? STUCK_ERROR : "too_many_tool_calls");
         return stuck ? endStuck() : endAtStepLimit();
       }
-      const steered = await deliverSteering();
+      const steered = await deliverSteering(firstTurn && run.turns === 0);
       if (steered && plan.kind !== "model") {
         nextPrompt = [nextPrompt ?? (computerTurns === 0 ? triggerText : ""), steered].filter(Boolean).join("\n\n");
       }
