@@ -1362,9 +1362,12 @@ p {
   transform-origin: top left;
   background: #fff;
 }
+/* A diagram taller than the box scrolls inside it, at its own proportions (not stretched to the box's height). */
 .artifact-diagram {
   display: flex;
   justify-content: center;
+  align-items: flex-start;
+  max-height: 70vh;
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -1640,10 +1643,11 @@ p {
   max-height: 420px;
 }
 /* A block drawn in place of its code (a ```mermaid diagram), centered: shrunk to fit its box but never below 60% of
-   its own size (`--w`), so its labels stay readable; a wider one scrolls inside the card, never widening the page. */
+   its own size (`--w`), so its labels stay readable; a wider or taller one scrolls inside the card, as code does. */
 .code-card__preview {
   padding: 2px 12px 14px;
   overflow-x: auto;
+  max-height: 420px;
 }
 .code-card__preview img,
 .code-viewer__preview img {

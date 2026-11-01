@@ -5,7 +5,7 @@ setupDom();
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { cleanup, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
 import { MermaidDiagram, setMermaidRenderer } from "@/components/artifacts/Mermaid";
 import { createI18n } from "@/i18n";
 import { Markdown } from "@/lib/markdown";
@@ -14,6 +14,7 @@ import {
   type MermaidFrame,
   mermaidDrawable,
   mermaidFrameDocument,
+  mermaidRunsApart,
   setMermaidFrame,
   svgDrawing,
 } from "@/lib/mermaid";
@@ -25,18 +26,22 @@ const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 2
 const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 type Request = { id: string; source: string; dark: boolean };
-/** A stand-in for the frame mermaid draws in: what the page posted to it, its load, whether it was thrown away. */
-type FakeFrame = { win: Window; posted: Request[]; load: () => void; removed: boolean };
+/**
+ * A stand-in for a frame the page made: the scripts it'd run, what the page posted to it, its load, whether it was
+ * thrown away.
+ */
+type FakeFrame = { scripts: string[]; win: Window; posted: unknown[]; load: () => void; removed: boolean };
 /** The frames the page made, oldest first. */
 const frames: FakeFrame[] = [];
-function fakeFrame(): MermaidFrame {
-  const posted: Request[] = [];
+function fakeFrame(scripts: string[]): MermaidFrame {
+  const posted: unknown[] = [];
   let load = () => {};
   const loaded = new Promise<void>((resolve) => {
     load = resolve;
   });
   const made: FakeFrame = {
-    win: { postMessage: (m: Request) => posted.push(m) } as unknown as Window,
+    scripts,
+    win: { postMessage: (m: unknown) => posted.push(m) } as unknown as Window,
     posted,
     load,
     removed: false,
@@ -61,6 +66,24 @@ async function readyFrame(index = 0) {
   post(made.win, { ready: true });
   await tick();
   return made;
+}
+/**
+ * The last frame made, the one without mermaid that `mermaidRunsApart` asks, answering as a frame does when it runs
+ * `apart` from the page: it read the question while the page kept busy (from 5 ms after asking, for 60 ms). On the
+ * page's thread it reads it only after.
+ */
+async function answerProbe(apart: boolean) {
+  const probe = await readyFrame(frames.length - 1);
+  await tick();
+  expect(probe.posted).toEqual([{ probe: true }]);
+  const asked = Date.now();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  // In act(): blocks waiting on the answer show it.
+  await act(async () => {
+    post(probe.win, { at: apart ? asked + 35 : Date.now() });
+    await tick();
+  });
+  return probe;
 }
 
 beforeAll(() => createI18n("pt-BR"));
@@ -197,12 +220,116 @@ describe("the frame mermaid draws in", () => {
     expect(frames).toEqual([]);
     const el = render(<Markdown source={fence(FLOW)} />).container;
     await settle();
-    const made = await readyFrame();
-    const [asked] = made.posted;
+    await answerProbe(true);
+    await settle();
+    const made = await readyFrame(1);
+    const [asked] = made.posted as Request[];
     expect(asked).toEqual({ id: expect.any(String), source: FLOW, dark: false });
     post(made.win, { id: asked?.id, svg: SVG });
     await settle();
     expect(el.querySelector(".code-card__preview img")?.getAttribute("alt")).toBe("Fluxo");
+  });
+
+  test("drawings start unasked where a frame runs apart from the page, as one without mermaid's bundle says", async () => {
+    const asking = mermaidRunsApart();
+    expect(frames.map((f) => f.scripts)).toEqual([["/assets/mermaid-frame.js"]]);
+    // Only the frame's own window is heard: the question is asked once.
+    post({ postMessage() {} }, { ready: true });
+    const probe = await answerProbe(true);
+    expect(await asking).toBe(true);
+    expect(probe.removed).toBe(true);
+    // Asked once a page load. The frame that draws runs mermaid's bundle.
+    expect(await mermaidRunsApart()).toBe(true);
+    void drawWithMermaid("d", FLOW, false);
+    expect(frames.map((f) => f.scripts)).toEqual([
+      ["/assets/mermaid-frame.js"],
+      ["/assets/mermaid.min.js", "/assets/mermaid-frame.js"],
+    ]);
+  });
+
+  test("a frame on the page's thread, whose answer arrives once it's done being busy, makes drawings wait", async () => {
+    const asking = mermaidRunsApart();
+    await answerProbe(false);
+    expect(await asking).toBe(false);
+  });
+
+  test("a frame that doesn't answer makes drawings wait", async () => {
+    setMermaidFrame(fakeFrame, 30);
+    expect(await mermaidRunsApart()).toBe(false);
+    expect(frames[0]?.removed).toBe(true);
+  });
+
+  test("once a drawing has timed out none starts unasked again, and the frame isn't asked again", async () => {
+    const asking = mermaidRunsApart();
+    await answerProbe(true);
+    expect(await asking).toBe(true);
+    const stuck = drawWithMermaid("stuck", FLOW, false, 30);
+    await readyFrame(1);
+    await expect(stuck).rejects.toThrow("didn't finish");
+    expect(await mermaidRunsApart()).toBe(false);
+    expect(frames).toHaveLength(2);
+  });
+
+  test("where the frame shares the page's thread a fence waits for Ver diagrama, and only that one is drawn", async () => {
+    const other = "flowchart LR\n  C --> D";
+    const el = render(<Markdown source={`${fence(FLOW)}\n\n${fence(other)}`} />).container;
+    await settle();
+    await answerProbe(false);
+    await settle();
+    const buttons = within(el).getAllByRole("button", { name: "Ver diagrama" });
+    expect(buttons).toHaveLength(2);
+    expect(Array.from(el.querySelectorAll(".code-card__code"), (code) => code.textContent)).toEqual([FLOW, other]);
+    expect(frames).toHaveLength(1);
+    await act(async () => fireEvent.click(buttons[0] as HTMLElement));
+    await settle();
+    const made = await readyFrame(1);
+    const [asked] = made.posted as Request[];
+    expect(asked?.source).toBe(FLOW);
+    post(made.win, { id: asked?.id, svg: SVG });
+    await settle();
+    expect(el.querySelector(".code-card__preview img")?.getAttribute("alt")).toBe("Fluxo");
+    expect(within(el).getAllByRole("button", { name: "Ver diagrama" })).toHaveLength(1);
+    expect(within(el).getByRole("button", { name: "Código" })).toBeTruthy();
+    expect(made.posted).toHaveLength(1);
+  });
+
+  test("there a diagram's thumbnail in Drive shows its code, and the diagram opened is drawn", async () => {
+    const thumbnail = render(<MermaidDiagram source={FLOW} label="Diagrama: Fluxo" compact />).container;
+    await settle();
+    await answerProbe(false);
+    await settle();
+    expect(thumbnail.querySelector(".artifact-diagram--failed code")?.textContent).toBe(FLOW);
+    expect(thumbnail.textContent).not.toContain("Não foi possível");
+    const view = render(<MermaidDiagram source={FLOW} label="Diagrama: Fluxo" />);
+    await settle();
+    const made = await readyFrame(1);
+    const [asked] = made.posted as Request[];
+    post(made.win, { id: asked?.id, svg: SVG });
+    await settle();
+    expect(view.container.querySelector(".artifact-diagram img")?.getAttribute("alt")).toBe("Fluxo");
+    // The same block made a thumbnail of another diagram waits again (once a source being edited would be drawn).
+    view.rerender(<MermaidDiagram source={"flowchart LR\n  C --> D"} label="Diagrama: Fluxo" compact />);
+    await act(() => new Promise((resolve) => setTimeout(resolve, 350)));
+    await settle();
+    expect(view.container.querySelector(".artifact-diagram--failed code")?.textContent).toBe("flowchart LR\n  C --> D");
+    expect(made.posted).toHaveLength(1);
+  });
+
+  test("after a drawing times out, the fences waiting behind it wait for the viewer, not for fresh frames", async () => {
+    setMermaidFrame(fakeFrame, 200);
+    const sources = [FLOW, "flowchart LR\n  C --> D", "flowchart LR\n  E --> F"];
+    const el = render(<Markdown source={sources.map(fence).join("\n\n")} />).container;
+    await tick();
+    await tick();
+    await answerProbe(true);
+    await settle();
+    // The first one's frame never answers.
+    await readyFrame(1);
+    await act(() => new Promise((resolve) => setTimeout(resolve, 250)));
+    await settle();
+    expect(frames).toHaveLength(2);
+    expect(Array.from(el.querySelectorAll(".code-card__code"), (code) => code.textContent)).toEqual(sources);
+    expect(within(el).getAllByRole("button", { name: "Ver diagrama" })).toHaveLength(2);
   });
 
   test("a diagram longer than the page sends mermaid stays code, in Drive too, and never reaches the frame", async () => {
@@ -230,6 +357,19 @@ describe("the frame mermaid draws in", () => {
     const drawing = parse(inner?.getAttribute("srcdoc") ?? "");
     expect(policy(drawing)).toBe(csp);
     expect(Array.from(drawing.querySelectorAll("script"), (s) => s.getAttribute("src"))).toEqual(scripts);
+  });
+
+  test("an SVG over 1 MB or 20,000 px on a side, or one an <img> can't read, isn't shown: its fence stays code", () => {
+    const svg = (viewBox: string, body = "") =>
+      `<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="${viewBox}">${body}</svg>`;
+    expect(svgDrawing(svg("0 0 200 80"))?.width).toBe(200);
+    expect(svgDrawing(svg("0 -25 20000 20000"))?.width).toBe(20_000);
+    // A packet of 10,000 rows (3.9 MB) stalled Chrome 0.5 s; spacings of 10,000,000 made a card 12,000,000 px tall.
+    expect(svgDrawing(svg("0 0 200 80", `<text>${"x".repeat(1_000_000)}</text>`))).toBeNull();
+    expect(svgDrawing(svg("0 0 20001 80"))).toBeNull();
+    expect(svgDrawing(svg("0 0 6000094 12000097"))).toBeNull();
+    expect(svgDrawing('<svg xmlns="http://www.w3.org/2000/svg"><g></svg>')).toBeNull();
+    expect(svgDrawing("<p>oi</p>")).toBeNull();
   });
 });
 
@@ -415,11 +555,71 @@ describe("inside the frame, mermaid-frame.js", () => {
       expect(await frame.ask(data)).toBeUndefined();
     const drawn = (await frame.ask({ id: "a", source: FLOW, dark: false })) as { id: string; svg: string };
     expect(drawn.id).toBe("a");
-    expect(svgDrawing(drawn.svg).width).toBeGreaterThan(0);
+    expect(drawn.svg).toStartWith('<svg id="mmd-');
     expect(await frame.ask({ id: "b", source: "sequenceDiagram\n  Ana-->>", dark: true })).toEqual({
       id: "b",
       error: expect.stringContaining("Parse error"),
     });
+  });
+
+  test("asked by the page whether it runs apart, it answers when it read the question, 25 ms on", async () => {
+    const frame = frameScript();
+    expect(await frame.ask({ probe: true }, { postMessage() {} })).toBeUndefined();
+    const before = Date.now();
+    const answer = (await frame.ask({ probe: true })) as { at: number };
+    expect(answer.at - before).toBeGreaterThanOrEqual(25);
+    expect(answer.at).toBeLessThanOrEqual(Date.now());
+  });
+
+  test("a diagram's own settings change how it looks, never its sizes, spacings or widths", async () => {
+    const own = {
+      theme: "forest",
+      look: "handDrawn",
+      fontSize: 400,
+      flowchart: { curve: "step", nodeSpacing: 10_000_000, rankSpacing: 10_000_000, wrappingWidth: 1 },
+      sequence: { mirrorActors: false, width: 1 },
+      packet: { bitsPerRow: 1 },
+      mindmap: { maxNodeWidth: 1 },
+      gantt: { useWidth: 100_000 },
+    };
+    const defaults = mermaid.mermaidAPI.defaultConfig;
+    for (const source of [
+      `%%{init: ${JSON.stringify(own)}}%%\nflowchart LR\n  A --> B`,
+      `---\nconfig: ${JSON.stringify(own)}\n---\nflowchart LR\n  A --> B`,
+    ]) {
+      await frameScript().ask({ id: "own", source, dark: false });
+      const config = mermaid.mermaidAPI.getConfig();
+      expect([config.look, config.flowchart?.curve, config.sequence?.mirrorActors]).toEqual([
+        "handDrawn",
+        "step",
+        false,
+      ]);
+      expect([config.theme, config.fontSize, config.gantt?.useWidth]).toEqual(["neutral", defaults.fontSize, 720]);
+      expect([config.flowchart?.nodeSpacing, config.flowchart?.rankSpacing, config.flowchart?.wrappingWidth]).toEqual([
+        defaults.flowchart?.nodeSpacing,
+        defaults.flowchart?.rankSpacing,
+        defaults.flowchart?.wrappingWidth,
+      ]);
+      expect([config.sequence?.width, config.packet?.bitsPerRow, config.mindmap?.maxNodeWidth]).toEqual([
+        defaults.sequence?.width,
+        defaults.packet?.bitsPerRow,
+        defaults.mindmap?.maxNodeWidth,
+      ]);
+    }
+    // Mermaid copies the list on every read of its settings, in time that grows with its square: 709 names (every one
+    // it knows) drew the largest diagrams 2 to 2.5 times as slowly.
+    expect(mermaid.mermaidAPI.getSiteConfig().secure?.length).toBeLessThan(120);
+  });
+
+  test("a journey drawn is markup an <img> reads: its own size takes the place of the height mermaid gave it", async () => {
+    const journey = "journey\n  title Onboarding\n  section Conta\n    Criar: 5: Ana";
+    const drawn = (await frameScript().ask({ id: "j", source: journey, dark: false })) as { svg: string };
+    expect(drawn.svg).toMatch(/^<svg [^>]*\bheight="/);
+    const src = svgDrawing(drawn.svg)?.src ?? "";
+    const root = decodeURIComponent(src.slice(src.indexOf(",") + 1)).match(/^<svg [^>]*>/)?.[0] ?? "";
+    const names = Array.from(root.matchAll(/\s([\w:-]+)=/g), ([, name]) => name);
+    expect(names).toContain("height");
+    expect(names).toEqual([...new Set(names)]);
   });
 
   let labels = 0;
@@ -545,6 +745,68 @@ describe("inside the frame, mermaid-frame.js", () => {
     expect(await mermaid.parse(chain(1))).toBeTruthy();
   });
 
+  test("node metadata with a YAML anchor or alias stays code too: a kanban card's held WebKit 56 s", async () => {
+    // Each level repeats the one before ten times.
+    const levels = [`&l0 [${Array(10).fill(1)}]`];
+    for (let i = 1; i < 4; i++) levels.push(`&l${i} [${Array(10).fill(`*l${i - 1}`)}]`);
+    const chain = `x: [${levels.join(", ")}], assigned: *l3`;
+    for (const source of [
+      `kanban\n  todo[A fazer]\n    t1[T]@{ ${chain} }`,
+      `kanban\n  todo[A fazer]\n    t1[T]@%%{x}%%{ ${chain} }`,
+      `flowchart LR\n  A@{ label: "a } b", ${chain} }`,
+      `flowchart LR\n  A@{\n    shape: rect\n    label: *l0\n  }`,
+      `flowchart LR\n  A e1@--> B\n  e1@{ animation: *a }`,
+      `sequenceDiagram\n  participant A@{ "type": "actor", "alias": *a }`,
+    ])
+      expect(mermaidDrawable(source)).toBe(false);
+    for (const label of ["Q&A", "R & D", "2 * 3", "*negrito*", "a&b*c"])
+      expect(mermaidDrawable(`flowchart LR\n  A@{ shape: rect, label: "${label}" } --> B`)).toBe(true);
+    expect(mermaidDrawable("kanban\n  todo[A fazer]\n    t1[Q&A]@{ assigned: 'Ana & Bia', priority: 'High' }")).toBe(
+      true,
+    );
+    expect((await mermaid.parse(`kanban\n  todo[A fazer]\n    t1[T]@{ x: [&a 1], assigned: *a }`))?.diagramType).toBe(
+      "kanban",
+    );
+  });
+
+  test("where a number sets mermaid's work, not the source's length, past a few the fence stays code", async () => {
+    const gantt = (excludes: string, tasks: string[], format = "YYYY-MM-DD") =>
+      `gantt\n  dateFormat ${format}\n  excludes ${excludes}\n${tasks.map((t, i) => `  t${i} :${t}`).join("\n")}`;
+    const nested = (levels: number, after = "") =>
+      `architecture-beta\n  group g0(cloud)[G0]\n${Array.from(
+        { length: levels - 1 },
+        (_, i) => `  group g${i + 1}(cloud)[G${i + 1}] in g${i}${after}`,
+      ).join("\n")}\n  service s(server)[S] in g${levels - 1}`;
+    for (const source of [
+      // `space:N` is N blocks: `space:100000` held WebKit 77 s.
+      "block-beta\n  space:101",
+      "block-beta\n  space:100000",
+      "block-beta\n  columns 3\n  space:60\n  a\n  space:60",
+      // Excluded dates make mermaid walk each task day by day: 1,000,000 days held WebKit 3.6 s.
+      gantt("1999-01-01", ["2024-01-01, 1000000d"]),
+      gantt("weekends", ["2024-01-01, 30y"]),
+      gantt("weekends", Array(30).fill("2024-01-01, 400d")),
+      gantt("weekends", ["01-01-2024, 31-12-2999"], "DD-MM-YYYY"),
+      gantt("weekends", ["2024-01-01, 3d", "2999-01-01, 3d", "until t1"]),
+      gantt("weekends", ["1700000000, 1d"], "X"),
+      // Groups 4 levels deep with edges across them held Chrome's frame 13 s, and 10 levels WebKit 25 s.
+      nested(4),
+      nested(4, " %% sub"),
+      "architecture-beta\n  group a[A] in b\n  group b[B] in a\n  service s in a",
+    ])
+      expect(mermaidDrawable(source)).toBe(false);
+    for (const source of [
+      "block-beta\n  columns 3\n  a space:2 b\n  space c:2",
+      gantt("weekends", ["2024-01-01, 30d", "2024-02-01, 2w", "2024-03-01, 1M"]),
+      "gantt\n  dateFormat YYYY-MM-DD\n  t :2024-01-01, 1000000d",
+      nested(3),
+      "architecture-beta\n  group g0(cloud)[Data in g1]\n  group g1(cloud)[G1] in g0\n  service s(server)[S] in g1",
+    ])
+      expect(mermaidDrawable(source)).toBe(true);
+    await answersQuickly(`block-beta\n  columns 10\n${"  space:10\n".repeat(10)}`);
+    await answersQuickly(gantt("weekends", Array(10).fill("2024-01-01, 1000d")));
+  });
+
   test("a mindmap over 100 lines or a venn diagram over 30 sets and unions stays code, its keyword split or not", async () => {
     const mindmap = (header: string, nodes: number) =>
       `${header}\n  root\n${Array.from({ length: nodes }, (_, i) => `    c${i}`).join("\n")}`;
@@ -570,6 +832,6 @@ describe("inside the frame, mermaid-frame.js", () => {
     const frame = frameScript();
     const gantt = "gantt\n  dateFormat YYYY-MM-DD\n  section Entrega\n  Build :a1, 2024-01-01, 3d";
     const drawn = (await frame.ask({ id: "g", source: gantt, dark: false })) as { svg: string };
-    expect(svgDrawing(drawn.svg).width).toBe(720);
+    expect(svgDrawing(drawn.svg)?.width).toBe(720);
   });
 });

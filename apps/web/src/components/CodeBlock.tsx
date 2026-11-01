@@ -9,9 +9,20 @@ import { useGrowFrom } from "@/lib/grow";
  * (the icon turns into "Copiado" for a moment) and full screen. Full screen grows out of the card itself
  * into a dialog with line numbers and an optional wrap; Esc closes. Colors from the shared highlighter
  * (`@agenteschat/client/lib/code`, the phone app uses the same one). `preview`: the block drawn (a diagram), shown
- * in place of the code until "Código" is pressed; full screen shows whichever is on.
+ * in place of the code until "Código" is pressed; full screen shows whichever is on. `action`: a button of the
+ * block's own on top ("Ver diagrama").
  */
-export function CodeBlock({ lang, text, preview }: { lang: string; text: string; preview?: ReactNode }) {
+export function CodeBlock({
+  lang,
+  text,
+  preview,
+  action,
+}: {
+  lang: string;
+  text: string;
+  preview?: ReactNode;
+  action?: ReactNode;
+}) {
   const { t } = useTranslation();
   const lines = useMemo(() => highlightCode(text, lang), [text, lang]);
   const label = codeLabel(lang) || t("common.code");
@@ -30,6 +41,7 @@ export function CodeBlock({ lang, text, preview }: { lang: string; text: string;
     <div className="code-card" ref={card}>
       <div className="code-card__top">
         <span className="code-card__lang">{label}</span>
+        {action}
         {preview && (
           <Button variant="ghost" size="sm" aria-pressed={code} onClick={() => setCode((c) => !c)}>
             {t("common.code")}

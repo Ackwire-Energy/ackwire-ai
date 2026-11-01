@@ -209,7 +209,7 @@ describe("```mermaid fences", () => {
     expect(img?.getAttribute("alt")).toBe("Diagrama");
     expect(img?.getAttribute("src")?.startsWith("data:image/svg+xml")).toBe(true);
     // Its own size, not its box's width ("100%"); the card fits it down to 60% of that (`--w`), then it scrolls.
-    expect(svgOf(img)).toContain('width="640" height="120"');
+    expect(svgOf(img)).toMatch(/^<svg [^>]*width="640"[^>]* height="120"/);
     expect((img as HTMLElement).style.getPropertyValue("--w")).toBe("640px");
     expect(el.querySelector(".code-card__code")).toBeNull();
     const card = el.querySelector(".code-card") as HTMLElement;
@@ -419,6 +419,45 @@ describe("```mermaid fences", () => {
     await settle();
     expect(el.querySelector(".code-card__code")?.textContent).toBe(bad);
     expect(asked).toEqual([bad]);
+  });
+
+  test("a drawing too big to show stays code, and isn't asked for again", async () => {
+    // 10,000,000 of a flowchart's own spacing made a card 12,000,000 px tall.
+    setMermaidRenderer(async (_id, source) => {
+      asked.push(source);
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 760 12000097"><g/></svg>';
+    });
+    const first = render(<MessageBody body={fence(FLOW)} />);
+    await settle();
+    first.unmount();
+    const el = render(<MessageBody body={fence(FLOW)} />).container;
+    await settle();
+    expect(el.querySelector("img")).toBeNull();
+    expect(el.querySelector(".code-card__code")?.textContent).toBe(FLOW);
+    expect(within(el).queryByRole("button", { name: "Código" })).toBeNull();
+    expect(asked).toEqual([FLOW]);
+  });
+
+  test("where mermaid would draw on the page's thread a fence waits for Ver diagrama, and is drawn when pressed", async () => {
+    setMermaidRenderer(async (_id, source) => {
+      asked.push(source);
+      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 120">${drawingOf(source)}</svg>`;
+    }, false);
+    const other = "flowchart LR\n  X --> Y";
+    const el = render(<MessageBody body={`Dois:\n\n${fence(FLOW)}\n\n${fence(other)}`} />).container;
+    await settle();
+    expect(asked).toEqual([]);
+    expect(Array.from(el.querySelectorAll(".code-card__code"), (code) => code.textContent)).toEqual([FLOW, other]);
+    const [first] = within(el).getAllByRole("button", { name: "Ver diagrama" });
+    await act(async () => fireEvent.click(first as HTMLElement));
+    await settle();
+    expect(asked).toEqual([FLOW]);
+    expect(shown(el)).toContain(drawingOf(FLOW));
+    expect(within(el).getAllByRole("button", { name: "Ver diagrama" })).toHaveLength(1);
+    // Shown again (the message's row replaced), the drawing made is there at once.
+    const again = render(<MessageBody body={fence(FLOW)} />).container;
+    expect(shown(again)).toContain(drawingOf(FLOW));
+    expect(within(again).queryByRole("button", { name: "Ver diagrama" })).toBeNull();
   });
 
   test("a page with no mermaid fence never loads mermaid", async () => {

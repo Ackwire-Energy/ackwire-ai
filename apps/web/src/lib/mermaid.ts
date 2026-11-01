@@ -18,12 +18,14 @@ import frameScript from "./mermaid-frame.js?url&no-inline";
  * - The page sends `{id, source, dark}` and takes `{id, svg}` or `{id, error}` back only from the inner frame's
  *   window, so another frame on the page (an agent's HTML page) can't post a drawing. The SVG still goes into an
  *   `<img>`, where nothing in it runs or loads.
- * - Mermaid's own settings in mermaid-frame.js (strict, no HTML labels, its sanitizer) are a second layer.
+ * - Mermaid's own settings in mermaid-frame.js (strict, no HTML labels, its sanitizer, a diagram's own settings cut to
+ *   the few that only change its look) are a second layer.
  *
  * Desktop Chrome and Edge give the frame a process of its own, where a drawing that takes long only holds up the next
- * one. Safari, Firefox and the desktop app (WebKit) run the frame on the page's own thread: there every drawing holds
- * up the page, and the timeout below can't fire until mermaid lets go. `mermaidDrawable` bounds what goes to mermaid
- * and says what a drawing within the bounds still costs.
+ * one. Safari, Firefox, the desktop app (WebKit) and a Chromium that doesn't isolate sandboxed frames run it on the
+ * page's own thread: there a drawing holds up the page, and the timeout below can't fire until mermaid lets go, so a
+ * diagram is drawn there only when the viewer asks for it (`mermaidRunsApart`). `mermaidDrawable` bounds what goes to
+ * mermaid either way.
  */
 
 const MERMAID_MAX_TEXT = 5000;
@@ -34,15 +36,24 @@ const MERMAID_MAX_MINDMAP_LINES = 100;
 const MERMAID_MAX_VENN_AREAS = 30;
 /** Characters mermaid's entity regexes may read over the `style` and `classDef` lines: about 25 ms of them. */
 const MERMAID_MAX_STYLE_WORK = 100_000_000;
+/** A block diagram's `space:N` blocks, all of them together. */
+const MERMAID_MAX_SPACES = 100;
+/** Days a gantt that `excludes` dates walks through day by day, its durations together: about 40 ms of them. */
+const MERMAID_MAX_GANTT_DAYS = 10_000;
+/** Years apart that such a gantt may name: a task that ends on a date or `until` another walks to it too. */
+const MERMAID_MAX_GANTT_YEARS = 30;
+/** Levels of an architecture diagram's groups inside groups. */
+const MERMAID_MAX_GROUP_DEPTH = 3;
+/** A gantt duration's unit (mermaid's duration regex) in days, rounded up. */
+const GANTT_DAYS: Record<string, number> = { y: 366, M: 31, w: 7, d: 1, h: 1 / 24, m: 1 / 1440, s: 1 / 86_400 };
 /** Mermaid's directive regex, as 11.17.2 has it: the source its parsers read is the one without these. */
 const MERMAID_DIRECTIVE = /%{2}{\s*(?:(\w+)\s*:|(\w+))\s*(?:(\w+)|((?:(?!}%{2}).|\r?\n)*))?\s*(?:}%{2})?/gi;
 /** A YAML anchor (`&a`) or alias (`*a`): an `&` or `*` that starts a key or a value and names something. */
 const YAML_ANCHOR_OR_ALIAS = /(?:^|[\s:?,[{-])[&*]\S/;
 
 /**
- * Whether a source goes to mermaid, checked before anything reaches the frame, in time linear in the source. Safari,
- * Firefox and the desktop app wait out every drawing on the page's thread, and past these bounds one fence held
- * WebKit 26 or Firefox 144 for seconds:
+ * Whether a source goes to mermaid, checked before anything reaches the frame, in time linear in the source. Past these
+ * bounds one fence held WebKit 26 or Firefox 144 for seconds to minutes (Chrome's frame process too):
  *
  * - At most 5,000 characters, 200 lines and 500 characters a line. Some of mermaid's parsers take time that grows with
  *   the square of the source (50,000 characters of `;` in an xychart: 5 s, 4,800 lines of `<a` in an architecture
@@ -52,12 +63,17 @@ const YAML_ANCHOR_OR_ALIAS = /(?:^|[\s:?,[{-])[&*]\S/;
  * - No more `style` and `classDef` than mermaid's entity regexes read in a moment. `style.*:\S*#.*;` (the same with
  *   classDef) tries, on a line with no `;` after its last `#`, each style there with each `:` after it and each `#`
  *   after that, reading the rest of the line each time.
- * - Front matter that mermaid reads, without YAML anchors or aliases: mermaid walks the config as a tree, so aliases of
- *   aliases take it exponential time (437 characters: 13 s).
+ * - Front matter that mermaid reads, and no YAML anchors or aliases in it or in node metadata (`@{ … }`): aliases of
+ *   aliases take mermaid exponential time (437 characters of front matter: 13 s, 223 in a kanban card: 56 s).
+ * - Where a number in the source sets the work, not its length: at most 100 blocks of `space:N` (`space:100000`:
+ *   77 s); in a gantt that `excludes` dates, 10,000 days of durations, no number of 5 digits or more and 30 years
+ *   between the years it names (a task of 1,000,000 days: 3.6 s).
+ * - Architecture groups at most 3 levels deep: the layout's time over edges across nested groups jumps with the edges'
+ *   pattern, up to 1.5 s in WebKit and 3 s in Firefox at 3 levels (as people draw them: 50 ms), 13 s in Chrome at 4,
+ *   25 s in WebKit and 38 s in Firefox at 10.
  *
- * What's left is what drawing a big diagram costs. The slowest fence measured within the bounds, a block diagram that
- * packs 1,000 blocks into 5,000 characters, holds the page 1.4 s in WebKit and 1.3 s in Firefox, and the largest of
- * every other kind tried less than 0.8 s. Chrome and Edge on a desktop draw in the frame's own process instead.
+ * Within the bounds a drawing still costs its size. The slowest measured in WebKit and Firefox: a block diagram that
+ * packs 1,000 blocks into 5,000 characters, 1.4 s, a 499-edge flowchart 0.75 s, a 200-line class diagram 0.57 s.
  */
 export function mermaidDrawable(source: string): boolean {
   if (source.length > MERMAID_MAX_TEXT) return false;
@@ -79,14 +95,39 @@ export function mermaidDrawable(source: string): boolean {
   const text = body.join("\n").replace(MERMAID_DIRECTIVE, "");
   const read = text.split("\n");
   let styleWork = 0;
+  const groupParent = new Map<string, string>();
   for (const line of read) {
     if (line.length > MERMAID_MAX_LINE) return false;
     const styles = line.match(/style|classDef/g)?.length ?? 0;
     styleWork += styles * line.split(":").length * line.split("#").length * line.length;
+    const group = /^\s*group\s+([-\w]+)\b.*\sin\s+([-\w]+)\s*$/.exec(line.replace(/%%.*/, ""));
+    if (group?.[1] && group[2]) groupParent.set(group[1], group[2]);
   }
   if (styleWork > MERMAID_MAX_STYLE_WORK) return false;
   if (/^\s*mindmap/m.test(text) && read.length > MERMAID_MAX_MINDMAP_LINES) return false;
-  return !/^\s*venn-beta/m.test(text) || (text.match(/^\s*(?:set|union)\b/gim)?.length ?? 0) <= MERMAID_MAX_VENN_AREAS;
+  if (/^\s*venn-beta/m.test(text) && (text.match(/^\s*(?:set|union)\b/gim)?.length ?? 0) > MERMAID_MAX_VENN_AREAS)
+    return false;
+  // Node metadata runs to its first `}` outside a quoted string (mermaid's lexer), and is read as YAML.
+  for (const [meta] of text.matchAll(/@\{(?:"[^"]*"|[^"}])*/g))
+    if (YAML_ANCHOR_OR_ALIAS.test(meta.slice(2).replace(/"[^"]*"/g, '""'))) return false;
+  let spaces = 0;
+  for (const [, count] of text.matchAll(/\bspace:(\d+)/g)) spaces += Number(count);
+  if (spaces > MERMAID_MAX_SPACES) return false;
+  if (/^\s*excludes\b/m.test(text)) {
+    let days = 0;
+    for (const [, count, unit = ""] of text.matchAll(/(\d+(?:\.\d+)?)(ms|[Mdhmswy])\b/g))
+      days += Number(count) * (GANTT_DAYS[unit] ?? 0);
+    const years = (text.match(/\b\d{4}\b/g) ?? []).map(Number);
+    if (days > MERMAID_MAX_GANTT_DAYS || /\d{5}/.test(text)) return false;
+    if (Math.max(...years) - Math.min(...years) > MERMAID_MAX_GANTT_YEARS) return false;
+  }
+  for (const group of groupParent.keys()) {
+    let depth = 1;
+    for (let id = group; depth <= MERMAID_MAX_GROUP_DEPTH && groupParent.has(id); id = groupParent.get(id) ?? "")
+      depth++;
+    if (depth > MERMAID_MAX_GROUP_DEPTH) return false;
+  }
+  return true;
 }
 
 /** Both frames' sandbox. Not the agent pages' (HtmlFrame): what those may be allowed must never reach this one. */
@@ -106,7 +147,8 @@ export function mermaidFrameDocument(scripts: string[]): string {
   return `${head}<iframe sandbox="${SANDBOX}" width="1280" height="900" srcdoc="${escapeHtml(drawing)}"></iframe>`;
 }
 
-function sandboxFrame(): MermaidFrame {
+/** A frame that runs `scripts` (relative to the page, as the build names them). */
+function sandboxFrame(scripts: string[]): MermaidFrame {
   const el = document.createElement("iframe");
   el.setAttribute("sandbox", SANDBOX);
   el.setAttribute("aria-hidden", "true");
@@ -115,7 +157,7 @@ function sandboxFrame(): MermaidFrame {
   el.style.cssText = "position:fixed;left:-10000px;top:0;width:1280px;height:900px;border:0";
   // The price of the opaque origin: Chrome never takes such a frame's scripts from its cache, so each frame (one per
   // page load, a fresh one after a timeout) downloads mermaid's bundle again. Safari and Firefox take it from theirs.
-  el.srcdoc = mermaidFrameDocument([mermaidBundle, frameScript].map((url) => new URL(url, document.baseURI).href));
+  el.srcdoc = mermaidFrameDocument(scripts.map((url) => new URL(url, document.baseURI).href));
   const loaded = new Promise((resolve) => el.addEventListener("load", resolve, { once: true }));
   document.body.append(el);
   const inner = () => {
@@ -130,8 +172,64 @@ function sandboxFrame(): MermaidFrame {
 }
 
 let makeFrame = sandboxFrame;
+let timeLimit = 10_000;
 let frame: { host: MermaidFrame; ready: Promise<void>; markReady: () => void } | null = null;
 const waiting = new Map<string, { resolve: (svg: string) => void; reject: (error: Error) => void }>();
+let apart: Promise<boolean> | undefined;
+
+/**
+ * Whether a drawing may start without the viewer asking for it: only where the frame runs apart from the page, in a
+ * process of its own, so a drawing that takes long can't hold the page up. Asked once a page load, of a frame without
+ * mermaid's bundle: the page sends it a question and then keeps itself busy for 60 ms, and the frame answers when it
+ * read the question (after 25 ms of its own, so that its answer falls within the page's 60). On the page's thread the
+ * frame can't read anything while the page is busy, so only a frame apart from it can answer with a time inside. A late
+ * answer or none reads as sharing the thread, which is why the question waits for the page to be on screen and idle.
+ *
+ * False from the first drawing that timed out: a fresh frame downloads mermaid's bundle again in Chrome, and the
+ * drawings behind a slow one wait it out.
+ */
+export function mermaidRunsApart(): Promise<boolean> {
+  apart ??= new Promise((resolve) => {
+    const ask = () => {
+      const host = makeFrame([frameScript]);
+      let busy: [number, number] | undefined;
+      let spell: ReturnType<typeof setTimeout> | undefined;
+      const done = (value: boolean) => {
+        window.removeEventListener("message", listen);
+        clearTimeout(timer);
+        clearTimeout(spell);
+        host.remove();
+        resolve(value);
+      };
+      const question = () => {
+        host.window()?.postMessage({ probe: true }, "*");
+        // In a task after this one: Chrome sends a message to another process once the task that posted it is over.
+        spell = setTimeout(() => {
+          const from = Date.now();
+          while (Date.now() - from < 60) {
+            // Busy.
+          }
+          busy = [from, Date.now()];
+        }, 5);
+      };
+      const listen = ({ source, data }: MessageEvent) => {
+        if (source !== host.window()) return;
+        if (data?.ready === true) {
+          if (typeof requestIdleCallback === "function") requestIdleCallback(question, { timeout: 1000 });
+          else setTimeout(question);
+        } else if (typeof data?.at === "number")
+          done(busy !== undefined && busy[0] + 5 < data.at && data.at < busy[1] - 5);
+      };
+      // A frame that doesn't answer couldn't draw either.
+      const timer = setTimeout(() => done(false), timeLimit);
+      window.addEventListener("message", listen);
+    };
+    // A page in a background tab has its timers held back.
+    if (document.hidden) document.addEventListener("visibilitychange", ask, { once: true });
+    else ask();
+  });
+  return apart;
+}
 
 /** The frame's answers: only from its window, only in the protocol's shape. */
 function onAnswer({ source, data }: MessageEvent) {
@@ -149,7 +247,7 @@ function currentFrame() {
     const ready = new Promise<void>((resolve) => {
       markReady = resolve;
     });
-    frame = { host: makeFrame(), ready, markReady };
+    frame = { host: makeFrame([mermaidBundle, frameScript]), ready, markReady };
   }
   return frame;
 }
@@ -157,9 +255,9 @@ function currentFrame() {
 /**
  * Mermaid's SVG for a source, drawn in the frame (made on first use and kept). It fails when mermaid can't draw the
  * source, or hasn't answered `timeout` ms after the frame loaded: that frame is thrown away with whatever holds it up,
- * and the next drawing gets a fresh one.
+ * the next drawing gets a fresh one, and none starts again without the viewer asking (`mermaidRunsApart`).
  */
-export async function drawWithMermaid(id: string, source: string, dark: boolean, timeout = 10_000) {
+export async function drawWithMermaid(id: string, source: string, dark: boolean, timeout = timeLimit) {
   const used = currentFrame();
   // Counted from here, however long mermaid's bundle took to arrive.
   await used.host.loaded;
@@ -172,6 +270,7 @@ export async function drawWithMermaid(id: string, source: string, dark: boolean,
           used.host.remove();
           frame = null;
         }
+        apart = Promise.resolve(false);
         reject(new Error("Mermaid didn't finish drawing"));
       }, timeout);
       used.ready.then(() => used.host.window()?.postMessage({ id, source, dark }, "*"));
@@ -182,11 +281,16 @@ export async function drawWithMermaid(id: string, source: string, dark: boolean,
   }
 }
 
-/** Tests: the frame to draw in (a fake that answers like mermaid-frame.js), or null for the real one. */
-export function setMermaidFrame(next: (() => MermaidFrame) | null) {
+/**
+ * Tests: the frames to draw and measure in (a fake that answers like mermaid-frame.js, given the scripts it'd run), or
+ * null for real ones, and how long a drawing may take.
+ */
+export function setMermaidFrame(next: ((scripts: string[]) => MermaidFrame) | null, limit = 10_000) {
   frame?.host.remove();
   frame = null;
+  apart = undefined;
   makeFrame = next ?? sandboxFrame;
+  timeLimit = limit;
 }
 
 /**
@@ -195,26 +299,42 @@ export function setMermaidFrame(next: (() => MermaidFrame) | null) {
  */
 export type Drawing = { src: string; width: number | null; title?: string; description?: string };
 
-/** Mermaid's SVG as an image at its own size, its accessible name and description taken out for the <img>. */
-export function svgDrawing(svg: string): Drawing {
-  // DOMParser's document never loads anything.
-  const root = new DOMParser().parseFromString(svg, "text/html").querySelector("svg");
-  // Its own size, not its box's width (mermaid's "100%"): a small diagram isn't blown up to fill the box.
+/** Past this the page itself takes long to read, encode, decode and paint a drawing (3.9 MB: 0.5 s in Chrome). */
+const MAX_SVG = 1_000_000;
+/** Past this on a side a drawing makes a card thousands of pixels tall, or wide with labels too small to read. */
+const MAX_SIDE = 20_000;
+
+/**
+ * Mermaid's SVG as an image at its own size, its accessible name and description taken out for the <img>. Null when
+ * it's too big to show (`MAX_SVG`, `MAX_SIDE`) or isn't markup an <img> can read: the block stays code.
+ */
+export function svgDrawing(svg: string): Drawing | null {
+  if (svg.length > MAX_SVG) return null;
+  // Read as XML, as the <img> reads it. DOMParser's document never loads anything.
+  const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
+  const root = doc.documentElement;
+  if (root.localName !== "svg" || doc.getElementsByTagName("parsererror").length) return null;
   const [, , width, height] =
     root
-      ?.getAttribute("viewBox")
+      .getAttribute("viewBox")
       ?.trim()
       .split(/[\s,]+/)
       .map(Number) ?? [];
-  const own = width && height ? svg.replace('width="100%"', `width="${width}" height="${height}"`) : svg;
+  if (width && height) {
+    if (width > MAX_SIDE || height > MAX_SIDE) return null;
+    // Its own size, not its box's width (mermaid's "100%"): a small diagram isn't blown up to fill the box. In place
+    // of the root's own: a journey's already has a height, and an attribute set twice is markup the <img> can't read.
+    root.setAttribute("width", String(width));
+    root.setAttribute("height", String(height));
+  }
   // Mermaid writes accTitle and accDescr as the SVG's first <title> and <desc>, which an <img> hides from assistive
   // technology.
   const childText = (tag: string) =>
-    Array.from(root?.children ?? [])
+    Array.from(root.children)
       .find((el) => el.localName === tag)
       ?.textContent?.trim() || undefined;
   return {
-    src: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(own)}`,
+    src: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(root))}`,
     width: width || null,
     title: childText("title"),
     description: childText("desc"),
