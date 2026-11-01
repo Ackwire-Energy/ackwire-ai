@@ -7663,6 +7663,11 @@ export const en: Translations = {
     reconnected: "{{name}} reconnected.",
     rulesRead: "What it reads",
     rulesLimits: "Limits",
+    copy: {
+      label: "Use {{name}}'s rules for",
+      apply: "Copy rules",
+      done: "Copied to {{names}}. Save to apply.",
+    },
     rule: {
       tables: "Tables",
       tablesLoading: "Loading the tables…",
@@ -7856,6 +7861,11 @@ export const en: Translations = {
       addTo: "Add to {{name}}",
       invalid: "Use an email or @domain.com.",
       placeholder: "name@company.com or @company.com",
+      clear: "Remove all",
+      clearName: "Remove all from {{name}}",
+      cleared_one: "{{count}} item removed.",
+      cleared_other: "{{count}} items removed.",
+      undo: "Undo",
     },
     routine: {
       mailbox: "Mailbox",

@@ -5,7 +5,7 @@ setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { pick, service } from "./catalog";
-import { ADA_ID, createFakeApi, fakeDatabasesOf, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, fakeDatabasesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -124,6 +124,57 @@ describe("Conectores → Banco de dados", () => {
     expect(row.textContent).toContain("Só lê");
     expect(row.textContent).toContain("agentes_leitura@db.acme.com/app");
     expect(row.textContent).toContain("1 de");
+  });
+});
+
+describe("Regras em: remove all, copy to other agents", () => {
+  test("Remover tudo empties the hidden columns with Desfazer, Copiar regras gives Atlas Ada's rules", async () => {
+    const { api, state } = databaseApi();
+    const dialog = await openCatalog(api);
+    await pick(dialog, "Banco de dados");
+    await type(within(flow()).getByLabelText("Nome"), "Produção");
+    await type(within(flow()).getByLabelText("Endereço do banco"), "postgres://reader:pw@db.acme.com:6543/app");
+    await click(within(flow()).getByRole("button", { name: "Conectar" }));
+    await settle(4);
+    await click(within(flow()).getByRole("button", { name: "Continuar" }));
+    await settle(4);
+    for (const name of ["Ada", "Atlas"]) {
+      const level = within(flow()).getByRole("radiogroup", { name: `Nível de ${name}` });
+      await click(within(level).getByRole("radio", { name: "Ler" }));
+    }
+    await click(within(flow()).getByRole("button", { name: "Continuar" }));
+    await settle(6);
+    expect(screen().getByRole("dialog", { name: "Regras em Produção" })).toBeTruthy();
+    const hidden = () => within(flow()).queryAllByRole("button", { name: /^Remover public\./ });
+
+    // One chip: no "Remover tudo" yet.
+    expect(within(flow()).queryByRole("button", { name: "Remover tudo de Colunas que ele nunca vê" })).toBeNull();
+    await type(within(flow()).getByRole("textbox", { name: "Colunas que ele nunca vê" }), "users.password_hash");
+    await click(within(flow()).getByRole("button", { name: "Adicionar em Colunas que ele nunca vê" }));
+    expect(hidden()).toHaveLength(2);
+    await click(within(flow()).getByRole("button", { name: "Remover tudo de Colunas que ele nunca vê" }));
+    expect(hidden()).toHaveLength(0);
+    expect(within(flow()).getByRole("status").textContent).toContain("2 itens removidos.");
+    await click(within(flow()).getByRole("button", { name: "Desfazer" }));
+    expect(hidden()).toHaveLength(2);
+    await click(within(flow()).getByRole("button", { name: "Remover tudo de Colunas que ele nunca vê" }));
+    await click(within(flow()).getByLabelText("orders"));
+
+    // Copy Ada's rules to Atlas: Atlas's tab shows them, and both save.
+    const copy = within(flow()).getByRole("button", { name: "Copiar regras" }) as HTMLButtonElement;
+    expect(copy.disabled).toBe(true);
+    await click(within(flow()).getByLabelText("Atlas"));
+    await click(copy);
+    expect(flow().textContent).toContain("Copiadas para Atlas. Salve para aplicar.");
+    await click(within(flow()).getByRole("radio", { name: "Atlas" }));
+    await settle(4);
+    expect(hidden()).toHaveLength(0);
+    await click(within(flow()).getByRole("button", { name: "Salvar regras" }));
+    await settle(6);
+    const saves = state.calls.filter((c) => c.method === "databases.setAgent").slice(-2);
+    const policy = { tables: ["public.orders"], hiddenColumns: [], dailyQueryCap: null, timeoutSeconds: 15 };
+    expect(saves.map((c) => c.args[1]).sort()).toEqual([ADA_ID, ATLAS_ID].sort());
+    for (const c of saves) expect(c.args[3]).toEqual({ level: "read", policy });
   });
 });
 
