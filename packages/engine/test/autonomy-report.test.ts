@@ -25,6 +25,7 @@ import {
   REFUSALS,
   renderEmail,
   type ToolSource,
+  toolPolicy,
   WRAP_UP_REPLY_NOTE,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
@@ -219,16 +220,13 @@ async function seed() {
   }
 
   // readOnly
-  await run({
-    at: at("07:00:00"),
-    status: "running",
-    steps: [["context", { behind: "unattended", unattended: "agent_note" }]],
-  });
+  await run({ at: at("07:00:00"), status: "running", steps: [["context", { heldBack: ["tell_agent", "ask_agent"] }]] });
+  await run({ at: at("07:05:00"), status: "running", background: true, steps: [["context", { heldBack: ["react"] }]] });
   for (const [time, reason] of [
-    ["07:10:00", REFUSALS.unattendedElsewhere],
+    ["07:10:00", REFUSALS.routineElsewhere],
     ["07:20:00", "Not allowed: this agent lacks the scope github:pr.write"],
   ] as const) {
-    const r = await run({ at: at(time), status: "running", steps: [["context", { behind: "person" }]] });
+    const r = await run({ at: at(time), status: "running", steps: [["context", { tools: ["tell_agent"] }]] });
     await f.db.insert(schema.auditLog).values({
       orgId: f.org.id,
       actorType: "agent",
@@ -347,7 +345,7 @@ describe("one workspace's day", () => {
     expect(row.handoffUnanswered).toBe(3);
   });
 
-  test("read-only: a run nobody was behind, and one refused a tool for that; another refusal doesn't count", () => {
+  test("read-only: a run its policy kept from tools, and one refused a tool for that; a routine's or another refusal doesn't count", () => {
     expect(row.readOnly).toBe(2);
   });
 
@@ -490,8 +488,8 @@ describe("one workspace's day", () => {
 describe("what runs record for it", () => {
   afterEach(() => f?.close());
 
-  test("who is behind a run as it starts: a person, or nobody (an agent's own line)", async () => {
-    f = await setup();
+  test("what a run's policy keeps from it as it starts: none for a person's, what it refuses for an agent's own line", async () => {
+    f = await setup({ askAgent: true });
     await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
     await drainOutbox(f.db, f.handlers);
     const line = await insertMessage(f.db, {
@@ -503,14 +501,21 @@ describe("what runs record for it", () => {
     });
     await createAgentRuns(f.db, line, [f.agent.id], "mention");
     await drainOutbox(f.db, f.handlers);
-    const behind = await f.db
+    const started = await f.db
       .select({ trigger: schema.agentRuns.triggerMessageId, data: schema.agentRunSteps.data })
       .from(schema.agentRunSteps)
       .innerJoin(schema.agentRuns, eq(schema.agentRuns.id, schema.agentRunSteps.runId))
       .where(eq(schema.agentRunSteps.kind, "context"));
-    const of = (id: string) => behind.find((b) => b.trigger === id && "behind" in b.data)?.data;
-    expect(of(line.id)).toMatchObject({ behind: "unattended", unattended: "agent" });
-    expect(behind.filter((b) => b.data.behind === "person").length).toBe(1);
+    const first = started.filter((s) => "tools" in s.data);
+    expect(first.length).toBe(2);
+    // Whatever the policy refuses a run nobody is behind, of the tools this agent has.
+    const nobody = { kind: "unattended", personId: null, reason: "agent" } as const;
+    const refused = ["ask_agent", "find_agent", "tell_agent"].filter(
+      (name) => toolPolicy(nobody, { name, scope: "" }).action === "refuse",
+    );
+    const lineRun = first.find((s) => s.trigger === line.id)?.data.heldBack as string[] | undefined;
+    expect([...(lineRun ?? [])].sort()).toEqual(refused);
+    expect(first.some((s) => s.trigger !== line.id && "heldBack" in s.data)).toBe(false);
   });
 
   test("a computer turn's own calls are counted on its model call", async () => {

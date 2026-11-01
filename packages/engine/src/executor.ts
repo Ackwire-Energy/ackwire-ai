@@ -767,6 +767,8 @@ async function executeRunInner(
     ...(run.background ? { background: true } : {}),
   };
   const needsContext = !run.transcript;
+  /** What the run's policy refused of the tools the agent's scopes grant: who is behind it held them back. */
+  const heldBack: string[] = [];
   // Independent reads together: the agent (cached), the trigger, and the tools it may use.
   const [agent, triggerRows, granted] = await Promise.all([
     getAgentCached(db, run.orgId, run.agentId),
@@ -778,7 +780,7 @@ async function executeRunInner(
             .select()
             .from(schema.messages)
             .where(and(eq(schema.messages.orgId, run.orgId), eq(schema.messages.id, run.triggerMessageId))),
-    deps.tools ? deps.tools.granted(ctx) : Promise.resolve([]),
+    deps.tools ? deps.tools.granted(ctx, heldBack) : Promise.resolve([]),
   ]);
   let tools = presentTools(granted, isSensitive, ctx.loadedGroups);
   const trigger = triggerRows[0];
@@ -1071,8 +1073,6 @@ async function executeRunInner(
     ]);
     // Per turn, like memory: a live computer session reads "# This turn", never a later system prompt.
     if (archived) system.push({ turn: true, found: true, text: archived });
-    // Who is behind it as it starts (ADR 0053): the daily report counts the runs nobody was (`autonomy-report.ts`).
-    const behind = await runAuthority(db, run);
     const stats = {
       ...context.stats,
       model: agent.model,
@@ -1080,8 +1080,8 @@ async function executeRunInner(
       ...(toolChoice ? { toolGroups: toolChoice } : {}),
       memoryItems: memory.itemIds,
       wikiPages: wikiPages.pageIds,
-      behind: behind.kind,
-      ...(behind.kind === "unattended" ? { unattended: behind.reason } : {}),
+      // The daily report counts these runs as read-only (`autonomy-report.ts`).
+      ...(heldBack.length > 0 ? { heldBack } : {}),
     };
     later(() => addRunStep(db, run, "context", stats));
     transcript = {

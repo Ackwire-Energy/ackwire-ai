@@ -12,9 +12,9 @@ import { REFUSALS } from "./tools/run-policy";
  * Stalls:
  * - `mentionNoRun`: an agent @mentioned another agent and that agent got no run and never read the message in
  *   one; mentions the judge read as only a reference ("Só mencionado") are left out.
- * - `readOnly`: conversation runs nobody was behind (unattended, ADR 0053: read-only on a computer, no hand-off
- *   tools), from the run's first `context` step (`behind`), and runs with a tool call refused for who was behind
- *   them (`tool.call` audit rows with a run-policy refusal).
+ * - `readOnly`: conversation runs the policy kept from tools the agent's scopes grant, for who was behind them
+ *   (ADR 0053), from the run's first `context` step (`heldBack`), and runs with a tool call refused for that
+ *   (`tool.call` audit rows with a run-policy refusal).
  * - `promiseUnkept`: runs the follow-through judge found ending on work left undone (the `nudged: promise` step);
  *   `promiseIgnored`: those that ended after the nudge without doing anything (no tool call, no command on the
  *   computer).
@@ -317,7 +317,7 @@ export function autonomySql(range: AutonomyRange) {
         select coalesce(bool_or(s.kind = 'message'), false) as posted,
           coalesce(bool_or(${ACTED}), false) as acted,
           min(s.seq) filter (where s.kind = 'context' and s.data->>'nudged' = 'promise') as nudged_at,
-          coalesce(bool_or(s.kind = 'context' and s.data->>'behind' = 'unattended'), false) as unattended,
+          coalesce(bool_or(s.kind = 'context' and s.data ? 'heldBack'), false) as held_back,
           coalesce(bool_or(s.kind = 'context' and s.data ? 'wrapUp'), false) as wrapped_up
         from agent_run_steps s where s.run_id = r.id
       ) f
@@ -387,7 +387,7 @@ export function autonomySql(range: AutonomyRange) {
     ),
     counts as (
       select day, org_id, 'readOnly' as metric, count(*) as n from runs
-        where (not background and unattended) or id in (select run_id from refused) group by 1, 2
+        where (not background and held_back) or id in (select run_id from refused) group by 1, 2
       union all
       select day, org_id, 'promiseUnkept', count(*) from runs where nudged_at is not null group by 1, 2
       union all
@@ -516,7 +516,7 @@ export async function autonomyReport(
 const COLUMNS: { key: keyof AutonomyCounts; head: string; means: string }[] = [
   { key: "stalls", head: "stalls", means: "the stall columns added up" },
   { key: "mentionNoRun", head: "mention", means: "agent @mentions of agents that started no run" },
-  { key: "readOnly", head: "readonly", means: "runs nobody was behind (read-only), or with a tool refused for that" },
+  { key: "readOnly", head: "readonly", means: "runs kept from their tools for who was behind them, or refused one" },
   { key: "promiseUnkept", head: "promise", means: "runs the follow-through judge found ending on work undone" },
   { key: "promiseIgnored", head: "ignored", means: "...that did nothing after being told to do it" },
   { key: "handoffUnanswered", head: "handoff", means: "notes, questions and @mentions unanswered in 30 min" },
