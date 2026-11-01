@@ -11,7 +11,7 @@ import { addContextItemByPerson, editContextItem, holdsSecret, looksLikeSecret }
 import { nextCronTime, zonedParts } from "./cron";
 import { sha256 } from "./crypto";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
-import { requirePermission } from "./organizations";
+import { can, requirePermission } from "./organizations";
 import {
   createRoutine,
   type RoutineDeps,
@@ -925,11 +925,11 @@ function driveTitle(folder: string, path: string) {
 /**
  * One of an imported agent's own files (OpenBot.run's `files/`, an OpenClaw workspace) into its folder in the
  * Drive: titled `<agent's name>/<path>`, keeping the source's folders, seen by the whole workspace and made by the
- * agent (its page lists it; the audit names the importer). A name the folder already has (outside the trash) stays
- * as it was: `exists`, so importing again never overwrites. Never a credential store, by its name (`isSecretFile`) or
+ * agent (its page lists it; the audit names the importer). A path the agent already has a file at (outside the
+ * trash, whatever its folder is named now) stays as it was: `exists`, so importing again never overwrites. Never a credential store, by its name (`isSecretFile`) or
  * by what it holds, whatever its type (`holdsSecret`: a private key, or a key or a password in its text, as for
  * memory). The Drive's limits apply: 50 MB a file, the workspace's storage and daily uploads (409 `storage.full`,
- * `storage.daily_full`). Who may import.
+ * `storage.daily_full`). Who may import, into an agent their own import brought (or anyone's, who manages agents).
  */
 export async function copyImportedFile(
   deps: ArtifactDeps,
@@ -945,7 +945,23 @@ export async function copyImportedFile(
   },
 ): Promise<{ status: "created" | "exists"; artifactId: string; title: string; folder: string }> {
   const { db } = deps;
-  await requirePermission(db, actorId, orgId, "create_agents");
+  const membership = await requirePermission(db, actorId, orgId, "create_agents");
+  // The file is credited to the agent: only into one this person's import brought, unless they manage agents.
+  if (!can(membership, "manage_agents")) {
+    const [mine] = await db
+      .select({ id: importItems.id })
+      .from(importItems)
+      .where(
+        and(
+          eq(importItems.orgId, orgId),
+          eq(importItems.createdByUserId, actorId),
+          eq(importItems.kind, "agent"),
+          eq(importItems.targetId, input.agentId),
+        ),
+      )
+      .limit(1);
+    if (!mine) throw new NotFoundError("Agent not found");
+  }
   const parts = input.path.split(/[\\/]+/).filter((p) => p && p !== ".");
   if (parts.length === 0 || parts.includes("..")) {
     throw new ValidationError("the path must stay inside the agent's folder", "import.file_path");
@@ -961,20 +977,24 @@ export async function copyImportedFile(
     .where(and(eq(agents.id, input.agentId), eq(agents.orgId, orgId), isNull(agents.deletedAt)));
   if (!agent) throw new NotFoundError("Agent not found");
   const folder = driveFolder(agent.name);
-  const title = driveTitle(folder, path);
+  // Trimmed as the Drive stores titles. What the agent already has at this path, whatever its folder is named now.
+  const title = driveTitle(folder, path).trim();
+  const tail = title.slice(folder.length);
   const [existing] = await db
-    .select({ id: schema.artifacts.id })
+    .select({ id: schema.artifacts.id, title: schema.artifacts.title })
     .from(schema.artifacts)
     .where(
       and(
         eq(schema.artifacts.orgId, orgId),
-        eq(schema.artifacts.title, title),
+        eq(schema.artifacts.createdByType, "agent"),
+        eq(schema.artifacts.createdById, input.agentId),
+        sql`right(${schema.artifacts.title}, ${[...tail].length}) = ${tail}`,
         isNull(schema.artifacts.channelId),
         isNull(schema.artifacts.deletedAt),
       ),
     )
     .limit(1);
-  if (existing) return { status: "exists", artifactId: existing.id, title, folder };
+  if (existing) return { status: "exists", artifactId: existing.id, title: existing.title, folder };
   const created = await createFileArtifact(deps, { type: "person", userId: actorId }, orgId, {
     title,
     name,

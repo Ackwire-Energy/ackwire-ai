@@ -232,6 +232,19 @@ const BUNDLE = {
   leftOut: [{ kind: "picture", label: "Scout" }],
 };
 
+/** BUNDLE's agent alone, as another package (`ref`) may bring it. */
+const ONLY_SCOUT = (agent: Partial<(typeof BUNDLE.agents)[number]> = {}, ref = BUNDLE.source.ref) => ({
+  ...BUNDLE,
+  source: { ...BUNDLE.source, ref },
+  agents: [{ ...BUNDLE.agents[0], skills: [], ...agent }],
+  skills: [],
+  channels: [],
+  routines: [],
+  notes: [],
+  todo: [],
+  leftOut: [],
+});
+
 type Plan = { items: { kind: string; key: string; action: string; reason?: string; targetId?: string }[] };
 
 describe("imports and the export", () => {
@@ -480,5 +493,54 @@ describe("an imported agent's own files into the Drive", () => {
       path: "a.md",
     });
     expect(stranger.status).toBe(404);
+  });
+
+  test("who may create agents but not manage them copies only into the agents their own import brought", async () => {
+    const { b, orgId } = await owner({});
+    const base = `/api/app/organizations/${orgId}`;
+    const role = await b(`${base}/roles`, { json: { name: "Builders", permissions: ["create_agents"] } });
+    expect(role.status).toBe(201);
+    const { id: roleId } = (await role.json()) as { id: string };
+    const builder = await joinByInvitation(t as TestServer, b, orgId, "builder@example.com");
+    const builderId = ((await (await builder("/api/app/me")).json()) as { user: { id: string } }).user.id;
+    expect((await b(`${base}/members/${builderId}/roles`, { method: "PUT", json: { roleIds: [roleId] } })).status).toBe(
+      200,
+    );
+    const agentOf = async (as: Browser) =>
+      (
+        (await (await as(`${base}/imports`, { json: { bundle: ONLY_SCOUT(), dryRun: false } })).json()) as Plan
+      ).items.find((i) => i.kind === "agent")?.targetId as string;
+    const admins = await agentOf(b);
+    const copy = (agentId: string, path: string) =>
+      send(builder, `${base}/imports/files`, { file: new File(["# Notes"], "notes.md"), agentId, path });
+
+    // The admin's agent: as if it weren't there, so nothing is credited to it.
+    expect((await copy(admins, "notes.md")).status).toBe(404);
+    // Their own import's agent: like any importer.
+    const mine = await agentOf(builder);
+    expect(mine).not.toBe(admins);
+    expect((await copy(mine, "notes.md")).status).toBe(201);
+  });
+
+  test("importing again keeps what the agent has at a path: the name trimmed as the Drive keeps it, after a rename, never another agent's file", async () => {
+    const { b, orgId } = await owner({});
+    const base = `/api/app/organizations/${orgId}`;
+    const applied = (await (await b(`${base}/imports`, { json: { bundle: BUNDLE, dryRun: false } })).json()) as Plan;
+    const scout = applied.items.find((i) => i.kind === "agent")?.targetId as string;
+    const copy = (path: string, agentId = scout) =>
+      send(b, `${base}/imports/files`, { file: new File(["x"], "plan.md"), agentId, path });
+    const first = (await (await copy("plan.md ")).json()) as Copied;
+    expect(first).toMatchObject({ status: "created", title: "Scout/plan.md" });
+    expect(((await (await copy("plan.md ")).json()) as Copied).status).toBe("exists");
+
+    // Renamed: its files stay where they are, never copied again.
+    await (t as TestServer).db.update(schema.agents).set({ name: "Scout Pro" }).where(eq(schema.agents.id, scout));
+    expect(await (await copy("plan.md")).json()).toEqual({ ...first, status: "exists", folder: "Scout Pro" });
+
+    // Another agent with that name: its file at the same title is its own.
+    const bundle = ONLY_SCOUT({ name: "Scout Pro", handle: "scout-pro" }, "pkg-other");
+    const other = (await (await b(`${base}/imports`, { json: { bundle, dryRun: false } })).json()) as Plan;
+    const theirs = (await (await copy("plan.md", other.items[0]?.targetId)).json()) as Copied;
+    expect(theirs.status).toBe("created");
   });
 });
