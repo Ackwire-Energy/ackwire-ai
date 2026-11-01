@@ -1,6 +1,6 @@
 import type { AgentPresence } from "@agenteschat/client";
 import { agentStateIn } from "@agenteschat/client";
-import { wordIndex } from "@agenteschat/client/lib/text";
+import { splitAtNames } from "@agenteschat/client/lib/text";
 import {
   type AgentAppearance,
   type AgentState,
@@ -71,13 +71,24 @@ export function AgentWho({ agentId, name }: { agentId?: string; name: string }) 
 
 /** `text` with the agent's name, where it first stands as a word, drawn as `AgentWho`. */
 export function withAgentFace(text: string, name: string, agentId?: string): ReactNode {
-  const at = wordIndex(text, name);
-  if (at < 0) return text;
+  return withAgentFaces(text, [{ name, agentId }]);
+}
+
+/** `text` with each agent's name, where it first stands as a word, drawn as `AgentWho` ("Atlas respondeu à Ada"). */
+export function withAgentFaces(text: string, who: { name: string; agentId?: string }[]): ReactNode {
+  const parts = splitAtNames(
+    text,
+    who.map((w) => w.name),
+  );
+  if (parts.every((p) => typeof p === "string")) return text;
   return (
     <>
-      {text.slice(0, at)}
-      <AgentWho agentId={agentId} name={name} />
-      {text.slice(at + name.length)}
+      {parts.map((p, i) => {
+        if (typeof p === "string") return p;
+        const w = who[p];
+        // biome-ignore lint/suspicious/noArrayIndexKey: the pieces of one sentence, in order
+        return <AgentWho key={i} agentId={w?.agentId} name={w?.name ?? ""} />;
+      })}
     </>
   );
 }

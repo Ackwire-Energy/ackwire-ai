@@ -154,6 +154,28 @@ export function wordIndex(text: string, word: string): number {
   return -1;
 }
 
+/**
+ * `text` cut where each of `names` first stands as a word (`wordIndex`), in order of where they stand: the plain
+ * pieces as strings, each name found as its index in `names` (where a face goes before it). A name already used, or
+ * inside an earlier one, is left as text.
+ */
+export function splitAtNames(text: string, names: readonly string[]): (string | number)[] {
+  const found = names
+    .map((name, i) => ({ i, at: wordIndex(text, name), len: name.length }))
+    .filter((f) => f.at >= 0 && names.indexOf(names[f.i] ?? "") === f.i)
+    .sort((a, b) => a.at - b.at || b.len - a.len);
+  const out: (string | number)[] = [];
+  let at = 0;
+  for (const f of found) {
+    if (f.at < at) continue;
+    if (f.at > at) out.push(text.slice(at, f.at));
+    out.push(f.i);
+    at = f.at + f.len;
+  }
+  if (at < text.length) out.push(text.slice(at));
+  return out;
+}
+
 /** Where a shortened text may stop with nothing added: a sentence's end, or a line's. */
 const STOPS = /[.!?…](?=\s)|\n/g;
 

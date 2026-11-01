@@ -318,10 +318,12 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
     const c = consultation({ status: "answered", answer: ANSWER, answeredAt: ago(5) });
     await open(talkAfter(withTalk(withAsk([c], true), c), 3));
     expect(document.querySelectorAll(".ac-consult").length).toBe(0);
-    const line = screen()
-      .getByText(/Atlas respondeu à pergunta da Ada/)
-      .closest(".cn-line") as HTMLElement;
-    expect(line).not.toBeNull();
+    const line = [...document.querySelectorAll(".cn-line")].find((l) =>
+      l.textContent?.includes("Atlas respondeu à pergunta da Ada"),
+    ) as HTMLElement;
+    expect(line).toBeTruthy();
+    // Each agent with its face before its name.
+    expect([...line.querySelectorAll(".ac-who b")].map((b) => b.textContent)).toEqual(["Atlas", "Ada"]);
     await act(async () => fireEvent.click(within(line).getByRole("button", { name: "Ver" })));
     await settle(3);
     // The two agents' conversation over the channel: the question and the whole answer.

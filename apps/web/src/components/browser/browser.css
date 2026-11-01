@@ -1518,9 +1518,6 @@ html:not([data-pointer]) .brw-mf__now:focus-visible {
   gap: 6px;
   flex: none;
 }
-.brw-mf__acts .ac-btn--ghost {
-  color: rgba(255, 255, 255, 0.85);
-}
 /* The page and what goes under it, inside the frame. */
 .brw-mf > :not(.brw-mf__top) {
   background: var(--raised);
@@ -1616,7 +1613,13 @@ html:not([data-pointer]) .brw-mf__now:focus-visible {
 .brw-mf__hist canvas {
   filter: none;
 }
-/* Assumir, Parar and full screen, over the page on hover. */
+/* "Parar a Ada?": its words start where a small button's label would, never on the toolbar's edge. */
+.brw-stopask {
+  padding-left: var(--space-3);
+  white-space: nowrap;
+}
+/* Assumir, Parar and full screen, over the page on hover of the page only: the head's steps chip opens its own list
+   there, and the two must never open together. */
 .brw-mf__over {
   position: absolute;
   top: 10px;
@@ -1636,7 +1639,7 @@ html:not([data-pointer]) .brw-mf__now:focus-visible {
     opacity 0.2s,
     transform 0.2s var(--out);
 }
-.brw-mf:hover .brw-mf__over,
+.brw-mf .brw-ac__stage:hover .brw-mf__over,
 .brw-mf__over:focus-within,
 .brw-mf__over.is-pinned {
   opacity: 1;

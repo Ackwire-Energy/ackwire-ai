@@ -45,7 +45,7 @@ import { MessageFiles } from "../files/MessageFiles";
 import { consultationHref, routineHref } from "../links/logic";
 import { DecisionCard, MissionCard, PlanCard, ReviewCard, SetupFailedCard } from "../missions/cards";
 import { BrainWait } from "../outages/WaitCard";
-import { AgentFace, Face } from "../shared/Face";
+import { AgentFace, Face, withAgentFaces } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useMyHandle, useNamesComputers, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
@@ -678,7 +678,11 @@ function HelpingTag({ consultation: c, channelId }: { consultation: RunConsultat
   return (
     <>
       <Text variant="caption" tone="faint" numberOfLines={1} style={styles.shrink}>
-        {t("chat.consultPanel.helping", { name: from.name, article: from.article })}
+        {withAgentFaces(
+          t("chat.consultPanel.helping", { name: from.name, article: from.article }),
+          [{ name: from.name, agentId: c.agentId }],
+          12,
+        )}
       </Text>
       <Pressable
         onPress={() => router.push(consultationHref(c.id, channelId))}

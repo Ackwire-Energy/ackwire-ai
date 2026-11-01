@@ -213,6 +213,7 @@ import { BrowserTrailCard } from "@/components/browser/BrowserTrailCard";
 import { requestBrowserCard } from "@/components/browser/open";
 import { CategorySelect } from "@/components/ChannelCategoryDialogs";
 import { ChannelDetailsButton, ChannelMembersStack } from "@/components/ChannelMembers";
+import { ChannelPinsButton } from "@/components/ChannelPins";
 import { InlineProposal, MemoryChangeCard, QuestionCard, SecretCard } from "@/components/ChatCards";
 import { NoticeLine, RoutineReport, RoutineTag, UnshownLine } from "@/components/ChatNotices";
 import { ConsultationCard } from "@/components/ConsultationCard";
@@ -1724,6 +1725,7 @@ function ChannelView({
                     onDetails={() => setDetailsOpen(true)}
                   />
                   {isMember && <ChannelThreadsButton channelId={channel.id} channelName={channel.name} />}
+                  {isMember && <ChannelPinsButton channelId={channel.id} channelName={channel.name} />}
                   <ChannelDetailsButton onClick={() => setDetailsOpen(true)} />
                 </div>
               </header>

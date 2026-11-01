@@ -863,7 +863,7 @@ export function BrowserCard({
     )
   ) : confirmStop ? (
     <>
-      <span className="small muted">{t("browser.watch.stopAsk")}</span>
+      <span className="brw-stopask small muted">{t("browser.watch.stopAsk", g)}</span>
       <Button size="sm" variant="ghost" onClick={() => setConfirmStop(false)}>
         {t("browser.watch.no")}
       </Button>
@@ -1025,7 +1025,7 @@ export function BrowserCard({
       {!surface && !framed && <SkyStrip color={color} muted={inControl} moving={live_} />}
       {framed ? (
         // The frame's top: where it is, and what it does now (its steps on hover), or the person's controls.
-        <div className="brw-mf__top">
+        <div className="brw-mf__top ac-on-dark">
           <span className="brw-mf__site">
             {asTitle === "host" ? <SiteIcon host={host} /> : <Icon name="globe" size={14} />}
             {titleText}

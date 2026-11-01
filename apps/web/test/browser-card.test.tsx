@@ -448,6 +448,30 @@ describe("the card in the message", () => {
   });
 });
 
+describe("the frame's stop", () => {
+  test("asks 'Parar a Ada?' with her name, its words off the toolbar's edge; the frame's top is a dark surface", async () => {
+    const api = createFakeApi(seedState());
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(5);
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    const run = { channelId: ENG_ID, threadId: null, runId: "r-stop", agentId: ADA_ID };
+    await act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.thinking", ...run } }));
+    await act(async () =>
+      socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.tool", tool: "browser_open", ...run } }),
+    );
+    await settle(3);
+    const card = document.querySelector(".brw-ac") as HTMLElement;
+    expect(card.querySelector(".brw-mf__top")?.classList.contains("ac-on-dark")).toBe(true);
+    const over = card.querySelector(".brw-mf__over") as HTMLElement;
+    await act(async () => fireEvent.click(within(over).getByRole("button", { name: "Parar" })));
+    await settle(2);
+    const ask = over.querySelector(".brw-stopask") as HTMLElement;
+    expect(ask.textContent).toBe("Parar a Ada?");
+    expect(within(over).getByRole("button", { name: "Não" })).toBeTruthy();
+  });
+});
+
 describe("the card's title", () => {
   test("'opening' only until the first frame; then the site, or the agent's browser when none is known", () => {
     expect(titleKind({ inControl: false, ask: null, host: "", opening: true })).toBe("opening");

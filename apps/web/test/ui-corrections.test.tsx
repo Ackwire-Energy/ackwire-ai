@@ -5,12 +5,18 @@ setupDom();
 
 import { join } from "node:path";
 import type { Approval, Message } from "@agenteschat/client";
+import { barEntries, barPhrase, markedPieces, markFaced, markInk } from "@agenteschat/client/lib/activity";
 import { mentionsHandle } from "@agenteschat/client/lib/markdown";
 import { apiProviderOf } from "@agenteschat/client/lib/providers";
-import { wordIndex } from "@agenteschat/client/lib/text";
+import { splitAtNames, wordIndex } from "@agenteschat/client/lib/text";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { withAgentFace } from "@/components/AgentAvatar";
+import type { TFunction } from "i18next";
+import type { ReactElement } from "react";
+import { withAgentFace, withAgentFaces } from "@/components/AgentAvatar";
 import { InlineApproval } from "@/components/ApprovalItem";
+import { SidebarHorizon } from "@/components/Sky";
+import { boldNames } from "@/components/WorkingLine";
+import { createI18n } from "@/i18n";
 import { declarations, topLevel } from "./built-css";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, renderPage, screen, settle } from "./render";
@@ -322,5 +328,218 @@ describe("the agent page's cards and the chat's", () => {
         "padding-left",
       ),
     ).toBe("7px");
+  });
+});
+
+describe("Fixadas in the channel header", () => {
+  const pinOf = (messageId: string, pinnedAt: string) => {
+    const message = seedState().messages.find((m) => m.id === messageId) as Message;
+    return { messageId, channelId: ENG_ID, threadId: null, pinnedByUserId: "u-joao", pinnedAt, message };
+  };
+  const button = () => screen().getByRole("button", { name: /^Mensagens fixadas/ });
+
+  test("its count, the list (face, words, time), a row goes to the message, Desafixar unpins; live", async () => {
+    const api = createFakeApi(seedState());
+    let pinned = [pinOf("m-2", "2026-11-01T10:05:00.000Z"), pinOf("m-1", "2026-11-01T10:00:00.000Z")];
+    const unpinned: string[] = [];
+    api.pins = {
+      list: async () => pinned,
+      pin: async () => ({}) as never,
+      unpin: async (_orgId, _channelId, messageId) => {
+        unpinned.push(messageId);
+        pinned = pinned.filter((p) => p.messageId !== messageId);
+      },
+    };
+    const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(8);
+    expect(button().getAttribute("aria-label")).toBe("Mensagens fixadas (2)");
+    expect(button().querySelector(".ac-countchip")?.textContent).toBe("2");
+    await act(async () => fireEvent.click(button()));
+    await settle(2);
+    const list = screen().getByRole("dialog", { name: "Mensagens fixadas em #eng" });
+    const rows = [...list.querySelectorAll(".pins-pop__item")] as HTMLElement[];
+    expect(rows.map((row) => row.querySelector(".thread-pop__text b")?.textContent)).toEqual(["Ada", "João"]);
+    expect(rows[0]?.querySelector(".ac-avatar")).toBeTruthy();
+    expect(rows[0]?.querySelector(".thread-pop__text small")?.textContent).toContain("Achei a causa");
+    expect(rows[0]?.querySelector(".pins-pop__time")?.textContent).toBeTruthy();
+
+    await act(async () => fireEvent.click(rows[1]?.querySelector(".thread-pop__row") as HTMLElement));
+    await settle(2);
+    expect(row("m-1").classList.contains("ac-msg--focus")).toBe(true);
+
+    await act(async () => fireEvent.click(button()));
+    await settle(2);
+    const again = screen().getByRole("dialog", { name: "Mensagens fixadas em #eng" });
+    await act(async () => fireEvent.click(within(again).getByRole("button", { name: "Desafixar a mensagem de Ada" })));
+    await settle(4);
+    expect(unpinned).toEqual(["m-2"]);
+    expect(button().getAttribute("aria-label")).toBe("Mensagens fixadas (1)");
+
+    // Someone else pins one: the count follows the event.
+    pinned = [pinOf("m-2", "2026-11-01T10:10:00.000Z"), ...pinned];
+    const socket = r.sockets.last();
+    await act(async () => socket.open());
+    await act(async () =>
+      socket.push({
+        type: "event",
+        channelId: ENG_ID,
+        event: {
+          type: "message.pinned",
+          channelId: ENG_ID,
+          messageId: "m-2",
+          threadId: null,
+          pinnedByUserId: "u-joao",
+          pinnedAt: "2026-11-01T10:10:00.000Z",
+        },
+      }),
+    );
+    await settle(4);
+    expect(button().getAttribute("aria-label")).toBe("Mensagens fixadas (2)");
+  });
+
+  test("nothing pinned: no count, and the list says how to pin", async () => {
+    const api = createFakeApi(seedState());
+    api.pins = { list: async () => [], pin: async () => ({}) as never, unpin: async () => {} };
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(8);
+    expect(button().querySelector(".ac-countchip")).toBeNull();
+    await act(async () => fireEvent.click(button()));
+    await settle(2);
+    expect(document.body.textContent).toContain("Nada fixado aqui ainda.");
+  });
+});
+
+describe("agent faces in more lines", () => {
+  test("each name gets its face where it stands as a word, in order, whatever order they come in", () => {
+    expect(splitAtNames("Atlas respondeu à pergunta da Ada", ["Ada", "Atlas"])).toEqual([
+      1,
+      " respondeu à pergunta da ",
+      0,
+    ]);
+    expect(splitAtNames("Ninguém aqui", ["Ada"])).toEqual(["Ninguém aqui"]);
+    // The same name twice: one face.
+    expect(splitAtNames("Ada e Ada", ["Ada", "Ada"])).toEqual([0, " e Ada"]);
+  });
+
+  test("an answer line far from its question: a face before each agent", async () => {
+    await renderPage(
+      <p>
+        {withAgentFaces("Atlas respondeu à pergunta da Ada", [
+          { name: "Atlas", agentId: "a-atlas" },
+          { name: "Ada", agentId: ADA_ID },
+        ])}
+      </p>,
+      { api: createFakeApi(seedState()), org: true },
+    );
+    await settle(2);
+    const names = [...document.querySelectorAll("p .ac-who")].map((w) => w.querySelector("b")?.textContent);
+    expect(names).toEqual(["Atlas", "Ada"]);
+    expect(document.querySelector("p")?.textContent).toBe("Atlas respondeu à pergunta da Ada");
+  });
+
+  test("the working bar's 'said' line: the agent's face before its name, other names stay in ink", async () => {
+    const t = createI18n("pt-BR").t as unknown as TFunction;
+    const runs = [
+      {
+        channelId: ENG_ID,
+        threadId: null,
+        runId: "r-said",
+        agentId: ADA_ID,
+        lastSeq: 0,
+        status: "running" as const,
+        text: "",
+        tool: "browser_read",
+        work: [
+          { kind: "say" as const, text: "Achei a área" },
+          {
+            kind: "call" as const,
+            id: "k1",
+            tool: "browser_read",
+            connector: null,
+            detail: null,
+            code: null,
+            output: [],
+            running: true,
+            since: 0,
+          },
+        ],
+      },
+    ];
+    const entries = barEntries(
+      runs,
+      [],
+      () => "Ada",
+      () => undefined,
+      [],
+      true,
+    );
+    // The turn that says its last words (the sentence, then those words: no long step yet).
+    const said = barPhrase(t, entries, runs, 1, 0, markInk, markFaced);
+    expect(markedPieces(said)).toEqual([
+      { text: "Ada", bold: true, agentId: ADA_ID },
+      { text: ": Achei a área", bold: false },
+    ]);
+    expect(markedPieces(`${markInk("Theo")} e ${markInk("Iris")}`)).toEqual([
+      { text: "Theo", bold: true },
+      { text: " e ", bold: false },
+      { text: "Iris", bold: true },
+    ]);
+    await renderPage(<p>{boldNames(said)}</p>, { api: createFakeApi(seedState()), org: true });
+    await settle(2);
+    expect(document.querySelector("p .ac-who b")?.textContent).toBe("Ada");
+    expect(document.querySelector("p")?.textContent).toBe("Ada: Achei a área");
+  });
+
+  test("a toast that names an agent draws its face; a plain one stays plain", async () => {
+    const r = await renderPage(<p />, { api: createFakeApi(seedState()) });
+    await act(async () => {
+      r.services.toasts.show({ text: "Devolvido à Ada.", who: { name: "Ada" } });
+      r.services.toasts.show("Salvo");
+    });
+    const toasts = [...document.querySelectorAll(".ac-toast")] as HTMLElement[];
+    expect(toasts.map((x) => x.textContent)).toEqual(["Devolvido à Ada.", "Salvo"]);
+    expect(toasts[0]?.querySelector(".ac-who .ac-avatar--xs")).toBeTruthy();
+    expect(toasts[0]?.querySelector(".ac-who b")?.textContent).toBe("Ada");
+    expect(toasts[1]?.querySelector(".ac-who")).toBeNull();
+  });
+});
+
+describe("the sidebar's sky", () => {
+  test("no pixel agents drift behind the account row, however many agents work", async () => {
+    let shown: ReactElement<{ children: ReactElement<{ options: { sprites?: number } }> }> | null = null;
+    function Probe() {
+      shown = SidebarHorizon({ working: 3, total: 3 }) as typeof shown;
+      return shown;
+    }
+    await renderPage(<Probe />, { api: createFakeApi(seedState()) });
+    expect(shown?.props.children.props.options.sprites).toBe(0);
+  });
+});
+
+describe("ghost buttons on a dark or agent-colored surface", () => {
+  test("their own white ink, a light plate on hover and press, never the page's ink", async () => {
+    const css = await sheet("packages/ui/src/styles/tokens.css", "packages/ui/src/styles/components.css");
+    expect(value(css, ".ac-on-dark .ac-btn--ghost", "color")).toBe("var(--on-dark-soft)");
+    expect(value(css, ".ac-on-dark .ac-btn--ghost:hover", "color")).toBe("var(--on-dark)");
+    expect(value(css, ".ac-on-dark .ac-btn--ghost:hover", "background")).toBe("var(--on-dark-plate)");
+    expect(value(css, '.ac-on-dark .ac-btn--ghost[aria-pressed="true"]', "color")).toBe("var(--on-dark)");
+    expect(value(css, ".ac-on-dark .ac-btn--ghost:active:not([disabled])", "background")).toBe(
+      "var(--on-dark-plate-strong)",
+    );
+    expect(value(css, ".ac-on-dark .ac-btn--ghost[disabled]", "color")).toBe("var(--on-dark-faint)");
+    expect(value(css, ".ac-on-dark .ac-btn--ghost.ac-btn--glyph:hover::before", "background")).toBe(
+      "var(--on-dark-plate)",
+    );
+    // The same in both themes: defined once, outside the light and dark blocks.
+    expect(value(css, "[data-theme]", "--on-dark")).toBe("#fff");
+    expect(value(css, "[data-theme]", "--on-dark-plate")).toBe("rgba(255, 255, 255, 0.16)");
+  });
+
+  test("the browser frame's top is such a surface; its toolbar over the page opens on the page alone", async () => {
+    const css = await sheet("apps/web/src/components/browser/browser.css");
+    expect(declarations(css, ".brw-mf:hover .brw-mf__over")).toEqual([]);
+    expect(value(css, ".brw-mf .brw-ac__stage:hover .brw-mf__over", "opacity")).toBe("1");
+    expect(value(css, ".brw-mf__now:hover .brw-mf__hist", "opacity")).toBe("1");
+    expect(value(css, ".brw-stopask", "padding-left")).toBe("var(--space-3)");
   });
 });

@@ -24,6 +24,7 @@ import { stepText } from "../browser/logic";
 import { openSwitchComputer } from "../outages/OutageNotice";
 import { useMachineOutages } from "../outages/queries";
 import { useColors, useDirectory, useMeId, useNow } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
 import { goBack } from "../shared/parts";
 import { SheetHostProvider } from "../shared/SheetHost";
 import { offersSwitch, onScreen, type PhoneStage, phoneStage, screenRequest, setupSub } from "./logic";
@@ -50,13 +51,16 @@ export function ComputerScreen({ agentId }: { agentId: string }) {
   const actions = useBrowserHandoffActions(useOrg().orgId);
   const leave = (held: BrowserHandoff | null) => {
     if (!held) return;
-    const g = agentGrammar(t, dir.agentById.get(agentId)?.name ?? "");
+    const agent = dir.agentById.get(agentId);
+    const g = agentGrammar(t, agent?.name ?? "");
+    // The toast names the agent: its face leads it.
+    const face = agentLook(agent);
     if (held.kind === "takeover") {
       actions.done(held.id).then(
-        () => toast({ title: t("browser.now.handedBack", g), icon: "check" }),
+        () => toast({ title: t("browser.now.handedBack", g), agent: face }),
         () => toast({ title: t("mobile.app.failed"), icon: "x" }),
       );
-    } else toast({ title: t("agentComputer.closeAsk", g), icon: "clock" });
+    } else toast({ title: t("agentComputer.closeAsk", g), agent: face });
   };
   return (
     <ToastHost>

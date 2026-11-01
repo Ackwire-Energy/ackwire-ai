@@ -3876,6 +3876,32 @@ html:not([data-pointer]) .ac-btn--primary:focus-visible {
 .ac-btn--ghost[disabled] {
   background: transparent;
 }
+/*
+ * A ghost button on a dark or agent-colored surface (`.ac-on-dark`: an agent's frame, a graphite bar): its own white
+ * ink and a light plate, so hover and press never turn it the page's ink on a dark plate, in either theme.
+ */
+.ac-on-dark .ac-btn--ghost {
+  color: var(--on-dark-soft);
+}
+.ac-on-dark .ac-btn--ghost:hover,
+.ac-on-dark .ac-btn--ghost[aria-pressed="true"] {
+  color: var(--on-dark);
+  background: var(--on-dark-plate);
+}
+.ac-on-dark .ac-btn--ghost:active:not([disabled]) {
+  color: var(--on-dark);
+  background: var(--on-dark-plate-strong);
+}
+.ac-on-dark .ac-btn--ghost[disabled] {
+  color: var(--on-dark-faint);
+  background: transparent;
+}
+.ac-on-dark .ac-btn--ghost.ac-btn--glyph:hover {
+  background: transparent;
+}
+.ac-on-dark .ac-btn--ghost.ac-btn--glyph:hover::before {
+  background: var(--on-dark-plate);
+}
 .ac-btn .ac-icon {
   width: var(--control-icon-md);
   height: var(--control-icon-md);
