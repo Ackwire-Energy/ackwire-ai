@@ -185,8 +185,6 @@ function Profile({ id }: { id: string }) {
   const shown = usageShown(agent?.brain, detail.data?.budgetUsedPercent ?? 0);
   const money = (v: number) =>
     new Intl.NumberFormat(i18n.language || "pt-BR", { style: "currency", currency: "USD" }).format(v);
-  const date = (iso: string) =>
-    new Intl.DateTimeFormat(when.locale, { day: "numeric", month: "short" }).format(new Date(iso)).replace(".", "");
   const originText = useMemoryOriginText();
 
   const openDm = () =>

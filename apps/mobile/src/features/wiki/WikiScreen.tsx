@@ -153,7 +153,7 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
           )
         ) : home ? (
           <>
-            {map && star && !folder && pages.length > 1 ? (
+            {map && star && !folder && map.stars.length > 1 ? (
               <StarCard
                 label={t("mobile.wiki.map")}
                 count={pages.length}

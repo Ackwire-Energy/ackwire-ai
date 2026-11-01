@@ -39,9 +39,9 @@ const FOCUS = { duration: 420, easing: Easing.out(Easing.cubic) };
 
 /** A path of small squares, for what is drawn in one color. */
 function squares(points: Point[], size: number) {
-  const path = Skia.Path.Make();
+  const path = Skia.PathBuilder.Make();
   for (const p of points) path.addRect(Skia.XYWHRect(p.x, p.y, size, size));
-  return path;
+  return path.build();
 }
 
 /** A light that passes along the links used lately, one at a time. */
