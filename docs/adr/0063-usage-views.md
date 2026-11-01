@@ -1,6 +1,6 @@
 # 0063. Usage views: each plan account by computer, an agent's month, and its part of a limit
 
-- Status: Accepted. Amended 2026-10-30: §5 (a plan's limits where the budget was). Amended 2026-10-31: §5 (your plans' limits in Sua conta and, near a limit, in the account menu; the workspace's budget only where it uses the API; a budget counts only its agent's own calls)
+- Status: Accepted. Amended 2026-10-30: §5 (a plan's limits where the budget was). Amended 2026-10-31: §5 (your plans' limits in Sua conta and, near a limit, in the account menu; the workspace's budget only where it uses the API; a budget counts only its agent's own calls), §6 (the agent sees its own usage)
 - Date: 2026-10-24
 - Extends: ADR 0026 (budget visibility), ADR 0059 (AI accounts belong to people; §7 usage limits)
 
@@ -43,6 +43,16 @@ The agent list (`GET …/agents`, and the agent an edit returns) carries it in `
 *Amended 2026-10-31.* The workspace's budget read "0%" in a workspace that thinks only on plans (the account menu before it became a short menu, the Uso tile of the web's Settings, the phone's workspace page). It shows only where the workspace uses the API: an agent on the model brain has a key to think with (the AI status says it is ready, ADR 0061), or the agents spent through the API this month (the overview's `budgetUsedPercent` above 0). One rule, `workspaceUsesApi` in `packages/client/src/lib/plan-usage.ts`, reads what the apps already hold (the agent list's `brain`, the AI status, the overview): no new request. A budget counts only its agent's own calls (`usage_records.kind = 'agent'`): on the screens (`agentBudgetsThisMonth`, the agent page's `agentDetail`), in the gateway's counter when it starts a month or a budget changes (`agentSpendThisMonth`), and as API use in the usage views (`readUsage` reads a plan's rows, the router's on the plan too, and the agent's own calls). Jev's judgments (an agent's status line, its tool groups) and the router's calls on a key are recorded with the agent's id but never billed to its budget, and on plans alone they crossed 0.1% after a few hundred runs, which brought the budget back.
 
 The viewer's own plans' limits (`ownPlanLines`): the plans one of their agents thinks with whose limits are known, their computers' own sign-ins first (while one of their agents on that computer thinks with no account, ADR 0059 §3), then their accounts (while `usedBy` names an agent and one of its logins is signed in), named as "Seus planos" names them, and two of one name say which as it tells them apart: their computers, or on the same computer an account's email. Configurações › Sua conta lists them with the compact line above, each opening Uso, and shows nothing while no window is known. The account menu stays short: one line under the viewer's status only while one of those plans is at its limit or from 80% (`PLAN_ALMOST`, where the compact line already says "Quase no limite"), at its limit first, then the fullest: its maker's mark, its name and its state ("Quase no limite", "No limite até 15:40"), opening Uso. Sua conta and the menu ask the computers to look the usage up again when they open, as every plan meter does (`refreshAccountUsage`), and the menu reads the accounts then. Members without `view_usage` see their own plans' limits too: percentages, never money.
+
+### 6. The agent sees its own usage
+
+*Added 2026-10-31.* Asked "how is your usage limit?", an agent could only say it couldn't check. `get_my_usage` (`packages/engine/src/usage-tools.ts`) is a built-in tool with no scope: every agent has it in every run, listed from the first turn (the conversation group, ADR 0043). It reads the agent's own Uso tab as someone without `view_usage` sees it (`agentUsageFor` with no viewer, which also serves `GET …/agents/{agentId}/usage`):
+
+- the plan it thinks with (its name, maker, plan and owner), each window tightest first with its percentage, when it resets in the time zone of the person behind the run and the agent's estimated part (§2), and near or at the limit what the apps say (`planWindows`, `planState`);
+- its tokens this month, plans and API apart;
+- how much of its API budget it used where it uses the API: always on the model brain, on a plan once it spent through the API this month (§5).
+
+Only its own numbers: never another agent's part, tokens or budget, nor an account's email. Never money (the budget's amounts, what plan tokens would cost through the API), even when an admin asks: the result stays in the run, whose steps the agent's owner reads without `view_usage` (`GET …/runs/{runId}`, §4), and the answer may go to a channel where not everyone may see costs. It says the amounts are in Configurações › Orçamento e uso, for those who may see them. The run policy lists it as a read, so a routine's run, with nobody behind it, calls it too. The chat names the call "Conferiu o próprio uso" / "Checked its usage".
 
 ## Consequences
 

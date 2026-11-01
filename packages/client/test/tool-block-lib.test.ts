@@ -194,6 +194,13 @@ describe("the block's lines", () => {
     expect(toolApps(items)).toEqual([{ kind: "followingUp" }, { kind: "cancelingFollowUp" }]);
   });
 
+  test("checking its own usage is ours, not a tool named get my usage", () => {
+    const items = toolItemsLive([call("1", "get_my_usage"), call("2", "mcp__agentes__get_my_usage")]);
+    expect(items.map((i) => (i.kind === "call" ? `${i.line.kind}×${i.line.count}` : i.kind))).toEqual([
+      "checkingUsage×2",
+    ]);
+  });
+
   test("grey words: a built-in's label, or a connector tool's own name without its app; never its input", () => {
     expect(toolHint("create_issue", { kind: "creatingIssue" }, "Corrigir login")).toBe("Corrigir login");
     expect(toolHint("create_issue", { kind: "creatingIssue" })).toBeNull();

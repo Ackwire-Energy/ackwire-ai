@@ -82,6 +82,7 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   browsing: "globe",
   pcFiles: "file",
   checkingComputer: "computer",
+  checkingUsage: "chart",
   proposingMission: "flag",
   messagingMission: "flag",
   updatingPlan: "flag",

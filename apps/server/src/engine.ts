@@ -53,6 +53,7 @@ import {
   createStreamBroker,
   createTalker,
   createToolGateway,
+  createUsageToolSource,
   createWikiToolSource,
   createWorkspaceToolSource,
   type EmailArt,
@@ -269,6 +270,7 @@ export function buildEngine(o: EngineOptions) {
       // An agent with no AI connected is refused at once: its answer would never come.
       createAskAgentToolSource({ pubsub: adapters.pubsub, ai: { gateway, machines: machineHub } }),
       createFindAgentToolSource({ machines: machineHub }),
+      createUsageToolSource(),
       // What the agent says it is doing, next to its name (ADR 0084).
       createSetStatusToolSource({ pubsub: adapters.pubsub }),
       createReactToolSource({ pubsub: adapters.pubsub }),
