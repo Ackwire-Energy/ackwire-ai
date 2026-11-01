@@ -75,6 +75,10 @@ import type { Spawn } from "./scope-gate";
  *   last command just succeeded. Anything else starts Chrome when it isn't.
  * - The runner stops its Chromes itself: after the idle time (not while a
  *   person watches or a help request is open), on `stop`, and when it stops.
+ *   A help request forgotten on a dropped server connection still holds for
+ *   the idle time (the server says again on reconnect), and `agent-browser`'s
+ *   own idle timeout is kept off meanwhile. A browser that closed anyway under
+ *   an open help request opens again on its last page when a person views it.
  *   Their pids are kept in `<runner home>/browser/chromes.json`, so a runner
  *   that crashed closes what it left on its next start.
  * - The site allowlist is ours: `--allowed-domains` refuses persistent
@@ -1076,6 +1080,12 @@ interface Session {
   chrome?: OwnChrome;
   /** A Chrome being started: a second command waits for it. */
   chromeStarting?: Promise<OwnChrome>;
+  /** The last web page it showed: a help request's browser that closed anyway opens again there. */
+  url?: string;
+  /** Its last Chrome ran on the agent's desktop. */
+  headed?: boolean;
+  /** When the sweep last kept `agent-browser` up for a help request or a viewer. */
+  touchedAt?: number;
   /** For the desktop app: the page's host, what the agent did last, and the conversation it was for. */
   host?: string;
   doing?: ControlBrowserDoing;
@@ -1230,6 +1240,8 @@ export class BrowserManager {
   private readonly sessions = new Map<string, Session>();
   /** A person's turn in each agent's browser, as the server last told (`browser.handoff`). */
   private readonly handoffs = new Map<string, BrowserHandoffInfo>();
+  /** Handoffs forgotten when the server connection dropped: their browsers stay open until it says again, or a while. */
+  private readonly heldUntil = new Map<string, number>();
   private readonly namespace: string;
   private readonly configFile: string;
   private readonly now: () => number;
@@ -1733,6 +1745,7 @@ export class BrowserManager {
         : { success: true, data: { closed: true } };
       await this.stopChrome(session);
       session.aliveAt = null;
+      session.url = undefined;
       this.noteAct(session, command, args, answer, link);
       return answer;
     }
@@ -1942,6 +1955,7 @@ export class BrowserManager {
         );
       }
       session.chrome = chrome;
+      session.headed = chrome.display !== undefined;
       session.aliveAt = null;
       session.memory = this.memoryCounters();
       await this.rememberChrome(chrome.pid, profile, chrome.display);
@@ -2097,9 +2111,7 @@ export class BrowserManager {
 
   /** Someone may be looking at the agent's Chrome, or working in it: its live view, a person's turn, its desktop's viewers. */
   private inView(session: Session) {
-    return (
-      !!session.stream || !!session.streamOpening || this.handoffs.has(session.agentId) || this.desktopWatched(session)
-    );
+    return !!session.stream || !!session.streamOpening || this.held(session.agentId) || this.desktopWatched(session);
   }
 
   /** The agent's Chrome is on its desktop, and someone watches or controls that desktop. */
@@ -2116,7 +2128,7 @@ export class BrowserManager {
   onDesktopInUse(agentId: string): boolean {
     const s = this.sessions.get(agentId);
     if (!s || s.chrome?.display === undefined) return false;
-    return !!s.stream || !!s.streamOpening || this.handoffs.has(agentId) || this.now() - s.lastUsed < this.idleMs;
+    return !!s.stream || !!s.streamOpening || this.held(agentId) || this.now() - s.lastUsed < this.idleMs;
   }
 
   /**
@@ -2127,7 +2139,17 @@ export class BrowserManager {
     for (const [agentId, s] of this.sessions) {
       // A person on its desktop may be working in it without a command: that counts as use.
       if (this.desktopWatched(s)) s.lastUsed = this.now();
-      if (s.stream || s.streamOpening || this.handoffs.has(agentId)) continue;
+      if (s.stream || s.streamOpening || this.held(agentId)) {
+        // `agent-browser` stops on its own idle timeout: a command keeps it up for whoever is still on the page.
+        // Not a use: once nobody holds it, its idle time counts from the last real one.
+        if (s.chrome && this.now() - Math.max(s.lastUsed, s.touchedAt ?? 0) >= this.idleMs - 2 * SWEEP_MS) {
+          s.touchedAt = this.now();
+          await this.enqueue(s, () =>
+            this.run(s, ["stream", "status"], { timeoutMs: QUICK_TIMEOUT_MS, notUse: true }),
+          ).catch(() => undefined);
+        }
+        continue;
+      }
       if (this.now() - s.lastUsed < this.idleMs) continue;
       this.sessions.delete(agentId);
       this.changed();
@@ -2249,10 +2271,10 @@ export class BrowserManager {
   private async run(
     session: Session,
     args: string[],
-    opts: { timeoutMs: number; signal?: AbortSignal; stdin?: string },
+    opts: { timeoutMs: number; signal?: AbortSignal; stdin?: string; notUse?: boolean },
   ): Promise<BrowserAnswer> {
     const command = this.presentCommand() ?? (await this.ensureReady());
-    session.lastUsed = this.now();
+    if (!opts.notUse) session.lastUsed = this.now();
     // Never without our Chrome: `agent-browser` would launch its own, with the automation markers.
     const chrome = session.chrome;
     if (!chrome) return { success: false, data: null, error: "The browser isn't open: open a page first" };
@@ -2518,11 +2540,13 @@ export class BrowserManager {
           : undefined;
     const host = url ? pageHost(url) : null;
     if (host) session.host = host;
+    if (url && isWebPage(url)) session.url = url;
     this.changed();
   }
 
   /** `browser.handoff` from the server: a request waiting, a person in control, or none (null). */
   setHandoff(agentId: string, handoff: BrowserHandoffInfo | null) {
+    this.heldUntil.delete(agentId);
     if (handoff && (handoff.status === "pending" || handoff.status === "active")) {
       this.handoffs.set(agentId, {
         status: handoff.status,
@@ -2534,6 +2558,11 @@ export class BrowserManager {
     this.changed();
   }
 
+  /** A person's turn is open on the agent's browser, or was when the server connection dropped. */
+  private held(agentId: string) {
+    return this.handoffs.has(agentId) || (this.heldUntil.get(agentId) ?? 0) > this.now();
+  }
+
   /** The agent's Chrome process while it runs: its window on the agent's desktop is the browser's, not the desktop's. */
   chromePid(agentId: string): number | null {
     return this.sessions.get(agentId)?.chrome?.pid ?? null;
@@ -2542,6 +2571,7 @@ export class BrowserManager {
   /** The server connection dropped: what it told about handoffs is stale (it says again on reconnect). */
   clearHandoffs() {
     if (this.handoffs.size === 0) return;
+    for (const agentId of this.handoffs.keys()) this.heldUntil.set(agentId, this.now() + this.idleMs);
     this.handoffs.clear();
     this.changed();
   }
@@ -2629,7 +2659,7 @@ export class BrowserManager {
       void this.firstFrame(session, session.stream);
       return { mode };
     }
-    const opening = this.openStream(session, mode);
+    const opening = this.openStream(agent, session, mode);
     session.streamOpening = opening;
     try {
       await opening;
@@ -2639,8 +2669,13 @@ export class BrowserManager {
     return { mode };
   }
 
-  private async openStream(session: Session, mode: BrowserStreamMode): Promise<void> {
+  private async openStream(agent: AgentScope, session: Session, mode: BrowserStreamMode): Promise<void> {
     const port = await this.enqueue(session, async () => {
+      // Closed anyway while a person's help is asked for (it crashed, someone quit it): open again where it was.
+      if (!session.chrome && session.url && this.held(session.agentId)) {
+        await this.ensureOwnChrome(agent, session, session.headed === true, []);
+        await this.run(session, ["open", session.url], { timeoutMs: QUICK_TIMEOUT_MS * 4 });
+      }
       if (!session.chrome) return null;
       let status = await this.run(session, ["stream", "status"], { timeoutMs: QUICK_TIMEOUT_MS });
       if (isRecord(status.data) && status.data.connected !== true) return null;
@@ -2721,6 +2756,7 @@ export class BrowserManager {
       if (url === stream.url) return;
       const before = stream.url ? pageHost(stream.url) : null;
       stream.url = url;
+      if (isWebPage(url)) session.url = url;
       // Another page: its title comes with the next tab list.
       stream.title = undefined;
       if (pageHost(url) !== before) this.changed();

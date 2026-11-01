@@ -177,7 +177,7 @@ describe("the page box with no page to show", () => {
       for (const g of ["F", "M"]) expect(live[`stuckHelp${g}`]).toBeTruthy();
     }
     expect(featureKeysPtBR.browser.live.unavailable.stuckF).toBe("Não deu para abrir o navegador da {{name}}.");
-    expect(featureKeysEn.browser.live.stuckHelpM).toBe("Try again restarts the browser. Its sign-ins stay saved.");
+    expect(featureKeysEn.browser.live.stuckHelpM).toBe("Try again restarts the browser. Logins stay saved.");
   });
 });
 

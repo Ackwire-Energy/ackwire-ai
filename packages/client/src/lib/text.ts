@@ -185,3 +185,8 @@ export const matchesName = (typed: string, name: string) => typedForm(typed) ===
 
 /** Text made safe inside HTML, as text or as an attribute value (quoted either way). */
 export const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+const oneSpaced = (text: string) => text.replace(/\s+/g, " ").trim();
+
+/** Whether `whole` already holds `part` word for word (line breaks and extra spaces aside). */
+export const holdsText = (whole: string, part: string) => oneSpaced(whole).includes(oneSpaced(part));

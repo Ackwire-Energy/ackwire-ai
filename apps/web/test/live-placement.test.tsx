@@ -272,6 +272,34 @@ describe("live row in the timeline", () => {
     expect(row()).toBeNull();
   });
 
+  test("a line said before a call and posted as the message shows once (a repeated delta adds nothing)", async () => {
+    const { ev } = await open();
+    const said = "Achei o painel de cobrança. Preciso da sua sessão para puxar os valores.";
+    await ev({ type: "agent.run", ...ids, status: "running" });
+    await ev({ type: "agent.delta", ...ids, seq: 0, text: said });
+    await ev({ type: "agent.delta", ...ids, seq: 0, text: said });
+    await ev({ type: "agent.tool", ...ids, tool: "browser_ask_person", toolUseId: "call-1" });
+    await settle(2);
+    await ev({
+      type: "message.created",
+      messageId: "m-said",
+      message: {
+        id: "m-said",
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "agent", id: ADA_ID },
+        body: said,
+        mentionedAgentIds: [],
+        agentRunId: "r-live",
+        createdAt: new Date(Date.now() + 10_000).toISOString(),
+      },
+    });
+    await ev({ type: "agent.run", ...ids, status: "waiting_input" });
+    await settle(4);
+    const text = document.body.textContent ?? "";
+    expect(text.split(said).length - 1).toBe(1);
+  });
+
   test("after a reconnect, once the server confirms the channel again, live rows it no longer runs go away", async () => {
     const { ev, sockets } = await open((s) => {
       s.activeRuns = { [ENG_ID]: [] };

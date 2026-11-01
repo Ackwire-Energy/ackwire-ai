@@ -107,8 +107,10 @@ describe("the agent's computer on the phone: its words by edition", () => {
       const t = await translator(lng);
       for (const g of ["F", "M"]) expect(t(`mobile.browser.live.closedHelp${g}`)).not.toMatch(/Abre quando|opens when/);
     }
-    expect((await translator("pt-BR"))("mobile.browser.live.closedHelpF")).toBe("Os logins continuam salvos.");
-    expect((await translator("en"))("mobile.browser.live.closedHelpM")).toBe("Its sign-ins stay saved.");
+    expect((await translator("pt-BR"))("mobile.browser.live.closedHelpF")).toBe(
+      "Os logins continuam salvos para a próxima vez.",
+    );
+    expect((await translator("en"))("mobile.browser.live.closedHelpM")).toBe("Logins stay saved for next time.");
   });
 
   test("the phone's own Cloud words name no off, pairing, cloud or terminal", () => {
