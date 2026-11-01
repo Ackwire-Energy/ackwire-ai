@@ -20,7 +20,7 @@ import type { Notice } from "./notices";
 import { can, getMembership, requirePermission } from "./organizations";
 import { maySql } from "./permissions";
 import { type RoutineAccess, type RoutineReport, routineAccessOf, routineReportOf } from "./routine-brief";
-import { createRoutine, routineTimezone } from "./routines";
+import { checkFrequency, createRoutine, routineTimezone } from "./routines";
 import type { ScheduleRule } from "./rrule";
 import { deliverNoticeToRun } from "./run-resume";
 import { parseSchedule } from "./schedule";
@@ -322,6 +322,13 @@ async function checkRoutine(
   if (!read.ok) {
     throw new ValidationError(
       `The routine's schedule: ${read.error} Write it as the person said it ("todo dia ao meio-dia") or as cron ("0 12 * * *").`,
+    );
+  }
+  try {
+    checkFrequency({ triggerType: "schedule", rule: read.rule, cron: read.cron, timezone: read.timezone }, { type: "dm" });
+  } catch (error) {
+    throw new ValidationError(
+      `The routine's schedule: ${error instanceof Error ? error.message : String(error)}. Propose one at most that often.`,
     );
   }
   return {

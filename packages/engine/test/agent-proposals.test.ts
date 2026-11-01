@@ -526,6 +526,10 @@ describe("one request, one card: channels, mailboxes and a routine", () => {
     const bad = await propose(f, here, { ...CAIO, routine: { ...NOON, schedule: "quando der" } });
     expect(bad.isError).toBe(true);
     expect(bad.content).toContain('Write it as the person said it ("todo dia ao meio-dia") or as cron ("0 12 * * *")');
+    // One createRoutine would refuse is refused now, so the agent proposes one that can be made.
+    const often = await propose(f, here, { ...CAIO, routine: { ...NOON, schedule: "*/5 * * * *" } });
+    expect(often.isError).toBe(true);
+    expect(often.content).toContain("at most every 15 minutes");
     expect(await proposals(f)).toHaveLength(1);
   });
 
