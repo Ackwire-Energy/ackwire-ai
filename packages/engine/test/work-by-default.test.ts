@@ -162,8 +162,9 @@ describe("work that comes back goes on for the person behind it", () => {
       body: "@dev avisa o infra que o deploy terminou",
     });
     await drainOutbox(f.db, f.handlers);
-    const reply = (await f.db.select().from(schema.messages)).find(
-      (m) => (m.meta.notice as { kind?: string } | undefined)?.kind === "agent_note",
+    // What came of the note, back in @dev's conversation (a note's reply, or the answer kind a note may come back as).
+    const reply = (await f.db.select().from(schema.messages)).find((m) =>
+      ["agent_note", "consult_reply"].includes(String((m.meta.notice as { kind?: unknown } | undefined)?.kind)),
     );
     expect(reply?.channelId).toBe(f.general.id);
     const woken = await wokenBy(reply?.id ?? "");
