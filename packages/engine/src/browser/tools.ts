@@ -82,6 +82,7 @@ export {
 
 import { publishChannelEvent } from "../events";
 import { cutText } from "../format";
+import { releaseProfileTurns } from "../runs";
 
 const { agents, agentRuns, secretRequests, users } = schema;
 
@@ -103,8 +104,12 @@ export async function runBrowserProfile(
   return agent?.id ?? null;
 }
 
-/** The run's browser becomes this profile, or its own (`null`); a new profile's turn starts from scratch. */
+/**
+ * The run's browser becomes this profile, or its own (`null`): the turn it held elsewhere is let go at once, and the
+ * new profile's turn starts from scratch.
+ */
 async function switchRunBrowser(db: Database, runId: string, profileId: string | null) {
+  await releaseProfileTurns(db, runId);
   await db
     .update(agentRuns)
     .set({ browserProfileId: profileId, browserProfileOwn: profileId === null, browserProfileTurnAt: null })

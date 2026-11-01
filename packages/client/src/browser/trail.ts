@@ -43,7 +43,7 @@ export function screenTrailOf(meta: unknown, screen: ScreenKind): BrowserTrailSt
             detail: typeof s.detail === "string" && s.detail ? s.detail : null,
             at: s.at,
             failed: s.failed === true,
-            profileName: typeof s.profileName === "string" && s.profileName ? s.profileName : null,
+            ...(typeof s.profileName === "string" && s.profileName ? { profileName: s.profileName } : {}),
           },
         ]
       : [],

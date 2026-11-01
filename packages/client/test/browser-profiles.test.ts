@@ -34,7 +34,7 @@ test("the chip reads the profile the trail ended in, by its name then", () => {
       ],
     },
   });
-  expect(steps.map((s) => s.profileName)).toEqual(["Empresa B", null]);
+  expect(steps.map((s) => s.profileName ?? null)).toEqual(["Empresa B", null]);
   expect(trailProfile(steps)).toBeNull();
   expect(trailProfile(steps.slice(0, 1))).toBe("Empresa B");
 });

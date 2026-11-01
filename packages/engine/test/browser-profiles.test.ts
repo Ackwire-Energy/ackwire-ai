@@ -240,8 +240,10 @@ test("a granted agent switches with browser_profile; its commands go to the prof
   expect(
     sent.every((c) => c.profile?.id === p.id && c.agent?.id === f.agent.id && !("desktop" in c && c.desktop)),
   ).toBe(true);
-  // "own" goes back to its own browser.
+  // "own" goes back to its own browser, and lets go of the profile's turn at once.
   await b.call(ada, "browser_profile", { name: "own" });
+  const [row] = await f.db.select().from(schema.browserProfiles).where(eq(schema.browserProfiles.id, p.id));
+  expect(row?.heldByRunId).toBeNull();
   const n = b.ops().length;
   await b.call(ada, "browser_open", { url: "https://chat.example/" });
   expect(
