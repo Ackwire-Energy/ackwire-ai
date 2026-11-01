@@ -16,6 +16,7 @@ import { type RouterDeps, routeMessage } from "./router";
 import { bodyCode } from "./run-tools";
 import { type AgentRun, NO_AI, replyThreadOf } from "./runs";
 import { continueStretch, stretchCardOf } from "./stretch";
+import { continueUsagePause, usagePauseCardOf } from "./usage-pause";
 import { withWikiLinks } from "./wiki-links";
 
 const { agentRunSteps, agentRuns, agents, messages, routingDecisions } = schema;
@@ -279,6 +280,8 @@ export async function answerNow(
   const { membership } = await requireChannelAccess(deps.db, userId, orgId, message.channelId);
   const paused = message.authorType === "agent" ? stretchCardOf(message.meta) : null;
   if (paused) return continueStretch(deps, userId, membership, message, paused);
+  const usage = message.authorType === "agent" ? usagePauseCardOf(message.meta) : null;
+  if (usage) return continueUsagePause(deps, userId, membership, message, usage);
   const card = noAiCardOf(message);
   const found = await answeringRuns(deps.db, message, card);
   const failed = found.filter((r) => r.run.status === "failed" && r.run.error === NO_AI && !r.run.background);

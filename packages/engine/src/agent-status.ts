@@ -134,7 +134,10 @@ export async function loadAgentStatuses(
         updatedAt: agentRuns.updatedAt,
         waitingMachineId: agentRuns.waitingMachineId,
         outage: outageParkedSql,
-        waitCode: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'code'`,
+        // A long-work pause (ADR 0118) reads as the wait on what it paused on.
+        waitCode: sql<string | null>`case when ${agentRuns.transcript}->'waitingForBrain'->>'code' = 'usage_pause'
+          then (case when ${agentRuns.transcript}->'waitingForBrain'->>'source' = 'budget' then 'budget' else 'plan_limit' end)
+          else ${agentRuns.transcript}->'waitingForBrain'->>'code' end`,
       })
       .from(agentRuns)
       .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.status, [...ACTIVE, ...WAITING]), ...ofRuns)),

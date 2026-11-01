@@ -2,6 +2,7 @@ import type { TFunction } from "i18next";
 import { previewOf } from "./consultations";
 import { mediaKindOf, mediaWord } from "./media";
 import { usageWhen } from "./plan-usage";
+import { usageWindowText } from "./usage-pause";
 
 /** Notes of an agent waiting on its plan's limit or its budget (`meta.usageWait`): `{{when}}` from its reset. */
 const USAGE_NOTES = new Set([
@@ -69,6 +70,11 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
     const resetsAt = (m.usageWait as { resetsAt?: unknown } | undefined)?.resetsAt;
     const when = typeof resetsAt === "string" ? usageWhen(t, locale, resetsAt) : "";
     return t(`chat.body.${code}`, { ...params, when, defaultValue: body });
+  }
+  // Long work paused near a limit (ADR 0118): its window in the reader's words.
+  if (code === "usage_paused" || code === "usage_paused_budget") {
+    const window = typeof params.window === "string" && params.window ? usageWindowText(t, params.window) : "";
+    return t(`chat.body.${code}`, { ...params, window, defaultValue: body });
   }
   // An older note about a plan's limit (sent as the computer brain being unavailable): the plan's words.
   if (code === "brain_unavailable" && (m.brainUnavailable as { code?: unknown } | undefined)?.code === "plan_limit") {

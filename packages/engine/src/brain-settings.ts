@@ -226,6 +226,8 @@ export interface AgentBrainView {
   /** What it runs with (`model ?? defaultModel`), null for the model brain. */
   effectiveModel: string | null;
   fallback: boolean;
+  /** Long work may go on into the plan's paid extra usage where the provider reports it on (ADR 0118). */
+  extraUsage: boolean;
   computer: BrainComputer | null;
   options: BrainOption[];
   /** Every computer the caller may give the agent (admins: all; its owner: the ones they connected), with its options. */
@@ -341,6 +343,7 @@ function view(
     model: brain === "model" ? null : agent.brainModel,
     effectiveModel: brain === "model" ? null : (agent.brainModel ?? defaultBrainModel(brain)),
     fallback: agent.brainFallback,
+    extraUsage: agent.brainExtraUsage,
     computer: machine ? { machineId: machine.id, name: machine.name, online: machineOnline(machine) } : null,
     options: brainOptions(machine),
     machines,
@@ -401,6 +404,7 @@ export interface AgentBrainInput {
   /** Omitted = keep it (or the default when the brain changes); null = the brain's default. */
   model?: unknown;
   fallback?: unknown;
+  extraUsage?: unknown;
   /**
    * "Atende outras pessoas" turned off (ADR 0059 §5): true, only its owner talks
    * to it; false, whoever its "who can talk" list lets in (everyone with no
@@ -461,6 +465,9 @@ export async function setAgentBrain(
   if (input.fallback !== undefined && typeof input.fallback !== "boolean") {
     throw new ValidationError("fallback is on or off", "brain.invalid");
   }
+  if (input.extraUsage !== undefined && typeof input.extraUsage !== "boolean") {
+    throw new ValidationError("extraUsage is on or off", "brain.invalid");
+  }
   if (input.onlyOwner !== undefined && typeof input.onlyOwner !== "boolean") {
     throw new ValidationError("onlyOwner is on or off", "brain.invalid");
   }
@@ -493,6 +500,7 @@ export async function setAgentBrain(
         ? carried
         : agent.brainModel;
   const fallback = (input.fallback as boolean | undefined) ?? agent.brainFallback;
+  const extraUsage = (input.extraUsage as boolean | undefined) ?? agent.brainExtraUsage;
   if (input.effort !== undefined && input.effort !== null && !isBrainEffortSetting(input.effort)) {
     throw new ValidationError("Choose auto, low, medium, high, xhigh or max", "brain.invalid_effort");
   }
@@ -514,6 +522,7 @@ export async function setAgentBrain(
     changed ||
     model !== agent.brainModel ||
     fallback !== agent.brainFallback ||
+    extraUsage !== agent.brainExtraUsage ||
     account !== agent.brainAccountId ||
     effort !== agent.brainEffort ||
     contextTokens !== agent.contextTokens;
@@ -551,6 +560,7 @@ export async function setAgentBrain(
         brain,
         brainModel: model,
         brainFallback: fallback,
+        brainExtraUsage: extraUsage,
         brainAccountId: account,
         brainEffort: effort,
         contextTokens,
@@ -585,11 +595,12 @@ export async function setAgentBrain(
           brain: from,
           model: agent.brainModel,
           fallback: agent.brainFallback,
+          extraUsage: agent.brainExtraUsage,
           account: agent.brainAccountId,
           effort: agent.brainEffort,
           contextTokens: agent.contextTokens,
         },
-        to: { brain, model, fallback, account, effort, contextTokens },
+        to: { brain, model, fallback, extraUsage, account, effort, contextTokens },
         ...options.audit,
       },
     });
@@ -618,6 +629,7 @@ export async function setAgentBrain(
     brain,
     brainModel: model,
     brainFallback: fallback,
+    brainExtraUsage: extraUsage,
     brainAccountId: account,
     brainEffort: effort,
     contextTokens,

@@ -1,5 +1,5 @@
 import { BRAIN_PROTOCOL, type BrainEffort, isBrainEffort, type PlanUsage } from "@agenteschat/adapters";
-import { and, desc, type Executor, eq, isNotNull, ne, schema, sql } from "@agenteschat/db";
+import { and, desc, type Executor, eq, isNotNull, ne, notInArray, schema, sql } from "@agenteschat/db";
 import { isAutoModel } from "@agenteschat/providers";
 import { claudeCodeModel, planOf } from "@agenteschat/providers/plans";
 import { planState } from "@agenteschat/ui/plan-state";
@@ -465,6 +465,8 @@ async function sessionFor(
           ...(conversation === run.channelId ? [] : [eq(agentRuns.threadRootId, conversation)]),
           isNotNull(agentRuns.brainSessionId),
           ne(agentRuns.id, run.id),
+          // Never the session of a run still waiting to go on (a paused long job, ADR 0118): it picks up there.
+          notInArray(agentRuns.status, ["waiting_input", "waiting_approval"]),
           // Never a session background work thought in (a routine's: it was told to answer NO_REPLY, and a
           // conversation that picked it up answered that). Any run that shared it counts, older rows too.
           sql`not exists (select 1 from ${agentRuns} r2

@@ -208,6 +208,8 @@ export interface ContextBlock extends SystemBlock {
   now?: { zone: string; who: string | null; gapMs: number | null };
   /** The agents "# Your teammates now" lists, so a run that resumes reads how they are then (`teammatesNowAgain`). */
   teammates?: { id: string; handle: string }[];
+  /** Where the agent's plan stands from 90% (ADR 0118): replaced on every claim of the run. */
+  usage?: boolean;
 }
 
 export const isTurnBlock = (block: SystemBlock) => (block as ContextBlock).turn === true;
