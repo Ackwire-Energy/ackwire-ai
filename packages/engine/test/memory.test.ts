@@ -106,7 +106,7 @@ describe("guardrails", () => {
       "token = get_token()",
       'password = input("Senha: ")',
       'token = os.environ["NORTHWIND_TOKEN"]',
-      "export API_KEY=${NORTHWIND_KEY}",
+      `export API_KEY=${"$"}{NORTHWIND_KEY}`,
       "password: <your password>",
     ]) {
       expect([text, file(text)]).toEqual([text, false]);
