@@ -37,6 +37,7 @@ import {
 } from "@agenteschat/client";
 import { activityVerb, listNames } from "@agenteschat/client/lib/activity";
 import { canTalk } from "@agenteschat/client/lib/audience";
+import { runPosition } from "@agenteschat/client/lib/chat";
 import {
   type ConsultNoticeFold,
   consultBlocksNearEnd,
@@ -1383,6 +1384,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
               <MessageRow
                 message={item.message}
                 grouped={item.grouped}
+                run={runPosition(item.grouped, item.continued ?? false)}
                 meId={meId}
                 thread={isThread ? undefined : linkThreads.get(item.message.id)}
                 onLongPress={onLongPress}

@@ -914,7 +914,8 @@ textarea.ac-input {
 .ac-msg .ac-visually-hidden,
 .ac-msg .ac-reacts,
 .ac-msg .ac-receipt,
-.ac-msg .thread-line {
+.ac-msg .thread-line,
+.ac-msg__own-time {
   -webkit-user-select: none;
   user-select: none;
 }
@@ -1033,7 +1034,8 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
 }
 .ac-msg__time--details:hover .ac-msg__tip,
 .ac-msg__time--details:focus-visible .ac-msg__tip,
-.ac-msg__gutter-time:hover .ac-msg__tip {
+.ac-msg__gutter-time:hover .ac-msg__tip,
+.ac-msg__own-time:hover .ac-msg__tip {
   visibility: visible;
   opacity: 1;
 }
@@ -1047,7 +1049,8 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   }
   .ac-msg__time--details:hover .ac-msg__tip,
   .ac-msg__time--details:focus-visible .ac-msg__tip,
-  .ac-msg__gutter-time:hover .ac-msg__tip {
+  .ac-msg__gutter-time:hover .ac-msg__tip,
+  .ac-msg__own-time:hover .ac-msg__tip {
     transform: none;
     transition-delay: 250ms, 250ms, 0s;
   }
@@ -4956,6 +4959,157 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   font-size: 15.5px;
   line-height: 1.7;
   color: var(--ink);
+}
+
+/*
+ * The viewer's own messages: on the right in a neutral bubble a step off the page, no face or name (the hidden head
+ * still reads them). What hangs under the bubble (a file, reactions, the thread line, an error, the time) shares its
+ * right edge. A run of rows grouped under the first reads as one turn: the corners they share square off, and the
+ * time goes under the last.
+ */
+:root,
+[data-theme="light"] {
+  --own-bubble: color-mix(in srgb, var(--ink) 6%, var(--bg));
+}
+[data-theme="dark"] {
+  --own-bubble: color-mix(in srgb, var(--ink) 11%, var(--bg));
+}
+.ac-msg--own {
+  justify-content: flex-end;
+  padding-left: 96px;
+}
+.ac-msg--own:hover,
+.ac-msg--own[data-menu-open="true"] {
+  background: none;
+}
+.ac-msg--own > .ac-msg__body {
+  --own-max: min(70%, 640px);
+  position: relative;
+  flex: 0 1 auto;
+  max-width: var(--own-max);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+/* A code block or a table needs the whole width: the bubble takes the row (`ac-msg--wide`). */
+.ac-msg--own.ac-msg--wide > .ac-msg__body {
+  --own-max: 100%;
+  flex: 1 1 auto;
+}
+.ac-msg--own.ac-msg--wide .ac-msg__text {
+  align-self: stretch;
+}
+@media (max-width: 600px) {
+  .ac-msg--own {
+    padding-left: 40px;
+  }
+  .ac-msg--own > .ac-msg__body {
+    --own-max: 88%;
+  }
+}
+.ac-msg--own .ac-msg__text {
+  max-width: 100%;
+  margin-top: 0;
+  padding: 7px 14px;
+  border-radius: 18px;
+  background: var(--own-bubble);
+  transition: filter 0.12s;
+  /* A code block or a table in it is cut from the page's own color, as on anyone else's message. */
+  --surface-sunken: var(--bg);
+  --sunken: var(--bg);
+}
+.ac-msg--own .ac-msg__text .md > :first-child {
+  margin-top: 0;
+}
+.ac-msg--own .ac-msg__text .md > :last-child {
+  margin-bottom: 0;
+}
+.ac-msg--own[data-run="start"] .ac-msg__text {
+  border-bottom-right-radius: 6px;
+}
+.ac-msg--own[data-run="mid"] .ac-msg__text {
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+.ac-msg--own[data-run="end"] .ac-msg__text {
+  border-top-right-radius: 6px;
+}
+/* Hovered, or its menu open: the bubble itself lights a step, in place of the row's plate. */
+.ac-msg--own:is(:hover, [data-menu-open="true"]) .ac-msg__text {
+  filter: brightness(0.97);
+}
+[data-theme="dark"] .ac-msg--own:is(:hover, [data-menu-open="true"]) .ac-msg__text {
+  filter: brightness(1.14);
+}
+/* A mention on the bubble: a translucent chip, so it reads on the bubble's gray in both themes. */
+.ac-msg--own .ac-msg__text :is(.ac-mention, code:not(pre code)) {
+  background: rgb(127 127 127 / 0.16);
+}
+/* Sending: the bubble waits, quieter; not sent: a danger outline, the words kept. */
+.ac-msg--own.ac-msg--pending .ac-msg__text {
+  color: var(--ink);
+  opacity: 0.6;
+}
+.ac-msg--own.ac-msg--failed .ac-msg__text {
+  box-shadow: inset 0 0 0 1px var(--danger);
+}
+/* A run's rows sit 2px apart; a new turn keeps the usual gap. */
+.ac-msg--own:is([data-run="start"], [data-run="mid"]) {
+  padding-bottom: 1px;
+}
+.ac-msg--own:is([data-run="mid"], [data-run="end"]) {
+  padding-top: 1px;
+}
+.ac-msg--own .ac-reacts {
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+/* The "+" that shows on hover goes first, so the pills at rest end on the bubble's edge. */
+.ac-msg--own .ac-react--add {
+  order: -1;
+}
+.ac-msg--own .ac-msg__error,
+.ac-msg--own .ac-msg__foot {
+  justify-content: flex-end;
+  text-align: right;
+}
+/* Under the run's last bubble: its time (its details on hover), or "enviando…" in its place on the same line. */
+.ac-msg__own-time {
+  position: relative;
+  min-height: 16px;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ac-msg__own-time > .ac-msg__tip {
+  left: auto;
+  right: 0;
+}
+/*
+ * Left of the bubble, centred on its first line: the check (agents saw it, answered it) at rest, the action bar on
+ * hover, which hides the check. Neither ever covers the words.
+ */
+.ac-msg--own > .ac-msg__body > .ac-msg__aside--floating {
+  position: absolute;
+  top: 20px;
+  right: calc(100% + 8px);
+  float: none;
+  margin: 0;
+  line-height: 16px;
+  translate: 0 -50%;
+  transition: opacity 0.12s;
+}
+.ac-msg--own:is(:hover, :focus-within, [data-menu-open="true"]) > .ac-msg__body > .ac-msg__aside--floating {
+  opacity: 0;
+}
+.ac-msg--own > .ac-msg__body > .ac-msg__actions,
+.ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
+  top: 20px;
+  right: calc(100% + 8px);
+  left: auto;
 }
 
 /* Work under an agent message: a quiet 32px button ("Ver o que ela fez · 7 passos · 38 s");

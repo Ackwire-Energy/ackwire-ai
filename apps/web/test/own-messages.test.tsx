@@ -1,0 +1,139 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import { setupDom } from "@agenteschat/ui/testing/dom";
+
+setupDom();
+
+import type { Message } from "@agenteschat/client";
+import { cleanup, within } from "@testing-library/react";
+import { ADA_ID, createFakeApi, ENG_ID, NOW, ORG_ID, seedState } from "./fake-api";
+import { renderApp, settle } from "./render";
+
+afterEach(() => cleanup());
+
+const ROOT = new URL("../../../", import.meta.url).pathname;
+
+/** A message in #eng, `minutes` before now; people by user id ("u-walter" is me), agents by agent id. */
+const said = (id: string, who: string, body: string, minutes: number, extra: Partial<Message> = {}) =>
+  ({
+    id,
+    channelId: ENG_ID,
+    threadId: null,
+    author: who.startsWith("u-") ? { type: "person", id: who } : { type: "agent", id: who },
+    body,
+    mentionedAgentIds: [],
+    agentRunId: who.startsWith("u-") ? null : `r-${id}`,
+    createdAt: new Date(NOW.getTime() - minutes * 60_000).toISOString(),
+    ...extra,
+  }) as Message;
+
+async function open(messages: Message[]) {
+  await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState({ messages })) });
+  await settle(10);
+}
+
+const row = (id: string) => {
+  const el = document.querySelector<HTMLElement>(`article[data-message-id="${id}"]`);
+  if (!el) throw new Error(`no row ${id}`);
+  return el;
+};
+
+describe("my own messages sit on the right", () => {
+  test("mine get the own class and their place in the run; others' rows stay as they were", async () => {
+    await open([
+      said("j1", "u-joao", "Bom dia!", 10),
+      said("w1", "u-walter", "Vi o alerta também", 9),
+      said("w2", "u-walter", "Estou no celular", 9),
+      said("w3", "u-walter", "@ada consegue olhar?", 8, { mentionedAgentIds: [ADA_ID] }),
+      said("a1", ADA_ID, "Olhando.", 7),
+      said("w4", "u-walter", "Valeu", 6),
+    ]);
+    expect(
+      ["w1", "w2", "w3", "w4"].map((id) => [row(id).classList.contains("ac-msg--own"), row(id).dataset.run]),
+    ).toEqual([
+      [true, "start"],
+      [true, "mid"],
+      [true, "end"],
+      [true, "solo"],
+    ]);
+    for (const id of ["j1", "a1"]) {
+      expect(row(id).classList.contains("ac-msg--own")).toBe(false);
+      expect(row(id).dataset.run).toBeUndefined();
+    }
+    // No face; the name and time stay for screen readers, and the bar is still named after me.
+    expect(row("w1").querySelector(".ac-msg__avatar")).toBeNull();
+    const head = row("w1").querySelector(".ac-msg__body > div");
+    expect(head?.className).toBe("ac-visually-hidden");
+    expect(head?.textContent).toContain("Walter");
+    expect(within(row("w1")).getByRole("toolbar", { name: "Ações da mensagem de Walter" })).toBeTruthy();
+    // The time once per run, under its last row (never read twice).
+    expect(["w1", "w2", "w3", "w4"].map((id) => Boolean(row(id).querySelector(".ac-msg__own-time")))).toEqual([
+      false,
+      false,
+      true,
+      true,
+    ]);
+    expect(row("w3").querySelector(".ac-msg__own-time")?.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  test("a code block or a table takes the whole width; plain words stay a bubble", async () => {
+    await open([
+      said("w1", "u-walter", "Assim:\n\n```ts\nconst a = 1;\n```", 9),
+      said("j1", "u-joao", "ok", 8),
+      said("w2", "u-walter", "| a | b |\n| --- | --- |\n| 1 | 2 |", 7),
+      said("j2", "u-joao", "ok", 6),
+      said("w3", "u-walter", "só texto, com `código` e a | barra", 5),
+    ]);
+    expect(["w1", "w2", "w3"].map((id) => row(id).classList.contains("ac-msg--wide"))).toEqual([true, true, false]);
+  });
+
+  test("sending says so in the time's place; a send that failed keeps its words and Tentar de novo", async () => {
+    await open([
+      said("w1", "u-walter", "Mandando o resumo", 2, { local: "failed", clientId: "c-1" }),
+      said("j1", "u-joao", "ok", 1),
+      said("w2", "u-walter", "E o link", 0, { local: "pending", clientId: "c-2" }),
+    ]);
+    expect(row("w1").classList.contains("ac-msg--failed")).toBe(true);
+    expect(row("w1").textContent).toContain("Não enviada");
+    expect(within(row("w1")).getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
+    expect(row("w2").classList.contains("ac-msg--pending")).toBe(true);
+    const status = row("w2").querySelector(".ac-msg__own-time");
+    expect(status?.classList.contains("ac-msg__status")).toBe(true);
+    expect(status?.textContent).toContain("enviando");
+    expect(status?.getAttribute("aria-hidden")).toBeNull();
+  });
+});
+
+describe("own message styles", () => {
+  const rules = async () => {
+    const css = (await Bun.file(`${ROOT}packages/ui/src/styles/components.css`).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const out = new Map<string, string>();
+    for (const [, list = "", body = ""] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g))
+      for (const selector of list.split(",")) out.set(selector.trim(), `${out.get(selector.trim()) ?? ""}${body}`);
+    return out;
+  };
+
+  test("the bar and the check stand left of the bubble, never over my words", async () => {
+    const r = await rules();
+    const bar = r.get(
+      ".ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions",
+    );
+    expect(bar).toContain("right: calc(100% + 8px)");
+    expect(r.get(".ac-msg--own > .ac-msg__body > .ac-msg__actions")).toContain("right: calc(100% + 8px)");
+    expect(r.get(".ac-msg--own > .ac-msg__body > .ac-msg__aside--floating")).toContain("right: calc(100% + 8px)");
+    // The check gives way to the bar (`:is(:hover, :focus-within, [data-menu-open]) …`, split at its commas).
+    expect(r.get('[data-menu-open="true"]) > .ac-msg__body > .ac-msg__aside--floating')).toContain("opacity: 0");
+  });
+
+  test("the bubble's colors come from the theme's tokens, and wide rows take the row", async () => {
+    const r = await rules();
+    const bubble = r.get(".ac-msg--own .ac-msg__text") ?? "";
+    expect(bubble).toContain("background: var(--own-bubble)");
+    expect(bubble).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+    expect(r.get(".ac-msg--own.ac-msg--wide > .ac-msg__body")).toContain("--own-max: 100%");
+    expect(r.get(".ac-msg--own > .ac-msg__body")).toContain("--own-max: min(70%, 640px)");
+    expect(r.get(".ac-msg--own.ac-msg--failed .ac-msg__text")).toContain("var(--danger)");
+  });
+});

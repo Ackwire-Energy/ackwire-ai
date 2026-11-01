@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { LiveConsult, LiveRun, LiveWork, Message, RunConsultation } from "@agenteschat/client";
 import { activitySentence, barElapsed, barFaces, barWords } from "@agenteschat/client/lib/activity";
+import { runPosition } from "@agenteschat/client/lib/chat";
 import { consultBlocksNearEnd, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { secretRequestOf, secretValueProblem, secretWhere } from "@agenteschat/client/lib/secret-requests";
@@ -84,6 +85,37 @@ describe("timeline", () => {
     ]);
     const shape = rows.map((r) => (r.kind === "day" ? "day" : `${r.message.id}${r.grouped ? "+" : ""}`));
     expect(shape).toEqual(["day", "1", "day", "2", "3+", "4", "5", "6"]);
+  });
+
+  test("a run of one author's rows: start, mid, end, and solo for one alone (my bubbles' corners and time)", () => {
+    const rows = buildRows([
+      message({ id: "1", createdAt: "2026-10-17T12:00:00.000Z" }),
+      message({ id: "2", createdAt: "2026-10-17T12:01:00.000Z" }),
+      message({ id: "3", createdAt: "2026-10-17T12:02:00.000Z" }),
+      message({ id: "4", createdAt: "2026-10-17T12:03:00.000Z", author: { type: "agent", id: "dev" } }),
+      message({ id: "5", createdAt: "2026-10-17T12:04:00.000Z" }),
+      message({ id: "6", createdAt: "2026-10-17T12:20:00.000Z" }),
+      message({ id: "7", createdAt: "2026-10-17T12:21:00.000Z" }),
+    ]);
+    const runs = rows.flatMap((r) =>
+      r.kind === "message" ? [`${r.message.id}:${runPosition(r.grouped, r.continued ?? false)}`] : [],
+    );
+    expect(runs).toEqual(["1:start", "2:mid", "3:end", "4:solo", "5:solo", "6:start", "7:end"]);
+    expect([
+      runPosition(false, false),
+      runPosition(false, true),
+      runPosition(true, true),
+      runPosition(true, false),
+    ]).toEqual(["solo", "start", "mid", "end"]);
+  });
+
+  test("my row takes its place in the run: the bubble's corners and the time under the run's last", async () => {
+    expect(await source("features/chat/ChatScreen.tsx")).toContain(
+      "run={runPosition(item.grouped, item.continued ?? false)}",
+    );
+    const row = await source("features/chat/MessageRow.tsx");
+    expect(row).toContain("BUBBLE_RUN[run]");
+    expect(row).toContain('(run === "end" || run === "solo")');
   });
 
   test("hidden messages leave no row", () => {

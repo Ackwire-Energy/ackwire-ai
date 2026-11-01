@@ -34,6 +34,13 @@ export interface MessageProps extends Omit<HTMLAttributes<HTMLElement>, "childre
    */
   waiting?: boolean;
   agent?: boolean;
+  /**
+   * The viewer's own row: on the right in a bubble (`MessageText`), no face or name on screen (both stay for screen
+   * readers); the time goes under the bubble, a sending state in its place.
+   */
+  own?: boolean;
+  /** An own row's place in a run of the viewer's rows: the corners it shares square off, the time shows under "end". */
+  run?: "solo" | "start" | "mid" | "end";
   /** The message text (use `MessageText`), plus attachments or cards. */
   children: ReactNode;
   /** Wraps the body in a column with gaps (approval cards). */
@@ -92,6 +99,8 @@ export function Message({
   streaming,
   waiting,
   agent,
+  own,
+  run = "solo",
   children,
   stacked,
   aside,
@@ -134,6 +143,7 @@ export function Message({
       className={cx(
         "ac-msg",
         agent && "ac-msg--agent",
+        own && "ac-msg--own",
         grouped && "ac-msg--grouped",
         streaming && "ac-msg--streaming",
         waiting && "ac-msg--waiting",
@@ -141,6 +151,7 @@ export function Message({
         className,
       )}
       aria-busy={streaming || undefined}
+      data-run={own ? run : undefined}
       data-menu-open={menuOpen ? "true" : undefined}
       onClick={(e) => {
         onClick?.(e);
@@ -151,7 +162,7 @@ export function Message({
       }}
       {...rest}
     >
-      {grouped ? (
+      {own ? null : grouped ? (
         // Same width as the avatar column; the time shows here on hover (it's also in the hidden header).
         <span className="ac-msg__gutter" aria-hidden="true">
           <span className="ac-msg__gutter-time">
@@ -163,11 +174,15 @@ export function Message({
         <span className="ac-msg__avatar">{avatar}</span>
       )}
       <div className="ac-msg__body" style={stacked ? { display: "flex", flexDirection: "column", gap: 8 } : undefined}>
-        <div className={grouped || waiting ? "ac-visually-hidden" : "ac-msg__head"}>
+        <div className={grouped || waiting || own ? "ac-visually-hidden" : "ac-msg__head"}>
           <span className="ac-msg__author">{author}</span>
           {meta ? (
             // Focusable so the details are reachable without a mouse.
-            <span className="ac-msg__time ac-msg__time--details" tabIndex={grouped ? -1 : 0} aria-describedby={tipId}>
+            <span
+              className="ac-msg__time ac-msg__time--details"
+              tabIndex={grouped || own ? -1 : 0}
+              aria-describedby={tipId}
+            >
               {time}
               {tip}
             </span>
@@ -183,16 +198,30 @@ export function Message({
               </span>
             </span>
           )}
-          {status && (
+          {status && !own && (
             <span className="ac-msg__status">
               {status.mark ?? (status.icon ? <Icon name={status.icon} size={14} /> : null)}
               {status.label}
             </span>
           )}
-          {aside && !grouped && <span className="ac-msg__aside">{aside}</span>}
+          {aside && !grouped && !own && <span className="ac-msg__aside">{aside}</span>}
         </div>
-        {aside && grouped && <span className="ac-msg__aside ac-msg__aside--floating">{aside}</span>}
+        {aside && (grouped || own) && <span className="ac-msg__aside ac-msg__aside--floating">{aside}</span>}
         {children}
+        {own &&
+          (status ? (
+            <span className="ac-msg__own-time ac-msg__status">
+              {status.mark ?? (status.icon ? <Icon name={status.icon} size={14} /> : null)}
+              {status.label}
+            </span>
+          ) : run === "end" || run === "solo" ? (
+            // The head (hidden) reads the time; here it is for the eye, its details on hover. One per run: its rows
+            // are minutes apart at most (they group).
+            <span className="ac-msg__own-time" aria-hidden="true">
+              {time}
+              {meta && <span className="ac-msg__tip">{meta}</span>}
+            </span>
+          ) : null)}
         {foot && <div className="ac-msg__foot">{foot}</div>}
       </div>
       {menu &&

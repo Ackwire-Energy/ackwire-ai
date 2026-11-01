@@ -911,6 +911,16 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 .channel__messages > .ac-msg--grouped {
   margin-top: -4px;
 }
+/* My own rows (`.ac-msg--own`): files and the thread line hang under the bubble on its right edge. */
+.ac-msg--own .artifact-cards {
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+.ac-msg--own .thread-line {
+  align-self: flex-end;
+  margin: 4px -6px 0 0;
+  border-radius: 10px 10px 3px 10px;
+}
 .channel__composer {
   position: relative;
   padding: 8px 24px 20px;

@@ -63,7 +63,14 @@ const dayKey = (iso: string) => {
 
 export type ChatRow =
   | { kind: "day"; key: string; iso: string }
-  | { kind: "message"; key: string; message: Message; grouped: boolean };
+  | {
+      kind: "message";
+      key: string;
+      message: Message;
+      grouped: boolean;
+      /** The next row groups under this one (with `grouped`, its place in the run: `runPosition`). */
+      continued?: boolean;
+    };
 
 /** A row's key: an optimistic message keeps it when the server copy (same `clientId`) replaces it. */
 export const messageKey = (m: Pick<Message, "id" | "clientId">) => (m.clientId ? `c:${m.clientId}` : m.id);
@@ -113,6 +120,8 @@ export function buildRows(messages: Message[], hidden: (m: Message) => boolean =
     const grouped =
       continuesReply(prev, m) ||
       (!standsAlone(m) && !(prev && standsAlone(prev)) && !isTalkerReply(m.meta) && groupsWith(prev, m));
+    const last = rows.at(-1);
+    if (grouped && last?.kind === "message") last.continued = true;
     rows.push({ kind: "message", key: messageKey(m), message: m, grouped });
     prev = m;
   }
