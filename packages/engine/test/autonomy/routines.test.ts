@@ -68,7 +68,10 @@ scenario("S26", "a routine set to only look says who limited it, and its report 
     script: {
       otto: ({ system, n }) => {
         if (n === 1)
-          return { calls: [{ name: "hand_off", input: { message: "3 erros novos no checkout desde as 9h." } }] };
+          // A decision for the people there (whether the routine may fix them): `wake_me`, so a report run asks it.
+          return {
+            calls: [{ name: "hand_off", input: { message: "3 erros novos no checkout desde as 9h.", wake_me: true } }],
+          };
         if (n === 2) return { text: "Entreguei." };
         if (system.includes("routine") && n === 3)
           return {

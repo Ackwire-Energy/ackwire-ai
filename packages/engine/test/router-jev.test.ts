@@ -1075,7 +1075,7 @@ describe("a message for the agents always gets one (R5)", () => {
     strategy?: string,
   ];
 
-  /** #engenharia with Ana and Bruno, and Quirino (Dev) and Ada (Design); Theo (PM) coordinates when `coordinator`. */
+  /** #engenharia with Ana and Bruno, and Caio (Dev) and Ada (Design); Theo (PM) coordinates when `coordinator`. */
   async function room(options: { coordinator?: boolean } = {}) {
     f = await setup();
     const bruno = await addMember(f.db, f.org.id, "member", "Bruno");
@@ -1087,7 +1087,7 @@ describe("a message for the agents always gets one (R5)", () => {
         { name, handle: name.toLowerCase(), role, credentialId: f.credential.id },
         { model: "claude-sonnet-5-5" },
       );
-    const lauro = await make("Quirino", "Dev");
+    const caio = await make("Caio", "Dev");
     const ada = await make("Ada", "Design");
     const theo = await make("Theo", "PM");
     await f.db.update(schema.agents).set({ coordinator: false });
@@ -1099,7 +1099,7 @@ describe("a message for the agents always gets one (R5)", () => {
       const now = Date.now();
       const channel = await createChannel(f.db, f.owner.id, f.org.id, { name: `engenharia-${n}` });
       await addChannelMember(f.db, f.owner.id, f.org.id, channel.id, { userId: bruno.id });
-      for (const a of options.coordinator ? [lauro, ada, theo] : [lauro, ada])
+      for (const a of options.coordinator ? [caio, ada, theo] : [caio, ada])
         await addChannelMember(f.db, f.owner.id, f.org.id, channel.id, { agentId: a.id });
       const say = async ([author, text, minutesAgo, routedTo, strategy]: Line) => {
         const m = await insertMessage(f.db, {
@@ -1142,14 +1142,14 @@ describe("a message for the agents always gets one (R5)", () => {
         .where(eq(schema.routingDecisions.messageId, m.id));
       return { ...routed, decision };
     }
-    return { lauro, ada, theo, talk };
+    return { caio, ada, theo, talk };
   }
 
   /** Low need, every agent under the bar: what Jev said for "vocês se enrolaram muito". */
   const low =
     (needs: number, best = "none", confidence = 0.46) =>
     () => ({
-      nouls: { "@lauro": 0.25, "@ada": 0.2, "@theo": 0.15 },
+      nouls: { "@caio": 0.25, "@ada": 0.2, "@theo": 0.15 },
       needs,
       best,
       choice: { [best]: confidence },
@@ -1158,25 +1158,25 @@ describe("a message for the agents always gets one (R5)", () => {
   test("a complaint to the agents and a short 'Entenderam?' go to the agent the person talks with", async () => {
     const r = await room();
     const talk: Line[] = [
-      ["ana", "lauro, olha o build que quebrou", 6, [r.lauro.id]],
-      [{ id: r.lauro.id }, "Olhei, é o teste de login.", 5],
+      ["ana", "caio, olha o build que quebrou", 6, [r.caio.id]],
+      [{ id: r.caio.id }, "Olhei, é o teste de login.", 5],
     ];
     const complaint = await r.talk(
       talk,
       "Eu mesmo peguei e fiz tudo no meu computador, vocês se enrolaram muito.",
-      low(0.3, "lauro"),
+      low(0.3, "caio"),
     );
-    expect(complaint.selected).toEqual([r.lauro.id]);
+    expect(complaint.selected).toEqual([r.caio.id]);
     expect(complaint.decidedBy).toEqual({ step: "rule", rule: "default" });
     expect(complaint.decision?.strategy).toBe("rule:default");
     expect(complaint.decision?.reason).toStartWith("follow-up; default; talking to; jev:");
     // Right after it, with a pick of nobody and a need under the bar: the question mark keeps it out of the ack guard.
     const asked = await r.talk(
-      [...talk, ["ana", "Eu mesmo fiz tudo, vocês se enrolaram muito.", 1, [r.lauro.id], "rule:default"]],
+      [...talk, ["ana", "Eu mesmo fiz tudo, vocês se enrolaram muito.", 1, [r.caio.id], "rule:default"]],
       "Entenderam?",
       low(0.2),
     );
-    expect(asked.selected).toEqual([r.lauro.id]);
+    expect(asked.selected).toEqual([r.caio.id]);
     expect(asked.decision?.reason).toStartWith("follow-up; default; talking to");
   });
 
@@ -1184,8 +1184,8 @@ describe("a message for the agents always gets one (R5)", () => {
     const r = await room();
     const thanks = await r.talk(
       [
-        ["ana", "lauro, olha o build que quebrou", 6, [r.lauro.id]],
-        [{ id: r.lauro.id }, "Corrigi, já está verde.", 1],
+        ["ana", "caio, olha o build que quebrou", 6, [r.caio.id]],
+        [{ id: r.caio.id }, "Corrigi, já está verde.", 1],
       ],
       "valeu",
       low(0.1),
@@ -1199,7 +1199,7 @@ describe("a message for the agents always gets one (R5)", () => {
     const answer = await r.talk([["ana", "bruno, consegue revisar até amanhã?", 1]], "consigo sim", low(0.3), "bruno");
     expect(answer.selected).toEqual([]);
     // The same words with no colleague before them are for the agents: the best placed answers.
-    expect((await r.talk([], "consigo sim", low(0.3), "bruno")).selected).toEqual([r.lauro.id]);
+    expect((await r.talk([], "consigo sim", low(0.3), "bruno")).selected).toEqual([r.caio.id]);
     expect((await r.talk([], "boa tarde bruno", low(0.3))).selected).toEqual([]);
   });
 
@@ -1209,7 +1209,7 @@ describe("a message for the agents always gets one (R5)", () => {
     const said = (everyone: number) => () => ({ ...low(0.4)(), everyone });
     expect((await r.talk(before, "vocês viram o erro no deploy?", said(0.2))).selected).toEqual([]);
     const toAll = await r.talk(before, "vocês viram o erro no deploy?", said(0.6));
-    expect(toAll.selected).toEqual([r.lauro.id]);
+    expect(toAll.selected).toEqual([r.caio.id]);
     expect(toAll.decision?.reason).toStartWith("default; best");
   });
 
@@ -1247,9 +1247,9 @@ describe("a message for the agents always gets one (R5)", () => {
         [{ id: r.ada.id }, "Olhei, está ok.", 14],
       ],
       "e o build de ontem passou?",
-      low(0.3, "lauro", 0.4),
+      low(0.3, "caio", 0.4),
     );
-    expect(next.selected).toEqual([r.lauro.id]);
+    expect(next.selected).toEqual([r.caio.id]);
     expect(next.decision?.reason).toStartWith("default; best");
   });
 
@@ -1264,12 +1264,12 @@ describe("a message for the agents always gets one (R5)", () => {
 
   test("an agent's message never gets a default pick; a router failure is never silence for a person", async () => {
     const r = await room();
-    const byAgent = await r.talk([], "alguém de infra saberia dizer?", low(0.9, "ada"), { id: r.lauro.id });
+    const byAgent = await r.talk([], "alguém de infra saberia dizer?", low(0.9, "ada"), { id: r.caio.id });
     expect(byAgent.selected).toEqual([]);
     const down = () => new Error("down");
     // Nothing could read it: the best placed agent, with no scores the oldest.
     const failed = await r.talk([], "alguém viu o relatório?", down);
-    expect(failed).toMatchObject({ selected: [r.lauro.id], decidedBy: { step: "rule", rule: "default" } });
+    expect(failed).toMatchObject({ selected: [r.caio.id], decidedBy: { step: "rule", rule: "default" } });
     expect(failed.decision?.strategy).toBe("rule:default");
     expect(failed.decision?.error).toContain("jev:");
     // ...or the one that spoke here last.

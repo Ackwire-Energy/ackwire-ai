@@ -8,8 +8,6 @@ import { test } from "bun:test";
  * `AUTONOMY_STRICT=1` runs every scenario as a plain test.
  */
 export const KNOWN: Record<string, string[]> = {
-  S01: ["router-answer-by-default"],
-  S02: ["router-answer-by-default"],
   S40: ["handle-follows-name"],
 };
 

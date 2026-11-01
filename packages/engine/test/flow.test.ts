@@ -104,7 +104,8 @@ test("vertical slice: @mention → outbox → run → streamed reply → persist
     .from(schema.agentRunSteps)
     .where(eq(schema.agentRunSteps.runId, run?.id ?? ""))
     .orderBy(asc(schema.agentRunSteps.seq));
-  expect(steps.map((s) => s.kind)).toEqual(["context", "model_call", "message"]);
+  // The second `context` is how the turn ended (`decideTurnEnd`, ADR 0097).
+  expect(steps.map((s) => s.kind)).toEqual(["context", "model_call", "context", "message"]);
   expect(
     (await f.db.select().from(schema.outbox))
       // The thread's assessment is due minutes later (threads.assess).

@@ -1287,7 +1287,9 @@ export async function routeMessage(
     selected.length === 0 &&
     !duplicate &&
     !toPerson &&
-    (!ack || (await aloneWithTeam()))
+    // An ack goes to someone only alone with a coordinated team (ADR 0093): elsewhere "valeu" after an answer
+    // wakes nobody, it costs a run for nothing.
+    (!ack || (coordinatorId !== null && (await aloneWithTeam())))
   ) {
     if (addressee) chosen = [addressee];
     else if (

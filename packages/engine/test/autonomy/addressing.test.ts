@@ -32,10 +32,11 @@ async function afterTalkWithOtto(extra: Parameters<typeof world>[0]["route"] = {
 
 scenario("S01", "a complaint to the agents as a group gets the agent the person was talking to", async () => {
   const w = await afterTalkWithOtto();
-  await w.say(COMPLAINT);
+  const complaint = await w.say(COMPLAINT);
   await w.settle();
   expect((await w.runs()).map((r) => w.handleOf(r.agentId))).toEqual(["otto"]);
-  expect((await w.decisions()).at(-1)?.picked).toEqual(["otto"]);
+  // The complaint's own decision: Otto's reply is routed too, and decides later.
+  expect((await w.decisions()).find((d) => d.messageId === complaint.id)?.picked).toEqual(["otto"]);
   await assertInvariants(w);
 });
 
