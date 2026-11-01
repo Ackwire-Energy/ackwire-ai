@@ -121,7 +121,13 @@ function Block({
         </ScrollView>
       );
     case "table":
-      return <Table header={b.header} rows={b.rows} align={b.align} />;
+      return (
+        <Table
+          header={b.header.map((cell) => parseInline(cell))}
+          rows={b.rows.map((row) => row.map((cell) => parseInline(cell)))}
+          align={b.align}
+        />
+      );
     case "rule":
       return <View style={[styles.rule, { backgroundColor: c.line2 }]} />;
   }
