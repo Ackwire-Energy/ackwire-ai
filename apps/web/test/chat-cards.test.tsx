@@ -246,6 +246,33 @@ describe("the browser's card says what it did: no 'Ver o que ele fez' that opens
   });
 });
 
+describe("beside the browser's card, a lone quick read shows nothing, kept or saved", () => {
+  test("saved: the call left beside the browser's steps is quiet when the server timed it", async () => {
+    const api = createFakeApi(seedState());
+    const meta = (extra: Record<string, unknown>) => ({
+      work: {
+        steps: 4,
+        calls: [
+          { name: "browser_navigate", n: 3 },
+          { name: "get_my_usage", n: 1, ...extra },
+        ],
+        durationMs: 43_000,
+      },
+    });
+    await renderPage(
+      <>
+        <SavedTools runId="r-1" meta={meta({ ms: 33 })} agentName="Ada" skipScreens={["browser"]} />
+        <SavedTools runId="r-2" meta={meta({ ms: 33, failed: true })} agentName="Ada" skipScreens={["browser"]} />
+      </>,
+      { api, org: true },
+    );
+    await settle(2);
+    expect([...document.querySelectorAll(".ac-tools__row b")].map((b) => b.textContent)).toEqual([
+      "Deu erro conferindo o próprio uso",
+    ]);
+  });
+});
+
 /** Ada's answer with what it changed (a routine) and its one call, as the channel shows it. */
 const ANSWER = "Pronto: toda segunda às 9h eu posto o relatório de pagamentos aqui.";
 function answer(routineId: string, actions: Partial<AgentAction>[] = [{}]): Message {

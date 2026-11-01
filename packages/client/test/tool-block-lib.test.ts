@@ -678,6 +678,22 @@ describe("a lone quick read that only fed the answer shows no card", () => {
     expect(workSteps(mixed.work, browser)).toBe(1);
     expect(savedOneLine(mixed, browser)).toMatchObject({ kind: "creatingIssue", ms: null, state: "done" });
     expect(savedOneLine(mixed)).toBeNull();
+    // Beside the browser's steps, the call left carries its own time and outcome: a quick usage check is quiet, as
+    // in the kept view (which leaves the browser's calls to their card); without its time it may have failed.
+    const beside = (extra: Record<string, unknown>) => ({
+      work: {
+        steps: 4,
+        calls: [
+          { name: "browser_navigate", n: 3 },
+          { name: "get_my_usage", n: 1, ...extra },
+        ],
+        durationMs: 43_000,
+      },
+    });
+    const quick = savedOneLine(beside({ ms: 33 }), browser);
+    expect(quick && quietLine(quick)).toBe(true);
+    expect(savedOneLine(beside({ ms: 33, failed: true }), browser)?.state).toBe("fail");
+    expect(savedOneLine(beside({}), browser)?.ms).toBeNull();
     // Saved before the calls carried their count: the total stays.
     expect(workSteps({ ...mixed.work, calls: [{ name: "browser_navigate" }, { name: "create_issue" }] }, browser)).toBe(
       4,

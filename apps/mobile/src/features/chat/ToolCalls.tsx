@@ -713,8 +713,9 @@ export function SavedTools({
   if (!compact || shown === 0) return null;
   const calls = work ? toolCalls(items) : shown;
   const lone = savedOneLine(meta, onCard);
-  // The run's only call only fed the answer (`quietLine`): the reply says it.
-  if (lone && quietLine(lone) && compact?.steps === 1) return null;
+  // Its one call (beside the screens' on their cards) only fed the answer (`quietLine`): the reply says it. Time
+  // unknown (saved before the server wrote it): kept, it may have failed.
+  if (lone && lone.ms !== null && quietLine(lone)) return null;
   const durationMs = work?.durationMs ?? compact.durationMs;
   const apps = work ? toolApps(items) : workApps(compact.calls.filter((c) => !onCard(c.name)));
   const note = (key: string, node: ReactNode): BlockItem => ({ kind: "note", key, node });

@@ -83,7 +83,7 @@ describe("nothing more than the message shows", () => {
   test("a lone quick read draws no block; no block opens on nothing or says it used no tools", () => {
     const tools = source("ToolCalls.tsx");
     expect(tools).toContain("const now = quietWork(items) ? null : toolNow(items);");
-    expect(tools).toContain("if (lone && quietLine(lone) && compact?.steps === 1) return null;");
+    expect(tools).toContain("if (lone && lone.ms !== null && quietLine(lone)) return null;");
     expect(tools).toContain("const shown = compact ? workSteps(compact, onCard) : 0;");
     expect(tools).not.toContain("chat.work.none");
     expect(tools).not.toContain("chat.work.see");

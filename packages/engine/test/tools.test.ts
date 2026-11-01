@@ -439,7 +439,12 @@ describe("approval flow (end to end)", () => {
       },
     });
     const calling = (...names: string[]): Parameters<typeof setup>[0] => ({
-      toolSources: [{ name: "fake", tools: async () => [tool("make_note", false), tool("make_broken", true)] }],
+      toolSources: [
+        {
+          name: "fake",
+          tools: async () => [tool("make_note", false), tool("make_broken", true), tool("browser_open", false)],
+        },
+      ],
       reply: (req) => {
         const last = req.messages.at(-1);
         if (typeof last?.content !== "string" && last?.content.some((b) => b.type === "tool_result"))
@@ -471,6 +476,13 @@ describe("approval flow (end to end)", () => {
     expect(two?.calls).toEqual([{ name: "make_note", n: 2 }]);
     expect(two?.ms).toBeUndefined();
     expect(two?.failed).toBeUndefined();
+    // Beside the browser's steps (its card shows them), the one call left carries its own time and outcome.
+    const beside = await workOf("browser_open", "browser_open", "make_broken");
+    expect(beside?.calls).toEqual([
+      { name: "browser_open", n: 2 },
+      { name: "make_broken", n: 1, ms: expect.any(Number), failed: true },
+    ]);
+    expect(beside?.ms).toBeUndefined();
   });
 
   test("mention → tool call → approval → approve → resumed run → merged", async () => {

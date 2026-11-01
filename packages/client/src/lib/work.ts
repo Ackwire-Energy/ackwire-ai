@@ -67,6 +67,9 @@ export interface WorkCall {
   serviceIcon?: string;
   /** How many calls it stands for (absent on replies saved before it was written). */
   n?: number;
+  /** The one call beside the screens' (their cards show those steps): its time and whether it failed. */
+  ms?: number;
+  failed?: true;
 }
 
 /** The compact form the backend puts on the message (`meta.work`), before the steps are loaded. */
@@ -670,8 +673,9 @@ export const quietWork = (items: ToolItem[]) => {
 
 /**
  * A saved reply's lone call (`meta.work` of one step) as its line, before the run's steps load: what it did, from
- * `meta.work.calls`; how long it took and whether it failed, from `meta.work.ms` and `failed`. A reply saved before
- * the server wrote those reads as done, in the reply's own time. Null when the reply made no call, or several.
+ * `meta.work.calls`; how long it took and whether it failed, from `meta.work.ms` and `failed` (the call's own, when
+ * the screens' steps sit beside it). A reply saved before the server wrote those reads as done, in the reply's own
+ * time (unknown, `ms: null`, beside other calls). Null when the reply made no call, or several.
  */
 export function savedOneLine(
   meta: Record<string, unknown> | undefined,
@@ -679,12 +683,11 @@ export function savedOneLine(
 ): ToolLine | null {
   const w = workMeta(meta);
   if (!w) return null;
-  // Besides the calls another card shows, one call left: its line, its time and outcome known only when it was the
-  // run's only call (the server writes them for that one).
+  // Besides the calls another card shows, one call left: its line.
   const rest = w.calls.filter((c) => !skip(c.name));
   const call = workSteps(w, skip) === 1 && rest.length === 1 ? rest[0] : undefined;
   if (!call) return null;
-  const { ms, failed } = (w.steps === 1 ? (meta?.work ?? {}) : {}) as { ms?: unknown; failed?: unknown };
+  const { ms, failed } = (w.steps === 1 ? (meta?.work ?? {}) : call) as { ms?: unknown; failed?: unknown };
   const a = toolActivity(call.name, call.connector, null, call);
   return {
     key: `one-${call.name}`,

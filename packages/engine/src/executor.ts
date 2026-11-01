@@ -1065,6 +1065,10 @@ async function executeRunInner(
       )
       .groupBy(app)
       .orderBy(sql`min(${agentRunSteps.seq})`);
+    // The one call beside the screens' (their cards show those steps): its time and outcome, for its own line.
+    const besideScreens = tools.length > 1 ? tools.filter((t) => !SCREEN_TOOL.test(t.name)) : [];
+    const leftover = besideScreens.length === 1 && besideScreens[0]?.n === 1 ? besideScreens[0] : null;
+    const leftoverCall = leftover ? await loneCall(tx, run.id, leftover.name) : {};
     const work = {
       steps: tools.reduce((n, t) => n + t.n, 0),
       durationMs: Math.max(0, Date.now() - run.createdAt.getTime()),
@@ -1075,6 +1079,7 @@ async function executeRunInner(
         ...(t.connector ? { connector: t.connector } : {}),
         ...(t.service ? { service: t.service } : {}),
         ...(t.serviceIcon ? { serviceIcon: t.serviceIcon } : {}),
+        ...(t === leftover ? leftoverCall : {}),
       })),
     };
     // A mention reaches only this conversation's members: the agents it names that aren't here stay on the message,
@@ -3555,6 +3560,9 @@ function closingSummary(t: Transcript, anythingPosted: boolean): string {
  * A reply's lone tool call (`meta.work` of one step): how long it took and whether the tool answered with an error, so
  * the reply's line for it ("Criou uma rotina · 0,9 s") reads right before anyone loads the run's steps.
  */
+/** The screens' tools (`browser_*`, `desktop_*`), as the work summary groups them. */
+const SCREEN_TOOL = /^(?:mcp__agentes__)?(?:browser|desktop)_/;
+
 async function loneCall(tx: Executor, runId: string, name: string): Promise<{ ms?: number; failed?: true }> {
   const steps = await tx
     .select({ kind: agentRunSteps.kind, data: agentRunSteps.data, createdAt: agentRunSteps.createdAt })

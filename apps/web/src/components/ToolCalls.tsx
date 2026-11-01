@@ -314,8 +314,9 @@ export function SavedTools({
   if (shown === 0) return null;
   const calls = work ? toolCalls(items) : (shown ?? 0);
   const lone = savedOneLine(meta, onCard);
-  // The run's only call only fed the answer (`quietLine`): the reply says it.
-  if (lone && quietLine(lone) && compact?.steps === 1) return null;
+  // Its one call (beside the screens' on their cards) only fed the answer (`quietLine`): the reply says it. Time
+  // unknown (saved before the server wrote it): kept, it may have failed.
+  if (lone && lone.ms !== null && quietLine(lone)) return null;
   if (lone && (!work || oneCall(items) || !items.some((i) => i.kind === "call"))) {
     const line = blockLine(t, i18n.language, lone, logo(lone));
     const wait = run.isError ? (
