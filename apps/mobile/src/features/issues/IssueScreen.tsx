@@ -18,12 +18,10 @@ import { webUrl } from "@agenteschat/client/lib/guards";
 import { isOpen, PRIORITIES, STATUSES } from "@agenteschat/client/lib/issues";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, Chip, Icon, IconButton, type IconName, PixelOrbit, Text, useToast } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
 import { MessageText } from "../chat/MessageText";
@@ -52,6 +50,7 @@ import {
   stageCustomized,
   workLines,
 } from "./logic";
+import { IssueActivityFeed, IssueComposer } from "./IssueActivity";
 import { StateChip, useColumnLabel, useStepText } from "./parts";
 
 /**
@@ -72,7 +71,7 @@ function IssueView({ number }: { number: number }) {
   const { t } = useTranslation();
   const c = useColors();
   const orgId = useOrgId();
-  const insets = useSafeAreaInsets();
+  const scroll = useRef<ScrollView>(null);
   const issue = useIssue(orgId, number);
   const pull = usePullRefresh(issue.refetch);
   const sheet = useSheet();
@@ -99,14 +98,25 @@ function IssueView({ number }: { number: number }) {
         title={`#${i.number}`}
         solid={false}
         right={
-          <IconButton icon="more" label={t("mobile.issues.more")} onPress={() => sheet.open(<IssueMenu issue={i} />)} />
+          <View style={styles.barRight}>
+            <FinishWord issue={i} />
+            <IconButton
+              icon="more"
+              label={t("mobile.issues.more")}
+              onPress={() => sheet.open(<IssueMenu issue={i} />)}
+            />
+          </View>
         }
       />
       <FocusLive>
         <ScrollView
+          ref={scroll}
           contentInsetAdjustmentBehavior="automatic"
+          automaticallyAdjustKeyboardInsets
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
           refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
-          contentContainerStyle={{ paddingBottom: insets.bottom + BAR_HEIGHT + 24 }}
+          contentContainerStyle={styles.scroll}
         >
           <Head issue={i} />
           <WorkCard issue={i} />
@@ -114,14 +124,13 @@ function IssueView({ number }: { number: number }) {
           <Criteria issue={i} />
           <Linked issue={i} />
           <SubIssues issue={i} />
+          <IssueActivityFeed issue={i} />
         </ScrollView>
       </FocusLive>
-      <BottomBar issue={i} />
+      <IssueComposer issue={i} onSent={() => scroll.current?.scrollToEnd({ animated: true })} />
     </View>
   );
 }
-
-const BAR_HEIGHT = 68;
 
 /** "#134 · criada pelo Atlas a partir do Sentry · #tech", the title, the chips. */
 function Head({ issue: i }: { issue: Issue }) {
@@ -468,63 +477,40 @@ function SubIssues({ issue: i }: { issue: Issue }) {
   );
 }
 
-/** Conversar (the issue's channel, or the agent's conversation) and Concluir / Reabrir. */
-function BottomBar({ issue: i }: { issue: Issue }) {
+/** Concluir / Reabrir, the word in the bar. */
+function FinishWord({ issue: i }: { issue: Issue }) {
   const { t } = useTranslation();
   const c = useColors();
-  const insets = useSafeAreaInsets();
   const orgId = useOrgId();
   const action = useIssueAction(orgId);
   const toast = useToast();
-  const openDm = useOpenDm();
-  const target = conversationOf(i);
   const open = isOpen(i);
-  const setStatus = (status: IssueStatus) =>
-    action.mutate(
-      { type: "update", id: i.id, patch: { status } },
-      {
-        onSuccess: () => {
-          successHaptic();
-          toast({
-            title: t(status === "done" ? "mobile.issues.finished" : "mobile.issues.reopened", { number: i.number }),
-          });
-        },
-        onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
-      },
-    );
+  const status: IssueStatus = open ? "done" : "todo";
   return (
-    <View pointerEvents="box-none" style={[styles.bar, { paddingBottom: insets.bottom + 10 }]}>
-      <LinearGradient
-        pointerEvents="none"
-        colors={[`${c.bg}00`, c.bg]}
-        locations={[0, 0.3]}
-        style={StyleSheet.absoluteFill}
-      />
-      {target ? (
-        <View style={styles.grow}>
-          <Button
-            variant="secondary"
-            wide
-            icon="chat"
-            label={t("mobile.issues.talk")}
-            onPress={() => {
-              if ("channelId" in target) router.push(chatHref(target.channelId));
-              else void openDm({ agentId: target.agentId });
-            }}
-          />
-        </View>
-      ) : null}
-      <View style={styles.grow}>
-        <Button
-          variant={open ? "primary" : "secondary"}
-          wide
-          icon={open ? "checkc" : "right"}
-          label={t(open ? "mobile.issues.finish" : "mobile.issues.reopen")}
-          disabled={action.isPending}
-          onPress={() => setStatus(open ? "done" : "todo")}
-        />
-      </View>
-    </View>
+    <Pressable
+      accessibilityRole="button"
+      disabled={action.isPending}
+      hitSlop={6}
+      style={styles.barWord}
+      onPress={() =>
+        action.mutate(
+          { type: "update", id: i.id, patch: { status } },
+          {
+            onSuccess: () => {
+              successHaptic();
+              toast({
+                title: t(open ? "mobile.issues.finished" : "mobile.issues.reopened", { number: i.number }),
+              });
+            },
+            onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
+          },
+        )
+      }
+    >
+      <Text variant="callout" style={[styles.bold, { color: c.agent }]}>
+        {t(open ? "mobile.issues.finish" : "mobile.issues.reopen")}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -580,6 +566,7 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
   const columns = useIssueColumns(orgId);
   const columnLabel = useColumnLabel();
   const toast = useToast();
+  const openDm = useOpenDm();
   const stop = useMutation({
     mutationFn: (runId: string) => api.agents.cancelRun(orgId, runId),
     onSettled: () => void qc.invalidateQueries({ queryKey: keys.issues(orgId) }),
@@ -660,7 +647,22 @@ function IssueMenu({ issue: i }: { issue: Issue }) {
         )
       : pick(statusItems());
   const w = i.work;
+  const target = conversationOf(i);
   const items: ActionItem[] = [
+    ...(target
+      ? [
+          {
+            key: "talk",
+            icon: "chat" as const,
+            label: t("mobile.issues.talk"),
+            onPress: () => {
+              sheet.close();
+              if ("channelId" in target) router.push(chatHref(target.channelId));
+              else void openDm({ agentId: target.agentId });
+            },
+          },
+        ]
+      : []),
     {
       key: "column",
       icon: "circle",
@@ -734,14 +736,8 @@ const styles = StyleSheet.create({
   pickerStage: { gap: 6 },
   pickerTitle: { paddingHorizontal: 4 },
   tile: { width: 30, height: 30, borderRadius: 9, alignItems: "center", justifyContent: "center" },
-  bar: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    flexDirection: "row",
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingTop: 18,
-  },
+  /** Room for the comment box floating at the bottom. */
+  scroll: { paddingBottom: 130 },
+  barRight: { flexDirection: "row", alignItems: "center", gap: 2 },
+  barWord: { paddingHorizontal: 10, height: 36, justifyContent: "center" },
 });

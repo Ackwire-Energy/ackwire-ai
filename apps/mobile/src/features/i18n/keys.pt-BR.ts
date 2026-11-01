@@ -937,6 +937,7 @@ export const featureKeysPtBR = {
       canceled: "Canceladas",
     },
     columnEmpty: "Nada aqui por enquanto.",
+    commentHere: "Comentar…",
     state: {
       running: "Trabalhando",
       waiting: "Esperando você",

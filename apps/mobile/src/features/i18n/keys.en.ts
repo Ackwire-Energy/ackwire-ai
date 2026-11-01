@@ -934,6 +934,7 @@ export const featureKeysEn: FeatureTranslations = {
       canceled: "Canceled",
     },
     columnEmpty: "Nothing here for now.",
+    commentHere: "Comment…",
     state: {
       running: "Working",
       waiting: "Waiting for you",
