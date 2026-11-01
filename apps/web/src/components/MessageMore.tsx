@@ -1,5 +1,5 @@
-import { voiceOf } from "@agenteschat/client/lib/voice";
 import type { Message } from "@agenteschat/client";
+import { voiceOf } from "@agenteschat/client/lib/voice";
 import { Button, EmojiPickerPopover, Menu, MenuItem } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";

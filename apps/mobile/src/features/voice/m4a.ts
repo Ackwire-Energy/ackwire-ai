@@ -147,7 +147,9 @@ export function joinM4a(a: Uint8Array, b: Uint8Array): Uint8Array {
   const version = a[mdhd.start];
   const trackScale = v.getUint32(mdhd.start + (version === 1 ? 20 : 12));
   const movieScale = v.getUint32(mvhd.start + (a[mvhd.start] === 1 ? 20 : 12));
-  const secondScale = view(b).getUint32(find(b, second.mdia, "mdhd").start + (b[find(b, second.mdia, "mdhd").start] === 1 ? 20 : 12));
+  const secondScale = view(b).getUint32(
+    find(b, second.mdia, "mdhd").start + (b[find(b, second.mdia, "mdhd").start] === 1 ? 20 : 12),
+  );
   if (secondScale !== trackScale) throw new Error("m4a: different time scales");
 
   const sizes = [...first.sizes, ...second.sizes];

@@ -15,7 +15,7 @@ export const barsIn = (width: number) => Math.max(1, Math.floor((width + GAP) / 
  * recording looks; otherwise spread over the whole width.
  */
 export function barsPath(peaks: readonly number[], width: number, height: number, tail = false): SkPath {
-  const path = Skia.Path.Make();
+  const path = Skia.PathBuilder.Make();
   const n = barsIn(width);
   const shown = tail ? peaks.slice(-n) : stretched(peaks, n);
   const startAt = tail ? width - shown.length * (BAR + GAP) + GAP : 0;
@@ -26,7 +26,7 @@ export function barsPath(peaks: readonly number[], width: number, height: number
     const h = Math.max(3, Math.min(height, level * height));
     path.addRRect(rrect(rect(startAt + i * (BAR + GAP), (height - h) / 2, BAR, h), 1.5, 1.5));
   });
-  return path;
+  return path.build();
 }
 
 function stretched(peaks: readonly number[], n: number): number[] {

@@ -89,12 +89,6 @@ export { Button, type ButtonProps, type ButtonVariant } from "./components/Butto
 export { Carousel, type CarouselProps } from "./components/Carousel";
 export { CHAT_GIF_MAX, ChatGif, type ChatGifProps } from "./components/ChatGif";
 export {
-  type VoiceNotice,
-  type VoiceTake,
-  voiceRecordingSupported,
-} from "./components/voice-recorder";
-export { stopVoicePlayback, VoicePlayer, type VoicePlayerLabels, type VoicePlayerProps } from "./components/VoicePlayer";
-export {
   Checkbox,
   CheckboxPill,
   type CheckboxProps,
@@ -342,6 +336,17 @@ export {
   toolLevelTones,
 } from "./components/ToolPixels";
 export { type UsageDay, type UsageDayPart, UsageDays, UsageSwatch } from "./components/UsageDays";
+export {
+  stopVoicePlayback,
+  VoicePlayer,
+  type VoicePlayerLabels,
+  type VoicePlayerProps,
+} from "./components/VoicePlayer";
+export {
+  type VoiceNotice,
+  type VoiceTake,
+  voiceRecordingSupported,
+} from "./components/voice-recorder";
 export { Reaction, Reactions, type WorkStep, WorkSummary } from "./components/Work";
 export { COMPUTER_GRID, COMPUTER_KINDS, COMPUTER_STATES, drawComputer } from "./computer/portrait.js";
 export { cx } from "./cx";

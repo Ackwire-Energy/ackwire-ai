@@ -76,9 +76,9 @@ import { purgeOrgFiles, purgeUserFiles, runMigration, type StorageDeps } from ".
 import { postStretchCard, STRETCH_JOB, type StretchHold } from "./stretch";
 import { isAgentesCloud } from "./telemetry";
 import { assessThread } from "./thread-assess";
+import { transcribeVoiceClip, VOICE_JOB, type VoiceDeps } from "./voice";
 import { saveWaitlistContact } from "./waitlist";
 import { ORG_DELETE_JOB, purgeWorkspace } from "./workspace-deletion";
-import { transcribeVoiceClip, VOICE_JOB, type VoiceDeps } from "./voice";
 
 /** A thread that grew by another `everyMessages` gets reflected on (capture), within the per-thread cap. */
 async function maybeEnqueueReflection(deps: JobDeps, orgId: string, threadId: string) {

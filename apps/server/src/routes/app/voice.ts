@@ -6,8 +6,8 @@ import {
   pinnedOwner,
   requirePermission,
   type SpeechSettings,
-  VOICE_MAX_BYTES,
   ValidationError,
+  VOICE_MAX_BYTES,
   type VoiceDeps,
   voiceAllowed,
   voiceClipAudio,
@@ -52,9 +52,10 @@ function audioResponse(c: Context, audio: Uint8Array, contentType: string) {
   if (range === "bad") {
     return new Response(null, { status: 416, headers: { ...headers, "content-range": `bytes */${size}` } });
   }
-  if (!range) return new Response(audio as BodyInit, { headers: { ...headers, "content-length": String(size) } });
+  if (!range)
+    return new Response(audio as Uint8Array<ArrayBuffer>, { headers: { ...headers, "content-length": String(size) } });
   const part = audio.subarray(range.start, range.end + 1);
-  return new Response(part as BodyInit, {
+  return new Response(part as Uint8Array<ArrayBuffer>, {
     status: 206,
     headers: {
       ...headers,

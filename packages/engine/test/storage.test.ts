@@ -480,6 +480,7 @@ describe("voice recordings in a copy between storages", () => {
     const swept = await acceptVoiceClip(voiceDeps(), f.owner.id, f.org.id, f.general.id, recording());
     const { voiceClips } = schema;
     await f.db.update(voiceClips).set({ audioDeletedAt: new Date() }).where(eq(voiceClips.id, swept.clipId));
+    expect((await testStorage(f.storage, f.owner.id, f.org.id, bucket())).ok).toBe(true);
     await saveStorage(f.storage, f.owner.id, f.org.id, { kind: "s3", s3: bucket() });
     await startMigration(f.storage, f.owner.id, f.org.id);
     await drainOutbox(f.db, f.handlers);

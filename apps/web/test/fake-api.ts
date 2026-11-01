@@ -507,7 +507,15 @@ export const OPENROUTER_KEY: Credential = {
   revokedAt: null,
 };
 
-type MediaSetting = "voiceMessages" | "voiceAvailable" | "gifs" | "gifRating" | "agentStickers" | "agentMedia" | "gifsAvailable" | "agentMediaAvailable";
+type MediaSetting =
+  | "voiceMessages"
+  | "voiceAvailable"
+  | "gifs"
+  | "gifRating"
+  | "agentStickers"
+  | "agentMedia"
+  | "gifsAvailable"
+  | "agentMediaAvailable";
 
 /** What the fake GIF search finds (ADR 0091): three GIFs of their own proportions. */
 export const FAKE_GIFS: Gif[] = [

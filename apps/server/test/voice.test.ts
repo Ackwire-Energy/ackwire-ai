@@ -14,7 +14,11 @@ afterEach(async () => {
 const groq = (async () => Response.json({ text: "Ada, oi" })) as unknown as typeof fetch;
 
 async function start(env: Record<string, string> = { GROQ_API_KEY: "groq-key-1234" }) {
-  const server = await createTestServer({ env: { ALLOW_SIGNUP: "true", ...env }, speechFetch: groq });
+  const server = await createTestServer({
+    env: { ALLOW_SIGNUP: "true", ...env },
+    speechFetch: groq,
+    signedBlobs: false,
+  });
   t = server;
   const owner = browser(server);
   await signUp(owner, "owner@example.com");
@@ -27,9 +31,9 @@ async function start(env: Record<string, string> = { GROQ_API_KEY: "groq-key-123
   return { server, owner, other, orgId: created.organization.id, channelId: created.generalChannelId };
 }
 
-function send(b: Browser, orgId: string, channelId: string, over: Record<string, string> = {}, type = "audio/mp4") {
+function send(b: Browser, orgId: string, channelId: string, over: Record<string, string> = {}, name = "voice.m4a") {
   const form = new FormData();
-  form.set("file", new File([new Uint8Array(32)], "voice.m4a", { type }));
+  form.set("file", new File([new Uint8Array(32)], name));
   form.set("durationMs", "2000");
   form.set("peaks", "[0.2,0.4]");
   form.set("clientId", crypto.randomUUID());
@@ -46,7 +50,7 @@ test("a recording is stored and played back, with ranges", async () => {
   const { clipId } = (await res.json()) as { clipId: string };
   const audio = await owner(`/api/app/organizations/${orgId}/voice/${clipId}/audio`);
   expect(audio.status).toBe(200);
-  expect(audio.headers.get("content-type")).toBe("audio/mp4");
+  expect(audio.headers.get("content-type")).toBe("audio/x-m4a");
   expect(audio.headers.get("x-content-type-options")).toBe("nosniff");
   const part = await owner(`/api/app/organizations/${orgId}/voice/${clipId}/audio`, {
     headers: { range: "bytes=0-9" },
@@ -55,9 +59,18 @@ test("a recording is stored and played back, with ranges", async () => {
   expect(part.headers.get("content-range")).toBe("bytes 0-9/32");
 });
 
+test("a browser's .webm recording arrives as video and is kept as audio", async () => {
+  const { owner, orgId, channelId } = await start();
+  const res = await send(owner, orgId, channelId, {}, "voice.webm");
+  expect(res.status).toBe(202);
+  const { clipId } = (await res.json()) as { clipId: string };
+  const audio = await owner(`/api/app/organizations/${orgId}/voice/${clipId}/audio`);
+  expect(audio.headers.get("content-type")).toBe("audio/webm");
+});
+
 test("what isn't audio is refused, and an outsider can't play one", async () => {
   const { owner, other, orgId, channelId } = await start();
-  const refused = await send(owner, orgId, channelId, {}, "text/html");
+  const refused = await send(owner, orgId, channelId, {}, "page.html");
   expect(refused.status).toBe(400);
   expect(await errorCode(refused)).toBe("voice.bad_type");
   const { clipId } = (await (await send(owner, orgId, channelId)).json()) as { clipId: string };

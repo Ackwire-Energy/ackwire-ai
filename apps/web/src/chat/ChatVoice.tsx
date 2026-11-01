@@ -27,7 +27,7 @@ export function ChatVoice({ message, voice }: { message: Message; voice: Message
       note={
         message.meta?.[VOICE_WAITING] === true ? (
           <>
-            <Icon name="clock" size={12} /> {t("voice.waiting")}
+            <Icon name="clock" size={14} /> {t("voice.waiting")}
           </>
         ) : undefined
       }

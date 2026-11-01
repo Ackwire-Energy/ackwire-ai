@@ -4,8 +4,8 @@ import { Skia } from "@shopify/react-native-skia";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   getRecordingPermissionsAsync,
-  RecordingPresets,
   type RecordingOptions,
+  RecordingPresets,
   requestRecordingPermissionsAsync,
   setAudioModeAsync,
   useAudioRecorder,
@@ -106,10 +106,10 @@ export function useVoiceTake(target: VoiceTarget) {
     [t, toast],
   );
 
-  const stopTimer = () => {
+  const stopTimer = useCallback(() => {
     if (timer.current) clearInterval(timer.current);
     timer.current = null;
-  };
+  }, []);
 
   /** Ends the stretch in progress, if any, and keeps its file. */
   const finishStretch = useCallback(async () => {
@@ -120,7 +120,7 @@ export function useVoiceTake(target: VoiceTarget) {
     if (recorder.uri && ms > 0) stretches.current.push({ uri: recorder.uri, ms });
     doneMs.current += ms;
     liveMs.current = 0;
-  }, [recorder]);
+  }, [recorder, stopTimer]);
 
   const reset = useCallback(() => {
     stopTimer();
@@ -135,7 +135,7 @@ export function useVoiceTake(target: VoiceTarget) {
     setListening(false);
     setPhase("idle");
     void setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
-  }, [path, progress, setPhase]);
+  }, [path, progress, setPhase, stopTimer]);
 
   /** One file from every stretch; what can't be joined stays as a file of its own. */
   const joined = useCallback(async () => {
@@ -371,7 +371,7 @@ export function useVoiceTake(target: VoiceTarget) {
         for (const s of stretches.current) removeFile(s.uri);
       }
     },
-    [recorder],
+    [recorder, stopTimer],
   );
 
   return {

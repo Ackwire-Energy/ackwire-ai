@@ -8,18 +8,7 @@ import {
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
-import {
-  Button,
-  Card,
-  Chip,
-  Icon,
-  Input,
-  ProviderLogo,
-  Radio,
-  RadioGroup,
-  SettingNote,
-  Switch,
-} from "@agenteschat/ui";
+import { Button, Card, Chip, Icon, Input, ProviderLogo, Radio, RadioGroup, SettingNote, Switch } from "@agenteschat/ui";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ErrorState, LoadingList } from "@/components/Loading";
@@ -142,15 +131,17 @@ function SpeechProviderPicker({ view }: { view: SpeechKey }) {
           aria-label={t("voice.settings.engineTitle")}
         >
           {PROVIDERS.map((p) => (
+            // biome-ignore lint/a11y/noLabelWithoutControl: the Radio inside is its control
             <label key={p.id} className="voice-tile">
               <Radio className="voice-tile__radio" value={p.id} aria-label={p.name} />
               <ProviderLogo id={p.id} size="sm" />
               <span className="voice-tile__name">{p.name}</span>
               <span className="voice-tile__check" aria-hidden="true">
-                <Icon name="check" size={12} />
+                <Icon name="check" size={14} />
               </span>
             </label>
           ))}
+          {/* biome-ignore lint/a11y/noLabelWithoutControl: the Radio inside is its control */}
           <label className="voice-tile">
             <Radio className="voice-tile__radio" value="local" aria-label={t("voice.settings.own")} />
             <span className="voice-tile__own" aria-hidden="true">
@@ -158,7 +149,7 @@ function SpeechProviderPicker({ view }: { view: SpeechKey }) {
             </span>
             <span className="voice-tile__name">{t("voice.settings.own")}</span>
             <span className="voice-tile__check" aria-hidden="true">
-              <Icon name="check" size={12} />
+              <Icon name="check" size={14} />
             </span>
           </label>
         </RadioGroup>

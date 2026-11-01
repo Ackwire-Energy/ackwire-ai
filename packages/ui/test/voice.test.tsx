@@ -4,8 +4,8 @@ import { setupDom } from "../testing/dom";
 setupDom();
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { peaksOf } from "../src/components/voice-recorder";
 import { VoicePlayer, type VoicePlayerProps } from "../src/components/VoicePlayer";
+import { peaksOf } from "../src/components/voice-recorder";
 
 afterEach(() => cleanup());
 

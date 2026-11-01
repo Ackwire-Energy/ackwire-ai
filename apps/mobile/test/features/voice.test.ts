@@ -1,7 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import { VOICE_MAX_MS } from "@agenteschat/client/lib/voice";
 import { hidesBody } from "../../src/features/chat/logic";
-import { hasWords, levelOf, nextSpeed, peaksOf, retryDelayMs, secondsLeft, slideIntent, uploadVerdict } from "../../src/features/voice/logic";
+import {
+  hasWords,
+  levelOf,
+  nextSpeed,
+  peaksOf,
+  retryDelayMs,
+  secondsLeft,
+  slideIntent,
+  uploadVerdict,
+} from "../../src/features/voice/logic";
 import { joinM4a } from "../../src/features/voice/m4a";
 
 const u32 = (...v: number[]) => {

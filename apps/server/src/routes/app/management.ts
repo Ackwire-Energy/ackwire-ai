@@ -342,7 +342,10 @@ export function managementRoutes(deps: AppDeps) {
               description:
                 "Per provider and tier, one of that provider's models; null puts the tier back on its default.",
             }),
-            voiceMessages: z.boolean().optional().openapi({ description: "People can send voice messages (ADR 0098)." }),
+            voiceMessages: z
+              .boolean()
+              .optional()
+              .openapi({ description: "People can send voice messages (ADR 0098)." }),
             gifs: z.boolean().optional().openapi({ description: "People can send GIFs in chat (ADR 0091)." }),
             gifRating: z.enum(GIF_RATINGS).optional(),
             agentStickers: z.boolean().optional(),

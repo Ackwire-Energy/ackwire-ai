@@ -21,6 +21,7 @@ CREATE TABLE "voice_clips" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+-- deploy-safe: the new check allows all the old one did, and the previous version never writes 'speech'
 ALTER TABLE "instance_secrets" DROP CONSTRAINT "instance_secrets_name";--> statement-breakpoint
 ALTER TABLE "organization_settings" ADD COLUMN "voice_messages" boolean DEFAULT true NOT NULL;--> statement-breakpoint
 ALTER TABLE "voice_clips" ADD CONSTRAINT "voice_clips_org_id_organizations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

@@ -3,8 +3,6 @@ import type {
   BrowserLive,
   ContextDeps,
   GifKey,
-  SpeechSettings,
-  VoiceDeps,
   GitProxyDeps,
   JevKey,
   McpConnect,
@@ -12,9 +10,11 @@ import type {
   ResolveHost,
   RouterDeps,
   SandboxDeps,
+  SpeechSettings,
   StorageDeps,
   StreamBroker,
   Talker,
+  VoiceDeps,
 } from "@agenteschat/engine";
 import type { AppleTokenRevoker } from "../../auth";
 

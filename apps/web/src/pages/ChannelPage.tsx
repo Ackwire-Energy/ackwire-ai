@@ -96,7 +96,6 @@ import { dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/cl
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { isMediaAfterReply, messageMediaOf, quoteText, textOrMedia } from "@agenteschat/client/lib/media";
-import { voiceOf } from "@agenteschat/client/lib/voice";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import {
   isOpenMission,
@@ -120,6 +119,7 @@ import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@agenteschat/client/lib/threads";
 import { buildTimeline, groupsWith, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
+import { voiceOf } from "@agenteschat/client/lib/voice";
 import { splitCanceled } from "@agenteschat/client/lib/work";
 import {
   AffixInput,

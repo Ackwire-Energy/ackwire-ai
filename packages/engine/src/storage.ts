@@ -688,7 +688,8 @@ export async function runMigration(deps: StorageDeps, migrationId: string, optio
           .set({ storageConfigId: target.storageConfigId, blobKey: key })
           .where(eq(voiceClips.id, clip.id));
         // As for the Drive's files: only our own store frees the old copy.
-        if (clip.storageConfigId === null && clip.blobKey !== key) await source.delete(clip.blobKey).catch(() => undefined);
+        if (clip.storageConfigId === null && clip.blobKey !== key)
+          await source.delete(clip.blobKey).catch(() => undefined);
       } catch (error) {
         await db
           .update(storageMigrations)

@@ -25,7 +25,11 @@ import { type Fixture, SECRET, setup } from "./fixtures";
 const { voiceClips, messages } = schema;
 
 let f: Fixture;
-afterEach(() => f?.close());
+afterEach(async () => {
+  // Tests with no database of their own must not close the last one again.
+  await f?.close();
+  f = undefined as unknown as Fixture;
+});
 
 const DAY = 24 * 3600_000;
 

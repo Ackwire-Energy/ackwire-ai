@@ -24,12 +24,12 @@ import {
 } from "../format";
 import { Icon, type IconName } from "../icons/Icon";
 import { Button } from "./Button";
-import { type VoiceNotice, type VoiceTake, useVoiceRecorder, voiceRecordingSupported } from "./voice-recorder";
 import { type EmojiPickerLabels, EmojiPickerPopover, type PickerTab } from "./EmojiPicker";
 import { useAutoGrow } from "./Field";
 import { modKey } from "./Kbd";
 import { PixelStop } from "./PixelMarks";
 import { Spinner } from "./Skeleton";
+import { useVoiceRecorder, type VoiceNotice, type VoiceTake, voiceRecordingSupported } from "./voice-recorder";
 
 /** Names of the formatting buttons (also their tooltips, with the shortcut). */
 export type ComposerFormatLabels = Record<FormatKind, string> & {
@@ -816,7 +816,7 @@ export function Composer({
                       aria-label={rec.listening ? voice.labels.stopListening : voice.labels.listen}
                       onClick={() => void rec.toggleListening()}
                     >
-                      <Icon name={rec.listening ? "pause" : "play"} size={12} />
+                      <Icon name={rec.listening ? "pause" : "play"} size={14} />
                     </button>
                   ) : (
                     <span className="ac-composer__voice-dot" aria-hidden="true" />
@@ -824,12 +824,7 @@ export function Composer({
                   <span ref={rec.timer} className="ac-composer__voice-time">
                     0:00
                   </span>
-                  <canvas
-                    ref={wave}
-                    className="ac-composer__wave"
-                    aria-hidden="true"
-                    onPointerDown={rec.onWavePointerDown}
-                  />
+                  <canvas ref={wave} className="ac-composer__wave" onPointerDown={rec.onWavePointerDown} />
                 </div>
               )}
             </div>

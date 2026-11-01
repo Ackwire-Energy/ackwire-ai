@@ -476,5 +476,18 @@ export function useVoiceRecorder(options: VoiceRecorderOptions | undefined, wave
     [start, send, discard, togglePause],
   );
 
-  return { phase, hold, listening, seconds, active, timer, micProps, send, discard, togglePause, toggleListening, onWavePointerDown };
+  return {
+    phase,
+    hold,
+    listening,
+    seconds,
+    active,
+    timer,
+    micProps,
+    send,
+    discard,
+    togglePause,
+    toggleListening,
+    onWavePointerDown,
+  };
 }

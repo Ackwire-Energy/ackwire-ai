@@ -14,7 +14,7 @@ const OFF: SpeechKey = { provider: null, hint: null, state: "off", envProviders:
 
 const go = async (patch: Partial<FakeState> = {}) => {
   const state = seedState(patch);
-  await renderApp(`/org/${ORG_ID}/settings/media`, { api: createFakeApi(state) });
+  await renderApp(`/org/${ORG_ID}/settings/voice`, { api: createFakeApi(state) });
   await settle(6);
   return state;
 };

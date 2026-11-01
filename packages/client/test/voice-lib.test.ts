@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
+import type { Message } from "../src/api/types";
 import { quoteText, textOrMedia } from "../src/lib/media";
 import { previewBody } from "../src/lib/message-body";
 import { localMeta } from "../src/lib/reply";
 import { voiceAudioGone, voiceClock, voiceExpired, voiceOf } from "../src/lib/voice";
-import type { Message } from "../src/api/types";
 
 const t = ((key: string, params?: { time?: string }) =>
   key === "voice.wordTime" ? `Voz · ${params?.time}` : key === "voice.word" ? "Voz" : key) as unknown as TFunction;

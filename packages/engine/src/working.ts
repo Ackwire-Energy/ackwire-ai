@@ -1,4 +1,5 @@
 import { type Database, rowsOf, schema, sql } from "@agenteschat/db";
+import { readableBody } from "./message-preview";
 import { replyExcerpt } from "./messages";
 import { requirePermission } from "./organizations";
 import { pendingIds } from "./recovery";

@@ -159,7 +159,6 @@ import type {
   SkillDetail,
   SkillPick,
   SpeechKey,
-  SpeechKeyInput,
   StorageConfig,
   StorageMigration,
   StorageTestResult,

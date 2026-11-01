@@ -32,6 +32,8 @@ const DAY_MS = 24 * 3600_000;
 export const VOICE_NO_WORDS_BODY = "(voice message: the words could not be made out)";
 
 /** What the apps record, and all that is ever served back from our own address. */
+/** Bun names a multipart file's type after its extension: `.webm` and `.mp4` arrive as video, and these only hold audio. */
+const VOICE_ARRIVES_AS: Record<string, string> = { "video/webm": "audio/webm", "video/mp4": "audio/mp4" };
 const VOICE_TYPES = [
   "audio/mp4",
   "audio/m4a",
@@ -147,7 +149,8 @@ export async function acceptVoiceClip(
     throw new ValidationError("The recording is too long or too short", "voice.bad_duration");
   }
   if (!(await voiceAllowed(deps, userId, orgId))) throw new ValidationError("Too many voice messages", "voice.limit");
-  const contentType = input.contentType.split(";")[0]?.trim().toLowerCase() || "audio/mp4";
+  const declared = input.contentType.split(";")[0]?.trim().toLowerCase() || "audio/mp4";
+  const contentType = VOICE_ARRIVES_AS[declared] ?? declared;
   if (!VOICE_TYPES.includes(contentType)) throw new ValidationError("Not a voice recording", "voice.bad_type");
   const id = crypto.randomUUID();
   const place = await deps.blobs.forOrg(orgId);
@@ -261,7 +264,7 @@ const costOf = (engine: SpeechEngine, durationMs: number) =>
  */
 export async function transcribeVoiceClip(deps: VoiceDeps, clipId: string, options: { finalAttempt: boolean }) {
   const [clip] = await deps.db.select().from(voiceClips).where(eq(voiceClips.id, clipId));
-  if (!clip || clip.status !== "pending") return;
+  if (clip?.status !== "pending") return;
   if (!clip.userId) return dropClip(deps, clip, "refused");
   const place = await deps.blobs.forConfig(clip.orgId, clip.storageConfigId);
   const stored = await place.get(clip.blobKey);
@@ -319,7 +322,7 @@ export async function voiceClipAudio(
   userId: string,
   orgId: string,
   clipId: string,
-) {
+): Promise<{ expired: true } | { url: string } | { body: Uint8Array; contentType: string }> {
   const [clip] = await deps.db
     .select()
     .from(voiceClips)
@@ -328,16 +331,15 @@ export async function voiceClipAudio(
   await requireChannelAccess(deps.db, userId, orgId, clip.channelId);
   const expiry = expiryOf(clip.createdAt, deps.retentionDays);
   if (clip.audioDeletedAt || (clip.status !== "pending" && expiry && expiry.getTime() <= Date.now())) {
-    return { expired: true } as const;
+    return { expired: true };
   }
   const store = await deps.blobs.forConfig(orgId, clip.storageConfigId);
   const url = await store.signedUrl(clip.blobKey, { expiresInSeconds: 300 });
-  if (url) return { url } as const;
+  if (url) return { url };
   const object = await store.get(clip.blobKey);
   if (!object) throw new NotFoundError();
-  return { body: object.body, contentType: clip.contentType } as const;
+  return { body: object.body, contentType: clip.contentType };
 }
-
 
 const SWEEP_PAGE = 200;
 

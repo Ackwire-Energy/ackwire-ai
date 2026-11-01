@@ -5150,7 +5150,11 @@ html:not([data-pointer]) .ac-composer__send:focus-visible {
   height: 9px;
   border-radius: 50%;
   background: var(--danger);
-  animation: ac-voice-blink 1.1s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ac-composer__voice-dot {
+    animation: ac-voice-blink 1.1s ease-in-out infinite;
+  }
 }
 @keyframes ac-voice-blink {
   50% {
@@ -5180,7 +5184,9 @@ html:not([data-pointer]) .ac-composer__send:focus-visible {
   height: 28px;
 }
 /* The toolbar stays: the send button and the microphone where they were, and the rest gives way to delete and the keys. */
-.ac-composer[data-voice] .ac-composer__tools > :not(.ac-composer__voice-trash, .ac-composer__voice-hint, .ac-composer__mic, .ac-composer__send) {
+.ac-composer[data-voice]
+  .ac-composer__tools
+  > :not(.ac-composer__voice-trash, .ac-composer__voice-hint, .ac-composer__mic, .ac-composer__send) {
   display: none;
 }
 .ac-composer[data-voice] .ac-composer__tools {
@@ -5212,11 +5218,6 @@ html:not([data-pointer]) .ac-composer__send:focus-visible {
 .ac-composer__mic {
   touch-action: none;
   -webkit-touch-callout: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  .ac-composer__voice-dot {
-    animation: none;
-  }
 }
 
 .ac-voice {

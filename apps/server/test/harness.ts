@@ -105,6 +105,8 @@ export async function createTestServer(
      * Absent: `gifs` serves them, and a saved key is kept unchecked (tests never reach the network).
      */
     giphyFetch?: typeof fetch;
+    /** `false`: a store with no signed links, as on disk or in Postgres, so the server sends files itself. */
+    signedBlobs?: boolean;
     /** Fake speech providers (ADR 0098), for an engine set through `env`. */
     speechFetch?: typeof fetch;
   } = {},
@@ -119,7 +121,7 @@ export async function createTestServer(
   const email = createFakeEmailSender();
   const push = createFakePushSender();
   const webPush = options.webPush === undefined ? createFakeWebPushSender() : options.webPush;
-  const platformBlobs = createMemoryBlobStore({ kind: options.platformKind });
+  const platformBlobs = createMemoryBlobStore({ kind: options.platformKind, sign: options.signedBlobs });
   const keyWrapper = createLocalKeyWrapper(config.AGENTES_SECRET);
   const { giphyFetch } = options;
   // The installation's GIPHY key, as `start.ts` makes it off agentes.chat (ADR 0091, amended 2026-10-31).
@@ -286,7 +288,7 @@ export function browser(t: TestServer) {
     init: {
       method?: string;
       json?: unknown;
-      body?: BodyInit;
+      body?: RequestInit["body"];
       origin?: string | null;
       headers?: Record<string, string>;
     } = {},

@@ -1,5 +1,5 @@
 import type { Message } from "@agenteschat/client";
-import { VOICE_MAX_MS, VOICE_COUNTDOWN_MS, voiceOf } from "@agenteschat/client/lib/voice";
+import { VOICE_COUNTDOWN_MS, VOICE_MAX_MS, voiceOf } from "@agenteschat/client/lib/voice";
 
 /**
  * Voice messages on the phone (ADR 0098), the part with no device in it: how a recording's gestures read and how

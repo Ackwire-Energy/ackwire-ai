@@ -11537,7 +11537,7 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
 .voice-tile:has(.voice-tile__radio[data-state="checked"]) {
   box-shadow: inset 0 0 0 2px var(--ink);
 }
-.voice-tile:has(.voice-tile__radio:focus-visible) {
+html:not([data-pointer]) .voice-tile:has(.voice-tile__radio:focus-visible) {
   box-shadow: var(--focus-ring);
 }
 /* The real radio covers its tile, unseen: arrows and clicks work as on any radio group. */

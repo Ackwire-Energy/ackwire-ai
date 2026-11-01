@@ -162,7 +162,7 @@ test("the import step names the three most used apps, in the web's order, each b
     ["paperclip-dark.png", "paperclip-dark.svg"],
     ["paperclip.png", "paperclip.svg"],
   ];
-  const pngs = readdirSync(brands).filter((f) => f.endsWith(".png") && f !== "gemini.png");
+  const pngs = readdirSync(brands).filter((f) => f.endsWith(".png") && f !== "gemini.png" && f !== "soniox.png");
   expect(pngs.sort()).toEqual(rendered.map(([png]) => png));
   for (const [png, svg] of rendered) {
     expect(await web(svg).exists()).toBe(true);

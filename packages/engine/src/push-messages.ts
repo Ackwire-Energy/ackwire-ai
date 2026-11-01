@@ -195,7 +195,7 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
   const s = PUSH_STRINGS[locale];
   const actor = input.actorName?.trim() || (input.actorType === "agent" ? s.anAgent : s.someone);
   // A GIF or a sticker alone (ADR 0091) says what it was where its words would go.
-  const sent = { gif: s.sentGif, sticker: s.sentSticker, voice: s.sentVoice }[input.media ?? ""] ?? "";
+  const sent = input.media ? { gif: s.sentGif, sticker: s.sentSticker, voice: s.sentVoice }[input.media] : "";
   const text = input.text?.trim() || sent;
   const what = input.title?.trim() || input.label?.trim() || "";
   const out = (title: string, body: string) => ({

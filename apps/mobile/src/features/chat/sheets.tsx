@@ -23,6 +23,7 @@ import {
 } from "@agenteschat/client";
 import { textOrMedia } from "@agenteschat/client/lib/media";
 import { summaryParts } from "@agenteschat/client/lib/missions";
+import { voiceOf } from "@agenteschat/client/lib/voice";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import type { TFunction } from "i18next";
@@ -36,7 +37,6 @@ import { chatHref } from "../links/logic";
 import { missionComputerText } from "../missions/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useEdition, useMeId, useNamesComputers, useOrgId } from "../shared/hooks";
-import { voiceOf } from "@agenteschat/client/lib/voice";
 import { genderOf, previewOf } from "../shared/logic";
 import { SheetTitle } from "../shared/PromptForm";
 import { ActionList, copyText, successHaptic, Tile, tapHaptic, useSurface } from "../shared/parts";

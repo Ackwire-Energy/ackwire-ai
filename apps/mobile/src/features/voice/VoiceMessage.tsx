@@ -226,7 +226,14 @@ const styles = StyleSheet.create({
   wave: { flex: 1, minWidth: 0, height: WAVE, flexDirection: "row" },
   dim: { opacity: 0.5, marginLeft: 6 },
   time: { minWidth: 30, textAlign: "right", fontVariant: ["tabular-nums"] },
-  speed: { height: 22, minWidth: 28, paddingHorizontal: 5, borderRadius: 6, alignItems: "center", justifyContent: "center" },
+  speed: {
+    height: 22,
+    minWidth: 28,
+    paddingHorizontal: 5,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   speedText: { fontVariant: ["tabular-nums"] },
   // Under the wave, past the play button.
   words: { paddingLeft: 42, paddingBottom: 2 },

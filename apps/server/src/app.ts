@@ -29,7 +29,6 @@ import { desktopRoutes } from "./routes/app/desktop";
 import { dmRoutes } from "./routes/app/dms";
 import { forumRoutes } from "./routes/app/forum";
 import { gifKeyRoutes } from "./routes/app/gif-key";
-import { speechKeyRoutes, voiceRoutes } from "./routes/app/voice";
 import { gifRoutes } from "./routes/app/gifs";
 import { inviteRoutes } from "./routes/app/invites";
 import { issueRoutes } from "./routes/app/issues";
@@ -52,6 +51,7 @@ import { skillRoutes } from "./routes/app/skills";
 import { storageRoutes } from "./routes/app/storage";
 import { telemetryRoutes } from "./routes/app/telemetry";
 import { threadRoutes } from "./routes/app/threads";
+import { speechKeyRoutes, voiceRoutes } from "./routes/app/voice";
 import { wikiRoutes } from "./routes/app/wiki";
 import {
   createDesktopReleases,

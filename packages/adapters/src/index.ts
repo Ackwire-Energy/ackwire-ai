@@ -20,7 +20,6 @@ export * from "./composio";
 export * from "./database";
 export * from "./email";
 export * from "./gifs";
-export * from "./speech";
 export * from "./human-check";
 export * from "./imap";
 export * from "./keys";
@@ -38,6 +37,7 @@ export * from "./s3-fake";
 export * from "./sandbox";
 export * from "./search";
 export * from "./secret-box";
+export * from "./speech";
 export * from "./web-push";
 
 /**

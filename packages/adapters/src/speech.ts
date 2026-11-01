@@ -80,7 +80,10 @@ export function cleanTerms(terms: string[], max: number, words: number): string[
   const seen = new Set<string>();
   const out: string[] = [];
   for (const raw of terms) {
-    const term = raw.replace(/[<>{}[\]\\]/g, " ").replace(/\s+/g, " ").trim();
+    const term = raw
+      .replace(/[<>{}[\]\\]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
     const key = term.toLowerCase();
     if (term.length < 2 || term.length >= 50 || term.split(" ").length > words || seen.has(key)) continue;
     seen.add(key);
@@ -99,7 +102,9 @@ const extensionOf = (contentType: string) => {
 };
 
 const fileOf = (input: SpeechFileInput) =>
-  new File([input.audio as BlobPart], `voice.${extensionOf(input.contentType)}`, { type: input.contentType });
+  new File([input.audio as Uint8Array<ArrayBuffer>], `voice.${extensionOf(input.contentType)}`, {
+    type: input.contentType,
+  });
 
 /** Waits for a job a provider runs in the background; `read` answers null while it isn't done. */
 async function poll<T>(read: () => Promise<T | null>, options: SpeechOptions): Promise<T> {
@@ -127,7 +132,7 @@ function assemblyAi(apiKey: string, options: SpeechOptions): SpeechEngine {
       const upload = await http(`${base}/upload`, {
         method: "POST",
         headers: { ...headers, "content-type": "application/octet-stream" },
-        body: input.audio as BodyInit,
+        body: input.audio as Uint8Array<ArrayBuffer>,
       });
       if (!upload.ok) throw await refuse(upload, "AssemblyAI");
       const { upload_url: audioUrl } = (await upload.json()) as { upload_url: string };

@@ -42,9 +42,7 @@ function useVoiceAllowed(orgId: string, enabled: boolean) {
  * Locked, the field holds the clock, the wave and pause, and the button sends. Paused, the play button stands where
  * the dot was and the whole recording fits the wave. Nothing changes the composer's height. Null where voice is off.
  */
-export function useVoiceComposer(
-  input: Omit<VoiceTarget, "allowed"> & { enabled: boolean },
-): ComposerVoice | null {
+export function useVoiceComposer(input: Omit<VoiceTarget, "allowed"> & { enabled: boolean }): ComposerVoice | null {
   const { enabled, ...rest } = input;
   const { t } = useTranslation();
   const c = useColors();
