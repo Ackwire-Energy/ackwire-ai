@@ -8,6 +8,8 @@ import { useOrg } from "@/components/org-context";
 import { contextMenuHandler, copyText } from "@/lib/context-menu";
 import { useToast } from "@/lib/toast";
 import { useArtifactDownload } from "./ArtifactActions";
+import { LiveBlockCard } from "@/components/blocks/LiveBlock";
+import { PollCard } from "@/components/blocks/PollCard";
 import { artifactLink, useArtifactViewer, useAuthorName } from "./ArtifactViewer";
 import { FileCardPreview } from "./FileView";
 import { HtmlFrame } from "./HtmlFrame";
@@ -43,6 +45,9 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
     );
   }
   if (!a) return <div className="artifact-card artifact-card--loading" aria-busy="true" />;
+  // What lives in the conversation isn't a file: the thing itself, not a card that opens it (ADR 0109).
+  if (a.kind === "block") return <LiveBlockCard id={a.id} version={a.shownVersion} />;
+  if (a.kind === "poll") return <PollCard id={a.id} version={a.shownVersion} />;
   const open = () => viewer.open(a.id, a.shownVersion < a.version ? a.shownVersion : undefined);
   // The desktop app's right click: open, download, its link.
   const onContextMenu = contextMenuHandler(() => [
@@ -191,7 +196,9 @@ function Preview({ content, title }: { content: ArtifactContent; title: string }
         />
       );
     case "file":
-      // Files render as tiles (`ArtifactCard`), never inside a card.
+    case "block":
+    case "poll":
+      // Files render as tiles and blocks and votes as themselves (`ArtifactCard`), never inside a card.
       return null;
   }
 }

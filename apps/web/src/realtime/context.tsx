@@ -747,6 +747,7 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
         if ((event.type as string) === "artifact.deleted")
           void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
       }
+      if (event.type === "poll.updated") qc.setQueryData(keys.poll(orgId, event.poll.id), event.poll);
       if (event.type === "thread.updated") applyThreadEvent(qc, orgId, event);
       // An agent's browser request changed (ADR 0040): its card, the live view, the agent's open request.
       if (event.type === "browser.handoff.updated")

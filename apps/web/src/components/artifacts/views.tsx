@@ -5,6 +5,8 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Markdown } from "@/lib/markdown";
 import { FileSummary, FileView } from "./FileView";
+import { LiveBlock } from "@/components/blocks/LiveBlock";
+import { PollCard } from "@/components/blocks/PollCard";
 import { HtmlFrame } from "./HtmlFrame";
 import { MermaidOrCode } from "./Mermaid";
 
@@ -16,7 +18,7 @@ export function ArtifactContentView({
 }: {
   content: ArtifactContent;
   title: string;
-  source?: { id: string; version: number };
+  source?: { id: string; version: number; agentId?: string };
 }) {
   const { t } = useTranslation();
   switch (content.kind) {
@@ -37,6 +39,19 @@ export function ArtifactContentView({
           <HtmlFrame html={content.html} title={t("artifacts.htmlFrame", { title })} />
         </div>
       );
+    case "block":
+      return source ? (
+        <LiveBlock
+          id={source.id}
+          version={source.version}
+          title={title}
+          html={content.html}
+          agentId={source.agentId ?? ""}
+          big
+        />
+      ) : null;
+    case "poll":
+      return source ? <PollCard id={source.id} version={source.version} /> : null;
     case "file":
       return source ? (
         <FileView content={content} artifactId={source.id} version={source.version} title={title} />
