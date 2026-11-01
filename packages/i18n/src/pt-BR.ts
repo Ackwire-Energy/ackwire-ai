@@ -6684,10 +6684,18 @@ export const ptBR = {
     /** What a coding plan's model is sold as, beside its name. */
     modelTag: { cheap: "Econômico", fast: "Rápido", smart: "Topo de linha" },
     /** What a coding plan's model needs from its account before it answers. */
-    modelNeeds: { globalRegion: "Precisa da região Global no OpenCode" },
+    modelNeeds: {
+      globalRegion: "Precisa da região Global no OpenCode",
+      paidTraining: "Treina com o que recebe. Precisa da permissão no OpenCode",
+      freeTraining: "Grátis. Treina com o que recebe. Precisa da permissão no OpenCode",
+    },
     /** Under the model chosen that needs it: how to give it. */
     modelHow: {
       globalRegion: "Ligue a região Global no OpenCode, em Settings › Privacy. Sem ela, este modelo não responde.",
+      paidTraining:
+        "No OpenCode, em Settings › Privacy, ligue os modelos pagos que treinam com os pedidos. Sem isso, este modelo não responde.",
+      freeTraining:
+        "No OpenCode, em Settings › Privacy, ligue os modelos grátis que treinam com os pedidos. Sem isso, este modelo não responde.",
     },
     recommended: "Recomendado",
     modelHelp: "Os modelos maiores pensam mais e gastam o plano mais rápido.",
