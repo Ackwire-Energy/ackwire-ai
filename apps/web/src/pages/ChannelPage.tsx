@@ -11,6 +11,7 @@ import type {
   HeldPlace,
   Member,
   MemoryUpdate,
+  MessageMedia,
   Message as MessageType,
   ReplyRef,
   RunConsultation,
@@ -87,6 +88,7 @@ import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@
 import { dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
+import { isMediaAfterReply, messageMediaOf, quoteText } from "@agenteschat/client/lib/media";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import {
   isOpenMission,
@@ -167,6 +169,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { tokenizeBody } from "@/chat/body";
+import { ChatMedia } from "@/chat/ChatMedia";
 import { MessageBody } from "@/chat/MessageBody";
 import { browserOffline } from "@/chat/offline";
 import { readingLanding } from "@/chat/reading";
@@ -220,6 +223,7 @@ import { useUploadFailed } from "@/components/Limits";
 import { LiveCodeToggle, type SteerNote } from "@/components/LiveCode";
 import { ErrorState, LoadingConversation } from "@/components/Loading";
 import { WaitingCard } from "@/components/MachineOutages";
+import { useMediaTabs } from "@/components/MediaPicker";
 import { MemberPickerRows, memberOf, type PickKey, useMemberRows } from "@/components/MemberPicker";
 import { MemoryMarks } from "@/components/MemoryMark";
 import { MessageFeedback } from "@/components/MessageFeedback";
@@ -409,18 +413,20 @@ function QuotedMessage({ reply }: { reply: ReplyRef }) {
       ? dir.agentById.get(reply.author.id ?? "")?.name
       : dir.memberById.get(reply.author.id ?? "")?.name;
   const name = known || reply.authorName || dir.authorName(reply.author);
+  // A quoted GIF or sticker has no words: its word stands for it (ADR 0091).
+  const excerpt = quoteText(t, reply);
   return (
     <button
       type="button"
       className="msg-quote"
-      aria-label={t("channel.quoteOf", { name, excerpt: reply.excerpt })}
+      aria-label={t("channel.quoteOf", { name, excerpt })}
       onClick={() => actions?.jumpTo?.(reply.messageId)}
     >
       <span className="msg-quote__who" aria-hidden="true">
         {name}
       </span>
       <span className="msg-quote__excerpt" aria-hidden="true">
-        {reply.excerpt}
+        {excerpt}
       </span>
     </button>
   );
@@ -710,10 +716,12 @@ function ChannelView({
       if (fresh.length > 0) live.expect(channel.id, local.id, fresh);
     },
     onSent: (message, local) => live.retarget(local.id, message.id),
-    // A thread archived meanwhile (`thread.archived`): say so in the person's language. Without a connection
-    // (or with the server restarting) it waits instead, "sai quando a conexão voltar" (`useSendWaiting`).
+    // A thread archived meanwhile (`thread.archived`), GIFs or stickers turned off or a GIF gone (`message.media_*`):
+    // say so in the person's language. Without a connection (or with the server restarting) it waits instead, "sai
+    // quando a conexão voltar" (`useSendWaiting`).
     onFailed: (error) => {
-      if (errorCode(error)?.startsWith("thread.")) toast.show(errorText(t, error), "error");
+      const code = errorCode(error);
+      if (code?.startsWith("thread.") || code?.startsWith("message.media_")) toast.show(errorText(t, error), "error");
     },
   });
   const { send, retry } = sendHelpers(post);
@@ -1420,6 +1428,17 @@ function ChannelView({
     send(text, thread ? thread.id : null, meta, opts?.interrupt ? { steer: "now" } : undefined);
     dropFiles(() => false);
   };
+  // A GIF or a sticker from the picker (ADR 0091): one click sends it here, as a message of its own (no text), shown
+  // at once like any message I send. The tabs read the latest handler, so they stay the same across keystrokes.
+  const sendMediaNow = useRef<(media: MessageMedia) => void>(() => {});
+  sendMediaNow.current = (media) => {
+    toBottom(true);
+    const meta: Record<string, unknown> = { media };
+    if (thread && chrome?.openThread) meta[OPEN_THREAD] = true;
+    send("", thread ? thread.id : null, meta);
+  };
+  const sendMedia = useCallback((media: MessageMedia) => sendMediaNow.current(media), []);
+  const mediaTabs = useMediaTabs(sendMedia);
   // While an agent works here: the send button turns into stop (box empty), and typing offers
   // "Juntar ao que ele faz" (↵) or "Parar e mandar" (⌘↵).
   const stopName = stopTarget ? (dir.agentById.get(stopTarget.agentId)?.name ?? t("channel.unknownAgent")) : "";
@@ -1895,7 +1914,9 @@ function ChannelView({
                         canSendEmpty={attached.length > 0}
                         sendBlocked={uploading}
                         format={formatLabels}
-                        emoji={emojiLabels}
+                        emoji={mediaTabs ? { ...emojiLabels, button: mediaTabs.button } : emojiLabels}
+                        pickerTabs={mediaTabs?.tabs}
+                        pickerLabels={mediaTabs?.labels}
                         id={`composer-${thread?.id ?? channel.id}`}
                         textareaRef={composer}
                         value={draft}
@@ -2172,9 +2193,12 @@ const Timeline = memo(function Timeline({
   // last one is drawn under the block's key, the others under their own (keys stay unique).
   const blockRows = useMemo(() => blockRowByRun(items, new Set(slots.map((s) => s.runId))), [items, slots]);
   // Each run's last message here carries its browser card while a take over holds it (`HeldBrowserCard`).
+  // The sticker or GIF an agent adds after its reply (ADR 0091) is never its run's last message: the reply is.
   const lastByRun = useMemo(() => {
     const out = new Map<string, string>();
-    for (const i of items) if (i.kind === "message" && i.message.agentRunId) out.set(i.message.agentRunId, i.key);
+    for (const i of items)
+      if (i.kind === "message" && i.message.agentRunId && !isMediaAfterReply(i.message.meta))
+        out.set(i.message.agentRunId, i.key);
     return out;
   }, [items]);
   // The block that opens is the first one at work: a failed or stopped block draws anyway and never hides it.
@@ -2199,6 +2223,7 @@ const Timeline = memo(function Timeline({
   );
   const rows: ReactElement<{ message?: MessageType }>[] = [];
   const afterUnshown = () => unshown.has(rows.at(-1)?.key ?? "");
+  const newestKey = items.findLast((i) => i.kind === "message")?.key;
   for (const item of items) {
     const grouped = item.kind === "message" && item.grouped && !afterUnshown();
     if (divider?.key === item.key) {
@@ -2234,6 +2259,7 @@ const Timeline = memo(function Timeline({
           contextMark={threadsView?.marks.has(m.id)}
           replyContext={item.context}
           lastOfRun={lastByRun.get(m.agentRunId) === item.key}
+          latest={item.key === newestKey}
         />
       ) : (
         <TimelineMessage
@@ -2247,7 +2273,8 @@ const Timeline = memo(function Timeline({
           lastOfRun={Boolean(m.agentRunId && lastByRun.get(m.agentRunId) === item.key)}
           dmPersonId={dmPersonId}
           seen={m.id === seenId}
-          helping={m.agentRunId ? consultGroups.helping.get(m.agentRunId) : undefined}
+          helping={m.agentRunId && !isMediaAfterReply(m.meta) ? consultGroups.helping.get(m.agentRunId) : undefined}
+          latest={item.key === newestKey}
         />
       ),
     );
@@ -2361,6 +2388,7 @@ function RunBlock({
   contextMark?: boolean;
   replyContext?: ReplyRef;
   lastOfRun?: boolean;
+  latest?: boolean;
 }) {
   const run = useStreams((s) => (message ? undefined : s.runs[runId]));
   const last = useRef<LiveRun | undefined>(undefined);
@@ -2865,6 +2893,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   seen = false,
   helping,
   readOnly = false,
+  latest = true,
 }: {
   message: MessageType;
   grouped: boolean;
@@ -2888,6 +2917,11 @@ export const TimelineMessage = memo(function TimelineMessage({
   helping?: RunConsultation;
   /** Shown where the person can't act on it (a question opened in the panel): no feedback, reactions or menu. */
   readOnly?: boolean;
+  /**
+   * The conversation's newest message: only it says in words that no agent will answer ("Nenhum agente vai
+   * responder sem @"); older ones keep the check, with the same words in its popover.
+   */
+  latest?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
@@ -2908,8 +2942,11 @@ export const TimelineMessage = memo(function TimelineMessage({
   const queued = useWaiting(m.local === "failed" ? m.clientId : undefined);
   const local = m.local === "failed" && queued ? "pending" : m.local;
   const slowSend = useAfter(500, local === "pending");
-  // The streamed row it replaces was already on screen: take its place without sliding in again.
-  const replacesLive = useStreams((s) => Boolean(m.agentRunId && s.finished[m.agentRunId]));
+  // The streamed row it replaces was already on screen: take its place without sliding in again (an agent's sticker
+  // after its reply replaces nothing: it slides in).
+  const replacesLive = useStreams((s) =>
+    Boolean(m.agentRunId && !isMediaAfterReply(m.meta) && s.finished[m.agentRunId]),
+  );
   const dir = useDirectory(org.id);
   const actions = useChannelActions();
   const threadLine = useChannelThreadsView()?.lines.get(m.id);
@@ -3008,6 +3045,12 @@ export const TimelineMessage = memo(function TimelineMessage({
   );
   // Files an agent made, or a person attached.
   const artifacts = artifactRefs(meta);
+  // A GIF or a sticker (ADR 0091); with no words, the message is the picture alone.
+  const media = useMemo(() => messageMediaOf(m.meta), [m.meta]);
+  // The one an agent adds after its own reply: a message of its own, not a reply (no feedback, no run's cards).
+  const mediaAfter = isMediaAfterReply(m.meta);
+  // The run this message answers for (its steps, its browser, the questions it asked): none for that one.
+  const replyRun = mediaAfter ? null : m.agentRunId;
   // "Responder": the message this one quotes.
   const quoted = useMemo(() => replyOf(m.meta) ?? replyContext ?? null, [m.meta, replyContext]);
   // An agent opened a forum topic from here: the topic card with "Ver discussão".
@@ -3059,13 +3102,14 @@ export const TimelineMessage = memo(function TimelineMessage({
     missionCard ||
     forumSuggestion ||
     issueWork;
-  const feedback = !readOnly && m.author.type === "agent" && !card && !m.local && !live;
+  const feedback = !readOnly && m.author.type === "agent" && !card && !m.local && !live && !mediaAfter;
   const menu = useMessageMenu(m, channelName ?? "", {
     feedback,
     agentName: agent?.name ?? t("channel.unknownAgent"),
   });
-  // A row with a bar has the same actions in a menu that a tap opens on touch.
-  const barred = !readOnly && (feedback || (m.author.type === "person" && !m.local));
+  // A row with a bar has the same actions in a menu that a tap opens on touch (an agent's sticker gets a person's).
+  const personBar = (m.author.type === "person" || mediaAfter) && !m.local;
+  const barred = !readOnly && (feedback || personBar);
   // Watched live here: the steps it took stay in the block, folded ("3 passos"), instead of the summary.
   const keptAll = seenLive?.work?.length ? seenLive.work : null;
   const keptWork =
@@ -3075,8 +3119,9 @@ export const TimelineMessage = memo(function TimelineMessage({
   // The line it opened with live stays where it was, above the steps: it never vanishes into the fold.
   const keptSaid = keptWork?.find((w) => w.kind === "say");
   const keptSteps = keptSaid && keptWork ? keptWork.filter((w) => w !== keptSaid) : keptWork;
-  // People see name, time and text; the date, model and tokens wait behind the time.
-  const usage = m.author.type === "agent" ? messageUsage(m) : null;
+  // People see name, time and text; the date, model and tokens wait behind the time. An agent's sticker after its
+  // reply carries the reply's run: its model and tokens are the reply's, never said twice.
+  const usage = m.author.type === "agent" && !mediaAfter ? messageUsage(m) : null;
   const details = [
     formatFullDate(i18n.language, m.createdAt),
     usage ? usageLine(t, i18n.language, usage, { modelLabel: modelLabels.get(usage.model) }) : null,
@@ -3095,7 +3140,7 @@ export const TimelineMessage = memo(function TimelineMessage({
         m.local
           ? undefined
           : m.author.type === "agent"
-            ? (m.agentRunId ?? m.id)
+            ? (replyRun ?? m.id)
             : m.author.type === "person" && m.author.id !== me.user.id
               ? m.id
               : undefined
@@ -3193,12 +3238,12 @@ export const TimelineMessage = memo(function TimelineMessage({
       aside={
         receipted || seenSlot ? (
           <>
-            {receipted && <MessageReceipts message={m} part="check" />}
+            {receipted && <MessageReceipts message={m} part="check" latest={latest} />}
             {seenSlot && <SeenMark personId={seen ? dmPersonId : undefined} />}
           </>
         ) : undefined
       }
-      foot={receipted ? <MessageReceipts message={m} part="line" /> : undefined}
+      foot={receipted ? <MessageReceipts message={m} part="line" latest={latest} /> : undefined}
       menu={
         barred && menu.touch.length > 0
           ? { label: t("channel.actions", { name }), items: <MenuEntries entries={menu.touch} /> }
@@ -3315,7 +3360,7 @@ export const TimelineMessage = memo(function TimelineMessage({
             !actionCard &&
             // A question's card already says it: its own text isn't repeated above.
             !(question && body.trim() === question.text.trim()) &&
-            (body.trim() || (!card && !stopped.canceled && artifacts.length === 0)) && (
+            (body.trim() || (!card && !stopped.canceled && artifacts.length === 0 && !media)) && (
               <MessageText>
                 <MessageBody
                   body={body}
@@ -3326,6 +3371,7 @@ export const TimelineMessage = memo(function TimelineMessage({
                 />
               </MessageText>
             )}
+          {media && <ChatMedia media={media} />}
           {(stopped.canceled || atLimit) && (
             <StoppedLine
               runId={m.agentRunId}
@@ -3384,26 +3430,21 @@ export const TimelineMessage = memo(function TimelineMessage({
               screen="desktop"
             />
           )}
-          {lastOfRun && m.author.type === "agent" && m.author.id && m.agentRunId && !m.local && (
+          {lastOfRun && m.author.type === "agent" && m.author.id && replyRun && !m.local && (
             <HeldBrowserCard
               agentId={m.author.id}
-              runId={m.agentRunId}
+              runId={replyRun}
               name={name}
               enabled={Date.now() - Date.parse(m.createdAt) < HELD_RECENT_MS}
             />
           )}
-          {lastOfRun &&
-            m.author.type === "agent" &&
-            m.author.id &&
-            m.agentRunId &&
-            !m.local &&
-            consulted.length === 0 && (
-              <ConsultGroup runId={m.agentRunId} askerId={m.author.id} color={colorOf(agent)} saved />
-            )}
+          {lastOfRun && m.author.type === "agent" && m.author.id && replyRun && !m.local && consulted.length === 0 && (
+            <ConsultGroup runId={replyRun} askerId={m.author.id} color={colorOf(agent)} saved />
+          )}
           {/* A question to another agent (in their DM) carries the asking run: its work shows on that run's reply. */}
-          {m.author.type === "agent" && m.agentRunId && !card && !m.local && !keptAll && !m.meta?.consultation && (
+          {m.author.type === "agent" && replyRun && !card && !m.local && !keptAll && !m.meta?.consultation && (
             <SavedTools
-              runId={m.agentRunId}
+              runId={replyRun}
               meta={m.meta}
               agentName={agent?.name ?? name}
               color={colorOf(agent)}
@@ -3454,7 +3495,7 @@ export const TimelineMessage = memo(function TimelineMessage({
             />
           )}
           {feedback && <CorrectionAsk message={m} agentName={agent?.name ?? t("channel.unknownAgent")} />}
-          {m.author.type === "person" && !m.local && (
+          {personBar && !(mediaAfter && readOnly) && (
             <PersonMessageActions message={m} authorName={name} channelName={channelName ?? ""} />
           )}
           {menu.dialog}

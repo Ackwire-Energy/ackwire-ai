@@ -28,6 +28,7 @@ export function Segmented<V extends string>({
   options,
   label,
   size = "md",
+  disabled = false,
   className,
 }: {
   value: V;
@@ -35,6 +36,8 @@ export function Segmented<V extends string>({
   options: SegmentedOption<V>[];
   label: string;
   size?: "md" | "sm";
+  /** Shown, not changed (a member reading an admin's setting, a setting this server can't use). */
+  disabled?: boolean;
   className?: string;
 }) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -57,6 +60,7 @@ export function Segmented<V extends string>({
     return () => ro.disconnect();
   });
   const move = (step: number) => {
+    if (disabled) return;
     const next = options[(index + step + options.length) % options.length];
     if (!next) return;
     onValueChange(next.value);
@@ -66,6 +70,7 @@ export function Segmented<V extends string>({
     <div
       role="radiogroup"
       aria-label={label}
+      aria-disabled={disabled || undefined}
       className={cx("ac-seg", size === "sm" && "ac-seg--sm", className)}
       onKeyDown={(e) => {
         if (e.key === "ArrowRight" || e.key === "ArrowDown") {
@@ -98,6 +103,7 @@ export function Segmented<V extends string>({
           className="ac-seg__item"
           data-on={o.value === value || undefined}
           title={o.title}
+          disabled={disabled}
           onClick={() => onValueChange(o.value)}
         >
           {o.mark}

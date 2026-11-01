@@ -20,6 +20,7 @@ import {
   cancelRun,
   clearPlanLimits,
   computerBrainUnavailable,
+  computerMediaNote,
   createChannel,
   createJobHandlers,
   createMissionEngine,
@@ -1794,6 +1795,30 @@ test("a computer brain with the react tool is told to end with an empty reply af
   await drainOutbox(f.db, handlers);
   expect(systems[0]).toContain(COMPUTER_REACT_NOTE);
   expect(systems[0]).toContain("not even the emoji again");
+});
+
+test("a computer brain with the GIF and sticker tools is told an empty reply after one adds nothing", async () => {
+  f = await setup({ mediaTools: true });
+  await computerAgent(f);
+  const systems: string[] = [];
+  const brain: Brain = {
+    kind: "claude_code",
+    async *run(turn) {
+      systems.push(turn.system);
+      yield { type: "done", text: "Oi." };
+    },
+  };
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(f, "@dev oi");
+  await drainOutbox(f.db, handlers);
+  // No GIF search on this server: the note names only the sticker, and no reaction note without `react`.
+  expect(systems[0]).toContain(computerMediaNote(["send_sticker"]));
+  expect(systems[0]).not.toContain("`send_gif`");
+  expect(systems[0]).not.toContain(COMPUTER_REACT_NOTE);
 });
 
 test("bridged side effects reach the engine: artifacts and memory cards on the reply, memory.updated published", async () => {

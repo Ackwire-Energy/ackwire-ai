@@ -22,6 +22,7 @@ import { invitationMailProof, invitationToken, inviteLinkToken, randomToken, saf
 import { earlyAccessLink, hasWorkspaceAllowance, recordFirstWorkspace, signupMode } from "./early-access";
 import { ConflictError, ForbiddenError, UnauthorizedError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
+import { deleteGifKey } from "./gif-key";
 import { deleteJevKey } from "./jev-key";
 import { assertMemberRoom } from "./limits";
 import { followWorkspaceName } from "./machine-provisioning";
@@ -372,10 +373,11 @@ export async function installOwner(db: Database): Promise<string | null> {
 }
 
 /**
- * Who has the installation's own settings, the usage report's switch and the Jev key (ADR 0073): its first account,
- * pinned the first time anyone asks. Unlike `installOwner`, it never passes to the next oldest account, who may be
- * any member of any workspace: once the owner deletes their account, nobody has these settings here (the server's
- * environment still does), until no account is left and the next first account is pinned.
+ * Who has the installation's own settings, the usage report's switch, the Jev key (ADR 0073) and the GIPHY key
+ * (ADR 0091): its first account, pinned the first time anyone asks. Unlike `installOwner`, it never passes to the
+ * next oldest account, who may be any member of any workspace: once the owner deletes their account, nobody has
+ * these settings here (the server's environment still does), until no account is left and the next first account
+ * is pinned.
  */
 export async function pinnedOwner(db: Database): Promise<string | null> {
   const [row] = await db
@@ -932,8 +934,12 @@ export async function deleteAccount(db: Database, userId: string, options: Omit<
     }
     if (options.emails) await queueAccountDeletedEmail(tx, userId, closed, options.emails);
     await tx.delete(users).where(eq(users.id, userId));
-    // The owner's own TypeSafe account would go on getting, and paying for, every workspace's Jev calls.
-    if (userId === owner) await deleteJevKey(tx, { type: "system", id: null });
+    // The owner's own TypeSafe account would go on getting, and paying for, every workspace's Jev calls; and their
+    // GIPHY key would go on serving every workspace's GIFs, with nobody left who could remove it (ADR 0091).
+    if (userId === owner) {
+      await deleteJevKey(tx, { type: "system", id: null });
+      await deleteGifKey(tx, { type: "system", id: null });
+    }
     // With nobody left, the next first account owns the server again.
     await tx.update(instanceTelemetry).set({ ownerUserId: null }).where(sql`not exists (select 1 from ${users})`);
     await recordOperatorEvent(tx, { type: "user.deleted", userId });

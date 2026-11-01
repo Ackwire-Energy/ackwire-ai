@@ -1,6 +1,7 @@
-import type { AppNotification, NotificationActor, Routine } from "@agenteschat/client";
+import type { AppNotification, MediaKind, NotificationActor, Routine } from "@agenteschat/client";
 import { approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
 import { namesText } from "@agenteschat/client/lib/format";
+import { mediaKindOf } from "@agenteschat/client/lib/media";
 import { askersOf } from "@agenteschat/client/lib/notifications";
 import { routineNotificationWords, type Words } from "@agenteschat/client/lib/routine-view";
 import type { TFunction } from "i18next";
@@ -80,11 +81,14 @@ export type SayWords = (w: Words, otherwise?: string) => string;
 /**
  * The line under the title: the snippet, the quote of a reaction, or the request's title. Coded words are
  * said in the person's language (`say`): why a routine paused or failed (its `latest.reason`, never the
- * server's English), and who asked for an approval while nobody watched, leading its title.
+ * server's English), and who asked for an approval while nobody watched, leading its title. A GIF or a sticker
+ * with no words (`latest.media`, ADR 0091) is said by its word (`mediaWord`: "GIF", "Figurinha").
  */
-export function subtitleOf(n: AppNotification, say: SayWords): string {
+export function subtitleOf(n: AppNotification, say: SayWords, mediaWord?: (kind: MediaKind) => string): string {
   const l = n.latest;
-  if (n.kind === "reaction") return l.quote ?? "";
+  const media = mediaKindOf(l.media);
+  const word = media && mediaWord ? mediaWord(media) : "";
+  if (n.kind === "reaction") return l.quote || word;
   // Its title already names who joined (ADR 0090): `latest.title` would say it twice.
   if (n.kind === "invitation_accepted") return "";
   const reason = routineNotificationWords(n);
@@ -94,7 +98,7 @@ export function subtitleOf(n: AppNotification, say: SayWords): string {
     return [origin ? say(origin) : "", l.title ?? l.text ?? ""].filter(Boolean).join(" · ");
   }
   if (n.kind === "issue_assigned" || n.kind === "forum_turn") return l.title ?? l.text ?? "";
-  return l.text ?? l.title ?? "";
+  return (l.text || word || l.text) ?? l.title ?? "";
 }
 
 /** Where it happened ("#produto", the thread's title, the mission's name). */

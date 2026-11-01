@@ -1,4 +1,5 @@
 import {
+  AGENT_MEDIA_LEVELS,
   agentDetail,
   agentView,
   audienceOf,
@@ -7,6 +8,7 @@ import {
   canTalkTo,
   canViewCost,
   continueRun,
+  GIF_RATINGS,
   getOrgSettings,
   getRun,
   INVITE_NOTE_MAX,
@@ -69,6 +71,27 @@ const Settings = z
     autoModels: z.record(z.string(), z.partialRecord(ModelTier, z.string())).openapi({
       description:
         "Per provider, the models Automático picks per tier where the workspace chose its own (`{ openrouter: { small, medium, large } }`, ADR 0087); a tier left out is the provider's default.",
+    }),
+    gifs: z.boolean().openapi({
+      description: "People can send GIFs in chat (ADR 0091); they also need `gifsAvailable`. On by default.",
+    }),
+    gifRating: z.enum(GIF_RATINGS).openapi({
+      description: "The most a GIF may be rated: `g` (any age, the default) or `pg`.",
+    }),
+    agentStickers: z.boolean().openapi({
+      description: "The agents' own stickers, drawn from each agent's look (ADR 0091). On by default.",
+    }),
+    agentMedia: z.enum(AGENT_MEDIA_LEVELS).openapi({
+      description:
+        "How often agents follow a light reply with a sticker or a GIF on their own: `never`, `sometimes` (the default) or `often`. Needs `agentMediaAvailable`; each agent can be turned off (`mediaReplies`). When someone asks for one, agents send it at any level.",
+    }),
+    gifsAvailable: z.boolean().openapi({
+      description:
+        "Read only: this server has a GIF provider with a key now (`GIPHY_API_KEY`, or the one the installation's owner added in Settings). Without it there are no GIFs at all.",
+    }),
+    agentMediaAvailable: z.boolean().openapi({
+      description:
+        "Read only: this installation has a Jev key (ADR 0073), which decides when an agent sends a sticker or a GIF. Without it agents send none.",
     }),
   })
   .openapi("OrgSettings");
@@ -185,6 +208,10 @@ const AgentDetail = z
     audienceMode: z.enum(["everyone", "people", "owner"]),
     canTalk: z.boolean(),
     appearance: AgentAppearance.nullable(),
+    mediaReplies: z.boolean().openapi({
+      description:
+        "It may send a sticker or a GIF (ADR 0091): when someone asks for one, and after a light reply as often as the workspace's `agentMedia` allows.",
+    }),
   })
   .openapi("AgentDetail");
 
@@ -234,6 +261,12 @@ export function managementRoutes(deps: AppDeps) {
   const app = createAppRouter(deps);
   app.use("/organizations/*", requireSession(deps.auth));
   const AgentParams = OrgParams.extend({ agentId: z.uuid() });
+  /** What this server can do for GIFs and agents' stickers (ADR 0091 §5), so no switch does nothing. */
+  const mediaAvailable = async () => ({
+    // The provider follows the installation's key, which its owner may add or remove at any time.
+    gifsAvailable: adapters.gifs?.available() ?? false,
+    agentMediaAvailable: Boolean((await deps.extras?.jevKey?.view())?.source),
+  });
 
   // ── Organization ──────────────────────────────────────────────────────────
   app.openapi(
@@ -250,7 +283,8 @@ export function managementRoutes(deps: AppDeps) {
       const { orgId } = c.req.valid("param");
       const actor = c.get("user").id;
       const settings = await getOrgSettings(db, actor, orgId);
-      return c.json(settingsFor(settings, await canViewCost(db, actor, orgId)), 200);
+      const seesCost = await canViewCost(db, actor, orgId);
+      return c.json({ ...settingsFor(settings, seesCost), ...(await mediaAvailable()) }, 200);
     },
   );
 
@@ -284,6 +318,10 @@ export function managementRoutes(deps: AppDeps) {
               description:
                 "Per provider and tier, one of that provider's models; null puts the tier back on its default.",
             }),
+            gifs: z.boolean().optional().openapi({ description: "People can send GIFs in chat (ADR 0091)." }),
+            gifRating: z.enum(GIF_RATINGS).optional(),
+            agentStickers: z.boolean().optional(),
+            agentMedia: z.enum(AGENT_MEDIA_LEVELS).optional(),
           }),
         ),
       },
@@ -299,7 +337,8 @@ export function managementRoutes(deps: AppDeps) {
           ? { defaultAgentBudgetNanoUsd: usdToNanoUsd(defaultAgentBudgetUsd) }
           : {}),
       });
-      return c.json(settingsFor(settings, await canViewCost(db, actor, orgId)), 200);
+      const seesCost = await canViewCost(db, actor, orgId);
+      return c.json({ ...settingsFor(settings, seesCost), ...(await mediaAvailable()) }, 200);
     },
   );
 
@@ -793,6 +832,7 @@ export function managementRoutes(deps: AppDeps) {
           audienceMode: d.agent.audienceMode,
           canTalk: canTalkTo(d.agent, c.get("user").id, await talksToAgents(db, orgId, c.get("user").id)),
           appearance: v.appearance,
+          mediaReplies: v.mediaReplies,
           channels: d.channels,
           createdAt: v.createdAt.toISOString(),
         },

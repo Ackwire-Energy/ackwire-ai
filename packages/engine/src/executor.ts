@@ -107,6 +107,7 @@ import { linkRunToIssue, mirrorReplyToIssue } from "./issues";
 import { listenLiveSteering, renderSteered } from "./live-steer";
 import { touchMachineAccount } from "./machine-accounts";
 import { computerBackSoon, type MachineStatus } from "./machine-hub";
+import { MEDIA_TOOLS } from "./media";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import { postNoAiCard } from "./no-ai";
 import { enqueue, PermanentJobError } from "./outbox";
@@ -298,6 +299,8 @@ export interface Transcript {
   desktop?: BrowserTrailStep[];
   /** The agent reacted (`react`) instead of replying: an empty final answer posts nothing. */
   reacted?: boolean;
+  /** It sent a GIF or its sticker (`send_gif`, `send_sticker`, ADR 0091): an empty final answer posts nothing. */
+  mediaSent?: boolean;
   /** A mission `report` card was posted this run: it is the answer, an empty final reply posts nothing. */
   reported?: boolean;
   /** Nobody called it by name and it called `pass`: the run ends without a message. */
@@ -2404,11 +2407,13 @@ async function executeRunInner(
           return fail(STUCK_ERROR, { code: STUCK_ERROR, ...(record ? { detail: record } : {}) });
         return finishBackground(record);
       }
-      // Nobody called it by name: it passed, or ended with nothing to say. Nothing is posted.
+      // Nobody called it by name: it passed, or ended with nothing to say. Nothing is posted. (A reaction, a GIF or
+      // a sticker it sent is an answer: below.)
       if (
         policy.mayPass &&
         !transcript.answerOwed &&
         !transcript.reacted &&
+        !transcript.mediaSent &&
         (transcript.passed ||
           (!anythingPosted && (wantsQuiet || !said) && updates.length === 0 && !saved && !transcript.reported))
       ) {
@@ -2418,11 +2423,14 @@ async function executeRunInner(
       }
       // It reacted (`react`) instead of replying and wrote nothing more (or only the emoji again):
       // the reaction is the answer.
+      // Or it sent a GIF or its sticker and wrote nothing after it, with no card left to attach: that was the answer.
       // Or it posted a mission report and has no card left to attach: the report is the answer. Coding CLIs
       // always close with a summary that repeats it, whatever the prompt says, so the text is dropped too.
+      const noCards = !transcript.artifacts?.length && !transcript.memoryUpdates?.length;
       const silent =
         (Boolean(transcript.reacted) && restatesReaction(said)) ||
-        (Boolean(transcript.reported) && !transcript.artifacts?.length && !transcript.memoryUpdates?.length);
+        (Boolean(transcript.mediaSent) && !said && noCards) ||
+        (Boolean(transcript.reported) && noCards);
       // The message is the final answer only: the last model call's text. Without it, a short closing line.
       const written = silent
         ? ""
@@ -2613,6 +2621,10 @@ function createBrain(
 export const COMPUTER_REACT_NOTE =
   "# Reacting\nWhen you call the agentes `react` tool, the reaction is your whole answer: end your turn right after it with an empty final reply (no text, no emoji, no confirmation that you reacted).";
 
+/** For computer brains: a GIF or a sticker through the bridge is posted at once (`tools`: the ones it has). */
+export const computerMediaNote = (tools: string[]) =>
+  `# GIFs and stickers\nWhen you call the agentes ${tools.map((t) => `\`${t}\``).join(" or ")} tool, it is posted at once as a message of its own: unless you have something to add, end your turn right after it with an empty final reply (no confirmation that you sent it).`;
+
 /**
  * The turn as every brain receives it. The text view of the conversation is
  * computed only when a brain reads it (the model brain reads the exact
@@ -2645,8 +2657,15 @@ function brainTurnOf(
         .join("\n\n");
       // A computer brain has its own tools (read, search, shell, git) besides ours.
       const computer = forComputerBrain(text);
-      // It also sees `react` as an MCP tool and tends to echo the emoji as its final text.
-      return tools.some((d) => d.name === REACT_TOOL) ? `${computer}\n\n${COMPUTER_REACT_NOTE}` : computer;
+      // It also sees `react` as an MCP tool and tends to echo the emoji as its final text; a GIF or a sticker, too.
+      const media = tools.filter((d) => MEDIA_TOOLS.has(d.name)).map((d) => d.name);
+      return [
+        computer,
+        tools.some((d) => d.name === REACT_TOOL) ? COMPUTER_REACT_NOTE : "",
+        media.length > 0 ? computerMediaNote(media) : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
     },
     get thisTurn() {
       return plan.kind === "model" ? undefined : thisTurnText(t.system, new Date(), options) || undefined;

@@ -125,6 +125,8 @@ export interface NotificationSource {
 export interface NotificationLatest {
   /** Snippet of the latest message, comment, question or summary (plain text, ≤ 280 chars); an approval's why. */
   text?: string;
+  /** A message with only a GIF or a sticker (ADR 0091): which one, so the apps say it in the person's language. */
+  media?: "gif" | "sticker";
   title?: string;
   emojis?: string[];
   quote?: string;

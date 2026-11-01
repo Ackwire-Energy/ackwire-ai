@@ -33,6 +33,7 @@ export type SettingsSection =
   | "general"
   | "members"
   | "audit"
+  | "media"
   | "access"
   | "connectors"
   | "skills"
@@ -61,6 +62,8 @@ export const SETTINGS_SECTIONS: readonly SettingsEntry[] = [
   { id: "members", group: "org", icon: "members", href: "/me/members", allowed: (o) => can(o, "read") },
   // What agents did and people changed: who may see the audit (it shows everyone's work).
   { id: "audit", group: "org", icon: "shield", href: "/settings/audit", allowed: (o) => can(o, "view_audit") },
+  // GIFs and stickers in chat (ADR 0091): everyone reads them, who configures the workspace changes them.
+  { id: "media", group: "org", icon: "sticker", href: "/settings/media", allowed: () => true },
   { id: "access", group: "agents", icon: "agent", href: "/settings/access", allowed: (o) => can(o, "manage_agents") },
   { id: "connectors", group: "agents", icon: "bolt", href: "/connectors", allowed: () => true },
   { id: "skills", group: "agents", icon: "sparkle", href: "/settings/skills", allowed: (o) => can(o, "manage_agents") },

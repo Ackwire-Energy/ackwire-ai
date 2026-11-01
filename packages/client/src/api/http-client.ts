@@ -70,6 +70,8 @@ import type {
   ForumSuggestion,
   ForumTopic,
   ForumTopicDetail,
+  GifKey,
+  GifPage,
   GitHubAppInstallation,
   GitHubRepositories,
   Health,
@@ -327,6 +329,18 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     desktop: {
       status: (orgId, agentId) => request<DesktopStatus>(`${org(orgId)}/agents/${enc(agentId)}/desktop`),
     },
+    gifs: {
+      search: (orgId, query) =>
+        request<GifPage>(`${org(orgId)}/gifs`, {
+          query: {
+            q: query.q?.trim() || undefined,
+            category: query.category ?? undefined,
+            offset: query.offset || undefined,
+            limit: query.limit,
+            lang: query.lang,
+          },
+        }),
+    },
     reminders: {
       create: (orgId, input) => request<Reminder>(`${org(orgId)}/reminders`, { json: input }),
       list: async (orgId) => (await request<{ reminders: Reminder[] }>(`${org(orgId)}/reminders`)).reminders,
@@ -350,6 +364,9 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       saveJev: (apiKey) => request<JevKey>("/api/app/jev", { method: "PUT", json: { apiKey } }),
       checkJev: () => request<JevKey>("/api/app/jev/check", { method: "POST" }),
       removeJev: () => request<JevKey>("/api/app/jev", { method: "DELETE" }),
+      gifKey: () => nullOn(404, () => request<GifKey>("/api/app/gif-key")),
+      saveGifKey: (apiKey) => request<GifKey>("/api/app/gif-key", { method: "PUT", json: { apiKey } }),
+      removeGifKey: () => request<GifKey>("/api/app/gif-key", { method: "DELETE" }),
     },
     account: {
       authConfig: () => request<AuthConfig>("/api/app/auth-config"),

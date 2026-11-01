@@ -5553,6 +5553,78 @@ export const ptBR = {
       symbols: "Símbolos",
     },
   },
+  /** GIFs and the agents' stickers in chat (ADR 0091). */
+  media: {
+    /** What stands for a message's GIF or sticker where its text would show (lists, quotes, the inbox). */
+    word: { gif: "GIF", sticker: "Figurinha" },
+    /** The small mark on a GIF in a message. */
+    gifMark: "GIF",
+    /** Where GIFs come from (the provider's name, as it writes it). */
+    giphy: "GIPHY",
+    gifTitled: "GIF: {{title}}",
+    stickerOf: "Figurinha {{of}} {{name}}: {{mood}}",
+    moods: {
+      celebrate: "comemorando",
+      love: "amei",
+      deal: "fechado",
+      thinking: "pensando",
+      wow: "uau",
+      dizzy: "zonzo",
+    },
+    /** More words a search finds each mood by. */
+    moodWords: {
+      celebrate: "festa parabéns comemorar deploy subiu viva",
+      love: "obrigado obrigada valeu amor coração adorei",
+      deal: "ok fechado combinado sim beleza certo",
+      thinking: "hmm dúvida será pensar",
+      wow: "nossa surpresa caramba incrível",
+      dizzy: "cansado sexta socorro ops tonto",
+    },
+    picker: {
+      /** The composer's button and the picker it opens. */
+      button: "Emojis, GIFs e figurinhas",
+      /** The phone composer's button (emojis stay on the system keyboard there). */
+      send: "Mandar GIF ou figurinha",
+      tabs: "O que mandar",
+      gifs: "GIFs",
+      stickers: "Figurinhas",
+    },
+    gifs: {
+      search: "Buscar GIFs",
+      clear: "Limpar busca",
+      categoriesLabel: "Categorias",
+      previous: "Categorias anteriores",
+      next: "Mais categorias",
+      trending: "Em alta",
+      results: "GIFs",
+      loading: "Carregando GIFs",
+      empty: "Nenhum GIF encontrado. Tente outra palavra.",
+      error: "Não deu para buscar GIFs agora.",
+      retry: "Tentar de novo",
+      /** The provider's credit, under the results. */
+      attribution: "GIFs do GIPHY",
+      hint: "Um clique envia",
+      categories: {
+        celebrate: "Comemorar",
+        thanks: "Obrigado",
+        ok: "Ok",
+        applause: "Aplausos",
+        wow: "Uau",
+        coffee: "Café",
+        good_morning: "Bom dia",
+        bye: "Até amanhã",
+        friday: "Sexta",
+        oops: "Ops",
+        thinking: "Pensando",
+      },
+    },
+    stickers: {
+      search: "Buscar figurinhas",
+      clear: "Limpar busca",
+      empty: "Nenhuma figurinha encontrada.",
+      foot: "Feitas do visual de cada agente",
+    },
+  },
   memoryMark: {
     label: "{{name}} guardou isso na memória: {{text}}",
     saved: "{{name}} guardou isso:",
@@ -7854,6 +7926,13 @@ export const ptBR = {
     downloadOnly: "Sem prévia para este tipo de arquivo. Baixe para abrir.",
   },
   errors: {
+    /** GIFs and stickers (ADR 0091). */
+    media: {
+      off: "GIFs e figurinhas estão desligados neste workspace.",
+      notFound: "Esse GIF não está mais disponível. Escolha outro.",
+      gifsOff: "Os GIFs estão desligados neste workspace.",
+      gifsUnavailable: "A busca de GIFs não respondeu agora. Tente de novo daqui a pouco.",
+    },
     role: {
       nameRequired: "O papel precisa de um nome.",
       nameLong: "No máximo {{max}} letras.",
@@ -8468,6 +8547,7 @@ export const ptBR = {
       audit: "Auditoria",
       import: "Importar e exportar",
       billing: "Plano e cobrança",
+      media: "GIFs e figurinhas",
     },
     sectionText: {
       account: "Seu perfil e como o app fica para você.",
@@ -8484,6 +8564,7 @@ export const ptBR = {
       audit: "O que os agentes fizeram fora da conversa e o que as pessoas mudaram. Só admins veem.",
       import: "Traga agentes de outro app ou de outro workspace, e leve este para onde quiser.",
       billing: "O plano do agentes.chat deste workspace, o cartão e as faturas ficam numa página nossa, fora do app.",
+      media: "O que dá para mandar na conversa, e quando os agentes mandam um GIF ou uma figurinha.",
     },
     title: "Configurações",
     account: {
@@ -8608,6 +8689,54 @@ export const ptBR = {
     usageCalls_one: "{{count}} chamada",
     usageCalls_other: "{{count}} chamadas",
     usageHidden: "Só admins veem o uso do workspace.",
+    /** Configurações › GIFs e figurinhas (ADR 0091). */
+    media: {
+      chatTitle: "Na conversa",
+      gifs: "GIFs",
+      gifsHelp: "Busca de GIFs no seletor. Desligado, a aba some para todos.",
+      gifsUnavailable: "A busca de GIFs ainda não está disponível aqui.",
+      rating: "Quais GIFs aparecem",
+      ratingHelp: "Para qualquer idade é o mais seguro no trabalho.",
+      ratings: { g: "Qualquer idade", pg: "Até 13 anos" },
+      stickers: "Figurinhas dos agentes",
+      stickersHelp: "Feitas do visual de cada agente, sem upload.",
+      agentsTitle: "Agentes",
+      level: "Agentes mandam por conta própria",
+      levelHelp: "Só em conversa leve. Se alguém pedir, mandam mesmo em Nunca.",
+      levelUnavailable: "Ainda não disponível aqui.",
+      levels: { never: "Nunca", sometimes: "Às vezes", often: "Bastante" },
+      agentOn: "{{name}} manda GIFs e figurinhas",
+      agentsNever: "Com Nunca, nenhum agente manda por conta própria. Quando alguém pede, os ligados aqui mandam.",
+      noAgents: "Nenhum agente no workspace ainda.",
+      /** The installation's GIPHY key, for its owner on a server that isn't agentes.chat's own (ADR 0091). */
+      giphy: {
+        title: "Chave do GIPHY",
+        lead: "Com ela, as pessoas mandam GIFs em todos os workspaces deste servidor.",
+        without: "A chave é grátis no GIPHY Developers. Sem ela, os agentes mandam só as próprias figurinhas.",
+        setUp: "Adicionar a chave",
+        steps: {
+          app: "Crie um app no GIPHY Developers",
+          appHint: "É grátis: escolha API e copie a chave do app.",
+          openSite: "Abrir o GIPHY Developers",
+          paste: "Cole a chave aqui",
+          placeholder: "A sua chave do GIPHY",
+          sealed: "Cifrada neste servidor. Nunca mais aparece.",
+        },
+        state: { off: "Desligado", on: "Ligado", invalid: "Chave inválida" },
+        line: {
+          invalid: "Este servidor não consegue ler esta chave. Cole a chave de novo.",
+          env: "Definida nas configurações deste servidor (GIPHY_API_KEY).",
+          envInvalid: "Esta chave não serve. Troque nas configurações deste servidor (GIPHY_API_KEY).",
+        },
+        invalid: "O GIPHY não aceitou esta chave. Copie de novo no GIPHY Developers.",
+        remove: {
+          title: "Remover a chave do GIPHY?",
+          text: "Os GIFs somem do seletor em todos os workspaces deste servidor. As figurinhas continuam.",
+        },
+        jev: "Os agentes só mandam figurinhas por conta própria com o Jev.",
+        jevLink: "Configurar o Jev",
+      },
+    },
   },
   usageViews: {
     and: " e ",
@@ -8870,6 +8999,8 @@ export const ptBR = {
         schedulingEvent: "Marcou na agenda",
         askingQuestion: "Fez uma pergunta",
         reacting: "Reagiu à mensagem",
+        sendingGif: "Mandou um GIF",
+        sendingSticker: "Mandou uma figurinha",
         openingSkill: "Abriu a skill {{app}}",
         consultingSkill: "Consultou uma skill",
         runningCode: "Rodou código no PC",
@@ -8948,6 +9079,8 @@ export const ptBR = {
       schedulingEvent: "marcando na agenda",
       askingQuestion: "preparando uma pergunta",
       reacting: "reagindo",
+      sendingGif: "mandando um GIF",
+      sendingSticker: "mandando uma figurinha",
       openingSkill: "abrindo a skill {{app}}",
       consultingSkill: "consultando uma skill",
       runningCode: "rodando código",

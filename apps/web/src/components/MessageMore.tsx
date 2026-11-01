@@ -21,6 +21,8 @@ export function MessageMoreMenu({ message, channelName }: { message: Message; ch
   const toast = useToast();
   const actions = useChannelActions();
   const [saving, setSaving] = useState(false);
+  // Only a GIF, a sticker or files (ADR 0091): no words to save, as in the right-click menu.
+  const words = message.body.trim() !== "";
   return (
     <>
       <Menu
@@ -28,9 +30,11 @@ export function MessageMoreMenu({ message, channelName }: { message: Message; ch
         label={t("channel.more")}
         trigger={<Button variant="ghost" size="sm" iconOnly icon="more" aria-label={t("channel.more")} />}
       >
-        <MenuItem icon="book" onSelect={() => setSaving(true)}>
-          {t("wiki.save")}
-        </MenuItem>
+        {words && (
+          <MenuItem icon="book" onSelect={() => setSaving(true)}>
+            {t("wiki.save")}
+          </MenuItem>
+        )}
         <MenuItem
           icon="link"
           onSelect={async () => {

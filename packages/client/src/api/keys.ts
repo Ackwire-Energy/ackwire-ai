@@ -6,6 +6,8 @@ export const keys = {
   instance: ["instance"] as const,
   telemetry: ["telemetry"] as const,
   jev: ["jev"] as const,
+  /** The installation's GIPHY key (ADR 0091), not a workspace's: it stays when switching organizations. */
+  gifKey: ["gif-key"] as const,
   authConfig: ["auth-config"] as const,
   me: ["me"] as const,
   accountDeletion: ["account-deletion"] as const,
@@ -167,6 +169,11 @@ export const keys = {
   wikiGraph: (orgId: string) => ["org", orgId, "wiki", "graph"] as const,
   wikiReads: (orgId: string) => ["org", orgId, "wiki", "reads"] as const,
   pins: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "pins"] as const,
+  /** Every GIF search (prefix): the workspace's rating or its GIFs switch changing refreshes them all (ADR 0091). */
+  gifs: (orgId: string) => ["org", orgId, "gifs"] as const,
+  /** One search's pages: free text or a category (neither: what is trending), in the person's language. */
+  gifSearch: (orgId: string, q: string, category: string | null, lang: string) =>
+    ["org", orgId, "gifs", q, category ?? "", lang] as const,
   working: (orgId: string) => ["org", orgId, "working"] as const,
   reminders: (orgId: string) => ["org", orgId, "reminders"] as const,
   /** Every mailbox read (prefix). */

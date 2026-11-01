@@ -29,6 +29,8 @@ import type {
   Credential,
   Edition,
   FormerAgent,
+  Gif,
+  GifKey,
   GitHubAppInstallation,
   GitHubRepositories,
   HttpApi,
@@ -227,6 +229,15 @@ export interface FakeState {
   actionCheck?: boolean;
   /** Automático's models per provider and tier (Settings › Chaves); none when unset. */
   autoModels?: OrgSettings["autoModels"];
+  /**
+   * Configurações › GIFs e figurinhas (ADR 0091); unset: GIFs on at any age, stickers on, agents now and then, and a
+   * server that has GIF search and decides when agents send one.
+   */
+  media?: Partial<Pick<OrgSettings, MediaSetting>>;
+  /** What `gifs.search` finds (trending and any search alike, by title); unset: `FAKE_GIFS`. */
+  gifResults?: Gif[];
+  /** Make `gifs.search` fail with this error (`gifs.off`…). */
+  gifsError?: ApiError;
   /** What agents did outside (search kind `action`), as the search returns it. */
   teamActions?: SearchHit[];
   /** My inbox (`notifications.*`); empty unless a test fills it. */
@@ -262,6 +273,13 @@ export interface FakeState {
    * `rate_limited`: the server's limit answers the first try (429), and the next one goes through.
    */
   jevVerdicts?: Record<string, "invalid" | "no_credit" | "rate_limited">;
+  /**
+   * `system.gifKey`: the installation's GIPHY key (ADR 0091); unset = I'm not its owner on a self-hosted server
+   * (null). Saving one makes GIFs available here (`media.gifsAvailable`), removing it takes them away.
+   */
+  gifKey?: GifKey;
+  /** The keys GIPHY refuses when `system.saveGifKey` checks them (422, nothing kept); any other works. */
+  gifKeyRefused?: string[];
   /** Where the server keeps files itself (`storage.get`'s `platform`); unset = its disk, no folder. */
   storagePlatform?: StoragePlatform;
   /** What the workspace's files take (`storage.get`'s `usage`); unset = none yet, no disk told. */
@@ -449,6 +467,27 @@ export const OPENROUTER_KEY: Credential = {
   createdAt: "2026-10-30T12:00:00.000Z",
   revokedAt: null,
 };
+
+type MediaSetting = "gifs" | "gifRating" | "agentStickers" | "agentMedia" | "gifsAvailable" | "agentMediaAvailable";
+
+/** What the fake GIF search finds (ADR 0091): three GIFs of their own proportions. */
+export const FAKE_GIFS: Gif[] = [
+  { id: "gif-party", title: "party cat", width: 480, height: 360 },
+  { id: "gif-thanks", title: "thank you", width: 480, height: 480 },
+  { id: "gif-coffee", title: "coffee time", width: 360, height: 480 },
+];
+
+/** The GIFs and stickers settings as the server sends them (defaults: everything on and available). */
+function mediaSettings(state: FakeState): Pick<OrgSettings, MediaSetting> {
+  return {
+    gifs: state.media?.gifs ?? true,
+    gifRating: state.media?.gifRating ?? "g",
+    agentStickers: state.media?.agentStickers ?? true,
+    agentMedia: state.media?.agentMedia ?? "sometimes",
+    gifsAvailable: state.media?.gifsAvailable ?? true,
+    agentMediaAvailable: state.media?.agentMediaAvailable ?? true,
+  };
+}
 
 /** A small in-memory backend with the design's demo data ("Acme"). */
 export function seedState(overrides: Partial<FakeState> = {}): FakeState {
@@ -1072,6 +1111,24 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.jev = { ...state.jev, source: null, hint: null, state: "off" };
         return state.jev;
       },
+      gifKey: async () => state.gifKey ?? null,
+      saveGifKey: async (apiKey) => {
+        log("system.saveGifKey", apiKey);
+        if (!state.gifKey) throw new ApiError(404, "not_found", "Not found");
+        if (state.gifKeyRefused?.includes(apiKey)) {
+          throw new ApiError(422, "gif_key_invalid", "GIPHY didn't accept this key.");
+        }
+        state.gifKey = { source: "settings", hint: apiKey.slice(-4), state: "ok" };
+        state.media = { ...state.media, gifsAvailable: true };
+        return state.gifKey;
+      },
+      removeGifKey: async () => {
+        log("system.removeGifKey");
+        if (!state.gifKey) throw new ApiError(404, "not_found", "Not found");
+        state.gifKey = { source: null, hint: null, state: "off" };
+        state.media = { ...state.media, gifsAvailable: false };
+        return state.gifKey;
+      },
     },
     account: {
       authConfig: async () => ({
@@ -1367,6 +1424,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         timezone: "America/Sao_Paulo",
         actionCheck: state.actionCheck ?? true,
         autoModels: state.autoModels ?? {},
+        ...mediaSettings(state),
         // Money: admins only, like the backend.
         ...(seesCost() ? { defaultAgentBudgetUsd: state.defaultAgentBudgetUsd ?? 50 } : {}),
       }),
@@ -1376,6 +1434,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (input.defaultCredentialId !== undefined) state.defaultCredentialId = input.defaultCredentialId;
         if (input.defaultAgentBudgetUsd !== undefined) state.defaultAgentBudgetUsd = input.defaultAgentBudgetUsd;
         if (input.actionCheck !== undefined) state.actionCheck = input.actionCheck;
+        const { gifs, gifRating, agentStickers, agentMedia } = input;
+        state.media = {
+          ...state.media,
+          ...(gifs !== undefined ? { gifs } : {}),
+          ...(gifRating !== undefined ? { gifRating } : {}),
+          ...(agentStickers !== undefined ? { agentStickers } : {}),
+          ...(agentMedia !== undefined ? { agentMedia } : {}),
+        };
         for (const [provider, tiers] of Object.entries(input.autoModels ?? {})) {
           const next = { ...state.autoModels?.[provider] };
           for (const [tier, model] of Object.entries(tiers ?? {}) as [ModelTier, string | null][]) {
@@ -1393,6 +1459,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           timezone: input.timezone ?? "America/Sao_Paulo",
           actionCheck: state.actionCheck ?? true,
           autoModels: state.autoModels ?? {},
+          ...mediaSettings(state),
         };
       },
       overview: async () => ({
@@ -2157,6 +2224,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           };
         }
         if (input.attachments?.length) meta.artifacts = input.attachments.map((a) => ({ id: a, version: 1 }));
+        // Like the server (ADR 0091): a GIF looked up again (its size and title are the provider's), a sticker as sent.
+        const media = input.media;
+        if (media?.kind === "gif") {
+          const gif = (state.gifResults ?? FAKE_GIFS).find((g) => g.id === media.id);
+          if (!gif) throw new ApiError(422, "message.media_not_found", "That GIF isn't available");
+          meta.media = { kind: "gif", provider: "giphy", ...gif };
+        } else if (media?.kind === "sticker") meta.media = { ...media };
         const message: Message = {
           id: input.clientId ? `srv-${input.clientId}` : id("msg"),
           channelId,
@@ -2177,6 +2251,24 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         // Like the server: a reply from the thread panel marks when "Responder" opened the thread.
         if (input.openThread && input.threadId) await state.openThread?.(orgId, input.threadId, message.createdAt);
         return message;
+      },
+    },
+    // GIF search (ADR 0091): titles that hold the words, a page at a time; `gifs.off` like the server's.
+    gifs: {
+      search: async (orgId, query) => {
+        log("gifs.search", orgId, query);
+        if (state.gifsError) throw state.gifsError;
+        const media = mediaSettings(state);
+        if (!media.gifsAvailable || !media.gifs) throw new ApiError(404, "gifs.off", "GIFs are off");
+        const words = query.q?.trim().toLowerCase();
+        const all = state.gifResults ?? FAKE_GIFS;
+        const found = words ? all.filter((g) => g.title.toLowerCase().includes(words)) : all;
+        const offset = query.offset ?? 0;
+        const limit = query.limit ?? 24;
+        return {
+          gifs: structuredClone(found.slice(offset, offset + limit)),
+          next: offset + limit < found.length ? offset + limit : null,
+        };
       },
     },
     approvals: {

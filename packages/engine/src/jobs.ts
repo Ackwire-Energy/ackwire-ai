@@ -1,5 +1,6 @@
 import type {
   EmailSender,
+  GifProvider,
   MailAdapters,
   Presence,
   PushSender,
@@ -8,6 +9,7 @@ import type {
   WebPushSender,
 } from "@agenteschat/adapters";
 import { and, count, eq, inArray, queryTrace, schema } from "@agenteschat/db";
+import { AGENT_MEDIA_JOB, enqueueAgentMedia, maybeSendAgentMedia } from "./agent-media";
 import { aiConnectIntent, type ConnectIntent } from "./ai-intent";
 import { orgHasAi } from "./ai-status";
 import type { ArtifactDeps } from "./artifacts";
@@ -39,6 +41,7 @@ import {
   type TaskCall,
   wakeConversationForTask,
 } from "./machine-tasks";
+import { isMediaAfterReply, isMediaOnly } from "./media";
 import { getMessage, referencedOf } from "./messages";
 import { checkMissionDone } from "./mission-delivery";
 import { onMissionTaskEnded, syncMissionFiles } from "./mission-sync";
@@ -102,6 +105,8 @@ export interface JobDeps extends RunExecutorDeps {
   webPush?: WebPushSender | null;
   /** Who has the app open: pushes not waiting on them hold a little (ADR 0071 §7); absent = never held. */
   presence?: Presence | null;
+  /** GIF search (ADR 0091): an agent's GIF after its reply (job `agents.media`); absent = its own stickers only. */
+  gifs?: GifProvider | null;
   /** Org storage (job `storage.migrate`). */
   storage?: StorageDeps;
   /** Connectors: job `org.delete` revokes a workspace's GitHub OAuth grants at GitHub before its rows go. */
@@ -327,6 +332,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (message.meta.issueWork || message.meta.issueWorkStart || message.meta.issueTaken) return;
       // A fast reply while the task works (talker.ts): its task reads it; it starts nobody, not even by mention.
       if (message.meta.talker) return;
+      // A GIF or a sticker alone (ADR 0091), an agent's silent one after its reply too: it starts nobody, routes
+      // to nobody and gets no sticker after it. Its insert queues no `message.posted`; one delivered anyway does
+      // nothing.
+      if (isMediaAfterReply(message.meta) || isMediaOnly(message)) return;
       // A routine's trigger: its background run is already started; nobody else is routed (routines.ts).
       if (message.meta.background) return;
       const routed = (
@@ -397,13 +406,15 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
           return;
         }
         // No mention: another agent may chime in when it clearly should (ADR 0034). Only in
-        // channels, never in a mission's thread (the mission's own turns run it).
-        if (!routing || where?.kind !== "channel") return;
+        // channels, never in a mission's thread (the mission's own turns run it). Once that is settled, a
+        // light reply may get the agent's sticker or a GIF after it (ADR 0091): judged in a job of its own.
+        if (!routing || where?.kind !== "channel") return enqueueAgentMedia(deps.db, message, where);
         if (message.threadId && (await missionOfThread(deps.db, message.orgId, message.threadId))) return;
         const res = await routeMessage(routing, input);
         // Receipts only when someone answers: an agent's message isn't waiting for anyone.
         if (res.runs.length > 0)
           await routed("router", res.seenBy ?? [], res.runs, res.reason, undefined, res.decidedBy);
+        await enqueueAgentMedia(deps.db, message, where);
         return;
       }
       if (message.mentionedAgentIds.length > 0) {
@@ -622,6 +633,14 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     // A request to join through an invitation link, filed apart from the ask's reply (ADR 0068).
     [FILE_JOIN_REQUEST_JOB]: async (job) => {
       await fileJoinRequest({ db: deps.db, pubsub: deps.pubsub }, job.payload);
+    },
+    // An agent's reply may get its sticker or a GIF after it (ADR 0091): free checks, then one calibrated judgment.
+    // A slow, failing or keyless judgment sends nothing and fails nothing.
+    [AGENT_MEDIA_JOB]: async (job) => {
+      await maybeSendAgentMedia(
+        { db: deps.db, pubsub: deps.pubsub, judge: deps.context?.judge ?? null, gifs: deps.gifs ?? null },
+        { orgId: orgOf(job), messageId: String(job.payload.messageId) },
+      );
     },
     // In-app notifications of a message: mentions, thread replies, DMs.
     "notifications.message": async (job) => {
