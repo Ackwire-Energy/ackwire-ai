@@ -59,6 +59,7 @@ import {
 } from "@/lib/import";
 import { frontmatter } from "@/lib/import/shared";
 import {
+  agentsArrived,
   applyInChunks,
   blockedItems,
   bundleOrigin,
@@ -182,6 +183,8 @@ export function useImportFlow(orgId: string | null) {
   const last = useRef<ReadInput | null>(null);
   const focus = useRef<Focus>(null);
   const agentIds = useRef(new Map<string, string>());
+  // Agents whose files were sent to the Drive, so a later apply (a retry) sends only those it brought.
+  const sent = useRef(new Set<string>());
 
   const read = async (input: ReadInput) => {
     if (!orgId) return;
@@ -222,6 +225,7 @@ export function useImportFlow(orgId: string | null) {
       if (!current()) return;
       done.current = new Map();
       agentIds.current = new Map();
+      sent.current = new Set();
       focus.current = "preview";
       setPlanned({ bundle, items: plan.items, skipped, files: parsed.files });
       setPick(new Set(plan.items.filter(choosable).map(itemId)));
@@ -261,7 +265,7 @@ export function useImportFlow(orgId: string | null) {
       ? {
           copied: before.copied + now.copied,
           folders: new Map([...before.folders, ...now.folders]),
-          left: [...before.left.filter((l) => l.why !== "failed"), ...now.left],
+          left: [...before.left, ...now.left],
         }
       : now;
     setCopy({ done: total, total, running: false, result });
@@ -298,13 +302,12 @@ export function useImportFlow(orgId: string | null) {
       );
       focus.current = "report";
       setReport(items);
-      // The agents here now: made by this import, or by an earlier one (the plan has those).
-      const first = agentIds.current.size === 0;
-      for (const i of [...planned.items, ...items]) {
-        if (i.kind === "agent" && i.targetId && i.action !== "skip") agentIds.current.set(i.key, i.targetId);
-      }
-      if (first && copyFiles && planned.files.some((f) => agentIds.current.has(f.agent))) {
-        void copyToDrive(planned.files, planned.bundle);
+      const arrived = agentsArrived(planned.items, items, pick, sent.current);
+      for (const [key, id] of arrived) agentIds.current.set(key, id);
+      const theirs = planned.files.filter((f) => arrived.has(f.agent));
+      if (copyFiles && theirs.length > 0) {
+        for (const key of arrived.keys()) sent.current.add(key);
+        void copyToDrive(theirs, planned.bundle, copy?.result ?? null);
       }
       return items;
     } finally {
@@ -357,13 +360,15 @@ export function useImportFlow(orgId: string | null) {
       const before = copy?.result;
       if (!planned || !before || copy?.running) return;
       const failed = before.left.filter((l) => l.why === "failed").map((l) => l.file);
-      if (failed.length) void copyToDrive(failed, planned.bundle, before);
+      const rest = { ...before, left: before.left.filter((l) => l.why !== "failed") };
+      if (failed.length) void copyToDrive(failed, planned.bundle, rest);
     },
     reset: () => {
       setTouched(true);
       run.current++;
       done.current = new Map();
       agentIds.current = new Map();
+      sent.current = new Set();
       focus.current = "drop";
       setBusy(null);
       setFailure(null);

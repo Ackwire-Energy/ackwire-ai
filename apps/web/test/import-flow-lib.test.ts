@@ -10,6 +10,7 @@ import type {
 import { ApiError } from "@agenteschat/client";
 import { type AgentFile, ImportError } from "@/lib/import";
 import {
+  agentsArrived,
   applyInChunks,
   blockedItems,
   bundleOrigin,
@@ -345,6 +346,42 @@ describe("the agents' files to the Drive", () => {
       expect(sent.some((x) => x.path === path) !== (why[path] === "storage_full")).toBe(true);
     }
     expect(why["f.md"]).toBe("storage_full");
+  });
+
+  test("files go for the agents the preview shows coming, each once: never an unchecked update, a failed one on the next try", () => {
+    const agent = (key: string, action: ImportItemResult["action"], targetId?: string): ImportItemResult => ({
+      kind: "agent",
+      key,
+      label: key,
+      action,
+      ...(targetId ? { targetId } : {}),
+    });
+    const planned = [
+      agent("scout", "update", "id-scout"),
+      agent("closer", "create"),
+      agent("pinch", "create"),
+      agent("ana", "unchanged", "id-ana"),
+    ];
+    const pick = new Set(["agent:closer", "agent:pinch"]);
+    // Scout's update unchecked; Pinch failed this time.
+    const first = agentsArrived(
+      planned,
+      [agent("closer", "create", "id-closer"), agent("pinch", "skip")],
+      pick,
+      new Set(),
+    );
+    expect([...first]).toEqual([
+      ["closer", "id-closer"],
+      ["ana", "id-ana"],
+    ]);
+    // Tentar de novo: Pinch arrives, the others were sent already.
+    const again = agentsArrived(
+      planned,
+      [agent("closer", "unchanged", "id-closer"), agent("pinch", "create", "id-pinch")],
+      pick,
+      new Set(first.keys()),
+    );
+    expect([...again]).toEqual([["pinch", "id-pinch"]]);
   });
 
   test("each agent keeps one line about where its files are", () => {

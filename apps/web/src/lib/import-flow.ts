@@ -313,6 +313,27 @@ export async function copyAgentFiles(
   return out;
 }
 
+/**
+ * The agents whose files go to the Drive after an apply (key → id): here now, as the preview shows them coming
+ * (already here unchanged, or checked and applied, not skipped), and not sent by an earlier apply. An unchecked
+ * update, or an agent whose apply failed, waits for the next apply that brings it.
+ */
+export function agentsArrived(
+  planned: readonly ImportItemResult[],
+  applied: readonly ImportItemResult[],
+  pick: ReadonlySet<string>,
+  sent: ReadonlySet<string>,
+): Map<string, string> {
+  const results = new Map(applied.map((i) => [itemId(i), i]));
+  const out = new Map<string, string>();
+  for (const item of planned) {
+    if (item.kind !== "agent" || sent.has(item.key)) continue;
+    const now = item.action === "unchanged" ? item : pick.has(itemId(item)) ? results.get(itemId(item)) : undefined;
+    if (now?.targetId && now.action !== "skip") out.set(item.key, now.targetId);
+  }
+  return out;
+}
+
 /** The line each agent keeps in its memory about where its files are: a note the import brings (once). */
 export const filesNotes = (folders: ReadonlyMap<string, string>, line: (folder: string) => string): BundleNote[] =>
   [...folders].map(([agent, folder]) => ({
