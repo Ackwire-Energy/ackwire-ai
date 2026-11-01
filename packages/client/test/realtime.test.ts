@@ -172,6 +172,77 @@ describe("RealtimeConnection", () => {
     expect(got).toEqual([event]);
   });
 
+  test("a channel the server drops or refuses on a live socket is asked for again and caught up", () => {
+    const { factory, sockets } = fakeSockets();
+    const clock = manualTimers();
+    const conn = new RealtimeConnection({
+      url: "ws://x",
+      createSocket: factory,
+      timers: clock.timers,
+      pingMs: 0,
+      backoffMs: [100, 200],
+    });
+    const live: string[] = [];
+    conn.onSubscribed((channelId) => live.push(channelId));
+    const got: unknown[] = [];
+    conn.subscribe("c1", (e) => got.push(e));
+    conn.subscribe("c2", () => {});
+    conn.start();
+    const socket = sockets[0];
+    if (!socket) throw new Error("no socket");
+    socket.open();
+    socket.push({ type: "subscribed", channelId: "c1" });
+    socket.push({ type: "subscribed", channelId: "c2" });
+    socket.sent.length = 0;
+    // Dropped server-side (after a membership recheck): the socket stays up, the channel goes silent.
+    socket.push({ type: "unsubscribed", channelId: "c1", reason: "revoked" });
+    expect(clock.pending.map((p) => p.ms)).toEqual([100]);
+    clock.runNext();
+    expect(socket.sent).toEqual([{ type: "subscribe", channelId: "c1" }]);
+    // Refused once, then allowed.
+    socket.push({ type: "error", code: "forbidden", channelId: "c1" });
+    expect(clock.pending.map((p) => p.ms)).toEqual([200]);
+    clock.runNext();
+    socket.push({ type: "subscribed", channelId: "c1" });
+    expect(live).toEqual(["c1", "c2", "c1"]);
+    const event = { type: "agent.thinking", channelId: "c1", threadId: null, agentId: "a", runId: "r" };
+    socket.push({ type: "event", channelId: "c1", event });
+    expect(got).toEqual([event]);
+    // A real refusal stops after the last backoff step.
+    socket.push({ type: "unsubscribed", channelId: "c1", reason: "archived" });
+    clock.runNext();
+    socket.push({ type: "error", code: "forbidden", channelId: "c1" });
+    clock.runNext();
+    socket.push({ type: "error", code: "forbidden", channelId: "c1" });
+    expect(clock.pending).toEqual([]);
+    // No listener left: nothing to ask for.
+    socket.push({ type: "unsubscribed", channelId: "gone" });
+    expect(clock.pending).toEqual([]);
+  });
+
+  test("a subscribe refused by the rate limit (no channel id) is sent again for the channels not confirmed", () => {
+    const { factory, sockets } = fakeSockets();
+    const clock = manualTimers();
+    const conn = new RealtimeConnection({
+      url: "ws://x",
+      createSocket: factory,
+      timers: clock.timers,
+      pingMs: 0,
+      backoffMs: [100],
+    });
+    conn.subscribe("c1", () => {});
+    conn.subscribe("c2", () => {});
+    conn.start();
+    const socket = sockets[0];
+    if (!socket) throw new Error("no socket");
+    socket.open();
+    socket.push({ type: "subscribed", channelId: "c1" });
+    socket.push({ type: "error", code: "rate_limited" });
+    socket.sent.length = 0;
+    clock.runNext();
+    expect(socket.sent).toEqual([{ type: "subscribe", channelId: "c2" }]);
+  });
+
   test("stop closes the socket and never reconnects", () => {
     const { factory, last } = fakeSockets();
     const clock = manualTimers();
