@@ -260,6 +260,7 @@ scenario("S37", "a mention of an agent outside the conversation is not lost: the
   const w = await world({
     agents: ["ada", "nina"],
     dmWith: "ada",
+    judge: { followThrough: (s) => (s.unreached ? "continue" : "done") },
     script: {
       ada: [
         { text: "@nina revisa o PR #227" },
@@ -274,6 +275,21 @@ scenario("S37", "a mention of an agent outside the conversation is not lost: the
   await w.settle();
   expect(await w.runs("nina")).toHaveLength(1);
   expect((await w.posts("ada")).at(-1)?.body).toContain("aprovou");
+  await assertInvariants(w);
+});
+
+scenario("S48", "an agent outside the conversation only named in an answer costs no extra turn", async () => {
+  const w = await world({
+    agents: ["otto", "vera"],
+    dmWith: "otto",
+    judge: { followThrough: (s) => (String(s.reply).includes("Quem cuida") && s.unreached ? "done" : "continue") },
+    script: { otto: [{ text: "Quem cuida do deploy é a @vera." }] },
+  });
+  await w.say("quem cuida do deploy?");
+  await w.settle();
+  expect((await w.posts("otto")).map((m) => m.body)).toEqual(["Quem cuida do deploy é a @vera."]);
+  expect(w.f.provider.calls.filter((c) => !c.request.outputSchema)).toHaveLength(1);
+  expect(await w.runs("vera")).toHaveLength(0);
   await assertInvariants(w);
 });
 

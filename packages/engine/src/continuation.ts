@@ -59,6 +59,8 @@ export async function continuationVerdict(
     reply: string;
     did: string[];
     runKind: TurnKind;
+    /** Agents its reply @named that aren't in the conversation (`unreachedNote`), "" none. */
+    unreached?: string;
   },
 ): Promise<ContinuationVerdict> {
   const answers = await judge.ask({
@@ -71,6 +73,7 @@ export async function continuationVerdict(
       reply: cutTextEnd(input.reply, 3000),
       did: input.did.slice(-20),
       runKind: input.runKind,
+      ...(input.unreached ? { unreached: input.unreached } : {}),
     },
     questions: {
       verdict: {
@@ -80,7 +83,7 @@ export async function continuationVerdict(
         criteria: {
           done: "It gave the result or the answer, or said plainly what it couldn't do and why. An offer that needs someone else's decision (a sensitive or external action, a choice between their options) counts as done only when asked as one direct question.",
           continue:
-            "It said it will do more itself (next, later, after a build), or offered reversible work inside what it was asked ('want me to create the issues?' after 'triage these'), or stopped midway, and nothing it set up brings it back.",
+            "It said it will do more itself (next, later, after a build), or offered reversible work inside what it was asked ('want me to create the issues?' after 'triage these'), or stopped midway, and nothing it set up brings it back. Also when `unreached` is set and the reply hands work or a question to an agent it names (that mention reached nobody); merely naming one is not that.",
           ask: "To go on it needs something only a person can give (a credential, a decision, a test, access), but it described the need or listed what's missing instead of asking one direct question.",
         },
       },
@@ -108,7 +111,10 @@ export interface TurnEnd {
   decided: string | null;
   /** Addressed directly, it wrote nothing (or only the silence word). */
   unanswered: boolean;
-  /** Its answer names agents outside the conversation (`unreachedNote`, "" none): the mention reached nobody. */
+  /**
+   * Its answer names agents outside the conversation (`unreachedNote`, "" none): the mention reached nobody. Judged:
+   * a hand-off by that mention goes on with this note, a mention that only names them ends as judged.
+   */
   unreached: string;
   /** What is judged ("" skips the judgment: nothing to read, or an agents' DM run that owes no answer). */
   judged: string;
@@ -140,8 +146,6 @@ export async function decideTurnEnd(t: TurnEnd): Promise<TurnEndDecision> {
   if (t.quiet) return { outcome: "done", rule: "quiet" };
   if (t.decided && canNudge) return { outcome: "continue", rule: "decision", nudge: decisionNudge(t.decided) };
   if (t.unanswered && canNudge) return { outcome: "continue", rule: "answer", nudge: ANSWER_NUDGE };
-  // A hand-off by mention to an agent that isn't here is an unkept hand-off: it goes on and hands it over.
-  if (t.unreached && canNudge) return { outcome: "continue", rule: "unreached", nudge: t.unreached };
   if (!t.judged || !t.verdict) return { outcome: "done", rule: t.verdict ? "nothing_to_judge" : "no_judge" };
   if (!canNudge && !t.state.askPending && (t.state.askNudged || t.kind !== "conversation"))
     return { outcome: "done", rule: "cap" };
@@ -155,6 +159,9 @@ export async function decideTurnEnd(t: TurnEnd): Promise<TurnEndDecision> {
   // No person reads a routine's run or an agents' DM: what it lacks goes out in its report or its answer, and
   // the controller of the run that reads it can ask.
   if (verdict === "ask" && t.kind !== "conversation") return { outcome: "done", rule: "ask_elsewhere", verdict };
+  // A hand-off by mention to an agent that isn't here is an unkept hand-off: it goes on and hands it over.
+  if (verdict === "continue" && t.unreached && canNudge)
+    return { outcome: "continue", rule: "unreached", verdict, nudge: t.unreached };
   if (verdict === "continue") {
     const progressed = t.state.count === 0 || t.executed > (t.state.executedAtNudge ?? 0);
     if (canNudge && progressed)

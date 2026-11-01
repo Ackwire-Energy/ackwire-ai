@@ -2709,6 +2709,21 @@ async function executeRunInner(
       const state = t.continuation ?? { count: 0 };
       // A forum's turn is its post (the topic moves on); a run at its turn cap has no turn left to give.
       const capped = run.turns + 1 >= maxTurns;
+      const unreached =
+        text.includes("@") && channelRow
+          ? unreachedNote(
+              await unreachedAgents(db, {
+                orgId: run.orgId,
+                channelId: run.channelId,
+                authorAgentId: run.agentId,
+                body: text,
+                // Naming an agent it already handed this to (`ask_agent`, `tell_agent`) is no hand-off.
+                handedTo: run.id,
+              }).catch(() => []),
+              channelRow.kind === "dm" ? "this DM" : `#${channelRow.name}`,
+              channelRow.kind !== "dm",
+            )
+          : "";
       const decision = await decideTurnEnd({
         state,
         kind: betweenAgents ? "agents_dm" : "conversation",
@@ -2717,21 +2732,7 @@ async function executeRunInner(
         quiet: silent && !judged,
         decided: decided && !silent && !said && !capped && !closingSummary(t, true) ? decided : null,
         unanswered: !silent && !viaRoutine && (sentinelOnly || (!text && !anythingPosted)),
-        unreached:
-          text.includes("@") && channelRow
-            ? unreachedNote(
-                await unreachedAgents(db, {
-                  orgId: run.orgId,
-                  channelId: run.channelId,
-                  authorAgentId: run.agentId,
-                  body: text,
-                  // Naming an agent it already handed this to (`ask_agent`, `tell_agent`) is no hand-off.
-                  handedTo: run.id,
-                }).catch(() => []),
-                channelRow.kind === "dm" ? "this DM" : `#${channelRow.name}`,
-                channelRow.kind !== "dm",
-              )
-            : "",
+        unreached,
         judged: owesAnswer && !forum && !capped ? judged : "",
         mission: Boolean(plan.missionId),
         // A mission's card already asking a person brings it back too.
@@ -2752,6 +2753,7 @@ async function executeRunInner(
                     : m.content.flatMap((b) => (b.type === "tool_use" ? [b.name] : [])),
                 ),
                 runKind: betweenAgents ? "agents_dm" : "conversation",
+                unreached,
               })
           : null,
       });
