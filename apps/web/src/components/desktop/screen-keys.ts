@@ -3,18 +3,10 @@ import type RFB from "@novnc/novnc";
 import { type RefObject, useCallback, useEffect, useRef } from "react";
 import { liveCanvas } from "@/lib/canvas";
 import { composes, copies, isModifier, keyInit, locksOf, macCopy, pastes } from "@/lib/keys";
+import { CONTROL, INSERT, PASTE_MAX_BYTES, pasteBytes, SHIFT } from "./paste";
 
-/**
- * Xvnc's MaxCutText (its default): a larger clipboard from a viewer is dropped without a word. It counts what noVNC
- * sends: UTF-8 with every line break as CRLF, and a NUL at the end.
- */
-const PASTE_MAX_BYTES = 262_144;
 /** What the computer copies this soon after the person's copy keys goes to their clipboard. */
 const COPY_WAIT_MS = 2_000;
-/** Shift+Insert pastes and Ctrl+Insert copies in every window there, a terminal too. Inline: noVNC exports only RFB. */
-const SHIFT = { keysym: 0xffe1, code: "ShiftLeft" };
-const CONTROL = { keysym: 0xffe3, code: "ControlLeft" };
-const INSERT = { keysym: 0xff63, code: "Insert" };
 
 /**
  * The person's keyboard on the agent's screen while in control (ADR 0058 §16). It goes to `field`, a text field
@@ -137,8 +129,7 @@ export function useScreenKeys({
       e.preventDefault();
       const text = e.clipboardData?.getData("text/plain") ?? "";
       if (!text) return on.current.onRefused("textOnly");
-      const sent = new TextEncoder().encode(text.replace(/\r\n|\r|\n/g, "\r\n")).byteLength + 1;
-      if (sent > PASTE_MAX_BYTES) return on.current.onRefused("tooLong");
+      if (pasteBytes(text) > PASTE_MAX_BYTES) return on.current.onRefused("tooLong");
       paste(text.replaceAll("\r\n", "\n"));
     };
     const input = (e: Event) => {

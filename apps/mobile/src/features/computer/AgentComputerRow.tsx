@@ -18,7 +18,7 @@ export const openComputer = (agentId: string) => router.push(`/computer/${agentI
 
 /**
  * "Computador" on the agent's profile, as the web's entry: the computer's portrait, "Computador da Ada", the
- * same status line and Abrir, or Ajudar on a request in the agent's browser for this person. Only for whoever
+ * same status line and Abrir, or Ajudar on a request of the agent's for this person. Only for whoever
  * may watch the computer, the wait included. The row never opens a stream.
  */
 export function AgentComputerRow({ agentId }: { agentId: string }) {

@@ -7,6 +7,7 @@ import {
   getAgent,
   itemVisibleIn,
   listAgentMemoryRows,
+  listOrgMemoryRows,
   listProposals,
   NotFoundError,
   ownerDecides,
@@ -344,6 +345,23 @@ export function memoryRoutes(deps: AppDeps) {
   const { db } = deps;
   const app = createAppRouter(deps);
   app.use("/organizations/*", requireSession(deps.auth));
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/memories",
+      tags,
+      security,
+      summary: "What all the agents know: the current memories the viewer may see, newest first",
+      request: { params: OrgParams },
+      responses: { 200: json(z.object({ memories: z.array(Memory) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const { items, visible } = await listOrgMemoryRows(db, c.get("user").id, orgId);
+      return c.json({ memories: await memoryViews(db, items, visible) }, 200);
+    },
+  );
 
   app.openapi(
     createRoute({
