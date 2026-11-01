@@ -1,15 +1,7 @@
 import type { TFunction } from "i18next";
 import type { ConnectorDef, Run, RunStep } from "../api/types";
 import type { LiveCode, LiveOutput, LiveWork } from "../realtime/streams";
-import {
-  type Activity,
-  type ActivityKind,
-  activityVerb,
-  appLabel,
-  LONG_STEP_MS,
-  PERMISSION_TOOL,
-  toolActivity,
-} from "./activity";
+import { type Activity, type ActivityKind, activityVerb, appLabel, PERMISSION_TOOL, toolActivity } from "./activity";
 import { appConnector } from "./connected";
 import { POSTGRES_MARK } from "./databases";
 import { joinNames, shortTarget } from "./format";
@@ -672,6 +664,9 @@ const QUIET_READS: ReadonlySet<ActivityKind> = new Set([
   "consultingSkill",
   "openingSkill",
 ]);
+
+/** A step running this long is no quick read: its card stays. */
+const LONG_STEP_MS = 4000;
 
 /**
  * One quick internal read that ended well, with nothing of its own to show (no code, no output). Ours only: another
