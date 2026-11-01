@@ -1293,7 +1293,7 @@ describe("Quem pensa: a coding plan's models", () => {
     const options = screen()
       .getAllByRole("option")
       .map((o) => o.textContent);
-    expect(options).toHaveLength(25);
+    expect(options).toHaveLength(29);
     expect(options.slice(0, 4)).toEqual([
       "AutomáticoEscolhe o modelo e o esforço para cada tarefa",
       "MiniMax M3",
@@ -1317,8 +1317,11 @@ describe("Quem pensa: a coding plan's models", () => {
       "Meituan",
       "Tencent",
       "StepFun",
+      "Meta",
+      "Reflection",
+      "OpenCode",
     ]);
-    expect(list.querySelectorAll(".ac-menu__leading")).toHaveLength(25);
+    expect(list.querySelectorAll(".ac-menu__leading")).toHaveLength(29);
     // DeepSeek's answer only once the OpenCode workspace allows the Global region.
     expect(
       within(within(list).getByRole("group", { name: "DeepSeek" }))

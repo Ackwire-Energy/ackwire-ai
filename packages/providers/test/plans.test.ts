@@ -50,9 +50,13 @@ describe("coding plans' models", () => {
     expect(aliases("kimi")).toEqual({ opus: "k3.1-pro", sonnet: "kimi-for-coding", haiku: "kimi-for-coding" });
     expect(ids("minimax")).toEqual(["MiniMax-M3.1-Flash[1m]"]);
     expect(aliases("opencode")).toEqual({ opus: "minimax-m3", sonnet: "minimax-m3", haiku: "claude-haiku-5-5" });
-    expect(ids("opencode")).toHaveLength(24);
-    // The free models and the ones that train on what they're sent stay out.
-    expect(ids("opencode").some((m) => /free|contributor/.test(m))).toBe(false);
+    // All 28 of OpenCode Go's live list (2026-11-01). The ones that train on what they're sent say so and run only
+    // when chosen: "Automático" never picks one.
+    expect(ids("opencode")).toHaveLength(28);
+    for (const m of models("opencode").filter((m) => /free|contributor/.test(m.id))) {
+      expect(m.needs === "paidTraining" || m.needs === "freeTraining").toBe(true);
+      expect(m.alias).toBeUndefined();
+    }
     const cheap = models("opencode")
       .filter((m) => m.tag === "cheap")
       .map((m) => m.id);
@@ -86,6 +90,10 @@ describe("coding plans' models", () => {
     expect(needs).toEqual([
       ["deepseek-v4-pro", "globalRegion"],
       ["deepseek-v4.1-flash", "globalRegion"],
+      ["muse-spark-1.3-contributor", "paidTraining"],
+      ["muse-spark-1.2-contributor", "paidTraining"],
+      ["beam-free", "freeTraining"],
+      ["iceman-contributor-free", "freeTraining"],
     ]);
   });
 
@@ -107,6 +115,9 @@ describe("coding plans' models", () => {
       "Meituan",
       "Tencent",
       "StepFun",
+      "Meta",
+      "Reflection",
+      "OpenCode",
     ]);
     for (const plan of ["zai", "kimi", "minimax"] as const) expect(models(plan).some((m) => m.maker)).toBe(false);
   });

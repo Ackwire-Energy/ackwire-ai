@@ -487,7 +487,7 @@ describe("the agent's AI", () => {
     };
     const view = (effectiveModel: string) => ({ brain: "claude_code" as const, effectiveModel, options: [claude] });
     const go = modelRows(t, view("deepseek-v4.1-flash"), planOf("opencode"));
-    expect(go).toHaveLength(25);
+    expect(go).toHaveLength(29);
     expect(go[0]).toEqual({
       value: "auto",
       label: "Automático",
@@ -528,6 +528,9 @@ describe("the agent's AI", () => {
       "Meituan",
       "Tencent",
       "StepFun",
+      "Meta",
+      "Reflection",
+      "OpenCode",
     ]);
     expect(sections[0]?.rows.map((r) => r.label)).toEqual(["Automático"]);
     expect(sections.flatMap((s) => s.rows)).toEqual(go);

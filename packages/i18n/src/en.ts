@@ -6641,11 +6641,19 @@ export const en: Translations = {
     /** What a coding plan's model is sold as, beside its name. */
     modelTag: { cheap: "Cheap", fast: "Fast", smart: "Flagship" },
     /** What a coding plan's model needs from its account before it answers. */
-    modelNeeds: { globalRegion: "Needs the Global region in OpenCode" },
+    modelNeeds: {
+      globalRegion: "Needs the Global region in OpenCode",
+      paidTraining: "Trains on what it's sent. Needs OpenCode's permission",
+      freeTraining: "Free. Trains on what it's sent. Needs OpenCode's permission",
+    },
     /** Under the model chosen that needs it: how to give it. */
     modelHow: {
       globalRegion:
         "Turn on the Global region in OpenCode, under Settings › Privacy. Without it, this model doesn't answer.",
+      paidTraining:
+        "In OpenCode, under Settings › Privacy, turn on paid endpoints that train on request data. Without it, this model doesn't answer.",
+      freeTraining:
+        "In OpenCode, under Settings › Privacy, turn on free endpoints that train on request data. Without it, this model doesn't answer.",
     },
     recommended: "Recommended",
     modelHelp: "Bigger models think more and use up the plan faster.",
