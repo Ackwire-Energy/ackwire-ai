@@ -263,6 +263,7 @@ function Round({
       accessibilityLabel={label}
       hitSlop={4}
       style={[styles.round, { backgroundColor: PLATE }]}
+      contentStyle={styles.center}
     >
       <Icon name={icon} size={20} color={WHITE} />
     </PressScale>
@@ -291,6 +292,7 @@ function Action({
       accessibilityLabel={label}
       accessibilityState={{ busy, disabled }}
       style={styles.action}
+      contentStyle={styles.actionIn}
     >
       <View style={[styles.circle, { backgroundColor: PLATE }]}>
         {busy ? <ActivityIndicator color={WHITE} /> : <Icon name={icon} size={21} color={WHITE} />}
@@ -318,11 +320,13 @@ const styles = StyleSheet.create({
   },
   title: { flex: 1, minWidth: 0, alignItems: "center" },
   bold: { fontWeight: "600" },
-  round: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  round: { width: 44, height: 44, borderRadius: 22 },
+  center: { alignItems: "center", justifyContent: "center" },
   bottom: { position: "absolute", left: 0, right: 0, bottom: 0, paddingTop: 6 },
   dots: { flexDirection: "row", justifyContent: "center", gap: 6, paddingVertical: 6 },
   dot: { width: 6, height: 6, borderRadius: 3 },
   actions: { flexDirection: "row", justifyContent: "space-around", paddingHorizontal: 20, paddingTop: 10 },
-  action: { alignItems: "center", gap: 5, minWidth: 88 },
+  action: { minWidth: 88 },
+  actionIn: { alignItems: "center", gap: 5 },
   circle: { width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center" },
 });

@@ -29,8 +29,8 @@ import { Note, PlanReplies, PlanRepliesOf } from "./parts";
 
 /*
  * An agent's "Configuração avançada" on the phone (ADR 0086), the web's dialog over "Quem pensa" as a screen of its
- * own, opened from "Pensa com" by its owner or an admin: how it thinks (effort, with a fixed model on its computer;
- * the context window, any brain) and who it answers ("Atende outras pessoas", answering through the API while its
+ * own, opened from "Pensa com" by its owner or an admin: how it thinks (effort on its computer, a ramp with a fixed
+ * model and a row that says "Automático" picks it otherwise; the context window, any brain) and who it answers ("Atende outras pessoas", answering through the API while its
  * computer is away). Each choice saves at once, like the rest of "Pensa com"; "Voltar ao padrão" puts them all back.
  */
 
@@ -136,17 +136,27 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
           <Note icon="x">{t("common.loadFailed")}</Note>
         ) : (
           <>
-            {kind && !autoModel ? (
+            {kind ? (
               <View style={styles.gap}>
                 <GroupedList>
-                  <View style={styles.ramp}>
-                    <EffortRamp
-                      value={effort.value}
-                      onChange={effort.change}
-                      color={agentLook(agent).color}
-                      disabled={!view.canEdit}
+                  {autoModel ? (
+                    // "Automático" picks the effort too: the row says so and leads to a model, which brings the ramp.
+                    <GroupedRow
+                      label={t("agentPage.work.brain.effort")}
+                      sub={t("agentPage.work.brain.effortText.auto")}
+                      chevron
+                      onPress={() => router.push(`/agent-model/${agentId}` as never)}
                     />
-                  </View>
+                  ) : (
+                    <View style={styles.ramp}>
+                      <EffortRamp
+                        value={effort.value}
+                        onChange={effort.change}
+                        color={agentLook(agent).color}
+                        disabled={!view.canEdit}
+                      />
+                    </View>
+                  )}
                 </GroupedList>
               </View>
             ) : null}
