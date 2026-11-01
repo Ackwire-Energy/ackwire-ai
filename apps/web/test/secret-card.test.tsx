@@ -82,7 +82,7 @@ describe("secret requests (ADR 0027)", () => {
     // Once sent, one line takes its place (another element): look it up again.
     const done = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
     expect(done.querySelector(".rq-done__mark[data-done]")).not.toBeNull();
-    expect(done.textContent).toContain("Você entregou às");
+    expect(done.textContent).toContain("Entregue por você: NPM_TOKEN");
     expect(within(done).queryByLabelText("Valor de NPM_TOKEN")).toBeNull();
     expect(done.hasAttribute("data-ask-id")).toBe(false);
   });
