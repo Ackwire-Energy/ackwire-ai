@@ -235,7 +235,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
   async function delegatedAgents(
     message: NonNullable<Awaited<ReturnType<typeof getMessage>>>,
     outside: string[] = [],
-    options: { record?: boolean } = {},
+    /** `wakeAll`: a routine set to act was told to name only agents that must act, so each one it names wakes. */
+    options: { record?: boolean; wakeAll?: boolean } = {},
   ) {
     const ids = [...message.mentionedAgentIds, ...outside];
     const targets = ids.length
@@ -254,7 +255,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     let strategy = "mention-judge";
     let error: string | null = null;
     const judge = deps.context ? judgeOf(deps.context) : null;
-    if (judge && others.length > 0) {
+    if (options.wakeAll) {
+      for (const t of others) scores.set(t.id, 1);
+      strategy = "mention-routine";
+    } else if (judge && others.length > 0) {
       const [[author], answering] = await Promise.all([
         message.authorAgentId
           ? deps.db
@@ -281,7 +285,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     }
     // No judge, or it failed: only a message that opens by addressing an agent ("@ada já postei…") wakes it. Waking
     // every agent named would let two agents thank each other in a loop while the judge is down.
-    if (!judge || error !== null) for (const t of others) if (opensWith(message.body, t.handle)) scores.set(t.id, 1);
+    if (!options.wakeAll && (!judge || error !== null)) for (const t of others) if (opensWith(message.body, t.handle)) scores.set(t.id, 1);
     const allowed = others.filter((t) => (scores.get(t.id) ?? 0) >= mentionThreshold).map((t) => t.id);
     // Not when the router still decides this message: its decision row is what it reads to skip (`already_routed`).
     if (options.record !== false)
@@ -475,13 +479,18 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         // read, it wakes nobody, since text it read must not become actions. Never silently: the agents it named
         // and its run's tell_agent refusals show under it.
         const routineRun = await routinePostRun(deps.db, message);
-        const actingRoutine = routineRun
-          ? routineCreatorOf(await runAuthorityById(deps.db, message.orgId, routineRun))
-          : null;
+        const routineAuthority = routineRun ? await runAuthorityById(deps.db, message.orgId, routineRun) : null;
+        const actingRoutine = routineAuthority ? routineCreatorOf(routineAuthority) : null;
         if (message.meta.routine && !message.meta.reminder && !message.agentRunId && !actingRoutine) {
-          const [blocked, outside] = await Promise.all([refusedReach(message), outsideAgents(message)]);
+          const [refused, outside] = await Promise.all([refusedReach(message), outsideAgents(message)]);
           const named = message.mentionedAgentIds.filter((id) => id !== message.authorAgentId);
-          await settleReach(deps, message, { outside, blocked, routinePost: named });
+          // Set to act but with no creator left: nobody's reach to wake them with, which is not "only looks".
+          const act = !!routineAuthority && "brief" in routineAuthority && routineAuthority.brief?.access === "act";
+          await settleReach(deps, message, {
+            outside,
+            blocked: act ? [...new Set([...refused, ...named])] : refused,
+            routinePost: act ? [] : named,
+          });
           return;
         }
         // Agents' mentions go through the hop limit here; a person's mentions and DMs already
@@ -489,7 +498,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         const [outside, refused] = await Promise.all([outsideAgents(message), refusedReach(message)]);
         if (message.mentionedAgentIds.length > 0) {
           // No cap on hand-offs between agents: the stretch's limits hold a run agents start (`startOrJoinRun`).
-          const handed = await delegatedAgents(message, outside);
+          const handed = await delegatedAgents(message, outside, { wakeAll: Boolean(actingRoutine) });
           // An agent the routine's run already handed this to (tell_agent) has it: the mention doesn't wake it again.
           const told = routineRun ? await consultedBy(message.orgId, routineRun) : [];
           let allowed = handed.allowed.filter((id) => !outside.includes(id) && !told.includes(id));
@@ -530,7 +539,7 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         }
         // Only agents outside the conversation named: a note to the ones it needs, settled once the router decided.
         const reach = {
-          outside: outside.length > 0 ? (await delegatedAgents(message, outside, { record: false })).allowed : [],
+          outside: outside.length > 0 ? (await delegatedAgents(message, outside, { record: false, wakeAll: Boolean(actingRoutine) })).allowed : [],
           blocked: refused,
         };
         try {

@@ -255,6 +255,69 @@ test("a routine set to act hands its mention to an agent outside as a note, and 
   expect(told?.userId).toBe(bob.id);
 });
 
+test("a routine set to act wakes the agent it mentions even when the mention judge reads it as needing nothing", async () => {
+  const order = "Chamado #812 (checkout), responsável: @ops";
+  f = await setup({
+    handOff: true,
+    judge: (kind) => (kind === "mention_needs_nothing" ? 1 : undefined),
+    reply: (req) => {
+      if (!isRoutine(req)) return { chunks: ["Vendo o #812."] };
+      if (seen(req).includes("Posted.")) return { chunks: ["Chamei o ops."] };
+      return { chunks: [], toolUses: [{ name: "hand_off", input: { message: order } }] };
+    },
+  });
+  const ops = await opsInGeneral();
+  const routine = await channelRoutine(f, { prompt: "Revise os chamados da noite.", access: "act" });
+  await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);
+  await drainOutbox(f.db, f.handlers);
+
+  const [posted] = await messagesIn(f, f.general.id);
+  const opsRuns = (await f.db.select().from(schema.agentRuns)).filter((r) => r.agentId === ops.id);
+  expect(opsRuns.map((r) => r.triggerMessageId)).toEqual([posted?.id as string]);
+});
+
+test("a routine set to act whose creator is gone says it couldn't call the agent, not that it only looks", async () => {
+  const order = "@ops investiga o checkout.";
+  f = await setup({
+    handOff: true,
+    judge: (kind) => (kind === "mention_needs_nothing" ? 0 : undefined),
+    reply: (req) => {
+      if (!isRoutine(req)) return { chunks: ["Nobody should have run."] };
+      if (seen(req).includes("Posted.")) return { chunks: ["Chamei o ops."] };
+      return { chunks: [], toolUses: [{ name: "hand_off", input: { message: order } }] };
+    },
+  });
+  const ops = await opsInGeneral();
+  const routine = await channelRoutine(f, { prompt: "Revise os chamados da noite.", access: "act" });
+  // The creator's account goes away between the routine's post and its handling: the brief keeps no creator.
+  const posted = f.handlers["message.posted"];
+  if (!posted) throw new Error("no message.posted handler");
+  const handlers = {
+    ...f.handlers,
+    "message.posted": async (...args: Parameters<typeof posted>) => {
+      for (const m of await f.db.select().from(schema.messages)) {
+        const brief = m.meta.routineBrief as Record<string, unknown> | undefined;
+        if (brief?.creatorUserId)
+          await f.db
+            .update(schema.messages)
+            .set({ meta: { ...m.meta, routineBrief: { ...brief, creatorUserId: null } } })
+            .where(eq(schema.messages.id, m.id));
+      }
+      return posted(...args);
+    },
+  };
+  await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);
+  await drainOutbox(f.db, handlers);
+
+  const general = await messagesIn(f, f.general.id);
+  expect((await f.db.select().from(schema.agentRuns)).filter((r) => r.agentId === ops.id)).toEqual([]);
+  const reach = reachOf(general[0]?.meta);
+  expect(reach.map((e) => [e.handle, e.reason, e.routinePost ?? false, e.routine?.access])).toEqual([
+    ["ops", "routine_creator_reach", false, "act"],
+  ]);
+  expect(reachNote(reach)).not.toContain("only look and tell");
+});
+
 test("an always routine that ends without hand_off never posts its record as-is: the agent tells the people", async () => {
   const record = "Checado: primeira rodada, nada para comparar com execuções anteriores.";
   f = await setup({
