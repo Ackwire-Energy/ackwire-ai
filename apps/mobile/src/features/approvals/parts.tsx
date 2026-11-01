@@ -315,7 +315,7 @@ export function ApproveAlways({
 }
 
 /** The amber fuse burning to the expiry and "expira em N min" (amber: it waits on a person). */
-export function ApprovalFuse({ approval: a }: { approval: Approval }) {
+export function ApprovalFuse({ approval: a }: { approval: Pick<Approval, "createdAt" | "expiresAt"> }) {
   const { t } = useTranslation();
   const c = useColors();
   const now = useNow();

@@ -48,6 +48,7 @@ const NOTICE_KINDS = [
   "routine_failed",
   "routine_paused",
   "browser_handoff",
+  "secret_request",
 ] as const;
 type NoticeKind = (typeof NOTICE_KINDS)[number];
 const isNoticeKind = (kind: string): kind is NoticeKind => (NOTICE_KINDS as readonly string[]).includes(kind);

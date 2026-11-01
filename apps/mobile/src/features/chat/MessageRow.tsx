@@ -24,6 +24,7 @@ import { missionSetupOf } from "@agenteschat/client/lib/missions";
 import { isTalkerReply, routineReportText } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
+import { secretRequestOf } from "@agenteschat/client/lib/secret-requests";
 import { splitCanceled } from "@agenteschat/client/lib/work";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -47,7 +48,7 @@ import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
 import { ReceiptMark } from "./AgentReceipts";
 import { ConsultGroup } from "./ConsultGroup";
-import { ApprovalInline, ConsultationCard, QuestionCard, ThreadLink } from "./cards";
+import { ApprovalInline, ConsultationCard, QuestionCard, SecretCard, ThreadLink } from "./cards";
 import { IssueWorkCard } from "./issue-work";
 import { cacheContinued } from "./live";
 import {
@@ -176,6 +177,8 @@ export const MessageRow = memo(function MessageRow({
   const link = missionLinkOf(meta);
   const files = artifactsOf(meta);
   const question = isAgent ? questionOf(meta) : null;
+  // An agent asks a person for a secret for its computer (ADR 0027): typed and sealed in its card.
+  const secret = isAgent ? secretRequestOf(meta) : null;
   // The agent needs a person in its browser (ADR 0040): the request, live.
   const handoff = isAgent ? browserHandoffOf(meta) : null;
   // Where it browsed, or what it did on its desktop, after the run (as on the web): the steps' card.
@@ -431,6 +434,7 @@ export const MessageRow = memo(function MessageRow({
           />
         ) : null}
         {question ? <QuestionCard key={`${question.id}:${question.status}`} question={question} /> : null}
+        {secret ? <SecretCard key={`${secret.id}:${secret.status}`} request={secret} createdAt={m.createdAt} /> : null}
         {cards}
       </View>
     </Pressable>

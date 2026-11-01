@@ -338,6 +338,41 @@ export async function resolveQuestionNotifications(deps: NotificationDeps, orgId
   await resolveNotifications(deps, orgId, { groupKey: `agent_question:${questionId}` });
 }
 
+// ── Secret requests (ADR 0027) ────────────────────────────────────────────────
+
+/**
+ * An agent waits for a secret (`request_secret`): the one person who can answer it, in their "Waiting for you" and
+ * with a push, as a browser handoff asks. Only its name and what it is for travel, never a field: it is typed in
+ * the card, where it is sealed for the computer.
+ */
+export async function notifySecretRequest(deps: NotificationDeps, r: typeof schema.secretRequests.$inferSelect) {
+  const [channel] = await deps.db
+    .select({ kind: channels.kind, name: channels.name })
+    .from(channels)
+    .where(eq(channels.id, r.channelId));
+  await notify(deps, {
+    orgId: r.orgId,
+    userIds: [r.requestedForUserId],
+    kind: "secret_request",
+    groupKey: `secret_request:${r.id}`,
+    waiting: true,
+    actor: agent(r.agentId),
+    source: {
+      channelId: r.channelId,
+      ...(r.threadId ? { threadId: r.threadId } : {}),
+      ...(r.messageId ? { messageId: r.messageId } : {}),
+      ...(channel?.kind === "dm" ? { dmId: r.channelId } : {}),
+      ...(channel?.kind === "channel" ? { label: channel.name } : {}),
+    },
+    latest: { title: r.name, text: notificationSnippet(r.purpose), expiresAt: r.expiresAt.toISOString() },
+  });
+}
+
+/** Delivered, declined, expired or its run stopped: out of the inbox. */
+export async function resolveSecretRequestNotifications(deps: NotificationDeps, orgId: string, requestId: string) {
+  await resolveNotifications(deps, orgId, { groupKey: `secret_request:${requestId}` });
+}
+
 // ── Approvals ─────────────────────────────────────────────────────────────────
 
 /**

@@ -1,19 +1,26 @@
 import {
   type AgentQuestion,
   type Approval,
+  cacheSecretRequest,
   type MessageConsultation,
+  type SecretRequest,
   type ThreadInfo,
   useApi,
   useApproval,
   useDecideApproval,
 } from "@agenteschat/client";
 import { approvalWhy } from "@agenteschat/client/lib/approval-origin";
+import { secretAad } from "@agenteschat/client/lib/secret-box";
+import { secretPending, secretValueProblem, secretWhere } from "@agenteschat/client/lib/secret-requests";
+import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
+import { sealSecret } from "@/lib/secret-box";
 import { Button, Count, HoldButton, Icon, Text, useReducedMotion, useToast } from "@/ui";
+import { PasteField } from "../ai/parts";
 import { approvalAction, approvalRisk, approveAlwaysToast } from "../approvals/logic";
 import {
   ApprovalDetails,
@@ -27,17 +34,17 @@ import {
 } from "../approvals/parts";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
+import { useColors, useDirectory, useMeId, useNow, useOrgId, useWhen } from "../shared/hooks";
 import { genderOf, previewOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
-import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
+import { MONO, successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
 import { threadFaces } from "./logic";
 import { MessageText } from "./MessageText";
 
 /**
  * The cards inside a message: the agent it consulted, the approval it asks for (a question, no card), an
- * agent's question, and the link to its thread. Its tools are `ToolCalls.tsx`.
+ * agent's question or secret request, and the link to its thread. Its tools are `ToolCalls.tsx`.
  */
 
 // ── Consultation ─────────────────────────────────────────────────────────────
@@ -373,6 +380,164 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
   );
 }
 
+// ── Secret (request_secret) ──────────────────────────────────────────────────
+
+/**
+ * An agent asks for a secret for its computer (`request_secret`, ADR 0027, `meta.secretRequest`): who is asked,
+ * what it is for, its name and where it goes, said truly for each kind. The person asked types it here: it is
+ * sealed on the phone to the key the computer made, so it never reaches our server, the chat or the agent; then
+ * Enviar or Recusar, and the fuse to its deadline. Everyone else sees who may answer. Closed, one line says what
+ * happened. `createdAt`: when it was asked (its message's time), where the fuse starts.
+ */
+export function SecretCard({ request: r, createdAt }: { request: SecretRequest; createdAt: string }) {
+  const { t } = useTranslation();
+  const api = useApi();
+  const qc = useQueryClient();
+  const orgId = useOrgId();
+  const meId = useMeId();
+  const dir = useDirectory();
+  const c = useColors();
+  const when = useWhen();
+  const now = useNow();
+  const surface = useSurface();
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState<"send" | "decline" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const agent = dir.agentById.get(r.agentId)?.name ?? t("channel.unknownAgent");
+  const mine = r.requestedForUserId === meId;
+  const person = dir.memberById.get(r.requestedForUserId)?.name ?? t("channel.unknownPerson");
+
+  const answer = async (how: "send" | "decline") => {
+    const problem = how === "send" ? secretValueProblem(value) : null;
+    if (problem) return setError(t(problem));
+    setBusy(how);
+    setError(null);
+    try {
+      let next: SecretRequest;
+      if (how === "decline") next = await api.secrets.decline(orgId, r.id);
+      else {
+        if (!r.publicKey) throw Object.assign(new Error("closed"), { status: 409 });
+        const aad = secretAad({ requestId: r.id, orgId, name: r.name, target: r.target });
+        next = await api.secrets.deliver(orgId, r.id, await sealSecret(r.publicKey, value, aad));
+        setValue("");
+        successHaptic();
+      }
+      cacheSecretRequest(qc, orgId, next);
+    } catch (err) {
+      setError((err as { status?: number }).status === 409 ? t("secret.alreadyAnswered") : t("secret.failed"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  if (!secretPending(r, now)) {
+    const status = r.status === "pending" ? "expired" : r.status;
+    const line =
+      status === "delivered"
+        ? r.deliveredAt
+          ? mine
+            ? t("secret.deliveredByYou", { time: when.time(r.deliveredAt) })
+            : t("secret.delivered", { person, time: when.time(r.deliveredAt) })
+          : t("secret.chipDone")
+        : t(`secret.${status}`);
+    return (
+      <View style={[styles.qdone, surface]}>
+        <Icon
+          name={status === "delivered" ? "checkc" : "x"}
+          size={16}
+          color={status === "delivered" ? c.ok : c.muted}
+        />
+        <Text variant="small" tone="muted" style={styles.shrink}>
+          <Text variant="small" tone="ink2" style={styles.mono}>
+            {r.name}
+          </Text>
+          {` · ${line}`}
+        </Text>
+      </View>
+    );
+  }
+  return (
+    <View style={[styles.qcard, surface]} accessibilityLabel={t("secret.group", { agent })}>
+      <View style={styles.label}>
+        <Icon name="lock" size={15} color={c.muted} />
+        <Text variant="caption" tone="muted" style={[styles.bold, styles.shrink]}>
+          <Trans
+            i18nKey={mine ? "secret.asks" : "secret.asksPerson"}
+            values={{ agent, person }}
+            components={{ b: <Text variant="caption" tone="ink" style={styles.bold} /> }}
+          />
+        </Text>
+      </View>
+      <Text variant="title" style={styles.stitle}>
+        {r.purpose}
+      </Text>
+      <Text variant="footnote" tone="ink2" style={styles.mono} selectable>
+        {r.name}
+      </Text>
+      <Text variant="footnote" tone="muted" style={styles.where}>
+        {secretWhere(t, r, agent)}
+      </Text>
+      {mine ? (
+        <>
+          <PasteField
+            value={value}
+            onChangeText={(v) => {
+              setValue(v);
+              setError(null);
+            }}
+            onPasted={setValue}
+            label={t("secret.label", { name: r.name })}
+            placeholder={t("secret.label", { name: r.name })}
+            secret
+            disabled={busy !== null}
+            returnKeyType="send"
+            onSubmit={() => void answer("send")}
+          />
+          {error ? (
+            <Text variant="footnote" style={[styles.serror, { color: c.danger }]} accessibilityRole="alert">
+              {error}
+            </Text>
+          ) : (
+            <Text variant="caption" tone="faint" style={styles.serror}>
+              {t("secret.private")}
+            </Text>
+          )}
+          <View style={styles.acts}>
+            <View style={styles.approve}>
+              <Button
+                variant="primary"
+                wide
+                icon="lock"
+                label={t("secret.send")}
+                loading={busy === "send"}
+                disabled={busy === "decline"}
+                onPress={() => void answer("send")}
+              />
+            </View>
+            <View style={styles.grow}>
+              <Button
+                variant="secondary"
+                wide
+                label={t("secret.decline")}
+                loading={busy === "decline"}
+                disabled={busy === "send"}
+                onPress={() => void answer("decline")}
+              />
+            </View>
+          </View>
+        </>
+      ) : (
+        <Text variant="small" tone="muted" style={styles.serror}>
+          {t("secret.waitingFor", { person })}
+        </Text>
+      )}
+      <View style={styles.sfuse}>
+        <ApprovalFuse approval={{ createdAt, expiresAt: r.expiresAt }} />
+      </View>
+    </View>
+  );
+}
+
 // ── Thread link ──────────────────────────────────────────────────────────────
 
 /** "3 respostas" with who wrote; opens the thread. */
@@ -455,6 +620,11 @@ const styles = StyleSheet.create({
   approve: { flex: 1.5 },
   qcard: { marginTop: 12, padding: 14, borderRadius: 20 },
   qtitle: { marginTop: 5, marginBottom: 12 },
+  stitle: { marginTop: 5, marginBottom: 4 },
+  mono: { fontFamily: MONO },
+  where: { marginTop: 2 },
+  serror: { marginTop: 8 },
+  sfuse: { marginTop: 12 },
   opts: { gap: 6 },
   opt: {
     flexDirection: "row",

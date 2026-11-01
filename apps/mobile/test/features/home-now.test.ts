@@ -14,6 +14,7 @@ import {
   keepFinished,
   latestFinished,
 } from "../../src/features/chats/now";
+import { chatHref, notificationHref } from "../../src/features/links/logic";
 import { appColors, appShadows } from "../../src/ui/palette";
 import { countStyle, weights } from "../../src/ui/type-scale";
 import { at, notification } from "./fixtures";
@@ -219,6 +220,30 @@ describe("Atividade: cards and what comes next", () => {
     const approval = notification({ id: "a", kind: "approval", waiting: true, updatedAt: at(30) });
     const question = notification({ id: "q", kind: "agent_question", waiting: true, updatedAt: at(60) });
     expect(sortWaiting([join, approval, question]).map((n) => n.id)).toEqual(["q", "a", "j"]);
+  });
+
+  test("an agent waiting for a secret: its name and what for, its deadline, Abrir (typed in its card), on top", () => {
+    const expiresAt = at(-12);
+    const secret = notification({
+      id: "s",
+      kind: "secret_request",
+      waiting: true,
+      actors: [{ type: "agent", id: "theo" }],
+      source: { channelId: "c1", threadId: "t1", messageId: "m1" },
+      latest: { title: "NPM_TOKEN", text: "publicar o pacote", expiresAt },
+      updatedAt: at(90),
+    });
+    expect(waitingCardOf(secret)).toEqual({
+      kind: "secret",
+      title: "NPM_TOKEN · publicar o pacote",
+      expiresAt,
+      action: "open",
+    });
+    // Its conversation opens, at the thread it was asked in, where its card is.
+    expect(notificationHref(secret)).toBe(chatHref("c1", "t1"));
+    const question = notification({ id: "q", kind: "agent_question", waiting: true, updatedAt: at(1) });
+    const approval = notification({ id: "a", kind: "approval", waiting: true, updatedAt: at(2) });
+    expect(sortWaiting([approval, question, secret]).map((n) => n.id)).toEqual(["s", "q", "a"]);
   });
 
   test("the next routine: active, ahead, the soonest", () => {

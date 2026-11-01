@@ -213,6 +213,16 @@ const PUSHED: { kind: AppNotification["kind"]; n: Partial<AppNotification>; to: 
     n: { waiting: true, source: { channelId: "c1", threadId: "t1", messageId: "h1", handoffId: "h1" } },
     to: "/org/$orgId/threads/$threadId",
   },
+  {
+    kind: "secret_request",
+    n: { waiting: true, source: { channelId: "c1", threadId: "t1", messageId: "m1" } },
+    to: "/org/$orgId/threads/$threadId",
+  },
+  {
+    kind: "secret_request",
+    n: { waiting: true, source: { channelId: "c1", messageId: "m1" } },
+    to: "/org/$orgId/c/$channelId",
+  },
   { kind: "computer_ready", n: { source: { machineId: "pc1" } }, to: "/org/$orgId/settings/computers/$machineId" },
   { kind: "join_request", n: { waiting: true, source: { label: "Acme" } }, to: "/org/$orgId/settings/$section" },
   {

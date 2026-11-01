@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { MACHINE_PROTOCOL_VERSION, orgTopic, type ServerFrame, sealSecret, secretAad } from "@agenteschat/adapters";
-import { eq, schema } from "@agenteschat/db";
+import { and, eq, isNull, schema } from "@agenteschat/db";
 import {
   authenticateMachine,
   cancelRun,
@@ -26,9 +26,11 @@ import {
   NotFoundError,
   postPersonMessage,
   receiveMachineUpload,
+  registerPushDevice,
   removeAgentSecret,
   removeMember,
   renameMachine,
+  renderPush,
   SERVER_STOP_TASK_GRACE_MS,
   type SecretRequestView,
   secretSite,
@@ -959,10 +961,11 @@ describe("secrets for a connected machine (ADR 0027)", () => {
   const SANDBOX = [{ connectionId: null, scope: "sandbox:run" }];
   const VALUE = "npm_s3cr3t_value_0123456789";
 
-  /** An agent that asks for NPM_TOKEN when told "publica", then says what it got. */
+  /** An agent that asks for NPM_TOKEN when told "publica", then says what it got (`before`: ahead of the ask). */
   async function asking(
     target: ({ target: "env" } | { target: "file"; path: string }) & { site?: string } = { target: "env" },
     runnerOptions: FakeRunnerOptions = {},
+    before?: () => Promise<unknown>,
   ) {
     f = await setup({
       machines: true,
@@ -985,6 +988,7 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     const runner = fakeRunner(f.machineHub as MachineHub, runnerOptions);
     await runner.hello(paired.token);
     await setAgentComputerTarget(deps(), f.owner.id, f.org.id, f.agent.id, paired.machineId);
+    await before?.();
     await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
       body: "@dev publica o pacote",
     });
@@ -1578,6 +1582,69 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     expect(await listAgentSecrets(f.db, f.owner.id, f.org.id, f.agent.id)).toEqual([
       expect.objectContaining({ name: "NPM_TOKEN", target }),
     ]);
+  });
+
+  test("the person asked hears it where they wait, with a push, until it is answered", async () => {
+    const { row } = await asking({ target: "env" }, {}, () =>
+      registerPushDevice(f.db, f.owner.id, {
+        token: "ExponentPushToken[secret-card-0001]",
+        platform: "ios",
+        locale: "en",
+      }),
+    );
+    const notice = async () =>
+      (
+        await f.db
+          .select()
+          .from(schema.notifications)
+          .where(eq(schema.notifications.groupKey, `secret_request:${row.id}`))
+      )[0];
+    const n = await notice();
+    expect(n).toMatchObject({ userId: f.owner.id, kind: "secret_request", waiting: true, doneAt: null });
+    expect(n?.latest).toMatchObject({
+      title: "NPM_TOKEN",
+      text: "publicar o pacote no npm",
+      expiresAt: row.expiresAt.toISOString(),
+    });
+    expect(n?.source).toMatchObject({ channelId: f.general.id, messageId: row.messageId, label: "general" });
+    const pushes = await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "push.send"));
+    expect(pushes.map((p) => p.payload)).toContainEqual({ notificationId: n?.id });
+    const latest = n?.latest as { text?: string } | undefined;
+    expect(renderPush("en", { kind: "secret_request", waiting: true, actorName: "Dev", text: latest?.text })).toEqual({
+      title: "Dev needs a secret from you",
+      body: "publicar o pacote no npm",
+    });
+    expect(renderPush("pt-BR", { kind: "secret_request", waiting: true, actorName: "Dev" })).toEqual({
+      title: "Dev precisa de um segredo seu",
+      body: "Toque para enviar com segurança.",
+    });
+
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    await deliverSecret(sandbox, f.owner.id, f.org.id, row.id, await seal({ ...row, target: { kind: "env" } }));
+    expect((await notice())?.doneAt).not.toBeNull();
+
+    // Declined, or nobody answered in time: out of the inbox too.
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev publica de novo",
+    });
+    await drainOutbox(f.db, f.handlers);
+    const open = async () =>
+      f.db
+        .select()
+        .from(schema.notifications)
+        .where(and(eq(schema.notifications.kind, "secret_request"), isNull(schema.notifications.doneAt)));
+    const [second] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.status, "pending"));
+    expect(await open()).toHaveLength(1);
+    await declineSecret({ db: f.db, pubsub: f.pubsub, sandbox: f.sandboxDeps }, f.owner.id, f.org.id, second?.id ?? "");
+    expect(await open()).toHaveLength(0);
+    await drainOutbox(f.db, f.handlers);
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body: "@dev publica outra vez",
+    });
+    await drainOutbox(f.db, f.handlers);
+    expect(await open()).toHaveLength(1);
+    expect(await expireSecretRequests({ db: f.db, pubsub: f.pubsub }, new Date(Date.now() + 16 * 60_000))).toBe(1);
+    expect(await open()).toHaveLength(0);
   });
 
   test("owner removes a mixed browser and command secret from its original machine after code is disabled", async () => {

@@ -14,6 +14,7 @@ import {
   cacheMessage,
   cacheMessageActions,
   cacheMessageMemories,
+  cacheSecretRequest,
   catchUpChannel,
   consultSeeds,
   consultsIn,
@@ -52,7 +53,7 @@ import { withContinued } from "./turn";
 /**
  * A conversation, live: subscribes to its channel while the screen is open,
  * keeps the message caches current (new messages, reactions, approvals,
- * agents' questions, threads, missions) and holds the runs in progress (streaming text, who is
+ * agents' questions and secret requests, threads, missions) and holds the runs in progress (streaming text, who is
  * working, agents asking agents), who is typing, and the agents' receipts on people's messages (who saw it,
  * who answers; `receipts.ts`, as on the web). The database stays the truth: on open and after a reconnect the
  * active runs come from the server, and the lists' receipts seed the rest.
@@ -269,6 +270,10 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
     case "question.asked":
     case "question.answered":
       cacheQuestion(qc, orgId, channelId, event.question);
+      break;
+    case "secret.requested":
+    case "secret.updated":
+      cacheSecretRequest(qc, orgId, event.secretRequest);
       break;
     case "agent.proposal.updated":
       // An agent's proposal of a new agent was created or denied (by anyone): its card.

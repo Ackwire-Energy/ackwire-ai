@@ -28,6 +28,7 @@ const BY_KIND: Partial<Record<NotificationKind, SoundName>> = {
   agent_question: "attention",
   forum_turn: "attention",
   browser_handoff: "attention",
+  secret_request: "attention",
   join_request: "attention",
   mention: "mention",
   dm: "reply",

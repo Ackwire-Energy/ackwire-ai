@@ -959,6 +959,7 @@ export const en: Translations = {
     routine_failed: "A routine didn't finish",
     routine_paused: "A routine was paused",
     browser_handoff: "An agent needs you in the browser",
+    secret_request: "An agent needs a secret from you",
     waiting: "Something is waiting for you",
   },
   contextMenu: {
@@ -2086,6 +2087,7 @@ export const en: Translations = {
       machineConnected: "<b>{{name}}</b> connected the computer <b>{{label}}</b>",
       machineConnectedAny: "<b>{{name}}</b> connected a computer",
       browserHandoff: "<b>{{name}}</b> needs you in the browser",
+      secretRequest: "<b>{{name}}</b> asked you for a secret",
       desktopHandoff: "<b>{{name}}</b> needs you on the computer",
       joinRequest: "<b>{{name}}</b> asks to join",
       joinRequestMany: "<b>{{names}}</b> ask to join",

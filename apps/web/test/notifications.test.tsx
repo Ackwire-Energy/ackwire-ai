@@ -630,6 +630,33 @@ describe("an agent asks for a hand (ADR 0040, ADR 0058)", () => {
   });
 });
 
+describe("an agent asks for a secret (ADR 0027)", () => {
+  test("one row: who asks, the secret's name and what for, the expiry chip, and a click goes to its card's conversation", async () => {
+    const ask = notification({
+      id: "n-secret",
+      kind: "secret_request",
+      waiting: true,
+      actors: [{ type: "agent", id: ADA_ID }],
+      source: { channelId: ENG_ID, messageId: "msg-s" },
+      latest: {
+        title: "NPM_TOKEN",
+        text: "publicar o pacote no npm",
+        expiresAt: new Date(Date.now() + 12 * 60_000).toISOString(),
+      },
+      updatedAt: ago(1),
+    });
+    const { router } = await go(seedState({ notifications: [ask] }));
+    const row = document.querySelector('[data-n="n-secret"]') as HTMLElement;
+    expect(row.classList.contains("nt-wr")).toBe(true);
+    expect(row.querySelector(".nt-what")?.textContent).toBe("Ada pediu um segredo a você");
+    expect(row.querySelector(".nt-wr__sub")?.textContent).toBe("NPM_TOKEN · publicar o pacote no npm");
+    expect(row.querySelector(".nt-wr__l1 > .nt-wr__left.ac-chip--waiting")?.textContent).toMatch(/^expira em /);
+    await click(row.querySelector(".nt-wr__sub") as HTMLElement);
+    await settle(4);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
+  });
+});
+
 describe("Esperando você: what only points somewhere is one row", () => {
   const asks = (over: Partial<AppNotification> = {}) =>
     notification({

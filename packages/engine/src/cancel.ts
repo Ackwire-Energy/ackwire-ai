@@ -292,7 +292,7 @@ export async function stopRun(
     });
     if (done) {
       run = done;
-      for (const r of closedSecrets) await publishSecret(deps.pubsub, r, "secret.updated");
+      for (const r of closedSecrets) await publishSecret(deps, r, "secret.updated");
       break;
     }
     if (attempt >= 3) throw new ConflictError("This task changed state. Try again.", "run.state_changed");

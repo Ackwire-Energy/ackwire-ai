@@ -960,6 +960,7 @@ export const ptBR = {
     routine_failed: "Uma rotina não terminou",
     routine_paused: "Uma rotina foi pausada",
     browser_handoff: "Um agente precisa de você no navegador",
+    secret_request: "Um agente precisa de um segredo seu",
     waiting: "Tem algo esperando você",
   },
   contextMenu: {
@@ -2103,6 +2104,7 @@ export const ptBR = {
       machineConnected: "<b>{{name}}</b> conectou o computador <b>{{label}}</b>",
       machineConnectedAny: "<b>{{name}}</b> conectou um computador",
       browserHandoff: "<b>{{name}}</b> precisa de você no navegador",
+      secretRequest: "<b>{{name}}</b> pediu um segredo a você",
       desktopHandoff: "<b>{{name}}</b> precisa de você no computador",
       joinRequest: "<b>{{name}}</b> pede para entrar",
       joinRequestMany: "<b>{{names}}</b> pedem para entrar",

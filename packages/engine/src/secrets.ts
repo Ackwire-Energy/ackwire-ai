@@ -7,6 +7,7 @@ import { consultedFor } from "./consultations";
 import { isAgentOnlyDm } from "./dms";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
+import { notifySecretRequest, resolveSecretRequestNotifications } from "./notification-producers";
 import { enqueue } from "./outbox";
 import { personBehindCall } from "./requester";
 import {
@@ -132,17 +133,24 @@ export async function syncSecretMessage(db: Executor, row: SecretRequestRow) {
     .where(and(eq(schema.messages.id, row.messageId), eq(schema.messages.orgId, row.orgId)));
 }
 
+/**
+ * A request was asked or changed: its card, wherever it shows. The person asked hears a new one where they wait for
+ * things (`notifySecretRequest`), and once it is closed it leaves there.
+ */
 export async function publishSecret(
-  pubsub: PubSub | undefined,
+  deps: { db: Database; pubsub?: PubSub },
   row: SecretRequestRow,
   type: "secret.requested" | "secret.updated",
 ) {
-  await publishChannelEvent(pubsub, {
+  await publishChannelEvent(deps.pubsub, {
     type,
     channelId: row.channelId,
     threadId: row.threadId,
     secretRequest: secretRequestView(row),
   });
+  if (type === "secret.requested") await notifySecretRequest(deps, row).catch(() => undefined);
+  else if (statusOf(row) !== "pending")
+    await resolveSecretRequestNotifications(deps, row.orgId, row.id).catch(() => undefined);
 }
 
 const resumeJob = (row: SecretRequestRow) => ({
@@ -393,7 +401,7 @@ export async function deliverSecret(
     await activateDeliveredSecret(deps, orgId, row.id);
   } catch (error) {
     // The row stays visible and removable even if the activation reply is lost.
-    await publishSecret(deps.pubsub, delivered, "secret.updated").catch(() => undefined);
+    await publishSecret(deps, delivered, "secret.updated").catch(() => undefined);
     throw error;
   }
   const [latest] = await deps.db.select().from(secretRequests).where(eq(secretRequests.id, row.id));
@@ -497,8 +505,8 @@ export async function activateDeliveredSecret(
     ).catch(() => undefined);
   }
   if (finalized) {
-    await publishSecret(deps.pubsub, finalized.finished, "secret.updated");
-    for (const replaced of finalized.old) await publishSecret(deps.pubsub, replaced, "secret.updated");
+    await publishSecret(deps, finalized.finished, "secret.updated");
+    for (const replaced of finalized.old) await publishSecret(deps, replaced, "secret.updated");
   }
 }
 
@@ -536,7 +544,7 @@ export async function declineSecret(
     return updated;
   });
   if (!declined) throw new ConflictError("This request was already answered or expired");
-  await publishSecret(deps.pubsub, declined, "secret.updated");
+  await publishSecret(deps, declined, "secret.updated");
   const sandbox = deps.sandbox;
   if (sandbox) {
     await onRequestComputer(
@@ -571,7 +579,7 @@ export async function expireSecretRequests(deps: { db: Database; pubsub?: PubSub
     }
     return rows;
   });
-  for (const row of expired) await publishSecret(deps.pubsub, row, "secret.updated");
+  for (const row of expired) await publishSecret(deps, row, "secret.updated");
   return expired.length;
 }
 

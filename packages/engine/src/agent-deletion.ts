@@ -160,8 +160,8 @@ export async function deleteAgent(deps: AgentDeletionDeps, actorId: string, orgI
     return { released, dms };
   });
   invalidateOrg(orgId);
-  // What it waited on people for (approvals, questions, handoffs) leaves their inboxes, as a closed source does. A
-  // turn in a forum topic it opened stays: the topic goes on without it.
+  // What it waited on people for (approvals, questions, handoffs, secrets) leaves their inboxes, as a closed source
+  // does. A turn in a forum topic it opened stays: the topic goes on without it.
   const waiting = await db
     .selectDistinct({ groupKey: notifications.groupKey })
     .from(notifications)
@@ -170,7 +170,7 @@ export async function deleteAgent(deps: AgentDeletionDeps, actorId: string, orgI
         eq(notifications.orgId, orgId),
         isNull(notifications.doneAt),
         eq(notifications.waiting, true),
-        inArray(notifications.kind, ["approval", "agent_question", "browser_handoff"]),
+        inArray(notifications.kind, ["approval", "agent_question", "browser_handoff", "secret_request"]),
         sql`${notifications.actors} @> ${JSON.stringify([{ type: "agent", id: agentId }])}::jsonb`,
       ),
     );

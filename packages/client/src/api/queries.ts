@@ -100,6 +100,7 @@ import type {
   S3Input,
   SandboxSettingsInput,
   SearchKind,
+  SecretRequest,
   SeriesScope,
   SkillInput,
   SkillPatch,
@@ -1922,6 +1923,20 @@ export function cacheMessageMemories(
     const list = data as Message[];
     if (!list.some((m) => m && m.id === messageId)) return data;
     return list.map((m) => (m.id === messageId ? { ...m, memories } : m));
+  });
+}
+
+/**
+ * An agent's secret request was asked or closed (ADR 0027, `secret.requested` / `secret.updated`, or the answer the
+ * server returned): its card (`meta.secretRequest`) in every cached list of its channel (timeline and threads).
+ */
+export function cacheSecretRequest(qc: ReturnType<typeof useQueryClient>, orgId: string, request: SecretRequest) {
+  if (!request.messageId) return;
+  qc.setQueriesData({ queryKey: ["org", orgId, "channel", request.channelId] }, (data: unknown) => {
+    if (!Array.isArray(data)) return data;
+    const list = data as Message[];
+    if (!list.some((m) => m && m.id === request.messageId)) return data;
+    return list.map((m) => (m.id === request.messageId ? { ...m, meta: { ...m.meta, secretRequest: request } } : m));
   });
 }
 
