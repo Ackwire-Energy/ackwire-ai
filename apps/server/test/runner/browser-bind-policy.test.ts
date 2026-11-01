@@ -1,9 +1,11 @@
 import { expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { systemLauncher } from "../../runner/agent-users";
 import {
   type BindPolicyOptions,
   conflictingBrowserPorts,
   ensureBrowserBindPolicy,
+  rootDecoys,
 } from "../../runner/browser-bind-policy";
 import type { RunCommand } from "../../runner/service";
 
@@ -136,4 +138,26 @@ test("a listener on a browser port must be its owner's: only that agent's pair i
   ].join("\n");
   expect(conflictingBrowserPorts(ss, [20001, 20001])).toEqual([10003]);
   expect(conflictingBrowserPorts(ss, [20000, 20999])).toEqual([10003, 10004]);
+});
+
+test("root's decoys: bound before Bun.listen returns, and a handshake completes while root waits on the probe", () => {
+  const decoys = rootDecoys();
+  const connect = (host: string, port: number) =>
+    spawnSync(
+      process.execPath,
+      [
+        "-e",
+        `Bun.connect({ hostname: ${JSON.stringify(host)}, port: ${port}, socket: { open() { console.log("connected"); process.exit(0) }, data() {}, connectError() { console.log("refused"); process.exit(0) } } })`,
+      ],
+      { encoding: "utf8", timeout: 10_000 },
+    ).stdout.trim();
+  try {
+    expect(decoys.ports.every((p) => p > 0)).toBe(true);
+    // This process's event loop is blocked in spawnSync, as root's is in the probe: the kernel still accepts.
+    expect(connect("127.0.0.1", decoys.ports[0])).toBe("connected");
+    expect(connect("::1", decoys.ports[1])).toBe("connected");
+  } finally {
+    decoys.close();
+  }
+  expect(connect("127.0.0.1", decoys.ports[0])).toBe("refused");
 });

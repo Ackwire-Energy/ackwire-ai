@@ -42,7 +42,7 @@ export interface Decoys {
  * Bound before `Bun.listen` returns. While root waits on the probe its event loop is blocked, but the kernel still
  * completes handshakes into the backlog: a rule that let the agent in shows as a completed connect.
  */
-function rootDecoys(): Decoys {
+export function rootDecoys(): Decoys {
   if (typeof Bun === "undefined") throw new Error("System mode runs the runner on Bun");
   const open = (hostname: string) => Bun.listen({ hostname, port: 0, socket: { data() {} } });
   const v4 = open("127.0.0.1");

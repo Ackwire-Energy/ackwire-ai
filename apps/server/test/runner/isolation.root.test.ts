@@ -14,7 +14,7 @@ import {
 import { type BindPolicyOptions, ensureBrowserBindPolicy } from "../../runner/browser-bind-policy";
 import { browserBand, browserPortsForUid } from "../../runner/browser-ports";
 import { LoopbackGuard, RUNNER_NFT_TABLE } from "../../runner/loopback-guard";
-import { AGENT_TMP_ROOT, agentSlice, agentTmp, runSync } from "../../runner/service";
+import { AGENT_TMP_CLEANUP, AGENT_TMP_ROOT, agentSlice, agentTmp, runSync } from "../../runner/service";
 
 /**
  * System mode's isolation on a real Linux computer, as root: real agent users and slices, the runner's loopback
@@ -479,6 +479,17 @@ describe.if(ROOT)("the agents' isolation on this computer, as root", () => {
     }
     expect(existsSync(path.join(agentTmp(A.uid), "agentes-isolation-a.sock"))).toBe(true);
     expect(runAs(B, ["/bin/ls", "-a", "/tmp"]).out).not.toContain("agentes-isolation-a.sock");
+  });
+
+  test("systemd-tmpfiles takes the cleanup line for the agents' own folders, and keeps what is fresh", () => {
+    const conf = path.join(HOME, "agentes-runner.conf");
+    writeFileSync(conf, AGENT_TMP_CLEANUP);
+    const fresh = path.join(agentTmp(A.uid), "agentes-isolation-fresh");
+    writeFileSync(fresh, "");
+    const cleaned = runSync("systemd-tmpfiles", ["--clean", conf]);
+    expect(cleaned.output).not.toMatch(/fail|invalid|unknown/i);
+    expect(cleaned.code).toBe(0);
+    expect(existsSync(fresh)).toBe(true);
   });
 
   test.if(has(ADB))("adb: each agent its own server, at once", () => {
