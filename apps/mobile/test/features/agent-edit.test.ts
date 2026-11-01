@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { coordinatorNote } from "@agenteschat/client/lib/coordinator";
 import { presetChannels, presetLevels, ROLE_DEFAULTS, ROLE_IDS } from "@agenteschat/client/lib/new-agent";
 import {
   type AgentDraft,
@@ -10,6 +11,7 @@ import {
 } from "../../src/features/agents/edit";
 import { firstBlockedStep, NEW_AGENT_PHONE_STEPS, stepBlocked } from "../../src/features/agents/new-agent";
 import { AGENT_ACCESSORIES, AGENT_COLORS, AGENT_EYES } from "../../src/features/shared/logic";
+import { translator } from "./fixtures";
 
 describe("an agent's look", () => {
   test("every part is set, unknown values fall back to the default agent", () => {
@@ -59,10 +61,17 @@ describe("editing an agent", () => {
     role: "Atendimento",
     instructions: "Responde clientes.",
     look: { color: "teal", eyes: "happy", accessory: "headset" },
+    coordinator: false,
   };
 
   test("admins change everything, its person only the look, others nothing", () => {
-    expect([...editableFields({ admin: true, owner: false })].sort()).toEqual(["instructions", "look", "name", "role"]);
+    expect([...editableFields({ admin: true, owner: false })].sort()).toEqual([
+      "coordinator",
+      "instructions",
+      "look",
+      "name",
+      "role",
+    ]);
     expect([...editableFields({ admin: false, owner: true })]).toEqual(["look"]);
     expect(editableFields({ admin: false, owner: false }).size).toBe(0);
   });
@@ -78,6 +87,23 @@ describe("editing an agent", () => {
     expect(agentChanges(saved, { ...saved, name: "Outra", instructions: "x" }, own)).toBeNull();
     // An emptied name is never sent.
     expect(agentChanges(saved, { ...saved, name: "  " }, all)).toBeNull();
+  });
+
+  test("who coordinates the team (ADR 0093): admins switch it, its person can't; the line says who does now", async () => {
+    const turnedOn = { ...saved, coordinator: true };
+    expect(agentChanges(saved, turnedOn, editableFields({ admin: true, owner: false }))).toEqual({ coordinator: true });
+    expect(agentChanges(saved, turnedOn, editableFields({ admin: false, owner: true }))).toBeNull();
+    const pt = await translator("pt-BR");
+    const en = await translator("en");
+    const nina = { id: "nina", name: "Nina", coordinator: false };
+    const team = [nina, { id: "theo", name: "Theo", coordinator: true }];
+    expect(coordinatorNote(pt, team, "nina", false)).toBe("Hoje quem coordena é o Theo.");
+    expect(coordinatorNote(pt, team, "nina", true)).toBe("Hoje quem coordena é o Theo. Só um agente coordena por vez.");
+    expect(coordinatorNote(en, team, "nina", true)).toBe(
+      "Theo coordinates the team now. One agent coordinates at a time.",
+    );
+    expect(coordinatorNote(pt, team, "theo", true)).toBeNull();
+    expect(coordinatorNote(pt, [nina], "nina", false)).toBe("Ninguém coordena o time agora.");
   });
 });
 

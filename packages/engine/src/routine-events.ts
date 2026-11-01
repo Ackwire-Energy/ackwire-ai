@@ -1,4 +1,5 @@
 import { and, type Database, desc, type Executor, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
+import { cutText } from "./format";
 import { enqueue } from "./outbox";
 import { routineJobAlive } from "./routine-state";
 
@@ -37,7 +38,7 @@ export const mergeEvents: EventMerge = (current, incoming) => {
   const all = [...listOf(current), ...listOf(incoming)];
   const kept = all.slice(-MAX_EVENTS_PER_RUN);
   const extra = countOf(current) + countOf(incoming) + all.length - kept.length;
-  const lines = kept.map((e) => `- ${String(e.summary ?? "").slice(0, 300)}`);
+  const lines = kept.map((e) => `- ${cutText(String(e.summary ?? ""), 300)}`);
   return {
     type: current.type ?? incoming.type,
     events: kept,

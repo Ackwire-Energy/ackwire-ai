@@ -1,4 +1,5 @@
 import { and, type Database, desc, eq, inArray, isNull, schema } from "@agenteschat/db";
+import { cutText } from "./format";
 import { MISSION_RULES } from "./mission-rules";
 import { missionCwd, onlyReadsWhileWriting, shortSha } from "./mission-worktree";
 
@@ -86,7 +87,7 @@ export async function missionBrief(db: Database, missionId: string): Promise<str
   const provisional = decisions.filter((d) => d.status === "provisional");
   // Titles, lines and questions come from the executor (or the agent's own tools): data, never instructions.
   const data = [
-    `"${mission.title}" (${mission.status}). Goal: ${mission.goal.slice(0, 600)}`,
+    `"${mission.title}" (${mission.status}). Goal: ${cutText(mission.goal, 600)}`,
     items.length
       ? `Plan: ${mission.planDone} of ${mission.planTotal} done.${doing.length ? ` In progress: ${doing.join("; ")}.` : ""}${
           waiting.length ? ` Waiting for people: ${waiting.join("; ")}.` : ""

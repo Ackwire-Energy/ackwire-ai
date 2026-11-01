@@ -618,6 +618,11 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
             : `${org(orgId)}/channels/${enc(channelId)}/members/people/${enc(member.userId)}`,
           { method: "DELETE" },
         ),
+      setAutoReply: (orgId, channelId, agentId, autoReply) =>
+        request<void>(`${org(orgId)}/channels/${enc(channelId)}/members/agents/${enc(agentId)}`, {
+          method: "PATCH",
+          json: { autoReply },
+        }),
       messages: async (orgId, channelId, options = {}) => {
         const path = `${org(orgId)}/channels/${enc(channelId)}/messages`;
         const query = { threadId: options.threadId, before: options.before, limit: options.limit };
@@ -1218,7 +1223,12 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         ),
     },
     proposals: {
-      list: async (orgId) => (await request<{ proposals: Proposal[] }>(`${org(orgId)}/proposals`)).proposals,
+      list: async (orgId, filter) =>
+        (
+          await request<{ proposals: Proposal[] }>(
+            `${org(orgId)}/proposals${filter?.ids ? `?ids=${enc(filter.ids.join(","))}` : ""}`,
+          )
+        ).proposals,
       accept: (orgId, id, text) =>
         request<Proposal>(`${org(orgId)}/proposals/${enc(id)}/accept`, { json: text === undefined ? {} : { text } }),
       refuse: (orgId, id) => request<Proposal>(`${org(orgId)}/proposals/${enc(id)}/refuse`, { json: {} }),

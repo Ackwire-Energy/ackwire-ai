@@ -9948,6 +9948,15 @@ a.machine-row__name:hover {
   padding-top: 16px;
   border-top: 1px solid var(--line);
 }
+/* "Coordena o time", after the look and its same hairline. */
+.agp-coord {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
 /* Each part's name above its choices, all starting on the same left edge. */
 .agp-look__row {
   display: flex;

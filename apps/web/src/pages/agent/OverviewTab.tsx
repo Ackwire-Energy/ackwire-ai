@@ -9,6 +9,7 @@ import {
 } from "@agenteschat/client";
 import { audienceSummary } from "@agenteschat/client/lib/audience";
 import { formatMonth, formatPercent, formatUsd, whenAt } from "@agenteschat/client/lib/format";
+import { proposalTitle } from "@agenteschat/client/lib/proposals";
 import { excerpt } from "@agenteschat/client/lib/text";
 import { Avatar, Button, Card, Chip, Icon, Meter, PlanMeter } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
@@ -18,7 +19,6 @@ import { usd } from "@/components/AgentFields";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { planMeterText, usageShown } from "@/lib/plan-usage";
-import { proposalTitle } from "@/pages/ProposalsPage";
 import { AgentAsksLine, agentConnectorTools } from "./AgentTools";
 import { ComputerNow } from "./ComputerNow";
 import { CardHead, useAgentEdit } from "./context";
