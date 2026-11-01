@@ -4,9 +4,9 @@ import { CONTEXT_LIMITS, MODEL_TIERS, PROVIDER_IDS } from "@agenteschat/provider
 import { z } from "@hono/zod-openapi";
 
 /** A last message that was only a GIF or a sticker (ADR 0091): the apps say which, translated, in its preview. */
-export const MediaKind = z.enum(["gif", "sticker"]).nullable().openapi({
+export const MediaKind = z.enum(["gif", "sticker", "voice"]).nullable().openapi({
   description:
-    "The message was only a GIF or a sticker (ADR 0091): show `GIF` or `Sticker` in the reader's language where its text would be. Null for a message with text.",
+    "A voice message (ADR 0094), whose preview has no text, or a message of only a GIF or a sticker (ADR 0091): show `GIF` or `Sticker` in the reader's language where its text would be. Null for a message with text.",
 });
 
 /** A last-message preview's `meta`: what the app needs to show a server-written body in the reader's language. */

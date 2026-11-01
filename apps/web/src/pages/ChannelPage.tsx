@@ -59,6 +59,8 @@ import {
   usePlaceChannel,
   usePostMessage,
   useRoster,
+  useSendVoice,
+  useSettings,
   usesBrowser,
   useThreadInfo,
   useThreadMessages,
@@ -88,7 +90,8 @@ import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@
 import { dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
-import { isMediaAfterReply, messageMediaOf, quoteText } from "@agenteschat/client/lib/media";
+import { isMediaAfterReply, messageMediaOf, quoteText, textOrMedia } from "@agenteschat/client/lib/media";
+import { voiceOf } from "@agenteschat/client/lib/voice";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import {
   isOpenMission,
@@ -121,6 +124,7 @@ import {
   type ComposerCommand,
   ComposerFile,
   type ComposerFormatLabels,
+  type ComposerVoice,
   cx,
   DayDivider,
   Dialog,
@@ -149,6 +153,7 @@ import {
   SkeletonGroup,
   SkeletonMessage,
   Spinner,
+  type VoiceNotice,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -170,6 +175,7 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { tokenizeBody } from "@/chat/body";
 import { ChatMedia } from "@/chat/ChatMedia";
+import { ChatVoice } from "@/chat/ChatVoice";
 import { MessageBody } from "@/chat/MessageBody";
 import { browserOffline } from "@/chat/offline";
 import { readingLanding } from "@/chat/reading";
@@ -276,7 +282,7 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
 import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
 import { onChannelDetails, takeChannelDetails } from "@/lib/channel-details";
-import { useDocumentTitle } from "@/lib/desktop";
+import { desktopPlatform, useDocumentTitle } from "@/lib/desktop";
 import { reportPainted } from "@/lib/perf";
 import { useToast } from "@/lib/toast";
 import {
@@ -725,6 +731,11 @@ function ChannelView({
     },
   });
   const { send, retry } = sendHelpers(post);
+  const sendVoice = useSendVoice(org.id, channel.id, {
+    me: { id: me.user.id },
+    onRefused: (error) =>
+      toast.show(errorCode(error) === "voice_limit" ? t("voice.limit") : errorText(t, error), "error"),
+  });
   const status = useConnectionStatus();
 
   const api = useApi();
@@ -1439,6 +1450,53 @@ function ChannelView({
   };
   const sendMedia = useCallback((media: MessageMedia) => sendMediaNow.current(media), []);
   const mediaTabs = useMediaTabs(sendMedia);
+  // Voice messages (ADR 0094), where this person can write and the workspace has them; a reply to a mission goes in
+  // text, to the mission. The recording goes in the box's thread, and the box stays as it was.
+  const voiceSettings = useSettings(org.id);
+  const voiceOn = Boolean(voiceSettings.data?.voiceAvailable && voiceSettings.data.voiceMessages);
+  const voice: ComposerVoice | undefined =
+    voiceOn && !chrome?.locked && !missionReply
+      ? {
+          scope: `${channel.id}:${thread?.id ?? ""}`,
+          allowed: async () => {
+            const { allowed } = await api.voice.allowed(org.id).catch(() => ({ allowed: true }));
+            if (!allowed) toast.show(t("voice.limit"));
+            return allowed;
+          },
+          onTake: ({ blob, durationMs, peaks }) => {
+            toBottom(true);
+            void sendVoice({
+              blob,
+              durationMs,
+              peaks,
+              threadId: thread ? thread.id : null,
+              replyTo: null,
+              language: i18n.language.split("-")[0] ?? null,
+            });
+          },
+          onNotice: (notice: VoiceNotice) => {
+            if (notice === "blocked") {
+              toast.show(t(desktopPlatform() === "mac" ? "voice.blockedMac" : "voice.blockedWeb"), "error");
+            } else {
+              toast.show(t(`voice.${notice}`), notice === "deleted" ? undefined : "error");
+            }
+          },
+          labels: {
+            record: t("voice.record"),
+            recording: t("voice.recording"),
+            pause: t("voice.pause"),
+            resume: t("voice.resume"),
+            discard: t("voice.discard"),
+            send: t("voice.send"),
+            listen: t("voice.listen"),
+            stopListening: t("voice.stopListening"),
+            keys: t("voice.keys"),
+            keysHold: t("voice.keysHold"),
+            keysPaused: t("voice.keysPaused"),
+            left: (seconds) => t("voice.left", { seconds }),
+          },
+        }
+      : undefined;
   // While an agent works here: the send button turns into stop (box empty), and typing offers
   // "Juntar ao que ele faz" (↵) or "Parar e mandar" (⌘↵).
   const stopName = stopTarget ? (dir.agentById.get(stopTarget.agentId)?.name ?? t("channel.unknownAgent")) : "";
@@ -1927,6 +1985,7 @@ function ChannelView({
                         onSend={onSend}
                         working={chrome?.locked ? null : working}
                         choice={choice}
+                        voice={voice}
                         disabled={Boolean(chrome?.locked)}
                         label={
                           chrome?.composerLabel ??
@@ -2985,7 +3044,7 @@ export const TimelineMessage = memo(function TimelineMessage({
     return {
       author: dir.authorName(found.author),
       mine: found.author.type === "person" && found.author.id === me.user.id,
-      text: found.body,
+      text: textOrMedia(t, found.body, found.meta),
     };
   };
   // A stopped run's message (`meta.canceled`): the text so far, and "Interrompido por Walter" as a note.
@@ -3047,6 +3106,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   const artifacts = artifactRefs(meta);
   // A GIF or a sticker (ADR 0091); with no words, the message is the picture alone.
   const media = useMemo(() => messageMediaOf(m.meta), [m.meta]);
+  // A voice message is its recording: the player, and no text (ADR 0094).
+  const voice = useMemo(() => voiceOf(m.meta), [m.meta]);
   // The one an agent adds after its own reply: a message of its own, not a reply (no feedback, no run's cards).
   const mediaAfter = isMediaAfterReply(m.meta);
   // The run this message answers for (its steps, its browser, the questions it asked): none for that one.
@@ -3360,6 +3421,7 @@ export const TimelineMessage = memo(function TimelineMessage({
             !actionCard &&
             // A question's card already says it: its own text isn't repeated above.
             !(question && body.trim() === question.text.trim()) &&
+            !voice &&
             (body.trim() || (!card && !stopped.canceled && artifacts.length === 0 && !media)) && (
               <MessageText>
                 <MessageBody
@@ -3372,6 +3434,7 @@ export const TimelineMessage = memo(function TimelineMessage({
               </MessageText>
             )}
           {media && <ChatMedia media={media} />}
+          {voice && <ChatVoice message={m} voice={voice} />}
           {(stopped.canceled || atLimit) && (
             <StoppedLine
               runId={m.agentRunId}

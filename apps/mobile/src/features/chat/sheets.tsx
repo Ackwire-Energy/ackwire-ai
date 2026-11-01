@@ -36,6 +36,7 @@ import { chatHref } from "../links/logic";
 import { missionComputerKey } from "../missions/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useEdition, useMeId, useOrgId } from "../shared/hooks";
+import { voiceOf } from "@agenteschat/client/lib/voice";
 import { genderOf, previewOf } from "../shared/logic";
 import { SheetTitle } from "../shared/PromptForm";
 import { ActionList, copyText, successHaptic, Tile, tapHaptic, useSurface } from "../shared/parts";
@@ -96,7 +97,8 @@ export function MessageActions({
   const pills = reactionPills(cached.data ?? m.reactions, meId);
   const agentName = m.author.type === "agent" ? dir.nameOf(m.author) : "";
   const rootId = m.threadId ?? m.id;
-  const text = previewOf(m.body);
+  // A voice message is its audio: no words to preview or copy here.
+  const text = voiceOf(m.meta) ? "" : previewOf(m.body);
   const react = (emoji: string) => {
     tapHaptic();
     const reaction = reactionName(emoji);

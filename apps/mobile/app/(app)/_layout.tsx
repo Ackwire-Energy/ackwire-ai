@@ -5,6 +5,7 @@ import { View } from "react-native";
 import { useConnection, useRememberAgentLooks } from "@/features/shared/hooks";
 import { ScreenError } from "@/features/shared/ScreenError";
 import { useUserEvents } from "@/features/shared/userEvents";
+import { useVoiceOutbox } from "@/features/voice/useVoiceOutbox";
 import { useSounds } from "@/lib/sounds";
 import { useOrg, useOrgGate } from "@/providers/org";
 import {
@@ -44,6 +45,7 @@ export default function AppLayout() {
 function AppStack() {
   const { colors } = useTheme();
   useUserEvents();
+  useVoiceOutbox();
   // The app's sounds (ADR 0070): the player and its audio session.
   useSounds();
   useRememberAgentLooks();

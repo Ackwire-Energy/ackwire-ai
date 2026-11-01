@@ -20,6 +20,7 @@ export * from "./composio";
 export * from "./database";
 export * from "./email";
 export * from "./gifs";
+export * from "./speech";
 export * from "./human-check";
 export * from "./imap";
 export * from "./keys";

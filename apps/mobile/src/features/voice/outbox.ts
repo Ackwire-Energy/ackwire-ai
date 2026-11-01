@@ -1,0 +1,174 @@
+import { keys, type Message } from "@agenteschat/client";
+import { upsertMessage } from "@agenteschat/client/lib/timeline";
+import type { QueryClient } from "@tanstack/react-query";
+import { Directory, File, Paths } from "expo-file-system";
+import { authedFetch } from "@/lib/auth";
+import { serverUrl } from "@/lib/server";
+import { retryDelayMs, uploadVerdict } from "./logic";
+
+/**
+ * Recordings on their way to the server. A recording lands in the app's documents the moment it is sent and stays
+ * there, across restarts, until the server took it: no signal only delays it. Its bubble is an optimistic message
+ * that the real one replaces by `clientId`.
+ */
+export interface VoiceSend {
+  clientId: string;
+  orgId: string;
+  channelId: string;
+  threadId: string | null;
+  replyTo: string | null;
+  authorId: string;
+  /** File name in the folder (a path would go stale: iOS moves the app's container on updates). */
+  file: string;
+  durationMs: number;
+  peaks: number[];
+  language: string | null;
+  createdAt: string;
+}
+
+export type VoiceRefusal = "limit" | "refused";
+
+const folder = () => new Directory(Paths.document, "voice-outbox");
+const index = () => new File(folder(), "index.json");
+let queue: VoiceSend[] | null = null;
+let attempts = 0;
+let timer: ReturnType<typeof setTimeout> | null = null;
+let flushing = false;
+
+function read(): VoiceSend[] {
+  if (queue) return queue;
+  try {
+    const f = index();
+    queue = f.exists ? (JSON.parse(f.textSync()) as VoiceSend[]) : [];
+  } catch {
+    queue = [];
+  }
+  return queue;
+}
+
+function write() {
+  try {
+    if (!folder().exists) folder().create({ intermediates: true });
+    index().write(JSON.stringify(queue ?? []));
+  } catch {
+    // Not kept across a restart; it still goes while the app stays open.
+  }
+}
+
+/** The bubble until the real message arrives: my audio, not playable yet, no words. */
+export const localVoiceMessage = (item: VoiceSend): Message => ({
+  id: `local-${item.clientId}`,
+  channelId: item.channelId,
+  threadId: item.threadId,
+  author: { type: "person", id: item.authorId },
+  body: "",
+  mentionedAgentIds: [],
+  agentRunId: null,
+  meta: { voice: { clipId: `local:${item.clientId}`, durationMs: item.durationMs, peaks: item.peaks } },
+  clientId: item.clientId,
+  local: "pending",
+  createdAt: item.createdAt,
+});
+
+const listKeys = (item: Pick<VoiceSend, "orgId" | "channelId" | "threadId">) => [
+  keys.messages(item.orgId, item.channelId),
+  ...(item.threadId ? [keys.thread(item.orgId, item.channelId, item.threadId)] : []),
+];
+
+export function showBubble(qc: QueryClient, item: VoiceSend) {
+  const local = localVoiceMessage(item);
+  for (const key of listKeys(item)) {
+    qc.setQueryData<Message[]>(key, (list) => (list ? upsertMessage(list, local) : list));
+  }
+}
+
+export function removeBubble(
+  qc: QueryClient,
+  item: Pick<VoiceSend, "orgId" | "channelId" | "threadId" | "clientId">,
+) {
+  for (const key of listKeys(item)) {
+    qc.setQueryData<Message[]>(key, (list) =>
+      list?.filter((m) => !(m.local && m.clientId === item.clientId)),
+    );
+  }
+}
+
+function forget(item: VoiceSend) {
+  queue = read().filter((q) => q.clientId !== item.clientId);
+  write();
+  try {
+    const f = new File(folder(), item.file);
+    if (f.exists) f.delete();
+  } catch {}
+}
+
+async function upload(item: VoiceSend) {
+  const form = new FormData();
+  form.append("file", {
+    uri: new File(folder(), item.file).uri,
+    name: "voice.m4a",
+    type: "audio/mp4",
+  } as unknown as Blob);
+  form.append("durationMs", String(item.durationMs));
+  form.append("peaks", JSON.stringify(item.peaks));
+  form.append("clientId", item.clientId);
+  if (item.threadId) form.append("threadId", item.threadId);
+  if (item.replyTo) form.append("replyTo", item.replyTo);
+  if (item.language) form.append("language", item.language);
+  const res = await authedFetch(
+    `${serverUrl()}/api/app/organizations/${item.orgId}/channels/${item.channelId}/voice`,
+    { method: "POST", body: form },
+  );
+  if (res.status >= 400 && res.status < 500) {
+    const body = (await res.json().catch(() => null)) as { code?: string } | null;
+    if (body?.code === "voice_limit" || body?.code === "voice.limit") return "limit" as const;
+  }
+  return uploadVerdict(res.status);
+}
+
+/** Sends what waits, oldest first, and stops at the first that can't go now. */
+export async function flushVoice(qc: QueryClient, onRefused: (reason: VoiceRefusal) => void) {
+  if (flushing) return;
+  flushing = true;
+  if (timer) clearTimeout(timer);
+  timer = null;
+  try {
+    for (const item of [...read()]) {
+      const verdict = await upload(item).catch(() => "retry" as const);
+      if (verdict === "retry") {
+        timer = setTimeout(() => void flushVoice(qc, onRefused), retryDelayMs(attempts));
+        attempts++;
+        return;
+      }
+      attempts = 0;
+      forget(item);
+      if (verdict === "done") continue;
+      removeBubble(qc, item);
+      onRefused(verdict === "limit" ? "limit" : "refused");
+    }
+  } finally {
+    flushing = false;
+  }
+}
+
+/** Takes a finished recording: moved to the app's documents and queued. */
+export function queueVoice(
+  qc: QueryClient,
+  uri: string,
+  item: Omit<VoiceSend, "file" | "createdAt">,
+  onRefused: (reason: VoiceRefusal) => void,
+) {
+  if (!folder().exists) folder().create({ intermediates: true });
+  const file = `${item.clientId}.m4a`;
+  new File(uri).move(new File(folder(), file));
+  const full: VoiceSend = { ...item, file, createdAt: new Date().toISOString() };
+  queue = [...read(), full];
+  write();
+  showBubble(qc, full);
+  void flushVoice(qc, onRefused);
+}
+
+/** What was still waiting when the app last closed: its bubbles back in the lists. */
+export function restoreVoice(qc: QueryClient, orgId: string) {
+  for (const item of read()) if (item.orgId === orgId) showBubble(qc, item);
+}

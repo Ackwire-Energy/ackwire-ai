@@ -402,6 +402,78 @@ export const envVars = {
     section: "Chat",
     secret: true,
   },
+  SPEECH_ENGINES: {
+    schema: z.string().optional(),
+    description:
+      "Speech engines for voice messages, in the order they are tried (ADR 0094): comma-separated, from assemblyai, elevenlabs, soniox, groq, openai and local. Empty: every one with a key, in that order. With none, the microphone stays hidden, unless the installation's owner sets one in Settings.",
+    section: "Chat",
+    example: "assemblyai,groq",
+  },
+  ASSEMBLYAI_API_KEY: {
+    schema: z.string().optional(),
+    description: "AssemblyAI key for voice messages, optional (ADR 0094). The audio goes to AssemblyAI to become text.",
+    section: "Chat",
+    secret: true,
+  },
+  ELEVENLABS_API_KEY: {
+    schema: z.string().optional(),
+    description: "ElevenLabs key for voice messages, optional (ADR 0094). The audio goes to ElevenLabs to become text.",
+    section: "Chat",
+    secret: true,
+  },
+  SONIOX_API_KEY: {
+    schema: z.string().optional(),
+    description: "Soniox key for voice messages, optional (ADR 0094). The audio goes to Soniox to become text.",
+    section: "Chat",
+    secret: true,
+  },
+  GROQ_API_KEY: {
+    schema: z.string().optional(),
+    description: "Groq key for voice messages, optional (ADR 0094). The audio goes to Groq to become text.",
+    section: "Chat",
+    secret: true,
+  },
+  OPENAI_SPEECH_API_KEY: {
+    schema: z.string().optional(),
+    description: "OpenAI key for voice messages, optional (ADR 0094). The audio goes to OpenAI to become text.",
+    section: "Chat",
+    secret: true,
+  },
+  LOCAL_SPEECH_URL: {
+    schema: z.url().optional(),
+    description:
+      "A speech server of your own that speaks the OpenAI format, for voice messages (ADR 0094): Speaches, a local Whisper or Parakeet. The audio stays with you.",
+    section: "Chat",
+    example: "http://whisper:8000/v1",
+  },
+  LOCAL_SPEECH_MODEL: {
+    schema: z.string().optional(),
+    description: "The model that speech server loads (default `whisper-1`).",
+    section: "Chat",
+  },
+  VOICE_RETENTION_DAYS: {
+    schema: z.coerce.number().int().min(0).default(90),
+    description:
+      "Days a voice message's recording is kept (ADR 0094). After that its audio is deleted; the message and its words stay. 0 = keep it forever.",
+    section: "Chat",
+  },
+  VOICE_LIMIT_PERSON_MINUTES_PER_DAY: {
+    schema: z.coerce.number().int().min(0).default(60),
+    description:
+      "agentes.chat's own servers: minutes of voice messages one person may send in 24 hours (ADR 0094). 0 = no limit. Never applies on a self-hosted server.",
+    section: "Chat",
+  },
+  VOICE_LIMIT_ORG_MINUTES_PER_MEMBER: {
+    schema: z.coerce.number().int().min(0).default(20),
+    description:
+      "agentes.chat's own servers: minutes of voice messages a workspace may send in 24 hours, per member (ADR 0094). 0 = no limit for the workspace.",
+    section: "Chat",
+  },
+  VOICE_LIMIT_ORG_MIN_MINUTES_PER_DAY: {
+    schema: z.coerce.number().int().min(0).default(300),
+    description: "agentes.chat's own servers: the least a workspace's limit above may be, however few its members.",
+    section: "Chat",
+  },
   CONNECTOR_GITHUB_CLIENT_ID: {
     schema: z.string().optional(),
     description:

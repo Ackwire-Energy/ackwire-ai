@@ -171,7 +171,7 @@ export function SearchResults({ q }: { q: string }) {
                 return {
                   key: h.sourceId,
                   leading: <Tile icon="chat" size={34} />,
-                  label: previewOf(h.snippet || h.title),
+                  label: previewOf(h.snippet || h.title) || t("voice.word"),
                   hint: [where ? t("mobile.chats.waitIn", { where: `#${where}` }) : null, when.short(h.createdAt)]
                     .filter(Boolean)
                     .join(" · "),

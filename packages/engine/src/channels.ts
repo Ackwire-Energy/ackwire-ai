@@ -5,7 +5,7 @@ import { endOfCategory, requireCategoryInOrg } from "./channel-categories";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishOrgEvent, publishUserEvent } from "./events";
 import { followsThreadSql } from "./follows";
-import { type PreviewMeta, previewMediaKind, previewMeta } from "./message-preview";
+import { type PreviewMeta, previewMediaKind, previewMeta, readableBody } from "./message-preview";
 import { notificationSnippet } from "./notifications";
 import { can, getMembership, type Membership, requireActiveMembership, requirePermission } from "./organizations";
 import { memberKeysSql, memberRankSql, resolvePermissions } from "./permissions";
@@ -72,7 +72,7 @@ export interface ChannelLastMessage {
   /** What the app needs to show a server-written body in the reader's language; null for a plain message. */
   meta: PreviewMeta | null;
   /** A GIF or a sticker sent with no text (ADR 0091): the app says which where `preview` is empty; else null. */
-  mediaKind: "gif" | "sticker" | null;
+  mediaKind: "gif" | "sticker" | "voice" | null;
   createdAt: Date;
 }
 
@@ -194,7 +194,7 @@ export async function listChannels(db: Database, userId: string, orgId: string):
               authorType: r.last_author_type,
               authorId: r.last_author_type === "person" ? r.last_user_id : r.last_agent_id,
               authorName: r.last_author_name,
-              preview: notificationSnippet(r.last_body, CHANNEL_PREVIEW_LENGTH),
+              preview: notificationSnippet(readableBody(r.last_body ?? "", lastMeta), CHANNEL_PREVIEW_LENGTH),
               meta: previewMeta(lastMeta),
               mediaKind: previewMediaKind(r.last_body, lastMeta),
               createdAt: asDate(r.last_at),

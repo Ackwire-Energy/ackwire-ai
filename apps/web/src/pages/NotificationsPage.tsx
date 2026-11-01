@@ -711,7 +711,9 @@ function Row({
     ? restrictionLine(t, restriction.code, restriction.facts)
     : why
       ? sayWords(t, why, l.text ?? "")
-      : l.text || (media ? mediaWord(t, media) : l.text);
+      : media === "voice"
+        ? mediaWord(t, media)
+        : l.text || (media ? mediaWord(t, media) : l.text);
   const stopStep = steps ? (steps.failedAt ?? steps.done + 1) : 0;
   const stepWords = steps
     ? failed

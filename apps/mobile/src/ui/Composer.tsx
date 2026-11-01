@@ -90,6 +90,11 @@ export interface ComposerProps {
   onType?: () => void;
   /** The button in the empty field that opens the GIFs and stickers (null where neither can be sent). */
   media?: { label: string; onPress: () => void } | null;
+  /**
+   * Voice messages (null where they are off): `mic` in the empty field; while recording, `overlay` covers the field
+   * and `leading` takes the "+"'s place. The text field stays underneath, so the composer never changes height.
+   */
+  voice?: { mic: ReactNode; overlay: ReactNode | null; leading: ReactNode | null; active: boolean } | null;
 }
 
 /** The pill's height, the "+" and the send button's. */
@@ -124,6 +129,7 @@ export function Composer({
   prefill,
   onType,
   media,
+  voice,
 }: ComposerProps) {
   const theme = useTheme();
   const { colors, shadows, reducedMotion } = theme;
@@ -144,9 +150,10 @@ export function Composer({
   }, [prefillAt]);
   const has = text.trim().length > 0;
   const token = focused && mention && mentionAt ? mentionAt(text, caret) : null;
-  const stopMode = Boolean(working?.stop) && !has;
+  const stopMode = Boolean(working?.stop) && !has && !voice?.active;
   const button = has || stopMode;
   const mediaButton = media && !has ? media : null;
+  const mic = voice && !has ? voice.mic : null;
   // The choice is per message: back to "join" when the agent is done.
   const isWorking = Boolean(working);
   useEffect(() => {
@@ -234,26 +241,28 @@ export function Composer({
         </Animated.View>
       ) : null}
       <View style={styles.row}>
-        <PressScale
-          to={0.9}
-          onPress={onPlus}
-          accessibilityRole="button"
-          accessibilityLabel={t("mobile.a11y.attach")}
-          style={[styles.plus, { boxShadow: `0px 0px 0px 0.5px ${colors.line2}, ${shadows.top}` }]}
-        >
-          <Glass style={styles.plusGlass} intensity={50}>
-            <View style={styles.center}>
-              <Icon name="plus" size={22} color={colors.ink2} />
-            </View>
-          </Glass>
-        </PressScale>
+        {voice?.leading ?? (
+          <PressScale
+            to={0.9}
+            onPress={onPlus}
+            accessibilityRole="button"
+            accessibilityLabel={t("mobile.a11y.attach")}
+            style={[styles.plus, { boxShadow: `0px 0px 0px 0.5px ${colors.line2}, ${shadows.top}` }]}
+          >
+            <Glass style={styles.plusGlass} intensity={50}>
+              <View style={styles.center}>
+                <Icon name="plus" size={22} color={colors.ink2} />
+              </View>
+            </Glass>
+          </PressScale>
+        )}
         <View
           style={[
             styles.field,
             {
               backgroundColor: colors.raised,
               boxShadow: `0px 0px 0px 0.5px ${colors.line2}, 0px 6px 18px -10px rgba(0, 0, 0, 0.25)`,
-              paddingRight: button || mediaButton ? INSET : 14,
+              paddingRight: button || mediaButton || mic ? INSET : 14,
             },
           ]}
         >
@@ -315,6 +324,8 @@ export function Composer({
               onPress={press}
             />
           ) : null}
+          {voice?.overlay ?? null}
+          {mic ? <View style={styles.micBox}>{mic}</View> : null}
         </View>
       </View>
     </View>
@@ -421,6 +432,8 @@ const styles = StyleSheet.create({
   face: { height: SEND, justifyContent: "center" },
   choice: { paddingHorizontal: 4, paddingBottom: 8 },
   sendBox: { width: SEND, height: SEND },
+  // Above the overlay: the finger that holds it stays on the same button while the field changes.
+  micBox: { width: SEND, height: SEND, zIndex: 2 },
   send: { width: SEND, height: SEND, borderRadius: SEND / 2 },
   media: { width: SEND, height: SEND, borderRadius: SEND / 2 },
   glyph: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center" },

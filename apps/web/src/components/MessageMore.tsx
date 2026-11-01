@@ -1,3 +1,4 @@
+import { voiceOf } from "@agenteschat/client/lib/voice";
 import type { Message } from "@agenteschat/client";
 import { Button, EmojiPickerPopover, Menu, MenuItem } from "@agenteschat/ui";
 import { useState } from "react";
@@ -22,7 +23,7 @@ export function MessageMoreMenu({ message, channelName }: { message: Message; ch
   const actions = useChannelActions();
   const [saving, setSaving] = useState(false);
   // Only a GIF, a sticker or files (ADR 0091): no words to save, as in the right-click menu.
-  const words = message.body.trim() !== "";
+  const words = message.body.trim() !== "" && !voiceOf(message.meta);
   return (
     <>
       <Menu
@@ -163,7 +164,7 @@ export function useMessageMenu(
       return [copy(selected, "copy", t("contextMenu.copy")), ...reply, { kind: "separator" }, copyLink, wiki(selected)];
     }
     // A file with no words has no text to copy or save.
-    const words = message.body.trim() !== "";
+    const words = message.body.trim() !== "" && !voiceOf(message.meta);
     return [
       {
         kind: "reactions",

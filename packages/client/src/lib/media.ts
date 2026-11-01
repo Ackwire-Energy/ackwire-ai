@@ -16,6 +16,7 @@ import type {
   StickerMood,
 } from "../api/types";
 import { agentGrammar } from "./grammar";
+import { isVoiceMeta, voiceLength, voiceWord } from "./voice";
 
 /**
  * GIFs and stickers in chat (ADR 0091), the half the web and the phone app share: what a message's `meta.media`
@@ -185,17 +186,20 @@ export function postedMedia(media: MessageMedia): PostMedia {
  */
 export function mediaKindOf(v: unknown): MediaKind | null {
   const kind = isObject(v) ? v.kind : v;
-  return kind === "gif" || kind === "sticker" ? kind : null;
+  return kind === "gif" || kind === "sticker" || kind === "voice" ? kind : null;
 }
 
 /** The word for a GIF or a sticker where a message's text would show ("GIF", "Figurinha"). */
-export const mediaWord = (t: TFunction, kind: MediaKind) => t(kind === "gif" ? "media.word.gif" : "media.word.sticker");
+export const mediaWord = (t: TFunction, kind: MediaKind) =>
+  kind === "voice" ? voiceWord(t) : t(kind === "gif" ? "media.word.gif" : "media.word.sticker");
 
 /**
  * A message's text where a line of it shows (a list, a quote, an inbox card), or the word for its media when it has
  * no text: `meta.media` as a message stores it, or the kind a preview's meta carries.
  */
 export function textOrMedia(t: TFunction, body: string, meta: Meta): string {
+  // A voice message's words are the agents': people read its name, whatever the body holds (ADR 0094).
+  if (isVoiceMeta(meta)) return voiceWord(t, voiceLength(meta));
   if (body.trim()) return body;
   const kind = messageMediaOf(meta)?.kind ?? mediaKindOf(meta?.media);
   return kind ? mediaWord(t, kind) : body;
@@ -203,8 +207,9 @@ export function textOrMedia(t: TFunction, body: string, meta: Meta): string {
 
 /** A quote's line: its excerpt, or the word for what it quotes when that was a GIF or a sticker. */
 export function quoteText(t: TFunction, reply: Pick<ReplyRef, "excerpt" | "media">): string {
-  if (reply.excerpt.trim()) return reply.excerpt;
   const kind = mediaKindOf(reply.media);
+  if (kind === "voice") return mediaWord(t, kind);
+  if (reply.excerpt.trim()) return reply.excerpt;
   return kind ? mediaWord(t, kind) : reply.excerpt;
 }
 

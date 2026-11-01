@@ -262,12 +262,15 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
   });
   // The saved Jev key, before anything calls Jev (vision reads it synchronously).
   await engine.jevKey.ready();
+  await engine.speech.ready();
+  log.info("voice messages", { engines: engine.speech.chain().map((e) => e.id) });
   const workers = startWorkers({
     db: database.db,
     handlers: engine.handlers,
     pubsub: adapters.pubsub,
     context: engine.context,
     artifacts: engine.artifacts,
+    voice: engine.voice,
     approvalDigest: { publicUrl: config.PUBLIC_URL, afterHours: config.APPROVAL_REMINDER_HOURS },
     mail: { deps: engine.mail, pollSeconds: config.MAIL_POLL_SECONDS },
     browserLive: engine.browserLive,
@@ -309,6 +312,8 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
         router: engine.router,
         jevKey: engine.jevKey,
         gifKey: gifKey ?? undefined,
+        speech: engine.speech,
+        voice: engine.voice,
         gitProxy: engine.gitProxy,
         appleRevoke: appleTokenRevoker(config),
       },

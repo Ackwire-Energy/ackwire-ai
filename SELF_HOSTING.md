@@ -692,6 +692,10 @@ links, and budget and approval alerts. `MILLIONSEND_API_KEY` wins when both are 
 **Password reset** needs email, so it shows only with `SMTP_URL` or `MILLIONSEND_API_KEY` set: "Forgot
 my password" on the sign-in page emails a link to the web app's reset page (`/reset-password`).
 
+**Voice messages.** People hold the microphone and send audio; agents read its words, and the audio's words stay hidden until someone opens them on that message. The microphone shows only with a speech engine. As the server's owner, pick a provider and paste its key in **Settings**, or set it in the environment: `ASSEMBLYAI_API_KEY`, `ELEVENLABS_API_KEY`, `SONIOX_API_KEY`, `GROQ_API_KEY` or `OPENAI_SPEECH_API_KEY`, with `SPEECH_ENGINES` for the order they are tried. With any of these, the audio goes to that provider to become text. `LOCAL_SPEECH_URL` points at a server of your own that speaks the OpenAI format (Speaches, a local Whisper or Parakeet), and the audio stays with you. A self-hosted server has no limit on minutes.
+
+Recordings are kept with your files, outside the Drive, for `VOICE_RETENTION_DAYS` (90 by default; 0 keeps them forever). A daily sweep then deletes the audio; the message and its words stay for agents and search, and the player says the recording is gone.
+
 **Files.** The compose file stores uploaded files (Drive files, attachments, photos) in the `files`
 volume. With all four `S3_*` variables set they go to that bucket instead, and with neither, into
 Postgres. Choose before the first upload: a file stays in the store it was written to. An

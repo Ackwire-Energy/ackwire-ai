@@ -262,5 +262,7 @@ export const organizationSettings = pgTable("organization_settings", {
   agentStickers: boolean().notNull().default(true),
   /** How often agents follow a light reply with a sticker or a GIF: `never`, `sometimes` or `often` (ADR 0091). */
   agentMedia: text().$type<"never" | "sometimes" | "often">().notNull().default("sometimes"),
+  /** People can send voice messages (ADR 0094): needs a speech engine on the server too. */
+  voiceMessages: boolean().notNull().default(true),
   updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });

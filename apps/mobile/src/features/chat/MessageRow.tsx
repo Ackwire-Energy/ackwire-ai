@@ -24,6 +24,7 @@ import { serverBody } from "@agenteschat/client/lib/message-body";
 import { missionSetupOf } from "@agenteschat/client/lib/missions";
 import { isTalkerReply, routineReportText } from "@agenteschat/client/lib/notices";
 import { can } from "@agenteschat/client/lib/permissions";
+import { voiceOf } from "@agenteschat/client/lib/voice";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { splitCanceled } from "@agenteschat/client/lib/work";
 import { useQueryClient } from "@tanstack/react-query";
@@ -48,6 +49,7 @@ import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/h
 import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
 import { ReceiptMark } from "./AgentReceipts";
+import { VoiceMessage } from "../voice/VoiceMessage";
 import { ChatMedia } from "./ChatMedia";
 import { ConsultGroup } from "./ConsultGroup";
 import { ApprovalInline, ConsultationCard, QuestionCard, ThreadLink } from "./cards";
@@ -254,7 +256,11 @@ export const MessageRow = memo(function MessageRow({
   if (mine) {
     // The bubble, or the GIF or sticker or the files of a message with no words, leads; the receipt's mark stands
     // beside it.
-    const lead = body ? (
+    const lead = voiceOf(meta) ? (
+      <View style={styles.grow}>
+        <VoiceMessage message={m} />
+      </View>
+    ) : body ? (
       <View style={[styles.bubble, styles.lead, { backgroundColor: c.bubble }]}>
         <MessageText body={body} muted={m.local === "pending"} selectable={false} accent={accent} />
       </View>
@@ -419,6 +425,7 @@ export const MessageRow = memo(function MessageRow({
           <MessageText body={body} muted={m.local === "pending"} selectable={false} accent={accent} />
         ) : null}
         {media ? <ChatMedia media={media} liveId={m.id} /> : null}
+        {voiceOf(meta) ? <VoiceMessage message={m} /> : null}
         {(stopped || atLimit) && m.agentRunId ? (
           <StoppedLine
             message={m}

@@ -16,6 +16,9 @@
   </array>
   <key>CFBundleAllowMixedLocalizations</key>
   <true/>
+  <!-- Voice messages: what the Mac says when the site first asks for the microphone. -->
+  <key>NSMicrophoneUsageDescription</key>
+  <string>agentes.chat uses the microphone to record voice messages.</string>
   <!-- Files downloaded from the site get the quarantine mark, as from a browser: the Mac checks them. -->
   <key>LSFileQuarantineEnabled</key>
   <true/>

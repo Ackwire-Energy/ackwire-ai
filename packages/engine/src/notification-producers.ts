@@ -3,7 +3,7 @@ import { approvalCardThreads, approvalOriginOf } from "./approvals";
 import { accountablePerson, runAuthorityById } from "./authority";
 import { threadFollowChoices } from "./follows";
 import { isMediaAfterReply } from "./media";
-import { previewMediaKind } from "./message-preview";
+import { previewMediaKind, readableBody } from "./message-preview";
 import {
   type NotificationActor,
   type NotificationDeps,
@@ -130,7 +130,7 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   if (!channel || channel.kind === "forum") return;
   const actor = message.authorType === "person" ? person(message.authorUserId) : agent(message.authorAgentId);
   const authorUser = message.authorUserId;
-  const text = notificationSnippet(message.body);
+  const text = notificationSnippet(readableBody(message.body, meta));
   // Only a GIF or a sticker (ADR 0091): the apps and the push say which, in the person's language.
   const media = previewMediaKind(message.body, meta);
   const latest = media ? { text, media } : { text };
@@ -255,10 +255,10 @@ async function threadTitle(deps: NotificationDeps, orgId: string, rootId: string
     .where(and(eq(threads.orgId, orgId), eq(threads.rootMessageId, rootId)));
   if (t?.title) return t.title;
   const [root] = await deps.db
-    .select({ body: messages.body })
+    .select({ body: messages.body, meta: messages.meta })
     .from(messages)
     .where(and(eq(messages.orgId, orgId), eq(messages.id, rootId)));
-  return root ? notificationSnippet(root.body, 80) || undefined : undefined;
+  return root ? notificationSnippet(readableBody(root.body, root.meta), 80) || undefined : undefined;
 }
 
 const REACTION_EMOJI: Record<string, string> = { "+1": "👍", "-1": "👎" };
@@ -307,7 +307,7 @@ export async function notifyReaction(
       ...(channel?.kind === "dm" ? { dmId: message.channelId } : {}),
       ...(channel?.kind === "channel" ? { label: channel.name } : {}),
     },
-    latest: { emojis, quote: notificationSnippet(message.body, 140) },
+    latest: { emojis, quote: notificationSnippet(readableBody(message.body, message.meta), 140) },
   });
 }
 

@@ -5044,6 +5044,237 @@ a.ac-list__row:focus-visible {
   gap: 8px;
   padding: 6px 14px;
 }
+/* Voice messages (ADR 0094). The recording sits on the text's first line and hides nothing but the text, which keeps
+   its place: the box never changes height, whatever was typed. */
+.ac-composer__text {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ac-composer__voice {
+  position: absolute;
+  top: 7px;
+  left: 16px;
+  right: 16px;
+  height: 32px;
+  display: none;
+  align-items: center;
+  gap: 10px;
+}
+.ac-composer[data-voice] .ac-composer__voice {
+  display: flex;
+}
+.ac-composer[data-voice] textarea {
+  visibility: hidden;
+}
+.ac-composer[data-voice="rec"] {
+  box-shadow:
+    var(--e2),
+    var(--top),
+    inset 0 0 0 1.5px color-mix(in srgb, var(--danger) 60%, transparent);
+}
+.ac-composer__voice-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--danger);
+  animation: ac-voice-blink 1.1s ease-in-out infinite;
+}
+@keyframes ac-voice-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+.ac-composer__voice-time {
+  flex: none;
+  min-width: 38px;
+  font-size: 14.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.ac-composer__wave {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  --voice-on: var(--ink);
+  --voice-off: var(--line-strong);
+}
+.ac-composer[data-voice="paused"] .ac-composer__wave {
+  cursor: pointer;
+  touch-action: none;
+}
+.ac-composer__listen.ac-voice__play {
+  width: 28px;
+  height: 28px;
+}
+/* The toolbar stays: the send button and the microphone where they were, and the rest gives way to delete and the keys. */
+.ac-composer[data-voice] .ac-composer__tools > :not(.ac-composer__voice-trash, .ac-composer__voice-hint, .ac-composer__mic, .ac-composer__send) {
+  display: none;
+}
+.ac-composer[data-voice] .ac-composer__tools {
+  flex-wrap: nowrap;
+}
+.ac-composer[data-voice] .ac-composer__send {
+  margin-left: 0;
+}
+.ac-composer__voice-trash {
+  color: var(--danger);
+}
+.ac-composer__voice-hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  color: var(--muted);
+}
+.ac-composer__voice-hint[data-left] {
+  font-weight: 700;
+  color: var(--danger);
+}
+.ac-composer__mic[data-on] {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+.ac-composer__mic {
+  touch-action: none;
+  -webkit-touch-callout: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-composer__voice-dot {
+    animation: none;
+  }
+}
+
+.ac-voice {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 420px;
+}
+.ac-voice__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px 6px 6px;
+  border-radius: 16px 16px 16px 4px;
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.ac-voice__play {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--bg);
+  cursor: pointer;
+  transition: transform 0.2s var(--spring);
+}
+button.ac-voice__play:active {
+  transform: scale(0.92);
+}
+.ac-voice__wave {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  cursor: pointer;
+  touch-action: none;
+  --voice-on: var(--ink);
+  --voice-off: var(--line-strong);
+}
+.ac-voice__time {
+  flex: none;
+  min-width: 30px;
+  text-align: right;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.ac-voice__speed {
+  flex: none;
+  height: 22px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--plate);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  cursor: pointer;
+}
+.ac-voice__speed:hover {
+  color: var(--ink);
+}
+.ac-voice__words-toggle {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-right: -4px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--faint);
+  cursor: pointer;
+}
+.ac-voice__words-toggle:hover {
+  color: var(--ink);
+}
+.ac-voice[data-open] .ac-voice__words-toggle {
+  color: var(--muted);
+}
+/* Where a pointer can hover, the button waits for the message or the keyboard; open or expired it stays. */
+@media (hover: hover) {
+  .ac-voice:not([data-open], [data-expired]) .ac-voice__words-toggle {
+    opacity: 0;
+    transition: opacity 0.12s var(--out);
+  }
+  .ac-msg:hover .ac-voice .ac-voice__words-toggle,
+  .ac-voice:hover .ac-voice__words-toggle,
+  .ac-voice .ac-voice__words-toggle:focus-visible {
+    opacity: 1;
+  }
+}
+.ac-voice__words {
+  margin: 0 3px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.ac-voice__note {
+  margin-left: 3px;
+  font-size: 13px;
+  color: var(--faint);
+}
+.ac-voice[data-expired] .ac-voice__play {
+  background: var(--plate);
+  color: var(--faint);
+  cursor: default;
+}
+.ac-voice[data-expired] .ac-voice__wave {
+  opacity: 0.45;
+  cursor: default;
+}
+.ac-voice__expired {
+  flex: none;
+  font-size: 13px;
+  color: var(--muted);
+}
 .ac-composer[data-dragging] {
   box-shadow:
     var(--e3),

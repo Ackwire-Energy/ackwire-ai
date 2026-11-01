@@ -63,6 +63,8 @@ export interface OrgSettings extends MediaSettings {
   defaultAgentBudgetNanoUsd: number;
   /** Agents check what the team already did before an outside action (ADR 0064). On by default. */
   actionCheck: boolean;
+  /** People can send voice messages (ADR 0094); they also need `voiceAvailable`. On by default. */
+  voiceMessages: boolean;
   /** Per provider, the models "Automático" picks per tier where the workspace chose its own (ADR 0087). */
   autoModels: AutoModels;
 }
@@ -86,6 +88,7 @@ export async function getOrgSettings(db: Database, actorId: string, orgId: strin
     teamSize: TEAM_SIZES.includes(s?.teamSize as TeamSize) ? (s?.teamSize as TeamSize) : null,
     defaultAgentBudgetNanoUsd: s?.defaultAgentBudgetNanoUsd ?? DEFAULT_AGENT_BUDGET_NANO_USD,
     actionCheck: s?.actionCheck ?? true,
+    voiceMessages: s?.voiceMessages ?? true,
     autoModels: (s?.autoModels ?? {}) as AutoModels,
     ...mediaSettingsFrom(s),
   };
@@ -201,6 +204,7 @@ export async function updateOrgSettings(
         ? { defaultAgentBudgetNanoUsd: Math.round(input.defaultAgentBudgetNanoUsd) }
         : {}),
       ...(input.actionCheck !== undefined ? { actionCheck: input.actionCheck } : {}),
+      ...(input.voiceMessages !== undefined ? { voiceMessages: input.voiceMessages } : {}),
       ...(input.gifs !== undefined ? { gifs: input.gifs } : {}),
       ...(input.gifRating !== undefined ? { gifRating: input.gifRating } : {}),
       ...(input.agentStickers !== undefined ? { agentStickers: input.agentStickers } : {}),

@@ -1,6 +1,7 @@
 import type { Approval, Message, ReplyRef } from "../api/types";
 import type { LiveRun } from "../realtime/streams";
 import { messageMediaOf } from "./media";
+import { voiceOf } from "./voice";
 import { answeredNotices, isAnsweredNotice, isEventLine, isTalkerReply } from "./notices";
 import { quoteExcerpt } from "./reply";
 import { isRoutineCall, routineReplyOf } from "./routines";
@@ -127,14 +128,15 @@ export function buildTimeline(messages: Message[], approvals: Approval[], runs: 
       const away =
         root && lastShown && lastShown.id !== root.id && lastShown.threadId !== root.id && !replyQuotes(m, root.id);
       // A root that is a GIF or a sticker with no text: its quote names it (ADR 0091).
-      const rootMedia = away ? messageMediaOf(root.meta)?.kind : undefined;
+      const rootVoice = away && voiceOf(root.meta) !== null;
+      const rootMedia = rootVoice ? ("voice" as const) : away ? messageMediaOf(root.meta)?.kind : undefined;
       const context: ReplyRef | undefined = away
         ? {
             messageId: root.id,
             threadId: null,
             author: root.author,
             authorName: "",
-            excerpt: quoteExcerpt(root.body),
+            excerpt: rootVoice ? "" : quoteExcerpt(root.body),
             ...(rootMedia ? { media: rootMedia } : {}),
           }
         : undefined;

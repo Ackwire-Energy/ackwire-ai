@@ -3,6 +3,8 @@ import type {
   BrowserLive,
   ContextDeps,
   GifKey,
+  SpeechSettings,
+  VoiceDeps,
   GitProxyDeps,
   JevKey,
   McpConnect,
@@ -58,4 +60,7 @@ export interface AppExtras {
    * servers) = those routes answer 404.
    */
   gifKey?: GifKey;
+  /** Speech engines and what voice messages need (ADR 0094); absent: no voice messages. */
+  speech?: SpeechSettings;
+  voice?: VoiceDeps;
 }

@@ -11177,3 +11177,42 @@ html[data-menu-overlay] .shell {
     padding-left: 44px;
   }
 }
+
+/* Configurações › Mensagens de voz: who turns voice into text (ADR 0094). */
+.voice-engine__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--line);
+}
+.voice-engine__title {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.voice-engine__option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 5px 0;
+  cursor: pointer;
+}
+.voice-engine__label {
+  font-size: 14px;
+  font-weight: 600;
+}
+.voice-engine__field {
+  display: flex;
+  gap: 8px;
+}
+.voice-engine__field > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+.voice-engine__saved {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}

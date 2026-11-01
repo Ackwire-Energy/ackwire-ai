@@ -120,6 +120,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       { cameraPermission: CAMERA_USE, microphonePermission: false, recordAudioAndroid: false },
     ],
     [
+      // Mensagens de voz (ADR 0094): the app records only while the person holds or locks the button.
+      "expo-audio",
+      { microphonePermission: "To record voice messages in your conversations.", recordAudioAndroid: true },
+    ],
+    [
       // Salvar em Fotos: add-only access (the read text matches expo-image-picker's).
       "expo-media-library",
       {

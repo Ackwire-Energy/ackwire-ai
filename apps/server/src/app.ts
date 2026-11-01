@@ -28,6 +28,7 @@ import { desktopRoutes } from "./routes/app/desktop";
 import { dmRoutes } from "./routes/app/dms";
 import { forumRoutes } from "./routes/app/forum";
 import { gifKeyRoutes } from "./routes/app/gif-key";
+import { speechKeyRoutes, voiceRoutes } from "./routes/app/voice";
 import { gifRoutes } from "./routes/app/gifs";
 import { inviteRoutes } from "./routes/app/invites";
 import { issueRoutes } from "./routes/app/issues";
@@ -172,6 +173,8 @@ export function createApp(options: AppOptions) {
     api.route("/app", telemetryRoutes(deps));
     api.route("/app", jevRoutes(deps));
     api.route("/app", gifKeyRoutes(deps));
+    api.route("/app", speechKeyRoutes(deps));
+    api.route("/app", voiceRoutes(deps));
     api.route("/app", webhookAdminRoutes(deps));
     api.route("/app", githubAppRoutes(deps));
     registerWebhookReceiver(api, deps);

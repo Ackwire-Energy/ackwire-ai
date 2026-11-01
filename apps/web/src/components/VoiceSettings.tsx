@@ -1,0 +1,165 @@
+import type { SpeechKey, SpeechProvider } from "@agenteschat/client";
+import { useRemoveSpeechKey, useSaveSpeechKey, useSpeechKey } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
+import { Button, Card, CardHeader, Chip, Input, Radio, RadioGroup, SettingNote, Switch } from "@agenteschat/ui";
+import { useId, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { PrefRow } from "@/components/NoticePrefs";
+
+/** Who can be chosen, in the order the list shows them. Their names are the providers' own. */
+const PROVIDERS: { id: SpeechProvider; name: string }[] = [
+  { id: "assemblyai", name: "AssemblyAI" },
+  { id: "elevenlabs", name: "ElevenLabs" },
+  { id: "soniox", name: "Soniox" },
+  { id: "groq", name: "Groq" },
+  { id: "openai", name: "OpenAI" },
+];
+
+/**
+ * Configurações › Voice messages (ADR 0094): the workspace's switch, and on a server that isn't agentes.chat's own, for
+ * its owner, who turns voice into text (the API answers null to everyone else). A key is tried with the provider
+ * before it is kept, sealed on the server and never shown again.
+ */
+export function VoiceSettingsCard({
+  on,
+  available,
+  editable,
+  onChange,
+}: {
+  on: boolean;
+  available: boolean;
+  editable: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  const view = useSpeechKey().data;
+  return (
+    <Card aria-labelledby="media-voice">
+      <CardHeader id="media-voice" icon="mic" title={t("voice.settings.title")} />
+      <div className="settings-rows">
+        <PrefRow
+          id="media-voice-on"
+          icon="mic"
+          label={t("voice.settings.on")}
+          help={available ? t("voice.settings.onHelp") : t("voice.settings.noEngine")}
+          control={
+            <Switch
+              checked={available && on}
+              onCheckedChange={onChange}
+              disabled={!editable || !available}
+              aria-label={t("voice.settings.on")}
+            />
+          }
+        />
+      </div>
+      {view && <SpeechProviderPicker view={view} />}
+    </Card>
+  );
+}
+
+function SpeechProviderPicker({ view }: { view: SpeechKey }) {
+  const { t } = useTranslation();
+  const save = useSaveSpeechKey();
+  const remove = useRemoveSpeechKey();
+  const [provider, setProvider] = useState<SpeechProvider>(view.provider ?? "assemblyai");
+  const [value, setValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [tested, setTested] = useState(false);
+  const field = useId();
+  const local = provider === "local";
+  const name = PROVIDERS.find((p) => p.id === provider)?.name ?? "";
+  const pick = (next: string) => {
+    setProvider(next as SpeechProvider);
+    setValue("");
+    setError(null);
+    setTested(false);
+  };
+  const test = () => {
+    setError(null);
+    setTested(false);
+    const typed = value.trim();
+    save.mutate(local ? { provider, baseUrl: typed } : { provider, apiKey: typed }, {
+      onSuccess: () => {
+        setValue("");
+        setTested(true);
+      },
+      onError: (e) => setError(errorText(t, e)),
+    });
+  };
+  return (
+    <div className="settings-rows voice-engine">
+      <div className="voice-engine__body">
+        <h3 className="voice-engine__title">{t("voice.settings.engineTitle")}</h3>
+        <RadioGroup value={provider} onValueChange={pick} aria-label={t("voice.settings.engineTitle")}>
+          {PROVIDERS.map((p) => (
+            <label key={p.id} className="voice-engine__option">
+              <Radio value={p.id} aria-label={p.name} />
+              <span>{p.name}</span>
+            </label>
+          ))}
+          <label className="voice-engine__option">
+            <Radio value="local" aria-label={t("voice.settings.own")} />
+            <span className="list-col">
+              <span>{t("voice.settings.own")}</span>
+              <span className="small muted">{t("voice.settings.ownHelp")}</span>
+            </span>
+          </label>
+        </RadioGroup>
+        <label className="voice-engine__label" htmlFor={field}>
+          {local ? t("voice.settings.address") : t("voice.settings.key", { name })}
+        </label>
+        <span className="voice-engine__field">
+          <Input
+            id={field}
+            type={local ? "text" : "password"}
+            value={value}
+            autoComplete="off"
+            spellCheck={false}
+            placeholder={local ? "http://whisper:8000/v1" : t("voice.settings.keyPlaceholder")}
+            invalid={Boolean(error)}
+            onChange={(e) => {
+              setValue(e.target.value);
+              setError(null);
+              setTested(false);
+            }}
+          />
+          <Button disabled={!value.trim()} loading={save.isPending} onClick={test}>
+            {t("voice.settings.test")}
+          </Button>
+        </span>
+        {error ? (
+          <p className="ac-field__error">{error}</p>
+        ) : tested ? (
+          <SettingNote icon="check">{t("voice.settings.tested")}</SettingNote>
+        ) : (
+          <p className="ac-field__help">{local ? t("voice.settings.stays") : t("voice.settings.sealed")}</p>
+        )}
+        {!local && <SettingNote icon="info">{t("voice.settings.leaves", { name })}</SettingNote>}
+        {view.state === "invalid" && <SettingNote icon="alert">{t("voice.settings.invalid")}</SettingNote>}
+        {view.provider && (
+          <span className="voice-engine__saved">
+            <Chip icon="check" tone="done">
+              {view.provider === "local"
+                ? t("voice.settings.own")
+                : (PROVIDERS.find((p) => p.id === view.provider)?.name ?? "")}
+            </Chip>
+            {view.hint && (
+              <span className="small muted">
+                {view.provider === "local" ? view.hint : t("settings.keyEndsIn", { hint: view.hint })}
+              </span>
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              className="ac-btn--danger"
+              loading={remove.isPending}
+              onClick={() => remove.mutate(undefined)}
+            >
+              {t("settings.remove")}
+            </Button>
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}

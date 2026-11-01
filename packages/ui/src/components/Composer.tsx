@@ -23,6 +23,7 @@ import {
 } from "../format";
 import { Icon, type IconName } from "../icons/Icon";
 import { Button } from "./Button";
+import { type VoiceNotice, type VoiceTake, useVoiceRecorder, voiceRecordingSupported } from "./voice-recorder";
 import { type EmojiPickerLabels, EmojiPickerPopover, type PickerTab } from "./EmojiPicker";
 import { useAutoGrow } from "./Field";
 import { modKey } from "./Kbd";
@@ -120,6 +121,37 @@ export interface ComposerChoice {
   hint?: (choice: SendChoice, mod: string) => ReactNode;
 }
 
+/** Voice messages in the box: what it says, and what the app does with a recording (ADR 0094). */
+export interface ComposerVoice {
+  /** Where this recording would go: when it changes, one under way is dropped. */
+  scope: string;
+  /** Asked before the microphone opens: false stops there (the app says why). */
+  allowed?: () => Promise<boolean>;
+  onTake: (take: VoiceTake) => void;
+  onNotice: (notice: VoiceNotice) => void;
+  labels: {
+    record: string;
+    recording: string;
+    pause: string;
+    resume: string;
+    discard: string;
+    send: string;
+    listen: string;
+    stopListening: string;
+    /** "Enter envia · Esc apaga". */
+    keys: string;
+    /** While holding the microphone. */
+    keysHold: string;
+    keysPaused: string;
+    /** The last seconds, counting down: "faltam 13 s". */
+    left: (seconds: number) => string;
+  };
+}
+
+/** The clock counts down over the last seconds of the five minutes. */
+const VOICE_LIMIT_S = 300;
+const VOICE_COUNTDOWN_S = 15;
+
 export interface ComposerProps {
   value: string;
   onChange: (value: string) => void;
@@ -181,6 +213,8 @@ export interface ComposerProps {
    * `working`) to whoever may write but not stop it: they choose too, there is just no stop button.
    */
   choice?: ComposerChoice;
+  /** The microphone: absent, there is none. */
+  voice?: ComposerVoice;
 }
 
 /**
@@ -358,8 +392,18 @@ export function Composer({
   sendBlocked,
   working,
   choice,
+  voice,
 }: ComposerProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const wave = useRef<HTMLCanvasElement>(null);
+  const rec = useVoiceRecorder(voice, wave);
+  const recording = rec.active;
+  // The box keeps its height while recording, whatever was typed, attached or hidden: read as it starts.
+  const [heldHeight, setHeldHeight] = useState<number | undefined>(undefined);
+  const { discard } = rec;
+  const scope = voice?.scope;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `scope` is why it runs
+  useEffect(() => () => discard(false), [scope, discard]);
   const box = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const listId = useId();
@@ -487,7 +531,7 @@ export function Composer({
 
   const ready = Boolean(value.trim() || canSendEmpty) && !disabled && !sendBlocked;
   // An agent at work and nothing to send: the send button is the stop button.
-  const stopMode = Boolean(working) && !disabled && !value.trim() && !canSendEmpty;
+  const stopMode = Boolean(working) && !disabled && !value.trim() && !canSendEmpty && !recording;
   const showChoice = Boolean(choice) && Boolean(value.trim()) && !disabled;
   const [chosen, setChosen] = useState<SendChoice>("join");
   const [pressed, setPressed] = useState(false);
@@ -505,6 +549,10 @@ export function Composer({
     working.onStop();
   };
   const send = (alt = false) => {
+    if (recording) {
+      void rec.send();
+      return;
+    }
     if (!ready) return;
     if (working || choice) onSend(value.trim(), { interrupt: showChoice && sendChoice(chosen, alt) === "interrupt" });
     else onSend(value.trim());
@@ -557,6 +605,29 @@ export function Composer({
       send(e.metaKey || e.ctrlKey);
     }
   };
+
+  useLayoutEffect(() => {
+    if (recording) setHeldHeight(box.current?.offsetHeight);
+    else setHeldHeight(undefined);
+  }, [recording]);
+  const hasMic = Boolean(voice) && !disabled && voiceRecordingSupported();
+  const countdown = VOICE_LIMIT_S - rec.seconds;
+  const voiceHint = !voice
+    ? ""
+    : recording && countdown <= VOICE_COUNTDOWN_S
+      ? voice.labels.left(countdown)
+      : rec.phase === "paused"
+        ? voice.labels.keysPaused
+        : rec.hold
+          ? voice.labels.keysHold
+          : voice.labels.keys;
+  const micLabel = !voice
+    ? ""
+    : rec.phase === "paused"
+      ? voice.labels.resume
+      : rec.phase === "rec" && !rec.hold
+        ? voice.labels.pause
+        : voice.labels.record;
 
   const optionId = (i: number) => `${listId}-${i}`;
   const textarea = (
@@ -650,6 +721,8 @@ export function Composer({
             className={cx("ac-composer", inlinePills && "ac-composer--inline-pills", className)}
             data-disabled={disabled || undefined}
             data-dragging={dragging || undefined}
+            data-voice={recording ? rec.phase : undefined}
+            style={heldHeight ? { minHeight: heldHeight, maxHeight: heldHeight } : undefined}
             onDragOver={
               onFiles
                 ? (e) => {
@@ -680,9 +753,57 @@ export function Composer({
             }
           >
             {header && <div className="ac-composer__header">{header}</div>}
-            {textarea}
+            <div className="ac-composer__text">
+              {textarea}
+              {voice && (
+                // biome-ignore lint/a11y/useSemanticElements: a recording's controls, named as one
+                <div className="ac-composer__voice" role="group" aria-label={voice.labels.recording}>
+                  {rec.phase === "paused" ? (
+                    <button
+                      type="button"
+                      className="ac-voice__play ac-composer__listen"
+                      aria-label={rec.listening ? voice.labels.stopListening : voice.labels.listen}
+                      onClick={() => void rec.toggleListening()}
+                    >
+                      <Icon name={rec.listening ? "pause" : "play"} size={12} />
+                    </button>
+                  ) : (
+                    <span className="ac-composer__voice-dot" aria-hidden="true" />
+                  )}
+                  <span ref={rec.timer} className="ac-composer__voice-time">
+                    0:00
+                  </span>
+                  <canvas
+                    ref={wave}
+                    className="ac-composer__wave"
+                    aria-hidden="true"
+                    onPointerDown={rec.onWavePointerDown}
+                  />
+                </div>
+              )}
+            </div>
             {attachments && <div className="ac-composer__attachments">{attachments}</div>}
             <div className={cx("ac-composer__tools", format && "ac-composer__tools--format")}>
+              {voice && recording && (
+                <>
+                  <Button
+                    variant="ghost"
+                    iconOnly
+                    size="sm"
+                    icon="trash"
+                    className="ac-composer__voice-trash"
+                    aria-label={voice.labels.discard}
+                    onClick={() => rec.discard(true)}
+                  />
+                  <span
+                    className="ac-composer__voice-hint"
+                    data-left={countdown <= VOICE_COUNTDOWN_S || undefined}
+                    aria-live="off"
+                  >
+                    {voiceHint}
+                  </span>
+                </>
+              )}
               {pills && <div className="ac-composer__pills">{pills}</div>}
               {format && !disabled && <FormatBar labels={format} onFormat={applyKind} />}
               {emoji && !disabled && (
@@ -726,6 +847,19 @@ export function Composer({
                   }}
                 />
               )}
+              {hasMic && (
+                <Button
+                  variant="ghost"
+                  iconOnly
+                  size="sm"
+                  icon={rec.phase === "rec" && !rec.hold ? "pause" : "mic"}
+                  className="ac-composer__mic"
+                  data-on={rec.phase === "rec" || rec.phase === "paused" || undefined}
+                  aria-label={micLabel}
+                  title={micLabel}
+                  {...rec.micProps}
+                />
+              )}
               {/* The compact primary square (32px): dim until there is something to send. */}
               {working !== undefined ? (
                 // An agent may work here: one button whose glyph morphs between send and stop.
@@ -733,10 +867,10 @@ export function Composer({
                   variant="primary"
                   size="sm"
                   className="ac-composer__send ac-btn--icon"
-                  data-ready={ready || stopMode ? "" : undefined}
+                  data-ready={ready || stopMode || recording ? "" : undefined}
                   data-mode={stopMode ? "stop" : "send"}
                   data-press={pressed || undefined}
-                  aria-label={stopMode ? working?.stopLabel : sendLabel}
+                  aria-label={recording && voice ? voice.labels.send : stopMode ? working?.stopLabel : sendLabel}
                   title={sendTitle}
                   onClick={() => {
                     if (stopMode) stop();
@@ -745,7 +879,7 @@ export function Composer({
                       send();
                     }
                   }}
-                  disabled={!ready && !stopMode}
+                  disabled={!ready && !stopMode && !recording}
                 >
                   <span className="ac-composer__glyph ac-composer__glyph--send" aria-hidden="true">
                     <Icon name="send" />
@@ -761,11 +895,11 @@ export function Composer({
                   iconOnly
                   icon="send"
                   className="ac-composer__send"
-                  data-ready={ready ? "" : undefined}
-                  aria-label={sendLabel}
+                  data-ready={ready || recording ? "" : undefined}
+                  aria-label={recording && voice ? voice.labels.send : sendLabel}
                   title={sendTitle}
                   onClick={() => send()}
-                  disabled={!ready}
+                  disabled={!ready && !recording}
                 />
               )}
             </div>

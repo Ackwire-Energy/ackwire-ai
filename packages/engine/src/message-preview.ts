@@ -1,5 +1,34 @@
 import { type MessageMedia, mediaOf } from "./media";
 
+/** `meta.voice` of a message (ADR 0094): all the apps need to draw and play it. */
+export interface MessageVoice {
+  clipId: string;
+  durationMs: number;
+  peaks: number[];
+  /** When the recording stops playing (ISO); absent: it stays. */
+  expiresAt?: string;
+  /** `body` is our placeholder, not what was said: never offered as the message's words. */
+  noWords?: true;
+}
+
+/** A message's voice recording, if it is one. */
+export function voiceOf(meta: Record<string, unknown> | null | undefined): MessageVoice | null {
+  const v = meta?.voice as Partial<MessageVoice> | undefined;
+  return v && typeof v.clipId === "string" && typeof v.durationMs === "number"
+    ? {
+        clipId: v.clipId,
+        durationMs: v.durationMs,
+        peaks: Array.isArray(v.peaks) ? v.peaks : [],
+        ...(typeof v.expiresAt === "string" ? { expiresAt: v.expiresAt } : {}),
+        ...(v.noWords === true ? { noWords: true as const } : {}),
+      }
+    : null;
+}
+
+/** A message's text for what lists it (previews, notifications, quotes, snippets): none for a voice message (ADR 0094). */
+export const readableBody = (body: string, meta: Record<string, unknown> | null | undefined) =>
+  voiceOf(meta) ? "" : body;
+
 /** One line of at most `max` chars (a preview's text). */
 function oneLine(text: string, max = 200): string {
   const line = text.replace(/\s+/g, " ").trim();
@@ -20,6 +49,8 @@ export interface PreviewMeta {
   noAi?: { reason: string; own?: string };
   /** A GIF or a sticker (ADR 0091), as `meta.media`: a message of only that has no text to preview. */
   media?: MessageMedia;
+  /** A voice message (ADR 0094): its length, never its words. */
+  voice?: { durationMs: number };
 }
 
 /**
@@ -29,7 +60,8 @@ export interface PreviewMeta {
 export function previewMediaKind(
   body: string | null | undefined,
   meta: Record<string, unknown> | null | undefined,
-): MessageMedia["kind"] | null {
+): MessageMedia["kind"] | "voice" | null {
+  if (voiceOf(meta)) return "voice";
   return (body ?? "").trim() === "" ? (mediaOf(meta)?.kind ?? null) : null;
 }
 
@@ -39,6 +71,8 @@ export function previewMeta(meta: Record<string, unknown> | null | undefined): P
   if (typeof meta.bodyCode === "string") out.bodyCode = meta.bodyCode;
   const media = mediaOf(meta);
   if (media) out.media = media;
+  const voice = voiceOf(meta);
+  if (voice) out.voice = { durationMs: voice.durationMs };
   if (meta.bodyParams && typeof meta.bodyParams === "object") {
     out.bodyParams = meta.bodyParams as Record<string, unknown>;
   }

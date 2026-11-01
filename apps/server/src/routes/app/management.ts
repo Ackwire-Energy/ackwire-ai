@@ -85,6 +85,12 @@ const Settings = z
       description:
         "How often agents follow a light reply with a sticker or a GIF on their own: `never`, `sometimes` (the default) or `often`. Needs `agentMediaAvailable`; each agent can be turned off (`mediaReplies`). When someone asks for one, agents send it at any level.",
     }),
+    voiceMessages: z.boolean().openapi({
+      description: "People can send voice messages (ADR 0094); they also need `voiceAvailable`. On by default.",
+    }),
+    voiceAvailable: z.boolean().openapi({
+      description: "Read only: this server has a speech engine now, from its environment or from its owner's Settings.",
+    }),
     gifsAvailable: z.boolean().openapi({
       description:
         "Read only: this server has a GIF provider with a key now (`GIPHY_API_KEY`, or the one the installation's owner added in Settings). Without it there are no GIFs at all.",
@@ -265,6 +271,7 @@ export function managementRoutes(deps: AppDeps) {
   const mediaAvailable = async () => ({
     // The provider follows the installation's key, which its owner may add or remove at any time.
     gifsAvailable: adapters.gifs?.available() ?? false,
+    voiceAvailable: deps.extras?.speech?.available() ?? false,
     agentMediaAvailable: Boolean((await deps.extras?.jevKey?.view())?.source),
   });
 
@@ -318,6 +325,7 @@ export function managementRoutes(deps: AppDeps) {
               description:
                 "Per provider and tier, one of that provider's models; null puts the tier back on its default.",
             }),
+            voiceMessages: z.boolean().optional().openapi({ description: "People can send voice messages (ADR 0094)." }),
             gifs: z.boolean().optional().openapi({ description: "People can send GIFs in chat (ADR 0091)." }),
             gifRating: z.enum(GIF_RATINGS).optional(),
             agentStickers: z.boolean().optional(),

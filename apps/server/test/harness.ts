@@ -105,6 +105,8 @@ export async function createTestServer(
      * Absent: `gifs` serves them, and a saved key is kept unchecked (tests never reach the network).
      */
     giphyFetch?: typeof fetch;
+    /** Fake speech providers (ADR 0094), for an engine set through `env`. */
+    speechFetch?: typeof fetch;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -160,6 +162,7 @@ export async function createTestServer(
     embeddings: options.embeddings ? { provider: embeddings, apiKey: "test" } : undefined,
     deltaFlushMs: 0,
     s3Fetch: options.s3Fetch,
+    speechFetch: options.speechFetch,
     resolveHost: options.resolveHost,
     github: options.github,
     judge: createFakeJudge(options.judge),
@@ -208,6 +211,8 @@ export async function createTestServer(
         streams: engine.streams,
         jevKey: engine.jevKey,
         gifKey,
+        speech: engine.speech,
+        voice: engine.voice,
       },
     },
     log,
@@ -278,7 +283,13 @@ export function browser(t: TestServer) {
   let cookie = "";
   const request = async (
     path: string,
-    init: { method?: string; json?: unknown; origin?: string | null; headers?: Record<string, string> } = {},
+    init: {
+      method?: string;
+      json?: unknown;
+      body?: BodyInit;
+      origin?: string | null;
+      headers?: Record<string, string>;
+    } = {},
   ) => {
     const headers = new Headers(init.headers);
     if (cookie) headers.set("cookie", cookie);
@@ -287,7 +298,7 @@ export function browser(t: TestServer) {
     const res = await t.app.request(path, {
       method: init.method ?? (init.json !== undefined ? "POST" : "GET"),
       headers,
-      body: init.json !== undefined ? JSON.stringify(init.json) : undefined,
+      body: init.json !== undefined ? JSON.stringify(init.json) : init.body,
     });
     for (const c of res.headers.getSetCookie?.() ?? []) {
       const [pair] = c.split(";");

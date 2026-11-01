@@ -22,6 +22,7 @@ export * from "./storage";
 export * from "./team-actions";
 export * from "./telemetry";
 export * from "./tenancy";
+export * from "./voice";
 export * from "./waitlist";
 export * from "./wiki";
 export * from "./work";

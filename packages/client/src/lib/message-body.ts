@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
 import { previewOf } from "./consultations";
 import { mediaKindOf, mediaWord } from "./media";
+import { isVoiceMeta, voiceLength, voiceWord } from "./voice";
 
 type Meta = Record<string, unknown> | undefined;
 
@@ -63,6 +64,8 @@ export function serverBody(t: TFunction, body: string, meta: Meta): string {
  * text as its word (ADR 0091: the list's `mediaKind`, or a kind its meta carries); else the text as is.
  */
 export function previewBody(t: TFunction, text: string, meta: Meta | null, mediaKind?: unknown): string {
+  // Never a voice message's words, even from a server that sent them (ADR 0094).
+  if (isVoiceMeta(meta) || mediaKindOf(mediaKind) === "voice") return voiceWord(t, voiceLength(meta));
   if (!text.trim()) {
     const kind = mediaKindOf(mediaKind) ?? mediaKindOf(meta?.mediaKind) ?? mediaKindOf(meta?.media);
     if (kind) return mediaWord(t, kind);

@@ -47,6 +47,33 @@ export interface GifKey {
   state: "off" | "ok" | "invalid";
 }
 
+/** Who can turn voice into text on this server (ADR 0094). */
+export type SpeechProvider = "assemblyai" | "elevenlabs" | "soniox" | "groq" | "openai" | "local";
+
+/**
+ * The installation's speech engine, for its pinned owner on a server that isn't agentes.chat's own (`GET
+ * /api/app/speech-key`, ADR 0094): with one, every workspace has voice messages (`OrgSettings.voiceAvailable`).
+ */
+export interface SpeechKey {
+  /** The one chosen in Settings. Null: none. */
+  provider: SpeechProvider | null;
+  /** The key's last 4 characters, or the server's address (the key itself is never returned). */
+  hint: string | null;
+  /** `invalid`: a saved key this server can't read. */
+  state: "off" | "ok" | "invalid";
+  /** Engines set in the server's environment. */
+  envProviders: SpeechProvider[];
+}
+
+/** What `PUT /api/app/speech-key` takes: tried with the provider before it is kept. */
+export interface SpeechKeyInput {
+  provider: SpeechProvider;
+  apiKey?: string;
+  /** `local`: the address of a server speaking the OpenAI format. */
+  baseUrl?: string;
+  model?: string;
+}
+
 /**
  * A device that hears pushes (`POST /api/app/push/devices`): the phone app's Expo token (ADR 0035), or this
  * browser's Web Push subscription (ADR 0071: its endpoint and keys, from `PushSubscription.toJSON()`).
@@ -1162,6 +1189,7 @@ export type UserEvent =
   | BudgetEvent
   | NotificationEvent
   | ThreadFollowEvent
+  | VoiceDroppedEvent
   | { type: string };
 
 // ── Approvals, connectors, scopes ─────────────────────────────────────────────
@@ -1464,6 +1492,10 @@ export interface OrgSettings {
   agentStickers: boolean;
   /** How often agents follow a light reply with a sticker or a GIF. */
   agentMedia: AgentMediaLevel;
+  /** People can send voice messages (ADR 0094); only with `voiceAvailable` too. On by default. */
+  voiceMessages: boolean;
+  /** Read only: this server has a speech engine. */
+  voiceAvailable: boolean;
   /** Read only: this server can search GIFs (it has a GIF provider). */
   gifsAvailable: boolean;
   /** Read only: this server can decide when agents send one (agents send none on their own without it). */
@@ -1471,7 +1503,7 @@ export interface OrgSettings {
 }
 
 /** `OrgSettings` the server works out itself: never in a PATCH. */
-export type ReadOnlyOrgSettings = "gifsAvailable" | "agentMediaAvailable";
+export type ReadOnlyOrgSettings = "gifsAvailable" | "agentMediaAvailable" | "voiceAvailable";
 
 /** Automático's sizes: quick tasks, everyday work, hard work. */
 export type ModelTier = "small" | "medium" | "large";
@@ -1832,7 +1864,30 @@ export interface ReplyRef {
 // ── GIFs and stickers in chat (ADR 0091) ──────────────────────────────────────
 
 /** A message's media: a GIF or one of an agent's stickers. */
-export type MediaKind = "gif" | "sticker";
+export type MediaKind = "gif" | "sticker" | "voice";
+
+/**
+ * `message.meta.voice` (ADR 0094): the message is this recording. `message.body` holds its words for the agents; people
+ * read them only by opening them in the player.
+ */
+export interface MessageVoice {
+  clipId: string;
+  durationMs: number;
+  /** The wave, from 0 to 1. */
+  peaks: number[];
+  /** When the recording goes. The server may also answer 410 `voice.expired` before that. */
+  expiresAt?: string;
+  /** No engine could make out the words: there are none to open. */
+  noWords?: boolean;
+}
+
+/** A recording I sent didn't become a message: nothing was said, or the conversation refused it. */
+export interface VoiceDroppedEvent {
+  type: "voice.dropped";
+  clientId: string;
+  channelId: string;
+  reason: "silent" | "refused";
+}
 
 /** The agents' stickers, one animation per mood (`STICKER_MOODS` in `lib/media.ts`). */
 export type StickerMood = "celebrate" | "love" | "deal" | "thinking" | "wow" | "dizzy";

@@ -127,9 +127,11 @@ export function SearchPage() {
 }
 
 function HitBody({ snippet, meta }: { snippet: string; meta: string }) {
+  const { t } = useTranslation();
   return (
     <span className="list-col">
-      <span>{snippet}</span>
+      {/* A voice message comes with no snippet: it is found by its words, and shows as audio (ADR 0094). */}
+      <span>{snippet || t("voice.word")}</span>
       <span className="small muted">{meta}</span>
     </span>
   );

@@ -100,6 +100,7 @@ import { isOpenMission } from "../missions/logic";
 import { RemindSheet } from "../reminders/RemindSheet";
 import { AgentFace, Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
+import { voiceOf } from "@agenteschat/client/lib/voice";
 import { agentLook, previewOf } from "../shared/logic";
 import { FocusLive, PushedHeader, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
@@ -109,6 +110,7 @@ import { AgentReceiptLine } from "./AgentReceipts";
 import { receiptMessageId, turnHeadId } from "./agent-receipts";
 import { ChannelMembersSheet } from "./ChannelMembers";
 import { ConversationSwitcher } from "./ConversationSwitcher";
+import { useVoiceComposer } from "../voice/useVoiceComposer";
 import { takeComposerRequest, useComposerRequest } from "./composer-request";
 import { DmComputerButton } from "./DmComputerButton";
 import { EventLine } from "./EventLine";
@@ -186,6 +188,7 @@ const rowType = (r: Row) => {
   if (r.kind === "run" || (r.kind === "message" && r.key.startsWith("turn-"))) return "turn";
   if (r.kind !== "message") return r.kind;
   // A GIF or a sticker alone (ADR 0091) is about its picture's size, not a text's.
+  if (voiceOf(r.message.meta)) return "message-voice";
   const media = r.message.body.trim() ? null : messageMediaOf(r.message.meta);
   if (media) return `message-${media.kind}`;
   const n = r.message.body.length;
@@ -717,6 +720,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   sendRef.current = send;
   const onResend = useCallback(
     (m: Message) => {
+      // Sent again as text, a voice message's words would show: it is sent by recording it again.
+      if (voiceOf(m.meta)) return;
       sendRef.current(m.body, threadId);
       toEnd();
     },
@@ -811,6 +816,14 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   // mine. The list is aimed at the end before the sheet closes: the place it held under the sheet doesn't come back.
   const settings = useSettings(orgId).data;
   const mediaTabs = mediaTabsOf(settings, dir.agents.length, Boolean(api.gifs));
+  const voice = useVoiceComposer({
+    orgId,
+    channelId,
+    threadId,
+    authorId: meId ?? "",
+    enabled: Boolean(meId && settings?.voiceAvailable && settings.voiceMessages),
+    afterSend: toEnd,
+  });
   const sendMedia = (media: MessageMedia) => {
     send("", threadId, { media });
     toEnd();
@@ -1665,6 +1678,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                   <MentionPicker query={query} pick={pick} channelId={channelId} members={mentionMembers} />
                 )}
                 onType={() => sendTyping(threadId)}
+                voice={voice}
               />
             ) : (
               <Button

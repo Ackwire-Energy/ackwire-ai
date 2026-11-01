@@ -8,6 +8,7 @@ export const keys = {
   jev: ["jev"] as const,
   /** The installation's GIPHY key (ADR 0091), not a workspace's: it stays when switching organizations. */
   gifKey: ["gif-key"] as const,
+  speechKey: ["speech-key"] as const,
   authConfig: ["auth-config"] as const,
   me: ["me"] as const,
   accountDeletion: ["account-deletion"] as const,

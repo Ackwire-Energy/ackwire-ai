@@ -3,6 +3,7 @@ import { and, asc, type Database, type Executor, eq, gt, inArray, isNull, schema
 import { caches } from "./cache";
 import { cutText } from "./format";
 import type { ModelGateway } from "./gateway";
+import { readableBody } from "./message-preview";
 import { requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { isRoutineRoomKey } from "./routine-brief";
@@ -260,6 +261,7 @@ export async function describeHits<H extends SearchHit>(
     ? await db
         .select({
           id: messages.id,
+          meta: messages.meta,
           threadId: messages.threadId,
           authorType: messages.authorType,
           userId: messages.authorUserId,
@@ -295,12 +297,14 @@ export async function describeHits<H extends SearchHit>(
     }
     const m = h.kind === "message" ? byId.get(h.sourceId) : undefined;
     if (!m) return { ...h, messageId: null, threadId: null, author: null };
+    // A voice message is found by its words, and shows as its audio (ADR 0094).
+    const snippet = readableBody(h.snippet, m.meta);
     const author =
       m.authorType === "agent" && m.agentId
         ? { type: "agent" as const, id: m.agentId, name: m.agentName ?? "" }
         : m.userId
           ? { type: "person" as const, id: m.userId, name: m.userName ?? "" }
           : null;
-    return { ...h, messageId: m.id, threadId: m.threadId, author };
+    return { ...h, snippet, messageId: m.id, threadId: m.threadId, author };
   });
 }
