@@ -8328,6 +8328,8 @@ export const en: Translations = {
   },
   machines: {
     egress: {
+      draining: "Network settings are changing. Open computer sessions will restart at {{when}}.",
+      restart: "Computer sessions are restarting to apply network settings. New work waits until this finishes.",
       line: "Exit IP {{ip}}",
       hint: "The address websites see when the agents browse. It updates when the computer’s network changes.",
     },

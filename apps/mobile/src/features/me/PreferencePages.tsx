@@ -1,5 +1,6 @@
-import { type NoticeCategory, useNoticePrefs, useSetNoticePref } from "@agenteschat/client";
+import { type NoticeCategory, useApi, useNoticePrefs, useSetNoticePref } from "@agenteschat/client";
 import { SOUND_STYLES, type SoundStyle } from "@agenteschat/ui/sfx";
+import { useMutation } from "@tanstack/react-query";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -214,13 +215,30 @@ export function AppearancePage() {
 /** Idioma: Português or English. */
 export function LanguagePage() {
   const { t, i18n } = useTranslation();
+  const api = useApi();
+  const language = useMutation({
+    mutationFn: (locale: "pt-BR" | "en") => api.account.updateMe({ locale }),
+    onSuccess: (_data, locale) => {
+      void i18n.changeLanguage(locale);
+    },
+  });
   const en = i18n.language.startsWith("en");
   return (
     <Page title={t("mobile.me.language")}>
       <View style={styles.gap} />
       <GroupedList>
-        <GroupedRow label={t("mobile.me.langPt")} checked={!en} onPress={() => void i18n.changeLanguage("pt-BR")} />
-        <GroupedRow label={t("mobile.me.langEn")} checked={en} onPress={() => void i18n.changeLanguage("en")} />
+        <GroupedRow
+          label={t("mobile.me.langPt")}
+          checked={!en}
+          disabled={language.isPending}
+          onPress={() => language.mutate("pt-BR")}
+        />
+        <GroupedRow
+          label={t("mobile.me.langEn")}
+          checked={en}
+          disabled={language.isPending}
+          onPress={() => language.mutate("en")}
+        />
       </GroupedList>
     </Page>
   );

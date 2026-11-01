@@ -234,7 +234,7 @@ export interface SupervisorOptions {
   /** Real system installation: refuse to start the broker without root. Tests use in-memory workers. */
   requireRootBroker?: boolean;
   /** Root runtime configuration also applies to workers restored from the persisted user list. */
-  network?: Pick<AgentUser, "networkLauncher" | "networkMark">;
+  network?: Pick<AgentUser, "networkLauncher" | "networkMark" | "networkRevision">;
   /** Root scopes can pin this UID to its old network until the desktop and terminals close. */
   resolveNetwork?: (user: AgentUser) => NetworkConfig;
   networkBusy?: (agentId: string) => boolean;
@@ -381,7 +381,9 @@ export class Supervisor {
     this.opts.prepareExisting?.(users);
     for (const agentId of new Set([...this.owners.values()].map((o) => o.agentId))) {
       const user = users.find((u) => u.id === agentId);
-      if (user) this.launch(this.entry(user));
+      // A restored owner must not keep the machine offline while its old network drains. launch() owns
+      // resolution failures and retry/backoff; normal new requests still resolve eagerly in entry().
+      if (user) this.launch(this.entry(user, false));
     }
     this.pinger = setInterval(() => {
       for (const w of this.workers.values()) this.send(w, { type: "ping", at: Date.now() });
@@ -565,7 +567,7 @@ export class Supervisor {
   }
 
   private withNetwork(user: AgentUser): AgentUser {
-    const { networkLauncher: _launcher, networkMark: _mark, ...identity } = user;
+    const { networkLauncher: _launcher, networkMark: _mark, networkRevision: _revision, ...identity } = user;
     return { ...identity, ...(this.opts.resolveNetwork?.(user) ?? this.network) };
   }
 
@@ -609,6 +611,23 @@ export class Supervisor {
       w.networkStopTimer.unref?.();
     }
     return [...new Set(pending)].sort((a, b) => a - b);
+  }
+
+  /** A root-configured drain deadline elapsed: end only this runner-owned worker and tell its callers why. */
+  retireNetworkAgent(agentId: string, why: string) {
+    const w = this.workers.get(agentId);
+    if (!w?.proc || w.networkRetiring) return;
+    const proc = w.proc;
+    w.networkRetiring = true;
+    w.ready = false;
+    this.endSession(w, why);
+    this.endShows(w, why);
+    for (const waiter of [...w.waiters]) waiter.reject(new RunnerError("dropped", why));
+    proc.stdin.end();
+    w.networkStopTimer = setTimeout(() => {
+      if (w.proc === proc) proc.kill();
+    }, 5000);
+    w.networkStopTimer.unref?.();
   }
 
   /** The computer's pause, access or limits, or who watches an agent's desktop, may have changed. */
@@ -690,11 +709,11 @@ export class Supervisor {
 
   // ── Workers ────────────────────────────────────────────────────────────────
 
-  private entry(user: AgentUser): Worker {
+  private entry(user: AgentUser, resolveNetwork = true): Worker {
     let w = this.workers.get(user.id);
     if (!w) {
       w = {
-        user: this.withNetwork(user),
+        user: resolveNetwork ? this.withNetwork(user) : user,
         proc: null,
         ready: false,
         networkRetiring: false,

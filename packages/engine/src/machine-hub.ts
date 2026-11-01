@@ -591,7 +591,14 @@ export function createMachineHub(deps: MachineHubDeps) {
         : [];
     conn.lastSeenWrite = Date.now();
     conn.lastPong = Date.now();
-    send(conn, { type: "welcome", machineId: machine.id, name: machine.name, heartbeatMs, mcpOnce: true });
+    send(conn, {
+      type: "welcome",
+      machineId: machine.id,
+      name: machine.name,
+      heartbeatMs,
+      mcpOnce: true,
+      observeEgress: machine.kind === "managed",
+    });
     // The workspace's own computer (ADR 0056 §10): ready on its first hello, with its agents, before they are listed.
     const readyEmail = deps.readyEmail ? { ...deps.readyEmail, machines: hub } : null;
     await onManagedMachineHello({ db, pubsub, readyEmail }, machine).catch((error) =>
@@ -806,11 +813,22 @@ export function createMachineHub(deps: MachineHubDeps) {
    */
   async function touch(
     conn: MachineConnection,
-    { load, browserTraffic, egress }: Extract<RunnerFrame, { type: "pong" }>,
+    { load, browserTraffic, egress, networkTransition }: Extract<RunnerFrame, { type: "pong" }>,
   ) {
     conn.lastPong = Date.now();
     if (!conn.machineId) return;
-    if (!load && !browserTraffic && !egress && Date.now() - conn.lastSeenWrite < Math.min(40_000, heartbeatMs * 1.6))
+    // The authenticated database kind is authoritative, including for an older or modified personal runner.
+    if (conn.kind !== "managed") {
+      egress = undefined;
+      networkTransition = undefined;
+    }
+    if (
+      !load &&
+      !browserTraffic &&
+      !egress &&
+      networkTransition === undefined &&
+      Date.now() - conn.lastSeenWrite < Math.min(40_000, heartbeatMs * 1.6)
+    )
       return;
     conn.lastSeenWrite = Date.now();
     const now = new Date();
@@ -820,13 +838,17 @@ export function createMachineHub(deps: MachineHubDeps) {
       .set({
         lastSeenAt: now,
         online: true,
+        ...(networkTransition !== undefined ? { networkTransition } : {}),
         ...(load ? { load: { ...load, at } } : {}),
         ...(browserTraffic ? { browserTraffic: { ...browserTraffic, at } } : {}),
-        ...(egress ? { egress: { ...egress, at } } : {}),
+        ...(conn.kind !== "managed" ? { egress: null } : egress ? { egress: { ...egress, at } } : {}),
       })
       .where(and(eq(machines.id, conn.machineId), eq(machines.connectedReplica, replicaId)))
       .returning({ id: machines.id })
       .catch(() => []);
+    if (networkTransition !== undefined && changed.length && conn.orgId) {
+      await publishMachineUpdated(pubsub, conn.orgId, conn.machineId, { networkTransition });
+    }
     if (egress && changed.length && conn.orgId) {
       await publishMachineUpdated(pubsub, conn.orgId, conn.machineId, { egress: egress.ip ? { ...egress, at } : null });
     }

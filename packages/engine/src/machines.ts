@@ -358,7 +358,8 @@ async function machineViews(db: Database, actorId: string, orgId: string, only?:
       /** `connected` (a person paired it), `host` (the server's own) or `managed` (the workspace's, never removed here). */
       kind: m.kind,
       online: machineOnline(m, now),
-      egress: machineOnline(m, now) && m.egress?.ip ? { ...m.egress, ip: m.egress.ip } : null,
+      networkTransition: managed ? m.networkTransition : null,
+      egress: managed && machineOnline(m, now) && m.egress?.ip ? { ...m.egress, ip: m.egress.ip } : null,
       lastSeenAt: m.lastSeenAt?.toISOString() ?? null,
       hostname: managed ? "" : m.hostname,
       os: managed ? "other" : m.os,

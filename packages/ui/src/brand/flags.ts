@@ -19,6 +19,16 @@ const usa =
   `</g>`;
 const FLAGS: Record<string, string> = {
   US: usa,
+  GB: `<path fill="#012169" d="M0 0h30v20H0z"/><path stroke="#fff" stroke-width="4" d="m0 0 30 20M30 0 0 20"/><path stroke="#c8102e" stroke-width="1.5" d="m0 0 30 20M30 0 0 20"/><path stroke="#fff" stroke-width="6" d="M15 0v20M0 10h30"/><path stroke="#c8102e" stroke-width="3.5" d="M15 0v20M0 10h30"/>`,
+  CA: `<path fill="#fff" d="M0 0h30v20H0z"/><path fill="#d80621" d="M0 0h7v20H0zM23 0h7v20h-7zM15 3l1.3 3.2 1.7-.9-.5 4 2.6-2 0 1.8 2 .5-3.4 3 .6 1.4-3.8-.5.2 3.5h-1.4l.2-3.5-3.8.5.6-1.4-3.4-3 2-.5V7.3l2.6 2-.5-4 1.7.9z"/>`,
+  ES: stripes(["#aa151b", "#f1bf00", "#f1bf00", "#aa151b"]),
+  AT: stripes(["#ed2939", "#fff", "#ed2939"]),
+  SE: `<path fill="#006aa7" d="M0 0h30v20H0z"/><path stroke="#fecc00" stroke-width="4" d="M11 0v20M0 10h30"/>`,
+  CH: `<path fill="#da291c" d="M0 0h30v20H0z"/><path stroke="#fff" stroke-width="4" d="M15 4v12M9 10h12"/>`,
+  DK: `<path fill="#c8102e" d="M0 0h30v20H0z"/><path stroke="#fff" stroke-width="3" d="M11 0v20M0 10h30"/>`,
+  NO: `<path fill="#ba0c2f" d="M0 0h30v20H0z"/><path stroke="#fff" stroke-width="5" d="M11 0v20M0 10h30"/><path stroke="#00205b" stroke-width="3" d="M11 0v20M0 10h30"/>`,
+  FI: `<path fill="#fff" d="M0 0h30v20H0z"/><path stroke="#002f6c" stroke-width="5" d="M11 0v20M0 10h30"/>`,
+  RO: stripes(["#002b7f", "#fcd116", "#ce1126"], true),
   DE: stripes(["#000", "#d00", "#ffce00"]),
   FR: stripes(["#002654", "#fff", "#ed2939"], true),
   NL: stripes(["#ae1c28", "#fff", "#21468b"]),

@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   AgentNetworks,
+  NetworkDrain,
   networkConfig,
   networkKey,
   processStartTicks,
@@ -24,7 +25,7 @@ test("network configuration comparison excludes credentials and represents remov
     networkLauncher: "/root/net",
     networkMark: 0x08000000,
   });
-  expect(networkKey({})).toBe("[null,null]");
+  expect(networkKey({})).toBe("[null,null,0]");
   expect(networkKey({ networkMark: 1 })).not.toBe(networkKey({}));
 });
 
@@ -80,4 +81,31 @@ test("process observation uses kernel UIDs, ignores zombies and exits, and refus
   ]);
   writeFileSync(path.join(root, "2", "status"), "State:\tS (sleeping)\n");
   expect(readNetworkProcesses(root)).toBeNull();
+});
+
+test("a finite drain survives restart and never extends when the same policy repeats", () => {
+  const now = Date.parse("2026-11-01T00:00:00Z");
+  const pending = [{ uid: 21000, agentId: "a1" }];
+  const drain = new NetworkDrain();
+  const first = drain.update(pending, "target", 60, now);
+  expect(first[0]).toMatchObject({ state: "draining", deadline: "2026-11-01T00:01:00.000Z" });
+  const resumed = new NetworkDrain(first);
+  expect(resumed.update(pending, "target", 120, now + 60_000)[0]).toMatchObject({
+    state: "restart_required",
+    deadline: first[0]?.deadline,
+  });
+  expect(resumed.update([], "target", 60, now + 61_000)).toEqual([]);
+  expect(new NetworkDrain().update(pending, "target", undefined, now)).toEqual([]);
+});
+
+test("a higher isolation revision drains a live UID even when launcher and mark stay the same", () => {
+  const old = { networkLauncher: "/root/net", networkMark: 0x08000000, networkRevision: 1 };
+  const next = { ...old, networkRevision: 2 };
+  const pins = new AgentNetworks(old, [{ uid: 21000, ...old }]);
+  pins.set(next);
+  expect(pins.resolve(21000, true)).toEqual(old);
+  expect(pins.pending(() => true)).toEqual([21000]);
+  expect(networkKey(old)).not.toBe(networkKey(next));
+  expect(networkKey({})).toBe(networkKey({ networkRevision: 0 }));
+  expect(pins.resolve(21000, false)).toEqual(next);
 });

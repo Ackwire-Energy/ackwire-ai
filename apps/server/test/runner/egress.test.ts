@@ -82,8 +82,22 @@ test("system probe ignores user curl settings and inherited proxy or loader vari
     return {};
   }) as unknown as typeof execFile;
   const user = { id: "agent1", user: "ag-a1b2c3d4", uid: 21000 };
-  expect(await probeEgress("https://example.test", user, fetch, run)).toEqual({ ip: "8.8.8.8" });
+  expect(await probeEgress("https://example.test", user, fetch, run, false)).toEqual({ ip: "8.8.8.8" });
+  expect(captured?.options.env?.AGENTES_NETWORK_OBSERVATION).toBe("1");
   expect(captured?.file).toBe("/usr/sbin/runuser");
   expect(captured?.args.slice(0, 7)).toEqual(["-u", user.user, "--", "/usr/bin/curl", "-q", "--noproxy", "*"]);
-  expect(Object.keys(captured?.options.env ?? {}).sort()).toEqual(["HOME", "LANG", "LOGNAME", "PATH", "SHELL", "USER"]);
+  await probeEgress("https://example.test", user, fetch, run, true);
+  expect(captured?.file).toBe("/usr/bin/systemd-run");
+  expect(captured?.args).toContain("--slice=agents-21000.slice");
+  expect(captured?.args).toContain("/usr/bin/curl");
+  expect(Object.keys(captured?.options.env ?? {}).sort()).toEqual([
+    "AGENTES_NETWORK_OBSERVATION",
+    "ANDROID_ADB_SERVER_PORT",
+    "HOME",
+    "LANG",
+    "LOGNAME",
+    "PATH",
+    "SHELL",
+    "USER",
+  ]);
 });

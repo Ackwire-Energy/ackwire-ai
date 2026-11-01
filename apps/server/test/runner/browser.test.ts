@@ -1333,7 +1333,7 @@ test.if(posix)(
     expect(t.chromes[1]?.profile).toBe(profile);
     expect(t.chromes[1]?.cookies).toEqual(["shop_session", "shop_prefs"]);
     // One page, as before: the agent's command goes on it.
-    expect(t.chromes[1]?.tabs).toEqual(["about:blank"]);
+    expect(t.chromes[1]?.tabs).toEqual(["chrome://newtab/"]);
   },
 );
 

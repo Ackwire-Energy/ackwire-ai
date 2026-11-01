@@ -981,6 +981,7 @@ async function desktopCheck(p: Parsed): Promise<number> {
         ...u,
         networkLauncher: stored.networkLauncher,
         networkMark: stored.networkMark,
+        networkRevision: stored.networkRevision,
       });
       const desktop = await checkDesktop(
         report,

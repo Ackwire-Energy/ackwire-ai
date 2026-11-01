@@ -6,7 +6,16 @@ import { useTranslation } from "react-i18next";
 /** Only a recent observation from an online computer; a country is never inferred from an assigned address. */
 export function Egress({ machine, compact = false }: { machine: Machine | null | undefined; compact?: boolean }) {
   const { t } = useTranslation();
-  const e = machine?.online ? machine.egress : null;
+  const e = machine?.kind === "managed" && machine.online ? machine.egress : null;
+  const transition = machine?.kind === "managed" ? machine.networkTransition : null;
+  if (transition)
+    return (
+      <span role="status" className="setup-line small">
+        {t(transition.state === "draining" ? "machines.egress.draining" : "machines.egress.restart", {
+          when: new Date(transition.deadline).toLocaleTimeString(),
+        })}
+      </span>
+    );
   if (!e?.ip) return null;
   const flag = countryFlagUrl(e.country);
   return (

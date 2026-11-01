@@ -8384,6 +8384,8 @@ export const ptBR = {
   },
   machines: {
     egress: {
+      draining: "A rede está mudando. As sessões abertas do computador serão reiniciadas às {{when}}.",
+      restart: "As sessões do computador estão reiniciando para aplicar a rede. Novos trabalhos aguardam a conclusão.",
       line: "IP de saída {{ip}}",
       hint: "O endereço que os sites veem quando os agentes navegam. Ele acompanha as mudanças de rede do computador.",
     },

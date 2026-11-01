@@ -37,7 +37,7 @@ import { readJson, writeJson } from "./json-file";
 import { acquireLock } from "./lock";
 import { agentFolderName, isInside, ownedSafely } from "./paths";
 import type { Spawn } from "./scope-gate";
-import { prepareStartPage, readStartLocale, type StartPageData } from "./start-page";
+import { prepareStartPage, type StartPageData } from "./start-page";
 
 /**
  * The agent browser (protocol 12, ADR 0040). The runner drives the pinned
@@ -1927,7 +1927,7 @@ export class BrowserManager {
           exe,
           profile,
           process.platform,
-          readStartLocale(startPage),
+          undefined,
           on !== null,
           page,
           this.opts.fixedPorts?.cdp ?? 0,

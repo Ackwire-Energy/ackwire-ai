@@ -49,6 +49,10 @@ export interface RunnerConfig {
   networkLauncher?: string;
   /** Optional trusted packet bit for foreign traffic routed through loopback; no exception by default. */
   networkMark?: number;
+  /** Root policy: finite drain before managed session retirement (30–3600 seconds). */
+  networkDrainSeconds?: number;
+  /** Root-controlled context revision: bump when an unchanged helper path changes isolation behavior. */
+  networkRevision?: number;
   /**
    * System mode: what of this computer's own listeners agents may reach besides DNS, as `tcp/11434` or
    * `udp/8125` (`agentes-runner services allow`). Each agent reaches its own local ports anyway, never another's.
@@ -191,6 +195,14 @@ export function normalizeStored(raw: Record<string, unknown>): StoredConfig {
       ? { networkLauncher: raw.networkLauncher }
       : {}),
     ...(typeof raw.networkMark === "number" ? { networkMark: raw.networkMark } : {}),
+    ...(Number.isSafeInteger(raw.networkRevision) && (raw.networkRevision as number) >= 0
+      ? { networkRevision: raw.networkRevision as number }
+      : {}),
+    ...(Number.isInteger(raw.networkDrainSeconds) &&
+    (raw.networkDrainSeconds as number) >= 30 &&
+    (raw.networkDrainSeconds as number) <= 3600
+      ? { networkDrainSeconds: raw.networkDrainSeconds as number }
+      : {}),
     ...(services.length ? { services } : {}),
     ...(text(raw.previousToken, 4000) ? { previousToken: text(raw.previousToken, 4000) } : {}),
   };

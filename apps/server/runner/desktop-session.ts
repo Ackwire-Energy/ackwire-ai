@@ -681,7 +681,7 @@ export class DesktopSessions {
     );
   }
 
-  stop(agent: AgentScope): Promise<MachineReplies["desktop.session.stop"]> {
+  stop(agent: Pick<AgentScope, "id">): Promise<MachineReplies["desktop.session.stop"]> {
     return this.serial(agent.id, async () => {
       const d = this.desktops.get(agent.id);
       if (!d) return { stopped: false };
@@ -690,7 +690,7 @@ export class DesktopSessions {
     });
   }
 
-  /** Root's scope identity for a network transition; an existing desktop is never stopped to apply one. */
+  /** Root's scope identity: live desktops hold their network context until they end or an explicit drain expires. */
   hasActivity(agentId: string): boolean {
     return (this.operations.get(agentId) ?? 0) > 0 || this.processId(agentId) !== null;
   }

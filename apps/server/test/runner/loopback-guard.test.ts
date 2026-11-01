@@ -357,31 +357,32 @@ test("the band is the browser pairs of the computer's range: the Cloud's leaves 
   expect(() => checkEphemeralRange("nonsense", [10000, 11999])).toThrow("Cannot read");
 });
 
-test("a configured routing bit exempts only unchanged foreign destinations, keeping host addresses guarded", () => {
-  const plain = renderRuleset([A], "drop", RANGE);
-  expect(plain).not.toContain("meta mark &");
-  const marked = renderRuleset([A], "drop", RANGE, new Set(), 0x08000000);
+test("routing exemptions precede both local-port hooks and retain cgroup ownership protection", () => {
+  expect(renderRuleset(base)).not.toContain("meta mark &");
+  const marked = renderRuleset({ ...base, networkMark: 0x08000000 });
   const rule = "meta mark & 0x08000000 == 0x08000000 ct status != dnat fib daddr type != local return";
-  expect(marked).toContain(rule);
-  expect(marked.indexOf(rule)).toBeLessThan(marked.indexOf('oif "lo" meta skuid 0'));
+  for (const hook of ["output", "input"]) {
+    const chain = marked.split(`chain ${hook} {`)[1]?.split("\t}")[0] ?? "";
+    expect(chain).toContain(rule);
+    expect(chain.indexOf(rule)).toBeLessThan(chain.indexOf(hook === "output" ? 'oif "lo"' : 'iif "lo"'));
+  }
   expect(marked).not.toContain("fib daddr . mark");
-  expect(marked).toContain('oif "lo" tcp dport @browser_ports drop');
-  expect(marked).toContain('oif "lo" tcp dport @guarded drop');
-  expect(() => renderRuleset([], "drop", RANGE, new Set(), 0)).toThrow("networkMark");
+  expect(marked).toContain('socket cgroupv2 level 1 "agents.slice" goto refuse');
+  expect(() => renderRuleset({ ...base, networkMark: 0 })).toThrow("networkMark");
 });
 
-test("network mark reconciliation updates atomically and retains the previous setting on failure", () => {
-  const options = { ssFails: false };
-  const nft = fakeNft(options);
-  const { g } = guard(nft.run, [21000]);
+test("network mark reconciliation remains atomic and restores the previous setting on failure", () => {
+  let fail = false;
+  const pc = computer({ refuse: () => (fail ? "unavailable" : null) });
+  const g = pc.guard();
   expect(g.reconcile()).toBe(true);
   expect(g.setNetworkMark(0x08000000)).toBe(true);
-  const applied = nft.applied();
+  const applied = pc.loaded.at(-1);
   expect(applied).toContain("agentes network mark 134217728");
-  options.ssFails = true;
+  fail = true;
   expect(g.setNetworkMark(0x10000000)).toBe(false);
-  expect(nft.applied()).toBe(applied);
-  options.ssFails = false;
+  expect(pc.loaded.at(-1)).toBe(applied);
+  fail = false;
   expect(g.reconcile()).toBe(true);
-  expect(nft.applied()).toBe(applied);
+  expect(pc.loaded.at(-1)).toBe(applied);
 });

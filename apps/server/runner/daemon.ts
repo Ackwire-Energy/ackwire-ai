@@ -93,11 +93,13 @@ import {
   AgentNetworks,
   desktopUsesHostNetwork,
   type NetworkConfig,
+  NetworkDrain,
   type NetworkProcess,
   networkConfig,
   networkKey,
   readNetworkPins,
   readNetworkProcesses,
+  readNetworkTransitions,
   uidHasOtherProcesses,
   writeNetworkState,
 } from "./network-state";
@@ -193,6 +195,8 @@ export function configFromGrant(
     ...(prev?.agentUidRange ? { agentUidRange: prev.agentUidRange } : {}),
     ...(prev?.networkLauncher ? { networkLauncher: prev.networkLauncher } : {}),
     ...(prev?.networkMark ? { networkMark: prev.networkMark } : {}),
+    ...(prev?.networkDrainSeconds ? { networkDrainSeconds: prev.networkDrainSeconds } : {}),
+    ...(prev?.networkRevision !== undefined ? { networkRevision: prev.networkRevision } : {}),
     ...(prev?.maxConcurrentTasks ? { maxConcurrentTasks: prev.maxConcurrentTasks } : {}),
     ...(prev?.taskMaxSeconds ? { taskMaxSeconds: prev.taskMaxSeconds } : {}),
     ...(prev?.brainIdleMinutes ? { brainIdleMinutes: prev.brainIdleMinutes } : {}),
@@ -318,10 +322,17 @@ export class RunnerDaemon implements RequestObserver {
   private agents: MachineAgent[] = [];
   private egress = new EgressObservation();
   private probingEgress = false;
+  private observeEgress = false;
+  private refusedNetworkKey: string | null = null;
+  private networkWriteFailed = false;
   private egressGeneration = 0;
   private readonly uidNetworks: AgentNetworks;
   private readonly networkUsers = new Map<number, AgentUser>();
   private writtenNetworkPins = "";
+  private readonly networkDrain: NetworkDrain;
+  private sentNetworkTransition = "";
+  private readonly retiredNetworkAgents = new Set<string>();
+  private readonly networkRetirementWarnings = new Set<string>();
   private networkProcesses: NetworkProcess[] | null = null;
   private readonly jobs = new Map<string, ControlJob>();
   readonly activity: ActivityLog;
@@ -366,6 +377,7 @@ export class RunnerDaemon implements RequestObserver {
 
   constructor(private readonly opts: DaemonOptions) {
     this.uidNetworks = new AgentNetworks({}, readNetworkPins(opts.home));
+    this.networkDrain = new NetworkDrain(readNetworkTransitions(opts.home));
     this.activity = new ActivityLog(opts.home);
     this.now = opts.now ?? Date.now;
     this.requests = new AccessRequests(opts.home, this.now);
@@ -798,9 +810,12 @@ export class RunnerDaemon implements RequestObserver {
         const next = networkConfig(want);
         if (!this.opts.workers && next.networkLauncher) trustedNetworkLauncher(next.networkLauncher);
         if (!s.changeNetwork(next)) {
-          this.opts.log("Network settings are waiting for the local guard");
+          if (this.refusedNetworkKey !== networkKey(next))
+            this.opts.log("Network settings are waiting for the local guard");
+          this.refusedNetworkKey = networkKey(next);
           return;
         }
+        this.refusedNetworkKey = null;
         this.egressGeneration++;
         this.egress.clear();
         s.connection.send({ type: "pong", at: this.now(), egress: { ip: null } });
@@ -916,7 +931,11 @@ export class RunnerDaemon implements RequestObserver {
     let agentUser: Session["agentUser"] = null;
     if (config.mode === "system") {
       const users = new AgentUsers({ home, range: config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE });
-      for (const user of readAgentUsers(home)) this.networkUsers.set(user.uid, user);
+      for (const user of readAgentUsers(home)) {
+        this.networkUsers.set(user.uid, user);
+        // Keep already-running users out of cron/at even when their network must drain before preparation.
+        if (!this.opts.workers) denySchedulers(user.user);
+      }
       const resolveNetwork = (user: AgentUser): NetworkConfig => {
         this.networkUsers.set(user.uid, user);
         const running = supervisor?.runningNetwork(user.id) != null;
@@ -950,10 +969,14 @@ export class RunnerDaemon implements RequestObserver {
         // Save the pin before any child can outlive this daemon, including a desktop still starting.
         this.uidNetworks.pending((uid) => uid === user.uid || this.networkUidBusy(uid));
         this.persistNetworkPins(network);
+        if (this.config?.networkDrainSeconds && networkKey(effective) !== networkKey(network)) {
+          throw new Error("This agent’s network is changing. New work waits for its computer sessions to restart.");
+        }
         return effective;
       };
       const policy = {
-        uidRange: config.managedBy === "host" ? DEFAULT_AGENT_UID_RANGE : (config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE),
+        uidRange:
+          config.managedBy === "host" ? DEFAULT_AGENT_UID_RANGE : (config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE),
         refresh: () => void guard?.reconcile(),
       };
       const prepare = (user: AgentUser, effective = resolveNetwork(user)) => {
@@ -1107,13 +1130,17 @@ export class RunnerDaemon implements RequestObserver {
       onState: (state) => {
         // Offline: frames have nowhere to go; the server starts the live view again when it is back.
         if (state !== "online") {
+          this.observeEgress = false;
           browser.stopStreams();
           // What it said about people's turns is stale; it says again on reconnect.
           browser.clearHandoffs();
         }
         this.setConnState(state);
       },
-      onWelcome: () => {
+      onWelcome: (welcome) => {
+        this.observeEgress = welcome.observeEgress;
+        this.sentNetworkTransition = "";
+        this.observeNetwork();
         this.egressGeneration++;
         this.egress.reset();
         this.updateStartPages();
@@ -1137,6 +1164,7 @@ export class RunnerDaemon implements RequestObserver {
         if (guard && !guard.setNetworkMark(value.networkMark)) return false;
         delete network.networkLauncher;
         delete network.networkMark;
+        delete network.networkRevision;
         Object.assign(network, value);
         this.uidNetworks.set(value);
         this.refreshNetworkProcesses();
@@ -1183,7 +1211,8 @@ export class RunnerDaemon implements RequestObserver {
     const configured =
       this.config?.networkLauncher ||
       this.config?.networkMark ||
-      this.uidNetworks.snapshot().some((pin) => pin.networkLauncher || pin.networkMark);
+      this.config?.networkRevision ||
+      this.uidNetworks.snapshot().some((pin) => pin.networkLauncher || pin.networkMark || pin.networkRevision);
     if (!configured) {
       this.networkProcesses = [];
       return;
@@ -1199,10 +1228,19 @@ export class RunnerDaemon implements RequestObserver {
 
   private persistNetworkPins(network: NetworkConfig, pending?: number[]) {
     const pins = this.uidNetworks.snapshot();
+    if (
+      !this.writtenNetworkPins &&
+      !network.networkLauncher &&
+      !network.networkMark &&
+      !network.networkRevision &&
+      !pins.some((p) => p.networkLauncher || p.networkMark || p.networkRevision)
+    )
+      return;
     const pendingUids = pending ?? pins.filter((row) => networkKey(row) !== networkKey(network)).map((row) => row.uid);
-    const key = JSON.stringify([networkKey(network), pins, pendingUids]);
+    const transitions = this.networkDrain.snapshot();
+    const key = JSON.stringify([networkKey(network), pins, pendingUids, transitions]);
     if (key === this.writtenNetworkPins) return;
-    writeNetworkState(this.opts.home, network, pendingUids, pins);
+    writeNetworkState(this.opts.home, network, pendingUids, pins, transitions);
     this.writtenNetworkPins = key;
   }
 
@@ -1212,26 +1250,98 @@ export class RunnerDaemon implements RequestObserver {
     this.refreshNetworkProcesses();
     const pending = new Set(session.supervisor.drainNetwork());
     for (const uid of this.uidNetworks.pending((uid) => this.networkUidBusy(uid))) pending.add(uid);
+    const transitions = this.networkDrain.update(
+      [...pending].flatMap((uid) => {
+        const user = this.networkUsers.get(uid);
+        return user ? [{ uid, agentId: user.id }] : [];
+      }),
+      networkKey(session.network),
+      this.config?.networkDrainSeconds,
+      this.now(),
+    );
+    const active = new Set(transitions.map((t) => t.agentId));
+    for (const id of this.retiredNetworkAgents) if (!active.has(id)) this.retiredNetworkAgents.delete(id);
+    for (const id of this.networkRetirementWarnings) if (!active.has(id)) this.networkRetirementWarnings.delete(id);
+    const summary = transitions.length
+      ? {
+          state: transitions.some((t) => t.state === "restart_required")
+            ? ("restart_required" as const)
+            : ("draining" as const),
+          deadline: transitions.map((t) => t.deadline).sort()[0] as string,
+          agents: transitions.map((t) => t.agentId),
+        }
+      : null;
+    const summaryKey = JSON.stringify(summary);
+    if (
+      this.observeEgress &&
+      summaryKey !== this.sentNetworkTransition &&
+      session.connection.send({ type: "pong", at: this.now(), networkTransition: summary })
+    ) {
+      this.sentNetworkTransition = summaryKey;
+    }
     try {
       this.persistNetworkPins(
         session.network,
         [...pending].sort((a, b) => a - b),
       );
+      this.networkWriteFailed = false;
+      // Persist and announce the deadline before ending only sessions this runner owns. The routing integrator
+      // blocks any leftover stale process at that deadline; it must never infer completion from these closures.
+      for (const transition of transitions) {
+        if (transition.state !== "restart_required" || this.retiredNetworkAgents.has(transition.agentId)) continue;
+        this.retiredNetworkAgents.add(transition.agentId);
+        const why = "Network settings changed; this computer session is restarting";
+        if (!this.networkRetirementWarnings.has(transition.agentId)) this.opts.log(`[${transition.agentId}] ${why}`);
+        const failed = (error: unknown) => {
+          this.retiredNetworkAgents.delete(transition.agentId);
+          if (!this.networkRetirementWarnings.has(transition.agentId)) {
+            this.networkRetirementWarnings.add(transition.agentId);
+            this.opts.log(
+              `[${transition.agentId}] Could not restart its computer sessions: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          }
+        };
+        try {
+          session.supervisor.retireNetworkAgent(transition.agentId, why);
+          this.terminals.closeAgent(transition.agentId, why);
+          // Ownership comes from the restored desktop registry, even when the current agent roster is missing.
+          void this.desktops.stop({ id: transition.agentId }).catch(failed);
+        } catch (error) {
+          failed(error);
+        }
+      }
     } catch {
-      this.opts.log("Could not write the active network settings");
+      if (!this.networkWriteFailed) this.opts.log("Could not write the active network settings");
+      this.networkWriteFailed = true;
     }
   }
 
   private async sampleEgress() {
     const session = this.session;
-    if (!session || this.probingEgress || this.stopped) return;
-    const first = this.agents[0];
-    if (session.agentUser && !first) return;
+    if (!session || !this.observeEgress || !session.agentUser || this.probingEgress || this.stopped) return;
+    // Observe an existing agent context only: periodic probes must never create a user or prepare a desktop.
+    const known = new Map(readAgentUsers(this.opts.home).map((user) => [user.id, user]));
+    const pins = new Map(this.uidNetworks.snapshot().map((pin) => [pin.uid, pin]));
+    const retiring = new Set(
+      this.networkDrain
+        .snapshot()
+        .filter((item) => item.state === "restart_required")
+        .map((item) => item.uid),
+    );
+    let user: AgentUser | undefined;
+    for (const agent of this.agents) {
+      const existing = this.opts.workers?.user(agent) ?? known.get(agent.id);
+      if (!existing || retiring.has(existing.uid)) continue;
+      const pin = pins.get(existing.uid);
+      if (!pin && !this.opts.workers) continue;
+      user = { ...existing, ...networkConfig(pin ?? session.network) };
+      break;
+    }
+    if (!user) return;
     this.probingEgress = true;
     const before = this.egress.current;
     const generation = this.egressGeneration;
     try {
-      const user = session.agentUser && first ? session.agentUser(first) : undefined;
       const result = await (this.opts.probeEgress ?? probeEgress)(session.config.server, user);
       if (this.session === session && generation === this.egressGeneration) this.egress.record(result);
     } catch {

@@ -11,9 +11,10 @@ The public runner must support deployments with their own network isolation with
 ## Decision
 
 Protocol 33 adds an optional `egress` observation to `pong`: `{ip: string | null, country?: string}`. The
-runner samples its paired server's unauthenticated `/api/machines/ip` every 30 seconds and on welcome. In system
-mode the request runs as an agent's UID through its normal network launcher, with no machine credentials.
-Single-user mode uses the runner's own route. Only public addresses survive validation; three failures report
+server grants `observeEgress` in `welcome` only to a database `kind: managed` computer. Its system runner
+samples the paired server’s unauthenticated `/api/machines/ip` every 30 seconds and on welcome, using an
+existing agent UID inside its systemd slice and normal launcher, with no user creation, start-page preparation
+or machine credentials. Personal and server-hosted computers never sample, emit, store or display this field. Only public addresses survive validation; three failures report
 `{ip:null}`. Identical observations reuse their object, so ordinary heartbeats carry no repeated payload.
 The server stores its receive time in `machines.egress`, clears it on a new connection, and publishes changed
 observations. Offline computers show no address. Country marks are bundled SVGs; unknown countries use a globe.
@@ -67,7 +68,7 @@ permissions, localization, accidental input, and streaming backpressure. A relea
 needs Linux acceptance checks of both IPv4 and IPv6, existing-process coexistence, browser CDP, desktop and
 terminal paths, Chrome's user-namespace sandbox under no-new-privileges, and rollback before any production rollout.
 
-Network changes do not reconnect the machine or cancel foreground work. Workers with requests, background tasks,
+Without `networkDrainSeconds`, network changes do not reconnect the machine or cancel foreground work. Workers with requests, background tasks,
 secret installs, handoffs, browser streams or desktop leases finish those before they retire. Every launch for
 one UID keeps its previous network while that worker, desktop (including startup) or terminal still exists.
 Linux also retains that context while any other process runs as the UID, including daemonized services.
@@ -85,3 +86,30 @@ An integrator must verify process identity, root ownership, the actual firewall 
 membership before declaring a migration complete; the file describes launch defaults, not proof that every
 process moved. External routing must preserve already established connections during a change. Keep an installed
 routing mark until connections using it have drained before removing its exception.
+
+
+## Bounded migration policy
+
+System launches with an explicit network launcher, mark or revision fresh-mount procfs with `hidepid=2`
+inside the existing private mount namespace. Unconfigured self-host launches keep their existing mount behavior. Other users’
+processes, including `/proc/1/net`, are hidden; the host’s proc mount is unchanged. A custom network launcher
+must also mask host network configuration and choose its hostname inside its own mount and UTS namespaces.
+
+`networkRevision` is an optional root-controlled context revision (default 0). Increasing it starts a new
+transition even when the launcher path and mark are unchanged, so existing processes cannot keep an old
+helper’s mount policy indefinitely. The context key is `[launcher|null, mark|null, revision]`; the root state
+and per-UID pins preserve the revision.
+
+A root configuration may set `networkDrainSeconds` (30–3600). Stale UID contexts immediately refuse new work;
+existing work drains until its persisted deadline. `network-state.json` adds per-UID `transitions` with agent ID,
+target, start time, deadline and `draining`/`restart_required` state. Reapplying the same policy or restarting
+cannot extend the deadline. Managed machines publish a bounded `networkTransition` in pongs, lists and live
+updates; the computer view announces when its sessions will restart. At the deadline only the runner’s known
+worker, desktop and terminal handles close, with an interruption reason. The external routing controller must
+block old host-UID egress at the same deadline, then retire that UID’s managed cgroup if needed. Unknown
+processes keep the machine explicitly pending until an operator resolves them. No arbitrary process is killed
+by the runner, and no pending migration is reported complete merely because its known sessions closed.
+
+Without a network launcher, mark or retained isolated context, network-state persistence is skipped. Settings
+saves the account’s language before changing the local UI; the start page follows it through agent updates.
+Chrome itself keeps its previous OS language behavior.

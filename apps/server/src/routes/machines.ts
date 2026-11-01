@@ -145,6 +145,10 @@ export const Machine = z
         description:
           "Whether agents can use their own desktops there (protocol 21, ADR 0062): only where each agent works as its own OS user. Null when its runner doesn't report it.",
       }),
+    networkTransition: z
+      .object({ state: z.enum(["draining", "restart_required"]), deadline: z.string(), agents: z.array(z.string()) })
+      .nullable()
+      .optional(),
     egress: z.object({ ip: z.string(), country: z.string().optional(), at: z.string() }).nullable().optional(),
     canManage: z.boolean().openapi({ description: "This person may rename, delete or reduce its access." }),
     createdAt: z.string(),

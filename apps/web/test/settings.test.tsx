@@ -674,3 +674,10 @@ describe("Buscar no workspace", () => {
     expect(document.body.textContent).toContain("Nada encontrado com “nada-disso”.");
   });
 });
+
+test("changing Settings language saves the account before updating the local language", async () => {
+  const { state } = await go(seedState(), "settings/account");
+  await click(screen().getByRole("radio", { name: "English" }));
+  await settle(6);
+  expect(state.calls.find((call) => call.method === "account.updateMe")?.args[0]).toEqual({ locale: "en" });
+});

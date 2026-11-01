@@ -119,7 +119,7 @@ export interface ConnectionOptions {
   browserTraffic?: () => BrowserTraffic | null;
   egress?: () => MachineEgress | null;
   /** Called after each `welcome` (frames sent from here on reach the server). */
-  onWelcome?: (welcome: { machineId: string; name: string; heartbeatMs: number }) => void;
+  onWelcome?: (welcome: { machineId: string; name: string; heartbeatMs: number; observeEgress: boolean }) => void;
   /** Protocol 9: the server's `agents` frame (the agents that use this machine). */
   onAgents?: (agents: unknown) => void;
   /** Protocol 12: a person's turn in an agent's browser started, changed or ended (`browser.handoff`). */
@@ -236,9 +236,14 @@ export class RunnerConnection {
       let sentLoad: MachineLoad | null = null;
       let sentTraffic: BrowserTraffic | null = null;
       let sentEgress: MachineEgress | null = null;
+      let observeEgress = false;
 
       const send = (frame: RunnerFrame) => {
         if (finished || !socket) return;
+        if (frame.type === "pong" && frame.egress && !observeEgress) {
+          const { egress: _, ...privateFrame } = frame;
+          frame = privateFrame;
+        }
         // Browser pictures are independent JPEG frames: skip stale pictures while the link is backed up.
         // Results, heartbeats and input keep their normal ordered delivery.
         if (frame.type === "browser.frame" && (socket.bufferedAmount ?? 0) > 2 * 1024 * 1024) return;
@@ -296,12 +301,13 @@ export class RunnerConnection {
         switch (frame.type) {
           case "welcome": {
             welcomed = true;
+            observeEgress = frame.observeEgress === true;
             if (typeof frame.heartbeatMs === "number" && frame.heartbeatMs > 0) heartbeatMs = frame.heartbeatMs;
             log(`connected as ${frame.name}`);
             arm();
             this.live = send;
             opts.onState?.("online");
-            opts.onWelcome?.({ machineId: frame.machineId, name: frame.name, heartbeatMs });
+            opts.onWelcome?.({ machineId: frame.machineId, name: frame.name, heartbeatMs, observeEgress });
             // First: a supervisor passes what this server does with a repeated call on to its workers' welcome.
             opts.mcp?.attach(send, { mcpOnce: frame.mcpOnce === true });
             tasks?.attach(send);
@@ -325,7 +331,7 @@ export class RunnerConnection {
           case "ping": {
             const load = opts.load?.() ?? null;
             const traffic = opts.browserTraffic?.() ?? null;
-            const egress = opts.egress?.() ?? null;
+            const egress = observeEgress ? (opts.egress?.() ?? null) : null;
             send({
               type: "pong",
               at: frame.at,

@@ -47,6 +47,10 @@ export function AccountSection() {
   const dir = useDirectory(org.id);
   const navigate = useNavigate();
   const api = useApi();
+  const language = useMutation({
+    mutationFn: (locale: LocaleCode) => api.account.updateMe({ locale }),
+    onSuccess: (_data, locale) => setLocale(locale, i18n),
+  });
   const plans = ownPlanLines(t, useAiAccounts(org.id).data, dir.agents, me.user.id);
   // Looking at your plans: their usage is looked up again (it comes back as `machine.updated`).
   useEffect(() => {
@@ -147,7 +151,8 @@ export function AccountSection() {
                 size="sm"
                 label={t("shell.language")}
                 value={i18n.language}
-                onValueChange={(v) => setLocale(v as LocaleCode, i18n)}
+                disabled={language.isPending}
+                onValueChange={(v) => language.mutate(v as LocaleCode)}
                 options={locales.map((l) => ({ value: l.code, label: l.label }))}
               />
             }

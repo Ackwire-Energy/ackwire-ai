@@ -201,3 +201,9 @@ test("networkMark is absent by default and rejects malformed or reserved packet 
     expect(() => normalizeStored({ networkMark: mark })).toThrow("networkMark");
   }
 });
+
+test("only an explicit bounded root policy enables forced network draining", () => {
+  expect(normalizeStored({ networkDrainSeconds: 60 }).networkDrainSeconds).toBe(60);
+  for (const value of [undefined, 0, 29, 3601, 1.5, "60"])
+    expect(normalizeStored({ networkDrainSeconds: value }).networkDrainSeconds).toBeUndefined();
+});

@@ -255,6 +255,7 @@ test("the launcher: the agent's slice, its own temporary folders, its user, abso
     "/bin/sh",
     "-c",
   ]);
+  expect(p.join("\n")).not.toContain("hidepid=");
   expect(p.slice(19)).toEqual(["sh", "21003", "/usr/sbin/runuser", "-u", "ag-a1b2c3d4", "--"]);
   expect(launcher).toMatchObject({ env, home: "/home/ag-a1b2c3d4", tmp: "/run/agentes-runner-tmp/21003/tmp" });
   // Root on the computer: the agent's own tmpfs, mounted once (a lock, so two first launches don't stack two).
@@ -399,6 +400,7 @@ test("a configured routing mark drops network capabilities even without a namesp
   ]);
   const scoped = systemLauncher({ ...user, networkLauncher: "/usr/bin/true" }, true).prefix;
   expect(scoped.indexOf("/usr/bin/true")).toBeLessThan(scoped.indexOf("/usr/bin/setpriv"));
+  expect(scoped.join("\n")).toContain("mount -t proc -o nosuid,nodev,noexec,hidepid=2 proc /proc");
   expect(scoped.indexOf("/usr/bin/setpriv")).toBeLessThan(scoped.indexOf("/usr/sbin/runuser"));
   expect(systemLauncher({ ...user, networkMark: undefined }, false).prefix[0]).toBe("/usr/sbin/runuser");
 });

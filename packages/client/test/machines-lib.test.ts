@@ -309,7 +309,7 @@ describe("connected computers helpers (ADR 0036)", () => {
 test("an observed exit address updates live and is cleared across connection changes", () => {
   const qc = new QueryClient();
   const list = keys.machines("o1");
-  qc.setQueryData(list, [{ id: "m1", online: true, egress: null }]);
+  qc.setQueryData(list, [{ id: "m1", kind: "managed", online: true, egress: null }]);
   const event = (value: Record<string, unknown>) =>
     applyMachineEvent(qc, "o1", { type: "machine.updated", machineId: "m1", ...value } as { type: string });
   const current = () => qc.getQueryData<Machine[]>(list)?.[0]?.egress;
@@ -327,5 +327,18 @@ test("an observed exit address updates live and is cleared across connection cha
   expect(current()).toBeNull();
   applyMachineEvent(qc, "o1", { type: "machine.status", machineId: "m1", online: true } as { type: string });
   expect(current()).toBeNull();
+  qc.clear();
+});
+
+test("personal machine updates discard old-server public addresses", () => {
+  const qc = new QueryClient();
+  const list = keys.machines("o1");
+  qc.setQueryData(list, [{ id: "m1", kind: "connected", online: true, egress: null }]);
+  applyMachineEvent(qc, "o1", {
+    type: "machine.updated",
+    machineId: "m1",
+    egress: { ip: "8.8.8.8", country: "US", at: "2026-11-01T12:00:00Z" },
+  } as { type: string });
+  expect(qc.getQueryData<Machine[]>(list)?.[0]?.egress).toBeNull();
   qc.clear();
 });

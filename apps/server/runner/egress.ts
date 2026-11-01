@@ -70,6 +70,7 @@ export async function probeEgress(
   user?: AgentUser,
   get: typeof fetch = fetch,
   run: typeof execFile = execFile,
+  systemd?: boolean,
 ): Promise<unknown> {
   const url = new URL(`${server.replace(/\/+$/, "")}/api/machines/ip`);
   if (!user) {
@@ -95,7 +96,7 @@ export async function probeEgress(
     }
     return JSON.parse(Buffer.concat(chunks).toString("utf8"));
   }
-  const launch = systemLauncher(user, false);
+  const launch = systemLauncher(user, systemd);
   const [file, ...args] = [
     ...launch.prefix,
     "/usr/bin/curl",
@@ -115,7 +116,7 @@ export async function probeEgress(
     run(
       file as string,
       args,
-      { env: launch.env, cwd: launch.home, timeout: 12_000, maxBuffer: 4096 },
+      { env: { ...launch.env, AGENTES_NETWORK_OBSERVATION: "1" }, cwd: launch.home, timeout: 12_000, maxBuffer: 4096 },
       (error, stdout) => {
         if (error) return reject(new Error("Address lookup failed"));
         try {

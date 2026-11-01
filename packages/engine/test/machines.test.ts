@@ -680,6 +680,7 @@ describe("hub", () => {
       name: "Build box",
       heartbeatMs: 25_000,
       mcpOnce: true,
+      observeEgress: false,
     });
     const [row] = await f.db.select().from(schema.machines);
     expect(row).toMatchObject({
@@ -1705,6 +1706,7 @@ test("measured egress is stored, updated, cleared and hidden while a computer is
   f = await setup({ machines: true });
   const hub = f.machineHub as MachineHub;
   const paired = await pair();
+  await f.db.update(schema.machines).set({ kind: "managed" }).where(eq(schema.machines.id, paired.machineId));
   const runner = fakeRunner(hub);
   await runner.hello(paired.token);
   await runner.frame({ type: "pong", at: 1, egress: { ip: "8.8.8.8", country: "US" } });
@@ -1737,4 +1739,26 @@ test("the start-page language follows the responsible person and changes reach t
   expect(signals).toContainEqual({ type: "machine.agents", orgId: f.org.id });
   await setMyLocale(f.db, f.owner.id, "en", f.pubsub);
   expect((await machineAgents(f.db, f.org.id, paired.machineId)).find((a) => a.id === agent.id)?.locale).toBe("en");
+});
+
+test("personal computer IPs are neither stored nor broadcast to workspace readers", async () => {
+  f = await setup({ machines: true });
+  const hub = f.machineHub as MachineHub;
+  const guest = await addMember(f.db, f.org.id, "member", "Guest");
+  const paired = await pair();
+  const runner = fakeRunner(hub);
+  await runner.hello(paired.token);
+  expect(runner.sent.find((frame) => frame.type === "welcome")).toMatchObject({ observeEgress: false });
+  const events: unknown[] = [];
+  f.pubsub.subscribe(orgTopic(f.org.id), (event) => events.push(event));
+  await runner.frame({ type: "pong", at: 1, egress: { ip: "8.8.8.8", country: "US" } });
+  const [stored] = await f.db.select().from(schema.machines).where(eq(schema.machines.id, paired.machineId));
+  expect(stored?.egress).toBeNull();
+  expect(JSON.stringify(events)).not.toContain("8.8.8.8");
+  // Hide legacy data as well: no viewer, including the pairer, receives a personal machine's address.
+  await f.db
+    .update(schema.machines)
+    .set({ egress: { ip: "8.8.8.8", at: new Date().toISOString() } })
+    .where(eq(schema.machines.id, paired.machineId));
+  for (const actor of [f.owner, guest]) expect((await listMachines(f.db, actor.id, f.org.id))[0]?.egress).toBeNull();
 });

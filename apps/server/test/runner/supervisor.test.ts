@@ -21,6 +21,7 @@ import { BrowserManager } from "../../runner/browser";
 import { writeConfig } from "../../runner/config";
 import type { Dial, Socket, SocketHandlers } from "../../runner/connection";
 import { RunnerDaemon } from "../../runner/daemon";
+import { DesktopSessions } from "../../runner/desktop-session";
 import { RunnerError } from "../../runner/errors";
 import { type HandlerContext, handleRequest, type RequestScope } from "../../runner/handlers";
 import { readLines } from "../../runner/lines";
@@ -2570,7 +2571,7 @@ test.if(posix)("route changes discard in-flight egress observations and reconnec
     await waitFor(() => sockets.length === 1);
     const s = sockets[0] as FakeSocket;
     s.handlers.onOpen();
-    s.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25000 });
+    s.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25000, observeEgress: true });
     s.frame({ type: "agents", agents: [ANA] });
     await waitFor(() => probes.length === 1);
     expect(probes[0]?.uid).toBe(21000);
@@ -2585,7 +2586,7 @@ test.if(posix)("route changes discard in-flight egress observations and reconnec
     await waitFor(() => sockets.length === 2);
     const next = sockets[1] as FakeSocket;
     next.handlers.onOpen();
-    next.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25000 });
+    next.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25000, observeEgress: true });
     next.frame({ type: "ping", at: 1 });
     expect(next.of("pong").at(-1)?.egress).toBeUndefined();
     await waitFor(() => probes.length === 3);
@@ -2719,7 +2720,7 @@ test.if(posix)("editing only network settings applies without reconnecting or in
     await waitFor(() => sockets.length === 1);
     const socket = sockets[0] as FakeSocket;
     socket.handlers.onOpen();
-    socket.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25000 });
+    socket.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25000, observeEgress: true });
     socket.frame({ type: "agents", agents: [ANA] });
     socket.frame({ type: "request", id: "work", ...exec(ANA) });
     await waitFor(() => workers.length === 1);
@@ -2840,4 +2841,133 @@ test("a late hello cannot reopen a retiring worker to a new request", async () =
   const nextReq = await requestOn(next);
   next.send({ type: "result", ok: true, id: nextReq.id, data: execDone });
   await nextRun;
+});
+
+test.if(posix)(
+  "a managed finite drain rejects new stale work and retries owned desktop retirement without a roster",
+  async () => {
+    const home = newHome();
+    const ws = tempDir("network-deadline-");
+    dirs.push(ws);
+    let now = Date.now();
+    const config = {
+      server: "https://agentes.test",
+      machineId: "m1",
+      name: "box",
+      token: "agm_test_only",
+      workspace: ws,
+      exec: true,
+      mode: "system" as const,
+      agentUidRange: [21000, 21099] as [number, number],
+      networkDrainSeconds: 60,
+    };
+    writeConfig(config, home);
+    const workers: FakeWorker[] = [];
+    const sockets: FakeSocket[] = [];
+    const daemon = new RunnerDaemon({
+      home,
+      mode: "start",
+      log: () => {},
+      watch: true,
+      now: () => now,
+      executors: () => ({}),
+      caffeinate: false,
+      self: { command: ["/opt/agentes-runner/agentes-runner"], compiled: true },
+      fetch: async () => new Response("", { status: 404 }),
+      probeEgress: async () => null,
+      workers: {
+        user: userOf,
+        start: (user) => {
+          const worker = new FakeWorker(user);
+          workers.push(worker);
+          return worker;
+        },
+      },
+      dial: (_url, handlers) => {
+        const socket = new FakeSocket(handlers);
+        sockets.push(socket);
+        return socket;
+      },
+    });
+    let desktopStops = 0;
+    const stopDesktop = spyOn(DesktopSessions.prototype, "stop").mockImplementation(async (agent) => {
+      expect(agent.id).toBe(ANA.id);
+      if (++desktopStops === 1) throw new Error("Transient desktop stop failure");
+      return { stopped: true };
+    });
+    daemon.start();
+    try {
+      await waitFor(() => sockets.length === 1);
+      const socket = sockets[0] as FakeSocket;
+      socket.handlers.onOpen();
+      socket.frame({ type: "welcome", machineId: "m1", name: "box", heartbeatMs: 25000, observeEgress: true });
+      // A restored owned desktop must close even if its agent is absent from the cached roster.
+      socket.frame({ type: "request", id: "active", ...exec(ANA) });
+      await waitFor(() => workers.length === 1);
+      const old = workers[0] as FakeWorker;
+      old.hello();
+      await requestOn(old);
+      const target = { networkLauncher: "/root/network-launcher", networkMark: 0x08000000 };
+      writeConfig({ ...config, ...target }, home);
+      await waitFor(() =>
+        socket.of("pong").some((p) => (p.networkTransition as { state?: string } | undefined)?.state === "draining"),
+      );
+      expect(old.stdin.writableEnded).toBe(false);
+      socket.frame({ type: "request", id: "new-work", ...exec(ANA) });
+      await waitFor(() => socket.of("result").some((r) => r.id === "new-work"));
+      expect(socket.of("result").find((r) => r.id === "new-work")?.ok).toBe(false);
+      // Keep the old UID alive until the failed desktop stop has been retried.
+      old.stdin.removeAllListeners("end");
+      now += 61_000;
+      await waitFor(() => old.stdin.writableEnded, 5000);
+      expect(
+        socket
+          .of("pong")
+          .some((p) => (p.networkTransition as { state?: string } | undefined)?.state === "restart_required"),
+      ).toBe(true);
+      expect(socket.of("result").find((r) => r.id === "active")?.ok).toBe(false);
+      await waitFor(() => desktopStops === 2, 5000);
+      old.crash(0);
+      await new Promise((r) => setTimeout(r, 10));
+      socket.frame({ type: "request", id: "fresh", ...exec(ANA) });
+      await waitFor(() => workers.length === 2);
+      expect(workers[1]?.user).toMatchObject(target);
+    } finally {
+      stopDesktop.mockRestore();
+      await daemon.stop();
+    }
+  },
+  15000,
+);
+
+test("a restored owner with a temporarily unavailable network does not prevent connection and retries after drain", async () => {
+  const home = newHome();
+  writeFileSync(
+    path.join(home, WORKER_TASKS_FILE),
+    JSON.stringify({ restored: { agentId: ANA.id, startedAt: new Date().toISOString() } }),
+  );
+  let blocked = true;
+  const target = { networkLauncher: "/root/net", networkMark: 0x08000000, networkRevision: 2 };
+  const t = setup(
+    {
+      network: target,
+      resolveNetwork: () => {
+        if (blocked) throw new Error("The prior UID context is draining");
+        return target;
+      },
+    },
+    home,
+  );
+  expect(() => t.sup.boot()).not.toThrow();
+  t.sup.attach();
+  expect(t.workers).toHaveLength(0);
+  expect(t.sup.list()).toMatchObject([{ taskId: "restored", agentId: ANA.id }]);
+  blocked = false;
+  t.sup.drainNetwork();
+  await waitFor(() => t.workers.length === 1, 5000);
+  const worker = t.last(ANA.id);
+  worker.hello();
+  await waitFor(() => worker.of("welcome").length === 1);
+  expect(worker.user).toMatchObject(target);
+  expect(t.sup.list()).toMatchObject([{ taskId: "restored", agentId: ANA.id }]);
 });

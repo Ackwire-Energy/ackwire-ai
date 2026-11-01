@@ -169,7 +169,14 @@ export function MachineScreen({ machineId }: { machineId: string }) {
             {line}
           </Text>
         ))}
-        {m.online && m.egress?.ip && (
+        {managed && m.networkTransition && (
+          <Text>
+            {t(m.networkTransition.state === "draining" ? "machines.egress.draining" : "machines.egress.restart", {
+              when: new Date(m.networkTransition.deadline).toLocaleTimeString(),
+            })}
+          </Text>
+        )}
+        {managed && m.online && m.egress?.ip && (
           <View style={{ flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center" }}>
             {countryFlagSvg(m.egress.country) ? (
               <SvgXml xml={countryFlagSvg(m.egress.country) as string} width={20} height={14} />

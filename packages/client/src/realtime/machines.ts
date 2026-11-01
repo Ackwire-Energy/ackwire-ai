@@ -86,6 +86,7 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
     access?: unknown;
     accounts?: unknown;
     egress?: unknown;
+    networkTransition?: unknown;
   };
   if (typeof e.machineId !== "string") return true;
   const machineId = e.machineId;
@@ -130,6 +131,17 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
     case "machine.access": {
       // A rename, a pause on the machine, or what it allows now (ADR 0036): patch what came, refetch otherwise.
       const patch: Partial<Machine> = {};
+      if (e.networkTransition === null) patch.networkTransition = null;
+      else if (
+        isObject(e.networkTransition) &&
+        (e.networkTransition.state === "draining" || e.networkTransition.state === "restart_required") &&
+        typeof e.networkTransition.deadline === "string" &&
+        Number.isFinite(Date.parse(e.networkTransition.deadline)) &&
+        Array.isArray(e.networkTransition.agents) &&
+        e.networkTransition.agents.every((id) => typeof id === "string")
+      ) {
+        patch.networkTransition = e.networkTransition as NonNullable<Machine["networkTransition"]>;
+      }
       if (e.egress === null) patch.egress = null;
       else if (
         isObject(e.egress) &&
@@ -153,7 +165,13 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
       const access = accessOf(e.access);
       if (access !== undefined) patch.access = access;
       if (Object.keys(patch).length > 0) {
-        qc.setQueryData<Machine[]>(list, (old) => old?.map((m) => (m.id === machineId ? { ...m, ...patch } : m)));
+        qc.setQueryData<Machine[]>(list, (old) =>
+          old?.map((m) =>
+            m.id === machineId
+              ? { ...m, ...patch, ...(m.kind !== "managed" ? { egress: null, networkTransition: null } : {}) }
+              : m,
+          ),
+        );
         if (patch.name) patchTargets(qc, orgId, machineId, { name: patch.name });
       }
       // Nothing to patch, or `access: true` (it changed, and who may see it differs per person): refetch.

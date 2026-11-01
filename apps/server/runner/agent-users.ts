@@ -34,6 +34,7 @@ export interface AgentUser {
   networkLauncher?: string;
   /** Root-only routing configuration: also prevents acquiring network capabilities through file caps. */
   networkMark?: number;
+  networkRevision?: number;
 }
 
 /** How root runs a command as an agent: `prefix` before the command, exactly `env`, in `home`. */
@@ -306,7 +307,10 @@ export function systemLauncher(u: AgentUser, systemd = systemdBooted()): Launche
       "--",
       "/bin/sh",
       "-c",
-      PRIVATE_TMP,
+      // A configured isolation policy gets a fresh private proc instance, never a host remount.
+      u.networkLauncher || u.networkMark || u.networkRevision
+        ? `set -e\n/usr/bin/mount -t proc -o nosuid,nodev,noexec,hidepid=2 proc /proc\n${PRIVATE_TMP}`
+        : PRIVATE_TMP,
       "sh",
       String(u.uid),
       ...command,

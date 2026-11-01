@@ -1367,7 +1367,8 @@ font, image or page request is needed. System installs keep the extension files 
 under `/opt/agentes-runner/browser/start/<uid>`; a regular install uses the runner's own home. Existing profiles
 and sign-ins are kept. A running browser picks up changed names and observed addresses every 30 seconds.
 
-Computer settings and the screen's footer show the public address observed from an agent's route. The runner
+Only a workspace’s managed computer reports its public address in settings and the screen footer. Personal
+and server-hosted computers do not measure or report it. A server-authorized managed system runner
 asks this server's `/api/machines/ip` without credentials every 30 seconds; configure `TRUSTED_PROXIES` for your
 reverse proxy as for other IP-based features. Private LAN and tailnet addresses are hidden, and three failed
 observations clear the display. A country mark appears only when the response includes a recognized country.
@@ -1397,7 +1398,7 @@ uses the same restriction. Existing processes must be drained or restarted befor
 
 With no-new-privileges enabled, Chrome needs a working user-namespace sandbox; verify it during Linux acceptance.
 
-Network changes do not reconnect the machine or cancel foreground work. Workers with requests, background tasks,
+Without `networkDrainSeconds`, network changes do not reconnect the machine or cancel foreground work. Workers with requests, background tasks,
 secret installs, handoffs, browser streams or desktop leases finish those before they retire. Every launch for
 one UID keeps its previous network while that worker, desktop (including startup) or terminal still exists.
 Linux also retains that context while any other process runs as the UID, including daemonized services.
@@ -1415,3 +1416,14 @@ An integrator must verify process identity, root ownership, the actual firewall 
 membership before declaring a migration complete; the file describes launch defaults, not proof that every
 process moved. External routing must preserve already established connections during a change. Keep an installed
 routing mark until connections using it have drained before removing its exception.
+
+
+For a finite transition an administrator may set `networkDrainSeconds` (30–3600). New work waits whenever its
+UID still has the prior network context. Existing sessions get a visible deadline, then the runner closes only
+its own workers, desktops and terminals. The root routing integrator must block stale host-UID egress at that
+deadline and retain the pending status until all old processes are gone; unknown processes require operator
+attention. The persisted `transitions` array in `network-state.json` exposes the per-UID deadline and state.
+Reapplying the same network settings or restarting the daemon does not extend it.
+
+An optional `networkRevision` (default 0) identifies the isolation implementation. Increase it when the
+network helper changes behavior at the same path; existing UID contexts then follow the same bounded drain.
