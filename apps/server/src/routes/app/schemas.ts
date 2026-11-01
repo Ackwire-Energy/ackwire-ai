@@ -182,6 +182,10 @@ export const Agent = z
     id: z.uuid(),
     name: z.string(),
     handle: z.string(),
+    previousHandles: z.array(z.string()).optional().openapi({
+      description:
+        "Handles it had before a rename that still reach it (mentions, tools), so an old message's @ shows it (in the agent list and after an edit).",
+    }),
     role: z.string(),
     instructions: z.string(),
     model: z.string(),
