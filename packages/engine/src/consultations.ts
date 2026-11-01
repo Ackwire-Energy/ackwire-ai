@@ -341,29 +341,47 @@ export const normalizeNote = (text: string) =>
     .replace(/[\s.!?…]+$/u, "")
     .trim();
 
-/** Whether this agent already sent this note (normalized) in this agents' DM within `NOTE_DEDUPE_MS`. */
+/**
+ * Whether this agent already sent this note (normalized) in this agents' DM within `NOTE_DEDUPE_MS`. One that
+ * couldn't be finished or was never worked on doesn't count: its result says to hand it again.
+ */
 async function sameNoteSent(
   tx: Executor,
   ctx: Pick<ToolContext, "orgId" | "agentId">,
   channelId: string,
   body: string,
 ): Promise<boolean> {
+  const since = new Date(Date.now() - NOTE_DEDUPE_MS);
   const recent = await tx
-    .select({ body: messages.body })
+    .select({ id: messages.id, body: messages.body })
     .from(messages)
     .where(
       and(
         eq(messages.orgId, ctx.orgId),
         eq(messages.channelId, channelId),
         eq(messages.authorAgentId, ctx.agentId),
-        gte(messages.createdAt, new Date(Date.now() - NOTE_DEDUPE_MS)),
+        gte(messages.createdAt, since),
         sql`${messages.meta} ? 'agentNote'`,
       ),
     )
     .orderBy(desc(messages.createdAt))
     .limit(50);
   const wanted = normalizeNote(body);
-  return recent.some((m) => normalizeNote(m.body) === wanted);
+  const same = recent.flatMap((m) => (normalizeNote(m.body) === wanted ? [m.id] : []));
+  if (same.length === 0) return false;
+  const gone = await tx
+    .select({ messageId: agentConsultations.messageId })
+    .from(agentConsultations)
+    .where(
+      and(
+        eq(agentConsultations.orgId, ctx.orgId),
+        eq(agentConsultations.askerAgentId, ctx.agentId),
+        gte(agentConsultations.createdAt, since),
+        inArray(agentConsultations.messageId, same),
+        inArray(agentConsultations.status, ["failed", "expired"]),
+      ),
+    );
+  return same.some((id) => !gone.some((g) => g.messageId === id));
 }
 
 const ACTIVE_RUN = ["queued", "running", "waiting_approval", "waiting_input"] as const;
