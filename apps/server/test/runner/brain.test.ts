@@ -213,6 +213,53 @@ test("parser: without partial messages the assistant text comes whole", () => {
   expect(p.push("not json").events).toEqual([]);
 });
 
+test("parser: today's limit wordings are plan limits, the server's throttle is not; a text-only refusal is stored as limited", () => {
+  const p = new ClaudeStreamParser();
+  const end = (text: string) => {
+    p.beginTurn();
+    return p.push(line({ type: "result", subtype: "success", is_error: true, result: text }));
+  };
+  for (const text of [
+    "You've hit your session limit · resets 3pm",
+    "You've hit your weekly limit · resets Mon 10am",
+    "You've hit your Opus limit",
+    "You've hit your Sonnet limit",
+    "You've reached your monthly spend limit",
+  ]) {
+    const r = end(text);
+    expect(r.final).toMatchObject({ code: "plan_limit" });
+    // Nothing but the words said so: the stored usage hears it as a refusal.
+    expect(r.rateLimit).toEqual({ status: "rejected" });
+  }
+  const throttle = end("API Error: Server is temporarily limiting requests (not your usage limit) · Rate limited");
+  expect(throttle.final).toMatchObject({ code: "claude_failed" });
+  expect(throttle.rateLimit).toBeUndefined();
+});
+
+test("parser: a plan limit says whether the turn used a tool before it was cut", () => {
+  const p = new ClaudeStreamParser();
+  const limited = () =>
+    p.push(line({ type: "result", subtype: "success", is_error: true, result: "You've hit your session limit" })).final;
+  p.beginTurn();
+  expect(limited()).toMatchObject({ code: "plan_limit", worked: false });
+  p.beginTurn();
+  // Claude Code's own tool (never an event of ours) still counts as work.
+  p.push(
+    line({
+      type: "assistant",
+      parent_tool_use_id: null,
+      message: { content: [{ type: "tool_use", id: "b1", name: "Bash", input: { command: "ls" } }] },
+    }),
+  );
+  expect(limited()).toMatchObject({ code: "plan_limit", worked: true });
+  // A rejected `rate_limit_event` already told the stored usage.
+  p.beginTurn();
+  p.push(line({ type: "rate_limit_event", rate_limit_info: { status: "rejected" } }));
+  expect(
+    p.push(line({ type: "result", subtype: "success", is_error: true, result: "You've hit your limit" })).rateLimit,
+  ).toBeUndefined();
+});
+
 test("parser: a plan limit is a limit event with its reset time, then plan_limit; a login failure is not_logged_in", () => {
   const p = new ClaudeStreamParser();
   p.beginTurn();

@@ -38,7 +38,9 @@ export type AgentStatusKind =
   | "computer"
   | "waiting_approval"
   | "waiting_answer"
-  | "waiting_computer";
+  | "waiting_computer"
+  | "waiting_plan"
+  | "waiting_budget";
 
 /** An agent's line: its own words (`self`), one picked for its run (`auto`), or what its run waits on (`wait`). */
 export interface AgentStatusLine {
@@ -131,6 +133,7 @@ export async function loadAgentStatuses(
         updatedAt: agentRuns.updatedAt,
         waitingMachineId: agentRuns.waitingMachineId,
         outage: outageParkedSql,
+        waitCode: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'code'`,
       })
       .from(agentRuns)
       .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.status, [...ACTIVE, ...WAITING]), ...ofRuns)),
@@ -228,11 +231,23 @@ function storedLine(a: StoredStatus, aliveRuns: Map<string, unknown>, now: Date)
   return { line, busy: a.statusBusy };
 }
 
-const waitLine = (r: { status: string; waitingMachineId: string | null }): AgentStatusLine => ({
+const waitLine = (r: {
+  status: string;
+  waitingMachineId: string | null;
+  waitCode?: string | null;
+}): AgentStatusLine => ({
   by: "wait",
   text: null,
   kind:
-    r.status === "waiting_approval" ? "waiting_approval" : r.waitingMachineId ? "waiting_computer" : "waiting_answer",
+    r.status === "waiting_approval"
+      ? "waiting_approval"
+      : r.waitCode === "plan_limit"
+        ? "waiting_plan"
+        : r.waitCode === "budget"
+          ? "waiting_budget"
+          : r.waitingMachineId
+            ? "waiting_computer"
+            : "waiting_answer",
   subject: null,
   emoji: null,
   until: null,
@@ -259,6 +274,8 @@ export function lineInEnglish(line: AgentStatusLine): string | null {
     waiting_approval: "waiting for an approval",
     waiting_answer: "waiting for an answer",
     waiting_computer: "waiting for its computer",
+    waiting_plan: "waiting for its plan to reset",
+    waiting_budget: "waiting for its budget to renew",
   };
   return line.kind ? words[line.kind] : null;
 }

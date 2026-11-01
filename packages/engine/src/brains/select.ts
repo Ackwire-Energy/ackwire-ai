@@ -1,7 +1,8 @@
-import { BRAIN_PROTOCOL, type BrainEffort, isBrainEffort } from "@agenteschat/adapters";
+import { BRAIN_PROTOCOL, type BrainEffort, isBrainEffort, type PlanUsage } from "@agenteschat/adapters";
 import { and, desc, type Executor, eq, isNotNull, ne, schema, sql } from "@agenteschat/db";
 import { isAutoModel } from "@agenteschat/providers";
 import { claudeCodeModel, planOf } from "@agenteschat/providers/plans";
+import { planState } from "@agenteschat/ui/plan-state";
 import type { Agent } from "../agents";
 import type { MachineStatus } from "../machine-hub";
 import { pausedMessage } from "../machines";
@@ -57,13 +58,19 @@ export async function recordRunBrain(db: Executor, runId: string, kind: BrainKin
 export const mayFallBack = (agent: Pick<Agent, "brainFallback">, run: Pick<AgentRun, "background">) =>
   !run.background && agent.brainFallback !== false;
 
-/** Plan limits seen on this process (`limit` events), by machine, brain and account: until when they hold. */
-const planLimits = new Map<string, number>();
+/**
+ * Plan limits seen on this process (`limit` events), by machine, brain and account: a cache in front of the
+ * stored usage (`storedPlanLimit`), which a deploy or another replica reads too. `until` null: the reset isn't known.
+ */
+const planLimits = new Map<string, { until: number | null; seen: number }>();
 /** No account: the computer's own sign-in. Each account (ADR 0041) has its own plan, so its own limit. */
 const limitKey = (machineId: string, kind: BrainKind, accountId?: string) =>
   `${machineId}:${kind}:${accountId ?? "own"}`;
 
-/** A computer brain hit its plan limit (until `resetsAt`, or an hour when unknown). */
+/** How long a limit with no known reset holds after it was seen: then a turn asks the plan again. */
+export const UNKNOWN_LIMIT_MS = 30 * 60_000;
+
+/** A computer brain hit its plan limit (until `resetsAt`, or `UNKNOWN_LIMIT_MS` when unknown). */
 export function notePlanLimit(
   machineId: string,
   kind: BrainKind,
@@ -72,12 +79,85 @@ export function notePlanLimit(
   accountId?: string,
 ) {
   const until = resetsAt ? Date.parse(resetsAt) : Number.NaN;
-  planLimits.set(limitKey(machineId, kind, accountId), Number.isFinite(until) && until > now ? until : now + 3600_000);
+  planLimits.set(limitKey(machineId, kind, accountId), {
+    until: Number.isFinite(until) && until > now ? until : null,
+    seen: now,
+  });
 }
 
 /** Tests: forget the plan limits seen. */
 export function clearPlanLimits() {
   planLimits.clear();
+}
+
+/**
+ * When the binding window of a stored reading resets (ms): the latest reset of its full windows, else (a refusal
+ * known only from its words, no window full) the first window reset after the reading, while it is still ahead.
+ * Later windows didn't refuse anything: once that first reset passed, a turn asks the plan again. Null: none known.
+ */
+export function bindingReset(usage: PlanUsage | null | undefined, now = Date.now()): number | null {
+  if (!usage) return null;
+  const { until } = planState(usage, now);
+  if (until) return Date.parse(until);
+  const at = Date.parse(usage.at);
+  const first = Math.min(
+    ...usage.windows.map((w) => (w.resetsAt ? Date.parse(w.resetsAt) : Number.NaN)).filter((r) => r > at),
+  );
+  return first > now && Number.isFinite(first) ? first : null;
+}
+
+/**
+ * Whether a stored reading says the plan is at its limit now (`planState`), and until when (null: unknown).
+ * A limit with no known reset holds for `UNKNOWN_LIMIT_MS` after its reading, and never past a window's reset.
+ */
+export function storedPlanLimit(
+  usage: PlanUsage | null | undefined,
+  now = Date.now(),
+): { until: number | null } | null {
+  if (!usage || planState(usage, now).state !== "limited") return null;
+  const until = bindingReset(usage, now);
+  if (until !== null) return { until };
+  const at = Date.parse(usage.at);
+  const resetSince = usage.windows.some(
+    (w) => w.resetsAt && Date.parse(w.resetsAt) > at && Date.parse(w.resetsAt) <= now,
+  );
+  return Number.isFinite(at) && now - at < UNKNOWN_LIMIT_MS && !resetSince ? { until: null } : null;
+}
+
+/** The plan limit of this sign-in now, from this process's cache or the stored reading. */
+function planLimitNow(key: string, usage: PlanUsage | null | undefined, now: number) {
+  const seen = planLimits.get(key);
+  const cached = seen && (seen.until !== null ? seen.until > now : now - seen.seen < UNKNOWN_LIMIT_MS) ? seen : null;
+  const stored = storedPlanLimit(usage, now);
+  if (!cached && !stored) return null;
+  return { until: cached?.until ?? stored?.until ?? null };
+}
+
+/**
+ * What the runner last said about the plan this run would think with: the account's usage, or the computer's own
+ * sign-in's (`executors.ownUsage`). Read from the database, so every replica sees the same limit.
+ */
+export async function storedPlanUsage(
+  db: Executor,
+  orgId: string,
+  machineId: string,
+  kind: BrainKind,
+  accountId?: string,
+): Promise<PlanUsage | null> {
+  if (kind === "model") return null;
+  const { machineAccounts, machines } = schema;
+  if (accountId) {
+    const [row] = await db
+      .select({ usage: machineAccounts.usage })
+      .from(machineAccounts)
+      .where(and(eq(machineAccounts.orgId, orgId), eq(machineAccounts.id, accountId)));
+    return (row?.usage as PlanUsage | null | undefined) ?? null;
+  }
+  const [row] = await db
+    .select({ executors: machines.executors })
+    .from(machines)
+    .where(and(eq(machines.orgId, orgId), eq(machines.id, machineId)));
+  return (row?.executors.ownUsage?.[kind] as PlanUsage | undefined) ?? null;
 }
 
 export interface BrainUnavailability {
@@ -100,6 +180,8 @@ export function computerBrainUnavailable(
   account?: BrainAccount,
   /** The plan it would think with is the agent's owner's (`planIsOwners`). */
   ownersPlan = true,
+  /** What the runner last said about that plan (`storedPlanUsage`). */
+  usage?: PlanUsage | null,
 ): BrainUnavailability | null {
   if (kind === "model") return null;
   const name = kind === "codex" ? "Codex" : "Claude Code";
@@ -119,14 +201,14 @@ export function computerBrainUnavailable(
       message: `${name}${status ? ` on ${status.name}` : ""} would think with a plan that isn't the agent's owner's.`,
     };
   }
-  const limited = planLimits.get(limitKey(machineId, kind, account?.id));
-  if (limited && limited > now) {
+  const limited = planLimitNow(limitKey(machineId, kind, account?.id), usage, now);
+  if (limited) {
     return {
       code: "plan_limit",
       message: account
         ? `The ${name} account "${account.label}"${status ? ` on ${status.name}` : ""} reached its plan limit.`
         : `${name}${status ? ` on ${status.name}` : ""} reached its plan limit.`,
-      resetsAt: new Date(limited).toISOString(),
+      ...(limited.until !== null ? { resetsAt: new Date(limited.until).toISOString() } : {}),
     };
   }
   // Paused by its owner (ADR 0036 §6): like offline, until the pause ends (a known end: try again then).
@@ -206,6 +288,8 @@ export interface BrainPlan {
   account?: BrainAccount;
   /** How hard the computer brain thinks; absent: the CLI's default. */
   effort?: BrainEffort;
+  /** What the runner last said about the plan it thinks with (`storedPlanUsage`). */
+  usage?: PlanUsage;
 }
 
 /** What a Claude Code brain's model is when nobody chose one (Codex: its own default). */
@@ -433,6 +517,10 @@ export async function resolveBrain(
     machineId && deps.machines ? deps.machines.status(machineId).catch(() => null) : null,
     brainAccountFor(deps.db, agent, kind, machineId),
   ]);
+  const usage =
+    machineId && deps.machines
+      ? await storedPlanUsage(deps.db, agent.orgId, machineId, kind, account?.id).catch(() => null)
+      : null;
   // A plan's model kept while another account thinks (or none): what that one runs instead, so no turn asks a
   // provider for a model it doesn't have.
   const runs =
@@ -448,6 +536,7 @@ export async function resolveBrain(
           Date.now(),
           account,
           machineId ? await planIsOwners(deps.db, agent, machineId, account) : true,
+          usage,
         );
   const session: BrainSession | undefined =
     mission?.session ??
@@ -466,5 +555,6 @@ export async function resolveBrain(
     ...(unavailable ? { unavailable } : {}),
     ...(account ? { account } : {}),
     ...(effort ? { effort } : {}),
+    ...(usage ? { usage } : {}),
   };
 }

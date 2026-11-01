@@ -787,6 +787,58 @@ export async function notifyRoutineStalled(
 }
 
 /**
+ * A routine's run waits for its agent's plan to reset: its creator and the agent's owner hear it once per
+ * outage (`outageKey`, as `notifyRoutineStalled`). Resolved by the next good run.
+ */
+export async function notifyRoutineWaitingPlan(
+  deps: NotificationDeps,
+  input: { orgId: string; routineId: string; outageKey: string },
+) {
+  const r = await routineAudience(deps, input.orgId, input.routineId);
+  if (!r) return;
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: [r.creator, r.owner],
+    kind: "routine_waiting_plan",
+    groupKey: `routine_waiting_plan:${input.routineId}:${input.outageKey}`,
+    actor: agent(r.agentId),
+    source: { routineId: input.routineId, label: r.name },
+    latest: { title: r.name },
+  });
+}
+
+/**
+ * An agent's work has waited `UNKNOWN_RESET_NOTICE_MS` on its plan's limit and the plan never said when it resets:
+ * the agent's owner hears it once per wait, opening the conversation the work waits in.
+ */
+export async function notifyPlanResetUnknown(
+  deps: NotificationDeps,
+  input: {
+    orgId: string;
+    agentId: string;
+    agentName: string;
+    plan: string;
+    runId: string;
+    channelId: string;
+    threadId: string | null;
+  },
+) {
+  await notify(deps, {
+    orgId: input.orgId,
+    userIds: [await agentOwner(deps, input.agentId)],
+    kind: "plan_reset_unknown",
+    groupKey: `plan_reset_unknown:${input.runId}`,
+    actor: agent(input.agentId),
+    source: {
+      channelId: input.channelId,
+      ...(input.threadId ? { threadId: input.threadId } : {}),
+      label: input.agentName,
+    },
+    latest: { title: input.plan },
+  });
+}
+
+/**
  * The agent told people what a routine found (the message its report woke, §7): its creator hears
  * it, opening that message, unless they are a member of that conversation (they see it there).
  */
@@ -869,6 +921,7 @@ export async function resolveRunFailed(
 export async function resolveRoutineTrouble(deps: NotificationDeps, orgId: string, routineId: string) {
   await resolveNotifications(deps, orgId, { groupKeyPrefix: `routine_failed:${routineId}:` });
   await resolveNotifications(deps, orgId, { groupKeyPrefix: `routine_stalled:${routineId}:` });
+  await resolveNotifications(deps, orgId, { groupKeyPrefix: `routine_waiting_plan:${routineId}:` });
 }
 
 /** A person resumed or took over a routine: its pause notifications are done. */

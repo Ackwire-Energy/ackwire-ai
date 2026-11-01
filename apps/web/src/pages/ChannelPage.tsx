@@ -3119,7 +3119,10 @@ export const TimelineMessage = memo(function TimelineMessage({
   };
   // A stopped run's message (`meta.canceled`): the text so far, and "Interrompido por Walter" as a note.
   // A text the server wrote (`meta.bodyCode`, a deploy's notice) is shown in the person's language.
-  const stopped = useMemo(() => splitCanceled(serverBody(t, m.body, m.meta), m.meta), [t, m.body, m.meta]);
+  const stopped = useMemo(
+    () => splitCanceled(serverBody(t, m.body, m.meta, i18n.language), m.meta),
+    [t, m.body, m.meta, i18n.language],
+  );
   const body = reminderBody(stopped.body, m.meta);
   // The reply of a run that reached its step limit, or that stopped because it got stuck: Continuar under it too.
   const ended = stopped.canceled ? undefined : (m.meta?.stepLimit as { stuck?: unknown } | undefined);
@@ -3421,9 +3424,11 @@ export const TimelineMessage = memo(function TimelineMessage({
                   ? t("channel.runRefused", { agent: name, reason: refusal })
                   : live.errorCode === "run.computer_busy"
                     ? t("channel.runBusy", { agent: name })
-                    : live.error
-                      ? t("channel.runFailed", { agent: name, reason: live.error })
-                      : t("channel.runFailedNoReason", { agent: name })}
+                    : live.errorCode === "run.budget_exceeded"
+                      ? t("channel.runFailed", { agent: name, reason: t("agentPage.activity.errors.budget_exceeded") })
+                      : live.error
+                        ? t("channel.runFailed", { agent: name, reason: live.error })
+                        : t("channel.runFailedNoReason", { agent: name })}
               </span>
               <Button
                 variant="ghost"

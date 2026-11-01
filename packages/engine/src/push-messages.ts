@@ -68,6 +68,10 @@ interface Strings {
   agentUnreachedBody: string;
   routineStalledTitle: string;
   routineStalledBody: (computer: string) => string;
+  routineWaitingPlanTitle: string;
+  routineWaitingPlanBody: string;
+  planResetUnknownTitle: (plan: string) => string;
+  planResetUnknownBody: (agent: string) => string;
   machineConnectedTitle: string;
   computerReadyTitle: string;
   computerReadyBody: string;
@@ -109,6 +113,10 @@ export const PUSH_STRINGS: Record<PushLocale, Strings> = {
     agentUnreachedBody: "Só quem cuida do agente pode falar com ele. Toque para deixar.",
     routineStalledTitle: "Uma rotina está esperando o computador",
     routineStalledBody: (c) => `Ela roda quando ${c} voltar.`,
+    routineWaitingPlanTitle: "Uma rotina está esperando o plano renovar",
+    routineWaitingPlanBody: "Ela roda quando ele renovar.",
+    planResetUnknownTitle: (p) => `O ${p} não disse quando o limite renova`,
+    planResetUnknownBody: (a) => `O trabalho de ${a} segue esperando.`,
     machineConnectedTitle: "Um computador novo entrou no workspace",
     computerReadyTitle: "O computador do seu workspace está pronto",
     computerReadyBody: "Abra a página de um agente para ver ao vivo.",
@@ -147,6 +155,10 @@ export const PUSH_STRINGS: Record<PushLocale, Strings> = {
     agentUnreachedBody: "Only the people the agent works with can talk to it. Tap to let it.",
     routineStalledTitle: "A routine is waiting for its computer",
     routineStalledBody: (c) => `It runs when ${c} is back.`,
+    routineWaitingPlanTitle: "A routine is waiting for its plan to reset",
+    routineWaitingPlanBody: "It runs when the plan resets.",
+    planResetUnknownTitle: (p) => `${p} didn't say when its limit resets`,
+    planResetUnknownBody: (a) => `${a}'s work is still waiting.`,
     machineConnectedTitle: "A new computer joined the workspace",
     computerReadyTitle: "Your workspace's computer is ready",
     computerReadyBody: "Open an agent's page to see it live.",
@@ -216,6 +228,15 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
     case "routine_stalled":
       // The computer's name (what the person calls it), else the routine's.
       return out(s.routineStalledTitle, text ? s.routineStalledBody(text) : what || s.openBody);
+    case "routine_waiting_plan":
+      // The routine's name, then when it runs (the push has no time zone to say the hour in).
+      return out(s.routineWaitingPlanTitle, [what, s.routineWaitingPlanBody].filter(Boolean).join(" · "));
+    case "plan_reset_unknown":
+      // `title`: the plan's name; `label`: the agent's.
+      return out(
+        s.planResetUnknownTitle(input.title?.trim() || "AI"),
+        s.planResetUnknownBody(input.label?.trim() || actor),
+      );
     case "machine_connected":
       // Its name and who connected it: if nobody here expected it, it can be removed at once.
       return out(s.machineConnectedTitle, [what, input.actorName?.trim()].filter(Boolean).join(" · ") || s.openBody);

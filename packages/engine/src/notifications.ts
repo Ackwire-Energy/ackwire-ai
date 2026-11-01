@@ -75,6 +75,13 @@ export const NOTIFICATION_KINDS = [
    * and agent, `source.agentId` the agent, opening the message.
    */
   "agent_unreached",
+  /** A routine's run waits for its agent's plan to reset (once per outage, like `routine_stalled`). */
+  "routine_waiting_plan",
+  /**
+   * An agent's work waited a day on its plan's limit and the plan never said when it resets (the agent's owner,
+   * once per wait): `latest.title` the plan's name, `source.label` the agent's.
+   */
+  "plan_reset_unknown",
   "reaction",
   "machine_connected",
   /** An agent needs a person in its browser (ADR 0040 §6). */

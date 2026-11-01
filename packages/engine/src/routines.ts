@@ -69,6 +69,7 @@ import {
 } from "./rrule";
 import { describeWhen, parseSchedule, readSchedule, type ScheduleParse } from "./schedule";
 import { standingRefusal } from "./standing";
+import { USAGE_WAIT_CODES } from "./usage-pause";
 
 export { startRoutineRun } from "./routine-room";
 
@@ -362,6 +363,8 @@ type AgentRunInfo = {
   status: string;
   error: string | null;
   waitingMachineId: string | null;
+  /** What it waits on when that's its plan's limit or its budget (`USAGE_WAIT_CODES`). */
+  waitingCode: string | null;
   updatedAt: Date;
 };
 
@@ -371,7 +374,9 @@ const OPEN_RUN = ["queued", "starting", "started"];
 const ENDED_RUN = new Set(["reported", "silent", "failed", "canceled", "superseded", "missed", "skipped"]);
 /** An agent run still working or waiting. */
 const AGENT_ACTIVE = new Set(["queued", "running", "waiting_approval", "waiting_input"]);
-const agentWaiting = (a: AgentRunInfo | undefined) => a?.status === "waiting_approval" || a?.status === "waiting_input";
+/** Waiting for a person (an approval, an answer). A wait for the plan or the budget resumes by itself: still running. */
+const agentWaiting = (a: AgentRunInfo | undefined) =>
+  a?.status === "waiting_approval" || (a?.status === "waiting_input" && !USAGE_WAIT_CODES.has(a.waitingCode ?? ""));
 /** Waiting for its computer (ADR 0032 §5), not for a person. */
 const agentAway = (a: AgentRunInfo | undefined) => a?.status === "waiting_input" && Boolean(a.waitingMachineId);
 /**
@@ -427,6 +432,7 @@ async function runDetails(db: Database, orgId: string, runs: RunRow[]): Promise<
           status: agentRuns.status,
           error: agentRuns.error,
           waitingMachineId: agentRuns.waitingMachineId,
+          waitingCode: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'code'`,
           updatedAt: agentRuns.updatedAt,
         })
         .from(agentRuns)

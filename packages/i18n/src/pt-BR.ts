@@ -1929,6 +1929,8 @@ export const ptBR = {
       waiting_approval: "Esperando aprovação",
       waiting_answer: "Esperando resposta",
       waiting_computer: "Esperando o computador",
+      waiting_plan: "Esperando o plano renovar",
+      waiting_budget: "Esperando o orçamento renovar",
     },
     agentWhy: {
       online: "Ativo agora",
@@ -2231,6 +2233,8 @@ export const ptBR = {
       routinePaused: "Uma rotina de <b>{{name}}</b> foi pausada",
       routineStalled: "<b>{{name}}</b> espera o computador para rodar uma rotina",
       agentUnreached: "Uma rotina não conseguiu chamar <b>{{name}}</b>",
+      routineWaitingPlan: "<b>{{name}}</b> espera o plano renovar para rodar uma rotina",
+      planResetUnknown: "O {{plan}} não disse quando o limite renova. O trabalho de <b>{{name}}</b> segue esperando.",
       machineConnected: "<b>{{name}}</b> conectou o computador <b>{{label}}</b>",
       machineConnectedAny: "<b>{{name}}</b> conectou um computador",
       browserHandoff: "<b>{{name}}</b> precisa de você no navegador",
@@ -4220,8 +4224,12 @@ export const ptBR = {
       previous_running: "Pulada: a anterior ainda estava rodando",
       previous_waiting: "Pulada: a anterior ainda esperava alguém",
       waiting_computer: "Pulada: esperando o computador do agente",
+      waiting_plan: "Pulada: esperando o plano renovar",
+      waiting_budget: "Pulada: esperando o orçamento renovar",
       superseded: "Deu lugar à execução seguinte",
       stale: "Perdeu o horário: o computador voltou tarde demais",
+      waiting_plan_late: "Perdeu o horário: o plano renovou tarde demais",
+      waiting_budget_late: "Perdeu o horário: o orçamento renovou tarde demais",
       stopped: "Parada por alguém",
       stoppedBy: "Parada por {{name}}",
       no_report: "Terminou sem contar o resultado",
@@ -8930,7 +8938,7 @@ export const ptBR = {
   },
   budget: {
     warning: "{{name}} usou {{percent}} do orçamento do mês.",
-    exhausted: "{{name}} atingiu o orçamento do mês e parou. Um admin pode aumentar o limite para continuar.",
+    exhausted: "{{name}} atingiu o orçamento do mês e pausou. Continua {{when}} ou quando um admin aumentar o limite.",
   },
   gallery: {
     title: "Galeria de componentes",
@@ -8972,6 +8980,8 @@ export const ptBR = {
     hersM: "dele",
   },
   chat: {
+    /** When a waiting agent goes on (`usageWhen`). */
+    usageWhen: { at: "às {{time}}", on: "{{day}} às {{time}}", date: "em {{date}}" },
     /** Typing bar: "{{names}} está {{doing}}" (agents' verbs come from their tool calls). */
     doing_one: "{{names}} está {{doing}}",
     doing_other: "{{names}} estão {{doing}}",
@@ -9354,6 +9364,11 @@ export const ptBR = {
       provider_unavailable: "Meu provedor de IA não está respondendo agora. Respondo assim que ele voltar.",
       brain_busy: "Meu computador está ocupado com outras tarefas agora. Respondo assim que ele estiver livre.",
       brain_interrupted: "O {{brain}} parou antes de terminar. Já feito, sem repetir: {{tools}}.",
+      plan_limit_cut: "Parei no limite do plano do {{plan}}. Continuo de onde parei {{when}}, quando ele renovar.",
+      plan_limit_cut_unknown: "Parei no limite do plano do {{plan}}. Continuo de onde parei assim que ele renovar.",
+      plan_limit_wait: "O plano do {{plan}} chegou ao limite. Respondo {{when}}, quando ele renovar.",
+      plan_limit_wait_unknown: "O plano do {{plan}} chegou ao limite. Respondo assim que ele renovar.",
+      budget_wait: "Meu orçamento do mês acabou. Continuo {{when}}, ou antes se um admin aumentar o limite.",
       no_ai: "Ainda não consigo responder: não tenho uma IA conectada.",
       no_ai_signed_out: "Ainda não consigo responder: minha IA saiu da conta.",
       /** The computer's own sign-in of that CLI isn't there (`meta.noAi.own`); `brain`: Codex or Claude Code. */

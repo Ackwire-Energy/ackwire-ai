@@ -116,7 +116,7 @@ export const MessageRow = memo(function MessageRow({
   /** Shown where the person can't act on it (two agents' conversation): no long press, reactions or block. */
   readOnly?: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   // Mine and not sent for lack of a connection: it waits and goes by itself when the connection is back.
   const offline = useWaiting(m.local === "failed" ? m.clientId : null);
   const dir = useDirectory();
@@ -148,7 +148,9 @@ export const MessageRow = memo(function MessageRow({
   // A short reply it gave while its task kept working (the talker): its message, "enquanto trabalha".
   const talker = isAgent && isTalkerReply(meta);
   // What the server wrote itself is said in the person's language; a stopped reply drops the server's note.
-  const body = hidesBody(m) ? "" : reminderBody(splitCanceled(serverBody(t, m.body, meta), meta).body, meta);
+  const body = hidesBody(m)
+    ? ""
+    : reminderBody(splitCanceled(serverBody(t, m.body, meta, i18n.language), meta).body, meta);
   const consulted = isAgent && m.author.id ? consultationsOf(meta) : [];
   // A GIF or a sticker (ADR 0091); with no words, the message is the picture alone (no empty bubble).
   const media = messageMediaOf(meta);

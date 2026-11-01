@@ -27,6 +27,7 @@ import {
 } from "@agenteschat/providers";
 import { pendingConnectors } from "./access";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
+import { withTimeout } from "./agent-media";
 import { announceAgentStatus, askRunStatus, startRunStatus, statusCandidates } from "./agent-status";
 import { type Agent, getAgentCached } from "./agents";
 import { type AgentAi, agentAiState, type NoAiReason, noAiReasonOf, ownNotSignedIn } from "./ai-status";
@@ -52,14 +53,16 @@ import { ModelBrain } from "./brains/model";
 import type { ComputerTurn } from "./brains/prompt";
 import {
   type BrainPlan,
+  bindingReset,
   mayFallBack,
   NO_AI_CODES,
   notePlanLimit,
   recordRunBrain,
   resolveBrain,
+  storedPlanUsage,
   UNAVAILABLE_CODES,
 } from "./brains/select";
-import type { Brain, BrainIO, BrainKind, BrainTool, BrainTurn, ToolResult } from "./brains/types";
+import type { Brain, BrainEvent, BrainIO, BrainKind, BrainTool, BrainTurn, ToolResult } from "./brains/types";
 import { BROWSER_SCOPE } from "./browser/types";
 import {
   canceledBy,
@@ -115,7 +118,7 @@ import { MEDIA_TOOLS } from "./media";
 import { getMessage, insertMessage, type Message, messageView, unreachedAgents, unreachedNote } from "./messages";
 import { missionAsksPerson, missionReportSince, scheduleKeepGoing } from "./missions-engine";
 import { postNoAiCard } from "./no-ai";
-import { resolveRunFailed } from "./notification-producers";
+import { notifyPlanResetUnknown, resolveRunFailed } from "./notification-producers";
 import { enqueue, PermanentJobError } from "./outbox";
 import { createProfiler, type StageTiming } from "./profile";
 import { ASK_USER_TOOL, questionResult } from "./questions";
@@ -131,7 +134,7 @@ import {
   visibleText,
 } from "./reply-policy";
 import { routineBriefOf } from "./routine-brief";
-import { routineRunWaitingForComputer } from "./routine-firing";
+import { missStaleRoutineRun, routineRunWaitingForComputer, routineRunWaitingForPlan } from "./routine-firing";
 import { closeRoutineRun, type RoutineRunEnd, recordRoutineReportMessage, routineFailureEnd } from "./routine-ledger";
 import { type ReleaseReason, releaseHeldInbox, releaseInbox, takeInbox, whileHeld } from "./run-inbox";
 import { issueRunToolToken, revokeRunToolTokens } from "./run-tool-tokens";
@@ -186,6 +189,17 @@ import { chooseToolGroups, keptToolGroups, recentForJudge, type ToolGroupChoice 
 import { ON_DEMAND_FIND, ON_DEMAND_USE, presentTools, toolGroupKey } from "./tools/directory";
 import { type Approval, type InvokeResult, isSensitive, type ToolGateway } from "./tools/gateway";
 import type { ToolContext, ToolDefinition } from "./tools/types";
+import {
+  ladderDelay,
+  nextMonthStart,
+  planName,
+  RESUME_AFTER_MS,
+  RESUME_GAP_MS,
+  UNKNOWN_RESET_NOTICE_MS,
+  USAGE_WAIT_CODES,
+  usageWaitKey,
+  usageWaitPlace,
+} from "./usage-pause";
 import { recordWikiReads, retrieveWikiForRun } from "./wiki";
 import { withWikiLinks } from "./wiki-links";
 
@@ -252,6 +266,8 @@ export interface EngineDeps {
   computerBlipWaitMs?: number;
   /** How long a run waits for room on a busy computer before it fails (default `COMPUTER_BUSY_WAIT_MS`). */
   computerBusyWaitMs?: number;
+  /** How long a computer turn is still read after its plan's `limit` event (default `PLAN_LIMIT_GRACE_MS`). */
+  planLimitGraceMs?: number;
   /**
    * Tools on demand (ADR 0043): each run lists the core tools and the groups the
    * judge (`context.judge`) expects it to need; the rest go behind
@@ -354,9 +370,25 @@ export interface Transcript {
    */
   request?: string;
   /** The computer brain couldn't answer and the model brain did (ADR 0032 §5): the reply carries a quiet note. */
-  fallback?: { from: BrainKind; code: string; message: string };
-  /** The computer brain is unavailable and nothing can stand in: the run waits for the computer. */
-  waitingForBrain?: { kind: BrainKind; machineId: string; code: string; waitId?: string };
+  fallback?: { from: BrainKind; code: string; message: string; resetsAt?: string };
+  /**
+   * The computer brain is unavailable and nothing can stand in: the run waits for the computer. A usage wait
+   * (`USAGE_WAIT_CODES`: the plan's limit, the agent's budget) has no computer to wait for: `machineId` is empty,
+   * `waitKey` groups the runs that wait on the same plan or budget (`usageWaitKey`) and `until` is when its job runs.
+   */
+  waitingForBrain?: {
+    kind: BrainKind;
+    machineId: string;
+    code: string;
+    waitId?: string;
+    waitKey?: string;
+    until?: string;
+  };
+  /**
+   * Since when (ms) this run waits on usage, across its re-parks, and how far along the re-checks of an unknown
+   * reset it is (`LIMIT_LADDER_MS`); `noticed`: its owner heard that the reset is still unknown. Gone once a turn runs.
+   */
+  usageWait?: { since: number; step: number; noticed?: boolean };
   /**
    * The provider failed every attempt with a retryable error (I5): the run is parked on `OUTAGE_PARK`'s ladder
    * (`waitId`: the job that resumes it) since `since` (ms), `n` times so far. Cleared by the next model call that
@@ -376,9 +408,10 @@ export interface Transcript {
    * The computer dropped in the middle of a computer brain's turn: the turn is sent again to the same
    * computer once it is back (its session resumes), told which tools already ran so none is repeated.
    * `prompt`: what the interrupted turn was asked; `drops`: how many times this run was cut off;
-   * `cause`: `restart` when our server stopped in the middle of the turn, not the computer.
+   * `cause`: `restart` when our server stopped in the middle of the turn, not the computer; `plan_limit` when the
+   * plan refused the rest of the turn (never one of the computer's drops).
    */
-  interruptedTurn?: { prompt: string; executed: string[]; drops: number; cause?: "restart" };
+  interruptedTurn?: { prompt: string; executed: string[]; drops: number; cause?: "restart" | "plan_limit" };
   /** What the computer brain's turn under way was asked: a turn cut by a crash is sent again with it. */
   turnPrompt?: string;
   /**
@@ -433,6 +466,8 @@ export class BrainFailure extends Error {
     readonly resetsAt?: string,
     /** The computer dropped because our own server stopped: not one of its drops (`MAX_COMPUTER_DROPS`). */
     readonly serverStop = false,
+    /** A plan limit: whether the turn used a tool before it was cut (undefined: unknown, counted as worked). */
+    readonly worked?: boolean,
   ) {
     super(message);
     this.name = "BrainFailure";
@@ -445,6 +480,11 @@ export const sessionLostNote = (folder: string) =>
 
 /** How long a run whose computer dropped mid-turn waits quietly for it before saying it is unavailable. */
 export const COMPUTER_DROP_GRACE_MS = 2 * 60_000;
+/**
+ * How long a computer turn is still read after its plan said `limit`: the brain often finishes its answer, which
+ * is posted then (the plan is marked limited for the next turns); an error or this long without an end is a cut.
+ */
+export const PLAN_LIMIT_GRACE_MS = 2 * 60_000;
 /** A run resumes on its computer after this many drops at most; then it ends like any failed turn. */
 export const MAX_COMPUTER_DROPS = 3;
 /** How often a run whose computer had no room for its turn asks again (the runner admits turns by room). */
@@ -461,7 +501,12 @@ export function interruptedTurnPrompt(
   extra: string | null = null,
 ): string {
   const done = t.executed.length > 0 ? ` Already done in it, do not repeat: ${t.executed.join(", ")}.` : "";
-  const why = t.cause === "restart" ? "the server restarted" : "the computer disconnected";
+  const why =
+    t.cause === "restart"
+      ? "the server restarted"
+      : t.cause === "plan_limit"
+        ? "the plan's usage limit was reached"
+        : "the computer disconnected";
   return [
     `Your previous turn was cut off because ${why}.${done} Pick up where you left off and finish it. What you were asked:`,
     t.prompt,
@@ -588,14 +633,22 @@ async function executeRunInner(
     const [row] = await db
       .select({
         status: agentRuns.status,
+        background: agentRuns.background,
         waitId: sql<
           string | null
         >`coalesce(${agentRuns.transcript}->'waitingForBrain'->>'waitId', ${agentRuns.transcript}->'outage'->>'waitId')`,
         code: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'code'`,
+        cut: sql<string | null>`${agentRuns.transcript}->'interruptedTurn'->>'cause'`,
       })
       .from(agentRuns)
       .where(eq(agentRuns.id, runId));
     if (row?.status !== "waiting_input" || row.waitId !== options.wait) return;
+    // A routine's slot that waited on usage for more than 12 hours doesn't run late: it is missed. One the plan
+    // cut mid-work finishes what it started (only the next slot replaces it).
+    if (row.background && USAGE_WAIT_CODES.has(row.code ?? "") && row.cut !== "plan_limit") {
+      const late = row.code === "budget" ? "waiting_budget_late" : "waiting_plan_late";
+      if (await missStaleRoutineRun({ db, pubsub: deps.pubsub }, runId, new Date(), late)) return;
+    }
     // Asking a busy computer again: nothing says it works until a turn starts (its first words do), or the
     // conversation would flash "thinking" every few seconds while it waits.
     askingForRoom = row.code === "busy";
@@ -1757,15 +1810,16 @@ async function executeRunInner(
       if (back) return "back";
     }
     // Tools already ran in a turn cut off by its computer: only that computer may finish it (the model
-    // brain would redo them), so the run waits for it.
-    const onlyThisComputer = (t.interruptedTurn?.executed.length ?? 0) > 0;
+    // brain would redo them), so the run waits for it. A turn the plan cut after it worked parks with no
+    // executed tools when the runner can't name them (Claude Code's own tools, an older runner): the same.
+    const onlyThisComputer = (t.interruptedTurn?.executed.length ?? 0) > 0 || t.interruptedTurn?.cause === "plan_limit";
     // A background run never stands in on the model brain (`mayFallBack`): it waits for its computer.
     if (
       !onlyThisComputer &&
       mayFallBack(agent, run) &&
       (await deps.gateway.hasModelCredential(thinker).catch(() => false))
     ) {
-      t.fallback = { from, code: u.code, message: u.message };
+      t.fallback = { from, code: u.code, message: u.message, ...(u.resetsAt ? { resetsAt: u.resetsAt } : {}) };
       // On "Automático" the API answers with the model and effort chosen for this run.
       const autoEffort = isAutoModel(agent.model) ? t.autoModel?.effort : undefined;
       plan = {
@@ -1785,6 +1839,11 @@ async function executeRunInner(
     if (!onlyThisComputer && NO_AI_CODES.has(u.code)) {
       await failNoAi(noAiReasonOf(u.code), ownNotSignedIn(u.code, from, plan.account).own);
       return "failed";
+    }
+    // The plan's limit: nothing about the computer, the run waits for the plan in its own session.
+    if (u.code === "plan_limit") {
+      await waitForUsage({ code: "plan_limit", message: u.message, ...(u.resetsAt ? { resetsAt: u.resetsAt } : {}) });
+      return "waited";
     }
     if (!machineId || !UNAVAILABLE_CODES.has(u.code)) return "no";
     const busy = u.code === "busy";
@@ -2059,6 +2118,141 @@ async function executeRunInner(
     await finished("waiting_input");
   };
 
+  /**
+   * The plan's limit (`plan_limit`) or the agent's monthly budget (`budget`) stops the run: it parks in its own
+   * session (no computer to wait for) and a job resumes it when the limit resets (the refusal's time, else the
+   * stored window's, else the re-checks of `LIMIT_LADDER_MS`), at the next month, or when the budget goes up
+   * (`resumeBudgetWaits`). Every resume checks again: still limited, it parks again quietly (one note per run and
+   * wait). A turn cut mid-work (`interruptedTurn.cause: plan_limit`) is sent again in the same session.
+   */
+  const waitForUsage = async (u: {
+    code: "plan_limit" | "budget";
+    message: string;
+    resetsAt?: string;
+    /** A budget wall made only of other runs' reservations: looked at again soon (the ladder), quietly. */
+    soon?: boolean;
+  }) => {
+    await deferred;
+    const t = transcript as Transcript;
+    const now = Date.now();
+    const budget = u.code === "budget";
+    const machineId = plan.session?.machineId ?? agent.machineId ?? "";
+    const wait = t.usageWait ?? { since: now, step: 0 };
+    let at = budget ? (u.soon ? Number.NaN : nextMonthStart(now)) : u.resetsAt ? Date.parse(u.resetsAt) : Number.NaN;
+    if (!budget && !(at > now) && machineId) {
+      const stored = await storedPlanUsage(db, run.orgId, machineId, plan.kind, plan.account?.id).catch(() => null);
+      at = bindingReset(stored, now) ?? Number.NaN;
+    }
+    const known = at > now;
+    if (!known) {
+      at = now + ladderDelay(wait.step);
+      wait.step++;
+    }
+    const resetsAt = known ? new Date(at).toISOString() : undefined;
+    // Thinking through the API only because its computer brain couldn't: that brain may be back (its plan reset)
+    // long before the budget renews, and a resume picks it again. The note still says when the budget renews.
+    if (budget && t.fallback && !u.soon) {
+      const brainBack = Date.parse(t.fallback.resetsAt ?? "");
+      at = Math.min(at, brainBack > now ? brainBack : now + ladderDelay(wait.step++));
+    }
+    const key = budget
+      ? usageWaitKey({ code: "budget", agentId: agent.id })
+      : usageWaitKey({ code: "plan_limit", machineId, kind: plan.kind, accountId: plan.account?.id });
+    const runAt = new Date(at + RESUME_AFTER_MS + RESUME_GAP_MS * (await usageWaitPlace(db, run, key)));
+    const tellOwner = !budget && !known && !wait.noticed && now - wait.since >= UNKNOWN_RESET_NOTICE_MS;
+    if (tellOwner) wait.noticed = true;
+    t.usageWait = wait;
+    const cut = t.interruptedTurn?.cause === "plan_limit";
+    const name = planName(plan.kind, plan.account?.provider);
+    // A routine's run waits quietly (Rotinas says so); any other says it once per wait.
+    const firstPark = t.brainNotice !== u.code;
+    const say = !(run.background || viaRoutine !== null || u.soon) && firstPark;
+    const note = say
+      ? await db.transaction(async (tx) => {
+          const [code, text] = budget
+            ? [
+                "budget_wait",
+                "My budget for the month ran out. I'll go on when it renews, or sooner if an admin raises it.",
+              ]
+            : cut
+              ? [
+                  known ? "plan_limit_cut" : "plan_limit_cut_unknown",
+                  `I stopped at the ${name} plan's limit. I'll pick up where I left off ${known ? "when" : "as soon as"} it resets.`,
+                ]
+              : [
+                  known ? "plan_limit_wait" : "plan_limit_wait_unknown",
+                  `The ${name} plan hit its limit. I'll answer ${known ? "when" : "as soon as"} it resets.`,
+                ];
+          const m = await post(
+            tx,
+            replyThreadId,
+            text,
+            // `usageWait.resetsAt`: the apps say when in the reader's zone.
+            { ...bodyCode(code, { plan: name }), usageWait: { code: u.code, ...(resetsAt ? { resetsAt } : {}) } },
+            undefined,
+            true,
+          );
+          t.postedCount++;
+          return m;
+        })
+      : null;
+    t.postedUpTo = t.messages.length;
+    if (!u.soon) t.brainNotice = u.code;
+    delete t.roomWaitSince;
+    const waitId = Bun.randomUUIDv7();
+    t.waitingForBrain = {
+      kind: plan.kind,
+      machineId: "",
+      code: u.code,
+      waitId,
+      waitKey: key,
+      until: runAt.toISOString(),
+    };
+    await addRunStep(db, run, "error", {
+      reason: "usage_wait",
+      code: u.code,
+      message: u.message,
+      until: runAt.toISOString(),
+      ...(resetsAt ? { resetsAt } : {}),
+    });
+    // Queued before the wait is stored: a crash in between leaves at worst a job that finds no such wait.
+    await enqueue(db, {
+      orgId: run.orgId,
+      kind: "agent_run.execute",
+      payload: { runId: run.id, wait: waitId },
+      dedupeKey: `agent_run.execute:${run.id}:usage:${waitId}`,
+      runAt,
+      maxAttempts: 4,
+    });
+    const moved = await transitionRun(db, run.id, "running", "waiting_input", {
+      transcript: storedTranscript(t),
+      waitingMachineId: null,
+    });
+    if (!moved) throw new PermanentJobError("run changed state while executing");
+    if (note) {
+      const [view] = await withWikiLinks(db, run.orgId, [messageView(note)]);
+      if (view) await publishMessageCreated(deps.pubsub, view);
+    }
+    // A routine's run says nothing in the conversation: its people hear it once per outage instead.
+    if (firstPark && !budget) await routineRunWaitingForPlan({ db, pubsub: deps.pubsub }, run).catch(() => {});
+    if (tellOwner) {
+      await notifyPlanResetUnknown(
+        { db, pubsub: deps.pubsub },
+        {
+          orgId: run.orgId,
+          agentId: agent.id,
+          agentName: agent.name,
+          plan: name,
+          runId: run.id,
+          channelId: run.channelId,
+          threadId: replyThreadId,
+        },
+      ).catch(() => {});
+    }
+    await publishChannelEvent(deps.pubsub, event("waiting_input"));
+    await finished("waiting_input");
+  };
+
   if (plan.unavailable) {
     // A run back from waiting for its computer has waited for it already.
     const handled = await brainUnavailable(plan.unavailable, !backFromComputerWait);
@@ -2247,6 +2441,7 @@ async function executeRunInner(
                 notePlanLimit(machineId, turnPlan.kind, resetsAt, Date.now(), turnPlan.account?.id);
               }
             },
+            ...(deps.planLimitGraceMs !== undefined ? { limitGraceMs: deps.planLimitGraceMs } : {}),
             onExecuted: (call) => executedNow.push(call),
             onSteerRead: (uuids) => live.read(uuids),
           },
@@ -2254,6 +2449,11 @@ async function executeRunInner(
           // was handed and never confirmed reading goes back there.
         ).finally(() => live.endTurn());
         transcript.executedCalls = (transcript.executedCalls ?? 0) + result.toolCalls.length + result.executedCount;
+        // A turn ran: a later limit is a new wait, with its own note.
+        if (transcript.usageWait || USAGE_WAIT_CODES.has(transcript.brainNotice ?? "")) {
+          delete transcript.usageWait;
+          if (USAGE_WAIT_CODES.has(transcript.brainNotice ?? "")) delete transcript.brainNotice;
+        }
         if (turnPlan.kind !== "model") {
           computerTurns++;
           nextPrompt = null;
@@ -2324,6 +2524,28 @@ async function executeRunInner(
             later(() => addRunStep(db, run, "context", { sessionLost: gone }));
             continue;
           }
+          // The plan refused the rest of a turn that worked (the runner says so; an older one is taken as having
+          // worked): never ended there nor handed to the API, which can't see what it did. It waits for the plan and
+          // the same session finishes the turn.
+          if (
+            machineId &&
+            error instanceof BrainFailure &&
+            error.code === "plan_limit" &&
+            (error.worked !== false || executed.length > 0)
+          ) {
+            const prev = transcript.interruptedTurn;
+            transcript.interruptedTurn = {
+              prompt: prev?.prompt ?? prompt,
+              executed: [...new Set([...(prev?.executed ?? []), ...executed.map((c) => c.label)])],
+              drops: prev?.drops ?? 0,
+              cause: "plan_limit",
+            };
+            return waitForUsage({
+              code: "plan_limit",
+              message: error.message,
+              ...(error.resetsAt ? { resetsAt: error.resetsAt } : {}),
+            });
+          }
           if (executed.length > 0) {
             const failure =
               error instanceof BrainFailure
@@ -2347,6 +2569,11 @@ async function executeRunInner(
           });
           if (handled === "fallback") continue;
           if (handled === "waited" || handled === "failed") return;
+        }
+        // The agent's monthly budget: the run waits for the next month or a raise. A forum's turn fails instead:
+        // the topic's order moves on without it.
+        if (error instanceof BudgetExceededError && !forum) {
+          return waitForUsage({ code: "budget", message: error.message, soon: error.byReservations });
         }
         // Held or suspended meanwhile: that is why, whatever the brain made of the refusal.
         const paused = await standingRefusal(db, run.orgId, run.agentId);
@@ -3033,6 +3260,8 @@ async function thinkOnce(
     /** Usage on a person's plan (computer brains): recorded with cost zero (`recordPlanUsage`). */
     onUsage?(usage: { input: number; output: number; model?: string; cacheRead?: number; cacheWrite?: number }): void;
     onLimit?(resetsAt?: string): void;
+    /** How long the turn is still read after a `limit` event (`PLAN_LIMIT_GRACE_MS`). */
+    limitGraceMs?: number;
     /** A call the brain already ran (through the bridge, or its own tools). */
     onExecuted?(call: { id: string; name: string; input: unknown }): void;
     /** Messages handed to the turn mid-turn that it read (live steering). */
@@ -3043,7 +3272,26 @@ async function thinkOnce(
   const toolCalls: BrainStep["toolCalls"] = [];
   let executedCount = 0;
   let usage: { input: number; output: number; source: "api" | "plan"; model?: string } | null = null;
-  for await (const event of brain.run(turn, io)) {
+  /** The plan said `limit`: the turn is read on until `deadline`, for the answer the brain may still finish. */
+  let limit: { resetsAt?: string; deadline: number } | null = null;
+  const limitFailure = (message: string, worked?: boolean) =>
+    new BrainFailure("plan_limit", message, false, limit?.resetsAt, false, worked);
+  const events = brain.run(turn, io)[Symbol.asyncIterator]();
+  for (;;) {
+    // After a `limit`, a turn that fails or goes quiet past the deadline was cut: either way it ends here.
+    const next: IteratorResult<BrainEvent> | "timeout" = limit
+      ? await withTimeout(
+          events.next(),
+          Math.max(0, limit.deadline - Date.now()),
+          "the turn after its plan limit",
+        ).catch(() => "timeout" as const)
+      : await events.next();
+    if (next === "timeout") {
+      void events.return?.()?.catch(() => {});
+      throw limitFailure(`The plan limit was reached${limit?.resetsAt ? ` until ${limit.resetsAt}` : ""}.`);
+    }
+    if (next.done) break;
+    const event: BrainEvent = next.value;
     if (event.type === "text_delta") onDelta(event.text);
     else if (event.type === "tool_call") {
       // Executed elsewhere (a computer brain through the runner bridge, which recorded its steps): shown only.
@@ -3055,17 +3303,26 @@ async function thinkOnce(
       usage = event;
       if (event.source === "plan") hooks.onUsage?.(event);
     }
-    // Plan limit: the engine falls back to the model brain, or the run waits (ADR 0032 §5).
+    // Plan limit: the plan is marked limited, and the turn is read on: its `done` is posted, its error is the cut.
     else if (event.type === "limit") {
-      hooks.onLimit?.(event.resetsAt);
-      throw new BrainFailure(
-        "plan_limit",
-        `The plan limit was reached${event.resetsAt ? ` until ${event.resetsAt}` : ""}.`,
-        false,
-        event.resetsAt,
-      );
+      if (!limit) {
+        hooks.onLimit?.(event.resetsAt);
+        limit = {
+          ...(event.resetsAt ? { resetsAt: event.resetsAt } : {}),
+          deadline: Date.now() + (hooks.limitGraceMs ?? PLAN_LIMIT_GRACE_MS),
+        };
+      }
     } else if (event.type === "error") {
-      throw new BrainFailure(event.code, event.message, event.retryable === true, undefined, event.serverStop === true);
+      // After a `limit`, whatever ended the turn was the plan's refusal.
+      if (limit) throw limitFailure(event.message, event.worked);
+      throw new BrainFailure(
+        event.code,
+        event.message,
+        event.retryable === true,
+        undefined,
+        event.serverStop === true,
+        event.worked,
+      );
     } else if (event.type === "steer_read") hooks.onSteerRead?.(event.uuids);
     // `event.session`: computer brains keep a stable session per conversation (`brainSessionId`); nothing to store.
     else if (event.type === "done") text = event.text;

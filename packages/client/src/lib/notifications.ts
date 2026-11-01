@@ -261,6 +261,7 @@ export const ROUTINE_TROUBLE: ReadonlySet<NotificationKind> = new Set<Notificati
   "routine_failed",
   "routine_paused",
   "routine_stalled",
+  "routine_waiting_plan",
 ]);
 
 /**

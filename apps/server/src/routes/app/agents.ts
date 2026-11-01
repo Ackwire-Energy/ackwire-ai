@@ -456,6 +456,8 @@ export function agentRoutes(deps: AppDeps) {
                         "waiting_approval",
                         "waiting_answer",
                         "waiting_computer",
+                        "waiting_plan",
+                        "waiting_budget",
                       ])
                       .nullable()
                       .openapi({ description: "With `auto`/`wait`: what it does, worded by the app." }),
