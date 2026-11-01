@@ -1620,6 +1620,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("agents.update", orgId, agentId, input);
         const agent = state.agents.find((a) => a.id === agentId);
         if (!agent) throw new ApiError(404, "not_found", "Agent not found");
+        // One agent coordinates the team at a time (ADR 0093).
+        if (input.coordinator) for (const a of state.agents) a.coordinator = false;
         Object.assign(agent, input);
         return { ...agent };
       },
@@ -2074,6 +2076,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const id = "agentId" in member ? member.agentId : member.userId;
         state.channelMembers[channelId] = (state.channelMembers[channelId] ?? []).filter((m) => m.id !== id);
       },
+      setAutoReply: async (orgId, channelId, agentId, autoReply) => {
+        log("chat.setAutoReply", orgId, channelId, agentId, autoReply);
+        state.autoReply[`${agentId}:${channelId}`] = autoReply;
+      },
       addMember: async (orgId, channelId, member) => {
         log("chat.addMember", orgId, channelId, member);
         const list = state.channelMembers[channelId] ?? [];
@@ -2360,7 +2366,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
     },
     proposals: {
-      list: async () => structuredClone(state.proposals),
+      list: async (_orgId, filter) => {
+        const ids = filter?.ids;
+        return structuredClone(ids ? state.proposals.filter((p) => ids.includes(p.id)) : state.proposals);
+      },
       accept: async (orgId, id, text) => {
         log("proposals.accept", orgId, id, text);
         const p = findProposal(id);

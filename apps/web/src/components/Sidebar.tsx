@@ -26,7 +26,7 @@ import { audienceChip, audienceNotice, listsAgent } from "@agenteschat/client/li
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { waitingAgents } from "@agenteschat/client/lib/outages";
-import { can } from "@agenteschat/client/lib/permissions";
+import { can, managesChannel } from "@agenteschat/client/lib/permissions";
 import { AVAILABILITIES, clearsText, presenceOfAvailability } from "@agenteschat/client/lib/presence";
 import {
   type AgentColor,
@@ -706,8 +706,7 @@ function SidebarChannels({
   const recreate = useCreateChannelCategory(orgId);
   const manages = can(org, "manage_channels");
   const mayCreate = can(org, "create_channels");
-  // A channel's creator edits and moves it too, as the server allows.
-  const mayChange = (c: Channel) => c.createdByUserId === me.user.id || manages;
+  const mayChange = (c: Channel) => managesChannel(c, me.user.id, org);
   const [newCategory, setNewCategory] = useState<{ withChannel?: string } | null>(null);
   const [renaming, setRenaming] = useState<ChannelCategory | null>(null);
   const [moving, setMoving] = useState<Channel | null>(null);

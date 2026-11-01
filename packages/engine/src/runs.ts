@@ -41,6 +41,8 @@ export const RUN_TRANSITIONS: Record<RunStatus, readonly RunStatus[]> = {
 export const NO_AI = "no_ai" as const;
 /** A run's error when its computer had no room for its turn for the whole wait (`COMPUTER_BUSY_WAIT_MS`). */
 export const COMPUTER_BUSY = "computer_busy" as const;
+/** A run's error when it went in circles and its kind of run can't end with Continuar (a routine's, a forum's). */
+export const STUCK_ERROR = "stuck" as const;
 
 /** A run's error when its server stopped in the middle of a tool call (a deploy, a crash, a reboot). */
 export const INTERRUPTED_BY_RESTART = "Interrupted by a server restart";
@@ -65,6 +67,7 @@ export function runErrorDetail(error: string | null | undefined): {
     "agent_archived",
     NO_AI,
     COMPUTER_BUSY,
+    STUCK_ERROR,
   ];
   if (simple.includes(error)) return { errorCode: `run.${error}` };
   if (error.startsWith("provider_error:")) {

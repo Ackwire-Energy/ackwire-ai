@@ -5,6 +5,7 @@ import {
   addChannelMember,
   archiveChannel,
   ConflictError,
+  channelMembersDetail,
   createAgent,
   createChannel,
   ForbiddenError,
@@ -193,4 +194,31 @@ test("adding members: creator or admin; agents need an admin or their owner; eve
   expect(seen.at(-1)).toEqual(["dev"]);
   await Bun.sleep(5);
   expect(events.some((e) => e.type === "channel.member_removed")).toBe(true);
+});
+
+test("an agent's reply mode in a channel: the channel's creator or the agent's owner, no admin role needed", async () => {
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  const caio = await addMember(f.db, f.org.id, "member", "caio");
+  const room = await createChannel(f.db, bia.id, f.org.id, { name: "squad" });
+  const bot = await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: "Bot", handle: "bot", ownerUserId: caio.id },
+    { model: "claude-haiku-5-5" },
+  );
+  for (const agentId of [f.agent.id, bot.id]) await addChannelMember(f.db, f.owner.id, f.org.id, room.id, { agentId });
+
+  // bia created the room but doesn't own @dev; caio owns @bot but didn't create the room.
+  await setChannelAgentAutoReply(f.db, bia.id, f.org.id, room.id, f.agent.id, false);
+  await setChannelAgentAutoReply(f.db, caio.id, f.org.id, room.id, bot.id, false);
+  // Owning another agent there isn't enough.
+  await expect(setChannelAgentAutoReply(f.db, caio.id, f.org.id, room.id, f.agent.id, true)).rejects.toBeInstanceOf(
+    ForbiddenError,
+  );
+  const rows = await channelMembersDetail(f.db, f.org.id, room.id);
+  expect(Object.fromEntries(rows.filter((r) => r.agentHandle).map((r) => [r.agentHandle, r.autoReply]))).toEqual({
+    dev: false,
+    bot: false,
+  });
 });
