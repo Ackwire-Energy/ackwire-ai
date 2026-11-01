@@ -136,3 +136,20 @@ scenario(
     await assertInvariants(w);
   },
 );
+
+scenario("S50", "a routine told to go on keeps what its first turn found in its record", async () => {
+  const w = await world({
+    agents: ["otto"],
+    judge: { followThrough: (s) => (String(s.reply).includes("Vou abrir") ? "continue" : "done") },
+    script: {
+      otto: [
+        { text: "Achei 3 erros novos no Sentry: login, export e push. Vou abrir as issues." },
+        { text: "Issues abertas." },
+      ],
+    },
+  });
+  const run = await fireRoutine(w, "otto", "Checa o Sentry e abre issues dos erros novos.", "act");
+  expect(run?.summary).toContain("Achei 3 erros novos");
+  expect(run?.summary).toContain("Issues abertas.");
+  await assertInvariants(w);
+});

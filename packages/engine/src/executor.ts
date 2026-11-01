@@ -325,6 +325,8 @@ export interface Transcript {
    * it over (they are the bound); another agent's answer doesn't.
    */
   continuation?: ContinuationState;
+  /** A routine run's record of the turns before a continue: its ledger and report keep what they found. */
+  routineRecord?: string;
   /** Tool calls the run made so far, every brain and turn (the controller's progress check reads it). */
   executedCalls?: number;
   /** The last judged turn end: `waiting` holds a mission from going on by itself (`keepGoingBlocker`). */
@@ -2638,13 +2640,15 @@ async function executeRunInner(
             ...(decision.outcome === "continue" ? { nudged: "promise" } : {}),
           }),
         );
+        const kept = [transcript.routineRecord, record].filter(Boolean).join("\n\n");
         if (decision.outcome === "continue" && nudge) {
+          transcript.routineRecord = kept;
           appendUserText(transcript, nudge);
           if (plan.kind !== "model") nextPrompt = nudge;
           await saveTranscript(db, transcript);
           continue;
         }
-        return finishBackground(record);
+        return finishBackground(kept);
       }
       // Nobody called it by name: it passed, or ended with nothing to say. Nothing is posted. (A reaction, a GIF or
       // a sticker it sent is an answer: below.)
