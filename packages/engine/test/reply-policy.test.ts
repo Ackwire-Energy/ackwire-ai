@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   endsWithSentinel,
   isSentinelOnly,
+  pauseLead,
   replyPolicyFor,
   stripSentinel,
   visibleText,
@@ -161,5 +162,14 @@ describe("the sentinel", () => {
     const plain = stream(["Os builds ", "rodam no ", "GitHub Actions."]);
     expect(plain.seen).toEqual(["Os builds ", "Os builds rodam no ", "Os builds rodam no GitHub Actions."]);
     expect(stream(["NOW ", "is fine"]).shown).toBe("NOW is fine");
+  });
+});
+
+describe("what a run posts beside the request it stops on", () => {
+  test("a line that only announces the card stays out; real work written in the same step is posted", () => {
+    expect(pauseLead("Vou pedir `calendar:read`, que é só leitura. Pode aprovar ou recusar à vontade.")).toBe("");
+    expect(pauseLead("")).toBe("");
+    const analysis = "Comparei os três fornecedores e o segundo sai mais barato por causa do frete. ".repeat(5);
+    expect(pauseLead(analysis)).toBe(analysis);
   });
 });

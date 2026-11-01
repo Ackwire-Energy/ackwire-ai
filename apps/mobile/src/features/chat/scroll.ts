@@ -1,3 +1,5 @@
+import { isMediaAfterReply } from "@agenteschat/client/lib/media";
+
 /**
  * The conversation list's scroll rules, kept pure so they can be tested: when the list follows new
  * content, which rows just arrived at the bottom (they animate in), what sits below the person while
@@ -43,6 +45,8 @@ export interface ScrollRow {
   mine?: boolean;
   /** Who wrote it or is working ("agent:<id>", "person:<id>"): the pill's faces and names. */
   who?: string;
+  /** The sticker or GIF an agent adds after its reply (ADR 0091): never news of its own (no count, no "Novas"). */
+  silent?: boolean;
 }
 
 /** The last message row: where the person has read up to when they are at the end. */
@@ -74,7 +78,7 @@ export function unseenBelow(rows: readonly ScrollRow[], seenKey: string | null):
   const out: Unseen = { ...none, authors: [], working: [] };
   for (let i = at + 1; i < rows.length; i++) {
     const r = rows[i] as ScrollRow;
-    if ((r.kind !== "message" && r.kind !== "run") || r.mine) continue;
+    if ((r.kind !== "message" && r.kind !== "run") || r.mine || r.silent) continue;
     out.firstKey ??= r.key;
     if (r.kind === "message") out.messages++;
     const list = r.kind === "message" ? out.authors : out.working;
@@ -165,16 +169,21 @@ export function turnKeys(
 /**
  * Which saved message takes its run's block key: a run can post more than one (text before an approval,
  * the card, the reply), and only its last one does (keys stay unique). None while the run still draws its
- * own block.
+ * own block. The sticker or GIF an agent adds after its reply (ADR 0091) carries the reply's run but never takes
+ * its key: the reply keeps it (no remount).
  */
 export function turnRowByRun(
-  rows: readonly { kind: string; key: string; message?: { agentRunId?: string | null } }[],
+  rows: readonly {
+    kind: string;
+    key: string;
+    message?: { agentRunId?: string | null; meta?: Record<string, unknown> | null };
+  }[],
   drawn: ReadonlySet<string>,
 ): Map<string, string> {
   const out = new Map<string, string>();
   for (const r of rows) {
     const runId = r.kind === "message" ? r.message?.agentRunId : null;
-    if (runId && !drawn.has(runId)) out.set(runId, r.key);
+    if (runId && !drawn.has(runId) && !isMediaAfterReply(r.message?.meta)) out.set(runId, r.key);
   }
   return out;
 }

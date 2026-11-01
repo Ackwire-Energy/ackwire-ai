@@ -6,13 +6,14 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { Entering } from "@/features/auth/Entering";
-import { forgetInvite, loadPendingInvite } from "@/features/auth/invite";
+import { forgetInvite, loadPendingInvite, waitingAsk } from "@/features/auth/invite";
+import { resumesAsk } from "@/features/auth/invite-steps";
 import { LaunchSplash } from "@/features/launch/LaunchSplash";
 import { markLaunched } from "@/features/launch/launched";
 import { OnboardingFlow } from "@/features/onboarding/OnboardingFlow";
 import { ServerDownPanel, useServerDown } from "@/features/server/ServerDown";
 import { keepLastCrash } from "@/lib/last-crash";
-import { deletingOf, firstRunMounted, suspendedOf } from "@/lib/org-choice";
+import { deletingOf, enteringShown, firstRunMounted, suspendedOf } from "@/lib/org-choice";
 import { AppProviders } from "@/providers/AppProviders";
 import { useAppFonts } from "@/providers/fonts";
 import { useOrgGate } from "@/providers/org";
@@ -83,19 +84,22 @@ function Gate() {
     if (isDown && !launching) setLaunching(true);
   }, [isDown, launching]);
 
-  // Just signed in (not a cold start already signed in): "Entrando…" for a moment while the app fills in.
-  const [entering, setEntering] = useState(false);
+  // Just signed in (not a cold start already signed in): "Entrando…" for a moment while the app fills in. The timer
+  // outlives this effect: the session flipping within that moment reruns it past the sign-in check, and clearing the
+  // timer there left the screen up for good.
+  const [welcoming, setWelcoming] = useState(false);
   const wasSignedIn = useRef<boolean | null>(null);
   useEffect(() => {
     if (session.pending) return;
     const before = wasSignedIn.current;
     wasSignedIn.current = signedIn;
     if (before !== false || !signedIn) return;
-    setEntering(true);
-    const timer = setTimeout(() => setEntering(false), 1400);
-    return () => clearTimeout(timer);
+    setWelcoming(true);
+    setTimeout(() => setWelcoming(false), 1400);
   }, [signedIn, session.pending]);
   const accepting = useAcceptPendingInvite(signedIn && !session.pending);
+  const entering = enteringShown({ signedIn, launching, welcoming, ready, accepting });
+  useResumeAsk(!signedIn && !session.pending, pathname);
   // An invitation's own screen stays in front of the first run: someone with no workspace yet may be joining one.
   const onInvite = pathname.startsWith("/invite/");
   const [firstRunBefore, setFirstRunBefore] = useState(false);
@@ -157,6 +161,20 @@ function Gate() {
 }
 
 /**
+ * A request made through a link still waits on this phone (ADR 0090 §3): opening the app returns to its screen, once,
+ * from the sign-in a signed-out launch lands on. Back from there stays on the sign-in, and the request keeps waiting.
+ */
+function useResumeAsk(signedOut: boolean, pathname: string) {
+  const resumed = useRef(false);
+  useEffect(() => {
+    if (!signedOut || resumed.current || !resumesAsk(pathname)) return;
+    resumed.current = true;
+    const asked = waitingAsk();
+    if (asked) router.navigate(`/invite/${asked.token}`);
+  }, [signedOut, pathname]);
+}
+
+/**
  * An invitation opened before signing in (features/auth/invite.ts), once the person is in: an email invitation is
  * accepted and its organization becomes the current one; a link's page opens again, for the account to ask to
  * join. True while one is being accepted (the first run waits).
@@ -179,7 +197,7 @@ function useAcceptPendingInvite(signedIn: boolean): boolean {
       }
       setAccepting(true);
       try {
-        const { orgId } = await api.orgs.acceptInvitation(next.accept);
+        const { orgId } = await api.orgs.acceptInvitation(next.accept, next.mail);
         await qc.invalidateQueries({ queryKey: keys.me });
         choose(orgId);
       } catch {

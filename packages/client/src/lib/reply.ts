@@ -1,4 +1,5 @@
 import type { ArtifactRef, Message, ReplyRef } from "../api/types";
+import { mediaKindOf, messageMediaOf } from "./media";
 
 /** Same rule as the server (`replyExcerpt`): one line, no code fences, ~200 characters. */
 export function quoteExcerpt(body: string, max = 200): string {
@@ -16,6 +17,8 @@ export function replyOf(meta: Record<string, unknown> | undefined): ReplyRef | n
   const o = r as Record<string, unknown>;
   if (typeof o.messageId !== "string" || typeof o.excerpt !== "string") return null;
   const author = o.author as ReplyRef["author"] | undefined;
+  // A quoted GIF or sticker (ADR 0091): its kind, however the server wrote it ("gif", { kind }, `mediaKind`).
+  const media = mediaKindOf(o.media) ?? mediaKindOf(o.mediaKind);
   return {
     messageId: o.messageId,
     threadId: typeof o.threadId === "string" ? o.threadId : null,
@@ -25,6 +28,7 @@ export function replyOf(meta: Record<string, unknown> | undefined): ReplyRef | n
         : { type: "person", id: null },
     authorName: typeof o.authorName === "string" ? o.authorName : "",
     excerpt: o.excerpt,
+    ...(media ? { media } : {}),
   };
 }
 
@@ -32,12 +36,15 @@ export function replyOf(meta: Record<string, unknown> | undefined): ReplyRef | n
 export function localMeta(quote: Message | null, authorName: string, files: ArtifactRef[]): Record<string, unknown> {
   const meta: Record<string, unknown> = {};
   if (quote) {
+    // Quoting a GIF or a sticker: the quote names it until the server's copy comes (ADR 0091).
+    const media = messageMediaOf(quote.meta)?.kind;
     meta.replyTo = {
       messageId: quote.id,
       threadId: quote.threadId,
       author: quote.author,
       authorName,
       excerpt: quoteExcerpt(quote.body),
+      ...(media ? { media } : {}),
     } satisfies ReplyRef;
   }
   if (files.length > 0) meta.artifacts = files;

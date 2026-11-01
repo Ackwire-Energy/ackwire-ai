@@ -71,6 +71,8 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   linkingWiki: "book",
   askingQuestion: "question",
   reacting: "smile",
+  sendingGif: "sticker",
+  sendingSticker: "sticker",
   openingSkill: "layers",
   consultingSkill: "layers",
   runningSkillScript: "code",

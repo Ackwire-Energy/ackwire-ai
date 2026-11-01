@@ -43,6 +43,17 @@ export async function forgetSession(): Promise<void> {
     .catch(() => {});
 }
 
+/**
+ * Trades a one-time sign-in for a session (a connect link's token, the claim of an approved request): false when it
+ * was refused (expired or already used) or never reached the server. The session arrives a moment after the answer.
+ */
+export async function signInOneTime(token: string): Promise<boolean> {
+  const res = await authClient()
+    .$fetch("/sign-in/one-time-token", { method: "POST", body: { token } })
+    .catch(() => null);
+  return Boolean(res && !res.error);
+}
+
 let cookie = "";
 
 /** The session cookie, read fresh from SecureStore (and kept for the synchronous callers). */

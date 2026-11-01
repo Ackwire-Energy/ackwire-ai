@@ -753,6 +753,8 @@ export const featureKeysEn: FeatureTranslations = {
       org_standing_other: "The workspace's status changed",
       computer_ready_one: "Your workspace's computer is ready",
       computer_ready_other: "Your workspace's computer is ready",
+      invitation_accepted_one: "{{names}} accepted your invitation",
+      invitation_accepted_other: "{{names}} accepted your invitation",
     },
     markRead: "Mark as read",
     markUnread: "Mark as unread",
@@ -1430,13 +1432,18 @@ export const featureKeysEn: FeatureTranslations = {
     invited: "You were invited to {{org}}",
     joinAs: "You join as {{role}}.",
     apple: "Continue with Apple",
-    createPassword: "Create a password",
-    haveAccount: "I already have an account",
     signIn: "Sign in to accept",
     accept: "Join {{org}}",
     wrongAccount: "This invitation is for {{email}}.",
     otherAccount: "Use another account",
     failed: "Couldn't accept the invitation. Try again.",
+    // Entering through an invitation, what the shared words say another way on a phone (ADR 0090).
+    join: {
+      skip: "Skip",
+      sharedBy: "{{name}} shared this link",
+      waitLead: "You're in as soon as an admin approves. You can close the app: we'll let you know by email.",
+      passwordLead: "Your password, and you're in.",
+    },
   },
   joinRequests: {
     share: "Share the link",
@@ -1446,6 +1453,23 @@ export const featureKeysEn: FeatureTranslations = {
   humanCheck: {
     title: "Quick check",
     blocked: "The check didn't load. Try another network.",
+  },
+  /** Convidar pessoas and the sent invitations' sheet (ADR 0090); the other words are the shared `members.*`. */
+  invitePeople: {
+    emailsHelp: "Paste a list or type. Each person gets an email and joins right away.",
+    here: "Already here",
+    invited: "Already invited",
+    fix: "Check this",
+    channels: "Channels",
+    optional: "Optional",
+    ok: "OK",
+    noteHelp: "It shows in the email with your name. Up to {{max}} characters.",
+    roleHelp: "Changes what the person gets on joining.",
+    remove: "Take off the list",
+    sendAgain: "Send again",
+    cancelTitle: "Cancel the invitation to {{email}}?",
+    cancelText: "Its link stops opening.",
+    send: "Send",
   },
   members: {
     waiting_one: "{{count}} waiting",

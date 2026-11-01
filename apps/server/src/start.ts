@@ -6,9 +6,11 @@ import {
   createComposioMailConnector,
   createDiskBlobStore,
   createExpoPushSender,
+  createGiphyGifs,
   createImapConnectionTester,
   createImapMailConnector,
   createImapPoller,
+  createKeyedGifs,
   createLogEmailSender,
   createMemoryPresence,
   createMemoryPubSub,
@@ -24,6 +26,7 @@ import {
   createWebPushSender,
   type EmailSender,
   envPlatformCredentials,
+  type GifProvider,
   type KeyWrapper,
   MAIL_PRESETS,
   type MailAdapters,
@@ -40,6 +43,7 @@ import {
 } from "@agenteschat/db";
 import {
   adoptRestoredOperatorEvents,
+  createGifKey,
   createLocalKeyWrapper,
   defaultEmailFrom,
   drainLocalRuns,
@@ -47,6 +51,8 @@ import {
   emailArtFor,
   enableCaches,
   enableOperatorEvents,
+  type GifKey,
+  isAgentesCloud,
   isBlockedAddress,
   resolveHostDns,
   retireHostTokens,
@@ -139,6 +145,9 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
   // say (`resolved`, ADR 0071).
   const localKeyWrapper = createLocalKeyWrapper(config.AGENTES_SECRET);
   let resolved: Adapters | null = null;
+  // The GIPHY key its owner may add in Settings (ADR 0091, amended 2026-10-31), made below once modules had their
+  // say on the key wrappers; the GIF provider asks it on every call.
+  let gifKey: GifKey | null = null;
   const defaults: Adapters = {
     search: createPostgresSearchResolver(database.db),
     // PGlite (native mode) is one process: nothing to tell other replicas.
@@ -174,6 +183,8 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
             log,
           })
         : null,
+    // GIFs in chat (ADR 0091), only with a key: without one nothing reaches GIPHY and the app shows no GIFs.
+    gifs: gifProvider(config, () => gifKey?.key() ?? null),
   };
   log.info("platform file storage", { kind: defaults.platformBlobs.kind });
   log.info("transactional email", { sender: defaults.email.id });
@@ -188,6 +199,17 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
   );
   if (overridden.length > 0) log.info("adapters overridden by modules", { overridden });
   resolved = adapters;
+  if (!isAgentesCloud(config.PUBLIC_URL)) {
+    // Sealed with the installation's key wrappers, like the Jev key (ADR 0073), and read before anything serves.
+    gifKey = createGifKey({
+      db: database.db,
+      keyWrapper: adapters.keyWrapper,
+      keyWrappers: [adapters.keyWrapper, ...adapters.legacyKeyWrappers],
+      envKey: config.GIPHY_API_KEY,
+    });
+    await gifKey.ready();
+  }
+  log.info("GIFs in chat", { provider: adapters.gifs?.name ?? "off", available: adapters.gifs?.available() ?? false });
   try {
     await checkHumanCheckAtBoot(adapters.humanCheck, log);
   } catch (error) {
@@ -286,6 +308,7 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
         talker: engine.talker,
         router: engine.router,
         jevKey: engine.jevKey,
+        gifKey: gifKey ?? undefined,
         gitProxy: engine.gitProxy,
         appleRevoke: appleTokenRevoker(config),
       },
@@ -501,6 +524,15 @@ function webPushSender(config: Config, db: Database, wrappers: () => KeyWrapper[
       return result;
     },
   };
+}
+
+/**
+ * GIF search (ADR 0091): on agentes.chat's own servers GIPHY only with `GIPHY_API_KEY`; elsewhere a provider that
+ * follows the installation's key (`GIPHY_API_KEY`, or the one its owner adds in Settings), there while it has one.
+ */
+function gifProvider(config: Config, key: () => string | null): GifProvider | null {
+  if (!isAgentesCloud(config.PUBLIC_URL)) return createKeyedGifs({ key });
+  return config.GIPHY_API_KEY ? createGiphyGifs({ apiKey: config.GIPHY_API_KEY }) : null;
 }
 
 /** People's mailboxes for agents (ADR 0038): Gmail/Outlook through Composio when keyed, IMAP unless turned off. */

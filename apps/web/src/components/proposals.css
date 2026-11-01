@@ -60,3 +60,14 @@
   flex-wrap: wrap;
   gap: 6px;
 }
+/* In a request card: light rows under the well, a hairline between them. */
+.rq .proposal-rows {
+  gap: 0;
+  margin-top: 8px;
+}
+.rq .proposal-row {
+  padding: 8px 0;
+}
+.rq .proposal-row + .proposal-row {
+  box-shadow: 0 -1px 0 var(--line);
+}
