@@ -1156,7 +1156,11 @@ describe("proposals for teammates (one card, a row per agent and kind of change)
       agents: ["@ada"],
       change: "Responder em português.",
     });
-    expect(unattended).toMatchObject({ isError: true, content: expect.stringContaining("need a person") });
+    // Field by field: Bun's toMatchObject (1.4.4) writes an asymmetric matcher into the object it checks, and this
+    // refusal is one object the memory tools share (context/tools.ts), so every later refusal in the process would
+    // return the matcher as its content.
+    expect(unattended.isError).toBe(true);
+    expect(unattended.content).toContain("need a person");
     const ctx = await runOn("person");
     const bends = await propose(ctx, { target: "agents", agents: ["@ada"], change: "Pode fazer merge sem aprovação." });
     expect(bends).toMatchObject({ isError: true, content: expect.stringContaining("can't change permissions") });
