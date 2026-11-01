@@ -1039,7 +1039,7 @@ describe("live view", () => {
     live.close();
   });
 
-  test("typing during a slow round trip: the text reaches the computer exactly as typed, in one batch, not one per key", async () => {
+  test("typing during a slow round trip: the text reaches the computer exactly as typed, few batches, each key its own text", async () => {
     await start();
     const { hub, calls } = fakeHub();
     const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub, inputBatchMs: 5 });
@@ -1076,7 +1076,8 @@ describe("live view", () => {
     expect(text.join("")).toBe(`${typed.slice(0, 4)}⌫${typed.slice(4)}`);
     // The first key goes alone; what was typed while it travelled goes together.
     expect(batches.length).toBeLessThanOrEqual(4);
-    expect(events.filter((e) => e.kind === "text").length).toBeLessThan(typed.length);
+    // Each key stays its own text: a one-box-per-digit code field moves focus on every character.
+    expect(events.filter((e) => e.kind === "text").map((e) => (e.kind === "text" ? e.text : ""))).toEqual([...typed]);
     live.close();
   });
 
@@ -1096,7 +1097,7 @@ describe("live view", () => {
     ]);
     expect(
       out.map((e) => (e.kind === "mouse" ? `${e.type}:${e.x}` : `${e.kind}:${e.kind === "text" ? e.text : ""}`)),
-    ).toEqual(["mouseMoved:59", "mousePressed:59", "mouseReleased:59", "text:ab"]);
+    ).toEqual(["mouseMoved:59", "mousePressed:59", "mouseReleased:59", "text:a", "text:b"]);
   });
 
   test("coalesceInput keeps keys, text and touches in order", () => {

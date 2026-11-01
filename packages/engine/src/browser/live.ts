@@ -75,9 +75,10 @@ const ofBrowser = (screen: unknown) => (screen ?? "browser") === "browser";
 
 /**
  * One batch of a person's input, smaller: a run of plain mouse moves (no
- * button held) keeps only its last one; typed text in a row is one text (one
- * command on the computer, not one per key); moves while dragging and
- * everything else stay, in order.
+ * button held) keeps only its last one; moves while dragging and everything
+ * else stay, in order. Typed text stays one text per key: fields that react to
+ * each character (a code split into one box per digit) need the page's input
+ * handler to run between them.
  */
 export function coalesceInput(events: BrowserInputEvent[]): BrowserInputEvent[] {
   const out: BrowserInputEvent[] = [];
@@ -87,8 +88,6 @@ export function coalesceInput(events: BrowserInputEvent[]): BrowserInputEvent[] 
   for (const e of events) {
     const last = out.at(-1);
     if (plainMove(e, dragging) && plainMove(last, dragging)) out[out.length - 1] = e;
-    else if (e.kind === "text" && last?.kind === "text" && last.text.length + e.text.length <= BROWSER_LIMITS.inputText)
-      out[out.length - 1] = { kind: "text", text: last.text + e.text };
     else out.push(e);
     if (e.kind === "mouse" && e.type === "mousePressed") dragging = true;
     if (e.kind === "mouse" && e.type === "mouseReleased") dragging = false;
