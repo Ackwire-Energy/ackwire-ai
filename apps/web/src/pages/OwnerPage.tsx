@@ -1,3 +1,4 @@
+import { authErrorText } from "@agenteschat/client/lib/errors";
 import { isEmail, passwordState } from "@agenteschat/client/lib/text";
 import { Button, Icon, Input } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -48,7 +49,7 @@ export function OwnerPage({ claim }: { claim: string | null }) {
     }
     if (result.status === 401) return setProblem("wrongLink");
     if (result.status === 409) return setProblem("taken");
-    setError(result.status === 429 ? t("auth.tooManyTries") : result.message || t("common.unknownError"));
+    setError(authErrorText(t, result));
   };
 
   const [title, lead] = problem

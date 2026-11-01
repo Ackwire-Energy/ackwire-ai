@@ -51,10 +51,10 @@ describe("route guards", () => {
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/drive`);
   });
 
-  test("signed in: / → the organization → #general", async () => {
+  test("signed in: / → the organization → Início (ADR 0108)", async () => {
     const { router } = await renderApp("/", { api: createFakeApi() });
-    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
-    expect(screen().getByRole("heading", { name: "# general" })).toBeTruthy();
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/home`);
+    expect(screen().getByRole("heading", { level: 1 }).textContent).toMatch(/, Walter$/);
     expect(screen().getByRole("navigation", { name: "Navegação do workspace" })).toBeTruthy();
   });
 
@@ -70,10 +70,10 @@ describe("route guards", () => {
     expect(router.state.location.search).toEqual({ tab: "settings", sec: "budget" });
   });
 
-  test("an email's Connect your AI: #general with the dialog open, and the address drops the request", async () => {
+  test("an email's Connect your AI: Início with the dialog open, and the address drops the request", async () => {
     const { router } = await renderApp(`/org/${ORG_ID}?connect=ai`, { api: createFakeApi() });
     await settle();
-    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/home`);
     expect(screen().getByRole("dialog", { name: "Conectar uma IA" })).toBeTruthy();
     expect(router.state.location.search).toEqual({});
   });

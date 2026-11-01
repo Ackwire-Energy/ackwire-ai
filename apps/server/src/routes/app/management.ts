@@ -31,6 +31,7 @@ import {
   SIDEBAR_ITEMS,
   SIDEBAR_PLACES,
   type SidebarItem,
+  START_PAGES,
   STATUS_EMOJI_MAX,
   STATUS_TEXT_MAX,
   setAgentChannels,
@@ -38,6 +39,7 @@ import {
   setMySidebarItem,
   setMySidebarItems,
   setMyStatus,
+  setStartPage,
   sidebarPlaceAllowed,
   talksToAgents,
   updateMyProfile,
@@ -47,7 +49,7 @@ import {
 import { contextWindowOf, nanoUsdToUsd, PROVIDERS, pricesAt, usdToNanoUsd } from "@agenteschat/providers";
 import { createRoute, z } from "@hono/zod-openapi";
 import { type AppDeps, body, createAppRouter, errors, iso, json, OrgParams, requireSession, security } from "./context";
-import { AgentAppearance, AgentAudience, Credential, ModelTier, ProviderId, Role } from "./schemas";
+import { AgentAppearance, AgentAudience, Credential, ModelTier, ProviderId, Role, StartChoice } from "./schemas";
 
 const usd = (nano: number | null) => (nano === null ? null : nanoUsdToUsd(nano));
 const ModelId = z.string().max(100);
@@ -467,6 +469,32 @@ export function managementRoutes(deps: AppDeps) {
       const me = (await listMembers(db, orgId)).find((m) => m.userId === userId);
       if (!me) return c.json({ error: { code: "not_found", message: "Not a member" } }, 404);
       return c.json(personView(me, new Set(await adapters.presence.online(orgId)), userId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/me/start",
+      tags: ["Members"],
+      security,
+      summary: "Choose what opens when the app starts in this organization",
+      description:
+        "Yours, on every device (ADR 0108): `home` (Início, Conversas on the phone), `last` (where you were, which each device keeps) or `channel` (`channelId`, one of this organization's channels you are in, not archived: else 400 `start.channel_unknown`). `GET /me` sends it with each organization (`start`).",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            page: z.enum(START_PAGES),
+            channelId: z.uuid().nullable().optional().openapi({ description: "With `channel`; ignored otherwise." }),
+          }),
+        ),
+      },
+      responses: { 200: json(StartChoice), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json(await setStartPage(db, c.get("user").id, orgId, c.req.valid("json")), 200);
     },
   );
 

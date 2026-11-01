@@ -1,4 +1,5 @@
 import type { ConnectorCategory, ConnectorDef, CustomConnectStart } from "@agenteschat/client";
+import { hiddenWithoutComposio } from "@agenteschat/client/lib/composio";
 import { CONNECTOR_MARK, type ConnectedItem, OWN_MARK, SERVER_ICON } from "@agenteschat/client/lib/connected";
 import { mixHex } from "@agenteschat/ui/agent/engine";
 import type { TFunction } from "i18next";
@@ -32,6 +33,14 @@ export function connectionOf(def: ConnectorDef, items: ConnectedItem[]): Connect
   return items.find((i) => i.def?.id === def.id);
 }
 
+/**
+ * What an admin does with a connected account on its screen: rename it and sign it in again; an MCP server also
+ * takes another account (a catalog connector has one).
+ */
+export function accountActions(item: Pick<ConnectedItem, "custom">): ("rename" | "reconnect" | "add")[] {
+  return item.custom ? ["rename", "reconnect", "add"] : ["rename", "reconnect"];
+}
+
 /** The first three suggestions that can be connected here and aren't yet. */
 export function suggestionsOf(catalog: ConnectorDef[], items: ConnectedItem[], count = 3): ConnectorDef[] {
   const out: ConnectorDef[] = [];
@@ -49,13 +58,23 @@ export function searchConnectors(list: ConnectorDef[], query: string, shown: (d:
   return q ? list.filter((d) => `${d.label} ${d.id} ${d.description} ${shown(d)}`.toLowerCase().includes(q)) : list;
 }
 
+/** The connected row's mailboxes: a sign-in still pending (or left unfinished) has no name or address to show. */
+export const shownMailboxes = <T extends { status: string }>(accounts: T[]) =>
+  accounts.filter((a) => a.status !== "pending");
+
+/** "Nenhum resultado" only when nothing matches: while searching, the MillionSend card under Email is a match. */
+export const noResults = (tiles: number, searching: boolean, mailCard: boolean) =>
+  tiles === 0 && !(searching && mailCard);
+
 /**
  * The gallery's tiles: the ones that open first, "Em breve" last (as on the web). A connected one opens its
  * connection, even one connected by its address whose vendor hasn't approved agentes.chat yet (`soon`); a `soon`
- * one not connected gets a lock and opens nothing.
+ * one not connected gets a lock and opens nothing. One that connects only through Composio, on a server without it,
+ * isn't shown unless connected.
  */
 export function galleryTiles(list: ConnectorDef[], items: ConnectedItem[]) {
   return list
+    .filter((def) => !hiddenWithoutComposio(def) || connectionOf(def, items))
     .map((def) => {
       const connected = Boolean(connectionOf(def, items));
       return {
@@ -68,9 +87,14 @@ export function galleryTiles(list: ConnectorDef[], items: ConnectedItem[]) {
     .sort((a, b) => Number(b.opens) - Number(a.opens));
 }
 
-/** Why the sheet asks for a key: the server only lets in apps it approved (`not_approved`), or it has no sign-in. */
+/**
+ * Why the sheet asks for a key: the server only lets in apps it approved (`not_approved`, with its own words on the
+ * next line when it gave any), or it has no sign-in.
+ */
 export function needsKeyText(t: TFunction, start: Extract<CustomConnectStart, { status: "needs_key" }>, name: string) {
-  return start.reason === "not_approved" ? t("connectFlow.notApproved", { name }) : t("mobile.connectors.needsKey");
+  if (start.reason !== "not_approved") return t("mobile.connectors.needsKey");
+  const text = t("connectFlow.notApproved", { name });
+  return start.detail ? `${text}\n${t("connectFlow.serverSaid", { detail: start.detail })}` : text;
 }
 
 /** How a service connects on the phone: signing in in the browser, a key, or either. */
@@ -94,7 +118,7 @@ const safeId = (id: string) => id.replace(/[^a-zA-Z0-9]/g, "_");
 export function capabilityLines(
   tr: (key: string) => string,
   exists: (key: string) => boolean,
-  def: ConnectorDef,
+  def: Pick<ConnectorDef, "id" | "scopes">,
   scopeLabel: (scope: ConnectorDef["scopes"][number]) => string,
 ): { text: string; asks: boolean }[] {
   const base = `connectors.can.${safeId(def.id)}`;

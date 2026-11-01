@@ -205,7 +205,6 @@ const CONNECTORS: Record<string, string> = {
   sentry: "Sentry",
   linear: "Linear",
   drive: "Drive",
-  gdrive: "Drive",
   slack: "Slack",
   notion: "Notion",
   jira: "Jira",
@@ -240,7 +239,15 @@ const VERBS = new Set([
   "do",
 ]);
 
-const isDrive = (id: string) => id === "drive" || id === "gdrive" || id === "google_drive";
+const isDrive = (id: string) => id === "drive" || id === "google_drive";
+/** A connection's service as its name says it: "Google Drive (ana@acme.com) 2" → "google_drive". */
+const serviceKey = (label: string) =>
+  label
+    .replace(/\s+\d+$/, "")
+    .replace(/\s*\([^)]*\)$/, "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
 
 /** One of the org's mailboxes' tools (`mail_<slug>_<verb>`, ADR 0038), also through the executor's MCP. */
 const MAILBOX_TOOL = /^(?:mcp__agentes__)?mail_[a-z0-9]+_[a-z]+$/;
@@ -294,13 +301,13 @@ function activityOf(tool: string | null | undefined, connector?: string | null, 
   if (name.startsWith("desktop_")) return { kind: "usingScreen" };
   const label = connector?.trim();
   if (label) {
-    if (isDrive(label.toLowerCase().replace(/\s+/g, "_"))) return { kind: "readingDrive" };
+    if (isDrive(serviceKey(label))) return { kind: "readingDrive" };
     return { kind: "consulting", app: label };
   }
   // The org's databases (`pg_<slug>_query`, ADR 0039) when the event names no connection.
   if (name.startsWith("pg_")) return { kind: "queryingDatabase" };
   const prefix = name.split(/[_.:]/)[0] ?? "";
-  if (isDrive(prefix)) return { kind: "readingDrive" };
+  if (isDrive(prefix) || name.startsWith("google_drive_")) return { kind: "readingDrive" };
   const known = CONNECTORS[prefix];
   if (known) return { kind: "consulting", app: known };
   if (prefix.length >= 2 && prefix !== name && !VERBS.has(prefix)) return { kind: "consulting", app: prefix };

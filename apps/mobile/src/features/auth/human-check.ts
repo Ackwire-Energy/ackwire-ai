@@ -182,6 +182,17 @@ export function socialRefusalText(
 }
 
 /**
+ * A browser sign-in that came back: its refusal, or that it didn't finish (no session: the sheet was closed, or the
+ * browser refused it, which comes back to the app too). Null once signed in.
+ */
+export const socialReturnText = (
+  t: TFunction,
+  res: { error?: ({ code?: string; message?: string } & RestrictionFacts) | null },
+  signedIn: boolean,
+  emails: boolean,
+) => (res.error ? socialRefusalText(t, res.error, emails) : signedIn ? null : t("mobile.auth.social.unfinished"));
+
+/**
  * The step after the e-mail lookup, as the web's sign-in takes it: the account's way in, else a name for a new
  * account, an early-access link that expired, or sign-up closed. `usable`: the account signs in with a provider
  * this server has.

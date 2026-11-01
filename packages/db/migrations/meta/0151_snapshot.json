@@ -1,5 +1,5 @@
 {
-  "id": "cd2737b4-4737-4744-8c27-b98c294e1c30",
+  "id": "26f92909-4e65-480a-bf3b-8d41f131e283",
   "prevId": "4dbfa9a9-3812-433d-a624-c7cfd98e3c95",
   "version": "7",
   "dialect": "postgresql",
@@ -114,13 +114,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
-        },
-        "previous_handles": {
-          "name": "previous_handles",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::text[]"
         },
         "role": {
           "name": "role",
@@ -361,6 +354,13 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "previous_handles": {
+          "name": "previous_handles",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
         }
       },
       "indexes": {
@@ -7027,18 +7027,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "egress": {
-          "name": "egress",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "network_transition": {
-          "name": "network_transition",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
         "resume_tasks": {
           "name": "resume_tasks",
           "type": "boolean",
@@ -13571,6 +13559,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "source_via": {
+          "name": "source_via",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "version": {
           "name": "version",
           "type": "integer",
@@ -16153,19 +16147,19 @@
           "notNull": true,
           "default": "'{}'::jsonb"
         },
-        "sidebar_items": {
-          "name": "sidebar_items",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "sidebar_items": {
+          "name": "sidebar_items",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
         }
       },
       "indexes": {
@@ -17074,27 +17068,6 @@
           "notNull": true,
           "default": false
         },
-        "restricted": {
-          "name": "restricted",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "audience_role_ids": {
-          "name": "audience_role_ids",
-          "type": "uuid[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::uuid[]"
-        },
-        "audience_user_ids": {
-          "name": "audience_user_ids",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::text[]"
-        },
         "source": {
           "name": "source",
           "type": "jsonb",
@@ -17144,6 +17117,27 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "restricted": {
+          "name": "restricted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "audience_role_ids": {
+          "name": "audience_role_ids",
+          "type": "uuid[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::uuid[]"
+        },
+        "audience_user_ids": {
+          "name": "audience_user_ids",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
         }
       },
       "indexes": {

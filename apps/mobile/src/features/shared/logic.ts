@@ -5,9 +5,11 @@
  */
 
 import { isFeminineName } from "@agenteschat/client/lib/grammar";
+import { type AgentColorName, isHexColor } from "@agenteschat/ui/agent/engine";
 
+/** The preset colors; a custom "#rrggbb" ("Personalizar") is a color too. */
 export const AGENT_COLORS = ["sky", "indigo", "violet", "rose", "amber", "green", "teal", "graphite"] as const;
-export type AgentColor = (typeof AGENT_COLORS)[number];
+export type AgentColor = AgentColorName;
 export const AGENT_EYES = ["round", "dots", "wide", "happy", "sleepy"] as const;
 export type AgentEyes = (typeof AGENT_EYES)[number];
 export const AGENT_ACCESSORIES = [
@@ -35,13 +37,17 @@ export interface AgentLook {
 const pick = <T extends string>(list: readonly T[], v: unknown): T | undefined =>
   typeof v === "string" && (list as readonly string[]).includes(v) ? (v as T) : undefined;
 
+/** A stored color the engine can draw: a preset or a custom "#rrggbb" (lowercased), else undefined. */
+export const colorOf = (v: unknown): AgentColor | undefined =>
+  pick(AGENT_COLORS, v) ?? (isHexColor(v) ? (v.toLowerCase() as AgentColor) : undefined);
+
 /** The look the engine draws: only known values (the backend's allow-list), else the default agent. */
 export function agentLook(agent: { appearance?: unknown } | null | undefined): AgentLook {
   const raw = agent?.appearance;
   const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const accessory = pick(AGENT_ACCESSORIES, o.accessory);
   return {
-    color: pick(AGENT_COLORS, o.color) ?? "sky",
+    color: colorOf(o.color) ?? "sky",
     eyes: pick(AGENT_EYES, o.eyes) ?? "round",
     ...(accessory && accessory !== "none" ? { accessory } : {}),
   };

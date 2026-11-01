@@ -12,6 +12,7 @@
     "./command-policy": "./src/command-policy.ts",
     "./secret-box": "./src/secret-box.ts",
     "./redact": "./src/redact.ts",
+    "./error-scrub": "./src/error-scrub.ts",
     "./host-stats": "./src/host-stats.ts",
     "./browser-start": "./src/browser-start.ts"
   },
@@ -20,6 +21,7 @@
   },
   "dependencies": {
     "@agenteschat/db": "workspace:*",
+    "@sentry/core": "10.76.2",
     "imapflow": "^2.5.5",
     "mailparser": "^3.9.46",
     "nodemailer": "^10.1.7",

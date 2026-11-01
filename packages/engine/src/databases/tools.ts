@@ -146,6 +146,7 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
       inputSchema: { type: "object", additionalProperties: false, ...inputSchema },
       scope: DATABASE_SCOPE,
       connectionId: connection.id,
+      connector: { key: "postgres", via: "native", tool: verb },
       connectorLabel: connection.label,
       service: "postgres",
       sensitive: false,

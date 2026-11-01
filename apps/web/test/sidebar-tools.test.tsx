@@ -26,9 +26,10 @@ const click = async (el: Element) => {
 };
 // The page behind an open dialog is hidden from roles: the sidebar by its element.
 const nav = () => document.getElementById("app-nav") as HTMLElement;
-/** The tools in the list on top, in order (More keeps the rest). */
-const listed = () =>
+const rows = () =>
   [...nav().querySelectorAll(".sidebar__tools > a.sidebar__item .sidebar__item-label")].map((l) => l.textContent);
+/** The tools in the list on top, in order (More keeps the rest), under Início, which always heads it. */
+const listed = () => rows().slice(1);
 const openMore = async () => {
   await click(within(nav()).getByRole("button", { name: "Mais" }));
   return screen().getByRole("dialog", { name: "Mais" });
@@ -83,6 +84,7 @@ describe("the bell", () => {
 describe("the tools on top", () => {
   test("by default Threads, Tarefas and Drive, Aprovações while some wait; the rest in More, then Personalizar", async () => {
     await go();
+    expect(rows()[0]).toBe("Início");
     expect(listed()).toEqual(["Aprovações", "Threads", "Tarefas", "Drive"]);
     const more = await openMore();
     expect(inMore(more)).toEqual(["Wiki", "Rotinas", "Calendário", "Fórum"]);

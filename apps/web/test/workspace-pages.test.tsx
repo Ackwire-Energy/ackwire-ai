@@ -483,7 +483,7 @@ describe("Equipe", () => {
       const t = await team(orgId);
       return {
         ...t,
-        agents: t.agents.map((a) => ({ ...a, capabilities: ["github", "linear", "gdrive", "sentry", "browser"] })),
+        agents: t.agents.map((a) => ({ ...a, capabilities: ["github", "linear", "sentry", "browser"] })),
       };
     };
     await renderApp(`/org/${ORG_ID}/team`, { api });
@@ -498,7 +498,6 @@ describe("Equipe", () => {
     };
     expect(mark("GitHub")).toEqual(['url("/connectors/github.svg")', ""]);
     expect(mark("Linear")).toEqual(['url("/connectors/linear.svg")', "#5E6AD2"]);
-    expect(mark("Google Drive")).toEqual(['url("/connectors/googledrive.svg")', "#4285F4"]);
     // A service's mark sits beside the service's own name.
     expect(mark("Sentry")).toEqual(['url("/connectors/sentry.svg")', ""]);
     // Our own abilities keep their icons.

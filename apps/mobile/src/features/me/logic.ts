@@ -1,4 +1,5 @@
-import { ApiError } from "@agenteschat/client";
+import { ApiError, type StartChoice } from "@agenteschat/client";
+import { startPlace } from "@agenteschat/client/lib/home";
 
 /**
  * Você's pure logic: the Conta form (what changed, what is wrong with it, the server's error as our
@@ -83,3 +84,48 @@ export function openIssuesWithMe(
  * hold (pure).
  */
 export const preflightMissing = (error: unknown) => error instanceof ApiError && error.status === 404;
+
+// ── What opens when the app starts (ADR 0108) ───────────────────────────────
+
+/** The last conversation opened in each workspace on this phone (`STORED.lastPlace`, JSON by workspace id). */
+export function placesOf(raw: string | null): Record<string, string> {
+  try {
+    const parsed = JSON.parse(raw ?? "{}") as unknown;
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** The places with this workspace's set to `href` (a conversation's link). */
+export const withPlace = (raw: string | null, orgId: string, href: string) =>
+  JSON.stringify({ ...placesOf(raw), [orgId]: href });
+
+/** The conversation a link opens (`/chat/<channelId>?thread=…`), if it is one. */
+export const chatChannelOf = (href: string) => /^\/chat\/([^/?#]+)/.exec(href)?.[1] ?? null;
+
+/** Whether I'm in a conversation: one of my channels, or one of my DMs (`GET /channels` lists no DM). */
+export function inConversation(
+  channels: readonly { id: string; isMember: boolean }[],
+  dms: readonly { channelId: string }[],
+): (channelId: string) => boolean {
+  const mine = new Set([...channels.filter((c) => c.isMember).map((c) => c.id), ...dms.map((d) => d.channelId)]);
+  return (id) => mine.has(id);
+}
+
+/**
+ * What the app pushes over Conversas when it starts: the chosen channel, or the last conversation opened here, while
+ * the person is still in it; null for Conversas itself.
+ */
+export function startHref(
+  choice: StartChoice | undefined,
+  places: string | null,
+  orgId: string,
+  inChannel: (channelId: string) => boolean,
+): string | null {
+  const last = placesOf(places)[orgId];
+  const lastChannel = typeof last === "string" ? chatChannelOf(last) : null;
+  const place = startPlace(choice, { last: lastChannel && inChannel(lastChannel) ? (last ?? null) : null, inChannel });
+  if (place.kind === "channel") return `/chat/${place.channelId}`;
+  return place.kind === "last" ? place.place : null;
+}

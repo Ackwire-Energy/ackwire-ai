@@ -20,6 +20,17 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * A request that got no answer at all: `fetch` threw (no network, the address out of reach, the connection cut).
+ * Still the `TypeError` that `fetch` throws, so what reads one as "no network" keeps working.
+ */
+export class NetworkError extends TypeError {
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause), { cause });
+    this.name = "NetworkError";
+  }
+}
+
 export type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 export type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
@@ -53,8 +64,15 @@ interface Transport {
 
 function transport(options: TransportOptions): Transport {
   const base = (options.baseUrl ?? "").replace(/\/+$/, "");
+  const send = options.fetch ?? ((input, init) => fetch(input, init));
   return {
-    fetch: options.fetch ?? ((input, init) => fetch(input, init)),
+    fetch: async (input, init) => {
+      try {
+        return await send(input, init);
+      } catch (error) {
+        throw error instanceof TypeError ? new NetworkError(error) : error;
+      }
+    },
     base,
     credentials: base ? "omit" : "same-origin",
     headers: options.headers,

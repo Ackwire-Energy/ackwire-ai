@@ -65,6 +65,7 @@ case "$*" in
 "compose config --images") printf 'pgvector/pgvector:0.8.7-pg18\\nagentes:current\\n' ;;
 "compose config --services") printf 'postgres\\nagentes\\n' ;;
 "image inspect --format "*) id_of "$5" ;;
+"build "*" -") cat >"$state/dockerfile" && tag agentes:next sha256:versioned ;;
 "build "*) tag agentes:next sha256:new ;;
 "tag "*) tag "$3" "$(id_of "$2" || echo "$2")" ;;
 "compose exec -T postgres psql "*)
@@ -92,6 +93,7 @@ esac
     writeFileSync(join(state, "calls"), "");
     writeFileSync(join(state, "dumping"), String(dumping));
     return {
+      state,
       head: () => git(path, "rev-parse", "HEAD"),
       deploy(args: string[]) {
         const run = Bun.spawnSync(["bash", join(path, "deploy/deploy.sh"), ...args], {
@@ -151,6 +153,35 @@ esac
     // A self-hosted server keeps its files where it likes (FILES_DIR or Postgres).
     const selfHosted = server(commits.first, "AGENTES_IMAGE=agentes:current\nRUN_MIGRATIONS_ON_BOOT=false\n");
     expect(selfHosted.deploy([commits.second]).code).toBe(0);
+  });
+
+  test("a version as the second argument goes into the image as APP_VERSION, through the commit's own script", () => {
+    const env = "AGENTES_IMAGE=agentes:current\nRUN_MIGRATIONS_ON_BOOT=false\n";
+    const at = server(commits.first, env);
+    const { code, out, calls } = at.deploy([commits.second, "2026.10.31.4"]);
+    expect({ code, out }).toMatchObject({ code: 0 });
+    expect(out).toContain("(2026.10.31.4) is live");
+    const steps = [
+      "docker build --tag agentes:next .",
+      "docker build --quiet --tag agentes:next -",
+      "AGENTES_IMAGE=agentes:next docker compose run --rm agentes migrate",
+    ].map((step) => calls.findIndex((call) => call.startsWith(step)));
+    expect(steps.filter((index) => index < 0)).toEqual([]);
+    expect(steps).toEqual([...steps].sort((a, b) => a - b));
+    expect(readFileSync(join(at.state, "dockerfile"), "utf8")).toBe(
+      "FROM agentes:next\nENV APP_VERSION=2026.10.31.4\n",
+    );
+
+    // Without one, the image is the commit's build alone, as before.
+    const plain = server(commits.first, env).deploy([commits.second]);
+    expect(plain.code).toBe(0);
+    expect(plain.calls.filter((call) => call.endsWith(" -"))).toEqual([]);
+
+    const bad = server(commits.first, env);
+    const refused = bad.deploy([commits.second, "1.0; rm -rf /"]);
+    expect(refused.code).toBe(2);
+    expect(refused.out).toContain("not a version");
+    expect(refused.calls).toEqual([]);
   });
 
   test("a dump in progress holds every table: the migration waits for it to end, and one that outlasts the wait stops the deploy", () => {

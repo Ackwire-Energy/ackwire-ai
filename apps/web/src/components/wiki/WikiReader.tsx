@@ -1,5 +1,6 @@
 import type { WikiAuthor, WikiPage as WikiPageData, WikiPageSummary, WikiVersion } from "@agenteschat/client";
 import { ApiError, keys, useWikiAction, useWikiHistory, useWikiPage } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { fileIcon } from "@agenteschat/client/lib/files";
 import { relativeTime, whenAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -517,7 +518,7 @@ export function WikiReader({
             setDraft(null);
             void navigate({ to: "/org/$orgId/wiki/$slug", params: { orgId: org.id, slug: created.slug } });
           },
-          onError: (e) => toast.show(e.message, "error"),
+          onError: (e) => toast.show(errorText(t, e, i18n.language), "error"),
         },
       );
       return;
@@ -546,7 +547,7 @@ export function WikiReader({
         const latest = await api.wiki.get(org.id, p.slug);
         qc.setQueryData(keys.wikiPage(org.id, p.slug), latest);
         setConflict(latest);
-      } else toast.show((e as Error).message, "error");
+      } else toast.show(errorText(t, e, i18n.language), "error");
     }
   };
 

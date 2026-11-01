@@ -1,21 +1,27 @@
-import { useCatalog, useConnections, useCustomServers } from "@agenteschat/client";
-import { connectedItems, itemName } from "@agenteschat/client/lib/connected";
+import { useCatalog, useConnections, useCustomServers, useRenameConnection } from "@agenteschat/client";
+import { accountUnchecked, type ConnectedItem, connectedItems, itemName } from "@agenteschat/client/lib/connected";
+import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
+import { connectorBrand } from "@agenteschat/client/lib/scopes";
 import { router } from "expo-router";
 import { useHeaderHeight } from "expo-router/react-navigation";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, StyleSheet, TextInput, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { Dither } from "@/sky/Dither";
-import { Icon, Text } from "@/ui";
+import { Button, fieldText, Text, useToast } from "@/ui";
 import { CoverBarBackdrop, CoverParallax, useCoverScroll } from "@/ui/cover";
 import { useColors, useOrgId } from "../shared/hooks";
-import { goBack, PushedHeader, Tile } from "../shared/parts";
+import { ActionList, errorHaptic, goBack, PushedHeader, successHaptic } from "../shared/parts";
+import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { ConnectorIcon } from "./ConnectorIcon";
-import { AgentLevels, DisconnectButton, SafeNote } from "./ConnectSheet";
-import { brandOf, brandTones } from "./logic";
+import { AddressSheet, AgentLevels, ConnectSheet, DisconnectButton, SafeNote } from "./ConnectSheet";
+import { accountActions, brandOf, brandTones } from "./logic";
+import { Problem } from "./Problem";
+import { ToolsRow } from "./ToolReview";
 import { openTools } from "./ToolsScreen";
 
 /** Opens a connection's own screen (from its tile or its icon in Conectores). */
@@ -24,10 +30,19 @@ export const openConnection = (id: string) => router.push(`/connectors/${id}`);
 /**
  * A connection, a screen pushed over Conectores: its brand's pixel sky behind the native clear bar (lagging behind
  * the scroll, as an agent's page), its icon with the check, its name and account; who uses it and how far (one
- * choice per agent), what always asks, its tools (Ferramentas, a screen of their own; "Revisar" while some wait)
- * and disconnecting it. Connecting a new service stays in its sheet.
+ * choice per agent), what always asks, its tools (Ferramentas, a screen of their own; "Revisar" while some wait),
+ * the account itself (Renomear, Reconectar, another account of an MCP server, each in a sheet) and disconnecting
+ * it. Connecting a new service stays in its sheet.
  */
 export function ConnectionScreen({ id }: { id: string }) {
+  return (
+    <SheetHostProvider>
+      <Connection id={id} />
+    </SheetHostProvider>
+  );
+}
+
+function Connection({ id }: { id: string }) {
   const { t } = useTranslation();
   const c = useColors();
   const insets = useSafeAreaInsets();
@@ -38,6 +53,7 @@ export function ConnectionScreen({ id }: { id: string }) {
   const connections = useConnections(orgId);
   const servers = useCustomServers(orgId);
   const admin = can(org, "manage_connectors");
+  const sheet = useSheet();
   const { y, onScroll } = useCoverScroll();
   const item = connectedItems(connections.data ?? [], servers.data ?? [], catalog.data?.connectors ?? []).find(
     (i) => i.id === id,
@@ -45,13 +61,16 @@ export function ConnectionScreen({ id }: { id: string }) {
   const loading = !item && (catalog.isPending || connections.isPending || servers.isPending);
   const name = item ? itemName(t, item) : "";
   const brand = (item?.def ? brandOf(item.def.brandColor) : null) ?? c.ink2;
-  // The account when it says something the name doesn't (a server's host often is its name), else the category.
+  // The account when it says something the name doesn't (a server's host often is its name), else how it connects
+  // through Composio (its address means nothing to people), else the category.
   const sub =
     item?.account && item.account !== name
       ? item.account
-      : item?.def
-        ? t(`connectors.category.${item.def.category}`)
-        : "";
+      : item?.viaComposio
+        ? t("connectors.composio.via")
+        : item?.def
+          ? t(`connectors.category.${item.def.category}`)
+          : "";
   const waiting = admin && item ? item.pending : 0;
 
   return (
@@ -93,43 +112,58 @@ export function ConnectionScreen({ id }: { id: string }) {
             <Text variant="small" tone="ink" accessibilityRole="header" style={styles.section}>
               {t("mobile.connectors.whoTitle")}
             </Text>
+            {item.needsReconnect ? <Problem text={t("mobile.connectors.needsReconnect", { name })} /> : null}
             <AgentLevels connectionId={id} />
             <SafeNote />
+            {admin ? <ToolsRow count={item.tools} waiting={waiting} onPress={() => openTools(id)} /> : null}
             {admin ? (
-              <Pressable
-                onPress={() => openTools(id)}
-                accessibilityRole="button"
-                accessibilityLabel={`${t("connectors.tools")}, ${
-                  waiting > 0
-                    ? t("toolReview.decideTitle", { count: waiting })
-                    : t("toolReview.subjectCount", { count: item.tools })
-                }`}
-                style={({ pressed }) => [
-                  styles.tools,
-                  { borderColor: c.line },
-                  pressed && { backgroundColor: c.sunken },
-                ]}
-              >
-                <Tile icon="list" size={36} />
-                <View style={styles.grow}>
-                  <Text variant="body" style={styles.bold}>
-                    {t("connectors.tools")}
-                  </Text>
-                  <Text variant="small" tone="muted" numberOfLines={1} style={waiting > 0 && { color: c.warn }}>
-                    {waiting > 0
-                      ? t("toolReview.decideTitle", { count: waiting })
-                      : t("toolReview.subjectCount", { count: item.tools })}
-                  </Text>
-                </View>
-                {waiting > 0 ? (
-                  <Text variant="small" style={[styles.bold, { color: c.warn }]}>
-                    {t("connectors.review")}
+              <>
+                <Text variant="small" tone="ink" accessibilityRole="header" style={styles.section}>
+                  {t("mobile.connectors.accountTitle")}
+                </Text>
+                <ActionList
+                  items={accountActions(item).map((action) =>
+                    action === "rename"
+                      ? {
+                          key: action,
+                          icon: "pen",
+                          label: t("connectors.rename"),
+                          onPress: () => sheet.open(<RenameSheet item={item} />),
+                        }
+                      : {
+                          key: action,
+                          icon: action === "add" ? "plus" : "bolt",
+                          label: t(action === "add" ? "connectors.detail.addAccount" : "connectors.detail.reconnect"),
+                          hint: t(
+                            item.custom && accountUnchecked([item.server])
+                              ? action === "add"
+                                ? "connectFlow.newAccountUnchecked"
+                                : "connectFlow.replaceUnchecked"
+                              : action === "add"
+                                ? "connectors.detail.accountsText"
+                                : "connectors.detail.replaceText",
+                          ),
+                          onPress: () =>
+                            sheet.open(
+                              item.def ? (
+                                <ConnectSheet def={item.def} item={item} mode={action} />
+                              ) : (
+                                <AddressSheet item={item} mode={action} />
+                              ),
+                            ),
+                        },
+                  )}
+                />
+                <DisconnectButton item={item} name={name} onDone={goBack} />
+                {item.viaComposio ? (
+                  <Text variant="small" tone="muted">
+                    {t("connectors.composio.disconnectNote", {
+                      name: item.def ? connectorBrand(item.def) : name,
+                    })}
                   </Text>
                 ) : null}
-                <Icon name="right" size={15} color={c.faint} />
-              </Pressable>
+              </>
             ) : null}
-            {admin ? <DisconnectButton item={item} name={name} onDone={goBack} /> : null}
           </View>
         ) : null}
       </Animated.ScrollView>
@@ -139,21 +173,72 @@ export function ConnectionScreen({ id }: { id: string }) {
   );
 }
 
+/** "Renomear": the account's name, which people and agents tell it apart by (its tools keep their names). */
+function RenameSheet({ item }: { item: ConnectedItem }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const sheet = useSheet();
+  const toast = useToast();
+  const orgId = useOrgId();
+  const rename = useRenameConnection(orgId);
+  const [label, setLabel] = useState(item.label);
+  const [error, setError] = useState<string | null>(null);
+  const save = () => {
+    const wanted = label.trim();
+    if (!wanted || wanted === item.label) return sheet.close();
+    rename.mutate(
+      { id: item.id, label: wanted },
+      {
+        onSuccess: (saved) => {
+          successHaptic();
+          sheet.close();
+          toast({ title: t("connectors.renamed", { name: saved.label }) });
+        },
+        onError: (failed) => {
+          errorHaptic();
+          setError(knownErrorText(t, failed) ?? t("mobile.connectors.renameFailed"));
+        },
+      },
+    );
+  };
+  return (
+    <View style={styles.sheet}>
+      <Text variant="title">{t("connectors.renameTitle", { name: itemName(t, item) })}</Text>
+      <Text variant="small" tone="muted">
+        {t("connectors.renameHelp")}
+      </Text>
+      <TextInput
+        value={label}
+        onChangeText={(v) => {
+          setLabel(v);
+          setError(null);
+        }}
+        maxLength={80}
+        autoFocus
+        returnKeyType="done"
+        onSubmitEditing={save}
+        accessibilityLabel={t("connectFlow.name")}
+        style={[styles.field, { backgroundColor: c.raised, color: c.ink, borderColor: c.line }]}
+      />
+      {error ? <Problem text={error} /> : null}
+      <Button variant="primary" wide label={t("common.save")} disabled={rename.isPending} onPress={save} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  sheet: { gap: 14 },
+  field: {
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    ...fieldText("body"),
+  },
   band: { alignItems: "center", gap: 8, paddingHorizontal: 24, paddingBottom: 22 },
   center: { textAlign: "center" },
   loading: { marginTop: 24 },
   body: { paddingHorizontal: 20, gap: 12 },
   section: { fontWeight: "600", paddingTop: 6 },
-  grow: { flex: 1, minWidth: 0 },
-  bold: { fontWeight: "600" },
-  tools: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 12,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
 });

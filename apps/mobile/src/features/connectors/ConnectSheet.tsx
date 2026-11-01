@@ -1,6 +1,9 @@
 import {
   APP_OAUTH_RETURN,
+  type Connection,
+  type ConnectOutcome,
   type ConnectorDef,
+  type CustomServer,
   keys,
   useAgentAccess,
   useApi,
@@ -22,11 +25,15 @@ import {
   saveLevels,
   sharedLevel,
 } from "@agenteschat/client/lib/access-levels";
-import { type ConnectedItem, connectedItems, itemName } from "@agenteschat/client/lib/connected";
+import { composioConnectText } from "@agenteschat/client/lib/composio";
+import { type ConnectedItem, connectedItems, itemName, outcomeText } from "@agenteschat/client/lib/connected";
+import { sameServer } from "@agenteschat/client/lib/custom-tools";
+import { knownErrorText, oauthReturnText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
 import { connectorName, scopeText } from "@agenteschat/client/lib/scopes";
 import { useQueryClient } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
+import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -65,18 +72,22 @@ const RETURN_URL = "agenteschat://connectors/oauth";
  * always asks marked "pede sua aprovação") → connect (sign in in the browser and come back, or paste a key) →
  * its tools ("O que faz") → who uses it and how far. A connected one opens on who uses it (its tools are a screen
  * of their own; `item`: that connection, when the service is connected more than once; `start`, back from a
- * sign-in that finished elsewhere, with `fresh` saying it just connected).
+ * sign-in that finished elsewhere, with `fresh` saying it just connected). `mode` starts at connecting: `add`,
+ * another account of the service (it goes on to its tools), or `reconnect`, a new sign-in for `item` (a toast
+ * says it, and the sheet closes).
  */
 export function ConnectSheet({
   def,
   item,
   start,
   fresh = false,
+  mode,
 }: {
   def: ConnectorDef;
   item?: ConnectedItem;
   start?: Step;
   fresh?: boolean;
+  mode?: "add" | "reconnect";
 }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
@@ -86,14 +97,21 @@ export function ConnectSheet({
   const connections = useConnections(orgId);
   const servers = useCustomServers(orgId);
   const admin = can(org, "manage_connectors");
+  const sheet = useSheet();
   const existing =
     item ??
     connectionOf(def, connectedItems(connections.data ?? [], servers.data ?? [], catalog.data?.connectors ?? [def]));
-  const [connectionId, setConnectionId] = useState<string | null>(existing?.id ?? null);
-  const [step, setStep] = useState<Step>(() => firstStep(existing, admin, start));
+  const [connectionId, setConnectionId] = useState<string | null>(mode ? null : (existing?.id ?? null));
+  const [step, setStep] = useState<Step>(() => (mode ? "connect" : firstStep(existing, admin, start)));
   // Connected in this sheet: it says so on top of its tools (the list catching up must not take that away).
   const [justConnected, setJustConnected] = useState(fresh);
-  const name = connectorName(t, def);
+  const service = connectorName(t, def);
+  const name =
+    mode === "reconnect" && item
+      ? t("connectFlow.reconnectTitle", { name: itemName(t, item) })
+      : mode === "add"
+        ? t("connectFlow.addTitle", { name: service })
+        : service;
   const tr = t as unknown as (key: string) => string;
   const lines = capabilityLines(
     tr,
@@ -104,11 +122,13 @@ export function ConnectSheet({
   return (
     <View style={styles.body}>
       <View style={styles.head}>
-        <ConnectorIcon def={def} label={name} size={52} check={Boolean(connectionId)} />
+        <ConnectorIcon def={def} label={service} size={52} check={Boolean(connectionId)} />
         <View style={styles.grow}>
           <Text variant="title">{name}</Text>
           <Text variant="small" tone="muted">
-            {t(`connectors.category.${def.category}`)}
+            {def.via === "composio"
+              ? `${t(`connectors.category.${def.category}`)} · ${t("connectors.composio.via")}`
+              : t(`connectors.category.${def.category}`)}
           </Text>
         </View>
       </View>
@@ -139,12 +159,15 @@ export function ConnectSheet({
       ) : step === "connect" ? (
         <ConnectStep
           def={def}
-          name={name}
+          name={service}
+          item={mode ? item : undefined}
+          reconnect={mode === "reconnect"}
           onConnected={(id) => {
             setConnectionId(id);
             setJustConnected(true);
             setStep("review");
           }}
+          onDone={sheet.close}
         />
       ) : connectionId ? (
         <ConnectedSteps
@@ -152,28 +175,46 @@ export function ConnectSheet({
           onStep={setStep}
           connectionId={connectionId}
           def={def}
-          name={name}
+          name={service}
           justConnected={justConnected}
-          item={existing}
+          item={mode ? undefined : existing}
         />
       ) : null}
     </View>
   );
 }
 
-/** "Conectar pelo endereço": any MCP server by its https address (sign in there, or a key when it asks). */
-export function AddressSheet() {
+/**
+ * "Conectar pelo endereço": any MCP server by its https address (sign in there, or a key when it asks). With an
+ * `item` of a server not in the catalog: another account of it (`add`) or a new sign-in for it (`reconnect`).
+ */
+export function AddressSheet({ item, mode }: { item?: ConnectedItem; mode?: "add" | "reconnect" } = {}) {
   const { t } = useTranslation();
+  const sheet = useSheet();
   const [connected, setConnected] = useState<{ id: string; name: string } | null>(null);
   const [step, setStep] = useState<Step>("connect");
+  const title =
+    item && mode === "reconnect"
+      ? t("connectFlow.reconnectTitle", { name: itemName(t, item) })
+      : item
+        ? t("connectFlow.addTitle", { name: itemName(t, item) })
+        : t("mobile.connectors.addressTitle");
   return (
     <View style={styles.body}>
       <View style={styles.head}>
-        <ConnectorIcon def={null} label={connected?.name ?? "+"} size={52} check={Boolean(connected)} />
+        <ConnectorIcon
+          def={item?.def ?? null}
+          image={item?.image}
+          label={connected?.name ?? item?.label ?? "+"}
+          size={52}
+          check={Boolean(connected)}
+        />
         <View style={styles.grow}>
-          <Text variant="title">{t("mobile.connectors.addressTitle")}</Text>
-          <Text variant="small" tone="muted">
-            {t("mobile.connectors.addressHelp")}
+          <Text variant="title">{title}</Text>
+          <Text variant="small" tone="muted" numberOfLines={1}>
+            {item?.viaComposio
+              ? t("connectors.composio.via")
+              : (item?.server?.serverUrl ?? t("mobile.connectors.addressHelp"))}
           </Text>
         </View>
       </View>
@@ -190,11 +231,14 @@ export function AddressSheet() {
       ) : (
         <ConnectStep
           def={null}
-          name=""
+          name={item ? itemName(t, item) : ""}
+          item={item}
+          reconnect={mode === "reconnect"}
           onConnected={(id, name) => {
             setConnected({ id, name });
             setStep("review");
           }}
+          onDone={sheet.close}
         />
       )}
     </View>
@@ -385,46 +429,76 @@ function ConnectedNote({ name }: { name: string }) {
 /**
  * Connecting: sign in in the system browser (the server hands the answer back to the app, which finishes
  * with its own session) and/or paste a key. A catalog service that needs its server's address asks for it.
+ * `item`: an account of a server by address (its address; `reconnect`: a new sign-in for it). A new account
+ * goes on (`onConnected`); a new sign-in, or the same account again, ends with a toast (`onDone`).
  */
 function ConnectStep({
   def,
   name,
+  item,
+  reconnect = false,
   onConnected,
+  onDone,
 }: {
   def: ConnectorDef | null;
   name: string;
+  item?: ConnectedItem;
+  reconnect?: boolean;
   onConnected: (connectionId: string, name: string) => void;
+  onDone: () => void;
 }) {
   const { t } = useTranslation();
   const c = useColors();
+  const qc = useQueryClient();
+  const toast = useToast();
   const orgId = useOrgId();
+  const catalog = useCatalog();
+  const servers = useCustomServers(orgId);
   const start = useStartOAuth(orgId);
   const complete = useCompleteOAuth(orgId);
   const withKey = useConnectWithKey(orgId);
   const { connect } = useCustomServerAction(orgId);
-  const byAddress = def === null || def.kind === "remote_mcp";
-  const askUrl = def === null || (def.kind === "catalog" && def.needsServerUrl);
+  const fixed = item?.server?.serverUrl;
+  const byAddress = fixed !== undefined || def === null || def.kind === "remote_mcp";
+  const askUrl = fixed === undefined && def === null;
+  // Composio's page signs in: no key field of ours.
+  const viaComposio = item ? item.viaComposio : def?.via === "composio";
+  const connectionId = reconnect && item?.custom ? item.id : undefined;
   const how = def ? connectHow(def) : "either";
   const [mode, setMode] = useState<"signIn" | "key">(how === "key" ? "key" : "signIn");
   const [url, setUrl] = useState("");
   const [key, setKey] = useState("");
   const [error, setError] = useState<string | null>(null);
   const busy = start.isPending || complete.isPending || withKey.isPending || connect.isPending;
-  const serverUrl = def?.kind === "remote_mcp" ? (def.serverUrl ?? "") : url.trim();
+  const serverUrl = fixed ?? (def?.kind === "remote_mcp" ? def.serverUrl : url.trim());
   const shownName = name || serverUrl.replace(/^https:\/\//, "").split("/")[0] || "";
   const keyLabel = t("mobile.connectors.keyLabel", { name: shownName });
+  // The service's name: the server names another account after it ("Stripe 2"). A catalog entry's goes in English,
+  // so each viewer reads a name nobody changed in their own language.
+  const first = fixed ? (servers.data ?? []).find((s) => sameServer(s.serverUrl, fixed)) : undefined;
+  const label = def ? def.label : first?.label || item?.label || name;
 
   // Every ending is felt as well as seen: a success buzz with the sheet moving on, an error buzz with the
   // reason in the sheet.
-  const connected = (id: string, label: string) => {
+  const connected = (id: string, shown: string, outcome: ConnectOutcome = "connected") => {
     successHaptic();
-    onConnected(id, label || shownName);
+    if (outcome === "connected") return onConnected(id, shown || shownName);
+    // The lists were read again on the way back: the account's own name and whether its provider named it.
+    const now = connectedItems(
+      qc.getQueryData<Connection[]>(keys.connections(orgId)) ?? [],
+      qc.getQueryData<CustomServer[]>(keys.customServers(orgId)) ?? [],
+      catalog.data?.connectors ?? [],
+    ).find((i) => i.id === id);
+    toast({ title: now ? outcomeText(t, outcome, now) : t("mobile.connectors.connectedDone") });
+    onDone();
+    // Landed on another connection (a catalog connector's new sign-in is a new one): the screen behind follows it.
+    if (item && id !== item.id) router.replace(`/connectors/${id}`);
   };
   const oops = (text: string) => {
     errorHaptic();
     setError(text);
   };
-  const fail = () => oops(t("mobile.connectors.failed"));
+  const fail = (error?: unknown) => oops(knownErrorText(t, error) ?? t("mobile.connectors.failed"));
   /** The browser round trip: open, wait for the answer, finish with the app's session. */
   const signInWith = async (authorizeUrl: string) => {
     const state = stateOf(authorizeUrl);
@@ -434,11 +508,15 @@ function ConnectStep({
       if (result.type !== "success") return;
       const answer: AuthAnswer | null = authAnswerOf(result.url);
       if (!answer) return fail();
-      if (answer.kind === "error") return oops(t("mobile.connectors.refused", { name: shownName }));
+      if (answer.kind === "error") {
+        // A connector's own refusal (Composio's unfinished sign-in) comes as its full code.
+        const own = answer.error.startsWith("connector.") ? oauthReturnText(t, answer.error) : null;
+        return oops(own ?? t("mobile.connectors.refused", { name: shownName }));
+      }
       const done = await complete.mutateAsync({ state: answer.state, code: answer.code });
-      connected(done.connectionId, name);
-    } catch {
-      fail();
+      connected(done.connectionId, name, done.outcome);
+    } catch (error) {
+      fail(error);
     } finally {
       if (state) doneFinishing(state);
     }
@@ -452,24 +530,21 @@ function ConnectStep({
         const res = await connect.mutateAsync({
           serverUrl,
           returnTo: APP_OAUTH_RETURN,
-          ...(name ? { label: name } : {}),
+          ...(label ? { label } : {}),
+          ...(connectionId ? { connectionId } : {}),
         });
         if (res.status === "oauth") return void (await signInWith(res.authorizeUrl));
         if (res.status === "needs_key") {
           setMode("key");
           return oops(needsKeyText(t, res, shownName));
         }
-        return connected(res.server.id, name || res.server.label);
+        return connected(res.server.id, res.server.label, res.outcome);
       }
       if (!def) return;
-      const authorizeUrl = await start.mutateAsync({
-        connector: def.id,
-        returnTo: APP_OAUTH_RETURN,
-        ...(askUrl ? { serverUrl } : {}),
-      });
+      const authorizeUrl = await start.mutateAsync({ connector: def.id, returnTo: APP_OAUTH_RETURN });
       await signInWith(authorizeUrl);
-    } catch {
-      fail();
+    } catch (error) {
+      fail(error);
     }
   };
 
@@ -483,26 +558,29 @@ function ConnectStep({
           serverUrl,
           apiKey: key.trim(),
           returnTo: APP_OAUTH_RETURN,
-          ...(name ? { label: name } : {}),
+          ...(label ? { label } : {}),
+          ...(connectionId ? { connectionId } : {}),
         });
-        if (res.status === "connected") return connected(res.server.id, name || res.server.label);
+        if (res.status === "connected") return connected(res.server.id, res.server.label, res.outcome);
         return fail();
       }
       if (!def) return;
-      const conn = await withKey.mutateAsync({
-        connector: def.id,
-        apiKey: key.trim(),
-        ...(askUrl ? { serverUrl } : {}),
-      });
-      connected(conn.id, name);
-    } catch {
-      fail();
+      const conn = await withKey.mutateAsync({ connector: def.id, apiKey: key.trim() });
+      // One account per catalog connector: connecting it again is its new sign-in.
+      connected(conn.id, name, reconnect ? "reconnected" : "connected");
+    } catch (error) {
+      fail(error);
     }
   };
 
   const field = [styles.field, { backgroundColor: c.raised, color: c.ink, borderColor: c.line }];
   return (
     <>
+      {viaComposio && def ? (
+        <Text variant="small" tone="muted">
+          {composioConnectText(t, def)}
+        </Text>
+      ) : null}
       {askUrl ? (
         <View style={styles.fieldBox}>
           <Text variant="footnote" tone="faint">
@@ -521,7 +599,7 @@ function ConnectStep({
           />
         </View>
       ) : null}
-      {how === "either" || (byAddress && mode === "key") ? (
+      {!viaComposio && (how === "either" || (byAddress && mode === "key")) ? (
         <Segmented
           items={[
             { key: "signIn", label: t("mobile.connectors.useSignIn") },
@@ -535,7 +613,13 @@ function ConnectStep({
         <Button
           variant="primary"
           wide
-          label={busy ? t("mobile.connectors.working") : t("mobile.connectors.signIn", { name: shownName })}
+          label={
+            busy
+              ? t("mobile.connectors.working")
+              : viaComposio
+                ? t("connectFlow.continueInComposio")
+                : t("mobile.connectors.signIn", { name: shownName })
+          }
           disabled={busy}
           onPress={() => void signIn()}
         />
@@ -735,7 +819,7 @@ export function SafeNote() {
 }
 
 /** One dash per step, the ones done and the current in ink (`step`: "Passo 3 de 4: O que faz"). */
-function Progress({ steps, step }: { steps: Step[]; step: Step }) {
+export function Progress({ steps, step }: { steps: Step[]; step: Step }) {
   const { t } = useTranslation();
   const c = useColors();
   const index = steps.indexOf(step);

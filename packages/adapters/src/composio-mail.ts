@@ -1,9 +1,21 @@
 /**
- * Small, dependency-free helpers to normalise mail coming out of Composio
- * (Gmail and Outlook tool results, trigger payloads): HTML to plain text,
- * address lists, dates and base64url bodies.
+ * Small, dependency-free helpers to normalise mail coming out of providers
+ * (Composio's Gmail and Outlook tool results and trigger payloads, MillionSend's
+ * API): JSON fields, HTML to plain text, address lists, dates and base64url bodies.
  */
 import type { MailAddress } from "./mail";
+
+export type Obj = Record<string, unknown>;
+
+/** A JSON object field, or `{}`. */
+export const obj = (value: unknown): Obj =>
+  value && typeof value === "object" && !Array.isArray(value) ? (value as Obj) : {};
+export const arr = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
+/** A non-empty string (a number as text), else undefined. */
+export const str = (value: unknown): string | undefined =>
+  typeof value === "string" && value !== "" ? value : typeof value === "number" ? String(value) : undefined;
+/** A search's page size: 20 by default, 1 to 50. */
+export const clampLimit = (limit: number | undefined) => Math.min(50, Math.max(1, Math.floor(limit ?? 20)));
 
 const NAMED_ENTITIES: Record<string, string> = {
   amp: "&",
@@ -186,6 +198,18 @@ export function parseAddress(value: string): MailAddress | null {
   }
   const bare = /([^\s<>"]+@[^\s<>"]+)/.exec(trimmed);
   return bare?.[1] ? { address: bare[1].toLowerCase() } : null;
+}
+
+/**
+ * A mailbox as a From field carries it: the address alone without a name, else `Name <address>`, the name quoted
+ * unless it is plain words. MillionSend serializes its inbox senders the same way, and on its shared domain
+ * refuses a name that doesn't read back as the inbox's own.
+ */
+export function formatMailbox(name: string | null | undefined, address: string): string {
+  const n = name?.trim();
+  if (!n) return address;
+  const phrase = /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~\- ]+$/.test(n) ? n : `"${n.replace(/(["\\])/g, "\\$1")}"`;
+  return `${phrase} <${address}>`;
 }
 
 /** An address list header (or an array of strings / Graph recipients) into lowercase addresses. */

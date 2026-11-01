@@ -1,10 +1,13 @@
 import { connectorOAuthApps } from "@agenteschat/config";
 import {
+  abandonComposioOAuth,
   acceptCustomSuggestion,
   appOAuthRedirect,
   BUILTIN_SCOPES,
   type ConnectorDeps,
   completeOAuth,
+  composioConnectorsOf,
+  composioUsageOf,
   connectionView,
   connectOverHttp,
   connectorGrantValidator,
@@ -13,6 +16,7 @@ import {
   desktopOAuthRedirect,
   desktopReturnPath,
   getAgent,
+  isAgentesCloud,
   isAppReturn,
   isCustom,
   isDesktopReturn,
@@ -21,15 +25,19 @@ import {
   NotFoundError,
   peekOAuthState,
   presetForServer,
+  renameConnection,
   requirePermission,
   revokeAtProvider,
   revokeConnection,
   setAgentScopes,
   startOAuth,
   syncCustomTools,
+  withComposio,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { sessionUser } from "../../auth";
+import { isExpectedError } from "../../http/errors";
+import { Outcome } from "./connectors-custom";
 import {
   type AppDeps,
   body,
@@ -38,11 +46,22 @@ import {
   json,
   noContent,
   OrgParams,
+  oauthFailedUrl,
+  oauthFailure,
   requireSession,
   security,
+  signInPage,
 } from "./context";
 
 const tags = ["Connectors"];
+/** Refusals of one account's sign-in that the callback hands back as their code (`connector_error=other_account`). */
+const ACCOUNT_REFUSALS = [
+  "connector.other_account",
+  "connector.account_unknown",
+  "connector.gone",
+  "connector.unfinished",
+  "connector.unavailable",
+];
 
 const Connection = z
   .object({
@@ -67,19 +86,25 @@ const CatalogEntry = z
     description: z.string(),
     kind: z.enum(["catalog", "remote_mcp"]).openapi({
       description:
-        "`catalog`: our connector with its own scopes; `remote_mcp`: a vendor's official MCP server (one click).",
+        "`catalog`: our connector with its own scopes; `remote_mcp`: a server connected by its address in one click, the vendor's MCP server or the service through Composio (`via`).",
     }),
     category: z.enum(["dev", "product", "docs", "data", "payments", "sales", "support", "marketing", "automation"]),
     auth: z.array(z.enum(["oauth", "api_key"])),
     oauthConfigured: z
       .boolean()
-      .openapi({ description: "Signs in with OAuth here: our OAuth app, or the vendor's MCP OAuth." }),
+      .openapi({ description: "Signs in with OAuth here: our OAuth app, the vendor's MCP OAuth, or Composio's." }),
     available: z.boolean().openapi({ description: "Can be connected on this server." }),
     soon: z.boolean().openapi({
       description: "A one-click server whose vendor hasn't approved agentes.chat yet: listed, not connectable.",
     }),
-    needsServerUrl: z.boolean(),
-    serverUrl: z.string().nullable().openapi({ description: "The MCP endpoint (`remote_mcp`)." }),
+    via: z.literal("composio").optional().openapi({
+      description:
+        "Connects through Composio (ADR 0107): its page signs in. Unavailable when this server has no `COMPOSIO_API_KEY`.",
+    }),
+    serverUrl: z.string().openapi({
+      description:
+        "Where it connects, by the way this server picked: a `remote_mcp` entry's address goes to `POST …/connectors/custom`.",
+    }),
     iconUrl: z.string().nullable().openapi({
       description:
         "Brand icon served by the web app, null for a monogram: `/connectors/…` has one color, drawn in `brandColor`, and `/brands/…` keeps its maker's colors.",
@@ -108,6 +133,7 @@ export function connectorRoutes(deps: AppDeps) {
     c.req.path.endsWith("/connectors/oauth/callback") ? next() : session(c, next),
   );
   const oauthApps = connectorOAuthApps(config);
+  const composio = composioConnectorsOf(adapters.mail);
   const connectorDeps: ConnectorDeps = {
     db,
     keyWrappers: [adapters.keyWrapper, ...adapters.legacyKeyWrappers],
@@ -115,6 +141,9 @@ export function connectorRoutes(deps: AppDeps) {
     publicUrl: config.PUBLIC_URL,
     http: deps.extras?.http,
     resolveHost: deps.extras?.resolveHost,
+    // A sign-in's account is asked of the server before it's stored (two accounts are told apart by it).
+    connect: withComposio(deps.extras?.mcpConnect ?? connectOverHttp, composio),
+    composio,
   };
 
   app.openapi(
@@ -133,7 +162,12 @@ export function connectorRoutes(deps: AppDeps) {
     (c) =>
       c.json(
         {
-          connectors: connectorListing(oauthApps),
+          connectors: connectorListing({
+            oauthApps,
+            mail: adapters.mail,
+            composio,
+            cloud: isAgentesCloud(config.PUBLIC_URL),
+          }),
           builtinScopes: Object.entries(BUILTIN_SCOPES).map(([id, s]) => ({
             id,
             label: s.label,
@@ -176,7 +210,6 @@ export function connectorRoutes(deps: AppDeps) {
           z.object({
             connector: z.string(),
             apiKey: z.string().min(8).max(2000).optional(),
-            serverUrl: z.url().optional(),
             label: z.string().max(80).optional(),
           }),
         ),
@@ -196,6 +229,28 @@ export function connectorRoutes(deps: AppDeps) {
 
   app.openapi(
     createRoute({
+      method: "patch",
+      path: "/organizations/{orgId}/connectors/{connectionId}",
+      tags,
+      security,
+      summary: "Rename a connection, any kind (admins)",
+      description:
+        "1 to 80 characters, and no other live connection of the workspace has it (409 `connector.label_taken`). Its tools keep their names, so grants and denials of single tools keep applying.",
+      request: {
+        params: OrgParams.extend({ connectionId: z.uuid() }),
+        body: body(z.object({ label: z.string().max(200) })),
+      },
+      responses: { 200: json(Connection), ...errors },
+    }),
+    async (c) => {
+      const { orgId, connectionId } = c.req.valid("param");
+      const row = await renameConnection(db, c.get("user").id, orgId, connectionId, c.req.valid("json").label);
+      return c.json(connectionView(row), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
       method: "delete",
       path: "/organizations/{orgId}/connectors/{connectionId}",
       tags,
@@ -208,7 +263,7 @@ export function connectorRoutes(deps: AppDeps) {
       const { orgId, connectionId } = c.req.valid("param");
       await requirePermission(db, c.get("user").id, orgId, "manage_connectors");
       await revokeAtProvider(connectorDeps, orgId, connectionId).catch(() => false);
-      await revokeConnection(db, c.get("user").id, orgId, connectionId);
+      await revokeConnection(db, c.get("user").id, orgId, connectionId, composio);
       return c.body(null, 204);
     },
   );
@@ -228,7 +283,6 @@ export function connectorRoutes(deps: AppDeps) {
               description:
                 'Path to land on afterwards; "app:connectors" from the phone app, "desktop:" + the path from the desktop app\'s window (the callback hands the code back to the app, which finishes with `oauth/complete`).',
             }),
-            serverUrl: z.url().optional(),
           }),
         ),
       },
@@ -248,22 +302,34 @@ export function connectorRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "OAuth redirect target (browser navigation)",
-      description: "Validates state and PKCE, stores the tokens encrypted, then redirects to the web app.",
+      description:
+        "Validates state and PKCE, stores the tokens encrypted, then redirects to the web app with `connected` and `outcome` (`connected`, `reconnected`, `same_account`). It lands back on the page that started it; a Reconectar that signed in to another account comes back with `connector_error=connector.other_account`, one whose account couldn't be checked with `connector.account_unknown` (try again), one for an account disconnected meanwhile with `connector.gone`. Composio's return (ADR 0107) adds `status` and `connected_account_id`, which stands for the code: it must be the account the link made, and `status=failed` comes back as `connector.unfinished`.",
       request: {
         query: z.object({
           state: z.string().optional(),
           code: z.string().optional(),
           error: z.string().optional(),
+          status: z.string().optional(),
+          connected_account_id: z.string().max(200).optional(),
         }),
       },
       responses: { 302: { description: "Back to the web app" }, ...errors },
     }),
     async (c) => {
-      const q = c.req.valid("query");
+      const query = c.req.valid("query");
+      // Composio's return: its account stands for the code, and a sign-in that failed there is an error.
+      const q = {
+        ...query,
+        code: query.code ?? query.connected_account_id,
+        error: query.error ?? (query.status === "failed" ? "connector.unfinished" : undefined),
+      };
       const base = config.PUBLIC_URL.replace(/\/$/, "");
       // Started by the phone app: the system browser has no session of ours. Hand what the provider sent back
       // to the app, which finishes with its own session (the state stays bound to the person who started it).
       const started = q.state ? await peekOAuthState(connectorDeps, q.state) : null;
+      if (query.status === "failed" && q.state) {
+        await abandonComposioOAuth(connectorDeps, q.state);
+      }
       if (started && isAppReturn(started.returnTo)) {
         if (q.error || !q.code) return c.redirect(appOAuthRedirect({ error: q.error ?? "missing_code" }), 302);
         return c.redirect(appOAuthRedirect({ state: q.state, code: q.code }), 302);
@@ -275,19 +341,32 @@ export function connectorRoutes(deps: AppDeps) {
         if (q.error || !q.code) return c.redirect(desktopOAuthRedirect({ org, error: q.error ?? "missing_code" }), 302);
         return c.redirect(desktopOAuthRedirect({ org, state: q.state, code: q.code }), 302);
       }
-      if (q.error || !q.state || !q.code) {
-        return c.redirect(`${base}/?connector_error=${encodeURIComponent(q.error ?? "missing_code")}`, 302);
-      }
+      // The web app's: back where it started (its state's page) while the state can still be read, else the start.
+      const fail = (reason: string) =>
+        c.redirect(oauthFailedUrl(base, started?.returnTo ?? "/", "connector_error", reason), 302);
+      // Composio's failed sign-in says so; any other refusal at the provider is a cancel.
+      if (q.error) return fail(q.error === "connector.unfinished" ? q.error : "cancelled");
+      if (!q.state || !q.code) return fail("failed");
       const user = c.get("user") ?? (await sessionUser(deps.auth, c.req.raw.headers));
-      if (!user) return c.redirect(`${base}/?connector_error=sign_in`, 302);
+      // No session in this browser: the sign-in page first, and the return finishes once signed in.
+      if (!user) return c.redirect(signInPage(config.PUBLIC_URL, c.req.url), 302);
       try {
-        const { connection, returnTo } = await completeOAuth(connectorDeps, user, { state: q.state, code: q.code });
+        const { connection, returnTo, outcome } = await completeOAuth(connectorDeps, user, {
+          state: q.state,
+          code: q.code,
+        });
         await afterConnected(connection, user.id);
         const sep = returnTo.includes("?") ? "&" : "?";
-        return c.redirect(`${base}${returnTo}${sep}connected=${encodeURIComponent(connection.connector)}`, 302);
+        const landing = `connected=${encodeURIComponent(connection.connector)}&outcome=${outcome}`;
+        return c.redirect(`${base}${returnTo}${sep}${landing}`, 302);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "failed";
-        return c.redirect(`${base}/?connector_error=${encodeURIComponent(message)}`, 302);
+        // An account's own refusals go back as their code: the app says them in the person's language.
+        const reason = oauthFailure(error, ACCOUNT_REFUSALS);
+        if (reason === "failed") {
+          const log = isExpectedError(error) ? deps.log?.warn : deps.log?.error;
+          log?.("connector oauth failed", { error });
+        }
+        return fail(reason);
       }
     },
   );
@@ -306,7 +385,14 @@ export function connectorRoutes(deps: AppDeps) {
         body: body(z.object({ state: z.string().min(1).max(200), code: z.string().min(1).max(2000) })),
       },
       responses: {
-        200: json(z.object({ connectionId: z.uuid(), connector: z.string(), returnTo: z.string().optional() })),
+        200: json(
+          z.object({
+            connectionId: z.uuid(),
+            connector: z.string(),
+            outcome: Outcome,
+            returnTo: z.string().optional(),
+          }),
+        ),
         ...errors,
       },
     }),
@@ -323,25 +409,46 @@ export function connectorRoutes(deps: AppDeps) {
       ) {
         throw new NotFoundError("This authorization link is invalid or expired");
       }
-      const { connection, returnTo } = await completeOAuth(connectorDeps, user, input);
+      const { connection, returnTo, outcome } = await completeOAuth(connectorDeps, user, input);
       await afterConnected(connection, user.id);
       const landing = isDesktopReturn(returnTo) ? { returnTo: desktopReturnPath(returnTo) } : {};
-      return c.json({ connectionId: connection.id, connector: connection.connector, ...landing }, 200);
+      return c.json({ connectionId: connection.id, connector: connection.connector, outcome, ...landing }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/usage/composio",
+      tags,
+      security,
+      summary: "The workspace's Composio calls this month (UTC) and its cap (any member: calls, not money)",
+      description:
+        "Every Composio tool call counts before it is made (connectors and mailboxes, ADR 0107 §7). `limit` is `COMPOSIO_CALLS_PER_MONTH`, null with none; `month` is `YYYY-MM`.",
+      request: { params: OrgParams },
+      responses: {
+        200: json(z.object({ calls: z.number().int(), limit: z.number().int().nullable(), month: z.string() })),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const usage = await composioUsageOf(
+        db,
+        c.get("user").id,
+        c.req.valid("param").orgId,
+        config.COMPOSIO_CALLS_PER_MONTH,
+      );
+      return c.json(usage, 200);
     },
   );
 
   /** A server connected by address: its tools are read; a one-click one gets our classification right away. */
   async function afterConnected(connection: Awaited<ReturnType<typeof completeOAuth>>["connection"], userId: string) {
     if (!isCustom(connection)) return;
-    const connect = deps.extras?.mcpConnect ?? connectOverHttp;
     const judge = deps.extras?.context?.judge;
-    await syncCustomTools({ ...connectorDeps, connect, judge, blobs: adapters.platformBlobs }, connection).catch(
-      () => {},
-    );
+    await syncCustomTools({ ...connectorDeps, judge, blobs: adapters.platformBlobs }, connection).catch(() => {});
     if (presetForServer(connection.serverUrl)) {
-      await acceptCustomSuggestion({ ...connectorDeps, connect }, userId, connection.orgId, connection.id).catch(
-        () => {},
-      );
+      await acceptCustomSuggestion(connectorDeps, userId, connection.orgId, connection.id).catch(() => {});
     }
   }
 

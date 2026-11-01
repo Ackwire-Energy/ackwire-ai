@@ -1,4 +1,5 @@
 import { keys, useAiAccounts } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { browserTimezone, isTimeZone, timezoneName, zoneDisplayName } from "@agenteschat/client/lib/routines";
 import {
   AffixInput,
@@ -251,7 +252,7 @@ export function ProfileDialog({ focus, onClose }: { focus: "handle" | "timezone"
       toast.show(t("shell.profileSaved"));
       onClose();
     },
-    onError: (e) => setError(e.message),
+    onError: (e) => setError(errorText(t, e)),
   });
   return (
     <Dialog

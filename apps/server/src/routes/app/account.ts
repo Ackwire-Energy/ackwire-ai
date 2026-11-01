@@ -70,6 +70,7 @@ import { requestLimitIp } from "../../http/client-ip";
 import { apiError, errorResponse } from "../../http/errors";
 import { humanCheckRefusal } from "../../http/human-check";
 import { imageFile } from "../../http/image-file";
+import { releaseOf } from "../../version";
 import {
   type AppDeps,
   body,
@@ -195,6 +196,13 @@ export function accountRoutes(deps: AppDeps) {
               description:
                 "The bot check's site key (`TURNSTILE_SITE_KEY`, ADR 0075): pages run Cloudflare Turnstile and send its token in `x-captcha-response`. Null: no check, and nothing loads from Cloudflare.",
             }),
+            errorReports: z
+              .object({ dsn: z.string(), environment: z.string(), release: z.string() })
+              .nullable()
+              .openapi({
+                description:
+                  "Where the app reports its own errors (`SENTRY_WEB_DSN`, a Sentry-compatible server, ADR 0104), and under which environment and release. Null: it reports nothing and loads no reporting code.",
+              }),
           }),
         ),
       },
@@ -213,6 +221,9 @@ export function accountRoutes(deps: AppDeps) {
           workspaceComputer: config.MACHINE_PROVISIONING === "external",
           billingUrl: config.BILLING_URL ?? null,
           turnstileSiteKey: deps.adapters.humanCheck?.siteKey ?? null,
+          errorReports: config.SENTRY_WEB_DSN
+            ? { dsn: config.SENTRY_WEB_DSN, environment: config.SENTRY_ENVIRONMENT, release: releaseOf(config) }
+            : null,
         },
         200,
       );
@@ -497,6 +508,7 @@ export function accountRoutes(deps: AppDeps) {
               permissions: [...m.permissions],
               rank: m.rank,
               logo: m.orgLogo ?? null,
+              ...(m.start ? { start: m.start } : {}),
               ...(m.standing
                 ? { standing: { state: m.standing.state, reason: toldReason(m.standing), ...cloudNotice() } }
                 : {}),

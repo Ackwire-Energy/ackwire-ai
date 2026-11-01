@@ -9,7 +9,7 @@ import type { Connection, ConnectorCatalog, ConnectorDef, CustomServer, ScopeGra
 
 export const grantKey = (g: ScopeGrant) => `${g.connectionId ?? ""}|${g.scope}`;
 
-/** i18n key of a scope id (`github:pr.merge` → `github_pr_merge`). */
+/** i18n key of a scope or connector id (`github:pr.merge` → `github_pr_merge`, `meta-ads` → `meta_ads`). */
 const safe = (id: string) => id.replace(/[^a-zA-Z0-9]/g, "_");
 
 /** Our translation of a known scope, or the server's (English) text. */
@@ -35,6 +35,9 @@ export function connectorName(t: TFunction, def: Pick<ConnectorDef, "id" | "labe
   const tt = t as unknown as (key: string, options: { defaultValue: string }) => string;
   return tt(`connectors.names.${safe(def.id)}`, { defaultValue: def.label });
 }
+
+/** Where one signs in: the brand, without what a variant is ("Supabase (read-only)" → "Supabase"). */
+export const connectorBrand = (def: Pick<ConnectorDef, "label">) => def.label.replace(/\s*\(.*\)$/, "");
 
 export function connectorDescription(t: TFunction, def: ConnectorDef) {
   const tt = t as unknown as (key: string, options: { defaultValue: string }) => string;
@@ -83,7 +86,12 @@ export function scopeGroups(
   }
   // Custom MCP servers come from their own endpoint; nothing is exposed until an admin reviews the tools.
   for (const c of customServers.filter((x) => x.reviewedAt)) {
-    groups.push({ id: c.id, name: c.label, note: c.serverUrl, scopes: customScopes(t, c.id) });
+    groups.push({
+      id: c.id,
+      name: c.label,
+      note: c.via === "composio" ? (c.accountLabel ?? "") : c.serverUrl,
+      scopes: customScopes(t, c.id),
+    });
   }
   return groups;
 }

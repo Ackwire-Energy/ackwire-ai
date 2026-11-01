@@ -236,11 +236,16 @@ test("a job whose failure can't be recorded (the database went away) doesn't rej
   expect((await rows())[0]).toMatchObject({ status: "processing", lockedBy: "w" });
 });
 
-test("a lease that expires after the final attempt marks the job failed", async () => {
+test("a lease that expires after the final attempt marks the job failed, and says so as a failed job", async () => {
   await enqueue(db, job("k", { maxAttempts: 1 }));
   await claimJobs(db, { workerId: "dead" });
-  expect(await claimJobs(db, { workerId: "w", now: at(DEFAULT_LEASE_MS + 1000) })).toHaveLength(0);
+  const told: string[] = [];
+  const onError = (j: { kind: string }, error: unknown, outcome: string) =>
+    told.push(`${j.kind} ${outcome}: ${(error as Error).message}`);
+  expect(await claimJobs(db, { workerId: "w", now: at(DEFAULT_LEASE_MS + 1000), onError })).toHaveLength(0);
   expect((await rows())[0]?.status).toBe("failed");
+  // Its worker died or hung on it: nothing else would ever tell.
+  expect(told).toEqual(["k failed: lease expired on the final attempt"]);
 });
 
 test("processOutbox runs handlers and records outcomes", async () => {

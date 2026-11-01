@@ -25,6 +25,7 @@ import type {
   IssuePatch,
   IssueStatus,
   Routine,
+  RoutineHook,
   RoutineRun,
   RuleInfo,
   ScheduleParse,
@@ -57,6 +58,14 @@ const PHRASES: Record<string, Omit<ApiRule, "timezone">> = {
   "dia 1 às 8h": { freq: "monthly", byMonthDay: [1], times: ["08:00"] },
 };
 const UNREADABLE = "Não entendi. Tente “toda segunda às 9h” ou “dias úteis às 18h”.";
+
+/** A webhook routine's address, as the server makes them (a 43-character token). */
+const hookUrl = () => `https://app.agentes.test/api/hooks/${mockId("hook").padEnd(43, "x").slice(0, 43)}`;
+const hookOf = (s: { hooks: Map<string, RoutineHook> }, routineId: string) => {
+  const hook = s.hooks.get(routineId) ?? { url: hookUrl(), signed: false, calls: [] };
+  s.hooks.set(routineId, hook);
+  return hook;
+};
 
 /** What a new routine carries besides what it was made with (ADR 0053: state, week, where it runs). */
 const routineDefaults = (): Pick<
@@ -170,6 +179,8 @@ interface Store {
   activity: Map<string, IssueActivity[]>;
   routines: Routine[];
   runs: Map<string, RoutineRun[]>;
+  /** Webhook routines' addresses and calls. */
+  hooks: Map<string, RoutineHook>;
   events: CalendarEvent[];
   proposals: CalendarProposal[];
 }
@@ -186,6 +197,7 @@ export function createMockPlanning(
       activity: new Map(),
       routines: [],
       runs: new Map(),
+      hooks: new Map(),
       events: [],
       proposals: [],
     };
@@ -632,11 +644,14 @@ export function createMockPlanning(
             timezone: input.trigger.timezone ?? "America/Sao_Paulo",
             description: input.trigger.at,
           };
+        else if (input.trigger.type === "webhook") trigger = { type: "webhook", url: null, signed: false };
         else trigger = input.trigger;
         const agents = await ctx.lookup.agents(orgId);
+        const id = mockId("rt");
+        if (trigger.type === "webhook") trigger.url = hookOf(s, id).url;
         const r: Routine = {
           ...routineDefaults(),
-          id: mockId("rt"),
+          id,
           name: input.name?.trim() || `Rotina de ${agents.find((a) => a.id === input.agentId)?.name ?? "agente"}`,
           agentId: input.agentId,
           prompt: input.prompt,
@@ -669,6 +684,8 @@ export function createMockPlanning(
             timezone: patch.trigger.timezone ?? "America/Sao_Paulo",
             description: r.trigger.type === "once" ? r.trigger.description : patch.trigger.at,
           };
+        else if (patch.trigger?.type === "webhook")
+          r.trigger = { type: "webhook", url: hookOf(await store(orgId), id).url, signed: false };
         else if (patch.trigger) r.trigger = patch.trigger;
         r.nextRunAt =
           r.active && r.trigger.type === "schedule"
@@ -739,6 +756,39 @@ export function createMockPlanning(
       runs: async (orgId, id) => {
         await findRoutine(orgId, id);
         return clone((await store(orgId)).runs.get(id) ?? []);
+      },
+      hook: async (orgId, id) => clone(hookOf(await store(orgId), id)),
+      newHookAddress: async (orgId, id) => {
+        record("routines.newHookAddress", id);
+        const hook = hookOf(await store(orgId), id);
+        hook.url = hookUrl();
+        return clone(hook);
+      },
+      newHookSecret: async (orgId, id) => {
+        record("routines.newHookSecret", id);
+        const hook = hookOf(await store(orgId), id);
+        hook.signed = true;
+        return { secret: mockId("secret"), hook: clone(hook) };
+      },
+      removeHookSecret: async (orgId, id) => {
+        record("routines.removeHookSecret", id);
+        const hook = hookOf(await store(orgId), id);
+        hook.signed = false;
+        return clone(hook);
+      },
+      testHook: async (orgId, id) => {
+        record("routines.testHook", id);
+        const hook = hookOf(await store(orgId), id);
+        hook.calls.unshift({
+          id: mockId("call"),
+          at: ctx.now().toISOString(),
+          outcome: "accepted",
+          status: 202,
+          bytes: 74,
+          runId: null,
+          test: true,
+        });
+        return { runId: null, hook: clone(hook) };
       },
     },
     calendar: {

@@ -47,7 +47,7 @@ export type MessageRoot =
   | { kind: "routine_report"; backgroundRunId: string | null }
   | { kind: "agent" };
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * How many links (message → its run → that run's trigger) a chain may have before it counts as nobody's: far past

@@ -14,6 +14,7 @@ import type {
   NotificationPage,
 } from "../api/types";
 import { billingHoldOf } from "./billing";
+import { secretNoticeLine } from "./secret-requests";
 
 export const NOTIFICATION_FILTERS: NotificationFilter[] = ["all", "mentions", "waiting", "unread", "reactions"];
 
@@ -184,6 +185,7 @@ export const askersOf = (n: Pick<AppNotification, "count" | "latest">) => ({
  */
 export function workspaceHeadline(n: Pick<AppNotification, "kind" | "latest">) {
   if (n.kind === "computer_ready") return "computerSetup.notification.ready" as const;
+  if (n.kind === "composio_limit") return "connectors.composio.limitNotice" as const;
   if (n.kind !== "org_standing") return null;
   const to = n.latest.statusTo;
   const billing = billingHoldOf({ state: "hold", reason: n.latest.billingHold ?? null });
@@ -260,7 +262,7 @@ export type OpenTarget =
   | { to: "/org/$orgId/routines"; search?: { open: string } }
   | { to: "/org/$orgId/threads"; search: { tab: "missions" } }
   | { to: "/org/$orgId/settings/computers/$machineId"; params: { machineId: string } }
-  | { to: "/org/$orgId/settings/$section"; params: { section: "computers" | "members" } };
+  | { to: "/org/$orgId/settings/$section"; params: { section: "computers" | "members" | "usage" } };
 
 /** A routine's trouble (ADR 0053): it opens in Rotinas, where its state says what happened and how to fix it. */
 export const ROUTINE_TROUBLE: ReadonlySet<NotificationKind> = new Set<NotificationKind>([
@@ -287,6 +289,8 @@ export function openTarget(n: AppNotification): OpenTarget | null {
       ? { to: "/org/$orgId/dm/person/$userId", params: { userId: who.id } }
       : { to: "/org/$orgId/settings/$section", params: { section: "members" } };
   }
+  // The month's Composio calls are counted in Uso.
+  if (n.kind === "composio_limit") return { to: "/org/$orgId/settings/$section", params: { section: "usage" } };
   if (n.kind === "machine_connected" || n.kind === "computer_ready")
     return s.machineId
       ? { to: "/org/$orgId/settings/computers/$machineId", params: { machineId: s.machineId } }
@@ -347,6 +351,40 @@ export function snoozeTimes(now = new Date()) {
   const toMonday = ((8 - now.getDay()) % 7 || 7) as number;
   const nextWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() + toMonday, 9, 0, 0, 0);
   return { hour, tomorrow, nextWeek };
+}
+
+/**
+ * What a waiting item asks of you: approve, answer an agent, take your turn at the table, help in a browser, give
+ * a secret, or let someone in.
+ */
+export type WaitingCardKind = "approval" | "question" | "forum" | "browser" | "secret" | "join";
+
+export interface WaitingCard {
+  kind: WaitingCardKind;
+  /** The exact request: the action to approve, the question, the topic, what to do in the browser, who asks to join. */
+  title: string;
+  /** Only requests expire. */
+  expiresAt: string | null;
+  /** The one button: "Revisar" (a request), "Responder" or "Abrir" (the agent's browser, a secret's card). */
+  action: "review" | "answer" | "open";
+}
+
+/** A waiting inbox item as a card: who asks (`actors`), the kind, the exact request, the deadline, one button. */
+export function waitingCardOf(n: Pick<AppNotification, "kind" | "count" | "latest">): WaitingCard {
+  const l = n.latest;
+  if (n.kind === "browser_handoff")
+    return { kind: "browser", title: l.text ?? l.title ?? "", expiresAt: l.expiresAt ?? null, action: "open" };
+  // Its name and what it is for, as its card says: typed there, in the conversation, never here.
+  if (n.kind === "secret_request")
+    return { kind: "secret", title: secretNoticeLine(n), expiresAt: l.expiresAt ?? null, action: "open" };
+  if (n.kind === "approval")
+    return { kind: "approval", title: l.title ?? l.text ?? "", expiresAt: l.expiresAt ?? null, action: "review" };
+  if (n.kind === "forum_turn")
+    return { kind: "forum", title: l.title ?? l.text ?? "", expiresAt: null, action: "answer" };
+  // No actor (they aren't a member yet): the first who asked is the title; `joinRequestLine` says them all.
+  if (n.kind === "join_request")
+    return { kind: "join", title: askersOf(n).names[0] ?? "", expiresAt: null, action: "review" };
+  return { kind: "question", title: l.text ?? l.title ?? "", expiresAt: null, action: "answer" };
 }
 
 /** `@handle` tokens in a snippet (the page highlights mine). */

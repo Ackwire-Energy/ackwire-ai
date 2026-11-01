@@ -33,6 +33,7 @@ import { Route as OrgOrgIdApprovalsRouteImport } from './routes/org.$orgId.appro
 import { Route as OrgOrgIdCalendarRouteImport } from './routes/org.$orgId.calendar'
 import { Route as OrgOrgIdDriveRouteImport } from './routes/org.$orgId.drive'
 import { Route as OrgOrgIdForumRouteImport } from './routes/org.$orgId.forum'
+import { Route as OrgOrgIdHomeRouteImport } from './routes/org.$orgId.home'
 import { Route as OrgOrgIdMembersRouteImport } from './routes/org.$orgId.members'
 import { Route as OrgOrgIdNotificationsRouteImport } from './routes/org.$orgId.notifications'
 import { Route as OrgOrgIdOnboardingRouteImport } from './routes/org.$orgId.onboarding'
@@ -175,6 +176,11 @@ const OrgOrgIdDriveRoute = OrgOrgIdDriveRouteImport.update({
 const OrgOrgIdForumRoute = OrgOrgIdForumRouteImport.update({
   id: '/forum',
   path: '/forum',
+  getParentRoute: () => OrgOrgIdRoute,
+} as any)
+const OrgOrgIdHomeRoute = OrgOrgIdHomeRouteImport.update({
+  id: '/home',
+  path: '/home',
   getParentRoute: () => OrgOrgIdRoute,
 } as any)
 const OrgOrgIdMembersRoute = OrgOrgIdMembersRouteImport.update({
@@ -320,6 +326,7 @@ export interface FileRoutesByFullPath {
   '/org/$orgId/calendar': typeof OrgOrgIdCalendarRoute
   '/org/$orgId/drive': typeof OrgOrgIdDriveRoute
   '/org/$orgId/forum': typeof OrgOrgIdForumRoute
+  '/org/$orgId/home': typeof OrgOrgIdHomeRoute
   '/org/$orgId/members': typeof OrgOrgIdMembersRoute
   '/org/$orgId/notifications': typeof OrgOrgIdNotificationsRoute
   '/org/$orgId/onboarding': typeof OrgOrgIdOnboardingRoute
@@ -368,6 +375,7 @@ export interface FileRoutesByTo {
   '/org/$orgId/calendar': typeof OrgOrgIdCalendarRoute
   '/org/$orgId/drive': typeof OrgOrgIdDriveRoute
   '/org/$orgId/forum': typeof OrgOrgIdForumRoute
+  '/org/$orgId/home': typeof OrgOrgIdHomeRoute
   '/org/$orgId/members': typeof OrgOrgIdMembersRoute
   '/org/$orgId/notifications': typeof OrgOrgIdNotificationsRoute
   '/org/$orgId/onboarding': typeof OrgOrgIdOnboardingRoute
@@ -418,6 +426,7 @@ export interface FileRoutesById {
   '/org/$orgId/calendar': typeof OrgOrgIdCalendarRoute
   '/org/$orgId/drive': typeof OrgOrgIdDriveRoute
   '/org/$orgId/forum': typeof OrgOrgIdForumRoute
+  '/org/$orgId/home': typeof OrgOrgIdHomeRoute
   '/org/$orgId/members': typeof OrgOrgIdMembersRoute
   '/org/$orgId/notifications': typeof OrgOrgIdNotificationsRoute
   '/org/$orgId/onboarding': typeof OrgOrgIdOnboardingRoute
@@ -469,6 +478,7 @@ export interface FileRouteTypes {
     | '/org/$orgId/calendar'
     | '/org/$orgId/drive'
     | '/org/$orgId/forum'
+    | '/org/$orgId/home'
     | '/org/$orgId/members'
     | '/org/$orgId/notifications'
     | '/org/$orgId/onboarding'
@@ -517,6 +527,7 @@ export interface FileRouteTypes {
     | '/org/$orgId/calendar'
     | '/org/$orgId/drive'
     | '/org/$orgId/forum'
+    | '/org/$orgId/home'
     | '/org/$orgId/members'
     | '/org/$orgId/notifications'
     | '/org/$orgId/onboarding'
@@ -566,6 +577,7 @@ export interface FileRouteTypes {
     | '/org/$orgId/calendar'
     | '/org/$orgId/drive'
     | '/org/$orgId/forum'
+    | '/org/$orgId/home'
     | '/org/$orgId/members'
     | '/org/$orgId/notifications'
     | '/org/$orgId/onboarding'
@@ -784,6 +796,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrgOrgIdForumRouteImport
       parentRoute: typeof OrgOrgIdRoute
     }
+    '/org/$orgId/home': {
+      id: '/org/$orgId/home'
+      path: '/home'
+      fullPath: '/org/$orgId/home'
+      preLoaderRoute: typeof OrgOrgIdHomeRouteImport
+      parentRoute: typeof OrgOrgIdRoute
+    }
     '/org/$orgId/members': {
       id: '/org/$orgId/members'
       path: '/members'
@@ -953,6 +972,7 @@ interface OrgOrgIdRouteChildren {
   OrgOrgIdCalendarRoute: typeof OrgOrgIdCalendarRoute
   OrgOrgIdDriveRoute: typeof OrgOrgIdDriveRoute
   OrgOrgIdForumRoute: typeof OrgOrgIdForumRoute
+  OrgOrgIdHomeRoute: typeof OrgOrgIdHomeRoute
   OrgOrgIdMembersRoute: typeof OrgOrgIdMembersRoute
   OrgOrgIdNotificationsRoute: typeof OrgOrgIdNotificationsRoute
   OrgOrgIdOnboardingRoute: typeof OrgOrgIdOnboardingRoute
@@ -984,6 +1004,7 @@ const OrgOrgIdRouteChildren: OrgOrgIdRouteChildren = {
   OrgOrgIdCalendarRoute: OrgOrgIdCalendarRoute,
   OrgOrgIdDriveRoute: OrgOrgIdDriveRoute,
   OrgOrgIdForumRoute: OrgOrgIdForumRoute,
+  OrgOrgIdHomeRoute: OrgOrgIdHomeRoute,
   OrgOrgIdMembersRoute: OrgOrgIdMembersRoute,
   OrgOrgIdNotificationsRoute: OrgOrgIdNotificationsRoute,
   OrgOrgIdOnboardingRoute: OrgOrgIdOnboardingRoute,

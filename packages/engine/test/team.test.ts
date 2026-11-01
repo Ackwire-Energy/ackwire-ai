@@ -183,6 +183,7 @@ test("a whole-connection grant is named after its connector, not 'Connector'", a
       orgId: f.org.id,
       connector: "sentry",
       label: "Sentry",
+      toolPrefix: "sentry",
       serverUrl: "https://mcp.sentry.dev",
       authType: "none",
     })

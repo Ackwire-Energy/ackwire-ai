@@ -3,8 +3,10 @@
  * - `GET/POST …/skills`, `POST …/skills/import { url } | { url, paths } | { zipBase64 }`,
  *   `GET/PATCH/DELETE …/skills/{id}`, `POST …/skills/{id}/reimport`
  * - `GET/PUT …/agents/{id}/skills` → `{ skills: (Skill & { enabled })[] }`
- * A repository's root holds three skills to pick and one that can't be installed (`{ choices, skipped }`);
- * `acme/secret` is private. Scripts are listed as `ignored`.
+ * A repository's root holds three skills to pick and one that can't be installed (`{ choices, skipped }`), and `list`
+ * lists a folder's one skill. `acme/secret` is private and no connection reaches it; `contoso/skills` is private and the
+ * workspace's GitHub connection reads it (`github()`: that connection, none or one GitHub refuses). Scripts are listed
+ * as `ignored`.
  */
 import { type ApiClient, ApiError, type SkillDetail } from "@agenteschat/client";
 import { clone, type MockContext, MockNotFoundError, mockId, perOrg } from "./context";
@@ -26,6 +28,7 @@ const SKIPPED = [
 export function createFakeSkills(
   ctx: MockContext,
   log: (method: string, ...args: unknown[]) => void,
+  github: () => "none" | "refused" | "ok" = () => "none",
 ): ApiClient["skills"] {
   const assigned = new Map<string, Set<string>>();
   const store = perOrg(async (orgId) => {
@@ -117,14 +120,23 @@ export function createFakeSkills(
     import: async (orgId, input) => {
       log("skills.import", orgId, input);
       const url = "url" in input ? input.url : null;
-      if (url?.includes("/acme/secret")) {
-        throw new ApiError(400, "github.repo_missing", "acme/secret is private or doesn't exist on GitHub", {
-          repo: "acme/secret",
+      const hidden = url?.includes("/acme/secret")
+        ? "acme/secret"
+        : url?.includes("/contoso/") && github() !== "ok"
+          ? "contoso/skills"
+          : null;
+      if (hidden) {
+        throw new ApiError(400, "github.repo_missing", `${hidden} is private or doesn't exist on GitHub`, {
+          repo: hidden,
+          connection: github(),
+          app: false,
         });
       }
+      const via = url?.includes("/contoso/") ? { via: "github" as const } : {};
       if (url && /^https:\/\/github\.com\/[^/]+\/[^/]+\/?$/.test(url)) {
-        return { choices: clone(CHOICES), skipped: clone(SKIPPED) };
+        return { choices: clone(CHOICES), skipped: clone(SKIPPED), ...via };
       }
+      if (url && "list" in input && input.list) return { choices: clone(CHOICES.slice(0, 1)), ...via };
       const name = url ? (url.split("/").filter(Boolean).pop() ?? "skill") : "Skill enviada";
       return make(orgId, {
         name,
@@ -132,6 +144,7 @@ export function createFakeSkills(
         body: `# ${name}`,
         source: url ? "url" : "upload",
         sourceUrl: url,
+        ...(via.via ? { sourceVia: via.via } : {}),
         defaultForNewAgents: false,
         files: [{ path: "SKILL.md", size: 10, mime: "text/markdown", status: "stored" }],
       });
@@ -149,6 +162,7 @@ export function createFakeSkills(
             body: `# ${choice.name}`,
             source: "url",
             sourceUrl: `${url}/tree/HEAD/${path}`,
+            ...(url.includes("/contoso/") ? { sourceVia: "github" as const } : {}),
             defaultForNewAgents: false,
             files: [{ path: "SKILL.md", size: 10, mime: "text/markdown", status: "stored" }],
           }),
@@ -166,6 +180,18 @@ export function createFakeSkills(
     reimport: async (orgId, id) => {
       log("skills.reimport", orgId, id);
       const s = await find(orgId, id);
+      if (s.sourceVia && github() === "none") {
+        throw new ApiError(400, "skill.connection_gone", "The GitHub connection that read contoso/skills is gone", {
+          repo: "contoso/skills",
+        });
+      }
+      if (s.sourceVia && github() === "refused") {
+        throw new ApiError(400, "github.repo_missing", "contoso/skills is private or doesn't exist on GitHub", {
+          repo: "contoso/skills",
+          connection: "refused",
+          app: false,
+        });
+      }
       s.version += 1;
       return clone(s);
     },

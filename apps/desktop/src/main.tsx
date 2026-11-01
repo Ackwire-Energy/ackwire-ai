@@ -1,3 +1,4 @@
+import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { I18nextProvider } from "react-i18next";
@@ -13,7 +14,7 @@ import { type Host, WINDOW_NAMES, type WindowName } from "./host/types";
 import { createDesktopI18n, pickLocale, systemLocale } from "./i18n";
 import { ToastProvider } from "./ui/Toast";
 import { baseName } from "./ui/time";
-import { WindowView } from "./WindowView";
+import { WindowError, WindowView } from "./WindowView";
 
 const params = new URLSearchParams(window.location.search);
 const asked = params.get("window");
@@ -79,7 +80,12 @@ if (root) {
     <StrictMode>
       <I18nextProvider i18n={i18n}>
         <AppProvider host={host} store={store}>
-          <ToastProvider>{fakeHost ? <DevFrame host={fakeHost} /> : <WindowView name={host.window} />}</ToastProvider>
+          <ToastProvider>
+            {/* A window that breaks shows why and a way to try again, never an empty window. */}
+            <ErrorBoundary fallback={() => <WindowError />}>
+              {fakeHost ? <DevFrame host={fakeHost} /> : <WindowView name={host.window} />}
+            </ErrorBoundary>
+          </ToastProvider>
         </AppProvider>
       </I18nextProvider>
     </StrictMode>,

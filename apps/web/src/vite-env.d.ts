@@ -8,3 +8,10 @@ declare module "@tanstack/react-query" {
     queryMeta: { quiet?: boolean };
   }
 }
+
+declare global {
+  interface Window {
+    /** index.html's boot fallback: one reload, then a box over the boot sky. Nothing once React replaced the sky. */
+    __agentesBootFailed?: () => void;
+  }
+}

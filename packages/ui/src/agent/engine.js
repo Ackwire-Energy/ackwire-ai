@@ -60,9 +60,109 @@ export function mixHex(a, b, k) {
   ).join("")}`;
 }
 
-/** An agent color's [top, bottom] (unknown colors are sky). */
+/** Whether `v` is a custom agent color: "#rrggbb". */
+export function isHexColor(v) {
+  return typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v);
+}
+
+/** A color's name under `look.colors.*`: a preset's own, or "custom" for a "#rrggbb". */
+export function colorKey(color) {
+  return isHexColor(color) ? "custom" : color;
+}
+
+/** "#rrggbb" → [hue 0..360, saturation 0..1, value 0..1] (the picker's space). */
+export function hexToHsv(hex) {
+  const [r, g, b] = rgbOf(hex).map((c) => c / 255);
+  const max = Math.max(r, g, b);
+  const d = max - Math.min(r, g, b);
+  let h = 0;
+  if (d) h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [(h * 60 + 360) % 360, max ? d / max : 0, max];
+}
+
+/** [hue 0..360, saturation 0..1, value 0..1] → "#rrggbb". */
+export function hsvToHex(h, s, v) {
+  const f = (n) => {
+    const k = (n + h / 60) % 6;
+    return v - v * s * Math.max(0, Math.min(k, 4 - k, 1));
+  };
+  return `#${[f(5), f(3), f(1)]
+    .map((c) =>
+      Math.round(c * 255)
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
+}
+
+function hexToHsl(hex) {
+  const [h, s, v] = hexToHsv(hex);
+  const l = v * (1 - s / 2);
+  return [h, l === 0 || l === 1 ? 0 : (v - l) / Math.min(l, 1 - l), l];
+}
+
+function hslToHex(h, s, l) {
+  const v = l + s * Math.min(l, 1 - l);
+  return hsvToHex(h, v ? 2 * (1 - l / v) : 0, v);
+}
+
+/** WCAG relative luminance of "#rrggbb" (0 black .. 1 white). */
+export function luminance(hex) {
+  const [r, g, b] = rgbOf(hex).map((c) => {
+    const x = c / 255;
+    return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/**
+ * A custom color's [top, bottom], built like the presets: the bottom is the color itself, its lightness held
+ * between graphite's and a level where the white eyes and text still read (luminance ≤ 0.28, about 3:1 against
+ * white, which also keeps it off a dark theme's background); the top is the same hue 26 points lighter.
+ */
+export function customGradient(hex) {
+  const [h, s, l0] = hexToHsl(hex);
+  let l = Math.max(0.28, Math.min(0.55, l0));
+  let bottom = hslToHex(h, s, l);
+  while (luminance(bottom) > 0.28 && l > 0.2) {
+    l -= 0.01;
+    bottom = hslToHex(h, s, l);
+  }
+  // The top is capped too: yellow, lime or cyan 26 points lighter would be near white, washing out the body's
+  // light tones behind the eyes and vanishing on light surfaces. No custom top reads worse than amber's.
+  let lt = Math.min(0.78, l + 0.26);
+  let top = hslToHex(h, s, lt);
+  while ((luminance(top) > 0.59 || luminance(mixHex(bottom, top, 0.5)) > 0.405) && lt > l) {
+    lt -= 0.01;
+    top = hslToHex(h, s, lt);
+  }
+  return [top, bottom];
+}
+
+/** Where the custom color picker starts: the custom color itself, or the current preset's own tone. */
+export function pickerStart(color) {
+  return isHexColor(color) ? color.toLowerCase() : gradientOf(color)[1];
+}
+
+/** The preset closest to a color by hue (graphite when nearly gray): for places that only have the presets' pictures. */
+export function nearestPreset(color) {
+  if (!isHexColor(color)) return color in AGENT_GRADIENTS ? color : "sky";
+  const [h, s] = hexToHsl(color.toLowerCase());
+  if (s < 0.15) return "graphite";
+  let best = "sky";
+  let gap = 360;
+  for (const [name, [, bottom]] of Object.entries(AGENT_GRADIENTS)) {
+    if (name === "graphite") continue;
+    const d = Math.abs(hexToHsl(bottom)[0] - h) % 360;
+    const dd = Math.min(d, 360 - d);
+    if (dd < gap) [best, gap] = [name, dd];
+  }
+  return best;
+}
+
+/** An agent color's [top, bottom]: a preset, a custom "#rrggbb", or sky for anything else. */
 export function gradientOf(color) {
-  return AGENT_GRADIENTS[color] ?? AGENT_GRADIENTS.sky;
+  return AGENT_GRADIENTS[color] ?? (isHexColor(color) ? customGradient(color.toLowerCase()) : AGENT_GRADIENTS.sky);
 }
 
 /**

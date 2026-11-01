@@ -4,7 +4,7 @@ import { recordAudit } from "./audit";
 import { BROWSER_SCOPE, BROWSER_TOOL_INFO, BROWSER_TOOLS, DESKTOP_SCOPE, DESKTOP_TOOL_INFO } from "./browser/types";
 import { caches } from "./cache";
 import { CONNECTOR_CATALOG } from "./connectors/catalog";
-import { connectorGrantValidator } from "./connectors/connections";
+import { connectorGrantValidator, toolPrefixOfConnection } from "./connectors/connections";
 import { classifiedTools, customScope, isCustom, type ToolAccess } from "./connectors/custom";
 import { exposedToolName } from "./connectors/mcp";
 import { sha256 } from "./crypto";
@@ -53,6 +53,7 @@ export const BUILTIN_TOOLS: Record<string, string[]> = {
     "update_routine",
     "list_reminders",
     "cancel_reminder",
+    "schedule_action",
   ],
   "forum:write": ["suggest_forum_topic", "open_forum_topic", "post_in_forum", "read_forum_topic"],
   "wiki:read": ["search_wiki", "read_wiki_page"],
@@ -150,6 +151,10 @@ export const BUILTIN_TOOL_INFO: Record<string, { label: string; description: str
   update_routine: { label: "Change routine", description: "Changes a routine's instructions, schedule or channel." },
   list_reminders: { label: "View reminders", description: "Lists the pending reminders of the person asking." },
   cancel_reminder: { label: "Cancel reminder", description: "Cancels a reminder of the person asking." },
+  schedule_action: {
+    label: "Schedule an action",
+    description: "Prepares a connected app's action for a set time. A person approves it now.",
+  },
   suggest_forum_topic: {
     label: "Suggest forum topic",
     description: "Suggests a discussion among agents. A person opens it.",
@@ -243,18 +248,12 @@ export async function orgToolCatalog(db: Database, orgId: string) {
   for (const c of connections) {
     if (isCustom(c)) {
       const tools = await classifiedTools(db, c.id);
-      const prefix =
-        c.label
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "_")
-          .replace(/^_|_$/g, "")
-          .slice(0, 24) || "mcp";
       const byScope = new Map<string, CatalogTool[]>();
       for (const t of tools) {
         const scope = customScope(c.id, t.access as ToolAccess);
         const list = byScope.get(scope) ?? [];
         list.push({
-          name: exposedToolName(prefix, t.name),
+          name: exposedToolName(toolPrefixOfConnection(c), t.name),
           label: t.label || humanize(t.name),
           description: t.description,
           sensitive: t.access === "approval",
@@ -288,7 +287,7 @@ export async function orgToolCatalog(db: Database, orgId: string) {
         tools: Object.entries(def.tools)
           .filter(([, t]) => t.scope === id)
           .map(([name, t]) => {
-            const exposed = t.ours ? name : exposedToolName(def.id, name);
+            const exposed = t.ours ? name : exposedToolName(toolPrefixOfConnection(c), name);
             return {
               name: exposed,
               label: humanize(name),

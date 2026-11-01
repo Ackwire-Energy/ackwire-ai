@@ -13,6 +13,7 @@ import {
   Card,
   CheckboxPill,
   Chip,
+  colorKey,
   Field,
   Icon,
   type IconName,
@@ -298,7 +299,7 @@ export function SettingsTab({
               <span className="agp-chips">
                 <Chip icon="agent">
                   {[
-                    t(`look.colors.${look.color}`),
+                    t(`look.colors.${colorKey(look.color)}`),
                     t(`look.eyesNames.${look.eyes}`),
                     ...(look.accessory !== "none" ? [t(`look.accessories.${look.accessory}`)] : []),
                   ].join(" · ")}

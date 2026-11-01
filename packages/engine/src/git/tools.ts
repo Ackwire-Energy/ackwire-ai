@@ -183,6 +183,7 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
             "Clone a GitHub repository into your folder on your computer (repos/<owner>/<name>; already there: it is updated). No approval needed. Real git through our proxy: commit and push from there to branches agentes/<your handle>/…, then open_pull_request. Delete branches with delete_branches; to push to someone else's branch, ask with request_branch_push first.",
           scope: connectorScope("github", "git.read"),
           connectionId: connection.id,
+          connector: { key: "github", via: "native", tool: "git_clone" },
           connectorLabel: connection.label,
           service: "github",
           inputSchema: {
@@ -257,6 +258,7 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
             "Open a pull request on GitHub from a branch you pushed (agentes/<your handle>/…). Merging is separate and always needs a person's approval.",
           scope: connectorScope("github", "pr.write"),
           connectionId: connection.id,
+          connector: { key: "github", via: "native", tool: "open_pull_request" },
           connectorLabel: connection.label,
           service: "github",
           inputSchema: {
@@ -326,6 +328,7 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
             "Delete branches on GitHub, your own included: the only way agents delete branches (git push --delete is refused). A person approves the whole list on one card, then they're deleted. Never tags, the default branch or a protected branch.",
           scope: connectorScope("github", "git.write"),
           connectionId: connection.id,
+          connector: { key: "github", via: "native", tool: DELETE_BRANCHES_TOOL },
           connectorLabel: connection.label,
           sensitive: true,
           inputSchema: {
@@ -384,6 +387,7 @@ export function createGitToolSource(deps: GitToolDeps): ToolSource {
             "Ask a person to let you push to a GitHub branch that isn't yours (agentes/<your handle>/… needs no asking). Once they approve, push again with git: fast-forwards to that existing branch, for 24 h or for good if they choose. Never the default branch or a protected one, never a new branch, never a force push.",
           scope: connectorScope("github", "git.write"),
           connectionId: connection.id,
+          connector: { key: "github", via: "native", tool: BRANCH_PUSH_TOOL },
           connectorLabel: connection.label,
           sensitive: true,
           inputSchema: {

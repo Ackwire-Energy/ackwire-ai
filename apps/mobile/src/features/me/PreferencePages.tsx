@@ -1,4 +1,13 @@
-import { type NoticeCategory, useApi, useNoticePrefs, useSetNoticePref } from "@agenteschat/client";
+import {
+  type NoticeCategory,
+  type StartPage as StartPageId,
+  useApi,
+  useChannels,
+  useDms,
+  useNoticePrefs,
+  useSetNoticePref,
+  useSetStart,
+} from "@agenteschat/client";
 import { SOUND_STYLES, type SoundStyle } from "@agenteschat/ui/sfx";
 import { useMutation } from "@tanstack/react-query";
 import { router, useFocusEffect } from "expo-router";
@@ -23,7 +32,10 @@ import {
 import { OrgAvatar } from "../shared/OrgAvatar";
 import { Page } from "./parts";
 
-/** Você's smaller screens, each pushed from its row: Workspaces, Notificações, Sons, Aparência and Idioma. */
+/**
+ * Você's smaller screens, each pushed from its row: Workspaces, Notificações, Ao abrir o app, Sons, Aparência and
+ * Idioma.
+ */
 
 const SOUND_LABELS: Record<SoundStyle, string> = {
   tactile: "mobile.me.soundTactile",
@@ -152,6 +164,65 @@ export function NotificationsPage() {
           <GroupedFooter>{t("mobile.me.notificationsKindsHint")}</GroupedFooter>
         </>
       ) : null}
+    </Page>
+  );
+}
+
+/** My channels (not DMs), and what opens when the app starts among Conversas, where I left off and one of them. */
+function useStartChoice() {
+  const { orgId, org } = useOrg();
+  const channels = useChannels(orgId);
+  const dms = useDms(orgId);
+  const dmIds = new Set((dms.data ?? []).map((d) => d.channelId));
+  const mine = (channels.data ?? []).filter((c) => c.isMember && !dmIds.has(c.id));
+  const start = org?.start;
+  // A channel I'm no longer in opens Conversas: the choice says so.
+  const channel = start?.page === "channel" ? mine.find((c) => c.id === start.channelId) : undefined;
+  const page: StartPageId = start?.page === "last" ? "last" : channel ? "channel" : "home";
+  return { mine, page, channel };
+}
+
+/** "Ao abrir o app"'s value on Você's row. */
+export function useStartLabel() {
+  const { t } = useTranslation();
+  const { page, channel } = useStartChoice();
+  if (channel) return `#${channel.name}`;
+  return page === "last" ? t("mobile.me.startLast") : t("mobile.me.startHome");
+}
+
+/** Ao abrir o app (ADR 0108): Conversas, where I left off, or one of my channels, the same on every device. */
+export function StartPage() {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const { orgId } = useOrg();
+  const set = useSetStart(orgId);
+  const { mine, page, channel } = useStartChoice();
+  const choose = (next: StartPageId, channelId: string | null = null) =>
+    set.mutate({ page: next, channelId }, { onError: () => toast({ title: t("mobile.me.startFailed"), icon: "x" }) });
+  return (
+    <Page title={t("mobile.me.start")}>
+      <View style={styles.gap} />
+      <GroupedList>
+        <GroupedRow label={t("mobile.me.startHome")} checked={page === "home"} onPress={() => choose("home")} />
+        <GroupedRow label={t("mobile.me.startLast")} checked={page === "last"} onPress={() => choose("last")} />
+      </GroupedList>
+      {mine.length > 0 ? (
+        <>
+          <GroupedHeader>{t("mobile.me.startChannels")}</GroupedHeader>
+          <GroupedList>
+            {mine.map((c) => (
+              <GroupedRow
+                key={c.id}
+                icon="hash"
+                label={c.name}
+                checked={channel?.id === c.id}
+                onPress={() => choose("channel", c.id)}
+              />
+            ))}
+          </GroupedList>
+        </>
+      ) : null}
+      <GroupedFooter>{t("mobile.me.startHint")}</GroupedFooter>
     </Page>
   );
 }

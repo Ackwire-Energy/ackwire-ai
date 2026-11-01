@@ -72,6 +72,21 @@ export function dayAndTime(at: Date, timeZone: string, locale: "en" | "pt-BR") {
   };
 }
 
+/** A `YYYY-MM-DD` day from 2000 to 2999 as the ms of its start in UTC, or null when it isn't a real day. */
+export function utcDayMs(day: string) {
+  const ms = Date.parse(`${day}T00:00:00Z`);
+  return /^2\d{3}-\d\d-\d\d$/.test(day) && !Number.isNaN(ms) && new Date(ms).toISOString().startsWith(day) ? ms : null;
+}
+
+/** The value under `key`, made and kept the first time it is asked for. */
+export function getOrMake<K, V>(map: Map<K, V>, key: K, make: () => V): V {
+  const found = map.get(key);
+  if (found !== undefined) return found;
+  const made = make();
+  map.set(key, made);
+  return made;
+}
+
 /** Levenshtein distance: the fewest one-character insertions, deletions or substitutions from `a` to `b`. */
 export function editDistance(a: string, b: string): number {
   let prev = Array.from({ length: b.length + 1 }, (_, j) => j);

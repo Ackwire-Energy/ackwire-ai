@@ -901,13 +901,13 @@ describe("agent page: which computer", () => {
     expect(screen().queryByRole("combobox", { name: "Computador" })).toBeNull();
   });
 
-  test("an error's code is said in the person's language; an unknown one keeps the server's words", () => {
+  test("an error's code is said in the person's language; an unknown one never in the server's words", () => {
     const i18n = createI18n("pt-BR");
     const t = i18n.t.bind(i18n);
     expect(errorText(t, new ApiError(413, "artifact.file_too_large", "too large"))).toBe(
       "O arquivo passa de 50 MB, o limite por arquivo.",
     );
-    expect(errorText(t, new ApiError(500, "boom", "Server exploded"))).toBe("Server exploded");
+    expect(errorText(t, new ApiError(500, "boom", "Server exploded"))).toBe("Algo deu errado. Tente de novo.");
     const en = createI18n("en");
     expect(errorText(en.t.bind(en), new ApiError(400, "machine.pairing_invalid", "x"))).toBe(
       "Invalid, used or expired code. Generate another one.",

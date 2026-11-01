@@ -35,7 +35,7 @@ Neither has an IMAP client, and neither gives the bot its own sending address. B
 | --- | --- |
 | Gmail, Outlook / Microsoft 365 | Composio, with its managed OAuth app |
 | iCloud (including custom domains), hosting mail, Fastmail, Zoho, Yahoo, any IMAP | Our IMAP/SMTP connector, using an app password and presets per provider |
-| Apps with a good official MCP (GitHub, Linear, Notion, Supabase, Stripe, Figma…) | Direct MCP (ADR 0016), never through Composio |
+| Apps with an official MCP server that connects today (GitHub, Linear, Notion, Supabase, Stripe…) | Direct MCP (ADR 0016). Amended by ADR 0107: a service whose server refuses us, or has none, goes through Composio when this server has it (Google Drive, Slack, HubSpot, Figma…); GitHub never does |
 
 ### Composio is a `ToolSource`, not a policy
 
@@ -122,6 +122,11 @@ KMS is not a prerequisite for email. Gmail and Outlook through Composio store no
 - IMAP host names are resolved and refused when they point to private, loopback or metadata addresses. They are checked once before connecting, not pinned against DNS rebinding.
 - Presets: iCloud, Yahoo, Zoho (and Zoho custom domains), Fastmail, Locaweb, Hostinger, GoDaddy, Titan and IONOS. KingHost and UOL Host are left out because no official settings page was found; those mailboxes use "Outro servidor".
 - Outlook has no brand icon (Simple Icons removed it at Microsoft's request); the card shows a letter tile.
+- A MillionSend inbox is a fourth path (`via = millionsend`), through MillionSend's API with a key of its own: ADR 0102.
+
+## Amendment (2026-10-31): connectors through Composio
+
+ADR 0107 uses the same Composio project for connectors, not only mailboxes: one client, the same user id (`org_<orgId>`), explicit actions only, no meta tool. Its calls are counted with the mailboxes' (`composio_usage`, `COMPOSIO_CALLS_PER_MONTH`), its expired accounts come through the same webhook and reconcile, and its accounts are deleted at Composio without revoking (Composio's Google and Microsoft apps may share one grant with a mailbox). For the same reason, disconnecting a mailbox revokes its grant only when no live connector on the same provider's app, of the mailbox's account or of one it can't name, may share it.
 
 ## Addendum (2026-11-01): only the mailbox's owner gives access
 

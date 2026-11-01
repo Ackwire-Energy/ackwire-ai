@@ -60,9 +60,11 @@ import type {
   ChannelMember,
   CodeSent,
   CommandApproval,
+  ComposioUsage,
   ComputerSetup,
   ComputerTarget,
   Connection,
+  ConnectOutcome,
   ConnectorCatalog,
   ConsultationConversation,
   Credential,
@@ -135,6 +137,8 @@ import type {
   Memory,
   Message,
   MessagePin,
+  MillionSendInbox,
+  MillionSendKeyInput,
   Mission,
   MissionBrain,
   MissionCommand,
@@ -184,6 +188,7 @@ import type {
   RoleInput,
   RosterMember,
   Routine,
+  RoutineHook,
   RoutineInput,
   RoutinePatch,
   RoutineRun,
@@ -212,6 +217,8 @@ import type {
   SkillInput,
   SkillPatch,
   SkillPick,
+  StartChoice,
+  StartPage,
   StatusInput,
   StorageConfig,
   StorageMigration,
@@ -345,6 +352,8 @@ export interface ApiClient {
     updateMe(orgId: string, input: { handle?: string; timezone?: string | null }): Promise<Person>;
     /** Your availability (auto, busy, hidden) and what you are doing (ADR 0084). */
     setStatus(orgId: string, input: StatusInput): Promise<Person>;
+    /** What opens when the app starts here, on every device (ADR 0108; `start.channel_unknown`). */
+    setStart(orgId: string, input: { page: StartPage; channelId?: string | null }): Promise<StartChoice>;
     /** Where I put the tools at the top of my sidebar here (only the ones I moved). */
     sidebarItems(orgId: string): Promise<SidebarItems>;
     /** Moves one tool (`null`: back on its default), my others as the server has them. Answers with every choice. */
@@ -639,6 +648,8 @@ export interface ApiClient {
     /** `always`: also approve this kind for good (409 `approval.always_unavailable` where it isn't offered). */
     approve(orgId: string, approvalId: string, reason?: string, always?: boolean): Promise<Approval>;
     refuse(orgId: string, approvalId: string, reason?: string): Promise<Approval>;
+    /** Withdraws an action approved ahead before its time: its routine's run won't do it. */
+    cancel(orgId: string, approvalId: string): Promise<Approval>;
     /** A card's "Aprovar tudo" / "Agora não para todos": exactly these ids; `skipped` the ones not decided. */
     decideMany(
       orgId: string,
@@ -654,12 +665,11 @@ export interface ApiClient {
     catalog(): Promise<ConnectorCatalog>;
     /** The organization's connections (no secrets). */
     list(orgId: string): Promise<Connection[]>;
-    connectWithKey(
-      orgId: string,
-      input: { connector: string; apiKey: string; serverUrl?: string; label?: string },
-    ): Promise<Connection>;
+    connectWithKey(orgId: string, input: { connector: string; apiKey: string; label?: string }): Promise<Connection>;
     /** Returns the provider URL to open; the server redirects back to `returnTo`. */
-    startOAuth(orgId: string, connector: string, input: { returnTo: string; serverUrl?: string }): Promise<string>;
+    startOAuth(orgId: string, connector: string, input: { returnTo: string }): Promise<string>;
+    /** The workspace's Composio calls this month and its cap (any member). */
+    composioUsage(orgId: string): Promise<ComposioUsage>;
     /**
      * The phone app (`returnTo: APP_OAUTH_RETURN`) or the desktop app's window (`desktop:` + a path) finishes an
      * authorization it started with the `state` and `code` the callback handed back to it. `returnTo`: the path
@@ -668,7 +678,15 @@ export interface ApiClient {
     completeOAuth(
       orgId: string,
       input: { state: string; code: string },
-    ): Promise<{ connectionId: string; connector: string; returnTo?: string }>;
+    ): Promise<{
+      connectionId: string;
+      connector: string;
+      /** Absent from an older server. */
+      outcome?: ConnectOutcome;
+      returnTo?: string;
+    }>;
+    /** Renames a connection, any kind (admins); its tools keep their names. 409 `connector.label_taken`. */
+    rename(orgId: string, connectionId: string, label: string): Promise<Connection>;
     disconnect(orgId: string, connectionId: string): Promise<void>;
   };
   githubApp: {
@@ -753,10 +771,14 @@ export interface ApiClient {
     create(orgId: string, input: SkillInput): Promise<SkillDetail>;
     /**
      * A GitHub link (a skill's folder or a file in it) or the folder as a zip in base64 (writes are JSON only). A link
-     * holding several skills installs nothing and answers with them to pick from (`importPicked`), those that can't
-     * be installed apart.
+     * holding several skills (or any, with `list`) installs nothing and answers with them to pick from
+     * (`importPicked`), those that can't be installed apart. A private repository is read through the workspace's
+     * GitHub, on the server.
      */
-    import(orgId: string, input: { url: string } | { zipBase64: string }): Promise<SkillDetail | SkillPick>;
+    import(
+      orgId: string,
+      input: { url: string; list?: boolean } | { zipBase64: string },
+    ): Promise<SkillDetail | SkillPick>;
     /** Installs the skills picked among a link's choices (their `path`). */
     importPicked(orgId: string, url: string, paths: string[]): Promise<SkillDetail[]>;
     update(orgId: string, id: string, patch: SkillPatch): Promise<SkillDetail>;
@@ -801,14 +823,14 @@ export interface ApiClient {
   customConnectors: {
     list(orgId: string): Promise<CustomServer[]>;
     /**
-     * Connects to an https MCP server. Without `apiKey` the server tries OAuth
-     * (discovery + dynamic client registration); if the MCP server doesn't
-     * support it, answers `needs_key` (`reason: "not_approved"` when it only
-     * registers apps it approved).
+     * Connects to an https MCP server: a new account, or with `connectionId` a new sign-in for that one
+     * ("Reconectar"). Without `apiKey` the server tries OAuth (discovery + dynamic client registration); if the
+     * MCP server doesn't support it, answers `needs_key` (`reason: "not_approved"` when it only registers apps it
+     * approved, with its refusal in `detail`).
      */
     connect(
       orgId: string,
-      input: { serverUrl: string; apiKey?: string; label?: string; returnTo: string },
+      input: { serverUrl: string; apiKey?: string; label?: string; returnTo: string; connectionId?: string },
     ): Promise<CustomConnectStart>;
     /** Lists the server's tools again; new ones come back unclassified. */
     refresh(orgId: string, serverId: string): Promise<CustomServer>;
@@ -1040,6 +1062,15 @@ export interface ApiClient {
     remove(orgId: string, id: string): Promise<void>;
     /** `name`: the copy's name in the UI language. */
     duplicate(orgId: string, id: string, name?: string): Promise<Routine>;
+    /** A webhook routine's address and latest calls (who may manage it). */
+    hook(orgId: string, id: string): Promise<RoutineHook>;
+    /** A new address: the old one stops at once. */
+    newHookAddress(orgId: string, id: string): Promise<RoutineHook>;
+    /** A new signing secret, shown this once. */
+    newHookSecret(orgId: string, id: string): Promise<{ secret: string; hook: RoutineHook }>;
+    removeHookSecret(orgId: string, id: string): Promise<RoutineHook>;
+    /** "Testar": a sample call; the agent is told it is a test. */
+    testHook(orgId: string, id: string): Promise<{ runId: string | null; hook: RoutineHook }>;
   };
   /** The org wiki: pages in folders, `[[links]]`, backlinks, history and the graph. */
   wiki: {
@@ -1288,6 +1319,13 @@ export interface ApiClient {
     accounts(orgId: string): Promise<MailAccount[]>;
     /** Tests the login and both servers first; a `422` carries `MailConnectError` as its code. */
     connectImap(orgId: string, input: MailImapInput): Promise<MailAccount>;
+    /** The inboxes a MillionSend key reaches (the key isn't kept); a `422 auth` when MillionSend refuses it. */
+    millionsendInboxes(orgId: string, input: MillionSendKeyInput): Promise<MillionSendInbox[]>;
+    /** Connects one; `instant`: a webhook brings its new mail at once (else it's checked every few minutes). */
+    connectMillionSend(
+      orgId: string,
+      input: MillionSendKeyInput & { inboxId: string; label?: string },
+    ): Promise<{ account: MailAccount; instant: boolean }>;
     /**
      * Gmail/Outlook: the page to open; the server sends the person back with `?mail=connected|failed`.
      * `desktop`: started in the desktop app's window, which opens the page in the browser and gets the return back.

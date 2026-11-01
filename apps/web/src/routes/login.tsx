@@ -18,7 +18,8 @@ export const Route = createFileRoute("/login")({
       // The page names the invitation's workspace from the first frame (`AuthPage`).
       goal && "invite" in goal ? context.queryClient.prefetchQuery(invitationQuery(context.api, goal.invite)) : null,
     ]);
-    if (me) throw redirect({ href: search.redirect ?? "/" });
+    // An OAuth callback that waited for a sign-in (under /api/) is the server's: a full load.
+    if (me) throw redirect({ href: search.redirect ?? "/", reloadDocument: search.redirect?.startsWith("/api/") });
     // A brand-new instance has nobody to sign in: go straight to the first account.
     if (config.firstRun) throw redirect({ to: "/signup", search: { redirect: search.redirect } });
   },

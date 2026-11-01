@@ -534,6 +534,12 @@ export const WRAP_UP_NOTE =
   "You are close to this run's limit of steps: only a couple of calls are left. Stop starting new work. If the people need to know what you found, call hand_off now with what you have; then end with your record (a short summary of what you checked). Your tools stay available for these last calls.";
 
 /**
+ * A provider's refusals that are the account's (its key, credit, access, quota): the person sees why and can fix it.
+ * Any other refusal (a request the provider rejects, a model it doesn't have) is the app's, so it is reported.
+ */
+const ACCOUNT_REFUSALS = new Set([401, 402, 403, 429]);
+
+/**
  * What a conversation run near its cap reads once (not a forum's): where it stands, so the person can let it go on
  * (Continuar).
  */
@@ -572,26 +578,43 @@ const CUT_BY_RESTART =
 
 const toolResultFor = (approval: Approval | undefined): { content: string; isError: boolean } => {
   if (!approval) return { content: "The approval request is missing.", isError: true };
+  // Asked ahead (`schedule_action`): the action was for later, so the answer says what happens then.
+  const ahead = approval.runAt !== null;
   if (approval.status === "refused") {
     return {
-      content: `A person refused this action. Do not retry it.${approval.reason ? ` Reason: ${approval.reason}` : ""}`,
+      content: `A person refused this action${ahead ? " ahead: it won't run at its time" : ""}. Do not retry it.${approval.reason ? ` Reason: ${approval.reason}` : ""}`,
       isError: true,
     };
   }
   if (approval.status === "expired") {
-    return { content: "Nobody approved this action within 24 hours; it was not executed.", isError: true };
+    return {
+      content: ahead
+        ? "Nobody approved this action ahead in time: at its time it asks a person first."
+        : "Nobody approved this action within 24 hours; it was not executed.",
+      isError: true,
+    };
+  }
+  if (ahead && approval.status === "canceled") {
+    return { content: "This action prepared ahead was canceled: it won't run at its time.", isError: true };
   }
   return { content: "This action was not executed.", isError: true };
 };
 
 /**
  * `wait`: the job resumes one wait for the computer (`waitingForBrain.waitId`); anything else is stale.
- * `jobId`: that job's row. `owned`: whether this claim still holds the job (`JobContext.owned`).
+ * `jobId`: that job's row. `owned`: whether this claim still holds the job (`JobContext.owned`). `failed`: the run
+ * gave up on an error that is the app's to fix (`JobContext.failed`).
  */
 /** A provider outage's resume ladder (minutes, the last repeats), and how long a run waits before failing. */
 export const OUTAGE_PARK = { ladderMinutes: [2, 15, 30, 60], maxMs: 24 * 60 * 60_000 } as const;
 
-type RunJobOptions = { finalAttempt: boolean; wait?: string; jobId?: string; owned?: () => Promise<boolean> };
+type RunJobOptions = {
+  finalAttempt: boolean;
+  wait?: string;
+  jobId?: string;
+  owned?: () => Promise<boolean>;
+  failed?: (error: unknown) => void;
+};
 
 /**
  * Executes one agent run (job `agent_run.execute`), end to end
@@ -2606,10 +2629,14 @@ async function executeRunInner(
         const paused = await standingRefusal(db, run.orgId, run.agentId);
         if (paused) return fail(paused.message);
         const reason = userFacing(error);
-        if (reason) return fail(reason);
+        if (reason) {
+          if (error instanceof ProviderError && !ACCOUNT_REFUSALS.has(error.status ?? 0)) options.failed?.(error);
+          return fail(reason);
+        }
         if (options.finalAttempt) {
           const message = error instanceof Error ? error.message : String(error);
           if (retryableOutage(error) && (await parkOutage(message))) return;
+          options.failed?.(error);
           return fail(`gave_up: ${message}`);
         }
         await addRunStep(db, run, "error", { reason: "transient", message: String(error), willRetry: true });

@@ -482,6 +482,28 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
   font-size: 12px;
   color: var(--faint);
 }
+/* What was prepared for its runs (`schedule_action`): one box each, its Cancel at the end. */
+.routine-ahead {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.routine-ahead__item {
+  align-items: flex-start;
+}
+.routine-ahead__text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.routine-ahead__title {
+  display: block;
+  font-weight: 600;
+  color: var(--ink);
+}
 .routine-runs {
   list-style: none;
   margin: 0;
@@ -705,4 +727,34 @@ html:not([data-pointer]) .routine-preset:focus-visible {
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+}
+
+/* "Quando o webhook for chamado": the address, the signature, an example and the latest calls, one under another. */
+.routine-hook {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.routine-hook__part {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.routine-hook__part p {
+  margin: 0;
+}
+.routine-hook__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.routine-hook__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--control-r-md);
+  background: var(--sunken);
 }

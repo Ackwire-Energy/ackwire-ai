@@ -1,5 +1,5 @@
 import type { ApiClient, SocketFactory } from "@agenteschat/client";
-import { knownErrorText } from "@agenteschat/client/lib/errors";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { domWindow } from "@agenteschat/ui/testing/dom";
 import {
   createMemoryHistory,
@@ -10,7 +10,7 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 import { act, render, within } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { type ReactNode, StrictMode } from "react";
 import { AppProviders, type AppServices } from "@/app/providers";
 import { createQueryClient } from "@/app/query-client";
 import type { RouterContext } from "@/app/router-context";
@@ -37,10 +37,10 @@ export function makeServices(
   const queryClient = createQueryClient({
     onUnauthorized: () => {},
     onMutationError: (m) => toasts.show(m, "error"),
-    unknownError: () => "erro",
-    describeError: (error) => knownErrorText(i18n.t, error),
+    describeError: (error) => errorText(i18n.t, error, i18n.language),
   });
-  queryClient.setDefaultOptions({ queries: { retry: false, refetchOnWindowFocus: false } });
+  // A query that retries by itself (an invitation that got no answer) does so at once.
+  queryClient.setDefaultOptions({ queries: { retry: false, retryDelay: 0, refetchOnWindowFocus: false } });
   return { api, auth, queryClient, i18n, toasts, createSocket };
 }
 
@@ -122,10 +122,13 @@ export async function renderPage(
   return { ...result, services, router, sockets };
 }
 
-/** Renders the real app routes (route guards, redirects) at `path`. */
+/**
+ * Renders the real app routes (route guards, redirects) at `path`. `strict`: inside StrictMode, as development runs
+ * the app (every effect twice on mounting).
+ */
 export async function renderApp(
   path: string,
-  options: { api: ApiClient; auth?: AuthClient; createSocket?: SocketFactory },
+  options: { api: ApiClient; auth?: AuthClient; createSocket?: SocketFactory; strict?: boolean },
 ) {
   const sockets = fakeSockets();
   const services = makeServices(options.api, options.auth, options.createSocket ?? sockets.factory);
@@ -134,11 +137,12 @@ export async function renderApp(
     history: createMemoryHistory({ initialEntries: [path] }),
     context: { queryClient: services.queryClient, api: options.api },
   });
-  const result = render(
+  const app = (
     <AppProviders services={services}>
       <RouterProvider router={router} />
-    </AppProviders>,
+    </AppProviders>
   );
+  const result = render(options.strict ? <StrictMode>{app}</StrictMode> : app);
   await settle(6);
   return { ...result, services, router, sockets };
 }

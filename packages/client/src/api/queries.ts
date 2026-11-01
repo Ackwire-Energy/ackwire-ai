@@ -13,7 +13,7 @@ import { moveInGroups } from "../lib/agent-groups";
 import { artifactRefs } from "../lib/artifacts";
 import { newerSetup } from "../lib/computer";
 import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS } from "../lib/consult-group";
-import { sendWaits } from "../lib/errors";
+import { noAnswer, sendWaits } from "../lib/errors";
 import { LoginReadError, loginReadPasses } from "../lib/machines";
 import { GIF_PAGE, messageMediaOf, postedMedia } from "../lib/media";
 import {
@@ -89,6 +89,7 @@ import type {
   Me,
   Message,
   MessageMemory,
+  MillionSendKeyInput,
   MoveAgentsInput,
   NoticeCategory,
   NoticePrefs,
@@ -102,6 +103,8 @@ import type {
   ReminderInput,
   Role,
   RoleInput,
+  Routine,
+  RoutineHook,
   RoutineInput,
   RoutinePatch,
   S3Input,
@@ -113,6 +116,7 @@ import type {
   SidebarPlace,
   SkillInput,
   SkillPatch,
+  StartChoice,
   StatusInput,
   StorageMigration,
   ThreadAction,
@@ -149,9 +153,16 @@ export const instanceQuery = (api: ApiClient) =>
   queryOptions({ queryKey: keys.instance, queryFn: () => api.system.instance(), staleTime: 60_000 });
 export const channelsQuery = (api: ApiClient, orgId: string) =>
   queryOptions({ queryKey: keys.channels(orgId), queryFn: () => api.chat.channels(orgId), staleTime: 30_000 });
-/** An invitation's preview (its page, and the sign-in that leads to it). */
+/**
+ * An invitation's preview (its page, and the sign-in that leads to it). One that got no answer is asked twice more:
+ * the server may be restarting, and it's no expired link.
+ */
 export const invitationQuery = (api: ApiClient, token: string) =>
-  queryOptions({ queryKey: keys.invitation(token), queryFn: () => api.orgs.previewInvitation(token), retry: false });
+  queryOptions({
+    queryKey: keys.invitation(token),
+    queryFn: () => api.orgs.previewInvitation(token),
+    retry: (count, error) => count < 2 && noAnswer(error),
+  });
 /** An email invitation that no longer opens: accepted or expired (ADR 0090). */
 export const invitationStateQuery = (api: ApiClient, token: string) =>
   queryOptions({
@@ -872,6 +883,25 @@ export function cacheMessage(qc: ReturnType<typeof useQueryClient>, orgId: strin
   qc.setQueryData<Message[]>(key, (list) => upsertMessage(withoutLocal(list), message));
 }
 
+/**
+ * Início's "Peça a um agente" (ADR 0108): the DM with the agent (made if new), the message sent there and kept in its
+ * cache, so the conversation opens with it and the agent at work.
+ */
+export function useAskAgent(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ agentId, body }: { agentId: string; body: string }) => {
+      const { channelId } = await api.dms.open(orgId, { agentId });
+      return api.chat.post(orgId, channelId, { body, clientId: newClientId() });
+    },
+    onSuccess: (message) => {
+      cacheMessage(qc, orgId, message);
+      void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
+    },
+  });
+}
+
 const isMessageList = (key: readonly unknown[]) => key[4] === "messages" || key[4] === "thread";
 
 /**
@@ -1250,14 +1280,25 @@ export function cacheApproval(qc: ReturnType<typeof useQueryClient>, orgId: stri
   qc.setQueryData<Approval[]>(keys.approvals(orgId), (list) => {
     if (!list) return list;
     const previous = list.find((a) => a.id === approval.id);
-    // Channel events don't know who is asking: keep our own `canDecide` until it's decided.
-    const merged =
-      previous && approval.status === "pending" ? { ...approval, canDecide: previous.canDecide } : approval;
+    const merged = keepOwnRights(previous, approval);
     return previous ? list.map((a) => (a.id === approval.id ? merged : a)) : [merged, ...list];
   });
-  qc.setQueryData<Approval>(keys.approval(orgId, approval.id), (prev) =>
-    prev && approval.status === "pending" ? { ...approval, canDecide: prev.canDecide } : approval,
-  );
+  qc.setQueryData<Approval>(keys.approval(orgId, approval.id), (prev) => keepOwnRights(prev, approval));
+  // One prepared ahead is also on its routine's page (approved, ran, withdrawn).
+  if (approval.routineId) void qc.invalidateQueries({ queryKey: keys.routines(orgId) });
+}
+
+/**
+ * Channel events don't know who is asking: our own `canDecide` stays until it's decided, and our own `canCancel`
+ * while an action approved ahead may still run.
+ */
+function keepOwnRights(previous: Approval | undefined, approval: Approval): Approval {
+  if (!previous) return approval;
+  if (approval.status === "pending") return { ...approval, canDecide: previous.canDecide };
+  if (approval.status === "approved" && approval.runAt && !approval.executedAt) {
+    return { ...approval, canCancel: approval.canCancel || previous.canCancel };
+  }
+  return approval;
 }
 
 /** `always` ("Aprovar sempre"): approves this one and the agent's next calls of its kind. */
@@ -1284,6 +1325,19 @@ export function useDecideApproval(orgId: string) {
       cacheApproval(qc, orgId, approval);
       void qc.invalidateQueries({ queryKey: keys.approvals(orgId) });
       if (always) void qc.invalidateQueries({ queryKey: keys.approvalRules(orgId, approval.agentId) });
+    },
+  });
+}
+
+/** Withdraws an action approved ahead before its time (its routine's page, its card). */
+export function useCancelApproval(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.approvals.cancel(orgId, id),
+    onSuccess: (approval) => {
+      cacheApproval(qc, orgId, approval);
+      void qc.invalidateQueries({ queryKey: keys.approvals(orgId) });
     },
   });
 }
@@ -1329,22 +1383,28 @@ export const useCatalog = () => {
   return useQuery({ queryKey: keys.catalog, queryFn: () => api.connectors.catalog(), staleTime: 10 * 60_000 });
 };
 
-export const useConnections = (orgId: string) => {
+export const useConnections = (orgId: string, enabled = true) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.connections(orgId), queryFn: () => api.connectors.list(orgId), staleTime: 30_000 });
+  return useQuery({
+    queryKey: keys.connections(orgId),
+    queryFn: () => api.connectors.list(orgId),
+    staleTime: 30_000,
+    enabled,
+  });
 };
 
 export function useConnectWithKey(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { connector: string; apiKey: string; serverUrl?: string; label?: string }) =>
+    mutationFn: (input: { connector: string; apiKey: string; label?: string }) =>
       api.connectors.connectWithKey(orgId, input),
-    // A new connection is every agent's: their access trees change too.
+    // A new connection is every agent's: their access trees change too, and so do the repositories GitHub reaches.
     onSuccess: () =>
       Promise.all([
         qc.invalidateQueries({ queryKey: keys.connections(orgId) }),
         qc.invalidateQueries({ queryKey: keys.access(orgId) }),
+        qc.invalidateQueries({ queryKey: keys.githubRepos(orgId) }),
       ]),
   });
 }
@@ -1352,8 +1412,27 @@ export function useConnectWithKey(orgId: string) {
 export function useStartOAuth(orgId: string) {
   const api = useApi();
   return useMutation({
-    mutationFn: ({ connector, returnTo, serverUrl }: { connector: string; returnTo: string; serverUrl?: string }) =>
-      api.connectors.startOAuth(orgId, connector, { returnTo, serverUrl }),
+    mutationFn: ({ connector, returnTo }: { connector: string; returnTo: string }) =>
+      api.connectors.startOAuth(orgId, connector, { returnTo }),
+  });
+}
+
+/**
+ * Renames a connection (any kind). Its lists and every agent's access tree show the name. A 409 (`connector.label_taken`)
+ * is the form's to say, not a toast.
+ */
+export function useRenameConnection(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, label }: { id: string; label: string }) => api.connectors.rename(orgId, id, label),
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: keys.connections(orgId) }),
+        qc.invalidateQueries({ queryKey: keys.customServers(orgId) }),
+        qc.invalidateQueries({ queryKey: keys.access(orgId) }),
+      ]),
+    meta: { silent: true },
   });
 }
 
@@ -1366,12 +1445,15 @@ export function useCompleteOAuth(orgId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { state: string; code: string }) => api.connectors.completeOAuth(orgId, input),
+    // Its callers say why it failed in words of their own (oauthReturnText on the web), once.
+    meta: { silent: true },
     // It may finish a catalog connection or a server connected by address (their own list), every agent's.
     onSuccess: () =>
       Promise.all([
         qc.invalidateQueries({ queryKey: keys.connections(orgId) }),
         qc.invalidateQueries({ queryKey: keys.customServers(orgId) }),
         qc.invalidateQueries({ queryKey: keys.access(orgId) }),
+        qc.invalidateQueries({ queryKey: keys.githubRepos(orgId) }),
       ]),
   });
 }
@@ -1425,6 +1507,7 @@ export function useDisconnect(orgId: string) {
     mutationFn: (connectionId: string) => api.connectors.disconnect(orgId, connectionId),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.connections(orgId) });
+      void qc.invalidateQueries({ queryKey: keys.githubRepos(orgId) });
       // Agents lose the scopes of that connection.
       void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === "org" && q.queryKey[4] === "scopes" });
     },
@@ -1512,6 +1595,17 @@ export function useMailAction(orgId: string) {
     connectComposio: useMutation({
       mutationFn: (input: { provider: "gmail" | "outlook"; label?: string; accountId?: string; desktop?: boolean }) =>
         api.mail.connectComposio(orgId, input),
+    }),
+    millionsendInboxes: useMutation({
+      mutationFn: (input: MillionSendKeyInput) => api.mail.millionsendInboxes(orgId, input),
+      // The form says why (a key MillionSend refused).
+      meta: { silent: true },
+    }),
+    connectMillionSend: useMutation({
+      mutationFn: (input: MillionSendKeyInput & { inboxId: string; label?: string }) =>
+        api.mail.connectMillionSend(orgId, input),
+      onSuccess: done,
+      meta: { silent: true },
     }),
     update: useMutation({
       mutationFn: ({ accountId, ...input }: MailAccountUpdate & { accountId: string }) =>
@@ -1610,6 +1704,29 @@ export function useSetMyStatus(orgId: string, userId: string | undefined) {
     onSuccess: (me) => {
       qc.setQueryData<Person[]>(keys.people(orgId), (people) => people?.map((p) => (p.userId === me.userId ? me : p)));
     },
+  });
+}
+
+/** What opens when the app starts here (ADR 0108): in `me` at once, back as it was if the server refuses. */
+export function useSetStart(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const put = (start: StartChoice) =>
+    qc.setQueryData<Me | null>(keys.me, (me) =>
+      me ? { ...me, organizations: me.organizations.map((o) => (o.id === orgId ? { ...o, start } : o)) } : me,
+    );
+  return useMutation({
+    mutationFn: (input: StartChoice) => api.orgs.setStart(orgId, input),
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: keys.me });
+      const before = qc.getQueryData<Me | null>(keys.me);
+      put(input);
+      return { before };
+    },
+    onError: (_e, _input, ctx) => {
+      if (ctx?.before !== undefined) qc.setQueryData(keys.me, ctx.before);
+    },
+    onSuccess: put,
   });
 }
 
@@ -1797,6 +1914,17 @@ export function useDenyJoinRequest(orgId: string) {
 export const useUsageReport = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({ queryKey: keys.usageReport(orgId), queryFn: () => api.orgs.usageReport(orgId), enabled });
+};
+
+/** The workspace's Composio calls this month (Uso, and Conectores past 80%). */
+export const useComposioUsage = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.composioUsage(orgId),
+    queryFn: () => api.connectors.composioUsage(orgId),
+    enabled,
+    staleTime: 60_000,
+  });
 };
 
 /** Configurações › Auditoria: pages of 50, newest first (admins). */
@@ -2176,8 +2304,13 @@ export function useCustomServerAction(orgId: string) {
   const done = () => qc.invalidateQueries({ queryKey: keys.customServers(orgId) });
   return {
     connect: useMutation({
-      mutationFn: (input: { serverUrl: string; apiKey?: string; label?: string; returnTo: string }) =>
-        api.customConnectors.connect(orgId, input),
+      mutationFn: (input: {
+        serverUrl: string;
+        apiKey?: string;
+        label?: string;
+        returnTo: string;
+        connectionId?: string;
+      }) => api.customConnectors.connect(orgId, input),
       // A new server is every agent's: their access trees change too.
       onSuccess: () => Promise.all([done(), qc.invalidateQueries({ queryKey: keys.access(orgId) })]),
     }),
@@ -2590,6 +2723,35 @@ export const useRoutineRuns = (orgId: string, id: string | null) => {
   });
 };
 
+/** A webhook routine's address and latest calls (ADR 0106), for who manages it. */
+export const useRoutineHook = (orgId: string, id: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.routineHook(orgId, id ?? ""),
+    queryFn: () => api.routines.hook(orgId, id ?? ""),
+    enabled: Boolean(id),
+  });
+};
+
+/** A new address, a new signing secret (its `secret` shown once) or none, and Testar. */
+export function useRoutineHookAction(orgId: string, id: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      action: "address" | "secret" | "unsign" | "test",
+    ): Promise<{ hook: RoutineHook; secret?: string; runId?: string | null }> => {
+      if (action === "address") return { hook: await api.routines.newHookAddress(orgId, id) };
+      if (action === "secret") return api.routines.newHookSecret(orgId, id);
+      if (action === "unsign") return { hook: await api.routines.removeHookSecret(orgId, id) };
+      return api.routines.testHook(orgId, id);
+    },
+    onSuccess: ({ hook }) => qc.setQueryData(keys.routineHook(orgId, id), hook),
+    // The list carries the address too, and a test starts a run (both under the routines' key).
+    onSettled: () => void qc.invalidateQueries({ queryKey: keys.routines(orgId) }),
+  });
+}
+
 export const useScheduleParse = (orgId: string, phrase: string, enabled: boolean, timezone?: string) => {
   const api = useApi();
   return useQuery({
@@ -2658,6 +2820,16 @@ export function useRoutineAction(orgId: string) {
         return api.routines.setActive(orgId, action.id, true);
       }
       return api.routines.runNow(orgId, action.id);
+    },
+    // A routine just made or changed is in the list at once, before it comes back: its page reads it from there.
+    onSuccess: (saved, action) => {
+      if (action.type !== "create" && action.type !== "update" && action.type !== "duplicate") return;
+      const routine = saved as Routine;
+      qc.setQueryData<Routine[]>(keys.routines(orgId), (list) =>
+        list?.some((r) => r.id === routine.id)
+          ? list.map((r) => (r.id === routine.id ? routine : r))
+          : list && [...list, routine],
+      );
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: keys.routines(orgId) });
@@ -2767,13 +2939,15 @@ export function useSkillUsage(orgId: string, enabled: boolean) {
   return usage;
 }
 
-export function useSkillAction(orgId: string) {
+/** `silent`: the screen says every refusal itself (Instalar skill), so the app's own error toast stays out. */
+export function useSkillAction(orgId: string, { silent = false } = {}) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
+    ...(silent ? { meta: { silent: true } } : {}),
     mutationFn: (
       action:
-        | { type: "import"; input: { url: string } | { zipBase64: string } }
+        | { type: "import"; input: { url: string; list?: boolean } | { zipBase64: string } }
         | { type: "importPicked"; url: string; paths: string[] }
         | { type: "create"; input: SkillInput }
         | { type: "update"; id: string; patch: SkillPatch }
@@ -3832,14 +4006,18 @@ export function useFollowThread(orgId: string) {
   });
 }
 
-/** "Trabalhando agora": agent runs in progress where you are (refetch on `agent.run` / `run.finished`). */
-export function useWorkingRuns(orgId: string, enabled = true) {
+/**
+ * "Trabalhando agora": agent runs in progress where you are (refetch on `agent.run` / `run.finished`). `pollMs`: asked
+ * again this often where no channel's events reach (Início).
+ */
+export function useWorkingRuns(orgId: string, enabled = true, pollMs: number | false = false) {
   const api = useApi();
   return useQuery({
     queryKey: keys.working(orgId),
     queryFn: () => part(api, "working").list(orgId),
     enabled: enabled && Boolean(api.working),
     staleTime: 10_000,
+    refetchInterval: pollMs,
   });
 }
 

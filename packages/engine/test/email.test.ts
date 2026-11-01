@@ -461,6 +461,7 @@ describe("the picture over the headline", () => {
     expect(shown([])).toEqual(ONBOARDING);
     expect(shown(undefined)).toEqual(ONBOARDING);
     expect(shown([{ color: "mauve" }, {}])).toEqual(faces("sky", "sky"));
+    expect(shown([{ color: "#e0457b" }, { color: "#808080" }])).toEqual(faces("rose", "graphite"));
   });
 
   test("an onboarding agent's look is drawn whole, eyes and accessory; any other look is its colour's face", () => {

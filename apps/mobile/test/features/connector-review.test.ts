@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { ConnectorDef, CustomServer, CustomTool, ToolAccess } from "@agenteschat/client";
+import { mailActionsChanged, mailActionsFrom, mailReviewTools } from "@agenteschat/client/lib/mail";
 import { type ReviewTool, reviewDecisions, reviewToolsOf } from "@agenteschat/client/lib/tool-review";
 import {
   ADDRESS_STEPS,
@@ -31,8 +32,7 @@ const def = (id: string, over: Partial<ConnectorDef> = {}): ConnectorDef => ({
   auth: ["oauth"],
   oauthConfigured: true,
   available: true,
-  needsServerUrl: false,
-  serverUrl: null,
+  serverUrl: `https://mcp.${id}.example/mcp`,
   iconUrl: null,
   brandColor: null,
   scopes: [],
@@ -94,6 +94,10 @@ describe("where the sheet is", () => {
     // Back from a sign-in: on its tools, reviewed or not; never for someone who can't change them.
     expect(firstStep({ needsReview: false }, true, "review")).toBe("review");
     expect(firstStep({ needsReview: true }, false, "review")).toBe("who");
+    // Connecting again over a connection (one GitHub refuses, from Instalar skill): an admin's, a new service as ever.
+    expect(firstStep({ needsReview: false }, true, "connect")).toBe("connect");
+    expect(firstStep({ needsReview: false }, false, "connect")).toBe("who");
+    expect(firstStep(undefined, true, "connect")).toBe("about");
   });
 
   test("each step has a name in both languages, and the dashes say where the flow is", async () => {
@@ -221,5 +225,26 @@ describe("the list", () => {
     ]);
     expect(subjectsOf(t, settled, "nada disso")).toEqual([]);
     expect(waitingHits(state, tools, "nada disso")).toEqual([]);
+  });
+});
+
+describe("a mailbox's tools", () => {
+  test("as the web reviews them: each choice saves the mailbox's off and asking actions, nothing changed saves nothing", async () => {
+    const t = await translator("pt-BR");
+    const account = { offActions: [], askActions: [] };
+    const tools = mailReviewTools(t, account);
+    expect(tools.find((x) => x.name === "send")?.levels).toEqual(["approval", "off"]);
+    expect(subjectsOf(t, tools, "").map((g) => g.tools.length)).toEqual([8, 1]);
+    let state = emptyReview();
+    expect(mailActionsChanged(account, mailActionsFrom(tools, state.levels))).toBe(false);
+    state = choose(state, named(tools, "delete"), "off");
+    state = choose(state, named(tools, "organize"), "approval");
+    const chosen = mailActionsFrom(tools, state.levels);
+    expect(chosen).toEqual({ offActions: ["delete"], askActions: ["organize"] });
+    expect(mailActionsChanged(account, chosen)).toBe(true);
+    // Opened again, the mailbox's choices are where the review starts.
+    const saved = mailReviewTools(t, chosen);
+    expect([named(saved, "delete").level, named(saved, "organize").level]).toEqual(["off", "approval"]);
+    expect(mailActionsChanged(chosen, mailActionsFrom(saved, {}))).toBe(false);
   });
 });

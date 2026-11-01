@@ -10,8 +10,8 @@ import {
   ACCOUNT_NOT_LINKED,
   authErrorText,
   EARLY_ACCESS_OTHER_EMAIL,
-  knownErrorText,
-  providerRefusalText,
+  errorText,
+  signInRefusalText,
 } from "@agenteschat/client/lib/errors";
 import { signInFor } from "@agenteschat/client/lib/guards";
 import { type HumanAction, isHumanCheckRefusal, withHumanCheck } from "@agenteschat/client/lib/human-check";
@@ -115,8 +115,8 @@ export function AuthPage({
   /** An early-access link's token (`/signup?access=`): it opens sign-up for the address it was sent to. */
   access?: string;
   /**
-   * The code of a provider sign-in the server refused (`/login?error=`): said when the app knows it. An unconfirmed
-   * password account's comes with its address in `email`, to make a new password from here.
+   * The code of a provider sign-in that didn't finish or the server refused (`/login?error=`), said in the person's
+   * words. An unconfirmed password account's comes with its address in `email`, to make a new password from here.
    */
   refused?: string;
 }) {
@@ -132,7 +132,7 @@ export function AuthPage({
   const [password, setPassword] = useState("");
   const [options, setOptions] = useState<SignInOptions | null>(null);
   const canReset = config.data?.passwordReset === true;
-  const refusal = refused ? providerRefusalText(t, refused, canReset) : null;
+  const refusal = refused ? signInRefusalText(t, refused, canReset) : null;
   const [error, setError] = useState<string | null>(refusal);
   const [wrong, setWrong] = useState(false);
   const [pending, setPending] = useState(false);
@@ -203,11 +203,7 @@ export function AuthPage({
   const offerReset = providerRefused && refused === ACCOUNT_NOT_LINKED && canReset && isEmail(email);
 
   const fail = (e: unknown) =>
-    setError(
-      e instanceof ApiError && e.status === 429
-        ? t("auth.tooManyTries")
-        : (knownErrorText(t, e) ?? t("common.unknownError")),
-    );
+    setError(e instanceof ApiError && e.status === 429 ? t("auth.tooManyTries") : errorText(t, e));
 
   /** Who is this e-mail: the next step follows from the server's answer. */
   const lookUp = async (value = email) => {
@@ -235,10 +231,12 @@ export function AuthPage({
     if (initialEmail && isEmail(initialEmail) && !refused) void lookUp(initialEmail);
   }, []);
 
-  // `to` is a path with its query (an email's `?open=`, `?connect=ai`): an href, not a route.
+  // `to` is a path with its query (an email's `?open=`, `?connect=ai`): an href, not a route. One under /api/ (an
+  // OAuth callback that waited for this sign-in) is the server's: a full load.
   const enter = async (to: string) => {
     prepareBurst(header.current ?? document.body)();
     qc.clear();
+    if (to.startsWith("/api/")) return window.location.assign(to);
     await navigate({ href: to });
   };
 

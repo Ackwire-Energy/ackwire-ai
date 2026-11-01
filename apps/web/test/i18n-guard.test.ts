@@ -47,6 +47,23 @@ describe("no hardcoded UI text", () => {
   });
 });
 
+describe("a failed request in the person's words", () => {
+  /** Where an error's own words are the point: Better Auth's refusal read into `AuthResult`, a framed page's script. */
+  const OWN_WORDS = ["auth/better-auth.ts", "components/artifacts/HtmlFrame.tsx"];
+  test("no error's own message on screen: errorText, authErrorText or the screen's own line", () => {
+    const src = ROOTS[0] ?? "";
+    const offenders = sourceFiles(src)
+      .filter((f) => !OWN_WORDS.some((own) => f.endsWith(own)))
+      .flatMap((f) => {
+        const source = withoutComments(readFileSync(f, "utf8"));
+        return [...source.matchAll(/\b(?:e|err|error|failed|result)\.message\b|as Error\)\.message/g)].map(
+          (m) => `${relative(src, f)}:${source.slice(0, m.index).split("\n").length}`,
+        );
+      });
+    expect(offenders).toEqual([]);
+  });
+});
+
 describe("Claude and ChatGPT, not their makers, in what a person reads", () => {
   /** A legal text names the company, once, beside the product people know. */
   const MAKER = { en: "Anthropic, which makes Claude", "pt-BR": "a Anthropic, que faz o Claude" } as const;

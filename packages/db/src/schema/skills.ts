@@ -27,6 +27,11 @@ export const skills = pgTable(
     /** `upload`, `url` or `manual`. */
     source: text().notNull(),
     sourceUrl: text(),
+    /**
+     * How a private repository was read (`github_app` or the `github` connection), which updating reads through
+     * again. Null: read with no credentials.
+     */
+    sourceVia: text(),
     version: integer().notNull().default(1),
     /** Enabled for agents created later. */
     defaultForNewAgents: boolean().notNull().default(false),

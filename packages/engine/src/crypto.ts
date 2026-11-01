@@ -21,7 +21,8 @@ export type KeyPurpose =
   | "git-proxy"
   | "invite-links"
   | "invitations"
-  | "invitation-mail";
+  | "invitation-mail"
+  | "routine-hooks";
 
 function deriveKey(masterSecret: string, purpose: KeyPurpose): Buffer {
   return Buffer.from(hkdfSync("sha256", masterSecret, "agentes.chat", `agentes.chat/${purpose}/v1`, 32));
@@ -145,6 +146,11 @@ export function invitationToken(masterSecret: string, invitationId: string): str
  */
 export function invitationMailProof(masterSecret: string, invitationId: string): string {
   return createHmac("sha256", deriveKey(masterSecret, "invitation-mail")).update(invitationId).digest("base64url");
+}
+
+/** The token in a routine's webhook address (ADR 0106), made the same way from its hook's key id. */
+export function routineHookToken(masterSecret: string, keyId: string): string {
+  return createHmac("sha256", deriveKey(masterSecret, "routine-hooks")).update(keyId).digest("base64url");
 }
 
 /** URL-safe random token, e.g. for invitation links. */

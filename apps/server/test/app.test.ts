@@ -1,4 +1,6 @@
 import { expect, test } from "bun:test";
+import { MachineRequestError } from "@agenteschat/engine";
+import type { ModuleContext } from "@agenteschat/modules";
 import { createApp } from "../src/app";
 import { createTestServer } from "./harness";
 
@@ -41,6 +43,29 @@ test("health answers 503 once the server is shutting down, so a proxy stops send
   const res = await app.request("/api/health");
   expect(res.status).toBe(503);
   expect(await res.json()).toMatchObject({ status: "draining", database: "ok" });
+});
+
+test("a computer's error is a 503 with its code: behind Cloudflare an origin's 502 never reaches the app", async () => {
+  const app = createApp({
+    edition: "selfhost",
+    version: "1",
+    pingDatabase: async () => {},
+    moduleContext: {} as ModuleContext,
+    modules: [
+      {
+        name: "computer",
+        registerRoutes: (api) =>
+          api.get("/computer/run", () => {
+            throw new MachineRequestError("timeout", "The computer didn't answer in time");
+          }),
+      },
+    ],
+  });
+  const res = await app.request("/api/computer/run");
+  expect(res.status).toBe(503);
+  expect(await res.json()).toEqual({
+    error: { code: "machine.timeout", message: "The computer didn't answer in time" },
+  });
 });
 
 test("unknown API routes return the JSON error shape", async () => {
