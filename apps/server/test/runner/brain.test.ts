@@ -174,7 +174,7 @@ test("parser: partial deltas, our tool calls with results, usage, and the final 
       },
     }),
   );
-  // Only our bridge's tools are the engine's to record; Claude Code's own stay on the machine.
+  // Claude Code's own tools come too, by their names: the engine keeps them as what the turn tried.
   expect(results.events).toEqual([
     {
       type: "tool_call",
@@ -183,6 +183,7 @@ test("parser: partial deltas, our tool calls with results, usage, and the final 
       input: { query: "q" },
       executed: { content: "found", isError: true },
     },
+    { type: "tool_call", id: "t2", name: "Bash", input: { command: "ls" }, executed: { content: "a.txt" } },
   ]);
   const end = p.push(
     line({

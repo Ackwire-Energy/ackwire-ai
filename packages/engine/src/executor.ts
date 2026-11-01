@@ -2633,7 +2633,7 @@ async function executeRunInner(
       // Text before tool calls is narration of the work: kept on the model call's step, not part of the answer.
       const turnText = dropSquashedEcho(textOf(result.content).trim());
       const narration = result.stopReason === "tool_use" && turnText ? turnText : "";
-      // The calls a computer turn ran itself (Codex's commands and edits; Claude Code keeps its own on the computer):
+      // The calls a computer turn ran itself (Codex's commands and edits, Claude Code's Bash, WebSearch…):
       // the report tells action from talk by them. Ours through the bridge have steps of their own.
       const ours = new Set(turnTools.map((t) => t.name));
       const own = executedNow.filter((c) => !ours.has(c.name));

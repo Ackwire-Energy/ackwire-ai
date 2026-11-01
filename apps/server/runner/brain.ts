@@ -253,16 +253,12 @@ function taskOf(ev: Record<string, unknown>): ParsedTask | undefined {
  * Claude Code's `stream-json` output → `WireBrainEvent`s. One parser per
  * process (the session id persists); `beginTurn` resets what a turn tracks.
  * Only the main conversation counts (`parent_tool_use_id` null): subagents
- * work inside a tool call.
+ * work inside a tool call. Claude Code's own tools (Bash, WebSearch, Read…)
+ * become executed `tool_call` events too, by their Claude Code names: the
+ * engine keeps them as what the turn tried (`transcript.harnessTried`).
  */
 export class ClaudeStreamParser {
   session?: string;
-  /**
-   * `false` (default): only our bridge's tools become `tool_call` events (the
-   * engine records them); Claude Code's own tools (Bash, Edit, Read…) stay on
-   * the machine. `true`: those too, by their Claude Code names.
-   */
-  constructor(private readonly localTools = false) {}
 
   private tools = new Map<string, { name: string; input: unknown }>();
   private sawDelta = false;
@@ -335,12 +331,7 @@ export class ClaudeStreamParser {
         for (const block of content) {
           if (!isObj(block)) continue;
           if (block.type === "tool_use") this.worked = true;
-          if (
-            block.type === "tool_use" &&
-            str(block.id) &&
-            str(block.name) &&
-            (this.localTools || str(block.name).startsWith(OUR_TOOL_PREFIX))
-          ) {
+          if (block.type === "tool_use" && str(block.id) && str(block.name)) {
             this.tools.set(str(block.id), { name: str(block.name), input: block.input ?? {} });
           } else if (block.type === "text" && str(block.text) && !this.sawDelta) {
             // No partial messages (an older Claude Code): the whole text block at once.
