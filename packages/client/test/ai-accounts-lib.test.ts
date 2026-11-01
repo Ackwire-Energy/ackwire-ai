@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { AiComputer, Credential, MachineAccount, PlanUsage } from "../src/api/types";
 import {
+  accountAbout,
   accountChoices,
   accountTitle,
   agentsToGive,
@@ -342,5 +343,19 @@ describe("an account for all of its owner's agents", () => {
     expect(endsOnClaude({ ...token, provider: "zai" }, { mode: "system" })).toBe(false);
     expect(endsOnClaude({ ...token, shared: false }, { mode: "system" })).toBe(false);
     expect(endsOnClaude({ ...token, kind: "codex" }, { mode: "system" })).toBe(false);
+  });
+});
+
+describe("an account's line in an agent's account choice", () => {
+  const t = ((key: string) => key) as unknown as TFunction;
+  const about = (over: Partial<MachineAccount>) =>
+    accountAbout(t, { login: login("k", over), usedBy: [], also: false }, "Ada");
+
+  test("a coding plan's key that its endpoint refused asks for a new key; a sign-in that ended, to sign in again", () => {
+    expect(about({ status: "signed_out" })).toBe("aiAccounts.page.keyRefused");
+    expect(about({ status: "signed_out", provider: null, keyHint: null, email: "ana@acme.com" })).toBe(
+      "agentPage.work.brain.accountSignedOut",
+    );
+    expect(about({})).toBe("aiAccounts.page.keyEnds");
   });
 });

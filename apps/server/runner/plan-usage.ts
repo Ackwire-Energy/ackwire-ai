@@ -56,12 +56,16 @@ const snapshot = (windows: PlanWindow[], source: PlanUsage["source"], now: numbe
 const usedIn = (u: PlanUsage | undefined, w: PlanWindow) =>
   u?.windows.find((x) => x.kind === w.kind && x.label === w.label)?.usedPercent;
 
-/** People should hear it at once: a limit hit or cleared, or a window crossing 80 or 100. */
+/**
+ * People should hear it at once: a limit hit or cleared, or a window crossing a line where its bar changes color
+ * (80, 90) or 100.
+ */
 export function usageCrossed(prev: PlanUsage | undefined, next: PlanUsage): boolean {
   if (!prev || Boolean(prev.limited) !== Boolean(next.limited)) return true;
   return next.windows.some((w) => {
     const before = usedIn(prev, w) ?? 0;
-    return [80, 100].some((line) => before < line !== w.usedPercent < line);
+    // `PLAN_ALMOST` and `PLAN_CRITICAL` in packages/ui/src/plan-state.ts, then the limit.
+    return [80, 90, 100].some((line) => before < line !== w.usedPercent < line);
   });
 }
 
@@ -234,7 +238,10 @@ function kimiWindows(body: unknown): PlanWindow[] {
   return out;
 }
 
-/** OpenCode Go's `/usage`: `rolling` (5 hours), `weekly` and `monthly`, each `{ percent, resetsAt }`. */
+/**
+ * OpenCode Go's `/usage`: `rolling` (5 hours), `weekly` and `monthly`, each `{ status, percent, resetsAt }`. A window
+ * whose `status` is `rate-limited` refuses requests whatever its percent says (97%), so it reads as full.
+ */
 function opencodeWindows(body: unknown): PlanWindow[] {
   const usage = isObj(body) && isObj(body.usage) ? body.usage : {};
   const out: PlanWindow[] = [];
@@ -244,7 +251,7 @@ function opencodeWindows(body: unknown): PlanWindow[] {
     ["monthly", "monthly"],
   ] as const) {
     const m = usage[key];
-    const used = isObj(m) ? finite(m.percent) : undefined;
+    const used = !isObj(m) ? undefined : m.status === "rate-limited" ? 100 : finite(m.percent);
     if (isObj(m) && used !== undefined) out.push(planWindow({ kind }, used, m.resetsAt));
   }
   return out;

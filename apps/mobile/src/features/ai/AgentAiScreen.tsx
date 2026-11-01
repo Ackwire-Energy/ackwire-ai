@@ -1,13 +1,12 @@
-import type { AgentBrainInput, MachineAccount } from "@agenteschat/client";
+import type { AgentBrain, AgentBrainInput, MachineAccount } from "@agenteschat/client";
 import { keys, useAgentBrain, useAiAccounts, useAiStatus, useApi, useMachines } from "@agenteschat/client";
 import { accountChoices, ownSignInListed, ownSignInName } from "@agenteschat/client/lib/ai-accounts";
-import { brainLine } from "@agenteschat/client/lib/brain";
+import { brainLine, thinksWith } from "@agenteschat/client/lib/brain";
 import { advancedSummary } from "@agenteschat/client/lib/brain-advanced";
-import { lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { planOfKind } from "@agenteschat/client/lib/no-ai";
+import { aiChoiceOf, planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { brainPlan, planOf } from "@agenteschat/client/lib/plans";
+import { brainPlan, isPlanId, planOf } from "@agenteschat/client/lib/plans";
 import { isAuto, providerLabel } from "@agenteschat/client/lib/providers";
 import { limitOffers, planState } from "@agenteschat/ui/plan-state";
 import { useQueryClient } from "@tanstack/react-query";
@@ -22,9 +21,12 @@ import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { PushedHeader } from "../shared/parts";
 import { PlanMeter } from "../usage/parts";
 import { advancedOf, openAgentAdvanced } from "./AgentAdvancedScreen";
+import { openAgentSetup } from "./AgentSetupScreen";
 import {
+  accountInput,
   accountKindOf,
   accountRow,
+  accountSaved,
   agentAccounts,
   modelInput,
   modelRows,
@@ -36,9 +38,11 @@ import { openConnectAi } from "./NoAiCard";
 import { AiRow, Note } from "./parts";
 
 /*
- * An agent's AI on the phone (the web's "Quem pensa" for a plan, ADR 0059), from "Pensa com" on its profile: the
- * model, the account it thinks with on its computer (one of its owner's, or that computer's own sign-in), one row per
- * account, that plan's usage with, at its limit, the owner's other accounts that could think instead, and
+ * An agent's AI on the phone (the web's "Quem pensa" for a plan, ADR 0059), from "Pensa com" on its profile, under what
+ * thinks in one sentence ("DeepSeek V4.1 Flash pelo OpenCode Go"): the account it thinks with on its computer (one of
+ * its owner's, or that computer's own sign-in), one row per account, which is the plan choice (another plan's starts
+ * on that plan's default model), then the model, that plan's usage with, at its limit, the owner's other accounts that
+ * could think instead, and
  * "Configuração avançada" (ADR 0086: effort, context window, "Atende outras pessoas", the API when away, on a screen of
  * its own). Each choice saves at once. Another AI, or one more login of an account other agents think with where it
  * may have one per agent ("Também usada por Theo"), goes through Connect an AI. Its owner and admins open it; only its
@@ -59,11 +63,12 @@ function useSaveBrain(agentId: string) {
   const qc = useQueryClient();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
-  const save = async (input: AgentBrainInput, done: string) => {
+  const save = async (input: AgentBrainInput, done: string | ((saved: AgentBrain) => string)) => {
     setBusy(true);
     try {
-      qc.setQueryData(keys.agentBrain(orgId, agentId), await api.agents.setBrain(orgId, agentId, input));
-      toast({ title: done, icon: "check" });
+      const saved = await api.agents.setBrain(orgId, agentId, input);
+      qc.setQueryData(keys.agentBrain(orgId, agentId), saved);
+      toast({ title: typeof done === "string" ? done : done(saved), icon: "check" });
     } catch {
       toast({ title: t("agentPage.work.failed"), icon: "x" });
     } finally {
@@ -123,16 +128,14 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
   const mayPick = view?.canUsePlans === true && !busy;
   const choose = (a: MachineAccount | null) => {
     if (!view || !mayPick || (a?.id ?? null) === view.account) return;
-    // The computer's own sign-in is chosen only where it is its owner's: the account their agents share.
-    const done = a
-      ? t("agentPage.work.saved.account", { ...g, account: a.label })
-      : t("aiAccounts.done.savedAgent", { agent: name, label: lowerFirst(t("connectAi.own.shared"), i18n.language) });
+    const input = accountInput(view, a);
+    const done = (saved: AgentBrain) => accountSaved(t, i18n.language, name, a, input, saved);
     const others = a ? takenFrom(a, name) : [];
-    if (!a || others.length === 0) return void save({ account: a?.id ?? null }, done);
+    if (!a || others.length === 0) return void save(input, done);
     // A login made for one agent thinks for one: picking another agent's takes it from that one.
     Alert.alert(a.label, t("agentPage.work.brain.accountMove", { agents: others.join(", ") }), [
       { text: t("common.cancel"), style: "cancel" },
-      { text: t("mobile.ai.moveHere"), onPress: () => void save({ account: a.id, moveAccount: true }, done) },
+      { text: t("mobile.ai.moveHere"), onPress: () => void save({ ...input, moveAccount: true }, done) },
     ]);
   };
 
@@ -141,8 +144,10 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
   const limited = usage ? planState(usage).state === "limited" : false;
   const offers = limited && kind && view?.canUsePlans ? limitOffers(accounts, kind, view.account).slice(0, 2) : [];
   const signedOut = current?.status === "signed_out" && current.mine;
+  // A coding plan's key that its endpoint refused: a new key, on that plan's page.
+  const refused = signedOut && current && isPlanId(current.provider) ? current.provider : null;
   const accountNote = signedOut
-    ? t("agentPage.work.brain.accountSignedOut")
+    ? t(refused ? "aiAccounts.page.keyRefused" : "agentPage.work.brain.accountSignedOut")
     : view && !view.canUsePlans && ownerFirst
       ? t("agentPage.work.brain.accountLocked", { name: ownerFirst })
       : null;
@@ -175,23 +180,10 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
           <Note icon="x">{t("common.loadFailed")}</Note>
         ) : (
           <>
-            {kind ? (
-              <>
-                <GroupedHeader>{t("agentPage.work.brain.planModel")}</GroupedHeader>
-                <GroupedList>
-                  <GroupedRow
-                    label={model?.label ?? view.effectiveModel ?? ""}
-                    {...(model?.sub ? { sub: model.sub } : {})}
-                    {...(model?.note ? { belowText: model.note } : {})}
-                    chevron
-                    onPress={() => openAgentModel(agentId)}
-                  />
-                </GroupedList>
-              </>
-            ) : null}
+            {/* The account first: on the phone the account list is the plan choice, which the model then follows. */}
             {kind && view.accountsSupported && view.computer ? (
               <>
-                <GroupedHeader>{t(`agentPage.work.brain.account.${kind}`)}</GroupedHeader>
+                <GroupedHeader>{t("agentPage.work.brain.account")}</GroupedHeader>
                 <GroupedList>
                   {ownRow ? (
                     <GroupedRow
@@ -214,8 +206,14 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                   {adds ? (
                     <GroupedRow
                       icon="plus"
-                      label={signedOut ? t("agentPage.work.brain.signInAgain") : t("agentPage.work.brain.addAccount")}
-                      onPress={() => connect(current)}
+                      label={
+                        refused
+                          ? t("aiAccounts.page.newKey")
+                          : signedOut
+                            ? t("agentPage.work.brain.signInAgain")
+                            : t("agentPage.work.brain.addAccount")
+                      }
+                      onPress={() => (refused ? openConnectAi({ agentId, plan: refused }) : connect(current))}
                     />
                   ) : null}
                 </GroupedList>
@@ -225,6 +223,20 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                   </Note>
                 ) : null}
                 {accountNote ? <GroupedFooter>{accountNote}</GroupedFooter> : null}
+              </>
+            ) : null}
+            {kind ? (
+              <>
+                <GroupedHeader>{t("agentPage.work.brain.planModel")}</GroupedHeader>
+                <GroupedList>
+                  <GroupedRow
+                    label={model?.label ?? view.effectiveModel ?? ""}
+                    {...(model?.sub ? { sub: model.sub } : {})}
+                    {...(model?.needs ? { belowText: t(`brain.modelHow.${model.needs}`) } : {})}
+                    chevron
+                    onPress={() => openAgentModel(agentId)}
+                  />
+                </GroupedList>
               </>
             ) : null}
             {usage ? (
@@ -270,6 +282,17 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
                   chevron
                   onPress={() => openAgentAdvanced(agentId)}
                 />
+                {kind &&
+                view.canEdit &&
+                (view.account !== null || ownRow) &&
+                dir.agents.some((a) => a.id !== agentId) ? (
+                  <GroupedRow
+                    label={t("agentPage.work.brain.copy.row")}
+                    sub={t("agentPage.work.brain.copy.rowLine")}
+                    chevron
+                    onPress={() => openAgentSetup(agentId)}
+                  />
+                ) : null}
               </GroupedList>
             </View>
             {view.canUsePlans ? (
@@ -339,9 +362,10 @@ export function AgentModelScreen({ agentId }: { agentId: string }) {
                     disabled={busy || !view.canEdit}
                     onPress={() => {
                       if (r.checked) return;
+                      const ai = aiChoiceOf(view);
                       const done = t("agentPage.work.saved.brain", {
                         ...g,
-                        brain: `${t(`brain.card.${view.brain}`)} · ${r.label}`,
+                        brain: ai === "key" ? r.label : thinksWith(t, ai, r.label),
                       });
                       void save(modelInput(r.value, view), done);
                     }}

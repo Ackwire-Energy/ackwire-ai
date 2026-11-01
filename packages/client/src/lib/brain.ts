@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import type { AgentBrainLine, BrainKind, BrainOption } from "../api/types";
+import { type PlanChoice, planLabel, planOfAccount } from "./no-ai";
 import { isAuto } from "./providers";
 
 /*
@@ -36,10 +37,22 @@ export function engineStateOfOption(
 }
 
 /**
- * What thinks for an agent, wherever it is shown (DM header, profile card, the phone's "Pensa com"):
- * "Claude Code · Sonnet", "GLM-5.3 pelo Claude Code", "Codex · GPT-6 Sol", the brain alone when nobody chose its model
- * ("Claude Code"), or the API model's label. Its computer only where it tells two apart, when the organization's
- * `agents` think on more than one ("Claude Code · Sonnet no mac"; a computer's name reaches only its owner and
+ * What thinks on a plan, in one sentence wherever it's said: the model by the plan that pays for it ("Sonnet pelo
+ * plano do Claude", "DeepSeek V4.1 Flash pelo OpenCode Go"), never the program it runs in; the plan alone when
+ * nobody chose its model ("Plano do Claude", no "Automático"); with `owner`, whose plan it is.
+ */
+export function thinksWith(t: TFunction, plan: PlanChoice, model: string | null, owner?: string | null): string {
+  const kind = plan === "claude" || plan === "chatgpt" ? plan : "coding";
+  const line = model ? kind : (`${kind}Auto` as const);
+  return owner
+    ? t(`brain.line.${line}Of`, { model: model ?? "", plan: planLabel(t, plan), owner })
+    : t(`brain.line.${line}`, { model: model ?? "", plan: planLabel(t, plan) });
+}
+
+/**
+ * What thinks for an agent, wherever it is shown (DM header, profile card, the phone's "Pensa com"): on a plan its
+ * model by that plan (`thinksWith`), else the API model's label. Its computer only where it tells two apart, when
+ * the organization's `agents` think on more than one ("… no mac"; a computer's name reaches only its owner and
  * admins). Whoever doesn't see its computer also reads whose plan it is (`owner`). `mark` is the maker's
  * (`ProviderLogo` id: a plan account's own provider when it has one), null for the API.
  */
@@ -53,16 +66,13 @@ export function brainLine(
   }: { owner?: string | null; agents?: readonly { brain?: Pick<AgentBrainLine, "computer"> | null }[] } = {},
 ): { text: string; kind: EngineKind; mark: string | null } {
   if (!brain || brain.kind === "model") return { text: apiModelLabel, kind: "agent", mark: null };
-  const line = brain.provider && brain.kind === "claude_code" ? "plan" : brain.kind;
-  const named =
-    brain.model && !isAuto(brain.model)
-      ? t(`brain.line.${line}`, { model: brain.model })
-      : t(`brain.card.${brain.kind}`);
+  const plan = planOfAccount({ kind: brain.kind, provider: brain.provider ?? null });
+  const named = thinksWith(t, plan, brain.model && !isAuto(brain.model) ? brain.model : null, brain.computer ? null : owner);
   const computers = new Set(agents.flatMap((a) => (a.brain?.computer ? [a.brain.computer] : [])));
   const text =
     brain.computer && computers.size > 1 ? t("brain.line.on", { line: named, computer: brain.computer }) : named;
   return {
-    text: !brain.computer && owner ? t("brain.line.ofOwner", { line: text, owner }) : text,
+    text,
     kind: engineOfBrain(brain.kind),
     mark: brain.provider ?? brain.kind,
   };

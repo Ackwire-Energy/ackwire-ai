@@ -141,7 +141,7 @@ describe("profile card", () => {
     expect(screen().getByRole("complementary", { name: "Perfil da Ada" })).toBeTruthy();
   });
 
-  test("agent thinking with Claude Code: the card says so instead of the API model, its computer only beside another", async () => {
+  test("agent thinking with Claude Code: the card says the model by its plan instead of the API model, its computer only beside another", async () => {
     type Brain = NonNullable<ReturnType<typeof seedState>["agents"][number]["brain"]>;
     const model = async (brains: Record<string, Brain>) => {
       const state = seedState();
@@ -156,15 +156,15 @@ describe("profile card", () => {
     };
     // The workspace's one computer tells nothing apart.
     expect(await model({ [ADA_ID]: { kind: "claude_code", model: "Opus", computer: "MacBook" } })).toBe(
-      "Claude Code · Opus",
+      "Opus pelo plano do Claude",
     );
-    // Beside an agent on another computer it does; nobody chose Ada's model, so the brain alone.
+    // Beside an agent on another computer it does; nobody chose Ada's model, so the plan alone.
     expect(
       await model({
         [ADA_ID]: { kind: "claude_code", model: "auto", computer: "MacBook" },
         [ATLAS_ID]: { kind: "codex", model: "GPT-6 Sol", computer: "Servidor" },
       }),
-    ).toBe("Claude Code no MacBook");
+    ).toBe("Plano do Claude no MacBook");
   });
 
   test("agent on a plan: its plan's limits and no budget until it spends through the API, then the budget after them", async () => {

@@ -832,7 +832,7 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 .channel__header > .ac-avatar + div:has(> .ac-captop) {
   align-self: flex-start;
 }
-/* Who thinks, after the owner: "Claude Code · Sonnet no mac" with its mark. */
+/* Who thinks, after the owner: "Sonnet pelo plano do Claude" with its mark. */
 /* The engine line (an `.ac-iconline`) inside a line of text. */
 .channel__brain,
 .profile-card__brain {
@@ -8438,16 +8438,7 @@ html:not([data-pointer]) .agp-cell:focus-visible {
 .agp-number .ac-planmeter__line {
   color: inherit;
 }
-/* The sentence's dialogs: the note by the buttons (the plan, or what the choice does). */
-.agp-wdlg__note {
-  color: var(--muted);
-  font-size: 12.5px;
-  line-height: 1.4;
-}
-.agp-wdlg__note b {
-  color: var(--ink);
-  font-weight: 600;
-}
+/* The sentence's dialogs: the link by the buttons ("Conectar outro computador"). */
 .agp-wdlg__link {
   display: inline-flex;
   align-items: center;
@@ -8469,13 +8460,7 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink2);
 }
-/* "Quem pensa": the opened brain's settings full width, a small label above each. */
-/* The brain's card: model, account and "Configuração avançada", one stack of pickers. */
-.agp-brainpicks {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
+/* "Quem pensa": the opened card's settings full width, a small label above each. */
 .agp-advrow .ac-select__trigger {
   cursor: pointer;
 }
@@ -9209,12 +9194,15 @@ html:not([data-pointer]) .agp-chipbtn:focus-visible {
 .agp-repogroup .scope-row {
   align-items: center;
 }
-.agp-repogroup .scope-row[data-off] {
+.agp-repogroup .scope-row[data-off],
+.agp-copydialog .scope-row[data-off],
+.agp-copydialog__all[data-off] {
   cursor: default;
   opacity: 0.55;
 }
-/* "Todos os repositórios" on top of the list. */
-.agp-repodialog__all {
+/* "Todos os repositórios" on top of the list, and "Levar a autonomia" and "Todos" over the agents a setup is used on. */
+.agp-repodialog__all,
+.agp-copydialog__all {
   flex: 1;
   display: flex;
   align-items: center;

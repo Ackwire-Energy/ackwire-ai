@@ -2099,23 +2099,40 @@ html:not([data-pointer]) .ac-tab:focus-visible {
 }
 .ac-meter__bar {
   height: 100%;
-  background: var(--ink);
+  background: var(--meter-fill, var(--ink));
   border-radius: var(--radius-full);
 }
-/* One part in full ink over the rest of the use (an agent's share of its plan's window). */
+/* One part in full tone over the rest of the use (an agent's share of its plan's window). */
 .ac-meter--parts .ac-meter__bar {
-  background: color-mix(in srgb, var(--ink) 30%, transparent);
+  background: color-mix(in srgb, var(--meter-fill, var(--ink)) 30%, transparent);
 }
 .ac-meter__part {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
-  background: var(--ink);
+  background: var(--meter-fill, var(--ink));
   border-radius: var(--radius-full);
 }
 
-/* Plan usage: a bar per window (ink, like every meter); the state in words above */
+/*
+ * Plan usage: a bar per window, ink until it nears its limit (`planLevel`): amber from 80%, red from 90% and at the
+ * limit, each window by its own level and the state in words above by the plan's (a plan that refused a request reads
+ * red over ink bars). Only here: every other meter stays ink.
+ */
+.ac-planmeter[data-level="almost"],
+.ac-planmeter__window[data-level="almost"] {
+  --meter-fill: var(--warn);
+}
+.ac-planmeter[data-level="critical"],
+.ac-planmeter[data-level="limited"],
+.ac-planmeter__window[data-level="critical"],
+.ac-planmeter__window[data-level="limited"] {
+  --meter-fill: var(--danger);
+}
+.ac-planmeter__window[data-level="ok"] {
+  --meter-fill: var(--ink);
+}
 .ac-planmeter {
   display: grid;
   gap: 8px;
@@ -2125,7 +2142,7 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   margin: 0;
   font-size: 13px;
   font-weight: 600;
-  color: var(--attention);
+  color: var(--meter-fill, var(--attention));
 }
 .ac-planmeter__windows {
   display: grid;
@@ -2152,6 +2169,9 @@ html:not([data-pointer]) .ac-tab:focus-visible {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   color: var(--ink-muted);
+}
+.ac-planmeter__window:not([data-level="ok"]) .ac-planmeter__pct {
+  color: var(--meter-fill);
 }
 .ac-planmeter__reset,
 .ac-planmeter__note,
