@@ -360,6 +360,7 @@ describe("routine views", () => {
 
     expect(await names(outsider.id)).toEqual([]);
     await expect(getRoutineView(f.db, outsider.id, f.org.id, routine.id)).rejects.toThrow("Routine not found");
+    await expect(listRoutineRuns(f.db, outsider.id, f.org.id, routine.id)).rejects.toThrow("Routine not found");
     expect((await range(outsider.id)).routines).toEqual([]);
 
     for (const who of [insider.id, admin.id, f.owner.id]) {

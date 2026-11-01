@@ -1576,6 +1576,7 @@ export async function listRoutineRuns(
 ): Promise<RoutineRunView[]> {
   await requirePermission(db, actorId, orgId, "read");
   const routine = await loadRoutine(db, orgId, id, { deleted: true });
+  if (!(await routineSeer(db, orgId, actorId))(routine)) throw new NotFoundError("Routine not found");
   const [runs, rights] = await Promise.all([
     db
       .select()
