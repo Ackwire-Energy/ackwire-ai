@@ -407,6 +407,8 @@ export function autonomySql(range: AutonomyRange) {
         join orgs o on o.id = m.org_id
         where m.created_at >= ${start}::timestamptz and m.created_at < ${end}::timestamptz
           and m.author_type = 'agent' and m.deleted_at is null and m.meta ? 'agentNote'
+          -- A note that carries its consultation row is counted with the questions below.
+          and not (m.meta ? 'consultation')
           and not exists (select 1 from messages a where a.org_id = m.org_id and a.channel_id = m.channel_id
             and ${SPOKE} and a.author_agent_id is distinct from m.author_agent_id and a.created_at > m.created_at
             and a.created_at <= m.created_at + ${ANSWER_WITHIN.handoff}::interval)
@@ -416,7 +418,8 @@ export function autonomySql(range: AutonomyRange) {
         from agent_consultations q
         join orgs o on o.id = q.org_id
         where q.created_at >= ${start}::timestamptz and q.created_at < ${end}::timestamptz
-          and (q.answered_at is null or q.answered_at > q.created_at + ${ANSWER_WITHIN.handoff}::interval)
+          -- Closing stamps answered_at whatever the outcome: an expired or failed question has one too.
+          and (q.status <> 'answered' or q.answered_at > q.created_at + ${ANSWER_WITHIN.handoff}::interval)
         group by 1, 2
       union all
       select m.day, m.org_id, 'personUnanswered', count(*) from people m

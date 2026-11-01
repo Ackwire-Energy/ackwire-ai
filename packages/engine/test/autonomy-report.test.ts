@@ -9,15 +9,18 @@ import {
   autonomyTable,
   type Brain,
   type BrainEvent,
+  CONSULTATION_TTL_MS,
   createAgent,
   createAgentRuns,
   createJobHandlers,
   drainOutbox,
   type EmailTemplate,
   enqueueAutonomyReport,
+  expireConsultations,
   insertMessage,
   type MachineStatus,
   NEW_AGENT_DEFAULTS,
+  onConsultedRunFinished,
   postPersonMessage,
   REFUSALS,
   renderEmail,
@@ -531,5 +534,52 @@ describe("what runs record for it", () => {
       .from(schema.agentRunSteps)
       .where(eq(schema.agentRunSteps.kind, "model_call"));
     expect(calls.map((c) => c.data.executed)).toEqual([2]);
+  });
+});
+
+describe("rows as the server writes them", () => {
+  afterEach(() => f?.close());
+
+  test("a question that expired or failed is unanswered, one answered in time isn't; a note with its own row counts once", async () => {
+    f = await setup();
+    ops = (await createAgent(f.db, f.owner.id, f.org.id, { name: "Ops", handle: "ops" }, NEW_AGENT_DEFAULTS)).id;
+    const dm = await channel("dm-agents", "dm", `a:${f.agent.id}|a:${ops}`);
+    // Past a question's 15 minutes, within a hand-off's 30: the server closes them now, with the clock's time.
+    const asked = new Date(Date.now() - 20 * 60_000);
+    const asker = await run({ at: asked, status: "running" });
+    const target = await run({ at: asked, agentId: ops, status: "failed", error: "provider_error: 529" });
+    const ask = (row: Partial<typeof schema.agentConsultations.$inferInsert> = {}) =>
+      f.db.insert(schema.agentConsultations).values({
+        orgId: f.org.id,
+        askerRunId: asker.id,
+        askerAgentId: f.agent.id,
+        targetAgentId: ops,
+        channelId: dm,
+        messageId: crypto.randomUUID(),
+        waitId: `async:${crypto.randomUUID()}`,
+        question: "How is staging deployed?",
+        chain: [f.agent.id],
+        expiresAt: new Date(asked.getTime() + CONSULTATION_TTL_MS),
+        createdAt: asked,
+        ...row,
+      });
+    await ask();
+    await ask({ targetRunId: target.id });
+    await ask({ status: "answered", answer: "The deploy script.", answeredAt: new Date(asked.getTime() + 5 * 60_000) });
+    const note = await message({
+      at: asked,
+      by: f.agent.id,
+      channelId: dm,
+      body: "Deploy is out.",
+      meta: { agentNote: { runId: asker.id }, consultation: { id: crypto.randomUUID() } },
+    });
+    await ask({ messageId: note.id, question: note.body });
+    await onConsultedRunFinished({ db: f.db, pubsub: f.pubsub }, target, "failed", "provider_error: 529");
+    expect(await expireConsultations({ db: f.db, pubsub: f.pubsub })).toBe(2);
+    const closed = await f.db.select().from(schema.agentConsultations);
+    expect(closed.map((q) => q.status).sort()).toEqual(["answered", "expired", "expired", "failed"]);
+    expect(closed.every((q) => q.answeredAt)).toBe(true);
+    const [day] = await autonomyRows(f.db, { from: asked.toISOString().slice(0, 10), days: 1 });
+    expect(day?.handoffUnanswered).toBe(3);
   });
 });
