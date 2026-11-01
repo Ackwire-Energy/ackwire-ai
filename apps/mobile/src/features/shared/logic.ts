@@ -79,6 +79,20 @@ export function whenKind(iso: string, now = new Date()): WhenKind {
   return "date";
 }
 
+/** The time `useNow` keeps, and how often its interval reads it. */
+export interface PacedClock {
+  every: number;
+  now: number;
+}
+
+/**
+ * `useNow`'s clock once asked to move every `every` ms, at `at`. The same pace keeps the time its interval last read, so
+ * every draw in between reads the same and a count steps evenly; a new pace reads it afresh, as the time kept can be a
+ * whole interval of the old pace old (a minute's, just as a count of seconds starts).
+ */
+export const pacedClock = (clock: PacedClock, every: number, at: number): PacedClock =>
+  clock.every === every ? clock : { every, now: at };
+
 /** Minutes until `iso` (never below 0). */
 export function minutesLeft(iso: string, now = Date.now()) {
   return Math.max(0, Math.ceil((new Date(iso).getTime() - now) / 60_000));
