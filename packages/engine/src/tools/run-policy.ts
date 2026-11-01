@@ -1,4 +1,4 @@
-import type { RunAuthority } from "../authority";
+import { fedByRoutine, type RunAuthority } from "../authority";
 import { cutText } from "../format";
 import { directoryRole } from "./directory";
 import type { JsonSchema } from "./json-schema";
@@ -12,7 +12,8 @@ import type { ToolDefinition } from "./types";
  *
  * - `person` and `unattended` (nobody behind it: it works as the agent itself): every tool but
  *   `hand_off`; scopes and the tools' own approvals decide. A tool that needs a person's request
- *   refuses on its own when nobody is behind the run.
+ *   refuses on its own when nobody is behind the run. An `unattended` run a routine's report or work woke
+ *   (`fedByRoutine`) asks a person before every write to a connected app.
  * - `routine`, any access: nothing that speaks for someone or reaches beyond its room (posting, DMs,
  *   reactions, GIFs and stickers, questions, reminders, routines, other agents, forum, channels, secrets,
  *   permissions). It speaks only through `hand_off`; the people decide.
@@ -225,7 +226,9 @@ export function toolPolicy(authority: RunAuthority, tool: PolicyTool): PolicyDec
     return ALLOW;
   }
   // A person's run and a run nobody is behind work alike: as the agent, with every tool its scopes give.
-  // The mission's own tools check that the run works for the mission (`runActsForMission`).
+  // The mission's own tools check that the run works for the mission (`runActsForMission`). What a routine read
+  // feeding a run can't approve its own writes to connected apps (`fedByRoutine`).
+  if (authority.kind === "unattended" && what.kind === "external" && fedByRoutine(authority)) return APPROVE;
   if (authority.kind !== "routine") return what.kind === "hand_off" ? refuse(REFUSALS.handOffOnly) : ALLOW;
   switch (what.kind) {
     case "hand_off":

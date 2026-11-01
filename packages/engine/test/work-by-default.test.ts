@@ -107,6 +107,29 @@ async function routineRun(access: RoutineAccess) {
   return { run: await runOn(fired.id, { background: true }), room };
 }
 
+/** The run a routine's report woke in #general (the routine's run `run` handed it off). */
+async function reportWakes(run: { id: string }) {
+  const delivered = await f.db.transaction((tx) =>
+    deliverNotice(tx, {
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      channelId: f.general.id,
+      threadId: null,
+      hop: 0,
+      stretchId: null,
+      notice: {
+        kind: "routine_handoff",
+        text: "3 erros novos no checkout.",
+        from: "Routine «Sentry diário»",
+        refs: { runId: run.id },
+      },
+    }),
+  );
+  const woken = delivered.runs[0];
+  if (!woken) throw new Error("no run woken");
+  return woken;
+}
+
 /** Who is behind a run, and the permission profile of its computer turns. */
 const howItWorks = async (runId: string) => ({
   behind: await runAuthorityById(f.db, f.org.id, runId),
@@ -229,9 +252,9 @@ describe("work that comes back goes on for the person behind it", () => {
     const woke = await wakeConversationForTask({ db: f.db }, task?.id ?? "", { maxHops: 100 });
     expect(woke?.message?.channelId).toBe(f.general.id);
     expect(woke?.runs.map((r) => r.channelId)).toEqual([f.general.id]);
-    // Nobody is behind a routine's work: the run it wakes works as the agent itself.
+    // Nobody is behind a routine's work: the run it wakes works as the agent itself, fed by the routine's work.
     expect(await howItWorks(woke?.runs[0]?.id ?? "")).toEqual({
-      behind: { kind: "unattended", personId: null, reason: "agent" },
+      behind: { kind: "unattended", personId: null, reason: "routine" },
       profile: "work",
     });
   });
@@ -373,29 +396,28 @@ describe("with nobody behind it, a run works as the agent itself", () => {
     f = await setup();
     for (const access of ["read", "act"] as const) {
       const { run } = await routineRun(access);
-      const delivered = await f.db.transaction((tx) =>
-        deliverNotice(tx, {
-          orgId: f.org.id,
-          agentId: f.agent.id,
-          channelId: f.general.id,
-          threadId: null,
-          hop: 0,
-          stretchId: null,
-          notice: {
-            kind: "routine_handoff",
-            text: "3 erros novos no checkout.",
-            from: "Routine «Sentry diário»",
-            refs: { runId: run.id },
-          },
-        }),
-      );
-      const woken = delivered.runs[0];
-      const { behind, profile } = await howItWorks(woken?.id ?? "");
+      const woken = await reportWakes(run);
+      const { behind, profile } = await howItWorks(woken.id);
       expect(behind).toEqual({ kind: "unattended", personId: null, reason: "routine_report" });
       expect(profile).toBe("work");
       // It can hand the work on and do it: code, background tasks, other agents, other channels, pull requests.
       expect(decisions(behind)).toEqual(["allow", "allow", "allow", "allow", "allow"]);
     }
+  });
+
+  test("what the run a report woke writes holds no credential: what the routine read may be a stranger's", async () => {
+    const key = "AKIAIOSFODNN7EXAMPLE";
+    f = await setup({ reply: () => ({ chunks: [`Achei a chave ${key} no repo.`] }) });
+    const { run } = await routineRun("read");
+    const woken = await reportWakes(run);
+    await drainOutbox(f.db, f.handlers);
+    const [reply] = await f.db.select().from(schema.messages).where(eq(schema.messages.agentRunId, woken.id));
+    expect(reply?.body).toBe("Achei a chave •••• no repo.");
+    // An agent's own work writes as the agent, with its own grants.
+    const own = await runOn((await agentLine("Lembrete: revisar o PR #12.")).id);
+    await drainOutbox(f.db, f.handlers);
+    const [ownReply] = await f.db.select().from(schema.messages).where(eq(schema.messages.agentRunId, own.id));
+    expect(ownReply?.body).toContain(key);
   });
 
   test("an agent's own message wakes a run that works as the agent", async () => {

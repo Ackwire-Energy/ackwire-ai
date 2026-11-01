@@ -9,7 +9,7 @@ import {
 import { and, type Database, eq, gte, schema, sql } from "@agenteschat/db";
 import { type ArtifactDeps, createFileArtifact } from "../artifacts";
 import { recordAudit } from "../audit";
-import { runAuthorityById } from "../authority";
+import { fedByRoutine, runAuthorityById } from "../authority";
 import { cutText } from "../format";
 import { recordOperatorEvent } from "../operator-events";
 import { replyThreadOf } from "../runs";
@@ -96,13 +96,13 @@ const MESSAGE_ID = { type: "string", minLength: 1, maxLength: 500, description: 
 const utcDayStart = (now: Date) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
 /**
- * Whether this is a routine's background run (ADR 0053): then a send always asks a person, whatever the
+ * Whether a routine's reading feeds this run (`fedByRoutine`): then a send always asks a person, whatever the
  * mailbox policy says, since what it read (inbound mail included) can't approve its own sends (ADR 0038).
  * Any other run, a person behind it or not, follows the mailbox policy.
  */
 async function unwatched(ctx: ToolContext) {
   if (!ctx.runId) return false;
-  return (await runAuthorityById(ctx.db, ctx.orgId, ctx.runId)).kind === "routine";
+  return fedByRoutine(await runAuthorityById(ctx.db, ctx.orgId, ctx.runId));
 }
 
 /** Why a message is outside what the agent may read; null = inside. */

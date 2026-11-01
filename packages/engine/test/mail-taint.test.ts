@@ -14,10 +14,11 @@ const WHY = "The customer asked for the invoice twice; this reply sends it once 
 const SEND = { to: ["cliente@acme.com"], subject: "Fatura", body: "Segue a fatura." };
 
 /** A run nobody watches: an unattended one (an agent's own message started it) or a routine's. */
-async function unwatchedRun(kind: "unattended" | RoutineAccess): Promise<ToolContext> {
+/** `report`: the run a routine's report woke (nobody behind it, fed by what the routine read). */
+async function unwatchedRun(kind: "unattended" | "report" | RoutineAccess): Promise<ToolContext> {
   const { f } = m;
   const brief: RoutineBrief | null =
-    kind === "unattended"
+    kind === "unattended" || kind === "report"
       ? null
       : {
           routineId: crypto.randomUUID(),
@@ -37,7 +38,18 @@ async function unwatchedRun(kind: "unattended" | RoutineAccess): Promise<ToolCon
       ? { type: "person", userId: f.owner.id }
       : { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
     body: "Answer the new support mail.",
-    meta: brief ? { routineBrief: brief } : undefined,
+    meta: brief
+      ? { routineBrief: brief }
+      : kind === "report"
+        ? {
+            notice: {
+              kind: "routine_handoff",
+              text: "1 new mail",
+              from: "Routine",
+              refs: { runId: crypto.randomUUID() },
+            },
+          }
+        : undefined,
   });
   const [run] = await f.db
     .insert(schema.agentRuns)
@@ -90,6 +102,19 @@ test("a person's run and a run nobody is behind follow the mailbox: they send wi
   if (asked.type !== "approval") throw new Error(`expected an approval, got ${JSON.stringify(asked)}`);
   expect(asked.approval).toMatchObject({ why: WHY, origin: { kind: "unattended" }, params: SEND });
   expect(m.box.state.sent).toHaveLength(1);
+});
+
+test("the run a routine's report woke always asks before a send, whatever the mailbox allows", async () => {
+  m = await mailSetup();
+  const account = await imapAccount(m);
+  await giveMail(m, account.id, "read_write", { allowedRecipients: ["@acme.com"], sendWithoutAsking: true });
+  const ctx = await unwatchedRun("report");
+  const tool = await sendTool(ctx);
+  expect(tool && isSensitive(tool)).toBe(true);
+  const asked = await send(ctx, { ...SEND, why: WHY });
+  if (asked.type !== "approval") throw new Error(`expected an approval, got ${JSON.stringify(asked)}`);
+  expect(asked.approval).toMatchObject({ origin: { kind: "unattended" } });
+  expect(m.box.state.sent).toEqual([]);
 });
 
 test("a routine that may act gets a card for every send; one that only reads can't send at all", async () => {

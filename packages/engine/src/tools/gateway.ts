@@ -2,7 +2,7 @@ import { PERMISSION_TOOL } from "@agenteschat/adapters";
 import { and, eq, schema, sql } from "@agenteschat/db";
 import { auditsCall, callTitle, recordToolCall } from "../agent-audit";
 import { coveringRules, type RememberedKind } from "../approval-rules";
-import { type RunAuthority, runAuthorityById } from "../authority";
+import { fedByRoutine, type RunAuthority, runAuthorityById } from "../authority";
 import { actionLevel, nameWords, openEnded } from "../connectors/classify";
 import { missingConnectors, type ServerCatalog } from "../connectors/listing";
 import { consultationOrigin } from "../consultations";
@@ -141,9 +141,9 @@ const ranBefore = (approval: { result: unknown }): ToolOutput =>
     isError: true,
   };
 
-/** The answer to a call of a routine's run that carries a credential (`carriesCredential`). */
+/** The answer to a call that carries a credential (`carriesCredential`) on a run a routine's reading feeds (`fedByRoutine`). */
 export const CREDENTIAL_REFUSAL =
-  "Refused: this call carries what looks like a key, token or private key. A routine's background work never sends credentials anywhere: leave the value out (you may say one was found, and where).";
+  "Refused: this call carries what looks like a key, token or private key. Work that comes from a routine's background work never sends credentials anywhere: leave the value out (you may say one was found, and where).";
 
 /** `ask_user` (questions.ts): it waits for a person, so it carries a `why` like an approval. */
 const ASK_USER = "ask_user";
@@ -526,10 +526,10 @@ export function createToolGateway(deps: {
         const schemaHint = viaDirectory ? `\nInput schema of ${tool.name}: ${compactSchema(tool.inputSchema)}` : "";
         return finish({ content: `Invalid input: ${problems.join("; ")}${schemaHint}`, isError: true });
       }
-      // A routine's run never sends a credential anywhere (ADR 0053 §3): a key it read on its computer (a sandbox
-      // that can't keep it from being read) can't leave through any tool, on any brain. Any other run uses the
-      // agent's own grants, as a person's does.
-      if (authority?.kind === "routine" && carriesCredential(call.input)) {
+      // A run a routine's reading feeds never sends a credential anywhere (ADR 0053 §3): a key it read on its
+      // computer (a sandbox that can't keep it from being read) can't leave through any tool, on any brain. Any
+      // other run uses the agent's own grants, as a person's does.
+      if (fedByRoutine(authority) && carriesCredential(call.input)) {
         return finish({ content: CREDENTIAL_REFUSAL, isError: true, data: { code: "tool.credential" } }, "refused");
       }
       // The call's arguments (GitHub repositories, mail folders and recipients…), before running or asking anyone.

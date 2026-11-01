@@ -31,7 +31,7 @@ import { announceAgentStatus, askRunStatus, startRunStatus, statusCandidates } f
 import { type Agent, getAgentCached } from "./agents";
 import { type AgentAi, agentAiState, type NoAiReason, noAiReasonOf, ownNotSignedIn } from "./ai-status";
 import { publishApproval } from "./approvals";
-import { runAuthority } from "./authority";
+import { fedByRoutine, runAuthority } from "./authority";
 import {
   type AutoChoice,
   type AutoModelRecord,
@@ -907,9 +907,12 @@ async function executeRunInner(
     note = false,
   ) => {
     const tagged = report && !note ? { routine: report } : {};
-    // What a routine's run writes holds no credential it may have read (ADR 0053 §3); any other run writes as the
-    // agent, with its own grants, as a person's does.
-    const said = !note && run.background && carriesCredential(body) ? maskCredentials(body) : body;
+    // What a run a routine's reading feeds writes holds no credential it may have read (ADR 0053 §3); one a person
+    // wrote into since (`steeredBy`, in the transcript as it is now) answers that person. Any other run writes as
+    // the agent, with its own grants, as a person's does.
+    const current = { ...run, transcript: transcript as unknown as Record<string, unknown> | null };
+    const said =
+      !note && carriesCredential(body) && fedByRoutine(await runAuthority(tx, current)) ? maskCredentials(body) : body;
     // Team actions (ADR 0064): what the run didn't repeat because the team already did it rides on its reply.
     const teamChecks = note ? [] : await runChecksForReply(tx, run.orgId, run.id);
     // "Ver o que ele fez" under the reply: how many tool calls so far, so the apps leave it out at 0, and one call

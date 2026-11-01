@@ -30,8 +30,11 @@ export type RunAuthority =
   | { kind: "routine"; personId: null; brief: RoutineBrief | null }
   | { kind: "unattended"; personId: null; reason: UnattendedReason };
 
-/** Why nobody is behind an unattended run: a routine's report joins only a run such news woke (`mayJoin`). */
-export type UnattendedReason = "routine_report" | "agent";
+/**
+ * Why nobody is behind an unattended run: a routine's report woke it (`routine_report`), its chain roots in a
+ * routine's background run (`routine`: the end of a task one started), or an agent's own work (`agent`).
+ */
+export type UnattendedReason = "routine_report" | "routine" | "agent";
 
 /** What a message's chain roots in. */
 export type MessageRoot =
@@ -161,8 +164,16 @@ export async function runAuthority(db: Executor, run: AuthorityRun): Promise<Run
   if (root.kind === "person") return { kind: "person", personId: root.personId };
   const steeredBy = steeredByOf(run.transcript);
   if (steeredBy) return { kind: "person", personId: steeredBy };
-  return { kind: "unattended", personId: null, reason: root.kind === "routine_report" ? "routine_report" : "agent" };
+  return { kind: "unattended", personId: null, reason: root.kind };
 }
+
+/**
+ * Whether what a routine read feeds this run: a routine's own run, or a run nobody is behind that its report or its
+ * work woke. Such text may come from outside (inbound mail, a webhook) through a routine set to only read, so the run
+ * never sends a credential, its writes to connected apps and its mail sends always ask a person (ADR 0038, 0053 §3).
+ */
+export const fedByRoutine = (authority: RunAuthority | null): boolean =>
+  authority?.kind === "routine" || (authority?.kind === "unattended" && authority.reason !== "agent");
 
 /** Who is behind a run, by its id (the tool context's `runId`); unattended when the run is gone. */
 export async function runAuthorityById(db: Executor, orgId: string, runId: string): Promise<RunAuthority> {

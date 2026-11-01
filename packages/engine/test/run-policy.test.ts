@@ -45,7 +45,9 @@ const briefOf = (access: RoutineAccess): RoutineBrief => ({
   dueAt: new Date().toISOString(),
 });
 const routine = (access: RoutineAccess): RunAuthority => ({ kind: "routine", personId: null, brief: briefOf(access) });
-const unattended: RunAuthority = { kind: "unattended", personId: null, reason: "routine_report" };
+const unattended: RunAuthority = { kind: "unattended", personId: null, reason: "agent" };
+/** The run a routine's report woke: what the routine read (inbound mail, a webhook) feeds it. */
+const reportWoke: RunAuthority = { kind: "unattended", personId: null, reason: "routine_report" };
 const person: RunAuthority = { kind: "person", personId: "user_ana" };
 
 const builtIn = (name: string, scope = "") => ({ name, scope, connectionId: null });
@@ -129,6 +131,8 @@ describe("run policy table", () => {
       app("github_merge_pr", "github:pr.merge", true),
     ]) {
       expect(decide(unattended, tool)).toBe("allow");
+      // Woken by a routine's report it works too, but every write to a connected app asks a person.
+      expect(decide(reportWoke, tool)).toBe(toolKind(tool).kind === "external" ? "approve" : "allow");
     }
     expect(toolPolicy(unattended, builtIn("hand_off"))).toEqual({ action: "refuse", reason: REFUSALS.handOffOnly });
   });
@@ -159,6 +163,8 @@ describe("run policy table", () => {
       expect(decide(routine("act"), connected)).toBe("approve");
       // Nobody behind the run: the connector's own approvals decide, as for a person's run.
       expect(decide(unattended, connected)).toBe("allow");
+      expect(decide(reportWoke, connected)).toBe("approve");
+      expect(decide({ ...reportWoke, reason: "routine" }, connected)).toBe("approve");
     }
   });
 
@@ -242,9 +248,12 @@ async function gatewaySetup() {
   await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "*" }]);
 }
 
-type Kind = "person" | "unattended" | RoutineAccess;
+type Kind = "person" | "unattended" | "report" | RoutineAccess;
 
-/** A run of the agent in #general and its tool context: a person's, an unattended one, or a routine's. */
+/**
+ * A run of the agent in #general and its tool context: a person's, an unattended one (`report`: woken by a
+ * routine's report), or a routine's.
+ */
 async function runAs(kind: Kind) {
   const brief =
     kind === "read" || kind === "act"
@@ -254,11 +263,15 @@ async function runAs(kind: Kind) {
     orgId: f.org.id,
     channelId: f.general.id,
     author:
-      kind === "unattended"
+      kind === "unattended" || kind === "report"
         ? { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null }
         : { type: "person", userId: f.owner.id },
     body: brief ? "Check today's orders." : "hi",
-    meta: brief ? { routineBrief: brief } : undefined,
+    meta: brief
+      ? { routineBrief: brief }
+      : kind === "report"
+        ? { notice: { kind: "routine_handoff", text: "hi", from: "Routine", refs: { runId: crypto.randomUUID() } } }
+        : undefined,
   });
   const [run] = await f.db
     .insert(schema.agentRuns)
@@ -536,21 +549,30 @@ describe("the gateway applies the run policy", () => {
     expect(executed).toEqual([{ order: "3" }]);
   });
 
-  test("a routine's run never sends a credential, through any tool; any other run uses the agent's own grants", async () => {
+  test("a run a routine's reading feeds never sends a credential, through any tool; any other run uses the agent's own grants", async () => {
     await gatewaySetup();
     const key = "AKIAIOSFODNN7EXAMPLE";
     const privateKey =
       "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAA\n-----END OPENSSH PRIVATE KEY-----";
-    const routineCtx = (await runAs("read")).ctx;
-    for (const query of [`customer ${key}`, privateKey]) {
-      expect(await call(routineCtx, "list_issues", { query })).toMatchObject({
-        type: "result",
-        output: { isError: true, content: CREDENTIAL_REFUSAL, data: { code: "tool.credential" } },
-      });
+    // A routine's own run, and the run its report woke (what it read may be a stranger's email).
+    for (const kind of ["read", "report"] as const) {
+      const fedCtx = (await runAs(kind)).ctx;
+      for (const query of [`customer ${key}`, privateKey]) {
+        expect(await call(fedCtx, "list_issues", { query })).toMatchObject({
+          type: "result",
+          output: { isError: true, content: CREDENTIAL_REFUSAL, data: { code: "tool.credential" } },
+        });
+      }
+      // Anything else still runs.
+      const fine = await call(fedCtx, "list_issues", { query: "checkout" });
+      expect(fine.type === "result" && fine.output.isError).toBeFalsy();
     }
-    // Anything else still runs.
-    const fine = await call(routineCtx, "list_issues", { query: "checkout" });
-    expect(fine.type === "result" && fine.output.isError).toBeFalsy();
+    // The run a report woke asks a person before a connected app's write.
+    const report = (await runAs("report")).ctx;
+    const refund = await call(report, "shop_refund_order", { order: "7", why: WHY });
+    if (refund.type !== "approval") throw new Error(`expected an approval, got ${JSON.stringify(refund)}`);
+    expect(refund.approval).toMatchObject({ origin: { kind: "unattended" } });
+    expect(executed).toEqual([]);
     for (const kind of ["unattended", "person"] as const) {
       const { ctx } = await runAs(kind);
       const asked = await call(ctx, "list_issues", { query: `customer ${key}` });
