@@ -63,8 +63,9 @@ describe("agent permissions model", () => {
     expect(budgetAlert(t, "pt-BR", { type: "budget.warning", agentId: "a", percent: 80.4 }, "Ada")).toBe(
       "Ada usou 80% do orçamento do mês.",
     );
-    expect(budgetAlert(t, "pt-BR", { type: "budget.exhausted", agentId: "a", percent: 100 }, "Ada")).toBe(
-      "Ada atingiu o orçamento do mês e parou. Um admin pode aumentar o limite para continuar.",
+    // It pauses until the budget renews next month (the date depends on today) or an admin raises the limit.
+    expect(budgetAlert(t, "pt-BR", { type: "budget.exhausted", agentId: "a", percent: 100 }, "Ada")).toMatch(
+      /^Ada atingiu o orçamento do mês e pausou\. Continua .+ ou quando um admin aumentar o limite\.$/,
     );
   });
 });

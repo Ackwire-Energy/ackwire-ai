@@ -26,6 +26,7 @@ import {
   orgDefaultAgentBudget,
   workspaceBudgetPercent,
 } from "./usage";
+import { resumeBudgetWaits } from "./usage-pause";
 
 const {
   organizations,
@@ -218,6 +219,8 @@ export async function updateOrgSettings(
   });
   caches.orgs.delete(`${orgId}:`);
   caches.orgs.delete(`${orgId}:agent-budget`);
+  // Agents on the default budget whose runs wait for it look again now (the rest park again quietly).
+  if (input.defaultAgentBudgetNanoUsd !== undefined) await resumeBudgetWaits(db, orgId, null);
   caches.orgs.delete(`${orgId}:action-check`);
   caches.orgs.delete(`${orgId}:auto-models`);
   caches.orgs.delete(mediaSettingsCacheKey(orgId));

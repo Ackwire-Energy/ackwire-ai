@@ -21,7 +21,7 @@ export function receiptIcon(view: ReceiptView): IconName {
   if (view.picking) return "waiting";
   const kind = view.status?.kind;
   if (kind === "failed" || kind === "no_ai") return "alert";
-  if (kind === "claimed" || kind === "waiting" || kind === "asking") return "waiting";
+  if (kind === "claimed" || kind === "waiting" || kind === "asking" || kind === "outage") return "waiting";
   if (kind === "handled") return "checks";
   return "check";
 }
@@ -32,6 +32,7 @@ const RULE_ICON: Record<Extract<DecidedBy, { step: "rule" }>["rule"], IconName> 
   only_agent: "person",
   follow_up: "thread",
   coordinator: "flag",
+  default: "check",
 };
 
 /** A dot and the action after it: one piece, which wraps whole. */
@@ -65,7 +66,8 @@ function SteerMark({ steer, name, size }: { steer: SteerState; name: string; siz
  * popover with each agent and its status, and who picked them. While the author's own plan picks, the mark is the
  * clock, and "Chamar um agente" is in its popover. A message sent into a task at work wears what became of it there
  * instead of the check ("Ada leu" is Ada's face), the words said to screen readers as they change. Words only for what
- * you can act on ("Nenhum agente vai responder", a failure, no AI connected): then the whole receipt is a line under
+ * you can act on ("Nenhum agente vai responder", a failure, no AI connected) or what nobody can (the AI provider is
+ * down, it retries by itself): then the whole receipt is a line under
  * the message (`part="line"`), so the text still follows the name. "Nenhum agente vai responder" is said that way only
  * under the conversation's newest message (`latest`): in a talk among people, or where agents answer only when
  * called, it repeated under every message. Older ones keep the check, whose popover says it.
@@ -104,6 +106,7 @@ export function MessageReceipts({
   // "Tentar de novo" sends the words again as mine: never an agent's.
   const worded =
     (status?.kind === "nobody" && !quietNobody) ||
+    status?.kind === "outage" ||
     status?.kind === "no_ai" ||
     status?.kind === "platform_cap" ||
     (status?.kind === "failed" && actions !== null && message.author.type === "person");
@@ -238,6 +241,11 @@ export function MessageReceipts({
   return (
     <div className="ac-receipt">
       {check}
+      {status?.kind === "outage" && (
+        <span className="ac-receipt__words">
+          <span>{statusText}</span>
+        </span>
+      )}
       {status?.kind === "failed" && actions && (
         <span className="ac-receipt__words">
           <span>{t("receipts.failedShort")}</span>

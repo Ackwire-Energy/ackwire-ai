@@ -771,6 +771,8 @@ export interface MessageReceipts {
     status: RunStatus | "waiting_input" | "canceled";
     /** `no_ai`: it couldn't answer, it has no AI connected. */
     reason?: string;
+    /** `waiting_input` because its AI provider is down: it retries by itself. */
+    outage?: true;
   }[];
   /** Agents it mentions that won't answer (they don't reply to this person). */
   blocked?: string[];
@@ -795,7 +797,7 @@ export type DecidedBy =
   | { step: "jev" }
   | { step: "model"; model: string; provider: string }
   | { step: "plan"; brand: "claude" | "chatgpt"; ownerId: string }
-  | { step: "rule"; rule: "reply" | "only_agent" | "follow_up" | "coordinator" };
+  | { step: "rule"; rule: "reply" | "only_agent" | "follow_up" | "coordinator" | "default" };
 
 /**
  * Who picks the agents for a message nobody mentioned (`ai-status`, ADR 0074): `by` for the workspace, `mine` for
@@ -850,7 +852,7 @@ export interface OpenConsult {
  * What a consulted agent waits on before it can answer: an approval, or a person's answer or secret (a person);
  * `computer`: its computer coming back (no one to ask); `agents`: its part done, what it handed on to other agents.
  */
-export type ConsultationWait = "approval" | "input" | "computer" | "agents";
+export type ConsultationWait = "approval" | "input" | "computer" | "agents" | "outage";
 
 /**
  * A question an agent asked another agent from a conversation, or work it handed one (`GET
@@ -872,6 +874,8 @@ export interface RunConsultation {
   question: string;
   /** The answer once answered; why it couldn't once failed. */
   answer: string | null;
+  /** Open: what the consulted agent posted in the agents' DM so far (ADR 0097). Older servers send none. */
+  progress?: { posts: number; latest: string; at: string } | null;
   createdAt: string;
   answeredAt: string | null;
   expiresAt: string;
@@ -965,6 +969,8 @@ export type ChannelEvent =
       startedAt?: string | null;
       /** A routine's background run: never the conversation's working indicator. */
       background?: boolean;
+      /** `waiting_input` parked on a provider outage: it retries by itself, nobody is asked. */
+      outage?: true;
     }
   | { type: "approval.created" | "approval.decided"; channelId: string; approval: Approval }
   /** An agent's forum suggestion card was accepted or dismissed: its `meta.forumSuggestion` now. */
@@ -1038,7 +1044,9 @@ export type ChannelEvent =
       threadId: string;
       agentId: string;
       runId: string;
-      status: "done" | "failed" | "waiting_approval";
+      status: "done" | "failed" | "waiting_approval" | "waiting_input";
+      /** `waiting_input` parked on a provider outage. */
+      outage?: true;
       error?: string;
       /** The error as a code (`run.org_paused`…) and its values, to say it in the person's language. */
       errorCode?: string;
@@ -1122,9 +1130,11 @@ export type ChannelEvent =
       messageId: string;
       agentId: string;
       runId?: string;
-      status?: "done" | "failed" | "waiting_approval";
+      status?: "done" | "failed" | "waiting_approval" | "waiting_input";
       /** `no_ai`: the agent has no AI to think with. */
       reason?: string;
+      /** `waiting_input` parked on a provider outage. */
+      outage?: true;
     }
   /** An agent asked a person something and waits (expected: `ask_user` tool; shape to confirm). */
   | {
@@ -1569,7 +1579,10 @@ export type AgentStatusKind =
   | "computer"
   | "waiting_approval"
   | "waiting_answer"
-  | "waiting_computer";
+  | "waiting_computer"
+  | "waiting_plan"
+  | "waiting_budget"
+  | "provider_down";
 
 /** An agent's line: its own words (`by: "self"`, `text`), or one the server picked for the run (`kind` + `subject`). */
 export interface AgentStatusLine {
@@ -2586,6 +2599,8 @@ export interface Routine {
   canSeeDetails: boolean;
   /** The viewer may change, pause, run, stop or delete it. */
   canManage: boolean;
+  /** Its creator, whose reach it has (kept on edit); null once they left. Absent from older servers. */
+  createdByUserId?: string | null;
   lastRun: RoutineRun | null;
   /** The last runs, newest first (at most 14): the row's pixel strip and the horizon. */
   recentRuns: RoutineRun[];
@@ -4679,10 +4694,20 @@ export type NotificationKind =
   | "routine_finished"
   /** A routine's failure streak began (one per streak; the next good run resolves it). Opens it in Rotinas. */
   | "routine_failed"
+  /** ADR 0097: an agent's run in a conversation failed for good (`latest.reason` coded). Opens that conversation. */
+  | "run_failed"
   /** The server paused a routine (`latest.reason`: its coded `pausedReason`). Opens it in Rotinas. */
   | "routine_paused"
   /** A routine waits for its computer (once per outage; `source.machineId`). Opens it in Rotinas. */
   | "routine_stalled"
+  /**
+   * A routine set to act couldn't call an agent its creator can't talk to (the agent's owner, else who manages
+   * agents). Opens the agent's page; `source.userId` is the creator, whom its action lets talk to it.
+   */
+  | "agent_unreached"
+  /** A routine's run waits for its agent's plan to reset (once per outage). Opens it in Rotinas. */
+  | "routine_waiting_plan"
+  | "plan_reset_unknown"
   | "reaction"
   /** ADR 0036 §5: a new computer joined the organization (admins). `source.machineId`; `source.label` = its name. */
   | "machine_connected"
@@ -4731,6 +4756,8 @@ export interface NotificationSource {
   handoffId?: string;
   /** `browser_handoff`: the agent's screen it is on, when not its browser (ADR 0058: `desktop`). */
   screen?: ScreenKind;
+  /** `agent_unreached`: the routine's creator, whom the agent's owner may let talk to `agentId`. */
+  userId?: string;
   /** `org_standing` to `agent_hold`: the agent held (its name in `label`). */
   agentId?: string;
   /** Channel name, thread title, issue title, topic title, mission or routine name (or the computer's name). */

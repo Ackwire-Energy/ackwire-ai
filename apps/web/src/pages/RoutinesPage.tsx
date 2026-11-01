@@ -87,6 +87,7 @@ import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { SwitchComputerDialog } from "@/components/MachineOutages";
 import { useOrg } from "@/components/org-context";
+import { RoutineReachWarnings } from "@/components/RoutineReachWarnings";
 import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { lookOf } from "@/lib/look";
@@ -1742,6 +1743,12 @@ function RoutineDialog({ open, onClose, routine }: { open: boolean; onClose: () 
               options={(["read", "act"] as const).map((v) => ({ value: v, label: t(`routines.access.${v}`) }))}
             />
           </div>
+          <RoutineReachWarnings
+            prompt={prompt}
+            access={access}
+            agentId={agentId || null}
+            creatorUserId={routine?.createdByUserId}
+          />
           {editing && !(routine && isDoneOnce(routine)) && (
             <label className="routine-active" htmlFor="nr-active">
               <Switch id="nr-active" checked={active} onCheckedChange={setActive} />

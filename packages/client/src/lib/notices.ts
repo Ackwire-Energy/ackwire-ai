@@ -12,7 +12,8 @@ export type NoticeKind =
   | "wait_result"
   | "talker_reply"
   | "proposal_result"
-  | "follow_up";
+  | "follow_up"
+  | "wake_skipped";
 
 /**
  * An event an agent's conversation got (`meta.notice`): its routine's report,
@@ -61,6 +62,9 @@ export function noticeAgentHandle(notice: MessageNotice): string | null {
   const handle = notice.refs.agentHandle ?? notice.from?.match(/^@([\w.-]+)$/)?.[1];
   return handle ? handle.replace(/^@/, "") : null;
 }
+
+/** `wake_skipped`: the handles an agent's mention couldn't wake (ADR 0097), for the line's names. */
+export const skippedHandles = (notice: MessageNotice) => (notice.refs.agentHandles ?? "").split(",").filter(Boolean);
 
 /** An automatic line in the conversation (a notice): nothing groups with it. */
 export const isEventLine = (meta: Meta) => noticeOf(meta) !== null;

@@ -1,5 +1,5 @@
 import { type Message, useMachines } from "@agenteschat/client";
-import { brainUnavailableOf, waitCardState } from "@agenteschat/client/lib/machine-outages";
+import { brainUnavailableOf, waitCardState, waitsForComputer } from "@agenteschat/client/lib/machine-outages";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
@@ -19,8 +19,7 @@ function useBrainWait(m: Pick<Message, "meta" | "author">) {
   const info = brainUnavailableOf(m.meta);
   const outages = useMachineOutages();
   const machines = useMachines(orgId);
-  // Waiting for room on a computer that is there: the agent's own words, never a card about it coming back.
-  if (!info?.machineId || info.code === "busy") return null;
+  if (!info?.machineId || !waitsForComputer(info)) return null;
   const state = waitCardState(info, outages.data?.outages, m.author.type === "agent" ? m.author.id : null);
   const name = machines.data?.find((x) => x.id === info.machineId)?.name ?? null;
   const text = waitCardText(t, state, info.brain, name);

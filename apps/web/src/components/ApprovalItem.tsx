@@ -8,7 +8,12 @@ import {
   approveAlwaysOffered,
 } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalWhy } from "@agenteschat/client/lib/approval-origin";
-import { approvalTitle, approveAlwaysHint, decisionOutcome } from "@agenteschat/client/lib/approval-words";
+import {
+  approvalSummary,
+  approvalTitle,
+  approveAlwaysHint,
+  decisionOutcome,
+} from "@agenteschat/client/lib/approval-words";
 import { timeLeft, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { ApprovalCard, Button } from "@agenteschat/ui";
@@ -161,6 +166,7 @@ export function InlineApproval({
   if (approval.status !== "pending") {
     // No one decided one that ran out: it expired at its deadline.
     const ended = approval.decidedAt ?? (approval.status === "expired" ? approval.expiresAt : null);
+    const summary = approvalSummary(approval, i18n.language);
     return (
       <RequestDone
         done={approval.status === "approved"}
@@ -180,6 +186,8 @@ export function InlineApproval({
         }
       >
         {decisionOutcome(t, approval, me.user.id, (id) => members.get(id)?.name)}: <b>{approvalTitle(t, approval)}</b>
+        {/* What was decided, so several requests for one tool are told apart. */}
+        {summary && ` · ${summary}`}
         {ended && ` · ${whenAt(t, i18n.language, ended)}`}
       </RequestDone>
     );
@@ -199,7 +207,13 @@ export function InlineApproval({
       origin={origin ? tt(origin.key, origin.values) : undefined}
       title={approvalTitle(t, approval)}
       action={approval.email ? <EmailLetter email={approval.email} /> : undefined}
-      detail={approval.email ? expires || undefined : `${approval.detail}${expires ? ` · ${expires}` : ""}`}
+      detail={
+        approval.email
+          ? expires || undefined
+          : [approval.connector ? approvalSummary(approval, i18n.language) : approval.detail, expires]
+              .filter(Boolean)
+              .join(" · ")
+      }
       why={
         why ? (
           <Trans i18nKey="approval.said" values={{ name, text: why }} components={{ b: <b /> }} {...TYPED_VALUES} />

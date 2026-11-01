@@ -44,6 +44,7 @@ import {
   useApproval,
   useApprovals,
   useArchiveChannel,
+  useCardApprovals,
   useChannelCategories,
   useChannelMembers,
   useChannels,
@@ -70,6 +71,7 @@ import {
 import { actionCardOf } from "@agenteschat/client/lib/action-cards";
 import { activityVerb, barElapsed, barEntries, isWriting, toolActivity } from "@agenteschat/client/lib/activity";
 import { looksLikeApiKey } from "@agenteschat/client/lib/api-key-text";
+import { approvalCardItems, asOfNow, cardDeadline } from "@agenteschat/client/lib/approval-card";
 import { artifactRefs } from "@agenteschat/client/lib/artifacts";
 import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
 import {
@@ -189,7 +191,7 @@ import { ActionCard } from "@/components/ActionCard";
 import { AgentActionReceipts } from "@/components/AgentActions";
 import { ActorAvatar, AgentAvatar, AgentSpinner, PersonAvatar } from "@/components/AgentAvatar";
 import { AgentPanel } from "@/components/AgentPanel";
-import { ApprovalAsk } from "@/components/ApprovalAsk";
+import { ApprovalAsk, ApprovalGroupAsk } from "@/components/ApprovalAsk";
 import { InlineApproval } from "@/components/ApprovalItem";
 import { AgentPanelContext, useOpenAgentPanel } from "@/components/agent-panel-context";
 import { ArtifactCard } from "@/components/artifacts/ArtifactCard";
@@ -254,6 +256,7 @@ import { KeyGuardDialog, NoAiBanner, NoAiCard, useNoAiAutoOpen } from "@/compone
 import { useOrg } from "@/components/org-context";
 import { AuthorStatus } from "@/components/Presence";
 import { ProfileTrigger } from "@/components/ProfileCard";
+import { ReachLines } from "@/components/ReachLines";
 import { MessageReactions, useEmojiLabels } from "@/components/Reactions";
 import {
   type AskRegistry,
@@ -3116,7 +3119,10 @@ export const TimelineMessage = memo(function TimelineMessage({
   };
   // A stopped run's message (`meta.canceled`): the text so far, and "Interrompido por Walter" as a note.
   // A text the server wrote (`meta.bodyCode`, a deploy's notice) is shown in the person's language.
-  const stopped = useMemo(() => splitCanceled(serverBody(t, m.body, m.meta), m.meta), [t, m.body, m.meta]);
+  const stopped = useMemo(
+    () => splitCanceled(serverBody(t, m.body, m.meta, i18n.language), m.meta),
+    [t, m.body, m.meta, i18n.language],
+  );
   const body = reminderBody(stopped.body, m.meta);
   // The reply of a run that reached its step limit, or that stopped because it got stuck: Continuar under it too.
   const ended = stopped.canceled ? undefined : (m.meta?.stepLimit as { stuck?: unknown } | undefined);
@@ -3418,9 +3424,11 @@ export const TimelineMessage = memo(function TimelineMessage({
                   ? t("channel.runRefused", { agent: name, reason: refusal })
                   : live.errorCode === "run.computer_busy"
                     ? t("channel.runBusy", { agent: name })
-                    : live.error
-                      ? t("channel.runFailed", { agent: name, reason: live.error })
-                      : t("channel.runFailedNoReason", { agent: name })}
+                    : live.errorCode === "run.budget_exceeded"
+                      ? t("channel.runFailed", { agent: name, reason: t("agentPage.activity.errors.budget_exceeded") })
+                      : live.error
+                        ? t("channel.runFailed", { agent: name, reason: live.error })
+                        : t("channel.runFailedNoReason", { agent: name })}
               </span>
               <Button
                 variant="ghost"
@@ -3524,7 +3532,10 @@ export const TimelineMessage = memo(function TimelineMessage({
           )}
           {m.author.type === "agent" && !m.local && <AgentActionReceipts message={m} />}
           {m.author.type === "agent" && !m.local && <TeamChecks message={m} />}
-          {approvalId && <MessageApproval approvalId={approvalId} agent={agent} members={dir.memberById} />}
+          {m.author.type === "agent" && !m.local && <ReachLines message={m} />}
+          {approvalId && (
+            <MessageApproval messageId={m.id} approvalId={approvalId} agent={agent} members={dir.memberById} />
+          )}
           {proposalId && <InlineProposal proposalId={proposalId} />}
           {agent &&
             memoryUpdates.map((u) => (
@@ -3658,12 +3669,17 @@ const inlineButton = {
   color: "inherit",
 };
 
-/** The request of a message with `meta.approvalId`: from the approvals list, or fetched by id. */
+/**
+ * The request of a message with `meta.approvalId`: from the approvals list, or fetched by id. Requests the agent
+ * asked later in this conversation join the same card (`messageId`): then one card lists them all.
+ */
 function MessageApproval({
+  messageId,
   approvalId,
   agent,
   members,
 }: {
+  messageId: string;
   approvalId: string;
   agent: Agent | undefined;
   members: Map<string, Member>;
@@ -3672,10 +3688,27 @@ function MessageApproval({
   const approvals = useApprovals(org.id);
   const listed: Approval | undefined = approvals.data?.find((a) => a.id === approvalId);
   const one = useApproval(org.id, approvalId, !listed && approvals.isSuccess);
+  // Older than the list reaches: its card's requests by the card (the list holds everything newer than the first).
+  const card = useCardApprovals(org.id, messageId, !listed && approvals.isSuccess);
   const approval = listed ?? one.data;
+  const items = approvalCardItems([...(approvals.data ?? []), ...(card.data ?? [])], messageId, approval);
   // Past its deadline it has expired, even before the server's event says so.
   const expired = useExpired(approval?.status === "pending" ? approval.expiresAt : null);
+  // Drawn again when the card's earliest deadline passes.
+  useExpired(cardDeadline(items));
   if (!approval) return null;
+  if (items.length > 1) {
+    const now = items.map((a) => asOfNow(a));
+    if (now.some((a) => a.status === "pending"))
+      return <ApprovalGroupAsk items={now} agent={agent} members={members} />;
+    return (
+      <>
+        {now.map((a) => (
+          <InlineApproval key={a.id} approval={a} agent={agent} members={members} />
+        ))}
+      </>
+    );
+  }
   // Waiting: the agent asking, in the conversation; decided or expired: one line.
   if (approval.status === "pending" && !expired)
     return <ApprovalAsk approval={approval} agent={agent} members={members} />;

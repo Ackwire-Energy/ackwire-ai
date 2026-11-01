@@ -3,6 +3,7 @@ import {
   dropNotification,
   useAiStatus,
   useApproval,
+  useApprovals,
   useChannels,
   useForumAction,
   useForumTopic,
@@ -13,6 +14,7 @@ import {
   useNotifications,
   useThreadMessages,
 } from "@agenteschat/client";
+import { approvalCardItems, approveAllScope } from "@agenteschat/client/lib/approval-card";
 import { approvalOriginWords, approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import { WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { restrictionLine } from "@agenteschat/client/lib/errors";
@@ -67,13 +69,14 @@ import { useConnectAi } from "@/components/ConnectAi";
 import { ErrorState, LoadingCards } from "@/components/Loading";
 import { useNotificationOpener } from "@/components/NotificationOpen";
 import { useOrg } from "@/components/org-context";
+import { AllowTalkButton } from "@/components/ReachLines";
 import { colorOf, prepareBurst } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useWraps } from "@/hooks/useWraps";
 import { TYPED_VALUES } from "@/i18n";
 import { useToast } from "@/lib/toast";
 import { useLiveStore } from "@/realtime/context";
-import { ApproveButton, ConnectorMark, RefuseBox } from "./ApprovalsPage";
+import { ApproveAll, ApproveButton, ConnectorMark, RefuseBox } from "./ApprovalsPage";
 import "./notifications.css";
 
 const TTL_MS = 24 * 3_600_000;
@@ -282,8 +285,12 @@ type WhatKey =
   | "missionStopped"
   | "routineFinished"
   | "routineFailed"
+  | "runFailed"
   | "routinePaused"
   | "routineStalled"
+  | "agentUnreached"
+  | "routineWaitingPlan"
+  | "planResetUnknown"
   | "machineConnected"
   | "machineConnectedAny"
   | "browserHandoff"
@@ -346,10 +353,18 @@ function Headline({ n, dir, channelName }: { n: AppNotification; dir: Dir; chann
       return k("routineFinished", { name });
     case "routine_failed":
       return k("routineFailed", { name });
+    case "run_failed":
+      return k("runFailed", { name });
     case "routine_paused":
       return k("routinePaused", { name });
     case "routine_stalled":
       return k("routineStalled", { name });
+    case "agent_unreached":
+      return k("agentUnreached", { name });
+    case "routine_waiting_plan":
+      return k("routineWaitingPlan", { name });
+    case "plan_reset_unknown":
+      return k("planResetUnknown", { name, plan: n.latest.title ?? "" });
     case "machine_connected":
       return n.source.label
         ? k("machineConnected", { name, label: n.source.label })
@@ -639,6 +654,18 @@ function RowActions({ n, h }: { n: AppNotification; h: RowHandlers }) {
   );
 }
 
+/** `agent_unreached`: let the routine's creator talk to the agent, from the inbox (its report may be out of reach). */
+function UnreachedAllow({ agentId, userId }: { agentId: string; userId: string }) {
+  const { org } = useOrg();
+  const agent = useDirectory(org.id).agentById.get(agentId);
+  if (!agent) return null;
+  return (
+    <div className="nt-steprow">
+      <AllowTalkButton agent={agent} userId={userId} className="ag-rc__btn" />
+    </div>
+  );
+}
+
 /** One item in a day group. */
 function Row({
   n,
@@ -691,6 +718,7 @@ function Row({
       : (n.kind === "mission_finished" ||
             n.kind === "mission_stopped" ||
             n.kind.startsWith("routine_") ||
+            n.kind === "agent_unreached" ||
             n.kind === "forum_synthesis") &&
           n.source.label
         ? n.source.label
@@ -700,7 +728,8 @@ function Row({
   const speaker = n.count > 1 && (n.kind === "thread_reply" || n.kind === "issue_comment") ? name : null;
   const expandable = isExpandable(n);
   const steps = l.steps && l.steps.total > 0 ? l.steps : null;
-  const failed = n.kind === "mission_stopped" || n.kind === "routine_failed" || l.steps?.failedAt != null;
+  const failed =
+    n.kind === "mission_stopped" || n.kind === "routine_failed" || n.kind === "run_failed" || l.steps?.failedAt != null;
   // A routine's trouble says why in the person's language (`latest.reason`): a pause its reason, a failed
   // run what went wrong (never the server's English).
   const why = routineNotificationWords(n);
@@ -805,6 +834,9 @@ function Row({
                   {stepWords}
                 </Chip>
               </div>
+            )}
+            {n.kind === "agent_unreached" && n.source.agentId && n.source.userId && (
+              <UnreachedAllow agentId={n.source.agentId} userId={n.source.userId} />
             )}
             {expandable && (
               <>
@@ -944,9 +976,14 @@ function ApprovalSay({
   const { t } = useTranslation();
   const { org } = useOrg();
   const approval = useApproval(org.id, approvalId);
+  const approvals = useApprovals(org.id);
   const [open, setOpen] = useState(false);
   const a = approval.data;
   if (!a) return <h3>{fallback}</h3>;
+  // One notification per card: how many on it still wait.
+  const waiting = a.messageId
+    ? approvalCardItems(approvals.data, a.messageId, a).filter((x) => x.status === "pending").length
+    : 0;
   const reason = approvalWhy(a) ?? why;
   const values = approvalValues(a, { max: 3 }).map(([label, value]) => `${label}: ${value}`);
   return (
@@ -960,6 +997,7 @@ function ApprovalSay({
       </p>
       {(a.connector || a.email || approvalReadsOnly(a) || values.length > 0 || reason) && (
         <div className="nt-facts">
+          {waiting > 1 && <Chip icon="clock">{t("approval.all.waitingCount", { count: waiting })}</Chip>}
           {(a.connector || a.email) && <ConnectorMark approval={a} />}
           {approvalReadsOnly(a) && <Chip icon="eye">{t("approvals.readsOnly")}</Chip>}
           {values.map((v) => (
@@ -1004,8 +1042,29 @@ function ApprovalActs({
   const { t } = useTranslation();
   const { org } = useOrg();
   const approval = useApproval(org.id, approvalId);
+  const approvals = useApprovals(org.id);
   const [refusing, setRefusing] = useState(false);
   const a = approval.data;
+  const items = a?.messageId ? approvalCardItems(approvals.data, a.messageId, a) : [];
+  // Several on its card: decided together here, one by one in the conversation or Aprovações.
+  if (approveAllScope(items).ids.length > 1) {
+    return (
+      <div className="nt-wacts ac-acts">
+        <ApproveAll items={items} />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpen();
+          }}
+        >
+          {t("notifications.wait.openApprovals")}
+        </Button>
+        {tail}
+      </div>
+    );
+  }
   if (a?.canDecide && a.status === "pending") {
     if (refusing) return <RefuseBox approval={a} agent={agent} onCancel={() => setRefusing(false)} />;
     return (

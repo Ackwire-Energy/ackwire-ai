@@ -236,7 +236,14 @@ export async function resumeRunsWaitingForMachine(
       updatedAt: agentRuns.updatedAt,
     })
     .from(agentRuns)
-    .where(and(eq(agentRuns.waitingMachineId, machineId), eq(agentRuns.status, "waiting_input")))
+    .where(
+      and(
+        eq(agentRuns.waitingMachineId, machineId),
+        eq(agentRuns.status, "waiting_input"),
+        // The computer coming back says nothing about a plan's limit or a budget.
+        sql`coalesce(${agentRuns.transcript}->'waitingForBrain'->>'code', '') not in ('plan_limit', 'budget')`,
+      ),
+    )
     .limit(200);
   const resumed: string[] = [];
   for (const r of rows) {
