@@ -3477,7 +3477,7 @@ export function useWikiAction(orgId: string) {
         | { type: "move"; slug: string; folder: string }
         | { type: "lock"; slug: string; locked: boolean }
         | { type: "pin"; slug: string; pinned: boolean }
-        | { type: "audience"; slug: string; audience: WikiAudience | null }
+        | { type: "audience"; slug: string; audience: WikiAudience | null; agentIds?: string[] | null }
         | {
             type: "append";
             slug: string;
@@ -3499,13 +3499,36 @@ export function useWikiAction(orgId: string) {
         case "pin":
           return api.wiki.pin(orgId, action.slug, action.pinned);
         case "audience":
-          return api.wiki.audience(orgId, action.slug, action.audience);
+          return api.wiki.audience(orgId, action.slug, action.audience, action.agentIds);
         case "append":
           return api.wiki.append(orgId, action.slug, { text: action.text, source: action.source });
       }
     },
     onSuccess: (page) => {
       qc.setQueryData(keys.wikiPage(orgId, page.slug), page);
+      void qc.invalidateQueries({ queryKey: keys.wiki(orgId) });
+    },
+  });
+}
+
+/** A wiki folder's audience and the closest limited folder above it. */
+export function useWikiFolderAudience(orgId: string, folder: string, enabled = true) {
+  const api = useApi();
+  return useQuery({
+    enabled,
+    queryKey: [...keys.wiki(orgId), "folder-audience", folder],
+    queryFn: () => api.wiki.folderAudience(orgId, folder),
+  });
+}
+
+/** Saves a folder's audience: it reaches its pages, so everything in the wiki is read again. */
+export function useSetWikiFolderAudience(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { folder: string; audience: WikiAudience | null; agentIds: string[] | null }) =>
+      api.wiki.setFolderAudience(orgId, input.folder, input.audience, input.agentIds),
+    onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.wiki(orgId) });
     },
   });

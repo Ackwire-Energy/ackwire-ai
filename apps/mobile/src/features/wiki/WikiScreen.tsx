@@ -70,7 +70,9 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
   const c = useColors();
   const orgId = useOrgId();
   // Writing in the wiki is `edit_wiki` (ADR 0085; the server checks it again).
-  const writes = can(useOrg().org, "edit_wiki");
+  const { org } = useOrg();
+  const writes = can(org, "edit_wiki");
+  const choosesAudience = writes && can(org, "manage_roles");
   const dir = useDirectory();
   const insets = useSafeAreaInsets();
   const tree = useWikiTree(orgId);
@@ -114,6 +116,14 @@ export function WikiScreen({ folder = "" }: { folder?: string }) {
             {t("wiki.subtitle")}
           </Text>
         )}
+        {folder && choosesAudience ? (
+          <Row
+            leading={<Tile icon="eye" />}
+            title={t("wiki.audience")}
+            chevron
+            onPress={() => router.push({ pathname: "/wiki-audience", params: { folder } })}
+          />
+        ) : null}
         <View style={styles.search}>
           <SearchField
             value={q}
@@ -543,9 +553,9 @@ function WikiPage({ slug }: { slug: string }) {
                   {by} · {relativeTime(t, i18n.language, p.updatedAt)} · v{p.version}
                 </Text>
               </View>
-              {p.audience ? (
+              {p.audience || p.agentIds ? (
                 <View style={styles.note}>
-                  <Note icon="eye">{t("wiki.restrictedHint")}</Note>
+                  <Note icon="eye">{p.audience ? t("wiki.restrictedHint") : t("wiki.audienceAgentsOnlyHint")}</Note>
                 </View>
               ) : null}
               {p.locked ? (

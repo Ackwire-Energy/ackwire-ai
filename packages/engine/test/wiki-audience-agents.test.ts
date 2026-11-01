@@ -1,0 +1,257 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import { schema } from "@agenteschat/db";
+import {
+  createAgent,
+  createWikiPage,
+  getWikiFolderAudience,
+  getWikiPage,
+  importWikiPages,
+  moveWikiPage,
+  NotFoundError,
+  RESTRICTED_WIKI_RULE,
+  removeMember,
+  retrieveWikiForRun,
+  searchWiki,
+  setWikiFolderAudience,
+  setWikiPageAudience,
+  ValidationError,
+  type WikiActor,
+  wikiHitsForAgent,
+} from "../src";
+import { addMember, adminRoleId, type Fixture, setup } from "./fixtures";
+
+let f: Fixture;
+afterEach(async () => {
+  const current = f;
+  f = undefined as unknown as Fixture;
+  await current?.close();
+});
+
+const person = (userId: string): WikiActor => ({ type: "person", userId });
+const agent = (agentId: string): WikiActor => ({ type: "agent", agentId, requestedByUserId: null });
+const wikiDeps = () => ({ db: f.db, pubsub: f.pubsub, search: f.context, artifacts: f.artifactDeps });
+const code = (e: unknown) => (e as { code?: string }).code;
+const noReaders = { channelId: null, person: async () => null };
+
+async function workspace() {
+  f = await setup();
+  const deps = wikiDeps();
+  const other = await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: "Infra", handle: "infra", role: "Infra", credentialId: f.credential.id },
+    { model: "claude-sonnet-5-5" },
+  );
+  const ana = await addMember(f.db, f.org.id, "admin", "ana");
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  const admin = await adminRoleId(f.db, f.org.id);
+  const page = await createWikiPage(deps, person(f.owner.id), f.org.id, {
+    title: "Margens",
+    folder: "Financeiro",
+    body: "Margem mínima de 40% nos contratos.",
+  });
+  return { deps, other, ana, bia, admin, page };
+}
+
+describe("wiki pages limited to some agents", () => {
+  test("an agent off the list finds nothing, and every agent reads by default", async () => {
+    const { deps, other, page } = await workspace();
+    expect((await getWikiPage(f.db, agent(other.id), f.org.id, "margens")).id).toBe(page.id);
+    const view = await setWikiPageAudience(deps, f.owner.id, f.org.id, "margens", null, [f.agent.id]);
+    expect(view.audience).toBeNull();
+    expect(view.agentIds).toEqual([f.agent.id]);
+    expect((await getWikiPage(f.db, agent(f.agent.id), f.org.id, "margens")).id).toBe(page.id);
+    const refused = await getWikiPage(f.db, agent(other.id), f.org.id, "margens").catch((e) => e);
+    expect(refused).toBeInstanceOf(NotFoundError);
+    expect(code(refused)).toBe("wiki.page_not_found");
+    expect(await searchWiki(deps, agent(other.id), f.org.id, "margem contratos")).toEqual([]);
+    expect((await searchWiki(deps, agent(f.agent.id), f.org.id, "margem contratos")).map((p) => p.id)).toEqual([
+      page.id,
+    ]);
+  });
+
+  test("an older app that sends no list keeps the page's list", async () => {
+    const { deps, admin } = await workspace();
+    await setWikiPageAudience(deps, f.owner.id, f.org.id, "margens", null, [f.agent.id]);
+    const view = await setWikiPageAudience(deps, f.owner.id, f.org.id, "margens", { roleIds: [admin], userIds: [] });
+    expect(view.agentIds).toEqual([f.agent.id]);
+  });
+
+  test("a run's context leaves it out, even when the message links it", async () => {
+    const { deps, other } = await workspace();
+    await setWikiPageAudience(deps, f.owner.id, f.org.id, "margens", null, [f.agent.id]);
+    const off = await retrieveWikiForRun(deps, {
+      orgId: f.org.id,
+      agentId: other.id,
+      text: "resuma [[Margens]]",
+      readers: noReaders,
+    });
+    expect(off).toEqual({ text: "", pageIds: [] });
+  });
+
+  test("search over everything drops it for an agent off the list", async () => {
+    const { deps, other, page } = await workspace();
+    await setWikiPageAudience(deps, f.owner.id, f.org.id, "margens", null, [f.agent.id]);
+    const hit = { kind: "wiki", sourceId: page.id, title: "Margens", snippet: "40%" };
+    const message = { kind: "message", sourceId: "m", title: "", snippet: "oi" };
+    expect(await wikiHitsForAgent(f.db, other.id, [hit, message], noReaders)).toEqual([message]);
+    // Nobody to check with: the agent on the list gets the rule, never the text or the title.
+    const [kept] = await wikiHitsForAgent(f.db, f.agent.id, [hit], noReaders);
+    expect(kept?.snippet).toBe(RESTRICTED_WIKI_RULE);
+    expect(kept?.title).toBe("");
+    const seen = await wikiHitsForAgent(f.db, f.agent.id, [hit], {
+      channelId: null,
+      person: async () => f.owner.id,
+    });
+    expect(seen[0]?.snippet).toBe("40%");
+  });
+
+  test("an agent off the list in the channel counts as someone outside", async () => {
+    const { deps, other } = await workspace();
+    await setWikiPageAudience(deps, f.owner.id, f.org.id, "margens", null, [f.agent.id]);
+    const ask = () =>
+      retrieveWikiForRun(deps, {
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        text: "resuma [[Margens]]",
+        readers: { channelId: f.general.id, person: async () => f.owner.id },
+      });
+    expect((await ask()).text).not.toContain(RESTRICTED_WIKI_RULE);
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, agentId: other.id });
+    expect((await ask()).text).toContain(RESTRICTED_WIKI_RULE);
+  });
+});
+
+describe("wiki folders with an audience", () => {
+  test("saving reaches its pages and subfolders; new, moved and imported pages take it", async () => {
+    const { deps, admin, bia, ana } = await workspace();
+    const sub = await createWikiPage(deps, person(f.owner.id), f.org.id, {
+      title: "Acme",
+      folder: "Financeiro/Contratos",
+    });
+    const outside = await createWikiPage(deps, person(f.owner.id), f.org.id, { title: "Geral", folder: "Pessoas" });
+    const done = await setWikiFolderAudience(
+      deps,
+      f.owner.id,
+      f.org.id,
+      "Financeiro",
+      { roleIds: [admin], userIds: [] },
+      [f.agent.id],
+    );
+    expect(done.pages).toBe(2);
+    const followed = await getWikiPage(f.db, person(ana.id), f.org.id, sub.id);
+    expect(followed.audienceFolder).toBe("Financeiro");
+    expect(followed.agentIds).toEqual([f.agent.id]);
+    expect(code(await getWikiPage(f.db, person(bia.id), f.org.id, sub.id).catch((e) => e))).toBe("wiki.no_access");
+    const made = await createWikiPage(deps, person(f.owner.id), f.org.id, { title: "Nova", folder: "Financeiro/Q4" });
+    expect(made.audienceFolder).toBe("Financeiro");
+    const moved = await moveWikiPage(deps, person(f.owner.id), f.org.id, outside.id, "Financeiro");
+    expect(moved.audienceFolder).toBe("Financeiro");
+    expect(moved.audience?.roleIds).toEqual([admin]);
+    const imported = await importWikiPages(deps, f.owner.id, f.org.id, {
+      source: { type: "obsidian", name: "Cofre" },
+      notes: [{ title: "Nota", folder: "Financeiro", body: "x" }],
+      onConflict: "keep_both",
+    });
+    expect(imported.created[0]?.audienceFolder).toBe("Financeiro");
+  });
+
+  test("a page that leaves keeps its limit; opening a folder opens only what followed it", async () => {
+    const { deps, admin, page, ana } = await workspace();
+    const own = await createWikiPage(deps, person(f.owner.id), f.org.id, { title: "Própria", folder: "Financeiro" });
+    await setWikiFolderAudience(deps, f.owner.id, f.org.id, "Financeiro", { roleIds: [admin], userIds: [] }, null);
+    await setWikiPageAudience(deps, f.owner.id, f.org.id, own.id, { roleIds: [], userIds: [ana.id] }, null);
+    const out = await moveWikiPage(deps, person(f.owner.id), f.org.id, page.id, "Geral");
+    expect(out.audienceFolder).toBeNull();
+    expect(out.audience?.roleIds).toEqual([admin]);
+    const stay = await createWikiPage(deps, person(f.owner.id), f.org.id, { title: "Fica", folder: "Financeiro" });
+    await setWikiFolderAudience(deps, f.owner.id, f.org.id, "Financeiro", null, null);
+    expect((await getWikiPage(f.db, person(f.owner.id), f.org.id, stay.id)).audience).toBeNull();
+    expect((await getWikiPage(f.db, person(f.owner.id), f.org.id, own.id)).audience?.userIds).toEqual([ana.id]);
+    expect((await getWikiFolderAudience(f.db, f.owner.id, f.org.id, "Financeiro")).own).toBeNull();
+  });
+
+  test("a page and a subfolder can only be narrower than the folder", async () => {
+    const { deps, admin, ana, bia, other, page } = await workspace();
+    await setWikiFolderAudience(
+      deps,
+      f.owner.id,
+      f.org.id,
+      "Financeiro",
+      { roleIds: [admin], userIds: [] },
+      [f.agent.id],
+    );
+    const open = await setWikiPageAudience(deps, f.owner.id, f.org.id, page.id, null, null).catch((e) => e);
+    expect(open).toBeInstanceOf(ValidationError);
+    expect(code(open)).toBe("wiki.audience_wider_than_folder");
+    const wider = await setWikiPageAudience(
+      deps,
+      f.owner.id,
+      f.org.id,
+      page.id,
+      { roleIds: [], userIds: [bia.id] },
+      [f.agent.id],
+    ).catch((e) => e);
+    expect(code(wider)).toBe("wiki.audience_wider_than_folder");
+    const moreAgents = await setWikiPageAudience(
+      deps,
+      f.owner.id,
+      f.org.id,
+      page.id,
+      { roleIds: [admin], userIds: [] },
+      [f.agent.id, other.id],
+    ).catch((e) => e);
+    expect(code(moreAgents)).toBe("wiki.audience_wider_than_folder");
+    // Ana holds the folder's role, so naming her alone is narrower.
+    const narrow = await setWikiPageAudience(
+      deps,
+      f.owner.id,
+      f.org.id,
+      page.id,
+      { roleIds: [], userIds: [ana.id] },
+      [],
+    );
+    expect(narrow.audienceFolder).toBeNull();
+    expect(narrow.folderAudience?.folder).toBe("Financeiro");
+    // A subfolder with no audience of its own just follows the folder.
+    expect((await setWikiFolderAudience(deps, f.owner.id, f.org.id, "Financeiro/Sub", null, null)).pages).toBe(0);
+    const wideSub = await setWikiFolderAudience(
+      deps,
+      f.owner.id,
+      f.org.id,
+      "Financeiro/Sub",
+      { roleIds: [], userIds: [bia.id] },
+      [f.agent.id],
+    ).catch((e) => e);
+    expect(code(wideSub)).toBe("wiki.audience_wider_than_folder");
+  });
+
+  test("a move or a create that would lose the writer the page is refused", async () => {
+    const { deps, admin, bia } = await workspace();
+    const hers = await createWikiPage(deps, person(bia.id), f.org.id, { title: "Dela", folder: "Geral" });
+    await setWikiFolderAudience(deps, f.owner.id, f.org.id, "Financeiro", { roleIds: [admin], userIds: [] }, null);
+    const created = await createWikiPage(deps, person(bia.id), f.org.id, {
+      title: "Outra",
+      folder: "Financeiro",
+    }).catch((e) => e);
+    expect(code(created)).toBe("wiki.no_access");
+    const moved = await moveWikiPage(deps, person(bia.id), f.org.id, hers.id, "Financeiro").catch((e) => e);
+    expect(code(moved)).toBe("wiki.no_access");
+    expect((await getWikiPage(f.db, person(bia.id), f.org.id, hers.id)).folder).toBe("Geral");
+  });
+
+  test("the setter stays in it, a limited folder is only for its audience, and leavers are removed", async () => {
+    const { deps, admin, ana, bia } = await workspace();
+    const out = await setWikiFolderAudience(deps, ana.id, f.org.id, "Financeiro", {
+      roleIds: [],
+      userIds: [],
+    }, null).catch((e) => e);
+    expect(code(out)).toBe("wiki.audience_excludes_you");
+    const both = { roleIds: [admin], userIds: [bia.id] };
+    await setWikiFolderAudience(deps, f.owner.id, f.org.id, "Financeiro", both, null);
+    await removeMember(f.db, f.owner.id, f.org.id, bia.id);
+    const info = await getWikiFolderAudience(f.db, f.owner.id, f.org.id, "Financeiro");
+    expect(info.own?.audience?.userIds).toEqual([]);
+  });
+});

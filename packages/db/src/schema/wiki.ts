@@ -36,11 +36,16 @@ export const wikiPages = pgTable(
     pinned: boolean().notNull().default(false),
     /**
      * Limited to an audience (ADR 0023 addendum): only owners, the people holding one of `audienceRoleIds` and the
-     * people in `audienceUserIds` see it. Agents always read it.
+     * people in `audienceUserIds` see it.
      */
     restricted: boolean().notNull().default(false),
     audienceRoleIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
     audienceUserIds: text().array().notNull().default(sql`'{}'::text[]`),
+    /** Limited to some agents: only `audienceAgentIds` read it. Independent of `restricted`. */
+    agentsLimited: boolean().notNull().default(false),
+    audienceAgentIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    /** The folder whose audience this page follows; null = its own audience, or open. */
+    audienceFolder: text(),
     /** Where it came from: "Salvar na wiki" (`message`, `forum_topic`) or an import (`obsidian`, id = the vault's name). */
     source: jsonb().$type<{ type: string; id: string; channelId?: string; attachments?: Record<string, string> }>(),
     /** `person` or `agent`. */
@@ -56,6 +61,32 @@ export const wikiPages = pgTable(
     uniqueIndex("wiki_pages_org_slug").on(t.orgId, t.slug).where(sql`${t.deletedAt} is null`),
     index().on(t.orgId, t.updatedAt),
   ],
+);
+
+/**
+ * A folder's audience (ADR 0023 addendum): applied to the pages in it and its subfolders, and taken by a page created
+ * or moved in. A page holds its own copy, so one condition over `wiki_pages` decides who sees it.
+ */
+export const wikiFolderAudiences = pgTable(
+  "wiki_folder_audiences",
+  {
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    /** `Financeiro/Contratos`, as `wiki_pages.folder` writes it. */
+    folder: text().notNull(),
+    restricted: boolean().notNull().default(false),
+    audienceRoleIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    audienceUserIds: text().array().notNull().default(sql`'{}'::text[]`),
+    agentsLimited: boolean().notNull().default(false),
+    audienceAgentIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    updatedById: text().notNull(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex().on(t.orgId, t.folder)],
 );
 
 /** Full history: one row per save, with who wrote it (and for whom, for agents) and a note. */

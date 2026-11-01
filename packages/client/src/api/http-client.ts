@@ -1263,8 +1263,15 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         request<WikiPage>(`${org(orgId)}/wiki/pages/${enc(slug)}/lock`, { json: { locked } }),
       pin: (orgId, slug, pinned) =>
         request<WikiPage>(`${org(orgId)}/wiki/pages/${enc(slug)}/pin`, { json: { pinned } }),
-      audience: (orgId, slug, audience) =>
-        request<WikiPage>(`${org(orgId)}/wiki/pages/${enc(slug)}/audience`, { method: "PUT", json: { audience } }),
+      audience: (orgId, slug, audience, agentIds) =>
+        request<WikiPage>(`${org(orgId)}/wiki/pages/${enc(slug)}/audience`, {
+          method: "PUT",
+          json: { audience, agentIds },
+        }),
+      folderAudience: (orgId, folder) =>
+        request(`${org(orgId)}/wiki/folder-audience?folder=${enc(folder)}`),
+      setFolderAudience: (orgId, folder, audience, agentIds) =>
+        request(`${org(orgId)}/wiki/folder-audience`, { method: "PUT", json: { folder, audience, agentIds } }),
       remove: async (orgId, slug) => {
         await request<void>(`${org(orgId)}/wiki/pages/${enc(slug)}`, { method: "DELETE" });
       },

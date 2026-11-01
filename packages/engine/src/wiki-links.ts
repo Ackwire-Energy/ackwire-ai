@@ -41,6 +41,24 @@ export function wikiPageVisibleSql(userId: string | SQL) {
       where vr.org_id = ${wikiPages.orgId} and vr.user_id = ${userId} and vr.role_id = any(${wikiPages.audienceRoleIds})))`;
 }
 
+/**
+ * Whether the agent `agentId` reads a wiki page, as a condition over `wiki_pages`: every page but one limited to other
+ * agents. `agentId` may be a column, to ask it for every row of another table.
+ */
+export function wikiPageAgentVisibleSql(agentId: string | SQL) {
+  return sql<boolean>`(not ${wikiPages.agentsLimited} or ${agentId} = any(${wikiPages.audienceAgentIds}))`;
+}
+
+/** Of these page ids, the ones the agent `agentId` reads. */
+export async function agentVisibleWikiPageIds(db: Executor, agentId: string, ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const rows = await db
+    .select({ id: wikiPages.id })
+    .from(wikiPages)
+    .where(and(inArray(wikiPages.id, [...new Set(ids)]), wikiPageAgentVisibleSql(agentId)));
+  return new Set(rows.map((r) => r.id));
+}
+
 /** Of these page ids, the ones `userId` sees. */
 export async function visibleWikiPageIds(db: Executor, userId: string, ids: string[]): Promise<Set<string>> {
   if (ids.length === 0) return new Set();

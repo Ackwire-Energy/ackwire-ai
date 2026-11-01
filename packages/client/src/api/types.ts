@@ -3682,10 +3682,17 @@ export interface WikiAuthor {
   onBehalfOf?: string | null;
 }
 
-/** Who sees a restricted wiki page besides agents and owners: roles (`OrgRole` ids) and people. */
+/** Who sees a restricted wiki page besides owners: roles (`OrgRole` ids) and people. */
 export interface WikiAudience {
   roleIds: string[];
   userIds: string[];
+}
+
+/** A wiki folder's audience: `audience` null = every member, `agentIds` null = every agent. */
+export interface WikiFolderAudience {
+  folder: string;
+  audience: WikiAudience | null;
+  agentIds: string[] | null;
 }
 
 export interface WikiPageSummary {
@@ -3702,8 +3709,12 @@ export interface WikiPageSummary {
   locked?: boolean;
   /** "Fixadas": at the top of the wiki for everyone. */
   pinned?: boolean;
-  /** Limited to these roles and people (agents and owners always read it); null or missing = every member. */
+  /** Limited to these roles and people (owners always read it); null or missing = every member. */
   audience?: WikiAudience | null;
+  /** Limited to these agents; null or missing = every agent. */
+  agentIds?: string[] | null;
+  /** The folder whose audience it follows. */
+  audienceFolder?: string | null;
   /** The start of the text, plain, for cards. */
   excerpt?: string;
   /** `obsidian` for an imported page. */
@@ -3928,6 +3939,8 @@ export interface WikiPage extends WikiPageSummary {
   /** Everyone who wrote it, most recent first. */
   authors: WikiAuthor[];
   backlinks: WikiBacklink[];
+  /** The closest limited folder: this page can only be narrower. */
+  folderAudience?: WikiFolderAudience | null;
   /** Where it came from; an import keeps its attachments (name → Drive artifact id). */
   source?: { type: string; id: string; channelId?: string; attachments?: Record<string, string> } | null;
   /** Agents that used it in the last 7 days; the channel only when public. */

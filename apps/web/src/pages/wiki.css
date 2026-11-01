@@ -133,6 +133,41 @@ html:not([data-pointer]) .wiki-row:focus-visible {
 .wiki-row__car {
   transition: transform 0.2s var(--out);
 }
+/* A folder's "Quem vê": on hover, and always once the folder is limited. */
+.wiki-folder-row {
+  position: relative;
+}
+.wiki-folder-row__act {
+  position: absolute;
+  top: 5px;
+  right: 30px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--faint);
+  opacity: 0;
+}
+button.wiki-folder-row__act {
+  cursor: pointer;
+}
+button.wiki-folder-row__act:hover {
+  color: var(--ink2);
+}
+.wiki-folder-row:hover .wiki-folder-row__act,
+.wiki-folder-row__act:focus-visible,
+.wiki-folder-row__act[data-on] {
+  opacity: 1;
+}
+@media (hover: none) {
+  .wiki-folder-row__act {
+    opacity: 1;
+  }
+}
 .wiki-row[aria-expanded="false"] .wiki-row__car {
   transform: rotate(-90deg);
 }

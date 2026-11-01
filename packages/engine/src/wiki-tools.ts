@@ -99,7 +99,7 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
           if (pages.length === 0) return { content: "No wiki pages match." };
           const hidden = await unseen(
             ctx,
-            pages.filter((p) => p.restricted).map((p) => p.id),
+            pages.filter((p) => p.restricted || p.agentsLimited).map((p) => p.id),
           );
           return {
             content: pages
@@ -135,7 +135,7 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
             pageIds: [p.id],
           });
           const backlinks = p.backlinks.filter((b) => b.kind === "page").map((b) => `[[${b.title}]]`);
-          const hidden = p.audience ? (await unseen(ctx, [p.id])).has(p.id) : false;
+          const hidden = p.audience || p.agentIds ? (await unseen(ctx, [p.id])).has(p.id) : false;
           return {
             content: [
               `# ${p.title} (slug ${p.slug}, version ${p.version}${p.folder ? `, folder ${p.folder}` : ""}${p.locked ? ", locked" : ""})`,

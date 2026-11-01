@@ -12,6 +12,7 @@ import { agentSearchChannels, agentVisibleChannels, indexSource, searchVisible }
 import { closedRefusal } from "../standing";
 import { noAgentText } from "../team";
 import type { ToolContext, ToolDefinition, ToolSource } from "../tools/types";
+import { wikiHitsForAgent } from "../wiki";
 import { type ContextItem, checkPermissionText, consolidateItem, getContextItems, supersede } from "./items";
 import { kindFamily, overlap } from "./judgments";
 import { CARD_MAX_AGENTS, ownerDecides, type Proposal, proposeChange } from "./proposals";
@@ -65,13 +66,18 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         additionalProperties: false,
       },
       async execute(input, ctx) {
-        const hits = await searchVisible(deps, {
-          orgId: ctx.orgId,
-          text: str(input.query),
-          visibleChannelIds: await visible(ctx),
-          kinds: Array.isArray(input.kinds) ? (input.kinds as never[]) : undefined,
-          limit: typeof input.limit === "number" ? input.limit : 8,
-        });
+        const hits = await wikiHitsForAgent(
+          ctx.db,
+          ctx.agentId,
+          await searchVisible(deps, {
+            orgId: ctx.orgId,
+            text: str(input.query),
+            visibleChannelIds: await visible(ctx),
+            kinds: Array.isArray(input.kinds) ? (input.kinds as never[]) : undefined,
+            limit: typeof input.limit === "number" ? input.limit : 8,
+          }),
+          { channelId: ctx.channelId, person: () => personBehindCall(ctx) },
+        );
         if (hits.length === 0) return { content: "No results." };
         const items = new Map(
           (

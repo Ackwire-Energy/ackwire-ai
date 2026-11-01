@@ -229,12 +229,12 @@ describe("the wiki", () => {
     await act(() => new Promise((r) => setTimeout(r, 0)));
     await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Quem vê" }));
     const dialog = screen().getByRole("dialog", { name: "Quem vê Deploy" });
-    await click(within(dialog).getByRole("radio", { name: /Só os agentes e quem eu escolher/ }));
+    await click(within(dialog).getByRole("radio", { name: /Só quem eu escolher/ }));
     await click(within(dialog).getByRole("checkbox", { name: "Admin" }));
     await click(within(dialog).getByRole("button", { name: "Salvar" }));
     await settle(6);
     const call = state.calls.find((c) => c.method === "wiki.audience");
-    expect(call?.args.slice(1)).toEqual(["deploy", { roleIds: [ADMIN_ROLE_ID], userIds: [] }]);
+    expect(call?.args.slice(1)).toEqual(["deploy", { roleIds: [ADMIN_ROLE_ID], userIds: [] }, null]);
     expect(screen().getByText("Restrita")).toBeTruthy();
   });
 

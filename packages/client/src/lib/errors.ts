@@ -96,6 +96,7 @@ const KNOWN = {
   "wiki.no_access": "errors.wiki.noAccess",
   "wiki.audience_forbidden": "errors.wiki.audienceForbidden",
   "wiki.audience_excludes_you": "errors.wiki.audienceExcludesYou",
+  "wiki.audience_wider_than_folder": "errors.wiki.audienceWiderThanFolder",
   "role.name_required": "errors.role.nameRequired",
   "role.name_long": "errors.role.nameLong",
   "role.too_many": "errors.role.tooMany",

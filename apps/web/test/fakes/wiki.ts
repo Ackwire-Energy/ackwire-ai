@@ -231,11 +231,19 @@ export function createFakeWiki(ctx: MockContext, log: (method: string, ...args: 
       s.page = { ...s.page, pinned };
       return withBacklinks(orgId, s);
     },
-    audience: async (orgId, slug, audience) => {
-      log("wiki.audience", orgId, slug, audience);
+    audience: async (orgId, slug, audience, agentIds) => {
+      log("wiki.audience", orgId, slug, audience, agentIds);
       const s = await find(orgId, slug);
-      s.page = { ...s.page, audience };
+      s.page = { ...s.page, audience, ...(agentIds === undefined ? {} : { agentIds }) };
       return withBacklinks(orgId, s);
+    },
+    folderAudience: async (orgId, folder) => {
+      log("wiki.folderAudience", orgId, folder);
+      return { own: null, above: null };
+    },
+    setFolderAudience: async (orgId, folder, audience, agentIds) => {
+      log("wiki.setFolderAudience", orgId, folder, audience, agentIds);
+      return { folder, pages: 0 };
     },
     remove: async (orgId, slug) => {
       log("wiki.remove", orgId, slug);

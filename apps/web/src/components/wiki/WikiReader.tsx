@@ -673,9 +673,9 @@ export function WikiReader({
   } else if (p) {
     actions = (
       <>
-        {p.audience && (
-          <Chip icon="eye" title={t("wiki.restrictedHint")}>
-            {t("wiki.restricted")}
+        {(p.audience || p.agentIds) && (
+          <Chip icon="eye" title={p.audience ? t("wiki.restrictedHint") : t("wiki.audienceAgentsOnlyHint")}>
+            {p.audienceFolder ? t("wiki.audienceFollows", { folder: p.audienceFolder }) : t("wiki.restricted")}
           </Chip>
         )}
         {p.locked && (
