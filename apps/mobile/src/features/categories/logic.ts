@@ -1,5 +1,5 @@
 import type { Channel } from "@agenteschat/client";
-import { can } from "@agenteschat/client/lib/permissions";
+import { can, managesChannel } from "@agenteschat/client/lib/permissions";
 
 /** The person's membership: what they may do (`OrgSummary.permissions`, ADR 0085). */
 type Membership = Parameters<typeof can>[0];
@@ -7,9 +7,8 @@ type Membership = Parameters<typeof can>[0];
 /** Who manages channels arranges the categories (ADR 0080). */
 export const arrangesCategories = (org: Membership) => can(org, "manage_channels");
 
-/** Who may put a channel in a category: its creator or who manages channels, as for renaming it. */
-export const movesChannel = (channel: Pick<Channel, "createdByUserId">, meId: string | null, org: Membership) =>
-  (meId !== null && channel.createdByUserId === meId) || can(org, "manage_channels");
+/** Who may put a channel in a category: who manages it, as for renaming it. */
+export const movesChannel = managesChannel;
 
 /** The pushed screens. */
 export const categoryHrefs = {

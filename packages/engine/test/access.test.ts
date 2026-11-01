@@ -3,6 +3,7 @@ import { eq, schema } from "@agenteschat/db";
 import {
   accessMatrix,
   type ConnectorDeps,
+  connectorGrantValidator,
   createApiKeyConnection,
   createConnectorToolSource,
   createToolGateway,
@@ -10,8 +11,11 @@ import {
   getAgentAccess,
   grantKey,
   postPersonMessage,
+  resolveApps,
   setAgentAccess,
+  setAgentScopes,
   toolAccess,
+  ValidationError,
 } from "../src";
 import { fakeGithubMcp } from "./fake-mcp";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -211,6 +215,32 @@ test("write implies read for built-ins: issues:write lets the agent list its iss
   expect(issuesRead?.tools.map((t) => [t.name, t.state])).toEqual([["list_issues", "inherited"]]);
   expect(tree.builtins.find((b) => b.scope === "drive:read")?.tools.every((t) => t.state === "inherited")).toBe(true);
   expect(tree.builtins.find((b) => b.scope === "calendar:read")?.state).toBe("off");
+});
+
+test("names every object has (constructor, toString) are no app or scope", async () => {
+  f = await setup();
+  const apps = await resolveApps(f.db, f.org.id, ["constructor", "toString", "__proto__"]);
+  expect(apps.unknown).toEqual(["constructor", "toString", "__proto__"]);
+  const scopes = (scope: string) => ({ ...none, scopes: [{ connectionId: null, scope }] });
+  await expect(setAgentAccess(f.db, f.owner.id, f.org.id, f.agent.id, scopes("constructor"))).rejects.toBeInstanceOf(
+    ValidationError,
+  );
+  await expect(
+    setAgentScopes(f.db, f.owner.id, f.org.id, f.agent.id, [{ connectionId: null, scope: "toString" }]),
+  ).rejects.toBeInstanceOf(ValidationError);
+  const [linear] = await f.db
+    .insert(schema.connectorConnections)
+    .values({
+      orgId: f.org.id,
+      connector: "linear",
+      label: "Linear",
+      serverUrl: "https://linear.example.com/mcp",
+      authType: "none",
+    })
+    .returning();
+  expect(
+    await connectorGrantValidator(f.db, f.org.id, { connectionId: linear?.id ?? null, scope: "linear:constructor" }),
+  ).toBe("Unknown scope linear:constructor for linear");
 });
 
 test("tools carry a label, a description and readOnly", async () => {

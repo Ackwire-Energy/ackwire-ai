@@ -15,6 +15,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOpenAgentPanel } from "@/components/agent-panel-context";
+import { CoordinatorChip } from "@/components/CoordinatorChip";
 import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -259,6 +260,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
             {agent.role ? t("issues.agentRole", { role: agent.role }) : t("profile.agent")}
           </span>
           <NoAiChip agentId={agent.id} />
+          <CoordinatorChip agent={agent} />
         </div>
       </div>
       {line && shown?.line && (
