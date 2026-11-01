@@ -40,7 +40,10 @@ const contentProperties = {
     description: "diff: one unified patch per file",
   },
   mermaid: { type: "string", description: "diagram: Mermaid source" },
-  html: { type: "string", description: "html: a self-contained page (no external scripts)" },
+  html: {
+    type: "string",
+    description: "html: a self-contained page. It has no network: inline every script, style, image and font",
+  },
 };
 
 function contentFrom(kind: ArtifactKind, input: Record<string, unknown>): unknown {

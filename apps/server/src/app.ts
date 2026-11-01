@@ -109,6 +109,8 @@ export interface AppOptions {
  * - `/sw.js`              the web app's service worker (browser push, ADR 0071)
  * - everything else       web app (single-page app), when built
  */
+const APP_CSP = "frame-ancestors 'none'; base-uri 'self'; frame-src 'self' blob: data: https://challenges.cloudflare.com";
+
 export function createApp(options: AppOptions) {
   const log = options.log ?? createLogger("warn");
   const version = options.services?.config.APP_VERSION ?? options.version;
@@ -255,13 +257,16 @@ export function createApp(options: AppOptions) {
   // Ties a request's failure in the log to its report, and to what the client saw (`X-Request-Id`).
   app.use("/api/*", requestId());
   // Security headers on every response: the app may not be framed (clickjacking of approval, merge and deploy
-  // cards), <base> is pinned to our own origin, and HSTS is sent where the instance is served over TLS.
+  // cards), <base> is pinned to our own origin, and HSTS is sent where the instance is served over TLS. `frame-src`
+  // keeps a frame on our pages from navigating itself to another site with what it holds: an agent's page has no
+  // other way out (ADR 0019), and no policy inside the page can stop that. Frames are our own blobs (pages, PDFs)
+  // and the bot check.
   const httpsPublicUrl = options.services?.config.PUBLIC_URL?.startsWith("https:") ?? false;
   app.use("*", async (c, next) => {
     await next();
     const h = c.res.headers;
     if (!h.has("x-frame-options")) h.set("x-frame-options", "DENY");
-    if (!h.has("content-security-policy")) h.set("content-security-policy", "frame-ancestors 'none'; base-uri 'self'");
+    if (!h.has("content-security-policy")) h.set("content-security-policy", APP_CSP);
     if (httpsPublicUrl && !h.has("strict-transport-security")) h.set("strict-transport-security", "max-age=63072000");
   });
   // A CDN in front may cache by the path's extension, whatever the type: without this, a private

@@ -1,12 +1,13 @@
+import { isolatedPage, PAGE_SANDBOX } from "@agenteschat/client/lib/isolated-page";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /**
- * Agent-made HTML, isolated: a blob URL in an iframe sandboxed with
- * `allow-scripts` only. Without `allow-same-origin` the page gets an opaque
- * origin: no cookies, storage or DOM of ours. Never inlined into our DOM.
+ * Agent-made HTML, isolated: a blob URL in a sandboxed iframe, behind a policy that cuts it off from the network
+ * (`isolatedPage`). Without `allow-same-origin` the page gets an opaque origin: no cookies, storage or DOM of ours.
+ * Never inlined into our DOM.
  */
-export const HTML_SANDBOX = "allow-scripts";
+export const HTML_SANDBOX = PAGE_SANDBOX;
 
 /** How long the page has to say it started before we try the next way to load it. */
 const READY_MS = 4000;
@@ -38,11 +39,9 @@ post({agentesHtml:"ready"});
 @supports not selector(::-webkit-scrollbar){*{scrollbar-width:thin;scrollbar-color:rgba(128,128,128,.4) transparent}}
 }</style>`;
 
-/** The page with the shim first: after `<head>`, else after the doctype (a script before it would switch to quirks mode), else at the top. */
+/** The page behind its policy, with the shim first. */
 export function withShim(html: string): string {
-  const head = /<head(\s[^>]*)?>/i.exec(html);
-  const at = head ? head.index + head[0].length : (/^\s*<!doctype[^>]*>/i.exec(html)?.[0].length ?? 0);
-  return html.slice(0, at) + SHIM + html.slice(at);
+  return isolatedPage(html, SHIM);
 }
 
 type Load = "blob" | "data" | "failed";
