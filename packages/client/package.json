@@ -13,7 +13,8 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@agenteschat/providers": "workspace:*"
+    "@agenteschat/providers": "workspace:*",
+    "@agenteschat/ui": "workspace:*"
   },
   "peerDependencies": {
     "@tanstack/react-query": "^5.104.1",

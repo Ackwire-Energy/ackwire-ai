@@ -44,3 +44,12 @@ test("the # picker: query at the caret, names starting with it first, then mine;
     caret: 10,
   });
 });
+
+test("one rule for the composers, the renderer and the server", async () => {
+  const shared = await import("@agenteschat/ui/channel-refs");
+  const ui = await import("@agenteschat/ui");
+  const lib = await import("../src/lib/channel-refs");
+  expect(lib.CHANNEL_REF).toBe(shared.CHANNEL_REF);
+  expect([lib.channelQuery, lib.insertChannelRef]).toEqual([shared.channelQuery, shared.insertChannelRef]);
+  expect([ui.channelQuery, ui.insertChannelRef]).toEqual([shared.channelQuery, shared.insertChannelRef]);
+});

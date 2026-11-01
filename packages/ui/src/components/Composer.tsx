@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { channelQuery, insertChannelRef } from "../channel-refs";
 import { cx } from "../cx";
 import { onScreenKeyboard } from "../device";
 import {
@@ -329,14 +330,6 @@ export function mentionQuery(text: string, caret: number): { start: number; quer
   return { start: caret - query.length - 1, query };
 }
 
-/** "#que" right before the caret (start of text or after a space or bracket); same rule as `channelQuery` in the client. */
-export function channelQuery(text: string, caret: number): { start: number; query: string } | null {
-  const m = text.slice(0, caret).match(/(^|[\s(])#([a-zA-Z0-9_-]{0,80})$/);
-  if (!m) return null;
-  const query = m[2] ?? "";
-  return { start: caret - query.length - 1, query };
-}
-
 /** The chat message box: attach on the left, send (primary, icon only) on the right, focus on the whole box. */
 export function Composer({
   value,
@@ -508,12 +501,10 @@ export function Composer({
       return;
     }
     if (isChannel && channelToken) {
-      const end = channelToken.start + 1 + channelToken.query.length;
-      const inserted = `#${item.insert} `;
-      const next = value.slice(0, channelToken.start) + inserted + value.slice(end).replace(/^ /, "");
-      caretAfter.current = channelToken.start + inserted.length;
+      const next = insertChannelRef(value, channelToken, item.insert);
+      caretAfter.current = next.caret;
       setChannelToken(null);
-      onChange(next);
+      onChange(next.text);
       channels?.onPick?.(item);
       return;
     }

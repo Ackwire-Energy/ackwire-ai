@@ -52,6 +52,7 @@ export {
   type BrainAgentLook,
   drawBrain,
 } from "./brain/portrait.js";
+export { channelQuery, insertChannelRef } from "./channel-refs";
 export {
   AGENT_ACCESSORIES,
   AGENT_COLORS,
@@ -109,7 +110,6 @@ export {
   type ComposerProps,
   type ComposerSuggestion,
   type ComposerWorking,
-  channelQuery,
   linkQuery,
   mentionQuery,
   type SendChoice,

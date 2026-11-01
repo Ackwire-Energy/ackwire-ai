@@ -15,6 +15,7 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import { CHANNEL_REF } from "@agenteschat/ui/channel-refs";
 import { type AgentActionView, actionsFor } from "./agent-actions";
 import { currentHandles } from "./agents";
 import { withDeletedArtifacts } from "./artifacts";
@@ -319,7 +320,7 @@ export function parseMentionHandles(body: string): string[] {
 
 /**
  * `#name` channel references in a message, lower-cased and de-duplicated, outside code and links (they stay as
- * typed). Same rule as the apps (`CHANNEL_REF` in `@agenteschat/client/lib/channel-refs`).
+ * typed), by the rule the apps share (`CHANNEL_REF`).
  */
 export function parseChannelNames(body: string): string[] {
   const prose = body
@@ -327,7 +328,7 @@ export function parseChannelNames(body: string): string[] {
     .replace(/`[^`\n]+`/g, " ")
     .replace(/\[[^\]]*\]\([^)\s]*\)|https?:\/\/\S+/g, " ");
   const found = new Set<string>();
-  for (const match of prose.matchAll(/(^|[^\w#&/])#([a-zA-Z0-9][a-zA-Z0-9_-]{0,79})(?![\w-])/g)) {
+  for (const match of prose.matchAll(CHANNEL_REF)) {
     if (match[2]) found.add(match[2].toLowerCase());
   }
   return [...found];

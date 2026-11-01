@@ -5,8 +5,9 @@
  * store resolves by the channel's current name. Only channels the viewer can see become links.
  */
 
-/** Same rule as the backend (`parseChannelNames`): `#name` after a space or punctuation, never `a#b`, `&#39;` or `##`. */
-export const CHANNEL_REF = /(^|[^\w#&/])#([a-zA-Z0-9][a-zA-Z0-9_-]{0,79})(?![\w-])/g;
+import { CHANNEL_REF } from "@agenteschat/ui/channel-refs";
+
+export { CHANNEL_REF, channelQuery, insertChannelRef } from "@agenteschat/ui/channel-refs";
 
 /** A piece of text: words, or a `#name` reference (`name` lower case, as channels are named). */
 export type ChannelRefPart = { text: string; name?: undefined } | { text: string; name: string };
@@ -56,14 +57,6 @@ export function resolveChannelRef<C extends { id: string; name: string }>(
   return known ? { id: known.id, known } : null;
 }
 
-/** "#que" right before the caret (start of text or after a space or bracket); null when not typing one. */
-export function channelQuery(text: string, caret: number): { start: number; query: string } | null {
-  const m = text.slice(0, caret).match(/(^|[\s(])#([a-zA-Z0-9_-]{0,80})$/);
-  if (!m) return null;
-  const query = m[2] ?? "";
-  return { start: caret - query.length - 1, query };
-}
-
 /** How many channels the "#" picker shows. */
 export const CHANNEL_PICK_LIMIT = 8;
 
@@ -82,18 +75,4 @@ export function channelOptions<C extends { name: string; isMember: boolean }>(
     .filter((c) => c.name.includes(q))
     .sort((a, b) => rank(a) - rank(b) || Number(b.isMember) - Number(a.isMember) || a.name.localeCompare(b.name))
     .slice(0, limit);
-}
-
-/** The text with "#name " in place of the "#que" being typed, and where the caret goes. */
-export function insertChannelRef(
-  text: string,
-  token: { start: number; query: string },
-  name: string,
-): { text: string; caret: number } {
-  const end = token.start + 1 + token.query.length;
-  const inserted = `#${name} `;
-  return {
-    text: text.slice(0, token.start) + inserted + text.slice(end).replace(/^ /, ""),
-    caret: token.start + inserted.length,
-  };
 }
