@@ -3010,6 +3010,8 @@ export interface Machine {
   /** `system`: each agent works as its own OS user, in its own folder (ADR 0057). Absent on older servers: `single`. */
   mode?: "system" | "single";
   runnerVersion: string;
+  /** ADR 0110: its runner can hold browser profiles; `false`: update the computer. */
+  browserProfiles?: boolean;
   /** `false`: started with `--no-exec` (files and uploads only). */
   execAllowed: boolean;
   pairedBy: { id: string; name: string } | null;

@@ -98,7 +98,9 @@ function NewProfileDialog({
           setError(
             errorCode(err) === "browser_profile.name_taken"
               ? t("browser.profiles.nameTaken")
-              : (err as Error).message || t("browser.profiles.failed"),
+              : errorCode(err) === "browser_profile.machine"
+                ? t("browser.profiles.outdated")
+                : t("browser.profiles.failed"),
           ),
       },
     );
@@ -322,6 +324,7 @@ export function BrowserProfilesCard({ machine: m }: { machine: Machine }) {
   const drive = manage && canDo(org, "control_computers");
   const mine = (profiles.data ?? []).filter((p) => p.machineId === m.id);
   const system = m.mode === "system";
+  const outdated = !system && m.browserProfiles === false;
   const login = (p: BrowserProfile) =>
     actions.takeover.mutate(p.id, {
       onSuccess: (now) => setOpen({ kind: "view", profile: now }),
@@ -339,7 +342,8 @@ export function BrowserProfilesCard({ machine: m }: { machine: Machine }) {
         subtitle={t("browser.profiles.sub")}
         action={
           manage &&
-          !system && (
+          !system &&
+          !outdated && (
             <Button size="sm" icon="plus" onClick={() => setOpen({ kind: "new" })}>
               {t("browser.profiles.new")}
             </Button>
@@ -348,6 +352,8 @@ export function BrowserProfilesCard({ machine: m }: { machine: Machine }) {
       />
       {system ? (
         <SettingNote icon="alert">{t("browser.profiles.systemMode")}</SettingNote>
+      ) : outdated ? (
+        <SettingNote icon="alert">{t("browser.profiles.outdated")}</SettingNote>
       ) : mine.length === 0 ? (
         <p className="small muted">{t("browser.profiles.empty")}</p>
       ) : (

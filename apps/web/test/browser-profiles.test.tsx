@@ -141,6 +141,16 @@ test("Perfis do navegador: each row says Livre or who uses it, its agents and Fa
   ]);
 });
 
+test("an outdated computer says to update it instead of offering Novo perfil", async () => {
+  const s = withProfiles();
+  fakeMachinesOf.get(s.api)?.patch(s.machine.id, { browserProfiles: false });
+  await renderApp(`/org/${ORG_ID}/settings/computers/${s.machine.id}`, { api: s.api });
+  await settle(8);
+  const card = screen().getByRole("heading", { name: "Perfis do navegador" }).closest(".ac-card") as HTMLElement;
+  expect(card.textContent).toContain("Atualize o computador para usar perfis do navegador.");
+  expect(within(card).queryByRole("button", { name: "Novo perfil" })).toBeNull();
+});
+
 test("Novo perfil: a name, who may use it and one note; Criar e fazer login creates it and takes control", async () => {
   const s = withProfiles();
   await renderApp(`/org/${ORG_ID}/settings/computers/${s.machine.id}`, { api: s.api });

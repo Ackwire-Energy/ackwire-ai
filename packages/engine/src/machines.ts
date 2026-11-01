@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import {
+  BROWSER_PROFILE_PROTOCOL,
   DESKTOP_PROTOCOL,
   HEARTBEAT_MS,
   MACHINE_TOKEN_PREFIX,
@@ -367,6 +368,8 @@ async function machineViews(db: Database, actorId: string, orgId: string, only?:
       runnerVersion: m.runnerVersion,
       /** The runner's machine protocol (9+: pause; 10+: access on the machine). */
       protocol: m.protocol,
+      /** Its runner can hold browser profiles (ADR 0110); system mode is refused apart (`mode`). */
+      browserProfiles: m.protocol >= BROWSER_PROFILE_PROTOCOL,
       execAllowed: m.execAllowed,
       /** The owner paused it (ADR 0036 §6); `until` null: until they resume. */
       paused: pause ? { until: pause.until } : null,

@@ -107,6 +107,10 @@ export const Machine = z
     }),
     runnerVersion: z.string(),
     protocol: z.number().int().openapi({ description: "The runner's machine protocol (9+: pause; 10+: access)." }),
+    browserProfiles: z.boolean().openapi({
+      description:
+        "Its runner can hold browser profiles (protocol 34, ADR 0110); `false`: update the computer. System mode is refused apart (`mode`).",
+    }),
     execAllowed: z.boolean().openapi({ description: "`false`: started with `--no-exec` (files and uploads only)." }),
     paused: z
       .object({ until: z.string().nullable() })
