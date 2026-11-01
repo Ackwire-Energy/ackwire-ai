@@ -84,6 +84,7 @@ export {
 
 import { publishChannelEvent } from "../events";
 import { cutText } from "../format";
+import { outboundRefusal } from "../outbound";
 import { releaseProfileTurns } from "../runs";
 
 const { agents, agentRuns, secretRequests, users } = schema;
@@ -785,6 +786,10 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
    * on it by their own name).
    */
   async function plan(ctx: ToolContext, steps: ScreenStep[], options: { trail?: boolean } = {}): Promise<ToolOutput> {
+    for (const s of steps) {
+      const refused = s.do === "open" && s.url ? await outboundRefusal(ctx, s.url) : null;
+      if (refused) return refused;
+    }
     const linked = await linkFor(ctx);
     if (!linked.ok) return { content: linked.text, isError: true };
     // A secret is typed only on the site the person gave it for: found before anything runs.
@@ -1051,7 +1056,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
         required: ["action"],
         additionalProperties: false,
       },
-      (input, ctx) => {
+      async (input, ctx) => {
         const action = str(input.action);
         const index = typeof input.index === "number" ? String(Math.max(0, Math.round(input.index))) : null;
         let args: string[];
@@ -1061,6 +1066,8 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
           if (url && !/^https?:\/\//i.test(url)) {
             return Promise.resolve({ content: "Give a full web address starting with https://.", isError: true });
           }
+          const refused = url ? await outboundRefusal(ctx, url) : null;
+          if (refused) return refused;
           args = ["new", ...(url ? [url] : [])];
         } else if (action === "switch") {
           if (index === null)

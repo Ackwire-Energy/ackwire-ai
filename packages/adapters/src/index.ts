@@ -31,6 +31,7 @@ export * from "./mail";
 export * from "./mail-fake";
 export * from "./mail-presets";
 export * from "./millionsend-mail";
+export * from "./outbound-url";
 export * from "./presence";
 export * from "./pubsub";
 export * from "./push";

@@ -164,6 +164,7 @@ export * from "./operator";
 export * from "./operator-events";
 export * from "./operator-review";
 export * from "./organizations";
+export * from "./outbound";
 export * from "./outbox";
 export * from "./pdf";
 export * from "./permissions";
