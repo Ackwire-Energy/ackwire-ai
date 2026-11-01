@@ -1249,6 +1249,7 @@ export async function consultationsIn(db: Executor, orgId: string, channelId: st
       createdAt: agentConsultations.createdAt,
       answeredAt: agentConsultations.answeredAt,
       expiresAt: agentConsultations.expiresAt,
+      dmId: agentConsultations.channelId,
     })
     .from(agentConsultations)
     .innerJoin(agentRuns, eq(agentRuns.id, agentConsultations.askerRunId))
@@ -1270,24 +1271,37 @@ export async function consultationsIn(db: Executor, orgId: string, channelId: st
         .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.id, held)))
     : [];
   const waitOf = new Map(targets.map((t) => [t.id, consultationWait(t)]));
-  const progressOf = await progressIn(db, orgId, held);
+  const progressOf = await progressIn(
+    db,
+    orgId,
+    rows.flatMap((r) =>
+      r.status === "open" && r.targetRunId ? [{ runId: r.targetRunId, dmId: r.dmId, since: r.createdAt }] : [],
+    ),
+  );
   return rows.map((r) => ({
     ...consultationView(r, waitOf),
     progress: r.status === "open" && r.targetRunId ? (progressOf.get(r.targetRunId) ?? null) : null,
   }));
 }
 
-/** What each of `runIds` posted so far (its messages, not notices): how many, and its latest's start and time. */
-async function progressIn(db: Executor, orgId: string, runIds: string[]) {
-  if (runIds.length === 0) return new Map<string, NonNullable<RunConsultation["progress"]>>();
+/**
+ * What each consulted run posted so far in its agents' DM since the consultation (its messages, not notices): how
+ * many, and its latest's start and time. Bounded by DM and time, so `(channel_id, created_at)` and the partitions
+ * of `messages` keep it to the hand-off's own rows.
+ */
+async function progressIn(db: Executor, orgId: string, targets: { runId: string; dmId: string; since: Date }[]) {
+  if (targets.length === 0) return new Map<string, NonNullable<RunConsultation["progress"]>>();
+  const since = new Date(Math.min(...targets.map((t) => t.since.getTime())));
   const rows = rowsOf<{ run_id: string; posts: number | string; latest: string; at: string | Date }>(
     await db.execute(sql`select distinct on (m.agent_run_id) m.agent_run_id as run_id,
         count(*) over (partition by m.agent_run_id) as posts, left(m.body, 400) as latest, m.created_at as at
       from ${messages} m
-      where m.org_id = ${orgId}::uuid and m.agent_run_id in (${sql.join(
-        runIds.map((id) => sql`${id}::uuid`),
+      join (values ${sql.join(
+        targets.map((t) => sql`(${t.runId}::uuid, ${t.dmId}::uuid, ${t.since.toISOString()}::timestamptz)`),
         sql`, `,
-      )})
+      )}) as t(run_id, dm_id, since)
+        on m.agent_run_id = t.run_id and m.channel_id = t.dm_id and m.created_at >= t.since
+      where m.org_id = ${orgId}::uuid and m.created_at >= ${since.toISOString()}::timestamptz
         and m.deleted_at is null and m.meta->'notice' is null
       order by m.agent_run_id, m.created_at desc`),
   );
