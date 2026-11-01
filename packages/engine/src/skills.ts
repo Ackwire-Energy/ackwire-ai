@@ -2,7 +2,10 @@ import type { BlobStoreResolver } from "@agenteschat/adapters";
 import { and, asc, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
+import { activeConnections, type ConnectorDeps } from "./connectors/connections";
 import { type ErrorParams, ForbiddenError, NotFoundError, TooManyError, ValidationError } from "./errors";
+import { connectionToken } from "./git/branches";
+import { appTokenForRepo, boundInstallations, type GitHubAppConfig, type GitHubHttp } from "./git/github-app";
 import { assertStorageRoom } from "./limits";
 import { assertPublicHttpsUrl, type ResolveHost } from "./net-guard";
 import { can, requirePermission } from "./organizations";
@@ -188,7 +191,12 @@ export interface SkillDeps {
   /** Tests: fake HTTP and DNS for URL imports. */
   fetch?: (url: string, init?: RequestInit) => Promise<Response>;
   resolveHost?: ResolveHost;
+  /** The workspace's GitHub (its connection, the GitHub App), for private repositories. None: public ones only. */
+  github?: { connectors: ConnectorDeps; app?: GitHubAppConfig | null };
 }
+
+/** Which of the workspace's GitHub connections read a private repository: the GitHub App, or the GitHub connector. */
+export type SkillVia = "github_app" | "github";
 
 export interface SkillView {
   id: string;
@@ -197,6 +205,7 @@ export interface SkillView {
   version: number;
   source: string;
   sourceUrl: string | null;
+  sourceVia: SkillVia | null;
   defaultForNewAgents: boolean;
   metadata: Record<string, unknown>;
   createdAt: string;
@@ -215,6 +224,7 @@ const view = (s: SkillRow): SkillView => ({
   version: s.version,
   source: s.source,
   sourceUrl: s.sourceUrl,
+  sourceVia: s.sourceVia as SkillVia | null,
   defaultForNewAgents: s.defaultForNewAgents,
   metadata: s.metadata,
   createdAt: s.createdAt.toISOString(),
@@ -315,6 +325,7 @@ export async function saveSkill(
   input: ParsedSkill & {
     source: "upload" | "url" | "manual";
     sourceUrl?: string | null;
+    sourceVia?: SkillVia | null;
     files?: SkillFileInput[];
     defaultForNewAgents?: boolean;
   },
@@ -337,6 +348,8 @@ export async function saveSkill(
         metadata: input.metadata,
         source: input.source,
         sourceUrl: input.sourceUrl ?? existing.sourceUrl,
+        // A link read again says how it was read; an edit or an upload keeps what updating reads through.
+        sourceVia: input.source === "url" ? (input.sourceVia ?? null) : existing.sourceVia,
         // Incremented in SQL (not from the value read above) so two concurrent saves take distinct versions.
         version: sql`${skills.version} + 1`,
         ...(input.defaultForNewAgents !== undefined ? { defaultForNewAgents: input.defaultForNewAgents } : {}),
@@ -359,6 +372,7 @@ export async function saveSkill(
         metadata: input.metadata,
         source: input.source,
         sourceUrl: input.sourceUrl ?? null,
+        sourceVia: input.sourceVia ?? null,
         defaultForNewAgents: input.defaultForNewAgents ?? false,
         createdByUserId: actorId,
       })
@@ -372,7 +386,13 @@ export async function saveSkill(
     actor: { type: "person", id: actorId },
     action: existing && !existing.deletedAt ? "skill.updated" : existing ? "skill.restored" : "skill.installed",
     target: { type: "skill", id: row.id },
-    details: { name: row.name, version: row.version, source: row.source, sourceUrl: row.sourceUrl },
+    details: {
+      name: row.name,
+      version: row.version,
+      source: row.source,
+      sourceUrl: row.sourceUrl,
+      ...(row.sourceVia ? { sourceVia: row.sourceVia } : {}),
+    },
   });
   return { ...view(row), body: row.body, files: await skillFilesOf(deps.db, row) };
 }
@@ -419,8 +439,22 @@ function githubWaitMinutes(res: Response): number | null {
   return Math.max(1, Math.ceil(seconds / 60));
 }
 
-/** One GET to a GitHub host through the SSRF guard (on every hop); GitHub limiting this server is refused as such. */
-async function githubGet(deps: GithubFetchDeps, url: string, accept: string, options: GithubFetchOptions) {
+const GITHUB_API = "https://api.github.com";
+
+/** GitHub didn't answer (no answer, a 5xx while making a token): trying again later may read it. */
+const unreachable = () => new ValidationError("Could not reach GitHub", "github.unreachable");
+
+/**
+ * One GET to a GitHub host through the SSRF guard (on every hop); GitHub limiting this server is refused as such.
+ * `token` goes to api.github.com only: the archive it redirects to carries a short-lived link of its own.
+ */
+async function githubGet(
+  deps: GithubFetchDeps,
+  url: string,
+  accept: string,
+  options: GithubFetchOptions,
+  token?: string,
+) {
   const http = deps.fetch ?? ((input: string, init?: RequestInit) => fetch(input, init));
   const signal = AbortSignal.timeout(options.timeoutMs ?? 15_000);
   const redirects = options.redirects ?? 0;
@@ -428,12 +462,14 @@ async function githubGet(deps: GithubFetchDeps, url: string, accept: string, opt
   for (let hop = 0; ; hop++) {
     const at = await assertPublicHttpsUrl(next, deps.resolveHost);
     if (!GITHUB_HOSTS.has(at.hostname)) throw new ValidationError("Only GitHub URLs can be imported for now");
+    const headers: Record<string, string> = { accept, "user-agent": "agentes.chat" };
+    if (token && at.origin === GITHUB_API) headers.authorization = `Bearer ${token}`;
     const res = await http(at.toString(), {
-      headers: { accept, "user-agent": "agentes.chat" },
+      headers,
       redirect: redirects > 0 ? "manual" : "error",
       signal,
     }).catch(() => {
-      throw new ValidationError("Could not reach GitHub");
+      throw unreachable();
     });
     const location = res.headers.get("location");
     if (hop < redirects && res.status >= 300 && res.status < 400 && location) {
@@ -467,7 +503,7 @@ async function githubBody(res: Response, at: URL, options: GithubFetchOptions) {
     }
   } catch (err) {
     if (err instanceof ValidationError) throw err;
-    throw new ValidationError("Could not reach GitHub");
+    throw unreachable();
   }
   return Buffer.concat(chunks);
 }
@@ -537,37 +573,165 @@ function folderOf(folders: ReadonlyMap<string, unknown>, dir: string): string | 
   }
 }
 
-/**
- * The repository at the link's ref, from its zip archive (`github.com/{owner}/{repo}/archive/{ref}.zip`, served by
- * codeload.github.com): one download, outside the REST API, where unauthenticated calls share one limit per server
- * address (60 an hour) that every workspace's imports would spend. Its files by path from the repository's root,
- * symbolic links left out.
- */
-async function githubRepository(deps: SkillDeps, target: GithubTarget) {
+const refMissing = (target: GithubTarget) => {
   const repo = `${target.owner}/${target.repo}`;
-  const archive = `https://github.com/${encodePath(repo)}/archive/${encodePath(target.ref)}.zip`;
-  const { res, at } = await githubGet(deps, archive, "application/zip", ARCHIVE);
-  if (res.status === 404) {
-    // github.com hides a private or missing repository; past its redirect, codeload lacks the ref.
-    if (at.hostname === "codeload.github.com" && target.ref !== "HEAD") {
-      throw new ValidationError(`${repo} has no branch, tag or commit ${target.ref}`, "github.ref_missing", {
-        repo,
-        ref: target.ref,
-      });
-    }
-    throw new ValidationError(`${repo} is private or doesn't exist on GitHub`, "github.repo_missing", { repo });
-  }
-  const zip = await githubBody(res, at, ARCHIVE);
+  return new ValidationError(`${repo} has no branch, tag or commit ${target.ref}`, "github.ref_missing", {
+    repo,
+    ref: target.ref,
+  });
+};
+
+/** An archive's files by path from the repository's root, symbolic links left out. */
+function repositoryOf(zip: Uint8Array) {
   const files = new Map<string, ZipListing>();
   for (const entry of listZip(zip)) {
-    // Every path starts with the archive's own folder (`{repo}-{ref}/`).
+    // Every path starts with the archive's own folder (`{repo}-{ref}/`, `{owner}-{repo}-{commit}/` from the API).
     const slash = entry.path.indexOf("/");
     if (!entry.symlink && slash > 0) files.set(entry.path.slice(slash + 1), entry);
   }
   return { zip, files };
 }
 
-type GithubRepository = Awaited<ReturnType<typeof githubRepository>>;
+type GithubRepository = ReturnType<typeof repositoryOf>;
+
+/**
+ * The repository at the link's ref, from its zip archive (`github.com/{owner}/{repo}/archive/{ref}.zip`, served by
+ * codeload.github.com): one download, outside the REST API, where unauthenticated calls share one limit per server
+ * address (60 an hour) that every workspace's imports would spend. Null when github.com hides it (private, or
+ * missing).
+ */
+async function publicRepository(deps: SkillDeps, target: GithubTarget) {
+  const archive = `https://github.com/${encodePath(`${target.owner}/${target.repo}`)}/archive/${encodePath(target.ref)}.zip`;
+  const { res, at } = await githubGet(deps, archive, "application/zip", ARCHIVE);
+  if (res.status === 404) {
+    await res.body?.cancel();
+    // Past github.com's redirect, codeload lacks the ref.
+    if (at.hostname === "codeload.github.com" && target.ref !== "HEAD") throw refMissing(target);
+    return null;
+  }
+  return repositoryOf(await githubBody(res, at, ARCHIVE));
+}
+
+/**
+ * The repository's archive read with one of the workspace's tokens (`api.github.com/repos/{repo}/zipball/{ref}`, on
+ * the token's own limit). Null when the token works and can't read it (403, an organization's SSO say, or 404),
+ * `refused` when GitHub no longer takes it (401). The API answers 404 alike for a ref the repository lacks and for a
+ * repository the token can't see: asking for the repository tells them apart.
+ */
+async function tokenRepository(deps: SkillDeps, target: GithubTarget, token: string) {
+  const repo = `${GITHUB_API}/repos/${encodePath(target.owner)}/${encodePath(target.repo)}`;
+  const ref = target.ref === "HEAD" ? "" : `/${encodePath(target.ref)}`;
+  const { res, at } = await githubGet(deps, `${repo}/zipball${ref}`, "application/vnd.github+json", ARCHIVE, token);
+  if (res.ok) return repositoryOf(await githubBody(res, at, ARCHIVE));
+  await res.body?.cancel();
+  if (res.status === 404 && target.ref !== "HEAD") {
+    const seen = await githubGet(deps, repo, "application/vnd.github+json", ARCHIVE, token);
+    await seen.res.body?.cancel();
+    if (seen.res.ok) throw refMissing(target);
+  }
+  if (res.status === 401) return "refused" as const;
+  if (res.status === 403 || res.status === 404) return null;
+  throw new ValidationError(`GitHub answered ${res.status} for ${at.pathname}`);
+}
+
+/** An account or repository name as GitHub allows it, so building an API path from one never climbs out of it. */
+const GITHUB_NAME = /^(?!\.\.?$)[A-Za-z0-9_.-]{1,100}$/;
+
+/** A link a token may go with: its owner, repository and ref can't climb out of the repository's API path. */
+const tokenSafe = (target: GithubTarget) =>
+  GITHUB_NAME.test(target.owner) &&
+  GITHUB_NAME.test(target.repo) &&
+  !target.ref.split("/").some((s) => s === "." || s === "..");
+
+/**
+ * The GitHub App's token for the repository (only from an installation on its account bound to this workspace), and
+ * whether GitHub left one of the requests for it unanswered (no answer, or a 5xx).
+ */
+async function appToken(deps: SkillDeps, orgId: string, app: GitHubAppConfig, target: GithubTarget) {
+  const seen = { unanswered: false };
+  const send = deps.fetch ?? fetch;
+  const http: GitHubHttp = {
+    apiUrl: GITHUB_API,
+    fetch: (async (url: string, init?: RequestInit) => {
+      const res = await send(url, init).catch((err) => {
+        seen.unanswered = true;
+        throw err;
+      });
+      if (res.status >= 500) seen.unanswered = true;
+      return res;
+    }) as typeof fetch,
+  };
+  const tenant = { db: deps.db, orgId };
+  const read = { contents: "read" } as const;
+  const token = await appTokenForRepo(app, http, tenant, target.owner, target.repo, read).catch(() => null);
+  return { token, unanswered: seen.unanswered };
+}
+
+/** The workspace's GitHub connection: none, one GitHub refuses (a token it no longer takes), or one that works. */
+type GithubConnectionState = "none" | "refused" | "ok";
+
+/**
+ * The repository a link points into, and which of the workspace's GitHub connections read it (null: none was
+ * needed). A repository github.com hides is read with the workspace's tokens, which never leave the server: the
+ * GitHub App's for it, then the GitHub connection's, each made only when the one before can't read it. `through`: how
+ * a skill installed before was read, tried first and with no read without credentials before it (the other
+ * connection follows it, so a skill never stays stuck on one the workspace replaced).
+ *
+ * None reads it: `github.unreachable` when GitHub left a token request unanswered, `skill.connection_gone` when the
+ * workspace no longer has the connection `through` names, else `github.repo_missing` with the connection's state and
+ * whether the GitHub App is installed on some account (`app`).
+ */
+async function readRepository(deps: SkillDeps, orgId: string, target: GithubTarget, through: SkillVia | null) {
+  const repo = `${target.owner}/${target.repo}`;
+  if (!through) {
+    const open = await publicRepository(deps, target);
+    if (open) return { ...open, via: null };
+  }
+  const github = deps.github;
+  const connection = github && (await activeConnections(deps.db, orgId)).find((c) => c.connector === "github");
+  let state: GithubConnectionState = connection ? "ok" : "none";
+  let unanswered = false;
+  if (github && tokenSafe(target)) {
+    const order: SkillVia[] = through === "github" ? ["github", "github_app"] : ["github_app", "github"];
+    for (const via of order) {
+      let token: string | null = null;
+      if (via === "github_app" && github.app) {
+        const made = await appToken(deps, orgId, github.app, target);
+        token = made.token;
+        unanswered ||= made.unanswered;
+      } else if (via === "github" && connection) {
+        const made = await connectionToken(github.connectors, connection).then(
+          (value) => ({ value, failed: false }),
+          // A refresh the provider refused needs connecting again; one that got no answer may work later.
+          (err: unknown) => ({ value: null, failed: !(err instanceof ValidationError) }),
+        );
+        token = made.value;
+        unanswered ||= made.failed;
+        if (!token && !made.failed) state = "refused";
+      }
+      if (!token) continue;
+      const found = await tokenRepository(deps, target, token);
+      if (found === "refused") {
+        if (via === "github") state = "refused";
+      } else if (found) return { ...found, via };
+    }
+  }
+  if (unanswered) throw unreachable();
+  const installations = github?.app ? await boundInstallations(deps.db, orgId) : [];
+  const owner = target.owner.toLowerCase();
+  const gone =
+    through === "github"
+      ? !connection
+      : through === "github_app" && !installations.some((i) => i.accountLogin.toLowerCase() === owner);
+  if (gone) {
+    throw new ValidationError(`The GitHub connection that read ${repo} is gone`, "skill.connection_gone", { repo });
+  }
+  throw new ValidationError(`${repo} is private or doesn't exist on GitHub`, "github.repo_missing", {
+    repo,
+    connection: state,
+    app: installations.length > 0,
+  });
+}
 
 /**
  * The skill folders at or below `folder`, each with its SKILL.md, by path. A SKILL.md inside another skill's folder
@@ -614,10 +778,13 @@ export interface SkillSkipped {
   params?: ErrorParams;
 }
 
-/** What a GitHub link holds: the repository and the skill folders at or below the link (a file's: its folder's). */
-async function readGithubLink(deps: SkillDeps, url: string) {
+/**
+ * What a GitHub link holds: the repository, how it was read, and the skill folders at or below the link (a file's:
+ * its folder's).
+ */
+async function readGithubLink(deps: SkillDeps, orgId: string, url: string, through: SkillVia | null = null) {
   const target = parseGithubUrl(url);
-  const repository = await githubRepository(deps, target);
+  const repository = await readRepository(deps, orgId, target, through);
   const folder = target.kind === "file" ? parentOf(target.path) : target.path;
   const folders = skillFolders(repository.files, folder);
   const repo = `${target.owner}/${target.repo}`;
@@ -654,14 +821,19 @@ async function readGithubLink(deps: SkillDeps, url: string) {
     source: "url" as const,
     sourceUrl:
       dir === folder ? url : `https://github.com/${encodePath(repo)}/tree/${encodePath(target.ref)}/${encodePath(dir)}`,
+    sourceVia: repository.via,
   });
-  return { found, about, skillAt };
+  return { found, about, skillAt, via: repository.via };
 }
 
-/** A GitHub link holding several skills: those that can be installed, to pick, and those that can't, with why. */
+/**
+ * A GitHub link holding several skills: those that can be installed, to pick, and those that can't, with why. `via`:
+ * which of the workspace's GitHub connections read it, when the repository needed one.
+ */
 export interface SkillPick {
   choices: SkillChoice[];
   skipped?: SkillSkipped[];
+  via?: SkillVia;
 }
 
 /**
@@ -669,19 +841,24 @@ export interface SkillPick {
  * on every request, 200 files a skill and 2 MB of the text and scripts it keeps, binaries only listed): the skill
  * folder it points at (a file's folder), or the one skill below it. A link that holds several answers with them to
  * pick from (`importPickedSkills`), nothing installed, and with those that can't be installed (past the limits, or a
- * SKILL.md that doesn't parse) apart, each with why. Installing a skill whose name is already installed makes a new
- * version.
+ * SKILL.md that doesn't parse) apart, each with why; `list` answers so for one skill too. Installing a skill whose
+ * name is already installed makes a new version. A private repository is read through the workspace's GitHub (the
+ * GitHub App, else the connection): installing skills (`manage_agents`) is what lets a person read through it.
+ * `through`: that connection first, with no read without credentials (a skill updated from the link it came from).
  */
 export async function importSkillFromUrl(
   deps: SkillDeps,
   actorId: string,
   orgId: string,
   url: string,
+  options: { list?: boolean; through?: SkillVia | null } = {},
 ): Promise<SkillDetail | SkillPick> {
   await requirePermission(deps.db, actorId, orgId, "manage_agents");
-  const link = await readGithubLink(deps, url);
+  const link = await readGithubLink(deps, orgId, url, options.through);
   const [only, ...more] = link.found.keys();
-  if (only !== undefined && more.length === 0) return saveSkill(deps, actorId, orgId, link.skillAt(only));
+  if (!options.list && only !== undefined && more.length === 0) {
+    return saveSkill(deps, actorId, orgId, link.skillAt(only));
+  }
   const choices: SkillChoice[] = [];
   const skipped: SkillSkipped[] = [];
   let refused: unknown;
@@ -696,7 +873,7 @@ export async function importSkillFromUrl(
     }
   }
   if (choices.length === 0) throw refused;
-  return skipped.length > 0 ? { choices, skipped } : { choices };
+  return { choices, ...(skipped.length > 0 ? { skipped } : {}), ...(link.via ? { via: link.via } : {}) };
 }
 
 /** Installs the skills picked among a link's choices (`paths`, as `importSkillFromUrl` gave them). */
@@ -708,7 +885,7 @@ export async function importPickedSkills(
   paths: string[],
 ) {
   await requirePermission(deps.db, actorId, orgId, "manage_agents");
-  const link = await readGithubLink(deps, url);
+  const link = await readGithubLink(deps, orgId, url);
   // Every pick is checked before any is saved; a refusal names the skill's folder.
   const skills = [...new Set(paths)].map((dir) => {
     if (!link.found.has(dir)) throw new ValidationError(`That link holds no skill at ${dir}`);
@@ -726,11 +903,16 @@ export async function importPickedSkills(
   return installed;
 }
 
-/** Imports the skill again from where it came (a new version). */
+/**
+ * Imports the skill again from where it came (a new version). A skill a GitHub connection read is read through it
+ * first, then through the workspace's other one, and keeps the one that read it (`skill.connection_gone` when the
+ * workspace no longer has the first and the other can't read it).
+ */
 export async function reimportSkill(deps: SkillDeps, actorId: string, orgId: string, id: string) {
   const s = await loadSkill(deps.db, orgId, id);
   if (!s.sourceUrl) throw new ValidationError("This skill wasn't imported from a URL");
-  const again = await importSkillFromUrl(deps, actorId, orgId, s.sourceUrl);
+  const through = s.sourceVia as SkillVia | null;
+  const again = await importSkillFromUrl(deps, actorId, orgId, s.sourceUrl, { through });
   if ("choices" in again) {
     throw new ValidationError("Its link holds several skills now. Install this one again from its own folder.");
   }

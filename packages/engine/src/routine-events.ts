@@ -3,7 +3,7 @@ import { cutText } from "./format";
 import { enqueue } from "./outbox";
 import { routineJobAlive } from "./routine-state";
 
-const { routines, routineRuns, agentRuns } = schema;
+const { routines, routineRuns, agentRuns, routineHookCalls } = schema;
 
 type RoutineRow = typeof routines.$inferSelect;
 
@@ -149,13 +149,13 @@ export type EventOutcome = "queued" | "merged" | "gathered" | "duplicate";
  * An event for a routine (§6.3, §6.5): a repeat of an event it already got is dropped; else it joins
  * the run still queued with its job alive, or the run waiting to start (gathered, or held emails),
  * which starts now when nothing of the routine is working; else a run starts, or, while one works,
- * a gathered run waits for it to end (`startGatheredRun`).
+ * a gathered run waits for it to end (`startGatheredRun`). `runId`: the routine run it went into.
  */
 export async function queueEventRun(
   deps: { db: Database },
   routine: Pick<RoutineRow, "id" | "orgId">,
   input: { event: RoutineEventPayload; dedupeKey?: string | null; merge?: EventMerge; at?: Date },
-): Promise<EventOutcome> {
+): Promise<{ outcome: EventOutcome; runId: string | null }> {
   const merge = input.merge ?? mergeEvents;
   const key = input.dedupeKey ?? null;
   return deps.db.transaction(async (tx) => {
@@ -174,7 +174,7 @@ export async function queueEventRun(
           ),
         )
         .limit(1);
-      if (seen) return "duplicate";
+      if (seen) return { outcome: "duplicate" as const, runId: seen.id };
     }
     const waiting = await tx
       .select({ id: routineRuns.id, event: routineRuns.event, alive: routineJobAlive(routineRuns.id) })
@@ -193,15 +193,15 @@ export async function queueEventRun(
     const live = waiting.find((w) => w.alive && !flag(w.event, "gathered") && !flag(w.event, "held"));
     if (live) {
       await join(live, {});
-      return "merged";
+      return { outcome: "merged" as const, runId: live.id };
     }
     const inFlight = await routineInFlight(tx, routine.id);
     const pending = waiting.find((w) => flag(w.event, "gathered") || flag(w.event, "held"));
     if (pending) {
       await join(pending, { gathered: inFlight });
-      if (inFlight) return "gathered";
+      if (inFlight) return { outcome: "gathered" as const, runId: pending.id };
       await enqueueRoutineJob(tx, { id: pending.id, orgId: routine.orgId });
-      return "queued";
+      return { outcome: "queued" as const, runId: pending.id };
     }
     const row = await insertRun(tx, routine, {
       at: input.at ?? new Date(),
@@ -209,10 +209,10 @@ export async function queueEventRun(
       event: withState(input.event, key ? [key] : [], { gathered: inFlight }),
       dedupeKey: key,
     });
-    if (!row) return "duplicate";
-    if (inFlight) return "gathered";
+    if (!row) return { outcome: "duplicate" as const, runId: null };
+    if (inFlight) return { outcome: "gathered" as const, runId: row.id };
     await enqueueRoutineJob(tx, row);
-    return "queued";
+    return { outcome: "queued" as const, runId: row.id };
   });
 }
 
@@ -277,7 +277,7 @@ export async function deferEventRun(
     if (!taken) return false;
     const event = taken.event ?? {};
     const keys = [...keysOf(event), ...(taken.dedupeKey ? [taken.dedupeKey] : [])];
-    await insertRun(
+    const moved = await insertRun(
       tx,
       { id: taken.routineId, orgId: taken.orgId },
       {
@@ -287,6 +287,13 @@ export async function deferEventRun(
         dedupeKey: taken.dedupeKey,
       },
     );
+    // The webhook calls it carried point to where it went.
+    if (moved) {
+      await tx
+        .update(routineHookCalls)
+        .set({ routineRunId: moved.id })
+        .where(and(eq(routineHookCalls.routineId, taken.routineId), eq(routineHookCalls.routineRunId, taken.id)));
+    }
     return true;
   });
 }

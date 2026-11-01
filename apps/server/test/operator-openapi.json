@@ -3,7 +3,7 @@
   "info": {
     "title": "agentes.chat operator API",
     "version": "test",
-    "description": "Workspace and account lookups, workspace standing, billing holds and limits (ADR 0079), the events feed and review blocks, the workspaces' computers from an external provisioner, and who may sign up (the waiting list and early-access invitations, ADR 0078), for the people who run this instance (ADR 0056)."
+    "description": "Workspace and account lookups, workspace standing, billing holds and limits (ADR 0079), the events feed and review blocks, the workspaces' computers from an external provisioner, who may sign up (the waiting list and early-access invitations, ADR 0078), and how connectors are used (ADR 0103), for the people who run this instance (ADR 0056)."
   },
   "servers": [
     {
@@ -1025,6 +1025,514 @@
           }
         },
         "required": ["invitation"]
+      },
+      "OperatorAnalytics": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "A UTC day, YYYY-MM-DD.",
+            "example": "2026-10-31"
+          },
+          "to": {
+            "type": "string",
+            "description": "A UTC day, YYYY-MM-DD.",
+            "example": "2026-10-31"
+          },
+          "since": {
+            "type": ["string", "null"],
+            "description": "The first day anything was counted here, null before any.",
+            "example": "2026-10-31"
+          },
+          "totals": {
+            "type": "object",
+            "properties": {
+              "calls": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Tool calls that ran, approved ones included."
+              },
+              "errors": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Calls whose result was an error, or whose tool threw."
+              },
+              "approvalsAsked": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Approval requests its calls created."
+              },
+              "approvalsGiven": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Approved actions that ran."
+              },
+              "workspaces": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Workspaces with at least one call of any connector."
+              },
+              "agents": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": ["calls", "errors", "approvalsAsked", "approvalsGiven", "workspaces", "agents"]
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "day": {
+                  "type": "string",
+                  "description": "A UTC day, YYYY-MM-DD.",
+                  "example": "2026-10-31"
+                },
+                "via": {
+                  "$ref": "#/components/schemas/OperatorConnectorVia"
+                },
+                "calls": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Tool calls that ran, approved ones included."
+                },
+                "errors": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Calls whose result was an error, or whose tool threw."
+                },
+                "approvalsAsked": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Approval requests its calls created."
+                },
+                "approvalsGiven": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Approved actions that ran."
+                },
+                "workspaces": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": ["day", "via", "calls", "errors", "approvalsAsked", "approvalsGiven", "workspaces"]
+            },
+            "description": "Per UTC day and way, oldest first. A day without calls is left out."
+          },
+          "connectors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OperatorConnectorUse"
+            },
+            "description": "Per connector and way, most calls first (then executions, events and accounts), at most 500. One connected but unused in the dates has zero calls."
+          },
+          "connectorsMore": {
+            "type": "boolean",
+            "description": "More connectors than were listed."
+          },
+          "composio": {
+            "type": "object",
+            "properties": {
+              "days": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "day": {
+                      "type": "string",
+                      "description": "A UTC day, YYYY-MM-DD.",
+                      "example": "2026-10-31"
+                    },
+                    "executions": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "failures": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "events": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": ["day", "executions", "failures", "events"]
+                },
+                "description": "What this server asked of its Composio project, per UTC day, oldest first."
+              },
+              "month": {
+                "type": "object",
+                "properties": {
+                  "month": {
+                    "type": "string",
+                    "description": "The UTC calendar month so far, YYYY-MM.",
+                    "example": "2026-10"
+                  },
+                  "executions": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "failures": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "events": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "connections": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Composio connected accounts made this month (mailboxes), reconnects included: Composio bills each once past the free ones."
+                  }
+                },
+                "required": ["month", "executions", "failures", "events", "connections"],
+                "description": "This month whatever the dates: Composio's free allowances are monthly."
+              }
+            },
+            "required": ["days", "month"]
+          },
+          "product": {
+            "type": "object",
+            "properties": {
+              "days": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "day": {
+                      "type": "string",
+                      "description": "A UTC day, YYYY-MM-DD.",
+                      "example": "2026-10-31"
+                    },
+                    "runs": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Agent runs that ended."
+                    },
+                    "tasks": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Tasks on computers that ended."
+                    },
+                    "activeWorkspaces": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Workspaces where a run or a task ended."
+                    },
+                    "newWorkspaces": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "signUps": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": ["day", "runs", "tasks", "activeWorkspaces", "newWorkspaces", "signUps"]
+                },
+                "description": "From the events feed, oldest first. A day without any is left out."
+              },
+              "activeWorkspaces": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Workspaces where a run or a task ended in the dates."
+              },
+              "keptDays": {
+                "type": "integer",
+                "description": "Days the events feed keeps: older days read as zero."
+              }
+            },
+            "required": ["days", "activeWorkspaces", "keptDays"]
+          }
+        },
+        "required": ["from", "to", "since", "totals", "days", "connectors", "connectorsMore", "composio", "product"]
+      },
+      "OperatorConnectorVia": {
+        "type": "string",
+        "enum": ["native", "mcp", "composio"],
+        "description": "How the connector's tools reach it: `native` our own code (GitHub's git tools, Postgres, IMAP mailboxes), `mcp` an MCP server (the catalog's, one-click presets, custom servers), `composio` this server's own Composio project (Gmail and Outlook mailboxes), which Composio bills."
+      },
+      "OperatorConnectorUse": {
+        "type": "object",
+        "properties": {
+          "connector": {
+            "type": "string",
+            "description": "The connector's stable key: a catalog connector's or a one-click preset's id (a custom server on a preset's host takes it too), a custom server's hostname (never its path), `gmail`, `outlook`, an IMAP preset's id or `imap`, `postgres`, or a Composio toolkit's slug."
+          },
+          "label": {
+            "type": "string",
+            "description": "Its name in the catalog or the presets, else the key."
+          },
+          "via": {
+            "$ref": "#/components/schemas/OperatorConnectorVia"
+          },
+          "calls": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Tool calls that ran, approved ones included."
+          },
+          "errors": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Calls whose result was an error, or whose tool threw."
+          },
+          "approvalsAsked": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Approval requests its calls created."
+          },
+          "approvalsGiven": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Approved actions that ran."
+          },
+          "workspaces": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Workspaces with at least one call. For `composio`, also those Composio billed without one (an execution or a trigger event)."
+          },
+          "agents": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Agents with at least one call."
+          },
+          "accounts": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Accounts connected now (servers, installations, mailboxes, databases)."
+          },
+          "accountsAdded": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Of those, the ones connected in the dates."
+          },
+          "executions": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "`composio` only: executions Composio answered, each one billed."
+          },
+          "executionFailures": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Of those, the ones Composio answered as failed."
+          },
+          "events": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "`composio` only: trigger events delivered (new mail), each one billed."
+          }
+        },
+        "required": [
+          "connector",
+          "label",
+          "via",
+          "calls",
+          "errors",
+          "approvalsAsked",
+          "approvalsGiven",
+          "workspaces",
+          "agents",
+          "accounts",
+          "accountsAdded",
+          "executions",
+          "executionFailures",
+          "events"
+        ]
+      },
+      "OperatorConnectorAnalytics": {
+        "type": "object",
+        "properties": {
+          "connector": {
+            "type": "string",
+            "description": "The connector's stable key: a catalog connector's or a one-click preset's id (a custom server on a preset's host takes it too), a custom server's hostname (never its path), `gmail`, `outlook`, an IMAP preset's id or `imap`, `postgres`, or a Composio toolkit's slug."
+          },
+          "label": {
+            "type": "string",
+            "description": "Its name in the catalog or the presets, else the key."
+          },
+          "from": {
+            "type": "string",
+            "description": "A UTC day, YYYY-MM-DD.",
+            "example": "2026-10-31"
+          },
+          "to": {
+            "type": "string",
+            "description": "A UTC day, YYYY-MM-DD.",
+            "example": "2026-10-31"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "day": {
+                  "type": "string",
+                  "description": "A UTC day, YYYY-MM-DD.",
+                  "example": "2026-10-31"
+                },
+                "via": {
+                  "$ref": "#/components/schemas/OperatorConnectorVia"
+                },
+                "calls": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "errors": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "approvals": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Approval requests its calls created."
+                },
+                "executions": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "events": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": ["day", "via", "calls", "errors", "approvals", "executions", "events"]
+            },
+            "description": "Per UTC day and way, oldest first. Executions and events are `composio`'s."
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "via": {
+                  "$ref": "#/components/schemas/OperatorConnectorVia"
+                },
+                "tool": {
+                  "type": "string",
+                  "description": "The server's own tool name (a catalog connector's or a preset's) or our verb. `other` for a custom server's tools, whose owner names them, and for an unusual name."
+                },
+                "calls": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "errors": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "approvals": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "workspaces": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": ["via", "tool", "calls", "errors", "approvals", "workspaces"]
+            },
+            "description": "Most calls first, at most 200."
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "description": "Composio's action or trigger slug.",
+                  "example": "GMAIL_FETCH_EMAILS"
+                },
+                "executions": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "failures": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "events": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "workspaces": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": ["action", "executions", "failures", "events", "workspaces"]
+            },
+            "description": "Most executions first, at most 200."
+          },
+          "orgs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "orgId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "via": {
+                  "$ref": "#/components/schemas/OperatorConnectorVia"
+                },
+                "calls": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "errors": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "approvals": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "executions": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "events": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "agents": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "accounts": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Its accounts of this connector connected now."
+                },
+                "lastDay": {
+                  "type": ["string", "null"],
+                  "description": "Its last day with a count in the dates.",
+                  "example": "2026-10-31"
+                }
+              },
+              "required": [
+                "orgId",
+                "via",
+                "calls",
+                "errors",
+                "approvals",
+                "executions",
+                "events",
+                "agents",
+                "accounts",
+                "lastDay"
+              ]
+            },
+            "description": "Per workspace and way, most calls first, at most 500. One connected but idle in the dates has zero calls."
+          },
+          "orgsMore": {
+            "type": "boolean"
+          }
+        },
+        "required": ["connector", "label", "from", "to", "days", "tools", "actions", "orgs", "orgsMore"]
       }
     },
     "parameters": {}
@@ -2848,6 +3356,142 @@
           },
           "404": {
             "description": "No invitation with this id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analytics": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "How connectors and the product are used, in counts",
+        "description": "Counted on every server, by UTC day (ADR 0103). Only counts, keys and ids: no connection label, URL path, tool input, address or anyone's name.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "The first UTC day, YYYY-MM-DD.",
+              "example": "2026-10-01"
+            },
+            "required": true,
+            "description": "The first UTC day, YYYY-MM-DD.",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "The last UTC day, YYYY-MM-DD: at most 400 days, both counted. Else 400 `analytics.range`.",
+              "example": "2026-10-31"
+            },
+            "required": true,
+            "description": "The last UTC day, YYYY-MM-DD: at most 400 days, both counted. Else 400 `analytics.range`.",
+            "name": "to",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorAnalytics"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (`analytics.range`: the dates)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analytics/connectors/{connector}": {
+      "get": {
+        "tags": ["Operator"],
+        "summary": "One connector's use: per day, tool, Composio action and workspace",
+        "description": "An unknown connector answers with empty lists.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9._-]{0,99}$",
+              "example": "github"
+            },
+            "required": true,
+            "name": "connector",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "The first UTC day, YYYY-MM-DD.",
+              "example": "2026-10-01"
+            },
+            "required": true,
+            "description": "The first UTC day, YYYY-MM-DD.",
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "The last UTC day, YYYY-MM-DD: at most 400 days, both counted. Else 400 `analytics.range`.",
+              "example": "2026-10-31"
+            },
+            "required": true,
+            "description": "The last UTC day, YYYY-MM-DD: at most 400 days, both counted. Else 400 `analytics.range`.",
+            "name": "to",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorConnectorAnalytics"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (`analytics.range`: the dates)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong token",
             "content": {
               "application/json": {
                 "schema": {

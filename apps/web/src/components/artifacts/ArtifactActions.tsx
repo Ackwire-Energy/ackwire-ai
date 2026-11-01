@@ -1,6 +1,7 @@
 import type { Artifact, ArtifactContent, ArtifactKind } from "@agenteschat/client";
 import { ApiError, keys } from "@agenteschat/client";
 import { fileName } from "@agenteschat/client/lib/artifacts";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { Button, Dialog, DialogFooter, type IconName, Menu, MenuItem, MenuSeparator } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -43,7 +44,7 @@ export function useDeleteArtifact(onDeleted?: (ids: string[]) => void) {
     }
     if (failed) {
       toast.show(
-        failed instanceof ApiError && failed.status === 409 ? t("artifacts.purged") : (failed as Error).message,
+        failed instanceof ApiError && failed.status === 409 ? t("artifacts.purged") : errorText(t, failed),
         "error",
       );
     } else {
@@ -77,9 +78,7 @@ export function useDeleteArtifact(onDeleted?: (ids: string[]) => void) {
     }
     if (failed) {
       toast.show(
-        failed instanceof ApiError && failed.status === 403
-          ? t("artifacts.deleteForbidden")
-          : (failed as Error).message,
+        failed instanceof ApiError && failed.status === 403 ? t("artifacts.deleteForbidden") : errorText(t, failed),
         "error",
       );
     }

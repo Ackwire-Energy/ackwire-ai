@@ -1,5 +1,6 @@
 import { keys, useChannelCategories } from "@agenteschat/client";
 import { waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages";
+import { WORKING_POLL_MS } from "@agenteschat/client/lib/working";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, useIsFocused } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -10,6 +11,7 @@ import { LargeTitleScreen, Text } from "@/ui";
 import { workByAgent } from "../agents/logic";
 import { useCategoryMenus } from "../categories/menus";
 import { SetupNotice } from "../computer/SetupWait";
+import { useOpenStart } from "../me/useStart";
 import { useOpenDm } from "../new/useOpenDm";
 import { OutageNotices } from "../outages/OutageNotice";
 import { useMachineOutages } from "../outages/queries";
@@ -18,6 +20,7 @@ import { useActiveWork, useConversations, useHiddenAgents, useWorkingNow } from 
 import { SheetHostProvider } from "../shared/SheetHost";
 import { useTabHeader } from "../shared/tabHeader";
 import { ConversationRowView } from "./ConversationRowView";
+import { FirstSteps } from "./FirstSteps";
 import { FirstAgentEmpty, Greeting, GreetingSky } from "./Greeting";
 import { CollapsibleSection, SeeAllRow, useHomeCollapsed } from "./HomeSection";
 import { HomeServerError, HomeServerNotice } from "./HomeServerError";
@@ -34,8 +37,6 @@ import { useWaitingItems, WaitingStrip } from "./WaitingStrip";
 
 /** Rows of the home whose agent moves (a long list stays light). */
 const LIVE_ROWS = 6;
-/** How often who is working is asked again while Conversas shows (runs start in conversations it doesn't follow). */
-const WORKING_POLL_MS = 20_000;
 /** How long Conversas shows, loaded, before our notifications sheet opens over it (past the launch). */
 const PUSH_OFFER_MS = 2500;
 
@@ -67,6 +68,8 @@ function Home() {
   const orgId = useOrgId();
   const qc = useQueryClient();
   const focused = useIsFocused();
+  // What the person chose to open when the app starts goes over Conversas, once (ADR 0108).
+  useOpenStart(focused);
   const header = useTabHeader();
   const dir = useDirectory();
   const list = useConversations();
@@ -140,6 +143,7 @@ function Home() {
       <OutageNotices />
       {list.stale && !failed ? <HomeServerNotice retry={list.refetch} /> : null}
       {strip}
+      {failed || empty || list.loading ? null : <FirstSteps collapsed={collapsed} onToggle={toggle} />}
       {failed ? (
         <HomeServerError retry={list.refetch} />
       ) : empty ? (

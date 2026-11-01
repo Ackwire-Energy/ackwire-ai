@@ -509,6 +509,141 @@ describe("Conectores → Email", () => {
   });
 });
 
+describe("Conectores → Email → MillionSend", () => {
+  const KEYS = "https://app.millionsend.com/api-keys";
+  const withMillionSend = (connectorKey: boolean, accounts: Partial<MailAccount>[] = []) => {
+    const made = mailApi(accounts);
+    made.mail.providers = { ...structuredClone(MAIL_PROVIDERS), millionsend: { connectorKey, keysUrl: KEYS } };
+    return made;
+  };
+
+  test("a key, then one of its inboxes; the toast says new email arrives at once; then o que faz", async () => {
+    const { api, state, mail } = withMillionSend(false);
+    const dialog = await openCatalog(api);
+    await click(
+      within(within(dialog).getByRole("radiogroup", { name: "Categorias" })).getByRole("radio", { name: /^Email/ }),
+    );
+    const names = [...dialog.querySelectorAll(".catalog-tile__name")].map((el) => el.textContent);
+    expect(names).toEqual(["Gmail", "Outlook", "iCloud", "MillionSend", "Outro email", "Não achou?"]);
+    // MillionSend's own M, in the ink.
+    const tile = within(dialog).getByRole("button", { name: "MillionSend" });
+    expect(tile.querySelector(".connector-icon__mark")?.getAttribute("style")).toContain("/connectors/millionsend.svg");
+    await click(tile);
+    expect(service("MillionSend").textContent).toContain("Precisa de uma chave de API");
+    expect(service("MillionSend").textContent).toContain("Acordar rotinas quando chega um email");
+    await click(within(service("MillionSend")).getByRole("button", { name: "Conectar MillionSend" }));
+
+    expect(flow().textContent).toContain("Os agentes leem e respondem uma caixa de entrada do MillionSend.");
+    expect(within(flow()).getByRole("link", { name: "Criar uma chave no MillionSend" }).getAttribute("href")).toBe(
+      KEYS,
+    );
+    await click(within(flow()).getByRole("button", { name: "Continuar" }));
+    expect(flow().textContent).toContain("Cole a chave de API.");
+    expect(state.calls.some((c) => c.method === "mail.millionsendInboxes")).toBe(false);
+
+    await type(within(flow()).getByLabelText("Chave de API do MillionSend"), "ms_fake_key");
+    mail.nextError = "auth";
+    await click(within(flow()).getByRole("button", { name: "Continuar" }));
+    await settle(4);
+    expect(within(flow()).getByRole("alert").textContent).toBe(
+      "O MillionSend não aceitou essa chave. Use uma chave com acesso total.",
+    );
+    await click(within(flow()).getByRole("button", { name: "Continuar" }));
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "mail.millionsendInboxes").at(-1)?.args[1]).toEqual({
+      apiKey: "[redacted]",
+    });
+    const inboxes = within(flow()).getByRole("radiogroup", { name: "Qual caixa os agentes usam" });
+    const first = within(inboxes).getByRole("radio", { name: /suporte@acme\.agents\.millionsend\.com/ });
+    expect(first.getAttribute("aria-checked")).toBe("true");
+    expect(inboxes.textContent).toContain("Vendas");
+    await click(within(flow()).getByRole("button", { name: "Conectar" }));
+    await settle(6);
+    expect(state.calls.find((c) => c.method === "mail.connectMillionSend")?.args[1]).toEqual({
+      inboxId: "7eeb9517-aed7-40d7-ad65-500be42ed147",
+      apiKey: "[redacted]",
+    });
+    expect(
+      screen().getByText("suporte@acme.agents.millionsend.com conectado. Emails novos chegam aos agentes na hora."),
+    ).toBeTruthy();
+    expect(screen().getByRole("dialog", { name: "O que suporte@acme.agents.millionsend.com faz" })).toBeTruthy();
+  });
+
+  test("the MillionSend connector's key, when the person keeps it chosen; a connected inbox can't be picked", async () => {
+    const { api, state, mail } = withMillionSend(true, [
+      { provider: "millionsend", via: "millionsend", preset: null, address: "suporte@acme.agents.millionsend.com" },
+    ]);
+    mail.instant = false;
+    const dialog = await openCatalog(api);
+    // Another inbox of the same MillionSend: its card says one is connected, and connects one more.
+    await click(within(dialog).getByRole("button", { name: "MillionSend, conectado" }));
+    await click(within(service("MillionSend")).getByRole("button", { name: "Adicionar outra conta do MillionSend" }));
+    const source = within(flow()).getByRole("radiogroup", { name: "Chave de API do MillionSend" });
+    expect(
+      within(source)
+        .getByRole("radio", { name: /Usar a chave do conector MillionSend/ })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(within(flow()).queryByLabelText("Chave de API do MillionSend", { selector: "input" })).toBeNull();
+    await click(within(flow()).getByRole("button", { name: "Continuar" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "mail.millionsendInboxes")?.args[1]).toEqual({ useConnector: true });
+    const inboxes = within(flow()).getByRole("radiogroup", { name: "Qual caixa os agentes usam" });
+    const taken = within(inboxes).getByRole("radio", { name: /suporte@acme\.agents\.millionsend\.com/ });
+    expect(taken.hasAttribute("disabled") || taken.getAttribute("data-disabled") !== null).toBe(true);
+    expect(taken.textContent).toContain("Já conectada");
+    await click(within(flow()).getByRole("button", { name: "Conectar" }));
+    await settle(6);
+    expect(state.calls.find((c) => c.method === "mail.connectMillionSend")?.args[1]).toEqual({
+      useConnector: true,
+      inboxId: "2c6d1e0a-5b4f-4a3e-9c2d-1b0a9f8e7d6c",
+    });
+    expect(
+      screen().getByText("vendas@acme.com.br conectado. Emails novos chegam aos agentes em poucos minutos."),
+    ).toBeTruthy();
+  });
+
+  test("a key MillionSend stopped accepting: Reconectar takes a new one; no other addresses", async () => {
+    const { api, state, mail } = withMillionSend(false, [
+      {
+        provider: "millionsend",
+        via: "millionsend",
+        preset: null,
+        address: "suporte@acme.agents.millionsend.com",
+        status: "needs_reconnect",
+      },
+    ]);
+    await renderApp(`/org/${ORG_ID}/settings/connectors`, { api });
+    await settle(8);
+    const row = screen()
+      .getByRole("button", { name: "Quem usa suporte@acme.agents.millionsend.com" })
+      .closest(".connected-row") as HTMLElement;
+    expect(row.textContent).toContain("MillionSend");
+    expect(within(row).queryByRole("button", { name: /^Endereços/ })).toBeNull();
+    await click(within(row).getByRole("button", { name: "Reconectar suporte@acme.agents.millionsend.com" }));
+    const dialog = screen().getByRole("dialog", { name: "Reconectar suporte@acme.agents.millionsend.com" });
+    expect(dialog.textContent).toContain("O MillionSend parou de aceitar a chave. Cole uma nova.");
+    expect(within(dialog).getByRole("link", { name: "Criar uma chave no MillionSend" }).getAttribute("href")).toBe(
+      KEYS,
+    );
+    await type(within(dialog).getByLabelText("Chave de API do MillionSend"), "ms_fake_new");
+    // A key of another MillionSend team: trying again can't help, so it says why.
+    mail.nextError = "mail.millionsend_inbox_not_found";
+    await click(within(dialog).getByRole("button", { name: "Reconectar" }));
+    await settle(4);
+    expect(within(dialog).getByRole("alert").textContent).toBe(
+      "Essa chave não alcança suporte@acme.agents.millionsend.com. Use uma chave do time do MillionSend que tem essa caixa.",
+    );
+    await click(within(dialog).getByRole("button", { name: "Reconectar" }));
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "mail.update").map((c) => c.args.slice(1))).toEqual([
+      ["mail-1", { apiKey: "[redacted]" }],
+      ["mail-1", { apiKey: "[redacted]" }],
+    ]);
+    expect(screen().queryByRole("dialog", { name: "Reconectar suporte@acme.agents.millionsend.com" })).toBeNull();
+  });
+});
+
 describe("the agent's email rules", () => {
   test("'Enviar sem pedir aprovação' waits for 'Só enviar para'; Salvar sends level, delete and rules", async () => {
     const { api, state } = mailApi([{ address: "ana@example.com" }]);

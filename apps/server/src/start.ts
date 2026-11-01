@@ -5,6 +5,7 @@ import {
   createComposioClient,
   createComposioMailConnector,
   createDiskBlobStore,
+  createErrorReporter,
   createExpoPushSender,
   createGiphyGifs,
   createImapConnectionTester,
@@ -15,6 +16,7 @@ import {
   createMemoryPresence,
   createMemoryPubSub,
   createMemoryRateLimiter,
+  createMillionSendMail,
   createMillionSendSender,
   createPostgresBlobStore,
   createPostgresDatabaseDriver,
@@ -33,7 +35,7 @@ import {
   postgresJsNotifier,
   type WebPushSender,
 } from "@agenteschat/adapters";
-import { type Config, ConfigError, loadConfig, redactConfig } from "@agenteschat/config";
+import { type Config, ConfigError, composioAuthConfigs, loadConfig, redactConfig } from "@agenteschat/config";
 import {
   createDatabase,
   type Database,
@@ -43,6 +45,7 @@ import {
 } from "@agenteschat/db";
 import {
   adoptRestoredOperatorEvents,
+  composioUsageHook,
   createGifKey,
   createLocalKeyWrapper,
   defaultEmailFrom,
@@ -54,6 +57,7 @@ import {
   type GifKey,
   isAgentesCloud,
   isBlockedAddress,
+  meterComposio,
   resolveHostDns,
   retireHostTokens,
   setRestrictionNotices,
@@ -73,7 +77,7 @@ import { createMachineSockets } from "./realtime/machines";
 import { createStreamSockets } from "./realtime/streams";
 import { createRealtime, type SocketData } from "./realtime/ws";
 import { startTelemetry } from "./telemetry";
-import { version } from "./version";
+import { releaseOf, version } from "./version";
 import { startWorkers } from "./workers";
 
 /** On SIGTERM, how long runs in progress get to finish before they are handed to the next instance. */
@@ -83,6 +87,9 @@ const JOB_DRAIN_MS = 5_000;
 
 /** How long the `agentes` tool calls of computers' tasks still running here get at least to store their answers. */
 const MCP_DRAIN_MS = 5_000;
+
+/** How long error reports still on their way get before the process exits. */
+const EXIT_FLUSH_MS = 2_000;
 
 export interface StartOptions {
   edition: Edition;
@@ -112,7 +119,7 @@ export function applyBootSwitches(config: Config) {
  * Shared by the self-hosted entrypoint (`src/main.ts`) and any entrypoint
  * that adds public modules (ADR 0002); only `modules` differ.
  */
-export async function startServer({ edition, modules = [], ownHostsOnly = false }: StartOptions) {
+export async function startServer(options: StartOptions) {
   let config: ReturnType<typeof loadConfig>;
   try {
     config = loadConfig();
@@ -124,8 +131,36 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     throw error;
   }
 
-  const log = createLogger(config.LOG_LEVEL);
-  log.info("starting agentes.chat", { version, edition, config: redactConfig(config) });
+  const release = releaseOf(config);
+  const errors = await createErrorReporter({
+    dsn: config.SENTRY_DSN,
+    environment: config.SENTRY_ENVIRONMENT,
+    release,
+  });
+  const log = createLogger(config.LOG_LEVEL, errors);
+  try {
+    return await boot(options, config, log, release);
+  } catch (error) {
+    log.error("startup failed", { error, unhandled: true });
+    await log.flush(EXIT_FLUSH_MS);
+    throw error;
+  }
+}
+
+/** Everything of the boot after the config, so `startServer` can report what fails in it. */
+async function boot(
+  { edition, modules = [], ownHostsOnly = false }: StartOptions,
+  config: Config,
+  log: Logger,
+  release: string,
+) {
+  log.info("starting agentes.chat", { version: release, edition, config: redactConfig(config) });
+  log.info(
+    "error reports",
+    config.SENTRY_DSN
+      ? { to: new URL(config.SENTRY_DSN).host, environment: config.SENTRY_ENVIRONMENT, release }
+      : { reports: "off" },
+  );
   if (config.NODE_ENV === "production" && config.PUBLIC_URL === "http://localhost:3000") {
     log.warn(
       "PUBLIC_URL is http://localhost:3000 (the default): only a browser on this machine, at exactly that address, can sign in and save. Set PUBLIC_URL to the address people open (e.g. https://chat.example.com): sign-in cookies, the browser origin allowed to make changes (CSRF) and the links in emails all come from it, so from any other address sign-in and saving fail with bad_origin.",
@@ -170,7 +205,12 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
       () => [resolved?.keyWrapper ?? localKeyWrapper, ...(resolved?.legacyKeyWrappers ?? [])],
       log,
     ),
-    mail: mailAdapters(config),
+    // Each Composio call counts for its workspace before it is made (ADR 0107 §7).
+    mail: mailAdapters(
+      config,
+      database.db,
+      meterComposio({ db: database.db, cap: config.COMPOSIO_CALLS_PER_MONTH, pubsub: () => resolved?.pubsub }),
+    ),
     // People's Postgres databases for agents (ADR 0039): always on; every connection is checked and read-only.
     databases: createPostgresDatabaseDriver(),
     // agentes.chat Cloud's bot check (ADR 0075), only with both keys: without them nothing reaches Cloudflare.
@@ -188,9 +228,13 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
   };
   log.info("platform file storage", { kind: defaults.platformBlobs.kind });
   log.info("transactional email", { sender: defaults.email.id });
-  log.info("mail for agents", { composio: Boolean(defaults.mail?.composio), imap: Boolean(defaults.mail?.imap) });
+  log.info("mail for agents", {
+    composio: Boolean(defaults.mail?.composio),
+    imap: Boolean(defaults.mail?.imap),
+    millionsend: Boolean(defaults.mail?.millionsend),
+  });
   log.info("browser push", defaults.webPush ? { webPush: "on", contact: vapidSubject(config) } : { webPush: "off" });
-  const base = { config, db: database.db, edition, version };
+  const base = { config, db: database.db, edition, version: release };
   const { adapters, modelProviders, overridden } = await resolveAdapters(
     modules,
     base,
@@ -356,12 +400,17 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     idleTimeout: 120,
     fetch: (req, srv) => ownHostAnswer(req) ?? realtime.fetch(req, srv, (r) => app.fetch(r)),
     websocket: realtime.websocket,
+    // What the HTTP app doesn't answer itself: a WebSocket upgrade that failed before the socket opened.
+    error(error) {
+      log.error("request failed", { error, stack: error.stack });
+      return new Response("Something went wrong on our side\n", { status: 500 });
+    },
   });
   log.info("listening", { url: `http://${config.HOST}:${config.PORT}` });
   const operator = serveOperatorApi({
     db: database.db,
     config,
-    version,
+    version: release,
     log,
     pubsub: adapters.pubsub,
     hub: engine.machineHub,
@@ -416,11 +465,13 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
     for (const module of modules) await module.onStop?.();
     await adapters.pubsub.close?.();
     await database.close();
+    await log.flush(EXIT_FLUSH_MS);
     process.exit(0);
   };
   const stop = (signal: string) =>
-    void shutdown(signal).catch((error: unknown) => {
-      log.error("shutdown failed", { error: String(error) });
+    void shutdown(signal).catch(async (error: unknown) => {
+      log.error("shutdown failed", { error });
+      await log.flush(EXIT_FLUSH_MS);
       process.exit(1);
     });
   process.on("SIGTERM", () => stop("SIGTERM"));
@@ -429,10 +480,10 @@ export async function startServer({ edition, modules = [], ownHostsOnly = false 
   // instead of ending the process with every run in progress. Not before: a failed boot must still exit, and a
   // rejected top-level `await startServer()` would come here and leave the process hanging.
   process.on("unhandledRejection", (reason) =>
-    log.error("unhandled rejection", { error: String(reason), stack: (reason as Error | null)?.stack }),
+    log.error("unhandled rejection", { error: reason, stack: (reason as Error | null)?.stack, unhandled: true }),
   );
   process.on("uncaughtException", (error) =>
-    log.error("uncaught exception", { error: String(error), stack: error.stack }),
+    log.error("uncaught exception", { error, stack: error.stack, unhandled: true }),
   );
 
   return { server, config };
@@ -451,7 +502,11 @@ export async function prepareDatabase(database: DatabaseHandle, log: Logger, mig
     } catch (error) {
       if (error instanceof MigrationMismatchError) {
         // Never re-run or skip a changed migration against a real database.
-        log.error("refusing to migrate: the database's migrations don't match this build", { reason: error.message });
+        log.error("refusing to migrate: the database's migrations don't match this build", {
+          reason: error.message,
+          error,
+        });
+        await log.flush(EXIT_FLUSH_MS);
         process.exit(1);
       }
       throw error;
@@ -538,14 +593,26 @@ function gifProvider(config: Config, key: () => string | null): GifProvider | nu
   return config.GIPHY_API_KEY ? createGiphyGifs({ apiKey: config.GIPHY_API_KEY }) : null;
 }
 
-/** People's mailboxes for agents (ADR 0038): Gmail/Outlook through Composio when keyed, IMAP unless turned off. */
-function mailAdapters(config: Config): MailAdapters {
+/**
+ * People's mailboxes for agents (ADR 0038): Gmail/Outlook through Composio when keyed, IMAP unless turned off, and
+ * MillionSend inboxes (ADR 0102) at `MILLIONSEND_INBOXES_API_URL` unless turned off, each with its own key. The same
+ * Composio client serves the connectors that go through it (ADR 0107).
+ */
+function mailAdapters(
+  config: Config,
+  db: Database,
+  beforeToolCall: (call: { slug: string; userId: string }) => Promise<void>,
+): MailAdapters {
   const composio = config.COMPOSIO_API_KEY
     ? createComposioClient({
         apiKey: config.COMPOSIO_API_KEY,
         webhookSecret: config.COMPOSIO_WEBHOOK_SECRET,
         gmailAuthConfigId: config.COMPOSIO_GMAIL_AUTH_CONFIG_ID,
         outlookAuthConfigId: config.COMPOSIO_OUTLOOK_AUTH_CONFIG_ID,
+        // What Composio bills, counted per workspace (ADR 0103): it has no usage API to read back.
+        onExecute: composioUsageHook(db),
+        authConfigs: composioAuthConfigs(config),
+        beforeToolCall,
       })
     : null;
   // A mail server named by a person never resolves to our network (private, loopback, metadata).
@@ -564,5 +631,9 @@ function mailAdapters(config: Config): MailAdapters {
           presets: MAIL_PRESETS,
         }
       : null,
+    millionsend:
+      config.MILLIONSEND_INBOXES_API_URL === "off"
+        ? null
+        : createMillionSendMail({ baseURL: config.MILLIONSEND_INBOXES_API_URL }),
   };
 }

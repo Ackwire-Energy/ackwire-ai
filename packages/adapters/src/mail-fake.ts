@@ -1,6 +1,9 @@
 import {
+  type ComposioAccount,
   type ComposioClient,
+  type ComposioMailToolkit,
   ComposioSignatureError,
+  type ComposioTool,
   type ComposioToolkit,
   type ComposioWebhookEvent,
   type MailAccountRef,
@@ -16,6 +19,8 @@ import {
   type MailQuery,
   type MailSummary,
   type MailTestError,
+  type MillionSendClient,
+  type MillionSendInbox,
   type OutgoingMail,
 } from "./mail";
 
@@ -262,11 +267,14 @@ export function createFakeMailTester(
 export const FAKE_COMPOSIO_SIGNATURE = "v1,test-signature";
 
 /**
- * A fake Composio client: connected accounts in memory (status and address
- * settable), triggers recorded, webhooks are JSON `ComposioWebhookEvent`s
- * signed with `webhook-signature: FAKE_COMPOSIO_SIGNATURE`.
+ * A fake Composio client: connected accounts in memory (status, address and name settable), triggers recorded,
+ * toolkits' tools by version (`addTools`) and what each run answers (`answer`), webhooks are JSON
+ * `ComposioWebhookEvent`s signed with `webhook-signature: FAKE_COMPOSIO_SIGNATURE`. `beforeToolCall` runs before
+ * each tool call, as the real client's does.
  */
-export function createFakeComposioClient() {
+export function createFakeComposioClient(
+  hooks: { beforeToolCall?: (call: { slug: string; userId: string }) => Promise<void> } = {},
+) {
   const state = {
     accounts: new Map<
       string,
@@ -275,6 +283,7 @@ export function createFakeComposioClient() {
         userId: string;
         status: "active" | "pending" | "failed" | "expired";
         address: string | null;
+        displayName: string | null;
       }
     >(),
     links: [] as { toolkit: ComposioToolkit; userId: string; callbackUrl: string; connectedAccountId: string }[],
@@ -287,9 +296,20 @@ export function createFakeComposioClient() {
     profileReads: [] as string[],
     triggers: new Map<
       string,
-      { toolkit: ComposioToolkit; connectedAccountId: string; userId: string; query: string | null }
+      { toolkit: ComposioMailToolkit; connectedAccountId: string; userId: string; query: string | null }
     >(),
     deletedTriggers: [] as string[],
+    /** Tools by `toolkit@version`. */
+    tools: new Map<string, ComposioTool[]>(),
+    /** How often each toolkit's tools were listed. */
+    toolLists: [] as string[],
+    /** Every tool run, in order. */
+    executions: [] as { slug: string; account: ComposioAccount; args: Record<string, unknown>; version?: string }[],
+    /** What a run of a slug answers (its `data`), or throws. */
+    answers: new Map<string, unknown | ((args: Record<string, unknown>) => unknown)>(),
+    /** Files tools link to, by URL; `fetched`: the URLs downloaded. */
+    files: new Map<string, Uint8Array>(),
+    fetched: [] as string[],
     failWith: null as Error | null,
   };
   let seq = 0;
@@ -302,6 +322,7 @@ export function createFakeComposioClient() {
         userId: input.userId,
         status: "pending",
         address: null,
+        displayName: null,
       });
       state.links.push({ ...input, connectedAccountId });
       return { connectedAccountId, redirectUrl: `https://composio.example/connect/${connectedAccountId}` };
@@ -311,17 +332,39 @@ export function createFakeComposioClient() {
       const a = state.accounts.get(id);
       if (!a) return { status: "failed", address: null };
       if (a.status !== "active") return { status: a.status, address: null };
-      if (options?.readAddress === false) return { status: "active", address: null };
+      if (options?.readAddress === false) return { status: "active", address: null, displayName: a.displayName };
       // The address is read with a profile tool call.
+      await hooks.beforeToolCall?.({ slug: `${a.toolkit.toUpperCase()}_GET_PROFILE`, userId });
       if (userId !== a.userId) throw composioUserRefused(userId);
       state.profileReads.push(id);
-      return { status: "active", address: a.address };
+      return { status: "active", address: a.address, displayName: a.displayName };
     },
     async deleteConnectedAccount(id, options) {
       state.deletedAccounts.push(id);
       if (options?.revoke === false) state.grantsKept.push(id);
       else state.revokedAccounts.push(id);
       state.accounts.delete(id);
+    },
+    async listTools(toolkit, version) {
+      if (state.failWith) throw state.failWith;
+      state.toolLists.push(`${toolkit}@${version}`);
+      return state.tools.get(`${toolkit}@${version}`) ?? [];
+    },
+    async executeTool(slug, account, args, version) {
+      await hooks.beforeToolCall?.({ slug, userId: account.userId });
+      if (state.failWith) throw state.failWith;
+      const owner = state.accounts.get(account.connectedAccountId);
+      if (!owner || owner.userId !== account.userId) throw composioUserRefused(account.userId);
+      state.executions.push({ slug, account, args, ...(version ? { version } : {}) });
+      const answer = state.answers.get(slug);
+      if (answer instanceof Error) throw answer;
+      return typeof answer === "function" ? answer(args) : (answer ?? {});
+    },
+    async fetchFile(url) {
+      const file = state.files.get(url);
+      if (!file) throw new MailError(`no file at ${url}`, false);
+      state.fetched.push(url);
+      return file;
     },
     async createMailTrigger(input) {
       if (state.failWith) throw state.failWith;
@@ -340,16 +383,77 @@ export function createFakeComposioClient() {
       return JSON.parse(rawBody) as ComposioWebhookEvent;
     },
   };
-  /** The person finished OAuth at Composio: the account is active with this address. */
-  const activate = (connectedAccountId: string, address: string) => {
+  /** The person finished OAuth at Composio: the account is active with this address (and name). */
+  const activate = (connectedAccountId: string, address: string, displayName: string | null = null) => {
     const a = state.accounts.get(connectedAccountId);
     if (a) {
       a.status = "active";
       a.address = address;
+      a.displayName = displayName;
     }
   };
-  return { client, state, activate };
+  /** A toolkit's tools at a version. */
+  const addTools = (toolkit: string, version: string, tools: ComposioTool[]) =>
+    state.tools.set(`${toolkit}@${version}`, tools);
+  /** What runs of `slug` answer from now on (an `Error` is thrown). */
+  const answer = (slug: string, data: unknown | ((args: Record<string, unknown>) => unknown)) =>
+    state.answers.set(slug, data);
+  return { client, state, activate, addTools, answer };
 }
 
 /** A MailAuthError, for fakes told to refuse the credentials. */
 export const fakeMailAuthError = () => new MailAuthError("Invalid credentials (fake)");
+
+/** Fake MillionSend keys: one with full access, one limited to an inbox (it can't create webhooks). */
+export const FAKE_MILLIONSEND_KEY = "ms_fake_full";
+export const FAKE_MILLIONSEND_INBOX_KEY = "ms_fake_inbox";
+
+/**
+ * A fake MillionSend: the inboxes every fake key reaches, the webhooks created (with the secret each was given,
+ * so a test signs deliveries with it) and those deleted. Any other key is refused.
+ */
+export function createFakeMillionSend(
+  inboxes: MillionSendInbox[] = [
+    {
+      id: "7eeb9517-aed7-40d7-ad65-500be42ed147",
+      address: "suporte@acme.agents.millionsend.com",
+      name: "Suporte",
+      kind: "agent",
+      shared: true,
+    },
+  ],
+) {
+  const state = {
+    inboxes,
+    keys: new Map([
+      [FAKE_MILLIONSEND_KEY, { webhooks: true }],
+      [FAKE_MILLIONSEND_INBOX_KEY, { webhooks: false }],
+    ]),
+    webhooks: new Map<string, { apiKey: string; endpoint: string; inboxId: string; secret: string }>(),
+    deletedWebhooks: [] as string[],
+  };
+  let seq = 0;
+  const known = (apiKey: string) => {
+    const key = state.keys.get(apiKey);
+    if (!key) throw new MailAuthError("MillionSend refused the API key");
+    return key;
+  };
+  const client: MillionSendClient = {
+    async listInboxes(apiKey) {
+      known(apiKey);
+      return state.inboxes.map((i) => ({ ...i }));
+    },
+    async createWebhook(apiKey, input) {
+      if (!known(apiKey).webhooks) return null;
+      const id = `00000000-0000-4000-8000-${String(++seq).padStart(12, "0")}`;
+      state.webhooks.set(id, { apiKey, ...input });
+      return { id };
+    },
+    async deleteWebhook(apiKey, webhookId) {
+      known(apiKey);
+      state.deletedWebhooks.push(webhookId);
+      state.webhooks.delete(webhookId);
+    },
+  };
+  return { client, state };
+}

@@ -19,7 +19,7 @@ import { clockAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { computerKind, isPaused } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
-import { AGENT_GRADIENTS, Button, ComputerPortrait, cx, Dialog, Icon, SkyStrip } from "@agenteschat/ui";
+import { Button, ComputerPortrait, cx, Dialog, gradientOf, Icon, SkyStrip } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -618,7 +618,7 @@ export function ComputerButton({ agent }: { agent: Agent }) {
       : entry.kind === "working" || entry.kind === "you" || entry.kind === "other"
         ? "live"
         : undefined;
-  const dot = { "--dot": (AGENT_GRADIENTS[colorOf(agent)] ?? AGENT_GRADIENTS.sky)[0] } as CSSProperties;
+  const dot = { "--dot": gradientOf(colorOf(agent))[0] } as CSSProperties;
   return (
     <Button
       size="sm"

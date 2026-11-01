@@ -35,8 +35,10 @@ test("a password account not confirmed yet: Google links nothing and signs nobod
 
   for (const app of ["web", "desktop", "phone"] as const) {
     const { location, browser: landed } = await googleSignIn(server, app, "ana@acme.test");
-    expect(location.startsWith("/login?")).toBe(true);
-    const back = new URL(location, ORIGIN).searchParams;
+    // The sign-in page, by path or (a sign-in that named no page for refusals) at this server's address.
+    const landing = new URL(location, ORIGIN);
+    expect([landing.origin, landing.pathname]).toEqual([ORIGIN, "/login"]);
+    const back = landing.searchParams;
     expect([back.get("error"), back.get("email")]).toEqual(["account_not_linked", "ana@acme.test"]);
     expect((await landed("/api/app/me")).status).toBe(401);
   }

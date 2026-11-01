@@ -93,6 +93,19 @@ test("agent appearance: on the list and detail, allow-list enforced", async () =
   expect(list.agents.find((a) => a.id === agentId)?.appearance).toEqual(look);
   expect(await (await api(`/agents/${agentId}`)).json()).toMatchObject({ appearance: look });
 
+  // "Personalizar": a #rrggbb in the same field, stored lowercase; anything else hex-like is refused.
+  for (const color of ["#12345", "#12345g", "red"]) {
+    expect(
+      (await api(`/agents/${agentId}`, { method: "PATCH", json: { appearance: { ...look, color } } })).status,
+    ).toBe(400);
+  }
+  const custom = await api(`/agents/${agentId}`, {
+    method: "PATCH",
+    json: { appearance: { ...look, color: "#A1B2C3" } },
+  });
+  expect(custom.status).toBe(200);
+  expect(((await custom.json()) as { appearance: { color: string } }).appearance.color).toBe("#a1b2c3");
+
   const reset = await api(`/agents/${agentId}`, { method: "PATCH", json: { appearance: null } });
   expect(await reset.json()).toMatchObject({ appearance: null });
 });

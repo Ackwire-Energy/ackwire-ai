@@ -8,6 +8,7 @@ import {
   usePlaceChannelCategory,
   useRenameChannelCategory,
 } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -21,8 +22,6 @@ import { arrangesCategories, categoryHrefs, channelSteps, movesChannel, stepBefo
 
 /** Names are at most this long (the server's CATEGORY_NAME_MAX). */
 const NAME_MAX = 40;
-
-const failedText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** The other channels of a category, for the line under it ("bugs, tech, deploys"). */
 function channelLine(channels: Channel[], categoryId: string | null, except?: string) {
@@ -51,7 +50,7 @@ export function PickCategoryScreen({ channelId }: { channelId: string }) {
   const all = channels.data ?? [];
   const order = channelSteps(all, channelId);
   const step = (move: typeof order.up) => {
-    if (move) place.mutate(move, { onError: (e) => toast({ title: failedText(e), icon: "x" }) });
+    if (move) place.mutate(move, { onError: (e) => toast({ title: errorText(t, e), icon: "x" }) });
   };
   const pick = (categoryId: string | null, name: string) => {
     if (!channel || categoryId === current) return router.back();
@@ -63,7 +62,7 @@ export function PickCategoryScreen({ channelId }: { channelId: string }) {
           toast({ title: t("channelCategories.moved", { channel: channel.name, name }) });
           router.back();
         },
-        onError: (e) => toast({ title: failedText(e), icon: "x" }),
+        onError: (e) => toast({ title: errorText(t, e), icon: "x" }),
       },
     );
   };
@@ -151,7 +150,7 @@ export function NewCategoryScreen({ channelId }: { channelId?: string }) {
           toast({ title: t("channelCategories.created", { name: category.name }) });
           router.back();
         },
-        onError: (e) => toast({ title: failedText(e), icon: "x" }),
+        onError: (e) => toast({ title: errorText(t, e), icon: "x" }),
       },
     );
   };
@@ -284,7 +283,7 @@ export function EditCategoryScreen({ categoryId }: { categoryId: string }) {
           successHaptic();
           router.back();
         },
-        onError: (e) => toast({ title: failedText(e), icon: "x" }),
+        onError: (e) => toast({ title: errorText(t, e), icon: "x" }),
       },
     );
   };
@@ -293,7 +292,7 @@ export function EditCategoryScreen({ categoryId }: { categoryId: string }) {
     if (before === undefined) return;
     placeCategory.mutate(
       { categoryId, beforeCategoryId: before },
-      { onError: (e) => toast({ title: failedText(e), icon: "x" }) },
+      { onError: (e) => toast({ title: errorText(t, e), icon: "x" }) },
     );
   };
   const askDelete = () =>
@@ -313,7 +312,7 @@ export function EditCategoryScreen({ categoryId }: { categoryId: string }) {
               });
               router.back();
             },
-            onError: (e) => toast({ title: failedText(e), icon: "x" }),
+            onError: (e) => toast({ title: errorText(t, e), icon: "x" }),
           }),
       },
     ]);

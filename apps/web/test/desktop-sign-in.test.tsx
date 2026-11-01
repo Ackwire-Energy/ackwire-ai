@@ -123,9 +123,15 @@ describe("in the browser, for the app", () => {
       auth: first.auth,
     });
     await settle(3);
+    // A refusal comes back to this page, without `done`.
     expect(first.calls[0]).toEqual({
       method: "signInSocial",
-      args: ["github", `/desktop/sign-in?provider=github&request=${request}&done=1`],
+      args: [
+        "github",
+        `/desktop/sign-in?provider=github&request=${request}&done=1`,
+        undefined,
+        `/desktop/sign-in?provider=github&request=${request}`,
+      ],
     });
     cleanup();
 
@@ -146,6 +152,20 @@ describe("in the browser, for the app", () => {
     expect(heading()).toBe("Tudo certo.");
   });
 
+  test("refused by the provider or the server: why, and back to the app, never the provider again", async () => {
+    const { auth, calls } = createFakeAuth();
+    await renderApp(`/desktop/sign-in?provider=github&request=${request}&error=access_denied`, {
+      api: createFakeApi(seedState({ me: null })),
+      auth,
+    });
+    await settle(3);
+    expect(heading()).toBe("O login não terminou.");
+    expect(document.querySelector(".auth__lead")?.textContent).toBe(
+      "O login foi cancelado. Volte ao app para tentar de novo.",
+    );
+    expect(calls).toEqual([]);
+  });
+
   test("an early-access token from the app's window goes on to the provider, for the sign-up it makes", async () => {
     const { auth, calls } = createFakeAuth();
     await renderApp(`/desktop/sign-in?provider=google&request=${request}&access=${ACCESS}`, {
@@ -155,7 +175,12 @@ describe("in the browser, for the app", () => {
     await settle(3);
     expect(calls[0]).toEqual({
       method: "signInSocial",
-      args: ["google", `/desktop/sign-in?provider=google&request=${request}&done=1`, ACCESS],
+      args: [
+        "google",
+        `/desktop/sign-in?provider=google&request=${request}&done=1`,
+        ACCESS,
+        `/desktop/sign-in?provider=google&request=${request}`,
+      ],
     });
   });
 

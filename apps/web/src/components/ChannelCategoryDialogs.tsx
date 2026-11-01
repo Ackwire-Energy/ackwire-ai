@@ -8,6 +8,7 @@ import {
   usePlaceChannel,
   useRenameChannelCategory,
 } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
 import {
   Button,
   Checkbox,
@@ -100,7 +101,7 @@ export function NewCategoryDialog({
         },
         onError: (e) => {
           if (e instanceof ApiError && e.status === 409) setTouched(true);
-          else toast.show(e instanceof Error ? e.message : String(e), "error");
+          else toast.show(errorText(t, e), "error");
         },
       },
     );
@@ -231,7 +232,7 @@ export function RenameCategoryDialog({
             { categoryId: category.id, name: name.trim() },
             {
               onSuccess: () => onOpenChange(false),
-              onError: (e) => toast.show(e instanceof Error ? e.message : String(e), "error"),
+              onError: (e) => toast.show(errorText(t, e), "error"),
             },
           );
         }}
@@ -367,7 +368,7 @@ export function MoveChannelDialog({
             run: () => place.mutate({ channelId: channel.id, categoryId: current === NONE ? null : current }),
           });
         },
-        onError: (e) => toast.show(e instanceof Error ? e.message : String(e), "error"),
+        onError: (e) => toast.show(errorText(t, e), "error"),
       },
     );
   };

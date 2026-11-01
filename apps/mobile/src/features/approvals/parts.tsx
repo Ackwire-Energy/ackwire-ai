@@ -1,13 +1,21 @@
-import { type Approval, type ApprovalEmail, useCatalog, useCustomServers } from "@agenteschat/client";
+import {
+  type Approval,
+  type ApprovalEmail,
+  useCancelApproval,
+  useCatalog,
+  useCustomServers,
+} from "@agenteschat/client";
+import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalOriginWords } from "@agenteschat/client/lib/approval-origin";
 import { approvalTitle } from "@agenteschat/client/lib/approval-words";
 import { fromServer, itemName } from "@agenteschat/client/lib/connected";
+import { nextLabel } from "@agenteschat/client/lib/format";
 import { connectorName } from "@agenteschat/client/lib/scopes";
 import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Button, Chip, Fuse, Icon, LineIcon, Text } from "@/ui";
+import { Button, Chip, Fuse, Icon, LineIcon, Text, useToast } from "@/ui";
 import { ConnectorIcon, IconTile } from "../connectors/ConnectorIcon";
 import { AgentFace } from "../shared/Face";
 import { useColors, useNow, useOrgId } from "../shared/hooks";
@@ -306,6 +314,43 @@ export function ApprovalWhy({
       ) : null}
     </View>
   );
+}
+
+/** A request for an action prepared ahead: that approving covers a later run, and when, as on the web. */
+export function ApprovalAheadLine({
+  approval: a,
+}: {
+  approval: Pick<Approval, "runAt" | "status" | "executedAt" | "decidedAt">;
+}) {
+  const { t, i18n } = useTranslation();
+  const c = useColors();
+  if (aheadPhase(a) !== "asking" || !a.runAt) return null;
+  return (
+    <View style={styles.origin}>
+      <LineIcon name="clock" size={14} color={c.ink2} variant="small" />
+      <Text variant="small" tone="ink" style={[styles.grow, styles.medium]}>
+        {t("approval.ahead.line", { when: nextLabel(i18n.language, a.runAt) })}
+      </Text>
+    </View>
+  );
+}
+
+/** Withdraws an action approved ahead before its time (its routine's run won't do it), and says so. */
+export function useCancelAhead() {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const cancel = useCancelApproval(useOrgId());
+  return {
+    pending: cancel.isPending,
+    cancel: (id: string, onDone?: () => void) =>
+      cancel.mutate(id, {
+        onSuccess: () => {
+          toast({ title: t("approval.ahead.canceled") });
+          onDone?.();
+        },
+        onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
+      }),
+  };
 }
 
 /** "Aprovar sempre" where the request offers it, and under it what one tap approves for good, as on the web. */

@@ -1,33 +1,43 @@
 /**
- * Gmail and Outlook through Composio (ADR 0038), over its REST API v3.1
- * (`https://backend.composio.dev/api/v3.1`, `x-api-key` header).
+ * Composio over its REST API v3.1 (`https://backend.composio.dev/api/v3.1`, `x-api-key` header): Gmail and Outlook
+ * mailboxes (ADR 0038) and the connectors that go through it (ADR 0107).
  *
- * - `createComposioClient`: auth configs (Composio-managed, found or created
- *   once per toolkit), Connect Links, connected accounts, "new message"
- *   triggers, signed webhooks, and tool execution for our connector.
+ * - `createComposioClient`: auth configs (one of this server's own, else Composio-managed, found or created once per
+ *   toolkit), Connect Links, connected accounts, tools at a pinned version and their execution, "new message"
+ *   triggers and signed webhooks.
  * - `createComposioMailConnector`: a `MailProvider` per account that runs
  *   only explicit Gmail/Outlook tools (never Composio's meta-tools).
  *
  * Permissions, approvals and per-call checks live in the engine; this file
  * only reaches the mailbox. The API key never appears in errors.
  */
-import { createHmac, timingSafeEqual } from "node:crypto";
 import {
+  arr,
+  clampLimit,
   decodeBase64,
   decodeBase64Text,
   decodeEntities,
   graphRecipient,
   htmlToText,
+  type Obj,
+  obj,
   parseAddressList,
   snippetOf,
+  str,
   toIsoDate,
   toPlainText,
 } from "./composio-mail";
 import {
+  type ComposioAccount,
+  ComposioActionError,
   type ComposioClient,
+  ComposioKeyError,
+  type ComposioMailToolkit,
   ComposioSignatureError,
+  type ComposioTool,
   type ComposioToolkit,
   type ComposioWebhookEvent,
+  FileTooLargeError,
   type MailAccountRef,
   type MailAttachment,
   MailAuthError,
@@ -41,29 +51,21 @@ import {
   type MailSummary,
   type OutgoingMail,
 } from "./mail";
+import { readCapped } from "./read-capped";
+import { verifyStandardWebhook } from "./standard-webhooks";
 
 /** Composio trigger types for a new message. */
-export const COMPOSIO_MAIL_TRIGGERS: Record<ComposioToolkit, string> = {
+export const COMPOSIO_MAIL_TRIGGERS: Record<ComposioMailToolkit, string> = {
   gmail: "GMAIL_NEW_GMAIL_MESSAGE",
   outlook: "OUTLOOK_MESSAGE_TRIGGER",
 };
 
-/** How old (or how far ahead) a webhook timestamp may be, in seconds. */
-const WEBHOOK_TOLERANCE_SECONDS = 300;
-
-/** A connected account as a tool call names it. */
-export interface ComposioAccount {
-  connectedAccountId: string;
-  /** The user id it was linked for (`createConnectLink`'s `userId`). */
+/** One execution Composio answered, as `onExecute` hears of it. */
+export interface ComposioExecution {
   userId: string;
-}
-
-/** The client plus what only our connector uses (tool execution, file downloads). */
-export interface ComposioRestClient extends ComposioClient {
-  /** Runs one tool for a connected account; returns the tool's `data`. Throws `MailAuthError`/`MailError`. */
-  executeTool(slug: string, account: ComposioAccount, args: Record<string, unknown>): Promise<unknown>;
-  /** Downloads a file a tool returned as a URL (attachments). */
-  fetchFile(url: string): Promise<Uint8Array>;
+  toolkit: string;
+  slug: string;
+  ok: boolean;
 }
 
 export interface ComposioClientOptions {
@@ -73,26 +75,31 @@ export interface ComposioClientOptions {
   /** Auth configs to use; absent = find or create a Composio-managed one per toolkit. */
   gmailAuthConfigId?: string;
   outlookAuthConfigId?: string;
+  /** Auth configs of this server's own by toolkit (`COMPOSIO_AUTH_CONFIGS`): each wins over any other. */
+  authConfigs?: Record<string, string>;
+  /**
+   * Runs before every tool call, the billed ones Composio counts (this server's per-workspace cap, ADR 0107 §7); a
+   * throw stops the call before it reaches Composio.
+   */
+  beforeToolCall?: (call: { slug: string; userId: string }) => Promise<void>;
   baseUrl?: string;
   fetch?: typeof fetch;
   /** Clock for webhook timestamps (tests). */
   now?: () => number;
+  /**
+   * Told of every execution Composio answered (`ok` false: an error status or `successful: false`), never of one
+   * that didn't reach it: what Composio bills, which it has no API to read back (ADR 0103). A hook that throws
+   * changes nothing.
+   */
+  onExecute?: (execution: ComposioExecution) => void;
 }
 
-type Obj = Record<string, unknown>;
-
-const obj = (value: unknown): Obj =>
-  value && typeof value === "object" && !Array.isArray(value) ? (value as Obj) : {};
-const arr = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
-const str = (value: unknown): string | undefined =>
-  typeof value === "string" && value !== "" ? value : typeof value === "number" ? String(value) : undefined;
 /** Tool results sometimes nest the provider response under `response_data`. */
 const unwrap = (data: unknown): Obj => {
   const outer = obj(data);
   const inner = outer.response_data;
   return inner && typeof inner === "object" && !Array.isArray(inner) ? (inner as Obj) : outer;
 };
-const clampLimit = (limit: number | undefined) => Math.min(50, Math.max(1, Math.floor(limit ?? 20)));
 
 /** A connection that needs reconnecting (expired, revoked, deleted, refused by the provider). */
 const AUTH_BROKEN =
@@ -109,7 +116,7 @@ function cut(message: string): string {
 function toolError(slug: string, message: string): Error {
   const text = `Composio ${slug} failed: ${cut(message)}`;
   if (AUTH_BROKEN.test(message)) return new MailAuthError(text);
-  return new MailError(text, RETRYABLE.test(message));
+  return new ComposioActionError(text, RETRYABLE.test(message));
 }
 
 /** Gmail search terms: drops characters Gmail can't take inside a term. */
@@ -161,19 +168,20 @@ export function gmailSearchQuery(query: MailQuery): string {
   return parts.join(" ");
 }
 
-export function createComposioClient(options: ComposioClientOptions): ComposioRestClient {
+export function createComposioClient(options: ComposioClientOptions): ComposioClient {
   const http = options.fetch ?? fetch;
   const base = (options.baseUrl ?? "https://backend.composio.dev/api/v3.1").replace(/\/$/, "");
   const now = options.now ?? Date.now;
   const authConfigs = new Map<ComposioToolkit, Promise<string>>();
   if (options.gmailAuthConfigId) authConfigs.set("gmail", Promise.resolve(options.gmailAuthConfigId));
   if (options.outlookAuthConfigId) authConfigs.set("outlook", Promise.resolve(options.outlookAuthConfigId));
+  for (const [toolkit, id] of Object.entries(options.authConfigs ?? {})) authConfigs.set(toolkit, Promise.resolve(id));
 
   async function request(
     method: string,
     path: string,
     body?: unknown,
-    opts: { allowNotFound?: boolean } = {},
+    opts: { allowNotFound?: boolean; answered?: () => void } = {},
   ): Promise<Obj | null> {
     let res: Response;
     try {
@@ -189,6 +197,7 @@ export function createComposioClient(options: ComposioClientOptions): ComposioRe
     } catch (error) {
       throw new MailError(`could not reach Composio: ${error instanceof Error ? error.message : String(error)}`, true);
     }
+    opts.answered?.();
     if (opts.allowNotFound && res.status === 404) return null;
     const text = await res.text().catch(() => "");
     let json: unknown = {};
@@ -204,13 +213,16 @@ export function createComposioClient(options: ComposioClientOptions): ComposioRe
     const text2 = `Composio ${method} ${path.split("?")[0]} failed (${res.status}${slug ? ` ${slug}` : ""}): ${cut(message)}`;
     if (res.status === 429 || res.status >= 500) throw new MailError(text2, true);
     // 401/403 here is our project key, not the person's connection.
-    if (res.status === 401 || res.status === 403) throw new MailError(text2, false);
+    if (res.status === 401 || res.status === 403) throw new ComposioKeyError(text2);
     if (AUTH_BROKEN.test(`${message} ${slug ?? ""}`)) throw new MailAuthError(text2);
     throw new MailError(text2, false);
   }
 
   async function findOrCreateAuthConfig(toolkit: ComposioToolkit): Promise<string> {
-    const list = await request("GET", `/auth_configs?toolkit_slug=${toolkit}&is_composio_managed=true&limit=50`);
+    const list = await request(
+      "GET",
+      `/auth_configs?toolkit_slug=${encodeURIComponent(toolkit)}&is_composio_managed=true&limit=50`,
+    );
     const found = arr(list?.items)
       .map(obj)
       .find(
@@ -240,18 +252,71 @@ export function createComposioClient(options: ComposioClientOptions): ComposioRe
     return pending;
   }
 
-  async function executeTool(slug: string, account: ComposioAccount, args: Record<string, unknown>) {
-    const result = await request("POST", `/tools/execute/${encodeURIComponent(slug)}`, {
-      connected_account_id: account.connectedAccountId,
-      // Composio refuses a connected account without the user id it belongs to
-      // (400 ActionExecute_ConnectedAccountEntityIdRequired).
-      user_id: account.userId,
-      arguments: Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)),
-    });
+  /** `onExecute`, kept from changing what the execution returns or throws. */
+  function executed(slug: string, account: ComposioAccount, ok: boolean) {
+    try {
+      options.onExecute?.({ userId: account.userId, toolkit: account.toolkit, slug, ok });
+    } catch {}
+  }
+
+  async function executeTool(slug: string, account: ComposioAccount, args: Record<string, unknown>, version?: string) {
+    await options.beforeToolCall?.({ slug, userId: account.userId });
+    let answered = false;
+    let result: Obj | null = null;
+    try {
+      result = await request(
+        "POST",
+        `/tools/execute/${encodeURIComponent(slug)}`,
+        {
+          connected_account_id: account.connectedAccountId,
+          // Composio refuses a connected account without the user id it belongs to
+          // (400 ActionExecute_ConnectedAccountEntityIdRequired).
+          user_id: account.userId,
+          arguments: Object.fromEntries(Object.entries(args).filter(([, value]) => value !== undefined)),
+          ...(version ? { version } : {}),
+        },
+        {
+          answered: () => {
+            answered = true;
+          },
+        },
+      );
+    } finally {
+      if (answered) executed(slug, account, result !== null && result.successful !== false);
+    }
     if (!result || result.successful === false) {
       throw toolError(slug, str(result?.error) ?? "unknown error");
     }
     return result.data ?? {};
+  }
+
+  async function listTools(toolkit: ComposioToolkit, version: string): Promise<ComposioTool[]> {
+    const tools: ComposioTool[] = [];
+    let cursor: string | undefined;
+    for (let page = 0; page < 10; page++) {
+      const query = new URLSearchParams({
+        toolkit_slug: toolkit,
+        toolkit_versions: version,
+        include_deprecated: "true",
+        limit: "1000",
+        ...(cursor ? { cursor } : {}),
+      });
+      const result = await request("GET", `/tools?${query}`);
+      for (const item of arr(result?.items).map(obj)) {
+        const slug = str(item.slug);
+        if (!slug) continue;
+        const schema = obj(item.input_parameters);
+        tools.push({
+          slug,
+          description: str(item.description) ?? str(item.human_description) ?? "",
+          inputSchema: schema.type === "object" ? schema : { type: "object", ...schema },
+          tags: arr(item.tags).filter((tag): tag is string => typeof tag === "string"),
+        });
+      }
+      cursor = str(result?.next_cursor);
+      if (!cursor) break;
+    }
+    return tools;
   }
 
   async function mailboxAddress(toolkit: string, account: ComposioAccount): Promise<string | null> {
@@ -267,32 +332,16 @@ export function createComposioClient(options: ComposioClientOptions): ComposioRe
     return null;
   }
 
-  function signatureMatches(secret: string, signed: string, header: string): boolean {
-    const keys: (string | Uint8Array)[] = [secret];
-    // Standard Webhooks secrets (`whsec_<base64>`) sign with the decoded key.
-    if (secret.startsWith("whsec_")) keys.push(decodeBase64(secret.slice(6)));
-    const expected = keys.map((key) => createHmac("sha256", key).update(signed).digest());
-    return header
-      .split(" ")
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .some((part) => {
-        const comma = part.indexOf(",");
-        const version = comma === -1 ? "v1" : part.slice(0, comma);
-        if (version !== "v1") return false;
-        const received = Buffer.from(comma === -1 ? part : part.slice(comma + 1), "base64");
-        return expected.some((digest) => digest.length === received.length && timingSafeEqual(digest, received));
-      });
-  }
-
   return {
     executeTool,
+    listTools,
 
-    async fetchFile(url) {
+    async fetchFile(url, maxBytes = Number.POSITIVE_INFINITY) {
       if (!/^https:\/\//i.test(url)) throw new MailError("Composio returned a file URL that is not https", false);
       let res: Response;
       try {
-        res = await http(url);
+        // A presigned link answers at its own address: a redirect could lead anywhere, our own network included.
+        res = await http(url, { redirect: "error" });
       } catch (error) {
         throw new MailError(
           `could not download the file: ${error instanceof Error ? error.message : String(error)}`,
@@ -300,7 +349,9 @@ export function createComposioClient(options: ComposioClientOptions): ComposioRe
         );
       }
       if (!res.ok) throw new MailError(`could not download the file (${res.status})`, res.status >= 500);
-      return new Uint8Array(await res.arrayBuffer());
+      const data = await readCapped(res, maxBytes);
+      if (!data) throw new FileTooLargeError(maxBytes);
+      return data;
     },
 
     async createConnectLink(input) {
@@ -324,14 +375,17 @@ export function createComposioClient(options: ComposioClientOptions): ComposioRe
       if (raw === "INITIALIZING" || raw === "INITIATED") return { status: "pending", address: null };
       if (raw === "EXPIRED") return { status: "expired", address: null };
       if (raw !== "ACTIVE" || account.is_disabled === true) return { status: "failed", address: null };
-      if (options?.readAddress === false) return { status: "active", address: null };
+      // Only the name from the account's state: the rest of it holds its credentials.
+      const displayName =
+        str(obj(obj(account.state).val).displayName)
+          ?.trim()
+          .slice(0, 120) || null;
+      if (options?.readAddress === false) return { status: "active", address: null, displayName };
       try {
+        const toolkit = (str(obj(account.toolkit).slug) ?? "").toLowerCase();
         // Not the `user_id` in this response: Composio deprecated it and stops returning it.
-        const address = await mailboxAddress((str(obj(account.toolkit).slug) ?? "").toLowerCase(), {
-          connectedAccountId: id,
-          userId,
-        });
-        return { status: "active", address };
+        const address = await mailboxAddress(toolkit, { connectedAccountId: id, userId, toolkit });
+        return { status: "active", address, displayName };
       } catch (error) {
         if (error instanceof MailAuthError) return { status: "expired", address: null };
         throw error;
@@ -372,15 +426,7 @@ export function createComposioClient(options: ComposioClientOptions): ComposioRe
 
     verifyWebhook(headers, rawBody) {
       const secret = options.webhookSecret;
-      const id = headers.get("webhook-id");
-      const timestamp = headers.get("webhook-timestamp");
-      const signature = headers.get("webhook-signature");
-      if (!secret || !id || !timestamp || !signature) throw new ComposioSignatureError();
-      const seconds = Number(timestamp);
-      if (!Number.isFinite(seconds) || Math.abs(now() / 1000 - seconds) > WEBHOOK_TOLERANCE_SECONDS) {
-        throw new ComposioSignatureError();
-      }
-      if (!signatureMatches(secret, `${id}.${timestamp}.${rawBody}`, signature)) throw new ComposioSignatureError();
+      if (!secret || !verifyStandardWebhook(secret, headers, rawBody, now())) throw new ComposioSignatureError();
       let payload: unknown;
       try {
         payload = JSON.parse(rawBody);
@@ -583,7 +629,7 @@ function sentId(data: unknown): string | null {
   return str(result.id) ?? str(result.messageId) ?? str(result.message_id) ?? null;
 }
 
-function gmailProvider(client: ComposioRestClient, account: ComposioAccount): MailProvider {
+function gmailProvider(client: ComposioClient, account: ComposioAccount): MailProvider {
   const exec = (slug: string, args: Obj = {}) => client.executeTool(slug, account, { user_id: "me", ...args });
   const read = async (id: string, format: "full" | "metadata" = "full") =>
     gmailMessage(unwrap(await exec("GMAIL_FETCH_MESSAGE_BY_MESSAGE_ID", { message_id: id, format })));
@@ -656,7 +702,7 @@ function gmailProvider(client: ComposioRestClient, account: ComposioAccount): Ma
         attachment_id: freshId,
         file_name: filename,
       });
-      const file = await extractFile(client, data);
+      const file = await composioFile(client, data);
       return {
         filename,
         contentType: meta?.contentType ?? file.contentType ?? "application/octet-stream",
@@ -827,7 +873,7 @@ const odataString = (value: string) => `'${value.replace(/'/g, "''")}'`;
 const kqlPhrase = (value: string) => value.replace(/["\\]/g, " ").replace(/\s+/g, " ").trim();
 const day = (iso: string) => new Date(iso).toISOString().slice(0, 10);
 
-function outlookProvider(client: ComposioRestClient, account: ComposioAccount): MailProvider {
+function outlookProvider(client: ComposioClient, account: ComposioAccount): MailProvider {
   const exec = (slug: string, args: Obj = {}) => client.executeTool(slug, account, { user_id: "me", ...args });
 
   async function listAttachments(messageId: string): Promise<MailAttachment[]> {
@@ -966,7 +1012,7 @@ function outlookProvider(client: ComposioRestClient, account: ComposioAccount): 
     async attachment(messageId, attachmentId) {
       const meta = (await listAttachments(messageId)).find((item) => item.id === attachmentId);
       const filename = meta?.filename ?? "attachment";
-      const file = await extractFile(
+      const file = await composioFile(
         client,
         await exec("OUTLOOK_DOWNLOAD_OUTLOOK_ATTACHMENT", {
           message_id: messageId,
@@ -1030,8 +1076,8 @@ function outlookProvider(client: ComposioRestClient, account: ComposioAccount): 
 }
 
 /** A file from a tool result: inline base64 (`data`, `contentBytes`…) or a download URL (`s3url`…). */
-async function extractFile(
-  client: ComposioRestClient,
+export async function composioFile(
+  client: Pick<ComposioClient, "fetchFile">,
   data: unknown,
 ): Promise<{ data: Uint8Array; contentType?: string }> {
   const outer = unwrap(data);
@@ -1057,13 +1103,17 @@ async function extractFile(
  * Gmail and Outlook mailboxes through Composio tools (`account.externalAccountId` is the connected
  * account, `account.externalUserId` the user id it belongs to).
  */
-export function createComposioMailConnector(client: ComposioRestClient): MailConnector {
+export function createComposioMailConnector(client: ComposioClient): MailConnector {
   return {
     async open(account: MailAccountRef) {
       if (account.via !== "composio" || !account.externalAccountId || !account.externalUserId) {
         throw new MailError(`mail account ${account.id} is not connected through Composio`, false);
       }
-      const ref = { connectedAccountId: account.externalAccountId, userId: account.externalUserId };
+      const ref = {
+        connectedAccountId: account.externalAccountId,
+        userId: account.externalUserId,
+        toolkit: account.provider,
+      };
       if (account.provider === "gmail") return gmailProvider(client, ref);
       if (account.provider === "outlook") return outlookProvider(client, ref);
       throw new MailError(`Composio does not serve ${account.provider} mailboxes`, false);

@@ -8,7 +8,8 @@ import { type AgentAppearance, setAgentAppearance, validateAppearance } from "./
 import { canTalkTo, talksToAgents } from "./audience";
 import { setAgentBrain } from "./brain-settings";
 import { requireChannelAccess } from "./channels";
-import { customScope } from "./connectors/custom";
+import { prefixService, toolPrefixOf, toolPrefixOfConnection } from "./connectors/connections";
+import { customScope, isCustom } from "./connectors/custom";
 import { type ContextDeps, schedulesOf } from "./context/summaries";
 import { publishDelivery } from "./delivery";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
@@ -184,7 +185,7 @@ export interface DraftPlace {
 /** What a draft may name here: channels, the workspace's connected apps, the asker's own mailboxes. */
 interface Offer {
   channels: { id: string; name: string }[];
-  apps: { id: string; connector: string; label: string }[];
+  apps: { id: string; connector: string; label: string; toolPrefix: string }[];
   mailboxes: { id: string; address: string; label: string; provider: string; ownerUserId: string }[];
   /** The conversation the card goes in, when it is a channel the agent can join (a routine reports there). */
   here: { id: string; name: string } | null;
@@ -246,9 +247,11 @@ async function offerOf(db: Database, at: DraftPlace): Promise<Offer> {
         id: connectorConnections.id,
         connector: connectorConnections.connector,
         label: connectorConnections.label,
+        toolPrefix: connectorConnections.toolPrefix,
       })
       .from(connectorConnections)
-      .where(and(eq(connectorConnections.orgId, at.orgId), isNull(connectorConnections.revokedAt))),
+      .where(and(eq(connectorConnections.orgId, at.orgId), isNull(connectorConnections.revokedAt)))
+      .orderBy(asc(connectorConnections.createdAt)),
     at.personId
       ? db
           .select({
@@ -278,7 +281,8 @@ async function offerOf(db: Database, at: DraftPlace): Promise<Offer> {
   };
 }
 
-const appName = (a: Offer["apps"][number]) => (a.connector === "custom" ? a.label : a.connector);
+// A server by address (`custom:<id>`) goes by its name, which also tells its accounts apart.
+const appName = (a: Offer["apps"][number]) => (isCustom(a) ? `"${a.label}"` : a.connector);
 
 /** Everything a draft may name here, for the agent to get it right at once. */
 const offerText = (o: Offer) =>
@@ -397,9 +401,21 @@ export async function checkAgentDraft(
   const mail = new Map<string, ProposedMailbox>();
   for (const raw of list(input.access)) {
     const entry = (raw && typeof raw === "object" ? raw : {}) as { connector?: unknown; level?: unknown };
-    const asked = str(entry.connector).toLowerCase();
+    const asked = str(entry.connector).trim().toLowerCase();
     const level = entry.level === "write" ? "write" : "read";
-    const app = offer.apps.find((c) => c.connector.toLowerCase() === asked || c.label.toLowerCase() === asked);
+    // Its name ("Stripe (Acme)"), else the service: a catalog id, or the start of its tools' names (`stripe_2` is a
+    // second Stripe account).
+    const byName = offer.apps.filter((c) => c.label.toLowerCase() === asked);
+    const service = toolPrefixOf(asked);
+    const apps = byName.length
+      ? byName
+      : offer.apps.filter((c) => c.connector === asked || prefixService(toolPrefixOfConnection(c)) === service);
+    if (apps.length > 1) {
+      throw new ValidationError(
+        `"${asked}" is connected more than once: name one of ${apps.map((c) => `"${c.label}"`).join(", ")}.`,
+      );
+    }
+    const [app] = apps;
     const box = app ? undefined : mailboxNamed(offer.mailboxes, asked);
     if (app) access.set(app.id, level);
     else if (box) mail.set(box.id, { accountId: box.id, address: box.address, level, ownerUserId: box.ownerUserId });

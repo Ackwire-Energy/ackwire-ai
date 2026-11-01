@@ -5,6 +5,7 @@ import {
   useAiAccounts,
   useAiStatus,
   useAuthConfig,
+  useComposioUsage,
   useComputerSetup,
   useConnections,
   useCredentials,
@@ -22,6 +23,7 @@ import {
   useUpdateSettings,
   useUsageReport,
 } from "@agenteschat/client";
+import { composioUsageText, showsComposioUsage } from "@agenteschat/client/lib/composio";
 import { computerEdition } from "@agenteschat/client/lib/computer";
 import { formatPercent, formatShortDate, formatUsd, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -94,17 +96,23 @@ import { SETTINGS_GROUPS, SETTINGS_SECTIONS, type SettingsSection } from "./sett
 export function SettingsPage({
   section = "general",
   connected,
+  outcome,
   review,
   mail,
   account,
   machineId,
+  install,
 }: {
   section?: SettingsSection;
   connected?: string;
+  /** Back from OAuth: what came in (`connected`, `reconnected`, `same_account`). */
+  outcome?: string;
   review?: boolean;
   /** Back from Gmail/Outlook: `connected` or `failed`, and the mailbox (`account`). */
   mail?: string;
   account?: string;
+  /** Skills, back from connecting GitHub in Instalar skill: the link to read again. */
+  install?: string;
   /** Computadores → one computer (`/settings/computers/{id}`). */
   machineId?: string;
 }) {
@@ -185,9 +193,9 @@ export function SettingsPage({
         {current === "media" && <MediaSettingsSection />}
         {current === "access" && <AccessMatrixSection />}
         {current === "connectors" && (
-          <ConnectorsSection connected={connected} review={review} mail={mail} account={account} />
+          <ConnectorsSection connected={connected} outcome={outcome} review={review} mail={mail} account={account} />
         )}
-        {current === "skills" && <SkillsSection />}
+        {current === "skills" && <SkillsSection install={install} connected={connected} />}
         {current === "keys" && (
           <>
             <AiAccountsSection />
@@ -947,9 +955,16 @@ function UsageSection() {
   const { org } = useOrg();
   const allowed = can(org, "view_usage");
   const report = useUsageReport(org.id, allowed);
+  // Calls, not money: every member sees them.
+  const composio = useComposioUsage(org.id);
   return (
     <>
       <PlanUsageCards />
+      {composio.data && showsComposioUsage(composio.data) && (
+        <Card>
+          <span className="small">{composioUsageText(t, i18n.language, composio.data)}</span>
+        </Card>
+      )}
       {allowed && (
         <Card aria-labelledby="sec-usage">
           <h2 id="sec-usage" className="ac-card__title">

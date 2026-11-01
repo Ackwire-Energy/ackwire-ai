@@ -1,5 +1,6 @@
 import type { Proposal } from "@agenteschat/client";
 import { ApiError, useDecideProposal, useMemory, useProposals } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { proposalTitle } from "@agenteschat/client/lib/proposals";
 import {
@@ -41,7 +42,7 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
   const g = agentGrammar(t, agent.name);
   const onError = (error: unknown) => {
     if (error instanceof ApiError && error.status === 409) setStale(true);
-    else toast.show(error instanceof Error ? error.message : t("common.unknownError"), "error");
+    else toast.show(errorText(t, error), "error");
   };
   const accept = () =>
     decide.mutate(

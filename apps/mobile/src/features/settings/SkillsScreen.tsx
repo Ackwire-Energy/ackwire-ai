@@ -1,9 +1,29 @@
-import type { SkillChoice, SkillDetail, SkillFile, SkillSkipped } from "@agenteschat/client";
-import { useSkill, useSkillAction, useSkills, useSkillUsage } from "@agenteschat/client";
+import type { Connection, SkillChoice, SkillDetail, SkillFile, SkillSkipped, SkillVia } from "@agenteschat/client";
+import {
+  keys,
+  useCatalog,
+  useGitHubRepos,
+  useSkill,
+  useSkillAction,
+  useSkills,
+  useSkillUsage,
+} from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { pickSkills, skillPickOf, skippedSkillText } from "@agenteschat/client/lib/skills";
+import {
+  githubRepoLink,
+  hiddenRepoOf,
+  hiddenRepoText,
+  pickSkills,
+  searchRepos,
+  skillPickOf,
+  skillRefusalText,
+  skillSourceViaText,
+  skillViaText,
+  skippedSkillText,
+} from "@agenteschat/client/lib/skills";
+import { useQueryClient } from "@tanstack/react-query";
 import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
 import { router } from "expo-router";
@@ -11,11 +31,24 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, SearchField, Segmented, Text, useToast } from "@/ui";
+import {
+  Button,
+  GroupedFooter,
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
+  SearchField,
+  Segmented,
+  Text,
+  useToast,
+} from "@/ui";
+import { SocialMark } from "@/ui/auth/SocialMarks";
 import { Note } from "../ai/parts";
 import { MessageText } from "../chat/MessageText";
+import { ConnectSheet } from "../connectors/ConnectSheet";
 import { useColors } from "../shared/hooks";
 import { goBack, successHaptic } from "../shared/parts";
+import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { TextArea } from "../shared/TextArea";
 import { useStepText } from "./hooks";
 import { isGithubSkillLink, SKILLS_INLINE, searchSkills, skillLine, skillSourceKey } from "./logic";
@@ -124,6 +157,7 @@ export function SkillScreen({ id }: { id: string }) {
   const usage = useSkillUsage(orgId, admin);
   const s = skill.data;
   const users = usage.get(id) ?? [];
+  const via = s ? skillSourceViaText(t, s) : null;
   const subtitle = s
     ? [
         t(`skills.source.${skillSourceKey(s)}`),
@@ -141,7 +175,8 @@ export function SkillScreen({ id }: { id: string }) {
           successHaptic();
           toast({ title: t("skills.refreshed", { name: item.name }), icon: "check" });
         },
-        onError: failed,
+        // A repository none of the workspace's GitHub reads, as Instalar skill says it.
+        onError: (e) => toast({ title: skillRefusalText(t, e, can(org, "manage_connectors")), icon: "x" }),
       },
     );
   const remove = (item: SkillDetail) =>
@@ -189,6 +224,11 @@ export function SkillScreen({ id }: { id: string }) {
       {s ? (
         <>
           {s.description ? <GroupedFooter>{s.description}</GroupedFooter> : null}
+          {via ? (
+            <View style={styles.note}>
+              <Note icon={<SocialMark provider="github" color={c.muted} size={15} />}>{via}</Note>
+            </View>
+          ) : null}
           <Gap />
           <GroupedList>
             <View style={styles.page}>
@@ -241,17 +281,40 @@ export function SkillScreen({ id }: { id: string }) {
 
 type InstallTab = "github" | "zip" | "write";
 
+/** How many of the connected GitHub's repositories show at once: the search finds the rest. */
+const REPOS_SHOWN = 30;
+
 /**
  * "Instalar skill", as the web's dialog: from a GitHub link, a .zip from Arquivos, or written here. "Instalar" in the
  * bar; while it works, the step it is on; done, the skill's page in its place. A link holding several skills lists
  * them under the field, each checked to install, and "Instalar" installs those. Those it holds that can't be installed
- * follow, with why.
+ * follow, with why. With GitHub connected, its repositories follow the field ("Do GitHub conectado"): one tapped is
+ * read to pick its skills. A private repository is read through the workspace's GitHub, and the screen says which
+ * connection read it; when none can, "Conectar o GitHub" opens the connect sheet over it (or it says whom to ask),
+ * and the link is read again once GitHub is connected.
  */
 export function InstallSkillScreen() {
+  return (
+    <SheetHostProvider>
+      <InstallSkill />
+    </SheetHostProvider>
+  );
+}
+
+function InstallSkill() {
   const { t } = useTranslation();
+  const c = useColors();
   const toast = useToast();
-  const { orgId } = useOrg();
+  const qc = useQueryClient();
+  const sheet = useSheet();
+  const { orgId, org } = useOrg();
   const action = useSkillAction(orgId);
+  const repos = useGitHubRepos(orgId);
+  const catalog = useCatalog();
+  const github = catalog.data?.connectors.find((d) => d.id === "github");
+  const [hidden, setHidden] = useState<ReturnType<typeof hiddenRepoOf>>(null);
+  const [via, setVia] = useState<SkillVia | null>(null);
+  const [q, setQ] = useState("");
   const [tab, setTab] = useState<InstallTab>("github");
   const [url, setUrl] = useState("");
   const [zip, setZip] = useState<{ uri: string; name: string } | null>(null);
@@ -276,6 +339,51 @@ export function InstallSkillScreen() {
   };
   const onError = (e: unknown) => setError(errorText(t, e));
   const togglePick = (paths: string[], on: boolean) => setPicked(pickSkills(picked, paths, on));
+  /** Reads a GitHub link: one skill installs at once, unless `list`; several (or `list`) are listed to pick. */
+  const read = (link: string, list = false) => {
+    setError(null);
+    setHidden(null);
+    action.mutate(
+      { type: "import", input: list ? { url: link, list } : { url: link } },
+      {
+        onSuccess: (result) => {
+          const found = skillPickOf(result);
+          if (!found) return done(result);
+          setChoices(found.choices);
+          setSkipped(found.skipped);
+          setVia(found.via);
+          setPicked(new Set());
+        },
+        onError: (e) => {
+          const missing = hiddenRepoOf(e);
+          if (missing) setHidden(missing);
+          else onError(e);
+        },
+      },
+    );
+  };
+  const pickRepo = (fullName: string) => {
+    const link = githubRepoLink(fullName);
+    setUrl(link);
+    setChoices(null);
+    read(link, true);
+  };
+  const mayConnect = can(org, "manage_connectors") && Boolean(github);
+  const said = hidden ? hiddenRepoText(t, hidden, mayConnect) : null;
+  const connect = () => {
+    if (!github) return;
+    const link = url.trim();
+    // Opens on connecting, even over a connection GitHub refuses (a connected service opens on who uses it).
+    sheet.open(<ConnectSheet def={github} start="connect" />, {
+      // Closed with GitHub connected: the link again, to pick.
+      onClose: () => {
+        const now = qc.getQueryData<Connection[]>(keys.connections(orgId)) ?? [];
+        if (now.some((x) => x.connector === "github" && !x.revokedAt)) read(link, true);
+      },
+    });
+  };
+  const found = searchRepos(repos.data, q).flatMap((a) => a.repositories);
+  const total = (repos.data?.accounts ?? []).reduce((n, a) => n + a.repositories.length, 0);
   const pickZip = async () => {
     const res = await DocumentPicker.getDocumentAsync({
       type: ["application/zip", "application/x-zip-compressed"],
@@ -296,14 +404,7 @@ export function InstallSkillScreen() {
         return;
       }
       if (!choices) {
-        const onSuccess = (result: unknown) => {
-          const found = skillPickOf(result);
-          if (!found) return done(result);
-          setChoices(found.choices);
-          setSkipped(found.skipped);
-          setPicked(new Set());
-        };
-        action.mutate({ type: "import", input: { url: url.trim() } }, { onSuccess, onError });
+        read(url.trim());
         return;
       }
       if (picked.size === 0) {
@@ -376,6 +477,7 @@ export function InstallSkillScreen() {
             onChangeText={(next) => {
               setUrl(next);
               setChoices(null);
+              setHidden(null);
             }}
             placeholder="https://github.com/…"
             multiline={false}
@@ -390,6 +492,27 @@ export function InstallSkillScreen() {
           <GroupedFooter>
             {choices ? t("skills.pickLead", { count: choices.length + skipped.length }) : t("skills.githubHelp")}
           </GroupedFooter>
+          {said ? (
+            <View style={styles.hidden}>
+              <Note icon="lock" live>
+                {said.text}
+              </Note>
+              {said.connect ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  label={t("skills.hidden.connectButton")}
+                  leading={(color) => <SocialMark provider="github" color={color} size={16} />}
+                  onPress={connect}
+                />
+              ) : null}
+            </View>
+          ) : null}
+          {choices && via ? (
+            <View style={styles.note}>
+              <Note icon={<SocialMark provider="github" color={c.muted} size={15} />}>{skillViaText(t, via, url)}</Note>
+            </View>
+          ) : null}
           {choices ? (
             <GroupedList>
               <GroupedRow
@@ -416,6 +539,38 @@ export function InstallSkillScreen() {
                 <GroupedRow key={s.path} label={s.path} sub={skippedSkillText(t, s)} subLines={3} disabled />
               ))}
             </GroupedList>
+          ) : repos.data?.connected ? (
+            <>
+              <GroupedHeader>{t("skills.connectedRepos")}</GroupedHeader>
+              {total > SKILLS_INLINE ? (
+                <View style={styles.search}>
+                  <SearchField
+                    value={q}
+                    onChangeText={setQ}
+                    placeholder={t("repos.search")}
+                    accessibilityLabel={t("repos.search")}
+                  />
+                </View>
+              ) : null}
+              {found.length > 0 ? (
+                <GroupedList>
+                  {found.slice(0, REPOS_SHOWN).map((r) => (
+                    <GroupedRow
+                      key={r.fullName}
+                      icon={r.private ? "lock" : "globe"}
+                      label={r.fullName}
+                      sub={r.private ? t("repos.private") : t("repos.public")}
+                      chevron
+                      disabled={busy}
+                      onPress={() => pickRepo(r.fullName)}
+                    />
+                  ))}
+                </GroupedList>
+              ) : (
+                <GroupedFooter>{q.trim() ? t("repos.noMatch", { q: q.trim() }) : t("repos.none")}</GroupedFooter>
+              )}
+              {found.length > REPOS_SHOWN ? <GroupedFooter>{t("skills.reposMore")}</GroupedFooter> : null}
+            </>
           ) : null}
         </>
       ) : tab === "zip" ? (
@@ -558,4 +713,5 @@ const styles = StyleSheet.create({
   page: { paddingHorizontal: 16, paddingVertical: 14 },
   tabs: { paddingTop: 10, paddingHorizontal: 4 },
   error: { paddingTop: 8, paddingHorizontal: 16 },
+  hidden: { gap: 12, paddingHorizontal: 4, paddingTop: 10, alignItems: "flex-start" },
 });

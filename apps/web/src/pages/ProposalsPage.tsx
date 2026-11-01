@@ -1,5 +1,6 @@
 import type { Proposal } from "@agenteschat/client";
 import { ApiError, useDecideProposal, useProposals } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { relativeTime, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { proposalTarget, proposalTitle, proposerOf } from "@agenteschat/client/lib/proposals";
@@ -37,7 +38,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
   const onDecideError = (error: unknown) => {
     if (error instanceof ApiError && error.status === 409)
       setStaleError(t(current && !isText(current) ? "proposals.staleErrorAgent" : "proposals.staleError"));
-    else toast.show(error instanceof Error ? error.message : t("common.unknownError"), "error");
+    else toast.show(errorText(t, error, i18n.language), "error");
   };
 
   const preferred = list.find((p) => p.agentId === agentId && p.status === "pending") ?? list[0];

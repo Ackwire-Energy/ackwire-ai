@@ -5,13 +5,15 @@ import { useTranslation } from "react-i18next";
 import type { RouterContext } from "@/app/router-context";
 import { ContextMenuHost } from "@/components/DesktopMenus";
 import { DesktopDragStrip } from "@/components/DesktopTitleBar";
-import { askForPhone, asksForPhone, inDesktopApp, pageReady, routeNewWindowLinks } from "@/lib/desktop";
+import { ErrorScreen } from "@/components/ErrorScreen";
+import { askForPhone, asksForPhone, inDesktopApp, pageReadyAfterPaint, routeNewWindowLinks } from "@/lib/desktop";
 import { dispatchPushOpen } from "@/lib/push-open";
 import { listenForPushOpens } from "@/lib/web-push";
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   component: Root,
   notFoundComponent: NotFound,
+  errorComponent: ErrorScreen,
 });
 
 function Root() {
@@ -19,9 +21,7 @@ function Root() {
   const inWorkspace = useRouterState({ select: (s) => s.location.pathname.startsWith("/org/") });
   const router = useRouter();
   // In the app: once this first screen is on the glass, the app's cover over the window goes.
-  useEffect(() => {
-    if (inDesktopApp()) requestAnimationFrame(() => requestAnimationFrame(pageReady));
-  }, []);
+  useEffect(pageReadyAfterPaint, []);
   // In the app: a link to another site opens in the browser, one to this server in the window (main_window.rs).
   useEffect(() => {
     const root = document.getElementById("root");

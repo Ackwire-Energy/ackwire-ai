@@ -308,7 +308,7 @@ export function activityOf(
   if (group === "browser") return { kind: "browsing", subject: null, text: "Browsing the web" };
   if (group === "desktop") return { kind: "computer", subject: null, text: "Using the computer" };
   if (group === "sandbox" || group === "github") return { kind: "coding", subject: null, text: "Coding" };
-  if (group === "drive" || group === "gdrive") return { kind: "files", subject: null, text: "Working on files" };
+  if (group === "drive") return { kind: "files", subject: null, text: "Working on files" };
   if (group === "wiki") return { kind: "wiki", subject: null, text: "Writing in the wiki" };
   if (["issues", "linear", "calendar", "schedule", "forum"].includes(group)) {
     return { kind: "planning", subject: null, text: "Organizing tasks" };

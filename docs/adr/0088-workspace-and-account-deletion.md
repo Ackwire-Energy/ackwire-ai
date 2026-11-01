@@ -144,3 +144,7 @@ One migration, `0138_workspace_deletion`: `organizations.deletion_due_at`, `dele
 - **Operator routes to delete or restore workspaces and delete accounts.** By hand until the first real request.
 - **Deleting abandoned onboardings after a while.** Not now: where new workspaces wait for their first plan, one waiting is no computer request (ADR 0079 §2), so one left behind costs little.
 - **Checking the typed name on the server.** The proof guards the server; the name only stops a wrong pick in the one app that deletes.
+
+## Addendum (2026-10-31): connectors through Composio
+
+Amended by ADR 0107. The purge (`revokeGrants`) also deletes the workspace's connector accounts at Composio (`composio_account_id`, disconnected ones included), and the account of every Connect Link it made for one (`oauth_states`), never revoking them there: Composio's Google and Microsoft apps may share one grant with another workspace's connection of the same account. They go before the mailboxes, and a mailbox's grant (§3) also stays while a live connector on the same provider's app, of that account or of one it can't name, may share it. Each is marked as it goes; one Composio refuses keeps the workspace for the next try, as a mailbox does.

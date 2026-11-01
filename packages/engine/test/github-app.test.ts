@@ -170,9 +170,9 @@ describe("GitHub App installations are bound to one organization", () => {
       "account that started it",
     );
     await completeGitHubAppInstall(w.deps, w.ana, { state, code, installationId: 1 });
-    await expect(completeGitHubAppInstall(w.deps, w.ana, { state, code, installationId: 1 })).rejects.toThrow(
-      "invalid or expired",
-    );
+    await expect(completeGitHubAppInstall(w.deps, w.ana, { state, code, installationId: 1 })).rejects.toMatchObject({
+      code: "oauth.link_used",
+    });
 
     const member = await addMember(w.db, w.orgA.id, "member", "caio");
     await expect(startGitHubAppInstall(w.deps, member.id, w.orgA.id)).rejects.toThrow();

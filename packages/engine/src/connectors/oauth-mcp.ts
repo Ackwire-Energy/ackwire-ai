@@ -1,6 +1,7 @@
 import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
 import { openSecret, sealSecret } from "../crypto";
 import { ValidationError } from "../errors";
+import { oneLine } from "../mail/text";
 import { assertPublicHttpsUrl, type ResolveHost } from "../net-guard";
 import type { ConnectorDeps } from "./connections";
 
@@ -32,7 +33,11 @@ export interface AuthServerMetadata {
   token_endpoint: string;
   registration_endpoint?: string;
   code_challenge_methods_supported?: string[];
+  scopes_supported?: string[];
+  token_endpoint_auth_methods_supported?: string[];
 }
+
+const AUTH_METHODS: readonly string[] = ["none", "client_secret_post", "client_secret_basic"];
 
 const http = (deps: McpOAuthDeps) => deps.http ?? fetch;
 
@@ -47,12 +52,21 @@ async function getJson(deps: McpOAuthDeps, url: string): Promise<Record<string, 
   }
 }
 
+/** The scopes a metadata document lists (`scopes_supported`; servers send anything). */
+const scopesOf = (meta: { scopes_supported?: unknown } | null) => {
+  const listed = meta?.scopes_supported;
+  return Array.isArray(listed) ? listed.filter((x): x is string => typeof x === "string") : [];
+};
+
 /** The canonical resource URI of an MCP server (RFC 8707): no fragment, no trailing slash. */
 export function canonicalResource(serverUrl: string) {
   const u = new URL(serverUrl);
   u.hash = "";
   return u.toString().replace(/\/$/, "");
 }
+
+/** One MCP address however it was typed: no trailing slash, any case (mirrors the apps' `sameServer`). */
+export const serverKey = (serverUrl: string) => serverUrl.replace(/\/+$/, "").toLowerCase();
 
 /** Asks the server who it is without credentials and reads where its OAuth lives. */
 export async function probeMcpServer(deps: McpOAuthDeps, serverUrl: string): Promise<ServerProbe> {
@@ -81,17 +95,20 @@ export async function probeMcpServer(deps: McpOAuthDeps, serverUrl: string): Pro
   const fromHeader = /resource_metadata="([^"]+)"/.exec(header)?.[1];
   const base = new URL(serverUrl);
   const path = base.pathname.replace(/\/$/, "");
-  const candidates = [
-    ...(fromHeader ? [fromHeader] : []),
-    `${base.origin}/.well-known/oauth-protected-resource${path}`,
-    `${base.origin}/.well-known/oauth-protected-resource`,
-  ];
+  const root = `${base.origin}/.well-known/oauth-protected-resource`;
+  const candidates = [...(fromHeader ? [fromHeader] : []), `${root}${path}`, root];
   for (const url of candidates) {
     const meta = await getJson(deps, url).catch(() => null);
     const servers = meta?.authorization_servers;
     if (Array.isArray(servers) && typeof servers[0] === "string") {
-      const supported = meta?.scopes_supported;
-      const scopes = Array.isArray(supported) ? supported.filter((x): x is string => typeof x === "string") : [];
+      let scopes = scopesOf(meta);
+      // Square lists its scopes only at the root, and refuses an authorization that asks for none.
+      if (scopes.length === 0 && url !== root) {
+        const top = await getJson(deps, root).catch(() => null);
+        if (Array.isArray(top?.authorization_servers) && top.authorization_servers[0] === servers[0]) {
+          scopes = scopesOf(top);
+        }
+      }
       const resource = typeof meta?.resource === "string" ? meta.resource : canonicalResource(serverUrl);
       return { kind: "oauth", resource, issuer: servers[0], scopes };
     }
@@ -130,13 +147,49 @@ export async function authServerMetadata(deps: McpOAuthDeps, issuer: string): Pr
 
 const clientAad = (orgId: string, id: string) => `oauth-client|${orgId}|${id}`;
 
+/** It has OAuth but only takes clients it approved; `detail`: how it refused our registration, in its words. */
+export interface NotApproved {
+  notApproved: true;
+  detail?: string;
+}
+
+/**
+ * A refused registration's own words for the admin (RFC 7591 §3.2.2): its `error` and `error_description`, on one
+ * line and short. Only those two fields: anything else it sends back stays out.
+ */
+function refusalDetail(text: string): Pick<NotApproved, "detail"> {
+  let body: { error?: unknown; error_description?: unknown } | null;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return {};
+  }
+  const detail = oneLine(
+    [body?.error, body?.error_description]
+      .map((x) => (typeof x === "string" ? x.replace(/\p{Cc}/gu, " ").trim() : ""))
+      .filter(Boolean)
+      .join(": "),
+  );
+  return detail ? { detail } : {};
+}
+
+/**
+ * The scope to ask for: the protected resource's, with offline_access when the authorization server lists it
+ * (Vercel gives a refresh token only for it). Never offline_access alone: no scope gets the server's defaults, and
+ * offline_access alone would replace them.
+ */
+export function oauthScope(meta: AuthServerMetadata, scopes: string[]): string | null {
+  const offline = scopes.length > 0 && scopesOf(meta).includes("offline_access");
+  return (offline ? [...new Set([...scopes, "offline_access"])] : scopes).join(" ") || null;
+}
+
 /**
  * The client agentes.chat registered with this issuer for this org, or a new
  * one (Dynamic Client Registration). A registration is reused only while an
  * active connection uses it: once every connection to that server is gone,
  * the server may have dropped the client (Supabase answered "Unrecognized
  * client_id"), so we register again and replace the row. Null when the server
- * doesn't offer PKCE S256 or the registration fails; `not_approved` when it
+ * doesn't offer PKCE S256 or the registration fails; `NotApproved` when it
  * has OAuth but only takes clients it approved (no registration for us, or a
  * refused one).
  */
@@ -145,8 +198,8 @@ export async function ensureOAuthClient(
   orgId: string,
   issuer: string,
   meta: AuthServerMetadata,
-  input: { redirectUri: string; scopes: string[] },
-): Promise<OAuthClientRow | "not_approved" | null> {
+  input: { redirectUri: string; scope: string | null },
+): Promise<OAuthClientRow | NotApproved | null> {
   const [existing] = await deps.db
     .select()
     .from(oauthClients)
@@ -162,10 +215,19 @@ export async function ensureOAuthClient(
   const methods = meta.code_challenge_methods_supported;
   if (methods && !methods.includes("S256")) return null;
   const endpoint = meta.registration_endpoint;
-  if (!endpoint) return "not_approved";
+  if (!endpoint) return { notApproved: true };
   await assertPublicHttpsUrl(endpoint, deps.resolveHost);
-  const register = (clientName: string) =>
-    http(deps)(endpoint, {
+  const { scope } = input;
+  // A public client with PKCE where it takes one (or doesn't say), else one with the secret it gives us.
+  const supported = meta.token_endpoint_auth_methods_supported;
+  const method =
+    !Array.isArray(supported) || supported.length === 0 || supported.includes("none")
+      ? "none"
+      : supported.includes("client_secret_post")
+        ? "client_secret_post"
+        : "client_secret_basic";
+  const register = async (clientName: string) => {
+    const res = await http(deps)(endpoint, {
       method: "POST",
       redirect: "error",
       headers: { "content-type": "application/json", accept: "application/json" },
@@ -174,20 +236,29 @@ export async function ensureOAuthClient(
         redirect_uris: [input.redirectUri],
         grant_types: ["authorization_code", "refresh_token"],
         response_types: ["code"],
-        token_endpoint_auth_method: "none",
-        ...(input.scopes.length > 0 ? { scope: input.scopes.join(" ") } : {}),
+        token_endpoint_auth_method: method,
+        ...(scope ? { scope } : {}),
       }),
     }).catch(() => null);
-  let res = await register("agentes.chat");
+    return { res, refusal: res && !res.ok ? await res.text().catch(() => "") : "" };
+  };
+  let { res, refusal } = await register("agentes.chat");
   // Calendly takes only letters, digits, hyphens and spaces in a client's name. The others keep the brand's,
   // the name people see on the consent screen.
-  const refusal = res?.status === 400 ? await res.text().catch(() => "") : "";
-  if (/\b(client_)?name\b/i.test(refusal)) res = await register("agentes chat");
+  if (res?.status === 400 && /\b(client_)?name\b/i.test(refusal)) ({ res, refusal } = await register("agentes chat"));
   // RFC 7591: 400 for a redirect URI or metadata it won't take, 401 or 403 for a registration closed to us.
-  if (res && [400, 401, 403].includes(res.status)) return "not_approved";
+  if (res && [400, 401, 403].includes(res.status)) return { notApproved: true, ...refusalDetail(refusal) };
   if (!res?.ok) return null;
-  const body = (await res.json().catch(() => ({}))) as { client_id?: string; client_secret?: string };
+  const body = (await res.json().catch(() => ({}))) as {
+    client_id?: string;
+    client_secret?: string;
+    token_endpoint_auth_method?: string;
+  };
   if (!body.client_id) return null;
+  // It may register another method than the one asked for (RFC 7591 §3.2.1): its answer is the one it checks. A
+  // secret it gives for `none` without naming a method still goes, in the form, as for a client with no method stored.
+  const answered = AUTH_METHODS.find((m) => m === body.token_endpoint_auth_method);
+  const tokenAuthMethod = answered ?? (method === "none" && body.client_secret ? "client_secret_post" : method);
   // A new registration replaces the old one in place (same row id: old states and connections stay valid references).
   const id = existing?.id ?? crypto.randomUUID();
   const wrapper = deps.keyWrappers[0];
@@ -203,7 +274,8 @@ export async function ensureOAuthClient(
         secretCiphertext: sealed?.ciphertext ?? null,
         wrappedDataKey: sealed?.wrappedDataKey ?? null,
         kekId: sealed?.kekId ?? null,
-        scope: input.scopes.length > 0 ? input.scopes.join(" ") : null,
+        scope,
+        tokenAuthMethod,
       })
       .where(eq(oauthClients.id, existing.id))
       .returning();
@@ -221,7 +293,8 @@ export async function ensureOAuthClient(
       secretCiphertext: sealed?.ciphertext ?? null,
       wrappedDataKey: sealed?.wrappedDataKey ?? null,
       kekId: sealed?.kekId ?? null,
-      scope: input.scopes.length > 0 ? input.scopes.join(" ") : null,
+      scope,
+      tokenAuthMethod,
     })
     .onConflictDoNothing()
     .returning();
@@ -235,17 +308,28 @@ export async function ensureOAuthClient(
 
 export type OAuthClientRow = typeof oauthClients.$inferSelect;
 
-/** Client id and (if any) secret for the token endpoint. */
-export async function clientCredentials(keyWrappers: ConnectorDeps["keyWrappers"], c: OAuthClientRow) {
+/**
+ * How the token endpoint knows us, by the client's method (RFC 6749 §2.3.1): the form fields and headers to add.
+ * Its id alone (`none`), with the secret in the form (`client_secret_post`), or the two by HTTP Basic.
+ */
+export async function clientAuth(
+  keyWrappers: ConnectorDeps["keyWrappers"],
+  c: OAuthClientRow,
+): Promise<{ form: Record<string, string>; headers: Record<string, string> }> {
   const secret =
-    c.secretCiphertext && c.wrappedDataKey && c.kekId
+    c.secretCiphertext && c.wrappedDataKey && c.kekId && c.tokenAuthMethod !== "none"
       ? await openSecret(
           keyWrappers,
           { ciphertext: c.secretCiphertext, wrappedDataKey: c.wrappedDataKey, kekId: c.kekId },
           clientAad(c.orgId, c.id),
         )
       : null;
-  return { client_id: c.clientId, ...(secret ? { client_secret: secret } : {}) };
+  if (secret && c.tokenAuthMethod === "client_secret_basic") {
+    // Each part form-encoded first (RFC 6749 §2.3.1): a server that decodes them would refuse a raw `+`, `%` or `:`.
+    const [id, pass] = [c.clientId, secret].map((v) => encodeURIComponent(v).replace(/%20/g, "+"));
+    return { form: {}, headers: { authorization: `Basic ${Buffer.from(`${id}:${pass}`).toString("base64")}` } };
+  }
+  return { form: { client_id: c.clientId, ...(secret ? { client_secret: secret } : {}) }, headers: {} };
 }
 
 export async function getOAuthClient(db: Database, id: string) {

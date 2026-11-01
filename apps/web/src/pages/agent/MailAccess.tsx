@@ -6,6 +6,7 @@ import { knownErrorText } from "@agenteschat/client/lib/errors";
 import {
   choiceOf,
   defaultPolicy,
+  fromMailLevel,
   MAIL_ACTIONS,
   mailAccessOf,
   normalizePolicy,
@@ -102,8 +103,6 @@ function SeeInConnectors({ text }: { text: string }) {
   );
 }
 
-const toLevel = (l: AgentMailbox["level"]): Level => (l === "read_write" ? "write" : l);
-
 interface Draft {
   level: Level;
   canDelete: boolean;
@@ -111,7 +110,7 @@ interface Draft {
 }
 
 const draftOf = (saved: AgentMailbox | null): Draft => ({
-  level: saved ? toLevel(saved.level) : "none",
+  level: fromMailLevel(saved?.level),
   canDelete: saved?.canDelete ?? false,
   policy: saved ? { ...defaultPolicy(), ...saved.policy } : defaultPolicy(),
 });

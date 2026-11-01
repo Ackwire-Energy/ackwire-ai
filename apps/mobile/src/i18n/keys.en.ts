@@ -16,6 +16,7 @@ export const mobileEn: MobileTranslations = {
     skyLabel: "Sky with agents",
     social: {
       failed: "Couldn't sign you in right now. Try again.",
+      unfinished: "Sign-in didn't finish. Try again or use your email.",
     },
     errors: {
       network: "No connection. Check the internet and try again.",

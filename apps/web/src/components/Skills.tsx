@@ -1,9 +1,29 @@
-import type { Skill, SkillChoice, SkillDetail, SkillFile, SkillSkipped } from "@agenteschat/client";
-import { useSkill, useSkillAction, useSkills, useSkillUsage } from "@agenteschat/client";
+import type { Skill, SkillChoice, SkillDetail, SkillFile, SkillSkipped, SkillVia } from "@agenteschat/client";
+import {
+  useCatalog,
+  useConnections,
+  useGitHubRepos,
+  useSkill,
+  useSkillAction,
+  useSkills,
+  useSkillUsage,
+} from "@agenteschat/client";
+import { fromConnection, itemName } from "@agenteschat/client/lib/connected";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
-import { pickSkills, skillPickOf, skippedSkillText } from "@agenteschat/client/lib/skills";
+import {
+  githubRepoLink,
+  hiddenRepoOf,
+  hiddenRepoText,
+  pickSkills,
+  searchRepos,
+  skillPickOf,
+  skillRefusalText,
+  skillSourceViaText,
+  skillViaText,
+  skippedSkillText,
+} from "@agenteschat/client/lib/skills";
 import {
   Alert,
   Button,
@@ -21,6 +41,7 @@ import {
   type IconName,
   Input,
   List,
+  ListRow,
   SearchField,
   Switch,
   TabPanel,
@@ -29,8 +50,9 @@ import {
 } from "@agenteschat/ui";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ConnectFlow, type FlowState } from "@/components/ConnectFlow";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
-import { LoadingList, useStepText } from "@/components/Loading";
+import { LoadingLine, LoadingList, useStepText } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { Markdown } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
@@ -100,13 +122,30 @@ function SkillRow({ skill, users, onOpen }: { skill: Skill; users: number | null
   );
 }
 
-/** Configurações → Skills: the org library (admins manage it). */
-export function SkillsSection() {
+/** One line led by GitHub's mark: which of the workspace's GitHub connections read a private repository. */
+function ViaLine({ children }: { children: string }) {
+  return (
+    <p className="small muted ac-iconline skill-via">
+      <ConnectorIcon def={GITHUB_MARK} label="GitHub" />
+      <span>{children}</span>
+    </p>
+  );
+}
+
+/**
+ * Configurações → Skills: the org library (admins manage it). `install`: back from connecting GitHub in Instalar
+ * skill, the link it couldn't read, which the dialog reads again (`connected`: the server's `?connected=github`).
+ */
+export function SkillsSection({ install, connected }: { install?: string; connected?: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const admin = can(org, "manage_agents");
   const skills = useSkills(org.id, admin);
-  const [installing, setInstalling] = useState(false);
+  const [installing, setInstalling] = useState(Boolean(install));
+  const [returned, setReturned] = useState(install);
+  useEffect(() => {
+    if (install) window.history.replaceState(null, "", window.location.pathname);
+  }, [install]);
   const [all, setAll] = useState(false);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<string | null>(null);
@@ -166,7 +205,16 @@ export function SkillsSection() {
         </DialogSearchList>
         <DialogFooter />
       </Dialog>
-      <InstallSkillDialog open={installing} onOpenChange={setInstalling} onInstalled={(id) => setOpen(id)} />
+      <InstallSkillDialog
+        open={installing}
+        onOpenChange={(o) => {
+          setInstalling(o);
+          if (!o) setReturned(undefined);
+        }}
+        onInstalled={(id) => setOpen(id)}
+        initialUrl={returned}
+        connected={returned !== undefined && connected === "github"}
+      />
       {open && <SkillSheet id={open} users={usage.get(open) ?? []} onClose={() => setOpen(null)} />}
     </Card>
   );
@@ -232,19 +280,44 @@ export function SkillPicker({
 
 type InstallTab = "github" | "zip" | "write";
 
+/**
+ * Where connecting GitHub from Instalar skill comes back to: Skills, with the link to read again. A link too long
+ * for the connect flow's `returnTo` (500 characters, a desktop window's `desktop:` before it) comes back to Skills.
+ */
+const returnHere = (orgId: string, url: string) => {
+  const skills = `/org/${orgId}/settings/skills`;
+  const back = `${skills}?install=${encodeURIComponent(url)}`;
+  return back.length <= 490 ? back : skills;
+};
+
+/**
+ * Instalar skill: a GitHub link, a .zip or written here. A link holding several skills (or a repository picked from
+ * the connected GitHub) lists them to pick. A private repository is read on the server through the workspace's
+ * GitHub, and the dialog says which connection read it. When none can, it says the repository looks private or
+ * missing and offers to connect GitHub (or to ask whoever manages connectors). Once GitHub is connected it reads the
+ * link again while the connect flow goes on to what GitHub does and who uses it, as from Conectores (`initialUrl`
+ * and `connected` when signing in on GitHub left the page).
+ */
 export function InstallSkillDialog({
   open,
   onOpenChange,
   onInstalled,
+  initialUrl,
+  connected = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onInstalled: (id: string) => void;
+  initialUrl?: string;
+  connected?: boolean;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
-  const action = useSkillAction(org.id);
+  const action = useSkillAction(org.id, { silent: true });
+  const repos = useGitHubRepos(org.id, open);
+  const catalog = useCatalog();
+  const connections = useConnections(org.id, open && connected);
   const installStep = useStepText(action.isPending, [
     t("skills.installStep.fetching"),
     t("skills.installStep.reading"),
@@ -255,19 +328,19 @@ export function InstallSkillDialog({
   const [file, setFile] = useState<File | null>(null);
   const [form, setForm] = useState({ name: "", description: "", body: "" });
   const [error, setError] = useState<string | null>(null);
+  /** A link the workspace's GitHub couldn't read either, and whether GitHub is connected. */
+  const [hidden, setHidden] = useState<ReturnType<typeof hiddenRepoOf>>(null);
   /** The skills a link holds when it holds several, those that can't be installed, and the ones picked. */
   const [choices, setChoices] = useState<SkillChoice[] | null>(null);
   const [skipped, setSkipped] = useState<SkillSkipped[]>([]);
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [via, setVia] = useState<SkillVia | null>(null);
+  /** The connected GitHub's repositories in place of the tabs, to read one. */
+  const [browsing, setBrowsing] = useState(false);
+  /** Connecting GitHub, over the dialog. */
+  const [flow, setFlow] = useState<FlowState | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    setUrl("");
-    setFile(null);
-    setForm({ name: "", description: "", body: "" });
-    setError(null);
-    setChoices(null);
-  }, [open]);
+  const github = catalog.data?.connectors.find((c) => c.id === "github");
   const githubOk = /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+/.test(url.trim());
   const writeOk = form.name.trim() && form.description.trim() && form.body.trim();
   const done = (skill: unknown) => {
@@ -277,21 +350,64 @@ export function InstallSkillDialog({
     onInstalled(s.id);
   };
   const pick = (paths: string[], on: boolean) => setPicked(pickSkills(picked, paths, on));
+  /** Reads a GitHub link: one skill installs at once, unless `list`; several (or `list`) are listed to pick. */
+  const read = (link: string, list = false) => {
+    setError(null);
+    setHidden(null);
+    action.mutate(
+      { type: "import", input: list ? { url: link, list } : { url: link } },
+      {
+        onSuccess: (result) => {
+          const found = skillPickOf(result);
+          if (!found) return done(result);
+          setChoices(found.choices);
+          setSkipped(found.skipped);
+          setVia(found.via);
+          setPicked(new Set());
+        },
+        onError: (e) => {
+          const missing = hiddenRepoOf(e);
+          if (missing) setHidden(missing);
+          else setError(errorText(t, e));
+        },
+      },
+    );
+  };
+  // Opening starts afresh, on the link it couldn't read when back from connecting GitHub on its site, read once more
+  // to pick (once: development runs effects twice).
+  const readAgain = useRef<string | undefined>(undefined);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on opening only
+  useEffect(() => {
+    if (!open) return;
+    setUrl(initialUrl ?? "");
+    setFile(null);
+    setForm({ name: "", description: "", body: "" });
+    setError(null);
+    setHidden(null);
+    setChoices(null);
+    setBrowsing(false);
+    if (initialUrl && readAgain.current !== initialUrl) {
+      readAgain.current = initialUrl;
+      read(initialUrl, true);
+    }
+  }, [open]);
+  // Signed in on GitHub: on to what it does and who uses it, as Conectores goes on after signing in.
+  const resumed = useRef(false);
+  useEffect(() => {
+    if (!open || !connected || resumed.current || !connections.data || !catalog.data) return;
+    resumed.current = true;
+    const connection = connections.data.find((c) => c.connector === "github" && !c.revokedAt);
+    if (!connection || !can(org, "manage_connectors")) return;
+    const item = fromConnection(connection, catalog.data.connectors);
+    toast.show(t("connectors.connectedToast", { name: itemName(t, item) }));
+    setFlow({ step: 1, item });
+  }, [open, connected, connections.data, catalog.data, org, t, toast]);
   const submit = async () => {
     setError(null);
     const onError = (e: Error) => setError(errorText(t, e));
     if (tab === "github") {
       if (!githubOk) return setError(t("skills.githubInvalid"));
-      if (!choices) {
-        const onSuccess = (result: unknown) => {
-          const found = skillPickOf(result);
-          if (!found) return done(result);
-          setChoices(found.choices);
-          setSkipped(found.skipped);
-          setPicked(new Set());
-        };
-        return action.mutate({ type: "import", input: { url: url.trim() } }, { onSuccess, onError });
-      }
+      if (!choices) return read(url.trim());
       if (picked.size === 0) return setError(t("skills.pickMissing"));
       action.mutate(
         { type: "importPicked", url: url.trim(), paths: choices.map((c) => c.path).filter((p) => picked.has(p)) },
@@ -320,126 +436,227 @@ export function InstallSkillDialog({
       );
     }
   };
+  const mayConnect = can(org, "manage_connectors") && Boolean(github);
+  const said = hidden ? hiddenRepoText(t, hidden, mayConnect) : null;
   return (
     <Dialog open={open} onOpenChange={onOpenChange} title={t("skills.install")} closeLabel={t("common.close")}>
-      <form
-        style={{ display: "contents" }}
-        onSubmit={(e) => {
-          e.preventDefault();
-          void submit();
-        }}
-      >
-        <DialogBody>
-          <Tabs
-            value={tab}
-            onValueChange={(v) => {
-              setTab(v);
-              setError(null);
-            }}
-            label={t("skills.installHow")}
-            items={[
-              { value: "github", label: t("skills.tab.github") },
-              { value: "zip", label: t("skills.tab.zip") },
-              { value: "write", label: t("skills.tab.write") },
-            ]}
-          >
-            <TabPanel value="github">
-              <Field label={t("skills.githubUrl")} id="skill-url" help={t("skills.githubHelp")}>
-                <Input
-                  value={url}
-                  onChange={(e) => {
-                    setUrl(e.target.value);
-                    setChoices(null);
-                  }}
-                  placeholder="https://github.com/…"
-                  inputMode="url"
-                />
-              </Field>
-              {choices && (
-                <fieldset className="skill-picks">
-                  <legend className="small muted">
-                    {t("skills.pickLead", { count: choices.length + skipped.length })}
-                  </legend>
-                  <label htmlFor="skill-pick-all" className="scope-row">
-                    <Checkbox
-                      id="skill-pick-all"
-                      checked={picked.size === 0 ? false : picked.size === choices.length ? true : "indeterminate"}
-                      onCheckedChange={(on) =>
-                        pick(
-                          choices.map((c) => c.path),
-                          on,
-                        )
-                      }
-                    />
-                    <span className="scope-row__text">{t("skills.pickAll")}</span>
-                  </label>
-                  {choices.map((c, i) => (
-                    <label key={c.path} htmlFor={`skill-pick-${i}`} className="scope-row">
+      {browsing ? (
+        <ConnectedRepos
+          onBack={() => setBrowsing(false)}
+          onPick={(fullName) => {
+            const link = githubRepoLink(fullName);
+            setBrowsing(false);
+            setUrl(link);
+            setChoices(null);
+            read(link, true);
+          }}
+        />
+      ) : (
+        <form
+          style={{ display: "contents" }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            void submit();
+          }}
+        >
+          <DialogBody>
+            <Tabs
+              value={tab}
+              onValueChange={(v) => {
+                setTab(v);
+                setError(null);
+                setHidden(null);
+              }}
+              label={t("skills.installHow")}
+              items={[
+                { value: "github", label: t("skills.tab.github") },
+                { value: "zip", label: t("skills.tab.zip") },
+                { value: "write", label: t("skills.tab.write") },
+              ]}
+            >
+              <TabPanel value="github">
+                <Field label={t("skills.githubUrl")} id="skill-url" help={t("skills.githubHelp")}>
+                  <Input
+                    value={url}
+                    onChange={(e) => {
+                      setUrl(e.target.value);
+                      setChoices(null);
+                      setHidden(null);
+                    }}
+                    placeholder="https://github.com/…"
+                    inputMode="url"
+                  />
+                </Field>
+                {repos.data?.connected && !choices && (
+                  <div className="row">
+                    <Button size="sm" onClick={() => setBrowsing(true)}>
+                      <ConnectorIcon def={GITHUB_MARK} label="GitHub" />
+                      {t("skills.fromConnected")}
+                    </Button>
+                  </div>
+                )}
+                {said && (
+                  <div className="skill-hidden">
+                    <Alert tone="neutral">{said.text}</Alert>
+                    {said.connect && github && (
+                      <div className="row">
+                        <Button size="sm" variant="primary" onClick={() => setFlow({ step: 0, def: github })}>
+                          <ConnectorIcon def={GITHUB_MARK} label="GitHub" />
+                          {t("skills.hidden.connectButton")}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {choices && via && <ViaLine>{skillViaText(t, via, url)}</ViaLine>}
+                {choices && (
+                  <fieldset className="skill-picks">
+                    <legend className="small muted">
+                      {t("skills.pickLead", { count: choices.length + skipped.length })}
+                    </legend>
+                    <label htmlFor="skill-pick-all" className="scope-row">
                       <Checkbox
-                        id={`skill-pick-${i}`}
-                        checked={picked.has(c.path)}
-                        onCheckedChange={(on) => pick([c.path], on)}
+                        id="skill-pick-all"
+                        checked={picked.size === 0 ? false : picked.size === choices.length ? true : "indeterminate"}
+                        onCheckedChange={(on) =>
+                          pick(
+                            choices.map((c) => c.path),
+                            on,
+                          )
+                        }
                       />
-                      <span className="scope-row__text">
-                        <span className="skill-pick__name">{c.name}</span>
-                        <span className="small muted skill-pick__about">{c.description}</span>
-                      </span>
+                      <span className="scope-row__text">{t("skills.pickAll")}</span>
                     </label>
-                  ))}
-                  {skipped.map((s, i) => (
-                    <label key={s.path} htmlFor={`skill-skip-${i}`} className="scope-row">
-                      <Checkbox id={`skill-skip-${i}`} checked={false} disabled />
-                      <span className="scope-row__text">
-                        <span className="skill-pick__name">{s.path}</span>
-                        <span className="small muted skill-pick__about">{skippedSkillText(t, s)}</span>
-                      </span>
-                    </label>
-                  ))}
-                </fieldset>
-              )}
-            </TabPanel>
-            <TabPanel value="zip">
-              <span className="small muted">{t("skills.zipHelp")}</span>
-              {/* Our button over a hidden file input: never the native control look. */}
-              <input
-                ref={fileInput}
-                type="file"
-                accept=".zip,application/zip"
-                className="ac-visually-hidden"
-                aria-label={t("skills.zipPick")}
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              />
-              <div className="row" style={{ gap: 8, alignItems: "center" }}>
-                <Button type="button" icon="attach" onClick={() => fileInput.current?.click()}>
-                  {t("skills.zipPick")}
-                </Button>
-                <span className="small muted">{file ? file.name : t("skills.zipNone")}</span>
-              </div>
-            </TabPanel>
-            <TabPanel value="write">
-              <Field label={t("skills.name")} id="skill-name">
-                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              </Field>
-              <Field label={t("skills.description")} id="skill-desc" help={t("skills.descriptionHelp")}>
-                <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-              </Field>
-              <Field label={t("skills.body")} id="skill-body" help={t("skills.bodyHelp")}>
-                <Textarea rows={10} value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} />
-              </Field>
-            </TabPanel>
-          </Tabs>
-          {error && <Alert>{error}</Alert>}
-        </DialogBody>
-        <DialogFooter note={installStep}>
-          <Button type="button" onClick={() => onOpenChange(false)}>
-            {t("common.cancel")}
-          </Button>
-          <Button type="submit" variant="primary" disabled={action.isPending} loading={action.isPending}>
-            {t("skills.installSubmit")}
-          </Button>
-        </DialogFooter>
-      </form>
+                    {choices.map((c, i) => (
+                      <label key={c.path} htmlFor={`skill-pick-${i}`} className="scope-row">
+                        <Checkbox
+                          id={`skill-pick-${i}`}
+                          checked={picked.has(c.path)}
+                          onCheckedChange={(on) => pick([c.path], on)}
+                        />
+                        <span className="scope-row__text">
+                          <span className="skill-pick__name">{c.name}</span>
+                          <span className="small muted skill-pick__about">{c.description}</span>
+                        </span>
+                      </label>
+                    ))}
+                    {skipped.map((s, i) => (
+                      <label key={s.path} htmlFor={`skill-skip-${i}`} className="scope-row">
+                        <Checkbox id={`skill-skip-${i}`} checked={false} disabled />
+                        <span className="scope-row__text">
+                          <span className="skill-pick__name">{s.path}</span>
+                          <span className="small muted skill-pick__about">{skippedSkillText(t, s)}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </fieldset>
+                )}
+              </TabPanel>
+              <TabPanel value="zip">
+                <span className="small muted">{t("skills.zipHelp")}</span>
+                {/* Our button over a hidden file input: never the native control look. */}
+                <input
+                  ref={fileInput}
+                  type="file"
+                  accept=".zip,application/zip"
+                  className="ac-visually-hidden"
+                  aria-label={t("skills.zipPick")}
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                />
+                <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                  <Button type="button" icon="attach" onClick={() => fileInput.current?.click()}>
+                    {t("skills.zipPick")}
+                  </Button>
+                  <span className="small muted">{file ? file.name : t("skills.zipNone")}</span>
+                </div>
+              </TabPanel>
+              <TabPanel value="write">
+                <Field label={t("skills.name")} id="skill-name">
+                  <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                </Field>
+                <Field label={t("skills.description")} id="skill-desc" help={t("skills.descriptionHelp")}>
+                  <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                </Field>
+                <Field label={t("skills.body")} id="skill-body" help={t("skills.bodyHelp")}>
+                  <Textarea rows={10} value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} />
+                </Field>
+              </TabPanel>
+            </Tabs>
+            {error && <Alert>{error}</Alert>}
+          </DialogBody>
+          <DialogFooter note={installStep}>
+            <Button type="button" onClick={() => onOpenChange(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" variant="primary" disabled={action.isPending} loading={action.isPending}>
+              {t("skills.installSubmit")}
+            </Button>
+          </DialogFooter>
+        </form>
+      )}
+      <ConnectFlow
+        flow={flow}
+        returnTo={returnHere(org.id, url.trim())}
+        onChange={(next) => {
+          // Connected without leaving the page (a token): the link again, to pick, behind the steps that follow.
+          if (flow?.step === 0) read(url.trim(), true);
+          setFlow(next);
+        }}
+        onClose={() => setFlow(null)}
+      />
     </Dialog>
+  );
+}
+
+/**
+ * Instalar skill › Escolher do GitHub conectado: the repositories the workspace's GitHub reaches, by account, with a
+ * search. Picking one reads it; Voltar goes back to the tabs.
+ */
+function ConnectedRepos({ onPick, onBack }: { onPick: (fullName: string) => void; onBack: () => void }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const listing = useGitHubRepos(org.id);
+  const [q, setQ] = useState("");
+  const accounts = searchRepos(listing.data, q);
+  return (
+    <>
+      {listing.isLoading ? (
+        <div className="ac-dialog__body">
+          <LoadingLine width={220} />
+        </div>
+      ) : listing.isError ? (
+        <p className="ac-dialog__empty">{t("repos.unavailable")}</p>
+      ) : (
+        <DialogSearchList
+          query={q}
+          onQueryChange={setQ}
+          searchLabel={t("repos.search")}
+          searchPlaceholder={t("repos.search")}
+          listLabel={t("skills.connectedRepos")}
+          isEmpty={accounts.length === 0}
+          emptyText={q.trim() ? t("repos.noMatch", { q: q.trim() }) : t("repos.none")}
+        >
+          {accounts.map((a) => (
+            <section key={a.login} className="skill-repos" aria-label={a.login}>
+              <p className="ac-eyebrow">{a.login}</p>
+              {a.repositories.map((r) => (
+                <ListRow
+                  key={r.fullName}
+                  lead={<Icon name={r.private ? "lock" : "globe"} size={16} />}
+                  title={r.fullName}
+                  meta={r.private ? t("repos.private") : t("repos.public")}
+                  onClick={() => onPick(r.fullName)}
+                />
+              ))}
+            </section>
+          ))}
+          {listing.data?.truncated && <p className="small muted">{t("repos.truncated")}</p>}
+        </DialogSearchList>
+      )}
+      <DialogFooter>
+        <Button onClick={onBack}>{t("common.back")}</Button>
+      </DialogFooter>
+    </>
   );
 }
 
@@ -459,9 +676,12 @@ export function SkillSheet({
   const toast = useToast();
   const skill = useSkill(org.id, id);
   const action = useSkillAction(org.id);
+  // Its refusals are said here, a repository none of the workspace's GitHub reads as Instalar skill says it.
+  const refresh = useSkillAction(org.id, { silent: true });
   const [editing, setEditing] = useState(false);
   const [removing, setRemoving] = useState(false);
   const s = skill.data;
+  const via = s ? skillSourceViaText(t, s) : null;
   return (
     <DetailsDialog
       open
@@ -488,12 +708,15 @@ export function SkillSheet({
               <Button
                 size="sm"
                 variant="ghost"
-                disabled={action.isPending}
-                loading={action.isPending && action.variables?.type === "reimport"}
+                disabled={action.isPending || refresh.isPending}
+                loading={refresh.isPending}
                 onClick={() =>
-                  action.mutate(
+                  refresh.mutate(
                     { type: "reimport", id: s.id },
-                    { onSuccess: () => toast.show(t("skills.refreshed", { name: s.name })) },
+                    {
+                      onSuccess: () => toast.show(t("skills.refreshed", { name: s.name })),
+                      onError: (e) => toast.show(skillRefusalText(t, e, can(org, "manage_connectors")), "error"),
+                    },
                   )
                 }
               >
@@ -516,6 +739,7 @@ export function SkillSheet({
         <div className="skill-sheet">
           <div className="skill-sheet__main">
             <p className="muted">{s.description}</p>
+            {via && <ViaLine>{via}</ViaLine>}
             {editing ? <EditSkill skill={s} onDone={() => setEditing(false)} /> : <Markdown source={s.body} />}
           </div>
           <nav className="skill-sheet__files" aria-label={t("skills.files")}>

@@ -92,6 +92,7 @@ export function CommandMenu() {
       });
     }
     const pages = [
+      { key: "home", to: "/org/$orgId/home", icon: "home", label: t("shell.home") },
       { key: "approvals", to: "/org/$orgId/approvals", icon: "waiting", label: t("shell.approvals") },
       { key: "issues", to: "/org/$orgId/issues", icon: "issues", label: t("shell.issues") },
       { key: "routines", to: "/org/$orgId/routines", icon: "routines", label: t("shell.routines") },
