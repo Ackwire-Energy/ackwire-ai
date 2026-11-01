@@ -34,12 +34,35 @@ const SECRET_PATTERNS = [
   /\bxox[abprs]-[a-z0-9-]{10,}/i, // Slack tokens
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
   /\b(bearer)\s+[a-z0-9._-]{20,}/i,
-  /\b(password|senha|passwd|secret|api[_ -]?key|token)\s*[:=]\s*\S{6,}/i,
+  // `name: value`, `NAME=value` and JSON's `"name": "value"`; `_` before it too (`DB_PASSWORD`), never inside a word.
+  /(?:\b|_)(password|senha|passwd|secret(?:[_-]?(?:access[_-]?)?key)?|api[_ -]?key|token)["']?\s*[:=]\s*["']?[^\s"']{6,}/i,
   /\beyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}/, // JWTs
 ];
 
 /** Memories and context never carry credentials (docs/adr/0017). */
 export const looksLikeSecret = (text: string) => SECRET_PATTERNS.some((p) => p.test(text));
+
+/** How much of a file is read as text for credentials; past it, only a private key's header is looked for. */
+const FILE_SCAN_BYTES = 8 * 1024 * 1024;
+const PRIVATE_KEY = /^-----BEGIN [A-Z0-9 ]*PRIVATE KEY/;
+const utf8 = new TextDecoder("utf-8", { fatal: true });
+
+/**
+ * A file that holds credentials, whatever its name or type: a private key's header anywhere in its bytes (PEM, PGP),
+ * or a key or a password in what reads as UTF-8 text.
+ */
+export function holdsSecret(bytes: Uint8Array): boolean {
+  const buf = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  for (let at = buf.indexOf("-----BEGIN "); at >= 0; at = buf.indexOf("-----BEGIN ", at + 1)) {
+    if (PRIVATE_KEY.test(buf.toString("latin1", at, at + 64))) return true;
+  }
+  if (bytes.byteLength > FILE_SCAN_BYTES) return false;
+  try {
+    return looksLikeSecret(utf8.decode(bytes));
+  } catch {
+    return false;
+  }
+}
 
 /** Refuses content that must never become context: credentials (by their format). */
 export function checkContent(text: string) {

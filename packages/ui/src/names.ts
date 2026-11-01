@@ -13,21 +13,21 @@ export function initialsOf(name: string): string {
 }
 
 /**
- * Where apps keep keys and sign-ins, whatever the format: env files, auth and token files, keys, credential folders
- * and browser profiles. An import never reads these, and never copies them into the Drive.
+ * Where apps keep keys and sign-ins, whatever the format: env files, auth and token files, keys, the config files of
+ * tools that keep a token, credential folders and browser profiles. An import never reads these, only lists them.
  */
 const SECRET_PATH = new RegExp(
   [
     "(?:^|/)\\.env(?:[./][^/]*)?$",
+    "(?:^|/)[^/]+\\.env$",
     "(?:^|/)\\.envrc$",
-    "(?:^|/)\\.op\\.env$",
     "(?:^|/)auth[^/]*\\.json$",
     "(?:^|/)(?![^/]*\\.(?:md|markdown)$)[^/]*(?:token|oauth|secret|credential|password|cookie)[^/]*$",
     "(?:^|/)[^/]*private[^/]*key[^/]*$",
-    "\\.(?:pem|key|p12|pfx|ppk|jks|keystore|kdbx|gpg|asc)$",
+    "\\.(?:pem|key|p8|p12|pfx|ppk|jks|keystore|kdbx|gpg|asc|ovpn|tfvars(?:\\.json)?)$",
     "(?:^|/)id_(?:rsa|dsa|ecdsa|ed25519)[^/]*$",
     "(?:^|/)\\.?npmrc$",
-    "(?:^|/)(?:[._]netrc|\\.pgpass|\\.htpasswd)$",
+    "(?:^|/)(?:[._]netrc|\\.pgpass|\\.htpasswd|\\.pypirc|\\.s3cfg|\\.boto|kubeconfig[^/]*)$",
     "(?:^|/)(?:honcho|mem0|cursor-session|mcp-oauth|teams_pipeline_store)\\.json$",
     "(?:^|/)(?:credentials|mcp-tokens|vault|secrets|proxy|\\.ssh|\\.aws|\\.gnupg|\\.kube|\\.docker|\\.azure)/",
     "(?:^|/)\\.config/(?:gh|gcloud)/",
@@ -37,6 +37,11 @@ const SECRET_PATH = new RegExp(
   "i",
 );
 export const isSecretPath = (path: string) => SECRET_PATH.test(path.replace(/\\/g, "/"));
+
+/** A note named like a list of logins (`passwords.md`, `credentials.md`): read by an import, never copied. */
+const SECRET_NOTE = /(?:^|\/)[^/]*(?:password|credential|secret)[^/]*\.(?:md|markdown)$/i;
+/** Never copied into the Drive, by its name: a credential store, or a note named like one. */
+export const isSecretFile = (path: string) => isSecretPath(path) || SECRET_NOTE.test(path.replace(/\\/g, "/"));
 
 /** The Drive folder an imported agent's files go in: its name, with no `/` to read as a deeper folder. */
 export const driveFolder = (agentName: string) => agentName.replace(/[\\/]+/g, "-").trim() || "agent";

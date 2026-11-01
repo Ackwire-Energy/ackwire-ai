@@ -240,6 +240,51 @@ describe("the agents' own files", () => {
     ]);
   });
 
+  test("keys stay behind whatever the file's type: by what they hold (JSON's quotes too, a script peeked at), by their names, a note named like one", async () => {
+    const key = `sk-proj-${"x".repeat(24)}`;
+    const pem = ["-----BEGIN PRIVATE KEY-----", "fixture", "-----END PRIVATE KEY-----"].join("\n");
+    const own: Record<string, string> = {
+      "accounts.json": '{"gmail":{"password":"hunter22-fixture"}}',
+      "config.json": `{"apiKey":"${"f".repeat(20)}"}`,
+      "prod.env": `OPENAI_API_KEY=${key}`,
+      "deploy.sh": `#!/bin/sh\nexport OPENAI_API_KEY=${key}\n`,
+      "run.sh": "DB_PASSWORD=fixture-never-stored ./run",
+      kubeconfig: "users:\n- name: ci\n  user:\n    token: fixture-never-stored\n",
+      "AuthKey_ABC123.p8": pem,
+      "certs/server.crt": pem,
+      "passwords.md": "- gmail: fixture",
+      "credentials.md": "the logins",
+      "hello.sh": "#!/bin/sh\necho hi\n",
+    };
+    const files: Record<string, string> = { "openbot-import.json": manifest };
+    for (const [path, text] of Object.entries(own)) files[`agents/scout/files/${path}`] = text;
+    const entries = Object.entries(files).map(([name, data]) => ({ name, data }));
+    const reads = {
+      zip: await readImportFiles([archive(zip(files), "export.zip")]),
+      tgz: await readImportFiles([archive(Bun.gzipSync(tar(entries)), "export.tgz")]),
+      picked: await readImportFiles(entries.map((e) => ({ path: `export/${e.name}`, file: new Blob([e.data]) }))),
+    };
+    for (const [how, read] of Object.entries(reads)) {
+      const skips = parsePackage(read.files, { root: read.root }).files.map((f) => [f.path, f.skip ?? "copy"]);
+      expect([how, Object.fromEntries(skips)]).toEqual([
+        how,
+        {
+          "accounts.json": "secret",
+          "config.json": "secret",
+          "prod.env": "secret",
+          "deploy.sh": "secret",
+          "run.sh": "secret",
+          kubeconfig: "secret",
+          "AuthKey_ABC123.p8": "secret",
+          "certs/server.crt": "secret",
+          "passwords.md": "secret",
+          "credentials.md": "secret",
+          "hello.sh": "copy",
+        },
+      ]);
+    }
+  });
+
   test("an OpenClaw state folder (.tar.gz): each workspace's own files, never its skills; read back from the archive", async () => {
     const report = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 1, 2, 3, 4]);
     const entries: TarEntry[] = [

@@ -1,13 +1,13 @@
 import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { isKnownModel, isOpenRouterModel } from "@agenteschat/providers";
-import { driveFolder, isIdHandle, isSecretPath } from "@agenteschat/ui/names";
+import { driveFolder, isIdHandle, isSecretFile } from "@agenteschat/ui/names";
 import { createAgent, HANDLE_PATTERN, updateAgent } from "./agents";
 import { type AgentAppearance, setAgentAppearance, validateAppearance } from "./appearance";
-import { ARTIFACT_LIMITS, type ArtifactDeps, createFileArtifact, fileContentType, isTextFile } from "./artifacts";
+import { ARTIFACT_LIMITS, type ArtifactDeps, createFileArtifact } from "./artifacts";
 import { recordAudit } from "./audit";
 import { addChannelMember, CHANNEL_NAME_PATTERN, createChannel } from "./channels";
-import { addContextItemByPerson, editContextItem, looksLikeSecret } from "./context/items";
+import { addContextItemByPerson, editContextItem, holdsSecret, looksLikeSecret } from "./context/items";
 import { nextCronTime, zonedParts } from "./cron";
 import { sha256 } from "./crypto";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
@@ -926,9 +926,10 @@ function driveTitle(folder: string, path: string) {
  * One of an imported agent's own files (OpenBot.run's `files/`, an OpenClaw workspace) into its folder in the
  * Drive: titled `<agent's name>/<path>`, keeping the source's folders, seen by the whole workspace and made by the
  * agent (its page lists it; the audit names the importer). A name the folder already has (outside the trash) stays
- * as it was: `exists`, so importing again never overwrites. Never a credential store, by its name or, for a text
- * file, by what it says (`looksLikeSecret`, as for memory). The Drive's limits apply: 50 MB a file, the workspace's
- * storage and daily uploads (409 `storage.full`, `storage.daily_full`). Who may import.
+ * as it was: `exists`, so importing again never overwrites. Never a credential store, by its name (`isSecretFile`) or
+ * by what it holds, whatever its type (`holdsSecret`: a private key, or a key or a password in its text, as for
+ * memory). The Drive's limits apply: 50 MB a file, the workspace's storage and daily uploads (409 `storage.full`,
+ * `storage.daily_full`). Who may import.
  */
 export async function copyImportedFile(
   deps: ArtifactDeps,
@@ -951,9 +952,7 @@ export async function copyImportedFile(
   }
   const path = parts.join("/");
   const name = input.name || (parts.at(-1) as string);
-  // A text file with a key or a password in it is a credential store by another name.
-  const text = isTextFile(name, fileContentType(name, input.contentType)) ? new TextDecoder().decode(input.bytes) : "";
-  if (isSecretPath(path) || isSecretPath(name) || looksLikeSecret(text)) {
+  if (isSecretFile(path) || isSecretFile(name) || holdsSecret(input.bytes)) {
     throw new ValidationError("files with keys or sign-ins are never copied to the Drive", "import.secret_file");
   }
   const [agent] = await db

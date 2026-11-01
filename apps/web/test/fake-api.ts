@@ -73,7 +73,7 @@ import { moveInGroups } from "@agenteschat/client/lib/agent-groups";
 import { answersOthers, audienceOf } from "@agenteschat/client/lib/audience";
 import { stepIndex } from "@agenteschat/client/lib/onboarding";
 import { grants, SUMMARY_ORDER } from "@agenteschat/client/lib/roles";
-import { driveFolder, isSecretPath } from "@agenteschat/ui/names";
+import { driveFolder, isSecretFile } from "@agenteschat/ui/names";
 import { createFakeAccess } from "./fakes/access";
 import { createMockArtifacts } from "./fakes/artifacts";
 import { createFakeBrowser, type FakeBrowser } from "./fakes/browser";
@@ -1937,7 +1937,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       // Like the backend: `<agent's name>/<path>` in the Drive, never over a name already there, never a key file.
       copyFile: async (orgId, { file, ...input }) => {
         log("imports.copyFile", orgId, input);
-        if (isSecretPath(input.path)) throw new ApiError(400, "import.secret_file", "Never copied to the Drive");
+        if (isSecretFile(input.path)) throw new ApiError(400, "import.secret_file", "Never copied to the Drive");
         const agent = state.agents.find((a) => a.id === input.agentId);
         const drive = state.drive;
         if (!agent || !drive) throw new ApiError(404, "not_found", "Agent not found");

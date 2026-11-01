@@ -21,6 +21,8 @@ export interface ImportFile {
   size?: number;
   /** Its bytes as they are, read only when the file is copied to the Drive (a link's files have none). */
   read?: () => Promise<Blob>;
+  /** The text of a small file no format reads (a script, a config), only to look for keys before it goes to the Drive. */
+  peek?: string;
 }
 
 export type ImportErrorCode = "empty" | "tooLarge" | "unknown" | "newerVersion" | "noAgents" | "unsafe" | "corrupt";
@@ -313,7 +315,10 @@ const SECRET_PATTERNS: [RegExp, string][] = [
   [/\bAIza[0-9A-Za-z_-]{30,}/g, REDACTED],
   [/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, REDACTED],
   [/\b(bearer)\s+[A-Za-z0-9._~+/=-]{20,}/gi, `$1 ${REDACTED}`],
-  [/\b(password|senha|passwd|secret|api[_ -]?key|token)\s*[:=]\s*\S{6,}/gi, `$1 ${REDACTED}`],
+  [
+    /(\b|_)(password|senha|passwd|secret(?:[_-]?(?:access[_-]?)?key)?|api[_ -]?key|token)["']?\s*[:=]\s*["']?[^\s"']{6,}/gi,
+    `$1$2 ${REDACTED}`,
+  ],
 ];
 
 export function scrubSecrets(text: string): { text: string; redacted: boolean } {

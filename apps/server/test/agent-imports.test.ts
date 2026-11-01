@@ -406,6 +406,37 @@ describe("an imported agent's own files into the Drive", () => {
       expect(refused.status).toBe(400);
       expect(((await refused.json()) as { error: { code: string } }).error.code).toBe(code);
     }
+    // As an archive's file comes (no type): keys by what they hold, whatever the type, JSON's quotes too; key and
+    // login files by their names, a note named like one too.
+    const key = `sk-proj-${"x".repeat(24)}`;
+    const pem = ["-----BEGIN PRIVATE KEY-----", "fixture", "-----END PRIVATE KEY-----"].join("\n");
+    const bytes = (body: string | Uint8Array, path: string) =>
+      send(b, `${base}/imports/files`, {
+        file: new File([body], path.split("/").pop() as string),
+        agentId: scout,
+        path,
+      });
+    const binary = new Uint8Array([0xff, 0xfe, 0, 1, ...new TextEncoder().encode(pem), 0xff]);
+    for (const [path, body] of [
+      ["accounts.json", '{"gmail":{"password":"hunter22-fixture"}}'],
+      ["config.json", `{"apiKey":"${"f".repeat(20)}"}`],
+      ["prod.env", `OPENAI_API_KEY=${key}`],
+      ["deploy.sh", `#!/bin/sh\nexport OPENAI_API_KEY=${key}\n`],
+      ["run.sh", "DB_PASSWORD=fixture-never-stored ./run"],
+      ["kubeconfig", "users:\n- name: ci\n  user:\n    token: fixture-never-stored\n"],
+      ["AuthKey_ABC123.p8", pem],
+      ["certs/server.crt", pem],
+      ["blob.bin", binary],
+      ["passwords.md", "- gmail: fixture"],
+      ["notes/credentials.md", "the logins"],
+    ] as const) {
+      const refused = await bytes(body, path);
+      expect([path, refused.status]).toEqual([path, 400]);
+      expect(((await refused.json()) as { error: { code: string } }).error.code).toBe("import.secret_file");
+    }
+    // A script or a binary with none goes like any file.
+    expect((await bytes("#!/bin/sh\necho hi\n", "hello.sh")).status).toBe(201);
+    expect((await bytes(new Uint8Array([0xff, 0xfe, 0, 1]), "data.bin")).status).toBe(201);
 
     // The Drive's limits: the workspace's storage.
     await setOrgLimits((t as TestServer).db, orgId, {
@@ -433,7 +464,11 @@ describe("an imported agent's own files into the Drive", () => {
     expect(((await big.json()) as { error: { code: string } }).error.code).toBe("artifact.file_too_large");
 
     const titles = (await (await b(`${base}/artifacts?q=Scout%2F`)).json()) as { artifacts: { title: string }[] };
-    expect(titles.artifacts.map((a) => a.title)).toEqual(["Scout/notes/plan.md"]);
+    expect(titles.artifacts.map((a) => a.title).sort()).toEqual([
+      "Scout/data.bin",
+      "Scout/hello.sh",
+      "Scout/notes/plan.md",
+    ]);
 
     // Only who imports; and only into an agent of this workspace.
     const member = await joinByInvitation(t as TestServer, b, orgId, "member@example.com");

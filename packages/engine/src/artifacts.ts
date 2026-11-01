@@ -288,8 +288,7 @@ export function cleanFileName(raw: string): string {
   return ext && ext.length < 20 ? `${base.slice(0, max - ext.length - 1)}.${ext}` : base.slice(0, max);
 }
 
-/** A file whose bytes read as text: by its type, or its extension. */
-export const isTextFile = (name: string, contentType: string) =>
+const isTextFile = (name: string, contentType: string) =>
   contentType.startsWith("text/") ||
   contentType.startsWith("application/json") ||
   TEXT_EXTENSIONS.has(extensionOf(name));

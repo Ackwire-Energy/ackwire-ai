@@ -1,6 +1,7 @@
 import type { MigrationBundle } from "@agenteschat/client";
 import { MAX_UPLOAD_BYTES } from "@agenteschat/client/lib/files";
 import { excerpt } from "@agenteschat/client/lib/text";
+import { isSecretFile } from "@agenteschat/ui/names";
 import * as agenteschat from "./agenteschat";
 import * as hermes from "./hermes";
 import * as openbot from "./openbot";
@@ -184,14 +185,14 @@ function ownerOf(d: Draft, path: string): { agent: string; path: string } | null
 }
 
 /**
- * One of an agent's files: copied unless it is a credential store (by its name, or a text that has a key in it), has
- * no bytes we can read, or is over the Drive's limit.
+ * One of an agent's files: copied unless it is a credential store (by its name, or a key in its text or in what the
+ * reader peeked at), has no bytes we can read, or is over the Drive's limit.
  */
 function agentFile(agent: string, path: string, f: ImportFile): AgentFile {
   const size = f.size ?? new TextEncoder().encode(f.text).byteLength;
   const read = f.read ?? (f.text ? async () => new Blob([f.text]) : undefined);
   const skip: AgentFileSkip | undefined =
-    isSecretPath(f.name) || isSecretPath(path) || scrubSecrets(f.text).redacted
+    isSecretPath(f.name) || isSecretFile(path) || scrubSecrets(f.text || f.peek || "").redacted
       ? "secret"
       : !read
         ? "unreadable"
