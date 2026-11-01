@@ -80,15 +80,16 @@ describe("provider marks where a provider is named", () => {
     };
     const brainLine = () => document.querySelector(".channel__brain") as HTMLElement;
 
+    // The workspace's one computer: its name tells nothing apart.
     await open(`dm/agent/${ADA_ID}`, withBrain({ kind: "claude_code", model: "Sonnet", computer: "MacBook" }));
-    expect(brainLine().textContent).toBe("Claude Code · Sonnet no MacBook");
+    expect(brainLine().textContent).toBe("Sonnet pelo plano do Claude");
     expect(marks(brainLine())).toEqual(["claude"]);
     expect(brainLine().querySelector(".ac-brand")?.getAttribute("aria-hidden")).toBe("true");
     cleanup();
 
-    // A coding plan names its maker's model; who doesn't see the computer reads whose plan it is.
+    // A coding plan names its maker's model and the plan; who doesn't see the computer reads whose plan it is.
     await open(`dm/agent/${ADA_ID}`, withBrain({ kind: "claude_code", model: "GLM-5.3", provider: "zai" }));
-    expect(brainLine().textContent).toBe("GLM-5.3 pelo Claude Code · plano de João");
+    expect(brainLine().textContent).toBe("GLM-5.3 pelo GLM Coding de João");
     expect(marks(brainLine())).toEqual(["zai"]);
     cleanup();
 

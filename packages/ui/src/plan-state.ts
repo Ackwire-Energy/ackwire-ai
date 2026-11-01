@@ -42,6 +42,22 @@ export type PlanState = "ok" | "almost" | "limited";
 
 /** The usage at which a plan is "almost at the limit". */
 export const PLAN_ALMOST = 80;
+/** From here a window's bar is red: one long task can take a 5-hour window's last tenth. */
+export const PLAN_CRITICAL = 90;
+
+export type PlanLevel = "ok" | "almost" | "critical" | "limited";
+
+/** How close a window (or the plan: `limited` when it refused a request) is to its limit, as its bar is colored. */
+export const planLevel = (used: number, limited = false): PlanLevel =>
+  limited || used >= 100 ? "limited" : used >= PLAN_CRITICAL ? "critical" : used >= PLAN_ALMOST ? "almost" : "ok";
+
+/** Each level's color token: the phone's `c[...]`. The web maps the same levels in components.css. */
+export const PLAN_TONE = {
+  ok: "ink",
+  almost: "warn",
+  critical: "danger",
+  limited: "danger",
+} as const satisfies Record<PlanLevel, "ink" | "warn" | "danger">;
 
 const KIND_ORDER = ["five_hour", "seven_day", "seven_day_opus", "seven_day_sonnet", "monthly", "other"];
 const passed = (iso: string | undefined, now: number) => iso !== undefined && Date.parse(iso) <= now;

@@ -30,18 +30,22 @@ export const advancedDefaults = (kind: BrainKind, now: Advanced): Advanced =>
 export const isAdvancedDefault = (kind: BrainKind, now: Advanced) =>
   JSON.stringify(advancedDefaults(kind, now)) === JSON.stringify(now);
 
+type AdvancedOf = { kind: BrainKind; autoModel: boolean; apiKey: boolean; now: Advanced };
+
 /**
  * The row's line: "Tudo no padrão", or only what differs ("Esforço alto · Contexto de 400K"). The effort counts only
  * with a fixed model (an automatic one picks it), and the fallback only where answering through the API is possible.
  */
-export function advancedSummary(
-  t: TFunction,
-  language: string,
-  o: { kind: BrainKind; autoModel: boolean; apiKey: boolean; now: Advanced },
-): string {
+export function advancedSummary(t: TFunction, language: string, o: AdvancedOf): string {
+  const parts = advancedParts(t, language, o);
+  return parts.length ? parts.join(" · ") : t("agentPage.work.brain.advanced.allDefault");
+}
+
+/** What differs from the defaults, each as the row says it; none when everything is. */
+export function advancedParts(t: TFunction, language: string, o: AdvancedOf): string[] {
   const computer = o.kind !== "model";
   const { now } = o;
-  const parts = [
+  return [
     computer && !o.autoModel && now.effort !== ADVANCED_DEFAULTS.effort
       ? t("agentPage.work.brain.advanced.effort", {
           level: lowerFirst(t(`agentPage.work.brain.efforts.${now.effort}`), language),
@@ -51,7 +55,6 @@ export function advancedSummary(
     computer && !now.onlyOwner ? t("agentPage.work.brain.advanced.sharing") : null,
     computer && o.apiKey && !now.fallback ? t("agentPage.work.brain.advanced.waits") : null,
   ].filter((p): p is string => p !== null);
-  return parts.length ? parts.join(" · ") : t("agentPage.work.brain.advanced.allDefault");
 }
 
 /** Claude's own models (`--model opus|sonnet|haiku`) say what each is for under their names. */
