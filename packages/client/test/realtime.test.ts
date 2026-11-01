@@ -6,6 +6,7 @@ import {
   applyChannelEvent,
   emptyStreams,
   expectReply,
+  MISSED_MESSAGE_GRACE_MS,
   parseServerFrame,
   RealtimeConnection,
   realtimeUrl,
@@ -241,6 +242,61 @@ describe("RealtimeConnection", () => {
     socket.sent.length = 0;
     clock.runNext();
     expect(socket.sent).toEqual([{ type: "subscribe", channelId: "c2" }]);
+  });
+
+  test("a notification for a message whose message.created never came subscribes its channel anew and catches up", () => {
+    const { factory, sockets } = fakeSockets();
+    const clock = manualTimers();
+    const conn = new RealtimeConnection({ url: "ws://x", createSocket: factory, timers: clock.timers, pingMs: 0 });
+    const caughtUp: string[] = [];
+    conn.onSubscribed((channelId) => caughtUp.push(channelId));
+    conn.subscribe("c1", () => {});
+    conn.start();
+    const socket = sockets[0];
+    if (!socket) throw new Error("no socket");
+    socket.open();
+    socket.push({ type: "subscribed", channelId: "c1" });
+    socket.sent.length = 0;
+    const reply = (messageId: string, channelId = "c1", readAt: string | null = null) =>
+      socket.push({
+        type: "event",
+        scope: "user",
+        event: { type: "notification.upserted", notification: { source: { channelId, messageId }, readAt } },
+      });
+    // Heard live first: nothing to do.
+    socket.push({
+      type: "event",
+      channelId: "c1",
+      event: { type: "message.created", channelId: "c1", messageId: "m1" },
+    });
+    reply("m1");
+    // Read already, or in a channel nobody here listens to: nothing either.
+    reply("m2", "c1", "2026-11-01T21:10:00Z");
+    reply("m3", "c9");
+    expect(clock.pending.map((p) => p.ms)).toEqual([]);
+    // The channel went silent: the reply's notification comes, its message.created doesn't.
+    reply("m4");
+    expect(clock.pending.map((p) => p.ms)).toEqual([MISSED_MESSAGE_GRACE_MS]);
+    clock.runNext();
+    expect(socket.sent).toEqual([
+      { type: "unsubscribe", channelId: "c1" },
+      { type: "subscribe", channelId: "c1" },
+    ]);
+    socket.push({ type: "unsubscribed", channelId: "c1" });
+    socket.push({ type: "subscribed", channelId: "c1" });
+    expect(caughtUp).toEqual(["c1", "c1"]);
+    // The answer to its own unsubscribe asked for no extra retry once the channel was confirmed.
+    expect(clock.pending).toEqual([]);
+    // The message.created arriving within the grace cancels it.
+    reply("m5");
+    socket.push({
+      type: "event",
+      channelId: "c1",
+      event: { type: "message.created", channelId: "c1", messageId: "m5" },
+    });
+    socket.sent.length = 0;
+    clock.runNext();
+    expect(socket.sent).toEqual([]);
   });
 
   test("stop closes the socket and never reconnects", () => {

@@ -15,7 +15,10 @@ import { steerStore } from "./steer";
  *   minutes while HTTP still works, so messages send and nothing arrives live;
  * - asks again, with backoff, for a channel someone still listens to when the server drops or refuses its
  *   subscription (`unsubscribed`, an error about the channel, `rate_limited`): the socket stays up and keeps
- *   bringing the person's own events (the reply sound) while that channel would stay silent until a refresh.
+ *   bringing the person's own events (the reply sound) while that channel would stay silent until a refresh;
+ * - when a notification names a message in a channel listened to here whose `message.created` never came
+ *   (`MISSED_MESSAGE_GRACE_MS` later), subscribes that channel anew: the server's `subscribed` has every screen
+ *   catch up (`onSubscribed`), and a subscription the server lost without a word is made again.
  */
 
 export type ServerFrame =
@@ -60,6 +63,10 @@ const defaultTimers: Timers = {
 };
 
 export const BACKOFF_MS = [500, 1000, 2000, 5000, 10_000];
+/** How long after a notification its message's own `message.created` may still come (it is normally first). */
+export const MISSED_MESSAGE_GRACE_MS = 3000;
+/** How many `message.created` ids are remembered for that check. */
+const HEARD_LIMIT = 500;
 const OPEN = 1;
 
 /** Where the server is: the page's location (web) or the server's origin, e.g. "https://app.agentes.chat" (phone app). */
@@ -124,6 +131,8 @@ export class RealtimeConnection {
   /** Channels the server confirmed on this socket. */
   private readonly confirmed = new Set<string>();
   private readonly retries = new Map<string, { timer: unknown; attempt: number }>();
+  /** Recent `message.created` ids, oldest first. */
+  private readonly heard = new Set<string>();
   private everOpened = false;
   private stopped = true;
   status: ConnectionStatus = "idle";
@@ -332,8 +341,13 @@ export class RealtimeConnection {
       return;
     }
     if (frame.type === "event" && "scope" in frame) {
+      this.checkHeard(frame.event);
       for (const l of this.userListeners) l(frame.event);
     } else if (frame.type === "event") {
+      if (frame.event.type === "message.created") {
+        this.heard.add(frame.event.messageId);
+        if (this.heard.size > HEARD_LIMIT) this.heard.delete(this.heard.values().next().value as string);
+      }
       // "lê na próxima pausa" / "leu" under your messages: one store for every screen (`useSteerState`).
       steerStore.apply(frame.event);
       const set = this.listeners.get(frame.channelId);
@@ -356,6 +370,20 @@ export class RealtimeConnection {
           if (!this.confirmed.has(channelId)) this.retrySubscribe(channelId);
       for (const l of this.errorListeners) l(frame.code, frame.channelId);
     }
+  }
+
+  /** A notification about a message in a channel open here: if its `message.created` doesn't come, subscribe anew. */
+  private checkHeard(event: UserEvent) {
+    if (event.type !== "notification.upserted" || !("notification" in event)) return;
+    const { source, readAt } = event.notification;
+    const { channelId, messageId } = source;
+    if (!channelId || !messageId || readAt || !this.listeners.has(channelId) || this.heard.has(messageId)) return;
+    this.timers.setTimeout(() => {
+      if (this.heard.has(messageId) || !this.listeners.has(channelId)) return;
+      this.confirmed.delete(channelId);
+      this.send({ type: "unsubscribe", channelId });
+      this.send({ type: "subscribe", channelId });
+    }, MISSED_MESSAGE_GRACE_MS);
   }
 
   private clearRetry(channelId: string) {
