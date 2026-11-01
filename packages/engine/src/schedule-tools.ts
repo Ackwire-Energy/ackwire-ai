@@ -978,7 +978,6 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
                 description: when.description,
                 message: str(input.title),
                 askAgent: true,
-                access: "act",
               });
               return { routineId: r.id, runAt: when.at };
             };

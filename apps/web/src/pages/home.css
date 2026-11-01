@@ -40,7 +40,7 @@
 .home-sec__more:hover {
   color: var(--ink);
 }
-.home-sec__more:focus-visible {
+html:not([data-pointer]) .home-sec__more:focus-visible {
   outline: none;
   border-radius: 4px;
   box-shadow: var(--focus-ring);
@@ -80,7 +80,7 @@
 :is(a, button).home-row:hover {
   background: color-mix(in srgb, var(--sunken) 45%, transparent);
 }
-:is(a, button).home-row:focus-visible {
+html:not([data-pointer]) :is(a, button).home-row:focus-visible {
   outline: none;
   box-shadow: inset var(--focus-ring);
 }

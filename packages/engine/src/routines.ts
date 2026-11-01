@@ -1977,8 +1977,6 @@ export async function createReminder(
     forUserId?: string;
     /** At the time, ask the agent to do it (a run) instead of only reminding. */
     askAgent?: boolean;
-    /** What that run may do (default `read`): `act` for an action approved ahead (`schedule_action`). */
-    access?: RoutineAccess;
   },
 ): Promise<ReminderView> {
   const { db } = deps;
@@ -2017,7 +2015,6 @@ export async function createReminder(
       timezone: input.timezone,
       description: input.description,
       nextRunAt: input.at,
-      access: routineAccessOf(input.access),
       createdByUserId: requesterId,
     })
     .returning();

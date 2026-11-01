@@ -90,7 +90,7 @@ export async function validateAgentFields(db: Database, orgId: string, input: Pa
   }
   // An id-shaped handle is how mentions written before migration 0132 still name an imported agent (`currentHandles`).
   if (input.handle !== undefined && isIdHandle(input.handle)) {
-    throw new ValidationError("handle can't look like an id; pick one from the agent's name");
+    throw new ValidationError("handle can't look like an id. Pick one from the agent's name");
   }
   // "auto": each run picks the model from the line of the agent's key (any provider).
   const model = input.model && !isAutoModel(input.model) ? await modelInfoFor(db, input.model) : undefined;
