@@ -286,6 +286,7 @@ export const hidesBody = (m: Message) =>
       m.meta?.threadStart ||
       m.meta?.issueWork ||
       m.meta?.browserHandoff ||
+      m.meta?.secretRequest ||
       m.meta?.missionSetup ||
       questionOf(m.meta)?.text.trim() === m.body.trim(),
   );
@@ -315,6 +316,17 @@ export function workingEntries(
  */
 export const stoppableInLine = (runs: LiveRun[]) =>
   runs.filter((r) => !r.provisional && (r.status === "thinking" || r.status === "queued" || r.status === "running"));
+
+/**
+ * What the line above the composer stops with its own "Parar" (the working line, or the requests' line while it
+ * takes its place): the runs I may stop of the one agent at work here. With several, the line can't say whose (the
+ * box's own stop stops them all).
+ */
+export function lineStops(entries: ActivityEntry[], runs: LiveRun[], canStop: (run: LiveRun) => boolean): LiveRun[] {
+  const agents = entries.filter((e) => e.type === "agent");
+  const solo = agents.length === 1 ? agents[0] : undefined;
+  return solo ? stoppableInLine(runs).filter((r) => r.agentId === solo.id && canStop(r)) : [];
+}
 
 /**
  * Who may press "Parar" (the web's `useStopRun`): admins, the agent's owner,

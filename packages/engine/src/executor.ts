@@ -118,6 +118,7 @@ import {
   endsWithSentinel,
   isSentinelOnly,
   PASS_TOOL,
+  pauseLead,
   repliesAfterTrigger,
   replyPolicyFor,
   routedAsFollowUp,
@@ -1726,7 +1727,7 @@ async function executeRunInner(
   /**
    * A computer brain's call through the bridge paused the run during the turn
    * (`suspendRunForTool` posted the card and moved it to `waiting_*`): keep the
-   * pending calls it recorded, post what the brain said, and stop here.
+   * pending calls it recorded, post what the brain said if it says more than the card, and stop here.
    */
   const suspendedByBridge = async (
     status: "waiting_approval" | "waiting_input",
@@ -1743,7 +1744,7 @@ async function executeRunInner(
     // A question the brain asked mid-turn is already posted. Only what it wrote before asking leads to it
     // (posted just before the card, so it reads first); what it wrote after only repeats the question.
     const asked = await bridgedQuestionCard(t);
-    let text = stripSentinel(said);
+    let text = pauseLead(stripSentinel(said));
     let at: Date | undefined;
     if (asked && textBefore) {
       text = stripSentinel(textBefore(asked.askedAt + ASKED_GRACE_MS));
@@ -2350,13 +2351,15 @@ async function executeRunInner(
           continue;
         }
 
-        // Suspend: post what the agent said so far, one card per approval and each question, then wait.
+        // Suspend: post what the agent said (`pauseLead`), one card per approval and each question, then wait.
         transcript.pending = { calls };
         const t = transcript;
         const posted = await db.transaction(async (tx) => {
-          // Only this turn's text (it introduces the approval or question); earlier narration is in the steps.
-          // A background run never posts by itself (ADR 0053 §5): its cards speak for it.
-          const said = run.background ? "" : stripSentinel(turnText);
+          // Only this turn's text: what leads to a question, or what says more than an approval's or a secret's
+          // card. Earlier narration is in the steps. A background run never posts by itself (ADR 0053 §5): its
+          // cards speak for it.
+          const text = stripSentinel(turnText);
+          const said = run.background ? "" : asks.length > 0 ? text : pauseLead(text);
           const lead = said ? await post(tx, replyThreadId, said, withFallback(t, takeMemoryUpdates(t))) : null;
           // The cards, the same way a computer brain's bridged call posts them (`postPauseCards`).
           const pause = await postPauseCards(tx, run, {
