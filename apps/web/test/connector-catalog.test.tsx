@@ -344,8 +344,9 @@ describe("Adicionar conector: one catalog", () => {
     await click(within(service("Outro serviço")).getByRole("button", { name: "Conectar pelo endereço" }));
     expect(flow().textContent).toContain("Ao conectar, todos os agentes podem usar. Você muda isso no passo 3.");
     await type(within(flow()).getByLabelText("Endereço do servidor MCP"), "https://oauth.zapier.example/mcp");
+    // No account here was named by its provider, so step 1 can't tell accounts apart and asks for one not yet here.
     expect(flow().textContent).toContain(
-      "A nova conta começa sem agentes, menos os que têm acesso a tudo. Você escolhe no passo 3.",
+      "Entre numa conta que ainda não está conectada, a gente não consegue conferir. Ela começa sem agentes, menos os que têm acesso a tudo.",
     );
   });
 
@@ -859,7 +860,9 @@ describe("several accounts of one service", () => {
     const { state, second } = await twoAccounts();
     await click(within(await rowMenu("Zapier 2")).getByRole("menuitem", { name: "Reconectar" }));
     expect(screen().getByRole("dialog", { name: "Reconectar Zapier 2" })).toBe(flow());
-    expect(flow().textContent).toContain("Substitui o login atual. Quem usa continua igual.");
+    expect(flow().textContent).toContain(
+      "Entre na mesma conta de antes. A gente não consegue conferir qual é, e quem usa continua igual.",
+    );
     await click(within(flow()).getByRole("button", { name: "Continuar no Zapier" }));
     await settle(4);
     expect(state.calls.filter((c) => c.method === "customConnectors.connect").at(-1)?.args[1]).toMatchObject({
@@ -885,8 +888,9 @@ describe("several accounts of one service", () => {
     const { state } = await twoAccounts();
     await click(within(await rowMenu("Zapier")).getByRole("menuitem", { name: "Adicionar outra conta" }));
     expect(screen().getByRole("dialog", { name: "Outra conta do Zapier" })).toBe(flow());
+    // No account here was named by its provider, so step 1 can't tell accounts apart and asks for one not yet here.
     expect(flow().textContent).toContain(
-      "A nova conta começa sem agentes, menos os que têm acesso a tudo. Você escolhe no passo 3.",
+      "Entre numa conta que ainda não está conectada, a gente não consegue conferir. Ela começa sem agentes, menos os que têm acesso a tudo.",
     );
     await click(within(flow()).getByRole("button", { name: "Continuar no Zapier" }));
     await settle(4);
