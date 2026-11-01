@@ -15,8 +15,8 @@ import {
   STEER_PROTOCOL,
   type WireBrainEvent,
 } from "@agenteschat/adapters/machine-protocol";
+import { accountSettingsEnv } from "../../runner/accounts";
 import {
-  accountSettingsEnv,
   BRAIN_BUILTIN_TOOLS,
   BrainManager,
   type BrainManagerOptions,

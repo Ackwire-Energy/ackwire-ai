@@ -317,9 +317,9 @@ export const envVars = {
     section: "Agents",
   },
   ROUTER_MENTION_THRESHOLD: {
-    schema: z.coerce.number().min(0).max(1).default(0.6),
+    schema: z.coerce.number().min(0).max(1).default(0.2),
     description:
-      "When an agent @mentions another, minimum Jev probability (0–1) that it is asking that agent to act now for it to answer.",
+      "When an agent @mentions another, minimum probability (0–1) that the message needs something from that agent for it to answer. Low on purpose: only a judge sure the message needs nothing (a thanks, an ok, a quote) leaves the agent asleep.",
     section: "Agents",
   },
   AGENT_MAX_OUTPUT_TOKENS: {
@@ -712,6 +712,22 @@ export const envVars = {
       "Where people write to whoever runs this server, shown with a workspace's hold notice, its suspended screen and the workspace's own computer when something on it doesn't work. Unset (default): they are told to ask the people who run the server.",
     section: "Operator",
     example: "support@example.com",
+  },
+  OPS_REPORT_EMAIL: {
+    schema: z
+      .string()
+      .optional()
+      .transform((value) =>
+        value
+          ?.split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean),
+      )
+      .pipe(z.array(z.email()).optional()),
+    description:
+      "Where the daily stall-and-noise report goes, one address or several separated by commas: for each workspace, where agents stopped although someone waited on them and where they acted for nothing, over the previous UTC day and against the 7 days before it. Workspace names and counts only, never what anyone wrote. Needs email (`MILLIONSEND_API_KEY` or `SMTP_URL`). Unset (default): no report. `bun run report:autonomy` prints the same table at any time.",
+    section: "Operator",
+    example: "ops@example.com",
   },
   BILLING_URL: {
     schema: z.url({ protocol: /^https$/ }).optional(),

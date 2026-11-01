@@ -539,7 +539,8 @@ describe("missions with executor agent (ADR 0029)", () => {
     f = await setup({
       machines: true,
       missionTools: true,
-      judge: () => 1,
+      // Ops' mention needs Dev: only the mission's rule keeps Dev from working for Bia.
+      judge: (kind) => (kind === "mention_needs_nothing" ? 0 : 1),
       reply: (req) =>
         systemText(req.system).includes("(@ops)")
           ? { chunks: ["@dev please build the dark mode now"] }

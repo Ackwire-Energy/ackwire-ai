@@ -7,7 +7,7 @@ import { publishUserEvent } from "./events";
 import { cutText } from "./format";
 import { taskRequester } from "./machine-tasks";
 import { getMessage } from "./messages";
-import { missionOfRun, type RunMission, runActsForMission } from "./mission-context";
+import { missionOfRun, NOT_FOR_MISSION, type RunMission, runActsForMission } from "./mission-context";
 import { completeMission } from "./mission-delivery";
 import { MISSION_LIMITS } from "./mission-limits";
 import {
@@ -229,12 +229,7 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
             return { content: "The plan isn't approved yet: wait for the people to start the mission.", isError: true };
           }
           if (!(await runActsForMission(ctx, run))) {
-            return {
-              content:
-                "Only the mission's owner or someone who can decide can make the mission act. Tell the person; the owner can accept their suggestion.",
-              isError: true,
-              data: { code: "mission.not_allowed" },
-            };
+            return { content: NOT_FOR_MISSION, isError: true, data: { code: "mission.not_allowed" } };
           }
           await checkMissionToolRate(ctx.db, mission, tool.name, `agent:${ctx.agentId}`);
           const out = await body(input, ctx, mission);

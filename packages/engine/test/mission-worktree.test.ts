@@ -23,7 +23,7 @@ import {
 import { deliverNotice } from "../src/delivery";
 import { type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
-import { pairedMachine, RUNNER } from "./mission-helpers";
+import { ownerWrites, pairedMachine, RUNNER } from "./mission-helpers";
 
 let f: Fixture;
 afterEach(async () => {
@@ -186,7 +186,7 @@ async function startTaskInTurn(args: Record<string, unknown>) {
       agentId: f.agent.id,
       channelId: mission.channelId,
       threadRootId: mission.threadRootId,
-      triggerMessageId: crypto.randomUUID(),
+      triggerMessageId: await ownerWrites(f, mission),
       trigger: "mention",
       hop: 1,
       status: "running",
@@ -515,7 +515,7 @@ describe("one worktree per mission (ADR 0044)", () => {
     expect(await missionTurnPermissions(f.db, { ...turn, threadRootId: crypto.randomUUID() })).toBeNull();
   });
 
-  test("a run a routine's report woke in the mission's thread only reads; the mission's own runs work", async () => {
+  test("a run a routine's report woke in the mission's thread has the mission's profile but doesn't make it act", async () => {
     await started();
     const mission = await missionRow();
     const turn = { orgId: f.org.id, agentId: f.agent.id, threadRootId: mission.threadRootId };
@@ -532,11 +532,35 @@ describe("one worktree per mission (ADR 0044)", () => {
     );
     const woken = delivered.runs[0];
     expect(woken).toBeDefined();
-    expect(await missionTurnPermissions(f.db, { ...turn, runId: woken?.id })).toMatchObject({ mode: "plan" });
+    expect(await missionTurnPermissions(f.db, { ...turn, runId: woken?.id })).toMatchObject({ mode: "work" });
     // The mission's own run (woken by its inbox, nobody behind it) keeps the mission's profile.
     const own = (await f.db.select().from(schema.agentRuns)).find((r) => r.id !== woken?.id);
     expect(own).toBeDefined();
     expect(await missionTurnPermissions(f.db, { ...turn, runId: own?.id })).toMatchObject({ mode: "work" });
+    // Nobody is behind the report, so it doesn't make the mission act: its machine tools say so, as its others do.
+    const { db: _db, ...deps } = f.missionDeps;
+    const ctx = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: woken?.id ?? "",
+      channelId: mission.channelId,
+      threadRootId: mission.threadRootId,
+      triggerMessageId: woken?.triggerMessageId ?? "",
+      bridge: { machineId: mission.machineId as string },
+    };
+    const tools = await createMissionRunToolSource(deps).tools(ctx);
+    for (const [name, input] of [
+      ["start_task", { title: "Corrigir o checkout", prompt: "Os 3 erros novos" }],
+      ["upload_artifact", { path: "relatorio.md" }],
+    ] as const) {
+      expect(await tools.find((t) => t.name === name)?.execute(input, ctx)).toMatchObject({
+        isError: true,
+        data: { code: "mission.not_allowed" },
+      });
+    }
+    const titles = (await f.db.select().from(schema.machineTasks)).map((t) => t.title);
+    expect(titles).not.toContain("Corrigir o checkout");
   });
 
   test("moving to another computer removes the copy on the old one (the branch stays)", async () => {

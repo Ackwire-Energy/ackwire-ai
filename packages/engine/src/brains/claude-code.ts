@@ -14,7 +14,7 @@ import {
 } from "@agenteschat/adapters";
 import { type Database, type Executor, schema } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
-import { type RunAuthority, runAuthorityById } from "../authority";
+import { fedByRoutine, type RunAuthority, runAuthorityById } from "../authority";
 import { type MachineCaller, MachineRequestError, type MachineStatus } from "../machine-hub";
 import { MachineDroppedError, MachineOfflineError, MachinePausedError, pausedMessage } from "../machines";
 import { computerPrompt } from "./prompt";
@@ -52,23 +52,21 @@ import type { Brain, BrainAccount, BrainEvent, BrainIO, BrainTurn, SteerMessage,
  */
 
 /**
- * The permission profile of a computer turn (ADR 0053 §3), from who is behind
- * its run: a person's run works (`work`: edits, commands by the command policy
- * and a person); a routine works only with access `act`; a routine that only
- * reads (`read`, the default, also a legacy brief-less one) and every
- * unattended run read (`plan`: no edits, read-only shell, no web, our tools
- * only). Missions keep their own profile (`missionTurnPermissions`).
+ * The permission profile of a computer turn (ADR 0053 §3 and its addendum of
+ * 2026-10-31), from who is behind its run: every run works (`work`: edits,
+ * commands by the command policy and a person), whoever woke it, except a
+ * routine set to only look and tell (`read`, the default, also a legacy
+ * brief-less one), which reads (`plan`: no edits, read-only shell, no web, our
+ * tools only; its context says why), and so does a run its report or work woke
+ * (`fedByRoutine`). Missions keep their own profile
+ * (`missionTurnPermissions`).
  */
 export function computerProfile(authority: RunAuthority): "plan" | "work" {
-  if (authority.kind === "person") return "work";
-  if (authority.kind === "routine") return authority.brief?.access === "act" ? "work" : "plan";
-  return "plan";
+  const bounded = authority.kind === "routine" || fedByRoutine(authority);
+  return bounded && authority.kind !== "person" && authority.brief?.access !== "act" ? "plan" : "work";
 }
 
-/**
- * A turn's profile, read again for every turn: a person who writes into an
- * unattended run while it works puts them behind it (`steeredBy`) from then on.
- */
+/** A turn's profile (`computerProfile`), from its run. */
 export async function computerTurnProfile(
   db: Executor,
   turn: Pick<BrainTurn, "orgId" | "runId">,
@@ -270,6 +268,13 @@ export function toolOff(
   }
   return status.execAllowed ? null : { code: "exec_disabled", message: `Commands are turned off on ${status.name}.` };
 }
+
+/**
+ * The folder a computer turn was to start in, when the runner refused the turn because it isn't on the computer
+ * (`not_found`, which a Claude Code runner answers as `bad_request`, in every runner version); else null.
+ */
+export const missingTurnFolder = (message: string): string | null =>
+  /^The folder (.+) doesn't exist$/.exec(message)?.[1] ?? null;
 
 /**
  * The runner refused the turn before starting it, for lack of room (`no_slot`) or at its request ceiling
