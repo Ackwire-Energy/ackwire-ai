@@ -503,7 +503,7 @@ describe("ask_agent", () => {
     await insertMessage(f.db, {
       orgId: f.org.id,
       channelId: dm,
-      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0 },
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0, stretchId: null },
       body: "Another question, for someone else",
     });
     // The consulted run's own words in the DM are.
@@ -538,7 +538,7 @@ describe("ask_agent", () => {
     const trigger = await insertMessage(f.db, {
       orgId: f.org.id,
       channelId: dm,
-      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0 },
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0, stretchId: null },
       body: "Started elsewhere",
     });
     const asker = (await runs()).find((r) => r.id === row.askerRunId);
@@ -557,7 +557,9 @@ describe("ask_agent", () => {
     const other = await insertMessage(f.db, {
       orgId: f.org.id,
       channelId: dm,
-      author: { type: "agent", agentId: f.agent.id, runId: elsewhere?.id ?? null, hop: 0 },
+      author: elsewhere
+        ? { type: "agent", agentId: f.agent.id, runId: elsewhere.id, hop: 0 }
+        : { type: "agent", agentId: f.agent.id, runId: null, hop: 0, stretchId: null },
       body: "Is production up?",
       meta: { consultation: { id: otherId } },
     });
@@ -619,18 +621,22 @@ describe("ask_agent", () => {
     expect(judged.filter((j) => j.kind === "follow_through" && j.agentId === infra.id)).toEqual([]);
   });
 
-  test("an asker that says it will pass the answer on keeps that promise: the answer wakes it, no judge asked", async () => {
+  test("an asker that says it will pass the answer on keeps that promise: the answer wakes it, no nudge", async () => {
+    let judged = 0;
     f = await setup({
       askAgent: true,
-      judge: (kind) => (kind === "follow_through" ? "unkept" : undefined),
+      // Its first reply promises to pass the answer on (unkept), the relay is done.
+      judge: (kind) => (kind === "follow_through" ? (++judged === 1 ? "unkept" : "done") : undefined),
       reply: consultReply(() => answer("Staging deploys with deploy.sh")),
     });
     await addInfra();
     await post("@dev how do we deploy to staging?");
     await drainOutbox(f.db, f.handlers);
 
-    const judged = (f.context.judge as unknown as { calls: { kind: string }[] }).calls;
-    expect(judged.filter((j) => j.kind === "follow_through")).toEqual([]);
+    // Each run's end is read once (ADR 0089); the open question kept the first promise.
+    expect(judged).toBe(2);
+    const steps = await f.db.select().from(schema.agentRunSteps);
+    expect(steps.filter((s) => s.data.nudged === "promise")).toEqual([]);
     const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
     expect(timeline.at(-1)?.body).toBe("Relaying: Staging deploys with deploy.sh");
   });
@@ -869,5 +875,42 @@ describe("ask_agent", () => {
     expect(after.filter(isReply)).toHaveLength(1);
     expect(after.at(-1)?.body).toContain("stopped by a person");
     expect(github.executed).toHaveLength(0);
+  });
+});
+
+describe("a reply to a note (tell_agent) goes back when the judge reads something in it, in any language", () => {
+  /** @dev tells @infra the deploy finished; @infra replies `infraSays`; the judge reads it as `score`. */
+  async function noteFlow(infraSays: string, score: number) {
+    f = await setup({
+      askAgent: true,
+      judge: (kind) => (kind === "note_reply" ? score : undefined),
+      reply: (req) => {
+        if (inAgentDm(req)) return answer(infraSays);
+        const last = lastText(req);
+        if (last.includes("Note from @infra")) return answer("ok");
+        if (last.includes("tool_result")) return answer("Told Infra.");
+        return {
+          chunks: [],
+          toolUses: [{ name: "tell_agent", input: { agent: "@infra", message: "The deploy to staging finished." } }],
+        };
+      },
+    });
+    await addInfra();
+    await post("@dev tell infra the deploy finished");
+    await drainOutbox(f.db, f.handlers);
+    return (await f.db.select().from(schema.messages)).filter(
+      (m) => (m.meta.notice as { kind?: string } | undefined)?.kind === "agent_note",
+    );
+  }
+
+  test("a short Japanese question back, ending in a full-width ？, reaches the sender", async () => {
+    const [notice, ...more] = await noteFlow("どのブランチ？", 0.9);
+    expect(more).toEqual([]);
+    expect(notice?.channelId).toBe(f.general.id);
+    expect(notice?.meta.notice).toMatchObject({ kind: "agent_note", text: "どのブランチ？", from: "@infra" });
+  });
+
+  test("a bare acknowledgement doesn't", async () => {
+    expect(await noteFlow("了解。", 0.1)).toEqual([]);
   });
 });

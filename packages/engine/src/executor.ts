@@ -93,10 +93,9 @@ import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationE
 import { type ChannelEvent, type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
 import {
   decisionNudge,
+  FOLLOW_THROUGH_NUDGE,
   FOLLOW_UP_TOOL,
-  followThroughNudge,
   followThroughVerdict,
-  promiseIn,
   wakesLater,
 } from "./follow-through";
 import { onForumRunFinished } from "./forum";
@@ -163,6 +162,7 @@ import { truncateOutput } from "./sandbox";
 import { secretResult } from "./secrets";
 import { enabledSkills } from "./skills";
 import { standingErrorDetail, standingRefusal } from "./standing";
+import { rerootRun } from "./stretch";
 import { archivedAgentsPrompt, FIND_AGENT_TOOL } from "./team";
 import { linkRunChecks, runChecksForReply } from "./team-actions";
 import { carriesCredential, maskCredentials } from "./tool-detail";
@@ -680,7 +680,9 @@ async function executeRunInner(
     }
     // It answered another agent's question (ADR 0034): the asking run resumes with the reply.
     if (channelRow && isAgentOnlyDm(channelRow))
-      await onConsultedRunFinished({ db, pubsub: deps.pubsub }, run, status, error).catch(() => {});
+      await onConsultedRunFinished({ db, pubsub: deps.pubsub, judge: deps.context?.judge }, run, status, error).catch(
+        () => {},
+      );
     // Paused on a decision (an approval, a secret, a mission's): what came in during this turn and wasn't
     // read gets a run of its own; nothing sent to the agent waits behind the decision.
     if ((status === "waiting_approval" || status === "waiting_input") && !run.background)
@@ -1107,10 +1109,13 @@ async function executeRunInner(
     const blocks: ContentBlock[] = [];
     const bridgedLines: string[] = [];
     const decided: string[] = [];
+    /** A person decided one of them (an approval, a question, a secret), not another agent's answer: ADR 0089. */
+    let byPerson = false;
     for (const call of transcript.pending.calls) {
       let result = call.result;
       if (!result && call.secretRequestId) {
         const [request] = await db.select().from(secretRequests).where(eq(secretRequests.id, call.secretRequestId));
+        if (request?.status === "delivered" || request?.status === "declined") byPerson = true;
         result = { isError: false, ...secretResult(request) };
         await addRunStep(db, run, "tool_result", {
           toolUseId: call.toolUseId,
@@ -1121,6 +1126,7 @@ async function executeRunInner(
         });
       } else if (!result && call.questionId) {
         const [question] = await db.select().from(agentQuestions).where(eq(agentQuestions.id, call.questionId));
+        if (question?.status === "answered") byPerson = true;
         result = { isError: false, ...questionResult(question) };
         await addRunStep(db, run, "tool_result", {
           toolUseId: call.toolUseId,
@@ -1131,6 +1137,7 @@ async function executeRunInner(
         });
       } else if (!result && call.approvalId) {
         const [approval] = await db.select().from(approvals).where(eq(approvals.id, call.approvalId));
+        if (approval?.decidedByUserId) byPerson = true;
         if (approval?.status === "approved" && deps.tools) {
           const output = await deps.tools.executeApproved(ctx, approval);
           result = { content: output.content, isError: output.isError === true };
@@ -1165,6 +1172,8 @@ async function executeRunInner(
     transcript.decided = decided.join("\n");
     delete transcript.pending;
     await saveTranscript(db, transcript);
+    // What it starts from here counts from zero.
+    if (byPerson) await rerootRun(db, run, Bun.randomUUIDv7());
   }
 
   /** Whether a person canceled the run (this process heard it, or the row says so). */
@@ -1265,8 +1274,10 @@ async function executeRunInner(
     t.answerOwed = true;
     if (!run.background && !t.steeredBy) {
       const authority = await runAuthority(db, { ...run, transcript: t as unknown as Record<string, unknown> });
-      if (authority.kind === "unattended") t.steeredBy = person;
+      if (authority.kind === "unattended") t.steeredBy = person.userId;
     }
+    // A person wrote to it: what it starts from here is a new stretch of theirs (ADR 0089).
+    if (!run.background) await rerootRun(db, run, person.messageId);
     return true;
   };
   /**
@@ -2401,37 +2412,33 @@ async function executeRunInner(
       }
       if (!text && !anythingPosted && !silent) return fail("empty_reply");
       const t = transcript;
-      // Its last words promise more ("I'll send the numbers", "vou checar de novo"): one judge call, once per run,
-      // says whether that promise is left with nothing to keep it. Then this answer is posted and the run goes on,
-      // told to keep it now or come back with a follow-up. Not in the agents' DM: there the last message is the
-      // whole answer another agent reads (`onConsultedRunFinished`), and nobody waits on a follow-up.
-      const promise =
+      // Work it said it would do still undone, in any language: one judge call, once per run (ADR 0089). When
+      // nothing it set up brings it back (`wakesLater`, read only then), this answer is posted and the run goes on,
+      // told to do it now or come back with a follow-up. Not in the agents' DM: there the last message is the whole
+      // answer another agent reads (`onConsultedRunFinished`), and nobody waits on a follow-up.
+      let keep: string | null = null;
+      if (
         judge &&
         said &&
         !silent &&
         !t.followThroughChecked &&
         run.turns + 1 < maxTurns &&
         !(channelRow && isAgentOnlyDm(channelRow))
-          ? promiseIn(said)
-          : null;
-      let keep: string | null = null;
-      if (judge && promise) {
+      ) {
         t.followThroughChecked = true;
         const detached = (t as { detachedWaits?: { waitId: string }[] }).detachedWaits;
-        const verdict = (await wakesLater(db, run, detached).catch(() => false))
-          ? "waiting"
-          : await followThroughVerdict(judge, {
-              orgId: run.orgId,
-              agentId: run.agentId,
-              runId: run.id,
-              request: triggerMessage?.body ?? triggerText,
-              reply: said,
-            }).catch(() => "done" as const);
-        if (verdict === "unkept") {
-          keep = followThroughNudge(promise);
+        const verdict = await followThroughVerdict(judge, {
+          orgId: run.orgId,
+          agentId: run.agentId,
+          runId: run.id,
+          request: triggerMessage?.body ?? triggerText,
+          reply: said,
+        }).catch(() => "done" as const);
+        if (verdict === "unkept" && !(await wakesLater(db, run, detached).catch(() => false))) {
+          keep = FOLLOW_THROUGH_NUDGE;
           appendUserText(t, keep);
           if (plan.kind !== "model") nextPrompt = keep;
-          later(() => addRunStep(db, run, "context", { nudged: "promise", promise }));
+          later(() => addRunStep(db, run, "context", { nudged: "promise" }));
         }
       }
       // Someone wrote while it answered: post this answer, then read the new message(s) and go on.
@@ -3133,11 +3140,16 @@ function routineRunIdOf(meta: Record<string, unknown> | null | undefined): strin
  * it, or names no agent and quotes none (said to whoever works there, as in a DM). A message that names
  * or quotes only another agent is for that one.
  */
-async function lastPersonAmong(db: Executor, orgId: string, agentId: string, ids: string[]): Promise<string | null> {
+async function lastPersonAmong(
+  db: Executor,
+  orgId: string,
+  agentId: string,
+  ids: string[],
+): Promise<{ userId: string; messageId: string } | null> {
   if (ids.length === 0) return null;
   const quoted = sql`${messages.meta} #>> '{replyTo,author,type}'`;
   const [row] = await db
-    .select({ userId: messages.authorUserId })
+    .select({ userId: messages.authorUserId, messageId: messages.id })
     .from(messages)
     .where(
       and(
@@ -3152,7 +3164,7 @@ async function lastPersonAmong(db: Executor, orgId: string, agentId: string, ids
     )
     .orderBy(desc(messages.createdAt))
     .limit(1);
-  return row?.userId ?? null;
+  return row?.userId ? { userId: row.userId, messageId: row.messageId } : null;
 }
 
 /**

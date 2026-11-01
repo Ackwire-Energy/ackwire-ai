@@ -5,7 +5,7 @@ import {
   type PlanWindow,
   type PlanWindowKind,
 } from "@agenteschat/adapters";
-import { and, type Database, eq, gte, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, type Database, eq, gte, inArray, isNull, or, schema, sql } from "@agenteschat/db";
 import { catalogModelOf, nanoUsdToUsd, summedCostNanoUsd } from "@agenteschat/providers";
 import { NotFoundError } from "./errors";
 import { LISTED_ACCOUNT_STATUSES } from "./machine-accounts";
@@ -155,6 +155,9 @@ async function readUsage(
         eq(usageRecords.orgId, orgId),
         gte(usageRecords.createdAt, since),
         sql`${usageRecords.agentId} is not null`,
+        // A plan's rows, the router's too (they spend its limits), and the agent's own calls: Jev's and the router's
+        // on a key are recorded with its id but are no API use of its own (`agentBudgetsThisMonth`).
+        or(eq(usageRecords.billedTo, "plan"), eq(usageRecords.kind, "agent")),
         ...(opts.agentId ? [eq(usageRecords.agentId, opts.agentId)] : []),
         ...(opts.planOnly ? [eq(usageRecords.billedTo, "plan")] : []),
       ),

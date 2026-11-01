@@ -1039,6 +1039,7 @@ export const en: Translations = {
   shell: {
     // The Mac app's own title bar (ADR 0036).
     titleBar: { back: "Back", forward: "Forward" },
+    unshown: "Couldn't be shown",
     more: "More",
     moreGroups: { schedule: "Schedule", decisions: "Decisions" },
     moreWhat: {
@@ -1501,6 +1502,10 @@ export const en: Translations = {
     remove: "Remove it",
     send: "Send anyway",
   },
+  stretchCard: {
+    continued: "{{name}} let them go on · {{time}}",
+    continuedByYou: "You let them go on · {{time}}",
+  },
   actionCard: {
     connect_ai: {
       title: "Connect an AI for {{agents}}",
@@ -1580,6 +1585,7 @@ export const en: Translations = {
       renamed: "Renamed the conversation to <b>{{to}}</b>",
       closed: "Closed the conversation <b>{{title}}</b>",
     },
+    other: "Made a change",
     issueFields: {
       title: "the title",
       description: "the description",
@@ -8258,6 +8264,7 @@ export const en: Translations = {
     },
     title: "Settings",
     account: {
+      plans: "Your plans' limits",
       device: "On this device",
     },
     orgTitle: "Workspace",
@@ -8543,6 +8550,8 @@ export const en: Translations = {
       helping: "helping {{name}}",
       see: "See conversation",
     },
+    unshown: "This message couldn't be shown",
+    unshownPart: "Part of this message couldn't be shown",
     /** Automatic lines: what reached an agent's conversation (`meta.notice`), a routine's background start. */
     notice: {
       routineHandoff: "Routine «{{routine}}» delivered a report",
@@ -8831,6 +8840,17 @@ export const en: Translations = {
       issue_work_start: "Please do task #{{number}}.",
       issue_taken: "Took task #{{number}}.",
       done: "Done.",
+      stretch_paused_runs_one: "{{agents}} stopped to check with you · {{steps}} steps without you since your request",
+      stretch_paused_runs_other:
+        "{{agents}} stopped to check with you · {{steps}} steps on their own since your request",
+      stretch_paused_spend_one:
+        "{{agents}} stopped to check with you · used {{percent}}% of the month's budget on this without you",
+      stretch_paused_spend_other:
+        "{{agents}} stopped to check with you · each used {{percent}}% of the month's budget on this without you",
+      stretch_paused_spend_cost_one:
+        "{{agents}} stopped to check with you · used {{amount}} ({{percent}}% of the month's budget) on this without you",
+      stretch_paused_spend_cost_other:
+        "{{agents}} stopped to check with you · each used {{amount}} ({{percent}}% of the month's budget) on this without you",
       memory: {
         proposed: "Proposal created: {{text}}",
         forgot: 'Memory updated: forgot "{{text}}".',

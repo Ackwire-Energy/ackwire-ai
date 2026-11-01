@@ -338,9 +338,9 @@ export const envVars = {
     section: "Agents",
   },
   AGENT_MAX_HOPS: {
-    schema: z.coerce.number().int().min(1).max(20).default(3),
+    schema: z.coerce.number().int().min(1).max(500).default(100),
     description:
-      "Maximum consecutive agent replies in one thread without a person posting. Stops agents from triggering each other forever.",
+      "Depth backstop: the most agent replies in a row along one chain without a person. The per-stretch limit (50 runs agents start on their own since a person last acted) stops them long before; reaching this means some path lost its stretch.",
     section: "Agents",
   },
   PLATFORM_ANTHROPIC_API_KEY: {

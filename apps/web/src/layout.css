@@ -440,20 +440,24 @@ p {
   /* Soft edges where the list runs under the top card or the foot (Sidebar.tsx sets the flags). */
   --sidebar-fade-top: 0px;
   --sidebar-fade-bottom: 0px;
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    #000 var(--sidebar-fade-top),
-    #000 calc(100% - var(--sidebar-fade-bottom)),
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    #000 var(--sidebar-fade-top),
-    #000 calc(100% - var(--sidebar-fade-bottom)),
-    transparent 100%
-  );
+  -webkit-mask-image:
+    linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 var(--sidebar-fade-top),
+      #000 calc(100% - var(--sidebar-fade-bottom)),
+      transparent 100%
+    ),
+    var(--scroll-strip);
+  mask-image:
+    linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 var(--sidebar-fade-top),
+      #000 calc(100% - var(--sidebar-fade-bottom)),
+      transparent 100%
+    ),
+    var(--scroll-strip);
 }
 .sidebar__scroll[data-fade-top="true"] {
   --sidebar-fade-top: 24px;
@@ -476,6 +480,22 @@ p {
     transition:
       --sidebar-fade-top 0.2s var(--out),
       --sidebar-fade-bottom 0.2s var(--out);
+  }
+}
+/* Its thumb shows only while the pointer is on the list or the keyboard moves through it. Through the token: Chrome
+   repaints a scrollbar when its element's style changes, never for a `:hover` that only its pseudo-elements read. */
+.sidebar__scroll:not(:hover, :has(:focus-visible)) {
+  --scroll-thumb: transparent;
+}
+/* The kit's 8px scrollbar sits at the sidebar's edge, in room kept whether the list scrolls or not, and the 4px of the
+   list's 12px side padding left beside it hold a row's focus ring: the rows end where the header's and the foot's do,
+   and keep their width when opening a category makes the list scroll. */
+@media (hover: hover) and (pointer: fine) {
+  @supports selector(::-webkit-scrollbar) {
+    .sidebar:not([data-rail="true"]) .sidebar__scroll {
+      scrollbar-gutter: stable;
+      padding-right: 4px;
+    }
   }
 }
 .sidebar__org {
@@ -574,7 +594,8 @@ p {
 .sidebar__channel-icon {
   color: var(--ink-muted);
 }
-/* The icon rail: a channel's initials stand in for its "#" (Sidebar.tsx, channelInitials). */
+/* The icon rail: a channel's initials stand in for its "#" (Sidebar.tsx, channelInitials), on a tile as big as the
+   faces under it, so they read as its mark and not as a cut name. */
 .sidebar__channel-abbr {
   display: none;
 }
@@ -582,14 +603,19 @@ p {
   display: none;
 }
 .sidebar[data-rail="true"] .sidebar__channel-abbr {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 30%;
+  background: var(--plate);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: 11px;
+  font-weight: 650;
   line-height: 1;
-  letter-spacing: -0.01em;
   color: var(--ink-muted);
 }
-.sidebar[data-rail="true"] .sidebar__item[data-status="active"] .sidebar__channel-abbr {
+.sidebar[data-rail="true"] .sidebar__item:is([data-status="active"], [data-unread="true"]) .sidebar__channel-abbr {
   color: var(--ink);
 }
 .sidebar__foot {
@@ -611,7 +637,7 @@ p {
   text-align: left;
   cursor: pointer;
 }
-/* A name alone centres on the face; with the status line under it the card is an `.ac-faceline`. */
+/* A name alone centres on the face; with your line under it the card is an `.ac-faceline`. */
 .sidebar__user:not(.ac-faceline) {
   align-items: center;
 }
@@ -622,7 +648,7 @@ p {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-/* Two tight lines, as in the workspace header above: the name, then the status line. */
+/* Two lines: the name, on the page's 22px line, then your line. */
 .sidebar__user-text {
   flex: 1;
   min-width: 0;
@@ -632,7 +658,7 @@ p {
 .sidebar__user-name {
   font-size: 14px;
   font-weight: 600;
-  line-height: 18px;
+  line-height: 22px;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -849,8 +875,8 @@ p {
 /* Messages fade out at the list's bottom edge, above the composer: a mask on the list itself, so a hovered
    (lifted) row, its reactions and any background fade too. The padding keeps the newest line clear of it. */
 .channel__messages {
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent), var(--scroll-strip);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent), var(--scroll-strip);
 }
 .channel__status {
   margin: 0 24px;
@@ -1638,6 +1664,11 @@ p {
   padding: 0 16px 14px;
   overflow-x: auto;
   max-height: 420px;
+}
+/* The rest of a longer block scrolls into its 420px in a message too, where the kit keeps code from scrolling up and
+   down. */
+.ac-msg__text .code-card__code {
+  overflow-y: auto;
 }
 .md .code-card code,
 .md .code-viewer code {
@@ -2609,6 +2640,11 @@ p {
 .profile-menu__line {
   margin: 0 4px 6px;
 }
+/* A plan near its limit: a long name gives way to its state. */
+.profile-menu__plan {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* "Ada não está no canal" after an @ pick */
 .mention-offer {
@@ -2937,19 +2973,23 @@ p {
   align-items: center;
   gap: 4px;
 }
-/* The same insets and gap as the workspace header's button, so both cards line up. */
+/*
+ * The workspace header's side insets and gap, so both cards line up, and as much room over the face and the name's
+ * capitals as under the face and the last line's baseline.
+ */
 .sidebar__me > .sidebar__user {
   flex: 1;
   min-width: 0;
   gap: var(--space-2);
-  padding: 4px 10px 4px 8px;
+  padding: 8px 10px 8px 8px;
   border-radius: inherit;
 }
-/* The person's face about as tall as its two lines (32px). */
+/* The face as tall as the two lines from the name's capitals to the last baseline (28px, as the workspace's mark
+   above), so the face and the words fill the card's middle together. */
 .sidebar__me > .sidebar__user > .ac-avatar {
-  width: 32px;
-  height: 32px;
-  font-size: 13px;
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
 }
 
 /* Settings: a grouped left sub-nav + one section. */
@@ -3204,6 +3244,10 @@ p {
     padding: 2px 16px 6px;
     overflow-x: auto;
     overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .settings__groups::-webkit-scrollbar {
+    display: none;
   }
   .settings__group-label {
     display: none;
@@ -4737,6 +4781,13 @@ p {
 .sidebar__item:hover {
   background: var(--plate);
 }
+/* A row that failed to draw (Sidebar.tsx, UnshownRow): quiet, and nothing to open. */
+.sidebar__item--unshown,
+.sidebar__item--unshown:hover {
+  background: transparent;
+  color: var(--faint);
+  cursor: default;
+}
 /* The chosen item: a frame of dithered sky rising from the right (an agent's row in its color) around one
    plate of the item's own white, 3px in with the item's corner less 3px, so the frame keeps an even width round
    the corners and the role, lock or state at the end sits on the plate like the label. A hairline outside keeps
@@ -5676,6 +5727,11 @@ p {
   font-size: 10px;
   line-height: 16px;
 }
+/* Over a tile's or a face's corner a bare number reads as an exponent: the rail's other counts' plate. */
+.sidebar[data-rail="true"] .sidebar__unread {
+  background: var(--sunken);
+  color: var(--ink2);
+}
 .sidebar[data-rail="true"] .sidebar__top,
 .sidebar[data-rail="true"] .sidebar__scroll,
 .sidebar[data-rail="true"] .sidebar__foot {
@@ -5686,9 +5742,20 @@ p {
 .sidebar[data-rail="true"] .sidebar__scroll {
   gap: 14px;
 }
+/* One 48px column (a 40px item and its focus ring) from the rail's padding, so the items stay on the rail's middle as
+   the header and the foot do, whatever room the scrollbar takes at the edge. Not `scrollbar-gutter: stable
+   both-edges`: WebKit keeps both gutters on the scrollbar's side. Never sideways: Firefox's thin scrollbar is 11px
+   with classic scrollbars on macOS, 1px more than the room beside the column. */
 .sidebar[data-rail="true"] .sidebar__scroll {
+  display: grid;
+  grid-template-columns: 48px;
+  align-content: start;
+  justify-items: center;
+  align-self: stretch;
+  width: auto;
   margin: -4px -10px;
-  padding: 4px 10px;
+  padding: 4px 0 4px 10px;
+  overflow-x: hidden;
 }
 .sidebar[data-rail="true"] .sidebar__jump-row {
   flex-direction: column;
@@ -5719,9 +5786,10 @@ p {
   gap: 6px;
   padding: 0;
 }
+/* As tall as the workspace's button above it: the face as big as its mark, the same room around. */
 .sidebar[data-rail="true"] .sidebar__user {
   justify-content: center;
-  padding: 4px;
+  padding: 6px;
 }
 /* A routine's "when": Horário / Evento / Email, then one quiet panel with the
    sentence, "Ajustar" and the next runs; the picker opens inside it. */
@@ -6463,7 +6531,6 @@ p {
   font-size: 12px;
   line-height: 18px;
   white-space: pre;
-  scrollbar-width: thin;
 }
 .machine-command__copy {
   flex: none;
@@ -7171,6 +7238,10 @@ a.machine-row__name:hover {
     gap: 4px;
     overflow-x: auto;
     overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .onb__steps::-webkit-scrollbar {
+    display: none;
   }
   .onb__step {
     width: auto;
@@ -7951,6 +8022,9 @@ a.machine-row__name:hover {
     scrollbar-width: none;
     padding: 2px;
   }
+  .newag .onb__steps::-webkit-scrollbar {
+    display: none;
+  }
   .newag .onb__steps li {
     flex: none;
   }
@@ -7994,6 +8068,9 @@ a.machine-row__name:hover {
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
+  }
+  .newag__tips::-webkit-scrollbar {
+    display: none;
   }
   .newag__tip {
     flex: none;
@@ -11008,8 +11085,8 @@ html[data-menu-overlay] .shell {
     var(--top);
   font-size: 14px;
 }
-/* A face brings its own tile. */
-.settings-row__icon:has(> .ac-avatar) {
+/* A face, or a plan maker's mark, brings its own tile. */
+.settings-row__icon:has(> .ac-avatar, > .ac-brand) {
   background: none;
   box-shadow: none;
 }

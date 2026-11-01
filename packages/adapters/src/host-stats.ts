@@ -97,11 +97,35 @@ async function memoryInUse(): Promise<number> {
   return Math.min(1, Math.max(0, 1 - (available ?? os.freemem()) / total));
 }
 
+/** A cgroup's counters (`memory.events`: `name value` lines), or null where there is no such cgroup. */
+export function cgroupCounters(file: string): Record<string, number> | null {
+  try {
+    const lines = readFileSync(file, "utf8").matchAll(/^(\w+) (\d+)$/gm);
+    return Object.fromEntries([...lines].map((m) => [m[1], Number(m[2])]));
+  } catch {
+    return null;
+  }
+}
+
 export interface LoadSample {
   /** Epoch milliseconds. */
   at: number;
   load: number;
   memory: number;
+  /** How many processes the kernel had stopped for memory in the agents' slices so far, where there are any. */
+  oomKills?: number;
+}
+
+/** What a counter rose by from each sample to the next that has it; one that went down started again (a reboot). */
+function risen(counts: readonly (number | undefined)[]): number {
+  let total = 0;
+  let prev: number | undefined;
+  for (const c of counts) {
+    if (c === undefined) continue;
+    if (prev !== undefined) total += c >= prev ? c - prev : c;
+    prev = c;
+  }
+  return total;
 }
 
 /** One sample: the 5-minute load average per logical CPU of the machine and the share of memory in use. Null on Windows. */
@@ -136,6 +160,7 @@ export class LoadWindow {
       memoryAvg: avg((s) => s.memory),
       memoryPeak: peak((s) => s.memory),
       hours: hoursOf(n),
+      ...(sample.oomKills === undefined ? {} : { oomKills: risen(this.kept.map((s) => s.oomKills)) }),
     };
   }
 
@@ -144,10 +169,13 @@ export class LoadWindow {
   }
 }
 
-/** Several computers' days as one: their averages averaged and the highest peaks; null when none said. */
+/**
+ * Several computers' days as one, for the usage report: their averages averaged and the highest peaks; null
+ * when none said. A computer's OOM kills stay out of it, as for one computer alone.
+ */
 export function combineLoads(loads: readonly (MachineLoad | null)[]): MachineLoad | null {
   const known = loads.filter((l): l is MachineLoad => l !== null);
-  if (known.length <= 1) return known[0] ?? null;
+  if (known.length === 0) return null;
   const mean = (pick: (l: MachineLoad) => number) => known.reduce((sum, l) => sum + pick(l), 0) / known.length;
   const peak = (pick: (l: MachineLoad) => number) => known.reduce((max, l) => Math.max(max, pick(l)), 0);
   return {

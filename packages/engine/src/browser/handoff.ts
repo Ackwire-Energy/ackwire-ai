@@ -1398,7 +1398,7 @@ async function postRestarted(deps: HandoffDeps, row: BrowserHandoffRow, controll
     orgId: row.orgId,
     channelId: where.channelId,
     threadId: where.threadId,
-    author: { type: "agent", agentId: row.agentId, runId: null, hop: 0 },
+    author: { type: "agent", agentId: row.agentId, runId: null, hop: 0, stretchId: null },
     body: `${params.agent} restarted its browser. ${params.person}'s control ended.`,
     meta: bodyCode("browser_restarted", params),
   });

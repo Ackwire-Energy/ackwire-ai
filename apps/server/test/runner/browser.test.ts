@@ -15,9 +15,12 @@ import {
   type RunnerAccess,
   type RunnerFrame,
 } from "@agenteschat/adapters/machine-protocol";
+import { browserErrorText, formatPlanReport, runPlan } from "@agenteschat/engine";
+import { type BrowserLink, type BrowserReply, browserSurface } from "../../../../packages/engine/src/browser/surface";
 import { reduceAccess, setTool, TOOL_NAMES, widens } from "../../runner/access";
 import {
   agentBrowserTarget,
+  type BrowserAnswer,
   BrowserManager,
   type BrowserManagerOptions,
   browserSetupText,
@@ -27,6 +30,7 @@ import {
   chromeLabel,
   chromeLaunchArgs,
   chromeUserAgent,
+  crashPage,
   defaultMaxSessions,
   domainAllowed,
   findChrome,
@@ -543,10 +547,14 @@ test.if(posix)("a fixed CDP port accepts only its owned listener and ignores a s
 /**
  * A Chrome's DevTools endpoint on this computer, for the traffic counter: each connection's first
  * auto-attach is answered when `answer` lets it, then a page attaches, and once its network events are on
- * it says it received the next of `down` (bytes) and sent a request of 100 bytes of body.
+ * it says it received the next of `down` (bytes) and sent a request of 100 bytes of body. `crash(n)` says the
+ * page of connection `n` died; its history is one entry at `https://heavy.example/`, and where it is sent
+ * (`Page.navigate`) is kept in `navigated`.
  */
 function fakeDevtools(down: number[], answer: (reply: () => void) => void = (reply) => reply()) {
   const asked: string[] = [];
+  const navigated: string[] = [];
+  const sockets: { send(data: string): unknown }[] = [];
   let connections = 0;
   const server = Bun.serve({
     port: 0,
@@ -555,17 +563,27 @@ function fakeDevtools(down: number[], answer: (reply: () => void) => void = (rep
     websocket: {
       open(ws) {
         (ws as unknown as { data: number }).data = connections++;
+        sockets.push(ws);
       },
       message(ws, raw) {
-        const msg = JSON.parse(String(raw)) as { id: number; method: string; sessionId?: string };
+        const msg = JSON.parse(String(raw)) as {
+          id: number;
+          method: string;
+          params?: { url?: string };
+          sessionId?: string;
+        };
         asked.push(msg.sessionId ? `${msg.method} ${msg.sessionId}` : msg.method);
         const n = (ws as unknown as { data: number }).data;
         const event = (method: string, params: object, sessionId?: string) =>
           ws.send(JSON.stringify({ method, params, ...(sessionId ? { sessionId } : {}) }));
+        const result = (r: object) => ws.send(JSON.stringify({ id: msg.id, result: r }));
         if (msg.method === "Target.setAutoAttach" && !msg.sessionId) {
           answer(() => {
-            ws.send(JSON.stringify({ id: msg.id, result: {} }));
-            event("Target.attachedToTarget", { sessionId: `page-${n}`, targetInfo: { type: "page" } });
+            result({});
+            event("Target.attachedToTarget", {
+              sessionId: `page-${n}`,
+              targetInfo: { type: "page", targetId: `tab-${n}` },
+            });
           });
         } else if (msg.method === "Network.enable") {
           event(
@@ -574,11 +592,18 @@ function fakeDevtools(down: number[], answer: (reply: () => void) => void = (rep
             msg.sessionId,
           );
           event("Network.loadingFinished", { requestId: "r", encodedDataLength: down[n] ?? 0 }, msg.sessionId);
+        } else if (msg.method === "Page.getNavigationHistory") {
+          result({ currentIndex: 0, entries: [{ id: 1, url: "https://heavy.example/", title: "Heavy" }] });
+        } else if (msg.method === "Page.navigate") {
+          navigated.push(msg.params?.url ?? "");
+          result({ frameId: "main" });
         }
       },
     },
   });
-  return { port: server.port as number, asked, stop: () => server.stop(true) };
+  const crash = (n: number) =>
+    sockets[n]?.send(JSON.stringify({ method: "Inspector.targetCrashed", params: {}, sessionId: `page-${n}` }));
+  return { port: server.port as number, asked, navigated, crash, stop: () => server.stop(true) };
 }
 
 /** Fake Chromes whose endpoint is `devtools`. */
@@ -651,6 +676,176 @@ test.if(posix)("takeTraffic: what each Chrome moved, across a restart and after 
     devtools.stop();
   }
 });
+
+/** Said to the command after the page died, which didn't run. */
+const RELOADED = "The page crashed and was reloaded, so this wasn't done. Read it again before you go on.";
+/** Said to the command the page died under. */
+const RELOADED_UNDER = "The page crashed while this ran, and was reloaded. Read it again before you go on.";
+const OUT_OF_MEMORY_UNDER =
+  "The page ran out of memory while this ran, and was reloaded. Read it again before you go on.";
+
+test.if(posix)(
+  "a page that dies is opened again once: a look runs on it, and the agent's next action is told instead of running",
+  async () => {
+    const devtools = fakeDevtools([]);
+    try {
+      const logs: string[] = [];
+      const t = setup({ startChrome: chromesAt(devtools).start, log: (l) => logs.push(l) });
+      await t.act("open", ["https://heavy.example/"]);
+      await waitFor(() => devtools.asked.includes("Network.enable page-0"));
+      devtools.crash(0);
+      // Opened again at the address it was on.
+      await waitFor(() => devtools.navigated.length === 1);
+      expect(devtools.asked).toContain("Page.getNavigationHistory page-0");
+      expect(devtools.navigated).toEqual(["https://heavy.example/"]);
+      // A look and a wait run on the page as it is now: the server ignores their failures (its own looks too).
+      expect(await t.act("snapshot")).toMatchObject({ success: true });
+      expect(await t.act("wait", ["100"])).toMatchObject({ success: true });
+      // A person in control opening a site isn't told either: the agent hears it after their turn.
+      t.manager.setHandoff(dev.id, { status: "active", controller: "Ana" });
+      expect(await t.act("open", ["https://heavy.example/"])).toMatchObject({ success: true });
+      t.manager.setHandoff(dev.id, null);
+      const clicks = () => t.logged().filter((l) => l.args.includes("click")).length;
+      expect(await t.act("click", ["@e1"])).toMatchObject({ success: false, data: null, error: RELOADED });
+      expect(clicks()).toBe(0);
+      expect(await t.act("click", ["@e1"])).toMatchObject({ success: true });
+
+      // The agent heard: the next one is reloaded too. Dying twice before it hears shows our notice, no loop.
+      devtools.crash(0);
+      await waitFor(() => devtools.navigated.length === 2);
+      devtools.crash(0);
+      await waitFor(() => devtools.navigated.length === 3);
+      expect(devtools.navigated[2]).toBe(crashPage(false));
+      expect(devtools.asked.filter((a) => a === "Page.getNavigationHistory page-0")).toHaveLength(2);
+      // Our notice died too (a page that can't start there at all): Chrome's own page stays, nothing opens again.
+      devtools.crash(0);
+      await waitFor(() => logs.filter((l) => l.includes(": a page crashed, ")).length === 4);
+      expect(logs.at(-1)).toEndWith("a page crashed, left on Chrome's page");
+      expect(await t.act("click", ["@e1"])).toMatchObject({
+        success: false,
+        error: "The page crashed again, so it wasn't reloaded a second time. Open it again only if you need it.",
+      });
+      // That click ran nothing; this one runs, long enough for a navigation sent at the crash to have arrived.
+      expect(await t.act("click", ["@e1"])).toMatchObject({ success: true });
+      expect(devtools.navigated).toHaveLength(3);
+      expect(devtools.asked.filter((a) => a === "Page.getNavigationHistory page-0")).toHaveLength(2);
+      // Our notice, in both languages, in the app's look.
+      const notice = decodeURIComponent(crashPage(true).slice("data:text/html;charset=utf-8,".length));
+      expect(notice).toContain("<title>A página ficou sem memória</title>");
+      expect(notice).toContain("The page ran out of memory");
+      expect(notice).toContain("background:#fbfbfa");
+      expect(decodeURIComponent(crashPage(false))).toContain("The page stopped working");
+    } finally {
+      devtools.stop();
+    }
+  },
+);
+
+test.if(posix)(
+  "a page that died of memory says so to the action it died under; in a batch, the action's answer says it",
+  async () => {
+    const dir = tempDir("cgroup-");
+    dirs.push(dir);
+    const events = path.join(dir, "memory.events");
+    writeFileSync(events, "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\n");
+    const devtools = fakeDevtools([]);
+    try {
+      const t = setup({ startChrome: chromesAt(devtools).start, memoryEvents: events });
+      await t.act("open", ["https://heavy.example/"]);
+      await waitFor(() => devtools.asked.includes("Network.enable page-0"));
+      const ran = (command: string) => t.logged().filter((l) => l.args.includes(command)).length;
+      t.page({ delayMs: 400 });
+      // The agent's slice reached its limit and the page died while a click ran.
+      const clicked = t.act("click", ["@e1"]);
+      await waitFor(() => ran("click") === 1);
+      writeFileSync(events, "low 0\nhigh 9\nmax 2\noom 1\noom_kill 1\n");
+      devtools.crash(0);
+      expect(await clicked).toMatchObject({ success: false, data: null, error: OUT_OF_MEMORY_UNDER });
+
+      const folder = await t.folder();
+      const batch = () =>
+        t.manager.batch(dev, folder, {
+          op: "browser.batch",
+          commands: [
+            { command: "click", args: ["@e1"], timeoutSeconds: 30 },
+            { command: "eval", args: ["true"], timeoutSeconds: 5, tolerate: true },
+            { command: "snapshot", args: [], timeoutSeconds: 30 },
+          ],
+        });
+      // Under the batch's action: that answer says it, and nothing more runs. Its slice didn't reach its limit again.
+      const first = batch();
+      await waitFor(() => ran("click") === 2);
+      devtools.crash(0);
+      expect((await first).answers).toEqual([{ success: false, data: null, error: RELOADED_UNDER }]);
+      // Under the settling after it, whose failure the server ignores: the action's answer says it, in place of its
+      // own and the settling's, and the look doesn't run.
+      const second = batch();
+      await waitFor(() => ran("eval") === 1);
+      devtools.crash(0);
+      expect((await second).answers).toEqual([{ success: false, data: null, error: RELOADED_UNDER }]);
+      t.page({ delayMs: 0 });
+      expect(ran("snapshot")).toBe(0);
+      // Before a batch: one with no action (a pause) runs, and the next one's action is told instead of running.
+      devtools.crash(0);
+      await waitFor(() => devtools.navigated.length === 4);
+      const pause = await t.manager.batch(dev, folder, {
+        op: "browser.batch",
+        commands: [{ command: "wait", args: ["100"], timeoutSeconds: 5 }],
+      });
+      expect(pause.answers).toEqual([expect.objectContaining({ success: true })]);
+      expect((await batch()).answers).toEqual([{ success: false, data: null, error: RELOADED }]);
+      expect(ran("click")).toBe(3);
+      expect(devtools.navigated).toEqual(Array(4).fill("https://heavy.example/"));
+    } finally {
+      devtools.stop();
+    }
+  },
+);
+
+test.if(posix)(
+  "a plan's click whose page dies while it settles stops there, and the agent's report says so",
+  async () => {
+    const devtools = fakeDevtools([]);
+    try {
+      const t = setup({ startChrome: chromesAt(devtools).start });
+      await t.act("open", ["https://heavy.example/"]);
+      await waitFor(() => devtools.asked.includes("Network.enable page-0"));
+      const folder = await t.folder();
+      // The server's link to the runner, as its browser tools make it.
+      const reply = (a: BrowserAnswer): BrowserReply =>
+        a.success ? { ok: true, data: a.data } : { ok: false, text: browserErrorText(a.error || "the command failed") };
+      const link: BrowserLink = {
+        act: async (c) =>
+          reply(
+            await t.manager.act(dev, folder, {
+              op: "browser.act",
+              command: c.command,
+              args: c.args,
+              timeoutSeconds: c.timeoutSeconds,
+            }),
+          ),
+        batch: async (commands) =>
+          (await t.manager.batch(dev, folder, { op: "browser.batch", commands })).answers.map(reply),
+        capture: async () => null,
+      };
+      const ran = (command: string) => t.logged().filter((l) => l.args.includes(command)).length;
+      const evals = ran("eval");
+      t.page({ delayMs: 400 });
+      const judge = { name: "none", ask: () => Promise.reject(new Error("no judge here")) };
+      const plan = runPlan({ judge, orgId: "o", surface: browserSurface({ link }), scope: "s" }, [
+        { do: "click", target: "e1" },
+      ]);
+      // The click went through, and the page died while the plan waited for it to settle.
+      await waitFor(() => ran("eval") === evals + 1);
+      devtools.crash(0);
+      const report = await plan;
+      expect(report.steps.map((s) => s.status)).toEqual(["failed"]);
+      expect(formatPlanReport(report).summary).toBe(`Couldn't click "e1": The browser said: ${RELOADED_UNDER}`);
+    } finally {
+      devtools.stop();
+    }
+  },
+);
 
 test.if(posix)("flags that reach outside the agent's browser, and unknown commands, are refused", async () => {
   const t = setup();

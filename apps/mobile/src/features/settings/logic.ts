@@ -91,6 +91,8 @@ export const visibleSections = (org: OrgSummary | null | undefined) => SETTINGS_
 /** What the workspace's page knows of each area (absent while it loads: its line stays empty). */
 export interface TileFacts {
   overview?: { people: number; agents: number; budgetUsedPercent: number } | undefined;
+  /** The workspace uses the API (`workspaceUsesApi`): only then Uso says its budget, never 0% on plans alone. */
+  usesApi?: boolean | undefined;
   /** Invitations waiting (managers only). */
   invitations?: number | undefined;
   /** The live connections' names. */
@@ -114,7 +116,8 @@ export function tileStates(t: TFunction, locale: string, f: TileFacts): Partial<
       .filter(Boolean)
       .join(" · ");
     out.access = t("settings.tileState.agents", { count: f.overview.agents });
-    out.usage = t("settings.tileState.usage", { percent: formatPercent(locale, f.overview.budgetUsedPercent) });
+    if (f.usesApi)
+      out.usage = t("settings.tileState.usage", { percent: formatPercent(locale, f.overview.budgetUsedPercent) });
   }
   if (f.connectors) {
     const names = f.connectors.slice(0, 3).join(", ");

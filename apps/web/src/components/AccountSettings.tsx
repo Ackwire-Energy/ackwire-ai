@@ -1,4 +1,4 @@
-import { keys } from "@agenteschat/client";
+import { keys, useAiAccounts } from "@agenteschat/client";
 import { browserTimezone, isTimeZone, timezoneName, zoneDisplayName } from "@agenteschat/client/lib/routines";
 import {
   AffixInput,
@@ -12,9 +12,12 @@ import {
   DialogBody,
   DialogFooter,
   Field,
+  PlanMeter,
+  ProviderLogo,
   Segmented,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
@@ -28,19 +31,27 @@ import { type LocaleCode, locales, setLocale } from "@/i18n";
 import { type MenuLook, menuLook, onMenuLookChange, setMenuLook } from "@/lib/context-menu";
 import { inDesktopApp } from "@/lib/desktop";
 import { useOpenParam } from "@/lib/open-param";
+import { ownPlanLines, planMeterText } from "@/lib/plan-usage";
 import { onSoundChoiceChange, type SoundChoice, setSoundChoice, soundChoice } from "@/lib/sounds";
 import { type ThemePreference, useTheme } from "@/lib/theme";
 import { useToast } from "@/lib/toast";
 
 /**
  * Configurações › Sua conta: your profile in this workspace, your time zone, opening the phone app and a password
- * for an account without one, then what this device keeps for itself (theme, language, sounds, the desktop app's
- * menus), and last, deleting the account.
+ * for an account without one, your plans' limits (ADR 0063 §5), then what this device keeps for itself (theme,
+ * language, sounds, the desktop app's menus), and last, deleting the account.
  */
 export function AccountSection() {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
+  const navigate = useNavigate();
+  const api = useApi();
+  const plans = ownPlanLines(t, useAiAccounts(org.id).data, dir.agents, me.user.id);
+  // Looking at your plans: their usage is looked up again (it comes back as `machine.updated`).
+  useEffect(() => {
+    void api.machines.refreshAccountUsage(org.id).catch(() => undefined);
+  }, [api, org.id]);
   const theme = useTheme();
   const look = useSyncExternalStore(onMenuLookChange, menuLook, () => "ours" as const);
   const sounds = useSyncExternalStore(onSoundChoiceChange, soundChoice, soundChoice);
@@ -87,6 +98,25 @@ export function AccountSection() {
           )}
         </div>
       </Card>
+      {plans.length > 0 && (
+        <Card aria-labelledby="account-plans">
+          <CardHeader id="account-plans" title={t("settings.account.plans")} />
+          <div className="settings-rows">
+            {plans.map((p) => (
+              <PrefRow
+                key={p.key}
+                id={`account-plan-${p.key}`}
+                lead={<ProviderLogo id={p.logo} size="sm" />}
+                label={p.name}
+                help={<PlanMeter compact usage={p.usage} text={planMeterText(t, i18n.language)} />}
+                onOpen={() =>
+                  void navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section: "usage" } })
+                }
+              />
+            ))}
+          </div>
+        </Card>
+      )}
       <Card aria-labelledby="account-device">
         <CardHeader id="account-device" title={t("settings.account.device")} />
         <div className="settings-rows">

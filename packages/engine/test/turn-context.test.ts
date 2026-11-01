@@ -388,7 +388,7 @@ describe("a routine's background run", () => {
         author:
           author === "person"
             ? { type: "person", userId: f.owner.id }
-            : { type: "agent", agentId: f.agent.id, runId: null, hop: 1 },
+            : { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
         body,
         meta,
       });
@@ -535,7 +535,9 @@ describe("the agents' DM, per person", () => {
       insertMessage(f.db, {
         orgId: f.org.id,
         channelId: dm.id,
-        author: { type: "agent", agentId, runId, hop: 1 },
+        author: runId
+          ? { type: "agent", agentId, runId, hop: 1 }
+          : { type: "agent", agentId, runId: null, hop: 1, stretchId: null },
         body,
       });
     const read = async (run: AgentRun) => {

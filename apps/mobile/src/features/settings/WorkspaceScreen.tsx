@@ -1,5 +1,7 @@
 import {
+  useAgents,
   useAiAccounts,
+  useAiStatus,
   useComputerSetup,
   useConnections,
   useCredentials,
@@ -12,6 +14,7 @@ import {
 } from "@agenteschat/client";
 import { computerEdition } from "@agenteschat/client/lib/computer";
 import { can } from "@agenteschat/client/lib/permissions";
+import { workspaceUsesApi } from "@agenteschat/client/lib/plan-usage";
 import { router } from "expo-router";
 import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
@@ -100,8 +103,11 @@ function useAreaStates(areas: readonly SettingsEntry[]) {
   const platform = usePlatformKey(orgId);
   const storage = useStorage(orgId, shown("storage"));
   const edition = computerEdition(useComputerSetup(orgId, shown("storage")).data);
+  const agents = useAgents(orgId).data ?? [];
+  const aiStatus = useAiStatus(orgId).data;
   return tileStates(t, i18n.language, {
     overview: overview.data,
+    usesApi: overview.data && workspaceUsesApi(agents, aiStatus, overview.data.budgetUsedPercent),
     invitations: invitations.data?.length,
     connectors: connections.data?.filter((x) => !x.revokedAt).map((x) => x.label),
     skills: skills.data?.length,
