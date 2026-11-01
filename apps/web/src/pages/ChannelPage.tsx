@@ -67,7 +67,7 @@ import {
   useWikiTree,
 } from "@agenteschat/client";
 import { actionCardOf } from "@agenteschat/client/lib/action-cards";
-import { activityVerb, barEntries, isWriting, toolActivity } from "@agenteschat/client/lib/activity";
+import { activityVerb, barElapsed, barEntries, isWriting, toolActivity } from "@agenteschat/client/lib/activity";
 import { looksLikeApiKey } from "@agenteschat/client/lib/api-key-text";
 import { artifactRefs } from "@agenteschat/client/lib/artifacts";
 import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
@@ -173,7 +173,6 @@ import { readingLanding } from "@/chat/reading";
 import {
   blockRowByRun,
   drawsBehind,
-  elapsedParts,
   nextSlots,
   openerDelayMs,
   openerOf,
@@ -2754,7 +2753,7 @@ function ActivityBar({
   const firstAgent = agents[0];
   // The time, "Ver" and the stop are one agent's: with several, the line can't say whose (the composer still stops).
   const soloRun = agents.length === 1 && firstAgent ? runs.find((r) => r.agentId === firstAgent.id) : undefined;
-  const took = soloRun ? elapsedParts(now - (soloRun.startedAt ?? now)) : null;
+  const took = barElapsed(t, entries, runs, now);
   // Agents running code: "Ver código" with the live code and output.
   const coding = runs.filter(
     (r) => outOfView(r.runId) && r.code && (r.work ?? []).some((w) => w.kind === "call" && w.running),
@@ -2810,13 +2809,7 @@ function ActivityBar({
               <BarPhrase entries={entries} runs={runs} />
             </span>
             <ConsultClock entries={entries} now={now} />
-            {took && !entries.some((e) => e.consult?.status === "asking") && (
-              <span className="ac-typing__elapsed ac-num">
-                {took.m > 0
-                  ? t("run.elapsedMinutes", { m: took.m, s: took.s })
-                  : t("run.elapsedSeconds", { n: took.s })}
-              </span>
-            )}
+            {took && <span className="ac-typing__elapsed ac-num">{took}</span>}
             {openBrowser && (
               <Button
                 size="sm"

@@ -13,8 +13,9 @@ import {
   reconcileRuns,
   steerStore,
 } from "@agenteschat/client";
+import { elapsedParts } from "@agenteschat/client/lib/activity";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { blockRowByRun, elapsedParts, nextSlots, OPENERS, openerOf, SLOT_HOLD_MS, sameSlots } from "@/chat/run-slots";
+import { blockRowByRun, nextSlots, OPENERS, openerOf, SLOT_HOLD_MS, sameSlots } from "@/chat/run-slots";
 import { createStreamsStore, reconcileChannelRuns } from "@/realtime/context";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
