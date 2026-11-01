@@ -61,7 +61,10 @@ export function requestOriginAllowed(origins: Set<string>, headers: Headers): bo
  * POSTs to these paths may also be `multipart/form-data` (file uploads); the origin check still applies.
  * One list for every app router: each router's middleware runs for every `/api/app/*` request.
  */
-const MULTIPART_PATHS = [/\/organizations\/[^/]+\/artifacts(\/[^/]+)?\/files$/];
+const MULTIPART_PATHS = [
+  /\/organizations\/[^/]+\/artifacts(\/[^/]+)?\/files$/,
+  /\/organizations\/[^/]+\/channels\/[^/]+\/voice$/,
+];
 
 export function createAppRouter(deps: AppDeps) {
   const app = new OpenAPIHono<AppEnv>({ defaultHook: validationHook<AppEnv>() });

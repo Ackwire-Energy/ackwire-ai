@@ -11172,11 +11172,14 @@ html[data-menu-overlay] .shell {
 }
 
 /* Configurações › Mensagens de voz: who turns voice into text (ADR 0094). */
+.voice-engine {
+  margin: var(--card-pad) calc(-1 * var(--card-pad)) calc(-1 * var(--card-pad));
+}
 .voice-engine__body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 14px 16px;
+  padding: 14px var(--card-pad);
   border-top: 1px solid var(--line);
 }
 .voice-engine__title {

@@ -122,7 +122,7 @@ function SpeechProviderPicker({ view }: { view: SpeechKey }) {
     });
   };
   return (
-    <div className="settings-rows voice-engine">
+    <div className="voice-engine">
       <div className="voice-engine__body">
         <h3 className="voice-engine__title">{t("voice.settings.engineTitle")}</h3>
         <RadioGroup value={provider} onValueChange={pick} aria-label={t("voice.settings.engineTitle")}>
