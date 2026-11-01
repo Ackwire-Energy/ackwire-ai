@@ -1009,6 +1009,13 @@
       "when": 1793508158970,
       "tag": "0143_gifs_and_stickers",
       "breakpoints": true
+    },
+    {
+      "idx": 144,
+      "version": "7",
+      "when": 1793527631405,
+      "tag": "0144_wiki_visibility",
+      "breakpoints": true
     }
   ]
 }

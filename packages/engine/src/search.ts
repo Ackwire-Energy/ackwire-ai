@@ -6,6 +6,7 @@ import type { ModelGateway } from "./gateway";
 import { requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { isRoutineRoomKey } from "./routine-brief";
+import { visibleWikiPageIds } from "./wiki-links";
 
 const { messages, channelMembers, channels, contextItems } = schema;
 
@@ -239,7 +240,16 @@ export async function searchForUser(
   input: { text: string; kinds?: SearchKind[]; limit?: number },
 ) {
   await requirePermission(deps.db, userId, orgId, "read");
-  return searchVisible(deps, { orgId, ...input, visibleChannelIds: await userVisibleChannels(deps.db, orgId, userId) });
+  const hits = await searchVisible(deps, {
+    orgId,
+    ...input,
+    visibleChannelIds: await userVisibleChannels(deps.db, orgId, userId),
+  });
+  // Wiki pages are indexed for the whole workspace; a restricted one only reaches its audience.
+  const pages = hits.filter((h) => h.kind === "wiki").map((h) => h.sourceId);
+  if (pages.length === 0) return hits;
+  const seen = await visibleWikiPageIds(deps.db, userId, pages);
+  return hits.filter((h) => h.kind !== "wiki" || seen.has(h.sourceId));
 }
 
 export interface HitSource {

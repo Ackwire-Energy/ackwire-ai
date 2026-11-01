@@ -26,10 +26,20 @@ import { getForumTopic } from "./forum";
 import { getMessage } from "./messages";
 import { can, type Membership, requireActiveMembership } from "./organizations";
 import { enqueueIndex, registerDocumentBuilder, registerReindexSource, type SearchDeps, searchVisible } from "./search";
-import { pagesBySlug, parseWikiLinks, syncWikiLinks, wikiSlug } from "./wiki-links";
+import {
+  pagesBySlug,
+  parseWikiLinks,
+  syncWikiLinks,
+  visibleWikiPageIds,
+  wikiPageVisibleSql,
+  wikiSlug,
+} from "./wiki-links";
 
 const {
   wikiPages,
+  orgRoles,
+  organizationMembers,
+  organizationMemberRoles,
   wikiPageVersions,
   wikiLinks,
   wikiPageReads,
@@ -65,6 +75,12 @@ export interface WikiAuthor {
   onBehalfOf: string | null;
 }
 
+/** A restricted page's audience: the roles and the people who see it (owners and agents always do). */
+export interface WikiAudience {
+  roleIds: string[];
+  userIds: string[];
+}
+
 export interface WikiPageSummary {
   id: string;
   slug: string;
@@ -75,6 +91,8 @@ export interface WikiPageSummary {
   locked: boolean;
   /** "Fixadas": at the top of the wiki for everyone. */
   pinned: boolean;
+  /** Who sees it besides agents and owners; null = every member. */
+  audience: WikiAudience | null;
   /** The start of the text, plain (no markdown), for cards. */
   excerpt: string;
   /** Where it came from: `obsidian` for an imported page, `message`/`forum_topic` for "Save to wiki". */
@@ -185,15 +203,30 @@ async function requireReader(db: Database, actor: WikiActor, orgId: string): Pro
   return membership;
 }
 
-/** Members create and edit; a locked page only admins (never agents). */
+/**
+ * Members create and edit; a locked page only admins (never agents). A restricted page only its audience, and an
+ * agent only for someone in it: an agent reads every page, but doesn't write one for a person who can't see it.
+ */
 async function requireWriter(db: Database, actor: WikiActor, orgId: string, page?: PageRow) {
   const membership = await requireReader(db, actor, orgId);
   if (membership && !can(membership, "edit_wiki")) throw new ForbiddenError();
   if (page?.locked && !(membership && can(membership, "configure"))) {
     throw new ForbiddenError("This page is locked: only admins edit it", "wiki.locked");
   }
+  const who = actor.type === "person" ? actor.userId : actor.requestedByUserId;
+  if (page && who && !(await sees(db, who, page))) throw noAccess();
   return membership;
 }
+
+const noAccess = () => new ForbiddenError("You don't have access to this page", "wiki.no_access");
+
+/** Whether the person `userId` sees `page` (agents see every page). */
+async function sees(db: Executor, userId: string, page: Pick<PageRow, "id" | "restricted">) {
+  return !page.restricted || (await visibleWikiPageIds(db, userId, [page.id])).has(page.id);
+}
+
+/** The condition that keeps a person to the pages they see; none for agents. */
+const visibleTo = (actor: WikiActor) => (actor.type === "person" ? wikiPageVisibleSql(actor.userId) : undefined);
 
 const authorCols = (actor: WikiActor) =>
   actor.type === "person"
@@ -207,8 +240,23 @@ const auditActor = (actor: WikiActor) =>
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** A live page by id, slug or an earlier slug (or a deleted one with `deleted`). */
-async function findPage(db: Executor, orgId: string, ref: string, options: { deleted?: boolean } = {}) {
+/**
+ * A live page by id, slug or an earlier slug (or a deleted one with `deleted`), that `actor` sees: a restricted page
+ * outside a person's audience is a plain `wiki.no_access`.
+ */
+async function findPage(
+  db: Executor,
+  actor: WikiActor,
+  orgId: string,
+  ref: string,
+  options: { deleted?: boolean } = {},
+) {
+  const row = await findAnyPage(db, orgId, ref, options);
+  if (actor.type === "person" && !(await sees(db, actor.userId, row))) throw noAccess();
+  return row;
+}
+
+async function findAnyPage(db: Executor, orgId: string, ref: string, options: { deleted?: boolean } = {}) {
   const key = ref.trim();
   if (UUID.test(key)) {
     const [row] = await db
@@ -262,6 +310,7 @@ async function summaries(db: Executor, rows: PageRow[]): Promise<WikiPageSummary
     version: r.version,
     locked: r.locked,
     pinned: r.pinned,
+    audience: r.restricted ? { roleIds: r.audienceRoleIds, userIds: r.audienceUserIds } : null,
     excerpt: plainExcerpt(r.body, r.title),
     sourceType: r.source?.type ?? null,
     updatedAt: r.updatedAt.toISOString(),
@@ -310,7 +359,7 @@ async function backlinksOf(db: Database, actor: WikiActor, page: PageRow): Promi
     const from = await db
       .select({ slug: wikiPages.slug, title: wikiPages.title, body: wikiPages.body })
       .from(wikiPages)
-      .where(and(inArray(wikiPages.id, pageIds), isNull(wikiPages.deletedAt)))
+      .where(and(inArray(wikiPages.id, pageIds), isNull(wikiPages.deletedAt), visibleTo(actor)))
       .orderBy(asc(wikiPages.title));
     for (const p of from) out.push({ kind: "page", slug: p.slug, title: p.title, excerpt: excerpt(p.body, page) });
   }
@@ -411,7 +460,7 @@ async function detail(db: Database, actor: WikiActor, row: PageRow): Promise<Wik
       .orderBy(desc(wikiPageVersions.version))
       .limit(500),
     backlinksOf(db, actor, row),
-    resolveOwnLinks(db, row),
+    resolveOwnLinks(db, actor, row),
     pageReads(db, row),
   ]);
   const authors: WikiAuthor[] = [];
@@ -538,6 +587,7 @@ export async function topWikiReads(db: Database, actor: WikiActor, orgId: string
         gte(wikiPageReads.createdAt, since(READ_WINDOW_DAYS)),
         isNull(wikiPages.deletedAt),
         isNull(agents.archivedAt),
+        visibleTo(actor),
       ),
     )
     .groupBy(wikiPageReads.pageId, wikiPageReads.agentId, wikiPages.slug, wikiPages.title);
@@ -557,13 +607,19 @@ export async function topWikiReads(db: Database, actor: WikiActor, orgId: string
     .slice(0, limit);
 }
 
-async function resolveOwnLinks(db: Executor, row: PageRow) {
+/** The page's own links; a restricted page a person doesn't see shows as not written. */
+async function resolveOwnLinks(db: Executor, actor: WikiActor, row: PageRow) {
   const refs = parseWikiLinks(row.body);
   const pages = await pagesBySlug(
     db,
     row.orgId,
     refs.map((r) => r.slug),
   );
+  const hidden = [...pages.values()].filter((p) => p.restricted).map((p) => p.id);
+  if (actor.type === "person" && hidden.length) {
+    const seen = await visibleWikiPageIds(db, actor.userId, hidden);
+    for (const [slug, p] of pages) if (p.restricted && !seen.has(p.id)) pages.delete(slug);
+  }
   return refs.map((r) => {
     const p = pages.get(r.slug);
     return { target: r.target, slug: p?.slug ?? r.slug, title: p?.title ?? null, exists: Boolean(p) };
@@ -618,14 +674,17 @@ async function announce(
     | "unlocked"
     | "pinned"
     | "unpinned"
+    | "audience"
     | "imported",
   extra: Record<string, unknown> = {},
 ) {
   caches.contextPresence.delete(`${orgId}:wiki`);
+  // The broadcast reaches every member: a restricted page goes out as its id alone (the apps refetch what they see).
+  const shown = page.audience ? { id: page.id, restricted: true } : page;
   await publishOrgEvent(deps.pubsub, {
     type: "org.broadcast",
     orgId,
-    event: { type: "wiki.page.updated", action, page, ...extra },
+    event: { type: "wiki.page.updated", action, page: shown, ...(page.audience ? {} : extra) },
   });
 }
 
@@ -674,7 +733,9 @@ export async function createWikiPage(
     const wanted = wikiSlug(leafTitle);
     if (!wanted) throw new ValidationError("The title needs letters or numbers", "wiki.title_empty_slug");
     const existing = (await pagesBySlug(tx, orgId, [wanted])).get(wanted);
-    if (existing && existing.slug === wanted && !options.allowDuplicate) {
+    // A restricted page the writer doesn't see takes the next free slug instead of naming itself in the conflict.
+    const hidden = existing?.restricted && actor.type === "person" && !(await sees(tx, actor.userId, existing));
+    if (existing && existing.slug === wanted && !options.allowDuplicate && !hidden) {
       throw new ConflictError(`A page "${existing.title}" already exists`, "slug_taken", {
         title: existing.title,
         slug: existing.slug,
@@ -918,7 +979,7 @@ export async function updateWikiPage(
   patch: WikiPagePatch,
 ): Promise<WikiPageView> {
   const { db } = deps;
-  const current = await findPage(db, orgId, ref);
+  const current = await findPage(db, actor, orgId, ref);
   await requireWriter(db, actor, orgId, current);
   if (current.version !== patch.baseVersion) throw new WikiVersionConflictError(current.version);
   const next = {
@@ -1018,7 +1079,7 @@ export async function appendToWikiPage(
   ref: string,
   input: { text: string; section?: string | null; mode?: "append" | "replace_section"; note?: string },
 ) {
-  const page = await findPage(deps.db, orgId, ref);
+  const page = await findPage(deps.db, actor, orgId, ref);
   const body =
     input.mode === "replace_section" && input.section
       ? replaceSection(page.body, input.section, input.text)
@@ -1048,7 +1109,7 @@ export async function renameWikiPage(
   input: { title: string },
 ): Promise<WikiPageView> {
   const { db } = deps;
-  const current = await findPage(db, orgId, ref);
+  const current = await findPage(db, actor, orgId, ref);
   await requireWriter(db, actor, orgId, current);
   const title = cleanTitle(input.title.split("/").pop() ?? input.title);
   const wanted = wikiSlug(title);
@@ -1155,7 +1216,7 @@ export function rewriteLinks(body: string, slugs: Set<string>, newTitle: string)
 
 /** Moves a page to another folder ("" = the root). */
 export async function moveWikiPage(deps: WikiDeps, actor: WikiActor, orgId: string, ref: string, folder: string) {
-  const page = await findPage(deps.db, orgId, ref);
+  const page = await findPage(deps.db, actor, orgId, ref);
   const view = await updateWikiPage(deps, actor, orgId, page.id, {
     baseVersion: page.version,
     folder,
@@ -1178,7 +1239,7 @@ export async function moveWikiPage(deps: WikiDeps, actor: WikiActor, orgId: stri
 /** Soft delete: links to it show as missing; restore brings it back. */
 export async function deleteWikiPage(deps: WikiDeps, actor: WikiActor, orgId: string, ref: string) {
   const { db } = deps;
-  const page = await findPage(db, orgId, ref);
+  const page = await findPage(db, actor, orgId, ref);
   await requireWriter(db, actor, orgId, page);
   const row = await db.transaction(async (tx) => {
     const [deleted] = await tx
@@ -1203,7 +1264,7 @@ export async function deleteWikiPage(deps: WikiDeps, actor: WikiActor, orgId: st
 /** Brings a deleted page back (by id, or the most recently deleted page with that slug). */
 export async function restoreWikiPage(deps: WikiDeps, actor: WikiActor, orgId: string, ref: string) {
   const { db } = deps;
-  const page = await findPage(db, orgId, ref, { deleted: true });
+  const page = await findPage(db, actor, orgId, ref, { deleted: true });
   await requireWriter(db, actor, orgId, page);
   const row = await db.transaction(async (tx) => {
     const [taken] = await tx
@@ -1243,7 +1304,7 @@ export async function setWikiPageLock(deps: WikiDeps, userId: string, orgId: str
   const { db } = deps;
   const membership = await requireActiveMembership(db, userId, orgId);
   if (!can(membership, "configure")) throw new ForbiddenError("Only admins lock pages", "wiki.lock_admins_only");
-  const page = await findPage(db, orgId, ref);
+  const page = await findPage(db, { type: "person", userId }, orgId, ref);
   const [row] = await db.update(wikiPages).set({ locked }).where(eq(wikiPages.id, page.id)).returning();
   if (!row) throw new NotFoundError("Page not found", "wiki.page_not_found");
   await recordAudit(db, {
@@ -1263,7 +1324,7 @@ export async function setWikiPagePinned(deps: WikiDeps, userId: string, orgId: s
   const { db } = deps;
   const actor: WikiActor = { type: "person", userId };
   await requireWriter(db, actor, orgId);
-  const page = await findPage(db, orgId, ref);
+  const page = await findPage(db, actor, orgId, ref);
   const [row] = await db.update(wikiPages).set({ pinned }).where(eq(wikiPages.id, page.id)).returning();
   if (!row) throw new NotFoundError("Page not found", "wiki.page_not_found");
   await recordAudit(db, {
@@ -1278,11 +1339,92 @@ export async function setWikiPagePinned(deps: WikiDeps, userId: string, orgId: s
   return view;
 }
 
+/**
+ * Limits a page to an audience (or opens it again with `null`): besides agents and owners, only the people holding
+ * one of `roleIds` and the people in `userIds` see it. Who may: people who edit the wiki and manage roles, and only
+ * an audience they stay in, so nobody hides a page from themselves.
+ */
+export async function setWikiPageAudience(
+  deps: WikiDeps,
+  userId: string,
+  orgId: string,
+  ref: string,
+  audience: WikiAudience | null,
+) {
+  const { db } = deps;
+  const actor: WikiActor = { type: "person", userId };
+  const membership = await requireActiveMembership(db, userId, orgId);
+  if (!(can(membership, "edit_wiki") && can(membership, "manage_roles"))) {
+    throw new ForbiddenError(
+      "Only people who edit the wiki and manage roles choose who sees a page",
+      "wiki.audience_forbidden",
+    );
+  }
+  const page = await findPage(db, actor, orgId, ref);
+  await requireWriter(db, actor, orgId, page);
+  let roleIds: string[] = [];
+  let userIds: string[] = [];
+  if (audience) {
+    const wantedRoles = [...new Set(audience.roleIds)].filter((id) => UUID.test(id));
+    const wantedUsers = [...new Set(audience.userIds)];
+    roleIds = wantedRoles.length
+      ? (
+          await db
+            .select({ id: orgRoles.id })
+            .from(orgRoles)
+            .where(and(eq(orgRoles.orgId, orgId), eq(orgRoles.kind, "custom"), inArray(orgRoles.id, wantedRoles)))
+        ).map((r) => r.id)
+      : [];
+    userIds = wantedUsers.length
+      ? (
+          await db
+            .select({ id: organizationMembers.userId })
+            .from(organizationMembers)
+            .where(and(eq(organizationMembers.orgId, orgId), inArray(organizationMembers.userId, wantedUsers)))
+        ).map((r) => r.id)
+      : [];
+    const mine = roleIds.length
+      ? await db
+          .select({ id: organizationMemberRoles.roleId })
+          .from(organizationMemberRoles)
+          .where(
+            and(
+              eq(organizationMemberRoles.orgId, orgId),
+              eq(organizationMemberRoles.userId, userId),
+              inArray(organizationMemberRoles.roleId, roleIds),
+            ),
+          )
+      : [];
+    if (membership.role !== "owner" && !userIds.includes(userId) && mine.length === 0) {
+      throw new ValidationError(
+        "Keep yourself in the audience (one of your roles, or you)",
+        "wiki.audience_excludes_you",
+      );
+    }
+  }
+  const [row] = await db
+    .update(wikiPages)
+    .set({ restricted: Boolean(audience), audienceRoleIds: roleIds, audienceUserIds: userIds })
+    .where(eq(wikiPages.id, page.id))
+    .returning();
+  if (!row) throw new NotFoundError("Page not found", "wiki.page_not_found");
+  await recordAudit(db, {
+    orgId,
+    actor: { type: "person", id: userId },
+    action: audience ? "wiki.page_restricted" : "wiki.page_opened",
+    target: { type: "wiki_page", id: page.id },
+    details: { slug: page.slug, roleIds, userIds },
+  });
+  const view = await detail(db, actor, row);
+  await announce(deps, orgId, view, "audience");
+  return view;
+}
+
 // ── Reads ────────────────────────────────────────────────────────────────────
 
 export async function getWikiPage(db: Database, actor: WikiActor, orgId: string, ref: string) {
   await requireReader(db, actor, orgId);
-  return detail(db, actor, await findPage(db, orgId, ref));
+  return detail(db, actor, await findPage(db, actor, orgId, ref));
 }
 
 /** Pages (no bodies): all of them, or by folder (and its subfolders), tag or title words; most recent first. */
@@ -1307,6 +1449,7 @@ export async function listWikiPages(
           : undefined,
         filters.tag ? sql`${filters.tag.trim().replace(/^#/, "").toLowerCase()} = any(${wikiPages.tags})` : undefined,
         q ? sql`${wikiPages.title} ilike ${`%${q.replace(/[%_\\]/g, "\\$&")}%`}` : undefined,
+        visibleTo(actor),
       ),
     )
     .orderBy(desc(wikiPages.updatedAt))
@@ -1352,6 +1495,7 @@ export async function suggestWikiPages(db: Database, actor: WikiActor, orgId: st
         q
           ? or(sql`${wikiPages.title} ilike ${`%${esc}%`}`, sql`${wikiPages.slug} like ${`%${wikiSlug(q) || esc}%`}`)
           : undefined,
+        visibleTo(actor),
       ),
     )
     .orderBy(
@@ -1364,7 +1508,7 @@ export async function suggestWikiPages(db: Database, actor: WikiActor, orgId: st
 
 export async function listWikiVersions(db: Database, actor: WikiActor, orgId: string, ref: string) {
   await requireReader(db, actor, orgId);
-  const page = await findPage(db, orgId, ref);
+  const page = await findPage(db, actor, orgId, ref);
   const rows = await db
     .select()
     .from(wikiPageVersions)
@@ -1389,7 +1533,7 @@ export async function listWikiVersions(db: Database, actor: WikiActor, orgId: st
 
 export async function getWikiVersion(db: Database, actor: WikiActor, orgId: string, ref: string, version: number) {
   await requireReader(db, actor, orgId);
-  const page = await findPage(db, orgId, ref);
+  const page = await findPage(db, actor, orgId, ref);
   const [v] = await db
     .select()
     .from(wikiPageVersions)
@@ -1533,7 +1677,7 @@ export async function wikiGraph(db: Database, actor: WikiActor, orgId: string) {
       source: wikiPages.source,
     })
     .from(wikiPages)
-    .where(and(eq(wikiPages.orgId, orgId), isNull(wikiPages.deletedAt)))
+    .where(and(eq(wikiPages.orgId, orgId), isNull(wikiPages.deletedAt), visibleTo(actor)))
     .limit(5000);
   const links = await db
     .select({ from: wikiLinks.fromId, to: wikiLinks.toPageId, toSlug: wikiLinks.toSlug })
@@ -1546,6 +1690,7 @@ export async function wikiGraph(db: Database, actor: WikiActor, orgId: string) {
   for (const l of links) {
     const from = byId.get(l.from);
     if (!from) continue;
+    if (l.to && !byId.has(l.to)) continue; // a page the reader doesn't see
     const to = l.to ? byId.get(l.to) : undefined;
     if (to) {
       if (to.id !== from.id) edges.push({ from: from.slug, to: to.slug });
@@ -1569,10 +1714,16 @@ export async function wikiGraph(db: Database, actor: WikiActor, orgId: string) {
 /** Wiki search: hybrid search when available, else title and body words. */
 export async function searchWiki(deps: WikiDeps, actor: WikiActor, orgId: string, text: string, limit = 8) {
   await requireReader(deps.db, actor, orgId);
-  return searchPages(deps, orgId, text, limit);
+  return searchPages(deps, actor, orgId, text, limit);
 }
 
-async function searchPages(deps: WikiDeps, orgId: string, text: string, limit: number): Promise<PageRow[]> {
+async function searchPages(
+  deps: WikiDeps,
+  actor: WikiActor,
+  orgId: string,
+  text: string,
+  limit: number,
+): Promise<PageRow[]> {
   const q = text.trim();
   if (!q) return [];
   if (deps.search) {
@@ -1596,6 +1747,7 @@ async function searchPages(deps: WikiDeps, orgId: string, text: string, limit: n
               wikiPages.id,
               hits.map((h) => h.sourceId),
             ),
+            visibleTo(actor),
           ),
         );
       const rank = new Map(hits.map((h, i) => [h.sourceId, i]));
@@ -1613,7 +1765,7 @@ async function searchPages(deps: WikiDeps, orgId: string, text: string, limit: n
   return deps.db
     .select()
     .from(wikiPages)
-    .where(and(eq(wikiPages.orgId, orgId), isNull(wikiPages.deletedAt), match))
+    .where(and(eq(wikiPages.orgId, orgId), isNull(wikiPages.deletedAt), match, visibleTo(actor)))
     .orderBy(desc(wikiPages.updatedAt))
     .limit(limit);
 }
@@ -1757,7 +1909,13 @@ export async function retrieveWikiForRun(
         .from(wikiPages)
         .where(and(inArray(wikiPages.id, named), isNull(wikiPages.deletedAt)))
     : [];
-  const found = await searchPages(deps, input.orgId, input.text, 5).catch(() => [] as PageRow[]);
+  const found = await searchPages(
+    deps,
+    { type: "agent", agentId: input.agentId, requestedByUserId: null },
+    input.orgId,
+    input.text,
+    5,
+  ).catch(() => [] as PageRow[]);
   const budget = input.budgetChars ?? 6000;
   const lines: string[] = [];
   const ids: string[] = [];

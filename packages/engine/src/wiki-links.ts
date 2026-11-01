@@ -21,9 +21,33 @@ export interface ResolvedWikiLink {
   label: string;
   section: string | null;
   slug: string;
-  /** The page's title when it exists. */
+  /** The page's title when it exists (never for a restricted page: the link shows what was written). */
   title: string | null;
   exists: boolean;
+  /** The page is limited to an audience: the app shows a locked link, and opening it says who may not see it. */
+  restricted?: true;
+}
+
+/**
+ * Whether the person `userId` sees a wiki page, as a condition over `wiki_pages` (ADR 0023 addendum): an open page,
+ * or a restricted one they own the workspace of, hold one of its audience roles or are named in.
+ */
+export function wikiPageVisibleSql(userId: string) {
+  return sql<boolean>`(not ${wikiPages.restricted} or ${userId} = any(${wikiPages.audienceUserIds})
+    or exists (select 1 from organization_members vm
+      where vm.org_id = ${wikiPages.orgId} and vm.user_id = ${userId} and vm.role = 'owner')
+    or exists (select 1 from organization_member_roles vr
+      where vr.org_id = ${wikiPages.orgId} and vr.user_id = ${userId} and vr.role_id = any(${wikiPages.audienceRoleIds})))`;
+}
+
+/** Of these page ids, the ones `userId` sees. */
+export async function visibleWikiPageIds(db: Executor, userId: string, ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const rows = await db
+    .select({ id: wikiPages.id })
+    .from(wikiPages)
+    .where(and(inArray(wikiPages.id, [...new Set(ids)]), wikiPageVisibleSql(userId)));
+  return new Set(rows.map((r) => r.id));
 }
 
 /** "Processos/Guia de Deploy" → "guia-de-deploy" (the folder is not part of it; unique per org). */
@@ -68,11 +92,17 @@ export function parseWikiLinks(text: string): WikiLinkRef[] {
 /** Live pages for these slugs (current slug or an earlier one), by requested slug. */
 export async function pagesBySlug(db: Executor, orgId: string, slugs: string[]) {
   const wanted = [...new Set(slugs)].filter(Boolean);
-  const out = new Map<string, { id: string; slug: string; title: string }>();
+  const out = new Map<string, { id: string; slug: string; title: string; restricted: boolean }>();
   if (wanted.length === 0) return out;
   const literal = `{${wanted.map((s) => `"${s}"`).join(",")}}`; // slugs are [a-z0-9-]
   const rows = await db
-    .select({ id: wikiPages.id, slug: wikiPages.slug, title: wikiPages.title, aliases: wikiPages.aliases })
+    .select({
+      id: wikiPages.id,
+      slug: wikiPages.slug,
+      title: wikiPages.title,
+      aliases: wikiPages.aliases,
+      restricted: wikiPages.restricted,
+    })
     .from(wikiPages)
     .where(
       and(
@@ -97,8 +127,21 @@ export async function resolveWikiTargets(db: Executor, orgId: string, refs: Wiki
   return refs.map((r) => resolved(r, pages));
 }
 
-function resolved(r: WikiLinkRef, pages: Map<string, { slug: string; title: string }>): ResolvedWikiLink {
+function resolved(
+  r: WikiLinkRef,
+  pages: Map<string, { slug: string; title: string; restricted: boolean }>,
+): ResolvedWikiLink {
   const page = pages.get(r.slug);
+  if (page?.restricted)
+    return {
+      target: r.target,
+      label: r.label,
+      section: r.section,
+      slug: r.slug,
+      title: null,
+      exists: true,
+      restricted: true,
+    };
   return {
     target: r.target,
     label: r.label,
