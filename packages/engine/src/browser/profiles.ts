@@ -510,6 +510,7 @@ export async function takeProfileTurn(
   db: Database,
   at: { orgId: string; profileId: string; agentId: string; runId: string },
   turnMs = PROFILE_TURN_MS,
+  retried = false,
 ): Promise<TurnResult> {
   const { orgId, profileId, agentId, runId } = at;
   const p = browserProfiles;
@@ -549,15 +550,17 @@ export async function takeProfileTurn(
       profile: { id: profileId, name: row.name, machineId: row.machineId },
     };
   }
-  const [now] = await db
-    .select()
+  const [read] = await db
+    .select({ row: p, live: sql<boolean>`coalesce(${p.heldUntil} >= now(), false)` })
     .from(p)
     .where(and(eq(p.id, profileId), eq(p.orgId, orgId)));
+  const now = read?.row;
   if (!now || now.deletedAt) return { ok: false, reason: "deleted", name: now?.name ?? null };
   if (!(await isGranted(db, profileId, agentId))) return { ok: false, reason: "revoked", name: now.name };
-  const holder = holderOf(now);
-  // Lapsed between the two statements: the next try takes it.
-  if (!holder) return takeProfileTurn(db, at, turnMs);
+  // Lapsed by the database's clock between the two statements: one more try takes it. The app's clock may differ.
+  if (!read?.live && !retried) return takeProfileTurn(db, at, turnMs, true);
+  const holder = holderOf(now, 0);
+  if (!holder) throw new Error("browser profile turn refused with no holder");
   return { ok: false, reason: "busy", name: now.name, holder };
 }
 

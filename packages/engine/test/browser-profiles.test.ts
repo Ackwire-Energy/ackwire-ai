@@ -325,6 +325,28 @@ test("revoking or deleting an agent's default profile tells its next command, no
   f = undefined as never;
 });
 
+test("a hold the app's clock thinks lapsed but the database's doesn't answers busy at once, never spins", async () => {
+  const b = await profilesSetup();
+  const p = await b.profile([f.agent.id, b.bia.id]);
+  const ada = await runOf(f.agent.id);
+  const bia = await runOf(b.bia.id);
+  // Inside a transaction Postgres's now() stands still while Date.now() moves on: an app clock ahead of the DB's.
+  const t = await f.db.transaction(async (tx) => {
+    await tx
+      .update(schema.browserProfiles)
+      .set({
+        heldByRunId: ada.runId,
+        heldByAgentId: f.agent.id,
+        heldSince: sql`now()`,
+        heldUntil: sql`now() + interval '50 milliseconds'`,
+      })
+      .where(eq(schema.browserProfiles.id, p.id));
+    await Bun.sleep(120);
+    return takeProfileTurn(tx as never, { orgId: f.org.id, profileId: p.id, agentId: b.bia.id, runId: bia.runId });
+  });
+  expect(t).toMatchObject({ ok: false, reason: "busy" });
+}, 5000);
+
 test("a run that lost its turn to another doesn't run its command: it looks at the page and decides again", async () => {
   const b = await profilesSetup();
   const p = await b.profile([f.agent.id, b.bia.id]);
