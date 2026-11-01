@@ -118,6 +118,9 @@ export function timeLeft(t: TFunction, iso: string, now = new Date()) {
   return t("format.inDays", { count: Math.floor(ms / 86_400_000) });
 }
 
+/** "Ana" for "Ana Souza". */
+export const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? "";
+
 /** "Ada e Atlas", "Ada, Atlas e Theo". */
 export function joinNames(names: string[], and: string) {
   if (names.length <= 1) return names[0] ?? "";

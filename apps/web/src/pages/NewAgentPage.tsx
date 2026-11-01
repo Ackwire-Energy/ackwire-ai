@@ -13,12 +13,21 @@ import {
   useMailAccounts,
   useMembers,
   useModels,
+  useNewAgentSetup,
   usePlatformKey,
   useSettings,
   useSkills,
 } from "@agenteschat/client";
 import { LEVELS, type Level, saveLevels } from "@agenteschat/client/lib/access-levels";
 import { draftLevels, draftMailLevels } from "@agenteschat/client/lib/action-cards";
+import {
+  autonomyName,
+  autonomyWords,
+  DEFAULT_AUTONOMY,
+  type NewAgentStart,
+  newAgentStart,
+  newAgentStartText,
+} from "@agenteschat/client/lib/agent-setup";
 import { ownSignInReady } from "@agenteschat/client/lib/ai-accounts";
 import { type ConnectedItem, itemName } from "@agenteschat/client/lib/connected";
 import { errorText as failureText } from "@agenteschat/client/lib/errors";
@@ -27,7 +36,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { choiceOf, defaultPolicy, MAIL_ACTIONS, toMailLevel } from "@agenteschat/client/lib/mail";
 import { planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { AUTO, isAuto, modelChoices } from "@agenteschat/client/lib/providers";
+import { AUTO, isAuto, modelChoices, usableModels } from "@agenteschat/client/lib/providers";
 import { scopeText } from "@agenteschat/client/lib/scopes";
 import {
   AffixInput,
@@ -49,6 +58,8 @@ import {
   modKey,
   prefersReducedMotion,
   randomAppearance,
+  SettingNote,
+  SettingRow,
   Spinner,
   Switch,
   Textarea,
@@ -225,6 +236,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
   const dms = useDms(org.id);
   const platform = usePlatformKey(org.id);
   const brainMachines = useBrainMachines(org.id);
+  const lastSetup = useNewAgentSetup(org.id);
   const aiAccounts = useAiAccounts(org.id);
   const connect = useConnectAi();
   const toast = useToast();
@@ -236,7 +248,11 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
   const connectedList = useMemo(() => [...connected.values()], [connected]);
   const mail = useMailAccounts(org.id);
   // Mailboxes (ADR 0038) start without access: email is always granted on purpose.
-  const mailboxes = useMemo(() => (mail.data ?? []).filter((a) => a.status === "active"), [mail.data]);
+  // Only my own: only who connected a mailbox gives an agent access to it (ADR 0038).
+  const mailboxes = useMemo(
+    () => (mail.data ?? []).filter((a) => a.status === "active" && a.ownerUserId === me.user.id),
+    [mail.data, me.user.id],
+  );
   const navigate = useNavigate();
   const mood = useDraftMood();
   const root = useRef<HTMLDivElement>(null);
@@ -298,10 +314,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
     () => modelChoices(models.data?.models ?? [], credentials.data ?? [], platform.data ?? false),
     [models.data, credentials.data, platform.data],
   );
-  const usable = useMemo(
-    () => new Set(choices.flatMap(([, list]) => list.filter((c) => c.available).map((c) => c.model.id))),
-    [choices],
-  );
+  const usable = useMemo(() => usableModels(choices), [choices]);
   const taken = useMemo(
     () =>
       new Set([
@@ -310,6 +323,43 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
       ]),
     [agents.data, members.data],
   );
+
+  // What it starts thinking with (ADR 0094): the last setup saved or used on other agents, where it can think for it.
+  const startOf = (ownerId: string | null): NewAgentStart | null =>
+    from
+      ? null
+      : newAgentStart(lastSetup.data, {
+          ownerIsMe: ownerId === me.user.id,
+          admin: can(org, "manage_agents"),
+          usable,
+          keys: credentials.data ?? [],
+        });
+  const startWith = (start: NewAgentStart | null) => {
+    const api = start?.brain === "model" ? start : null;
+    setModel(api?.model ?? AUTO);
+    setKey(api?.key ?? DEFAULT_KEY);
+    setPlan(
+      start && start.brain !== "model"
+        ? {
+            kind: start.brain,
+            machineId: start.machineId,
+            ...(start.account ? { accountId: start.account.id, label: start.account.label } : {}),
+          }
+        : null,
+    );
+  };
+  // Until the person picks what it thinks with, it follows whose it is.
+  const [aiPicked, setAiPicked] = useState(Boolean(from));
+  // "Levar a autonomia" off: the last setup's AI with the default Autonomia.
+  const [withAutonomy, setWithAutonomy] = useState(true);
+  const startsReady = lastSetup.isFetched && models.isFetched && credentials.isFetched && platform.isFetched;
+  const started = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, when what it starts with is known
+  useEffect(() => {
+    if (started.current || !startsReady || aiPicked) return;
+    started.current = true;
+    startWith(startOf(me.user.id));
+  }, [startsReady]);
 
   // Defaults once the data arrives: the skills on for new agents, the levels.
   useEffect(() => {
@@ -365,6 +415,28 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
   const { amount, invalid: budgetInvalid } = readBudget(budget);
   const defaultBudget = settings.data?.defaultAgentBudgetUsd;
   const budgetShown = amount ?? defaultBudget;
+  const start = startOf(ownerId);
+  // Still on what it started with: said on the model step, saved with all of it.
+  const onStart = start
+    ? start.brain === "model"
+      ? !plan && model === start.model
+      : plan?.kind === start.brain && plan.machineId === start.machineId && plan.accountId === start.account?.id
+    : false;
+  const autonomy = onStart && withAutonomy ? start?.autonomy : undefined;
+  // Its Autonomia has a switch of its own under it.
+  const startLine =
+    start && onStart
+      ? newAgentStartText(
+          t,
+          locale,
+          { ...start, autonomy: undefined },
+          {
+            models: models.data?.models ?? [],
+            machines: brainMachines.data ?? [],
+            provider: lastSetup.data?.account?.provider,
+          },
+        )
+      : null;
   const modelInfo = (models.data?.models ?? []).find((m) => m.id === model);
   const modelLabel = plan
     ? [t(`brain.card.${plan.kind}`), plan.label].filter(Boolean).join(" · ")
@@ -429,6 +501,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
       monthlyBudgetUsd: amount,
       appearance: look,
       ...(from ? { proposal: from.messageId } : {}),
+      ...(autonomy ? { autonomy } : {}),
     });
     // A plan thinks on its computer: the agent goes there, then thinks with it (an automatic model stays automatic).
     // The agent exists either way: if the plan can't be saved now it stays on the API, and its page says so.
@@ -436,10 +509,13 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
     if (plan) {
       try {
         await api.sandbox.setTarget(org.id, agent.id, plan.machineId);
-        await api.agents.setBrain(org.id, agent.id, {
-          brain: plan.kind,
-          ...(plan.accountId ? { account: plan.accountId } : {}),
-        });
+        await api.agents.setBrain(
+          org.id,
+          agent.id,
+          start && start.brain !== "model" && onStart
+            ? start.input
+            : { brain: plan.kind, ...(plan.accountId ? { account: plan.accountId } : {}) },
+        );
         // Saved with no account, it thinks with that computer's own sign-in, which thinks only for agents of whoever
         // connected it, where that CLI is signed in (never on the workspace's computer). Else, for an agent of the
         // person's own, its plan's sign-in opens once it's created: only the owner signs a plan in for it.
@@ -451,6 +527,8 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
       } catch {
         toast.show(t("newAgent.planNotSaved", { ...g, brain: t(`brain.card.${plan.kind}`) }), "error");
       }
+    } else if (start?.brain === "model" && onStart && start.contextTokens !== null) {
+      await api.agents.setBrain(org.id, agent.id, { brain: "model", contextTokens: start.contextTokens });
     }
     if (joined.length > 0) {
       await api.agents.setChannels(
@@ -535,8 +613,9 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
     setChannelIds(new Set());
     setOwner(me.user.id);
     setAudience({ mode: "everyone", userIds: [] });
-    setModel(AUTO);
-    setKey(DEFAULT_KEY);
+    startWith(startOf(me.user.id));
+    setAiPicked(false);
+    setWithAutonomy(true);
     setBudget("");
     scrollTop();
   };
@@ -596,7 +675,8 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
     setInstructions(t(`newAgent.roles.${id}.instructions`));
     setLevels(presetLevels(id, connectedList));
     setChannelIds(new Set(presetChannels(id, myChannels)));
-    setModel(AUTO);
+    startWith(startOf(ownerId));
+    setAiPicked(false);
   };
   const changeName = (value: string) => {
     const had = Boolean(name.trim());
@@ -1086,6 +1166,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
             meId={me.user.id}
             onChange={(v) => {
               setOwner(v);
+              if (!aiPicked) startWith(startOf(v === NO_OWNER ? null : v));
               if (v !== NO_OWNER) setAudience((a) => ({ ...a, userIds: a.userIds.filter((id) => id !== v) }));
             }}
           />
@@ -1114,6 +1195,19 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
       return (
         <>
           {head(t("newAgent.steps.model.title"), t("newAgent.steps.model.lead"))}
+          {startLine && <SettingNote icon="repeat">{t("newAgent.lastSetup", { setup: startLine })}</SettingNote>}
+          {onStart && start?.autonomy && (
+            <SettingRow
+              title={t("agentPage.work.brain.copy.withAutonomy")}
+              description={t("newAgent.lastAutonomy", {
+                value: autonomyName(t, start.autonomy),
+                fallback: autonomyName(t, DEFAULT_AUTONOMY),
+              })}
+              htmlFor="ag-autonomy"
+            >
+              <Switch id="ag-autonomy" checked={withAutonomy} onCheckedChange={setWithAutonomy} />
+            </SettingRow>
+          )}
           <ModelCards
             choices={choices}
             value={plan ? undefined : model}
@@ -1121,6 +1215,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
             onChange={(id) => {
               setModel(id);
               setPlan(null);
+              setAiPicked(true);
               mood.react(id.toLowerCase().includes("opus") ? "star" : "happy", 800);
             }}
           />
@@ -1138,6 +1233,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
             value={plan}
             onChange={(choice) => {
               setPlan(choice);
+              setAiPicked(true);
               mood.react("happy", 800);
             }}
           />
@@ -1156,7 +1252,14 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
               {t("newAgent.key")}
             </h2>
           </div>
-          <KeySelect value={key} onChange={setKey} options={keys} />
+          <KeySelect
+            value={key}
+            onChange={(v) => {
+              setKey(v);
+              setAiPicked(true);
+            }}
+            options={keys}
+          />
           <div className="newag__sect">
             <div className="ac-hintline">
               <h2>
@@ -1303,7 +1406,8 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
               "bolt",
               t("newAgent.modelAndCost"),
               <span>
-                {modelLabel}{" "}
+                {modelLabel}
+                {autonomy && ` · ${autonomyWords(t, autonomy)}`}{" "}
                 <span className="muted">
                   · {keyLabel}
                   {budgetShown !== undefined && ` · ${t("newAgent.upTo", { amount: usd(t, locale, budgetShown) })}`}
@@ -1524,6 +1628,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
                 <PreviewSection label={t("newAgent.modelAndCost")}>
                   <span className="newag__chips">
                     {modelLabel && chip("bolt", modelLabel, "model")}
+                    {autonomy && chip("shield", autonomyWords(t, autonomy), "autonomy")}
                     {budgetShown !== undefined &&
                       !budgetInvalid &&
                       chip("wallet", t("newAgent.upTo", { amount: usd(t, locale, budgetShown) }), "budget")}

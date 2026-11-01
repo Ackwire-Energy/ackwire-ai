@@ -41,7 +41,7 @@
 .roles-row:hover {
   background: color-mix(in srgb, var(--ink) 3%, transparent);
 }
-.roles-row:focus-visible {
+html:not([data-pointer]) .roles-row:focus-visible {
   box-shadow: inset var(--focus-ring);
 }
 .roles-row > .ac-icon {
@@ -132,7 +132,7 @@
   background: var(--plate);
   color: var(--ink);
 }
-.roles-back:focus-visible {
+html:not([data-pointer]) .roles-back:focus-visible {
   box-shadow: var(--focus-ring);
 }
 .roles-id {
@@ -330,7 +330,7 @@
   border-top: 1px solid var(--line);
   cursor: pointer;
 }
-.roles-pick__row:focus-visible {
+html:not([data-pointer]) .roles-pick__row:focus-visible {
   border-radius: 8px;
   box-shadow: var(--focus-ring);
 }
@@ -388,7 +388,7 @@
     0 0 0 2px var(--raised),
     0 0 0 4px var(--ink);
 }
-.roles-color:focus-visible {
+html:not([data-pointer]) .roles-color:focus-visible {
   box-shadow: var(--focus-ring);
 }
 .roles-color:disabled {
@@ -418,7 +418,7 @@
   box-shadow: var(--card-key);
   color: var(--ink);
 }
-.roles-iconpick:focus-visible {
+html:not([data-pointer]) .roles-iconpick:focus-visible {
   box-shadow: var(--focus-ring);
 }
 .roles-iconpick:disabled {
@@ -459,7 +459,7 @@
   background: linear-gradient(180deg, var(--card-face-top), var(--raised));
   box-shadow: var(--card-key);
 }
-.roles-template:focus-visible {
+html:not([data-pointer]) .roles-template:focus-visible {
   box-shadow: var(--focus-ring);
 }
 .roles-template b {

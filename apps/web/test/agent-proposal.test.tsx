@@ -92,7 +92,7 @@ describe("an agent's proposal of a new agent, in the chat", () => {
       "esperando você",
       "Você pediu alguém para o design.",
       "Nina",
-      "@nina · Designer · Pensa com o modelo do workspace",
+      "@nina · Designer · Pensa pela API",
       "para decidir",
     ])
       expect(card.textContent).toContain(shown);
@@ -342,6 +342,7 @@ describe("one request, one card: what it gets, created in one click", () => {
       askActions: [],
       aliases: [],
       defaultFrom: null,
+      ownerUserId: id === "mb-w" ? "u-walter" : "u-joao",
       agents: [],
     });
     fakeMail.accounts = [mailbox("mb-w", "walter@acme.com.br"), mailbox("mb-j", "joao@acme.com.br")];

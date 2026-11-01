@@ -227,11 +227,15 @@ export {
   limitOffers,
   type OfferAccount,
   PLAN_ALMOST,
+  PLAN_CRITICAL,
+  PLAN_TONE,
+  type PlanLevel,
   PlanMeter,
   type PlanMeterText,
   type PlanMeterUsage,
   type PlanMeterWindow,
   type PlanState,
+  planLevel,
   planLine,
   planState,
   planWindows,
@@ -342,7 +346,7 @@ export { type UsageDay, type UsageDayPart, UsageDays, UsageSwatch } from "./comp
 export { Reaction, Reactions, type WorkStep, WorkSummary } from "./components/Work";
 export { COMPUTER_GRID, COMPUTER_KINDS, COMPUTER_STATES, drawComputer } from "./computer/portrait.js";
 export { cx } from "./cx";
-export { hoverPointer, onScreenKeyboard, onScreenNow } from "./device";
+export { hoverPointer, movesByKeys, onScreenKeyboard, onScreenNow, trackInput } from "./device";
 export {
   EMOJI_CATEGORIES,
   EMOJIS,

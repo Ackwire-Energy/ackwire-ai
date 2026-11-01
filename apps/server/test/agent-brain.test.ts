@@ -83,7 +83,7 @@ async function workspace(env: Record<string, string> = {}) {
   await member(`/api/app/invitations/${url.split("/invite/")[1]}/accept`, { json: {} });
   const asBia = (path: string, init?: Parameters<typeof member>[1]) =>
     member(`/api/app/organizations/${seeded.orgId}${path}`, init);
-  return { ...seeded, api, asBia, owner };
+  return { ...seeded, api, asBia, owner, member };
 }
 
 function pairMac(api: (path: string, init?: Parameters<ReturnType<typeof browser>>[1]) => Promise<Response>) {
@@ -388,6 +388,95 @@ test("a new agent starts on Automático on every brain; one with a fixed model k
     effectiveModel: "sonnet",
     effort: null,
   });
+});
+
+test("one agent's setup on others (ADR 0094): a preview keeps nothing, each agent by its rules, new agents start with it", async () => {
+  const { api, asBia, agentId, credentialId } = await workspace();
+  const eva = (await (await api("/agents", { json: { name: "Eva", handle: "eva" } })).json()) as { id: string };
+  const mac = await pairMac(api);
+  for (const id of [agentId, eva.id]) {
+    await api(`/agents/${id}/computer/target`, { method: "PUT", json: { machineId: mac.machineId } });
+  }
+  const setup = { brain: "claude_code", machineId: mac.machineId, account: null, model: "opus", effort: "high" };
+  const use = (json: Record<string, unknown>, as = api) => as("/agent-setup", { json });
+  type Results = { results: { agentId: string; status: string; reason?: string }[] };
+  const brainOf = async (id: string) => (await (await api(`/agents/${id}/brain`)).json()) as Brain;
+  const newAgentSetup = async () => ((await (await api("/agent-setup")).json()) as { setup: unknown }).setup;
+  // Dev was created on Sonnet with the workspace's key, Eva on Automático: Dev's is the last pick.
+  const created = {
+    brain: "model",
+    model: "claude-sonnet-5-5",
+    key: credentialId,
+    contextTokens: null,
+    autonomy: null,
+  };
+  expect(await newAgentSetup()).toEqual(created);
+
+  const preview = await use({ setup, agentIds: [agentId, eva.id], preview: true });
+  expect(preview.status).toBe(200);
+  expect(((await preview.json()) as Results).results.map((r) => r.status)).toEqual(["applied", "applied"]);
+  expect((await brainOf(eva.id)).brain).toBe("model");
+  expect(await newAgentSetup()).toEqual(created);
+
+  const done = (await (await use({ setup, agentIds: [agentId, eva.id] })).json()) as Results;
+  expect(done.results.map((r) => r.status)).toEqual(["applied", "applied"]);
+  expect(await brainOf(eva.id)).toMatchObject({ brain: "claude_code", model: "opus", effort: "high" });
+  expect(await newAgentSetup()).toMatchObject({
+    brain: "claude_code",
+    model: "opus",
+    computer: { machineId: mac.machineId, name: "mac" },
+    account: null,
+    ownSignIn: true,
+    effort: "high",
+  });
+
+  // A member changes only their own agents, and doesn't create agents.
+  const bia = (await (await use({ setup, agentIds: [eva.id] }, asBia)).json()) as Results;
+  expect(bia.results).toEqual([{ agentId: eva.id, status: "skipped", reason: "not_allowed" }]);
+  expect((await asBia("/agent-setup")).status).toBe(403);
+  expect((await use({ setup, agentIds: [] })).status).toBe(400);
+  expect((await use({ setup: { ...setup, effort: "hard" }, agentIds: [eva.id] })).status).toBe(400);
+});
+
+test("the Autonomia goes with the setup (ADR 0094); a new agent starts with one only from an admin or its owner", async () => {
+  const { api, asBia, member, agentId } = await workspace();
+  const autonomyOf = async (id: string) =>
+    ((await (await api(`/agents/${id}/brain`)).json()) as { autonomy: string }).autonomy;
+  const created = await api("/agents", {
+    json: { name: "Eva", handle: "eva", model: "claude-opus-5-5", autonomy: "always" },
+  });
+  const eva = (await created.json()) as { id: string };
+  expect(await autonomyOf(eva.id)).toBe("always");
+
+  // Dev takes the model and the Autonomia; Eva already thinks so and takes the Autonomia alone.
+  const setup = { brain: "model", model: "claude-opus-5-5", autonomy: "never" };
+  const use = (json: Record<string, unknown>) => api("/agent-setup", { json });
+  const expected = [
+    { agentId, status: "applied", autonomy: { from: "low_risk_auto", to: "never" } },
+    { agentId: eva.id, status: "same", autonomy: { from: "always", to: "never" } },
+  ];
+  const preview = await use({ setup, agentIds: [agentId, eva.id], preview: true });
+  expect(((await preview.json()) as { results: unknown[] }).results).toEqual(expected);
+  expect(await autonomyOf(eva.id)).toBe("always");
+  const done = await use({ setup, agentIds: [agentId, eva.id] });
+  expect(((await done.json()) as { results: unknown[] }).results).toEqual(expected);
+  expect([await autonomyOf(agentId), await autonomyOf(eva.id)]).toEqual(["never", "never"]);
+  const last = (await (await api("/agent-setup")).json()) as { setup: { autonomy: string | null } };
+  expect(last.setup.autonomy).toBe("never");
+  expect((await use({ setup: { ...setup, autonomy: "sometimes" }, agentIds: [eva.id] })).status).toBe(400);
+
+  // Bia creates agents: an Autonomia only on her own, as she could set it by hand.
+  const role = await api("/roles", { json: { name: "Criadores", permissions: ["create_agents"] } });
+  const biaId = ((await (await member("/api/app/me")).json()) as { user: { id: string } }).user.id;
+  await api(`/members/${biaId}/roles`, {
+    method: "PUT",
+    json: { roleIds: [((await role.json()) as { id: string }).id] },
+  });
+  const make = (handle: string, ownerUserId: string | null) =>
+    asBia("/agents", { json: { name: handle, handle, ownerUserId, autonomy: "never" } });
+  expect((await make("ivo", biaId)).status).toBe(201);
+  expect((await make("rui", null)).status).toBe(403);
+  expect((await asBia("/agents", { json: { name: "Lua", handle: "lua", ownerUserId: null } })).status).toBe(201);
 });
 
 test("mission brain: from the executor by default; the brain before Start, the model any time; who may", async () => {

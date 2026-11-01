@@ -53,6 +53,7 @@ import {
   createStreamBroker,
   createTalker,
   createToolGateway,
+  createUsageToolSource,
   createWikiToolSource,
   createWorkspaceToolSource,
   type EmailArt,
@@ -72,6 +73,7 @@ import {
   type ResolveHost,
   ROUTER_QUIET_MS,
   type RunExecutorDeps,
+  reauthorizeStream,
   recheckStream,
   resolveSummaryModel,
   type SandboxDeps,
@@ -269,6 +271,7 @@ export function buildEngine(o: EngineOptions) {
       // An agent with no AI connected is refused at once: its answer would never come.
       createAskAgentToolSource({ pubsub: adapters.pubsub, ai: { gateway, machines: machineHub } }),
       createFindAgentToolSource({ machines: machineHub }),
+      createUsageToolSource(),
       // What the agent says it is doing, next to its name (ADR 0084).
       createSetStatusToolSource({ pubsub: adapters.pubsub }),
       createReactToolSource({ pubsub: adapters.pubsub }),
@@ -369,6 +372,7 @@ export function buildEngine(o: EngineOptions) {
       return target;
     },
     recheck: (stream) => recheckStream(db, stream),
+    reauthorize: (stream, mode) => reauthorizeStream(db, stream, mode),
     onReady: sessions ? (stream) => sessions.ready(stream) : undefined,
     onClosed: (stream) => Promise.all([streamClosed(db, stream), sessions?.closed(stream)]),
     log: o.log,

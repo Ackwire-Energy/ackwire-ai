@@ -57,6 +57,18 @@ describe("pricing", () => {
     );
   });
 
+  test("GPT-6.1 Terra: $1 / $0.05 / $1.25 / $5, and $2 / $0.10 / $2.50 / $7.50 above 272K prompt tokens", () => {
+    expect(costNanoUsd("gpt-6.1-terra", usage(100_000, 1000, 100_000, 72_000))).toBe(
+      100_000 * 1000 + 1000 * 5000 + 100_000 * 50 + 72_000 * 1250,
+    );
+    expect(costNanoUsd("gpt-6.1-terra", usage(100_001, 1000, 100_000, 72_000))).toBe(
+      100_001 * 2000 + 1000 * 7500 + 100_000 * 100 + 72_000 * 2500,
+    );
+    // People pick it: never Automático's, the router's or the system tasks' choice.
+    expect(MODEL_CATALOG["gpt-6.1-terra"]).toMatchObject({ provider: "openai", contextWindow: 1_050_000 });
+    expect(MODEL_CATALOG["gpt-6.1-terra"]?.tier).toBeUndefined();
+  });
+
   test("GPT-6 Sol and Luna: input, cached input and cache writes 2×, output 1.5× above 272K prompt tokens", () => {
     expect(costNanoUsd("gpt-6-sol", usage(272_000, 1000))).toBe(272_000 * 2000 + 1000 * 10000);
     expect(costNanoUsd("gpt-6-sol", usage(200_000, 1000, 72_001))).toBe(200_000 * 4000 + 1000 * 15000 + 72_001 * 400);

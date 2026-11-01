@@ -25,6 +25,8 @@ import type {
   AgentProposal,
   AgentQuestion,
   AgentSecret,
+  AgentSetup,
+  AgentSetupResult,
   AgentSkill,
   AgentStatus,
   AgentUsage,
@@ -155,6 +157,7 @@ import type {
   MoveAgentsInput,
   MoveAgentsResult,
   MySuggestion,
+  NewAgentSetup,
   NoticeCategory,
   NoticePrefs,
   NotificationCount,
@@ -487,6 +490,16 @@ export interface ApiClient {
     setBrain(orgId: string, agentId: string, input: AgentBrainInput): Promise<AgentBrain>;
     /** "Quem pensa" for an agent still being created: the workspace's computers and what each offers (admins). */
     brainMachines(orgId: string): Promise<BrainMachine[]>;
+    /**
+     * "Usar em outros agentes": the setup on each agent, by its own rules, one result each in the order asked; with
+     * `preview`, what each would do and nothing kept.
+     */
+    applySetup(
+      orgId: string,
+      input: { setup: AgentSetup; agentIds: string[]; preview?: boolean },
+    ): Promise<AgentSetupResult[]>;
+    /** What a new agent starts thinking with (whoever creates agents); null: "Automático" on the API. */
+    newAgentSetup(orgId: string): Promise<NewAgentSetup | null>;
     runs(
       orgId: string,
       filter?: { agentId?: string; status?: string; before?: string; since?: string; limit?: number },

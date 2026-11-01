@@ -268,6 +268,37 @@ test("a run lists what the judge expects it to need, keeps it for the whole run,
   expect(contexts.at(-1)?.data.toolGroups).toMatchObject({ groups: ["issues"], kept: ["issues"], source: "none" });
 });
 
+test("a reply counts its tools without the lookups: lookups alone leave no tools under it", async () => {
+  let step = 0;
+  f = await setup({
+    toolsOnDemand: true,
+    issueTools: true,
+    contextTools: true,
+    reply: () => {
+      step++;
+      // The first run looks a tool up, misnames one, then lists the issues; the second only looks.
+      if (step === 1 || step === 4)
+        return { chunks: [], toolUses: [{ name: "find_tools", input: { query: "issues" } }] };
+      if (step === 2) return { chunks: [], toolUses: [{ name: "use_tool", input: { tool: "nope", arguments: {} } }] };
+      if (step === 3)
+        return { chunks: [], toolUses: [{ name: "use_tool", input: { tool: "list_issues", arguments: {} } }] };
+      return { chunks: ["Nenhuma issue aberta."] };
+    },
+  });
+  await grantScopes(f.db, f.org.id, f.agent.id, [{ connectionId: null, scope: "issues:read" }]);
+  for (const body of ["@dev quais issues estão abertas?", "@dev e agora?"]) {
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body });
+    await drainOutbox(f.db, f.handlers);
+  }
+  const replies = (await f.db.select().from(schema.messages))
+    .filter((m) => m.authorType === "agent")
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  const work = replies.map((m) => (m.meta as { work?: { steps: number; calls: { name: string }[] } }).work);
+  expect(work.map((w) => w?.steps)).toEqual([1, 0]);
+  expect(work[0]?.calls).toEqual([{ name: "list_issues" }]);
+  expect(work[1]?.calls).toEqual([]);
+});
+
 test("a group the judge expects goes in as it is, with no directory when nothing is left", async () => {
   f = await setup({
     toolsOnDemand: true,

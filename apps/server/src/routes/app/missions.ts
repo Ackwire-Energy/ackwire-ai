@@ -61,7 +61,7 @@ import {
   requireSession,
   security,
 } from "./context";
-import { BrainKind, MissionBrain } from "./schemas";
+import { BrainKind, CommandApproval, MissionBrain } from "./schemas";
 
 const tags = ["Missions"];
 const Status = z.enum(["proposed", "active", "paused", "done", "canceled", "awaiting_close"]).openapi({
@@ -80,11 +80,6 @@ const PlanItem = z.object({
   title: z.string(),
   status: z.enum(["todo", "doing", "waiting_you", "done", "dropped"]),
   note: z.string().optional(),
-});
-
-const CommandApproval = z.enum(["always", "low_risk_auto", "never"]).openapi({
-  description:
-    '"Pedir aprovação de comandos": always (every command off the allow list asks), low_risk_auto (the judge allows low-risk ones within what code allows) or never (everything but the deny list).',
 });
 
 const Mission = z

@@ -573,6 +573,8 @@ export interface AgentInput {
   proposal?: string;
   /** Its stickers and GIFs after a light reply (ADR 0091); same permission as editing the agent. */
   mediaReplies?: boolean;
+  /** The Autonomia it starts with (the last setup's, ADR 0094): only an admin or its own owner sends it. */
+  autonomy?: CommandApproval;
 }
 
 /**
@@ -4175,6 +4177,8 @@ export interface AgentBrain {
   ownSignIn: boolean;
   /** "Conta deste computador"'s plan usage, by brain (absent: not known). */
   ownUsage: Partial<Record<MachineAccountKind, PlanUsage>>;
+  /** Its Autonomia (its new missions' autonomy), copied with its setup (ADR 0094); absent on older servers. */
+  autonomy?: CommandApproval;
 }
 
 /** ADR 0041 §5: `xhigh` may be stored; the page offers low, medium, high and max. */
@@ -4273,6 +4277,68 @@ export interface AgentBrainInput {
   effort?: BrainEffortSetting | null;
   /** 200K, 400K or 1M tokens; null = the model's window; omitted = keep. */
   contextTokens?: number | null;
+}
+
+/** One agent's "Quem pensa" as a value, to use on other agents (ADR 0094, `POST …/agent-setup`). */
+export interface AgentSetup {
+  brain: BrainKind;
+  /** The API brain: the agent's model (`auto` included). A computer brain: its model as stored (null: the default). */
+  model: string | null;
+  /** The API brain's key; null = the workspace's default; omitted = each agent keeps its own. */
+  key?: string | null;
+  /** A computer brain: the computer it thinks on, and its account there (null: that computer's own sign-in). */
+  machineId?: string | null;
+  account?: string | null;
+  effort?: BrainEffortSetting | null;
+  contextTokens?: number | null;
+  fallback?: boolean;
+  /** "Atende outras pessoas" off, for the agents that move onto the plan. */
+  onlyOwner?: boolean;
+  /** Its Autonomia, wherever the caller may set it by hand, whatever the AI takes; omitted = each keeps its own. */
+  autonomy?: CommandApproval;
+}
+
+/** Why an agent can't take a setup. */
+export type AgentSetupReason =
+  | "not_allowed"
+  | "admins_only"
+  | "account_owner"
+  | "account_single"
+  | "other_computer"
+  | "model_missing"
+  | "failed";
+
+/** What a setup does to one agent (in a preview, would do). */
+export interface AgentSetupResult {
+  agentId: string;
+  /** Its AI. `same`: it already thinks this way; `skipped`: it takes none of the AI (`reason`), maybe the Autonomia. */
+  status: "applied" | "same" | "skipped";
+  /** It keeps the account it has (another person's plan) and takes the rest: its name; null = its computer's own. */
+  keeps?: { account: string | null };
+  reason?: AgentSetupReason;
+  /** `owner` (account_owner, not the caller's), `agent` (account_single), `computer`, `plan` and `model`. */
+  params?: Record<string, string>;
+  /** Its Autonomia changes, whatever its AI does: wherever the caller may set it by hand, `skipped` agents too. */
+  autonomy?: { from: CommandApproval; to: CommandApproval };
+}
+
+/** `GET …/agent-setup`: what a new agent starts thinking with (the last setup saved or used on others). */
+export interface NewAgentSetup {
+  brain: BrainKind;
+  model: string | null;
+  /** The API brain's key, still the workspace's; null = the workspace's default. */
+  key: string | null;
+  contextTokens: number | null;
+  /** A computer brain: where it thinks. */
+  computer?: { machineId: string; name: string };
+  /** Its account there; null = that computer's own sign-in. */
+  account?: { id: string; label: string; provider: string | null; mine: boolean; free: boolean } | null;
+  /** The computer's own sign-in thinks for the caller's agents there (they connected it). */
+  ownSignIn?: boolean;
+  effort?: BrainEffortSetting | null;
+  fallback?: boolean;
+  /** Its Autonomia; null or absent = the default. */
+  autonomy?: CommandApproval | null;
 }
 
 /** `POST …/machines/{id}/account-logins` (201): what the person needs to sign in. */
