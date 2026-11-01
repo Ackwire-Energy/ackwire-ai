@@ -99,6 +99,7 @@ import {
   type RoleGroupId,
   type RoleId,
   readBudget,
+  savePart,
   stepErrors,
 } from "@/lib/new-agent";
 import { useToast } from "@/lib/toast";
@@ -232,7 +233,8 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const preview = useRef<HTMLDivElement>(null);
   const phone = useMediaQuery("(max-width: 820px)");
-  // Who edits any agent picks its owner. Anyone else makes their own (the server's rule, ADR 0085 §5).
+  // Who edits any agent picks its owner and gives it apps and mailboxes. Anyone else makes their own agent, which
+  // starts without access (the server's rule, ADR 0085 §5).
   const managesAgents = can(org, "manage_agents");
 
   // An agent's proposal starts on the last step, filled in: its role as written, its look, levels and channels.
@@ -254,7 +256,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
     (draft?.appearance as Required<AgentAppearance> | null) ?? BLANK_LOOK,
   );
   const [instructions, setInstructions] = useState(draft?.instructions ?? "");
-  const [levels, setLevels] = useState<Record<string, Level>>(draft ? draftLevels(draft) : {});
+  const [levels, setLevels] = useState<Record<string, Level>>(draft && managesAgents ? draftLevels(draft) : {});
   const [mailLevels, setMailLevels] = useState<Record<string, Level>>({});
   const [skillIds, setSkillIds] = useState<Set<string> | null>(null);
   const [channelIds, setChannelIds] = useState<Set<string>>(new Set(draft?.channelIds));
@@ -308,12 +310,13 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
       setSkillIds(new Set(library.data.filter((s) => s.defaultForNewAgents).map((s) => s.id)));
   }, [library.data, skillIds]);
   useEffect(() => {
+    if (!managesAgents) return;
     setLevels((prev) => {
       const missing = connectedList.filter((i) => prev[i.id] === undefined);
       if (missing.length === 0) return prev;
       return { ...prev, ...presetLevels(role ?? "custom", missing) };
     });
-  }, [connectedList, role]);
+  }, [connectedList, role, managesAgents]);
 
   const ownerId = owner === NO_OWNER ? null : owner;
   const ownerMember = (members.data ?? []).find((m) => m.userId === ownerId);
@@ -443,21 +446,12 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
         toast.show(t("newAgent.planNotSaved", { ...g, brain: t(`brain.card.${plan.kind}`) }), "error");
       }
     }
-    // The rest is saved one part at a time. What fails is said, and the flow still ends on the new agent: a second
-    // "Criar" would make another one.
+    // The rest is saved one part at a time. What fails is said, and the flow still ends on the new agent: its @ is
+    // taken now, so "Criar" again would only be refused.
     const failures: unknown[] = [];
-    const attempt = async (save: () => Promise<unknown>) => {
-      try {
-        await save();
-        return true;
-      } catch (e) {
-        failures.push(e);
-        return false;
-      }
-    };
     const inChannels =
       joined.length > 0 &&
-      (await attempt(() =>
+      (await savePart(failures, () =>
         api.agents.setChannels(
           org.id,
           agent.id,
@@ -473,10 +467,10 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
         .filter((item) => (levels[item.id] ?? "none") !== "none")
         .map((item) => [`connector:${item.id}`, levels[item.id] as Level]),
     );
-    if (Object.keys(chosen).length > 0) await attempt(() => saveLevels(api, org.id, agent.id, chosen));
+    if (Object.keys(chosen).length > 0) await savePart(failures, () => saveLevels(api, org.id, agent.id, chosen));
     // Mailboxes: the chosen level with the default rules (every send asks); rules are set on the agent page.
     for (const account of grantedMail) {
-      await attempt(() =>
+      await savePart(failures, () =>
         api.mail.setAgent(org.id, agent.id, account.id, {
           level: toMailLevel(mailLevels[account.id] ?? "none"),
           canDelete: false,
@@ -486,7 +480,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
     }
     const libraryList = library.data ?? [];
     if (libraryList.length > 0) {
-      await attempt(() =>
+      await savePart(failures, () =>
         api.skills.setForAgent(
           org.id,
           agent.id,
@@ -597,7 +591,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
     setHandleTouched(false);
     setLook({ ...preset.look });
     setInstructions(t(`newAgent.roles.${id}.instructions`));
-    setLevels(presetLevels(id, connectedList));
+    if (managesAgents) setLevels(presetLevels(id, connectedList));
     setChannelIds(new Set(presetChannels(id, myChannels)));
     setModel(AUTO);
   };
@@ -722,7 +716,9 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
               <div className="newag__roles">
                 {group.roles.map((id) => {
                   const preset = ROLE_PRESETS[id];
-                  const kit = connectedList.filter((i) => i.def && (preset.levels[i.def.id] ?? "none") !== "none");
+                  const kit = managesAgents
+                    ? connectedList.filter((i) => i.def && (preset.levels[i.def.id] ?? "none") !== "none")
+                    : [];
                   const room = presetChannels(id, myChannels)
                     .map((cid) => myChannels.find((c) => c.id === cid)?.name)
                     .filter(Boolean)[0];
@@ -934,7 +930,13 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
     },
     tools: () => (
       <>
-        {head(t("newAgent.steps.tools.title"), t("newAgent.steps.tools.lead", { ...g, org: org.name }))}
+        {head(
+          t("newAgent.steps.tools.title"),
+          managesAgents
+            ? t("newAgent.steps.tools.lead", { ...g, org: org.name })
+            : t("newAgent.steps.tools.leadNoAccess", g),
+          managesAgents ? undefined : t("newAgent.accessAdmins"),
+        )}
         <Card as="div" className="newag__card">
           {connectedList.length + mailboxes.length > 0 ? (
             <>
@@ -942,29 +944,31 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
                 <span className="small muted">
                   {t("newAgent.connectedCount", { count: connectedList.length + mailboxes.length })}
                 </span>
-                <span className="newag__quick">
-                  {t("newAgent.all")}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setLevels(presetLevels("custom", connectedList));
-                      setMailLevels({});
-                    }}
-                  >
-                    {t("access.level.none")}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setLevels(Object.fromEntries(connectedList.map((i) => [i.id, "read" as Level])));
-                      setMailLevels(Object.fromEntries(mailboxes.map((a) => [a.id, "read" as Level])));
-                    }}
-                  >
-                    {t("access.level.read")}
-                  </Button>
-                </span>
+                {managesAgents && (
+                  <span className="newag__quick">
+                    {t("newAgent.all")}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setLevels(presetLevels("custom", connectedList));
+                        setMailLevels({});
+                      }}
+                    >
+                      {t("access.level.none")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setLevels(Object.fromEntries(connectedList.map((i) => [i.id, "read" as Level])));
+                        setMailLevels(Object.fromEntries(mailboxes.map((a) => [a.id, "read" as Level])));
+                      }}
+                    >
+                      {t("access.level.read")}
+                    </Button>
+                  </span>
+                )}
               </div>
               <ul className="level-list" aria-label={t("newAgent.connectorsLabel")}>
                 {connectedList.map((item) => {
@@ -979,7 +983,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
                       asks={level === "write" ? asksOf(item) : []}
                       levels={LEVELS}
                       value={level}
-                      onChange={(l) => setLevel(item.id, l)}
+                      onChange={managesAgents ? (l) => setLevel(item.id, l) : undefined}
                     />
                   );
                 })}
@@ -994,10 +998,14 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
                       asks={level === "write" ? mailAsks : []}
                       levels={LEVELS}
                       value={level}
-                      onChange={(l) => {
-                        setMailLevels((prev) => ({ ...prev, [account.id]: l }));
-                        if (l === "write") mood.react("star", 900);
-                      }}
+                      onChange={
+                        managesAgents
+                          ? (l) => {
+                              setMailLevels((prev) => ({ ...prev, [account.id]: l }));
+                              if (l === "write") mood.react("star", 900);
+                            }
+                          : undefined
+                      }
                     />
                   );
                 })}
@@ -1006,15 +1014,17 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
           ) : (
             <p className="small muted">{t("access.noConnectors", { org: org.name })}</p>
           )}
-          <Link
-            className="newag__addrow"
-            to="/org/$orgId/settings/$section"
-            params={{ orgId: org.id, section: "connectors" }}
-          >
-            <Icon name="plug" />
-            {t("newAgent.connectOther")}
-            <span className="newag__addrow-aside">{t("newAgent.opensConnectors")}</span>
-          </Link>
+          {managesAgents && (
+            <Link
+              className="newag__addrow"
+              to="/org/$orgId/settings/$section"
+              params={{ orgId: org.id, section: "connectors" }}
+            >
+              <Icon name="plug" />
+              {t("newAgent.connectOther")}
+              <span className="newag__addrow-aside">{t("newAgent.opensConnectors")}</span>
+            </Link>
+          )}
         </Card>
         <p className="newag__note ac-iconline">
           <Icon name="shield" size={16} />

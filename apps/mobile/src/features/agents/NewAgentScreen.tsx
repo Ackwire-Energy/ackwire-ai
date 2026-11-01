@@ -26,6 +26,7 @@ import {
   ROLE_DEFAULTS,
   ROLE_GROUPS,
   type RoleId,
+  savePart,
 } from "@agenteschat/client/lib/new-agent";
 import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
 import { AUTO } from "@agenteschat/client/lib/providers";
@@ -36,7 +37,7 @@ import { Alert, Pressable, ScrollView, type ScrollViewInstance, StyleSheet, Text
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
-import { AgentAvatar, Button, Card, fieldText, Icon, Row, Text, Toggle, useToast } from "@/ui";
+import { AgentAvatar, Button, Card, fieldText, Icon, InfoHint, Row, Text, Toggle, useToast } from "@/ui";
 import { openConnectAi } from "../ai/NoAiCard";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { suggestAgentName } from "../new/logic";
@@ -103,6 +104,8 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
   const orgId = useOrgId();
   const { org } = useOrg();
   const mayImport = can(org, "create_agents");
+  // Giving a new agent apps is for who edits any agent: anyone else's starts without them (ADR 0085 §5).
+  const managesAgents = can(org, "manage_agents");
   const meId = useMeId();
   const dir = useDirectory();
   const create = useCreateAgent(orgId);
@@ -130,7 +133,7 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
   const [channelIds, setChannelIds] = useState<Set<string>>(new Set(proposed?.channelIds));
   // A proposal's levels are the reviewer's to change in Revisar; otherwise they come with the role.
   const [proposedLevels, setProposedLevels] = useState<Record<string, Level>>(() =>
-    proposed ? draftLevels(proposed) : {},
+    proposed && managesAgents ? draftLevels(proposed) : {},
   );
   const created = useRef(false);
   const denied = useRef(false);
@@ -143,8 +146,8 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
     [connections.data, servers.data, catalog.data],
   );
   const levels = useMemo(
-    () => (proposed ? proposedLevels : presetLevels(role ?? "custom", items)),
-    [proposed, proposedLevels, role, items],
+    () => (proposed ? proposedLevels : managesAgents ? presetLevels(role ?? "custom", items) : {}),
+    [proposed, proposedLevels, role, items, managesAgents],
   );
   const granted = items.filter((i) => (levels[i.id] ?? "none") !== "none");
   // Revisar lists what a proposal asked for at any level, so a change can be taken back.
@@ -249,40 +252,49 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
         ...(from ? { proposal: from.messageId } : {}),
       });
       created.current = true;
-      // What the role brings, as the web's last step: its channels, its apps' levels, the default skills.
+      // What the role brings, as the web's last step: its channels, its apps' levels, the default skills. One part
+      // at a time, so a refused one doesn't keep the rest (the AI below too) from saving.
+      const failures: unknown[] = [];
       const joined = myChannels.filter((ch) => channelIds.has(ch.id));
       if (joined.length > 0)
-        await api.agents.setChannels(
-          orgId,
-          agent.id,
-          joined.map((ch) => ({ channelId: ch.id })),
+        await savePart(failures, () =>
+          api.agents.setChannels(
+            orgId,
+            agent.id,
+            joined.map((ch) => ({ channelId: ch.id })),
+          ),
         );
       const chosen = Object.fromEntries(granted.map((i) => [`connector:${i.id}`, levels[i.id] as Level]));
-      if (Object.keys(chosen).length > 0) await saveLevels(api, orgId, agent.id, chosen);
+      if (Object.keys(chosen).length > 0) await savePart(failures, () => saveLevels(api, orgId, agent.id, chosen));
       const list = library.data ?? [];
       if (list.length > 0)
-        await api.skills.setForAgent(
-          orgId,
-          agent.id,
-          list.map((s) => ({ skillId: s.id, enabled: s.defaultForNewAgents })),
+        await savePart(failures, () =>
+          api.skills.setForAgent(
+            orgId,
+            agent.id,
+            list.map((s) => ({ skillId: s.id, enabled: s.defaultForNewAgents })),
+          ),
         );
       // The AI the server suggests for me: an account of mine on its computer; the workspace's model needs nothing.
       const ai = proposed?.ai;
       if (ai?.kind === "account") {
-        await api.sandbox.setTarget(orgId, agent.id, ai.machineId);
-        await api.agents.setBrain(orgId, agent.id, { brain: ai.brain, account: ai.accountId });
+        await savePart(failures, async () => {
+          await api.sandbox.setTarget(orgId, agent.id, ai.machineId);
+          await api.agents.setBrain(orgId, agent.id, { brain: ai.brain, account: ai.accountId });
+        });
       }
-      successHaptic();
-      toast({ title: t("mobile.agents.created", { name: agent.name }), agentId: agent.id });
-      // Nothing to think with yet: Connect opens for it over its conversation.
+      if (failures.length > 0) toast({ title: t("mobile.newAgent.partly"), icon: "x" });
+      else {
+        successHaptic();
+        toast({ title: t("mobile.agents.created", { name: agent.name }), agentId: agent.id });
+      }
+      // It exists either way (Criar again would only find its @ taken): on to its conversation, where Connect opens
+      // when it has nothing to think with yet.
       void openDm({ agentId: agent.id }).then(() => {
         if (ai?.kind === "none") openConnectAi({ agentId: agent.id });
       });
     } catch (e) {
-      if (created.current) {
-        // The agent exists; only part of what the role brings didn't go through.
-        toast({ title: t("mobile.newAgent.partly"), icon: "x" });
-      } else failed(e);
+      failed(e);
     } finally {
       setBusy(false);
     }
@@ -310,6 +322,11 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
     </View>
   );
   const input = [styles.input, fieldText("body"), { backgroundColor: c.raised, color: c.ink, borderColor: c.line }];
+  const usesTitle = (
+    <Text variant="title" accessibilityRole="header">
+      {t("newAgent.preview.uses")}
+    </Text>
+  );
 
   const views: Record<PhoneStep, () => ReactNode> = {
     role: () => (
@@ -499,9 +516,17 @@ function NewAgentForm({ initialWhat, from }: { initialWhat: string; from?: Agent
         ) : null}
 
         <View style={styles.section}>
-          <Text variant="title" accessibilityRole="header">
-            {t("newAgent.preview.uses")}
-          </Text>
+          {managesAgents ? (
+            usesTitle
+          ) : (
+            <InfoHint
+              name={t("common.about", { label: t("newAgent.preview.uses") })}
+              text={t("newAgent.accessAdmins")}
+              variant="title"
+            >
+              {usesTitle}
+            </InfoHint>
+          )}
           {listedApps.length > 0 ? (
             <Card>
               {listedApps.map((i) => {

@@ -694,7 +694,7 @@ describe("Criar agente: what gets created", () => {
   });
 });
 
-describe("Criar agente with Criar agentes alone: an agent of my own", () => {
+describe("Criar agente with Criar agentes alone: an agent of my own, without apps", () => {
   const asMaker = () => {
     const state = seedState();
     meWithRole(state, ["create_agents"]);
@@ -715,6 +715,31 @@ describe("Criar agente with Criar agentes alone: an agent of my own", () => {
     await click(screen().getByRole("button", { name: "Criar Iris" }));
     await settle(8);
     expect(createdWith(state)?.ownerUserId).toBe("u-walter");
+    expect(screen().getByRole("heading", { name: "Iris entrou no time" })).toBeTruthy();
+  });
+
+  test("apps start without access and can't be changed here; Criar saves none, so nothing is refused", async () => {
+    const state = await asMaker();
+    // QA's apps (GitHub) aren't on its card: they wouldn't come with it.
+    expect(screen().getByRole("button", { name: /^QA/ }).textContent).not.toContain("GitHub");
+    await startAs("QA");
+    await proceed(2);
+    expect(title()).toBe("Ferramentas e acesso");
+    expect(document.querySelector(".onb__lead")?.textContent).toBe("A Iris começa sem acesso aos apps do workspace.");
+    expect(hintOf("Ferramentas e acesso").text).toBe(
+      "Só admins dão acesso a apps e caixas de email. Depois de criar, peça a um admin.",
+    );
+    const apps = screen().getByRole("list", { name: "Conectores e níveis" });
+    expect(within(apps).queryByRole("radiogroup")).toBeNull();
+    expect(apps.textContent).toContain("GitHub");
+    expect(apps.textContent).toContain("Sem acesso");
+    expect(screen().queryByRole("button", { name: "Ler" })).toBeNull();
+    expect(screen().queryByRole("link", { name: /Conectar outro app/ })).toBeNull();
+    await proceed(3);
+    await click(screen().getByRole("button", { name: "Criar Iris" }));
+    await settle(8);
+    expect(state.calls.some((c) => c.method === "access.set" || c.method === "mail.setAgent")).toBe(false);
+    expect(document.querySelector(".ac-toasts")?.textContent ?? "").not.toContain("não foi salva");
     expect(screen().getByRole("heading", { name: "Iris entrou no time" })).toBeTruthy();
   });
 });

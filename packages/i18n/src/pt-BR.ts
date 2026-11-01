@@ -2961,6 +2961,7 @@ export const ptBR = {
         name: "Ferramentas e acesso",
         title: "Ferramentas e acesso",
         lead: "Escolha até onde {{article}} {{name}} vai em cada app.",
+        leadNoAccess: "{{The}} {{name}} começa sem acesso aos apps do workspace.",
       },
       where: {
         name: "Onde e quem",
@@ -3131,6 +3132,7 @@ export const ptBR = {
     noOwnerHelp: "Sem responsável, os admins recebem os avisos e aprovam as ações sensíveis.",
     ownerHelp: "Recebe os avisos de orçamento e aprova as ações sensíveis.",
     ownerYours: "Quem cria o agente é o responsável. Um admin pode passar para outra pessoa depois.",
+    accessAdmins: "Só admins dão acesso a apps e caixas de email. Depois de criar, peça a um admin.",
     modelAndCost: "Modelo e custo",
     model: "Modelo",
     modelDesc: {

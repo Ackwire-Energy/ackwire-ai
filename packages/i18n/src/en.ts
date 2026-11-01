@@ -2936,6 +2936,7 @@ export const en: Translations = {
         name: "Tools and access",
         title: "Tools and access",
         lead: "Choose how far {{name}} can go in each app.",
+        leadNoAccess: "{{name}} starts without access to the workspace's apps.",
       },
       where: {
         name: "Where and who",
@@ -3102,6 +3103,7 @@ export const en: Translations = {
     noOwnerHelp: "Without an owner, admins get the alerts and approve sensitive actions.",
     ownerHelp: "Gets the budget alerts and approves sensitive actions.",
     ownerYours: "Whoever creates the agent is its owner. An admin can hand it to someone else later.",
+    accessAdmins: "Only admins give agents access to apps and mailboxes. Once it's created, ask an admin.",
     modelAndCost: "Model and cost",
     model: "Model",
     modelDesc: {
