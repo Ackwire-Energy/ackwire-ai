@@ -426,6 +426,27 @@ describe("one workspace's day", () => {
     expect(day?.ackReplies).toBe(acks.length);
   });
 
+  test("a message whose woken run ended without a word is that run's noise, not also a stall", async () => {
+    const other = "2026-10-19";
+    const dev = f.agent.id;
+    const asked = await message({ at: at("10:00:00", other), body: "alguém viu o relatório de ontem?" });
+    await decide(asked.id, [dev]);
+    await run({ at: at("10:00:03", other), triggerId: asked.id });
+    const again = await message({ at: at("11:00:00", other), body: "e o de anteontem?" });
+    await decide(again.id, [dev]);
+    await run({ at: at("11:00:03", other), triggerId: again.id, status: "failed", error: "provider_error: 529" });
+    const told = await message({
+      at: at("12:00:00", other),
+      by: ops,
+      body: "@dev the deploy finished, watch the metrics",
+      mentions: [dev],
+    });
+    await decide(told.id, [dev]);
+    await run({ at: at("12:00:01", other), triggerId: told.id, trigger: "mention", steps: [["tool_call", { name: "react" }]] });
+    const [day] = await autonomyRows(f.db, { from: other, days: 1 });
+    expect(day).toMatchObject({ personUnanswered: 1, handoffUnanswered: 0, quietRuns: 2, idleWakes: 1, stalls: 1 });
+  });
+
   test("only active workspaces, unless one is asked for by its id", async () => {
     await f.db.update(schema.organizations).set({ standing: "hold" }).where(eq(schema.organizations.id, f.org.id));
     try {

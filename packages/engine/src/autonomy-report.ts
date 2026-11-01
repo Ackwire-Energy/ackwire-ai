@@ -27,6 +27,9 @@ import { REFUSALS } from "./tools/run-policy";
  *   channel message the router never decided on) with no agent message there within 10 minutes.
  * - `taskStartFailed`: background tasks that failed within a minute ("Not logged in", a missing CLI).
  *
+ * Each event goes on one side: a message or hand-off whose woken run ended done without a word (it passed, or only
+ * reacted) is that run's noise (`quietRuns`), never also an unanswered stall.
+ *
  * Noise (conversation runs): `quietRuns` ended without a message (`pass`, the silence word, nothing);
  * `ackReplies` replied to a message that is only a thanks, an ok or a sign-off, and did nothing else; `idleWakes`
  * were woken by an agent's @mention and did nothing (no message, or only an acknowledgement). `noiseRuns`,
@@ -251,6 +254,12 @@ const ACTED = sql.raw(`((s.kind = 'tool_call' and coalesce(s.data->>'name', '') 
 const SPOKE = sql.raw(`(a.author_type = 'agent' and a.deleted_at is null and not (a.meta ? 'notice' or a.meta ? 'noAi')
   and coalesce(a.meta->'actionCard'->>'kind', '') <> 'stretch_paused')`);
 
+/**
+ * SQL: a run `w` of the report's runs, matching `on`, ended done without a word (it passed, or only reacted): the
+ * message that woke it counts with that noise run, never also as a stall (each event on one side).
+ */
+const wokeQuiet = (on: string) => sql.raw(`exists (select 1 from runs w where w.quiet and ${on})`);
+
 /** SQL: message `a` is in message `m`'s conversation: its timeline, or a thread opened under it. */
 const SAME_CONVERSATION = sql.raw(
   "(a.org_id = m.org_id and a.channel_id = m.channel_id and (a.thread_id is not distinct from m.thread_id or a.thread_id = m.id))",
@@ -297,9 +306,10 @@ export function autonomySql(range: AutonomyRange) {
       select o.id, o.name from organizations o where ${orgs}
     ),
     runs as (
-      select r.id, r.org_id, r.trigger_message_id, r.trigger, r.status, r.error, r.background,
+      select r.id, r.org_id, r.agent_id, r.trigger_message_id, r.trigger, r.status, r.error, r.background,
         (r.created_at at time zone 'UTC')::date as day, rm.body as reply_body,
-        coalesce(rm.meta ? 'stepLimit', false) as reply_limit, f.*
+        coalesce(rm.meta ? 'stepLimit', false) as reply_limit,
+        r.status = 'done' and not f.posted and not r.background as quiet, f.*
       from agent_runs r
       join orgs o on o.id = r.org_id
       left join messages rm on rm.org_id = r.org_id and rm.id = r.reply_message_id
@@ -321,8 +331,7 @@ export function autonomySql(range: AutonomyRange) {
         and l.details->>'reason' in (${refusals})
     ),
     noise as (
-      select r.id, r.org_id, r.day,
-        r.status = 'done' and not r.posted as quiet,
+      select r.id, r.org_id, r.day, r.quiet,
         r.posted and not r.acted and ${isAck("t.body")} as ack,
         r.status = 'done' and r.trigger = 'mention' and t.author_type = 'agent' and not r.acted
           and (not r.posted or ${isAck("r.reply_body")}) as idle
@@ -403,6 +412,7 @@ export function autonomySql(range: AutonomyRange) {
         where m.reached and not exists (select 1 from messages a where ${SAME_CONVERSATION} and ${SPOKE}
           and a.author_agent_id = m.agent_id and a.created_at > m.created_at
           and a.created_at <= m.created_at + ${ANSWER_WITHIN.handoff}::interval)
+          and not ${wokeQuiet("w.trigger_message_id = m.id and w.agent_id = m.agent_id")}
         group by 1, 2
       union all
       select (m.created_at at time zone 'UTC')::date, m.org_id, 'handoffUnanswered', count(*) from messages m
@@ -414,6 +424,7 @@ export function autonomySql(range: AutonomyRange) {
           and not exists (select 1 from messages a where a.org_id = m.org_id and a.channel_id = m.channel_id
             and ${SPOKE} and a.author_agent_id is distinct from m.author_agent_id and a.created_at > m.created_at
             and a.created_at <= m.created_at + ${ANSWER_WITHIN.handoff}::interval)
+          and not ${wokeQuiet("w.trigger_message_id = m.id")}
         group by 1, 2
       union all
       select (q.created_at at time zone 'UTC')::date, q.org_id, 'handoffUnanswered', count(*)
@@ -422,12 +433,14 @@ export function autonomySql(range: AutonomyRange) {
         where q.created_at >= ${start}::timestamptz and q.created_at < ${end}::timestamptz
           -- Closing stamps answered_at whatever the outcome: an expired or failed question has one too.
           and (q.status <> 'answered' or q.answered_at > q.created_at + ${ANSWER_WITHIN.handoff}::interval)
+          and not ${wokeQuiet("w.id = q.target_run_id")}
         group by 1, 2
       union all
       select m.day, m.org_id, 'personUnanswered', count(*) from people m
         where m.meant and not exists (select 1 from messages a where ${SAME_CONVERSATION} and ${SPOKE}
           and (m.targets is null or a.author_agent_id = any(m.targets))
           and a.created_at > m.created_at and a.created_at <= m.created_at + ${ANSWER_WITHIN.person}::interval)
+          and not ${wokeQuiet("w.trigger_message_id = m.id and (m.targets is null or w.agent_id = any(m.targets))")}
         group by 1, 2
       union all
       select (t.created_at at time zone 'UTC')::date, t.org_id, 'taskStartFailed', count(*) from machine_tasks t
