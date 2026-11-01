@@ -1,5 +1,6 @@
 import { type TrashedArtifact, useArtifactTrash } from "@agenteschat/client";
 import { daysLeft } from "@agenteschat/client/lib/drive";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { Button, Chip, Dialog, DialogFooter, EmptyState, Icon } from "@agenteschat/ui";
 import { useState } from "react";
@@ -37,7 +38,7 @@ export function DriveTrash() {
       await api.artifacts.purge(org.id, a.id);
       toast.show(t("drive.purged", { title: a.title }));
     } catch (err) {
-      toast.show((err as Error).message, "error");
+      toast.show(errorText(t, err), "error");
     } finally {
       setBusy(false);
       setDoomed(null);
