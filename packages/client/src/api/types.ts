@@ -4679,6 +4679,8 @@ export type NotificationKind =
   | "routine_finished"
   /** A routine's failure streak began (one per streak; the next good run resolves it). Opens it in Rotinas. */
   | "routine_failed"
+  /** ADR 0096: an agent's run in a conversation failed for good (`latest.reason` coded). Opens that conversation. */
+  | "run_failed"
   /** The server paused a routine (`latest.reason`: its coded `pausedReason`). Opens it in Rotinas. */
   | "routine_paused"
   /** A routine waits for its computer (once per outage; `source.machineId`). Opens it in Rotinas. */

@@ -46,8 +46,12 @@ export const TELL_AGENT_TOOL = "tell_agent";
  * again, every time (`expireConsultations`).
  */
 export const CONSULTATION_TTL_MS = 15 * 60_000;
-/** Agents in one chain of consultations: Dev → Infra → one more, then no further. */
-export const MAX_CONSULTATION_CHAIN = 2;
+/**
+ * Agents already in a chain before one more may be asked (a lead → a dev → a reviewer → a specialist → one more).
+ * Real teams delegate three and four deep; cycles are refused anyway, and the stretch limits (`stretch.ts`: runs
+ * agents start on their own, per stretch and per budget) bound what a deep chain can spend.
+ */
+export const MAX_CONSULTATION_CHAIN = 4;
 /**
  * The wait id of a consultation nobody pauses on (`ask_agent` without
  * `wait`): its answer goes to the asker's conversation as a notice.
@@ -800,6 +804,8 @@ async function handBack(tx: Executor, asker: AgentRun, closed: AgentConsultation
           eq(agentConsultations.status, "open"),
         ),
       );
+    // It goes back inside that answer: reported (I3), whether or not this run reads it too.
+    await tx.update(agentConsultations).set({ reportedAt: new Date() }).where(eq(agentConsultations.id, closed.id));
   }
   const notice = consultationNotice(closed, handle);
   if (asker.status === "queued" || asker.status === "running") return deliverNoticeToRun(tx, asker, notice);

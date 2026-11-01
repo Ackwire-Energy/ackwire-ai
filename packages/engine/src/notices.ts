@@ -8,7 +8,7 @@ import { untrustedBlock } from "./untrusted";
  * stopped waiting on (`wait_result`), a fast reply it gave while it worked
  * (`talker_reply`), what people decided on its proposal of a new agent or of
  * a change (`proposal_result`), its own follow-up (`follow_up`: the line it set, and at
- * its time the notice that wakes it, `refs.wake`). Stored on the notice
+ * its time the notice that wakes it, `refs.wake`), agents its @mention couldn't wake (`wake_skipped`, ADR 0096). Stored on the notice
  * message as `meta.notice`; the agent's context reads it as an event, never
  * as a person's words.
  *
@@ -24,7 +24,8 @@ export type NoticeKind =
   | "wait_result"
   | "talker_reply"
   | "proposal_result"
-  | "follow_up";
+  | "follow_up"
+  | "wake_skipped";
 
 export interface Notice {
   kind: NoticeKind;
@@ -112,6 +113,8 @@ export function noticeText(meta: Record<string, unknown> | null | undefined, cur
       return `[${from ?? "Something you were waiting on"} finished]: ${n.text}`;
     case "talker_reply":
       return `[You already told them, while you worked]: ${n.text}`;
+    case "wake_skipped":
+      return `[Not woken]: ${n.text}`;
     case "follow_up": {
       const at = n.refs?.at ?? "";
       if (n.refs?.wake)

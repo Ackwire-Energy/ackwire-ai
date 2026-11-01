@@ -10,23 +10,6 @@ import { test } from "bun:test";
 export const KNOWN: Record<string, string[]> = {
   S01: ["router-answer-by-default"],
   S02: ["router-answer-by-default"],
-  S03: ["router-continuity"],
-  S04: ["router-continuity"],
-  S10b: ["wake-by-default"],
-  S11: ["wake-by-default", "open:mention-rows"],
-  S12: ["wake-by-default"],
-  S13: ["work-by-default"],
-  S18: ["controller"],
-  S21: ["open:chain-depth"],
-  S22: ["handoffs-come-back"],
-  S25: ["routines-reach-agents", "work-by-default"],
-  S26: ["work-by-default"],
-  S29: ["open:provider-outage-park"],
-  S30: ["open:mention-rows", "open:run-failure-report"],
-  S32: ["controller"],
-  S33: ["controller"],
-  S37: ["wake-by-default", "controller"],
-  S39: ["open:event-routine-check"],
   S40: ["handle-follows-name"],
 };
 

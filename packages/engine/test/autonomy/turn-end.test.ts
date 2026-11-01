@@ -106,6 +106,7 @@ scenario("S33", "an offer of reversible work inside the request is done, not ask
       ],
     },
   });
+  await w.grant("otto", ["issues:write"]);
   await w.say("@otto faz a triagem desses 5 bugs: login, export, pdf, push, busca");
   await w.settle();
   expect((await w.calls("otto")).map((c) => [c.name, c.isError])).toEqual([["create_issue", false]]);

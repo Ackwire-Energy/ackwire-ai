@@ -63,9 +63,9 @@ const ask = (fx: Fixture, body: string, threadId?: string) =>
     ...(threadId ? { threadId } : {}),
   });
 
-test("a promise nothing keeps: the answer posts, one more turn is told to keep it, and never a second", async () => {
+test("a promise nothing keeps: one more turn to keep it, one to ask, then the reply becomes a question card", async () => {
   f = await setup({
-    judge: (kind) => (kind === "follow_through" ? "unkept" : undefined),
+    judge: (kind) => (kind === "follow_through" ? "continue" : undefined),
     reply: (_request, call) => ({
       chunks: [
         call === 1
@@ -77,32 +77,42 @@ test("a promise nothing keeps: the answer posts, one more turn is told to keep i
   await ask(f, "@dev o ci demora tanto assim?");
   await drainOutbox(f.db, f.handlers);
 
-  expect(f.provider.calls.length).toBe(2);
+  expect(f.provider.calls.length).toBe(3);
   const nudge = lastUserText(f.provider.calls[1]?.request as ModelRequest);
   expect(nudge).toContain("You ended saying you would do more");
   // No sentence of it is quoted back: the judge read the whole message, in whatever language.
   expect(nudge).not.toContain("Vou checar");
-  // Asked once: the second promise ends the run.
-  expect(followThroughCalls(f).length).toBe(1);
+  // Promising again without doing anything: it is told to ask instead, once (ADR 0096).
+  expect(lastUserText(f.provider.calls[2]?.request as ModelRequest)).toContain("Ask them now with ask_user");
+  expect(followThroughCalls(f).length).toBe(3);
   const steps = await f.db.select().from(schema.agentRunSteps);
   expect(steps.filter((s) => s.data.nudged === "promise").length).toBe(1);
+  expect(steps.filter((s) => s.data.nudged === "ask").length).toBe(1);
   expect((await agentMessages(f)).map((m) => m.body)).toEqual([
     "O job de testes ainda está rodando. Vou checar de novo daqui a pouco e te passo os números.",
     "Ainda rodando: vou checar de novo depois.",
+    "Ainda rodando: vou checar de novo depois.",
   ]);
-  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("done");
+  // The last reply is the question a person answers: the run waits on it.
+  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("waiting_input");
+  expect((await f.db.select().from(schema.agentQuestions)).map((q) => [q.status, q.text])).toEqual([
+    ["open", "Ainda rodando: vou checar de novo depois."],
+  ]);
 });
 
-test("waiting on a person for something specific is legitimate: no nudge", async () => {
+test("a need only a person can fill, described instead of asked: one nudge to ask, then the reply is the question", async () => {
   f = await setup({
-    judge: (kind) => (kind === "follow_through" ? "waiting" : undefined),
+    judge: (kind) => (kind === "follow_through" ? "ask" : undefined),
     reply: () => ({ chunks: ["Assim que você me mandar o token do Sentry, vou configurar o alerta."] }),
   });
   await ask(f, "@dev configura o alerta do Sentry");
   await drainOutbox(f.db, f.handlers);
-  expect(followThroughCalls(f).length).toBe(1);
-  expect(f.provider.calls.length).toBe(1);
-  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("done");
+  expect(followThroughCalls(f).length).toBe(2);
+  expect(f.provider.calls.length).toBe(2);
+  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("waiting_input");
+  expect((await f.db.select().from(schema.agentQuestions)).map((q) => q.text)).toEqual([
+    "Assim que você me mandar o token do Sentry, vou configurar o alerta.",
+  ]);
 });
 
 test("every run's end is read once by the judge, in any language: a promise in Japanese is caught, a plain answer isn't", async () => {
@@ -110,22 +120,23 @@ test("every run's end is read once by the judge, in any language: a promise in J
   f = await setup({
     // The fake judge reads no words: it answers by the run it is asked about.
     judge: (kind, _id, state) =>
-      kind === "follow_through" ? (String(state.reply) === promised ? "unkept" : "done") : undefined,
+      kind === "follow_through" ? (String(state.reply) === promised ? "continue" : "done") : undefined,
     reply: (_request, call) => ({
       chunks: [call === 1 ? promised : call === 2 ? "数字です: テスト9分、lint 2分。" : "O CI levou 12 minutos."],
     }),
   });
   await ask(f, "@dev CIはどうなっていますか？");
   await drainOutbox(f.db, f.handlers);
-  // No word list stood in front of the judge: it read the reply and told the run to do it now.
-  expect(followThroughCalls(f).length).toBe(1);
+  // No word list stood in front of the judge: it read the reply and told the run to do it now; the kept promise
+  // is read again (done).
+  expect(followThroughCalls(f).length).toBe(2);
   expect(f.provider.calls.length).toBe(2);
   expect(lastUserText(f.provider.calls[1]?.request as ModelRequest)).toContain("You ended saying you would do more");
 
   await ask(f, "@dev e o tempo do CI?");
   await drainOutbox(f.db, f.handlers);
   // A plain answer: asked once too, done, no more turns.
-  expect(followThroughCalls(f).length).toBe(2);
+  expect(followThroughCalls(f).length).toBe(3);
   expect(f.provider.calls.length).toBe(3);
 });
 
@@ -152,7 +163,7 @@ test("follow_up: a line now; at its time the agent wakes in the same thread with
     followUps: true,
     // A promise kept by the follow-up just set: nothing to nudge.
     judge: (kind, _id, state) =>
-      kind === "follow_through" && String(state.reply).startsWith("Ainda rodando") ? "unkept" : undefined,
+      kind === "follow_through" && String(state.reply).startsWith("Ainda rodando") ? "continue" : undefined,
     reply: (_request, call) =>
       call === 1
         ? {
@@ -189,8 +200,8 @@ test("follow_up: a line now; at its time the agent wakes in the same thread with
   const ahead = (job?.nextAttemptAt.getTime() ?? 0) - Date.now();
   expect(ahead).toBeGreaterThan(29 * 60_000);
   expect(ahead).toBeLessThanOrEqual(30 * 60_000);
-  // The follow-up keeps the promise: the judge read it unkept, but what the run set up brings it back.
-  expect(followThroughCalls(f).length).toBe(1);
+  // The follow-up keeps the promise: what the run set up brings it back, so the judge isn't asked.
+  expect(followThroughCalls(f).length).toBe(0);
   expect(f.provider.calls.length).toBe(2);
 
   // Its time comes.
@@ -442,10 +453,10 @@ test("in a channel's timeline the follow-ups are each person's: cancel_follow_up
   expect(await lineState(f, anaThird)).toBe("pending");
 });
 
-test("a reminder it set to do the work itself keeps the promise: read as unkept, but no nudge", async () => {
+test("a reminder it set to do the work itself keeps the promise: no judgment, no nudge", async () => {
   f = await setup({
     scheduleTools: true,
-    judge: (kind) => (kind === "follow_through" ? "unkept" : undefined),
+    judge: (kind) => (kind === "follow_through" ? "continue" : undefined),
     reply: (request) =>
       JSON.stringify(request.messages.at(-1)?.content).includes("tool_result")
         ? { chunks: ["Agendado: daqui a 2 horas eu confiro o deploy e te passo como ficou."] }
@@ -461,7 +472,7 @@ test("a reminder it set to do the work itself keeps the promise: read as unkept,
   });
   await ask(f, "@dev daqui a 2 horas verifica o deploy");
   await drainOutbox(f.db, f.handlers);
-  expect(followThroughCalls(f).length).toBe(1);
+  expect(followThroughCalls(f).length).toBe(0);
   expect(f.provider.calls.length).toBe(2);
 });
 
@@ -469,7 +480,7 @@ test("asked to implement an issue: an answer posted before a nudge is a comment 
   const first = "Fixed in PR #7. CI is running: I'll check it once it finishes.";
   const second = "CI passed: PR #7 is ready to merge.";
   f = await setup({
-    judge: (kind) => (kind === "follow_through" ? "unkept" : undefined),
+    judge: (kind) => (kind === "follow_through" ? "continue" : undefined),
     reply: (_request, call) => ({ chunks: [call === 1 ? first : second] }),
   });
   const deps = { db: f.db, pubsub: f.pubsub };
@@ -483,7 +494,8 @@ test("asked to implement an issue: an answer posted before a nudge is a comment 
 
 test("a promise is kept by work handed off from this conversation still out, by any run; not another conversation's or a closed one", async () => {
   f = await setup({
-    judge: (kind) => (kind === "follow_through" ? "unkept" : undefined),
+    judge: (kind, _id, state) =>
+      kind === "follow_through" ? (String(state.reply).startsWith("A Rita") ? "continue" : "done") : undefined,
     reply: (request) => ({
       chunks: [
         lastUserText(request).includes("You ended saying")
@@ -589,8 +601,20 @@ describe("between agents (ADR 0095)", () => {
   };
   /** The judge reads Infra's replies as an unkept promise, and every note's reply as one the sender needs. */
   let infraId = "";
-  const judge = (kind: string, _id: string, _state: unknown, _q: unknown, request: { agentId?: string | null }) =>
-    kind === "follow_through" && request.agentId === infraId ? "unkept" : kind === "note_reply" ? 0.9 : undefined;
+  const judge = (
+    kind: string,
+    _id: string,
+    state: Record<string, unknown>,
+    _q: unknown,
+    request: { agentId?: string | null },
+  ) =>
+    kind === "follow_through" && request.agentId === infraId
+      ? String(state.reply).startsWith("Fila limpa")
+        ? "done"
+        : "continue"
+      : kind === "note_reply"
+        ? 0.9
+        : undefined;
   const infraJudged = (fx: Fixture) =>
     (fx.context.judge as unknown as { calls: { kind: string; agentId?: string }[] }).calls.filter(
       (c) => c.kind === "follow_through" && c.agentId === infraId,
@@ -611,7 +635,7 @@ describe("between agents (ADR 0095)", () => {
     infraId = infra.id;
     await ask(fx, "@dev pede ao infra para limpar a fila");
     await drainOutbox(fx.db, fx.handlers);
-    expect(infraJudged(fx)).toHaveLength(1);
+    expect(infraJudged(fx)).toHaveLength(2);
     expect(dmNudges(fx)).toHaveLength(1);
     expect(await fx.db.select().from(schema.agentConsultations)).toMatchObject([
       { status: "answered", answer: "Fila limpa: 0 jobs pendentes." },
@@ -632,7 +656,7 @@ describe("between agents (ADR 0095)", () => {
       await createAgentRuns(tx, m, [infra.id], "dm");
     });
     await drainOutbox(fx.db, fx.handlers);
-    expect(infraJudged(fx)).toHaveLength(1);
+    expect(infraJudged(fx)).toHaveLength(2);
   });
 
   test("a run that handed part on and ends saying it will come back gets no nudge: what it handed on goes back with its answer", async () => {
@@ -654,7 +678,8 @@ describe("between agents (ADR 0095)", () => {
     await addAgent(fx, "Ops");
     await ask(fx, "@dev pede ao infra para limpar a fila");
     await drainOutbox(fx.db, fx.handlers);
-    expect(infraJudged(fx)).toHaveLength(1);
+    // What it handed on brings it back: not judged.
+    expect(infraJudged(fx)).toHaveLength(0);
     expect(dmNudges(fx)).toEqual([]);
     const [handed] = (await fx.db.select().from(schema.agentConsultations)).filter((c) => c.targetAgentId === infra.id);
     expect(handed).toMatchObject({

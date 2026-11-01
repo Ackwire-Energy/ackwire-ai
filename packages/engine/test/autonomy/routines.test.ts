@@ -45,6 +45,8 @@ scenario("S25", "a routine set to act hands an error to an agent, which fixes it
         },
         { calls: [{ name: "hand_off", input: { message: "Passei o TypeError de checkout.ts:42 para a Lia." } }] },
         { text: "Feito." },
+        // The run the routine's report wakes, then the one Lia's result wakes in the same conversation.
+        { text: "Erro novo no checkout (TypeError em checkout.ts:42): passei para a Lia." },
         { text: "A Lia corrigiu o TypeError do checkout no PR #230." },
       ],
       lia: [

@@ -2,7 +2,6 @@ import { expect } from "bun:test";
 import { and, eq, inArray, lte, schema } from "@agenteschat/db";
 import { REFUSALS, runAuthority } from "../../src";
 import type { World } from "./harness";
-import { merged } from "./known";
 
 /**
  * The invariants every scenario must keep at its end, whatever it is about (ops design "autonomy as invariants",
@@ -50,17 +49,17 @@ export async function violations(w: World): Promise<string[]> {
     ? await w.db.select().from(schema.approvals).where(inArray(schema.approvals.runId, ids))
     : [];
   for (const r of runs) {
-    if (r.status === "waiting_input" && !questions.some((x) => x.runId === r.id && x.status === "open"))
+    // A run parked on a provider outage waits on its resume job, not on a person.
+    const parked = (r.transcript as { outage?: unknown } | null)?.outage !== undefined;
+    if (r.status === "waiting_input" && !parked && !questions.some((x) => x.runId === r.id && x.status === "open"))
       out.push(`I2: ${who(r.agentId)} waits for input with no open question`);
     if (r.status === "waiting_approval" && !approvals.some((x) => x.runId === r.id && x.status === "pending"))
       out.push(`I2: ${who(r.agentId)} waits for approval with no pending card`);
   }
-  // The continuation controller records each turn's end on a step (`data.continuation`); make this unconditional
-  // when it merges.
-  if (merged.has("controller"))
-    for (const r of runs.filter((r) => r.status === "done" && !r.background))
-      if (!steps.some((s) => s.runId === r.id && s.data.continuation !== undefined))
-        out.push(`I2: ${who(r.agentId)}'s run ended with no recorded continuation outcome`);
+  // The continuation controller records each turn's end on a step (`data.continuation`).
+  for (const r of runs.filter((r) => r.status === "done" && !r.background))
+    if (!steps.some((s) => s.runId === r.id && s.data.continuation !== undefined))
+      out.push(`I2: ${who(r.agentId)}'s run ended with no recorded continuation outcome`);
 
   // I3: every hand-off between agents is closed and reported back.
   const consultations = await w.db
@@ -76,10 +75,15 @@ export async function violations(w: World): Promise<string[]> {
     const targetWaitsOnPerson = target?.status === "waiting_input" || target?.status === "waiting_approval";
     if (c.status === "open" && !targetWaitsOnPerson) out.push(`I3: hand-off ${pair} is still open`);
     if (c.status !== "open" && c.waitId.startsWith("async:")) {
-      const reported = notices.some(
-        (n) =>
-          n.kind === "consult_reply" && n.refs?.askerAgentId === c.askerAgentId && n.refs?.agentId === c.targetAgentId,
-      );
+      // Reported on its own notice, or rolled up into the answer of the run that handed it on (`reportedAt`).
+      const reported =
+        c.reportedAt !== null ||
+        notices.some(
+          (n) =>
+            n.kind === "consult_reply" &&
+            n.refs?.askerAgentId === c.askerAgentId &&
+            n.refs?.agentId === c.targetAgentId,
+        );
       if (!reported) out.push(`I3: hand-off ${pair} closed ${c.status} and was never reported back`);
     }
   }

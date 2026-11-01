@@ -731,6 +731,49 @@ export async function notifyRoutineFinished(
   });
 }
 
+// ── Runs (ADR 0096) ─────────────────────────────────────────────────────────────
+
+const runFailedGroup = (run: { agentId: string; channelId: string; threadRootId: string }) =>
+  `run_failed:${run.agentId}:${run.channelId}:${run.threadRootId}`;
+
+/**
+ * A conversation run failed for good (`reportRunFailure`): `userId` (else the agent's owner) hears it once per agent
+ * and conversation, with the run's coded reason (`latest.reason`). Resolved by the agent's next good run there.
+ */
+export async function notifyRunFailed(
+  deps: NotificationDeps,
+  run: { orgId: string; agentId: string; channelId: string; threadRootId: string; triggerMessageId: string },
+  userId: string | null,
+  reason: string,
+) {
+  const to = userId ?? (await agentOwner(deps, run.agentId));
+  if (!to) return;
+  const [channel] = await deps.db.select({ name: channels.name }).from(channels).where(eq(channels.id, run.channelId));
+  await notify(deps, {
+    orgId: run.orgId,
+    userIds: [to],
+    kind: "run_failed",
+    groupKey: runFailedGroup(run),
+    actor: agent(run.agentId),
+    source: {
+      channelId: run.channelId,
+      ...(run.threadRootId !== run.triggerMessageId ? { threadId: run.threadRootId } : {}),
+      messageId: run.triggerMessageId,
+      agentId: run.agentId,
+      ...(channel?.name ? { label: channel.name } : {}),
+    },
+    latest: { reason: reason.split(":")[0] ?? reason },
+  });
+}
+
+/** The agent's run in that conversation ended well: its failure there is done. */
+export async function resolveRunFailed(
+  deps: NotificationDeps,
+  run: { orgId: string; agentId: string; channelId: string; threadRootId: string },
+) {
+  await resolveNotifications(deps, run.orgId, { groupKey: runFailedGroup(run) });
+}
+
 /** A routine ran well again: its failure streak and computer outage notifications are done. */
 export async function resolveRoutineTrouble(deps: NotificationDeps, orgId: string, routineId: string) {
   await resolveNotifications(deps, orgId, { groupKeyPrefix: `routine_failed:${routineId}:` });

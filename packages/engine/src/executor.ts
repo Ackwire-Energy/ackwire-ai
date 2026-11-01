@@ -88,20 +88,20 @@ import { recordContextUse } from "./context/feedback";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
 import { itemLabel, retrieveForRun } from "./context/tools";
 import { fitContextWindow } from "./context-budget";
+import {
+  advance as advanceContinuation,
+  type ContinuationState,
+  continuationVerdict,
+  decideTurnEnd,
+  reportRunFailure,
+  type TurnEndDecision,
+  verdictRecord,
+} from "./continuation";
 import { modelInfoFor } from "./credentials";
 import { isAgentOnlyDm } from "./dms";
 import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationError } from "./errors";
 import { type ChannelEvent, type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
-import {
-  decisionNudge,
-  FOLLOW_THROUGH_NUDGE,
-  FOLLOW_THROUGH_NUDGE_DM,
-  FOLLOW_UP_TOOL,
-  type FollowThroughVerdict,
-  followThroughVerdict,
-  MISSION_ASK_NUDGE,
-  wakesLater,
-} from "./follow-through";
+import { FOLLOW_UP_TOOL, wakesLater } from "./follow-through";
 import { cutText } from "./format";
 import { onForumRunFinished } from "./forum";
 import type { ModelGateway } from "./gateway";
@@ -112,14 +112,14 @@ import { listenLiveSteering, renderSteered } from "./live-steer";
 import { touchMachineAccount } from "./machine-accounts";
 import { computerBackSoon, type MachineStatus } from "./machine-hub";
 import { MEDIA_TOOLS } from "./media";
-import { getMessage, insertMessage, type Message, messageView, unreachedAgents } from "./messages";
+import { getMessage, insertMessage, type Message, messageView, unreachedAgents, unreachedNote } from "./messages";
 import { missionAsksPerson, missionReportSince, scheduleKeepGoing } from "./missions-engine";
 import { postNoAiCard } from "./no-ai";
+import { resolveRunFailed } from "./notification-producers";
 import { enqueue, PermanentJobError } from "./outbox";
 import { createProfiler, type StageTiming } from "./profile";
 import { ASK_USER_TOOL, questionResult } from "./questions";
 import {
-  ANSWER_NUDGE,
   endsWithSentinel,
   isSentinelOnly,
   PASS_TOOL,
@@ -315,19 +315,18 @@ export interface Transcript {
   passed?: { reason: string };
   /** `pass` was in its first call's tools: listed for good, continuations included (`createPassToolSource`). */
   passListed?: boolean;
-  /** It was told once to answer after a reply that was only the silence word (or nothing). */
-  nudged?: boolean;
   /**
    * What a person decided on the calls it waited on and what came back ("name: result" per line), from the
    * resume until its next final answer: ending that answer without a word gets one more turn (`decisionNudge`).
    */
   decided?: string;
-  /** It was told once to go on after a decision it ended its turn on (`decisionNudge`). */
-  decisionNudged?: boolean;
-  /** Its last message was checked once for a promise nothing keeps (`followThroughVerdict`). */
-  followThroughChecked?: boolean;
-  /** What that check found: `waiting` holds a mission from going on by itself (`keepGoingBlocker`). */
-  followThroughVerdict?: FollowThroughVerdict;
+  /**
+   * The continuation controller's count of extra turns in this run (ADR 0096). A person's answer or message starts
+   * it over (they are the bound); another agent's answer doesn't.
+   */
+  continuation?: ContinuationState;
+  /** The last judged turn end: `waiting` holds a mission from going on by itself (`keepGoingBlocker`). */
+  followThroughVerdict?: "done" | "unkept" | "waiting";
   /**
    * A person decided or answered what it waited on (an approval, a question), or wrote to it while it
    * worked (ADR 0053 §10): it owes them an answer and can't pass anymore.
@@ -354,6 +353,12 @@ export interface Transcript {
   fallback?: { from: BrainKind; code: string; message: string };
   /** The computer brain is unavailable and nothing can stand in: the run waits for the computer. */
   waitingForBrain?: { kind: BrainKind; machineId: string; code: string; waitId?: string };
+  /**
+   * The provider failed every attempt with a retryable error (I5): the run is parked on `OUTAGE_PARK`'s ladder
+   * (`waitId`: the job that resumes it) since `since` (ms), `n` times so far. Cleared by the next model call that
+   * answers.
+   */
+  outage?: { since: number; n: number; waitId: string };
   /** When the computer first had no room for this run's turn (ms), until a turn starts or it waits on something else. */
   roomWaitSince?: number;
   /** The "unavailable" note already posted in this run (its code): not repeated while it waits. */
@@ -517,6 +522,9 @@ const toolResultFor = (approval: Approval | undefined): { content: string; isErr
  * `wait`: the job resumes one wait for the computer (`waitingForBrain.waitId`); anything else is stale.
  * `jobId`: that job's row. `owned`: whether this claim still holds the job (`JobContext.owned`).
  */
+/** A provider outage's resume ladder (minutes, the last repeats), and how long a run waits before failing. */
+export const OUTAGE_PARK = { ladderMinutes: [2, 15, 30, 60], maxMs: 24 * 60 * 60_000 } as const;
+
 type RunJobOptions = { finalAttempt: boolean; wait?: string; jobId?: string; owned?: () => Promise<boolean> };
 
 /**
@@ -569,7 +577,9 @@ async function executeRunInner(
     const [row] = await db
       .select({
         status: agentRuns.status,
-        waitId: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'waitId'`,
+        waitId: sql<
+          string | null
+        >`coalesce(${agentRuns.transcript}->'waitingForBrain'->>'waitId', ${agentRuns.transcript}->'outage'->>'waitId')`,
         code: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'code'`,
       })
       .from(agentRuns)
@@ -656,6 +666,8 @@ async function executeRunInner(
   }
   /** Who thinks for this run (set before the first turn). */
   let brainPlan: BrainPlan | null = null;
+  /** How its last turn ended (`decideTurnEnd`); every other way to `done` is recorded as `ended` (I2). */
+  let turnEnd: TurnEndDecision | null = null;
   /** Tells the channel the run stopped: idle, finished, and the receipt for the trigger message. */
   /** Messages that got receipts (`message.actions` goes out once they are published). */
   const withReceipts: string[] = [];
@@ -723,6 +735,13 @@ async function executeRunInner(
     if (status === "done" && brainPlan?.missionId && !run.background)
       await scheduleKeepGoing(db, { id: brainPlan.missionId, orgId: run.orgId }).catch(() => {});
     // A routine's run is heard through its ledger (`closeRoutineRun`, on every ending), never from here.
+    if (!run.background && status === "done") {
+      if (!turnEnd || turnEnd.outcome === "continue")
+        await addRunStep(db, run, "context", { continuation: { outcome: "done", rule: "ended" } }).catch(() => {});
+      await resolveRunFailed({ db, pubsub: deps.pubsub }, run).catch(() => {});
+    }
+    if (status === "failed" && error && !standingErrorDetail(error))
+      await reportRunFailure({ db, pubsub: deps.pubsub }, run, error);
   };
 
   /**
@@ -1167,6 +1186,36 @@ async function executeRunInner(
   prof.mark("context");
   /** What a resumed computer brain reads first: the results of the calls that waited for a person. */
   let resumeText: string | null = null;
+  /**
+   * The provider is down past the job's own retries (I5): instead of `gave_up`, the run waits on the ladder and
+   * resumes the same turn, nothing repeated. Past `OUTAGE_PARK.maxMs` it fails for good, and the failure is
+   * reported (`reportRunFailure`). False when it can't park anymore.
+   */
+  const parkOutage = async (message: string): Promise<boolean> => {
+    const t = transcript as Transcript;
+    const since = t.outage?.since ?? Date.now();
+    const n = t.outage?.n ?? 0;
+    if (Date.now() - since >= OUTAGE_PARK.maxMs) return false;
+    const waitId = Bun.randomUUIDv7();
+    t.outage = { since, n: n + 1, waitId };
+    await deferred;
+    await addRunStep(db, run, "error", { reason: "provider_outage", message, parked: n + 1 });
+    const minutes = OUTAGE_PARK.ladderMinutes[Math.min(n, OUTAGE_PARK.ladderMinutes.length - 1)] ?? 60;
+    await enqueue(db, {
+      orgId: run.orgId,
+      kind: "agent_run.execute",
+      payload: { runId: run.id, wait: waitId },
+      dedupeKey: `agent_run.execute:${run.id}:outage:${waitId}`,
+      runAt: new Date(Date.now() + minutes * 60_000),
+      maxAttempts: 4,
+    });
+    if (!(await transitionRun(db, run.id, "running", "waiting_input", { transcript: storedTranscript(t) })))
+      throw new PermanentJobError("run changed state while executing");
+    await publishChannelEvent(deps.pubsub, event("waiting_input"));
+    await finished("waiting_input");
+    return true;
+  };
+
   // Back from waiting for the computer: it is tried again below.
   const backFromComputerWait = Boolean(transcript.waitingForBrain);
   if (backFromComputerWait) {
@@ -1239,9 +1288,9 @@ async function executeRunInner(
     // Someone decided or answered what it waited on: it answers them now, it can't pass anymore.
     transcript.answerOwed = true;
     transcript.decided = decided.join("\n");
-    // A new turn: what it ends with is judged again, and the last turn's verdict no longer holds a mission.
-    delete transcript.followThroughChecked;
+    // The last turn's verdict no longer holds a mission; a person's answer starts the extra turns over.
     delete transcript.followThroughVerdict;
+    if (byPerson) delete transcript.continuation;
     // As a person's message does (`oweAnswer`): what they decided may be what it lacked, unless it is already ending.
     if (byPerson && transcript.stuck?.endAt === undefined) delete transcript.stuck;
     delete transcript.pending;
@@ -1346,8 +1395,8 @@ async function executeRunInner(
     const person = await lastPersonAmong(db, run.orgId, run.agentId, ids);
     if (!person) return false;
     t.answerOwed = true;
-    // A new turn for them: its ending is judged again, and the last verdict no longer holds a mission.
-    delete t.followThroughChecked;
+    // A new turn for them: its extra turns start over, and the last verdict no longer holds a mission.
+    delete t.continuation;
     delete t.followThroughVerdict;
     // What they wrote may be what it lacked: its repetition so far no longer counts, unless it is already ending.
     if (t.stuck?.endAt === undefined) delete t.stuck;
@@ -1468,7 +1517,8 @@ async function executeRunInner(
     // choice kept for the next attempt.
     if (brainPlan.kind === "model" && isAutoModel(agent.model) && !applied.apiModel) {
       const outage = new ProviderError("could not reach provider", true);
-      if (options.finalAttempt) return fail(`gave_up: ${outage.message}`);
+      if (options.finalAttempt)
+        return (await parkOutage(outage.message)) ? undefined : fail(`gave_up: ${outage.message}`);
       t.autoModel = choice;
       await saveTranscript(db, t);
       await addRunStep(db, run, "error", { reason: "transient", message: String(outage), willRetry: true });
@@ -1600,6 +1650,34 @@ async function executeRunInner(
     await finished("done");
     await redispatchPending("done");
     return true;
+  };
+
+  /**
+   * Told to ask and still describing what it needs (ADR 0096): its reply becomes the question, as `ask_user` would
+   * post it. The run waits on the card, the accountable person hears it, and the answer resumes the run as text.
+   */
+  const askWithCard = async (text: string) => {
+    await deferred;
+    const t = transcript as Transcript;
+    const questionId = Bun.randomUUIDv7();
+    const toolUseId = `continuation:${questionId}`;
+    t.pending = { calls: [{ toolUseId, name: ASK_USER_TOOL, questionId, bridged: true }] };
+    const pause = await db.transaction(async (tx) => {
+      const posted = await postPauseCards(tx, run, {
+        approvals: [],
+        questions: [{ id: questionId, toolUseId, text: cutText(text, 1000), choices: null }],
+        secretRequestIds: [],
+      });
+      t.postedUpTo = t.messages.length;
+      t.postedCount += posted.messages.length;
+      await saveTranscript(tx, t);
+      if (!(await transitionRun(tx, run.id, "running", "waiting_input")))
+        throw new PermanentJobError("run changed state while executing");
+      return posted;
+    });
+    await publishPauseCards(deps, run, pause);
+    await publishChannelEvent(deps.pubsub, event("waiting_input"));
+    await finished("waiting_input");
   };
 
   /**
@@ -2239,13 +2317,18 @@ async function executeRunInner(
         if (paused) return fail(paused.message);
         const reason = userFacing(error);
         if (reason) return fail(reason);
-        if (options.finalAttempt) return fail(`gave_up: ${error instanceof Error ? error.message : String(error)}`);
+        if (options.finalAttempt) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (await parkOutage(message)) return;
+          return fail(`gave_up: ${message}`);
+        }
         await addRunStep(db, run, "error", { reason: "transient", message: String(error), willRetry: true });
         throw error;
       } finally {
         if (turnAbort) unregisterTurnAbort(run.id, turnAbort);
       }
       await deltas.flush();
+      delete transcript.outage;
       prof.mark(`model#${run.turns + 1}`);
       await deferred;
       transcript.deltaSeq = deltas.seq();
@@ -2488,6 +2571,48 @@ async function executeRunInner(
         // `reported`), so a routine that goes in circles on every firing is heard of and paused like any failing one.
         if (transcript.stuck?.endAt !== undefined)
           return fail(STUCK_ERROR, { code: STUCK_ERROR, ...(record ? { detail: record } : {}) });
+        // Work it said it would do still undone: once more in the same run (ADR 0096). It never asks: its report
+        // goes to a conversation whose own run can.
+        const state = transcript.continuation ?? { count: 0 };
+        const decision = await decideTurnEnd({
+          state,
+          kind: "routine",
+          executed: result.executedCount,
+          bound: run.turns + 1 >= maxTurns ? "turn_cap" : null,
+          quiet: !record,
+          decided: null,
+          unanswered: false,
+          unreached: "",
+          judged: record,
+          mission: false,
+          wakesLater: () => wakesLater(db, run),
+          verdict: judge
+            ? () =>
+                continuationVerdict(judge, {
+                  orgId: run.orgId,
+                  agentId: run.agentId,
+                  runId: run.id,
+                  request: transcript.request ?? triggerMessage?.body ?? triggerText,
+                  reply: record,
+                  did: [],
+                  runKind: "routine",
+                })
+            : null,
+        });
+        transcript.continuation = advanceContinuation(state, decision, result.executedCount);
+        const { nudge, ...recorded } = { ...decision, count: transcript.continuation.count };
+        later(() =>
+          addRunStep(db, run, "context", {
+            continuation: recorded,
+            ...(decision.outcome === "continue" ? { nudged: "promise" } : {}),
+          }),
+        );
+        if (decision.outcome === "continue" && nudge) {
+          appendUserText(transcript, nudge);
+          if (plan.kind !== "model") nextPrompt = nudge;
+          await saveTranscript(db, transcript);
+          continue;
+        }
         return finishBackground(record);
       }
       // Nobody called it by name: it passed, or ended with nothing to say. Nothing is posted. (A reaction, a GIF or
@@ -2535,42 +2660,11 @@ async function executeRunInner(
               : text === DONE_TEXT
                 ? bodyCode("done")
                 : undefined;
-      // A person decided what it waited on and it ended without a word about what came of it: one more turn,
-      // with the decision and the result, to finish what it set out to do (once per run).
-      const decided = transcript.decided;
-      delete transcript.decided;
-      if (
-        decided &&
-        !silent &&
-        !said &&
-        !closingSummary(transcript, true) &&
-        !transcript.decisionNudged &&
-        run.turns + 1 < maxTurns
-      ) {
-        transcript.decisionNudged = true;
-        const note = decisionNudge(decided);
-        appendUserText(transcript, note);
-        if (plan.kind !== "model") nextPrompt = note;
-        await saveTranscript(db, transcript);
-        later(() => addRunStep(db, run, "context", { nudged: "decision" }));
-        continue;
-      }
-      // Addressed directly, it wrote only the silence word (or nothing): one more turn, told to answer.
-      if (!silent && !viaRoutine && !transcript.nudged && (sentinelOnly || (!text && !anythingPosted))) {
-        transcript.nudged = true;
-        appendUserText(transcript, ANSWER_NUDGE);
-        if (plan.kind !== "model") nextPrompt = ANSWER_NUDGE;
-        await saveTranscript(db, transcript);
-        later(() => addRunStep(db, run, "context", { nudged: sentinelOnly ? "sentinel" : "empty" }));
-        continue;
-      }
-      if (!text && !anythingPosted && !silent) return fail("empty_reply");
       const t = transcript;
-      // Work it said it would do still undone, in any language: one judge call, once per run (ADR 0089). When
-      // nothing brings it back (`wakesLater`, read only then), this answer is posted and the run goes on, told to do
-      // it now or come back with a follow-up. In an agents' DM only a run that still owes another agent its answer
-      // is read (ADR 0095): its last message is that answer, and nothing wakes it there again.
-      let keep: string | null = null;
+      // How the turn ends (ADR 0096): it goes on in this run (told why), it waits on something durable, it asks a
+      // person with a card, or it is done. One choke point for every run kind but a routine's (above) and a forum's.
+      const decided = t.decided;
+      delete t.decided;
       const betweenAgents = Boolean(channelRow && isAgentOnlyDm(channelRow));
       // A mission's report card is its answer (`silent`): what it said there is what is judged.
       const judged = !silent
@@ -2578,41 +2672,87 @@ async function executeRunInner(
         : plan.missionId && t.reported
           ? said || (await missionReportSince(db, run, replyThreadId).catch(() => ""))
           : "";
-      if (
-        judge &&
-        judged &&
-        !t.followThroughChecked &&
-        run.turns + 1 < maxTurns &&
-        (!betweenAgents || (await answersOpen(db, run).catch(() => false)))
-      ) {
-        t.followThroughChecked = true;
-        const detached = (t as { detachedWaits?: { waitId: string }[] }).detachedWaits;
-        const verdict = await followThroughVerdict(judge, {
-          orgId: run.orgId,
-          agentId: run.agentId,
-          runId: run.id,
-          request: t.request ?? triggerMessage?.body ?? triggerText,
-          reply: judged,
-        }).catch(() => "done" as const);
-        t.followThroughVerdict = verdict;
-        if (verdict === "unkept" && !(await wakesLater(db, run, detached).catch(() => false))) {
-          keep = betweenAgents ? FOLLOW_THROUGH_NUDGE_DM : FOLLOW_THROUGH_NUDGE;
-          appendUserText(t, keep);
-          if (plan.kind !== "model") nextPrompt = keep;
-          later(() => addRunStep(db, run, "context", { nudged: "promise" }));
-        } else if (
-          verdict === "waiting" &&
-          plan.missionId &&
-          !(await missionAsksPerson(db, plan.missionId).catch(() => false))
-        ) {
-          // A mission waiting on a person asks with a card (unless one already asks): the thread shows it waits, and
-          // the answer resumes it.
-          keep = MISSION_ASK_NUDGE;
-          appendUserText(t, keep);
-          if (plan.kind !== "model") nextPrompt = keep;
-          later(() => addRunStep(db, run, "context", { nudged: "mission_ask" }));
+      // In an agents' DM only a run that still owes another agent its answer is read (ADR 0095): its last message
+      // is that answer, and nothing wakes it there again.
+      const owesAnswer = !betweenAgents || (await answersOpen(db, run).catch(() => false));
+      const state = t.continuation ?? { count: 0 };
+      // A forum's turn is its post (the topic moves on); a run at its turn cap has no turn left to give.
+      const capped = run.turns + 1 >= maxTurns;
+      const decision = await decideTurnEnd({
+        state,
+        kind: betweenAgents ? "agents_dm" : "conversation",
+        executed: result.executedCount,
+        bound: t.stuck?.endAt !== undefined ? "stuck" : t.wrapUpNoted ? "step_limit" : null,
+        quiet: silent && !judged,
+        decided: decided && !silent && !said && !capped && !closingSummary(t, true) ? decided : null,
+        unanswered: !silent && !viaRoutine && (sentinelOnly || (!text && !anythingPosted)),
+        unreached:
+          text.includes("@") && channelRow
+            ? unreachedNote(
+                await unreachedAgents(db, {
+                  orgId: run.orgId,
+                  channelId: run.channelId,
+                  authorAgentId: run.agentId,
+                  body: text,
+                  // Naming an agent it already handed this to (`ask_agent`, `tell_agent`) is no hand-off.
+                  handedTo: run.id,
+                }).catch(() => []),
+                channelRow.kind === "dm" ? "this DM" : `#${channelRow.name}`,
+                channelRow.kind !== "dm",
+              )
+            : "",
+        judged: owesAnswer && !forum && !capped ? judged : "",
+        mission: Boolean(plan.missionId),
+        // A mission's card already asking a person brings it back too.
+        wakesLater: async () =>
+          (plan.missionId ? await missionAsksPerson(db, plan.missionId) : false) ||
+          wakesLater(db, run, (t as { detachedWaits?: { waitId: string }[] }).detachedWaits),
+        verdict: judge
+          ? () =>
+              continuationVerdict(judge, {
+                orgId: run.orgId,
+                agentId: run.agentId,
+                runId: run.id,
+                request: t.request ?? triggerMessage?.body ?? triggerText,
+                reply: judged,
+                did: t.messages.flatMap((m) =>
+                  typeof m.content === "string"
+                    ? []
+                    : m.content.flatMap((b) => (b.type === "tool_use" ? [b.name] : [])),
+                ),
+                runKind: betweenAgents ? "agents_dm" : "conversation",
+              })
+          : null,
+      });
+      turnEnd = decision;
+      if (decision.verdict) t.followThroughVerdict = verdictRecord(decision.verdict);
+      t.continuation = advanceContinuation(state, decision, result.executedCount);
+      const nudgedAs = {
+        decision: "decision",
+        answer: sentinelOnly ? "sentinel" : "empty",
+        promise: "promise",
+        unreached: "unreached",
+      }[decision.rule];
+      const { nudge: _, ...recorded } = { ...decision, count: t.continuation.count };
+      later(() =>
+        addRunStep(db, run, "context", {
+          continuation: recorded,
+          ...(decision.outcome === "continue" ? { nudged: nudgedAs ?? (plan.missionId ? "mission_ask" : "ask") } : {}),
+        }),
+      );
+      if (decision.outcome === "ask_card") return askWithCard(text || judged);
+      let keep: string | null = null;
+      if (decision.outcome === "continue" && decision.nudge) {
+        appendUserText(t, decision.nudge);
+        if (plan.kind !== "model") nextPrompt = decision.nudge;
+        // Nothing to post first: it simply goes on.
+        if (decision.rule === "decision" || decision.rule === "answer") {
+          await saveTranscript(db, t);
+          continue;
         }
+        keep = decision.nudge;
       }
+      if (!text && !anythingPosted && !silent) return fail("empty_reply");
       // Someone wrote while it answered: post this answer, then read the new message(s) and go on.
       const [still] = await db
         .select({ pending: agentRuns.pendingMessageIds })

@@ -743,6 +743,8 @@ export const featureKeysPtBR = {
       routine_finished_one: "Rotina terminou",
       routine_finished_other: "Rotina terminou",
       routine_failed_one: "Rotina falhou",
+      run_failed_one: "Não conseguiu terminar",
+      run_failed_other: "Não conseguiu terminar",
       routine_failed_other: "Rotina falhou",
       routine_paused_one: "Rotina pausada",
       routine_paused_other: "Rotina pausada",

@@ -738,6 +738,8 @@ export const featureKeysEn: FeatureTranslations = {
       routine_finished_other: "Routine finished",
       routine_failed_one: "Routine failed",
       routine_failed_other: "Routine failed",
+      run_failed_one: "Couldn't finish",
+      run_failed_other: "Couldn't finish",
       routine_paused_one: "Routine paused",
       routine_paused_other: "Routine paused",
       routine_stalled_one: "Routine waiting for the computer",

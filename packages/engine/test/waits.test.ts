@@ -178,15 +178,15 @@ describe("a person's message while a run waits for help in the browser", () => {
   test("a promise to go on once the help is done gets no nudge: the help's result will wake the agent", async () => {
     const ask = await startBrowser("other", {
       after: "It's the Stripe account. I'll continue as soon as you finish signing in.",
-      followThrough: "unkept",
+      followThrough: "continue",
     });
     await say("while you wait: which account is it?", ask.id);
     await stopChecksSettled();
     await drainOutbox(f.db, f.handlers);
     expect((await runs())[0]?.status).toBe("done");
-    // Read once as unkept (ADR 0089), but what the run waits on brings it back: no more turns.
+    // What the run waits on brings it back: not judged, no more turns (ADR 0096).
     const judged = (f.context.judge as unknown as { calls: { kind: string }[] }).calls;
-    expect(judged.filter((j) => j.kind === "follow_through").length).toBe(1);
+    expect(judged.filter((j) => j.kind === "follow_through").length).toBe(0);
     const steps = await f.db.select().from(schema.agentRunSteps);
     expect(steps.filter((s) => s.data.nudged === "promise")).toEqual([]);
   });

@@ -1,5 +1,5 @@
 import { afterEach, expect } from "bun:test";
-import { schema } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
 import { runAuthority } from "../../src";
 import { closeWorlds, world } from "./harness";
 import { assertInvariants } from "./invariants";
@@ -228,11 +228,9 @@ scenario(
     expect(run).toBeDefined();
     expect((await runAuthority(w.db, run as NonNullable<typeof run>)).kind).toBe("person");
     expect(await w.posts("otto")).toHaveLength(1);
-    // The hand-off by mention leaves a row that closes (open item: mention rows).
-    const rows = (await w.db.select().from(schema.agentConsultations)).filter(
-      (c) => c.targetAgentId === w.agents.otto?.id,
-    );
-    expect(rows.map((r) => r.status)).toEqual(["answered"]);
+    // A hand-off by mention closes in the conversation itself: Otto's answer is there for Nina and the person, so
+    // Nina isn't woken again for it (a failure is reported to her instead: S30, ADR 0096).
+    expect(await w.runs("nina")).toHaveLength(1);
     await assertInvariants(w);
   },
 );
@@ -276,5 +274,36 @@ scenario("S37", "a mention of an agent outside the conversation is not lost: the
   await w.settle();
   expect(await w.runs("nina")).toHaveLength(1);
   expect((await w.posts("ada")).at(-1)?.body).toContain("aprovou");
+  await assertInvariants(w);
+});
+
+scenario("S43", "a mention dispatch can't wake is recorded and told to the agent that wrote it", async () => {
+  const w = await world({
+    agents: ["ada", "otto"],
+    people: ["bia"],
+    script: {
+      ada: [
+        { text: "@otto, roda o deploy 88 por favor" },
+        { text: "Ana, o Otto só atende a Bia: pede para ela passar o deploy 88 para ele." },
+      ],
+    },
+  });
+  // Otto answers only Bia, its owner: Ana, behind Ada's run, may not talk to it.
+  await w.db
+    .update(schema.agents)
+    .set({ ownerUserId: w.people.bia?.id ?? "", audienceMode: "people", audienceUserIds: [] })
+    .where(eq(schema.agents.id, w.agents.otto?.id ?? ""));
+  await w.say("@ada pede pro otto rodar o deploy 88");
+  await w.settle();
+  expect(await w.runs("otto")).toEqual([]);
+  const [first] = await w.posts("ada");
+  const decision = (await w.decisions()).find((d) => d.messageId === first?.id);
+  expect(decision?.picked).toEqual(["otto"]);
+  expect(decision?.reason).toContain("skipped @otto: audience");
+  const notices = (await w.db.select().from(schema.messages)).filter(
+    (m) => (m.meta.notice as { kind?: string } | undefined)?.kind === "wake_skipped",
+  );
+  expect(notices).toHaveLength(1);
+  expect((await w.posts("ada")).at(-1)?.body).toContain("Bia");
   await assertInvariants(w);
 });

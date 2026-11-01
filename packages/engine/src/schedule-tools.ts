@@ -18,6 +18,7 @@ import {
   EVENT_WEBHOOK,
   listOrgRoutines,
   listReminders,
+  missingEventSource,
   ROUTINE_EVENTS,
   type RoutineDeps,
   type RoutineEvent,
@@ -516,6 +517,14 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           const trigger: RoutineTriggerInput = rawTrigger
             ? await triggerOf(ctx, rawTrigger)
             : { type: "schedule", phrase: str(input.schedule) };
+          const missing = trigger.type === "event" ? await missingEventSource(ctx.db, ctx.orgId, trigger.event) : null;
+          if (missing) {
+            const name = missing === "sentry" ? "Sentry" : "GitHub";
+            return {
+              content: `Not created: nothing would ever start it. No ${name} webhook sends this workspace its events. Tell the person what it needs: a workspace admin sets up a ${name} webhook for this workspace (the app can't create one yet). If they'd rather not wait, offer a schedule that checks instead.`,
+              isError: true,
+            };
+          }
           const channel = str(input.channel).trim() ? await channelTarget(ctx, requester, str(input.channel)) : null;
           const conv =
             channel && channel.target.channelId !== ctx.channelId

@@ -55,6 +55,12 @@ const relay =
 scenario("S21", "a three-deep delegation rolls up to the person with every part", async () => {
   const w = await world({
     agents: ["chefe", "rita", "igor", "eva"],
+    // "Pedi a @rita; já volto." in the channel tells the people, it hands nothing to Rita there.
+    judge: {
+      mention: Object.fromEntries(
+        ["chefe", "rita", "igor", "eva"].map((h) => [h, { handoff: 0.05, needsNothing: 0.95 }]),
+      ),
+    },
     script: {
       chefe: relay("rita", "Release"),
       rita: relay("igor", "changelog pronto"),
