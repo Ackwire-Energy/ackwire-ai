@@ -996,6 +996,68 @@ describe("the team's coordinator (ADR 0093)", () => {
     expect((await route(scored({}, { needsAgent: 0.8 }), other.id)).selected).toEqual([ada.id]);
   });
 
+  const reasonOf = async (messageId: string) =>
+    (
+      await f.db
+        .select({ reason: schema.routingDecisions.reason })
+        .from(schema.routingDecisions)
+        .where(eq(schema.routingDecisions.messageId, messageId))
+    )[0]?.reason ?? null;
+
+  test("after a talk with an agent, a thanks or an aside needs nobody; a question goes to that agent, who may not pass", async () => {
+    const { ada } = await coordinated({ people: true });
+    const bug = await post("o checkout está dando 500");
+    expect((await route(scored({ ada: 0.9 }, { needsAgent: 0.9 }), bug.id)).selected).toEqual([ada.id]);
+    await byAgent(ada.id, "Achei: o deploy de ontem quebrou o checkout.");
+    const thanks = await post("valeu, ficou muito bom mesmo");
+    expect((await route(scored({}, { needsAgent: 0.05 }), thanks.id)).selected).toEqual([]);
+    const aside = await post("vou almoçar agora, volto em uma hora");
+    expect((await route(scored({}, { needsAgent: 0 }), aside.id)).selected).toEqual([]);
+    const asked = await post("Entenderam?");
+    expect((await route(scored({}, { needsAgent: 0.05 }), asked.id)).selected).toEqual([ada.id]);
+    expect(await reasonOf(asked.id)).toStartWith("follow-up; default; talking to");
+  });
+
+  test("an 'ok' alone with the team after a talk goes to that agent, who may pass on it", async () => {
+    const { ada, walter } = await coordinated({ people: true });
+    await f.db.delete(schema.channelMembers).where(eq(schema.channelMembers.userId, walter.id));
+    const bug = await post("o checkout está dando 500");
+    expect((await route(scored({ ada: 0.9 }, { needsAgent: 0.9 }), bug.id)).selected).toEqual([ada.id]);
+    await byAgent(ada.id, "Achei: o deploy de ontem quebrou o checkout.");
+    const ok = await post("ok");
+    expect((await route(scored({}, { needsAgent: 0.05 }), ok.id)).selected).toEqual([ada.id]);
+    expect(await reasonOf(ok.id)).toStartWith("default; talking to");
+  });
+
+  test("when no step can read it, the coordinator it falls back to answers, not whoever spoke before a colleague", async () => {
+    const { theo, ada, walter } = await coordinated({ people: true });
+    await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "agent", agentId: ada.id, runId: null, hop: 1, stretchId: null },
+      body: "Deploy feito.",
+      createdAt: new Date(Date.now() - 8 * 60_000),
+    });
+    await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "person", userId: walter.id },
+      body: "show",
+      createdAt: new Date(Date.now() - 6 * 60_000),
+    });
+    const next = await post("e aí?");
+    expect(await route(failing, next.id)).toMatchObject({ selected: [theo.id], decidedBy: COORDINATES });
+    expect(await reasonOf(next.id)).toStartWith("coordinator; default");
+  });
+
+  test("when no step can read it, the agent that just spoke gets it, and may pass: nobody knows it was for it", async () => {
+    const { ada } = await coordinated({ people: true });
+    await byAgent(ada.id, "Deploy feito.");
+    const aside = await post("vou almoçar agora, volto em uma hora");
+    expect((await route(failing, aside.id)).selected).toEqual([ada.id]);
+    expect(await reasonOf(aside.id)).toStartWith("default; talking to");
+  });
+
   test("what nobody took but speaks to one agent goes to that agent, as the step's pick, not to the coordinator", async () => {
     const { theo, ada } = await coordinated();
     const toAda = await post("ada, bom dia");
@@ -1116,6 +1178,10 @@ describe("the team's coordinator (ADR 0093)", () => {
     expect((await route(scored({}, { needsAgent: 0.4 }), maybe.id)).selected).toEqual([theo.id]);
     const chat = await post("vou almoçar");
     expect((await route(scored({}, { needsAgent: 0.2 }), chat.id)).selected).toEqual([]);
+    // From DEFAULT_NEED (R5) the same aside wakes the coordinator, in a run it may pass on.
+    const chat2 = await post("vou almoçar");
+    expect((await route(scored({}, { needsAgent: 0.3 }), chat2.id)).selected).toEqual([theo.id]);
+    expect(await reasonOf(chat2.id)).toStartWith("coordinator; default");
   });
 
   test("a person alone with the coordinator as the channel's only agent: the strategy was told so, and its nobody stands", async () => {
@@ -1132,6 +1198,10 @@ describe("the team's coordinator (ADR 0093)", () => {
     const thanks = await post("valeu!");
     expect(await route(low, thanks.id)).toMatchObject({ selected: [], runs: [] });
     expect(told).toEqual(["dev"]);
+    // Right after its own message too, and longer than an ack: R5 doesn't overrule it.
+    await byAgent(f.agent.id, "Pronto, terminei o relatório.");
+    const aside = await post("vou almoçar agora, volto em uma hora");
+    expect(await route(low, aside.id)).toMatchObject({ selected: [], runs: [] });
   });
 
   test("when no step can read it: a reply and a talk with an agent first, then the coordinator, also with other people here", async () => {

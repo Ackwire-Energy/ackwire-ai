@@ -1115,6 +1115,8 @@ export async function routeMessage(
   };
   // Which default tier picked (R5): the agent the person talks with, the coordinator, the best placed agent.
   let fallback: "talk" | "coordinator" | "best" | null = null;
+  // A default pick the agent may pass on: one the router could not read, or an ack said alone with the team.
+  let mayPass = false;
 
   let result: RoutingResult | null = null;
   let failures: string[] = [];
@@ -1176,6 +1178,7 @@ export async function routeMessage(
       const agentId = talkingWith ?? coordinatorId ?? bestPlaced(() => 0);
       if (agentId) {
         fallback = talkingWith ? "talk" : coordinatorId ? "coordinator" : "best";
+        mayPass = true;
         const ruleName = fallback === "coordinator" ? "coordinator" : "default";
         result = {
           agents: [{ agentId, score: 1 }],
@@ -1250,7 +1253,9 @@ export async function routeMessage(
       (id) =>
         id !== talkingTo && scoreOf(id) >= clearPickScore && scoreOf(id) >= scoreOf(talkingTo) + NAMED_OVER_CONTINUITY,
     );
+  // The failure fallback already chose, as a run that may pass: no follow-up marks it or switches its agent.
   const followUp =
+    fallback === null &&
     talkingTo !== null &&
     (repliedAgentId !== null ||
       (talkingTo === addressee && picked.includes(talkingTo)) ||
@@ -1274,19 +1279,32 @@ export async function routeMessage(
   let chosen = selected;
   // Alone with a team, even a greeting is for it (ADR 0093): the agent may still pass on an "ok".
   const aloneWithTeam = async () => candidates.length >= 2 && (await aloneHere());
-  if (!byAgent && selected.length === 0 && !duplicate && !toPerson && (!isAck(needs) || (await aloneWithTeam()))) {
+  // Alone with the channel's one agent (R2), the strategy decided knowing it (`aloneWith`): its nobody stands.
+  const ack = isAck(needs);
+  if (
+    !byAgent &&
+    !onlyAgentId &&
+    selected.length === 0 &&
+    !duplicate &&
+    !toPerson &&
+    (!ack || (await aloneWithTeam()))
+  ) {
     if (addressee) chosen = [addressee];
     else if (
       // Said to every agent ("vocês viram…?"), or needing one as much as a pick does, it is for them even right
       // after a colleague spoke.
       ((decided.forEveryone ?? 0) >= FOR_EVERYONE_THRESHOLD ||
         needs >= needGateOf(policy, candidates.length === 1) ||
-        (!peopleTalking && (talkingWith !== null || needs >= DEFAULT_NEED || (await aloneWithTeam())))) &&
+        // Talking with an agent is no reason on its own: "vou almoçar agora, volto em uma hora" 15 minutes after a
+        // talk needs nobody. A question, or some need, is for the agent ("Entenderam?").
+        (!peopleTalking &&
+          ((talkingWith !== null && saidText.includes("?")) || needs >= DEFAULT_NEED || (await aloneWithTeam())))) &&
       !(await defaultCapReached())
     ) {
       const agentId = talkingWith ?? coordinatorId ?? bestPlaced(scoreOf, decided.best);
       if (agentId) {
         fallback = talkingWith ? "talk" : coordinatorId ? "coordinator" : "best";
+        mayPass = ack;
         chosen = [agentId];
       }
     }
@@ -1315,7 +1333,7 @@ export async function routeMessage(
         selectedAgentIds: chosen,
         reason:
           [
-            followUp || fallback === "talk" ? FOLLOW_UP : null,
+            followUp || (fallback === "talk" && !mayPass) ? FOLLOW_UP : null,
             strategy === "rule:coordinator" ? "coordinator" : null,
             fallback ? "default" : null,
             fallback === "talk" ? "talking to" : fallback === "best" ? "best" : null,
