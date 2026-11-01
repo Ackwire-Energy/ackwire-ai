@@ -163,7 +163,7 @@ export function parseDayInput(value: string, now = new Date()): string | null {
 
 /**
  * A step's target cut to what names it on one short line, never with an ellipsis that hides what it is: a URL is its
- * host ("console.example.com"), a path its last part ("refresh.ts"), anything else its first `max` characters, cut at
+ * host ("console.example.com", with or without its scheme), a path its last part ("refresh.ts"), anything else its first `max` characters, cut at
  * a word when one is near.
  */
 export function shortTarget(text: string, max = 40) {
@@ -175,7 +175,15 @@ export function shortTarget(text: string, max = 40) {
     } catch {
       out = s;
     }
-  } else if (/^\S*\/\S*$/.test(s)) out = s.split("/").filter(Boolean).at(-1) ?? s;
+  } else if (/^\S*\/\S*$/.test(s)) {
+    const parts = s.split("/").filter(Boolean);
+    const first = parts[0] ?? "";
+    const last = parts.at(-1) ?? s;
+    // "acme/repo", "10/31", "and/or" name nothing shorter: only a path or a host without its scheme is cut.
+    if (/^(\/|\.{1,2}\/|~)/.test(s)) out = last;
+    else if (first.includes(".")) out = first;
+    else if (/\.[a-z0-9]{1,6}$/i.test(last)) out = last;
+  }
   if (out.length <= max) return out;
   const cut = out.slice(0, max);
   const space = cut.lastIndexOf(" ");
