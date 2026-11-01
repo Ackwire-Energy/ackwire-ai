@@ -17,6 +17,7 @@ import {
   getAgentBrain,
   getTeam,
   insertMessageWithRuns,
+  listRoutines,
   NO_PERSON,
   NotFoundError,
   openDm,
@@ -297,6 +298,31 @@ describe("who can talk to the agent", () => {
     const left = await mention();
     expect(await runsOf(left.id)).toEqual([]);
     expect(await teamSays()).toBe(false);
+  });
+
+  test("routines of an agent show only to who may talk to it: a role grants them, leaving it hides them", async () => {
+    const { bia } = await world();
+    const routine = await createRoutine({ db: f.db, pubsub: f.pubsub, context: f.context }, f.owner.id, f.org.id, {
+      agentId: f.agent.id,
+      prompt: "Resuma o dia.",
+      target: { type: "channel", channelId: f.general.id },
+      trigger: { type: "schedule", phrase: "todo dia às 9h" },
+    });
+    const support = await createRole(f.db, f.owner.id, f.org.id, { name: "Suporte" });
+    await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, {
+      mode: "people",
+      userIds: [],
+      roleIds: [support.id],
+    });
+    const seen = async (userId: string) => (await listRoutines(f.db, userId, f.org.id)).map((r) => r.id);
+    expect(await seen(bia.id)).toEqual([]);
+    expect(await seen(f.owner.id)).toEqual([routine.id]);
+    await setMemberRoles(f.db, f.owner.id, f.org.id, bia.id, [support.id]);
+    expect(await seen(bia.id)).toEqual([routine.id]);
+    await setMemberRoles(f.db, f.owner.id, f.org.id, bia.id, []);
+    expect(await seen(bia.id)).toEqual([]);
+    await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "owner", userIds: [] });
+    expect(await seen(bia.id)).toEqual([]);
   });
 
   test("roles to pick: the workspace's own, never `everyone` nor another workspace's; an app that sends none keeps them", async () => {

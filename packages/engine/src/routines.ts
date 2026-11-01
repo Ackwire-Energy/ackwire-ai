@@ -1172,13 +1172,40 @@ function hooksOf(deps: RoutineDeps): RoutineHookConfig {
 
 /** The organization's routines as the person sees them (ADR 0053 §9: outcomes only where they don't read). */
 export async function listRoutines(db: Database, actorId: string, orgId: string, hooks?: RoutineHookConfig) {
-  await requirePermission(db, actorId, orgId, "read");
+  const membership = await requirePermission(db, actorId, orgId, "read");
   const rows = await db
     .select()
     .from(routines)
     .where(and(eq(routines.orgId, orgId), isNull(routines.deletedAt)))
     .orderBy(routines.createdAt);
-  return views(db, rows, actorId, hooks);
+  return views(db, await visibleRoutines(db, membership, actorId, rows), actorId, hooks);
+}
+
+/**
+ * Only routines of agents the person may talk to (the same audience rule as the agents list), besides their own
+ * and their agents'; admins of routines or agents see them all.
+ */
+async function visibleRoutines(
+  db: Database,
+  membership: Awaited<ReturnType<typeof requirePermission>>,
+  actorId: string,
+  rows: RoutineRow[],
+) {
+  if (!rows.length || can(membership, "manage_routines") || can(membership, "manage_agents")) return rows;
+  const ids = [...new Set(rows.map((r) => r.agentId))];
+  const owned = await db
+    .select({
+      id: agents.id,
+      ownerUserId: agents.ownerUserId,
+      audienceMode: agents.audienceMode,
+      audienceUserIds: agents.audienceUserIds,
+      audienceRoleIds: agents.audienceRoleIds,
+    })
+    .from(agents)
+    .where(inArray(agents.id, ids));
+  const speaker = speakerOf(membership);
+  const open = new Set(owned.filter((a) => canTalkTo(a, actorId, speaker)).map((a) => a.id));
+  return rows.filter((r) => r.createdByUserId === actorId || open.has(r.agentId));
 }
 
 /**
