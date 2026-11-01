@@ -3,9 +3,11 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import { join } from "node:path";
 import { activityText, toolActivity } from "@agenteschat/client/lib/activity";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createI18n } from "@/i18n";
+import { declarations, topLevel } from "./built-css";
 import { ADA_ID, createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { proceed, startAs } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";
@@ -67,6 +69,31 @@ describe("Configurações → Skills", () => {
       expect(chip(name).querySelector(".connector-icon")).toBeNull();
       expect(chip(name).querySelector("svg.ac-icon")).not.toBeNull();
     }
+  });
+
+  test("a row stacks the name, its source line and what it is for, so the description runs the row's width", async () => {
+    const { section } = await settings();
+    const row = within(section()).getByRole("button", { name: "Relatório semanal" }).closest(".skill-row");
+    expect([...(row?.children ?? [])].map((c) => [c.className, c.textContent])).toEqual([
+      ["skill-row__name", "Relatório semanal"],
+      ["skill-row__meta", "Criada aquiEm agentes novosv1 · nenhum agente usa"],
+      ["small muted", "Monta o resumo da semana."],
+    ]);
+    // A column whose lines take its whole width (the name keeps its own); the source line's marks share one centre
+    // line and wrap on a phone.
+    const css = topLevel(await Bun.file(join(import.meta.dir, "../src/layout.css")).text());
+    expect(declarations(css, ".skill-row")).toEqual([
+      ["flex-direction", "column"],
+      ["align-items", "stretch"],
+      ["gap", "var(--space-1)"],
+    ]);
+    expect(declarations(css, ".skill-row__name")).toContainEqual(["align-self", "flex-start"]);
+    expect(declarations(css, ".skill-row__meta")).toEqual([
+      ["display", "flex"],
+      ["flex-wrap", "wrap"],
+      ["align-items", "center"],
+      ["gap", "var(--space-1) var(--space-2)"],
+    ]);
   });
 
   test("detail: rendered body, files (scripts need a sandbox), remove names the agents", async () => {

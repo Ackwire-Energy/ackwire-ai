@@ -3,7 +3,8 @@ import { type Database, eq, schema } from "@agenteschat/db";
 import { getAgent, getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { ForbiddenError, NotFoundError } from "./errors";
-import type { MachineCaller } from "./machine-hub";
+import { cutText, cutTextEnd } from "./format";
+import { computerBackSoon, type MachineCaller } from "./machine-hub";
 import { createMachineSandboxProvider } from "./machine-provider";
 import { computerPreparing } from "./machine-provisioning";
 import {
@@ -188,12 +189,20 @@ async function withMachine<T>(
  */
 export async function withConnectedMachine<T>(
   hub: MachineCaller,
-  ctx: Pick<ToolContext, "orgId" | "agentId">,
+  ctx: Pick<ToolContext, "orgId" | "agentId" | "signal">,
   { machineId, handle, name }: { machineId: string; handle: string; name?: string },
   fn: (computer: ComputerHandle) => Promise<T>,
   options: { allowPaused?: boolean } = {},
 ): Promise<T> {
-  const status = await hub.status(machineId);
+  let status = await hub.status(machineId);
+  // A run's call (it has a `signal`) waits for a computer just gone, its runner dialing again. A person's request
+  // or a job doesn't: deleting an agent whose computer just went away would wait the whole time once per secret.
+  const { signal } = ctx;
+  if (signal && status?.orgId === ctx.orgId && !status.online) {
+    if (await computerBackSoon(hub, machineId, { signal, canceled: () => signal.aborted })) {
+      status = await hub.status(machineId);
+    }
+  }
   if (!status || status.orgId !== ctx.orgId) {
     throw new SandboxUnavailableError(REMOVED_COMPUTER_MESSAGE);
   }
@@ -290,5 +299,5 @@ export function truncateOutput(text: string, max: number) {
   if (text.length <= max) return text;
   const head = Math.floor(max * 0.6);
   const tail = max - head;
-  return `${text.slice(0, head)}\n[… ${text.length - max} characters cut …]\n${text.slice(-tail)}`;
+  return `${cutText(text, head)}\n[… ${text.length - max} characters cut …]\n${cutTextEnd(text, tail)}`;
 }

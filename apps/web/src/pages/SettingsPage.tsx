@@ -1,7 +1,9 @@
 import type { Credential, OrgSettings } from "@agenteschat/client";
 import {
   useAddCredential,
+  useAgents,
   useAiAccounts,
+  useAiStatus,
   useAuthConfig,
   useComputerSetup,
   useConnections,
@@ -55,6 +57,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AccessMatrixSection } from "@/components/AccessLevels";
+import { AccountSection } from "@/components/AccountSettings";
 import { AuditSection } from "@/components/Audit";
 import { AutoModelsRow } from "@/components/AutoModels";
 import { AiAccountsSection } from "@/components/ai/AiAccounts";
@@ -67,10 +70,11 @@ import { ImportExportSection } from "@/components/ImportFlow";
 import { BillingMeters } from "@/components/Limits";
 import { ErrorState, LoadingLine, LoadingList } from "@/components/Loading";
 import { MachinePage } from "@/components/Machines";
+import { MediaSettingsSection } from "@/components/MediaSettings";
 import { NoticePrefsSection } from "@/components/NoticePrefs";
 import { useOrg } from "@/components/org-context";
 import { PlanUsageCards } from "@/components/PlanUsage";
-import { OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
+import { MyFace, OrgLogoDialog, OrgMark } from "@/components/ProfilePhoto";
 import { KeyMismatch, KeySite } from "@/components/ProviderKey";
 import { RolesSection } from "@/components/roles/RolesSection";
 import { SkillsSection } from "@/components/Skills";
@@ -78,6 +82,7 @@ import { StorageSection } from "@/components/StorageSettings";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useCentreCurrent } from "@/hooks/useCentreCurrent";
 import { useOpenParam } from "@/lib/open-param";
+import { workspaceUsesApi } from "@/lib/plan-usage";
 import { useToast } from "@/lib/toast";
 import { MembersPage } from "./MembersPage";
 import { SETTINGS_GROUPS, SETTINGS_SECTIONS, type SettingsSection } from "./settings-sections";
@@ -142,7 +147,7 @@ export function SettingsPage({
                         className="settings__link"
                         aria-current={s.id === current ? "page" : undefined}
                       >
-                        <Icon name={s.icon} size={18} />
+                        {s.id === "account" ? <MyFace size="xs" /> : <Icon name={s.icon} size={18} />}
                         {t(`settings.section.${s.id}`)}
                       </Link>
                     </li>
@@ -171,11 +176,13 @@ export function SettingsPage({
             )}
           </header>
         )}
+        {current === "account" && <AccountSection />}
         {current === "notifications" && <NoticePrefsSection />}
         {current === "general" && <GeneralSection />}
         {current === "members" && <MembersPage embedded />}
         {current === "roles" && <RolesSection />}
         {current === "audit" && <AuditSection />}
+        {current === "media" && <MediaSettingsSection />}
         {current === "access" && <AccessMatrixSection />}
         {current === "connectors" && (
           <ConnectorsSection connected={connected} review={review} mail={mail} account={account} />
@@ -556,6 +563,13 @@ function SettingsTiles() {
   const platform = usePlatformKey(org.id);
   const storage = useStorage(org.id, shown("storage"));
   const edition = computerEdition(useComputerSetup(org.id, shown("storage")).data);
+  const agents = useAgents(org.id).data ?? [];
+  const aiStatus = useAiStatus(org.id).data;
+  // The budget's share only where the workspace uses the API: on plans alone no 0% budget (ADR 0063 §5).
+  const budget =
+    overview.data && workspaceUsesApi(agents, aiStatus, overview.data.budgetUsedPercent)
+      ? overview.data.budgetUsedPercent
+      : null;
 
   const live = (connections.data ?? []).filter((c) => !c.revokedAt);
   const keys = (credentials.data ?? []).filter((c) => !c.revokedAt);
@@ -589,8 +603,7 @@ function SettingsTiles() {
         ? t("settings.tileState.noComputers")
         : t("settings.tileState.computers", { count: machines.data.length, online })),
     usage:
-      overview.data &&
-      t("settings.tileState.usage", { percent: formatPercent(i18n.language, overview.data.budgetUsedPercent) }),
+      budget !== null ? t("settings.tileState.usage", { percent: formatPercent(i18n.language, budget) }) : undefined,
     keys: managesKeys
       ? credentials.data &&
         (keys.length > 0
@@ -634,12 +647,8 @@ function SettingsTiles() {
               </div>
               <Icon name="chevronRight" size={16} className="settings-tile__chevron" />
             </div>
-            {s.id === "usage" && overview.data && (
-              <Meter
-                value={Math.min(100, overview.data.budgetUsedPercent)}
-                max={100}
-                label={t("settings.section.usage")}
-              />
+            {s.id === "usage" && budget !== null && (
+              <Meter value={Math.min(100, budget)} max={100} label={t("settings.section.usage")} />
             )}
             <span className="settings-tile__state">{state[s.id] ?? "\u00a0"}</span>
           </Link>

@@ -23,6 +23,16 @@ export type MailChoice = "gmail" | "outlook" | "icloud" | "other";
 /** `Outro email` with no preset: the person types the servers (under "Avançado"). */
 export const CUSTOM_PRESET = "custom";
 
+/**
+ * The mailboxes drawn with their maker's mark, by provider or IMAP preset (the catalog cards' names too): Gmail's
+ * and iCloud's in one color (Simple Icons, CC0), Outlook's in Microsoft's colors. Any other mailbox is our envelope.
+ */
+export const MAIL_BRANDS: Partial<Record<string, { name: string; iconUrl: string; brandColor: string | null }>> = {
+  gmail: { name: "Gmail", iconUrl: "/connectors/gmail.svg", brandColor: "#EA4335" },
+  outlook: { name: "Outlook", iconUrl: "/brands/outlook.svg", brandColor: null },
+  icloud: { name: "iCloud", iconUrl: "/connectors/icloud.svg", brandColor: "#3693F3" },
+};
+
 export const MAIL_ERRORS: MailConnectError[] = [
   "auth",
   "imap_unreachable",

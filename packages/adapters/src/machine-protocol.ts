@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 29;
+export const MACHINE_PROTOCOL_VERSION = 32;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -293,6 +293,12 @@ export interface MachineLoad {
   memoryAvg: number;
   memoryPeak: number;
   hours: number;
+  /**
+   * Processes the kernel stopped for running out of memory in the agents' slices (system mode under systemd,
+   * `agents.slice`'s `memory.events`) over those hours. Absent where agents have no slices, or from an older
+   * runner: the server needs to know nothing new, so no protocol number.
+   */
+  oomKills?: number;
 }
 
 /** How often a computer's load is sampled (protocol 22). */
@@ -383,6 +389,21 @@ export function browserSetupOf(v: unknown): BrowserSetup | null {
  * sends `shared` to an older runner.
  */
 export const SHARED_ACCOUNTS_PROTOCOL = 29;
+/**
+ * From this protocol on, a Codex turn's `cwd` is read in the agent's own folder. An older runner read it in a
+ * folder nested there, so a turn sent into one of the agent's checkouts was refused ("The folder … doesn't
+ * exist"): the server sends an older runner's Codex turns to the agent's own folder, never a checkout.
+ */
+export const CODEX_FOLDER_PROTOCOL = 32;
+
+/**
+ * From this protocol on (ADR 0058 §17): a desktop stream changes mode in place, on its own data socket, when its
+ * person takes control or hands it back. The server sends `{"type":"mode","mode"}` there; the runner logs in to the
+ * desktop again with that mode's password, sends the same frame back where the old session's bytes end, and a new
+ * RFB session follows on the same sockets. The server never sends it to an older runner, whose streams close and
+ * open again in the new mode.
+ */
+export const DESKTOP_SWITCH_PROTOCOL = 30;
 
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex";
@@ -649,9 +670,10 @@ export const STREAM_CLOSE = {
  * server may add a desktop's `keyboard` (a layout): it is ignored, as Xvnc types what the person's own layout made
  * (ADR 0058 §16).
  */
-export type StreamRequest =
-  | { kind: "desktop"; mode: "watch" | "control" }
-  | { kind: "terminal"; cols: number; rows: number };
+export type StreamRequest = { kind: "desktop"; mode: DesktopMode } | { kind: "terminal"; cols: number; rows: number };
+
+/** A desktop stream's mode: `watch` logs in with the view-only password, `control` with the full one. */
+export type DesktopMode = "watch" | "control";
 
 /**
  * `stream.open` (protocol 18): one viewer of the request's agent's desktop
@@ -677,9 +699,12 @@ export interface StreamHello {
 /**
  * Text frames on a stream once it is ready (binary frames are the bytes): a
  * terminal's new size (viewer → runner) and how its shell ended (runner →
- * viewer).
+ * viewer); a desktop's mode (protocol 30, `DESKTOP_SWITCH_PROTOCOL`).
  */
-export type StreamControl = { type: "resize"; cols: number; rows: number } | { type: "exit"; code: number | null };
+export type StreamControl =
+  | { type: "resize"; cols: number; rows: number }
+  | { type: "exit"; code: number | null }
+  | { type: "mode"; mode: DesktopMode };
 
 /**
  * A person's turn in an agent's browser (`browser.handoff`, ADR 0040 §6), as
@@ -715,7 +740,7 @@ export type BrowserInputEvent =
       deltaX?: number;
       deltaY?: number;
       modifiers?: BrowserModifiers;
-      /** When the person made it (ms, the sender's clock): the runner keeps a drag's gaps (ADR 0040 §12). */
+      /** When the person made it (ms, the sender's clock): the runner keeps a drag's gaps (ADR 0040 §13). */
       at?: number;
     }
   | {
@@ -889,6 +914,14 @@ export type TaskExecutor = "claude" | "codex" | "shell";
 export const TASK_EXECUTORS: readonly TaskExecutor[] = ["claude", "codex", "shell"];
 
 /**
+ * From this protocol on (ADR 0041 §5.1): a Claude Code or Codex `task.start` carries `account`, and the task's CLI
+ * signs in with it exactly as the agent's turns do (the account's folder, or what root keeps for it), never with
+ * the computer's own sign-in instead. Its credential is never written to the task's files. An older runner never
+ * gets `account` and starts every task on the computer's own sign-in, as before.
+ */
+export const TASK_ACCOUNTS_PROTOCOL = 31;
+
+/**
  * A background task (protocol 4): started detached on the machine, so it
  * survives the runner restarting and the socket dropping; its output goes to
  * files in `<runner home>/tasks/<taskId>/` and its state to the runner's
@@ -960,6 +993,11 @@ export interface TaskStart {
    * command policy would hold it (`approval_needed`).
    */
   approved?: boolean;
+  /**
+   * Protocol 31 (`TASK_ACCOUNTS_PROTOCOL`), `claude` / `codex`: the agent's account its CLI signs in with
+   * (`accounts/<kind>/<id>`), as `BrainTurnRequest.account`; absent: the computer's own sign-in.
+   */
+  account?: string;
 }
 
 /** A coding CLI on the machine, as `hello` reports it (protocol 7). */
@@ -1051,8 +1089,11 @@ export interface BrainTurnRequest {
   system: string;
   /** What this turn says (the new user message). */
   prompt: string;
-  /** The MCP bridge for this run: `token` identifies the run to the server (per run). */
-  mcp: { token: string; url?: string };
+  /**
+   * The MCP bridge for this run: `token` identifies the run to the server (per run). `tools`: the names of the run's
+   * tools, space-separated; a kept-alive Codex, which lists them once when its thread opens, starts again when one is new.
+   */
+  mcp: { token: string; url?: string; tools?: string };
   /** Keep one process per (agent, session) alive between turns (default true; false for a background turn). Codex: protocol 16. */
   keepAlive?: boolean;
   /** Also load the machine owner's own MCP servers (default false: `--strict-mcp-config`; never in a `plan` turn). */
@@ -2704,7 +2745,14 @@ export function parseMachineSize(v: unknown): MachineSize | null {
 export function parseMachineLoad(v: unknown): MachineLoad | null {
   if (!isObject(v) || !between(v.loadAvg, 0, 1000) || !between(v.loadPeak, 0, 1000)) return null;
   if (!between(v.memoryAvg, 0, 1) || !between(v.memoryPeak, 0, 1) || !between(v.hours, 0, 24)) return null;
-  return { loadAvg: v.loadAvg, loadPeak: v.loadPeak, memoryAvg: v.memoryAvg, memoryPeak: v.memoryPeak, hours: v.hours };
+  return {
+    loadAvg: v.loadAvg,
+    loadPeak: v.loadPeak,
+    memoryAvg: v.memoryAvg,
+    memoryPeak: v.memoryPeak,
+    hours: v.hours,
+    ...(inRange(v.oomKills, [0, 1e9]) ? { oomKills: v.oomKills } : {}),
+  };
 }
 
 /** `pong.browserTraffic` (protocol 23): whole bytes up to 1e15 and at most 24 hours, else none. */
@@ -2746,6 +2794,7 @@ export function parseStreamControl(raw: string): StreamControl | null {
   if (f.type === "exit" && (f.code === null || Number.isInteger(f.code))) {
     return { type: "exit", code: f.code as number | null };
   }
+  if (f.type === "mode" && (f.mode === "watch" || f.mode === "control")) return { type: "mode", mode: f.mode };
   return null;
 }
 

@@ -772,6 +772,7 @@ function PlanSteps({
       machines.data?.find((m) => m.id === view?.computer?.machineId),
       kind,
     );
+    const program = t(`brain.card.${kind}`);
     wait = (
       <InfoCard icon="laptop">
         {edition === "cloud"
@@ -779,8 +780,8 @@ function PlanSteps({
           : gate.reason === "keys"
             ? t("aiAccounts.connect.needs.keys")
             : gate.reason === "tool_off"
-              ? t(off.key, { computer, command: off.command })
-              : t(`brain.reasons.${gate.reason}`, { computer })}
+              ? t(off.key, { computer, command: off.command, program })
+              : t(`brain.reasons.${gate.reason}`, { computer, program })}
       </InfoCard>
     );
   } else if (gate.state === "locked") {

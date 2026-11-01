@@ -1,6 +1,7 @@
 import { DatabaseError } from "@agenteschat/adapters";
 import { and, type Database, eq, gte, schema, sql } from "@agenteschat/db";
 import { sha256 } from "../crypto";
+import { cutText } from "../format";
 import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
 import {
   CATALOG_LIMITS,
@@ -146,6 +147,7 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
       scope: DATABASE_SCOPE,
       connectionId: connection.id,
       connectorLabel: connection.label,
+      service: "postgres",
       sensitive: false,
       ...extra,
     });
@@ -171,7 +173,7 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
             if (visible.length === 0) return { content: `${label} No tables this agent may read.` };
             const lines = visible.map(
               (r) =>
-                `${r[0]}.${r[1]} (${r[2]}, ~${Number(r[3] ?? 0).toLocaleString("en-US")} rows)${r[4] ? ` — ${String(r[4]).slice(0, 200)}` : ""}`,
+                `${r[0]}.${r[1]} (${r[2]}, ~${Number(r[3] ?? 0).toLocaleString("en-US")} rows)${r[4] ? ` — ${cutText(String(r[4]), 200)}` : ""}`,
             );
             return {
               content: `${label} ${visible.length} tables. Use schema.table names in queries (unqualified names are public.*).\n${wrapRows(lines.join("\n"))}`,
@@ -231,7 +233,7 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
             if (columns.length === 0) return { content: `${label} Table ${name} not found.`, isError: true };
             const lines = columns.map(
               (c) =>
-                `${c[0]} ${c[1]}${c[2] ? "" : " not null"}${c[4] ? " primary key" : ""}${hidden.has(String(c[0])) ? " [hidden from you: never select it]" : ""}${c[3] ? ` — ${String(c[3]).slice(0, 200)}` : ""}`,
+                `${c[0]} ${c[1]}${c[2] ? "" : " not null"}${c[4] ? " primary key" : ""}${hidden.has(String(c[0])) ? " [hidden from you: never select it]" : ""}${c[3] ? ` — ${cutText(String(c[3]), 200)}` : ""}`,
             );
             const keys = fks.map((f) => `${f[0]}: ${f[1]}`);
             return {

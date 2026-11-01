@@ -30,7 +30,7 @@ import { agentWorkspace } from "./paths";
 import type { FetchLike } from "./push";
 import { ENTER_MS, type ScopeKind, type Spawn, spawnGated } from "./scope-gate";
 import { type ActivatedSecret, agentSecrets, handleSecret, secretValue } from "./secrets";
-import { systemdBooted } from "./service";
+import { agentCgroup, systemdBooted } from "./service";
 import {
   BROWSER_LEASE_MS,
   UPLOAD_CHUNK_BYTES,
@@ -357,6 +357,14 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     systemdBooted() ? (file, args, options) => spawnGated(kind, file, args, options, link.enterScope) : undefined;
   const cli = gated("cli");
   const chrome = gated("browser");
+  // The account folders root lends to this agent's user for its turns and tasks (`AccountManager.lendTo`), and its
+  // own folder for an account root keeps, whose credential comes with each turn and task (`AccountManager.grant`).
+  // What the turns say about the plan's usage goes to root, which keeps the accounts.
+  const accounts = {
+    ...lentAccounts(),
+    agentHome: (kind: AccountKind, id: string) => agentAccountHome(home, kind, id),
+    noteRateLimit: (account: string, info: unknown) => link.usage("claude_code", account, info),
+  };
   const tasks = new TaskManager({
     mcp: mcpCommand,
     root: path.join(home, "tasks"),
@@ -366,6 +374,7 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     log,
     agentFolder: (agent) => agentWorkspace(workspaceReal, agent),
     secrets: (agent) => agentSecrets(secretsDir, agent),
+    accounts,
     ...(self.compiled ? { wrapperCommand: [...self.command, "task-wrapper"] } : {}),
     ...(cli ? { spawnCli: cli } : {}),
   });
@@ -374,14 +383,6 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     idleMs: state.limits.brainIdleMinutes * 60_000,
     maxProcesses: state.limits.brainMaxProcesses,
   });
-  // The account folders root lends to this agent's user for its turns (`AccountManager.lendTo`), and its own
-  // folder for an account root keeps, whose credential comes with each turn (`AccountManager.grant`). What the
-  // turns say about the plan's usage goes to root, which keeps the accounts.
-  const accounts = {
-    ...lentAccounts(),
-    agentHome: (kind: AccountKind, id: string) => agentAccountHome(home, kind, id),
-    noteRateLimit: (account: string, info: unknown) => link.usage("claude_code", account, info),
-  };
   const brains = new BrainManager({
     root: path.join(home, "brains"),
     mcp: mcpCommand,
@@ -434,6 +435,7 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     },
     onChange: () => queueMicrotask(lease),
     ...(chrome ? { startChrome: (exe, args, profile, env) => launchChrome(exe, args, profile, env, chrome) } : {}),
+    memoryEvents: path.join(agentCgroup(process.getuid?.() ?? 0), "memory.events"),
     ...o.browser,
   });
   const leases = setInterval(lease, BROWSER_LEASE_MS / 3);
@@ -531,7 +533,10 @@ export async function runWorker(o: WorkerOptions): Promise<number> {
     tasks.setLimits({ maxConcurrent: next.limits.maxConcurrentTasks, defaultMaxSeconds: next.limits.taskMaxSeconds });
     brains.setLimits(brainLimits());
     codexApp.setLimits(brainLimits());
-    if (next.account !== undefined) brains.keepAccount(next.account);
+    if (next.account !== undefined) {
+      brains.keepAccount(next.account);
+      tasks.keepAccount(next.account);
+    }
     // The browser switch went off: the agent's browser closes now, not at its next command.
     if (browserOff) void browser.closeAll();
   };

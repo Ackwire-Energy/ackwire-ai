@@ -1,12 +1,18 @@
 import { ACCOUNT_KINDS, BRAIN_EFFORTS } from "@agenteschat/adapters";
-import { ONBOARDING_STEPS, STANDING_STATES } from "@agenteschat/engine";
+import { AGENT_ACTION_KINDS, ONBOARDING_STEPS, STANDING_STATES } from "@agenteschat/engine";
 import { CONTEXT_LIMITS, MODEL_TIERS, PROVIDER_IDS } from "@agenteschat/providers";
 import { z } from "@hono/zod-openapi";
+
+/** A last message that was only a GIF or a sticker (ADR 0091): the apps say which, translated, in its preview. */
+export const MediaKind = z.enum(["gif", "sticker"]).nullable().openapi({
+  description:
+    "The message was only a GIF or a sticker (ADR 0091): show `GIF` or `Sticker` in the reader's language where its text would be. Null for a message with text.",
+});
 
 /** A last-message preview's `meta`: what the app needs to show a server-written body in the reader's language. */
 export const PreviewMeta = z.record(z.string(), z.unknown()).nullable().openapi({
   description:
-    "For a body the server wrote (`bodyCode` + `bodyParams`, a cut-off run's notes, memory lines): show it in the reader's language, like the message itself. Null for a plain message.",
+    "For a body the server wrote (`bodyCode` + `bodyParams`, a cut-off run's notes, memory lines): show it in the reader's language, like the message itself. `media`: the message's GIF or sticker (ADR 0091), as `meta.media`, for a preview with no text. Null for a plain message.",
 });
 
 export const Role = z.enum(["owner", "member"]).openapi("Role", {
@@ -201,6 +207,14 @@ export const Agent = z
     audienceMode: z.enum(["everyone", "people", "owner"]),
     canTalk: z.boolean().openapi({ description: "Whether the current person can talk to it (mentions, DMs)." }),
     appearance: AgentAppearance.nullable().openapi({ description: "Its look; null = the default." }),
+    mediaReplies: z.boolean().openapi({
+      description:
+        "It may send a sticker or a GIF (ADR 0091): when someone asks for one, and after a light reply as often as the workspace's `agentMedia` allows.",
+    }),
+    coordinator: z.boolean().openapi({
+      description:
+        "It coordinates the team (ADR 0093): a message that needs an agent and that no other agent took goes to it, in the channels where it answers on its own. One per workspace.",
+    }),
     brain: z
       .object({
         kind: z.enum(["model", "claude_code", "codex"]),
@@ -255,7 +269,7 @@ export const Channel = z
     position: z.number().int().optional().openapi({ description: "Order inside its category, from 0." }),
     unreadCount: z.number().int().optional().openapi({
       description:
-        "Channel list only: messages since you last read it (since you joined, if never), not yours; a thread reply counts only in a thread you follow. At most 100; 0 when you're not a member.",
+        "Channel list only: messages since you last read it (since you joined, if never), not yours; a thread reply counts only in a thread you follow; an agent's sticker or GIF after its own reply never (ADR 0091). At most 100; 0 when you're not a member.",
     }),
     lastMessage: z
       .object({
@@ -265,12 +279,14 @@ export const Channel = z
         authorName: z.string().nullable().openapi({ description: "Null when the author was deleted." }),
         preview: z.string().openapi({ description: "Plain text, at most 140 characters." }),
         meta: PreviewMeta,
+        mediaKind: MediaKind,
         createdAt: z.string(),
       })
       .nullable()
       .optional()
       .openapi({
-        description: "Channel list only: the latest top-level message; null when empty or you're not a member.",
+        description:
+          "Channel list only: the latest top-level message (an agent's sticker or GIF after its own reply is part of that reply, so the reply shows); null when empty or you're not a member.",
       }),
   })
   .openapi("Channel");
@@ -283,23 +299,7 @@ export const AgentAction = z
   .object({
     id: z.uuid(),
     kind: z
-      .enum([
-        "issue.created",
-        "issue.updated",
-        "issue.assigned",
-        "memory.saved",
-        "memory.updated",
-        "memory.forgotten",
-        "routine.created",
-        "routine.updated",
-        "routine.deleted",
-        "channel.agent_added",
-        "channel.created",
-        "wiki.page_created",
-        "wiki.page_edited",
-        "thread.renamed",
-        "thread.closed",
-      ])
+      .enum(AGENT_ACTION_KINDS)
       .openapi({ description: "What the agent did; the app says it with `agentActions.{kind}` and `params`." }),
     agentId: z.uuid(),
     messageId: z.uuid().nullable(),
@@ -384,12 +384,12 @@ const MessageBase = z.object({
           z.object({ step: z.literal("jev") }),
           z.object({ step: z.literal("model"), model: z.string(), provider: z.string() }),
           z.object({ step: z.literal("plan"), brand: z.enum(["claude", "chatgpt"]), ownerId: z.string() }),
-          z.object({ step: z.literal("rule"), rule: z.enum(["reply", "only_agent", "follow_up"]) }),
+          z.object({ step: z.literal("rule"), rule: z.enum(["reply", "only_agent", "follow_up", "coordinator"]) }),
         ])
         .optional()
         .openapi({
           description:
-            "Who picked the agents for a message nobody mentioned (ADR 0074): Jev, a small model, the author's own plan (`ownerId`), or a rule. Absent before the chain.",
+            "Who picked the agents for a message nobody mentioned (ADR 0074): Jev, a small model, the author's own plan (`ownerId`), or a rule (`coordinator`: nobody else took it, so the team's coordinator did, ADR 0093). Absent before the chain.",
         }),
       reason: z
         .literal("mention_needed")
@@ -398,9 +398,10 @@ const MessageBase = z.object({
     })
     .optional()
     .openapi({ description: "People's messages: agents that saw it, picked it up, and how their runs ended." }),
-  meta: z
-    .record(z.string(), z.unknown())
-    .openapi({ description: "Attachments, e.g. `{ approvalId }` on an approval card (see /approvals)." }),
+  meta: z.record(z.string(), z.unknown()).openapi({
+    description:
+      'Attachments, e.g. `{ approvalId }` on an approval card (see /approvals). `media` (ADR 0091): a GIF `{ kind: "gif", provider, id, title, width, height }` (load it with `GET …/gifs/{id}/media`) or a sticker `{ kind: "sticker", agentId, mood }`, and the body may be empty then. `mediaAfter`: on the sticker or GIF an agent added after its own reply, that reply\'s id.',
+  }),
   usage: MessageUsage.optional(),
   reactions: z
     .array(
@@ -537,6 +538,11 @@ export const ContextLimit = z
   .literal(CONTEXT_LIMITS)
   .openapi("ContextLimit", { description: "The most context an agent reads, in tokens: 200000, 400000 or 1000000." });
 
+export const CommandApproval = z.enum(["always", "low_risk_auto", "never"]).openapi({
+  description:
+    '"Pedir aprovação de comandos": always (every command off the allow list asks), low_risk_auto (the judge allows low-risk ones within what code allows) or never (everything but the deny list).',
+});
+
 export const AccountKind = z.enum(ACCOUNT_KINDS).openapi("AccountKind");
 
 export const MachineAccount = z
@@ -619,8 +625,106 @@ export const AgentBrain = z
     ownUsage: z
       .object({ claude_code: PlanUsage.optional(), codex: PlanUsage.optional() })
       .openapi({ description: "The computer's own sign-ins' usage limits, by brain (absent: not known)." }),
+    autonomy: CommandApproval.openapi({
+      description:
+        'Its Autonomia: the autonomy its new missions start with ("Usar como padrão"), copied with its setup.',
+    }),
   })
   .openapi("AgentBrain");
+
+/** ADR 0094: one agent's "Quem pensa" as a value, to use on other agents. */
+export const AgentSetup = z
+  .object({
+    brain: BrainKind,
+    model: z.string().max(80).nullable().openapi({
+      description:
+        "The API brain: the agent's model (`auto` or a catalog id). A computer brain: its model as `PUT …/brain` takes it; null = the brain's default.",
+    }),
+    key: z.uuid().nullable().optional().openapi({
+      description: "The API brain's key; null = the workspace's default; omitted = each agent keeps its own.",
+    }),
+    machineId: z.uuid().nullable().optional().openapi({ description: "A computer brain: the computer it thinks on." }),
+    account: z
+      .uuid()
+      .nullable()
+      .optional()
+      .openapi({ description: "A computer brain: the account there; null = that computer's own sign-in." }),
+    effort: BrainEffortSetting.nullable().optional(),
+    contextTokens: ContextLimit.nullable().optional(),
+    fallback: z.boolean().optional(),
+    onlyOwner: z.boolean().optional().openapi({
+      description:
+        '"Atende outras pessoas" off, for the agents that move onto the plan (only the plan\'s owner turns it on).',
+    }),
+    autonomy: CommandApproval.optional().openapi({
+      description:
+        "Its Autonomia, set wherever the caller may set it by hand (an admin or the agent's owner), whatever the AI takes; omitted = each agent keeps its own.",
+    }),
+  })
+  .openapi("AgentSetup");
+
+export const AgentSetupResult = z
+  .object({
+    agentId: z.uuid(),
+    status: z.enum(["applied", "same", "skipped"]).openapi({
+      description:
+        "Its AI: `applied` (in a preview: would be); `same`: it already thinks this way; `skipped`: it takes none of the AI (`reason`), and may still take the Autonomia (`autonomy`).",
+    }),
+    autonomy: z.object({ from: CommandApproval, to: CommandApproval }).optional().openapi({
+      description:
+        "Its Autonomia changes (in a preview: would), whatever its AI does: wherever the caller may set it by hand, `skipped` agents too.",
+    }),
+    keeps: z.object({ account: z.string().nullable() }).optional().openapi({
+      description: "It keeps the account it has (another person's plan): its name; null = its computer's own.",
+    }),
+    reason: z
+      .enum([
+        "not_allowed",
+        "admins_only",
+        "account_owner",
+        "account_single",
+        "other_computer",
+        "model_missing",
+        "failed",
+      ])
+      .optional(),
+    params: z.record(z.string(), z.string()).optional(),
+  })
+  .openapi("AgentSetupResult");
+
+export const NewAgentSetup = z
+  .object({
+    brain: BrainKind,
+    model: z.string().nullable(),
+    key: z.uuid().nullable(),
+    contextTokens: ContextLimit.nullable(),
+    computer: z.object({ machineId: z.uuid(), name: z.string() }).optional(),
+    account: z
+      .object({
+        id: z.uuid(),
+        label: z.string(),
+        provider: z.string().nullable(),
+        mine: z.boolean(),
+        free: z.boolean().openapi({
+          description: "It can think for one more agent (made for all its owner's agents, or used by none).",
+        }),
+      })
+      .nullable()
+      .optional(),
+    ownSignIn: z
+      .boolean()
+      .optional()
+      .openapi({ description: "The computer's own sign-in thinks for the caller's agents (they connected it)." }),
+    effort: BrainEffortSetting.nullable().optional(),
+    fallback: z.boolean().optional(),
+    autonomy: CommandApproval.nullable().openapi({
+      description:
+        "Its Autonomia; null = the default. `POST …/agents` takes it only from an admin or the new agent's owner.",
+    }),
+  })
+  .openapi("NewAgentSetup", {
+    description: "What a new agent starts thinking with (ADR 0094): the last setup saved or used on other agents.",
+  });
 
 export const MissionBrain = z
   .object({

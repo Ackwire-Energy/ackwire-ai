@@ -11,7 +11,7 @@ afterEach(() => cleanup());
 
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const type = (el: Element, value: string) => act(async () => fireEvent.change(el, { target: { value } }));
-// The workspace and account cards open a full-screen menu (MenuOverlay): a dialog with our menu items.
+// The workspace card opens a full-screen menu (MenuOverlay): a dialog with our menu items.
 const openMenu = async (trigger: HTMLElement) => {
   await act(async () => fireEvent.click(trigger));
   await act(() => new Promise((r) => setTimeout(r, 0)));
@@ -88,7 +88,7 @@ describe("finding the settings", () => {
     ]);
   });
 
-  test("the account card is one button, no gear beside it (settings live in the workspace menu)", async () => {
+  test("the account card is one button, no gear beside it (settings open from its menu and the workspace's)", async () => {
     await go("issues");
     const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
     expect(within(nav).queryByRole("link", { name: "Configurações" })).toBeNull();
@@ -96,8 +96,9 @@ describe("finding the settings", () => {
 
   test("every section has its own URL, with the sub-nav marking it", async () => {
     const sections: [string, string][] = [
+      ["account", "Sua conta"],
       ["general", "Geral"],
-      ["members", "Membros"],
+      ["members", "Membros e convites"],
       ["access", "Agentes e acesso"],
       ["connectors", "Conectores"],
       ["skills", "Skills"],
@@ -124,10 +125,14 @@ describe("finding the settings", () => {
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings`);
   });
 
-  test("Perfil and Fuso in the account menu edit my handle and time zone", async () => {
-    const { state } = await go("issues");
-    const menu = await openMenu(screen().getByRole("button", { name: /^Conta: / }));
-    await click(within(menu).getByRole("menuitem", { name: /^Perfil/ }));
+  test("Sua conta: Perfil and Fuso horário edit my handle and time zone", async () => {
+    const { state } = await go("settings/account");
+    const nav = screen().getByRole("navigation", { name: "Seções das configurações" });
+    // Mine, in the "Você" group: my own face, not an icon.
+    const link = within(nav).getByRole("link", { name: "Sua conta" });
+    expect(link.querySelector(".ac-avatar")?.textContent).toBe("W");
+    expect(link.querySelector(".ac-icon")).toBeNull();
+    await click(screen().getByRole("button", { name: /^Perfil/ }));
     await settle(2);
     const dialog = screen().getByRole("dialog", { name: "Seu perfil neste workspace" });
     await type(within(dialog).getByLabelText("Seu @"), "walt");
@@ -150,7 +155,7 @@ describe("finding the settings", () => {
     expect(screen().getByText("Perfil salvo.")).toBeTruthy();
   });
 
-  test("Fuso in the account menu says my zone in words under its name, as the selector does, never its id", async () => {
+  test("Fuso horário in Sua conta says my zone in words under its name, as the selector does, never its id", async () => {
     for (const [zone, words] of [
       ["Europe/Lisbon", "Lisboa"],
       ["Asia/Kathmandu", "Horário do Nepal"],
@@ -158,11 +163,10 @@ describe("finding the settings", () => {
       const state = seedState();
       const me = state.members.find((m) => m.userId === state.me?.user.id);
       if (me) me.timezone = zone;
-      await go("issues", state);
-      const menu = await openMenu(screen().getByRole("button", { name: /^Conta: / }));
-      const item = within(menu).getByRole("menuitem", { name: /^Fuso horário/ });
+      await go("settings/account", state);
+      const item = screen().getByRole("button", { name: /^Fuso horário/ });
       // On a line of its own, as Perfil's: a long name ("Los Angeles (Pacífico dos EUA)") has the row's width.
-      const line = item.querySelector(".ac-menu__desc")?.textContent;
+      const line = item.querySelector(".settings-row__help")?.textContent;
       expect({ zone, line }).toEqual({ zone, line: words });
       cleanup();
     }

@@ -1,4 +1,5 @@
-/* Settings › General's last card: deleting the workspace, its icon in the danger tone. */
+/* The last card of Settings › General and of Sua conta: deleting the workspace or the account, its icon in the danger
+   tone. */
 .settings-danger .ac-card__key {
   color: var(--danger);
 }

@@ -81,8 +81,9 @@ export async function deliverRoutineReport(
     agentId: run.agentId,
     channelId: brief.deliverTo.channelId,
     threadId: brief.deliverTo.threadId,
-    // Nobody is behind it (authority.ts): the run it wakes answers at hop 1.
+    // Nobody is behind it (authority.ts): the run it wakes answers at hop 1, in a stretch of its own.
     hop: 0,
+    stretchId: null,
     notice: {
       kind: "routine_handoff",
       text,

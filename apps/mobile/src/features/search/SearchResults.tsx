@@ -113,7 +113,14 @@ export function SearchResults({ q }: { q: string }) {
                   leading: <Face who={{ type: d.with.type, id: d.with.id }} size={38} live={false} />,
                   label: d.with.name,
                   ...(d.lastMessage
-                    ? { hint: previewBody(t, previewOf(d.lastMessage.body), d.lastMessage.meta ?? null) }
+                    ? {
+                        hint: previewBody(
+                          t,
+                          previewOf(d.lastMessage.body),
+                          d.lastMessage.meta ?? null,
+                          d.lastMessage.mediaKind,
+                        ),
+                      }
                     : {}),
                   onPress: () => router.push(chatHref(d.channelId)),
                 })),

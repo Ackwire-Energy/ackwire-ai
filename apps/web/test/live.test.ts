@@ -6,6 +6,7 @@ import {
   applyTyping,
   emptyStreams,
   expectReply,
+  expireTyping,
   receiptView,
   runsInChannel,
   seedReceipt,
@@ -61,6 +62,27 @@ describe("typing", () => {
     expect(typingIn(s, "c1", 1000)).toEqual([]);
   });
 
+  test("typing in a thread shows in that thread only; the latest frame says where", () => {
+    let s = applyTyping({}, "c1", "marina", 1000, TYPING_TTL_MS, "t1");
+    s = applyTyping(s, "c1", "joao", 1000);
+    expect(typingIn(s, "c1", 1000)).toEqual(["joao"]);
+    expect(typingIn(s, "c1", 1000, undefined, "t1")).toEqual(["marina"]);
+    expect(typingIn(s, "c1", 1000, undefined, "t2")).toEqual([]);
+    // She moved to the conversation itself.
+    s = applyTyping(s, "c1", "marina", 2000);
+    expect(typingIn(s, "c1", 2000)).toEqual(["marina", "joao"]);
+    expect(typingIn(s, "c1", 2000, undefined, "t1")).toEqual([]);
+  });
+
+  test("what ran out is dropped on time (a store sweeping it re-renders); nothing ran out, the same state", () => {
+    let s = applyTyping({}, "c1", "marina", 1000, 5000);
+    s = applyTyping(s, "c1", "joao", 3000, 5000);
+    expect(expireTyping(s, 5999)).toBe(s);
+    const swept = expireTyping(s, 6000);
+    expect(Object.keys(swept.c1 ?? {})).toEqual(["joao"]);
+    expect(Object.keys(expireTyping(swept, 8000).c1 ?? {})).toEqual([]);
+  });
+
   test("our own typing frames are throttled to one every 3 s", () => {
     const shouldSend = typingThrottle(3000);
     expect([0, 500, 2999, 3000, 3100, 6000].map(shouldSend)).toEqual([true, false, false, true, false, true]);
@@ -87,6 +109,37 @@ describe("receipts", () => {
     // A late "routed" doesn't move it back.
     s = step(s, { type: "message.routed", messageId: "m1", seenBy: ["ada"], pickedBy: ["ada"] });
     expect(receiptView(s.m1).status?.kind).toBe("handled");
+  });
+
+  test("an agent's message that mentions agents: whom it handed off to, the one only mentioned, never 'nobody'", () => {
+    const byTheo = {
+      id: "m1",
+      author: { type: "agent", id: "theo" },
+      mentionedAgentIds: ["ada"],
+    } as unknown as Message;
+    let s = seedReceipt({}, byTheo);
+    // No guess: the judge decides whom it hands off to (ADR 0089).
+    expect(receiptView(s.m1)).toMatchObject({ seen: ["ada"], status: null });
+    s = step(s, {
+      type: "message.routed",
+      messageId: "m1",
+      seenBy: ["ada"],
+      pickedBy: [],
+      referenced: ["ada"],
+      strategy: "mention",
+    });
+    expect(receiptView(s.m1)).toMatchObject({ seen: ["ada"], status: null, referenced: ["ada"] });
+    // From the list after a reload, the same.
+    const listed = seedReceipt({}, {
+      ...byTheo,
+      receipts: { seenBy: ["ada"], pickedBy: [], handled: [], blocked: [], referenced: ["ada"] },
+    } as unknown as Message);
+    expect(receiptView(listed.m1)).toMatchObject({ status: null, referenced: ["ada"] });
+    // Handed off: who answers, as under a person's message.
+    s = step(seedReceipt({}, byTheo), { type: "message.routed", messageId: "m1", seenBy: ["ada"], pickedBy: ["ada"] });
+    expect(receiptView(s.m1).status).toEqual({ kind: "picked", agents: ["ada"] });
+    // An agent's message that mentions nobody has no receipt.
+    expect(seedReceipt({}, { ...byTheo, mentionedAgentIds: [] } as unknown as Message)).toEqual({});
   });
 
   test("seen by two, picked by nobody: 'Nenhum agente vai responder'", () => {

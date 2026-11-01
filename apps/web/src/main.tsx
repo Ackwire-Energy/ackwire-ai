@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import "./styles.css";
 import { createApiClient, createSnapshot, meQuery, outbox } from "@agenteschat/client";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
+import { trackInput } from "@agenteschat/ui";
 import { AppProviders, type AppServices } from "./app/providers";
 import { createQueryClient } from "./app/query-client";
 import { createBetterAuthClient } from "./auth/better-auth";
@@ -35,8 +36,10 @@ if (platform) {
   applyDesktopDevice(i18n, platform);
   if (asksForPhone(window.location.search)) askForPhone();
 }
+// Focus rings only while the keys move the focus (`data-pointer` on <html>, read by the stylesheet).
+trackInput();
 const toasts = createToastStore();
-// The app's sounds (ADR 0070): a click or a key switches audio on; the person's choice is in the account menu.
+// The app's sounds (ADR 0070): a click or a key switches audio on; the person's choice is in Sua conta.
 installSounds();
 const api = createApiClient();
 

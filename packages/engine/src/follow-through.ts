@@ -2,29 +2,33 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, gt, gte, isNotNull, isNull, schema, sql } from "@agenteschat/db";
 import { runAuthority } from "./authority";
 import { requireChannelAccess } from "./channels";
+import { handOffsFrom, sentOpen } from "./consultations";
 import { getChannelCached } from "./context";
 import { publishDelivery } from "./delivery";
 import { eligibleChannelAgents } from "./dispatch";
 import { isAgentOnlyDm } from "./dms";
 import { ConflictError, NotFoundError } from "./errors";
 import { publishMessageCreated } from "./events";
+import { cutText, cutTextEnd } from "./format";
 import type { Judge } from "./judge";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import { enqueue } from "./outbox";
 import { personCanPost } from "./routine-state";
-import { deliverNoticeToRun, lateNoticeSent, NOTICE_WAKE_MAX_HOP } from "./run-resume";
+import { deliverNoticeToRun, lateNoticeSent } from "./run-resume";
 import { type AgentRun, replyThreadOf } from "./runs";
+import { refusedAtLimit, runStretchOf } from "./stretch";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
 /**
  * Agents follow through (ADR 0037, round 3): a run that ends right after a decision without a word gets
- * one more turn with the result (`decisionNudge`); a run whose last message promises more that nothing
- * keeps is caught by one judge call (`promiseIn`, `followThroughVerdict`) and told once to keep it
- * (`followThroughNudge`); and an agent comes back to a conversation by itself (`follow_up`): a notice
- * line there now, and at its time a notice that wakes the agent in that conversation (`wakeFollowUp`).
+ * one more turn with the result (`decisionNudge`); a conversation run that ends with work it said it would do
+ * still undone and nothing set to bring it back is caught by one judge call, in any language
+ * (`followThroughVerdict`, ADR 0089), and told once to do it (`FOLLOW_THROUGH_NUDGE`); and an agent comes back to a
+ * conversation by itself (`follow_up`): a notice line there now, and at its time a notice that wakes the agent in
+ * that conversation (`wakeFollowUp`).
  */
 
-const { agentConsultations, agentRuns, messages, routines } = schema;
+const { agentRuns, messages, routines } = schema;
 
 export const FOLLOW_UP_TOOL = "follow_up";
 export const CANCEL_FOLLOW_UP_TOOL = "cancel_follow_up";
@@ -54,45 +58,6 @@ export const decisionNudge = (decided: string) =>
 
 // ── Promises at the end of a run ─────────────────────────────────────────────
 
-/** Verbs of later work after "I'll", "vou", "voy a" (and up to two words between): "I'll check", "vou te passar". */
-const LATER = {
-  en: "check|recheck|look|see|verify|confirm|run|rerun|re-run|retry|try|test|send|share|post|report|update|tell|give|let you know|get back|come back|be back|circle back|follow up|keep (?:an eye|you posted|you updated|watching|monitoring|track)|monitor|watch|ping|notify|dig|investigate|review|fix|open|create|write|draft|prepare|grab|pull|fetch|ask|wait|continue|finish|go on|handle|take care|work on|start|deploy|merge|push|do (?:it|that|this|so)",
-  pt: "checar|verificar|ver|olhar|conferir|rodar|testar|mandar|enviar|passar|avisar|acompanhar|investigar|revisar|corrigir|consertar|abrir|criar|tentar|esperar|continuar|seguir|terminar|voltar|retornar|monitorar|buscar|pegar|puxar|configurar|fazer|analisar|perguntar|dar uma olhada|ficar de olho",
-  es: "revisar|verificar|ver|mirar|comprobar|chequear|correr|probar|enviar|mandar|pasar|avisar|investigar|corregir|abrir|crear|intentar|esperar|seguir|continuar|volver|configurar|hacer|preguntar|contar",
-};
-
-/**
- * Words that promise more work by the agent itself (English, Portuguese, Spanish), looked for at the end of
- * its last message: only then is the judge asked. A future counts only with a verb of later work ("I'll
- * check", never "I'll be honest" or "vou ser direto"). A miss costs a nudge, a false hit one cheap judge call.
- */
-const PROMISE = new RegExp(
-  [
-    String.raw`\b(?:i['’]ll|i will|i['’]m going to|i am going to|i['’]m gonna)\s+(?:\w+\s+){0,2}?(?:${LATER.en})\b`,
-    String.raw`\blet me\s+(?:\w+\s+)?(?:check|look|see|verify|confirm|dig|find|grab|pull|fetch|run|try|test|investigate|review|take a look|think)\b`,
-    String.raw`\b(?:get back to you|keep you posted|report back|will (?:update you|let you know)|one (?:moment|sec(?:ond)?)|just a (?:moment|sec(?:ond)?|minute)|give me a (?:moment|minute|sec(?:ond)?)|hang on|bear with me|checking now|looking into it)\b`,
-    String.raw`\bvou\s+(?:\p{L}+\s+){0,2}?(?:${LATER.pt})(?!\p{L})`,
-    String.raw`\b(?:volto|te (?:aviso|falo|conto|mando|passo|retorno)|(?:eu )?aviso (?:quando|assim)|assim que (?:terminar|acabar|sair|ficar)|quando (?:terminar|acabar|ficar pronto|sair o)|fico de olho|deix[ae](?:-me| eu)|já (?:vejo|olho|checo|confiro|verifico|te falo|te digo|te passo)|só um (?:momento|minuto|segundo|instante)|um (?:momento|instante))(?!\p{L})`,
-    String.raw`\bvoy a\s+(?:\p{L}+\s+){0,2}?(?:${LATER.es})(?!\p{L})`,
-    String.raw`\b(?:d[ée]j[ae]me|te (?:cuento|paso|aviso|escribo)|cuando termine|vuelvo|un momento)(?!\p{L})`,
-  ].join("|"),
-  "iu",
-);
-
-/** How much of the end of the message is read for a promise (the start is the answer itself). */
-const PROMISE_TAIL = 600;
-
-/** The sentence of the reply's end that promises more ("When you approve, I'll give you the numbers"), or null. */
-export function promiseIn(reply: string): string | null {
-  const tail = reply.trim().slice(-PROMISE_TAIL);
-  const m = PROMISE.exec(tail);
-  if (!m) return null;
-  const start = Math.max(...[".", "!", "?", "\n"].map((c) => tail.lastIndexOf(c, m.index))) + 1;
-  const rest = tail.slice(m.index).search(/[.!?\n]/);
-  const end = rest < 0 ? tail.length : m.index + rest + 1;
-  return tail.slice(start, end).trim().slice(0, 300) || null;
-}
-
 export type FollowThroughVerdict = "done" | "waiting" | "unkept";
 
 /**
@@ -108,7 +73,7 @@ export async function followThroughVerdict(
     agentId: input.agentId,
     runId: input.runId,
     kind: "follow_through",
-    state: { request: input.request.slice(0, 2000), reply: input.reply.slice(-3000) },
+    state: { request: cutText(input.request, 2000), reply: cutTextEnd(input.reply, 3000) },
     questions: {
       verdict: {
         type: "choice",
@@ -130,9 +95,23 @@ export async function followThroughVerdict(
   return a?.choice === "waiting" ? "waiting" : "done";
 }
 
-/** What a run reads, once, when its last message promised more and nothing keeps that promise. */
-export const followThroughNudge = (promise: string) =>
-  `You ended with a promise nothing keeps: "${promise}". Do it now with your tools and tell them what came of it. If it has to wait (a build, a deploy, a job still running), set a follow_up to come back to it and say when, in one line.`;
+/** What a run reads, once, when it ended with work it said it would do still undone and nothing keeps it. */
+export const FOLLOW_THROUGH_NUDGE =
+  "You ended saying you would do more, and nothing you set up brings you back to it. Do it now with your tools and tell them what came of it. If it has to wait (a build, a deploy, a job still running), set a follow_up to come back to it and say when, in one line.";
+
+/**
+ * The same, for a run in an agents' DM answering another agent (ADR 0095): its last message goes back as the
+ * answer, and nothing wakes it there again.
+ */
+export const FOLLOW_THROUGH_NUDGE_DM =
+  "You ended saying you would do more, and nothing brings you back here: your answer goes back as it is. Do it now with your tools, then answer with what came of it. If a part needs another agent, hand it on with tell_agent: what comes of it goes back with your answer.";
+
+/**
+ * What a mission's run reads, once, when it ended waiting on a person without a card: asked in a card, the thread
+ * shows the mission waits on them, the answer resumes the session, and the mission doesn't go on by itself meanwhile.
+ */
+export const MISSION_ASK_NUDGE =
+  "You ended waiting on a person, but you didn't ask them in a card. Ask now, directly: ask_user with one clear question (request_secret for a credential or a key, a blocking ask_decision for a choice between options), mark the plan item waiting_you with update_plan, then end your turn. Don't repeat the question in your text.";
 
 // ── Coming back by itself (`follow_up`) ──────────────────────────────────────
 
@@ -177,16 +156,19 @@ async function pendingFollowUps(
 }
 
 /**
- * Whether something this run set up brings the agent back here by itself, keeping its promise: a follow-up still
- * to come, an agent it asked that hasn't answered (`ask_agent`), a wait it stopped waiting on whose result hasn't
- * come, or a reminder it set to do the work then (`schedule_reminder` with `ask_agent`).
+ * Whether something brings the agent back here by itself, keeping its promise: a follow-up this run set still to
+ * come, a question or work it or an earlier run of it asked or handed off from this conversation that is still out
+ * (`ask_agent`, `tell_agent`, the last day: what comes of it wakes the agent here), a wait it stopped waiting on
+ * whose result hasn't come, or a reminder it set to do the work then (`schedule_reminder` with `ask_agent`). In an
+ * agents' DM only what this run handed on counts: what another run there handed on goes back with that run's answer.
  */
 export async function wakesLater(
   db: Executor,
-  run: Pick<AgentRun, "id" | "orgId" | "agentId" | "channelId" | "createdAt">,
+  run: Pick<AgentRun, "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId" | "createdAt">,
   detachedWaits: { waitId: string }[] = [],
 ) {
-  const [followUp, consultation, reminder] = await Promise.all([
+  const channel = await getChannelCached(db, run.orgId, run.channelId);
+  const [followUp, handedOff, reminder] = await Promise.all([
     db
       .select({ id: messages.id })
       .from(messages)
@@ -203,17 +185,9 @@ export async function wakesLater(
         ),
       )
       .limit(1),
-    db
-      .select({ id: agentConsultations.id })
-      .from(agentConsultations)
-      .where(
-        and(
-          eq(agentConsultations.orgId, run.orgId),
-          eq(agentConsultations.askerRunId, run.id),
-          eq(agentConsultations.status, "open"),
-        ),
-      )
-      .limit(1),
+    channel && isAgentOnlyDm(channel)
+      ? sentOpen(db, run)
+      : handOffsFrom(db, run, { openOnly: true }).then((rows) => rows.length > 0),
     db
       .select({ id: routines.id })
       .from(routines)
@@ -232,7 +206,7 @@ export async function wakesLater(
       )
       .limit(1),
   ]);
-  if (followUp.length > 0 || consultation.length > 0 || reminder.length > 0) return true;
+  if (followUp.length > 0 || handedOff || reminder.length > 0) return true;
   for (const d of detachedWaits) if (!(await lateNoticeSent(db, run, d.waitId))) return true;
   return false;
 }
@@ -304,11 +278,9 @@ export function createFollowUpToolSource(deps: { pubsub?: PubSub }): ToolSource 
         const channel = await getChannelCached(ctx.db, run.orgId, run.channelId);
         if (channel && isAgentOnlyDm(channel))
           return refused("Answer the agent that asked now: no person reads this conversation to come back to.");
-        // Each follow-up wakes a run one hop further (`deliverNoticeToRun`): past the cap it would wake nobody.
-        if (run.hop >= NOTICE_WAKE_MAX_HOP)
-          return refused(
-            "No more follow-ups from here: you already came back several times in a row. Tell the people what is left and stop.",
-          );
+        // Its wake is one more run this agent starts on its own (ADR 0089): past the stretch's limits it would be held.
+        const atLimit = await refusedAtLimit(ctx.db, run, run.agentId);
+        if (atLimit) return atLimit;
         const now = Date.now();
         const given = str(input.at).trim();
         // A time without its offset would be read in the server's zone, not the person's.
@@ -334,7 +306,7 @@ export function createFollowUpToolSource(deps: { pubsub?: PubSub }): ToolSource 
             orgId: run.orgId,
             channelId: run.channelId,
             threadId: replyThreadOf(run),
-            author: { type: "agent", agentId: run.agentId, runId: null, hop: run.hop },
+            author: { type: "agent", agentId: run.agentId, runId: null, hop: run.hop, stretchId: runStretchOf(run) },
             body: note,
             meta: {
               notice: {

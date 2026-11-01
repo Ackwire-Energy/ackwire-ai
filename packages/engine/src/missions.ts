@@ -27,6 +27,7 @@ import { requireChannelAccess } from "./channels";
 import { eligibleChannelAgents } from "./dispatch";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
+import { cutText } from "./format";
 import type { Judge } from "./judge";
 import { type MachineCaller, MachineRequestError } from "./machine-hub";
 import {
@@ -310,10 +311,8 @@ const visible = (text: string) =>
     return (c < 32 && ch !== "\n" && ch !== "\t") || c === 127 ? " " : ch;
   }).join("");
 const clean = (text: unknown, max: number) =>
-  visible(typeof text === "string" ? text.slice(0, max * 2) : "")
-    .trim()
-    .slice(0, max);
-const oneLine = (text: string, max: number) => text.replace(/\s+/g, " ").trim().slice(0, max);
+  cutText(visible(typeof text === "string" ? cutText(text, max * 2) : "").trim(), max);
+const oneLine = (text: string, max: number) => cutText(text.replace(/\s+/g, " ").trim(), max);
 
 async function namesOf(db: Executor, ids: (string | null | undefined)[]) {
   const wanted = [...new Set(ids.filter((x): x is string => Boolean(x)))];
@@ -518,7 +517,7 @@ export async function postMissionMessage(
     orgId: mission.orgId,
     channelId: mission.channelId,
     threadId: mission.threadRootId,
-    author: { type: "agent", agentId: mission.agentId, runId: null, hop: 0 },
+    author: { type: "agent", agentId: mission.agentId, runId: null, hop: 0, stretchId: null },
     body: noMentions(body).slice(0, 39_000) || "…",
     meta,
   });
@@ -659,6 +658,7 @@ export async function missionViews(
             name: machines.name,
             online: machines.online,
             lastSeenAt: machines.lastSeenAt,
+            kind: machines.kind,
             pairedBy: machines.pairedByUserId,
             deletedAt: machines.deletedAt,
             protocol: machines.protocol,
@@ -714,7 +714,9 @@ export async function missionViews(
   return rows.map((r) => {
     const role: MissionRole = r.ownerId === userId ? "owner" : ((roleOf.get(r.id) as MissionRole) ?? "none");
     const m = r.machineId ? machineOf.get(r.machineId) : undefined;
-    const needsComputer = !m || Boolean(m.deletedAt) || (m.pairedBy !== r.ownerId && !r.machineLentBy);
+    // The workspace's own computer (`managed` on the Cloud, `host` on a self-hosted server) is nobody's to lend.
+    const needsComputer =
+      !m || Boolean(m.deletedAt) || (m.kind === "connected" && m.pairedBy !== r.ownerId && !r.machineLentBy);
     const items = planOf.get(r.id) ?? [];
     const join = joinOf.get(r.id);
     return {
@@ -1375,7 +1377,7 @@ export async function tellSession(
   const entry = {
     sessionId: target.sessionId,
     cwd: cwd ?? "",
-    text: text.slice(0, MISSION_LIMITS.sendText),
+    text: cutText(text, MISSION_LIMITS.sendText),
     at: new Date().toISOString(),
   };
   // Item sessions talk only while the mission is active.
@@ -2205,11 +2207,12 @@ export async function transferMission(
   }
   const [machine] = mission.machineId
     ? await deps.db
-        .select({ pairedBy: machines.pairedByUserId })
+        .select({ kind: machines.kind, pairedBy: machines.pairedByUserId })
         .from(machines)
         .where(eq(machines.id, mission.machineId))
     : [];
-  const theirs = machine?.pairedBy === input.userId;
+  // The workspace's own computer goes with the mission to whoever owns it.
+  const theirs = (!!machine && machine.kind !== "connected") || machine?.pairedBy === input.userId;
   // Only the computer's own person (who paired it, or who lends it now) can keep lending it.
   if (!theirs && input.lendMachine) {
     const lenderNow = mission.machineLentBy ?? machine?.pairedBy ?? null;
@@ -2292,7 +2295,7 @@ export async function setMissionMachine(
     .from(machines)
     .where(and(eq(machines.id, input.machineId), eq(machines.orgId, orgId), isNull(machines.deletedAt)));
   if (!machine) throw new NotFoundError("Computer not found");
-  if (machine.pairedByUserId !== actorId) {
+  if (machine.kind === "connected" && machine.pairedByUserId !== actorId) {
     throw new ForbiddenError("Choose a computer you paired", "mission.not_your_computer");
   }
   if (

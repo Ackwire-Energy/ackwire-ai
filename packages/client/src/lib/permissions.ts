@@ -35,3 +35,23 @@ export type Permission = RolePermission | "read" | "manage_owners";
 /** Whether this membership (an `OrgSummary`) may `permission`. */
 export const can = (org: { permissions?: readonly string[] } | null | undefined, permission: Permission) =>
   org?.permissions?.includes(permission) === true;
+
+type Membership = Parameters<typeof can>[0];
+
+/** Who manages a channel (its name, members and category): its creator, or who may manage every channel. */
+export const managesChannel = (
+  channel: { createdByUserId?: string | null } | null | undefined,
+  meId: string | null | undefined,
+  org: Membership,
+) => can(org, "manage_channels") || (!!meId && channel?.createdByUserId === meId);
+
+/**
+ * Who picks how an agent replies in a channel: who manages the channel, or the agent's owner. Mirrors the server's
+ * `setChannelAgentAutoReply` (packages/engine/src/channels.ts).
+ */
+export const setsAutoReply = (
+  channel: { createdByUserId?: string | null } | null | undefined,
+  agent: { ownerUserId?: string | null } | null | undefined,
+  meId: string | null | undefined,
+  org: Membership,
+) => managesChannel(channel, meId, org) || (!!meId && agent?.ownerUserId === meId);

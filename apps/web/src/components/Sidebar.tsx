@@ -1,10 +1,10 @@
-import type { Agent, AgentGroup, Channel, ChannelCategory, Member } from "@agenteschat/client";
+import type { Agent, AgentGroup, Availability, Channel, ChannelCategory, Member } from "@agenteschat/client";
 import {
   agentStateIn,
-  keys,
   runningAgents,
   useAgentGroups,
   useAgentStatuses,
+  useAiAccounts,
   useChannelCategories,
   useChannels,
   useConnections,
@@ -23,26 +23,18 @@ import {
 } from "@agenteschat/client";
 import { agentSections } from "@agenteschat/client/lib/agent-groups";
 import { audienceChip, audienceNotice, listsAgent } from "@agenteschat/client/lib/audience";
-import { formatPercent } from "@agenteschat/client/lib/format";
+import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { waitingAgents } from "@agenteschat/client/lib/outages";
-import { can } from "@agenteschat/client/lib/permissions";
-import { clearsText, presenceOfAvailability } from "@agenteschat/client/lib/presence";
-import { browserTimezone, timezoneName, zoneDisplayName } from "@agenteschat/client/lib/routines";
+import { can, managesChannel } from "@agenteschat/client/lib/permissions";
+import { AVAILABILITIES, clearsText, presenceOfAvailability } from "@agenteschat/client/lib/presence";
 import {
-  AffixInput,
   type AgentColor,
-  Alert,
   Avatar,
   Button,
-  Checkbox,
   CountBadge,
   CountChip,
   cx,
-  Dialog,
-  DialogBody,
-  DialogFooter,
-  Field,
   Icon,
   type IconName,
   Kbd,
@@ -51,17 +43,19 @@ import {
   MenuOverlay,
   MenuOverlayGroup,
   MenuOverlayItem,
-  MenuOverlayRow,
   MenuOverlaySeparator,
+  MenuRadioGroup,
   MenuSeparator,
+  MenuSub,
   modKey,
   Popover,
-  Segmented,
+  PresenceBadge,
+  ProviderLogo,
   Skeleton,
   SkeletonGroup,
   selectionSkyUrl,
 } from "@agenteschat/ui";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   type CSSProperties,
@@ -79,29 +73,19 @@ import {
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useAuth } from "@/auth/context";
-import { ZoneSelect } from "@/components/ZoneSelect";
 import { useDirectory } from "@/hooks/useDirectory";
-import { agentLine, personLine, useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
-import { type LocaleCode, locales, setLocale } from "@/i18n";
+import { agentLine, availabilityOf, personLine, useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
 import { requestChannelDetails } from "@/lib/channel-details";
-import {
-  contextMenuHandler,
-  copyText,
-  type MenuEntry,
-  type MenuLook,
-  menuLook,
-  onMenuLookChange,
-  setMenuLook,
-} from "@/lib/context-menu";
-import { inDesktopApp, onPhoneAsk, takePhoneAsk } from "@/lib/desktop";
+import { contextMenuHandler, copyText, type MenuEntry } from "@/lib/context-menu";
+import { onPhoneAsk, takePhoneAsk } from "@/lib/desktop";
 import { useOpenParam } from "@/lib/open-param";
 import { markOpen } from "@/lib/perf";
-import { onSoundChoiceChange, type SoundChoice, setSoundChoice, soundChoice } from "@/lib/sounds";
-import { STORAGE_KEYS, storage } from "@/lib/storage";
-import { type ThemePreference, useTheme } from "@/lib/theme";
+import { ownPlanLines, planNearLimit, planWord } from "@/lib/plan-usage";
+import { STORAGE_KEYS, storage, storedStrings } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/settings-sections";
 import { useLiveStore, useStreams } from "@/realtime/context";
+import { ProfileDialog } from "./AccountSettings";
 import { AddPasswordDialog } from "./AddPassword";
 import { AgentAvatar } from "./AgentAvatar";
 import {
@@ -115,16 +99,16 @@ import {
 import { MoveChannelDialog, NewCategoryDialog, RenameCategoryDialog } from "./ChannelCategoryDialogs";
 import { openPalette } from "./CommandMenu";
 import { DeleteAccountDialog } from "./DeleteAccount";
+import { useInviteDialog } from "./invite/InviteDialog";
 import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
 import { NewChannelDialog } from "./NewChannelDialog";
 import { OpenOnPhoneDialog } from "./OpenOnPhone";
 import { useOrg } from "./org-context";
 import { StatusLine } from "./Presence";
-import { OrgMark, ProfilePhotoDialog } from "./ProfilePhoto";
+import { MyFace, OrgMark } from "./ProfilePhoto";
 import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon, WorkspaceSky } from "./Sky";
-import { SetStatusDialog } from "./StatusDialog";
+import { SetStatusDialog, useSaveStatus } from "./StatusDialog";
 import { isStoppable, useStopRun } from "./StopRun";
-import { BrowserNoticesRow } from "./WebPush";
 
 /** The chosen item's sky: both themes, the CSS picks one. */
 const selectionSky = (color: AgentColor = "sky") =>
@@ -144,6 +128,18 @@ function SidebarSkeleton({ count, avatar, label }: { count: number; avatar?: boo
     </SkeletonGroup>
   );
 }
+
+/** In place of an agent's or a person's row that failed to draw (`ErrorBoundary`): the rest of the sidebar works. */
+function UnshownRow() {
+  const { t } = useTranslation();
+  return (
+    <span className="sidebar__item sidebar__item--unshown" title={t("shell.unshown")}>
+      <Icon name="alert" />
+      <span className="sidebar__item-label">{t("shell.unshown")}</span>
+    </span>
+  );
+}
+const unshownRow = () => <UnshownRow />;
 
 /** Tablet widths: the sidebar is always an icon rail (NavDrawer.tsx has the other breakpoints). */
 export const TABLET_QUERY = "(min-width: 761px) and (max-width: 1199px)";
@@ -220,7 +216,6 @@ export function Sidebar() {
   // Agents waiting for an offline computer: "esperando" instead of anything "working".
   const outages = useMachineOutages(orgId);
   const waitingFor = useMemo(() => waitingAgents(outages.data), [outages.data]);
-  const budgetUsed = overview.data ? overview.data.budgetUsedPercent : null;
   // The agents' presence and lines (ADR 0084): the one place that polls them; every face reads the same list.
   useAgentStatuses(orgId);
   const dms = useDms(orgId);
@@ -239,7 +234,7 @@ export function Sidebar() {
   // A closed conversation category still says how many unread messages it holds.
   const unreadOf = (agents: Agent[]) => agents.reduce((n, a) => n + (unreadWith.get(a.id) ?? 0), 0);
   const peopleUnread = people.reduce((n, m) => n + (unreadWith.get(m.userId) ?? 0), 0);
-  const sections = useSidebarSections();
+  const sections = useSidebarSections(me.user.id, orgId);
   // The workspace's groups of agents (ADR 0083): the agents in none stay under "Agentes", each group is a category.
   // Who manages agents sees them all, to arrange them; everyone else, the agents that answer them and the groups
   // holding one.
@@ -271,24 +266,34 @@ export function Sidebar() {
   // Owners and admins organize the groups, with the full sidebar (the rail shows faces only).
   const organize = arranges && !rail;
   const agentRow = (a: Agent) => (
-    <AgentRow
+    <ErrorBoundary
       key={a.id}
-      agent={a}
-      unread={unreadWith.get(a.id) ?? 0}
-      waitingFor={waitingFor.get(a.id)}
-      onPrefetch={() => prefetchDm(a.id)}
-      onOpen={() => markOpen(dmWith.get(a.id) ?? a.id)}
-      drag={organize ? drag.row(a.id) : undefined}
-      menu={
-        organize ? (
-          <AgentGroupMenu
-            agent={a}
-            groups={groups}
-            onNewGroup={() => setGroupDialog({ mode: "create", agentIds: [a.id] })}
-          />
-        ) : undefined
-      }
-    />
+      resetKey={a}
+      // Still a row the drag counts (`useAgentDrag`), so a drop below it lands where the pointer is.
+      fallback={() => (
+        <div className="sidebar__row" data-agent-row={a.id}>
+          <UnshownRow />
+        </div>
+      )}
+    >
+      <AgentRow
+        agent={a}
+        unread={unreadWith.get(a.id) ?? 0}
+        waitingFor={waitingFor.get(a.id)}
+        onPrefetch={() => prefetchDm(a.id)}
+        onOpen={() => markOpen(dmWith.get(a.id) ?? a.id)}
+        drag={organize ? drag.row(a.id) : undefined}
+        menu={
+          organize ? (
+            <AgentGroupMenu
+              agent={a}
+              groups={groups}
+              onNewGroup={() => setGroupDialog({ mode: "create", agentIds: [a.id] })}
+            />
+          ) : undefined
+        }
+      />
+    </ErrorBoundary>
   );
 
   // Only the middle scrolls: the workspace card on top and the foot stay put. The active item
@@ -445,7 +450,9 @@ export function Sidebar() {
                 <span className="sidebar__label">{t("shell.agents")}</span>
               </span>
             </div>
-            <SidebarSkeleton count={2} avatar label={t("common.loadingList")} />
+            <div className="sidebar__section-body">
+              <SidebarSkeleton count={2} avatar label={t("common.loadingList")} />
+            </div>
           </div>
         )}
         {dir.agents.length > 0 && (
@@ -525,13 +532,14 @@ export function Sidebar() {
             summary={peopleUnread > 0 && <UnreadCount count={peopleUnread} />}
           >
             {people.map((m) => (
-              <PersonRow
-                key={m.userId}
-                member={m}
-                unread={unreadWith.get(m.userId) ?? 0}
-                onPrefetch={() => prefetchDm(m.userId)}
-                onOpen={() => markOpen(dmWith.get(m.userId) ?? m.userId)}
-              />
+              <ErrorBoundary key={m.userId} resetKey={m} fallback={unshownRow}>
+                <PersonRow
+                  member={m}
+                  unread={unreadWith.get(m.userId) ?? 0}
+                  onPrefetch={() => prefetchDm(m.userId)}
+                  onOpen={() => markOpen(dmWith.get(m.userId) ?? m.userId)}
+                />
+              </ErrorBoundary>
             ))}
           </SidebarSection>
         )}
@@ -560,7 +568,7 @@ export function Sidebar() {
           </Button>
         )}
         <div className="sidebar__me" ref={meRow}>
-          <AccountMenu budgetUsed={budgetUsed} />
+          <AccountMenu />
         </div>
       </div>
     </nav>
@@ -573,36 +581,32 @@ export function Sidebar() {
  */
 type SectionId = "channels" | "agents" | "people" | `category:${string}` | `group:${string}`;
 
-/** Which sidebar categories are closed, remembered per browser. */
-function useSidebarSections() {
-  const [closed, setClosed] = useState<Set<string>>(() => {
-    try {
-      const saved = storage.get(STORAGE_KEYS.sidebarSections);
-      if (saved) return new Set(JSON.parse(saved) as string[]);
-    } catch {
-      // A bad value falls back to the defaults.
-    }
-    return new Set();
-  });
+/** Which sidebar categories are closed, remembered in this browser for each person in each workspace. */
+function useSidebarSections(userId: string, orgId: string) {
+  const key = `${STORAGE_KEYS.sidebarSections}.${userId}.${orgId}`;
+  const [saved, setSaved] = useState(() => ({ key, closed: new Set(storedStrings(key)) }));
+  // The sidebar stays mounted when the workspace changes: that one's own state.
+  if (saved.key !== key) setSaved({ key, closed: new Set(storedStrings(key)) });
+  const change = (edit: (closed: Set<string>) => void) =>
+    setSaved((prev) => {
+      const closed = new Set(prev.closed);
+      edit(closed);
+      storage.set(prev.key, JSON.stringify([...closed]));
+      return { key: prev.key, closed };
+    });
   const toggle = (id: SectionId) =>
-    setClosed((prev) => {
-      const next = new Set(prev);
-      if (!next.delete(id)) next.add(id);
-      storage.set(STORAGE_KEYS.sidebarSections, JSON.stringify([...next]));
-      return next;
+    change((closed) => {
+      if (!closed.delete(id)) closed.add(id);
     });
   /** "Fechar todas" / "Abrir todas" for the channel categories. */
   const setAll = (ids: SectionId[], open: boolean) =>
-    setClosed((prev) => {
-      const next = new Set(prev);
+    change((closed) => {
       for (const id of ids) {
-        if (open) next.delete(id);
-        else next.add(id);
+        if (open) closed.delete(id);
+        else closed.add(id);
       }
-      storage.set(STORAGE_KEYS.sidebarSections, JSON.stringify([...next]));
-      return next;
     });
-  return { isOpen: (id: SectionId) => !closed.has(id), toggle, setAll };
+  return { isOpen: (id: SectionId) => !saved.closed.has(id), toggle, setAll };
 }
 
 /**
@@ -703,8 +707,7 @@ function SidebarChannels({
   const recreate = useCreateChannelCategory(orgId);
   const manages = can(org, "manage_channels");
   const mayCreate = can(org, "create_channels");
-  // A channel's creator edits and moves it too, as the server allows.
-  const mayChange = (c: Channel) => c.createdByUserId === me.user.id || manages;
+  const mayChange = (c: Channel) => managesChannel(c, me.user.id, org);
   const [newCategory, setNewCategory] = useState<{ withChannel?: string } | null>(null);
   const [renaming, setRenaming] = useState<ChannelCategory | null>(null);
   const [moving, setMoving] = useState<Channel | null>(null);
@@ -1036,7 +1039,7 @@ function SidebarChannels({
                 {addButton(category.id, t("channelCategories.newChannelIn", { name: category.name }))}
                 <Menu
                   align="start"
-                  label={category.name}
+                  label={t("channelCategories.options", { name: category.name })}
                   trigger={
                     <Button
                       variant="ghost"
@@ -1044,7 +1047,7 @@ function SidebarChannels({
                       iconOnly
                       icon="more"
                       className="sidebar__section-add"
-                      aria-label={category.name}
+                      aria-label={t("channelCategories.options", { name: category.name })}
                     />
                   }
                 >
@@ -1329,25 +1332,23 @@ function UnreadCount({ count }: { count: number }) {
 }
 
 /**
- * The account button: your face with your presence badge; under the name, your line (or how you appear, or
- * "Definir status") and the workspace's budget use this month (a percentage, never money). It opens the account's
- * full-screen menu: your status (ADR 0084), profile, time zone, opening the phone app, theme, language, sounds, the
- * budget, deleting the account and signing out. Adding a password and deleting the account keep their dialogs in the
- * address (`?account=password`, `?account=delete`): adding a password may ask for a sign-in again, which comes back.
+ * The account button: your face with your presence badge; under the name, your line (or how you appear). It opens a
+ * menu right above it: you on top (face, name, @ and how you appear, your line in a well, a plan near its limit), then
+ * your status (how you appear, or what you're up to), your profile, your settings (Configurações › Sua conta) and
+ * signing out. Deleting the account starts at the bottom of Sua conta, not here beside Sair, where a slip would open
+ * it. It and adding a password keep their dialogs here, in the address (`?account=delete`, `?account=password`) on any
+ * page: adding a password may ask for a sign-in again, which comes back.
  */
-function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
+function AccountMenu() {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
-  const theme = useTheme();
-  const look = useSyncExternalStore(onMenuLookChange, menuLook, () => "ours" as const);
-  const sounds = useSyncExternalStore(onSoundChoiceChange, soundChoice, soundChoice);
   const auth = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
-  const trigger = useRef<HTMLButtonElement>(null);
-  const [profile, setProfile] = useState<"handle" | "timezone" | null>(null);
+  const compact = useMediaQuery(COMPACT_QUERY);
+  const saveStatus = useSaveStatus();
+  const [profile, setProfile] = useState(false);
   const [phone, setPhone] = useState(false);
   const [account, setAccount] = useOpenParam("account");
   const [statusOpen, setStatusOpen] = useState(false);
@@ -1359,197 +1360,131 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
       setPhone(true);
     });
   }, []);
-  const mine = dir.memberById.get(me.user.id);
-  const photo = mine?.image ?? me.user.image;
-  const zone = mine?.timezone || browserTimezone() || "UTC";
+  const handle = dir.memberById.get(me.user.id)?.handle;
   // How you appear to yourself (hidden stays hidden; what you picked, even before your socket is up) and your line.
   const shown = usePersonPresence(me.user.id);
   const picked = shown?.person.availability;
   const presence = picked ? presenceOfAvailability(picked) : (shown?.presence ?? null);
   const presenceWord = presence ? t(`presence.${presence}`) : undefined;
+  const availability = picked ?? availabilityOf(shown?.presence);
   const line = shown?.status ? personLine(shown.status) : null;
   // Under your name: your line, or how you appear (Online, Ocupado, Ausente, Oculto) when you wrote none (ADR 0084).
   const who = [me.user.name, line?.text ?? presenceWord].filter(Boolean).join(" · ");
-  // Closes the menu first, then does what was picked (a dialog opens over the app, not over the menu).
-  const pick = (run: () => void) => () => {
-    setOpen(false);
-    run();
-  };
+  const under = Boolean(line || presenceWord);
 
   const signOut = async () => {
     await auth.signOut();
     qc.clear();
     await navigate({ to: "/login" });
   };
+  // A dialog opens once the menu is gone and focus is back on this row, so closing the dialog lands here too.
+  const afterMenu = useRef<(() => void) | null>(null);
+  const openAfter = (open: () => void) => () => {
+    afterMenu.current = open;
+  };
+  // How you appear, then what you're up to: the dialog, with your line in it when you wrote one (it shows on top).
+  const statusChoices = (
+    <>
+      <MenuRadioGroup
+        label={t("presence.appearAs")}
+        value={availability}
+        onValueChange={(v) => v !== availability && saveStatus({ availability: v as Availability })}
+        options={AVAILABILITIES.map((a) => ({
+          value: a,
+          label: t(`presence.${presenceOfAvailability(a)}`),
+          leading: <PresenceBadge presence={presenceOfAvailability(a)} size="lg" ring={false} />,
+        }))}
+      />
+      <MenuSeparator />
+      <MenuItem icon="message" onSelect={openAfter(() => setStatusOpen(true))}>
+        {t("presence.placeholder")}
+      </MenuItem>
+    </>
+  );
 
   return (
     <>
-      <button
-        ref={trigger}
-        type="button"
-        // The face stands beside the lines under it (your status line): the name's capitals at its top. The budget
-        // is the menu's (ADR 0084): under your name, only what you wrote.
-        className="sidebar__user ac-faceline"
-        aria-haspopup="dialog"
-        aria-label={`${t("shell.account")}: ${who}`}
-        title={who}
-        onClick={() => setOpen(true)}
-      >
-        <Avatar name={me.user.name} size="sm" imageUrl={photo} presence={presence} presenceLabel={presenceWord} />
-        <span className="sidebar__user-text">
-          <span className="sidebar__user-name ac-captop">{me.user.name}</span>
-          {line ? (
-            <StatusLine emoji={line.emoji} text={line.text} className="sidebar__user-line" />
-          ) : (
-            presenceWord && <StatusLine text={presenceWord} className="sidebar__user-line" />
-          )}
-        </span>
-      </button>
-      <MenuOverlay
-        open={open}
-        onOpenChange={setOpen}
-        anchor={trigger}
-        closeLabel={t("common.close")}
-        mark={
-          <Avatar name={me.user.name} size="xl" imageUrl={photo} presence={presence} presenceLabel={presenceWord} />
+      <Menu
+        side="top"
+        className="profile-menu"
+        onClosed={() => {
+          afterMenu.current?.();
+          afterMenu.current = null;
+        }}
+        trigger={
+          <button
+            type="button"
+            // The face stands beside the lines under it (your status line): the name's capitals at its top. A name
+            // alone (while how you appear loads) centres on it.
+            className={cx("sidebar__user", under && "ac-faceline")}
+            aria-label={`${t("shell.account")}: ${who}`}
+            title={who}
+          >
+            <MyFace size="sm" presence={presence} presenceLabel={presenceWord} />
+            <span className="sidebar__user-text">
+              <span className={cx("sidebar__user-name", under && "ac-captop")}>{me.user.name}</span>
+              {line ? (
+                <StatusLine emoji={line.emoji} text={line.text} className="sidebar__user-line" />
+              ) : (
+                presenceWord && <StatusLine text={presenceWord} className="sidebar__user-line" />
+              )}
+            </span>
+          </button>
         }
-        title={me.user.name}
-        meta={[mine?.handle ? `@${mine.handle}` : null, me.user.email].filter(Boolean).join(" · ")}
       >
-        <MenuOverlayGroup label={t("shell.account")}>
-          {/* Your status first (ADR 0084): your line or "Definir status", when it clears, how you appear. */}
-          <MenuOverlayItem
-            icon="smile"
-            shortcut="0"
-            description={
-              line && shown?.status ? clearsText(t, i18n.language, shown.status.until) : t("presence.setStatusHint")
-            }
-            hint={presenceWord}
-            onSelect={pick(() => setStatusOpen(true))}
-          >
-            {line ? `${line.emoji} ${line.text}` : t("presence.setStatus")}
-          </MenuOverlayItem>
-          <MenuOverlayItem
-            icon="person"
-            shortcut="1"
-            description={t("shell.profileHint")}
-            onSelect={pick(() => setProfile("handle"))}
-          >
-            {t("shell.profile")}
-          </MenuOverlayItem>
-          <MenuOverlayItem
-            icon="clock"
-            shortcut="2"
-            description={zoneDisplayName(zone, i18n.language) ?? timezoneName(zone, i18n.language)}
-            onSelect={pick(() => setProfile("timezone"))}
-          >
-            {t("shell.timezone")}
-          </MenuOverlayItem>
-          <MenuOverlayItem
-            icon="phone"
-            shortcut="3"
-            description={t("shell.openOnPhoneHint")}
-            onSelect={pick(() => setPhone(true))}
-          >
-            {t("shell.openOnPhone")}
-          </MenuOverlayItem>
-          {me.user.hasPassword === false && (
-            <MenuOverlayItem
-              icon="key"
-              description={t("shell.addPasswordHint")}
-              onSelect={pick(() => setAccount("password"))}
-            >
-              {t("shell.addPassword")}
-            </MenuOverlayItem>
-          )}
-          <MenuOverlayRow icon="bulb" label={t("shell.theme")}>
-            <Segmented
-              size="sm"
-              label={t("shell.theme")}
-              value={theme.preference}
-              onValueChange={(v) => theme.setPreference(v as ThemePreference)}
-              options={[
-                { value: "system", label: t("shell.themeSystem") },
-                { value: "light", label: t("shell.themeLight") },
-                { value: "dark", label: t("shell.themeDark") },
-              ]}
-            />
-          </MenuOverlayRow>
-          <MenuOverlayRow icon="globe" label={t("shell.language")}>
-            <Segmented
-              size="sm"
-              label={t("shell.language")}
-              value={i18n.language}
-              onValueChange={(v) => setLocale(v as LocaleCode, i18n)}
-              options={locales.map((l) => ({ value: l.code, label: l.label }))}
-            />
-          </MenuOverlayRow>
-          <MenuOverlayRow icon="sound" label={t("shell.sounds")}>
-            <Segmented
-              size="sm"
-              label={t("shell.sounds")}
-              value={sounds}
-              onValueChange={(v) => setSoundChoice(v as SoundChoice)}
-              options={[
-                { value: "tactile", label: t("shell.soundTactile") },
-                { value: "sky", label: t("shell.soundSky") },
-                { value: "pixel", label: t("shell.soundPixel") },
-                { value: "off", label: t("shell.soundOff") },
-              ]}
-            />
-          </MenuOverlayRow>
-          <BrowserNoticesRow />
-          {inDesktopApp() && (
-            <MenuOverlayRow icon="pointer" label={t("contextMenu.look")}>
-              <Segmented
-                size="sm"
-                label={t("contextMenu.look")}
-                value={look}
-                onValueChange={(v) => setMenuLook(v as MenuLook)}
-                options={[
-                  { value: "ours", label: t("contextMenu.lookOurs") },
-                  { value: "system", label: t("contextMenu.lookSystem") },
-                ]}
-              />
-            </MenuOverlayRow>
-          )}
-          {budgetUsed !== null &&
-            (can(org, "view_usage") ? (
-              <MenuOverlayItem
-                icon="wallet"
-                shortcut="4"
-                description={t("shell.thisMonth")}
-                hint={<BudgetBar percent={budgetUsed} />}
-                onSelect={pick(
-                  () =>
-                    void navigate({
-                      to: "/org/$orgId/settings/$section",
-                      params: { orgId: org.id, section: "usage" },
-                    }),
-                )}
-              >
-                {t("shell.budgetOf", { name: org.name })}
-              </MenuOverlayItem>
-            ) : (
-              <MenuOverlayRow icon="wallet" label={t("shell.budgetOf", { name: org.name })}>
-                <BudgetBar percent={budgetUsed} />
-              </MenuOverlayRow>
-            ))}
-          {import.meta.env.DEV && (
-            <MenuOverlayItem icon="grid" onSelect={pick(() => void navigate({ to: "/dev/gallery" }))}>
-              {t("shell.gallery")}
-            </MenuOverlayItem>
-          )}
-          <MenuOverlaySeparator />
-          <MenuOverlayItem icon="trash" danger onSelect={pick(() => setAccount("delete"))}>
-            {t("deleteAccount.menu")}
-          </MenuOverlayItem>
-          <MenuOverlayItem icon="arrowRight" danger onSelect={pick(() => void signOut())}>
-            {t("auth.signOut")}
-          </MenuOverlayItem>
-        </MenuOverlayGroup>
-      </MenuOverlay>
-      <ProfileDialog focus={profile} onClose={() => setProfile(null)} />
+        <div className="profile-card__head profile-menu__head">
+          <MyFace size="lg" presence={presence} presenceLabel={presenceWord} />
+          <span className="list-col">
+            <span className="profile-card__name">{me.user.name}</span>
+            <span className="small muted">{[handle && `@${handle}`, presenceWord].filter(Boolean).join(" · ")}</span>
+          </span>
+        </div>
+        {line && shown?.status && (
+          <div className="profile-card__status profile-menu__line">
+            <span className="profile-card__status-emoji" aria-hidden="true">
+              {line.emoji}
+            </span>
+            <span>
+              {line.text}
+              <small>{clearsText(t, i18n.language, shown.status.until)}</small>
+            </span>
+          </div>
+        )}
+        <PlanNearLimitItem />
+        <MenuSeparator />
+        {/* A phone has no room beside the menu for another one: there the choices are in it. */}
+        {compact ? (
+          <>
+            {statusChoices}
+            <MenuSeparator />
+          </>
+        ) : (
+          <MenuSub icon="smile" label={t("presence.setStatus")}>
+            {statusChoices}
+          </MenuSub>
+        )}
+        <MenuItem icon="edit" onSelect={openAfter(() => setProfile(true))}>
+          {t("shell.editProfile")}
+        </MenuItem>
+        <MenuItem
+          icon="settings"
+          onSelect={() =>
+            void navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section: "account" } })
+          }
+        >
+          {t("shell.settings")}
+        </MenuItem>
+        {import.meta.env.DEV && (
+          <MenuItem icon="grid" onSelect={() => void navigate({ to: "/dev/gallery" })}>
+            {t("shell.gallery")}
+          </MenuItem>
+        )}
+        <MenuSeparator />
+        <MenuItem icon="arrowRight" danger onSelect={() => void signOut()}>
+          {t("auth.signOut")}
+        </MenuItem>
+      </Menu>
+      <ProfileDialog focus={profile ? "handle" : null} onClose={() => setProfile(false)} />
       <SetStatusDialog open={statusOpen} onClose={() => setStatusOpen(false)} />
       <OpenOnPhoneDialog open={phone} onClose={() => setPhone(false)} />
       <AddPasswordDialog
@@ -1558,6 +1493,35 @@ function AccountMenu({ budgetUsed }: { budgetUsed: number | null }) {
       />
       <DeleteAccountDialog open={account === "delete"} onClose={() => setAccount(null)} />
     </>
+  );
+}
+
+/**
+ * In the account menu, the one of your plans near or at its limit (from `PLAN_ALMOST`, 80%: "Quase no limite"), at
+ * its limit first: its maker's mark, its name and its state, opening Configurações › Uso. Nothing otherwise. Your
+ * accounts are read, and their usage looked up again (it comes back as `machine.updated`), when the menu opens.
+ */
+function PlanNearLimitItem() {
+  const { t, i18n } = useTranslation();
+  const { org, me } = useOrg();
+  const api = useApi();
+  const dir = useDirectory(org.id);
+  const navigate = useNavigate();
+  const plan = planNearLimit(ownPlanLines(t, useAiAccounts(org.id).data, dir.agents, me.user.id));
+  useEffect(() => {
+    void api.machines.refreshAccountUsage(org.id).catch(() => undefined);
+  }, [api, org.id]);
+  if (!plan) return null;
+  return (
+    <MenuItem
+      leading={<ProviderLogo id={plan.logo} size="xs" />}
+      hint={planWord(t, i18n.language, plan.usage)}
+      onSelect={() =>
+        void navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section: "usage" } })
+      }
+    >
+      <span className="profile-menu__plan">{plan.name}</span>
+    </MenuItem>
   );
 }
 
@@ -1626,11 +1590,19 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
   const managesAgents = can(org, "manage_agents");
   const connections = useConnections(org.id);
   const skills = useSkills(org.id, managesAgents);
+  const invite = useInviteDialog();
   const go = (section?: SettingsSection) => () => {
     onDone();
     void (section
       ? navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section } })
       : navigate({ to: "/org/$orgId/settings", params: { orgId: org.id } }));
+  };
+  // The workspace's invite dialog (ADR 0090), over the page this menu was opened on.
+  const inviteNow = () => {
+    if (invite) {
+      onDone();
+      invite.open();
+    } else go("members")();
   };
   let key = 0;
   const next = () => String(++key);
@@ -1638,7 +1610,7 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
     <>
       <MenuOverlayGroup label={t("shell.workspaceMenuOf", { name: org.name })}>
         {can(org, "invite_people") && (
-          <MenuOverlayItem icon="plus" shortcut={next()} description={t("shell.inviteHint")} onSelect={go("members")}>
+          <MenuOverlayItem icon="plus" shortcut={next()} description={t("shell.inviteHint")} onSelect={inviteNow}>
             {t("shell.invite")}
           </MenuOverlayItem>
         )}
@@ -1705,134 +1677,5 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
         )}
       </MenuOverlayGroup>
     </>
-  );
-}
-
-/** "Perfil" and "Fuso" in the account menu: my handle and time zone in this workspace. */
-function ProfileDialog({ focus, onClose }: { focus: "handle" | "timezone" | null; onClose: () => void }) {
-  const { t } = useTranslation();
-  const { org, me } = useOrg();
-  const api = useApi();
-  const qc = useQueryClient();
-  const toast = useToast();
-  const dir = useDirectory(org.id);
-  const mine = dir.memberById.get(me.user.id);
-  const [handle, setHandle] = useState("");
-  const [zone, setZone] = useState("");
-  const [useOrgZone, setUseOrgZone] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [photo, setPhoto] = useState(false);
-  useEffect(() => {
-    if (!focus) return;
-    setHandle(mine?.handle ?? "");
-    setZone(mine?.timezone || browserTimezone() || "UTC");
-    setUseOrgZone(false);
-    setError(null);
-  }, [focus, mine]);
-  const zoneOk = useOrgZone || isTimeZone(zone.trim());
-  const save = useMutation({
-    mutationFn: () =>
-      api.orgs.updateMe(org.id, {
-        handle: handle.trim() || undefined,
-        timezone: useOrgZone ? null : zone.trim(),
-      }),
-    meta: { silent: true },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: keys.members(org.id) });
-      void qc.invalidateQueries({ queryKey: keys.people(org.id) });
-      toast.show(t("shell.profileSaved"));
-      onClose();
-    },
-    onError: (e) => setError(e.message),
-  });
-  return (
-    <Dialog
-      open={focus !== null}
-      onOpenChange={(o) => !o && onClose()}
-      title={t("shell.profileTitle")}
-      closeLabel={t("common.close")}
-      width={440}
-    >
-      <form
-        style={{ display: "contents" }}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (zoneOk) save.mutate();
-        }}
-      >
-        <DialogBody>
-          <div className="row" style={{ gap: 12, alignItems: "center" }}>
-            <Avatar name={me.user.name} size="lg" imageUrl={mine?.image ?? me.user.image} />
-            <span style={{ fontWeight: 600, flex: 1 }}>{t("photo.label")}</span>
-            <Button size="sm" type="button" onClick={() => setPhoto(true)}>
-              {t("photo.change")}
-            </Button>
-          </div>
-          <Field label={t("shell.handle")} id="me-handle">
-            <AffixInput
-              prefix="@"
-              value={handle}
-              onChange={(e) => setHandle(e.target.value)}
-              autoFocus={focus === "handle"}
-            />
-          </Field>
-          <Field
-            label={t("shell.timezone")}
-            id="me-zone"
-            hint={{ name: t("common.about", { label: t("shell.timezone") }), text: t("shell.timezoneHelp") }}
-            error={!zoneOk ? t("shell.timezoneInvalid") : undefined}
-          >
-            <ZoneSelect value={zone || "UTC"} disabled={useOrgZone} onChange={setZone} />
-          </Field>
-          <span className="row" style={{ gap: 8, alignItems: "center" }}>
-            <Checkbox id="me-zone-org" checked={useOrgZone} onCheckedChange={setUseOrgZone} />
-            <label htmlFor="me-zone-org">{t("shell.useOrgZone")}</label>
-          </span>
-          {error && <Alert>{error}</Alert>}
-        </DialogBody>
-        <DialogFooter>
-          <Button type="button" onClick={onClose}>
-            {t("common.cancel")}
-          </Button>
-          <Button type="submit" variant="primary" disabled={!zoneOk || save.isPending} loading={save.isPending}>
-            {t("common.save")}
-          </Button>
-        </DialogFooter>
-      </form>
-      <ProfilePhotoDialog open={photo} onClose={() => setPhoto(false)} />
-    </Dialog>
-  );
-}
-
-/** An IANA zone the browser knows ("America/Sao_Paulo"). */
-export function isTimeZone(zone: string) {
-  if (!zone) return false;
-  try {
-    new Intl.DateTimeFormat("en", { timeZone: zone });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Thin bar + "37%": how much of the agents' monthly budgets the workspace used (the account menu). Nothing used,
- * nothing drawn: the bar's smallest mark means "a little".
- */
-function BudgetBar({ percent }: { percent: number }) {
-  const { t, i18n } = useTranslation();
-  const level = percent >= 100 ? "full" : percent >= 80 ? "high" : "ok";
-  return (
-    <span
-      className="sidebar__usage"
-      data-level={level}
-      title={t("shell.budgetUsedHint", { percent: formatPercent(i18n.language, percent) })}
-      aria-hidden="true"
-    >
-      <span className="sidebar__usage-track">
-        {percent > 0 && <span className="sidebar__usage-bar" style={{ width: `${Math.min(100, percent)}%` }} />}
-      </span>
-      <span className="sidebar__usage-value">{formatPercent(i18n.language, percent)}</span>
-    </span>
   );
 }

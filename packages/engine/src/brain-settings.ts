@@ -19,7 +19,7 @@ import {
   MODEL_CATALOG,
 } from "@agenteschat/providers";
 import { claudeCodeModel, isPlanModelId, planModel, planOf } from "@agenteschat/providers/plans";
-import { type Agent, getAgent } from "./agents";
+import { type Agent, getAgent, rememberAgentSetup, setupOfAgent } from "./agents";
 import { type AgentAudience, answersOthers, audienceOf, OWNER_ONLY, planSharing } from "./audience";
 import { recordAudit } from "./audit";
 import { type BrainKind, isComputerBrain } from "./brains/types";
@@ -37,6 +37,8 @@ import {
 } from "./machine-accounts";
 import { getMachine, type MachineRow, machineOnline } from "./machines";
 import {
+  agentMissionApproval,
+  type CommandApproval,
   type MissionDeps,
   type MissionRow,
   machineExecutors,
@@ -253,6 +255,8 @@ export interface AgentBrainView {
   ownSignIn: boolean;
   /** The computer's own sign-ins' plan usage, by brain (protocol 19; empty: not known). */
   ownUsage: OwnPlanUsage;
+  /** Its Autonomia (the autonomy its missions start with): "Usar em outros agentes" takes it along (ADR 0094). */
+  autonomy: CommandApproval;
 }
 
 /** The account part of the brain view. */
@@ -297,7 +301,7 @@ async function agentBrainAccess(db: Database, userId: string, orgId: string, age
   if (!admin && agent.ownerUserId !== userId) {
     throw new ForbiddenError("Only an admin or the agent's owner can see who thinks for it", "agent.not_owner");
   }
-  return { agent, admin };
+  return { agent, admin, membership };
 }
 
 /** The computers the caller may give the agent (the same rule as `setAgentComputerTarget`), with their options. */
@@ -349,6 +353,7 @@ function view(
     canUsePlans: agent.ownerUserId === userId,
     ownSignIn: Boolean(machine?.pairedByUserId) && machine?.pairedByUserId === agent.ownerUserId,
     ownUsage: machine?.executors?.ownUsage ?? {},
+    autonomy: agentMissionApproval(agent),
   };
 }
 
@@ -436,15 +441,19 @@ function nextAudience(
   return { base, to: kept ? { mode: "people", userIds: agent.audienceUserIds } : EVERYONE };
 }
 
-/** `PUT …/agents/{id}/brain` (an admin or the agent's owner). Audited. */
+/**
+ * `PUT …/agents/{id}/brain` (an admin or the agent's owner). Audited, with `options.audit` added to the entry. What it
+ * thinks with becomes what new agents start with, unless `options.remember` is false.
+ */
 export async function setAgentBrain(
   deps: BrainDeps,
   userId: string,
   orgId: string,
   agentId: string,
   input: AgentBrainInput,
+  options: { remember?: boolean; audit?: Record<string, unknown> } = {},
 ): Promise<AgentBrainView> {
-  const { agent, admin } = await agentBrainAccess(deps.db, userId, orgId, agentId);
+  const { agent, admin, membership } = await agentBrainAccess(deps.db, userId, orgId, agentId);
   const from = brainOf(agent.brain);
   if (input.brain !== undefined && !isBrainKind(input.brain)) {
     throw new ValidationError("Choose model, claude_code or codex", "brain.invalid");
@@ -581,6 +590,7 @@ export async function setAgentBrain(
           contextTokens: agent.contextTokens,
         },
         to: { brain, model, fallback, account, effort, contextTokens },
+        ...options.audit,
       },
     });
   }
@@ -613,6 +623,7 @@ export async function setAgentBrain(
     contextTokens,
     ...(audience ? { audienceMode: audience.mode } : {}),
   };
+  if (thinks && options.remember !== false) await rememberAgentSetup(deps.db, membership, setupOfAgent(saved));
   // The account's `usedBy` changed with it.
   const fresh =
     account !== agent.brainAccountId ? await brainAccounts(deps.db, userId, orgId, saved, machine) : accounts;

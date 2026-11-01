@@ -3,6 +3,7 @@ import type { LiveConsult, LiveConsultStatus } from "../realtime/consults";
 import { type LiveRun, narrationOf } from "../realtime/streams";
 import { joinNames } from "./format";
 import { agentGrammar } from "./grammar";
+import { MAIL_BRANDS } from "./mail";
 
 /**
  * What the typing bar says someone is doing: "Theo está pensando…", "Theo
@@ -25,6 +26,8 @@ export type ActivityKind =
   | "schedulingEvent"
   | "askingQuestion"
   | "reacting"
+  | "sendingGif"
+  | "sendingSticker"
   | "openingSkill"
   | "consultingSkill"
   | "runningCode"
@@ -81,6 +84,7 @@ export type ActivityKind =
   | "requestingAccess"
   | "requestingSecret"
   | "queryingDatabase"
+  | "checkingUsage"
   | "usingTool";
 
 /** The computer's own permission check before a command (`PERMISSION_TOOL` in `@agenteschat/adapters`). */
@@ -90,6 +94,19 @@ export interface Activity {
   kind: ActivityKind;
   /** The app being consulted ("GitHub", "himetrica"), for `consulting`; the skill name for `openingSkill`. */
   app?: string;
+  /**
+   * The service the call works in, for its logo: a catalog connector's id (`github`, `drive`), a mailbox's maker
+   * with a mark (`gmail`), `mail` for any other mailbox, or `postgres`.
+   */
+  service?: string;
+  /** A server connected by address: its own icon (`/api/app/connector-icons/…`). */
+  icon?: string;
+}
+
+/** Where a call works, as `agent.tool` and the saved `tool_call` step say it (the engine's `ToolDefinition`). */
+export interface ToolService {
+  service?: string | null;
+  serviceIcon?: string | null;
 }
 
 /** The engine's own tools (packages/engine/src/context, issues, artifacts, calendar). */
@@ -115,6 +132,9 @@ const BUILTIN: Record<string, ActivityKind> = {
   propose_event: "schedulingEvent",
   ask_user: "askingQuestion",
   react: "reacting",
+  // A GIF or the agent's sticker (ADR 0091): the message itself shows it, the block says it was sent.
+  send_gif: "sendingGif",
+  send_sticker: "sendingSticker",
   // The agent's PC (sandbox).
   run_code: "runningCode",
   write_file: "pcFiles",
@@ -175,6 +195,7 @@ const BUILTIN: Record<string, ActivityKind> = {
   request_secret: "requestingSecret",
   use_tool: "findingTools",
   follow_up: "followingUp",
+  get_my_usage: "checkingUsage",
   cancel_follow_up: "cancelingFollowUp",
 };
 
@@ -221,15 +242,31 @@ const VERBS = new Set([
 
 const isDrive = (id: string) => id === "drive" || id === "gdrive" || id === "google_drive";
 
+/** One of the org's mailboxes' tools (`mail_<slug>_<verb>`, ADR 0038), also through the executor's MCP. */
+const MAILBOX_TOOL = /^(?:mcp__agentes__)?mail_[a-z0-9]+_[a-z]+$/;
+
 /**
  * The friendly activity of a tool call. `connector` is the app label when the
  * event carries it; otherwise it is guessed from the tool name's prefix.
+ * `where`: the service the call names, for its logo. A mailbox goes by its maker's
+ * name when the app draws its mark ("Consultou o Gmail"), else by "Email".
  */
 export function toolActivity(
   tool: string | null | undefined,
   connector?: string | null,
   detail?: string | null,
+  where?: ToolService | null,
 ): Activity {
+  const a = activityOf(tool, connector, detail);
+  const service = where?.service?.trim() || undefined;
+  if (a.kind === "consulting" && MAILBOX_TOOL.test((tool ?? "").trim().toLowerCase())) {
+    const brand = service ? MAIL_BRANDS[service] : undefined;
+    return brand ? { kind: "consulting", app: brand.name, service } : { ...a, service: "mail" };
+  }
+  return { ...a, ...(service ? { service } : {}), ...(where?.serviceIcon ? { icon: where.serviceIcon } : {}) };
+}
+
+function activityOf(tool: string | null | undefined, connector?: string | null, detail?: string | null): Activity {
   let name = (tool ?? "").trim().toLowerCase();
   if (!name) return { kind: "thinking" };
   // An executor's MCP tool (`mcp__agentes__update_plan`): ours by its own name; another server's is that app.
@@ -341,7 +378,7 @@ export function barEntries(
       id: r.agentId,
       type: "agent",
       name: agentName(r.agentId),
-      activity: writing ? { kind: "writing" } : toolActivity(r.tool, r.connector, r.toolDetail),
+      activity: writing ? { kind: "writing" } : toolActivity(r.tool, r.connector, r.toolDetail, r),
     });
   }
   for (const id of typingUserIds) {
@@ -351,50 +388,69 @@ export function barEntries(
   return out;
 }
 
-export interface ActivityGroup {
-  names: string[];
-  activity: Activity;
-  consult?: EntryConsult;
+/** How many small faces the bar stacks, however many are at work (the sentence says "e mais N"). */
+export const BAR_FACES = 3;
+
+/** The faces the bar stacks: agents first, and at least one person typing when someone is. */
+export function barFaces(entries: ActivityEntry[]): ActivityEntry[] {
+  const agents = entries.filter((e) => e.type === "agent");
+  const people = entries.filter((e) => e.type === "person");
+  const shown = agents.slice(0, people.length > 0 ? BAR_FACES - 1 : BAR_FACES);
+  return [...shown, ...people.slice(0, BAR_FACES - shown.length)];
 }
 
-/** People doing the same thing share a phrase: "Ada e Atlas estão trabalhando". A consultation is its own. */
-export function groupActivities(entries: ActivityEntry[]): ActivityGroup[] {
-  const groups: ActivityGroup[] = [];
-  for (const e of entries) {
-    if (e.consult) {
-      groups.push({ names: [e.name], activity: e.activity, consult: e.consult });
-      continue;
-    }
-    const same = groups.find(
-      (g) => !g.consult && g.activity.kind === e.activity.kind && g.activity.app === e.activity.app,
-    );
-    if (same) same.names.push(e.name);
-    else groups.push({ names: [e.name], activity: e.activity });
-  }
-  return groups;
+/** The question the bar tells and times: one agent's on its own (beside others, its reply tells it). */
+export function barAsking(entries: ActivityEntry[]): EntryConsult | undefined {
+  const agents = entries.filter((e) => e.type === "agent");
+  const consult = agents.length === 1 ? agents[0]?.consult : undefined;
+  return consult?.status === "asking" ? consult : undefined;
+}
+
+/** " · 4 s" shows from 2 s on: minutes and seconds past a minute. */
+export function elapsedParts(ms: number): { m: number; s: number } | null {
+  const secs = Math.floor(Math.max(0, ms) / 1000);
+  if (secs < 2) return null;
+  return { m: Math.floor(secs / 60), s: secs % 60 };
+}
+
+/**
+ * The turn the bar tells for one agent on its own, its phrase and its time alike: a turn it stopped, or one that
+ * failed, can still be listed beside the one at work.
+ */
+const turnAtWork = (runs: LiveRun[], agentId: string) =>
+  runs.find((r) => r.agentId === agentId && r.status !== "failed" && r.status !== "canceled");
+
+/** How long one agent on its own has been at it ("16 s", "1 min 5 s"): none for several, or while it asks another. */
+export function barElapsed(t: TFunction, entries: ActivityEntry[], runs: LiveRun[], now: number): string | null {
+  const agents = entries.filter((e) => e.type === "agent");
+  const only = agents.length === 1 ? agents[0] : undefined;
+  if (!only || only.consult?.status === "asking") return null;
+  const run = turnAtWork(runs, only.id);
+  const took = run ? elapsedParts(now - (run.startedAt ?? now)) : null;
+  if (!took) return null;
+  return took.m > 0 ? t("run.elapsedMinutes", { m: took.m, s: took.s }) : t("run.elapsedSeconds", { n: took.s });
 }
 
 /** "trabalhando", "consultando o GitHub". */
 export const activityVerb = (t: TFunction, a: Activity) => t(`chat.activity.${a.kind}`, { app: appLabel(a) });
 
-/** The app as people read it: a connector's slug ("himetrica") starts with a capital ("Himetrica"). */
+/**
+ * The app as people read it: a connector's slug ("himetrica") starts with a capital ("Himetrica"); a name with
+ * capitals of its own stays as it is written ("iCloud").
+ */
 export const appLabel = (a: { kind: string; app?: string }) => {
   const app = a.app ?? "";
-  return a.kind === "consulting" ? app.charAt(0).toUpperCase() + app.slice(1) : app;
+  return a.kind === "consulting" && app === app.toLowerCase() ? app.charAt(0).toUpperCase() + app.slice(1) : app;
 };
 
 /** Wraps a name in the sentence (the bar shows names in bold); plain text by default. */
 export type MarkName = (name: string) => string;
 const plain: MarkName = (name) => name;
 
-/** "Theo", "Theo e Iris", "Theo, Iris e mais 2". */
+/** "Theo", "Theo e Iris", "Theo e mais 2". */
 export function listNames(t: TFunction, names: string[], mark: MarkName = plain) {
   if (names.length <= 2) return joinNames(names.map(mark), t("newAgent.and"));
-  return t("chat.namesMore", {
-    first: mark(names[0] ?? ""),
-    second: mark(names[1] ?? ""),
-    count: names.length - 2,
-  });
+  return t("chat.namesMore", { first: mark(names[0] ?? ""), count: names.length - 1 });
 }
 
 /** One consultation's phrase: "Dev está perguntando ao Infra", "Infra respondeu. Dev está escrevendo". */
@@ -405,23 +461,37 @@ function consultPhrase(t: TFunction, from: string, c: EntryConsult, mark: MarkNa
   return t("chat.consult.writing", { from: mark(from) });
 }
 
+/** "Theo e Iris estão trabalhando", "Marina está digitando". */
+const doingPhrase = (t: TFunction, names: string[], activity: Activity, mark: MarkName) =>
+  t("chat.doing", { count: names.length, names: listNames(t, names, mark), doing: activityVerb(t, activity) });
+
+/** The agents' part: one says what it does (or whom it asks); several just work, their blocks say the rest. */
+function agentsPhrase(t: TFunction, entries: ActivityEntry[], mark: MarkName) {
+  const agents = entries.filter((e) => e.type === "agent");
+  const only = agents.length === 1 ? agents[0] : undefined;
+  if (only?.consult) return consultPhrase(t, only.name, only.consult, mark);
+  if (agents.length === 0) return "";
+  const names = agents.map((e) => e.name);
+  return doingPhrase(t, names, only?.activity ?? { kind: "thinking" }, mark);
+}
+
+const typingNames = (entries: ActivityEntry[]) => entries.flatMap((e) => (e.type === "person" ? [e.name] : []));
+
+const PHRASES_SEP = " · ";
+
+/** "Marina está digitando"; "" when nobody types. */
+function typingPhrase(t: TFunction, entries: ActivityEntry[], mark: MarkName) {
+  const people = typingNames(entries);
+  return people.length > 0 ? doingPhrase(t, people, { kind: "typing" }, mark) : "";
+}
+
 /**
- * The bar's sentence: "Theo, Iris e mais 2 estão trabalhando · Marina está
- * digitando…"; "" when nobody. `mark` wraps each name (for bold).
+ * The bar's sentence, one short line however many are at work: "Theo e mais 2 estão trabalhando · Marina
+ * está digitando…"; "" when nobody. `mark` wraps each name (for bold).
  */
 export function activitySentence(t: TFunction, entries: ActivityEntry[], mark: MarkName = plain) {
-  const groups = groupActivities(entries);
-  if (groups.length === 0) return "";
-  const phrases = groups.map((g) =>
-    g.consult
-      ? consultPhrase(t, g.names[0] ?? "", g.consult, mark)
-      : t("chat.doing", {
-          count: g.names.length,
-          names: listNames(t, g.names, mark),
-          doing: activityVerb(t, g.activity),
-        }),
-  );
-  return `${phrases.join(" · ")}…`;
+  const phrases = [agentsPhrase(t, entries, mark), typingPhrase(t, entries, mark)].filter(Boolean);
+  return phrases.length > 0 ? `${phrases.join(PHRASES_SEP)}…` : "";
 }
 
 /** The bar's sentence as plain text (see `activitySentence`). */
@@ -462,7 +532,7 @@ export function barPhrase(
   const sentence = activitySentence(t, entries, mark);
   const only = entries.length === 1 ? entries[0] : undefined;
   if (only?.type !== "agent" || only.consult || only.activity.kind === "writing") return sentence;
-  const run = runs.find((r) => r.agentId === only.id);
+  const run = turnAtWork(runs, only.id);
   if (!run) return sentence;
   const calls = (run.work ?? []).filter((w) => w.kind === "call");
   if (only.activity.kind === "thinking" && calls.length === 0) {
@@ -478,4 +548,26 @@ export function barPhrase(
   const said = narrationOf(run).at(-1);
   if (said) pool.push(t("chat.phrase.said", { name: mark(only.name), text: said }));
   return pool[tick % pool.length] ?? sentence;
+}
+
+/**
+ * `barPhrase` in pieces, in the order they give way when the bar is short: the agents' words (then the " · "
+ * after them, so it never leads the line), the names of who is typing, and never what they do (" está
+ * digitando…"). Joined, they read as `barPhrase`; all but the first are "" when nobody types.
+ */
+export function barWords(
+  t: TFunction,
+  entries: ActivityEntry[],
+  runs: LiveRun[],
+  tick: number,
+  now: number,
+  mark: MarkName = plain,
+): [agents: string, sep: string, typers: string, typing: string] {
+  const typing = typingPhrase(t, entries, mark);
+  if (!typing) return [barPhrase(t, entries, runs, tick, now, mark), "", "", ""];
+  const agents = agentsPhrase(t, entries, mark);
+  // The names lead the phrase in pt-BR and en; a language that puts them later keeps the phrase whole.
+  const names = listNames(t, typingNames(entries), mark);
+  const at = typing.startsWith(names) ? names.length : 0;
+  return [agents, agents ? PHRASES_SEP : "", typing.slice(0, at), `${typing.slice(at)}…`];
 }

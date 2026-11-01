@@ -47,6 +47,23 @@ export function isWaitingHandoff(h: Pick<BrowserHandoff, "status" | "expiresAt">
   return !h.expiresAt || new Date(h.expiresAt).getTime() > now;
 }
 
+/**
+ * Whether a waiting request is this person's to answer (its card says it waits for you, the bar above the
+ * composer brings it back, its buttons show): the person it was asked of and the agent's responsible person,
+ * who are both notified. Asked of no one in particular (no one behind the run and no responsible person, or a
+ * desktop several people may drive), it is for whoever may control computers. The server checks again when
+ * they open it (ADR 0040 §6, ADR 0058 §4).
+ */
+export function handoffIsMine(
+  h: Pick<BrowserHandoff, "requestedForUserId">,
+  meId: string,
+  ownerUserId: string | null | undefined,
+  mayControlComputers: boolean,
+): boolean {
+  if (ownerUserId && ownerUserId === meId) return true;
+  return h.requestedForUserId ? h.requestedForUserId === meId : mayControlComputers;
+}
+
 /** Whole minutes left before a waiting request expires (at least 1 while it lasts); null without a deadline. */
 export function handoffMinutesLeft(h: Pick<BrowserHandoff, "expiresAt">, now = Date.now()): number | null {
   if (!h.expiresAt) return null;

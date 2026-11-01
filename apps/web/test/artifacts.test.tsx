@@ -15,7 +15,7 @@ import {
 import { daysLeft, groupArtifacts, rangeOf, sortArtifacts } from "@agenteschat/client/lib/drive";
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
 import { fileSaver } from "@/components/artifacts/ArtifactViewer";
-import { HTML_SANDBOX } from "@/components/artifacts/HtmlFrame";
+import { HTML_SANDBOX, withShim } from "@/components/artifacts/HtmlFrame";
 import { setMermaidRenderer } from "@/components/artifacts/Mermaid";
 import { Markdown, parseMarkdown } from "@/lib/markdown";
 import { ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
@@ -138,8 +138,14 @@ describe("artifact cards in the chat", () => {
     expect(img.getAttribute("src")?.startsWith("data:image/svg+xml")).toBe(true);
 
     const html = card("Painel de erros da semana");
-    expect(html.textContent).toContain("Página interativa. Abra para ver.");
-    expect(html.querySelector("iframe")).toBeNull();
+    // A live thumbnail: the same sandbox, a picture with no scrollbar, out of the tab order and hidden from screen readers.
+    await settle(3);
+    expect(within(html).getByRole("img", { name: "Página interativa. Abra para ver." })).toBeTruthy();
+    const thumb = html.querySelector("iframe") as HTMLIFrameElement;
+    expect(thumb.getAttribute("sandbox")).toBe("allow-scripts");
+    expect(thumb.getAttribute("scrolling")).toBe("no");
+    expect(thumb.getAttribute("tabindex")).toBe("-1");
+    expect(thumb.getAttribute("aria-hidden")).toBe("true");
   });
 });
 
@@ -216,11 +222,14 @@ describe("artifact viewer", () => {
     expect(changed?.children[1]?.className).toContain("ac-diff__line--add");
   });
 
-  test("diagram: drawn as an image", async () => {
+  test("diagram: drawn as an image, in the same card as a Markdown fence", async () => {
     await openChannel();
     const dialog = await openCard("Organograma do time");
     await settle(3);
-    expect(within(dialog).getByRole("img", { name: "Diagrama: Organograma do time" })).toBeTruthy();
+    // The viewer now uses the ```mermaid fence card, so the drawing sits in its preview (and waits for a press where the
+    // frame shares the page's thread). The fake renderer here runs apart, so it's drawn.
+    const img = dialog.querySelector(".code-card__preview img") as HTMLImageElement | null;
+    expect(img?.getAttribute("src")?.startsWith("data:image/svg+xml")).toBe(true);
   });
 
   test("html: only in a sandboxed iframe with allow-scripts and never allow-same-origin", async () => {
@@ -234,6 +243,8 @@ describe("artifact viewer", () => {
     expect(frame.getAttribute("sandbox")).not.toContain("allow-same-origin");
     expect(frame.hasAttribute("srcdoc")).toBe(false);
     expect(frame.getAttribute("src")).toMatch(/^(blob:|data:text\/html)/);
+    expect(frame.hasAttribute("loading")).toBe(false);
+    expect(frame.hasAttribute("scrolling")).toBe(false);
     expect(frame.getAttribute("title")).toBe("Página: Painel de erros da semana");
     // The page is never inlined into our DOM.
     expect(document.body.innerHTML).not.toContain("Erros da semana</h1>");
@@ -744,5 +755,17 @@ describe("deleting a file", () => {
     expect(artifactRefs({ artifacts: [{ id: "x", deleted: true, title: "Relatório" }] })).toEqual([
       { id: "x", deleted: true, title: "Relatório" },
     ]);
+  });
+});
+
+describe("html shim", () => {
+  test("goes after <head>, else after the doctype, else first", () => {
+    const head = withShim("<!doctype html><html><head><title>x</title></head><body></body></html>");
+    expect(head.startsWith("<!doctype html><html><head><script>")).toBe(true);
+    expect(head.indexOf("<script>")).toBeLessThan(head.indexOf("<title>"));
+    const doctype = withShim("<!DOCTYPE html>\n<body><h1>a</h1></body>");
+    expect(doctype.startsWith("<!DOCTYPE html><script>")).toBe(true);
+    expect(withShim("<h1>a</h1>").startsWith("<script>")).toBe(true);
+    expect(withShim("<header>a</header>").startsWith("<script>")).toBe(true);
   });
 });

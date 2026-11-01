@@ -1,3 +1,4 @@
+import { cutText } from "./format";
 import { agentSkillByName, SKILL_LIMITS, type SkillDeps, skillFilesOf, skillFileText } from "./skills";
 import type { ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 
@@ -71,7 +72,7 @@ export function createSkillToolSource(deps: SkillDeps): ToolSource {
           const text = await skillFileText(deps, skill, str(input.path));
           const shown =
             text.length > SKILL_LIMITS.fileReadChars
-              ? `${text.slice(0, SKILL_LIMITS.fileReadChars)}\n[truncated]`
+              ? `${cutText(text, SKILL_LIMITS.fileReadChars)}\n[truncated]`
               : text;
           return { content: `${skill.name}/${str(input.path)}:\n${shown}` };
         } catch (error) {

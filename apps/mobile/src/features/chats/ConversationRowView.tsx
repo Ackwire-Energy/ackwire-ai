@@ -36,6 +36,7 @@ export const ConversationRowView = memo(function ConversationRowView({
   agent,
   onHold,
   holdLabel,
+  onStart,
 }: {
   row: ConversationRow;
   /** A hairline above (every row but the first). */
@@ -47,6 +48,8 @@ export const ConversationRowView = memo(function ConversationRowView({
   onHold?: (channelId: string) => void;
   /** What the long press does, for screen readers. */
   holdLabel?: string;
+  /** An agent with no conversation yet (`channelId: ""`): opens one with it, given the agent (stable, memoized row). */
+  onStart?: (agentId: string) => void;
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
@@ -56,7 +59,7 @@ export const ConversationRowView = memo(function ConversationRowView({
   const lastText = (last: LastLine | null) => {
     if (!last) return { who: "", text: "" };
     const who = last.name || (last.author ? dir.nameOf(last.author) : "");
-    return { who, text: previewBody(t, last.text, last.meta ?? null) };
+    return { who, text: previewBody(t, last.text, last.meta ?? null, last.mediaKind) };
   };
   const agentDm = r.kind === "dm" && r.with.type === "agent";
   /** A DM with nothing in it yet: who the agent is (as its first conversation says), or a word to start. */
@@ -104,7 +107,8 @@ export const ConversationRowView = memo(function ConversationRowView({
     ) : (
       <Tile icon="hash" size={AVATAR} />
     );
-  const name = r.kind === "channel" ? r.name : r.kind === "dm" ? r.with.name : r.title;
+  // A thread on a GIF or a sticker has no words of its own to title it (ADR 0091).
+  const name = r.kind === "channel" ? r.name : r.kind === "dm" ? r.with.name : r.title || t("mobile.chat.thread");
   // Whose orbit: the DM's agent, or the mission's.
   const orbitAgent = r.kind === "dm" ? r.with.id : r.kind === "mission" ? r.mission?.agentId : null;
   const orbitColor = agentLook(orbitAgent ? dir.agentById.get(orbitAgent) : undefined).color;
@@ -191,7 +195,8 @@ export const ConversationRowView = memo(function ConversationRowView({
     );
   } else {
     const last = lastText(r.last);
-    const text = r.kind === "channel" ? last.text || r.topic : r.last ? last.text : introLine();
+    const text =
+      r.kind === "channel" ? last.text || r.topic || t("mobile.chats.channelEmpty") : r.last ? last.text : introLine();
     // In a DM the other side's own words need no "Ada:" before them (the row is already Ada's).
     const theirs = r.kind === "dm" && r.last?.author?.type === r.with.type && r.last.author.id === r.with.id;
     const lead = theirs ? "" : last.who;
@@ -210,7 +215,9 @@ export const ConversationRowView = memo(function ConversationRowView({
   if (r.kind === "thread" && r.closed) label = `${t("mobile.chats.closed")}, ${label}`;
 
   const open = () =>
-    router.push(chatHref(r.channelId, r.kind === "thread" || r.kind === "mission" ? r.threadId : null));
+    onStart && r.kind === "dm"
+      ? onStart(r.with.id)
+      : router.push(chatHref(r.channelId, r.kind === "thread" || r.kind === "mission" ? r.threadId : null));
   const a11y = [
     name,
     presenceWord,

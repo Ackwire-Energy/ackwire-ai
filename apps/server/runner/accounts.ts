@@ -22,8 +22,16 @@ import {
   type RunnerAccountInfo,
   type WireSecretBox,
 } from "@agenteschat/adapters/machine-protocol";
-import { generateSecretKeyPair, openSecret } from "@agenteschat/adapters/secret-box";
-import { isPlanId, type PlanId, planKeyFits, planOf } from "@agenteschat/providers/plans";
+import { generateSecretKeyPair, openSecret, redactSecrets } from "@agenteschat/adapters/secret-box";
+import {
+  type CodingPlan,
+  isPlanId,
+  PLAN_ALIASES,
+  type PlanId,
+  planKeyFits,
+  planModel,
+  planOf,
+} from "@agenteschat/providers/plans";
 import { errnoCode, RunnerError } from "./errors";
 import { killTree } from "./exec";
 import { claudeKeptPlan, claudePlan, claudeTier, resolveCommand } from "./executors";
@@ -36,6 +44,7 @@ import {
   usageCrossed,
   withRateLimit,
 } from "./plan-usage";
+import type { TaskSecrets } from "./tasks";
 
 /**
  * The computer brains' accounts on this machine (ADR 0041). An account is a
@@ -252,6 +261,111 @@ export function lentAccounts(root = SYSTEM_ACCOUNTS_ROOT) {
       }
     },
   };
+}
+
+// ── An agent's CLI on its account (ADR 0041 §5): turns and tasks alike ──────
+
+/** The accounts' folders: root's, or those lent to this agent's worker, and its own folder for one root keeps. */
+export interface AccountFolders {
+  accountDir(kind: AccountKind, id: string): string | null;
+  /** System mode, in a worker (protocol 29): this agent's own folder for an account root keeps (`AccountGrant`). */
+  agentHome?(kind: AccountKind, id: string): string | null;
+}
+
+/** What a CLI signs in with on an account: the folder that is its home, and what root handed over for it. */
+export interface AccountSignIn {
+  home: string;
+  /** A coding plan's key (protocol 20): in the CLI's env, under the plan's own name. */
+  planKey?: { provider: PlanId; key: string };
+  /** A token root keeps (protocol 29): on descriptor 3 only (`TOKEN_FD_ENV`), never in an env. */
+  token?: string;
+}
+
+/** What a turn or task says when root has nothing to sign its account in with (signed out on the computer). */
+export const ACCOUNT_SIGNED_OUT = "This account is signed out on this computer. Sign in again in AI accounts.";
+
+/**
+ * The account's folder or nothing, never the computer's own sign-in instead (ADR 0041 §5). One root keeps
+ * (protocol 29) works in this agent's own folder for it, with what root handed over (`grant`). `signed_out`: root
+ * has nothing for it; `missing`: no such folder here.
+ */
+export async function accountSignIn(
+  folders: AccountFolders | undefined,
+  kind: AccountKind,
+  id: string,
+  grant?: AccountGrant,
+): Promise<AccountSignIn | "signed_out" | "missing"> {
+  if (grant?.kind === "none") return "signed_out";
+  const home = grant ? folders?.agentHome?.(kind, id) : folders?.accountDir(kind, id);
+  if (!home) return "missing";
+  const planKey =
+    grant?.kind === "key" ? { provider: grant.provider, key: grant.key } : grant ? null : await planKeyOf(home);
+  return { home, ...(planKey ? { planKey } : {}), ...(grant?.kind === "token" ? { token: grant.token } : {}) };
+}
+
+/** The redaction of a CLI on an account also hides the key or token it got (an agent's shell could print a key). */
+export function withSignIn(secrets: TaskSecrets | null | undefined, signIn: AccountSignIn): TaskSecrets | null {
+  const secret = signIn.planKey
+    ? { name: planOf(signIn.planKey.provider)?.claudeCode.tokenEnv ?? "PLAN_KEY", value: signIn.planKey.key }
+    : signIn.token
+      ? { name: "CLAUDE_CODE_OAUTH_TOKEN", value: signIn.token }
+      : null;
+  if (!secret) return secrets ?? null;
+  const before = secrets?.redact ?? ((text: string) => text);
+  return {
+    env: secrets?.env ?? {},
+    redact: (text) => redactSecrets(before(text), [secret]),
+    hold: Math.max(secrets?.hold ?? 0, secret.value.length - 1),
+  };
+}
+
+const API_ANTHROPIC = "https://api.anthropic.com";
+
+/** What sends requests elsewhere besides the base URL: proxies and the certificates trusted on the way. */
+const NETWORK_ENV = [
+  "HTTPS_PROXY",
+  "https_proxy",
+  "HTTP_PROXY",
+  "http_proxy",
+  "ALL_PROXY",
+  "all_proxy",
+  "NO_PROXY",
+  "no_proxy",
+  "NODE_EXTRA_CA_CERTS",
+  "SSL_CERT_FILE",
+  "SSL_CERT_DIR",
+  "NODE_TLS_REJECT_UNAUTHORIZED",
+] as const;
+
+/** Claude Code's switches to another company's cloud. */
+const CLOUD_ENV = ["CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY"] as const;
+
+/**
+ * The `env` of a Claude Code turn's or task's own `--settings`, which outranks the project's settings (the agent
+ * can write those, and a cloned repo can bring them): the endpoint (the plan's, else Anthropic's), no other
+ * cloud, and the runner's own proxies and certificates (or none), so the sign-in or key goes nowhere else;
+ * for a plan, what each model alias runs. The key itself stays in the process env (the CLI doesn't sign in
+ * with one given only here). `own` (the computer's own sign-in): the endpoint and cloud the runner itself
+ * runs with, whatever its owner set there, still out of a project's reach.
+ */
+export function accountSettingsEnv(
+  plan: CodingPlan | undefined,
+  model: string | undefined,
+  runner = process.env,
+  own = false,
+) {
+  const env: Record<string, string> = {
+    ANTHROPIC_BASE_URL: plan?.claudeCode.baseUrl ?? (own ? runner.ANTHROPIC_BASE_URL : undefined) ?? API_ANTHROPIC,
+  };
+  for (const k of CLOUD_ENV) env[k] = own ? (runner[k] ?? "") : "";
+  for (const k of NETWORK_ENV) env[k] = runner[k] ?? "";
+  if (!plan) return env;
+  for (const alias of PLAN_ALIASES) env[`ANTHROPIC_DEFAULT_${alias.toUpperCase()}_MODEL`] = planModel(plan, alias).id;
+  // A subagent called with Claude Code's `fable` alias would otherwise ask the plan for a Claude model it doesn't serve.
+  env.ANTHROPIC_DEFAULT_FABLE_MODEL = planModel(plan, "opus").id;
+  env.CLAUDE_CODE_SUBAGENT_MODEL = planModel(plan, model).id;
+  env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1";
+  return { ...env, ...plan.claudeCode.env };
 }
 
 type Chown = (file: string, uid: number, gid: number) => Promise<void>;

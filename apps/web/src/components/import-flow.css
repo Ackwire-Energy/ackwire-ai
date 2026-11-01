@@ -146,7 +146,7 @@
   border-color: var(--line-strong);
   background: var(--raised);
 }
-.imp-drop__area:focus-visible {
+html:not([data-pointer]) .imp-drop__area:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -462,7 +462,7 @@ label.imp-row__text {
 .imp-link:hover {
   background: var(--sunken);
 }
-.imp-link:focus-visible {
+html:not([data-pointer]) .imp-link:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }

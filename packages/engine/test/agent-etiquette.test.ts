@@ -11,7 +11,7 @@ import {
   isShortFollowUp,
   isStopRequest,
   type JudgeQuestion,
-  mentionHandoffs,
+  mentionNeedsNothing,
   postPersonMessage,
   type RouterStrategy,
   routeMessage,
@@ -25,7 +25,7 @@ afterEach(async () => {
   await current?.close();
 });
 
-/** The handle a `mention_handoff` question is about ("@qa"). */
+/** The handle a `mention_needs_nothing` question is about ("@qa"). */
 const askedHandle = (q: JudgeQuestion) =>
   String((q.instructions as { agent?: { handle?: string } }).agent?.handle ?? "");
 const messageText = (state: Record<string, unknown>) => String((state.message as { text?: string })?.text ?? "");
@@ -48,9 +48,9 @@ async function addQa() {
 describe("an agent's @mention of another agent", () => {
   test("the judge gets one yes/no per mentioned agent, about that agent, with the message as written", async () => {
     const judge = createFakeJudge((kind, _id, _state, q) =>
-      kind === "mention_handoff" && askedHandle(q) === "@jorge" ? 0.9 : 0.1,
+      kind === "mention_needs_nothing" && askedHandle(q) === "@jorge" ? 0.1 : 0.9,
     );
-    const scores = await mentionHandoffs(judge, {
+    const scores = await mentionNeedsNothing(judge, {
       orgId: "o",
       body: "@jorge pode revisar o PR? O @theo já aprovou.",
       author: "@dev",
@@ -61,24 +61,24 @@ describe("an agent's @mention of another agent", () => {
     });
     expect(scores).toEqual(
       new Map([
-        ["a-jorge", 0.9],
-        ["a-theo", 0.1],
+        ["a-jorge", 0.1],
+        ["a-theo", 0.9],
       ]),
     );
     const [call] = judge.calls;
-    expect(Object.keys(call?.questions ?? {})).toEqual(["asks_0", "asks_1"]);
+    expect(Object.keys(call?.questions ?? {})).toEqual(["nothing_0", "nothing_1"]);
     expect(messageText(call?.state ?? {})).toBe("@jorge pode revisar o PR? O @theo já aprovou.");
   });
 
-  test("a reference doesn't start the other agent; a request does, once, and the reply can't hand back", async () => {
+  test("a reference doesn't start the other agent; a request does, once, and a thanks back starts nobody", async () => {
     let turn = 0;
     f = await setup({
-      // The judge hears "pode revisar?" as a hand-off and "como o @qa disse" as a reference.
+      // The judge reads "pode revisar?" as needing QA; "como o @qa disse" and QA's thanks need nobody.
       judge: (kind, _id, state) =>
-        kind === "mention_handoff" && messageText(state).includes("pode revisar") ? 0.9 : 0.1,
+        kind === "mention_needs_nothing" && messageText(state).includes("pode revisar") ? 0.1 : 0.9,
       reply: (req) => {
         const mine = systemText(req.system).includes("You are Dev (@dev)");
-        if (!mine) return { chunks: ["@dev revisei, pode seguir?"] }; // QA tries to hand back
+        if (!mine) return { chunks: ["Valeu, @dev! Revisado."] };
         turn++;
         return { chunks: [turn === 1 ? "Como o @qa disse, está tudo certo." : "@qa pode revisar o PR?"] };
       },
@@ -91,7 +91,7 @@ describe("an agent's @mention of another agent", () => {
     await post("@dev pede revisão do PR", first.id);
     await drainOutbox(f.db, f.handlers);
     const runs = await f.db.select().from(schema.agentRuns).orderBy(asc(schema.agentRuns.createdAt));
-    // Dev (hop 1) asked QA (hop 2); QA's "@dev …?" doesn't start Dev again.
+    // Dev (hop 1) asked QA (hop 2); QA's thanks doesn't start Dev again.
     expect(runs.map((r) => r.hop)).toEqual([1, 1, 2]);
   });
 
@@ -110,12 +110,12 @@ describe("an agent's @mention of another agent", () => {
         seen.push(String(init?.body));
         return Response.json({
           model: "jev-1",
-          answers: { asks_0: { type: "noul", noul: 0.83 } },
+          answers: { nothing_0: { type: "noul", noul: 0.83 } },
           usage: { input_tokens: 50 },
         });
       }) as unknown as typeof fetch,
     });
-    const scores = await mentionHandoffs(judge, {
+    const scores = await mentionNeedsNothing(judge, {
       orgId: "o",
       body: "Vou alinhar isso com @jorge depois.",
       author: "@dev",
@@ -215,7 +215,7 @@ describe("short follow-ups without a mention", () => {
     await insertMessage(f.db, {
       orgId: f.org.id,
       channelId: f.general.id,
-      author: { type: "agent", agentId: qa.id, runId: null, hop: 1 },
+      author: { type: "agent", agentId: qa.id, runId: null, hop: 1, stretchId: null },
       body: "Os testes de integração falharam no deploy.",
     });
     // "você" is ambiguous to the router (Dev a bit ahead): it's for QA, who just spoke.
@@ -268,20 +268,25 @@ test("an agent knows what the other agents here can do and points to them", asyn
 
 describe("the judge decides every agent-to-agent mention (the 20:35 loop)", () => {
   test("a question to three agents gets one answer each and at most one hand-off; decisions are recorded", async () => {
-    // "fale com o @qa ou o @ops" names them; QA's "@ops você consegue…?" hands off to Ops.
-    const asks: Record<string, number> = { "@ops": 0.9, "@qa": 0.2, "@dev": 0.2 };
+    // "fale com o @qa ou o @ops" names them; QA's "@ops você consegue…?" needs Ops; the rest needs nobody.
     f = await setup({
       judge: (kind, _id, state, q) =>
-        kind !== "mention_handoff" || messageText(state).includes("fale com") ? 0.1 : (asks[askedHandle(q)] ?? 0),
+        kind === "mention_needs_nothing" &&
+        messageText(state).includes("você consegue ver os logs") &&
+        askedHandle(q) === "@ops"
+          ? 0.1
+          : 0.9,
       reply: (req) => {
         const system = systemText(req.system);
         const last = JSON.stringify(req.messages.at(-1)?.content);
         if (system.includes("You are Dev (@dev)")) return { chunks: ["Não sei, fale com o @qa ou o @ops."] };
         if (system.includes("You are QA (@qa)")) return { chunks: ["@ops você consegue ver os logs?"] };
-        // Ops: first its own answer to the person, then (if asked by QA) a reply that tries to hand back.
+        // Ops: first its own answer to the person, then (if asked by QA) its sign-off to QA and Dev.
         return {
           chunks: [
-            last.includes("você consegue ver os logs") ? "@dev @qa sim, já vi, pode seguir?" : "Eu vejo os logs, @qa.",
+            last.includes("você consegue ver os logs")
+              ? "@dev @qa sim, já vi, está tudo certo."
+              : "Eu vejo os logs, @qa.",
           ],
         };
       },
@@ -313,8 +318,9 @@ describe("the judge decides every agent-to-agent mention (the 20:35 loop)", () =
     expect(judged.find((d) => d.selectedAgentIds.length === 1)?.selectedAgentIds).toEqual([ops.id]);
   });
 
-  test("when the judge doesn't hear a hand-off, a mention alone starts nobody", async () => {
+  test("when the judge is sure the message needs nothing, a mention alone starts nobody", async () => {
     f = await setup({
+      judge: (kind) => (kind === "mention_needs_nothing" ? 0.9 : undefined),
       reply: (req) =>
         systemText(req.system).includes("You are Dev (@dev)")
           ? { chunks: ["Vou alinhar isso com @qa depois."] }

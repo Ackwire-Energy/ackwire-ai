@@ -5,6 +5,7 @@ import {
   browserHandoffOf,
   controlledBy,
   createTouchInput,
+  handoffIsMine,
   heldTakeoversHere,
 } from "@agenteschat/client";
 import { sortWaiting, waitingCardOf } from "../../src/features/activity/logic";
@@ -70,6 +71,25 @@ describe("the help request card", () => {
     expect(hostOf("https://Dashboard.Stripe.com/login?x=1")).toBe("dashboard.stripe.com");
     expect(hostOf("about:blank")).toBe("");
     expect(hostOf(undefined)).toBe("");
+  });
+});
+
+describe("whose help request it is", () => {
+  const asked = (requestedForUserId: string | null) => ({ requestedForUserId });
+
+  test("the person it was asked of and the agent's responsible person, not everyone else", () => {
+    expect(handoffIsMine(asked("me"), "me", "owner", false)).toBe(true);
+    expect(handoffIsMine(asked("someone"), "me", "me", false)).toBe(true);
+    expect(handoffIsMine(asked("someone"), "me", "owner", false)).toBe(false);
+  });
+
+  test("an admin isn't called for one asked of someone else", () => {
+    expect(handoffIsMine(asked("someone"), "me", "owner", true)).toBe(false);
+  });
+
+  test("asked of no one in particular: only who may control computers", () => {
+    expect(handoffIsMine(asked(null), "me", null, true)).toBe(true);
+    expect(handoffIsMine(asked(null), "me", null, false)).toBe(false);
   });
 });
 
@@ -258,7 +278,7 @@ describe("a take over held in the conversation (the card outlives the run's live
   });
 });
 
-describe("fingers on the page in control (ADR 0040 §12)", () => {
+describe("fingers on the page in control (ADR 0040 §13)", () => {
   // A 1280×720 page in the card's 16:10 box (320×200): drawn 320×180, with 10 px of band above and below.
   const meta = { deviceWidth: 1280, deviceHeight: 720 };
   const box = { width: 320, height: 200 };

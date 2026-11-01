@@ -3,6 +3,7 @@ import { and, type Database, type Executor, eq, inArray, schema } from "@agentes
 import { getAgentCached } from "./agents";
 import { type BrowserHandoffRow, finishHandoff } from "./browser/handoff";
 import type { AgentConsultationRow } from "./consultations";
+import { cutText } from "./format";
 import type { Judge } from "./judge";
 import type { Message } from "./messages";
 import { enqueue } from "./outbox";
@@ -184,7 +185,7 @@ export function detachOf(wait: RunWait): Detach | null {
       waitId: wait.id,
       kind: wait.kind,
       from: "Your request for help in the browser",
-      text: `Still open: your request for a person's help in your browser ("${h.instructions.slice(0, 300)}"). ${MEANWHILE} Its result will reach you as a notice later; until then your browser stays with the person (your browser tools wait for it).`,
+      text: `Still open: your request for a person's help in your browser ("${cutText(h.instructions, 300)}"). ${MEANWHILE} Its result will reach you as a notice later; until then your browser stays with the person (your browser tools wait for it).`,
     };
   }
   if (wait.kind === "consultation" && wait.consultation) {

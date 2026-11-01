@@ -36,6 +36,15 @@ export {
   reactionPose,
   setGaze,
 } from "./agent/live";
+export { addLiveSticker, liveStickerCount } from "./agent/sticker-live";
+export {
+  drawSticker,
+  STICKER_MOODS,
+  STICKER_STILL_T,
+  type StickerLook,
+  type StickerMood,
+  stickerSeed,
+} from "./agent/stickers";
 export {
   BRAIN_GRID,
   BRAIN_KINDS,
@@ -56,6 +65,7 @@ export {
   normalizeAppearance,
   randomAppearance,
 } from "./components/AgentLook";
+export { AgentSticker, type AgentStickerProps } from "./components/AgentSticker";
 export { ApprovalCard, type ApprovalCardProps, type ApprovalStatus } from "./components/ApprovalCard";
 export { type AutonomyKind, AutonomyPixels, drawAutonomy } from "./components/AutonomyPixels";
 export {
@@ -76,6 +86,7 @@ export {
 } from "./components/Brain";
 export { Button, type ButtonProps, type ButtonVariant } from "./components/Button";
 export { Carousel, type CarouselProps } from "./components/Carousel";
+export { CHAT_GIF_MAX, ChatGif, type ChatGifProps } from "./components/ChatGif";
 export {
   Checkbox,
   CheckboxPill,
@@ -125,6 +136,7 @@ export {
   EmojiPicker,
   type EmojiPickerLabels,
   EmojiPickerPopover,
+  type PickerTab,
   readRecentEmoji,
   rememberEmoji,
 } from "./components/EmojiPicker";
@@ -153,6 +165,16 @@ export {
 export { InfoHint, type InfoHintProps } from "./components/InfoHint";
 export { isApple, Kbd, modKey, shortcut } from "./components/Kbd";
 export { Logo, LogoMark, type LogoProps } from "./components/Logo";
+export {
+  GifPicker,
+  type GifPickerLabels,
+  masonryColumns,
+  type PickerAgent,
+  type PickerGif,
+  StickerPicker,
+  type StickerPickerLabels,
+  stickerMoodsFor,
+} from "./components/MediaPicker";
 export { AgentReadingBook } from "./components/MemoryPixels";
 export { Mention } from "./components/Mention";
 export {
@@ -165,12 +187,12 @@ export {
   MenuRadioGroup,
   MenuReactions,
   MenuSeparator,
+  MenuSub,
 } from "./components/Menu";
 export {
   MenuOverlay,
   MenuOverlayGroup,
   MenuOverlayItem,
-  MenuOverlayRow,
   MenuOverlaySeparator,
 } from "./components/MenuOverlay";
 export { DayDivider, Message, type MessageProps, MessageText } from "./components/Message";
@@ -196,11 +218,15 @@ export {
   limitOffers,
   type OfferAccount,
   PLAN_ALMOST,
+  PLAN_CRITICAL,
+  PLAN_TONE,
+  type PlanLevel,
   PlanMeter,
   type PlanMeterText,
   type PlanMeterUsage,
   type PlanMeterWindow,
   type PlanState,
+  planLevel,
   planLine,
   planState,
   planWindows,
@@ -311,7 +337,7 @@ export { type UsageDay, type UsageDayPart, UsageDays, UsageSwatch } from "./comp
 export { Reaction, Reactions, type WorkStep, WorkSummary } from "./components/Work";
 export { COMPUTER_GRID, COMPUTER_KINDS, COMPUTER_STATES, drawComputer } from "./computer/portrait.js";
 export { cx } from "./cx";
-export { hoverPointer, onScreenKeyboard, onScreenNow } from "./device";
+export { hoverPointer, movesByKeys, onScreenKeyboard, onScreenNow, trackInput } from "./device";
 export {
   EMOJI_CATEGORIES,
   EMOJIS,

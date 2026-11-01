@@ -2,6 +2,7 @@ import { type AgentAudience, useAgentDetail, useAgentGroups, useSettings, useUsa
 import { groupOf, NO_GROUP } from "@agenteschat/client/lib/agent-groups";
 import { audienceSummary, audienceWidens } from "@agenteschat/client/lib/audience";
 import { engineOfBrain } from "@agenteschat/client/lib/brain";
+import { coordinatorNote } from "@agenteschat/client/lib/coordinator";
 import { formatMonth, formatPercent, formatTokensShort, formatUsd } from "@agenteschat/client/lib/format";
 import {
   type AgentAppearance,
@@ -19,6 +20,8 @@ import {
   randomAppearance,
   Select,
   SettingNote,
+  SettingRow,
+  Switch,
 } from "@agenteschat/ui";
 import { type CSSProperties, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -125,6 +128,7 @@ export function SettingsTab({
   const month = formatMonth(locale, new Date());
   const visibleChannels = useVisibleChannels().list;
   const look = draft.look;
+  const coordination = coordinatorNote(t, dir.agents, agent.id, draft.coordinator);
   // On a plan (ADR 0059 §5) only its owner lets more people in.
   const onPlan = engineOfBrain(agent.brain?.kind) !== "agent";
   const [blocked, setBlocked] = useState(false);
@@ -166,7 +170,7 @@ export function SettingsTab({
           <Section
             id="identity"
             title={t("agentPage.settings.identity")}
-            fields={["name", "role", "look", "group"]}
+            fields={["name", "role", "look", "group", "coordinator"]}
             action={
               can("look") ? (
                 <Button
@@ -263,6 +267,26 @@ export function SettingsTab({
                 </Chip>
               </span>
             )}
+            <div className="agp-coord">
+              <SettingRow
+                title={t("coordinator.chip")}
+                description={t("coordinator.help", g)}
+                htmlFor="agp-coordinator"
+              >
+                <Switch
+                  id="agp-coordinator"
+                  checked={draft.coordinator}
+                  disabled={!can("coordinator")}
+                  onCheckedChange={(on) => set("coordinator", on)}
+                />
+              </SettingRow>
+              {coordination && (
+                <SettingNote icon="flag" live>
+                  {coordination}
+                </SettingNote>
+              )}
+              <WasLine changeKey="coordinator" />
+            </div>
           </Section>
 
           <Section id="budget" title={t("agentPage.settings.budget")} fields={["budget"]}>

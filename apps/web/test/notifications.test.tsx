@@ -751,7 +751,7 @@ describe("Esperando você: what only points somewhere is one row", () => {
     const wraps = block(css, "(max-width: 1023px)");
     /** The body of a rule written at the top level of `sheet` (two-space indented inside a media block). */
     const rule = (selector: string, sheet = css) =>
-      new RegExp(`\\n *${selector.replace(/[.()>:*]/g, "\\$&")} \\{([^}]*)\\}`).exec(sheet)?.[1] ?? "";
+      new RegExp(`\\n *${selector.replace(/[.()>:*[\]]/g, "\\$&")} \\{([^}]*)\\}`).exec(sheet)?.[1] ?? "";
     const value = (selector: string, prop: string, sheet = css) =>
       new RegExp(`(?:^|[;\\s])${prop}: ([^;]+);`).exec(rule(selector, sheet))?.[1];
     const px = (selector: string, prop: string, sheet = css) => Number.parseFloat(value(selector, prop, sheet) ?? "");
@@ -795,9 +795,9 @@ describe("Esperando você: what only points somewhere is one row", () => {
     expect(rule(".nt-av40", phone)).toBe("");
     expect(value(".nt-wi", "grid-template-columns", phone)).toBeUndefined();
     // A ghost reaches into the item's padding and the item clips: its ring goes inside, as the item's own does.
-    const ring = value(".nt-item:focus-visible", "box-shadow");
+    const ring = value("html:not([data-pointer]) .nt-item:focus-visible", "box-shadow");
     expect(ring).toStartWith("inset ");
-    expect(value(".nt-wi .ac-acts > .ac-btn--ghost:focus-visible", "box-shadow")).toBe(ring);
+    expect(value("html:not([data-pointer]) .nt-wi .ac-acts > .ac-btn--ghost:focus-visible", "box-shadow")).toBe(ring);
   });
 });
 

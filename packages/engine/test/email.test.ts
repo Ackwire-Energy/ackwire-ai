@@ -64,6 +64,8 @@ function poisoned(t: EmailTemplate, value = SENTINEL): EmailTemplate {
   for (const k of TYPED) if (typeof o[k] === "string") o[k] = value;
   if (Array.isArray(o.items)) o.items = o.items.map((i) => ({ ...i, agentName: value, title: value }));
   if (Array.isArray(o.orgNames)) o.orgNames = o.orgNames.map(() => value);
+  for (const list of ["topStalls", "topNoise"])
+    if (Array.isArray(o[list])) o[list] = (o[list] as object[]).map((w) => ({ ...w, name: value }));
   return o as EmailTemplate;
 }
 
@@ -127,6 +129,7 @@ describe("every email, in both languages", () => {
       workspace_deleting: true,
       workspace_restored: true,
       account_deleted: true,
+      autonomy_report: true,
     };
     expect(new Set<string>(Object.values(EMAIL_SAMPLES).map((t) => t.kind))).toEqual(new Set(Object.keys(kinds)));
   });
@@ -791,11 +794,13 @@ describe("outbox delivery", () => {
     await f.db.update(schema.users).set({ email: inviterEmail }).where(eq(schema.users.id, f.owner.id));
     await queueInvitationEmail(f.db, {
       orgId: f.org.id,
-      invitationId: "i1",
+      // An id, as the function reads the invitation's note and expiry (none here: no note, keyed by the link).
+      invitationId: crypto.randomUUID(),
       email: "new@example.com",
       role: "member",
       url: "https://x/invite/abcdefghijklmnop",
       inviterId: f.owner.id,
+      secret: "test-secret",
     });
     const [job] = (await f.db.select().from(schema.outbox)).filter((j) => j.kind === "email.send");
     // The workspace's agents for its picture: the fixture's one, with no look (its face is sky).

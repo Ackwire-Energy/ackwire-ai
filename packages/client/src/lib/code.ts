@@ -34,6 +34,7 @@ const LABELS: Record<string, string> = {
   kt: "Kotlin",
   markdown: "Markdown",
   md: "Markdown",
+  mermaid: "Mermaid",
   php: "PHP",
   py: "Python",
   python: "Python",

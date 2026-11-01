@@ -3,6 +3,7 @@ import { eq, schema } from "@agenteschat/db";
 import {
   addChannelMember,
   answerQuestion,
+  createAgent,
   createAgentRuns,
   createChannel,
   insertMessage,
@@ -357,7 +358,7 @@ export const SCENARIOS: Scenario[] = [
   },
 
   {
-    name: "10. the run a report woke is unattended: posting in another channel is refused",
+    name: "10. the run a report woke works as the agent itself: it posts in another channel it is in",
     runs: [
       handsOff,
       {
@@ -377,10 +378,13 @@ export const SCENARIOS: Scenario[] = [
       const [, woken] = await agentRuns(h);
       expect(woken).toMatchObject({ status: "done", background: false });
       expect(await stepsOf(h, woken?.id ?? "", "tool_result")).toEqual([
-        expect.objectContaining({ name: "post_message", isError: true, content: REFUSALS.unattendedElsewhere }),
+        expect.objectContaining({ name: "post_message", isError: false }),
       ]);
-      expect(await messagesIn(h.f, h.vars.tech ?? "")).toEqual([]);
-      expect((await agentPosts(h)).map((m) => [m.channelId, m.body])).toEqual([[h.f.general.id, TOLD]]);
+      expect((await messagesIn(h.f, h.vars.tech ?? "")).map((m) => m.body)).toEqual(["Erro novo no checkout."]);
+      expect((await agentPosts(h)).map((m) => [m.channelId, m.body])).toEqual([
+        [h.vars.tech ?? "", "Erro novo no checkout."],
+        [h.f.general.id, TOLD],
+      ]);
     },
   },
 
@@ -473,6 +477,7 @@ export const SCENARIOS: Scenario[] = [
           channelId: h.f.general.id,
           threadId: null,
           hop: 0,
+          stretchId: null,
           notice: { kind: "agent_note", text: "Mudei a variável DATABASE_URL.", from: "@infra", refs: {} },
         }),
       );
@@ -492,6 +497,37 @@ export const SCENARIOS: Scenario[] = [
         expect.objectContaining({ steeredMessageIds: [h.vars.said] }),
       );
       expect((await agentPosts(h)).map((m) => m.body)).toEqual(["O staging também foi atualizado."]);
+    },
+  },
+
+  {
+    name: "15. a run another agent's mention woke passes: nothing posted",
+    runs: [{ steps: [{ calls: [{ name: "pass", input: { reason: "Só um obrigado." } }] }, { text: "" }] }],
+    async start(h) {
+      const qa = await createAgent(
+        h.f.db,
+        h.f.owner.id,
+        h.f.org.id,
+        { name: "QA", handle: "qa" },
+        { model: "claude-sonnet-5-5" },
+      );
+      await addChannelMember(h.f.db, h.f.owner.id, h.f.org.id, h.f.general.id, { agentId: qa.id });
+      const thanks = await insertMessage(h.f.db, {
+        orgId: h.f.org.id,
+        channelId: h.f.general.id,
+        author: { type: "agent", agentId: qa.id, runId: null, hop: 1, stretchId: null },
+        body: "Valeu, @dev!",
+      });
+      await h.f.db.transaction((tx) => createAgentRuns(tx, thanks, [h.f.agent.id], "mention"));
+      await h.drain();
+    },
+    async end(h) {
+      const run = await onlyRun(h);
+      expect(run).toMatchObject({ status: "done", trigger: "mention" });
+      expect((await agentPosts(h)).filter((m) => m.authorAgentId === h.f.agent.id)).toEqual([]);
+      expect(await stepsOf(h, run.id, "context")).toContainEqual(
+        expect.objectContaining({ passed: { how: "pass", reason: "Só um obrigado." } }),
+      );
     },
   },
 ];

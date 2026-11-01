@@ -17,6 +17,7 @@ import {
 } from "@agenteschat/client/lib/wiki";
 import { readZip } from "@agenteschat/client/lib/zip";
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
+import { setMermaidRenderer } from "@/components/artifacts/Mermaid";
 import { layoutGraph, neighborsOf } from "@/components/WikiGraph";
 import { VaultCard } from "@/components/wiki/VaultCard";
 import { useVaultReader } from "@/components/wiki/WikiImport";
@@ -244,6 +245,36 @@ describe("the wiki", () => {
     expect(within(graph).getByRole("link", { name: "Glossário" }).hasAttribute("data-lit")).toBe(true);
     expect(within(graph).getByRole("link", { name: "Onboarding" }).hasAttribute("data-lit")).toBe(true);
   });
+
+  test("a link's hover card shows a page's ```mermaid as code: it has only the page's first lines", async () => {
+    const asked: string[] = [];
+    setMermaidRenderer(async (_id, source) => {
+      asked.push(source);
+      return '<svg xmlns="http://www.w3.org/2000/svg"></svg>';
+    });
+    try {
+      const api = createFakeApi(seedState());
+      const glossary = await api.wiki.get(ORG_ID, "glossario");
+      await api.wiki.update(ORG_ID, "glossario", {
+        body: "```mermaid\nflowchart LR\n  PR --> Review\n  Review --> Merge\n  Merge --> Deploy\n```",
+        baseVersion: glossary.version,
+      });
+      await renderApp(`/org/${ORG_ID}/wiki/onboarding`, { api });
+      await settle(8);
+      const body = document.querySelector(".wiki-page__body") as HTMLElement;
+      const link = within(body).getByRole("link", { name: "Glossário" });
+      await act(async () => fireEvent.pointerEnter(link, { pointerType: "mouse" }));
+      await settle(4);
+      const card = document.querySelector(".wiki-preview") as HTMLElement;
+      expect(card.querySelector(".code-card__code")?.textContent).toBe(
+        "flowchart LR\n  PR --> Review\n  Review --> Merge",
+      );
+      expect(card.querySelector("img")).toBeNull();
+      expect(asked).toEqual([]);
+    } finally {
+      setMermaidRenderer(null);
+    }
+  });
 });
 
 describe("links everywhere", () => {
@@ -272,6 +303,46 @@ describe("links everywhere", () => {
     expect(within(list).getAllByRole("option")[0]?.textContent).toContain("Onboarding");
     await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
     expect(box.value).toBe("leia [[Onboarding]] ");
+    // Esc closes the list and leaves the text.
+    await type(box, "leia [[Onb");
+    expect(screen().getByRole("listbox", { name: "Páginas" })).toBeTruthy();
+    await act(async () => fireEvent.keyDown(box, { key: "Escape" }));
+    expect(screen().queryByRole("listbox", { name: "Páginas" })).toBeNull();
+    expect(box.value).toBe("leia [[Onb");
+  });
+
+  test("a [[link]]'s preview, from the mouse or the keys, leaves the focus where it was", async () => {
+    const state = seedState();
+    state.messages.push({
+      id: "m-wiki",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ADA_ID },
+      body: "Está no [[Onboarding]].",
+      mentionedAgentIds: [],
+      agentRunId: null,
+      createdAt: new Date().toISOString(),
+    });
+    await go(`c/${ENG_ID}`, state);
+    const box = screen().getByRole("combobox", { name: /Mensagem para/ });
+    box.focus();
+    const row = screen()
+      .getAllByRole("article")
+      .find((a) => a.textContent?.includes("Está no")) as HTMLElement;
+    const link = within(row).getByRole("link", { name: "Onboarding" });
+    const preview = () => screen().queryByRole("dialog", { name: /Onboarding/ });
+    await act(async () => fireEvent.pointerEnter(link, { pointerType: "mouse" }));
+    await settle(2);
+    expect(preview()).not.toBeNull();
+    expect(document.activeElement).toBe(box);
+    await act(async () => fireEvent.pointerLeave(link, { pointerType: "mouse" }));
+    await settle(2);
+    expect(preview()).toBeNull();
+    expect(document.activeElement).toBe(box);
+    await act(async () => link.focus());
+    await settle(2);
+    expect(preview()).not.toBeNull();
+    expect(document.activeElement).toBe(link);
   });
 
   test("Salvar na wiki from an agent's message appends it with the source", async () => {

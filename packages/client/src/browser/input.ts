@@ -1,7 +1,7 @@
 import type { BrowserFrameMetadata, BrowserInputEvent, BrowserModifiers } from "./live";
 
 /**
- * A person's input on the live view (ADR 0040 §7, §12): where a click, a drag
+ * A person's input on the live view (ADR 0040 §7, §13): where a click, a drag
  * or a finger on the shown frame lands on the page, and the key and text
  * events to send.
  */

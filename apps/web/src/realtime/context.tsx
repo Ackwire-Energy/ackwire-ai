@@ -74,6 +74,7 @@ import {
 } from "@agenteschat/client";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { formatPercent } from "@agenteschat/client/lib/format";
+import { isMediaAfterReply } from "@agenteschat/client/lib/media";
 import { playSound, soundForNotification } from "@agenteschat/client/lib/sounds";
 import { playAgentReaction } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -212,7 +213,8 @@ export function createStreamsStore(
     get: () => state,
     apply: (event: ChannelEvent) => {
       let typing = state.typing;
-      if (event.type === "user.typing") typing = applyTyping(typing, event.channelId, event.userId, now(), event.ttlMs);
+      if (event.type === "user.typing")
+        typing = applyTyping(typing, event.channelId, event.userId, now(), event.ttlMs, event.threadId);
       const memory =
         event.type === "memory.updated"
           ? {
@@ -780,8 +782,9 @@ export function useChannelRealtime(orgId: string, channelId: string, enabled: bo
         if (event.message && !event.message.threadId) {
           qc.setQueryData(keys.thread(orgId, channelId, event.message.id), (list: unknown) => list ?? []);
         }
-        // A reply: the thread lists (count, last reply, who is in it) behind the channel's thread lines.
-        if (event.message?.threadId) {
+        // A reply: the thread lists (count, last reply, who is in it) behind the channel's thread lines. An agent's
+        // sticker after its reply (ADR 0091) changes none of them.
+        if (event.message?.threadId && !isMediaAfterReply(event.message.meta)) {
           void qc.invalidateQueries({ queryKey: keys.threads(orgId), predicate: (q) => q.queryKey[3] !== "one" });
         }
       }
@@ -858,12 +861,12 @@ export function useLiveStore() {
   return useRealtime().streams;
 }
 
-/** Throttled "I'm typing" for a channel. */
-export function useTypingSender(channelId: string) {
+/** Throttled "I'm typing" for a channel, or for one of its threads. */
+export function useTypingSender(channelId: string, threadId?: string) {
   const { connection } = useRealtime();
   const throttle = useMemo(() => typingThrottle(), []);
   return () => {
-    if (connection && throttle(Date.now())) connection.sendTyping(channelId);
+    if (connection && throttle(Date.now())) connection.sendTyping(channelId, threadId);
   };
 }
 

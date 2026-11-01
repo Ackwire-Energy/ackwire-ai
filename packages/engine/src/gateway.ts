@@ -32,6 +32,7 @@ import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationE
 import { publishUserEvent } from "./events";
 import { maySql, type RolePermission } from "./permissions";
 import { assertCanWork } from "./standing";
+import { redactCredentials } from "./tool-detail";
 import { budgetPercent, monthStartUtc, withEffectiveBudget } from "./usage";
 
 const { usageRecords, agentBudgetPeriods, budgetReservations, providerCredentials, organizationSettings } = schema;
@@ -110,6 +111,12 @@ export const RESERVATION_TTL_MS = 15 * 60_000;
 export const MIN_OUTPUT_TOKENS = 256;
 
 const periodOf = (now: Date) => monthStartUtc(now).toISOString().slice(0, 10);
+
+/** A provider failure as it leaves the gateway: its words (a refused request keeps the API's) with credentials masked. */
+const masked = (error: unknown) =>
+  error instanceof ProviderError
+    ? new ProviderError(redactCredentials(error.message), error.retryable, error.status, error.partial)
+    : error;
 
 /**
  * The only way to call a model (docs/adr/0007, 0012). For every call:
@@ -357,9 +364,11 @@ export function createModelGateway(deps: ModelGatewayDeps) {
           orgId: agent.orgId,
           agentId: agent.id,
           periodStart: period,
-          // First call of the month (or first since budgets existed): start from recorded usage.
+          // First call of the month (or first since budgets existed): start from the agent's own recorded calls
+          // (`agentSpendThisMonth`).
           spentNanoUsd: sql`(select coalesce(sum(${usageRecords.costNanoUsd}), 0) from ${usageRecords}
             where ${usageRecords.orgId} = ${agent.orgId} and ${usageRecords.agentId} = ${agent.id}
+            and ${usageRecords.kind} = 'agent'
             and ${usageRecords.createdAt} >= ${monthStartUtc(at).toISOString()}::timestamptz)`,
         })
         .onConflictDoNothing();
@@ -607,7 +616,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
           }
           await settle(tx, reservation, actual, agent);
         });
-        throw error;
+        throw masked(error);
       }
 
       const { record, spent } = await settleCall({
@@ -621,7 +630,15 @@ export function createModelGateway(deps: ModelGatewayDeps) {
         reportedCost: result.costNanoUsd,
       });
       await checkThresholds(agent, spent, record.cost);
-      return { ...result, usageRecordId: record.id, costNanoUsd: record.cost, maxTokens };
+      const refused = result.thinking?.refused;
+      return {
+        ...result,
+        // The refusal that sent the call again without its thinking: a provider's words, masked like its errors.
+        ...(refused ? { thinking: { ...result.thinking, refused: redactCredentials(refused) } } : {}),
+        usageRecordId: record.id,
+        costNanoUsd: record.cost,
+        maxTokens,
+      };
     },
 
     /**
@@ -725,7 +742,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       } catch (error) {
         const usage = error instanceof ProviderError ? await partialUsage(error, provider, request, key) : null;
         if (usage) await recordUsage(db, { ...base, model: call.model, usage, partial: true });
-        throw error;
+        throw masked(error);
       }
       const record = await recordUsage(db, {
         ...base,

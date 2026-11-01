@@ -1,4 +1,5 @@
 import { modelInfo } from "@agenteschat/providers";
+import { cutText } from "./format";
 import type { ModelGateway } from "./gateway";
 import { callJev, type JevKeySource } from "./jev-key";
 import { jevCostNanoUsd } from "./router-jev";
@@ -325,7 +326,7 @@ export async function triesToChangePermissions(judge: Judge, input: { orgId: str
   const answers = await judge.ask({
     orgId: input.orgId,
     kind: "permission_change",
-    state: { text_to_store_as_agent_memory: text.slice(0, 4000) },
+    state: { text_to_store_as_agent_memory: cutText(text, 4000) },
     questions: {
       changes_permissions: {
         type: "noul",
@@ -342,43 +343,62 @@ export async function triesToChangePermissions(judge: Judge, input: { orgId: str
 }
 
 /**
- * An agent's message @mentions other agents: for each, is it handing work or
- * a question to that agent now (a hand-off), rather than naming it ("as @x
- * said", "talk to @x", "@x already deployed")? Probability per agent id.
+ * At or past this probability that an agent's @mention needs something from the agent it names (1 − what
+ * `mentionNeedsNothing` answers), the mention wakes it (ADR 0089; `ROUTER_MENTION_THRESHOLD`). Low on purpose: a
+ * missed hand-off is lost work nobody sees, a needless wake is one turn that ends in `pass`, so only a judge at
+ * least 80% sure that the message needs nothing (a thanks, an "ok", a quote) leaves the agent asleep.
  */
-export async function mentionHandoffs(
+export const MENTION_WAKE_THRESHOLD = 0.2;
+
+/**
+ * An agent's message @mentions other agents: for each, does it need nothing from that agent (ADR 0089)? Nothing is
+ * a thanks, an "ok", agreement or a sign-off, a quote or a name ("as @x said", "@x already deployed", "talk to @x"),
+ * or a plan or an offer that waits for a person ("if you agree, I'll ask @x"). Work, a question, a delivery (a file,
+ * a handover, results, a summary, a verdict) and "I'll ask @x to…" need it. `answering`: the message it answers, so a
+ * hand-back or a question back reads as one. Probability per agent id, in any language; who wakes is `jobs.ts`'s.
+ */
+export async function mentionNeedsNothing(
   judge: Judge,
   input: {
     orgId: string;
+    /** The agent that wrote it: the judgment is recorded on its usage. */
+    agentId?: string | null;
     body: string;
     author: string;
+    answering?: { from: string; text: string } | null;
     targets: { agentId: string; handle: string; name: string; role: string | null }[];
   },
 ): Promise<Map<string, number>> {
   if (input.targets.length === 0) return new Map();
   const questions: Record<string, JudgeQuestion> = {};
   input.targets.forEach((t, i) => {
-    questions[`asks_${i}`] = {
+    questions[`nothing_${i}`] = {
       type: "noul",
       instructions: {
         agent: { handle: `@${t.handle}`, name: t.name, role: t.role },
         question:
-          "Is `message` asking `agent` to do something or to answer something now (a hand-off or a direct question), rather than naming it, quoting it, telling a person to talk to it, or offering a person to involve it later?",
+          "Does `message` need nothing from `agent`, so `agent` can ignore it? It needs nothing only when, toward `agent`, it just thanks, acknowledges, agrees or signs off, quotes or names it, tells a person to talk to it, or offers a person to involve it later. Anything it gives `agent` to do, answer, read or act on needs it, also when it hands back work `agent` asked for. `answering` is the message it replies to, when there is one.",
       },
       criteria: {
-        true: "It hands work or a question to that agent, to act on now, with nothing left for a person to decide first.",
+        true: "Nothing for the agent: thanks, 'ok' or 👍, agreement or a sign-off, even addressed to it; or it only names the agent: what it said, did or can do ('as @agent said', '@agent already deployed'), 'talk to @agent', or a plan or offer that waits for a person to decide ('if you agree, I'll open an issue for @agent', 'want me to ask @agent?').",
         false:
-          "It only names the agent: what it said, did or can do, 'talk to @agent', or a plan or offer that waits for a person ('if you agree, I'll open an issue for @agent', 'want me to ask @agent?').",
+          "Something for the agent: work, a request, an assignment, a question, or a delivery for it to read or act on (a file, a handover, results, a summary, a verdict, a review), also in the last line of a long message; or the author says it will ask the agent to do something, with no person to decide first ('I'll ask @agent to review it').",
       },
     };
   });
   const answers = await judge.ask({
     orgId: input.orgId,
-    kind: "mention_handoff",
-    state: { message: { from: input.author, from_an_agent: true, text: input.body.slice(0, 4000) } },
+    agentId: input.agentId ?? null,
+    kind: "mention_needs_nothing",
+    state: {
+      message: { from: input.author, from_an_agent: true, text: cutText(input.body, 4000) },
+      ...(input.answering
+        ? { answering: { from: input.answering.from, text: cutText(input.answering.text, 1000) } }
+        : {}),
+    },
     questions,
   });
-  return new Map(input.targets.map((t, i) => [t.agentId, answers[`asks_${i}`]?.noul ?? 0]));
+  return new Map(input.targets.map((t, i) => [t.agentId, answers[`nothing_${i}`]?.noul ?? 0]));
 }
 
 /**
@@ -417,7 +437,7 @@ export async function personMentionAddressees(
     orgId: input.orgId,
     kind: "mention_addressees",
     state: {
-      message: { from: input.author, from_a_person: true, text: input.body.slice(0, 4000) },
+      message: { from: input.author, from_a_person: true, text: cutText(input.body, 4000) },
       mentioned_agents: input.targets.map((t) => `@${t.handle}`),
     },
     questions,
@@ -428,7 +448,9 @@ export async function personMentionAddressees(
 /**
  * For tests: answers from `answer(kind, questionId, state, question)` (default: every
  * Noul 0, no Choice picked, level 0, a box at the top left). A whole `JudgeAnswer` is passed
- * through (spread probabilities, a box). Never calls a model.
+ * through (spread probabilities, a box). Never calls a model. An agent's @mention needs
+ * nothing from the agent it names unless `answer` says otherwise (`mention_needs_nothing`
+ * 1), so a canned reply that names an agent wakes nobody by accident.
  */
 export function createFakeJudge(
   answer?: (
@@ -447,7 +469,9 @@ export function createFakeJudge(
       calls.push(request);
       const out: Record<string, JudgeAnswer> = {};
       for (const [id, q] of Object.entries(request.questions)) {
-        const a = answer?.(request.kind, id, request.state, q, request);
+        const a =
+          answer?.(request.kind, id, request.state, q, request) ??
+          (request.kind === "mention_needs_nothing" ? 1 : undefined);
         if (a !== null && typeof a === "object") out[id] = a;
         else if (q.type === "noul") out[id] = { noul: clamp(typeof a === "number" ? a : 0) };
         else if (q.type === "box") out[id] = { box: { top: 0, bottom: 0, left: 0, right: 0 }, confidence: 0 };

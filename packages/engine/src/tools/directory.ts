@@ -1,4 +1,5 @@
 import type { MissingConnector } from "../connectors/listing";
+import { cutText } from "../format";
 import { oneLine } from "../mail/text";
 import type { JsonSchema } from "./json-schema";
 import type { ToolDefinition } from "./types";
@@ -33,6 +34,8 @@ export interface DirectoryRole {
   tools: ToolDefinition[];
   prefix: string;
   label: string;
+  /** The prefix its names had before they followed the connector's own (`vega` for `vega_crm`): those still work. */
+  legacy?: string;
 }
 
 const roles = new WeakMap<ToolDefinition, DirectoryRole>();
@@ -45,7 +48,8 @@ export interface BlockedTool {
   tool: ToolDefinition;
   /**
    * Every permission a person turns on for it, each as `request_permission` takes it; null: an admin turned
-   * this tool, or one it needs, off by name.
+   * this tool, or one it needs, off by name; empty: its connector is the agent's with less access than it needs,
+   * which only an admin changes.
    */
   permissions: { id: string; label: string }[] | null;
 }
@@ -58,25 +62,147 @@ export type BlockedTools = () => Promise<{ tools: BlockedTool[]; ask: string | n
 
 const sizeOf = (t: ToolDefinition) => t.name.length + t.description.length + JSON.stringify(t.inputSchema).length;
 
-/** The part of the tools' names they all start with (`tiktok_ad_create`, `tiktok_report_get` → `tiktok`). */
-function prefixOf(tools: ToolDefinition[], label: string) {
+/** The first word all the tools' names share (`tiktok_ad_create`, `tiktok_report_get` → `tiktok`), or "". */
+function sharedFirstWord(tools: ToolDefinition[]) {
   const first = tools[0]?.name.split("_")[0] ?? "";
-  if (first && tools.every((t) => t.name.startsWith(`${first}_`))) return first;
+  return first && tools.every((t) => t.name.startsWith(`${first}_`)) ? first : "";
+}
+
+/**
+ * What the connector's tool names start with, so its directory is named the same way: its label as the connector
+ * source writes it in them (`Vega CRM` → `vega_crm_…`), else the first word they share (a catalog connector's id:
+ * `drive_…` for Google Drive), else the label.
+ */
+function prefixOf(tools: ToolDefinition[], label: string) {
   const slug = label
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_|_$/g, "")
     .slice(0, 24);
-  return slug || "connector";
+  if (slug && tools.every((t) => t.name.startsWith(`${slug}_`))) return slug;
+  return sharedFirstWord(tools) || slug || "connector";
 }
 
-/** The real tool's name as the model may write it: full, or without the connector's prefix. */
+/** What a harness puts before our MCP tools' names (Claude Code's `mcp__agentes__find_tools`). */
+export const HARNESS_PREFIX = /^mcp__agentes__/;
+const bareName = (name: string) => name.trim().replace(HARNESS_PREFIX, "");
+
+/** The names a directory's `use_tool` may mean by `name`: as written, after its connector's prefix, after the one before. */
+function spellings(role: DirectoryRole, name: string) {
+  const n = bareName(name);
+  return [n, ...(role.prefix ? [`${role.prefix}_${n}`] : []), ...(role.legacy ? [`${role.legacy}_${n}`] : [])];
+}
+
+/** The real tool a directory's `use_tool` names, among the directory's own (`spellings`). */
 export function resolveDirectoryTool(role: DirectoryRole, name: string) {
-  const n = name.trim();
-  return (
-    role.tools.find((t) => t.name === n) ??
-    (role.prefix ? role.tools.find((t) => t.name === `${role.prefix}_${n}`) : undefined)
-  );
+  for (const full of spellings(role, name)) {
+    const tool = role.tools.find((t) => t.name === full);
+    if (tool) return tool;
+  }
+  return undefined;
+}
+
+const directoryName = (prefix: string, kind: DirectoryRole["kind"]) =>
+  `${prefix}_${kind === "find" ? "find_tools" : "use_tool"}`;
+
+/** A listed tool by its name, or a directory by the name it had before (`vega_find_tools`: `vega_crm_find_tools`). */
+export function listedTool(shown: readonly ToolDefinition[], name: string) {
+  const n = bareName(name);
+  const exact = shown.find((t) => t.name === n);
+  if (exact) return exact;
+  const before = shown.filter((t) => {
+    const role = roles.get(t);
+    return role?.legacy !== undefined && directoryName(role.legacy, role.kind) === n;
+  });
+  return before.length === 1 ? before[0] : undefined;
+}
+
+/**
+ * Names one `_` word away from `name`, a word missing or extra (`vega_listar` for `vega_crm_listar`), or the same
+ * name with words before it or without them, when there are few enough to name. Never another word in a word's
+ * place: `get` for `delete` is another tool.
+ */
+function nearNames(name: string, names: Iterable<string>) {
+  if (!name) return [];
+  const words = name.split("_");
+  const near = (other: string) => {
+    if (other === name) return false;
+    if (other.endsWith(`_${name}`) || name.endsWith(`_${other}`)) return true;
+    const o = other.split("_");
+    if (Math.abs(o.length - words.length) !== 1) return false;
+    let head = 0;
+    while (head < o.length && head < words.length && o[head] === words[head]) head++;
+    let tail = 0;
+    while (tail < o.length - head && tail < words.length - head && o.at(-1 - tail) === words.at(-1 - tail)) tail++;
+    return Math.max(o.length, words.length) - head - tail === 1;
+  };
+  const found = [...new Set(names)].filter(near).sort();
+  return found.length <= 3 ? found : [];
+}
+
+/**
+ * Nothing runs by that name: what the agent can call instead. `within`: the directory whose `use_tool` named it.
+ * A close name is given exactly (and the directory that runs it, when it isn't listed); else where to search.
+ */
+function unknownTool(
+  name: string,
+  shown: readonly ToolDefinition[],
+  all: ReadonlyMap<string, ToolDefinition>,
+  within: DirectoryRole | null,
+) {
+  const head = within ? `No ${within.label} tool named "${name}".` : `Unknown tool ${name}`;
+  const near = nearNames(name, [...all.keys(), ...shown.filter((t) => roles.has(t)).map((t) => t.name)]);
+  const via = (exact: string) => {
+    if (shown.some((t) => t.name === exact)) return "";
+    const runs = shown.find((t) => roles.get(t)?.kind === "use" && roles.get(t)?.tools.some((r) => r.name === exact));
+    return runs ? ` (run it with ${runs.name})` : "";
+  };
+  const end = within ? "" : ".";
+  if (near.length === 1) return `${head}${end} The exact name is ${near[0]}${via(near[0] as string)}.`;
+  if (near.length > 1) return `${head}${end} Exact names close to it: ${near.join(", ")}.`;
+  return within
+    ? `${head} Find the exact name with ${within.prefix ? directoryName(within.prefix, "find") : ON_DEMAND_FIND}.`
+    : head;
+}
+
+/**
+ * What a call runs, from the run's list as the model sees it (`shown`) and every tool of the sources (`all`): a tool
+ * by its name; a directory's `find_tools` as itself (`find`); its `use_tool` as the tool it names, through another
+ * directory's `use_tool` inside too. That tool may be any of the sources', by its name or without its connector's
+ * prefix, a directory's own tools included: the gateway then refuses one the agent may not use, saying why. A name a
+ * directory had before (`legacy`) is that directory now, and a harness's prefix (`HARNESS_PREFIX`) is no part of
+ * the name. Nothing by that name: an error naming what to call instead (`unknownTool`).
+ */
+export function resolveCall<C extends { name: string; input: Record<string, unknown> }>(
+  shown: readonly ToolDefinition[],
+  all: ReadonlyMap<string, ToolDefinition>,
+  call: C,
+): { call: C; find?: ToolDefinition } | { error: string } {
+  // The call itself while nothing about it changes: the gateway tells a call that came through a directory by that.
+  const bare = bareName(call.name);
+  let current: C = bare === call.name ? call : { ...call, name: bare };
+  let within: DirectoryRole | null = null;
+  for (let hop = 0; hop <= 3; hop++) {
+    if (all.has(current.name)) return { call: current };
+    const listed = listedTool(shown, current.name);
+    const role = directoryRole(listed);
+    if (!listed || !role) break;
+    if (role.kind === "find") {
+      return { call: listed.name === current.name ? current : { ...current, name: listed.name }, find: listed };
+    }
+    if (hop === 3) break;
+    const named = typeof current.input.tool === "string" ? current.input.tool : "";
+    const spelled = spellings(role, named);
+    const args = current.input.arguments;
+    current = {
+      ...current,
+      // The directory's own first, then any tool by those names: one the agent may not use is refused as itself.
+      name: resolveDirectoryTool(role, named)?.name ?? spelled.find((n) => all.has(n)) ?? (spelled[0] as string),
+      input: args && typeof args === "object" && !Array.isArray(args) ? (args as Record<string, unknown>) : {},
+    };
+    within = role;
+  }
+  return { error: unknownTool(current.name, shown, all, within) };
 }
 
 /** The most common topics in the connector's tool names (`ad`, `campaign`, `report`…), for the search's description. */
@@ -145,8 +271,11 @@ function directoryTools(
     // Never runs itself: the gateway runs the real tool (`directoryRole`).
     execute: async () => ({ content: "Unknown tool", isError: true }),
   };
-  roles.set(find, { kind: "find", tools, prefix, label });
-  roles.set(use, { kind: "use", tools, prefix, label });
+  // Named after the first word of the tools' names before: a conversation that learned those names keeps them.
+  const before = sharedFirstWord(tools);
+  const legacy = before && before !== prefix ? { legacy: before } : {};
+  roles.set(find, { kind: "find", tools, prefix, label, ...legacy });
+  roles.set(use, { kind: "use", tools, prefix, label, ...legacy });
   return [find, use];
 }
 
@@ -397,7 +526,7 @@ export function rankTools(tools: ToolDefinition[], prefix: string, query: string
 /** A tool's input schema, short enough for a search result. */
 export function compactSchema(schema: JsonSchema) {
   const text = JSON.stringify(schema);
-  return text.length > SCHEMA_CHARS ? `${text.slice(0, SCHEMA_CHARS)}…` : text;
+  return text.length > SCHEMA_CHARS ? `${cutText(text, SCHEMA_CHARS)}…` : text;
 }
 
 /** How a person gets a connector the agent lacks, in the app's words (and the Portuguese the app shows). */
@@ -461,16 +590,18 @@ function findTools(
   const more = matches.slice(ready.length);
   const parts: string[] = [];
   if (ready.length > 0) {
-    const names = ready.map((t) => `- ${t.name}: ${t.description.slice(0, 300)}`);
+    const names = ready.map((t) => `- ${t.name}: ${cutText(t.description, 300)}`);
+    // A computer brain's harness may still list what it had when it started: `use_tool` runs these too.
+    const them = ready.length > 1 ? "them" : "it";
     parts.push(
-      `Already in your tool list for "${query}": call ${ready.length > 1 ? "them" : "it"} directly, not through ${useName}.\n${names.join("\n")}`,
+      `Already in your tool list for "${query}": call ${them} directly (if your list doesn't show ${them} yet, ${useName} runs ${them} too).\n${names.join("\n")}`,
     );
   }
   if (more.length > 0) {
     const lines = more.map((t) =>
       listed.has(t)
-        ? `- ${t.name} (already in your tool list: call it directly): ${t.description.slice(0, 300)}`
-        : `- ${t.name}${sensitive(t) ? " (asks a person's approval; its input includes why)" : ""}: ${t.description.slice(0, 300)}\n  input: ${compactSchema(t.inputSchema)}`,
+        ? `- ${t.name} (already in your tool list: call it directly): ${cutText(t.description, 300)}`
+        : `- ${t.name}${sensitive(t) ? " (asks a person's approval; its input includes why)" : ""}: ${cutText(t.description, 300)}\n  input: ${compactSchema(t.inputSchema)}`,
     );
     parts.push(`${label} tools for "${query}" (call one with ${useName}):\n${lines.join("\n")}`);
   }
@@ -478,7 +609,7 @@ function findTools(
   const named = (t: ToolDefinition) => `- ${t.name}: ${oneLine(t.description.split(/(?<=[.!?])\s/)[0] ?? "", 200)}`;
   const byPermission = new Map<string, string[]>();
   for (const { tool, permissions } of notAllowed) {
-    if (!permissions) continue;
+    if (!permissions?.length) continue;
     const head = `- ${permissions.map((p) => `permission "${p.id}" (${p.label})`).join(" and ")}, for:`;
     byPermission.set(head, [...(byPermission.get(head) ?? []), `  ${named(tool)}`]);
   }
@@ -492,6 +623,12 @@ function findTools(
   const turnedOff = notAllowed.flatMap(({ tool, permissions }) => (permissions ? [] : [named(tool)]));
   if (turnedOff.length > 0) {
     parts.push(`Turned off for you by an admin; only an admin can turn them back on:\n${turnedOff.join("\n")}`);
+  }
+  const beyond = notAllowed.flatMap(({ tool, permissions }) => (permissions?.length === 0 ? [named(tool)] : []));
+  if (beyond.length > 0) {
+    parts.push(
+      `Beyond your access to their connector; only an admin can change it, on your page in Tools and access (in Portuguese, Ferramentas e acesso):\n${beyond.join("\n")}`,
+    );
   }
   if (toGet) parts.push(toGet);
   return parts.join("\n\n");

@@ -15,6 +15,7 @@ import {
   databaseReviewTools,
   defaultDatabasePolicy,
   isDatabaseUrl,
+  POSTGRES_MARK,
   readOnlyRoleSql,
 } from "@agenteschat/client/lib/databases";
 import { relativeTime } from "@agenteschat/client/lib/format";
@@ -43,7 +44,6 @@ import { LoadingList, useStepText } from "@/components/Loading";
 import { CommandBlock } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { reviewNote, ToolReview, type ToolReviewState } from "@/components/ToolReview";
-import { POSTGRES_MARK } from "@/lib/brands";
 import { useToast } from "@/lib/toast";
 
 /**

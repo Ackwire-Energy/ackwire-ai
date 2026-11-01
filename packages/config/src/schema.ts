@@ -24,6 +24,7 @@ export interface EnvVarDefinition {
     | "Agents"
     | "Connectors"
     | "Search"
+    | "Chat"
     | "Storage"
     | "Sandbox"
     | "Email"
@@ -316,9 +317,9 @@ export const envVars = {
     section: "Agents",
   },
   ROUTER_MENTION_THRESHOLD: {
-    schema: z.coerce.number().min(0).max(1).default(0.6),
+    schema: z.coerce.number().min(0).max(1).default(0.2),
     description:
-      "When an agent @mentions another, minimum Jev probability (0–1) that it is asking that agent to act now for it to answer.",
+      "When an agent @mentions another, minimum probability (0–1) that the message needs something from that agent for it to answer. Low on purpose: only a judge sure the message needs nothing (a thanks, an ok, a quote) leaves the agent asleep.",
     section: "Agents",
   },
   AGENT_MAX_OUTPUT_TOKENS: {
@@ -327,8 +328,9 @@ export const envVars = {
     section: "Agents",
   },
   AGENT_MAX_TOOL_TURNS: {
-    schema: z.coerce.number().int().min(1).max(200).default(25),
-    description: "Maximum model calls in one agent run (each tool round trip is one). Stops runaway tool loops.",
+    schema: z.coerce.number().int().min(1).max(200).default(200),
+    description:
+      "Maximum model calls in one agent run (each tool round trip is one, browser and desktop steps included). A backstop for runaway runs: a run that goes in circles stops long before it. Near it the agent wraps up, and a conversation run ends with Continuar.",
     section: "Agents",
   },
   AGENT_CONTEXT_MESSAGES: {
@@ -337,9 +339,9 @@ export const envVars = {
     section: "Agents",
   },
   AGENT_MAX_HOPS: {
-    schema: z.coerce.number().int().min(1).max(20).default(3),
+    schema: z.coerce.number().int().min(1).max(500).default(100),
     description:
-      "Maximum consecutive agent replies in one thread without a person posting. Stops agents from triggering each other forever.",
+      "Depth backstop: the most agent replies in a row along one chain without a person. The per-stretch limit (50 runs agents start on their own since a person last acted) stops them long before; reaching this means some path lost its stretch.",
     section: "Agents",
   },
   PLATFORM_ANTHROPIC_API_KEY: {
@@ -392,6 +394,13 @@ export const envVars = {
     schema: z.string().default("voyage-3.5"),
     description: "Embedding model (1024 dimensions). After changing it, reindex (`search.reindex`).",
     section: "Search",
+  },
+  GIPHY_API_KEY: {
+    schema: z.string().optional(),
+    description:
+      "GIPHY API key (https://developers.giphy.com), optional. With it, people search and send GIFs in chat and agents may follow a light reply with one; each workspace can turn GIFs off and pick their rating in Settings › GIFs and stickers. The installation's owner can also add it there, on a server that isn't agentes.chat's own. This variable wins over that one. This server searches GIPHY and serves every GIF itself, so browsers and the phone app never talk to GIPHY and the key never leaves the server. With no key: no GIFs anywhere; the agents' own stickers still work.",
+    section: "Chat",
+    secret: true,
   },
   CONNECTOR_GITHUB_CLIENT_ID: {
     schema: z.string().optional(),
@@ -703,6 +712,22 @@ export const envVars = {
       "Where people write to whoever runs this server, shown with a workspace's hold notice, its suspended screen and the workspace's own computer when something on it doesn't work. Unset (default): they are told to ask the people who run the server.",
     section: "Operator",
     example: "support@example.com",
+  },
+  OPS_REPORT_EMAIL: {
+    schema: z
+      .string()
+      .optional()
+      .transform((value) =>
+        value
+          ?.split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean),
+      )
+      .pipe(z.array(z.email()).optional()),
+    description:
+      "Where the daily stall-and-noise report goes, one address or several separated by commas: for each workspace, where agents stopped although someone waited on them and where they acted for nothing, over the previous UTC day and against the 7 days before it. Workspace names and counts only, never what anyone wrote. Needs email (`MILLIONSEND_API_KEY` or `SMTP_URL`). Unset (default): no report. `bun run report:autonomy` prints the same table at any time.",
+    section: "Operator",
+    example: "ops@example.com",
   },
   BILLING_URL: {
     schema: z.url({ protocol: /^https$/ }).optional(),

@@ -147,9 +147,9 @@
 .nt-wi.is-cur {
   background: color-mix(in srgb, var(--sunken) 70%, transparent);
 }
-.nt-wi:focus-visible,
-.nt-item:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--ink);
+html:not([data-pointer]) .nt-wi:focus-visible,
+html:not([data-pointer]) .nt-item:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--focus-color);
 }
 .nt-face {
   grid-row: 1 / span 3;
@@ -252,8 +252,8 @@
 }
 /* On touch a ghost at the item's edge reaches to 2px from it (a phone's 14px padding, the 12px plate), and the item
    clips: the ring goes inside, as the item's own does. */
-.nt-wi .ac-acts > .ac-btn--ghost:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--ink);
+html:not([data-pointer]) .nt-wi .ac-acts > .ac-btn--ghost:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--focus-color);
 }
 
 /* ── What only points somewhere: one row, opened by a click on it ─────────── */
@@ -367,7 +367,7 @@
 .nt-sug button:active {
   transform: scale(0.96);
 }
-.nt-sug button:focus-visible {
+html:not([data-pointer]) .nt-sug button:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -630,7 +630,7 @@
 .nt-more:hover {
   background: rgba(127, 127, 127, 0.12);
 }
-.nt-more:focus-visible {
+html:not([data-pointer]) .nt-more:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -793,7 +793,7 @@
 .nt-nb:active {
   transform: scale(0.92);
 }
-.nt-nb:focus-visible {
+html:not([data-pointer]) .nt-nb:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }

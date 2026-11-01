@@ -25,7 +25,7 @@ import type { BridgeIdentity } from "./run-tool-tokens";
 import { type AgentRun, replyThreadOf } from "./runs";
 import { publishSecret, type SecretRequestRow, secretRequestView, syncSecretMessage } from "./secrets";
 import { artifactToolDetail, promptAnswer, promptPoll, toolCode, toolCommand, toolDetail } from "./tool-detail";
-import { directoryRole, ON_DEMAND_USE, resolveDirectoryTool } from "./tools/directory";
+import { directoryRole, HARNESS_PREFIX, ON_DEMAND_USE, resolveDirectoryTool } from "./tools/directory";
 import { type Approval, type InvokeResult, isSensitive, type ToolGateway } from "./tools/gateway";
 import { withWhy } from "./tools/run-policy";
 import type { ToolContext, ToolDefinition, ToolOutput } from "./tools/types";
@@ -97,7 +97,7 @@ export const brainToolOf = (t: ToolDefinition): BrainTool => ({
 
 // ── Side effects of tools ────────────────────────────────────────────────────
 
-/** What tools leave for the next message the run posts (cards), and how it ends (`react`). */
+/** What tools leave for the next message the run posts (cards), and how it ends (`react`, a GIF or a sticker). */
 export interface ToolSideEffects {
   /** Memory changes, for the "memory updated" card (`meta.memoryUpdates`). */
   memoryUpdates?: MemoryUpdate[];
@@ -107,6 +107,8 @@ export interface ToolSideEffects {
   missionLink?: { missionId: string; threadId: string } | null;
   /** The agent reacted (`react`) instead of replying. */
   reacted?: boolean;
+  /** It sent a GIF or its sticker (`send_gif`, `send_sticker`, ADR 0091): an empty final reply posts nothing. */
+  mediaSent?: boolean;
   /** A mission `report` card was posted: it is the answer, an empty final reply posts nothing. */
   reported?: boolean;
   /** Nobody called it by name and it called `pass` (reply-policy.ts): the run ends without a message. */
@@ -146,7 +148,7 @@ const TRAIL_DATA: Record<TrailScreen, { data: string; plan: string }> = {
 
 /** A computer brain's call carries the bridge's prefix (`mcp__agentes__browser_open`); the screen whose trail it joins. */
 const screenTool = (name: string): { tool: string; screen: TrailScreen } | null => {
-  const tool = name.replace(/^mcp__agentes__/, "");
+  const tool = name.replace(HARNESS_PREFIX, "");
   if (tool.startsWith("browser_")) return { tool, screen: "browser" };
   if (tool.startsWith("desktop_")) return { tool, screen: "desktop" };
   return null;
@@ -199,6 +201,7 @@ export function absorbToolData(t: ToolSideEffects, data: Record<string, unknown>
   const link = data.missionLink as { missionId: string; threadId: string } | undefined;
   if (link?.missionId && link.threadId) t.missionLink = link;
   if (data.reacted) t.reacted = true;
+  if (data.mediaSent) t.mediaSent = true;
   if (data.reported) t.reported = true;
   const passed = data.passed as { reason?: unknown } | undefined;
   if (passed) t.passed = { reason: typeof passed.reason === "string" ? passed.reason : "" };
@@ -234,6 +237,7 @@ export function mergeToolEffects(t: ToolSideEffects, e: ToolSideEffects | null |
   if (e.memoryUpdates?.length) t.memoryUpdates = [...(t.memoryUpdates ?? []), ...e.memoryUpdates];
   if (e.missionLink) t.missionLink = e.missionLink;
   if (e.reacted) t.reacted = true;
+  if (e.mediaSent) t.mediaSent = true;
   if (e.reported) t.reported = true;
   if (e.passed) t.passed = e.passed;
   if (e.repo) t.repo = e.repo;
@@ -248,6 +252,7 @@ const hasEffects = (e: ToolSideEffects) =>
       e.memoryUpdates?.length ||
       e.missionLink ||
       e.reacted ||
+      e.mediaSent ||
       e.reported ||
       e.passed ||
       e.repo ||
@@ -437,6 +442,8 @@ export async function invokeWithChip(
     ...where,
     tool: shownName,
     ...(connector ? { connector } : {}),
+    ...(def?.service ? { service: def.service } : {}),
+    ...(def?.serviceIcon ? { serviceIcon: def.serviceIcon } : {}),
     ...(detail ? { detail } : {}),
     toolUseId: use.id,
     ...(code ? { code } : {}),

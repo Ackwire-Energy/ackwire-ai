@@ -7,7 +7,9 @@ import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { useInviteDialog } from "@/components/invite/InviteDialog";
 import { useOrg } from "@/components/org-context";
+import { MyFace } from "@/components/ProfilePhoto";
 import { useDirectory } from "@/hooks/useDirectory";
 import { SETTINGS_SECTIONS } from "@/pages/settings-sections";
 
@@ -29,6 +31,7 @@ export function CommandMenu() {
   const channels = useChannels(org.id);
   const server = useAuthConfig().data;
   const navigate = useNavigate();
+  const invite = useInviteDialog();
   const [open, setOpen] = useState(false);
   // Topics only when the palette is open (no request on every page).
   const topics = useForumTopics(org.id, open);
@@ -149,12 +152,36 @@ export function CommandMenu() {
         label: t(`settings.section.${s.id}`),
         sub: t("palette.settings"),
         keywords: s.id,
-        mark: <Icon name={s.icon} size={16} />,
+        mark: s.id === "account" ? <MyFace size="xs" /> : <Icon name={s.icon} size={16} />,
         onSelect: () => void navigate({ to: "/org/$orgId/settings/$section", params: { orgId, section: s.id } }),
       });
     }
+    // Things to do, not places: the workspace's invite dialog (ADR 0090).
+    if (invite && can(org, "invite_people"))
+      list.push({
+        key: "do:invite",
+        group: t("palette.actions"),
+        label: t("shell.invite"),
+        sub: t("palette.inviteSub"),
+        keywords: t("palette.inviteKeywords"),
+        mark: <Icon name="plus" size={16} />,
+        onSelect: () => invite.open(),
+      });
     return list;
-  }, [channels.data, topics.data, wiki.data, dir.agents, dir.members, me.user.id, org, server, navigate, t, goTo]);
+  }, [
+    channels.data,
+    topics.data,
+    wiki.data,
+    dir.agents,
+    dir.members,
+    me.user.id,
+    org,
+    server,
+    navigate,
+    t,
+    goTo,
+    invite,
+  ]);
 
   // "Pedir a um agente": the agents I can talk to, with what was typed.
   const askable = useMemo(() => dir.agents.filter((a) => canTalk(a)), [dir.agents]);

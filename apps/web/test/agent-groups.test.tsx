@@ -71,20 +71,20 @@ describe("groups of agents in the sidebar (ADR 0083)", () => {
     await go(
       withGroups([
         { id: INTEGRATIONS, name: "Integrations", agentIds: [ATLAS_ID] },
-        { id: "00000000-0000-4000-8000-0000000000e2", name: "Florim | Gestão e Financeiro", agentIds: [] },
+        { id: "00000000-0000-4000-8000-0000000000e2", name: "Lumen | Gestão e Financeiro", agentIds: [] },
       ]),
     );
     expect(categories()).toEqual([
       "Canais",
       "Agentes",
       "Integrations",
-      "Florim | Gestão e Financeiro",
+      "Lumen | Gestão e Financeiro",
       "Mensagens diretas",
     ]);
     expect(category("Agentes").agents()).toEqual(["Ada"]);
     expect(category("Integrations").agents()).toEqual(["Atlas"]);
     // An empty group says where its agents go, to whoever organizes them.
-    expect(category("Florim | Gestão e Financeiro").root.textContent).toContain("Arraste agentes para cá");
+    expect(category("Lumen | Gestão e Financeiro").root.textContent).toContain("Arraste agentes para cá");
   });
 
   test("a group collapses and stays so in this browser", async () => {
@@ -94,7 +94,9 @@ describe("groups of agents in the sidebar (ADR 0083)", () => {
     await click(toggle);
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     expect(root.getAttribute("data-open")).toBe("false");
-    expect(JSON.parse(localStorage.getItem("agentes.sidebar.sections") ?? "[]")).toEqual([`group:${INTEGRATIONS}`]);
+    expect(JSON.parse(localStorage.getItem(`agentes.sidebar.sections.u-walter.${ORG_ID}`) ?? "[]")).toEqual([
+      `group:${INTEGRATIONS}`,
+    ]);
     cleanup();
     await go(withGroups());
     expect(category("Integrations").toggle.getAttribute("aria-expanded")).toBe("false");

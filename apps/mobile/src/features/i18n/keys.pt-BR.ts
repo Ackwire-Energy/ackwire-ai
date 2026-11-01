@@ -179,6 +179,8 @@ export const featureKeysPtBR = {
     empty: "Nenhuma conversa ainda.",
     // A DM with no message yet: a word to start (an agent's row says who it is instead).
     sayHi: "Diga oi para {{name}}.",
+    // A channel with no message and no topic yet.
+    channelEmpty: "Nenhuma mensagem ainda. Comece a conversa.",
     closed: "Fechada",
     working: "trabalhando…",
     missionProgress: "{{done}} de {{total}} itens",
@@ -309,6 +311,8 @@ export const featureKeysPtBR = {
       byYou: "Parado por você",
       by: "Parado por {{name}}",
       plain: "Parado",
+      limit: "No limite de passos",
+      stuck: "Parou porque travou",
       continue: "Continuar",
       failed: "Não deu para continuar. Tente de novo.",
     },
@@ -329,7 +333,6 @@ export const featureKeysPtBR = {
       expiredM: "O {{name}} não respondeu a tempo",
       failedF: "A {{name}} não conseguiu responder",
       failedM: "O {{name}} não conseguiu responder",
-      asked: "{{name}} perguntou",
       answerOfF: "Resposta da {{name}}",
       answerOfM: "Resposta do {{name}}",
       noAnswer: "Sem resposta.",
@@ -342,12 +345,6 @@ export const featureKeysPtBR = {
     fileOpen: "Toque para abrir",
     fileDeleted: "Arquivo removido",
     fileFailed: "Não deu para abrir o arquivo.",
-    approval: {
-      approved: "Aprovado: {{title}}",
-      refused: "Recusado: {{title}}",
-      expired: "Expirou: {{title}}",
-      canceled: "Cancelado: {{title}}",
-    },
     approvalPreview: "Pedido de aprovação",
     question: {
       fromF: "Pergunta da {{name}}",
@@ -755,6 +752,8 @@ export const featureKeysPtBR = {
       org_standing_other: "O status do workspace mudou",
       computer_ready_one: "O computador do seu workspace está pronto",
       computer_ready_other: "O computador do seu workspace está pronto",
+      invitation_accepted_one: "{{names}} aceitou seu convite",
+      invitation_accepted_other: "{{names}} aceitaram seu convite",
     },
     markRead: "Marcar como lida",
     markUnread: "Marcar como não lida",
@@ -1429,13 +1428,18 @@ export const featureKeysPtBR = {
     invited: "Você foi convidado para a {{org}}",
     joinAs: "Você entra como {{role}}.",
     apple: "Continuar com a Apple",
-    createPassword: "Criar uma senha",
-    haveAccount: "Já tenho conta",
     signIn: "Entrar para aceitar",
     accept: "Entrar na {{org}}",
     wrongAccount: "Este convite é para {{email}}.",
     otherAccount: "Entrar com outra conta",
     failed: "Não deu para aceitar o convite. Tente de novo.",
+    // Entering through an invitation, what the shared words say another way on a phone (ADR 0090).
+    join: {
+      skip: "Pular",
+      sharedBy: "{{name}} compartilhou este link",
+      waitLead: "Você entra assim que um admin aprovar. Pode fechar o app: avisamos no seu e-mail.",
+      passwordLead: "Sua senha, e você já entra.",
+    },
   },
   joinRequests: {
     share: "Compartilhar o link",
@@ -1445,6 +1449,23 @@ export const featureKeysPtBR = {
   humanCheck: {
     title: "Verificação rápida",
     blocked: "A verificação não carregou. Tente outra rede.",
+  },
+  /** Convidar pessoas and the sent invitations' sheet (ADR 0090); the other words are the shared `members.*`. */
+  invitePeople: {
+    emailsHelp: "Cole uma lista ou digite. Cada pessoa recebe um e-mail e entra direto.",
+    here: "Já está aqui",
+    invited: "Já convidado",
+    fix: "Confira",
+    channels: "Canais",
+    optional: "Opcional",
+    ok: "OK",
+    noteHelp: "Aparece no e-mail com o seu nome. Até {{max}} letras.",
+    roleHelp: "Muda o que a pessoa recebe ao entrar.",
+    remove: "Tirar da lista",
+    sendAgain: "Mandar de novo",
+    cancelTitle: "Cancelar o convite de {{email}}?",
+    cancelText: "O link dele para de abrir.",
+    send: "Mandar",
   },
   members: {
     waiting_one: "{{count}} esperando",

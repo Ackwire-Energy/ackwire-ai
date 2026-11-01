@@ -35,23 +35,13 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { ReconnectThisMacButton, useIsThisMac } from "@/components/ThisMac";
 import { useComputerEdition } from "@/components/WorkspaceComputer";
-import { STORAGE_KEYS, storage } from "@/lib/storage";
+import { STORAGE_KEYS, storage, storedStrings } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 
 /**
  * "Computador desconectado": the notice at the top of the work area,
  * the "Trocar o computador" dialog, and the agent's one waiting card in the chat.
  */
-
-/** Outages whose notice the person closed (until that computer comes back: a new outage shows again). */
-function readDismissed(): string[] {
-  try {
-    const v = JSON.parse(storage.get(STORAGE_KEYS.outagesDismissed) ?? "[]");
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
-  } catch {
-    return [];
-  }
-}
 
 /** Notices for everyone who can manage agents, one per offline computer, stacked. */
 export function OutageNotices() {
@@ -60,7 +50,8 @@ export function OutageNotices() {
   const manage = can(org, "manage_agents");
   const outages = useMachineOutages(org.id);
   const list = outages.data?.outages ?? [];
-  const [dismissed, setDismissed] = useState(readDismissed);
+  // Outages whose notice the person closed (until that computer comes back: a new outage shows again).
+  const [dismissed, setDismissed] = useState(() => storedStrings(STORAGE_KEYS.outagesDismissed));
   // Forget the closed ones whose computer came back (or whose agents moved away).
   const liveKeys = list.map(outageKey).join(",");
   useEffect(() => {
@@ -161,8 +152,16 @@ function OutageNotice({
             {t("outage.switch")}
           </Button>
         )}
-        <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t("outage.dismiss")} onClick={onDismiss} />
       </span>
+      <Button
+        variant="ghost"
+        size="sm"
+        iconOnly
+        icon="close"
+        className="outage__close"
+        aria-label={t("outage.dismiss")}
+        onClick={onDismiss}
+      />
       {open && <SwitchComputerDialog open={open} onOpenChange={setOpen} outage={o} data={data} />}
     </div>
   );

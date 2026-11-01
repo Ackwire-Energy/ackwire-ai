@@ -27,7 +27,7 @@ describe("loadConfig", () => {
     expect(config.ALLOW_SIGNUP).toBe(false);
     expect(config.AGENT_DEFAULT_MODEL).toBe("claude-sonnet-5-5");
     expect(config.ROUTER_MODEL).toBe("claude-haiku-5-5");
-    expect(config.AGENT_MAX_HOPS).toBe(3);
+    expect(config.AGENT_MAX_HOPS).toBe(100);
     expect(config.S3_PATH_STYLE).toBe(false);
     expect(config.MILLIONSEND_API_URL).toBe("https://api.millionsend.com");
     // Unset: the email senders use ping@ on the host of PUBLIC_URL.
@@ -191,6 +191,17 @@ describe("loadConfig", () => {
       "173.245.48.1",
       "2400:cb00::/32",
     ]);
+  });
+
+  test("OPS_REPORT_EMAIL: off unless set, one address or a list, each an address", () => {
+    expect(loadConfig(valid).OPS_REPORT_EMAIL).toBeUndefined();
+    expect(loadConfig({ ...valid, OPS_REPORT_EMAIL: " ops@example.com, ana@example.com ," }).OPS_REPORT_EMAIL).toEqual([
+      "ops@example.com",
+      "ana@example.com",
+    ]);
+    expect(() => loadConfig({ ...valid, OPS_REPORT_EMAIL: "ops@example.com, not an address" })).toThrow(
+      /OPS_REPORT_EMAIL/,
+    );
   });
 
   test("ignores variables that are not in the schema", () => {

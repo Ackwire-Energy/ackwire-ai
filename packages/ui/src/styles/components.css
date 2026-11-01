@@ -31,6 +31,88 @@ samp {
 }
 
 /*
+ * Focus rings only for the keys: from a press of a mouse, a finger or a pen until a key moves the focus, <html> has
+ * data-pointer (`trackInput`). A browser's :focus-visible also matches what a script focuses after any key, typing
+ * included (the button a dialog gives the focus back to once Enter sent its form), so every rule that draws a ring
+ * starts with html:not([data-pointer]): with the pointer, a focused control looks as it does unfocused.
+ */
+html[data-pointer] :focus-visible {
+  outline: none;
+}
+/* Whatever has no ring of its own takes the design system's, never the browser's (no weight: any rule wins). */
+:where(html:not([data-pointer])) :where(:focus-visible) {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 1px;
+}
+
+/*
+ * Scrollbars, ours wherever something scrolls under a mouse or a trackpad. A touch screen keeps the platform's
+ * indicator, which shows while scrolling and takes no room: ours would take 8px there, and one shown only on hover
+ * (the sidebar's) would never show. WebKit and Blink draw ours from the pseudo-elements; the standard properties go
+ * only to browsers without those (Firefox), since Chrome ignores the pseudo-elements on any element that sets them. A
+ * strip that scrolls by swipe hides its own on every device: `scrollbar-width: none` and its
+ * `::-webkit-scrollbar { display: none }` (older Safari has no `scrollbar-width`).
+ */
+:root,
+[data-theme] {
+  --scroll-thumb: color-mix(in srgb, var(--ink) 18%, transparent);
+  --scroll-thumb-hover: color-mix(in srgb, var(--ink) 36%, transparent);
+}
+/* A scroller that fades its content at an end with a mask adds this layer to it: the fade then spares the strip our
+   scrollbar is drawn in, and the thumb ends round. Nothing where we draw no scrollbar. */
+:root {
+  --scroll-strip: linear-gradient(transparent 0 0);
+}
+@media (hover: hover) and (pointer: fine) {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  @supports selector(::-webkit-scrollbar) {
+    :root {
+      --scroll-strip: linear-gradient(to left, #000 8px, transparent 0);
+    }
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-button {
+    display: none;
+  }
+  /* The thumb stops short of the box's ends: Chrome draws a scrollbar over its own box's rounded corners, and half the
+     largest radius a box takes keeps it inside every curve. */
+  ::-webkit-scrollbar-track:vertical {
+    margin: calc(var(--radius-section) / 2) 0;
+  }
+  ::-webkit-scrollbar-track:horizontal {
+    margin: 0 calc(var(--radius-section) / 2);
+  }
+  ::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: var(--radius-full);
+    background: var(--scroll-thumb) padding-box;
+  }
+  ::-webkit-scrollbar-thumb:vertical {
+    min-height: 32px;
+  }
+  ::-webkit-scrollbar-thumb:horizontal {
+    min-width: 32px;
+  }
+  ::-webkit-scrollbar-thumb:hover,
+  ::-webkit-scrollbar-thumb:active {
+    border-width: 1px;
+    background-color: var(--scroll-thumb-hover);
+  }
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--scroll-thumb) transparent;
+    }
+  }
+}
+
+/*
  * Elevation context: whatever sits inside a raised container (a row or card
  * in a dialog, a secondary button on a card, a file chip in the composer) is
  * one step up (`--raised-2`), so it never melts into its container in dark
@@ -187,14 +269,15 @@ samp {
 .ac-btn--ghost.ac-btn--glyph > * {
   position: relative;
 }
-.ac-btn--ghost.ac-btn--glyph:is(:hover, :focus-visible) {
+.ac-btn--ghost.ac-btn--glyph:hover,
+html:not([data-pointer]) .ac-btn--ghost.ac-btn--glyph:focus-visible {
   background: transparent;
   box-shadow: none;
 }
 .ac-btn--ghost.ac-btn--glyph:hover::before {
   background: var(--plate);
 }
-.ac-btn--ghost.ac-btn--glyph:focus-visible::before {
+html:not([data-pointer]) .ac-btn--ghost.ac-btn--glyph:focus-visible::before {
   box-shadow: var(--focus-ring);
 }
 
@@ -225,7 +308,7 @@ samp {
 .ac-btn:hover {
   background: var(--surface);
 }
-.ac-btn:focus-visible {
+html:not([data-pointer]) .ac-btn:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -325,7 +408,7 @@ samp {
 .ac-link--muted:hover {
   color: var(--ink);
 }
-.ac-link:focus-visible {
+html:not([data-pointer]) .ac-link:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: var(--radius-cut);
@@ -892,7 +975,7 @@ textarea.ac-input {
   cursor: default;
   border-radius: var(--radius-cut);
 }
-.ac-msg__time--details:focus-visible {
+html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -1343,7 +1426,7 @@ textarea.ac-input {
 .ac-select__trigger:hover {
   border-color: var(--line-strong);
 }
-.ac-select__trigger:focus-visible,
+html:not([data-pointer]) .ac-select__trigger:focus-visible,
 .ac-select__trigger[aria-expanded="true"] {
   outline: none;
   background: var(--raised);
@@ -1496,7 +1579,7 @@ textarea.ac-input {
   user-select: none;
 }
 .ac-menu__item:hover,
-.ac-menu__item:focus-visible,
+html:not([data-pointer]) .ac-menu__item:focus-visible,
 .ac-menu__item[data-highlighted] {
   background: var(--surface-sunken);
   outline: none;
@@ -1525,6 +1608,11 @@ textarea.ac-input {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+/* An item that opens a menu beside it (MenuSub): the chevron at its end. */
+.ac-menu__item > .ac-menu__chevron {
+  margin-left: auto;
+  color: var(--faint);
+}
 .ac-menu__item[aria-selected="true"],
 .ac-menu__item[data-state="checked"] {
   font-weight: 600;
@@ -1547,6 +1635,11 @@ textarea.ac-input {
 }
 .ac-menu__leading .ac-icon {
   margin-top: 0;
+}
+/* A bare mark (14px) in the icons' 16px column: its label starts where theirs do. */
+.ac-menu__leading:has(> .ac-brand--xs) {
+  justify-content: center;
+  width: 16px;
 }
 /*
  * An option with a description under its name: a lead no taller than 1.25 of its 20px lines (an icon, a mark, a
@@ -1582,6 +1675,8 @@ textarea.ac-input {
   color: var(--ink-muted);
 }
 .ac-menu__separator {
+  /* Empty, so in a menu taller than its room the column would shrink it to nothing. */
+  flex: none;
   height: 1px;
   margin: var(--space-1) 0;
   background: var(--line);
@@ -1645,8 +1740,8 @@ textarea.ac-input {
   background: var(--action);
   border-color: var(--action);
 }
-.ac-check:focus-visible,
-.ac-radio:focus-visible {
+html:not([data-pointer]) .ac-check:focus-visible,
+html:not([data-pointer]) .ac-radio:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -1724,14 +1819,14 @@ textarea.ac-input {
 [data-theme="dark"] .ac-option[aria-pressed="true"]::after {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23111110' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4L18 8.5'/%3E%3C/svg%3E");
 }
-.ac-option:focus-visible,
-.ac-option:has(:focus-visible) {
+html:not([data-pointer]) .ac-option:focus-visible,
+html:not([data-pointer]) .ac-option:has(:focus-visible) {
   outline: none;
   box-shadow: var(--e1), var(--field-ring);
 }
-.ac-option[aria-pressed="true"]:has(:focus-visible),
-.ac-option[data-state="checked"]:has(:focus-visible),
-.ac-option[aria-pressed="true"]:focus-visible {
+html:not([data-pointer]) .ac-option[aria-pressed="true"]:has(:focus-visible),
+html:not([data-pointer]) .ac-option[data-state="checked"]:has(:focus-visible),
+html:not([data-pointer]) .ac-option[aria-pressed="true"]:focus-visible {
   box-shadow: var(--pressed), var(--field-ring);
 }
 .ac-option__text {
@@ -1801,10 +1896,10 @@ textarea.ac-input {
 .ac-pill .ac-check {
   margin: 0;
 }
-.ac-pill:has(:focus-visible) {
+html:not([data-pointer]) .ac-pill:has(:focus-visible) {
   box-shadow: var(--focus-ring);
 }
-.ac-pill:has(:focus-visible) .ac-check {
+html:not([data-pointer]) .ac-pill:has(:focus-visible) .ac-check {
   box-shadow: none;
 }
 
@@ -1830,7 +1925,7 @@ textarea.ac-input {
   border-bottom-color: var(--ink);
   color: var(--ink);
 }
-.ac-tab:focus-visible {
+html:not([data-pointer]) .ac-tab:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
@@ -2004,23 +2099,40 @@ textarea.ac-input {
 }
 .ac-meter__bar {
   height: 100%;
-  background: var(--ink);
+  background: var(--meter-fill, var(--ink));
   border-radius: var(--radius-full);
 }
-/* One part in full ink over the rest of the use (an agent's share of its plan's window). */
+/* One part in full tone over the rest of the use (an agent's share of its plan's window). */
 .ac-meter--parts .ac-meter__bar {
-  background: color-mix(in srgb, var(--ink) 30%, transparent);
+  background: color-mix(in srgb, var(--meter-fill, var(--ink)) 30%, transparent);
 }
 .ac-meter__part {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
-  background: var(--ink);
+  background: var(--meter-fill, var(--ink));
   border-radius: var(--radius-full);
 }
 
-/* Plan usage: a bar per window (ink, like every meter); the state in words above */
+/*
+ * Plan usage: a bar per window, ink until it nears its limit (`planLevel`): amber from 80%, red from 90% and at the
+ * limit, each window by its own level and the state in words above by the plan's (a plan that refused a request reads
+ * red over ink bars). Only here: every other meter stays ink.
+ */
+.ac-planmeter[data-level="almost"],
+.ac-planmeter__window[data-level="almost"] {
+  --meter-fill: var(--warn);
+}
+.ac-planmeter[data-level="critical"],
+.ac-planmeter[data-level="limited"],
+.ac-planmeter__window[data-level="critical"],
+.ac-planmeter__window[data-level="limited"] {
+  --meter-fill: var(--danger);
+}
+.ac-planmeter__window[data-level="ok"] {
+  --meter-fill: var(--ink);
+}
 .ac-planmeter {
   display: grid;
   gap: 8px;
@@ -2030,7 +2142,7 @@ textarea.ac-input {
   margin: 0;
   font-size: 13px;
   font-weight: 600;
-  color: var(--attention);
+  color: var(--meter-fill, var(--attention));
 }
 .ac-planmeter__windows {
   display: grid;
@@ -2057,6 +2169,9 @@ textarea.ac-input {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   color: var(--ink-muted);
+}
+.ac-planmeter__window:not([data-level="ok"]) .ac-planmeter__pct {
+  color: var(--meter-fill);
 }
 .ac-planmeter__reset,
 .ac-planmeter__note,
@@ -2173,7 +2288,7 @@ textarea.ac-input {
 a.ac-list__row:hover {
   background: var(--surface);
 }
-a.ac-list__row:focus-visible {
+html:not([data-pointer]) a.ac-list__row:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -2197,7 +2312,7 @@ a.ac-list__row:focus-visible {
 .ac-row:hover {
   background: var(--plate-soft);
 }
-.ac-row:focus-visible {
+html:not([data-pointer]) .ac-row:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -2384,7 +2499,7 @@ a.ac-list__row:focus-visible {
 .ac-back:hover {
   color: var(--ink);
 }
-.ac-back:focus-visible {
+html:not([data-pointer]) .ac-back:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: var(--radius-cut);
@@ -2616,7 +2731,7 @@ a.ac-list__row:focus-visible {
   box-shadow: var(--chosen-shadow);
   transform: var(--chosen-lift);
 }
-.ac-navcard:focus-visible {
+html:not([data-pointer]) .ac-navcard:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -2723,7 +2838,7 @@ a.ac-list__row:focus-visible {
   text-decoration: underline;
   cursor: pointer;
 }
-.ac-receipt__action:focus-visible {
+html:not([data-pointer]) .ac-receipt__action:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: var(--radius-cut);
@@ -2762,7 +2877,7 @@ a.ac-list__row:focus-visible {
   color: var(--ink-muted);
 }
 
-/* Typing bar above the composer: tiny avatars + "Theo está digitando…" + three dots */
+/* The bar above the composer: the orbit (or three dots while only people type), tiny avatars, "Theo está trabalhando…" */
 .ac-typing {
   display: flex;
   align-items: center;
@@ -2825,6 +2940,7 @@ a.ac-list__row:focus-visible {
 }
 .ac-typing__dots {
   display: inline-flex;
+  flex: none;
   gap: 3px;
   align-items: center;
 }
@@ -2939,7 +3055,7 @@ a.ac-list__row:focus-visible {
 .ac-receipt__check:hover {
   color: var(--ink);
 }
-.ac-receipt__check:focus-visible {
+html:not([data-pointer]) .ac-receipt__check:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -3075,7 +3191,7 @@ a.ac-list__row:focus-visible {
   color: var(--surface-raised);
   font-weight: 600;
 }
-.ac-date__day:focus-visible {
+html:not([data-pointer]) .ac-date__day:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -3138,7 +3254,7 @@ a.ac-list__row:focus-visible {
   color: var(--ink);
   background: var(--surface-raised);
 }
-.ac-token__remove:focus-visible {
+html:not([data-pointer]) .ac-token__remove:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -3176,7 +3292,7 @@ a.ac-list__row:focus-visible {
 .ac-switch[data-state="checked"] {
   background: var(--action);
 }
-.ac-switch:focus-visible {
+html:not([data-pointer]) .ac-switch:focus-visible {
   box-shadow: var(--focus-ring);
 }
 .ac-switch[data-disabled] {
@@ -3659,7 +3775,7 @@ a.ac-list__row:focus-visible {
   background: var(--plate);
   box-shadow: none;
 }
-.ac-btn:focus-visible {
+html:not([data-pointer]) .ac-btn:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -3682,7 +3798,7 @@ a.ac-list__row:focus-visible {
     0 1px 2px rgba(0, 0, 0, 0.18),
     0 10px 22px -8px rgba(0, 0, 0, 0.5);
 }
-.ac-btn--primary:focus-visible {
+html:not([data-pointer]) .ac-btn--primary:focus-visible {
   box-shadow: var(--focus-ring);
 }
 .ac-btn--ghost {
@@ -3957,9 +4073,16 @@ a.ac-list__row:focus-visible {
   font-size: 12px;
   color: var(--faint);
 }
-.ac-seg__item:focus-visible {
+html:not([data-pointer]) .ac-seg__item:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
+}
+/* Shown, not changed (a member reading an admin's setting): the choice stays readable, faded. */
+.ac-seg[aria-disabled="true"] {
+  opacity: 0.55;
+}
+.ac-seg__item:disabled {
+  cursor: default;
 }
 .ac-seg__pill {
   position: absolute;
@@ -4081,7 +4204,8 @@ a.ac-list__row:focus-visible {
 }
 .ac-menu__item:hover,
 .ac-menu__item[data-highlighted],
-.ac-menu__item[data-active] {
+.ac-menu__item[data-active],
+.ac-menu__item[data-state="open"] {
   background: rgba(127, 127, 127, 0.12);
 }
 /* A select's chosen option: its background (the others light only on hover). */
@@ -4302,8 +4426,8 @@ a.ac-list__row:focus-visible {
  * The target reaches 1px into the label, so the ring is drawn well inside it (20px across, clear of the glyph), not
  * around it, where it would cover the label's last letter.
  */
-.ac-hint:focus-visible {
-  outline: 2px solid var(--ink);
+html:not([data-pointer]) .ac-hint:focus-visible {
+  outline: 2px solid var(--focus-color);
   outline-offset: -4px;
 }
 .ac-hint__bubble {
@@ -4610,7 +4734,7 @@ a.ac-list__row:focus-visible {
   background: var(--plate-soft);
   color: var(--ink);
 }
-.ac-work__head:focus-visible {
+html:not([data-pointer]) .ac-work__head:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -4726,7 +4850,7 @@ a.ac-list__row:focus-visible {
     inset 0 1px 3px rgba(23, 23, 22, 0.12),
     inset 0 0 0 1px var(--line);
 }
-.ac-react:focus-visible {
+html:not([data-pointer]) .ac-react:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -4853,7 +4977,7 @@ a.ac-list__row:focus-visible {
 .ac-composer__send:active:not([disabled]) {
   transform: scale(0.96);
 }
-.ac-composer__send:focus-visible {
+html:not([data-pointer]) .ac-composer__send:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5045,7 +5169,7 @@ a.ac-list__row:focus-visible {
 .ac-composer__format-btn:active {
   transform: scale(0.94);
 }
-.ac-composer__format-btn:focus-visible {
+html:not([data-pointer]) .ac-composer__format-btn:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5157,7 +5281,7 @@ a.ac-list__row:focus-visible {
 .ac-composer__file-remove:hover {
   background: var(--raised);
 }
-.ac-composer__file-remove:focus-visible {
+html:not([data-pointer]) .ac-composer__file-remove:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5194,7 +5318,10 @@ a.ac-list__row:focus-visible {
   color: var(--faint);
 }
 .ac-emoji__search:focus-within {
-  box-shadow: var(--focus-ring);
+  background: var(--raised);
+  box-shadow:
+    inset 0 0 0 1px var(--field-line),
+    var(--field-ring);
 }
 .ac-emoji__search input {
   flex: 1;
@@ -5276,7 +5403,7 @@ a.ac-list__row:focus-visible {
 .ac-emoji__cell:hover {
   transform: scale(1.12);
 }
-.ac-emoji__cell:focus-visible {
+html:not([data-pointer]) .ac-emoji__cell:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5294,6 +5421,285 @@ a.ac-list__row:focus-visible {
   }
   .ac-emoji__cell:hover {
     transform: none;
+  }
+}
+
+/*
+ * The composer's picker with tabs (ADR 0091): Emojis, GIFs and stickers in one popover of one height, so switching
+ * tabs never moves it. The tabs are the segmented control, across its width; each tab's list is its one scroll.
+ */
+.ac-emoji-popover.ac-picker {
+  width: 376px;
+  height: min(452px, var(--radix-popover-content-available-height, 452px));
+  max-height: none;
+  gap: 8px;
+  overflow: hidden;
+}
+/* The tabs' root is `display: contents`: its list and panels lay out in the popover's column. */
+.ac-picker .ac-tabs--seg {
+  --seg-h: var(--control-h-sm);
+  --seg-r: var(--control-r-sm);
+  --seg-in: 3px;
+  flex: none;
+  display: flex;
+  width: 100%;
+}
+.ac-picker .ac-tabs--seg .ac-seg__item {
+  flex: 1 1 0;
+}
+.ac-picker__panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  border-radius: var(--radius-item);
+}
+html:not([data-pointer]) .ac-picker__panel:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-picker__panel > .ac-emoji {
+  flex: 1 1 auto;
+}
+.ac-picker .ac-emoji__scroll {
+  flex: 1 1 auto;
+  height: auto;
+  max-height: none;
+}
+/* A tab of GIFs or stickers: its search, its chips, the list that scrolls, a quiet line under it. */
+.ac-media {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.ac-media__chips {
+  flex: none;
+}
+.ac-media__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.ac-media__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 32px 12px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+.ac-media__more {
+  display: flex;
+  justify-content: center;
+  min-height: 28px;
+  padding: 6px 0 2px;
+  color: var(--faint);
+}
+.ac-media__foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 -8px -8px;
+  padding: 7px 12px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--faint);
+}
+.ac-media__foot b {
+  color: var(--muted);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.ac-media__foot span:last-child:not(:first-child) {
+  margin-left: auto;
+}
+/* GIFs in two columns of their own proportions: each holds its place before its file loads. */
+.ac-gifs__grid {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.ac-gifs__grid[data-stale] {
+  opacity: 0.6;
+}
+.ac-gifs__col {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  gap: 6px;
+  min-width: 0;
+}
+.ac-gifs__cell {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  border-radius: var(--radius-item) var(--radius-item) var(--radius-item) var(--radius-cut);
+  background: var(--sunken);
+  cursor: pointer;
+  line-height: 0;
+}
+.ac-gifs__cell img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ac-gifs__cell:hover,
+html:not([data-pointer]) .ac-gifs__cell:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-gifs__ghost {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-item) var(--radius-item) var(--radius-item) var(--radius-cut);
+}
+/* The agents' stickers: a section per agent, four to a row. */
+.ac-stickers + .ac-stickers {
+  margin-top: 6px;
+}
+.ac-stickers__heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 4px 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--faint);
+}
+.ac-stickers__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+.ac-stickers__cell {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--radius-item);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.ac-stickers__cell:hover {
+  background: rgba(127, 127, 127, 0.12);
+}
+html:not([data-pointer]) .ac-stickers__cell:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-stickers__cell > .ac-sticker {
+  max-width: 100%;
+  max-height: 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-stickers__cell {
+    transition: none;
+  }
+}
+
+/* An agent's sticker: the agent itself on a transparent canvas, blocky when scaled; no frame, no background. */
+.ac-sticker {
+  display: block;
+  flex: none;
+  image-rendering: pixelated;
+}
+/* In a message: under the name, as a picture is, a little apart from any words above it. */
+.ac-sticker.ac-msg-media {
+  margin-top: 4px;
+}
+/*
+ * A GIF in a message: the picture in the cut-corner frame, as wide as it is up to 300px (`--gif-w`), its shape
+ * held before it loads (`--gif-ar`); a small "GIF" mark on its corner and where it comes from on hover.
+ */
+.ac-gif {
+  position: relative;
+  display: block;
+  width: min(100%, var(--gif-w, 300px));
+  aspect-ratio: var(--gif-ar, 4 / 3);
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) 4px;
+  background: var(--sunken);
+  box-shadow: 0 0 0 1px var(--line);
+  line-height: 0;
+}
+.ac-gif img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+html:not([data-pointer]) .ac-gif:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ac-gif__mark,
+.ac-gif__source {
+  position: absolute;
+  bottom: 8px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1.3;
+  pointer-events: none;
+}
+.ac-gif__mark {
+  left: 8px;
+}
+.ac-gif__source {
+  right: 8px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.ac-gif:hover .ac-gif__source,
+.ac-gif:focus-visible .ac-gif__source {
+  opacity: 1;
+}
+/* Its file no longer loads (GIFs turned off, the GIF gone): a quiet card of its size, its title, the mark. */
+.ac-gif--off {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  padding: 12px 12px 32px;
+  line-height: 1.35;
+}
+.ac-gif__title {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+.ac-gif--off .ac-gif__mark {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+  color: var(--faint);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-gif__source {
+    transition: none;
   }
 }
 
@@ -5468,8 +5874,8 @@ a.ac-list__row:focus-visible {
   background: var(--plate-soft);
 }
 /* Inside the card's clip: the ring goes inward. */
-.ac-tools__head:focus-visible {
-  outline: 2px solid var(--ink);
+html:not([data-pointer]) .ac-tools__head:focus-visible {
+  outline: 2px solid var(--focus-color);
   outline-offset: -2px;
 }
 .ac-tools__logos {
@@ -5583,7 +5989,7 @@ button.ac-tools__row:hover {
 button.ac-tools__row[aria-pressed="true"] {
   background: var(--plate);
 }
-button.ac-tools__row:focus-visible {
+html:not([data-pointer]) button.ac-tools__row:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5739,9 +6145,6 @@ button.ac-tools__row:focus-visible {
 }
 .ac-recur__modes {
   align-self: flex-start;
-  max-width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
 }
 .ac-recur__row {
   display: flex;
@@ -5801,7 +6204,7 @@ button.ac-tools__row:focus-visible {
   box-shadow: var(--chosen-shadow);
   transform: var(--chosen-lift);
 }
-.ac-recur__day:focus-visible {
+html:not([data-pointer]) .ac-recur__day:focus-visible {
   outline: none;
   box-shadow: var(--field-ring);
 }
@@ -5877,8 +6280,10 @@ button.ac-tools__row:focus-visible {
   overscroll-behavior: contain;
   padding: 6px;
   /* Soft fade at the edges of the scroll area. */
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 10px, #000 calc(100% - 10px), transparent 100%);
-  mask-image: linear-gradient(to bottom, transparent 0, #000 10px, #000 calc(100% - 10px), transparent 100%);
+  -webkit-mask-image:
+    linear-gradient(to bottom, transparent 0, #000 10px, #000 calc(100% - 10px), transparent 100%), var(--scroll-strip);
+  mask-image:
+    linear-gradient(to bottom, transparent 0, #000 10px, #000 calc(100% - 10px), transparent 100%), var(--scroll-strip);
 }
 .ac-tz__option {
   display: flex;
@@ -6207,7 +6612,7 @@ button.ac-tools__row:focus-visible {
 .ac-searchfield__clear:hover {
   background: var(--plate);
 }
-.ac-searchfield__clear:focus-visible {
+html:not([data-pointer]) .ac-searchfield__clear:focus-visible {
   outline: none;
   box-shadow: var(--field-ring);
 }
@@ -6245,7 +6650,7 @@ button.ac-tools__row:focus-visible {
 .ac-filtertoggle:active {
   transform: scale(0.97);
 }
-.ac-filtertoggle:focus-visible {
+html:not([data-pointer]) .ac-filtertoggle:focus-visible {
   outline: none;
   box-shadow: var(--field-ring);
 }
@@ -6320,8 +6725,8 @@ button.ac-tools__row:focus-visible {
 .ac-filter--active .ac-filter__trigger {
   padding-right: 4px;
 }
-.ac-filter__trigger:focus-visible,
-.ac-filter__clear:focus-visible {
+html:not([data-pointer]) .ac-filter__trigger:focus-visible,
+html:not([data-pointer]) .ac-filter__clear:focus-visible {
   outline: none;
   box-shadow: var(--field-ring);
 }
@@ -6383,7 +6788,7 @@ button.ac-tools__row:focus-visible {
   cursor: pointer;
 }
 .ac-filter__option:hover,
-.ac-filter__option:focus-visible {
+html:not([data-pointer]) .ac-filter__option:focus-visible {
   background: var(--plate-soft);
   outline: none;
 }
@@ -6833,7 +7238,7 @@ button.ac-tools__row:focus-visible {
 .ac-optrow:active {
   transform: scale(0.993);
 }
-.ac-optrow:focus-visible {
+html:not([data-pointer]) .ac-optrow:focus-visible {
   outline: none;
   box-shadow:
     inset 0 0 0 1px var(--line2),
@@ -6844,7 +7249,7 @@ button.ac-tools__row:focus-visible {
   background: var(--chosen-bg);
   transform: var(--chosen-lift);
 }
-.ac-optrow[data-state="checked"]:focus-visible {
+html:not([data-pointer]) .ac-optrow[data-state="checked"]:focus-visible {
   box-shadow: var(--chosen-shadow), var(--field-ring);
 }
 .ac-optrow__dot {
@@ -6949,7 +7354,7 @@ button.ac-tools__row:focus-visible {
   box-shadow: none;
   transform: none;
 }
-.ac-optcard > .ac-optrow:focus-visible {
+html:not([data-pointer]) .ac-optcard > .ac-optrow:focus-visible {
   box-shadow: var(--field-ring);
 }
 .ac-optlist--attached .ac-optrow--lead {
@@ -7001,7 +7406,7 @@ button.ac-tools__row:focus-visible {
 .ac-effort__ramp:active {
   cursor: grabbing;
 }
-.ac-effort:focus-visible .ac-effort__ramp {
+html:not([data-pointer]) .ac-effort:focus-visible .ac-effort__ramp {
   border-radius: 4px;
   box-shadow: var(--field-ring);
 }
@@ -7300,9 +7705,9 @@ label.ac-setrow__title {
 .ac-setmore__toggle:hover {
   background: var(--plate-soft);
 }
-.ac-setmore__toggle:focus-visible {
+html:not([data-pointer]) .ac-setmore__toggle:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--ink);
+  box-shadow: var(--focus-ring);
 }
 .ac-setmore__text {
   flex: 1;
@@ -7392,7 +7797,7 @@ label.ac-setrow__title {
 .ac-consult__head:hover {
   background: rgba(127, 127, 127, 0.05);
 }
-.ac-consult__head:focus-visible {
+html:not([data-pointer]) .ac-consult__head:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -7501,7 +7906,7 @@ label.ac-setrow__title {
   border-bottom: 1px dotted var(--line2);
   cursor: default;
 }
-.ac-msg__note:focus-visible {
+html:not([data-pointer]) .ac-msg__note:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: 4px;
@@ -7704,12 +8109,6 @@ label.ac-setrow__title {
 .ac-mo__item:focus-visible .ac-mo__kbd:not(:empty) {
   visibility: visible;
 }
-.ac-mo__item--static {
-  cursor: default;
-}
-.ac-mo__item--static:hover {
-  background: transparent;
-}
 /* A workspace's mark where the icon goes, with the name lined up with the other labels. */
 .ac-mo__leading {
   flex: none;
@@ -7837,7 +8236,7 @@ label.ac-setrow__title {
   opacity: 0;
   pointer-events: none;
 }
-.ac-carousel__arrow:focus-visible {
+html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   outline: none;
   box-shadow: var(--e1), var(--field-ring);
 }

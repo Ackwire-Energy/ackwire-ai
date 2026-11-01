@@ -25,6 +25,7 @@ export {
   type SendHow,
 } from "./Composer";
 export { Count, type CountProps } from "./Count";
+export { DiffView } from "./DiffView";
 export { EmptyState, type EmptyStateProps } from "./EmptyState";
 export { type FilterItem, Filters, type FiltersProps } from "./Filters";
 export { Glass, type GlassProps } from "./Glass";
@@ -82,7 +83,7 @@ export { SheetScreen, type SheetScreenProps } from "./SheetScreen";
 export { SheetSurface } from "./SheetSurface";
 export { type SwipeAction, SwipeRow } from "./SwipeRow";
 export { searchCancelVisible, searchShowsResults } from "./searchMode";
-export { fieldText, systemText, Text, type TextProps, type TextTone, type TextVariant } from "./Text";
+export { fieldText, systemText, Text, type TextProps, type TextTone, type TextVariant, textLineOf } from "./Text";
 export { ToastHost, type ToastInput, useToast } from "./Toast";
 export { Toggle, type ToggleProps, ToggleSwitch } from "./Toggle";
 export {

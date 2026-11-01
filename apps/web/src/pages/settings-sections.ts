@@ -6,6 +6,7 @@ import type { IconName } from "@agenteschat/ui";
 // the sections without loading the page itself.
 
 export type SettingsSection =
+  | "account"
   | "notifications"
   | "general"
   | "members"
@@ -19,7 +20,8 @@ export type SettingsSection =
   | "computers"
   | "usage"
   | "billing"
-  | "import";
+  | "import"
+  | "media";
 
 export type SettingsGroup = "you" | "org" | "agents" | "costs";
 
@@ -30,7 +32,9 @@ export const SETTINGS_SECTIONS: {
   group: SettingsGroup;
   allowed: (org: OrgSummary, server: AuthConfig | undefined) => boolean;
 }[] = [
-  // Mine, not the workspace's: what reaches my devices as a notification here (ADR 0071 §8).
+  // Mine, not the workspace's: my profile here and what this device keeps (the nav shows my face for it).
+  { id: "account", icon: "person", group: "you", allowed: () => true },
+  // What reaches my devices as a notification here (ADR 0071 §8).
   { id: "notifications", icon: "bell", group: "you", allowed: () => true },
   { id: "general", icon: "settings", group: "org", allowed: () => true },
   { id: "members", icon: "members", group: "org", allowed: () => true },
@@ -38,6 +42,8 @@ export const SETTINGS_SECTIONS: {
   { id: "roles", icon: "audiencePeople", group: "org", allowed: () => true },
   // What agents did and people changed: only for who may see it (it shows everyone's work).
   { id: "audit", icon: "shield", group: "org", allowed: (o) => can(o, "view_audit") },
+  // GIFs and stickers in chat (ADR 0091): everyone reads them, who configures the workspace changes them.
+  { id: "media", icon: "sticker", group: "org", allowed: () => true },
   { id: "access", icon: "agent", group: "agents", allowed: (o) => can(o, "manage_agents") },
   { id: "connectors", icon: "plug", group: "agents", allowed: () => true },
   { id: "skills", icon: "bulb", group: "agents", allowed: (o) => can(o, "manage_agents") },

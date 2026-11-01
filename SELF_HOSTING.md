@@ -150,8 +150,8 @@ one's container (Caddy or Tailscale), which `docker compose up` alone would leav
    **Connected**.
 2. Install the agentes.chat app.
 3. Point the phone's camera at a QR code for your instance. The setup prints one at the end; in the
-   web app, **Open on your phone** (**Abrir no celular** in Portuguese) in the account menu shows
-   one that also signs you in. Or, on the app's sign-in screen, tap the server line
+   web app, **Open on your phone** (**Abrir no celular** in Portuguese) in **Settings › Your account**
+   shows one that also signs you in. Or, on the app's sign-in screen, tap the server line
    (**Server: agentes.chat · Change**, or **Servidor: agentes.chat · Trocar**), then
    **Scan QR code** (**Escanear QR code**), or type the address and tap **Use this server**
    (**Usar este servidor**).
@@ -488,8 +488,8 @@ computer and opens agentes.chat, signed in.
   If something else holds the port when it starts, it moves to a free one. With reach on, Tailscale
   shares it only while it runs.
 - **No password:** the app signs you in, and on its sign-in screen **Continue on this Mac** does it again
-  whenever your session ends. For a browser on another device, add one in your account menu, **Add a
-  password**.
+  whenever your session ends. For a browser on another device, add one in **Settings › Your account**, **Add
+  a password**.
 - **Preferences › Servers › agentes.chat on this Mac:** reach (Tailscale needs HTTPS turned on for your
   tailnet, which **Turn it on** opens; on Linux, connect Tailscale with `sudo tailscale up`, and run
   `sudo tailscale set --operator=$USER` once), the phone's QR code, usage statistics, **Back up now**
@@ -730,6 +730,16 @@ far each one is, and asks for a single-use code that the computer connects with
 (`POST /orgs/{orgId}/machines`): write it to a file only the runner's user can read and run
 `agentes-runner pair --server <url> --enroll-file <file>` there (or pass `--enroll-file` to the installer),
 which removes the file as soon as it is read. Leave it `off` and people connect their own computers.
+
+**Stall-and-noise report (optional).** With `OPS_REPORT_EMAIL` set (one address, or several separated by
+commas) and email set up, the server emails the previous UTC day's report every day at about 01:00 UTC: for
+each workspace, where agents stopped although someone waited on them (a mention that woke nobody, a run that
+could only read, work an agent said it would do and didn't, a hand-off or a person left without an answer, a
+limit, a background task that failed at its start) and where they acted for nothing (runs that ended without a
+word, answered only a thanks, or were woken with nothing to do, with their tokens and cost), against the daily
+average of the 7 days before. Workspace names and counts only, never what anyone wrote.
+`docker compose exec agentes bun run report:autonomy` prints the same table at any time (`--day 2026-10-30`
+for another day, `--org <workspace id>` for one workspace).
 
 </details>
 

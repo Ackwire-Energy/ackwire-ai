@@ -122,7 +122,7 @@ const said = (events: BrowserInputEvent[]) =>
         : `${e.type.replace("mouse", "").toLowerCase()}${e.type === "mouseMoved" ? `+${e.button}` : ""}@${e.x},${e.y}`,
   );
 
-describe("dragging on the page (ADR 0040 §12)", () => {
+describe("dragging on the page (ADR 0040 §13)", () => {
   test("a press stays down until let go, and the moves between carry the button: the page sees a drag", () => {
     expect(
       said([...pressEvents({ x: 10, y: 20 }), dragEvent({ x: 60, y: 20 }), releaseEvent({ x: 60, y: 20 })]),
@@ -150,7 +150,7 @@ describe("dragging on the page (ADR 0040 §12)", () => {
   });
 });
 
-describe("fingers on the page (ADR 0040 §12)", () => {
+describe("fingers on the page (ADR 0040 §13)", () => {
   // A 640×360 page shown at half size, with 20 px of band above it: page = (frame - band) × 2.
   const toPage = (p: { x: number; y: number }, clamp: boolean) =>
     pagePoint(

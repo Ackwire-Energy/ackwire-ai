@@ -7,8 +7,8 @@ import "./roles.css";
 
 /**
  * Picks roles (ADR 0085) from a menu that stays open: only the ones the person may give (below their own). The
- * trigger is a field-like button that names what's picked ("Só Todos" with none), or `trigger` (a "+" on a
- * person's row).
+ * trigger is a field-like button that names what's picked ("Membro" with none: everyone's base alone, ADR 0090),
+ * or `trigger` (a "+" on a person's row).
  */
 export function RolesPicker({
   roles,
@@ -39,7 +39,7 @@ export function RolesPicker({
         trigger ?? (
           <Button size={size} className="roles-picker" aria-label={label}>
             <span className="roles-picker__value">
-              {picked.length ? picked.map((r) => r.name).join(", ") : t("members.onlyEveryone")}
+              {picked.length ? picked.map((r) => r.name).join(", ") : t("roles.member")}
             </span>
             <Icon name="chevronDown" size={16} />
           </Button>

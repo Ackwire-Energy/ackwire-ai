@@ -202,6 +202,109 @@ describe("typing bar above the composer", () => {
       { type: "typing", channelId: ENG_ID },
     ]);
   });
+
+  test("someone typing alone: the dots, their face and 'João está digitando…', gone once their message comes", async () => {
+    const { socket } = await open();
+    expect(typingBar().dataset.active).toBe("false");
+    await push(socket, { type: "user.typing", userId: "u-joao", threadId: null, ttlMs: 6000 });
+    await settle();
+    expect(typingBar().dataset.active).toBe("true");
+    expect(bar().textContent).toBe("João está digitando…");
+    // People only: the typing dots lead (the orbit is for agents), their face in the stack, no clock and no stop.
+    expect(typingBar().querySelector(".ac-typing__dots")).not.toBeNull();
+    expect(typingBar().querySelector(".ac-pixspin")).toBeNull();
+    expect(typingBar().querySelectorAll(".ac-typing__tok .ac-avatar")).toHaveLength(1);
+    expect(typingBar().querySelector(".ac-typing__elapsed, .stop-run")).toBeNull();
+    await push(socket, {
+      type: "message.created",
+      messageId: "m-joao",
+      message: {
+        id: "m-joao",
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "person", id: "u-joao" },
+        body: "pronto, subiu",
+        mentionedAgentIds: [],
+        agentRunId: null,
+        createdAt: new Date().toISOString(),
+      },
+    });
+    await settle();
+    expect(typingBar().dataset.active).toBe("false");
+  });
+
+  test("my own typing never shows, and someone typing in a thread shows in that thread, not here", async () => {
+    const { socket } = await open();
+    await push(socket, { type: "user.typing", userId: "u-walter", threadId: null, ttlMs: 6000 });
+    await push(socket, { type: "user.typing", userId: "u-joao", threadId: "m-1", ttlMs: 6000 });
+    await settle();
+    expect(typingBar().dataset.active).toBe("false");
+  });
+
+  test("in a thread: who types there shows (not who types in the channel), and my typing frames name the thread", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    await api.threads.create(ORG_ID, {
+      id: "m-1",
+      channelId: ENG_ID,
+      firstMessageId: "m-1",
+      lastMessageId: "m-1",
+      title: "Login com 401",
+    } as Parameters<typeof api.threads.create>[1]);
+    const { sockets } = await renderApp(`/org/${ORG_ID}/threads/m-1`, { api });
+    await settle(8);
+    const socket = sockets.last();
+    await act(async () => socket.open());
+    await settle(2);
+    await push(socket, { type: "user.typing", userId: "u-joao", threadId: null, ttlMs: 6000 });
+    await settle();
+    expect(typingBar().dataset.active).toBe("false");
+    await push(socket, { type: "user.typing", userId: "u-joao", threadId: "m-1", ttlMs: 6000 });
+    await settle();
+    expect(bar().textContent).toBe("João está digitando…");
+    const reply = screen().getByRole("combobox", { name: /Responder na thread/ });
+    await act(async () => fireEvent.change(reply, { target: { value: "vou olhar" } }));
+    expect(socket.sent.filter((f) => (f as { type: string }).type === "typing")).toEqual([
+      { type: "typing", channelId: ENG_ID, threadId: "m-1" },
+    ]);
+  });
+
+  test("several agents and people: one short line, three small faces at most, no clock or stop", async () => {
+    const { socket } = await open();
+    const a = { threadId: null, runId: "r-a", agentId: ADA_ID };
+    await push(socket, {
+      type: "agent.run",
+      ...a,
+      status: "running",
+      startedAt: new Date(Date.now() - 13_000).toISOString(),
+    });
+    await push(socket, { type: "agent.tool", ...a, tool: "github_list_prs" });
+    await push(socket, { type: "agent.run", threadId: null, runId: "r-b", agentId: ATLAS_ID, status: "running" });
+    await push(socket, { type: "user.typing", userId: "u-joao", threadId: null, ttlMs: 6000 });
+    await settle();
+    expect(bar().textContent).toBe("Ada e Atlas estão trabalhando · João está digitando…");
+    // Who is typing is a piece of its own, after the agents' words and their " · " (which give way first on a short
+    // bar), then the names, never what they do.
+    expect(typingBar().querySelector(".ac-typing__agents")?.textContent).toBe("Ada e Atlas estão trabalhando · ");
+    const people = typingBar().querySelector(".ac-typing__people");
+    expect(people?.textContent).toBe("João está digitando…");
+    expect(people?.querySelector(".ac-typing__typers")?.textContent).toBe("João");
+    expect(typingBar().querySelectorAll(".ac-typing__tok")).toHaveLength(3);
+    expect(typingBar().querySelector(".ac-pixspin")).not.toBeNull();
+    // The time, "Ver" and the stop are one agent's: with two at work the line shows none (the composer still stops).
+    expect(typingBar().querySelector(".ac-typing__elapsed")).toBeNull();
+    expect(within(typingBar()).queryByRole("button", { name: "Ver" })).toBeNull();
+    expect(within(typingBar()).queryByRole("button", { name: "Parar" })).toBeNull();
+    // One leaves: the other gets its own line back, with its time.
+    await push(socket, { type: "agent.idle", threadId: null, runId: "r-b", agentId: ATLAS_ID });
+    await push(socket, { type: "run.finished", threadId: null, runId: "r-b", agentId: ATLAS_ID, status: "done" });
+    await settle();
+    expect(bar().textContent).toBe("Ada está consultando o GitHub · João está digitando…");
+    const took = typingBar().querySelector(".ac-typing__elapsed") as HTMLElement;
+    expect(took.textContent).toMatch(/^1\d s$/);
+    // Tabular figures: the seconds tick without nudging what is beside them.
+    expect(took.classList.contains("ac-num")).toBe(true);
+  });
 });
 
 describe("bottom anchoring", () => {
@@ -468,6 +571,7 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
       [{ step: "rule", rule: "reply" }, "Uma resposta para a Ada", null],
       [{ step: "rule", rule: "only_agent" }, "Só a Ada responde aqui sem menção", null],
       [{ step: "rule", rule: "follow_up" }, "Segue a conversa com a Ada", null],
+      [{ step: "rule", rule: "coordinator" }, "A Ada coordena o time", null],
     ];
     for (const [i, [decidedBy, words, mark]] of cases.entries()) {
       const text = `pergunta ${i + 1}`;
@@ -487,11 +591,14 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
       expect(by.className).toContain("ac-iconline");
       if (mark) expect(by.querySelector(".ac-brand")?.getAttribute("data-mark")).toBe(mark);
       else expect(by.firstElementChild?.classList.contains("ac-icon")).toBe(true);
+      // The coordinator's line leads with its flag.
+      if ((decidedBy as { rule?: string }).rule === "coordinator")
+        expect(by.querySelector("path")?.getAttribute("d")).toBe("M5 17V3.5M5 3.5h9l-1.7 3.3L14 10H5");
       await closePopover(pop);
     }
     for (const [text, routed] of [
-      ["ninguém pegou", { pickedBy: [], decidedBy: { step: "jev" } }],
       ["de antes", { pickedBy: [ADA_ID] }],
+      ["ninguém pegou", { pickedBy: [], decidedBy: { step: "jev" } }],
     ] as const) {
       await sendText(text);
       await settle(4);
@@ -501,6 +608,13 @@ describe("receipts: who picked the agents for a message nobody mentioned", () =>
       await closePopover(pop);
     }
     expect(receiptOf("ninguém pegou").textContent).toContain("Nenhum agente vai responder·Chamar um agente");
+    // Only the newest message says it in words: an older one keeps the check, whose popover says it.
+    await sendText("e depois");
+    await settle(4);
+    expect(receiptOf("ninguém pegou").textContent).not.toContain("Nenhum agente vai responder");
+    const older = await popoverOf("ninguém pegou");
+    expect(older.textContent).toContain("Nenhum agente vai responder·Chamar um agente");
+    await closePopover(older);
   });
 });
 
@@ -637,24 +751,24 @@ describe("direct messages with an agent", () => {
     expect(document.activeElement).toBe(composer());
   });
 
-  test("a computer brain thinks for the agent: the DM header says Claude Code · Sonnet no MacBook, with its mark", async () => {
+  test("a plan thinks for the agent: the DM header says its model by that plan, with its mark", async () => {
     const state = seedState();
     const ada = state.agents.find((a) => a.id === ADA_ID);
     if (ada) ada.brain = { kind: "claude_code", model: "Sonnet", computer: "MacBook" };
     await open(state, `dm/agent/${ADA_ID}`);
     await settle(4);
-    expect(document.body.textContent).toContain("Dev · de João · Claude Code · Sonnet no MacBook");
+    expect(document.body.textContent).toContain("Dev · de João · Sonnet pelo plano do Claude");
     expect(document.body.textContent).not.toContain("Claude Sonnet 5.5");
     const brain = document.querySelector(".channel__brain") as HTMLElement;
     expect(brain.querySelector(".ac-brand[data-mark='claude']")).not.toBeNull();
     cleanup();
-    // Without the computer's name (a member): just the brain and its model.
+    // Who doesn't see its computer (a member) reads whose plan it is.
     const member = seedState();
     const codex = member.agents.find((a) => a.id === ADA_ID);
     if (codex) codex.brain = { kind: "codex", model: "GPT-6 Sol" };
     await open(member, `dm/agent/${ADA_ID}`);
     await settle(4);
-    expect(document.body.textContent).toContain("Dev · de João · Codex · GPT-6 Sol");
+    expect(document.body.textContent).toContain("Dev · de João · GPT-6 Sol pelo plano do ChatGPT de João");
   });
 
   test("sidebar agent → DM via POST /dms: header with role, owner and model; empty state; the agent answers without a mention", async () => {
@@ -766,7 +880,7 @@ describe("memory changes and proposals in the chat", () => {
     expect(screen().getByRole("group", { name: "Proposta de mudança de Ada" })).toBeTruthy();
   });
 
-  test("a proposal in the chat: diff inline with Aceitar / Editar / Recusar", async () => {
+  test("a proposal in the chat: Ver a mudança opens the diff, Editar there, Aceitar / Recusar in the footer", async () => {
     const state = seedState();
     state.messages.push({
       id: "msg-prop",
@@ -781,6 +895,10 @@ describe("memory changes and proposals in the chat", () => {
     });
     await open(state);
     const card = screen().getByRole("group", { name: "Proposta de mudança de Ada" });
+    expect(card.getAttribute("data-ask-kind")).toBe("proposal");
+    // The change is behind "Ver a mudança"; Editar lives there too.
+    expect(card.querySelector(".ac-diff__line--add")).toBeNull();
+    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Ver a mudança" })));
     expect(card.querySelectorAll(".ac-diff__line--add").length).toBeGreaterThan(0);
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Editar" })));
     await act(async () =>
@@ -795,7 +913,10 @@ describe("memory changes and proposals in the chat", () => {
       "prop-1",
       "Só PRs pequenos.",
     ]);
-    expect(card.querySelector(".ac-chip--done")?.textContent).toBe("Aceita");
+    // Decided: one line takes its place (another element).
+    const done = screen().getByRole("group", { name: "Proposta de mudança de Ada" });
+    expect(done.querySelector(".rq-done__mark[data-done]")).not.toBeNull();
+    expect(done.textContent).toContain("Aceita");
   });
 });
 

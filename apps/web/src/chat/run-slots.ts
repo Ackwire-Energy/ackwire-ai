@@ -1,4 +1,5 @@
 import type { LiveRun } from "@agenteschat/client";
+import { isMediaAfterReply } from "@agenteschat/client/lib/media";
 
 /**
  * One block per agent answer, from "pensando" to the final message:
@@ -81,16 +82,21 @@ export function nextSlots(
 /**
  * Which timeline row is drawn under its run's block key: a run can post more than one message (text
  * before an approval, the card, the final reply), and only its last one takes the block's place (keys
- * stay unique). A run still live keeps the key for its block, so none of its messages take it.
+ * stay unique). A run still live keeps the key for its block, so none of its messages take it. The sticker
+ * or GIF an agent adds after its reply (ADR 0091) is never the run's row: the reply keeps it.
  */
 export function blockRowByRun(
-  items: readonly { kind: string; key: string; message?: { agentRunId?: string | null } }[],
+  items: readonly {
+    kind: string;
+    key: string;
+    message?: { agentRunId?: string | null; meta?: Record<string, unknown> };
+  }[],
   liveRunIds: ReadonlySet<string>,
 ): Map<string, string> {
   const out = new Map<string, string>();
   for (const item of items) {
     const runId = item.kind === "message" ? item.message?.agentRunId : null;
-    if (runId && !liveRunIds.has(runId)) out.set(runId, item.key);
+    if (runId && !liveRunIds.has(runId) && !isMediaAfterReply(item.message?.meta)) out.set(runId, item.key);
   }
   return out;
 }
@@ -145,11 +151,4 @@ export function openerOf(r: Pick<LiveRun, "runId" | "status" | "text" | "work">)
   if (first?.kind === "say") return { said: first.text, opener: null, work: work.filter((w) => w !== first) };
   const generic = r.text.length === 0 && r.status !== "canceled" && r.status !== "failed";
   return { said: null, opener: generic ? hashOf(r.runId) % OPENERS : null, work };
-}
-
-/** " · 4 s" shows from 2 s on: minutes and seconds past a minute. */
-export function elapsedParts(ms: number): { m: number; s: number } | null {
-  const secs = Math.floor(Math.max(0, ms) / 1000);
-  if (secs < 2) return null;
-  return { m: Math.floor(secs / 60), s: secs % 60 };
 }

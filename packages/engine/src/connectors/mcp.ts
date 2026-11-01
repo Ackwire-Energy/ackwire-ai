@@ -2,6 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { recordAudit } from "../audit";
+import { cutText } from "../format";
 import type { ToolDefinition, ToolSource } from "../tools/types";
 import { CONNECTOR_CATALOG, connectorScope, fillTitle } from "./catalog";
 import { activeConnections, type ConnectorConnection, type ConnectorDeps, connectionHeaders } from "./connections";
@@ -14,6 +15,7 @@ import {
   isCustom,
   type ToolAccess,
 } from "./custom";
+import { presetForServer } from "./presets";
 import type { McpServerInfo } from "./server-icon";
 
 /** A tool as an MCP server lists it. */
@@ -149,6 +151,7 @@ export function createConnectorToolSource(deps: ConnectorDeps & { connect?: McpC
         .replace(/[^a-z0-9]+/g, "_")
         .replace(/^_|_$/g, "")
         .slice(0, 24) || "mcp";
+    const preset = presetForServer(connection.serverUrl)?.id;
     return classified.flatMap((row): ToolDefinition[] => {
       const tool = byName.get(row.name);
       const access = row.access as ToolAccess;
@@ -160,11 +163,13 @@ export function createConnectorToolSource(deps: ConnectorDeps & { connect?: McpC
       return [
         {
           name: exposedToolName(prefix, tool.name),
-          description: `[${connection.label}] ${row.label}: ${said}`.slice(0, 1024),
+          description: cutText(`[${connection.label}] ${row.label}: ${said}`, 1024),
           inputSchema: tool.inputSchema?.type === "object" ? tool.inputSchema : { type: "object" },
           scope: customScope(connection.id, access),
           connectionId: connection.id,
           connectorLabel: connection.label,
+          service: preset,
+          serviceIcon: connection.icon ?? undefined,
           // A sensitive tool never runs without approval, whatever is stored.
           sensitive: access === "approval" || row.sensitive || COMPOSIO_ANY_ACTION.has(tool.name),
           external: true, // whatever the server returns is third-party text
@@ -225,11 +230,12 @@ export function createConnectorToolSource(deps: ConnectorDeps & { connect?: McpC
           if (!mapped || mapped.ours) continue; // not in our catalog, or one we serve: never exposed
           out.push({
             name: exposedToolName(def.id, tool.name),
-            description: `[${def.label}] ${tool.description ?? tool.name}`.slice(0, 1024),
+            description: cutText(`[${def.label}] ${tool.description ?? tool.name}`, 1024),
             inputSchema: tool.inputSchema?.type === "object" ? tool.inputSchema : { type: "object" },
             scope: connectorScope(def.id, mapped.scope),
             connectionId: connection.id,
             connectorLabel: def.label,
+            service: def.id,
             sensitive: mapped.sensitive === true,
             external: true, // whatever the server returns is third-party text
             describe: (input) => ({

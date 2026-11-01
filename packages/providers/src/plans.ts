@@ -30,8 +30,12 @@ export const PLAN_ALIASES: readonly PlanAlias[] = ["opus", "sonnet", "haiku"];
  */
 export type PlanModelTag = "cheap" | "fast" | "smart";
 
-/** What the plan's account must allow before a model answers: `globalRegion`, OpenCode's Global region. */
-export type PlanModelNeed = "globalRegion";
+/**
+ * What the plan's account must allow before a model answers, all under OpenCode's Settings › Privacy: `globalRegion`
+ * its Global region, `paidTraining` paid models that train on what they're sent, `freeTraining` its free models
+ * (which all train on it).
+ */
+export type PlanModelNeed = "globalRegion" | "paidTraining" | "freeTraining";
 
 export interface PlanModel {
   /** What Claude Code sends (`--model`, or `ANTHROPIC_DEFAULT_SONNET_MODEL` for its alias); `[1m]`: a 1M-token window. */
@@ -144,9 +148,12 @@ export const CODING_PLANS = {
       baseUrl: "https://opencode.ai/inference/go/anthropic",
       tokenEnv: "ANTHROPIC_AUTH_TOKEN",
       // Go answers in Anthropic's format for every model, translating the others. Each model has its own
-      // monthly cap; `cheap`: 20,000 or more requests a month on Go by OpenCode's own estimates. Left out: the
-      // free models (for a limited time) and the ones that train on what they're sent. DeepSeek's models answer
-      // only once the OpenCode workspace allows the Global region (Settings › Privacy), off by default.
+      // monthly cap; `cheap`: 20,000 or more requests a month on Go by OpenCode's own estimates. DeepSeek's
+      // models answer only once the OpenCode workspace allows the Global region, the ones that train on what
+      // they're sent only once it allows that (paid and free are separate switches); none has an alias, so
+      // "Automático" never picks one.
+      // ponytail: hand-copied list, read the live list when OpenCode adds models faster than we copy them
+      // (opencode.ai/inference/go/v1/models: 28 on 2026-11-01, all of them here).
       models: [
         { id: "minimax-m3", label: "MiniMax M3", alias: "sonnet", maker: "minimax" },
         { id: "minimax-m3.1-flash", label: "MiniMax M3.1 Flash", maker: "minimax" },
@@ -178,6 +185,20 @@ export const CODING_PLANS = {
         { id: "hy3", label: "Hy3", tag: "cheap", maker: "Tencent" },
         { id: "hy4-preview", label: "Hy4 Preview", maker: "Tencent" },
         { id: "step-5-preview", label: "Step 5 Preview", maker: "StepFun" },
+        {
+          id: "muse-spark-1.3-contributor",
+          label: "Muse Spark 1.3 Contributor",
+          needs: "paidTraining",
+          maker: "Meta",
+        },
+        {
+          id: "muse-spark-1.2-contributor",
+          label: "Muse Spark 1.2 Contributor",
+          needs: "paidTraining",
+          maker: "Meta",
+        },
+        { id: "beam-free", label: "Beam Free", needs: "freeTraining", maker: "Reflection" },
+        { id: "iceman-contributor-free", label: "Iceman Contributor Free", needs: "freeTraining", maker: "OpenCode" },
       ],
       // Its models that aren't Claude refuse some of Claude Code's betas; the OpenCode CLI, if the agent runs
       // it, reads no project config that could point it elsewhere.

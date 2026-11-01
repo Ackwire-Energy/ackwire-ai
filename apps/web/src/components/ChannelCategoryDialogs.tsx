@@ -21,7 +21,7 @@ import {
   OptionList,
   Select,
 } from "@agenteschat/ui";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/lib/toast";
 import { useOrg } from "./org-context";
@@ -65,6 +65,7 @@ export function NewCategoryDialog({
   const [q, setQ] = useState("");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [touched, setTouched] = useState(false);
+  const nameField = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!open) return;
     setName(initialName);
@@ -113,6 +114,8 @@ export function NewCategoryDialog({
       description={t("channelCategories.newCategoryDesc")}
       closeLabel={t("common.close")}
       width={480}
+      // Not autoFocus: it also opens over Criar canal and over the channel's details.
+      initialFocus={nameField}
     >
       <form
         style={{ display: "contents" }}
@@ -135,12 +138,12 @@ export function NewCategoryDialog({
             }
           >
             <Input
+              ref={nameField}
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t("channelCategories.namePlaceholder")}
               maxLength={NAME_MAX}
               autoComplete="off"
-              autoFocus
             />
           </Field>
           {!nameOnly && <span className="ac-field__label">{t("channelCategories.channels")}</span>}
@@ -275,14 +278,22 @@ export function CategorySelect({
   const { org } = useOrg();
   const categories = useChannelCategories(org.id);
   const [creating, setCreating] = useState(false);
+  const wantsNew = useRef(false);
   return (
     <>
       <Select
         id={id}
         value={value ?? NONE}
         onValueChange={(v) => {
-          if (v === NEW) setCreating(true);
+          if (v === NEW) wantsNew.current = true;
           else onChange(v === NONE ? null : v);
+        }}
+        // The dialog opens once the list has given focus back to the trigger, a tick after it closes: opened with the
+        // pick, it would lose its field's focus to the trigger behind it, and give focus back to an option that's gone.
+        onCloseAutoFocus={() => {
+          if (!wantsNew.current) return;
+          wantsNew.current = false;
+          setCreating(true);
         }}
         options={[
           { value: NONE, label: t("channelCategories.noCategory"), description: t("channelCategories.noCategoryDesc") },

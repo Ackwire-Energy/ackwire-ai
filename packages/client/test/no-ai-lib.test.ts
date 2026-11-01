@@ -9,6 +9,7 @@ import {
   ALL_AGENTS,
   agentAi,
   agentPlan,
+  aiChoiceOf,
   allAgents,
   defaultChoice,
   defaultTarget,
@@ -362,6 +363,15 @@ describe("All agents: one login per agent, the key pasted once", () => {
     expect(agentAi({ brain: { kind: "model", model: null } }, "ready")).toBe("key");
     expect(agentAi({ brain: { kind: "model", model: null } }, "no_ai")).toBeNull();
     expect(agentAi(undefined, undefined)).toBeNull();
+  });
+
+  test("what its Quem pensa says pays: the API key, or the plan of the account it thinks with", () => {
+    const opencode = { id: "a_oc", kind: "claude_code", provider: "opencode" } as AgentBrain["accounts"][number];
+    expect(aiChoiceOf({ brain: "model", account: null, accounts: [] })).toBe("key");
+    expect(aiChoiceOf({ brain: "codex", account: null, accounts: [] })).toBe("chatgpt");
+    expect(aiChoiceOf({ brain: "claude_code", account: "a_oc", accounts: [opencode] })).toBe("opencode");
+    // The computer's own sign-in is Claude's, whatever keys are there.
+    expect(aiChoiceOf({ brain: "claude_code", account: null, accounts: [opencode] })).toBe("claude");
   });
 });
 

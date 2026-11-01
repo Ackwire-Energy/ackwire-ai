@@ -1,4 +1,5 @@
 import type { AppNotification, SignInProvider } from "@agenteschat/client";
+import { mediaKindOf, mediaWord } from "@agenteschat/client/lib/media";
 import type { i18n as I18n, TFunction } from "i18next";
 import { useEffect } from "react";
 
@@ -75,9 +76,11 @@ export function desktopNotice(
   const kind = isNoticeKind(n.kind) ? n.kind : n.waiting ? "waiting" : null;
   if (!kind) return null;
   const [first, second] = TITLED.has(kind) ? [n.latest.title, n.latest.text] : [n.latest.text, n.latest.title];
+  // A GIF or a sticker with no words: its word (ADR 0091).
+  const media = mediaKindOf(n.latest.media);
   return {
     title: oneLine(t(`desktopNotice.${kind}`), NOTICE_TITLE_MAX),
-    body: oneLine(first ?? second ?? "", NOTICE_BODY_MAX),
+    body: oneLine((first ?? second ?? "") || (media ? mediaWord(t, media) : ""), NOTICE_BODY_MAX),
     path: `/org/${encodeURIComponent(orgId)}/notifications`,
   };
 }
@@ -211,7 +214,7 @@ export const desktopRevealsFiles = () =>
 
 /**
  * The app's "Show QR code" (Preferences › Servers) opens the site with `?open=phone`: "Open on your phone"
- * opens once the account menu is on screen.
+ * opens once the account button is on screen.
  */
 const phone = { asked: false, listeners: new Set<() => void>() };
 export const asksForPhone = (search: string) => new URLSearchParams(search).get("open") === "phone";

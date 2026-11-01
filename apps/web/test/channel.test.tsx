@@ -4,7 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -16,6 +16,35 @@ const open = async (state = seedState()) => {
   await act(async () => socket.open());
   return { ...r, socket, state };
 };
+
+/**
+ * Every request card reads as out of view once it is observed (happy-dom's IntersectionObserver never answers), so
+ * the activity bar speaks for it. Returns the undo.
+ */
+function asksOutOfView() {
+  const native = globalThis.IntersectionObserver;
+  globalThis.IntersectionObserver = class {
+    answer: IntersectionObserverCallback;
+    constructor(answer: IntersectionObserverCallback) {
+      this.answer = answer;
+    }
+    observe(target: Element) {
+      if (target.matches("[data-ask-id]"))
+        this.answer([{ isIntersecting: false, target } as IntersectionObserverEntry], this as never);
+    }
+    unobserve() {}
+    disconnect() {}
+    takeRecords() {
+      return [];
+    }
+  } as unknown as typeof IntersectionObserver;
+  return () => {
+    globalThis.IntersectionObserver = native;
+  };
+}
+
+/** Waits, in real time, until `at` has passed: a request's own timer, with no event from the server. */
+const until = (at: number) => act(() => new Promise((r) => setTimeout(r, Math.max(0, at - Date.now()) + 50)));
 
 describe("Canal", () => {
   test("header, messages with agent replies inline, neutral mentions and code", async () => {
@@ -138,7 +167,11 @@ describe("Canal", () => {
     await settle(4);
     expect(state.calls.find((c) => c.method === "approvals.approve")?.args).toEqual([ORG_ID, "ap-merge", undefined]);
     const done = screen().getByRole("group", { name: "Aprovação concluída" });
-    expect(done.textContent).toContain("Aprovado por você · agora");
+    expect(done.textContent).toContain("Aprovado por você: Merge PR #42 into main");
+    expect(done.querySelector(".rq-done__text b")?.textContent).toBe("Merge PR #42 into main");
+    expect(done.querySelector(".rq-done__mark[data-done]")).not.toBeNull();
+    // Nothing behind the line: no reason to show.
+    expect(within(done).queryByRole("button")).toBeNull();
     // Someone else refuses another approval: the event updates the card live.
     const deploy = {
       ...state.approvals[1],
@@ -159,6 +192,106 @@ describe("Canal", () => {
       status: string;
     }[];
     expect(list.find((a) => a.id === "ap-deploy")?.status).toBe("refused");
+  });
+
+  test("a request waiting for you out of view: the activity bar says so, and Ver brings it back", async () => {
+    const undo = asksOutOfView();
+    try {
+      const { socket, state } = await open();
+      // The card registers with the conversation as it comes (its approval loads after the page).
+      await settle(2);
+      const card = screen().getByRole("group", { name: "Pedido de aprovação" });
+      expect(card.getAttribute("data-ask-id")).toBe("ap-merge");
+      const bar = document.querySelector(".ac-typing") as HTMLElement;
+      expect(bar.hasAttribute("data-ask")).toBe(true);
+      expect(bar.textContent).toContain("Ada espera sua aprovação");
+      expect(bar.textContent).toContain("Merge PR #42 into main");
+      await act(async () => fireEvent.click(within(bar).getByRole("button", { name: "Ver" })));
+      expect(card.classList.contains("rq--flash")).toBe(true);
+      // Ada at work meanwhile: the line still says the request, and keeps her stop at its end.
+      const run = { type: "agent.run", channelId: ENG_ID, threadId: null, runId: "r-live", agentId: ADA_ID };
+      await act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { ...run, status: "running" } }));
+      await settle(2);
+      expect(bar.textContent).toContain("Ada espera sua aprovação");
+      const stop = within(bar).getByRole("button", { name: "Parar" });
+      expect(bar.lastElementChild?.contains(stop)).toBe(true);
+      await act(async () => fireEvent.click(stop));
+      await settle(2);
+      expect(state.calls.some((c) => c.method === "agents.cancelRun")).toBe(true);
+    } finally {
+      undo();
+    }
+  });
+
+  test("what a request says reaches the bar as written, never read as markup", async () => {
+    const undo = asksOutOfView();
+    try {
+      const state = seedState();
+      const merge = state.approvals.find((a) => a.id === "ap-merge");
+      if (merge) merge.title = "Merge <b>PR</b> #42";
+      await open(state);
+      await settle(2);
+      const line = document.querySelector(".ac-typing__text") as HTMLElement;
+      expect(line.textContent).toBe("Ada espera sua aprovação · Merge <b>PR</b> #42");
+      // Only the agent's name is bold.
+      expect(Array.from(line.querySelectorAll("b"), (b) => b.textContent)).toEqual(["Ada"]);
+    } finally {
+      undo();
+    }
+  });
+
+  // Real time passes in it (the request's own timer), so it gets more than the default 5 s.
+  test("an approval past its time with no event: it stops waiting for you and reads as expired", async () => {
+    const state = seedState();
+    const merge = state.approvals.find((a) => a.id === "ap-merge");
+    const expiresAt = Date.now() + 3_000;
+    if (merge) merge.expiresAt = new Date(expiresAt).toISOString();
+    await open(state);
+    const card = screen().getByRole("group", { name: "Pedido de aprovação" });
+    expect(card.hasAttribute("data-ask-mine")).toBe(true);
+    await until(expiresAt);
+    await settle(2);
+    expect(document.querySelector('[data-ask-id="ap-merge"]')).toBeNull();
+    const expired = screen().getByRole("group", { name: "Pedido expirado" });
+    expect(expired.textContent).toContain("Expirou");
+    expect(expired.querySelector(".rq-done__mark[data-done]")).toBeNull();
+  }, 15_000);
+
+  test("a refused request is one line: 'Ver detalhes' opens its reason under the line and closes it", async () => {
+    const state = seedState();
+    const merge = state.approvals.find((a) => a.id === "ap-merge");
+    if (merge)
+      Object.assign(merge, {
+        status: "refused",
+        decidedByUserId: "u-walter",
+        decidedAt: new Date().toISOString(),
+        reason: "Falta a revisão.",
+      });
+    await open(state);
+    await settle(2);
+    const line = screen().getByRole("group", { name: "Pedido recusado" });
+    expect(line.textContent).toContain("Recusado por você: Merge PR #42 into main");
+    expect(line.querySelector(".rq-done__mark[data-done]")).toBeNull();
+    expect(line.textContent).not.toContain("Falta a revisão.");
+    const see = within(line).getByRole("button", { name: "Ver detalhes" });
+    expect(see.getAttribute("aria-expanded")).toBe("false");
+    await act(async () => fireEvent.click(see));
+    expect(see.getAttribute("aria-expanded")).toBe("true");
+    expect(line.querySelector(".rq__details")?.textContent).toBe("Motivo: Falta a revisão.");
+    await act(async () => fireEvent.click(see));
+    expect(see.getAttribute("aria-expanded")).toBe("false");
+    expect(line.querySelector(".rq__details")).toBeNull();
+  });
+
+  test("a request whose run stopped reads as canceled, not as refused by no one", async () => {
+    const state = seedState();
+    const merge = state.approvals.find((a) => a.id === "ap-merge");
+    if (merge) Object.assign(merge, { status: "canceled", decidedAt: new Date().toISOString() });
+    await open(state);
+    await settle(2);
+    const line = screen().getByRole("group", { name: "Pedido cancelado" });
+    expect(line.textContent).toContain("Cancelado: Merge PR #42 into main");
+    expect(line.querySelector(".rq-done__mark[data-done]")).toBeNull();
   });
 
   test("not a member of a public channel: join instead of the composer", async () => {

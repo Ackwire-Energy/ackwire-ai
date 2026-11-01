@@ -14,10 +14,11 @@ const WHY = "The customer asked for the invoice twice; this reply sends it once 
 const SEND = { to: ["cliente@acme.com"], subject: "Fatura", body: "Segue a fatura." };
 
 /** A run nobody watches: an unattended one (an agent's own message started it) or a routine's. */
-async function unwatchedRun(kind: "unattended" | RoutineAccess): Promise<ToolContext> {
+/** `report`: the run a routine's report woke (nobody behind it, fed by what the routine read). */
+async function unwatchedRun(kind: "unattended" | "report" | RoutineAccess): Promise<ToolContext> {
   const { f } = m;
   const brief: RoutineBrief | null =
-    kind === "unattended"
+    kind === "unattended" || kind === "report"
       ? null
       : {
           routineId: crypto.randomUUID(),
@@ -35,9 +36,20 @@ async function unwatchedRun(kind: "unattended" | RoutineAccess): Promise<ToolCon
     channelId: f.general.id,
     author: brief
       ? { type: "person", userId: f.owner.id }
-      : { type: "agent", agentId: f.agent.id, runId: null, hop: 1 },
+      : { type: "agent", agentId: f.agent.id, runId: null, hop: 1, stretchId: null },
     body: "Answer the new support mail.",
-    meta: brief ? { routineBrief: brief } : undefined,
+    meta: brief
+      ? { routineBrief: brief }
+      : kind === "report"
+        ? {
+            notice: {
+              kind: "routine_handoff",
+              text: "1 new mail",
+              from: "Routine",
+              refs: { runId: crypto.randomUUID() },
+            },
+          }
+        : undefined,
   });
   const [run] = await f.db
     .insert(schema.agentRuns)
@@ -69,7 +81,7 @@ const sendTool = async (ctx: ToolContext) => (await m.tools.list(ctx)).find((t) 
 const send = (ctx: ToolContext, input: Record<string, unknown>) =>
   m.tools.invoke(ctx, { toolUseId: `tu_${crypto.randomUUID()}`, name: "mail_support_send", input });
 
-test("a person's run sends without asking when the mailbox allows it; nobody's run always asks", async () => {
+test("a person's run and a run nobody is behind follow the mailbox: they send without asking when it allows it", async () => {
   m = await mailSetup();
   const account = await imapAccount(m);
   await giveMail(m, account.id, "read_write", { allowedRecipients: ["@acme.com"], sendWithoutAsking: true });
@@ -78,13 +90,30 @@ test("a person's run sends without asking when the mailbox allows it; nobody's r
   expect(person && isSensitive(person)).toBe(false);
 
   const ctx = await unwatchedRun("unattended");
-  const tainted = await sendTool(ctx);
-  expect(tainted && isSensitive(tainted)).toBe(true);
-  expect(tainted?.inputSchema.required).toContain("why");
+  const own = await sendTool(ctx);
+  expect(own && isSensitive(own)).toBe(false);
+  expect(await send(ctx, SEND)).toMatchObject({ type: "result" });
+  expect(m.box.state.sent).toHaveLength(1);
+
+  // A mailbox that asks first asks for it too: the card says nobody was watching.
+  await giveMail(m, account.id, "read_write", { allowedRecipients: ["@acme.com"], sendWithoutAsking: false });
   expect(await send(ctx, SEND)).toMatchObject({ type: "result", output: { content: WHY_REFUSAL, isError: true } });
   const asked = await send(ctx, { ...SEND, why: WHY });
   if (asked.type !== "approval") throw new Error(`expected an approval, got ${JSON.stringify(asked)}`);
   expect(asked.approval).toMatchObject({ why: WHY, origin: { kind: "unattended" }, params: SEND });
+  expect(m.box.state.sent).toHaveLength(1);
+});
+
+test("the run a routine's report woke always asks before a send, whatever the mailbox allows", async () => {
+  m = await mailSetup();
+  const account = await imapAccount(m);
+  await giveMail(m, account.id, "read_write", { allowedRecipients: ["@acme.com"], sendWithoutAsking: true });
+  const ctx = await unwatchedRun("report");
+  const tool = await sendTool(ctx);
+  expect(tool && isSensitive(tool)).toBe(true);
+  const asked = await send(ctx, { ...SEND, why: WHY });
+  if (asked.type !== "approval") throw new Error(`expected an approval, got ${JSON.stringify(asked)}`);
+  expect(asked.approval).toMatchObject({ origin: { kind: "unattended" } });
   expect(m.box.state.sent).toEqual([]);
 });
 

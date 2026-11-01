@@ -36,10 +36,11 @@ const click = async (el: HTMLElement, rounds = 6) => {
   await act(async () => fireEvent.click(el));
   await settle(rounds);
 };
+/** The message with this card: a card while it can be acted on, one line once done. */
 const cardRow = (title: string) =>
   screen()
     .getAllByRole("article")
-    .find((a) => a.querySelector(".waitcard")?.textContent?.includes(title)) as HTMLElement;
+    .find((a) => a.querySelector(".waitcard, .rq-done")?.textContent?.includes(title)) as HTMLElement;
 const dialog = (name: string) => screen().queryByRole("dialog", { name });
 const withBrain = (state: State, agentId: string, kind: NonNullable<Agent["brain"]>["kind"]) => {
   const agent = state.agents.find((a) => a.id === agentId);
@@ -108,11 +109,71 @@ describe("an agent's Connect card", () => {
     const claude = cardRow("Conectar o plano do Claude para Ada");
     expect(within(claude).queryByRole("button", { name: "Conectar" })).toBeNull();
     expect(claude.textContent).toContain("Conectado");
+    // One line, no card.
+    expect(claude.querySelector(".waitcard")).toBeNull();
+    expect(claude.querySelector(".rq-done__mark[data-done]")).not.toBeNull();
     // Ada thinks, but not with a ChatGPT plan; Atlas has no AI yet.
     for (const title of ["Conectar o plano do ChatGPT para Ada", "Conectar uma IA para Atlas"]) {
       const row = cardRow(title);
       expect(row.textContent).not.toContain("Conectado");
       expect(within(row).getByRole("button", { name: "Conectar" })).toBeTruthy();
     }
+  });
+});
+
+describe("a stretch's pause card (ADR 0089)", () => {
+  /** The card a stretch's limit posts as Atlas in #eng, for the agents it holds. */
+  const pause = (id: string, actionCard: Record<string, unknown>, minute = 0): Message => ({
+    ...card(id, {}, minute),
+    body: "Ada and Atlas stopped to check with you: server text",
+    meta: {
+      bodyCode: `stretch_paused_${actionCard.reason}`,
+      actionCard: {
+        kind: "stretch_paused",
+        stretchId: "s-1",
+        state: "paused",
+        forUserId: "u-joao",
+        held: [],
+        continuedByUserId: null,
+        continuedAt: null,
+        ...actionCard,
+      },
+    },
+  });
+
+  test("who stopped and why, in place of its text; Continuar lets them go on", async () => {
+    const state = seedState();
+    state.messages.push(pause("p-runs", { reason: "runs", limit: 50, agentIds: [ADA_ID, ATLAS_ID] }));
+    await open(state);
+    const row = cardRow("Ada e Atlas pararam para te consultar · 50 passos sozinhos desde o seu pedido");
+    expect(row.textContent).not.toContain("server text");
+    await click(within(row).getByRole("button", { name: "Continuar" }));
+    expect(state.calls.some((c) => c.method === "chat.answerNow" && c.args[1] === "p-runs")).toBe(true);
+  });
+
+  test("an agent's budget share in money for who can see costs; once continued, who let them and no button", async () => {
+    const state = seedState();
+    state.messages.push(
+      pause("p-spend", { reason: "spend", limit: 20, agentIds: [ADA_ID] }),
+      pause(
+        "p-done",
+        {
+          reason: "runs",
+          limit: 10,
+          agentIds: [ATLAS_ID],
+          state: "continued",
+          continuedByUserId: "u-walter",
+          continuedAt: NOW.toISOString(),
+        },
+        1,
+      ),
+    );
+    await open(state);
+    // Ada's own budget is US$ 40: 20% of it.
+    const spend = cardRow("Ada parou para te consultar · usou US$ 8 (20% do orçamento do mês) nisso sem você");
+    expect(within(spend).getByRole("button", { name: "Continuar" })).toBeTruthy();
+    const done = cardRow("Atlas parou para te consultar · 10 passos sem você desde o seu pedido");
+    expect(done.textContent).toContain("Você deixou continuar");
+    expect(within(done).queryByRole("button", { name: "Continuar" })).toBeNull();
   });
 });

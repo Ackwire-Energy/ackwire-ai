@@ -3,6 +3,7 @@ import type {
   AppNotification,
   Channel,
   DirectMessage,
+  MediaKind,
   Mission,
   MissionStatus,
   OrgSummary,
@@ -26,6 +27,8 @@ export interface LastLine {
   text: string;
   /** A body the server wrote: the row shows it in the reader's language (`previewBody`). */
   meta?: PreviewMeta | null;
+  /** A GIF or a sticker with no text (ADR 0091): the row says which ("GIF", "Figurinha"). */
+  mediaKind?: MediaKind | null;
 }
 
 export type ConversationRow =
@@ -139,6 +142,7 @@ export function buildConversations(input: {
             author: t.lastMessage.author,
             text: previewOf(t.lastMessage.excerpt),
             ...(t.lastMessage.meta ? { meta: t.lastMessage.meta } : {}),
+            ...(t.lastMessage.mediaKind ? { mediaKind: t.lastMessage.mediaKind } : {}),
           }
         : null,
       at: t.lastActivityAt,
@@ -167,6 +171,7 @@ export function buildConversations(input: {
             author: d.lastMessage.authorType === "agent" ? { type: "agent", id: d.with.id } : null,
             text: previewOf(d.lastMessage.body),
             ...(d.lastMessage.meta ? { meta: d.lastMessage.meta } : {}),
+            ...(d.lastMessage.mediaKind ? { mediaKind: d.lastMessage.mediaKind } : {}),
           }
         : null,
       at: d.lastMessage?.createdAt ?? null,
@@ -190,6 +195,7 @@ export function buildConversations(input: {
             name: last.authorName,
             text: previewOf(last.preview),
             ...(last.meta ? { meta: last.meta } : {}),
+            ...(last.mediaKind ? { mediaKind: last.mediaKind } : {}),
           }
         : null,
       at: last?.createdAt ?? null,
@@ -316,6 +322,7 @@ export function homeLayout(
   rows: ConversationRow[],
   categories: readonly { id: string; name: string }[],
   max = SECTION_MAX,
+  starters: ConversationRow[] = [],
 ): HomeBlock[] {
   const known = new Set(categories.map((c) => c.id));
   const categoryOf = (r: ConversationRow) =>
@@ -330,7 +337,10 @@ export function homeLayout(
   });
   const channels = rowsOfKind(rows, "channels");
   return [
-    block("agents", rowsOfKind(rows, "agents")),
+    // No conversation with an agent yet: the team's agents, to start one ("Ver todos" would list none).
+    rowsOfKind(rows, "agents").length > 0
+      ? block("agents", rowsOfKind(rows, "agents"))
+      : { ...block("agents", starters), more: false },
     block(
       "channels",
       channels.filter((r) => categoryOf(r) === null),
@@ -344,6 +354,28 @@ export function homeLayout(
     ),
     block("people", rowsOfKind(rows, "people")),
   ].filter((b) => b.total > 0);
+}
+
+/**
+ * The agents to start a conversation with, as rows of the home's Agentes section while there is no agent DM yet:
+ * each a DM with no channel (`channelId: ""`), opened on press. Agents hidden from me are left out.
+ */
+export function agentStarters(
+  agents: readonly { id: string; name: string; handle: string }[],
+  hidden: ReadonlySet<string> = new Set(),
+): ConversationRow[] {
+  return agents
+    .filter((a) => !hidden.has(a.id))
+    .map((a) => ({
+      kind: "dm" as const,
+      key: `a:${a.id}`,
+      channelId: "",
+      with: { type: "agent" as const, id: a.id, name: a.name, handle: a.handle },
+      last: null,
+      at: null,
+      unread: 0,
+      working: false,
+    }));
 }
 
 /** The home's closed sections as remembered: any keys (categories come and go), anything unreadable: none. */

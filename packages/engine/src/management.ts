@@ -7,6 +7,15 @@ import { CHANNEL_NAME_PATTERN } from "./channels";
 import { invalidateDefaults, modelInfoFor } from "./credentials";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { agentBudgetState } from "./gateway";
+import {
+  AGENT_MEDIA_LEVELS,
+  type AgentMediaLevel,
+  GIF_RATINGS,
+  type GifRating,
+  type MediaSettings,
+  mediaSettingsCacheKey,
+  mediaSettingsFrom,
+} from "./media";
 import { can, requireActiveMembership, requirePermission } from "./organizations";
 import {
   agentBudgetsThisMonth,
@@ -36,7 +45,10 @@ const {
 
 // ── Organization settings ────────────────────────────────────────────────────
 
-export interface OrgSettings {
+/**
+ * With the GIF and sticker switches (ADR 0091 §5): `gifs`, `gifRating`, `agentStickers`, `agentMedia`.
+ */
+export interface OrgSettings extends MediaSettings {
   name: string;
   context: string;
   defaultCredentialId: string | null;
@@ -75,6 +87,7 @@ export async function getOrgSettings(db: Database, actorId: string, orgId: strin
     defaultAgentBudgetNanoUsd: s?.defaultAgentBudgetNanoUsd ?? DEFAULT_AGENT_BUDGET_NANO_USD,
     actionCheck: s?.actionCheck ?? true,
     autoModels: (s?.autoModels ?? {}) as AutoModels,
+    ...mediaSettingsFrom(s),
   };
 }
 
@@ -121,6 +134,10 @@ export async function updateOrgSettings(
   }
   if (input.timezone !== undefined && !isValidTimeZone(input.timezone))
     throw new ValidationError("timezone must be an IANA time zone");
+  if (input.gifRating !== undefined && !GIF_RATINGS.includes(input.gifRating as GifRating))
+    throw new ValidationError(`gifRating must be one of ${GIF_RATINGS.join(", ")}`);
+  if (input.agentMedia !== undefined && !AGENT_MEDIA_LEVELS.includes(input.agentMedia as AgentMediaLevel))
+    throw new ValidationError(`agentMedia must be one of ${AGENT_MEDIA_LEVELS.join(", ")}`);
   for (const [provider, id] of Object.entries(input.defaultCredentialIds ?? {})) {
     if (!id) continue;
     const [cred] = await db
@@ -184,6 +201,10 @@ export async function updateOrgSettings(
         ? { defaultAgentBudgetNanoUsd: Math.round(input.defaultAgentBudgetNanoUsd) }
         : {}),
       ...(input.actionCheck !== undefined ? { actionCheck: input.actionCheck } : {}),
+      ...(input.gifs !== undefined ? { gifs: input.gifs } : {}),
+      ...(input.gifRating !== undefined ? { gifRating: input.gifRating } : {}),
+      ...(input.agentStickers !== undefined ? { agentStickers: input.agentStickers } : {}),
+      ...(input.agentMedia !== undefined ? { agentMedia: input.agentMedia } : {}),
       ...(input.autoModels !== undefined
         ? { autoModels: mergeAutoModels(await storedAutoModels(), input.autoModels) }
         : {}),
@@ -199,6 +220,7 @@ export async function updateOrgSettings(
   caches.orgs.delete(`${orgId}:agent-budget`);
   caches.orgs.delete(`${orgId}:action-check`);
   caches.orgs.delete(`${orgId}:auto-models`);
+  caches.orgs.delete(mediaSettingsCacheKey(orgId));
   caches.zones.deletePrefix(`${orgId}:`);
   invalidateDefaults(orgId);
   return getOrgSettings(db, actorId, orgId);
@@ -265,7 +287,8 @@ export async function agentDetail(db: Database, actorId: string, orgId: string, 
   const since = monthStartUtc(now);
   const [usage] = await db
     .select({
-      cost: sql<string>`coalesce(sum(${usageRecords.costNanoUsd}), 0)`,
+      // What its budget paid: its own calls, as `agentBudgetsThisMonth` counts them.
+      cost: sql<string>`coalesce(sum(${usageRecords.costNanoUsd}) filter (where ${usageRecords.kind} = 'agent'), 0)`,
       tokens: sql<string>`coalesce(sum(${usageRecords.inputTokens} + ${usageRecords.outputTokens} + ${usageRecords.cacheReadTokens} + ${usageRecords.cacheWriteTokens}), 0)`,
     })
     .from(usageRecords)
