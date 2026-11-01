@@ -101,7 +101,17 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
     // Membros is everyone's, as on the web: a member who may not invite suggests someone there (ADR 0090).
     expect(ids(["read", "post"])).toEqual(["general", "members", "media", "connectors", "computers", "usage", "keys"]);
     const agents = ids(["read", "manage_agents"]);
-    expect(agents).toEqual(["general", "members", "media", "access", "connectors", "skills", "computers", "usage", "keys"]);
+    expect(agents).toEqual([
+      "general",
+      "members",
+      "media",
+      "access",
+      "connectors",
+      "skills",
+      "computers",
+      "usage",
+      "keys",
+    ]);
     expect(ids(["read", "view_audit"])).toContain("audit");
     expect(ids(["read", "create_agents"])).toContain("import");
     expect(ids(["read", "configure"])).toContain("storage");
