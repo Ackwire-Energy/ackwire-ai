@@ -23,6 +23,8 @@ const unbrokenHyphens = (text: string) => text.replace(/([A-Za-zÀ-ÿ])-([A-Za-z
 export interface AuthScaffoldProps {
   title: string;
   subtitle?: string;
+  /** Where this question stands among several ("Passo 2 de 5"), over the title. */
+  progress?: string;
   onBack?: () => void;
   children?: ReactNode;
   footer?: ReactNode;
@@ -39,6 +41,7 @@ export interface AuthScaffoldProps {
 export function AuthScaffold({
   title,
   subtitle,
+  progress,
   onBack,
   children,
   footer,
@@ -90,6 +93,11 @@ export function AuthScaffold({
           entering={FadeIn.duration(220)}
           style={{ paddingHorizontal: 24, paddingTop: 8, flex: 1 }}
         >
+          {progress ? (
+            <Text variant="footnote" tone="faint" style={[CENTER, { fontWeight: "600", marginBottom: 6 }]}>
+              {progress}
+            </Text>
+          ) : null}
           {/* Centered, like the agent above it: the screens before the app are one question each. */}
           <Text variant="display" accessibilityRole="header" accessibilityLiveRegion="polite" style={CENTER}>
             {unbrokenHyphens(title)}

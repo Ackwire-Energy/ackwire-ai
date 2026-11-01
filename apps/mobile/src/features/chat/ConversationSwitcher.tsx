@@ -54,7 +54,8 @@ export function ConversationSwitcher({
     );
   const subtitle = (r: Conversation): string | undefined => {
     if (r.kind === "dm" && r.working) return t("mobile.chat.switchWorking");
-    if (r.last?.text) return previewBody(t, r.last.text, r.last.meta ?? null);
+    // A GIF or a sticker with no text says which (ADR 0091).
+    if (r.last?.text || r.last?.mediaKind) return previewBody(t, r.last.text, r.last.meta ?? null, r.last.mediaKind);
     return r.kind === "dm" && r.with.type === "agent" ? (dir.agentById.get(r.with.id)?.role ?? undefined) : undefined;
   };
 

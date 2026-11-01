@@ -88,6 +88,8 @@ export interface ComposerProps {
   prefill?: { text: string; at: number } | null;
   /** Each change that leaves text in the field ("está digitando…" for the others; the screen throttles it). */
   onType?: () => void;
+  /** The button in the empty field that opens the GIFs and stickers (null where neither can be sent). */
+  media?: { label: string; onPress: () => void } | null;
 }
 
 /** The pill's height, the "+" and the send button's. */
@@ -100,7 +102,8 @@ const INSET = (FIELD - SEND) / 2;
  * The center of the app: a round glass "+" for attachments and actions,
  * then the field, a raised pill. Empty, it can show who you write to (a small face) before the
  * placeholder; with text, the round ink send button pops in. One line keeps "+", text and send on the
- * same center line; longer text grows the pill upward and everything stays at the bottom.
+ * same center line; longer text grows the pill upward and everything stays at the bottom. GIFs and stickers (`media`)
+ * have their button at the empty field's end: they go as a message of their own, never with words.
  *
  * While an agent works: the empty field's button is "Parar" (a rounded square), one
  * tap and it stops, no question asked (what it did stays and can continue); with text, two buttons above
@@ -120,6 +123,7 @@ export function Composer({
   insertMention,
   prefill,
   onType,
+  media,
 }: ComposerProps) {
   const theme = useTheme();
   const { colors, shadows, reducedMotion } = theme;
@@ -142,19 +146,7 @@ export function Composer({
   const token = focused && mention && mentionAt ? mentionAt(text, caret) : null;
   const stopMode = Boolean(working?.stop) && !has;
   const button = has || stopMode;
-  // The send arrow and the stop square swap in place (one turns away as the other turns in).
-  const mode = useSharedValue(stopMode ? 1 : 0);
-  useEffect(() => {
-    mode.value = reducedMotion ? (stopMode ? 1 : 0) : withSpring(stopMode ? 1 : 0, { damping: 16, stiffness: 320 });
-  }, [stopMode, reducedMotion, mode]);
-  const sendGlyph = useAnimatedStyle(() => ({
-    opacity: 1 - mode.value,
-    transform: [{ scale: 1 - 0.6 * mode.value }, { rotate: `${45 * mode.value}deg` }],
-  }));
-  const stopGlyph = useAnimatedStyle(() => ({
-    opacity: mode.value,
-    transform: [{ scale: 0.4 + 0.6 * mode.value }, { rotate: `${-45 * (1 - mode.value)}deg` }],
-  }));
+  const mediaButton = media && !has ? media : null;
   // The choice is per message: back to "join" when the agent is done.
   const isWorking = Boolean(working);
   useEffect(() => {
@@ -261,7 +253,7 @@ export function Composer({
             {
               backgroundColor: colors.raised,
               boxShadow: `0px 0px 0px 0.5px ${colors.line2}, 0px 6px 18px -10px rgba(0, 0, 0, 0.25)`,
-              paddingRight: button ? INSET : 14,
+              paddingRight: button || mediaButton ? INSET : 14,
             },
           ]}
         >
@@ -296,33 +288,83 @@ export function Composer({
             accessibilityLabel={placeholder}
             style={[inputText, { color: colors.ink }]}
           />
-          {button ? (
+          {mediaButton ? (
             <Animated.View
-              entering={reducedMotion ? undefined : ZoomIn.springify().damping(14).stiffness(320)}
-              exiting={reducedMotion ? undefined : ZoomOut.duration(120)}
+              entering={reducedMotion ? undefined : FadeIn.duration(140)}
+              exiting={reducedMotion ? undefined : FadeOut.duration(100)}
               style={styles.sendBox}
             >
               <PressScale
                 to={0.9}
-                haptic={false}
-                onPress={press}
+                onPress={mediaButton.onPress}
                 accessibilityRole="button"
-                accessibilityLabel={stopMode && working?.stop ? working.stop.label : t("mobile.a11y.send")}
+                accessibilityLabel={mediaButton.label}
                 hitSlop={6}
-                style={[styles.send, { backgroundColor: colors.ink }]}
+                style={styles.media}
               >
-                <Animated.View style={[styles.glyph, sendGlyph]}>
-                  <Icon name="send" size={18} color={colors.bg} />
-                </Animated.View>
-                <Animated.View style={[styles.glyph, stopGlyph]}>
-                  <PixelStop size={13} color={colors.bg} moving={stopMode} />
-                </Animated.View>
+                <View style={styles.center}>
+                  <Icon name="sticker" size={22} color={colors.muted} />
+                </View>
               </PressScale>
             </Animated.View>
+          ) : null}
+          {button ? (
+            <SendButton
+              stop={stopMode}
+              label={stopMode && working?.stop ? working.stop.label : t("mobile.a11y.send")}
+              onPress={press}
+            />
           ) : null}
         </View>
       </View>
     </View>
+  );
+}
+
+/**
+ * The field's round button: the send arrow, or the stop square. It pops in (ZoomIn) on the glyph it shows, its value
+ * born with it: iOS draws a glyph still turning inside that pop blurry. On a button already there the two swap in
+ * place, one turning away as the other turns in.
+ */
+function SendButton({ stop, label, onPress }: { stop: boolean; label: string; onPress: () => void }) {
+  const { colors, reducedMotion } = useTheme();
+  const mode = useSharedValue(stop ? 1 : 0);
+  useEffect(() => {
+    const to = stop ? 1 : 0;
+    // Both springs give their mass: with Reanimated 4's default of 4 they overshoot by half and take seconds to settle.
+    mode.value = reducedMotion ? to : withSpring(to, { damping: 16, stiffness: 320, mass: 1 });
+  }, [stop, reducedMotion, mode]);
+  const sendGlyph = useAnimatedStyle(() => ({
+    opacity: 1 - mode.value,
+    transform: [{ scale: 1 - 0.6 * mode.value }, { rotate: `${45 * mode.value}deg` }],
+  }));
+  const stopGlyph = useAnimatedStyle(() => ({
+    opacity: mode.value,
+    transform: [{ scale: 0.4 + 0.6 * mode.value }, { rotate: `${-45 * (1 - mode.value)}deg` }],
+  }));
+  return (
+    <Animated.View
+      entering={reducedMotion ? undefined : ZoomIn.springify().damping(14).stiffness(320).mass(1)}
+      exiting={reducedMotion ? undefined : ZoomOut.duration(120)}
+      style={styles.sendBox}
+    >
+      <PressScale
+        to={0.9}
+        haptic={false}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        hitSlop={6}
+        style={[styles.send, { backgroundColor: colors.ink }]}
+      >
+        <Animated.View style={[styles.glyph, sendGlyph]}>
+          <Icon name="send" size={18} color={colors.bg} />
+        </Animated.View>
+        <Animated.View style={[styles.glyph, stopGlyph]}>
+          <PixelStop size={13} color={colors.bg} moving={stop} />
+        </Animated.View>
+      </PressScale>
+    </Animated.View>
   );
 }
 
@@ -380,5 +422,6 @@ const styles = StyleSheet.create({
   choice: { paddingHorizontal: 4, paddingBottom: 8 },
   sendBox: { width: SEND, height: SEND },
   send: { width: SEND, height: SEND, borderRadius: SEND / 2 },
+  media: { width: SEND, height: SEND, borderRadius: SEND / 2 },
   glyph: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center" },
 });

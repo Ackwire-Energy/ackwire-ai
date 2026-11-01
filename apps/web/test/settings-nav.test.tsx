@@ -98,7 +98,7 @@ describe("finding the settings", () => {
     const sections: [string, string][] = [
       ["account", "Sua conta"],
       ["general", "Geral"],
-      ["members", "Membros"],
+      ["members", "Membros e convites"],
       ["access", "Agentes e acesso"],
       ["connectors", "Conectores"],
       ["skills", "Skills"],

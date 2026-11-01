@@ -1,172 +1,86 @@
 import {
-  type InviteLink,
-  useInviteLinks,
+  type InvitationWithStatus,
+  useAllInvitations,
+  useCancelSuggestion,
   useJoinRequests,
-  useMakeInviteLink,
-  useMembers,
+  useMe,
+  useMySuggestions,
+  usePeople,
   useRoles,
-  useTurnOffInviteLink,
 } from "@agenteschat/client";
-import { formatShortDate, relativeTime } from "@agenteschat/client/lib/format";
+import { knownErrorText } from "@agenteschat/client/lib/errors";
+import { namesText } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Alert, Share, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Alert, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { GroupedHeader, GroupedList, GroupedRow } from "@/ui";
+import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, PersonAvatar, useToast } from "@/ui";
 import { Page } from "../me/parts";
 import { Face } from "../shared/Face";
-import { useColors } from "../shared/hooks";
-import { copyText, successHaptic } from "../shared/parts";
-import { membersByName, roleLine } from "./logic";
-
-/** How long "Copiado ✓" stays on the copy row. */
-const COPIED_MS = 1800;
+import { useColors, useMeId } from "../shared/hooks";
+import { SheetHostProvider, useSheet } from "../shared/SheetHost";
+import { InvitationSheet } from "./InviteSheets";
+import {
+  invitationLine,
+  invitationSender,
+  invitersOf,
+  memberLine,
+  membersByName,
+  pendingInvitations,
+  waitingLine,
+  whenWords,
+} from "./logic";
+import { MembersFullNote } from "./MembersFullNote";
 
 /**
- * Membros, a screen of Você's for who invites people or manages members: the requests to join (they open in their
- * sheet) and the workspace's invitation link as the web's Members has it (ADR 0068: copy or share it, when it works
- * until, turn it off; links made before links could be shown again, to turn off; make one), for who invites; then
- * the people, each with their roles (ADR 0085).
+ * Membros e convites (ADR 0090), one page: whoever may invite gets "Convidar pessoas" on top (the workspace's link
+ * lives on that screen), then what waits on them and the invitations sent; a member who may not invite suggests
+ * someone. Then the people, each with their roles (ADR 0085).
  */
 export function MembersPage() {
+  return (
+    <SheetHostProvider>
+      <Members />
+    </SheetHostProvider>
+  );
+}
+
+function Members() {
   const { t, i18n } = useTranslation();
   const { orgId, org } = useOrg();
   const c = useColors();
-  const members = useMembers(orgId);
+  const meId = useMeId();
+  const people = usePeople(orgId);
   const roles = useRoles(orgId).data?.roles ?? [];
   const invites = can(org, "invite_people");
-  const requests = useJoinRequests(orgId, invites);
-  const links = useInviteLinks(orgId, invites);
-  const make = useMakeInviteLink(orgId);
-  const turnOff = useTurnOffInviteLink(orgId);
-  const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), COPIED_MS);
-    return () => clearTimeout(timer);
-  }, [copied]);
-
-  const all = links.data ?? [];
-  const current = all.find((l) => l.url !== null);
-  const earlier = all.filter((l) => l.url === null);
-  const waiting = requests.data?.length ?? 0;
-  const until = (l: InviteLink) => formatShortDate(i18n.language, l.expiresAt);
-
-  /** Turning a link off closes its waiting requests too: the confirmation counts them. */
-  const confirmTurnOff = (l: InviteLink) =>
-    Alert.alert(t("members.link.turnOffTitle"), t("members.link.turnOffText", { count: l.waiting }), [
-      { text: t("mobile.common.cancel"), style: "cancel" },
-      { text: t("members.link.turnOff"), style: "destructive", onPress: () => turnOff.mutate(l.id) },
-    ]);
+  const list = people.data;
 
   return (
-    <Page title={t("members.title")}>
+    <Page title={invites ? t("settings.section.members") : t("members.title")}>
       <View style={styles.gap} />
       {invites ? (
         <>
           <GroupedList>
-            <GroupedRow
-              icon="join"
-              label={t("members.requests.title")}
-              value={waiting > 0 ? String(waiting) : undefined}
-              chevron
-              onPress={() => router.push("/join-requests")}
-            />
+            <GroupedRow icon="plus" label={t("members.inviteTitle")} onPress={() => router.push("/invite-people")} />
           </GroupedList>
-
-          <GroupedHeader>{t("members.link.title")}</GroupedHeader>
-          {links.isPending ? (
-            <ActivityIndicator color={c.muted} style={styles.loading} />
-          ) : (
-            <GroupedList>
-              {current?.url ? (
-                <GroupedRow
-                  key="current"
-                  label={current.url}
-                  sub={t("members.link.help", { date: until(current) })}
-                  subLines={3}
-                />
-              ) : null}
-              {current?.url ? (
-                <GroupedRow
-                  key="copy"
-                  icon={copied ? "check" : "copy"}
-                  label={copied ? t("common.copied") : t("common.copy")}
-                  onPress={() =>
-                    void copyText(current.url ?? "").then((ok) => {
-                      if (!ok) return;
-                      successHaptic();
-                      setCopied(true);
-                    })
-                  }
-                />
-              ) : null}
-              {current?.url ? (
-                <GroupedRow
-                  key="share"
-                  icon="share"
-                  label={t("mobile.joinRequests.share")}
-                  onPress={() =>
-                    void Share.share({
-                      message: t("mobile.onb.shareMessage", { org: org?.name ?? "", url: current.url ?? "" }),
-                    }).catch(() => undefined)
-                  }
-                />
-              ) : null}
-              {current ? (
-                <GroupedRow
-                  key="off"
-                  icon="x"
-                  label={t("members.link.turnOff")}
-                  danger
-                  disabled={turnOff.isPending}
-                  onPress={() => confirmTurnOff(current)}
-                />
-              ) : (
-                <GroupedRow
-                  key="make"
-                  icon="plus"
-                  label={t("members.link.make")}
-                  disabled={make.isPending}
-                  onPress={() => make.mutate()}
-                />
-              )}
-              {earlier.map((l) => {
-                const when = relativeTime(t, i18n.language, l.createdAt);
-                return (
-                  <GroupedRow
-                    key={l.id}
-                    icon="x"
-                    label={t("members.link.turnOff")}
-                    sub={
-                      l.createdBy
-                        ? t("members.link.earlier", { when, name: l.createdBy, date: until(l) })
-                        : t("members.link.earlierNoName", { when, date: until(l) })
-                    }
-                    subLines={3}
-                    danger
-                    disabled={turnOff.isPending}
-                    onPress={() => confirmTurnOff(l)}
-                  />
-                );
-              })}
-            </GroupedList>
-          )}
+          <WaitingYou />
+          <SentInvitations />
         </>
-      ) : null}
+      ) : (
+        <Suggestions />
+      )}
 
-      <GroupedHeader>{t("members.people")}</GroupedHeader>
-      {members.data ? (
+      <GroupedHeader>{list ? `${t("members.people")} · ${list.length}` : t("members.people")}</GroupedHeader>
+      {list ? (
         <GroupedList>
-          {membersByName(members.data, i18n.language).map((m) => (
+          {membersByName(list, i18n.language).map((m) => (
             <GroupedRow
               key={m.userId}
               leading={<Face who={{ type: "person", id: m.userId }} size={30} live={false} presence ring={c.raised} />}
-              label={m.name}
-              sub={m.email}
-              value={roleLine(t, m, roles)}
+              label={m.userId === meId ? `${m.name}${t("common.youSuffix")}` : m.name}
+              sub={memberLine(t, i18n.language, m, roles)}
             />
           ))}
         </GroupedList>
@@ -174,6 +88,137 @@ export function MembersPage() {
         <ActivityIndicator color={c.muted} style={styles.loading} />
       )}
     </Page>
+  );
+}
+
+/** Esperando você: who asked through the link and whom members suggested, each opening the review (ADR 0068, 0090). */
+function WaitingYou() {
+  const { t, i18n } = useTranslation();
+  const { orgId } = useOrg();
+  const requests = useJoinRequests(orgId).data ?? [];
+  if (requests.length === 0) return null;
+  return (
+    <>
+      <GroupedHeader>{`${t("members.waitingTitle")} · ${requests.length}`}</GroupedHeader>
+      <GroupedList>
+        {requests.map((r) => (
+          <GroupedRow
+            key={r.id}
+            leading={<PersonAvatar name={r.name} size={30} />}
+            label={r.name}
+            sub={waitingLine(t, i18n.language, r)}
+            subLines={2}
+            chevron
+            onPress={() => router.push({ pathname: "/join-requests", params: { request: r.id } })}
+          />
+        ))}
+      </GroupedList>
+      <MembersFullNote />
+    </>
+  );
+}
+
+/** Convites enviados: those still waiting, each opening its actions (ADR 0090). */
+function SentInvitations() {
+  const { t, i18n } = useTranslation();
+  const { orgId } = useOrg();
+  const sheet = useSheet();
+  const me = useMe().data?.user.name;
+  const list = pendingInvitations(useAllInvitations(orgId).data ?? []);
+  const roles = useRoles(orgId).data?.roles ?? [];
+  // Sent again from here: until when it works now.
+  const [resent, setResent] = useState<Record<string, string>>({});
+  if (list.length === 0) return null;
+  const open = (inv: InvitationWithStatus) =>
+    sheet.open(
+      <InvitationSheet
+        invitation={inv}
+        line={invitationLine(t, i18n.language, inv, roles, {
+          resentUntil: resent[inv.id],
+          sender: invitationSender(t, inv, me),
+        })}
+        resent={Boolean(resent[inv.id])}
+        onResent={(id, until) => setResent((all) => ({ ...all, [id]: until }))}
+      />,
+      { solid: true },
+    );
+  return (
+    <>
+      <GroupedHeader>{`${t("members.invitations.title")} · ${list.length}`}</GroupedHeader>
+      <GroupedList>
+        {list.map((inv) => (
+          <GroupedRow
+            key={inv.id}
+            leading={<PersonAvatar name={inv.email} size={30} />}
+            label={inv.email}
+            sub={invitationLine(t, i18n.language, inv, roles, { resentUntil: resent[inv.id] })}
+            more
+            onPress={() => open(inv)}
+          />
+        ))}
+      </GroupedList>
+    </>
+  );
+}
+
+/**
+ * A member who may not invite (ADR 0090 §7): "Sugerir pessoa", which reaches the people who invite as a request, who
+ * they are, and the suggestions still waiting, each to take back.
+ */
+function Suggestions() {
+  const { t, i18n } = useTranslation();
+  const { orgId } = useOrg();
+  const toast = useToast();
+  const people = usePeople(orgId).data ?? [];
+  const roles = useRoles(orgId).data?.roles ?? [];
+  const waiting = useMySuggestions(orgId).data ?? [];
+  const cancel = useCancelSuggestion(orgId);
+  const inviters = invitersOf(people, roles);
+
+  const cancelIt = async (id: string) => {
+    try {
+      await cancel.mutateAsync(id);
+      toast({ title: t("members.suggest.cancelled") });
+    } catch (e) {
+      toast({ title: knownErrorText(t, e, i18n.language) ?? t("mobile.app.failed"), icon: "x" });
+    }
+  };
+  const confirmCancel = (id: string, email: string) =>
+    Alert.alert(t("members.suggest.cancelOf", { email }), undefined, [
+      { text: t("mobile.common.back"), style: "cancel" },
+      { text: t("common.cancel"), style: "destructive", onPress: () => void cancelIt(id) },
+    ]);
+
+  return (
+    <>
+      <GroupedList>
+        <GroupedRow icon="plus" label={t("members.suggest.button")} onPress={() => router.push("/suggest-person")} />
+      </GroupedList>
+      <GroupedFooter>
+        {inviters.length > 0
+          ? t("members.suggest.lead", { count: inviters.length, names: namesText(t, inviters, 2) })
+          : t("members.suggest.leadNoNames")}
+      </GroupedFooter>
+      {waiting.length > 0 ? (
+        <>
+          <GroupedHeader>{t("members.suggest.mine")}</GroupedHeader>
+          <GroupedList>
+            {waiting.map((s) => (
+              <GroupedRow
+                key={s.id}
+                leading={<PersonAvatar name={s.email} size={30} />}
+                label={s.email}
+                sub={t("members.suggest.waiting", { when: whenWords(t, i18n.language, s.createdAt) })}
+                {...(s.note ? { belowText: s.note } : {})}
+                more
+                disabled={cancel.isPending}
+                onPress={() => confirmCancel(s.id, s.email)}
+              />
+            ))}
+          </GroupedList>
+        </>
+      ) : null}
+    </>
   );
 }
 

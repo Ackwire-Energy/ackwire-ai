@@ -8,7 +8,7 @@ import { BROWSER_SCOPE, DESKTOP_SCOPE } from "./browser/types";
 import { caches } from "./cache";
 import { capabilityKeys, summarizeScopes } from "./capabilities";
 import { agentDesktopUseStatus } from "./desktop/status";
-import { editDistance } from "./format";
+import { cutText, editDistance } from "./format";
 import type { MachineCaller, MachineStatus } from "./machine-hub";
 import { parseMentionHandles } from "./messages";
 import { can, requirePermission } from "./organizations";
@@ -293,7 +293,7 @@ export function createFindAgentToolSource(deps: { machines?: Pick<MachineCaller,
             `@${a.handle}: ${a.name}${a.role ? `, ${a.role}` : ""}${presenceNote(statusOf.get(a.id))}`,
             `  Can: ${summarizeScopes(scopes.filter((s) => s.agentId === a.id).map((s) => s.scope))}`,
             owner ? `  Responsible person: ${owner}` : "",
-            about ? `  About: ${about.length > 240 ? `${about.slice(0, 237)}…` : about}` : "",
+            about ? `  About: ${about.length > 240 ? `${cutText(about, 237)}…` : about}` : "",
           ]
             .filter(Boolean)
             .join("\n");

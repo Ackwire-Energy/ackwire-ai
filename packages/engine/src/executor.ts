@@ -98,6 +98,7 @@ import {
   followThroughVerdict,
   wakesLater,
 } from "./follow-through";
+import { cutText } from "./format";
 import { onForumRunFinished } from "./forum";
 import type { ModelGateway } from "./gateway";
 import { agentRepositoryList, repositoriesPrompt } from "./git/repos";
@@ -106,6 +107,7 @@ import { linkRunToIssue, mirrorReplyToIssue } from "./issues";
 import { listenLiveSteering, renderSteered } from "./live-steer";
 import { touchMachineAccount } from "./machine-accounts";
 import { computerBackSoon, type MachineStatus } from "./machine-hub";
+import { MEDIA_TOOLS } from "./media";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import { postNoAiCard } from "./no-ai";
 import { enqueue, PermanentJobError } from "./outbox";
@@ -116,6 +118,7 @@ import {
   endsWithSentinel,
   isSentinelOnly,
   PASS_TOOL,
+  pauseLead,
   repliesAfterTrigger,
   replyPolicyFor,
   routedAsFollowUp,
@@ -136,7 +139,6 @@ import {
   bridgeToolsFor,
   invokeToolForRun,
   invokeWithChip,
-  isScreenCall,
   mergeToolEffects,
   postPauseCards,
   publishPauseCards,
@@ -155,6 +157,7 @@ import {
   type RunStatus,
   replyThreadOf,
   runErrorDetail,
+  STUCK_ERROR,
   transitionRun,
 } from "./runs";
 import { truncateOutput } from "./sandbox";
@@ -162,6 +165,15 @@ import { secretResult } from "./secrets";
 import { enabledSkills } from "./skills";
 import { standingErrorDetail, standingRefusal } from "./standing";
 import { rerootRun } from "./stretch";
+import {
+  isStuck,
+  noteStep,
+  STUCK_END_NOTE,
+  STUCK_END_REPLY_NOTE,
+  STUCK_FORUM_NOTE,
+  STUCK_NOTE,
+  type StuckState,
+} from "./stuck";
 import { archivedAgentsPrompt, FIND_AGENT_TOOL, renamedAgentsPrompt } from "./team";
 import { linkRunChecks, runChecksForReply } from "./team-actions";
 import { carriesCredential, maskCredentials } from "./tool-detail";
@@ -288,6 +300,8 @@ export interface Transcript {
   desktop?: BrowserTrailStep[];
   /** The agent reacted (`react`) instead of replying: an empty final answer posts nothing. */
   reacted?: boolean;
+  /** It sent a GIF or its sticker (`send_gif`, `send_sticker`, ADR 0091): an empty final answer posts nothing. */
+  mediaSent?: boolean;
   /** A mission `report` card was posted this run: it is the answer, an empty final reply posts nothing. */
   reported?: boolean;
   /** Nobody called it by name and it called `pass`: the run ends without a message. */
@@ -320,8 +334,13 @@ export interface Transcript {
    * reply offers Continuar (`meta.stepLimit`).
    */
   wrapUpNoted?: boolean;
-  /** Model calls that only drove the browser or the desktop, and worked: they count apart (`SCREEN_TURNS_FACTOR`). */
-  screenTurns?: number;
+  /** Whether it goes in circles (`stuck.ts`): its latest steps and what was found. */
+  stuck?: StuckState;
+  /**
+   * What the person asked, carried by Continuar (`continueRun`): the new run's trigger is its own stopped reply, so
+   * the judges read this as the request instead.
+   */
+  request?: string;
   /** The computer brain couldn't answer and the model brain did (ADR 0032 §5): the reply carries a quiet note. */
   fallback?: { from: BrainKind; code: string; message: string };
   /** The computer brain is unavailable and nothing can stand in: the run waits for the computer. */
@@ -439,15 +458,10 @@ export const WRAP_UP_NOTE =
 export const WRAP_UP_REPLY_NOTE =
   "You are close to this run's limit of steps: only a couple of calls are left. Stop starting new work and reply with what you did, where you stopped and what is left, so the person can let you pick up from there.";
 
-/**
- * Each step on the browser or the desktop is a model call: calls that only drive them, and worked, count apart, up
- * to this many times the cap. A run posting on a few sites gets there, and a loop on a step that fails, or on any
- * other tool, still stops at the cap.
- */
-export const SCREEN_TURNS_FACTOR = 2;
-
 /** The closing line of a conversation run that reached its cap mid-work (`bodyCode` `step_limit`). */
 const STEP_LIMIT_TEXT = "I ran out of steps before finishing.";
+/** The closing line of a conversation run found stuck twice that didn't say where it stands (`bodyCode` `stuck`). */
+const STUCK_TEXT = "I got stuck and stopped before finishing.";
 
 /** Errors that will not get better by retrying: the run fails right away with a readable reason. */
 const userFacing = (error: unknown): string | null => {
@@ -1125,7 +1139,7 @@ async function executeRunInner(
           toolUseId: call.toolUseId,
           name: call.name,
           isError: result.isError,
-          content: result.content.slice(0, 4000),
+          content: cutText(result.content, 4000),
           data: { secretRequestId: call.secretRequestId },
         });
       } else if (!result && call.questionId) {
@@ -1136,7 +1150,7 @@ async function executeRunInner(
           toolUseId: call.toolUseId,
           name: call.name,
           isError: false,
-          content: result.content.slice(0, 4000),
+          content: cutText(result.content, 4000),
           data: { questionId: call.questionId },
         });
       } else if (!result && call.approvalId) {
@@ -1174,6 +1188,8 @@ async function executeRunInner(
     // Someone decided or answered what it waited on: it answers them now, it can't pass anymore.
     transcript.answerOwed = true;
     transcript.decided = decided.join("\n");
+    // As a person's message does (`oweAnswer`): what they decided may be what it lacked, unless it is already ending.
+    if (byPerson && transcript.stuck?.endAt === undefined) delete transcript.stuck;
     delete transcript.pending;
     await saveTranscript(db, transcript);
     // What it starts from here counts from zero.
@@ -1276,6 +1292,8 @@ async function executeRunInner(
     const person = await lastPersonAmong(db, run.orgId, run.agentId, ids);
     if (!person) return false;
     t.answerOwed = true;
+    // What they wrote may be what it lacked: its repetition so far no longer counts, unless it is already ending.
+    if (t.stuck?.endAt === undefined) delete t.stuck;
     if (!run.background && !t.steeredBy) {
       const authority = await runAuthority(db, { ...run, transcript: t as unknown as Record<string, unknown> });
       if (authority.kind === "unattended") t.steeredBy = person.userId;
@@ -1330,12 +1348,12 @@ async function executeRunInner(
       addRunStep(db, run, "model_call", {
         turn,
         stopReason: "interrupted",
-        ...(said ? { narration: said.slice(0, 4000) } : {}),
+        ...(said ? { narration: cutText(said, 4000) } : {}),
       }),
     ]);
     if (counted[0]) run = counted[0];
     if (said)
-      await publishChannelEvent(deps.pubsub, { type: "agent.narration", ...where, turn, text: said.slice(0, 4000) });
+      await publishChannelEvent(deps.pubsub, { type: "agent.narration", ...where, turn, text: cutText(said, 4000) });
   };
 
   /** Moves what a tool returned onto the transcript (cards for the next post) and tells the channel about memory. */
@@ -1487,6 +1505,10 @@ async function executeRunInner(
    * what it changed and where it browsed), and Continuar under that line picks up from here with a fresh count.
    */
   const endAtStepLimit = () => closeWith(STEP_LIMIT_TEXT, "step_limit", { stepLimit: true }, { stepLimit: {} });
+
+  /** Found stuck twice and still calling tools: the same ending, saying it stopped because it was stuck. */
+  const endStuck = () =>
+    closeWith(STUCK_TEXT, "stuck", { stepLimit: true, stuck: true }, { stepLimit: { stuck: true } });
 
   /**
    * Ends the run without a message (reply-policy.ts): nobody called it by name and it passed, or wrote
@@ -1710,7 +1732,7 @@ async function executeRunInner(
   /**
    * A computer brain's call through the bridge paused the run during the turn
    * (`suspendRunForTool` posted the card and moved it to `waiting_*`): keep the
-   * pending calls it recorded, post what the brain said, and stop here.
+   * pending calls it recorded, post what the brain said if it says more than the card, and stop here.
    */
   const suspendedByBridge = async (
     status: "waiting_approval" | "waiting_input",
@@ -1727,7 +1749,7 @@ async function executeRunInner(
     // A question the brain asked mid-turn is already posted. Only what it wrote before asking leads to it
     // (posted just before the card, so it reads first); what it wrote after only repeats the question.
     const asked = await bridgedQuestionCard(t);
-    let text = stripSentinel(said);
+    let text = pauseLead(stripSentinel(said));
     let at: Date | undefined;
     if (asked && textBefore) {
       text = stripSentinel(textBefore(asked.askedAt + ASKED_GRACE_MS));
@@ -1880,10 +1902,9 @@ async function executeRunInner(
     }
   }
 
-  const baseTurns = deps.maxToolTurns ?? 25;
-  const capOf = (t: Transcript) => baseTurns + Math.min(t.screenTurns ?? 0, baseTurns * SCREEN_TURNS_FACTOR);
-  /** Grows with the run's screen-only calls (`screenTurns`). */
-  let maxTurns = capOf(transcript);
+  // A backstop for a run that runs away: one that goes in circles is stopped long before (`stuck.ts`).
+  const backstop = deps.maxToolTurns ?? 200;
+  let maxTurns = Math.min(backstop, transcript.stuck?.endAt ?? backstop);
   let firstTurn = true;
   // Live steering (`live-steer.ts`): while a computer turn is in flight, a person's message goes to it
   // (read at its next tool boundary) instead of waiting for the turn's end; any other time, it waits.
@@ -1916,8 +1937,12 @@ async function executeRunInner(
       if (await isCanceled()) return stopCanceled("");
       // At the cap the inbox stays as it is: a message never gets marked read and then lost (the run's end
       // hands it to a run of its own). A routine's run fails there (its ledger says so), and so does a forum's;
-      // any other says it ran out of steps, with Continuar.
-      if (run.turns >= maxTurns) return run.background || forum ? fail("too_many_tool_calls") : endAtStepLimit();
+      // any other says it ran out of steps, or that it got stuck, with Continuar.
+      if (run.turns >= maxTurns) {
+        const stuck = transcript.stuck?.endAt !== undefined;
+        if (run.background || forum) return fail(stuck ? STUCK_ERROR : "too_many_tool_calls");
+        return stuck ? endStuck() : endAtStepLimit();
+      }
       const steered = await deliverSteering();
       if (steered && plan.kind !== "model") {
         nextPrompt = [nextPrompt ?? (computerTurns === 0 ? triggerText : ""), steered].filter(Boolean).join("\n\n");
@@ -1928,6 +1953,7 @@ async function executeRunInner(
         plan.kind === "model" &&
         !forum &&
         !transcript.wrapUpNoted &&
+        transcript.stuck?.endAt === undefined &&
         run.turns >= Math.max(0, maxTurns - WRAP_UP_TURNS)
       ) {
         transcript.wrapUpNoted = true;
@@ -2175,7 +2201,7 @@ async function executeRunInner(
           ...result.usage,
           thinking: result.thinking,
           turn,
-          ...(narration ? { narration: narration.slice(0, 4000) } : {}),
+          ...(narration ? { narration: cutText(narration, 4000) } : {}),
         }),
       ]);
       if (counted[0]) run = counted[0];
@@ -2195,7 +2221,7 @@ async function executeRunInner(
           type: "agent.narration",
           ...where,
           turn,
-          text: narration.slice(0, 4000),
+          text: cutText(narration, 4000),
         });
       }
 
@@ -2271,11 +2297,6 @@ async function executeRunInner(
           return stopCanceled("");
         }
         if (waiting.length === 0 && asks.length === 0 && secretAsks.length === 0 && waits.length === 0) {
-          // Only steps that worked count apart: a loop on a failing browser or desktop counts toward the cap.
-          if (toolUses.every(isScreenCall) && calls.every((c) => c.result && !c.result.isError)) {
-            transcript.screenTurns = (transcript.screenTurns ?? 0) + 1;
-            maxTurns = capOf(transcript);
-          }
           transcript.messages.push({
             role: "user",
             content: calls.map((c) => ({
@@ -2285,6 +2306,48 @@ async function executeRunInner(
               ...(c.result?.isError ? { isError: true } : {}),
             })),
           });
+          // Going in circles (`stuck.ts`): only a step that repeats is judged, and the next verdict needs new steps.
+          if (turnPlan.kind === "model" && transcript.stuck?.endAt === undefined && !shuttingDown()) {
+            const noted = noteStep(
+              transcript.stuck,
+              run.turns,
+              calls.map((c) => ({
+                name: c.name,
+                input: toolUses.find((u) => u.id === c.toolUseId)?.input,
+                content: c.result?.content ?? "",
+                isError: c.result?.isError === true,
+              })),
+            );
+            const stuck = noted.state;
+            transcript.stuck = stuck;
+            const sign = noted.sign;
+            if (sign) {
+              const verdict = await isStuck(judge, {
+                orgId: run.orgId,
+                agentId: run.agentId,
+                runId: run.id,
+                request: transcript.request ?? triggerMessage?.body ?? triggerText,
+                sign,
+                steps: stuck.steps,
+              });
+              stuck.since = run.turns;
+              const action = !verdict.stuck ? null : !stuck.noted ? "note" : forum ? "fail" : "end";
+              later(() => addRunStep(db, run, "context", { stuckCheck: { sign, ...verdict, action } }));
+              if (action === "note") {
+                stuck.noted = true;
+                appendUserText(transcript, forum ? STUCK_FORUM_NOTE : STUCK_NOTE);
+              } else if (action === "end") {
+                // As near the cap: a couple of calls to say where it stands, then the run ends.
+                stuck.endAt = run.turns + WRAP_UP_TURNS;
+                maxTurns = Math.min(maxTurns, stuck.endAt);
+                appendUserText(transcript, run.background ? STUCK_END_NOTE : STUCK_END_REPLY_NOTE);
+              } else if (action === "fail") {
+                // A forum's turn never wraps up (its words would be its post): it fails, and the topic stalls.
+                await saveTranscript(db, transcript);
+                return fail(STUCK_ERROR);
+              }
+            }
+          }
           await saveTranscript(db, transcript);
           // It passed and did nothing else: the run ends here, no closing call spent.
           if (transcript.passed && toolUses.every((u) => u.name === PASS_TOOL)) {
@@ -2293,13 +2356,15 @@ async function executeRunInner(
           continue;
         }
 
-        // Suspend: post what the agent said so far, one card per approval and each question, then wait.
+        // Suspend: post what the agent said (`pauseLead`), one card per approval and each question, then wait.
         transcript.pending = { calls };
         const t = transcript;
         const posted = await db.transaction(async (tx) => {
-          // Only this turn's text (it introduces the approval or question); earlier narration is in the steps.
-          // A background run never posts by itself (ADR 0053 §5): its cards speak for it.
-          const said = run.background ? "" : stripSentinel(turnText);
+          // Only this turn's text: what leads to a question, or what says more than an approval's or a secret's
+          // card. Earlier narration is in the steps. A background run never posts by itself (ADR 0053 §5): its
+          // cards speak for it.
+          const text = stripSentinel(turnText);
+          const said = run.background ? "" : asks.length > 0 ? text : pauseLead(text);
           const lead = said ? await post(tx, replyThreadId, said, withFallback(t, takeMemoryUpdates(t))) : null;
           // The cards, the same way a computer brain's bridged call posts them (`postPauseCards`).
           const pause = await postPauseCards(tx, run, {
@@ -2342,12 +2407,21 @@ async function executeRunInner(
       const sentinelOnly = isSentinelOnly(turnText);
       // Quiet on purpose: only the word, or a note it closes ("Nada novo desde ontem.\n\nNO_REPLY").
       const wantsQuiet = endsWithSentinel(turnText);
-      if (run.background) return finishBackground(wantsQuiet ? "" : said);
-      // Nobody called it by name: it passed, or ended with nothing to say. Nothing is posted.
+      if (run.background) {
+        const record = wantsQuiet ? "" : said;
+        // Found stuck twice, it ended as told: the routine run failed all the same (a hand-off already made stays
+        // `reported`), so a routine that goes in circles on every firing is heard of and paused like any failing one.
+        if (transcript.stuck?.endAt !== undefined)
+          return fail(STUCK_ERROR, { code: STUCK_ERROR, ...(record ? { detail: record } : {}) });
+        return finishBackground(record);
+      }
+      // Nobody called it by name: it passed, or ended with nothing to say. Nothing is posted. (A reaction, a GIF or
+      // a sticker it sent is an answer: below.)
       if (
         policy.mayPass &&
         !transcript.answerOwed &&
         !transcript.reacted &&
+        !transcript.mediaSent &&
         (transcript.passed ||
           (!anythingPosted && (wantsQuiet || !said) && updates.length === 0 && !saved && !transcript.reported))
       ) {
@@ -2357,11 +2431,14 @@ async function executeRunInner(
       }
       // It reacted (`react`) instead of replying and wrote nothing more (or only the emoji again):
       // the reaction is the answer.
+      // Or it sent a GIF or its sticker and wrote nothing after it, with no card left to attach: that was the answer.
       // Or it posted a mission report and has no card left to attach: the report is the answer. Coding CLIs
       // always close with a summary that repeats it, whatever the prompt says, so the text is dropped too.
+      const noCards = !transcript.artifacts?.length && !transcript.memoryUpdates?.length;
       const silent =
         (Boolean(transcript.reacted) && restatesReaction(said)) ||
-        (Boolean(transcript.reported) && !transcript.artifacts?.length && !transcript.memoryUpdates?.length);
+        (Boolean(transcript.mediaSent) && !said && noCards) ||
+        (Boolean(transcript.reported) && noCards);
       // The message is the final answer only: the last model call's text. Without it, a short closing line.
       const written = silent
         ? ""
@@ -2433,7 +2510,7 @@ async function executeRunInner(
           orgId: run.orgId,
           agentId: run.agentId,
           runId: run.id,
-          request: triggerMessage?.body ?? triggerText,
+          request: t.request ?? triggerMessage?.body ?? triggerText,
           reply: said,
         }).catch(() => "done" as const);
         if (verdict === "unkept" && !(await wakesLater(db, run, detached).catch(() => false))) {
@@ -2469,14 +2546,12 @@ async function executeRunInner(
         continue;
       }
       const reply = await db.transaction(async (tx) => {
-        // Told to wrap up near its cap: this is where it stands, and Continuar under it goes on from here.
+        // Told to wrap up near its cap, or found stuck twice: this is where it stands, and Continuar under it goes
+        // on from here.
+        const ended =
+          t.stuck?.endAt !== undefined ? { stepLimit: { stuck: true } } : t.wrapUpNoted ? { stepLimit: {} } : {};
         const message = text
-          ? await post(
-              tx,
-              replyThreadId,
-              text,
-              withFallback(t, withCode({ ...takeMemoryUpdates(t), ...(t.wrapUpNoted ? { stepLimit: {} } : {}) }, code)),
-            )
+          ? await post(tx, replyThreadId, text, withFallback(t, withCode({ ...takeMemoryUpdates(t), ...ended }, code)))
           : null;
         t.postedUpTo = t.messages.length;
         if (message) t.postedCount++;
@@ -2554,6 +2629,10 @@ function createBrain(
 export const COMPUTER_REACT_NOTE =
   "# Reacting\nWhen you call the agentes `react` tool, the reaction is your whole answer: end your turn right after it with an empty final reply (no text, no emoji, no confirmation that you reacted).";
 
+/** For computer brains: a GIF or a sticker through the bridge is posted at once (`tools`: the ones it has). */
+export const computerMediaNote = (tools: string[]) =>
+  `# GIFs and stickers\nWhen you call the agentes ${tools.map((t) => `\`${t}\``).join(" or ")} tool, it is posted at once as a message of its own: unless you have something to add, end your turn right after it with an empty final reply (no confirmation that you sent it).`;
+
 /**
  * The turn as every brain receives it. The text view of the conversation is
  * computed only when a brain reads it (the model brain reads the exact
@@ -2586,8 +2665,15 @@ function brainTurnOf(
         .join("\n\n");
       // A computer brain has its own tools (read, search, shell, git) besides ours.
       const computer = forComputerBrain(text);
-      // It also sees `react` as an MCP tool and tends to echo the emoji as its final text.
-      return tools.some((d) => d.name === REACT_TOOL) ? `${computer}\n\n${COMPUTER_REACT_NOTE}` : computer;
+      // It also sees `react` as an MCP tool and tends to echo the emoji as its final text; a GIF or a sticker, too.
+      const media = tools.filter((d) => MEDIA_TOOLS.has(d.name)).map((d) => d.name);
+      return [
+        computer,
+        tools.some((d) => d.name === REACT_TOOL) ? COMPUTER_REACT_NOTE : "",
+        media.length > 0 ? computerMediaNote(media) : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
     },
     get thisTurn() {
       return plan.kind === "model" ? undefined : thisTurnText(t.system, new Date(), options) || undefined;
@@ -2802,7 +2888,7 @@ function executedLabel(name: string, input: unknown): string {
     text(i.path) ||
     changes.filter(Boolean).join(", ");
   const head = maskCredentials(what.trim().replace(/\s+/g, " "));
-  return head ? `${name} (${head.length > 120 ? `${head.slice(0, 119)}…` : head})` : name;
+  return head ? `${name} (${head.length > 120 ? `${cutText(head, 119)}…` : head})` : name;
 }
 
 /** Identity of a run for tool access from outside the model loop (the runner MCP bridge). */

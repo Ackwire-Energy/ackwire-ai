@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { coordinatorNote } from "@agenteschat/client/lib/coordinator";
 import { agentsByAnyHandle } from "@agenteschat/client/lib/directory";
 import {
   handleAfterRename,
@@ -9,8 +10,6 @@ import {
   ROLE_IDS,
   takenHandles,
 } from "@agenteschat/client/lib/new-agent";
-import { resources } from "@agenteschat/i18n";
-import i18next, { type TFunction } from "i18next";
 import {
   type AgentDraft,
   agentChanges,
@@ -20,21 +19,8 @@ import {
   shuffleLook,
 } from "../../src/features/agents/edit";
 import { firstBlockedStep, NEW_AGENT_PHONE_STEPS, stepBlocked } from "../../src/features/agents/new-agent";
-import { featureKeysEn } from "../../src/features/i18n/keys.en";
-import { featureKeysPtBR } from "../../src/features/i18n/keys.pt-BR";
 import { AGENT_ACCESSORIES, AGENT_COLORS, AGENT_EYES } from "../../src/features/shared/logic";
-import { withMobileKeys } from "../../src/i18n/merge";
-
-/** The phone's words in pt-BR. */
-async function ptBR(): Promise<TFunction> {
-  const i18n = i18next.createInstance();
-  await i18n.init({
-    lng: "pt-BR",
-    resources: withMobileKeys(resources, { "pt-BR": featureKeysPtBR, en: featureKeysEn }),
-    interpolation: { escapeValue: false },
-  });
-  return i18n.t;
-}
+import { translator } from "./fixtures";
 
 describe("an agent's look", () => {
   test("every part is set, unknown values fall back to the default agent", () => {
@@ -85,10 +71,17 @@ describe("editing an agent", () => {
     role: "Atendimento",
     instructions: "Responde clientes.",
     look: { color: "teal", eyes: "happy", accessory: "headset" },
+    coordinator: false,
   };
 
   test("admins change everything, its person only the look, others nothing", () => {
-    expect([...editableFields({ admin: true, owner: false })].sort()).toEqual(["instructions", "look", "name", "role"]);
+    expect([...editableFields({ admin: true, owner: false })].sort()).toEqual([
+      "coordinator",
+      "instructions",
+      "look",
+      "name",
+      "role",
+    ]);
     expect([...editableFields({ admin: false, owner: true })]).toEqual(["look"]);
     expect(editableFields({ admin: false, owner: false }).size).toBe(0);
   });
@@ -104,6 +97,23 @@ describe("editing an agent", () => {
     expect(agentChanges(saved, { ...saved, name: "Outra", instructions: "x" }, own)).toBeNull();
     // An emptied name is never sent.
     expect(agentChanges(saved, { ...saved, name: "  " }, all)).toBeNull();
+  });
+
+  test("who coordinates the team (ADR 0093): admins switch it, its person can't; the line says who does now", async () => {
+    const turnedOn = { ...saved, coordinator: true };
+    expect(agentChanges(saved, turnedOn, editableFields({ admin: true, owner: false }))).toEqual({ coordinator: true });
+    expect(agentChanges(saved, turnedOn, editableFields({ admin: false, owner: true }))).toBeNull();
+    const pt = await translator("pt-BR");
+    const en = await translator("en");
+    const nina = { id: "nina", name: "Nina", coordinator: false };
+    const team = [nina, { id: "theo", name: "Theo", coordinator: true }];
+    expect(coordinatorNote(pt, team, "nina", false)).toBe("Hoje quem coordena é o Theo.");
+    expect(coordinatorNote(pt, team, "nina", true)).toBe("Hoje quem coordena é o Theo. Só um agente coordena por vez.");
+    expect(coordinatorNote(en, team, "nina", true)).toBe(
+      "Theo coordinates the team now. One agent coordinates at a time.",
+    );
+    expect(coordinatorNote(pt, team, "theo", true)).toBeNull();
+    expect(coordinatorNote(pt, [nina], "nina", false)).toBe("Ninguém coordena o time agora.");
   });
 });
 
@@ -124,7 +134,7 @@ describe("renaming an agent on the phone", () => {
   });
 
   test("Menções says why a taken @ can't be used and offers a free one; its own old @ comes back", async () => {
-    const t = await ptBR();
+    const t = await translator("pt-BR");
     const agents = [
       { id: "a1", handle: "ada", previousHandles: ["dra"] },
       { id: "a2", handle: "atlas", previousHandles: ["zeus"] },

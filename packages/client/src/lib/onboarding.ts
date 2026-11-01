@@ -1,5 +1,5 @@
 import type { AgentLookInput } from "../api/types";
-import { isEmail } from "./text";
+import { addressesIn } from "./text";
 
 /**
  * The onboarding's steps, in order (the server's `ONBOARDING_STEPS`, `packages/db/src/schema/tenancy.ts`, keeps the
@@ -100,24 +100,12 @@ export interface InviteDraft {
   valid: boolean;
 }
 
-/** "a@x.com, b@x.com\nnot-an-email" → every piece, lower case, deduplicated (invalid ones too). */
-export function splitEmails(text: string): string[] {
-  return [
-    ...new Set(
-      text
-        .split(/[,;\s]+/)
-        .map((e) => e.trim().toLowerCase())
-        .filter(Boolean),
-    ),
-  ];
-}
-
-/** Typed or pasted text turned into chips after the ones already there (new addresses only). */
+/** Typed or pasted text turned into chips after the ones already there (new addresses only, `addressesIn`). */
 export function addInvites(list: InviteDraft[], text: string, admin = false): InviteDraft[] {
   const known = new Set(list.map((i) => i.email));
-  const added = splitEmails(text)
-    .filter((email) => !known.has(email))
-    .map((email) => ({ email, admin, valid: isEmail(email) }));
+  const added = addressesIn(text)
+    .filter((a) => !known.has(a.email))
+    .map((a) => ({ ...a, admin }));
   return added.length ? [...list, ...added] : list;
 }
 

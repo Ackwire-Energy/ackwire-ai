@@ -54,6 +54,8 @@ export interface Saved {
   brain?: BrainChoice;
   /** Its group (ADR 0083): `NO_GROUP` or a group id; absent until the groups load. */
   group?: string;
+  /** It coordinates the team (ADR 0093). */
+  coordinator: boolean;
 }
 
 /** What the person changed. `budget` is the text typed; `levels` only the resources touched. */
@@ -76,6 +78,7 @@ export interface Edits {
   machine?: string;
   brain?: BrainChoice;
   group?: string;
+  coordinator?: boolean;
 }
 
 export type Field = Exclude<keyof Edits, "levels"> | "levels";
@@ -108,6 +111,7 @@ export const FIELD_PLACE: Record<Field, { tab: AgentTab; sec?: AgentSection }> =
   machine: { tab: "settings", sec: "computer" },
   brain: { tab: "settings", sec: "brain" },
   group: { tab: "settings", sec: "identity" },
+  coordinator: { tab: "settings", sec: "identity" },
 };
 
 export const sameLook = (a: Look, b: Look) => a.color === b.color && a.eyes === b.eyes && a.accessory === b.accessory;
@@ -147,6 +151,7 @@ export function changedKeys(saved: Saved, edits: Edits): ChangeKey[] {
   if (edits.machine !== undefined && saved.machine !== undefined && edits.machine !== saved.machine) add("machine");
   if (edits.brain && saved.brain && !sameBrain(edits.brain, saved.brain)) add("brain");
   if (edits.group !== undefined && saved.group !== undefined && edits.group !== saved.group) add("group");
+  if (edits.coordinator !== undefined && edits.coordinator !== saved.coordinator) add("coordinator");
   return out;
 }
 

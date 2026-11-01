@@ -42,7 +42,7 @@ both an approval and a question resumes only when neither is pending.
 
 Renaming an agent (Identidade on its page, Editar on the phone) moves its @handle to the one the new name gives, shown
 under "Menções" while the name is typed and editable before saving. Who may rename it (`manage_agents`) may move it.
-The handle it leaves goes to `agents.previous_handles` (migration 0140: a column with an empty default, no row
+The handle it leaves goes to `agents.previous_handles` (migration 0144: a column with an empty default, no row
 rewritten). Renaming back takes it out again, and deleting the agent (ADR 0082) empties the list, so those handles are
 free again.
 

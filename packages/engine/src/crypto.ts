@@ -15,7 +15,13 @@ import type { KeyWrapper } from "@agenteschat/adapters";
  * decrypt another. Never rename an existing purpose: data protected with it
  * would become unreadable.
  */
-export type KeyPurpose = "sessions" | "provider-credentials-kek" | "git-proxy" | "invite-links";
+export type KeyPurpose =
+  | "sessions"
+  | "provider-credentials-kek"
+  | "git-proxy"
+  | "invite-links"
+  | "invitations"
+  | "invitation-mail";
 
 function deriveKey(masterSecret: string, purpose: KeyPurpose): Buffer {
   return Buffer.from(hkdfSync("sha256", masterSecret, "agentes.chat", `agentes.chat/${purpose}/v1`, 32));
@@ -122,6 +128,23 @@ export async function openSecret(wrappers: KeyWrapper[], sealed: SealedSecret, a
  */
 export function inviteLinkToken(masterSecret: string, linkId: string): string {
   return createHmac("sha256", deriveKey(masterSecret, "invite-links")).update(linkId).digest("base64url");
+}
+
+/**
+ * The token of an email invitation (ADR 0090): an HMAC of its id, as a workspace's link, so its link can be copied
+ * again and sending it again keeps it, while only its hash is stored.
+ */
+export function invitationToken(masterSecret: string, invitationId: string): string {
+  return createHmac("sha256", deriveKey(masterSecret, "invitations")).update(invitationId).digest("base64url");
+}
+
+/**
+ * What only an email invitation's own message carries (ADR 0090): an HMAC of its id, on the emailed link's `?mail=`.
+ * The link an admin copies has none, so accepting with it is what shows the mailbox got the message: only then does
+ * the address count as confirmed.
+ */
+export function invitationMailProof(masterSecret: string, invitationId: string): string {
+  return createHmac("sha256", deriveKey(masterSecret, "invitation-mail")).update(invitationId).digest("base64url");
 }
 
 /** URL-safe random token, e.g. for invitation links. */

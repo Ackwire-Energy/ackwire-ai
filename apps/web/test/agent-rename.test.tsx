@@ -138,6 +138,7 @@ describe("renaming an agent on its page", () => {
       model: "m",
       owner: "u1",
       audience: { mode: "everyone", userIds: [] },
+      coordinator: false,
     };
     expect(handleAfterRename(saved, "Ada")).toBe("ada");
     expect(handleAfterRename(saved, " Ada ")).toBe("ada");

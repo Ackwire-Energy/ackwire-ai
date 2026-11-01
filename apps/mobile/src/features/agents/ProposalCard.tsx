@@ -6,14 +6,16 @@ import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { AgentAvatar, Button, Icon, Text, useTheme } from "@/ui";
+import { AskButtons, AskCard, AskFoot, ExpiryLine, useAskStore } from "../chat/asks";
 import { useFailed } from "../routines/hooks";
 import { useDirectory } from "../shared/hooks";
 import { fullLook } from "./edit";
 
 /**
- * The web's card for an agent's proposal of a new agent (ADR 0081): the draft at a glance, Revisar opens
- * "Criar agente" filled in with it and Recusar says no, for who may create agents while it is open; then
- * what was decided, and the new agent's page once created.
+ * An agent's proposal of a new agent (ADR 0081): while it is open, the request card (the agent's reason, the
+ * draft in the well, the AI it would think with under "Ver a mudança"); Revisar opens "Criar agente" filled
+ * in with it and Recusar says no, for who may create agents. Then what was decided, and the new agent's page
+ * once created.
  */
 export function ProposalCard({ message: m }: { message: Message }) {
   const { t } = useTranslation();
@@ -22,6 +24,7 @@ export function ProposalCard({ message: m }: { message: Message }) {
   const { colors } = useTheme();
   const deny = useDenyAgentProposal(orgId);
   const failed = useFailed();
+  const asks = useAskStore();
   const card = agentProposalOf(m.meta);
   if (!card || m.author.type !== "agent") return null;
   const { draft, why } = card.params;
@@ -38,6 +41,61 @@ export function ProposalCard({ message: m }: { message: Message }) {
           : decides
             ? null
             : t("proposals.waitingAdmin");
+  if (status === "open") {
+    return (
+      <AskCard
+        id={m.id}
+        kind="agent"
+        agentId={m.author.id ?? ""}
+        waitsFor={decides ? "you" : null}
+        lead={why || t("actionCard.agentProposal.title", { agent: proposer })}
+        well={{
+          tile: <AgentAvatar agent={fullLook(draft.appearance)} size={32} name={draft.name} live={false} />,
+          title: draft.name,
+          detail: [`@${draft.handle}`, draft.role].filter(Boolean).join(" · "),
+          more: {
+            label: t("ask.seeChange"),
+            content: (
+              <Text variant="footnote" tone="muted">
+                {suggestedAiText(t, draft.ai)}
+              </Text>
+            ),
+          },
+        }}
+        foot={
+          <AskFoot expiry={<ExpiryLine expiresAt={card.expiresAt} />}>
+            {decides ? (
+              <AskButtons
+                primary={
+                  <Button
+                    variant="primary"
+                    size="card"
+                    wide
+                    label={t("actionCard.agentProposal.review")}
+                    onPress={() => router.push(`/new-agent?proposal=${encodeURIComponent(m.id)}` as never)}
+                  />
+                }
+                secondary={
+                  <Button
+                    variant="secondary"
+                    size="card"
+                    wide
+                    label={t("approval.refuse")}
+                    disabled={deny.isPending}
+                    onPress={() => deny.mutate(m.id, { onSuccess: () => asks?.settle(m.id), onError: failed })}
+                  />
+                }
+              />
+            ) : (
+              <Text variant="small" tone="muted">
+                {outcome}
+              </Text>
+            )}
+          </AskFoot>
+        }
+      />
+    );
+  }
   return (
     <View style={[styles.card, { backgroundColor: colors.sunken }]}>
       <View style={styles.row}>

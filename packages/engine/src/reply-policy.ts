@@ -1,4 +1,5 @@
 import { and, asc, type Executor, eq, gt, isNull, ne, schema, sql } from "@agenteschat/db";
+import { cutText } from "./format";
 import type { Message } from "./messages";
 import type { AgentRun } from "./runs";
 import type { ToolDefinition, ToolSource } from "./tools/types";
@@ -177,6 +178,15 @@ export function visibleText(text: string, final: boolean): string {
   return kept.map((l) => `${l}\n`).join("") + tail;
 }
 
+/**
+ * What a run posts beside the approval or secret it stops on. The card already says what it asks, so a line that
+ * announces or repeats it ("I'll ask for X", "it's on the card") stays out of the conversation, where it would only
+ * push the card up. A longer text is real work written in the same step, and it is posted. A question keeps what
+ * leads to it: that text is its context, and it comes first.
+ */
+const PAUSE_LEAD_MIN_CHARS = 280;
+export const pauseLead = (text: string) => (text.length >= PAUSE_LEAD_MIN_CHARS ? text : "");
+
 /** The text without the sentinel, trimmed: what may be posted. */
 export const stripSentinel = (text: string) => visibleText(text, true).trim();
 
@@ -220,7 +230,7 @@ export function createPassToolSource(): ToolSource {
       if (!policy?.mayPass) {
         return { content: "You were addressed directly: answer the person instead.", isError: true };
       }
-      const reason = typeof input.reason === "string" ? input.reason.trim().slice(0, 300) : "";
+      const reason = typeof input.reason === "string" ? cutText(input.reason.trim(), 300) : "";
       return {
         content: "Passed: nothing is posted. End your turn now without any text.",
         data: { passed: { reason } },
@@ -268,6 +278,6 @@ export async function repliesAfterTrigger(
     .limit(5);
   if (rows.length === 0) return null;
   return rows
-    .map((m) => `[Meanwhile ${m.name} (@${m.handle}) replied here]: ${stripSentinel(m.body).slice(0, 4000)}`)
+    .map((m) => `[Meanwhile ${m.name} (@${m.handle}) replied here]: ${cutText(stripSentinel(m.body), 4000)}`)
     .join("\n\n");
 }
