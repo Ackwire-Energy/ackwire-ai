@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { atRule, builtCss, declarations, topLevel } from "./built-css";
 
-test("what ships wraps a hold from its top, its lead on the first line and its button in the middle; the other notices stay one-line strips", async () => {
+test("what ships wraps a hold from its top, its lead on the first line and its button in the middle; the other notices are one-line strips, and on phones all share the hold's top line", async () => {
   const css = await builtCss();
   const shipped = topLevel(css);
   const phone = atRule(css, "@media (max-width: 640px)");
@@ -28,9 +28,21 @@ test("what ships wraps a hold from its top, its lead on the first line and its b
   expect(last(shipped, ".hold-banner>.outage__acts", "margin-block")).toBe("calc(11px - var(--control-h-sm) / 2)");
   expect(last(phone, ".hold-banner>.outage__acts", "margin-block")).toBe("0");
 
-  // The offline computer and setup notices keep their centred one-line strip.
+  // The offline computer and setup notices keep their centred one-line strip, the × at the buttons' own gap.
   expect(last(shipped, ".outage", "align-items")).toBe("center");
   expect(last(shipped, ".outage", "min-height")).toBe("44px");
   expect(last(shipped, ".outage", "padding")).toBe("6px 10px 6px 16px");
-  expect(last(phone, ".outage", "padding")).toBe("10px 12px");
+  expect(last(shipped, ".outage__close", "margin-left")).toBe("-6px");
+
+  // On phones every notice reads from the top: the lead and the × on the title's line, whatever wraps under it.
+  expect(last(phone, ".outage", "display")).toBe("grid");
+  expect(last(phone, ".outage", "align-items")).toBe("start");
+  expect(last(phone, ".outage", "padding")).toBe("11px 12px");
+  expect(last(phone, ".outage>:first-child", "translate")).toBe("0 calc(11px - var(--cap-mid) - 50%)");
+  expect(last(phone, ".outage__close", "margin")).toBe(
+    "calc(11px - var(--cap-mid) - var(--control-h-sm) / 2) -12px 0 0",
+  );
+  // A ghost's words start under the words above, and no button stretches.
+  expect(last(phone, ".outage__acts>.ac-btn--ghost:first-child", "margin-left")).toBe("-12px");
+  expect(phone).not.toContain(".outage__acts>.ac-btn:not(.ac-btn--icon)");
 });

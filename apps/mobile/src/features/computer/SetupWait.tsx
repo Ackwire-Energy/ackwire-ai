@@ -190,7 +190,9 @@ export function SetupNotice() {
         accessibilityLabel={`${title}. ${line}`}
         style={[styles.card, surface]}
       >
-        <ComputerIcon kind={WORKSPACE_COMPUTER_KIND} size={22} color={c.muted} />
+        <LineIcon variant="callout" size={22}>
+          <ComputerIcon kind={WORKSPACE_COMPUTER_KIND} size={22} color={c.muted} />
+        </LineIcon>
         <View style={styles.grow}>
           <Text variant="callout" tone="ink" style={styles.bold} numberOfLines={2}>
             {title}
@@ -199,7 +201,9 @@ export function SetupNotice() {
             {line}
           </Text>
         </View>
-        <Icon name="right" size={16} color={c.faint} />
+        <View style={styles.more}>
+          <Icon name="right" size={16} color={c.faint} />
+        </View>
       </Pressable>
     </View>
   );
@@ -220,7 +224,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 10,
   },
+  // The chevron belongs to the whole card, so it stays in its middle.
+  more: { alignSelf: "center" },
 });

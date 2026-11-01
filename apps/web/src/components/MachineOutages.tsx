@@ -152,8 +152,16 @@ function OutageNotice({
             {t("outage.switch")}
           </Button>
         )}
-        <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t("outage.dismiss")} onClick={onDismiss} />
       </span>
+      <Button
+        variant="ghost"
+        size="sm"
+        iconOnly
+        icon="close"
+        className="outage__close"
+        aria-label={t("outage.dismiss")}
+        onClick={onDismiss}
+      />
       {open && <SwitchComputerDialog open={open} onOpenChange={setOpen} outage={o} data={data} />}
     </div>
   );
