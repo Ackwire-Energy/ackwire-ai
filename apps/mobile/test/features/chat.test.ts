@@ -401,6 +401,13 @@ describe("working line", () => {
     );
   });
 
+  test("once its words arrive, the block's header says the name and its start time, as on the web (no orbit)", async () => {
+    const lines = await source("features/chat/LiveRows.tsx");
+    const row = lines.slice(lines.indexOf("export const TurnRow"), lines.indexOf("function WaitLine("));
+    expect(row).toContain("when.time(new Date(since ?? mountedAt).toISOString())");
+    expect(row).not.toContain("PixelOrbit");
+  });
+
   test("Parar: real runs at work, also while they write (not a guess, not one waiting)", () => {
     const list = stoppableInLine([
       run({ runId: "p", agentId: "atlas", provisional: true }),

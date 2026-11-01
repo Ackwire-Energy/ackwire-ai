@@ -37,7 +37,7 @@ import { Dither } from "@/sky/Dither";
 import { softTones } from "@/sky/math";
 import { CHROME_MAX_SCALE, haptics, Icon, PixelOrbit, PixelStop, Text, useReducedMotion, useTheme } from "@/ui";
 import { AgentFace, Face } from "../shared/Face";
-import { useDirectory, useNow } from "../shared/hooks";
+import { useDirectory, useNow, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import {
   type LineDrawn,
@@ -88,6 +88,7 @@ export const TurnRow = memo(function TurnRow({
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
+  const when = useWhen();
   const agent = dir.agentById.get(run.agentId);
   const color = agentLook(agent).color;
   const phase = turnPhase(run);
@@ -144,10 +145,13 @@ export const TurnRow = memo(function TurnRow({
           <Text variant="footnote" tone="ink2" style={styles.name} numberOfLines={1}>
             {agent?.name ?? ""}
           </Text>
-          {/* While it works, the line above the box says so; the block only says "parado". */}
+          {/* While it works, the line above the box says so: the block has its start time, as a message (the web's
+              `RunClock`); "parado" once stopped. */}
           <View style={styles.state} accessible accessibilityLiveRegion="polite" accessibilityLabel={word}>
             {live ? (
-              <PixelOrbit color={color} size={12} />
+              <Text variant="footnote" tone="faint">
+                {when.time(new Date(since ?? mountedAt).toISOString())}
+              </Text>
             ) : (
               <Text variant="footnote" tone="faint" maxFontSizeMultiplier={CHROME_MAX_SCALE}>
                 {word}
