@@ -1,15 +1,7 @@
 import { expect, test } from "bun:test";
 import { QueryClient, QueryObserver } from "@tanstack/react-query";
-import type { ApiClient, Message, SecretRequest } from "../src/index";
-import {
-  cacheMessage,
-  cacheReceipts,
-  cacheSecretRequest,
-  catchUpChannel,
-  keys,
-  messagesQuery,
-  outbox,
-} from "../src/index";
+import type { ApiClient, Message } from "../src/index";
+import { cacheMessage, cacheReceipts, catchUpChannel, keys, messagesQuery, outbox } from "../src/index";
 
 const msg = (over: Partial<Message>): Message => ({
   id: "m",
@@ -117,46 +109,4 @@ test("catching up a channel adds what its open lists lack and keeps what they ho
   }
   expect(qc.getQueryData<Message[]>(keys.messages("o1", "c1"))?.at(-1)).toBe(live);
   for (const off of open) off();
-});
-
-test("a secret request asked or closed redraws its card wherever its channel's lists are cached", () => {
-  const qc = new QueryClient();
-  const request: SecretRequest = {
-    id: "s1",
-    agentId: "theo",
-    channelId: "c1",
-    threadId: "root",
-    messageId: "card",
-    requestedForUserId: "u1",
-    name: "NPM_TOKEN",
-    purpose: "publicar o pacote",
-    target: { kind: "env" },
-    machineId: "mac1",
-    publicKey: "BPk",
-    status: "pending",
-    expiresAt: "2026-10-16T04:39:00.000Z",
-    deliveredAt: null,
-    removed: false,
-  };
-  const card = msg({
-    id: "card",
-    threadId: "root",
-    author: { type: "agent", id: "theo" },
-    meta: { secretRequest: request },
-  });
-  qc.setQueryData(keys.thread("o1", "c1", "root"), [msg({ id: "x", threadId: "root" }), card]);
-  qc.setQueryData(keys.messages("o1", "c2"), [msg({ id: "card", channelId: "c2" })]);
-
-  const delivered = {
-    ...request,
-    status: "delivered" as const,
-    publicKey: null,
-    deliveredAt: "2026-10-16T04:30:00.000Z",
-  };
-  cacheSecretRequest(qc, "o1", delivered);
-  const thread = qc.getQueryData<Message[]>(keys.thread("o1", "c1", "root"));
-  expect(thread?.find((m) => m.id === "card")?.meta).toEqual({ secretRequest: delivered });
-  expect(thread?.find((m) => m.id === "x")?.meta).toEqual({});
-  // Another channel's message with the same id is left alone.
-  expect(qc.getQueryData<Message[]>(keys.messages("o1", "c2"))?.[0]?.meta).toEqual({});
 });

@@ -2,7 +2,15 @@ import { describe, expect, test } from "bun:test";
 import { ApiError } from "@agenteschat/client";
 import { readDeleteResponse } from "../src/features/account/result";
 import { preflightMissing } from "../src/features/me/logic";
-import { chooseOrg, firstRunMounted, openOrgs, pushOpens, serverDownOf } from "../src/lib/org-choice";
+import {
+  accountFailed,
+  chooseOrg,
+  enteringShown,
+  firstRunMounted,
+  openOrgs,
+  pushOpens,
+  serverDownOf,
+} from "../src/lib/org-choice";
 import { photoSource } from "../src/lib/photo";
 import { createHolder, deviceBody, devicePath, quietWhileOpen, readPushData } from "../src/lib/push-payload";
 import { connectPlan, currentServer, savedServer } from "../src/lib/server-choice";
@@ -158,6 +166,26 @@ test("the first run: kept, hidden, under an invitation's screen once mounted; ne
   // A workspace now (joined, or made): gone, and not kept for the next invitation.
   expect(firstRunMounted(true, false, false)).toBe(false);
   expect(firstRunMounted(false, false, true)).toBe(false);
+});
+
+test("signing in never leaves a blank screen, and the passage never covers the sign-in", () => {
+  const signedIn = { signedIn: true, launching: false, welcoming: false, ready: true, accepting: false };
+  expect(enteringShown(signedIn)).toBe(false);
+  expect(enteringShown({ ...signedIn, welcoming: true })).toBe(true);
+  // The moment passed and the account is still loading, or an invitation still being accepted: nothing else covers it.
+  expect(enteringShown({ ...signedIn, ready: false })).toBe(true);
+  expect(enteringShown({ ...signedIn, accepting: true })).toBe(true);
+  // The splash is up (a cold start, a server down): it speaks instead.
+  expect(enteringShown({ ...signedIn, ready: false, launching: true })).toBe(false);
+  // The session ended meanwhile.
+  expect(enteringShown({ ...signedIn, signedIn: false, welcoming: true, ready: false })).toBe(false);
+});
+
+test("an account that failed with only the signed-out answer cached is a failed load", () => {
+  expect(accountFailed(true, null)).toBe(true);
+  expect(accountFailed(true, undefined)).toBe(true);
+  expect(accountFailed(true, { organizations: [] })).toBe(false);
+  expect(accountFailed(false, null)).toBe(false);
 });
 
 test("a server that can't be opened gets its own screen, never the first run", () => {

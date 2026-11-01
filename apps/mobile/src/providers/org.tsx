@@ -1,6 +1,6 @@
 import { type OrgSummary, useMe } from "@agenteschat/client";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { chooseOrg, openOrgs } from "@/lib/org-choice";
+import { accountFailed, chooseOrg, openOrgs } from "@/lib/org-choice";
 import { readValue, STORED, writeValue } from "@/lib/storage";
 import { useSession } from "./session";
 
@@ -88,8 +88,12 @@ export function OrgProvider({ children }: { children: ReactNode }) {
 
   const orgs = useMemo(() => openOrgs(me.data?.organizations ?? []), [me.data]);
   const orgId = remembered === undefined ? null : chooseOrg(orgs, remembered);
-  const unreachable = me.isError && me.data === undefined;
-  const retry = me.refetch;
+  const unreachable = accountFailed(me.isError, me.data);
+  // From the top: one still null reads the session again at the end of its tries.
+  const retry = useCallback(() => {
+    tries.current = 0;
+    return refetch();
+  }, [refetch]);
   const value = useMemo<OrgGate>(() => {
     const base = { unreachable, retry, choose: setOrgId };
     const loading = me.isPending || remembered === undefined || stale;

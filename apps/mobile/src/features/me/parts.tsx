@@ -1,5 +1,6 @@
 import { type ReactNode, useSyncExternalStore } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "../shared/hooks";
 import { type HeaderWordAction, PushedHeader } from "../shared/parts";
@@ -8,22 +9,43 @@ import type { AccountDraft } from "./logic";
 /**
  * One screen of Você's (Conta, Membros, Notificações…), pushed with the platform's push: the native bar (its back
  * button and edge swipe, the title, a word that saves on the right) over the grouped gray, which scrolls under it.
+ * `footer`: a button that stays at the bottom, over the keyboard, with the page scrolling above it.
  */
-export function Page({ title, action, children }: { title: string; action?: HeaderWordAction; children?: ReactNode }) {
+export function Page({
+  title,
+  action,
+  footer,
+  children,
+}: {
+  title: string;
+  action?: HeaderWordAction;
+  footer?: ReactNode;
+  children?: ReactNode;
+}) {
   const c = useColors();
   const insets = useSafeAreaInsets();
+  const scroll = (
+    <ScrollView
+      style={styles.fill}
+      contentInsetAdjustmentBehavior="automatic"
+      keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets={!footer}
+      contentContainerStyle={[styles.body, { paddingBottom: footer ? 24 : 24 + insets.bottom }]}
+    >
+      {children}
+    </ScrollView>
+  );
   return (
     <View style={[styles.fill, { backgroundColor: c.grouped }]}>
       <PushedHeader title={title} solid={false} grouped {...(action ? { action } : {})} />
-      <ScrollView
-        style={styles.fill}
-        contentInsetAdjustmentBehavior="automatic"
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-        contentContainerStyle={[styles.body, { paddingBottom: 24 + insets.bottom }]}
-      >
-        {children}
-      </ScrollView>
+      {footer ? (
+        <KeyboardAvoidingView behavior="padding" style={styles.fill}>
+          {scroll}
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>{footer}</View>
+        </KeyboardAvoidingView>
+      ) : (
+        scroll
+      )}
     </View>
   );
 }
@@ -55,4 +77,5 @@ export function useAccountDraft(): AccountDraft | null {
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   body: { paddingHorizontal: 16, paddingTop: 4 },
+  footer: { paddingHorizontal: 16, paddingTop: 12 },
 });

@@ -88,6 +88,11 @@ export const ICONS = {
     p("M18.5 15.5c.3 1.5.9 2.1 2.4 2.4-1.5.3-2.1.9-2.4 2.4-.3-1.5-.9-2.1-2.4-2.4 1.5-.3 2.1-.9 2.4-2.4Z"),
   ],
   smile: [c(12, 12, 8.5), p("M8.5 14c.8 1.4 2 2 3.5 2s2.7-.6 3.5-2M9 9.5h.01M15 9.5h.01", 2)],
+  // The web's sticker on this grid: its corner peeled (ADR 0091).
+  sticker: [
+    p("M19.8 12.6V7.2a3 3 0 0 0-3-3H7.2a3 3 0 0 0-3 3v9.6a3 3 0 0 0 3 3h5.4Z"),
+    p("M19.8 12.6h-4.2a3 3 0 0 0-3 3v4.2"),
+  ],
   laptop: [r(5, 5, 14, 10, 1.8), p("M3 18.5h18")],
   // Each computer's line icon (the small form of its portrait, `ComputerIcon`).
   computerMac: [

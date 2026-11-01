@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { type BrowserHandoff, browserHandoffOf, controlledBy, heldTakeoversHere } from "@agenteschat/client";
+import {
+  type BrowserHandoff,
+  browserHandoffOf,
+  controlledBy,
+  handoffIsMine,
+  heldTakeoversHere,
+} from "@agenteschat/client";
 import { sortWaiting, waitingCardOf } from "../../src/features/activity/logic";
 import {
   browserGranted,
@@ -62,6 +68,25 @@ describe("the help request card", () => {
     expect(hostOf("https://Dashboard.Stripe.com/login?x=1")).toBe("dashboard.stripe.com");
     expect(hostOf("about:blank")).toBe("");
     expect(hostOf(undefined)).toBe("");
+  });
+});
+
+describe("whose help request it is", () => {
+  const asked = (requestedForUserId: string | null) => ({ requestedForUserId });
+
+  test("the person it was asked of and the agent's responsible person, not everyone else", () => {
+    expect(handoffIsMine(asked("me"), "me", "owner", false)).toBe(true);
+    expect(handoffIsMine(asked("someone"), "me", "me", false)).toBe(true);
+    expect(handoffIsMine(asked("someone"), "me", "owner", false)).toBe(false);
+  });
+
+  test("an admin isn't called for one asked of someone else", () => {
+    expect(handoffIsMine(asked("someone"), "me", "owner", true)).toBe(false);
+  });
+
+  test("asked of no one in particular: only who may control computers", () => {
+    expect(handoffIsMine(asked(null), "me", null, true)).toBe(true);
+    expect(handoffIsMine(asked(null), "me", null, false)).toBe(false);
   });
 });
 

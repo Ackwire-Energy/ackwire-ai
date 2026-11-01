@@ -200,15 +200,20 @@ export function ApprovalTraits({ approval: a }: { approval: Approval }) {
   );
 }
 
-/** Por onde, then the exact values (at most `max` rows; `long`: whole, every one), on a sunken plate. */
+/**
+ * Por onde, then the exact values (at most `max` rows; `long`: whole, every one), on a sunken plate.
+ * `stacked`: each label above its value, for a narrow card where a label column squeezes the values.
+ */
 export function ApprovalDetails({
   approval: a,
   max = 3,
   long = false,
+  stacked = false,
 }: {
   approval: Approval;
   max?: number;
   long?: boolean;
+  stacked?: boolean;
 }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -239,12 +244,25 @@ export function ApprovalDetails({
       {rows.map((r, i) => (
         <View
           key={r.label ?? "via"}
-          style={[styles.fact, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line2 }]}
+          style={[
+            stacked ? styles.factStacked : styles.fact,
+            i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line2 },
+          ]}
         >
-          <Text variant="small" tone="muted" style={styles.factKey} numberOfLines={1}>
+          <Text
+            variant={stacked ? "footnote" : "small"}
+            tone="muted"
+            style={stacked ? undefined : styles.factKey}
+            numberOfLines={1}
+          >
             {r.label ?? t("mobile.approval.via")}
           </Text>
-          <Text variant="small" tone="ink" style={styles.grow} numberOfLines={long ? undefined : 2}>
+          <Text
+            variant="small"
+            tone="ink"
+            style={stacked ? styles.wrapAnywhere : styles.grow}
+            numberOfLines={long ? undefined : stacked ? 4 : 2}
+          >
             {r.value}
           </Text>
         </View>
@@ -335,6 +353,8 @@ const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   facts: { borderRadius: 14, paddingHorizontal: 12, paddingVertical: 4 },
   fact: { flexDirection: "row", gap: 10, paddingVertical: 7 },
+  factStacked: { gap: 2, paddingVertical: 7 },
+  wrapAnywhere: { flexShrink: 1 },
   factKey: { width: 92 },
   grow: { flex: 1, minWidth: 0 },
   said: { lineHeight: 20 },

@@ -3,13 +3,9 @@ import type { AppNotification, SecretRequest } from "../api/types";
 import { MAX_SECRET_BYTES } from "./secret-box";
 
 /**
- * An agent's request for a secret (ADR 0027), as the web's card and the phone's both read it: whether it still takes
- * an answer, where the value goes (said truly for each kind), and what is wrong with a value before it is sealed.
+ * An agent's request for a secret (ADR 0027), as the web's card and the phone's both read it: where the value
+ * goes (said truly for each kind), and what is wrong with a value before it is sealed.
  */
-
-/** Still takes an answer: pending and before its deadline (the server closes it within a minute after). */
-export const secretPending = (r: Pick<SecretRequest, "status" | "expiresAt">, now = Date.now()) =>
-  r.status === "pending" && new Date(r.expiresAt).getTime() > now;
 
 /** `https://app.example.com` → `app.example.com`. */
 export function siteHost(site: string): string {

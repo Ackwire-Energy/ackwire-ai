@@ -6,7 +6,8 @@ import { AgentAvatar, Text, useTheme } from "@/ui";
 
 /**
  * The passage into the app after signing in: the sky rises, the
- * agent smiles, and the screen becomes the conversations (or the first run when there is no workspace yet).
+ * agent smiles, and the screen becomes the conversations (or the first run when there is no workspace yet). It
+ * also stands in for the launch splash, already gone by then, for as long as the account takes to load.
  */
 export function Entering({ org }: { org: string | null }) {
   const { t } = useTranslation();
@@ -18,13 +19,14 @@ export function Entering({ org }: { org: string | null }) {
       style={[StyleSheet.absoluteFill, { backgroundColor: c.bg }]}
       accessibilityLiveRegion="polite"
     >
-      <Sky color="sky" depth={1} fade={0.9} style={StyleSheet.absoluteFill} />
+      {/* The glow sits behind the text: at the home's depth, with both lines in ink, they read over its brightest tone. */}
+      <Sky color="sky" depth={0.7} fade={0.9} style={StyleSheet.absoluteFill} />
       <View style={styles.center}>
         <AgentAvatar agent={{ color: "sky", eyes: "round", id: "agentes" }} size={88} expression="happy" />
         <Text variant="display" style={styles.text}>
           {org ? t("mobile.entering.title", { org }) : t("mobile.entering.titleNew")}
         </Text>
-        <Text variant="callout" tone="muted" style={styles.text}>
+        <Text variant="callout" style={styles.text}>
           {t("mobile.entering.lead")}
         </Text>
       </View>

@@ -107,6 +107,7 @@ import { linkRunToIssue, mirrorReplyToIssue } from "./issues";
 import { listenLiveSteering, renderSteered } from "./live-steer";
 import { touchMachineAccount } from "./machine-accounts";
 import { computerBackSoon, type MachineStatus } from "./machine-hub";
+import { MEDIA_TOOLS } from "./media";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import { postNoAiCard } from "./no-ai";
 import { enqueue, PermanentJobError } from "./outbox";
@@ -117,6 +118,7 @@ import {
   endsWithSentinel,
   isSentinelOnly,
   PASS_TOOL,
+  pauseLead,
   repliesAfterTrigger,
   replyPolicyFor,
   routedAsFollowUp,
@@ -298,6 +300,8 @@ export interface Transcript {
   desktop?: BrowserTrailStep[];
   /** The agent reacted (`react`) instead of replying: an empty final answer posts nothing. */
   reacted?: boolean;
+  /** It sent a GIF or its sticker (`send_gif`, `send_sticker`, ADR 0091): an empty final answer posts nothing. */
+  mediaSent?: boolean;
   /** A mission `report` card was posted this run: it is the answer, an empty final reply posts nothing. */
   reported?: boolean;
   /** Nobody called it by name and it called `pass`: the run ends without a message. */
@@ -1723,7 +1727,7 @@ async function executeRunInner(
   /**
    * A computer brain's call through the bridge paused the run during the turn
    * (`suspendRunForTool` posted the card and moved it to `waiting_*`): keep the
-   * pending calls it recorded, post what the brain said, and stop here.
+   * pending calls it recorded, post what the brain said if it says more than the card, and stop here.
    */
   const suspendedByBridge = async (
     status: "waiting_approval" | "waiting_input",
@@ -1740,7 +1744,7 @@ async function executeRunInner(
     // A question the brain asked mid-turn is already posted. Only what it wrote before asking leads to it
     // (posted just before the card, so it reads first); what it wrote after only repeats the question.
     const asked = await bridgedQuestionCard(t);
-    let text = stripSentinel(said);
+    let text = pauseLead(stripSentinel(said));
     let at: Date | undefined;
     if (asked && textBefore) {
       text = stripSentinel(textBefore(asked.askedAt + ASKED_GRACE_MS));
@@ -2347,13 +2351,15 @@ async function executeRunInner(
           continue;
         }
 
-        // Suspend: post what the agent said so far, one card per approval and each question, then wait.
+        // Suspend: post what the agent said (`pauseLead`), one card per approval and each question, then wait.
         transcript.pending = { calls };
         const t = transcript;
         const posted = await db.transaction(async (tx) => {
-          // Only this turn's text (it introduces the approval or question); earlier narration is in the steps.
-          // A background run never posts by itself (ADR 0053 §5): its cards speak for it.
-          const said = run.background ? "" : stripSentinel(turnText);
+          // Only this turn's text: what leads to a question, or what says more than an approval's or a secret's
+          // card. Earlier narration is in the steps. A background run never posts by itself (ADR 0053 §5): its
+          // cards speak for it.
+          const text = stripSentinel(turnText);
+          const said = run.background ? "" : asks.length > 0 ? text : pauseLead(text);
           const lead = said ? await post(tx, replyThreadId, said, withFallback(t, takeMemoryUpdates(t))) : null;
           // The cards, the same way a computer brain's bridged call posts them (`postPauseCards`).
           const pause = await postPauseCards(tx, run, {
@@ -2404,11 +2410,13 @@ async function executeRunInner(
           return fail(STUCK_ERROR, { code: STUCK_ERROR, ...(record ? { detail: record } : {}) });
         return finishBackground(record);
       }
-      // Nobody called it by name: it passed, or ended with nothing to say. Nothing is posted.
+      // Nobody called it by name: it passed, or ended with nothing to say. Nothing is posted. (A reaction, a GIF or
+      // a sticker it sent is an answer: below.)
       if (
         policy.mayPass &&
         !transcript.answerOwed &&
         !transcript.reacted &&
+        !transcript.mediaSent &&
         (transcript.passed ||
           (!anythingPosted && (wantsQuiet || !said) && updates.length === 0 && !saved && !transcript.reported))
       ) {
@@ -2418,11 +2426,14 @@ async function executeRunInner(
       }
       // It reacted (`react`) instead of replying and wrote nothing more (or only the emoji again):
       // the reaction is the answer.
+      // Or it sent a GIF or its sticker and wrote nothing after it, with no card left to attach: that was the answer.
       // Or it posted a mission report and has no card left to attach: the report is the answer. Coding CLIs
       // always close with a summary that repeats it, whatever the prompt says, so the text is dropped too.
+      const noCards = !transcript.artifacts?.length && !transcript.memoryUpdates?.length;
       const silent =
         (Boolean(transcript.reacted) && restatesReaction(said)) ||
-        (Boolean(transcript.reported) && !transcript.artifacts?.length && !transcript.memoryUpdates?.length);
+        (Boolean(transcript.mediaSent) && !said && noCards) ||
+        (Boolean(transcript.reported) && noCards);
       // The message is the final answer only: the last model call's text. Without it, a short closing line.
       const written = silent
         ? ""
@@ -2613,6 +2624,10 @@ function createBrain(
 export const COMPUTER_REACT_NOTE =
   "# Reacting\nWhen you call the agentes `react` tool, the reaction is your whole answer: end your turn right after it with an empty final reply (no text, no emoji, no confirmation that you reacted).";
 
+/** For computer brains: a GIF or a sticker through the bridge is posted at once (`tools`: the ones it has). */
+export const computerMediaNote = (tools: string[]) =>
+  `# GIFs and stickers\nWhen you call the agentes ${tools.map((t) => `\`${t}\``).join(" or ")} tool, it is posted at once as a message of its own: unless you have something to add, end your turn right after it with an empty final reply (no confirmation that you sent it).`;
+
 /**
  * The turn as every brain receives it. The text view of the conversation is
  * computed only when a brain reads it (the model brain reads the exact
@@ -2645,8 +2660,15 @@ function brainTurnOf(
         .join("\n\n");
       // A computer brain has its own tools (read, search, shell, git) besides ours.
       const computer = forComputerBrain(text);
-      // It also sees `react` as an MCP tool and tends to echo the emoji as its final text.
-      return tools.some((d) => d.name === REACT_TOOL) ? `${computer}\n\n${COMPUTER_REACT_NOTE}` : computer;
+      // It also sees `react` as an MCP tool and tends to echo the emoji as its final text; a GIF or a sticker, too.
+      const media = tools.filter((d) => MEDIA_TOOLS.has(d.name)).map((d) => d.name);
+      return [
+        computer,
+        tools.some((d) => d.name === REACT_TOOL) ? COMPUTER_REACT_NOTE : "",
+        media.length > 0 ? computerMediaNote(media) : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
     },
     get thisTurn() {
       return plan.kind === "model" ? undefined : thisTurnText(t.system, new Date(), options) || undefined;

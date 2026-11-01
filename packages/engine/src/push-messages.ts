@@ -31,8 +31,12 @@ export interface PushTextInput {
   label?: string | null;
   /** Title of the thing (approval, mission, routine, topic). */
   title?: string | null;
+  /** `join_request` from a member's suggestion (ADR 0090): who suggested. */
+  suggestedBy?: string | null;
   /** Snippet of what was said. */
   text?: string | null;
+  /** A GIF or a sticker sent with no words (ADR 0091): the push says so in place of the snippet. */
+  media?: "gif" | "sticker" | null;
   /** An approval of a production, irreversible or external action. */
   highRisk?: boolean;
   /** The routine that asked for an approval while nobody watched (ADR 0053 §8): the push says so. */
@@ -71,9 +75,12 @@ interface Strings {
   secretTitle: (actor: string) => string;
   secretBody: string;
   joinRequestTitle: (name: string, org: string) => string;
+  joinSuggestionTitle: (by: string, name: string, org: string) => string;
   joinRequestBody: string;
   waitingTitle: string;
   openBody: string;
+  sentGif: string;
+  sentSticker: string;
 }
 
 /** Exported for the test that reads every text as a phone shows it. */
@@ -108,9 +115,12 @@ export const PUSH_STRINGS: Record<PushLocale, Strings> = {
     secretTitle: (a) => `${a} precisa de um segredo seu`,
     secretBody: "Toque para enviar com segurança.",
     joinRequestTitle: (name, org) => `${name} pede para entrar na ${org}`,
+    joinSuggestionTitle: (by, name, org) => `${by} sugeriu ${name} para a ${org}`,
     joinRequestBody: "Toque para aprovar ou recusar.",
     waitingTitle: "Tem algo esperando você",
     openBody: "Toque para abrir.",
+    sentGif: "Mandou um GIF",
+    sentSticker: "Mandou uma figurinha",
   },
   en: {
     someone: "Someone",
@@ -142,9 +152,12 @@ export const PUSH_STRINGS: Record<PushLocale, Strings> = {
     secretTitle: (a) => `${a} needs a secret from you`,
     secretBody: "Tap to send it securely.",
     joinRequestTitle: (name, org) => `${name} asks to join ${org}`,
+    joinSuggestionTitle: (by, name, org) => `${by} suggested ${name} for ${org}`,
     joinRequestBody: "Tap to approve or deny.",
     waitingTitle: "Something is waiting for you",
     openBody: "Tap to open.",
+    sentGif: "Sent a GIF",
+    sentSticker: "Sent a sticker",
   },
 };
 
@@ -157,7 +170,9 @@ const clip = (s: string, max: number) => {
 export function renderPush(locale: PushLocale, input: PushTextInput): { title: string; body: string } {
   const s = PUSH_STRINGS[locale];
   const actor = input.actorName?.trim() || (input.actorType === "agent" ? s.anAgent : s.someone);
-  const text = input.text?.trim() || "";
+  // A GIF or a sticker alone (ADR 0091) says what it was where its words would go.
+  const sent = input.media === "gif" ? s.sentGif : input.media === "sticker" ? s.sentSticker : "";
+  const text = input.text?.trim() || sent;
   const what = input.title?.trim() || input.label?.trim() || "";
   const out = (title: string, body: string) => ({
     title: clip(title, PUSH_TITLE_MAX),
@@ -207,9 +222,13 @@ export function renderPush(locale: PushLocale, input: PushTextInput): { title: s
     case "secret_request":
       // What it is for, in the agent's words: the value is typed in the app, sealed there, never here.
       return out(s.secretTitle(actor), text || what || s.secretBody);
-    case "join_request":
+    case "join_request": {
       // The name the person typed, never their note: approving happens in the app, never from the notification.
-      return out(s.joinRequestTitle(input.title?.trim() || s.someone, input.label?.trim() || ""), s.joinRequestBody);
+      const who = input.title?.trim() || s.someone;
+      const by = input.suggestedBy?.trim();
+      if (by) return out(s.joinSuggestionTitle(by, who, input.label?.trim() || ""), s.joinRequestBody);
+      return out(s.joinRequestTitle(who, input.label?.trim() || ""), s.joinRequestBody);
+    }
     default:
       return out(input.waiting ? s.waitingTitle : actor, text || what || s.openBody);
   }

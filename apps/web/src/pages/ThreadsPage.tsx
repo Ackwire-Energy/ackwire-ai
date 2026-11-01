@@ -463,7 +463,7 @@ function ThreadRow({
             <span className="thread-row__last">
               {t("threads.lastLine", {
                 name: actors.name(lastActor(last.author)),
-                text: previewBody(t, last.excerpt, last.meta ?? null),
+                text: previewBody(t, last.excerpt, last.meta ?? null, last.mediaKind),
               })}
             </span>
           )

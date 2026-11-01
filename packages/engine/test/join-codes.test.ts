@@ -294,6 +294,7 @@ describe("asking with the code", () => {
       status: "pending",
       email: "felipe@example.com",
       created: true,
+      requestId: expect.any(String),
     });
     expect(await requestRows()).toEqual([
       expect.objectContaining({

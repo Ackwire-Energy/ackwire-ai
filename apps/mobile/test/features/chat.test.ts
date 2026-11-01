@@ -3,12 +3,7 @@ import type { LiveConsult, LiveRun, LiveWork, Message, RunConsultation } from "@
 import { activitySentence, barElapsed, barFaces, barWords, PHRASE_TURN_MS } from "@agenteschat/client/lib/activity";
 import { consultBlocksNearEnd, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
-import {
-  secretPending,
-  secretRequestOf,
-  secretValueProblem,
-  secretWhere,
-} from "@agenteschat/client/lib/secret-requests";
+import { secretRequestOf, secretValueProblem, secretWhere } from "@agenteschat/client/lib/secret-requests";
 import { toolCalls, toolNow, toolPhrase, toolWhy } from "@agenteschat/client/lib/work";
 import {
   AGENT_WORDS_MIN,
@@ -1077,7 +1072,6 @@ describe("an agent's secret request (ADR 0027), as its card reads it", () => {
     deliveredAt: null,
     removed: false,
   } as const;
-  const NOW = new Date(at(0)).getTime();
 
   test("its card stands alone, and its message's text isn't repeated above it", () => {
     const card = message({ id: "m1", author: { type: "agent", id: "theo" }, body: "Secret request: SHOP_PASSWORD" });
@@ -1091,14 +1085,6 @@ describe("an agent's secret request (ADR 0027), as its card reads it", () => {
     expect(secretRequestOf({ secretRequest: { ...request, status: "opened" } })).toBeNull();
     expect(secretRequestOf({ secretRequest: "SHOP_PASSWORD" })).toBeNull();
     expect(secretRequestOf(undefined)).toBeNull();
-  });
-
-  test("it takes an answer while pending and before its deadline", () => {
-    expect(secretPending(request, NOW)).toBe(true);
-    expect(secretPending(request, new Date(at(-16)).getTime())).toBe(false);
-    for (const status of ["delivered", "declined", "expired", "canceled"] as const) {
-      expect(secretPending({ ...request, status }, NOW)).toBe(false);
-    }
   });
 
   test("where the value goes, said truly for each kind, in both languages", async () => {
