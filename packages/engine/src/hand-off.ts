@@ -205,11 +205,18 @@ async function holdUntried(deps: HandOffDeps, ctx: ToolContext, text: string): P
     ...own,
   ];
   const tried = await triedCalls(ctx.db, run, t.harnessTried);
+  // The task, as the turn-end judge reads it: Continuar's request, else the routine's trigger (its instructions).
+  const [trigger] = t.request
+    ? []
+    : await ctx.db
+        .select({ body: schema.messages.body })
+        .from(schema.messages)
+        .where(and(eq(schema.messages.orgId, run.orgId), eq(schema.messages.id, run.triggerMessageId)));
   const verdict = await continuationVerdict(deps.judge, {
     orgId: ctx.orgId,
     agentId: ctx.agentId,
     runId: ctx.runId,
-    request: t.request ?? "",
+    request: t.request || (trigger?.body ?? ""),
     reply: text,
     means,
     tried,

@@ -88,6 +88,7 @@ scenario(
     // The judge read what the run really has.
     const [held] = w.judgedAs("follow_through");
     expect(((held?.state.means ?? []) as string[]).join(" ")).toContain("web_search");
+    expect(String(held?.state.request)).toContain("pesquise notícias sobre o Banco Azul");
     expect(await untriedSteps(w)).toHaveLength(1);
     await assertInvariants(w);
   },
