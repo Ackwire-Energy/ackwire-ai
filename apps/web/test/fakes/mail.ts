@@ -58,7 +58,11 @@ export const MAIL_PROVIDERS: MailProviders = {
   ],
 };
 
-export function createFakeMail(log: (method: string, ...args: unknown[]) => void, now: () => Date): FakeMail {
+export function createFakeMail(
+  log: (method: string, ...args: unknown[]) => void,
+  now: () => Date,
+  meId: () => string | null = () => null,
+): FakeMail {
   const fake: FakeMail = {
     accounts: [],
     providers: { composio: false, imap: false, presets: [] },
@@ -108,6 +112,7 @@ export function createFakeMail(log: (method: string, ...args: unknown[]) => void
         lastError: null,
         preset: input.preset === "custom" ? null : input.preset,
         createdAt: now().toISOString(),
+        ownerUserId: meId(),
         agents: [],
       };
       fake.accounts.push(account);

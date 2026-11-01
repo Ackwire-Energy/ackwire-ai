@@ -9,6 +9,7 @@ import { onForumRunFinished } from "./forum";
 import type { MachineHub } from "./machine-hub";
 import { cancelOrgTasks, type TaskCall } from "./machine-tasks";
 import { can, type Membership, requireActiveMembership } from "./organizations";
+import { type AgentQuestionRow, publishQuestion, syncQuestionMessage } from "./questions";
 import { closeRoutineRun } from "./routine-ledger";
 import { ACTIVE_RUN_STATUSES, releaseInbox } from "./run-inbox";
 import { isTerminal, type RunStatus, replyThreadOf, transitionRun } from "./runs";
@@ -249,6 +250,7 @@ export async function stopRun(
     previous = run.status;
     const status = run.status;
     let closedSecrets: SecretRequestRow[] = [];
+    let closedQuestions: AgentQuestionRow[] = [];
     const done = await db.transaction(async (tx) => {
       const moved = await transitionRun(tx, run.id, status, "canceled", { error });
       if (!moved) return null;
@@ -264,10 +266,13 @@ export async function stopRun(
         .update(approvals)
         .set({ status: "canceled", decidedAt: now })
         .where(and(eq(approvals.runId, run.id), eq(approvals.status, "pending")));
-      await tx
+      // Their cards close too, or "Responder" would stay offered on a question nobody can answer anymore.
+      closedQuestions = await tx
         .update(agentQuestions)
         .set({ status: "canceled" })
-        .where(and(eq(agentQuestions.runId, run.id), eq(agentQuestions.status, "open")));
+        .where(and(eq(agentQuestions.runId, run.id), eq(agentQuestions.status, "open")))
+        .returning();
+      for (const q of closedQuestions) await syncQuestionMessage(tx, q);
       // Its secret requests close too; each terminal row queues runner key cleanup.
       closedSecrets = await cancelSecretRequests(tx, run.id);
       for (const r of closedSecrets) await syncSecretMessage(tx, r);
@@ -292,7 +297,8 @@ export async function stopRun(
     });
     if (done) {
       run = done;
-      for (const r of closedSecrets) await publishSecret(deps.pubsub, r, "secret.updated");
+      for (const r of closedSecrets) await publishSecret(deps, r, "secret.updated");
+      for (const q of closedQuestions) await publishQuestion(deps.pubsub, q, "question.answered");
       break;
     }
     if (attempt >= 3) throw new ConflictError("This task changed state. Try again.", "run.state_changed");

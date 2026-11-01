@@ -39,6 +39,7 @@ import { type EmbedRenderer, Markdown } from "@/lib/markdown";
 import { isAttachmentName } from "@/lib/obsidian";
 import { useToast } from "@/lib/toast";
 import { ObsidianMark } from "./ObsidianMark";
+import { WikiAudienceDialog } from "./WikiAudience";
 
 /** Typing in a field: single-key shortcuts stay off. */
 export const typingIn = (el: Element | null) =>
@@ -466,12 +467,15 @@ export function WikiReader({
   const [conflict, setConflict] = useState<WikiPageData | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [audienceOpen, setAudienceOpen] = useState(false);
   const embed = useEmbedRenderer(page.data?.source?.attachments);
   const p = page.data;
   const folders = [...new Set(pages.map((x) => x.folder).filter(Boolean))].sort();
   // Who edits pages (and pins, moves and deletes them); a locked page, and locking it, only who configures.
   const writes = can(org, "edit_wiki");
   const admin = can(org, "configure");
+  // Who sees a page: people who write the wiki and manage roles (the server checks the same).
+  const choosesAudience = writes && can(org, "manage_roles");
   const editing = draft !== null;
 
   const startEdit = () => {
@@ -548,6 +552,15 @@ export function WikiReader({
 
   if (!isNew && page.isLoading) return <LoadingPage rows={4} />;
   if (!isNew && !p) {
+    if (page.error instanceof ApiError && page.error.code === "wiki.no_access") {
+      return (
+        <div className="wiki-doc">
+          <EmptyState icon="lock" title={t("wiki.noAccessTitle")}>
+            {t("wiki.noAccessText")}
+          </EmptyState>
+        </div>
+      );
+    }
     const missing = (page.error as { status?: number } | null)?.status === 404;
     const title = leafTitle(slug?.split("/").pop()?.replace(/-/g, " ") ?? "");
     return missing ? (
@@ -597,6 +610,11 @@ export function WikiReader({
   } else if (p) {
     actions = (
       <>
+        {p.audience && (
+          <Chip icon="eye" title={t("wiki.restrictedHint")}>
+            {t("wiki.restricted")}
+          </Chip>
+        )}
         {p.locked && (
           <Chip icon="lock" title={t("wiki.lockedHint")}>
             {t("wiki.locked")}
@@ -641,6 +659,11 @@ export function WikiReader({
               }
             >
               {p.pinned ? t("wiki.unpin") : t("wiki.pin")}
+            </MenuItem>
+          )}
+          {choosesAudience && (
+            <MenuItem icon="eye" onSelect={() => setAudienceOpen(true)}>
+              {t("wiki.audience")}
             </MenuItem>
           )}
           {admin && (
@@ -761,6 +784,7 @@ export function WikiReader({
         />
       )}
       {p && <HistoryDialog page={p} open={historyOpen} onClose={() => setHistoryOpen(false)} />}
+      {p && audienceOpen && <WikiAudienceDialog page={p} onClose={() => setAudienceOpen(false)} />}
       {p && confirmDelete && (
         <Dialog
           open

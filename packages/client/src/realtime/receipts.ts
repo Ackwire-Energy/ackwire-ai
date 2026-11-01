@@ -13,7 +13,17 @@ import type { RunSteeredEvent } from "./streams";
  * messages steered into it), known from `message.routed` / `message.claimed`
  * / the list receipts; only an unknown run falls back to the event's `threadId`.
  */
-export type ReceiptPhase = "seen" | "picked" | "claimed" | "waiting" | "asking" | "handled" | "failed" | "no_ai";
+/** `outage`: its run is parked because its AI provider is down, and retries by itself. */
+export type ReceiptPhase =
+  | "seen"
+  | "picked"
+  | "claimed"
+  | "waiting"
+  | "asking"
+  | "outage"
+  | "handled"
+  | "failed"
+  | "no_ai";
 
 export interface MessageReceipt {
   /** The router decided (so "nobody picked it" is final). */
@@ -57,18 +67,21 @@ export type ReceiptsState = Record<string, MessageReceipt>;
 
 const phaseOf = (
   status: RunStatus | "done" | "failed" | "waiting_approval" | "waiting_input" | "canceled",
+  outage?: boolean,
 ): ReceiptPhase =>
-  status === "queued"
-    ? "picked"
-    : status === "running"
-      ? "claimed"
-      : status === "waiting_approval"
-        ? "waiting"
-        : status === "waiting_input"
-          ? "asking"
-          : status === "failed"
-            ? "failed"
-            : "handled";
+  outage && status === "waiting_input"
+    ? "outage"
+    : status === "queued"
+      ? "picked"
+      : status === "running"
+        ? "claimed"
+        : status === "waiting_approval"
+          ? "waiting"
+          : status === "waiting_input"
+            ? "asking"
+            : status === "failed"
+              ? "failed"
+              : "handled";
 
 const RANK: Record<ReceiptPhase, number> = {
   seen: 0,
@@ -76,6 +89,7 @@ const RANK: Record<ReceiptPhase, number> = {
   claimed: 2,
   waiting: 2,
   asking: 2,
+  outage: 2,
   handled: 3,
   failed: 3,
   no_ai: 3,
@@ -177,7 +191,7 @@ export function seedReceipt(state: ReceiptsState, message: Message, fresh = fals
   if (r && existing?.confirmed && !fresh) {
     let next = state;
     for (const h of r.handled) {
-      const phase = h.reason === NO_AI ? "no_ai" : phaseOf(h.status);
+      const phase = h.reason === NO_AI ? "no_ai" : phaseOf(h.status, h.outage);
       const follows = existing.runOf?.[h.agentId];
       if (RANK[phase] < RANK.handled || (follows && h.runId && h.runId !== follows)) continue;
       next = linkRun(set(next, message.id, h.agentId, phase), message.id, h.runId, h.agentId);
@@ -191,7 +205,7 @@ export function seedReceipt(state: ReceiptsState, message: Message, fresh = fals
     for (const id of r.seenBy) next = set(next, message.id, id, "seen");
     for (const id of r.pickedBy) next = set(next, message.id, id, "picked");
     for (const h of r.handled) {
-      next = set(next, message.id, h.agentId, h.reason === NO_AI ? "no_ai" : phaseOf(h.status));
+      next = set(next, message.id, h.agentId, h.reason === NO_AI ? "no_ai" : phaseOf(h.status, h.outage));
       next = linkRun(next, message.id, h.runId, h.agentId);
     }
     // Receipts come from the router's decision: "nobody picked it" is final. A read with none (the router is
@@ -294,7 +308,7 @@ export function applyReceiptEvent(
         linkRun(state, event.messageId, event.runId, event.agentId),
         event.messageId,
         event.agentId,
-        event.reason === NO_AI ? "no_ai" : event.status ? phaseOf(event.status) : "handled",
+        event.reason === NO_AI ? "no_ai" : event.status ? phaseOf(event.status, event.outage) : "handled",
       );
     case "agent.run.steered": {
       // Went into the agent's task in progress: that agent is on it (a "stop" ends it).
@@ -307,7 +321,7 @@ export function applyReceiptEvent(
         event.runId,
         event.triggerMessageId ?? event.threadId,
         event.agentId,
-        phaseOf(event.status),
+        phaseOf(event.status, event.outage),
         event.status === "running",
       );
     case "agent.thinking":
@@ -323,7 +337,7 @@ export function applyReceiptEvent(
         event.runId,
         event.threadId,
         event.agentId,
-        phaseOf(event.status),
+        phaseOf(event.status, event.outage),
         event.status === "waiting_approval",
       );
     case "question.asked":
@@ -355,7 +369,7 @@ export interface ReceiptView {
   seen: string[];
   /** Main status, or null when there is nothing to say yet. */
   status:
-    | { kind: "picked" | "claimed" | "waiting" | "asking" | "handled" | "failed"; agents: string[] }
+    | { kind: "picked" | "claimed" | "waiting" | "asking" | "outage" | "handled" | "failed"; agents: string[] }
     /** `mentionNeeded`: no step could read it and no rule fit, so only a mention reaches an agent. */
     | { kind: "nobody"; mentionNeeded?: true }
     /** Nobody will answer for want of an AI (`agents`: those that couldn't think; empty: nobody was asked). */
@@ -386,7 +400,7 @@ export function receiptView(receipt: MessageReceipt | undefined): ReceiptView {
   const noAi = with_("no_ai");
   if ((noAi.length > 0 || receipt.noAi) && receipt.agents.every(([, p]) => p === "seen" || p === "no_ai"))
     return { seen, status: { kind: "no_ai", agents: noAi }, done: false, referenced };
-  for (const kind of ["failed", "asking", "waiting", "claimed", "picked"] as const) {
+  for (const kind of ["failed", "outage", "asking", "waiting", "claimed", "picked"] as const) {
     const agents = with_(kind);
     if (agents.length) return { seen, status: { kind, agents }, done: false, referenced, ...decided };
   }

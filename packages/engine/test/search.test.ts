@@ -11,6 +11,7 @@ import {
   searchForUser,
   searchVisible,
 } from "../src";
+import { deliverNotice } from "../src/delivery";
 import { addMember, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
@@ -46,6 +47,21 @@ describe("search index (Postgres, hybrid)", () => {
     // Another org sees nothing, even with the channel ids.
     const other = await createPostgresSearchResolver(f.db).forOrg(crypto.randomUUID());
     expect(await other.query({ text: "launch", visibleChannelIds: [f.general.id] })).toEqual([]);
+    // A notice only its agent reads (what a person decided on its proposal) is nobody's to find.
+    await f.db.transaction((tx) =>
+      deliverNotice(tx, {
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        channelId: f.general.id,
+        threadId: null,
+        hop: 1,
+        stretchId: null,
+        notice: { kind: "proposal_result", text: "ana created the launch agent" },
+        wake: false,
+      }),
+    );
+    await drainOutbox(f.db, f.handlers);
+    expect(await f.db.select().from(schema.searchDocuments)).toHaveLength(3);
     // Embeddings were computed and recorded as usage (kind embedding, no agent).
     const usage = (await f.db.select().from(schema.usageRecords)).filter((u) => u.kind === "embedding");
     expect(usage.length).toBeGreaterThanOrEqual(3);

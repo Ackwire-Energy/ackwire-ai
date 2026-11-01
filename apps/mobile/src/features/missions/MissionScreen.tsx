@@ -8,7 +8,7 @@ import { Button, Card, Chip, Count, Icon, IconButton, PixelOrbit, PlanTrack, Sec
 import { ThreadOptions } from "../chat/sheets";
 import { chatHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
-import { useColors, useDirectory, useEdition, useNow, useOrgId, useWhen } from "../shared/hooks";
+import { useColors, useDirectory, useEdition, useNamesComputers, useNow, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { MONO, PushedHeader, Tile } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
@@ -16,7 +16,7 @@ import { DecisionCardView, ReviewCardView, SetupFailedCard } from "./cards";
 import {
   hoursSince,
   liveSessions,
-  missionComputerKey,
+  missionComputerText,
   missionTrack,
   planProgress,
   planRows,
@@ -55,6 +55,7 @@ function Mission({ id }: { id: string }) {
   const decisions = useMissionDecisions(orgId, id);
   const computer = useComputerKind(orgId, m?.machine?.id);
   const cloud = useEdition() === "cloud";
+  const names = useNamesComputers();
 
   if (!m) {
     return (
@@ -85,6 +86,7 @@ function Mission({ id }: { id: string }) {
   const live = m.status !== "done" && m.status !== "canceled";
   const preparing = live && m.worktreeState === "preparing";
   const setupFailed = live && m.worktreeState === "failed";
+  const where = m.machine ? missionComputerText(t, m.machine, { cloud, names }) : null;
 
   return (
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
@@ -152,26 +154,23 @@ function Mission({ id }: { id: string }) {
               <AgentFace agentId={m.agentId} size={30} mode={m.status === "active" ? "run" : "idle"} />
             </View>
             <PlanTrack color={color} items={missionTrack(m)} />
-            <View style={styles.chips}>
-              {m.machine ? (
-                <Chip
-                  leading={<ComputerIcon kind={computer} size={13} color={c.muted} />}
-                  label={t(missionComputerKey(m.machine.online, cloud), {
-                    name: m.machine.name,
-                  })}
-                />
-              ) : null}
-              {preparing ? (
-                <Chip leading={<PixelOrbit color={color} size={10} />} label={t("mobile.mission.setup.preparing")} />
-              ) : null}
-              {setupFailed ? <Chip icon="flag" label={t("mobile.mission.setup.failedShort")} /> : null}
-              {!preparing && m.runningTasks > 0 ? (
-                <Chip
-                  leading={<PixelOrbit color={color} size={10} />}
-                  label={t("mobile.mission.running", { count: m.runningTasks })}
-                />
-              ) : null}
-            </View>
+            {where || preparing || setupFailed || m.runningTasks > 0 ? (
+              <View style={styles.chips}>
+                {where ? (
+                  <Chip leading={<ComputerIcon kind={computer} size={13} color={c.muted} />} label={where} />
+                ) : null}
+                {preparing ? (
+                  <Chip leading={<PixelOrbit color={color} size={10} />} label={t("mobile.mission.setup.preparing")} />
+                ) : null}
+                {setupFailed ? <Chip icon="flag" label={t("mobile.mission.setup.failedShort")} /> : null}
+                {!preparing && m.runningTasks > 0 ? (
+                  <Chip
+                    leading={<PixelOrbit color={color} size={10} />}
+                    label={t("mobile.mission.running", { count: m.runningTasks })}
+                  />
+                ) : null}
+              </View>
+            ) : null}
           </View>
         </Card>
 

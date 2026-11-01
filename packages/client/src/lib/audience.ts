@@ -12,6 +12,24 @@ export function audienceOf(agent: Agent): AgentAudience {
 
 export const modeOf = (agent: Agent): AudienceMode => agent.audience?.mode ?? agent.audienceMode ?? "everyone";
 
+/**
+ * Whether its audience lets `userId` talk to the agent (the server's `canTalkTo`, without that person's role): its
+ * owner, everyone, or one of its people. A people list the directory didn't send says yes (don't warn on a guess).
+ */
+export function audienceAdmits(agent: Agent, userId: string): boolean {
+  if (agent.ownerUserId === userId) return true;
+  const mode = modeOf(agent);
+  if (mode !== "people") return mode === "everyone";
+  return !agent.audience || audienceOf(agent).userIds.includes(userId);
+}
+
+/** Its audience with `userId` let in; null when its people list wasn't sent (saving would drop them). */
+export function audienceWith(agent: Agent, userId: string): AgentAudience | null {
+  if (modeOf(agent) === "people" && !agent.audience) return null;
+  const a = audienceOf(agent);
+  return { mode: "people", userIds: [...new Set([...(a.mode === "people" ? a.userIds : []), userId])] };
+}
+
 /** Whether I can talk to it (the server's `canTalk`; absent = yes). */
 export const canTalk = (agent: Pick<Agent, "canTalk"> | undefined) => agent?.canTalk !== false;
 

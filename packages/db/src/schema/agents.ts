@@ -90,6 +90,12 @@ export const agents = pgTable(
     name: text().notNull(),
     /** Lower-case handle used in @mentions, unique per organization. */
     handle: text().notNull(),
+    /**
+     * Handles it had before a rename, oldest first: what names one (a mention, a tool's input, an old message)
+     * still reaches it (`currentHandles` in packages/engine/src/agents.ts), and no one else may take one. Checked
+     * in code, not by a constraint. Emptied when it is deleted, so they are free again.
+     */
+    previousHandles: text().array().notNull().default(sql`'{}'::text[]`),
     /** Short job title, e.g. "Developer" or "Support". */
     role: text().notNull().default(""),
     /** Standing instructions, part of the system prompt. */

@@ -4,6 +4,7 @@ import { publishOrgEvent } from "./events";
 import { cutText } from "./format";
 import type { Judge } from "./judge";
 import { requirePermission } from "./organizations";
+import { outageParkedSql } from "./runs";
 import { toolGroupKey } from "./tools/directory";
 import type { ToolContext, ToolDefinition, ToolSource } from "./tools/types";
 
@@ -37,7 +38,10 @@ export type AgentStatusKind =
   | "computer"
   | "waiting_approval"
   | "waiting_answer"
-  | "waiting_computer";
+  | "waiting_computer"
+  | "waiting_plan"
+  | "waiting_budget"
+  | "provider_down";
 
 /** An agent's line: its own words (`self`), one picked for its run (`auto`), or what its run waits on (`wait`). */
 export interface AgentStatusLine {
@@ -129,6 +133,8 @@ export async function loadAgentStatuses(
         heartbeatAt: agentRuns.heartbeatAt,
         updatedAt: agentRuns.updatedAt,
         waitingMachineId: agentRuns.waitingMachineId,
+        outage: outageParkedSql,
+        waitCode: sql<string | null>`${agentRuns.transcript}->'waitingForBrain'->>'code'`,
       })
       .from(agentRuns)
       .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.status, [...ACTIVE, ...WAITING]), ...ofRuns)),
@@ -170,7 +176,8 @@ export async function loadAgentStatuses(
           ? runs.find((r) => !isWorking(r))
           : undefined;
     if (waits && !(stored?.line.by === "self" && a.statusUntil)) {
-      status = ms - waits.updatedAt.getTime() < AGENT_WAIT_LINE_MS ? waitLine(waits) : null;
+      // Parked on a provider outage it waits on nobody: its line says the provider is down for as long as it is.
+      status = waits.outage || ms - waits.updatedAt.getTime() < AGENT_WAIT_LINE_MS ? waitLine(waits) : null;
     }
     const heavy =
       working.some((r) => r.background || r.issueId !== null || long(r)) ||
@@ -225,11 +232,25 @@ function storedLine(a: StoredStatus, aliveRuns: Map<string, unknown>, now: Date)
   return { line, busy: a.statusBusy };
 }
 
-const waitLine = (r: { status: string; waitingMachineId: string | null }): AgentStatusLine => ({
+const waitLine = (r: {
+  status: string;
+  waitingMachineId: string | null;
+  waitCode?: string | null;
+  outage?: boolean;
+}): AgentStatusLine => ({
   by: "wait",
   text: null,
-  kind:
-    r.status === "waiting_approval" ? "waiting_approval" : r.waitingMachineId ? "waiting_computer" : "waiting_answer",
+  kind: r.outage
+    ? "provider_down"
+    : r.status === "waiting_approval"
+      ? "waiting_approval"
+      : r.waitCode === "plan_limit"
+        ? "waiting_plan"
+        : r.waitCode === "budget"
+          ? "waiting_budget"
+          : r.waitingMachineId
+            ? "waiting_computer"
+            : "waiting_answer",
   subject: null,
   emoji: null,
   until: null,
@@ -256,6 +277,9 @@ export function lineInEnglish(line: AgentStatusLine): string | null {
     waiting_approval: "waiting for an approval",
     waiting_answer: "waiting for an answer",
     waiting_computer: "waiting for its computer",
+    waiting_plan: "waiting for its plan to reset",
+    waiting_budget: "waiting for its budget to renew",
+    provider_down: "waiting for its AI provider to come back (it retries by itself)",
   };
   return line.kind ? words[line.kind] : null;
 }

@@ -33,8 +33,12 @@ export interface SecretBox {
   ct: string;
 }
 
-/** Where a delivered secret goes on the computer. */
-export type SecretTarget = { kind: "env" } | { kind: "file"; path: string };
+/**
+ * Where a delivered secret goes on the computer: an environment variable of the agent's commands, a file in its
+ * folder, or (`site`) only the agent browser's password typing on that one site (an origin, `https://host`), never
+ * its commands.
+ */
+export type SecretTarget = { kind: "env" } | { kind: "file"; path: string } | { kind: "site"; site: string };
 
 const subtle = () => {
   const c = globalThis.crypto?.subtle;
@@ -55,7 +59,8 @@ const INFO = new TextEncoder().encode("agentes.chat secret v1");
 
 /** What binds a box to one request: replayed onto another request or target, it doesn't open. */
 export function secretAad(input: { requestId: string; orgId: string; name: string; target: SecretTarget }) {
-  const target = input.target.kind === "file" ? `file:${input.target.path}` : "env";
+  const t = input.target;
+  const target = t.kind === "file" ? `file:${t.path}` : t.kind === "site" ? `site:${t.site}` : "env";
   return `agentes-secret|v${SECRET_BOX_VERSION}|${input.requestId}|${input.orgId}|${input.name}|${target}`;
 }
 

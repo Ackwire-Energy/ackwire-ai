@@ -1,8 +1,26 @@
-import { invitationMailProof } from "@agenteschat/client/lib/guards";
+import { earlyAccessToken, invitationMailProof } from "@agenteschat/client/lib/guards";
 
 /** An invitation token from a link: what the server issues (url-safe base64), nothing else. Pure. */
 export const isInviteToken = (value: unknown): value is string =>
   typeof value === "string" && /^[A-Za-z0-9_-]{16,200}$/.test(value);
+
+/**
+ * Where an early-access email's link (`/signup?email=&access=`, ADR 0078) goes in the app: Criar conta with its
+ * address and token, or the app when signed in. Null while the session is still being read: until then the root
+ * gate sends any `(auth)` screen to the app's side, and from there to Entrar, without the token.
+ */
+export function signUpLinkTarget(
+  session: { pending: boolean; signedIn: boolean },
+  params: { email?: unknown; access?: unknown },
+): "/" | { pathname: "/sign-up"; params: { email?: string; access?: string } } | null {
+  if (session.pending) return null;
+  if (session.signedIn) return "/";
+  const access = earlyAccessToken(params.access);
+  return {
+    pathname: "/sign-up",
+    params: { ...(typeof params.email === "string" ? { email: params.email } : {}), ...(access ? { access } : {}) },
+  };
+}
 
 /** An invitation to one address (it joins), or a workspace's invitation link (it only asks, ADR 0068). */
 export type InviteKind = "email" | "link";

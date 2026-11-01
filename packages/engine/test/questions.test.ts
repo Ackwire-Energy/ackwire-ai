@@ -5,6 +5,7 @@ import { systemText } from "@agenteschat/providers";
 import {
   answerQuestion,
   ConflictError,
+  cancelRun,
   drainOutbox,
   expireQuestions,
   listMessages,
@@ -99,6 +100,22 @@ describe("ask_user", () => {
     expect(after.find((m) => m.id === q?.messageId)?.meta.question).toMatchObject({ status: "answered" });
     await Bun.sleep(5);
     expect(events.some((e) => e.type === "question.answered")).toBe(true);
+  });
+
+  test("a canceled run closes its question's card, so no one is offered an answer that can't arrive", async () => {
+    f = await setup({ askUser: true, reply });
+    const events = f.listen(f.general.id);
+    await post("@dev deploy it");
+    await drainOutbox(f.db, f.handlers);
+    const [run] = await runs();
+    await cancelRun({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, run?.id ?? "");
+    const [q] = await questions();
+    expect(q?.status).toBe("canceled");
+    const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    expect(main.find((m) => m.id === q?.messageId)?.meta.question).toMatchObject({ status: "answered", answer: null });
+    await Bun.sleep(5);
+    const closed = events.find((e) => e.type === "question.answered") as unknown as { question: { id: string } };
+    expect(closed?.question.id).toBe(q?.id ?? "");
   });
 
   test("the next message in the channel answers it, without starting another run", async () => {

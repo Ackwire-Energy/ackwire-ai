@@ -66,6 +66,8 @@ export type BrowserInputEvent =
       deltaX?: number;
       deltaY?: number;
       modifiers?: BrowserModifiers;
+      /** When the person made it (ms, the sender's clock): the computer keeps a drag's gaps. */
+      at?: number;
     }
   | {
       kind: "key";
@@ -101,8 +103,12 @@ export type BrowserLiveMessage =
 
 /** Most events in one `browser.input` frame (the server's limit). */
 export const BROWSER_INPUT_BATCH = 100;
-/** Moves while a button is down (a drag) or a finger moves go out at most once a frame, merged. */
-export const BROWSER_DRAG_FLUSH_MS = 16;
+/**
+ * Moves while a button is down (a drag) or a finger moves go out at most this often, merged. The server
+ * gathers input this long anyway, and a long drag stays well under its 60 messages a second: past them it
+ * drops a message, which could be the drag's release.
+ */
+export const BROWSER_DRAG_FLUSH_MS = 25;
 /** A pointer just hovering sends its position at most about 15 times a second (the latest one). */
 export const BROWSER_HOVER_MS = 66;
 
@@ -189,7 +195,7 @@ export interface BrowserLiveOptions {
    * connection sends `browser.watch` / `browser.unwatch` itself.
    */
   watcher?: BrowserWatcher;
-  /** The clock for hover throttling (tests). */
+  /** The clock for hover throttling and the time each mouse event says it was made (tests). */
   now?: () => number;
 }
 
@@ -200,8 +206,8 @@ export interface BrowserLiveConnection {
   handleMessage(message: unknown): void;
   /**
    * Sends a person's input (in control only). Clicks, keys and text go at once, in order; a drag's
-   * moves are merged and sent once a frame; hover moves at most ~15 a second. Batches fit the
-   * server's limit. False when there was nothing to send.
+   * moves are merged and sent every 25 ms; hover moves at most ~15 a second. Each mouse event says
+   * when it was made (`at`). Batches fit the server's limit. False when there was nothing to send.
    */
   sendInput(events: BrowserInputEvent[]): boolean;
   /** After the socket reconnected: watch again (the server forgot this socket). */
@@ -347,7 +353,8 @@ export function createBrowserLiveConnection(options: BrowserLiveOptions): Browse
     sendInput(events) {
       if (closed || events.length === 0) return false;
       let urgent = false;
-      for (const e of events) {
+      for (const given of events) {
+        const e: BrowserInputEvent = given.kind === "mouse" ? { ...given, at: clock() } : given;
         if (isHoverMove(e)) {
           hover = e;
           continue;

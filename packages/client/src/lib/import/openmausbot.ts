@@ -1,4 +1,4 @@
-import type { AgentColor } from "@agenteschat/ui";
+import type { AgentColor } from "@agenteschat/tokens/look";
 import {
   atTime,
   baseName,
@@ -216,12 +216,12 @@ function schedule(s: Record<string, unknown>): Trigger | null {
     case "interval": {
       const every = num(s.everyMinutes) ?? 0;
       const days = list(s.weekdays).map(Number);
-      const window = obj(s.window);
-      if (days.length === 0 && !str(window.start)) return everyMinutes(every, num(s.anchorAt));
+      const span = obj(s.window);
+      if (days.length === 0 && !str(span.start)) return everyMinutes(every, num(s.anchorAt));
       // Weekdays and a window are local wall-clock times: a cadence that divides an hour, a window on the hour.
-      const from = /^(\d{2}):00$/.exec(str(window.start));
-      const to = /^(\d{2}):00$/.exec(str(window.end));
-      if (every < 1 || every >= 60 || 60 % every !== 0 || (str(window.start) && !(from && to))) return null;
+      const from = /^(\d{2}):00$/.exec(str(span.start));
+      const to = /^(\d{2}):00$/.exec(str(span.end));
+      if (every < 1 || every >= 60 || 60 % every !== 0 || (str(span.start) && !(from && to))) return null;
       const hours = from && to ? `${Number(from[1])}-${Number(to[1]) - 1}` : "*";
       const dow = days.length > 0 && days.length < 7 ? [...new Set(days)].sort((a, b) => a - b).join(",") : "*";
       return cronTrigger(`*/${every} ${hours} * * ${dow}`, null);

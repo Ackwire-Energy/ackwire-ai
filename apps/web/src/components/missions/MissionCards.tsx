@@ -70,6 +70,7 @@ import { useChannelActions } from "@/components/channel-actions";
 import { CommandBlock, MachineIcon } from "@/components/Machines";
 import { useOrg } from "@/components/org-context";
 import { ShowRequestsButton, useIsThisMac } from "@/components/ThisMac";
+import { useNamesComputers } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { useStreams } from "@/realtime/context";
@@ -151,6 +152,9 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
   const choices = m?.role === "owner" && m.status === "proposed" ? (m.machine?.executors ?? []) : [];
   const items = (plan.data?.current?.items ?? []).filter((i) => i.status !== "dropped");
   const computer = m?.machine?.name ?? meta.computer;
+  // The computer by its name only where the workspace has more than one; else its state only when it's offline.
+  const names = useNamesComputers(org.id);
+  const offline = Boolean(m?.machine && !m.machine.online);
   // The main session is still drafting the plan (its run is live in the mission's thread).
   const drafting = useStreams((st) =>
     Object.values(st.runs).some((r) => r.agentId === m?.agentId && r.threadId === m?.threadId),
@@ -165,7 +169,11 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
         </span>
         <span className="mi-decided__t">
           <b>{t(`missions.plan.after.${m.status}`)}</b>
-          <small>{t("missions.plan.afterLine", { count: m.plan.total, computer })}</small>
+          <small>
+            {names
+              ? t("missions.plan.afterLine", { count: m.plan.total, computer })
+              : t("missions.plan.afterLineNoComputer", { count: m.plan.total })}
+          </small>
         </span>
         {panel && (
           <Button size="sm" icon="document" onClick={seePlan}>
@@ -232,7 +240,9 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
         <div className="mi-plan__drafting" role="status">
           <p>
             <AgentSpinner agentId={m?.agentId} />
-            {t("missions.plan.drafting", { executor, computer, The: xg.The })}
+            {names
+              ? t("missions.plan.drafting", { executor, computer, The: xg.The })
+              : t("missions.plan.draftingNoComputer", { executor, The: xg.The })}
           </p>
           <ul className="mi-plan__list mi-plan__list--ghost" aria-hidden="true">
             {["58%", "44%", "51%"].map((w) => (
@@ -253,15 +263,16 @@ export function MissionPlanCard({ plan: meta }: { plan: MissionPlanMeta }) {
         </p>
       )}
       <div className="mi-plan__metas">
-        <div className="mi-plan__meta">
-          <span className="mi-plan__label mi-plan__label--wide">
-            <MachineIcon machineId={m?.machine?.id} />
-            {t("missions.plan.on", {
-              computer,
-              state: m?.machine && !m.machine.online ? t("missions.offline") : t("missions.online"),
-            })}
-          </span>
-        </div>
+        {(names || offline) && (
+          <div className="mi-plan__meta">
+            <span className="mi-plan__label mi-plan__label--wide">
+              <MachineIcon machineId={m?.machine?.id} />
+              {names
+                ? t("missions.plan.on", { computer, state: offline ? t("missions.offline") : t("missions.online") })
+                : t("missions.computerOffline")}
+            </span>
+          </div>
+        )}
         {m?.baseBranch && (
           <div className="mi-plan__meta">
             <span className="mi-plan__label mi-plan__label--wide">
@@ -557,6 +568,7 @@ export function MissionDecisionCard({ message }: { message: Message }) {
 function DecisionBody({ decision: d, mission: m }: { decision: MissionDecision; mission: Mission }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
+  const names = useNamesComputers(org.id);
   const api = useApi();
   const dir = useDirectory(org.id);
   const toast = useToast();
@@ -630,7 +642,7 @@ function DecisionBody({ decision: d, mission: m }: { decision: MissionDecision; 
         )}
         <span className="mi-pill mi-exec">
           <ExecutorMark executor={m.executor} agentId={m.agentId} agentName={agentName} />
-          {viaText(t, m.executor, agentName, m.machine?.name)}
+          {viaText(t, m.executor, agentName, names ? m.machine?.name : null)}
         </span>
       </div>
       <div className="mi-q">
@@ -1111,10 +1123,14 @@ const NOTICE_ICON: Record<string, IconName> = {
   machine_access_expired: "dash",
 };
 
-/** The computer went offline, came back, a task ended: one quiet line. */
+/**
+ * The computer went offline, came back, a task ended: one quiet line. A task's end names its computer only where the
+ * workspace has more than one (`useNamesComputers`).
+ */
 export function TaskNoticeLine({ message }: { message: Message }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
+  const names = useNamesComputers(org.id);
   const dir = useDirectory(org.id);
   const notice = taskNoticeOf(message.meta);
   // A folder request to this very Mac (agentes for Mac): answered in the menu bar, one click away (ADR 0036).
@@ -1131,11 +1147,13 @@ export function TaskNoticeLine({ message }: { message: Message }) {
   // Commands it was refused: one line, the list in a dialog.
   const task = machineTaskOf(message.meta);
   const blocked = task?.blocked ?? [];
+  const key = `missions.notice.${notice.code}`;
   return (
     <div className="mi-evt ac-iconline" data-message-id={message.id}>
       <Icon name={NOTICE_ICON[notice.code] ?? "computer"} size={14} />
       <span>
-        {t(`missions.notice.${notice.code}`, {
+        {/* i18next takes the first key that exists: a notice with no `…NoComputer` words keeps its own. */}
+        {t(names ? key : [`${key}NoComputer`, key], {
           ...p,
           count: Number(p.count ?? 1),
           span: Number.isFinite(seconds) ? formatSpan(t, seconds) : "",
@@ -1161,10 +1179,14 @@ export function TaskNoticeLine({ message }: { message: Message }) {
   );
 }
 
-/** Under an executor's report: "via Claude Code no MacBook do Walter" and its session row. */
+/**
+ * Under an executor's report: "via Claude Code no MacBook do Walter" (the computer only where the workspace has more
+ * than one) and its session row.
+ */
 export function MissionReportExtras({ report, message }: { report: MissionReportMeta; message: Message }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const names = useNamesComputers(org.id);
   const tasks = useThreadTasks(org.id, message.threadId);
   const task = report.main ? undefined : tasks.data?.find((x) => x.id === report.taskId);
   const dir = useDirectory(org.id);
@@ -1174,7 +1196,7 @@ export function MissionReportExtras({ report, message }: { report: MissionReport
     <>
       <span className="mi-tag mi-exec">
         <ExecutorMark executor={report.executor} agentId={message.author.id ?? undefined} agentName={agentName} />
-        {viaText(t, report.executor, agentName, report.computer)}
+        {viaText(t, report.executor, agentName, names ? report.computer : null)}
       </span>
       {task && <SessionRows tasks={[task]} defaultOpen />}
     </>
@@ -1257,6 +1279,7 @@ export function MissionStartLink({ message }: { message: Message }) {
 export function MissionLinkCard({ link }: { link: MissionLinkMeta }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const names = useNamesComputers(org.id);
   const dir = useDirectory(org.id);
   const navigate = useNavigate();
   const panel = useMissionPanel();
@@ -1287,7 +1310,7 @@ export function MissionLinkCard({ link }: { link: MissionLinkMeta }) {
         meta={[
           <span key="via" className="mi-exec">
             <ExecutorMark executor={m.executor} agentId={m.agentId} agentName={agentName} />
-            {viaText(t, m.executor, agentName, m.machine?.name)}
+            {viaText(t, m.executor, agentName, names ? m.machine?.name : null)}
           </span>,
         ]}
         right={

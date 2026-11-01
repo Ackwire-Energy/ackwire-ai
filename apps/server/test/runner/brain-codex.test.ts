@@ -165,10 +165,28 @@ test("turn end: failed turns, usage limits, a stream error with a bad exit, last
   const limited = new CodexEventMapper();
   limited.line('{"type":"error","message":"Reconnecting... 1/5"}');
   limited.line('{"type":"turn.failed","error":{"message":"You’ve hit your usage limit. Try again later."}}');
-  expect(limited.finish({ exitCode: 1, sessionId: SESSION })).toMatchObject([
+  expect(limited.finish({ exitCode: 1, sessionId: SESSION })).toEqual([
     { type: "limit" },
-    { type: "error", code: "plan_limit" },
+    { type: "error", code: "plan_limit", message: "You’ve hit your usage limit. Try again later.", worked: false },
   ]);
+  // Cut after a command ran: the engine must not hand the rest to the API.
+  const cut = new CodexEventMapper();
+  cut.line(
+    '{"type":"item.completed","item":{"id":"c","type":"command_execution","command":"git push","aggregated_output":"","exit_code":0,"status":"completed"}}',
+  );
+  cut.line('{"type":"turn.failed","error":{"message":"Your workspace is out of credits."}}');
+  expect(cut.finish({ exitCode: 1, sessionId: SESSION }).at(-1)).toEqual({
+    type: "error",
+    code: "plan_limit",
+    message: "Your workspace is out of credits.",
+    worked: true,
+  });
+  // A workspace out of credits or at its spend cap is the plan's limit too.
+  for (const message of ["Your workspace is out of credits.", "You've reached your workspace's spend cap."]) {
+    const m = new CodexEventMapper();
+    m.line(JSON.stringify({ type: "turn.failed", error: { message } }));
+    expect(m.finish({ exitCode: 1, sessionId: SESSION })).toMatchObject([{ type: "limit" }, { code: "plan_limit" }]);
+  }
   // An `error` event alone doesn't end a completed turn.
   const retried = new CodexEventMapper();
   retried.line('{"type":"error","message":"Reconnecting... 1/5"}');

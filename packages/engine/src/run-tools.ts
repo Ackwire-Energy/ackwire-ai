@@ -2,11 +2,12 @@ import { PERMISSION_TOOL, type PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, inArray, type SQL, schema, sql } from "@agenteschat/db";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
 import { followWork } from "./agent-status";
-import { publishApproval } from "./approvals";
+import { openApprovalCard, publishApproval } from "./approvals";
 import type { BrainTool, ToolResult } from "./brains/types";
 import { consultationCardThread, consultationOrigin } from "./consultations";
 import { NotFoundError } from "./errors";
 import { type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
+import { pgSafeStringify } from "./format";
 import type { Judge } from "./judge";
 import { insertMessage, type Message, messageView } from "./messages";
 import { notifyMissionApproval } from "./mission-tools";
@@ -310,7 +311,7 @@ async function recordBridgeEffects(
  */
 export function storedTranscript(t: object): SQL {
   const { [BRIDGE_EFFECTS]: _kept, ...rest } = t as Record<string, unknown>;
-  return sql`(${JSON.stringify(rest)}::jsonb || jsonb_strip_nulls(jsonb_build_object(${BRIDGE_EFFECTS}::text, ${agentRuns.transcript} -> ${BRIDGE_EFFECTS}::text)))`;
+  return sql`(${pgSafeStringify(rest)}::jsonb || jsonb_strip_nulls(jsonb_build_object(${BRIDGE_EFFECTS}::text, ${agentRuns.transcript} -> ${BRIDGE_EFFECTS}::text)))`;
 }
 
 /** Takes (and clears) the side effects the bridge kept for this run (`recordBridgeEffects`). */
@@ -788,13 +789,23 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
             threadId: await consultationCardThread(tx, run.orgId, run.id, approval.threadRootId),
           }
         : home;
-    const message = await card(to, `Approval request: ${approval.title}`, meta);
+    // Several requests of the agent in one conversation share one card: this one joins it, live.
+    const joined = await openApprovalCard(tx, {
+      orgId: run.orgId,
+      agentId: run.agentId,
+      channelId: to.channelId,
+      threadId: to.threadId,
+      threadRootId: approval.threadRootId,
+      exceptId: approval.id,
+    });
+    if (joined && (await linkRunActions(tx, run.orgId, run.id, joined)) > 0) out.withReceipts.push(joined);
+    const messageId = joined ?? (await card(to, `Approval request: ${approval.title}`, meta)).id;
     const [linked] = await tx
       .update(approvals)
       .set({
-        messageId: message.id,
+        messageId,
         // A routine's approval lives where its card is: decided, announced and listed there.
-        ...(brief ? { channelId: home.channelId, threadRootId: home.threadId ?? message.id } : {}),
+        ...(brief ? { channelId: home.channelId, threadRootId: home.threadId ?? messageId } : {}),
       })
       .where(eq(approvals.id, approval.id))
       .returning();
@@ -823,7 +834,7 @@ export async function publishPauseCards(deps: { db: Database; pubsub?: PubSub },
     await publishQuestion(pubsub, q, "question.asked");
     await notifyQuestion({ db, pubsub } as Parameters<typeof notifyQuestion>[0], q).catch(() => {});
   }
-  for (const r of posted.secrets) await publishSecret(pubsub, r, "secret.requested");
+  for (const r of posted.secrets) await publishSecret({ db, pubsub }, r, "secret.requested");
 }
 
 /**

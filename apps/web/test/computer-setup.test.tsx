@@ -491,7 +491,8 @@ describe("Configurações → Computadores: the workspace's own computer", () =>
       "O computador do próprio workspace: sempre ligado, com um usuário só dele para cada agente.",
     );
     expect(pc.querySelector(".agp-ro")).toBeNull();
-    expect(pc.textContent).toContain("Usa só a própria pasta no Computador da Acme.");
+    expect(pc.textContent?.split("Computador da Acme").length).toBe(2);
+    expect(pc.textContent).toContain("Usa só a própria pasta.");
     expect(pc.textContent).not.toContain("por quem o conectou");
     expect(within(pc).queryByRole("button", { name: "Sobre Pastas no computador" })).toBeNull();
   });

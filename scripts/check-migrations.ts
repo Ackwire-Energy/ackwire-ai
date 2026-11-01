@@ -64,7 +64,23 @@ export function unsafeStatements(sql: string): string[] {
   return hits;
 }
 
+/**
+ * Journal entries whose `when` isn't later than the one before. Drizzle applies only migrations newer than the last
+ * applied one's `when`, so an older one landing after it is skipped on databases already past it, silently.
+ */
+export function outOfOrderEntries(entries: { tag: string; when: number }[]): string[] {
+  return entries.filter((e, i) => i > 0 && e.when <= (entries[i - 1] as { when: number }).when).map((e) => e.tag);
+}
+
 if (import.meta.main) {
+  const journal = await Bun.file("packages/db/migrations/meta/_journal.json").json();
+  const late = outOfOrderEntries(journal.entries);
+  if (late.length > 0) {
+    console.error(
+      `Drizzle skips a migration older than the last one applied. These journal entries aren't newer than the one before them (regenerate them on top): ${late.join(", ")}`,
+    );
+    process.exit(1);
+  }
   const problems: string[] = [];
   for (const file of [...new Glob("packages/db/migrations/*.sql").scanSync()].sort()) {
     if (Number.parseInt(basename(file), 10) <= CHECKED_AFTER || SHIPPED_UNMARKED.has(basename(file))) continue;

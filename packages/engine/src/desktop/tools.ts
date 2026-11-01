@@ -531,7 +531,12 @@ export function createDesktopToolSource(deps: DesktopToolDeps): ToolSource {
           const shot = await linked.link.capture();
           await linked.write(path, shot.data);
           const saved = {
-            content: `Saved ${path} in your folder: the whole screen as a JPEG (${shot.width}×${shot.height}). Open it with your own Read tool to look at it.`,
+            content: `Saved ${path} in your folder: the whole screen as a JPEG (${shot.width}×${shot.height}). ${
+              // A computer brain (Claude Code, Codex) sees pictures with its own Read; read_file gives text only.
+              ctx.bridge
+                ? "Open it with your own Read tool to look at it."
+                : "You can't see pictures from here: desktop_read tells what the screen says."
+            }`,
             data: { path },
           };
           if (input.share !== true) return { ...saved, content: `${saved.content} ${SHARE_HINT}` };

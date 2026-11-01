@@ -1,6 +1,15 @@
-import type { Agent, AgentGroup, Availability, Channel, ChannelCategory, Member } from "@agenteschat/client";
+import type {
+  Agent,
+  AgentGroup,
+  Availability,
+  Channel,
+  ChannelCategory,
+  Member,
+  SidebarItem,
+} from "@agenteschat/client";
 import {
   agentStateIn,
+  MISSIONS_WAITING_COUNT,
   runningAgents,
   useAgentGroups,
   useAgentStatuses,
@@ -19,6 +28,7 @@ import {
   usePlaceChannelCategory,
   usePrefetchMessages,
   usePrefetchRecent,
+  useSidebarItems,
   useSkills,
 } from "@agenteschat/client";
 import { agentSections } from "@agenteschat/client/lib/agent-groups";
@@ -28,6 +38,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { waitingAgents } from "@agenteschat/client/lib/outages";
 import { can, managesChannel } from "@agenteschat/client/lib/permissions";
 import { AVAILABILITIES, clearsText, presenceOfAvailability } from "@agenteschat/client/lib/presence";
+import { inSidebarList, SIDEBAR_ITEMS, sidebarPlace } from "@agenteschat/client/lib/sidebar-items";
 import {
   type AgentColor,
   Avatar,
@@ -106,6 +117,7 @@ import { OpenOnPhoneDialog } from "./OpenOnPhone";
 import { useOrg } from "./org-context";
 import { StatusLine } from "./Presence";
 import { MyFace, OrgMark } from "./ProfilePhoto";
+import { SIDEBAR_TOOLS, SidebarSetupDialog } from "./SidebarSetup";
 import { AgentGlow, AgentTrail, colorOf, MenuHorizon, SidebarHorizon, WorkspaceSky } from "./Sky";
 import { SetStatusDialog, useSaveStatus } from "./StatusDialog";
 import { isStoppable, useStopRun } from "./StopRun";
@@ -210,8 +222,34 @@ export function Sidebar() {
     lastUnread.current = unreadNotifications;
   }, [unreadNotifications]);
   // Threads: how many open missions wait for me (the server counts: a decision, a review, a suggestion…).
-  const missionList = useMissionList(orgId, { status: "waiting_you", limit: 1 });
+  const missionList = useMissionList(orgId, MISSIONS_WAITING_COUNT);
   const missionsWaiting = missionList.data?.counts.waitingYou ?? 0;
+  // The tools on top, each where I put it (the rest in More); one there "when there's something" while its count is.
+  const sidebarItems = useSidebarItems(orgId).data;
+  const counts: Partial<Record<SidebarItem, number>> = { approvals: pending, threads: missionsWaiting };
+  const listed = SIDEBAR_ITEMS.filter((id) => inSidebarList(sidebarPlace(sidebarItems, id), counts[id] ?? 0));
+  const inMore = SIDEBAR_ITEMS.filter((id) => !listed.includes(id));
+  const countOf = (id: SidebarItem) =>
+    id === "approvals" && pending > 0 ? (
+      <CountBadge aria-label={t("shell.pendingApprovals", { count: pending })}>{pending}</CountBadge>
+    ) : id === "threads" && missionsWaiting > 0 ? (
+      // Missões is a tab of Threads: the missions waiting for me as a neutral count.
+      <CountChip
+        className="sidebar__count"
+        role="img"
+        aria-label={t("shell.missionsWaiting", { count: missionsWaiting })}
+      >
+        {missionsWaiting}
+      </CountChip>
+    ) : null;
+  const toolRow = (id: SidebarItem) => (
+    <Link key={id} to={SIDEBAR_TOOLS[id].to} params={{ orgId }} className="sidebar__item" title={t(`shell.${id}`)}>
+      <Icon name={SIDEBAR_TOOLS[id].icon} />
+      <span className="sidebar__item-label">{t(`shell.${id}`)}</span>
+      {countOf(id)}
+    </Link>
+  );
+  const agentsShown = dir.agents.length > 0 || dir.loading;
   const people = dir.members.filter((m) => m.userId !== me.user.id);
   // Agents waiting for an offline computer: "esperando" instead of anything "working".
   const outages = useMachineOutages(orgId);
@@ -375,62 +413,13 @@ export function Sidebar() {
       </div>
 
       <div className="sidebar__scroll" ref={navRef}>
-        {/* The tools people use most stay in sight; the rest open beside the sidebar from More. */}
+        {/* The tools each person keeps in sight; the rest open beside the sidebar from More. */}
         <div className="sidebar__group sidebar__tools">
-          <Link
-            to="/org/$orgId/notifications"
-            params={{ orgId }}
-            className="sidebar__item"
-            title={t("shell.notifications")}
-          >
-            <Icon name="bell" />
-            <span className="sidebar__item-label">{t("shell.notifications")}</span>
-            {unreadNotifications > 0 && (
-              <CountBadge
-                key={bumps}
-                className={bumps > 0 ? "sidebar__bump" : undefined}
-                aria-label={t("shell.unreadNotifications", { count: unreadNotifications })}
-              >
-                {unreadNotifications}
-              </CountBadge>
-            )}
-          </Link>
-          <Link to="/org/$orgId/approvals" params={{ orgId }} className="sidebar__item" title={t("shell.approvals")}>
-            <Icon name="waiting" />
-            <span className="sidebar__item-label">{t("shell.approvals")}</span>
-            {pending > 0 && (
-              <CountBadge aria-label={t("shell.pendingApprovals", { count: pending })}>{pending}</CountBadge>
-            )}
-          </Link>
-          {/* Missões is a tab of Threads: one item, with the missions waiting for me as a neutral count. */}
-          <Link to="/org/$orgId/threads" params={{ orgId }} className="sidebar__item" title={t("shell.threads")}>
-            <Icon name="thread" />
-            <span className="sidebar__item-label">{t("shell.threads")}</span>
-            {missionsWaiting > 0 && (
-              <CountChip
-                className="sidebar__count"
-                role="img"
-                aria-label={t("shell.missionsWaiting", { count: missionsWaiting })}
-              >
-                {missionsWaiting}
-              </CountChip>
-            )}
-          </Link>
-          <Link to="/org/$orgId/issues" params={{ orgId }} className="sidebar__item" title={t("shell.issues")}>
-            <Icon name="issues" />
-            <span className="sidebar__item-label">{t("shell.issues")}</span>
-          </Link>
-          <Link to="/org/$orgId/wiki" params={{ orgId }} className="sidebar__item" title={t("shell.wiki")}>
-            <Icon name="book" />
-            <span className="sidebar__item-label">{t("shell.wiki")}</span>
-          </Link>
-          <Link to="/org/$orgId/drive" params={{ orgId }} className="sidebar__item" title={t("shell.drive")}>
-            <Icon name="drive" />
-            <span className="sidebar__item-label">{t("shell.drive")}</span>
-          </Link>
-          <MoreTools />
+          {listed.map(toolRow)}
+          <MoreTools items={inMore} row={toolRow} countOf={countOf} />
         </div>
 
+        {/* Lines between the tools, the channels, the agents and the people: parts of the sidebar, not categories. */}
         <span className="sidebar__divider" aria-hidden="true" />
 
         <SidebarChannels
@@ -441,9 +430,10 @@ export function Sidebar() {
           onPrefetch={prefetch}
         />
 
+        {agentsShown && <span className="sidebar__divider" aria-hidden="true" />}
         {dir.loading && dir.agents.length === 0 && (
-          // Loading: the same header as the open category, so nothing jumps when the list arrives.
-          <div className="sidebar__group sidebar__section" data-open="true">
+          // Loading: the same header as the open section, so nothing jumps when the list arrives.
+          <div className="sidebar__group sidebar__section sidebar__section--part" data-open="true">
             <div className="sidebar__section-head">
               <span className="sidebar__section-toggle">
                 <Icon name="chevronDown" size={14} className="sidebar__section-chevron" />
@@ -460,27 +450,38 @@ export function Sidebar() {
             id="agents"
             label={t("shell.agents")}
             sections={sections}
+            className="sidebar__section--part"
             summary={unreadOf(byGroup.ungrouped) > 0 && <UnreadCount count={unreadOf(byGroup.ungrouped)} />}
             action={
-              organize && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  iconOnly
-                  icon="plus"
-                  className="sidebar__section-add"
-                  aria-label={t("agentGroups.newGroup")}
-                  title={t("agentGroups.newGroup")}
-                  onClick={() => setGroupDialog({ mode: "create" })}
-                />
-              )
+              <>
+                <Button asChild variant="ghost" size="sm" iconOnly className="sidebar__section-add">
+                  <Link to="/org/$orgId/team" params={{ orgId }} aria-label={t("shell.team")} title={t("shell.team")}>
+                    <Icon name="agent" />
+                  </Link>
+                </Button>
+                {organize && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly
+                    icon="plus"
+                    className="sidebar__section-add"
+                    aria-label={t("agentGroups.newGroup")}
+                    title={t("agentGroups.newGroup")}
+                    onClick={() => setGroupDialog({ mode: "create" })}
+                  />
+                )}
+              </>
             }
             drop={organize ? drag.zone(null) : undefined}
           >
-            <Link to="/org/$orgId/team" params={{ orgId }} className="sidebar__item" title={t("shell.team")}>
-              <Icon name="agent" />
-              <span className="sidebar__item-label">{t("shell.team")}</span>
-            </Link>
+            {/* The rail hides the headers: Equipe stays there as a tile at the top of the agents. */}
+            {rail && (
+              <Link to="/org/$orgId/team" params={{ orgId }} className="sidebar__item" title={t("shell.team")}>
+                <Icon name="agent" />
+                <span className="sidebar__item-label">{t("shell.team")}</span>
+              </Link>
+            )}
             {byGroup.ungrouped.map(agentRow)}
           </SidebarSection>
         )}
@@ -524,11 +525,13 @@ export function Sidebar() {
             );
           })}
 
+        {people.length > 0 && <span className="sidebar__divider" aria-hidden="true" />}
         {people.length > 0 && (
           <SidebarSection
             id="people"
             label={t("shell.directMessages")}
             sections={sections}
+            className="sidebar__section--part"
             summary={peopleUnread > 0 && <UnreadCount count={peopleUnread} />}
           >
             {people.map((m) => (
@@ -569,6 +572,24 @@ export function Sidebar() {
         )}
         <div className="sidebar__me" ref={meRow}>
           <AccountMenu />
+          <Link
+            to="/org/$orgId/notifications"
+            params={{ orgId }}
+            className="sidebar__bell"
+            title={t("shell.notifications")}
+            aria-label={
+              unreadNotifications > 0
+                ? t("shell.unreadNotifications", { count: unreadNotifications })
+                : t("shell.notifications")
+            }
+          >
+            <Icon name="bell" />
+            {unreadNotifications > 0 && (
+              <CountBadge key={bumps} className={bumps > 0 ? "sidebar__bump" : undefined}>
+                {unreadNotifications}
+              </CountBadge>
+            )}
+          </Link>
         </div>
       </div>
     </nav>
@@ -979,6 +1000,7 @@ function SidebarChannels({
           id="channels"
           label={t("shell.channels")}
           sections={sections}
+          className="sidebar__section--part"
           action={addButton(null, t("newChannel.open"))}
         >
           {loading && <SidebarSkeleton count={3} label={t("common.loadingList")} />}
@@ -1073,22 +1095,25 @@ function SidebarChannels({
   );
 }
 
-/** The tools behind More, in groups, each with a line on what it is for. */
-const MORE_TOOLS = [
-  { group: "schedule", to: "/org/$orgId/routines", icon: "routines", key: "routines" },
-  { group: "schedule", to: "/org/$orgId/calendar", icon: "calendar", key: "calendar" },
-  { group: "decisions", to: "/org/$orgId/forum", icon: "message", key: "forum" },
-] as const;
-const MORE_GROUPS = ["schedule", "decisions"] as const;
-
 /**
- * More: the tools people reach for less, in a panel beside the sidebar (so nothing below moves).
- * The one you opened from it stays in sight under it (CSS shows only the active row).
+ * More: the tools the person keeps out of the list, in a panel beside the sidebar (so nothing below moves), each with a
+ * line on what it is for, then "Personalizar a barra lateral". The one opened from it stays in sight under it (CSS
+ * shows only the active row).
  */
-function MoreTools() {
+function MoreTools({
+  items,
+  row,
+  countOf,
+}: {
+  items: SidebarItem[];
+  row: (id: SidebarItem) => ReactNode;
+  countOf: (id: SidebarItem) => ReactNode;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const [open, setOpen] = useState(false);
+  const [setup, setSetup] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
   return (
     <>
       <Popover
@@ -1099,42 +1124,46 @@ function MoreTools() {
         align="start"
         className="sidebar__more-menu"
         trigger={
-          <button type="button" className="sidebar__item sidebar__more" title={t("shell.more")}>
+          <button ref={trigger} type="button" className="sidebar__item sidebar__more" title={t("shell.more")}>
             <Icon name="more" />
             <span className="sidebar__item-label">{t("shell.more")}</span>
             <Icon name="chevronRight" size={16} className="sidebar__more-chevron" />
           </button>
         }
       >
-        {MORE_GROUPS.map((group) => (
-          <div key={group} className="sidebar__more-group">
-            <div className="ac-menu__heading">{t(`shell.moreGroups.${group}`)}</div>
-            {MORE_TOOLS.filter((x) => x.group === group).map((x) => (
-              <Link
-                key={x.key}
-                to={x.to}
-                params={{ orgId: org.id }}
-                className="ac-menu__item sidebar__more-item"
-                onClick={() => setOpen(false)}
-              >
-                <Icon name={x.icon} />
-                <span className="ac-menu__label">
-                  {t(`shell.${x.key}`)}
-                  <span className="ac-menu__desc">{t(`shell.moreWhat.${x.key}`)}</span>
-                </span>
-              </Link>
-            ))}
-          </div>
-        ))}
-      </Popover>
-      <div className="sidebar__more-active">
-        {MORE_TOOLS.map((x) => (
-          <Link key={x.key} to={x.to} params={{ orgId: org.id }} className="sidebar__item" title={t(`shell.${x.key}`)}>
-            <Icon name={x.icon} />
-            <span className="sidebar__item-label">{t(`shell.${x.key}`)}</span>
+        {items.map((id) => (
+          <Link
+            key={id}
+            to={SIDEBAR_TOOLS[id].to}
+            params={{ orgId: org.id }}
+            className="ac-menu__item sidebar__more-item"
+            onClick={() => setOpen(false)}
+          >
+            <Icon name={SIDEBAR_TOOLS[id].icon} />
+            <span className="ac-menu__label">
+              {t(`shell.${id}`)}
+              <span className="ac-menu__desc">{t(`shell.moreWhat.${id}`)}</span>
+            </span>
+            {countOf(id)}
           </Link>
         ))}
-      </div>
+        {items.length > 0 && <div className="ac-menu__separator" aria-hidden="true" />}
+        <button
+          type="button"
+          className="ac-menu__item sidebar__more-item"
+          onClick={() => {
+            setOpen(false);
+            // Closing the dialog brings focus back to More, not to this line, gone with the panel.
+            trigger.current?.focus();
+            setSetup(true);
+          }}
+        >
+          <Icon name="settings" />
+          <span className="ac-menu__label">{t("shell.customizeSidebar")}</span>
+        </button>
+      </Popover>
+      <div className="sidebar__more-active">{items.map(row)}</div>
+      <SidebarSetupDialog open={setup} onClose={() => setSetup(false)} />
     </>
   );
 }
@@ -1245,7 +1274,10 @@ function AgentRow({
           presenceLabel={word ?? undefined}
           {...(waitingFor ? { state: "idle" as const, expression: "closed" as const } : {})}
         />
-        <span className="sidebar__item-label">{a.name}</span>
+        <span className="sidebar__item-text">
+          <span className="sidebar__item-label">{a.name}</span>
+          {a.role && <span className="sidebar__item-role">{a.role}</span>}
+        </span>
         {unread > 0 ? (
           <UnreadCount count={unread} />
         ) : waitingFor ? (
@@ -1256,10 +1288,8 @@ function AgentRow({
         ) : busy ? (
           <span className="sidebar__item-meta sidebar__busy">{t(`sky.busy.${state}`)}</span>
         ) : (
-          (chip ?? a.role) &&
-          (chip ? (
+          chip && (
             <span className="sidebar__item-meta sidebar__item-meta--audience">
-              {a.role && <span>{a.role}</span>}
               <span
                 className="sidebar__lock"
                 role="img"
@@ -1269,9 +1299,7 @@ function AgentRow({
                 <Icon name="lock" size={14} />
               </span>
             </span>
-          ) : (
-            <span className="sidebar__item-meta">{a.role}</span>
-          ))
+          )
         )}
       </Link>
       {menu}

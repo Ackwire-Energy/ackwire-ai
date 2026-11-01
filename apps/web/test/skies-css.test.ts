@@ -4,8 +4,9 @@ import { builtCss, declarations, topLevel } from "./built-css";
 
 const SRC = join(import.meta.dir, "../src");
 
-/** Declarations as `property:value`, spaces out: the minifier drops the ones it may. */
-const squeeze = (list: (readonly [string, string])[]) => list.map(([p, v]) => `${p}:${v.replace(/\s+/g, "")}`);
+/** Declarations as `property:value`, spaces and a number's leading zero out: the minifier drops the ones it may. */
+const squeeze = (list: (readonly [string, string])[]) =>
+  list.map(([p, v]) => `${p}:${v.replace(/\s+/g, "").replace(/(^|[^\d.])0\./g, "$1.")}`);
 
 const builds = new Map<string, Promise<string>>();
 const built = (input: string) => {
@@ -24,7 +25,7 @@ async function ships(file: string, input: string, selector: string) {
 
 test("the setup rail's horizon ships in the rail's column, under its steps, never laid over them", async () => {
   const shipped = await ships("layout.css", "src/styles.css", ".onb__horizon");
-  expect(shipped).toContain("max-height:46dvh");
+  expect(shipped).toContain("max-height:calc(var(--onb-h,100dvh)*.46)");
   expect(shipped.some((d) => /^(position:absolute|inset:|top:|z-index:)/.test(d))).toBe(false);
 });
 

@@ -16,7 +16,7 @@ import { PassThrough } from "node:stream";
 import type { AgentScope, MachineRequest, RunnerFrame, ServerFrame } from "@agenteschat/adapters/machine-protocol";
 import { sealSecret, secretAad } from "@agenteschat/adapters/secret-box";
 import type { AccountManager } from "../../runner/accounts";
-import { AGENT_USERS_FILE, type AgentUser } from "../../runner/agent-users";
+import { AGENT_USERS_FILE, type AgentUser, systemLauncher } from "../../runner/agent-users";
 import { BrowserManager } from "../../runner/browser";
 import { writeConfig } from "../../runner/config";
 import type { Dial, Socket, SocketHandlers } from "../../runner/connection";
@@ -274,6 +274,38 @@ test("system boot guards ports and prepares every persisted UID before restoring
   );
   t.sup.boot();
   expect(order).toEqual(["guard", "policy", "worker"]);
+});
+
+test("a worker that can't start fails what waits for it at once, saying why; another agent's still serves", async () => {
+  const why =
+    "Agent 21000's isolation doesn't hold in agents-21000.slice: An agent's bind(0) failed on 127.0.0.1: EPERM";
+  const t = setup({
+    start: (user) => {
+      if (user.uid === 21000) throw new Error(why);
+      const w = new FakeWorker(user);
+      t.workers.push(w);
+      return w;
+    },
+  });
+  t.sup.boot();
+  t.sup.attach();
+  const started = Date.now();
+  const failed = await handleRequest(t.ctx, exec(ANA), scope().scope).catch((err: unknown) => err);
+  expect(failed).toBeInstanceOf(RunnerError);
+  expect([(failed as RunnerError).code, (failed as RunnerError).message]).toEqual([
+    "internal",
+    `The agent's worker couldn't start on this computer: ${why}`,
+  ]);
+  // Not the start's timeout (20 s).
+  expect(Date.now() - started).toBeLessThan(5000);
+  expect(t.logs).toContain(`couldn't start the worker of ag-a1b2c3d4: ${why}`);
+  const read = handleRequest(t.ctx, { op: "read", path: "notes.md", maxBytes: 100, agent: BIA }, scope().scope);
+  await waitFor(() => t.workers.length === 1);
+  const bia = t.last(BIA.id);
+  bia.hello();
+  const req = await requestOn(bia);
+  bia.send({ type: "result", id: req.id, ok: true, data: { content: "hi" } });
+  expect(await read).toEqual({ content: "hi" });
 });
 
 test("the computer's own ops stay in the supervisor; an agent's go to its worker, started on its first request", async () => {
@@ -2307,16 +2339,7 @@ test("the launch line: the agent's launcher, then this runner's worker with the 
   const home = "/var/lib/agentes-runner-agents/ag-a1b2c3d4";
   const cmd = workerCommand(ana, runner, home, true);
   expect(cmd.argv).toEqual([
-    "/usr/bin/systemd-run",
-    "--quiet",
-    "--scope",
-    "--collect",
-    "--slice=agents-21000.slice",
-    "--",
-    "/usr/sbin/runuser",
-    "-u",
-    "ag-a1b2c3d4",
-    "--",
+    ...systemLauncher(ana, true).prefix,
     ...runner,
     "worker",
     "--agent",
@@ -2326,9 +2349,24 @@ test("the launch line: the agent's launcher, then this runner's worker with the 
     "--home",
     home,
   ]);
+  expect(cmd.argv.slice(0, 5)).toEqual([
+    "/usr/bin/systemd-run",
+    "--quiet",
+    "--scope",
+    "--collect",
+    "--slice=agents-21000.slice",
+  ]);
   expect(cmd.cwd).toBe("/home/ag-a1b2c3d4");
   // Only the launcher's environment: never the root runner's own (its token, its home).
-  expect(Object.keys(cmd.env).sort()).toEqual(["HOME", "LANG", "LOGNAME", "PATH", "SHELL", "USER"]);
+  expect(Object.keys(cmd.env).sort()).toEqual([
+    "ANDROID_ADB_SERVER_PORT",
+    "HOME",
+    "LANG",
+    "LOGNAME",
+    "PATH",
+    "SHELL",
+    "USER",
+  ]);
   expect(workerCommand(ana, runner, home, false).argv.slice(0, 4)).toEqual([
     "/usr/sbin/runuser",
     "-u",

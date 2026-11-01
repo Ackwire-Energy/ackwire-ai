@@ -138,6 +138,8 @@ async function reportEveryTime(
         brief,
         text: record,
         code: "auto_report",
+        // Its final text is its record, written for the next run, not for people: the agent tells them.
+        wake: true,
       }),
     };
   });

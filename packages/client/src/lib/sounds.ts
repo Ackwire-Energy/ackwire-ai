@@ -28,6 +28,7 @@ const BY_KIND: Partial<Record<NotificationKind, SoundName>> = {
   agent_question: "attention",
   forum_turn: "attention",
   browser_handoff: "attention",
+  secret_request: "attention",
   join_request: "attention",
   invitation_accepted: "done",
   mention: "mention",
@@ -38,6 +39,7 @@ const BY_KIND: Partial<Record<NotificationKind, SoundName>> = {
   routine_finished: "done",
   mission_stopped: "error",
   routine_failed: "error",
+  run_failed: "error",
   routine_paused: "error",
 };
 

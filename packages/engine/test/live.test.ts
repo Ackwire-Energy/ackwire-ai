@@ -116,7 +116,10 @@ describe("receipts", () => {
   });
 
   test("a failed run shows in the receipt and as message.handled failed", async () => {
-    f = await setup({ budgetNanoUsd: 0 });
+    // A refusal fails the run (an agent over budget waits for it instead).
+    f = await setup({
+      reply: () => ({ chunks: [], stopReason: "refusal", usage: { inputTokens: 10, outputTokens: 0 } }),
+    });
     const events = f.listen(f.general.id);
     const m = await post(f, "@dev hi");
     await drainOutbox(f.db, f.handlers);

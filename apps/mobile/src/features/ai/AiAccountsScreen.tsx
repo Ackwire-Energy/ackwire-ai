@@ -13,6 +13,7 @@ import {
   accountTitle,
   agentsToGive,
   endsOnClaude,
+  onSeveralComputers,
   ownSignIns,
   ownSignInTitle,
 } from "@agenteschat/client/lib/ai-accounts";
@@ -96,7 +97,7 @@ export function AiAccountsScreen() {
   }, [api, orgId]);
   const rows = ai.data?.accounts ?? [];
   const own = ownSignIns(ai.data);
-  const several = new Set(rows.map((r) => r.machineId)).size > 1;
+  const several = onSeveralComputers(rows);
   const refetch = () => void qc.invalidateQueries({ queryKey: keys.aiAccounts(orgId) });
   const failed = () => toast({ title: t("agentPage.work.failed"), icon: "x" });
 

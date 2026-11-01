@@ -16,8 +16,9 @@ import type { TFunction } from "i18next";
  * with a check and a popover). Faces of the agents it is about, a small mark, and words: who saw it, a wait, a
  * failure, nobody or no AI, and while the author's own plan picks who answers. A receipt never takes a line of its
  * own: it is a mark beside the message (`markOf`), its words its label, except what asks something of you (send it
- * again, connect an AI, nobody will answer), which keeps its line under the message, as on the web. Pure, so it is
- * tested; the state itself is the shared `receipts.ts` (seeded from the lists, moved by the channel's events).
+ * again, connect an AI, nobody will answer) and the AI provider being down, which keep their line under the message,
+ * as on the web. Pure, so it is tested; the state itself is the shared `receipts.ts` (seeded from the lists, moved
+ * by the channel's events).
  */
 
 /** The small mark before the words: a check (seen, answered), the orbit (on it), paused, a question, the clock, none. */
@@ -44,6 +45,7 @@ export type ReceiptWords =
   | "receipts.claimed"
   | "receipts.waiting"
   | "receipts.asking"
+  | "receipts.outage"
   | "receipts.handled"
   | "receipts.failed"
   | "receipts.nobody"
@@ -83,6 +85,10 @@ export function receiptLine(receipt: MessageReceipt | undefined): ReceiptLine | 
     case "asking": {
       const words = { key: `receipts.${status.kind}` as const, agents: status.agents };
       return { ...faces(status.agents), mark: status.kind, words, label: words, action: null, alert: false };
+    }
+    case "outage": {
+      const words = { key: "receipts.outage" as const, agents: status.agents };
+      return { ...faces(status.agents), mark: "none", words, label: words, action: null, alert: false };
     }
     case "failed": {
       const words = { key: "receipts.failed" as const, agents: status.agents };

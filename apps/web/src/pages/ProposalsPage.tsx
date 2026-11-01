@@ -81,7 +81,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
   };
 
   return (
-    <div className="page page--xwide page--tight">
+    <div className="page page--full page--tight">
       {backAgent && (
         <Link
           to="/org/$orgId/agents/$agentId/memory"

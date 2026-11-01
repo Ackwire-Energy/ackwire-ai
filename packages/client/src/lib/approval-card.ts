@@ -1,0 +1,73 @@
+import type { Approval } from "../api/types";
+import { approveAlwaysOffered } from "./approval-kind";
+import { approvalOriginShort, approvalWhy } from "./approval-origin";
+
+/**
+ * The requests on one approval card, oldest first: the card's own (`first`) and every request of the agent
+ * that joined it in that conversation (same `messageId`, server side `openApprovalCard`).
+ */
+export function approvalCardItems(list: readonly Approval[] | undefined, messageId: string, first?: Approval) {
+  const byId = new Map<string, Approval>();
+  // The first copy of an id wins: callers put the freshest list first.
+  for (const a of [...(list ?? []), ...(first ? [first] : [])])
+    if ((a.messageId === messageId || a === first) && !byId.has(a.id)) byId.set(a.id, a);
+  return [...byId.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+/**
+ * What "Aprovar tudo" covers: the items still waiting that this person may decide, as listed now (the ids
+ * sent, so one joining during the click is never approved unseen), and how many waiting ones they can't.
+ */
+export function approveAllScope(items: readonly Approval[], now = Date.now()) {
+  const waiting = items.filter((a) => a.status === "pending" && new Date(a.expiresAt).getTime() > now);
+  const ids = waiting.filter((a) => a.canDecide).map((a) => a.id);
+  return { ids, waiting: waiting.length, blocked: waiting.length - ids.length };
+}
+
+/** A request past its deadline reads as expired, before the server's event says so. */
+export const asOfNow = (a: Approval, now = Date.now()): Approval =>
+  a.status === "pending" && Date.parse(a.expiresAt) <= now ? { ...a, status: "expired" } : a;
+
+/** The card's shared deadline: the earliest of its waiting items (null: nothing waits). */
+export function cardDeadline(items: readonly Approval[]): string | null {
+  const pending = items.filter((a) => a.status === "pending").map((a) => a.expiresAt);
+  return pending.length ? pending.reduce((a, b) => (a < b ? a : b)) : null;
+}
+
+/**
+ * A list of approvals as their cards (Aprovações, the phone's list): requests sharing a card come together,
+ * at the place of its newest one; one without a card stands alone.
+ */
+export function approvalCards(list: readonly Approval[]): Approval[][] {
+  const cards = new Map<string, Approval[]>();
+  for (const a of list) {
+    const key = a.messageId ?? a.id;
+    const card = cards.get(key);
+    if (card) card.push(a);
+    else cards.set(key, [a]);
+  }
+  return [...cards.values()].map((items) => items.sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+}
+
+/**
+ * What a request on a shared card says for itself: its why and where it came from, where they differ from the
+ * card's lead request (one that joined from another turn or run keeps its own explanation).
+ */
+export function itemOwnWords(a: Approval, lead: Approval) {
+  const why = approvalWhy(a);
+  const origin = approvalOriginShort(a);
+  return {
+    why: why && why !== approvalWhy(lead) ? why : null,
+    origin: origin && JSON.stringify(origin) !== JSON.stringify(approvalOriginShort(lead)) ? origin : null,
+  };
+}
+
+/** "Aprovar sempre" on a shared card: once per kind, on the first request where it is offered. */
+export function approveAlwaysOn(items: readonly Approval[]): Set<string> {
+  const kinds = new Map<string, string>();
+  for (const a of items) {
+    const kind = JSON.stringify(a.approveAlways);
+    if (approveAlwaysOffered(a) && !kinds.has(kind)) kinds.set(kind, a.id);
+  }
+  return new Set(kinds.values());
+}

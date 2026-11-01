@@ -142,6 +142,10 @@ describe("push text", () => {
     });
     expect(fromRoutine.body).toBe("Routine «Deploys»: Deploy api to production. Open the app to review it.");
     expect(renderPush("en", { kind: "dm", waiting: false, actorType: "user", text: "hi" }).title).toBe("Someone");
+    expect(renderPush("pt-BR", { kind: "routine_waiting_plan", waiting: false, title: "Deploys" })).toEqual({
+      title: "Uma rotina está esperando o plano renovar",
+      body: "Deploys · Ela roda quando ele renovar.",
+    });
     const long = renderPush("en", { kind: "mention", waiting: false, actorName: "Ana", text: "x".repeat(500) });
     expect(long.body.length).toBeLessThanOrEqual(180);
   });

@@ -104,7 +104,8 @@ test("vertical slice: @mention → outbox → run → streamed reply → persist
     .from(schema.agentRunSteps)
     .where(eq(schema.agentRunSteps.runId, run?.id ?? ""))
     .orderBy(asc(schema.agentRunSteps.seq));
-  expect(steps.map((s) => s.kind)).toEqual(["context", "model_call", "message"]);
+  // The second `context` is how the turn ended (`decideTurnEnd`, ADR 0097).
+  expect(steps.map((s) => s.kind)).toEqual(["context", "model_call", "context", "message"]);
   expect(
     (await f.db.select().from(schema.outbox))
       // The thread's assessment is due minutes later (threads.assess).
@@ -168,26 +169,18 @@ test("thinking a call went without is on its model_call step, the refusal's cred
   ]);
 });
 
-test("an agent over budget fails the run without calling the model", async () => {
+test("an agent over budget waits for its budget without calling the model", async () => {
   f = await setup({ budgetNanoUsd: 0 });
   const events = f.listen(f.general.id);
   await post(f, "@dev hi");
   await drainOutbox(f.db, f.handlers);
   const [run] = await f.db.select().from(schema.agentRuns);
-  expect([run?.status, run?.error]).toEqual(["failed", "budget_exceeded"]);
+  expect([run?.status, run?.error]).toEqual(["waiting_input", null]);
   expect(f.provider.calls).toHaveLength(0);
-  expect([...events].reverse().find((e) => e.type === "agent.run")).toMatchObject({
-    status: "failed",
-    error: "budget_exceeded",
-  });
-  expect(events.at(-1)).toMatchObject({ type: "message.handled", status: "failed" });
-  // The job itself succeeded: a failed run is a handled outcome, not a retry.
-  expect(
-    (await f.db.select().from(schema.outbox))
-      // The thread's assessment is due minutes later (threads.assess).
-      .filter((j) => j.kind !== "threads.assess")
-      .every((j) => j.status === "done"),
-  ).toBe(true);
+  expect([...events].reverse().find((e) => e.type === "agent.run")).toMatchObject({ status: "waiting_input" });
+  // The job itself succeeded; only the resume at the next month waits.
+  const jobs = (await f.db.select().from(schema.outbox)).filter((j) => j.kind !== "threads.assess");
+  expect(jobs.filter((j) => j.status !== "done").map((j) => j.kind)).toEqual(["agent_run.execute"]);
 });
 
 test("a model refusal fails the run but still records usage", async () => {

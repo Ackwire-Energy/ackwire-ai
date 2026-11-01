@@ -5,12 +5,13 @@ import { caches } from "../cache";
 import { NotFoundError, ValidationError } from "../errors";
 import { requirePermission } from "../organizations";
 import { DATABASE_SCOPE, type DbConnectionRow, dbGrants, orgDbConnections } from "./connections";
+import { identPath, parseIdentPath } from "./identifiers";
 
 const { dbAgentPolicies, agentScopes } = schema;
 
 /** What one agent may read in one database beyond its scope (checked on every query). */
 export interface DatabasePolicy {
-  /** `schema.table`; empty = every table. */
+  /** `schema.table` (`identPath`: quoted where needed, names kept exact); empty = every table. */
   tables: string[];
   /** `schema.table.column`, never read. */
   hiddenColumns: string[];
@@ -81,26 +82,26 @@ export async function agentDatabasePolicies(
   );
 }
 
-const TABLE = /^[a-z_][a-z0-9_$]*\.[a-z_][a-z0-9_$]*$/;
-const COLUMN = /^[a-z_][a-z0-9_$]*\.[a-z_][a-z0-9_$]*\.[a-z_][a-z0-9_$]*$/;
-/** `table` → `public.table`; lowercase. */
-const qualified = (name: string, parts: number) => {
-  const n = name.trim().toLowerCase();
-  return n.split(".").length === parts - 1 ? `public.${n}` : n;
-};
+/** Each name as stored (`identPath`), deduplicated; blanks dropped; throws on one that isn't a name. */
+function canonicalNames(names: string[], count: 2 | 3) {
+  const out = new Set<string>();
+  for (const name of names) {
+    if (!name.trim()) continue;
+    const parts = parseIdentPath(name, count);
+    if (!parts) {
+      const value = name.trim();
+      if (count === 2) throw new ValidationError(`"${value}" is not schema.table`, "database.invalid_table", { value });
+      throw new ValidationError(`"${value}" is not schema.table.column`, "database.invalid_column", { value });
+    }
+    out.add(identPath(parts));
+  }
+  return [...out];
+}
 
 /** Normalised and checked rules; throws on anything invalid. */
 export function normalizeDatabasePolicy(input: DatabasePolicy): DatabasePolicy {
-  const tables = [...new Set(input.tables.map((t) => qualified(t, 2)).filter(Boolean))];
-  const hiddenColumns = [...new Set(input.hiddenColumns.map((c) => qualified(c, 3)).filter(Boolean))];
-  const badTable = tables.find((t) => !TABLE.test(t));
-  if (badTable)
-    throw new ValidationError(`"${badTable}" is not schema.table`, "database.invalid_table", { value: badTable });
-  const badColumn = hiddenColumns.find((c) => !COLUMN.test(c));
-  if (badColumn)
-    throw new ValidationError(`"${badColumn}" is not schema.table.column`, "database.invalid_column", {
-      value: badColumn,
-    });
+  const tables = canonicalNames(input.tables, 2);
+  const hiddenColumns = canonicalNames(input.hiddenColumns, 3);
   if (tables.length > 500 || hiddenColumns.length > 500)
     throw new ValidationError("At most 500 tables or columns", "database.too_many");
   const cap = input.dailyQueryCap;

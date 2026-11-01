@@ -12,7 +12,8 @@ export type NoticeKind =
   | "wait_result"
   | "talker_reply"
   | "proposal_result"
-  | "follow_up";
+  | "follow_up"
+  | "wake_skipped";
 
 /**
  * An event an agent's conversation got (`meta.notice`): its routine's report,
@@ -27,6 +28,23 @@ export interface MessageNotice {
   from: string | null;
   refs: Record<string, string>;
 }
+
+/**
+ * Notices only for the agent they are for (packages/engine/src/notices.ts): another agent's note, the late result of a
+ * wait, what a person decided on its proposal (its card already says it). People never see them: what matters to
+ * them, the agent says in its reply.
+ */
+export const AGENT_ONLY_NOTICES: ReadonlySet<string> = new Set<NoticeKind>([
+  "agent_note",
+  "wait_result",
+  "proposal_result",
+]);
+
+/** A message that is a notice only its agent reads: left out of the conversation. */
+export const isAgentOnlyNotice = (meta: Meta) => {
+  const kind = (meta?.notice as { kind?: unknown } | undefined)?.kind;
+  return typeof kind === "string" && AGENT_ONLY_NOTICES.has(kind);
+};
 
 /** The notice card of a message, or null (none, or a fast reply that shows as a normal message). */
 export function noticeOf(meta: Meta): MessageNotice | null {
@@ -61,6 +79,9 @@ export function noticeAgentHandle(notice: MessageNotice): string | null {
   const handle = notice.refs.agentHandle ?? notice.from?.match(/^@([\w.-]+)$/)?.[1];
   return handle ? handle.replace(/^@/, "") : null;
 }
+
+/** `wake_skipped`: the handles an agent's mention couldn't wake (ADR 0097), for the line's names. */
+export const skippedHandles = (notice: MessageNotice) => (notice.refs.agentHandles ?? "").split(",").filter(Boolean);
 
 /** An automatic line in the conversation (a notice): nothing groups with it. */
 export const isEventLine = (meta: Meta) => noticeOf(meta) !== null;

@@ -97,7 +97,7 @@ describe("the agent's name and role", () => {
     await act(() => new Promise((r) => setTimeout(r, 0)));
   };
 
-  test("Mais ações → Editar nome e cargo: edited in Configurações, saved together; the @handle stays", async () => {
+  test("Mais ações → Editar nome e cargo: edited in Configurações, saved together; the @handle follows", async () => {
     const state = seedState();
     await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}`, { api: createFakeApi(state) });
     await settle(8);
@@ -106,7 +106,7 @@ describe("the agent's name and role", () => {
     await key(trigger, "Enter");
     await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: "Editar nome e cargo" }));
     await settle(4);
-    expect(document.body.textContent).toContain("As menções continuam por @ada.");
+    expect(document.body.textContent).toContain("É como todo mundo vê o agente. O @ acompanha o nome.");
     const name = screen().getByLabelText("Nome") as HTMLInputElement;
     const role = screen().getByLabelText("Cargo") as HTMLInputElement;
     await act(async () => fireEvent.change(name, { target: { value: "Ada Lovelace" } }));
@@ -118,7 +118,7 @@ describe("the agent's name and role", () => {
     );
     await settle(6);
     const call = state.calls.find((c) => c.method === "agents.update");
-    expect(call?.args[2]).toEqual({ name: "Ada Lovelace", role: "Tech lead" });
-    expect(state.agents.find((a) => a.id === ADA_ID)?.handle).toBe("ada");
+    expect(call?.args[2]).toEqual({ name: "Ada Lovelace", handle: "adalovelace", role: "Tech lead" });
+    expect(state.agents.find((a) => a.id === ADA_ID)?.handle).toBe("adalovelace");
   });
 });

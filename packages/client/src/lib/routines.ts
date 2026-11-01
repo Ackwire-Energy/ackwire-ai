@@ -11,10 +11,10 @@ export function reminderBody(body: string, meta: Record<string, unknown> | undef
 }
 
 /**
- * The routine an agent's message answers (ADR 0053 §7): the run a routine's report woke tells people in
- * the agent's voice, and its message carries `meta.routine` (`id`, `name`, the routine run `runId`, the
- * `noticeId` of the report it answers). Shown as a small tag ("Rotina «X»") that opens the routine and
- * unfolds the report. A plain reminder is the agent's own message, so not here.
+ * The routine an agent's message comes from (ADR 0053 §7): a routine's own message (`meta.routine` with
+ * `id`, `name`, the routine run `runId`), or the reply of the run its hand-off woke, which also carries
+ * the `noticeId` of the report it answers. Shown as a small tag ("Rotina «X»") that opens the routine;
+ * only a reply has a report to unfold. A plain reminder is the agent's own message, so not here.
  */
 export interface RoutineReply {
   id: string;

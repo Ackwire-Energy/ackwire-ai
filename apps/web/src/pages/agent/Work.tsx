@@ -1171,37 +1171,31 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const again = !also && signedOut ? current : null;
   const signingIn = also ?? again;
   // The model as a picker like the account's: Automático first, each model with its line. Claude's own models say what
-  // each is for ("O mais capaz…"), a plan's what it's sold as and what it needs; several makers' models are grouped by
-  // maker, each beside its logo, the others beside their plan's. An alias the plan leaves out runs its main model: shown
-  // as that one (`shownModel`).
+  // each is for ("O mais capaz…"), a plan's what it's sold as, and what it needs from the plan's account behind its ⓘ;
+  // several makers' models are grouped by maker, each beside its logo, the others beside their plan's. An alias the
+  // plan leaves out runs its main model: shown as that one (`shownModel`).
   const planLogo = card === "key" ? null : <ProviderLogo id={planMark(card)} size="sm" />;
-  const modelLine = (m: BrainModelChoice, withNeed: boolean) =>
+  const modelLine = (m: BrainModelChoice) =>
     !plan && kind === "claude_code" && isClaudeAlias(m.value)
       ? t(`agentPage.work.brain.modelLine.${m.value}`)
-      : [m.tag && t(`brain.modelTag.${m.tag}`), withNeed && m.needs && t(`brain.modelNeeds.${m.needs}`)]
-          .filter(Boolean)
-          .join(" · ");
+      : m.tag && t(`brain.modelTag.${m.tag}`);
   const planModelOptionsShown: SelectOption[] = [
     { value: AUTO, label: t("brain.auto.label"), description: t("brain.auto.hint"), leading: autoMark },
     ...modelOptions.map((m) => {
-      const line = modelLine(m, true);
+      const line = modelLine(m);
       return {
         value: m.value,
         label: m.label,
         ...(line ? { description: line } : {}),
+        ...(m.needs ? { hint: t(`brain.modelNeeds.${m.needs}`) } : {}),
         ...(m.maker
           ? { group: providerLabel(m.maker), leading: <ProviderLogo id={m.maker} size="sm" /> }
           : { leading: planLogo }),
       };
     }),
   ];
-  // Once chosen, what a model needs from its plan's account is the note under it, with where to give it: said once.
+  // Once chosen, what a model needs from its plan's account is the note under it, with where to give it.
   const chosenModel = modelOptions.find((m) => m.value === shownModel);
-  const modelValue = (o: SelectOption) => {
-    if (!chosenModel?.needs || o.value !== chosenModel.value) return pickerValue(o);
-    const line = modelLine(chosenModel, false);
-    return pickerValue({ ...o, description: line || undefined });
-  };
   const modelHow = chosenModel?.needs && plan && (
     <SettingNote icon="info" live>
       {t(`brain.modelHow.${chosenModel.needs}`)}
@@ -1244,7 +1238,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           aria-label={t("agentPage.work.brain.planModel")}
           value={shownModel}
           onValueChange={setPlanModel}
-          renderValue={modelValue}
+          renderValue={pickerValue}
           options={planModelOptionsShown}
         />
         {modelHow}
