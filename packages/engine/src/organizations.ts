@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import {
   and,
+  arrayContains,
   asc,
   type Database,
   desc,
@@ -654,10 +655,17 @@ export async function updateMyProfile(
         max: 32,
       });
     }
+    // An agent's handle, or one it had before a rename: that one still names it.
     const [agent] = await db
       .select({ id: schema.agents.id })
       .from(schema.agents)
-      .where(and(eq(schema.agents.orgId, orgId), eq(schema.agents.handle, handle), isNull(schema.agents.archivedAt)));
+      .where(
+        and(
+          eq(schema.agents.orgId, orgId),
+          or(eq(schema.agents.handle, handle), arrayContains(schema.agents.previousHandles, [handle])),
+          isNull(schema.agents.archivedAt),
+        ),
+      );
     if (agent) throw new ConflictError(`@${handle} belongs to an agent`, "handle.taken_by_agent", { handle });
     const [other] = await db
       .select({ userId: organizationMembers.userId })

@@ -83,6 +83,7 @@ export async function deleteAgent(deps: AgentDeletionDeps, actorId: string, orgI
       .set({
         deletedAt: now,
         handle: deletedHandle(agentId),
+        previousHandles: [],
         instructions: "",
         model: "",
         credentialId: null,

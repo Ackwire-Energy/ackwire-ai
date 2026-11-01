@@ -1,4 +1,5 @@
 import { and, type Database, desc, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { currentHandles } from "../agents";
 import { announceMessageMemories } from "../message-memories";
 import {
   type ConsolidateResult,
@@ -198,8 +199,16 @@ export async function reflectThread(
   const parsed = parseReflectOutput(result.text);
   const channelIds = [thread.root.channelId];
   const now = new Date().toISOString();
+  // A lesson about an agent the thread names by a handle it had before a rename is about that agent.
+  const about = await currentHandles(
+    db,
+    input.orgId,
+    parsed.items.map((i) =>
+      i.kind === "lesson" && i.scope === "agent" ? i.about_agent.replace(/^@/, "").toLowerCase() : "",
+    ),
+  );
 
-  for (const item of parsed.items) {
+  for (const [n, item] of parsed.items.entries()) {
     const sources = item.sources.map((r) => refs.get(r.trim())).filter((s): s is NonNullable<typeof s> => Boolean(s));
     if (sources.length === 0) {
       out.rejected.push({ content: item.content, reason: "no_sources" });
@@ -214,9 +223,7 @@ export async function reflectThread(
       continue;
     }
     const aboutAgent =
-      item.kind === "lesson" && item.scope === "agent"
-        ? (agentByHandle.get(item.about_agent.replace(/^@/, "").toLowerCase()) ?? null)
-        : null;
+      item.kind === "lesson" && item.scope === "agent" ? (agentByHandle.get(about[n] ?? "") ?? null) : null;
 
     const evidence: Evidence[] = [];
     let trusted = true;

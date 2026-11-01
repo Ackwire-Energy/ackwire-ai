@@ -2,7 +2,7 @@ import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, schema, sql } from "@agenteschat/db";
 import { isKnownModel, isOpenRouterModel } from "@agenteschat/providers";
 import { isIdHandle } from "@agenteschat/ui/names";
-import { createAgent, HANDLE_PATTERN, updateAgent } from "./agents";
+import { createAgent, freeHandle, HANDLE_PATTERN, updateAgent } from "./agents";
 import { type AgentAppearance, setAgentAppearance, validateAppearance } from "./appearance";
 import { recordAudit } from "./audit";
 import { addChannelMember, CHANNEL_NAME_PATTERN, createChannel } from "./channels";
@@ -175,7 +175,7 @@ interface Made {
 export interface ImportState {
   /** What earlier imports of this package made, by `kind:key`. */
   made: Map<string, Made>;
-  /** Taken @handles: every agent's (archived ones too) and every person's. */
+  /** Taken @handles: every agent's (archived ones too) and the ones they had, and every person's. */
   handles: Set<string>;
   /** Skill names (deleted ones too) → id. */
   skills: Map<string, string>;
@@ -209,14 +209,6 @@ function fit(text: string, max: number, field: string, trimmed: string[]) {
   if (text.length <= max) return text;
   trimmed.push(field);
   return text.slice(0, max);
-}
-
-/** `base` with the first free number after a dash (`scout` → `scout-2`) in 32 characters, as the apps suggest. */
-function freeHandle(base: string, taken: Set<string>) {
-  for (let n = 2; ; n++) {
-    const handle = `${base.slice(0, 31 - String(n).length).replace(/[-_]+$/, "")}-${n}`;
-    if (!taken.has(handle)) return handle;
-  }
 }
 
 /** Letters and digits without accents, as the apps make a handle from a name (`handleFrom` in packages/client). */
@@ -551,7 +543,12 @@ export async function loadImportState(
   const targets = (kind: ImportItemKind) => rows.filter((r) => r.kind === kind).map((r) => r.targetId);
   const [agentRows, skillRows, channelRows, routineRows, noteRows, people] = await Promise.all([
     db
-      .select({ id: agents.id, handle: agents.handle, archivedAt: agents.archivedAt })
+      .select({
+        id: agents.id,
+        handle: agents.handle,
+        previousHandles: agents.previousHandles,
+        archivedAt: agents.archivedAt,
+      })
       .from(agents)
       .where(eq(agents.orgId, orgId)),
     db
@@ -616,7 +613,10 @@ export async function loadImportState(
         ];
       }),
     ),
-    handles: new Set([...agentRows.map((a) => a.handle), ...people.flatMap((p) => (p.handle ? [p.handle] : []))]),
+    handles: new Set([
+      ...agentRows.flatMap((a) => [a.handle, ...a.previousHandles]),
+      ...people.flatMap((p) => (p.handle ? [p.handle] : [])),
+    ]),
     skills: new Map(skillRows.map((s) => [s.slug, s.id])),
     // Agents never join a private channel through an import: it would show them what's said there.
     channels: new Map(

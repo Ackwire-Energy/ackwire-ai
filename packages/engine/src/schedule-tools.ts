@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
 import { type AgentActionParams, recordAgentActions } from "./agent-actions";
 import { routineRow, routineSnapshot } from "./agent-undo";
+import { currentHandles } from "./agents";
 import { canTalkTo, talksToAgents } from "./audience";
 import { runAuthorityById } from "./authority";
 import { consultationOrigin } from "./consultations";
@@ -568,7 +569,9 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
       async execute(input, ctx) {
         try {
           const person = await requesterOf(ctx);
-          const handle = str(input.agent).trim().replace(/^@/, "").toLowerCase();
+          const [handle = ""] = await currentHandles(ctx.db, ctx.orgId, [
+            str(input.agent).trim().replace(/^@/, "").toLowerCase(),
+          ]);
           const { agents } = schema;
           const team = await ctx.db
             .select({

@@ -86,20 +86,23 @@ export function gitAccess(keys: Set<string>, connectionId: string) {
 }
 
 /**
- * A push command as the proxy reads it before any grant: the agent's own branch (`agentes/{handle}/…`) goes; tags,
- * deletes (`delete_branches` deletes), refs that aren't branches and creating someone else's branch are refused; an
- * update of any other existing branch goes only with a grant (`request_branch_push`).
+ * A push command as the proxy reads it before any grant: the agent's own branch (`agentes/{handle}/…`, or under a
+ * handle it had before a rename) goes; tags, deletes (`delete_branches` deletes), refs that aren't branches and
+ * creating someone else's branch are refused; an update of any other existing branch goes only with a grant
+ * (`request_branch_push`).
  */
 export type RefVerdict =
   | { ok: true }
   | { grant: string }
   | { refused: string; kind: "tag" | "delete" | "ref" | "create" };
 
-export function refRule(cmd: RefCommand, handle: string): RefVerdict {
+export function refRule(cmd: RefCommand, handle: string, previousHandles: string[] = []): RefVerdict {
   if (cmd.ref.startsWith("refs/tags/")) return { refused: "tags can't be pushed by agents", kind: "tag" };
   if (cmd.newOid === ZERO_OID) return { refused: `branches are deleted with ${DELETE_BRANCHES_TOOL}`, kind: "delete" };
-  const own = `refs/heads/agentes/${handle}/`;
-  if (cmd.ref.startsWith(own) && cmd.ref.length > own.length) return { ok: true };
+  for (const h of [handle, ...previousHandles]) {
+    const own = `refs/heads/agentes/${h}/`;
+    if (cmd.ref.startsWith(own) && cmd.ref.length > own.length) return { ok: true };
+  }
   const branch = cmd.ref.startsWith("refs/heads/") ? cmd.ref.slice("refs/heads/".length) : "";
   if (!validBranch(branch)) return { refused: `agents push only to branches agentes/${handle}/…`, kind: "ref" };
   if (cmd.oldOid === ZERO_OID) return { refused: `agents create only branches agentes/${handle}/…`, kind: "create" };
@@ -233,7 +236,13 @@ export async function handleGitProxy(
   const revoked = () =>
     text(401, "agentes: this credential was revoked", { "www-authenticate": 'Basic realm="agentes git"' });
   const [agent] = await deps.db
-    .select({ id: agents.id, handle: agents.handle, archivedAt: agents.archivedAt, machineId: agents.machineId })
+    .select({
+      id: agents.id,
+      handle: agents.handle,
+      previousHandles: agents.previousHandles,
+      archivedAt: agents.archivedAt,
+      machineId: agents.machineId,
+    })
     .from(agents)
     .where(and(eq(agents.id, claims.agentId), eq(agents.orgId, claims.orgId)));
   // A connected machine (ADR 0024 addendum): still paired, same token, and still this agent's computer.
@@ -346,7 +355,7 @@ export async function handleGitProxy(
   /** Someone else's branches by ref: pushed with a grant, or named once to the agent. */
   const others = new Map<string, string>();
   for (const cmd of request.commands) {
-    const verdict = refRule(cmd, agent.handle);
+    const verdict = refRule(cmd, agent.handle, agent.previousHandles);
     if ("refused" in verdict) {
       reasons.set(cmd.ref, verdict.refused);
       told.add(verdict.kind === "delete" ? DELETE_BRANCHES_POINTER : verdict.refused);

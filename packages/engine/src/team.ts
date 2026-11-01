@@ -1,5 +1,6 @@
 import { and, asc, type Database, desc, eq, gte, inArray, isNotNull, isNull, schema, sql } from "@agenteschat/db";
 import { type AgentStatusView, lineInEnglish, loadAgentStatuses } from "./agent-status";
+import { currentHandles } from "./agents";
 import type { AgentAppearance } from "./appearance";
 import { canTalkTo, talksToAgents } from "./audience";
 import { agentBrowserStatus } from "./browser/status";
@@ -184,6 +185,19 @@ export async function archivedAgentsPrompt(db: Database, orgId: string, texts: s
   const one = gone.length === 1;
   const them = one ? "it" : "them";
   return `# Archived agents\n${gone.join(", ")} ${one ? "is" : "are"} archived: nothing you send reaches ${them}. Don't ask or mention ${them}. If your instructions, notes or this conversation count on ${one ? "it" : "one"}, tell the person.`;
+}
+
+/**
+ * "# Renamed agents": the old handles (`currentHandles`) that what a run reads still names (a routine's brief, its
+ * notes, the conversation), each with the handle its agent has now, so the run asks and mentions it by that one.
+ * Empty when it names none.
+ */
+export async function renamedAgentsPrompt(db: Database, orgId: string, texts: string[]): Promise<string> {
+  const named = [...new Set(texts.flatMap((t) => parseMentionHandles(t)))];
+  const now = await currentHandles(db, orgId, named);
+  const renamed = named.flatMap((h, i) => (now[i] && now[i] !== h ? [`@${h} is @${now[i]}`] : []));
+  if (renamed.length === 0) return "";
+  return `# Renamed agents\nSome text here names agents by a handle they had before: ${renamed.join(", ")}. It is the same agent: ask and mention it by the handle it has now.`;
 }
 
 /**

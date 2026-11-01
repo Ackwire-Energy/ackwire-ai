@@ -14,6 +14,7 @@ import {
   schema,
   sql,
 } from "@agenteschat/db";
+import { currentHandles } from "./agents";
 import { type AiStatusDeps, agentAiState } from "./ai-status";
 import { canTalkTo, talksToAgents } from "./audience";
 import { stopRun } from "./cancel";
@@ -62,8 +63,8 @@ type AiCheck = Omit<AiStatusDeps, "db">;
  * The asking run comes along: its hop and stretch go on to the other agent.
  */
 async function reachableAgent(ctx: ToolContext, input: unknown, ai?: AiCheck) {
-  const handle = String(input).trim().replace(/^@/, "").toLowerCase();
   const { db } = ctx;
+  const [handle = ""] = await currentHandles(db, ctx.orgId, [String(input).trim().replace(/^@/, "").toLowerCase()]);
   const [target] = await db
     .select()
     .from(agents)
