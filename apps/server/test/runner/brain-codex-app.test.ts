@@ -615,3 +615,22 @@ test("a refusal known by its words after a command says the turn worked", () => 
     worked: true,
   });
 });
+
+test("an agent message completed twice is sent once", () => {
+  const m = new CodexAppMapper({ cwd: "" });
+  const sent: string[] = [];
+  const text = (t: string | undefined) => t && sent.push(t);
+  text(m.completed({ id: "msg_b", type: "agentMessage", text: "Achei a chave." }).text);
+  text(m.completed({ id: "msg_b", type: "agentMessage", text: "Achei a chave." }).text);
+  expect(sent).toEqual(["Achei a chave."]);
+});
+
+test("two different messages that read alike are both sent", () => {
+  const m = new CodexAppMapper({ cwd: "" });
+  const sent: string[] = [];
+  for (const id of ["msg_1", "msg_2"]) {
+    sent.push(m.delta({ itemId: id, delta: "Feito." }));
+    expect(m.completed({ id, type: "agentMessage", text: "Feito." }).text).toBeUndefined();
+  }
+  expect(sent.join("")).toBe("Feito.\n\nFeito.");
+});

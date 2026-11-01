@@ -172,6 +172,8 @@ export interface FakeState {
   phoneServer?: string;
   /** Questions someone else answered on the server (this tab still shows them open). */
   answeredElsewhere?: Set<string>;
+  /** Answers to questions wait for this before the server replies (a slow network). */
+  answerHold?: Promise<void>;
   /** Secrets on agents' computers, by agent id (`secrets.list`). */
   agentSecrets?: Record<string, AgentSecret[]>;
   members: Member[];
@@ -2631,6 +2633,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       // Same rules as the server: the choice must be one of the options; answering twice is 409.
       answer: async (orgId, questionId, input) => {
         log("questions.answer", orgId, questionId, input);
+        await state.answerHold;
         const msg = state.messages.find((m) => (m.meta?.question as AgentQuestion | undefined)?.id === questionId);
         const q = msg?.meta?.question as AgentQuestion | undefined;
         if (!q) throw new ApiError(404, "not_found", "Question not found");

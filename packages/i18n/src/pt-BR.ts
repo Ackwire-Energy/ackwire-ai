@@ -2094,11 +2094,13 @@ export const ptBR = {
   },
   question: {
     answer: "Responder",
+    placeholder: "Sua resposta",
     answered: "Respondida por {{name}}: <b>{{answer}}</b>",
     answeredByYou: "Você respondeu: <b>{{answer}}</b>",
     chip: "Esperando resposta",
     group: "Pergunta de {{agent}}",
-    alreadyAnswered: "Alguém já respondeu esta pergunta.",
+    alreadyAnswered: "Esta pergunta já foi respondida ou encerrada.",
+    closed: "Encerrada sem resposta.",
     failed: "Não foi possível enviar a resposta. Tente de novo.",
   },
   /** A request in the conversation (approval, secret, question, help in the agent's screen, proposal): one card for all. */

@@ -395,8 +395,8 @@ const usageDiff = (a: TokenUsageBreakdown, b: TokenUsageBreakdown): TokenUsageBr
 export class CodexAppMapper {
   /** The last agent message of the Codex turn running now. */
   private answer?: string;
-  /** Agent messages streamed so far (by item id): a message that came whole is sent whole. */
-  private readonly streamed = new Set<string>();
+  /** Agent messages already sent, streamed or whole (by item id): Codex may complete one twice. */
+  private readonly sent = new Set<string>();
   private lastDeltaItem: string | null = null;
   private anyText = false;
   /** The thread's totals before this `brain.turn`, and now. */
@@ -432,7 +432,7 @@ export class CodexAppMapper {
     const itemId = str(params.itemId);
     const delta = str(params.delta);
     if (!delta) return "";
-    this.streamed.add(itemId);
+    this.sent.add(itemId);
     return this.textOf(itemId, delta);
   }
 
@@ -446,7 +446,9 @@ export class CodexAppMapper {
         const t = str(item.text);
         if (!t.trim()) return { events: [] };
         this.answer = this.clean(t);
-        return this.streamed.has(id) ? { events: [] } : { events: [], text: this.textOf(id, t) };
+        if (this.sent.has(id)) return { events: [] };
+        this.sent.add(id);
+        return { events: [], text: this.textOf(id, t) };
       }
       case "commandExecution":
         return {
