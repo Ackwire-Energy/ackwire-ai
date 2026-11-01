@@ -1,3 +1,4 @@
+import type { TFunction } from "i18next";
 import type { AgentAudience } from "../api/types";
 import type { Level } from "./access-levels";
 import { handleFrom, parseAmount } from "./text";
@@ -186,6 +187,41 @@ export function freeHandle(handle: string, taken: Set<string>) {
     if (!taken.has(next)) return next;
   }
   return base;
+}
+
+/**
+ * The handles an agent can't take: the other agents' (with the ones they had before a rename, which still name
+ * them) and people's. `exceptAgentId`: the agent being renamed, which may take one of its own back.
+ */
+export function takenHandles(
+  agents: readonly { id: string; handle: string; previousHandles?: string[] }[],
+  people: readonly { handle?: string | null }[],
+  exceptAgentId?: string,
+): Set<string> {
+  return new Set(
+    [
+      ...agents.flatMap((a) => (a.id === exceptAgentId ? [] : [a.handle, ...(a.previousHandles ?? [])])),
+      ...people.flatMap((p) => (p.handle ? [p.handle] : [])),
+    ].map((h) => h.toLowerCase()),
+  );
+}
+
+/**
+ * The @ a renamed agent gets: the one typed in Menções, else the one its new name gives (`handleForName`). With
+ * the name as it was, or one with no a-z or digit to make a handle of (an emoji, another script), it keeps its own.
+ */
+export function handleAfterRename(saved: { name: string; handle: string }, name: string, typed?: string): string {
+  if (typed !== undefined) return typed;
+  if (name.trim() === saved.name.trim() || !/[a-z0-9]/.test(cleanHandle(name))) return saved.handle;
+  return handleForName(name);
+}
+
+/** Why the @ can't be used, in words; null when it can. */
+export function handleProblemText(t: TFunction, handle: string, taken: Set<string>): string | null {
+  const problem = handleProblem(handle, taken);
+  if (problem === "taken") return t("newAgent.errors.handleTaken", { handle, suggestion: freeHandle(handle, taken) });
+  if (problem === "format") return t("newAgent.errors.handleFormat");
+  return problem === "empty" ? t("newAgent.errors.handleEmpty") : null;
 }
 
 /* ---------- Budget ---------- */

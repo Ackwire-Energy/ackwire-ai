@@ -71,6 +71,7 @@ import type {
 import { ApiError } from "@agenteschat/client";
 import { moveInGroups } from "@agenteschat/client/lib/agent-groups";
 import { answersOthers, audienceOf } from "@agenteschat/client/lib/audience";
+import { freeHandle, takenHandles } from "@agenteschat/client/lib/new-agent";
 import { stepIndex } from "@agenteschat/client/lib/onboarding";
 import { grants, SUMMARY_ORDER } from "@agenteschat/client/lib/roles";
 import { createFakeAccess } from "./fakes/access";
@@ -1620,6 +1621,17 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("agents.update", orgId, agentId, input);
         const agent = state.agents.find((a) => a.id === agentId);
         if (!agent) throw new ApiError(404, "not_found", "Agent not found");
+        // As the backend: a taken handle is refused with a free one; the one it leaves keeps naming it.
+        if (input.handle !== undefined && input.handle !== agent.handle) {
+          const taken = takenHandles(state.agents, state.members, agentId);
+          if (taken.has(input.handle)) {
+            throw new ApiError(409, "agent.handle_taken", `@${input.handle} is already taken`, {
+              handle: input.handle,
+              suggestion: freeHandle(input.handle, taken),
+            });
+          }
+          agent.previousHandles = [...(agent.previousHandles ?? []).filter((h) => h !== input.handle), agent.handle];
+        }
         Object.assign(agent, input);
         return { ...agent };
       },

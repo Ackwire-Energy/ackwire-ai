@@ -4,6 +4,7 @@ import { audienceSummary, audienceWidens } from "@agenteschat/client/lib/audienc
 import { engineOfBrain } from "@agenteschat/client/lib/brain";
 import { formatMonth, formatPercent, formatTokensShort, formatUsd } from "@agenteschat/client/lib/format";
 import {
+  AffixInput,
   type AgentAppearance,
   Avatar,
   agentGradient,
@@ -32,7 +33,7 @@ import { useOrg } from "@/components/org-context";
 import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { AGENT_SECTIONS, type AgentSection, type Field as EditField, FIELD_PLACE } from "@/lib/agent-edit";
-import { BLANK_LOOK } from "@/lib/new-agent";
+import { BLANK_LOOK, cleanHandle } from "@/lib/new-agent";
 import { CardHead, useAgentEdit, WasLine } from "./context";
 import { ReadOnlyNote, useVisibleChannels } from "./pieces";
 
@@ -166,7 +167,7 @@ export function SettingsTab({
           <Section
             id="identity"
             title={t("agentPage.settings.identity")}
-            fields={["name", "role", "look", "group"]}
+            fields={["name", "handle", "role", "look", "group"]}
             action={
               can("look") ? (
                 <Button
@@ -188,26 +189,40 @@ export function SettingsTab({
               </span>
               <div className="agp-id__fields">
                 {can("name") ? (
-                  <div className="newag__grid2">
-                    <Field label={t("agent.nameLabel")} id="agp-name" error={errors.name}>
-                      <Input
-                        value={draft.name}
-                        maxLength={80}
-                        autoComplete="off"
-                        onChange={(e) => set("name", e.target.value)}
-                      />
-                    </Field>
-                    <Field label={t("agent.roleLabel")} id="agp-role">
-                      <Input
-                        value={draft.role}
-                        maxLength={200}
-                        autoComplete="off"
-                        onChange={(e) => set("role", e.target.value)}
-                      />
-                    </Field>
-                    <WasLine changeKey="name" />
-                    <WasLine changeKey="role" />
-                  </div>
+                  <>
+                    <div className="newag__grid2">
+                      <Field label={t("agent.nameLabel")} id="agp-name" error={errors.name}>
+                        <Input
+                          value={draft.name}
+                          maxLength={80}
+                          autoComplete="off"
+                          onChange={(e) => set("name", e.target.value)}
+                        />
+                      </Field>
+                      <Field label={t("agent.roleLabel")} id="agp-role">
+                        <Input
+                          value={draft.role}
+                          maxLength={200}
+                          autoComplete="off"
+                          onChange={(e) => set("role", e.target.value)}
+                        />
+                      </Field>
+                      <WasLine changeKey="name" />
+                      <WasLine changeKey="role" />
+                    </div>
+                    <div className="newag__grid2">
+                      <Field label={t("agent.handleLabel")} id="agp-handle" error={errors.handle}>
+                        <AffixInput
+                          prefix="@"
+                          value={draft.handle}
+                          maxLength={32}
+                          autoComplete="off"
+                          spellCheck={false}
+                          onChange={(e) => set("handle", cleanHandle(e.target.value))}
+                        />
+                      </Field>
+                    </div>
+                  </>
                 ) : (
                   <div className="newag__grid2">
                     <div className="agp-field">
@@ -218,9 +233,17 @@ export function SettingsTab({
                       <span className="newag__label">{t("agent.roleLabel")}</span>
                       <ReadValue>{agent.role || t("agentPage.none")}</ReadValue>
                     </div>
+                    <div className="agp-field">
+                      <span className="newag__label">{t("agent.handleLabel")}</span>
+                      <ReadValue>@{agent.handle}</ReadValue>
+                    </div>
                   </div>
                 )}
-                <span className="small muted">{t("agent.identityHelp", { handle: agent.handle })}</span>
+                <span className="small muted">
+                  {draft.handle !== agent.handle && !errors.handle
+                    ? t("agent.handleMoves", { handle: draft.handle, old: agent.handle })
+                    : t("agent.identityHelp")}
+                </span>
                 {/* Only once the workspace has groups (ADR 0083); they are made in the sidebar. */}
                 {groups.length > 0 && can("group") ? (
                   <div className="agp-field">

@@ -21,6 +21,8 @@ export interface Change {
 /** The draft: what is saved, with the person's edits on top. */
 export interface Draft {
   name: string;
+  /** The @ it will have: typed, or the one the new name gives. */
+  handle: string;
   role: string;
   look: Look;
   instructions: string;
@@ -53,7 +55,7 @@ export interface AgentEdit {
   /** The change for a key (a field, or `levels:{id}`). */
   changeOf: (key: string) => Change | undefined;
   can: (field: Field) => boolean;
-  errors: { name?: string; budget?: string; audience?: string; repos?: string };
+  errors: { name?: string; handle?: string; budget?: string; audience?: string; repos?: string };
   /** The access tree's resources (empty while loading or unavailable). */
   resources: AccessResource[];
   accessState: "loading" | "ready" | "unavailable";

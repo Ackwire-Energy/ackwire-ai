@@ -2308,7 +2308,9 @@ export const ptBR = {
   },
   agent: {
     editIdentity: "Editar nome e cargo",
-    identityHelp: "É como todo mundo vê o agente. As menções continuam por @{{handle}}.",
+    identityHelp: "É como todo mundo vê o agente. O @ acompanha o nome.",
+    handleLabel: "Menções",
+    handleMoves: "As menções passam a ser por @{{handle}}. @{{old}} continua funcionando.",
     nameLabel: "Nome",
     roleLabel: "Cargo",
     roleHelp: "Uma linha, ex.: PM, Dev, Pesquisa.",
@@ -2577,6 +2579,7 @@ export const ptBR = {
       brain: "Quem pensa",
       repos: "Repositórios do GitHub",
       group: "Grupo",
+      handle: "Menções",
     },
     lines: {
       added_one: "{{count}} linha nova",

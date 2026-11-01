@@ -1430,6 +1430,7 @@ describe("Onde trabalha and the browser (their dialogs)", () => {
 describe("Quem pensa: the draft", () => {
   const saved: Saved = {
     name: "Ada",
+    handle: "ada",
     role: "",
     look: { color: "sky", eyes: "round", accessory: "none" },
     instructions: "",

@@ -98,6 +98,7 @@ import {
   type RoleId,
   readBudget,
   stepErrors,
+  takenHandles,
 } from "@/lib/new-agent";
 import { useToast } from "@/lib/toast";
 import "./new-agent.css";
@@ -286,14 +287,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
     () => new Set(choices.flatMap(([, list]) => list.filter((c) => c.available).map((c) => c.model.id))),
     [choices],
   );
-  const taken = useMemo(
-    () =>
-      new Set([
-        ...(agents.data ?? []).map((a) => a.handle.toLowerCase()),
-        ...(members.data ?? []).map((m) => m.handle?.toLowerCase()).filter((h): h is string => Boolean(h)),
-      ]),
-    [agents.data, members.data],
-  );
+  const taken = useMemo(() => takenHandles(agents.data ?? [], members.data ?? []), [agents.data, members.data]);
 
   // Defaults once the data arrives: the skills on for new agents, the levels.
   useEffect(() => {

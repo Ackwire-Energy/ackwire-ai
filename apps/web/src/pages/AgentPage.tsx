@@ -66,7 +66,7 @@ import {
   type Viewer,
 } from "@/lib/agent-edit";
 import { lookOf } from "@/lib/look";
-import { BLANK_LOOK, readBudget } from "@/lib/new-agent";
+import { BLANK_LOOK, handleAfterRename, handleProblemText, readBudget, takenHandles } from "@/lib/new-agent";
 import { useToast } from "@/lib/toast";
 import { AccessTab } from "./agent/AccessTab";
 import { ActivityTab } from "./agent/ActivityTab";
@@ -168,6 +168,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
     const cred = d?.credentialId ?? null;
     return {
       name: agent.name,
+      handle: agent.handle,
       role: agent.role ?? "",
       look: fullLook(lookOf(agent)),
       instructions: agent.instructions,
@@ -196,6 +197,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
 
   const draft: Draft = {
     name: edits.name ?? saved.name,
+    handle: handleAfterRename(saved, edits.name ?? saved.name, edits.handle),
     role: edits.role ?? saved.role,
     look: edits.look ?? saved.look,
     instructions: edits.instructions ?? saved.instructions,
@@ -260,6 +262,8 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
     switch (field) {
       case "name":
         return { ...base, label: label("name"), was: saved.name, now: draft.name || t("agentPage.empty") };
+      case "handle":
+        return { ...base, label: label("handle"), was: `@${saved.handle}`, now: `@${draft.handle}` };
       case "role":
         return {
           ...base,
@@ -345,6 +349,9 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
   const fields = new Set(changes.map((c) => c.field));
   const errors = {
     name: fields.has("name") && !draft.name.trim() ? t("newAgent.errors.nameRequired") : undefined,
+    handle: fields.has("handle")
+      ? (handleProblemText(t, draft.handle, takenHandles(dir.agents, dir.members, agent.id)) ?? undefined)
+      : undefined,
     budget: edits.budget !== undefined && readBudget(edits.budget).invalid ? t("agent.budgetInvalid") : undefined,
     audience:
       (fields.has("audience") || fields.has("owner")) &&
@@ -358,7 +365,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
         ? t("repos.emptyError")
         : undefined,
   };
-  const problem = errors.name ?? errors.budget ?? errors.audience ?? errors.repos;
+  const problem = errors.name ?? errors.handle ?? errors.budget ?? errors.audience ?? errors.repos;
   const dirty = changes.length > 0;
 
   /* ---------- Editing ---------- */
@@ -366,7 +373,9 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
   const set: AgentEdit["set"] = (field, value) => setEdits((e) => ({ ...e, [field]: value }));
   const setLevel = (id: string, level: Level) =>
     setEdits((e) => ({ ...e, levels: { ...(e.levels ?? {}), [id]: level } }));
-  const revert = (key: string) => setEdits((e) => revertKey(e, key));
+  // Undoing the @ a new name gave keeps the one it has; any other change goes back to what is saved.
+  const revert = (key: string) =>
+    setEdits((e) => (key === "handle" ? { ...e, handle: saved.handle } : revertKey(e, key)));
   const discard = () => setEdits({});
 
   const goTo = (next: AgentTab, sec?: AgentSection) => {
@@ -400,13 +409,14 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
       if (silent) toast.show(errorText(t, e), "error");
     };
     // 1. The agent itself: one PATCH (the owner may send only the look and the audience).
-    const patch: Partial<Omit<AgentInput, "handle">> = {};
+    const patch: Partial<AgentInput> = {};
     const patchFields: Field[] = [];
     const put = <K extends keyof typeof patch>(field: Field, k: K, v: (typeof patch)[K]) => {
       patch[k] = v;
       patchFields.push(field);
     };
     if (fields.has("name")) put("name", "name", draft.name.trim());
+    if (fields.has("handle")) put("handle", "handle", draft.handle);
     if (fields.has("role")) put("role", "role", draft.role.trim());
     if (fields.has("instructions")) put("instructions", "instructions", draft.instructions);
     if (fields.has("model")) put("model", "model", draft.model);
