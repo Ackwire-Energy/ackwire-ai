@@ -216,7 +216,8 @@ export function databaseRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Set an agent's access to a database: read or not, and its rules (admins)",
-      description: "Tables are `schema.table` and hidden columns `schema.table.column` (`public` when no schema).",
+      description:
+        'Tables are `schema.table` and hidden columns `schema.table.column` (`public` when no schema), written as SQL: names with capitals, spaces, dots or symbols in double quotes (`dbo.customers."Tax ID"`).',
       request: {
         params: AgentParams.extend({ connectionId: z.uuid() }),
         body: body(z.object({ level: z.enum(["none", "read"]), policy: DatabasePolicy })),
