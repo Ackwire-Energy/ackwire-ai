@@ -1,6 +1,6 @@
 # 0008. Agent runs: a Postgres state machine; mentions and the hop limit
 
-- Status: Accepted. Amended 2026-10-31 by ADR 0089: the hop limit is a depth backstop (`AGENT_MAX_HOPS`, default 100) behind the limits per stretch
+- Status: Accepted. Amended 2026-10-31 by ADR 0089: the hop limit is a depth backstop (`AGENT_MAX_HOPS`, default 100) behind the limits per stretch. Addendum 2026-10-31: a renamed agent's @handle follows its name
 - Date: 2026-10-14
 
 ## Decision
@@ -37,3 +37,29 @@ the executor, which posts it in the run's thread (`meta.question`), stores an
 same statement that writes the reply; that reply starts no other run), or
 after 24 hours, when the model is told nobody answered. A run waiting on
 both an approval and a question resumes only when neither is pending.
+
+## Addendum (2026-10-31): a renamed agent's handle follows its name; the old one keeps working
+
+Renaming an agent (Identidade on its page, Editar on the phone) moves its @handle to the one the new name gives, shown
+under "Menções" while the name is typed and editable before saving. Who may rename it (`manage_agents`) may move it.
+The handle it leaves goes to `agents.previous_handles` (migration 0140: a column with an empty default, no row
+rewritten). Renaming back takes it out again, and deleting the agent (ADR 0082) empties the list, so those handles are
+free again.
+
+- **One place reads an old handle.** `loadOldHandles` (`packages/engine/src/agents.ts`) maps every handle that names
+  an agent besides its own to that agent: its `previous_handles`, unless the agent is archived or an agent or a person
+  has that handle as their own now (it is theirs). It is kept per process (`caches.agents`), dropped by a rename, an
+  archive or a deletion here and seen by another replica within the cache's TTL. `currentHandles` maps written
+  handles through it, and every reader of a handle someone wrote asks it: a message's mentions (before the insert's
+  one statement) and the addressee check, `ask_agent`, `tell_agent`, `add_agent_to_channel`, `list_routines`, the forum
+  and setup tools (`agentsByHandle`), an issue's assignee, calendar participants and reflected lessons about an agent.
+  The agent list gives the apps each agent's (`previousHandles`, from `oldHandlesByAgent`), so an old message's "@ada"
+  shows the agent now called Claudio (`agentsByAnyHandle` in `@agenteschat/client`, where an agent's own handle wins).
+- **What a run reads.** Text that names an old handle (a routine's brief, memory, instructions, the conversation) gets
+  a per-turn "# Renamed agents" block with the handle each agent has now, so the run asks and mentions it by that one.
+  Its own identity, the channel's members and "# Your team" show the handle it has now: a rename drops the cached
+  channel members at once.
+- **Taken.** An agent takes a handle only when no other agent, archived or deleted, has it or had it, and no person has
+  it: else 409 `agent.handle_taken` with the first free one (`ada-2`), which the apps say under "Menções" before
+  saving. A new agent can't take another's old handle either, nor can a person take an active agent's.
+- **Git** (ADR 0024): branches under an old handle (`agentes/ada/…`) stay the agent's own in the proxy.
