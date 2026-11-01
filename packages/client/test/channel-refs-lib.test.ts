@@ -16,6 +16,8 @@ test("splits #names out of a text, keeping what was typed; never a#b, &#39; or #
   expect(splitChannelRefs("veja #Eng.")).toEqual([{ text: "veja " }, { text: "#Eng", name: "eng" }, { text: "." }]);
   expect(splitChannelRefs("a#b &#39; ##dois")).toEqual([{ text: "a#b &#39; ##dois" }]);
   expect(splitChannelRefs("(#infra)")).toEqual([{ text: "(" }, { text: "#infra", name: "infra" }, { text: ")" }]);
+  expect(splitChannelRefs("PR #2025, #42")).toEqual([{ text: "PR #2025, #42" }]);
+  expect(splitChannelRefs("#2025-plan").map((p) => p.name)).toEqual(["2025-plan"]);
 });
 
 test("the stored channel wins over the current names; else by name, ignoring case; unknown is null", () => {
@@ -38,6 +40,7 @@ test("the # picker: query at the caret, names starting with it first, then mine;
   expect(channelQuery("a#b", 3)).toBeNull();
   expect(channelOptions("en", [vendas, general, eng]).map((c) => c.name)).toEqual(["eng", "general", "vendas"]);
   expect(channelOptions("", [vendas, general, eng]).map((c) => c.name)).toEqual(["eng", "general", "vendas"]);
+  expect(channelOptions("20", [{ id: "c-y", name: "2025", isMember: true }, vendas])).toEqual([]);
   expect(channelOptions("ven", [vendas, general, eng]).map((c) => c.name)).toEqual(["vendas"]);
   expect(insertChannelRef("veja #en agora", { start: 5, query: "en" }, "eng")).toEqual({
     text: "veja #eng agora",

@@ -3,8 +3,11 @@
  * (`@agenteschat/client/lib/channel-refs`) and both composers, so what one suggests the others recognise.
  */
 
-/** `#name` after a space or punctuation, never `a#b`, `&#39;` or `##`. */
-export const CHANNEL_REF = /(^|[^\w#&/])#([a-zA-Z0-9][a-zA-Z0-9_-]{0,79})(?![\w-])/g;
+/**
+ * `#name` after a space or punctuation, never `a#b`, `&#39;` or `##`. It holds a letter, so `PR #123` or `#42` stays
+ * an issue number even where a channel is named with digits only.
+ */
+export const CHANNEL_REF = /(^|[^\w#&/])#(?=[\w-]*[a-zA-Z])([a-zA-Z0-9][a-zA-Z0-9_-]{0,79})(?![\w-])/g;
 
 /** "#que" right before the caret (start of text or after a space or bracket); null when not typing one. */
 export function channelQuery(text: string, caret: number): { start: number; query: string } | null {

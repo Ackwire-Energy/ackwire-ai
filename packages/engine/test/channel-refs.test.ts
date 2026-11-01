@@ -28,6 +28,8 @@ test("#names: lower case, once each, never in code, links, words or HTML entitie
     parseChannelNames("`#codigo` ```\n#bloco\n``` https://x.dev/#frag [ver](https://x.dev/#a) a#b &#39; ##dois"),
   ).toEqual([]);
   expect(parseChannelNames("# Título\n(#infra)")).toEqual(["infra"]);
+  expect(parseChannelNames("fixed in PR #2025, see #42 and #1-2")).toEqual([]);
+  expect(parseChannelNames("#2025-plan #fff")).toEqual(["2025-plan", "fff"]);
 });
 
 test("a message stores the channel each #name means, so a renamed channel still links", async () => {

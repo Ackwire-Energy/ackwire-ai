@@ -71,8 +71,11 @@ export function channelOptions<C extends { name: string; isMember: boolean }>(
 ): C[] {
   const q = query.toLowerCase();
   const rank = (c: C) => (c.name.startsWith(q) ? 0 : 1);
-  return channels
-    .filter((c) => c.name.includes(q))
-    .sort((a, b) => rank(a) - rank(b) || Number(b.isMember) - Number(a.isMember) || a.name.localeCompare(b.name))
-    .slice(0, limit);
+  return (
+    channels
+      // A name of digits only would never link (`CHANNEL_REF`).
+      .filter((c) => c.name.includes(q) && /[a-z]/.test(c.name))
+      .sort((a, b) => rank(a) - rank(b) || Number(b.isMember) - Number(a.isMember) || a.name.localeCompare(b.name))
+      .slice(0, limit)
+  );
 }
