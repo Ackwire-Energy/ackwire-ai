@@ -14,6 +14,7 @@ import {
   planIn,
   reportCounts,
   takesFiles,
+  todoHref,
 } from "../../src/features/agents/import";
 import { featureKeysEn } from "../../src/features/i18n/keys.en";
 import { featureKeysPtBR } from "../../src/features/i18n/keys.pt-BR";
@@ -201,5 +202,15 @@ describe("pasteAction", () => {
     expect(pasteAction('{"format":"agenteschat.bundle"}')).toBe("read");
     expect(pasteAction("x".repeat(3_000_000))).toBe("read");
     expect(pasteAction("  \n ")).toBeNull();
+  });
+});
+
+describe("todoHref", () => {
+  test("Connect opens Conectores, a file the Drive; a key or a model has no page on the phone", () => {
+    expect(todoHref("connection")).toBe("/connectors");
+    expect(todoHref("app")).toBe("/connectors");
+    expect(todoHref("file")).toBe("/drive");
+    expect(todoHref("secret")).toBeNull();
+    expect(todoHref("model")).toBeNull();
   });
 });

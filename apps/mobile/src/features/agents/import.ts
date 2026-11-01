@@ -1,4 +1,10 @@
-import type { ImportItemKind, ImportItemResult, ImportSkipReason, MigrationBundle } from "@agenteschat/client";
+import type {
+  BundleTodo,
+  ImportItemKind,
+  ImportItemResult,
+  ImportSkipReason,
+  MigrationBundle,
+} from "@agenteschat/client";
 import {
   choosable,
   IMPORT_KINDS,
@@ -162,3 +168,7 @@ export function reportCounts(report: readonly ImportItemResult[], asked: number)
   const done = report.filter((i) => i.action === "create" || i.action === "update").length;
   return { done, total: asked, partial: done < asked };
 }
+
+/** Where a to-do's action opens on the phone: Conectores or the Drive. A key is asked in the chat; a model has no page. */
+export const todoHref = (kind: BundleTodo["kind"]): "/connectors" | "/drive" | null =>
+  kind === "connection" || kind === "app" ? "/connectors" : kind === "file" ? "/drive" : null;

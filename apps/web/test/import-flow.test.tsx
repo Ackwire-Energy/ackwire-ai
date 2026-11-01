@@ -276,9 +276,9 @@ describe("Configurações → Importar e exportar", () => {
     await click(button(/^OpenClaw$/), 1);
     take(".imp-tip");
     await pick("Pasta para importar", folder("paperclip-company"));
-    take(".imp-note", ".imp-todo li");
+    take(".imp-note");
     await click(button(/^Importar \d+ itens/), 8);
-    take(".imp-missed li");
+    take(".imp-missed li", ".imp-todo li");
     for (const [selector, lines] of seen) {
       expect([selector, lines.length > 0]).toEqual([selector, true]);
       for (const line of lines) expect([selector, iconLine(line)]).toEqual([selector, true]);
@@ -319,11 +319,12 @@ describe("Configurações → Importar e exportar", () => {
     for (const group of ["Agentes", "Skills", "Rotinas", "Memória"]) {
       expect(screen().getByRole("region", { name: group })).toBeTruthy();
     }
-    expect(chipOf("Linus · Chief Technology Officer")).toBe("novo");
+    // A new row says nothing: no chip.
+    expect(chipOf("Linus · Chief Technology Officer")).toBeUndefined();
     const routines = screen().getByRole("region", { name: "Rotinas" });
-    expect(routines.textContent).toContain("Chegam pausadas");
-    // Skills land off: "Ligar" is the person's choice, for the agents that had them.
-    expect(screen().getByRole("switch", { name: "Ligar para Ada e Linus" }).getAttribute("aria-checked")).toBe("false");
+    // Skills arrive on and routines active: nothing to say, nothing to switch.
+    expect(text()).not.toContain("Chegam");
+    expect(screen().queryByRole("switch", { name: /^Ligar para/ })).toBeNull();
 
     const bring = (name: string) => screen().getByRole("checkbox", { name: `Trazer ${name}` });
     await click(bring("Ada"), 2);
@@ -333,19 +334,16 @@ describe("Configurações → Importar e exportar", () => {
     expect(chipOf("Heartbeat")).toBe("pulado");
     expect(row("Heartbeat").textContent).toContain("O agente dela não vem.");
 
-    // After importing, and what doesn't come along.
-    const todo = screen().getByRole("region", { name: "Depois de importar" });
-    expect(todo.textContent).toContain("GH_TOKEN: não vem no arquivo. Se um agente precisar, ele pede no chat.");
-    expect(todo.textContent).toContain("Para Ada e Linus");
-    const left = screen().getByRole("region", { name: "O que não vem junto" });
-    for (const what of ["gpt-imaginary-2", "Landing page", "Engineering"]) expect(left.textContent).toContain(what);
+    // What to set up comes after the import; what doesn't come along isn't listed.
+    expect(screen().queryByRole("list", { name: "Para configurar" })).toBeNull();
+    expect(text()).not.toContain("O que não vem junto");
+    expect(text()).not.toContain("gpt-imaginary-2");
 
-    await click(screen().getByRole("switch", { name: "Ligar para Linus" }), 2);
     await click(button("Importar 3 itens"), 8);
     const applied = applies(state).filter((i) => !i.dryRun);
     expect(applied).toHaveLength(1);
     expect(applied[0]?.pick).toEqual(["skill:review", "agent:cto", "note:COMPANY.md"]);
-    expect(applied[0]?.enableSkills).toEqual(["skill:review"]);
+    expect("enableSkills" in (applied[0] ?? {})).toBe(false);
     // Every agent goes along, so the handles new ones get don't depend on the pick; only the picked one comes.
     expect(applied[0]?.bundle.agents.map((a) => a.key)).toEqual(["ceo", "cto"]);
 
@@ -361,6 +359,15 @@ describe("Configurações → Importar e exportar", () => {
     expect(within(report).getByRole("link", { name: "Abrir Skills" }).getAttribute("href")).toBe(
       `/org/${ORG_ID}/settings/skills`,
     );
+    const todo = screen().getByRole("list", { name: "Para configurar" });
+    expect(
+      within(todo)
+        .getAllByRole("listitem")
+        .map((li) => li.textContent),
+    ).toEqual([
+      "Ada usa GH_TOKEN. Não vem no arquivo: o agente pede no chat.",
+      "Ada e Linus usam OPENAI_API_KEY. Não vem no arquivo: os agentes pedem no chat.",
+    ]);
     await click(button("Importar outro arquivo"), 2);
     expect(document.activeElement?.textContent).toContain("Solte aqui a pasta, o arquivo ou o .zip");
   });
@@ -410,7 +417,7 @@ describe("Configurações → Importar e exportar", () => {
     expect(chipOf("pricing-policy")).toBe("já está aqui");
     expect(chipOf("research-brief")).toBe("pulado");
     expect(row("research-brief").textContent).toContain("Já existe uma skill com esse nome aqui. Ela fica como está.");
-    expect(chipOf("Morgan · Sales lead")).toBe("novo");
+    expect(chipOf("Morgan · Sales lead")).toBeUndefined();
     expect(row("Morgan · Sales lead").textContent).toContain("Vira @lead2: o @lead já existe aqui.");
     expect(chipOf("Scout · Prospect researcher")).toBe("vai atualizar");
     expect(row("Scout · Prospect researcher").textContent).toContain("Mudou no outro app desde a última importação");
@@ -679,24 +686,6 @@ describe("Configurações → Importar e exportar", () => {
     expect(screen().getByRole("status").textContent).toContain("Comparando com o que já está aqui…");
   });
 
-  test("a skill's Ligar names only the agents this import brings: one already here turns it on in its own page", async () => {
-    const state = seedState();
-    const api = createFakeApi(state);
-    withPlan(api, state, () => [
-      { kind: "skill", key: "review", label: "review", action: "create" },
-      { kind: "agent", key: "cto", label: "Linus", action: "create" },
-      { kind: "agent", key: "ceo", label: "Ada", action: "unchanged" },
-    ]);
-    await go(state, api);
-    await pick("Pasta para importar", folder("paperclip-company"));
-    expect(screen().getByRole("switch", { name: "Ligar para Linus" })).toBeTruthy();
-    expect(screen().queryByRole("switch", { name: /Ada/ })).toBeNull();
-    // Linus unchecked: nobody coming uses it.
-    await click(screen().getByRole("checkbox", { name: "Trazer Linus" }), 2);
-    expect(screen().queryByRole("switch", { name: /^Ligar para/ })).toBeNull();
-    expect(row("review").textContent).toContain("Nenhum agente que vem usa esta skill.");
-  });
-
   test("an apply that fails keeps what came, says so, and Importar again brings the rest", async () => {
     const state = seedState();
     const api = createFakeApi(state);
@@ -716,7 +705,16 @@ describe("Configurações → Importar e exportar", () => {
     await click(button("Importar 11 itens"), 8);
     expect(screen().getByRole("heading", { name: "Chegou tudo" })).toBeTruthy();
     expect(text()).toContain("3 agentes");
-    expect(text()).toContain("Chegaram pausadas: ligue em Rotinas quando quiser.");
+    expect(text()).not.toContain("pausadas");
+    // What to set up: one plain line each, with where it's done.
+    const hubspot = within(screen().getByRole("list", { name: "Para configurar" }))
+      .getAllByRole("listitem")
+      .find((li) => li.textContent?.startsWith("Esta importação usa o HubSpot."));
+    expect(
+      within(hubspot as HTMLElement)
+        .getByRole("link", { name: "Conectar" })
+        .getAttribute("href"),
+    ).toBe(`/org/${ORG_ID}/settings/connectors`);
   });
 
   describe("an OpenBot.run export with the agents' own files", () => {
@@ -762,12 +760,10 @@ describe("Configurações → Importar e exportar", () => {
       ).toBe("true");
       expect(files.textContent).toContain("Drive\u00a0›\u00a0Scout");
       expect(files.textContent).toContain("3 arquivos · 51 bytes");
-      // What stays behind: system files here, keys with what never comes.
+      // What stays behind: system files here; keys aren't even listed.
       expect(files.textContent).toContain("Arquivos do sistema");
       expect(files.textContent).toContain(".DS_Store, ._rivals.txt");
-      expect(screen().getByRole("region", { name: "O que não vem junto" }).textContent).toContain(
-        "agents/scout/files/.env",
-      );
+      expect(text()).not.toContain("agents/scout/files/.env");
       expect(copies(state)).toEqual([]);
 
       await importIt();

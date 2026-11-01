@@ -7,12 +7,14 @@ import {
   importFailureText,
   kindsLine,
   retryable,
+  todoLine,
 } from "@agenteschat/client/lib/import/flow";
-import { EXPORT_PROMPT, groupLeftOut } from "@agenteschat/client/lib/import/index";
+import { EXPORT_PROMPT } from "@agenteschat/client/lib/import/index";
 import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
 import { Image } from "expo-image";
+import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
@@ -20,7 +22,16 @@ import { AgentAvatar, Button, Card, Icon, LogoMark, Text, Toggle, useTheme } fro
 import { tapHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { fullLook } from "./edit";
-import { agentRows, isRequestCard, kindGroups, pasteAction, phoneOffline, phonePicks, takesFiles } from "./import";
+import {
+  agentRows,
+  isRequestCard,
+  kindGroups,
+  pasteAction,
+  phoneOffline,
+  phonePicks,
+  takesFiles,
+  todoHref,
+} from "./import";
 import { IMPORT_LOGO } from "./import-logos";
 import type { AgentImport } from "./useAgentImport";
 
@@ -257,10 +268,6 @@ function Preview({ imp, orgId }: { imp: AgentImport; orgId: string }) {
   const agents = agentRows(bundle, items, pick, imp.blocked);
   const groups = kindGroups(items, pick, imp.blocked);
   const summary = kindsLine(t, (kind) => items.filter((i) => i.kind === kind && i.action !== "skip").length);
-  const left = groupLeftOut(bundle.leftOut);
-  const skills = groups.some((g) => g.kind === "skill");
-  const routines = groups.some((g) => g.kind === "routine");
-  const arrives = skills && routines ? "both" : skills ? "skill" : routines ? "routine" : null;
   const nameOf = (key: string) => bundle.agents.find((a) => a.key === key)?.name ?? key;
 
   return (
@@ -292,11 +299,11 @@ function Preview({ imp, orgId }: { imp: AgentImport; orgId: string }) {
       </Text>
       <Card>
         {agents.map((a, i) => {
-          const status = t(`onboarding.import.status.${a.status}`);
+          // A new agent says nothing: it's what every row would say.
+          const status = a.status === "create" ? "" : t(`onboarding.import.status.${a.status}`);
           const why = a.reason ? t(`onboarding.import.why.${a.reason}`) : "";
           const renamed = a.wanted ? t("onboarding.import.renamed", { handle: a.handle, wanted: a.wanted }) : "";
-          // "new" is what every row would say: only what differs gets a line.
-          const note = [a.status === "create" ? "" : status, why, renamed].filter(Boolean).join(" · ");
+          const note = [status, why, renamed].filter(Boolean).join(" · ");
           return (
             <Pressable
               key={a.id}
@@ -361,41 +368,33 @@ function Preview({ imp, orgId }: { imp: AgentImport; orgId: string }) {
               );
             })}
           </Card>
-          {arrives ? (
-            <Text variant="footnote" tone="faint">
-              {t(`mobile.newAgent.import.arrives.${arrives}`)}
-            </Text>
-          ) : null}
         </>
       ) : null}
 
       {bundle.todo.length > 0 ? (
-        <>
-          <Text variant="footnote" tone="faint" style={styles.gapTop}>
-            {t("onboarding.import.todoTitle")}
-          </Text>
-          {bundle.todo.map((todo) => (
-            <Text key={`${todo.kind}:${todo.label}`} variant="footnote" tone="ink2">
-              {[
-                t(`onboarding.import.todo.${todo.kind}`, { label: todo.label }),
-                todo.agents.length > 0
-                  ? t("onboarding.import.todoFor", { names: todo.agents.map(nameOf).join(", ") })
-                  : "",
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </Text>
-          ))}
-        </>
+        <View style={styles.todos}>
+          {bundle.todo.map((todo) => {
+            const href = todoHref(todo.kind);
+            return (
+              <View key={`${todo.kind}:${todo.label}`} style={styles.todo}>
+                <Text variant="footnote" tone="ink2" style={styles.fill}>
+                  {todoLine(t, todo, nameOf)}
+                </Text>
+                {href ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    label={t(`onboarding.import.needDo.${todo.kind as "connection" | "app" | "file"}`)}
+                    disabled={applying}
+                    onPress={() => router.push(href)}
+                  />
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
       ) : null}
 
-      {left.length > 0 ? (
-        <Text variant="footnote" tone="faint" style={styles.gapTop}>
-          {t("mobile.newAgent.import.leftOut", {
-            groups: left.map((g) => t(`onboarding.import.leftOut.${g.kind}`)).join(", "),
-          })}
-        </Text>
-      ) : null}
       <Note icon="lock">{t("onboarding.import.never")}</Note>
 
       {imp.progress ? (
@@ -452,4 +451,6 @@ const styles = StyleSheet.create({
   kindRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 13, paddingHorizontal: 14 },
   where: { paddingLeft: 60, paddingRight: 14, paddingBottom: 12 },
   note: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginTop: 6 },
+  todos: { gap: 10, marginTop: 14 },
+  todo: { flexDirection: "row", alignItems: "center", gap: 12 },
 });

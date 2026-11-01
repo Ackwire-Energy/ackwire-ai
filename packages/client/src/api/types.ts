@@ -3748,8 +3748,6 @@ export interface ImportInput {
    * in the plan's order (each call is safe to repeat).
    */
   pick?: string[];
-  /** `skill:key` of the skills to turn on for their agents; imported skills land off otherwise. */
-  enableSkills?: string[];
 }
 
 export interface ImportPlan {

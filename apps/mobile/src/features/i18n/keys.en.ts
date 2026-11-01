@@ -693,13 +693,7 @@ export const featureKeysEn: FeatureTranslations = {
         "The phone doesn't open .zip or .tar.gz files. In the Files app, tap the .zip to unzip it and pick the files inside, or import on the computer.",
       privacy: "Read on this phone. Key and login files are never opened.",
       also: "Also comes along",
-      arrives: {
-        both: "Skills arrive off and routines arrive paused.",
-        skill: "Skills arrive off.",
-        routine: "Routines arrive paused.",
-      },
       change: "Change",
-      leftOut: "Doesn't come along: {{groups}}",
       arrived_one: "{{name}} arrived",
       arrived_other: "{{count}} agents arrived",
       partial: "{{done}} of {{total}} arrived. Importing again brings the rest.",

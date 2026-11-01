@@ -42,7 +42,7 @@ function bundleRoutine(r: RoutineRow, channelIds: Set<string>): BundleRoutine | 
  * importable into another one (self-host ↔ Cloud) through `applyImport`.
  * Keys are our ids. Agents with their look and the skills they have on;
  * skills as `SKILL.md` (their other files are listed as left out); public
- * channels with their agents; scheduled routines (imports land paused);
+ * channels with their agents; scheduled routines;
  * memory everyone here can see, up to the import limit, most relevant
  * first. Never credentials, connections or their tokens, computers, runs,
  * usage, audit or messages.

@@ -8,6 +8,8 @@ import type {
   MigrationBundle,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
+import type { TFunction } from "i18next";
+import { createI18n } from "@/i18n";
 import { type AgentFile, ImportError } from "@/lib/import";
 import {
   agentsArrived,
@@ -23,6 +25,7 @@ import {
   picksOf,
   retryable,
   sliceBundle,
+  todoLine,
 } from "@/lib/import-flow";
 
 const bundle = (over: Partial<MigrationBundle> = {}): MigrationBundle => ({
@@ -213,15 +216,9 @@ describe("applying in chunks", () => {
   test(`at most ${PER_APPLY} per call, in the plan's order; the report adds them up`, async () => {
     const { api, inputs } = server();
     const progress: number[] = [];
-    const report = await applyInChunks(
-      api,
-      "org",
-      { bundle: many, pick: ids, enableSkills: ["skill:x"] },
-      new Map(),
-      (n) => progress.push(n),
-    );
+    const report = await applyInChunks(api, "org", { bundle: many, pick: ids }, new Map(), (n) => progress.push(n));
     expect(inputs.map((i) => i.pick?.length)).toEqual([200, 200, 50]);
-    expect(inputs.every((i) => i.dryRun === false && i.enableSkills?.[0] === "skill:x")).toBe(true);
+    expect(inputs.every((i) => i.dryRun === false)).toBe(true);
     expect(inputs[1]?.bundle.notes.map((n) => n.key)).toEqual(ids.slice(200, 400).map((id) => id.slice(5)));
     expect(progress).toEqual([200, 400, 450]);
     expect(report.map((i) => `${i.kind}:${i.key}`)).toEqual(ids);
@@ -231,7 +228,7 @@ describe("applying in chunks", () => {
   test("after a chunk fails, trying again keeps what the first try made as made", async () => {
     const { api, inputs } = server((call) => call === 2);
     const done = new Map<string, ImportItemResult>();
-    const input = { bundle: many, pick: ids, enableSkills: [] };
+    const input = { bundle: many, pick: ids };
     await expect(applyInChunks(api, "org", input, done)).rejects.toThrow("down");
     const report = await applyInChunks(api, "org", input, done);
     expect(inputs).toHaveLength(5);
@@ -389,5 +386,31 @@ describe("the agents' files to the Drive", () => {
     expect(notes).toEqual([
       { key: "scout/drive-files", agent: "scout", kind: "fact", content: "Seus arquivos estão em Drive › Scout." },
     ]);
+  });
+});
+
+describe("todoLine", () => {
+  const pt = createI18n("pt-BR");
+  const en = createI18n("en");
+  const names: Record<string, string> = { ada: "Ada", theo: "Theo" };
+  const nameOf = (key: string) => names[key] ?? key;
+  const line = (lang: typeof pt, todo: MigrationBundle["todo"][number]) =>
+    todoLine(lang.t.bind(lang) as TFunction, todo, nameOf);
+
+  test("says who needs what, one agent or several, in both languages", () => {
+    expect(line(pt, { kind: "app", label: "HubSpot", agents: ["ada"] })).toBe("Ada usa o HubSpot.");
+    expect(line(pt, { kind: "connection", label: "HubSpot", agents: ["ada", "theo"] })).toBe(
+      "Ada e Theo usam o HubSpot.",
+    );
+    expect(line(en, { kind: "app", label: "HubSpot", agents: ["ada"] })).toBe("Ada uses HubSpot.");
+    expect(line(en, { kind: "app", label: "HubSpot", agents: ["ada", "theo"] })).toBe("Ada and Theo use HubSpot.");
+  });
+
+  test("with no agent named, the import is the subject; a key says the agent asks for it", () => {
+    expect(line(pt, { kind: "app", label: "Reddit", agents: [] })).toBe("Esta importação usa o Reddit.");
+    expect(line(en, { kind: "app", label: "Reddit", agents: [] })).toBe("This import uses Reddit.");
+    expect(line(pt, { kind: "secret", label: "GH_TOKEN", agents: ["ada"] })).toBe(
+      "Ada usa GH_TOKEN. Não vem no arquivo: o agente pede no chat.",
+    );
   });
 });

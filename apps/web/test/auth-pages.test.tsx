@@ -2809,19 +2809,16 @@ describe("Onboarding", () => {
     const bring = (name: string) => screen().getByRole("checkbox", { name: `Trazer ${name}` });
     for (const name of ["Morgan", "Scout", "Quill"]) expect(bring(name).getAttribute("aria-checked")).toBe("true");
     const text = document.body.textContent ?? "";
-    // Skills, the room and the routines come along; connections are to-dos after importing.
+    // Skills, the room and the routines come along; connections are to-dos after the import, not in the preview.
     for (const name of ["pricing-policy", "research-brief", "objection-handling", "#deal-desk", "Daily digest"]) {
       expect(text).toContain(name);
     }
-    expect(text).toContain("Conectar CRM (mcp.example.com)");
-    expect(text).toContain("O que não vem junto");
+    expect(text).not.toContain("CRM (mcp.example.com)");
+    expect(text).not.toContain("O que não vem junto");
     expect(text).toContain("Chaves, senhas e histórico de conversa nunca vêm.");
     expect(text).toContain("Chega quando você criar o time.");
-    // Only the groups whose items arrive changed say so: skills off, routines paused.
-    expect([...document.querySelectorAll(".imp-group__help")].map((h) => h.textContent)).toEqual([
-      "Chegam desligadas.",
-      "Chegam pausadas.",
-    ]);
+    // Skills arrive on and routines active: no group says otherwise.
+    expect(document.querySelectorAll(".imp-group__help")).toHaveLength(0);
     expect(document.querySelector(".imp-block__help")).toBeNull();
     // Nothing is saved while reading: the server only planned it.
     expect(calls(state, "agents.create")).toHaveLength(0);
@@ -2883,9 +2880,6 @@ describe("Onboarding", () => {
     await throughContext(state);
     await click(button(/OpenMausBot/), 1);
     await pickFiles([new File([fixture("sales-desk.openmaus.json")], "sales-desk.openmaus.json")]);
-    // The to-dos say what to set up, with no link to a page of the workspace (each leads back here until it's set up).
-    expect(document.body.textContent).toContain("Conectar CRM (mcp.example.com)");
-    expect(screen().queryByRole("link", { name: /Abrir Conectores/ })).toBeNull();
     await click(screen().getByRole("checkbox", { name: "Trazer Quill" }), 1);
     await next();
     // Picked, not in yet: a reload comes back to the import step, where the file is read again.
@@ -2898,6 +2892,10 @@ describe("Onboarding", () => {
     await next();
     expect(screen().getByRole("heading", { name: "Chegou tudo" })).toBeTruthy();
     expect(document.querySelectorAll(".imp-report a")).toHaveLength(0);
+    // After the import, what to set up, one line each, with no link to a page of the workspace (each leads back
+    // here until it's set up).
+    expect(document.querySelector(".imp-report")?.textContent).toContain("Morgan e Scout usam o CRM (mcp.example.com)");
+    expect(screen().queryByRole("link", { name: "Conectar" })).toBeNull();
 
     // Opened again: the rail says what the import brought, not that it was skipped, and so does its step.
     cleanup();
@@ -2940,9 +2938,9 @@ describe("Onboarding", () => {
     expect(screen().getByRole("checkbox", { name: "Trazer General Assistant" })).toBeTruthy();
     expect(screen().getByRole("checkbox", { name: "Trazer Knowledge" })).toBeTruthy();
     const text = document.body.textContent ?? "";
-    expect(text).toContain("Risk Analyst (remote-ag-ui), Your Bot (remote-ag-ui)");
-    expect(text).toContain("openai/gpt-5.6-terra");
-    expect(text).toContain("openai-api-key");
+    // What doesn't come along isn't listed, and what to set up waits for the import.
+    expect(text).not.toContain("Risk Analyst");
+    expect(text).not.toContain("openai-api-key");
     expect(button("Continuar").hasAttribute("disabled")).toBe(false);
 
     // Skipped: nothing imported reaches the agents step, which offers the whole team.

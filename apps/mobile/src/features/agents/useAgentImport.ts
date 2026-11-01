@@ -89,18 +89,14 @@ export function useAgentImport(orgId: string) {
   const blocked = planned ? blockedItems(planned.bundle, planned.items, pick) : new Map();
   const picks = planned ? picksOf(planned.items, pick, blocked) : [];
 
-  /** Applies what is picked; skills arrive off, as on the web unless turned on there. `null`: it failed (`applyError`). */
+  /** Applies what is picked. `null`: it failed (`applyError`). */
   const apply = async (): Promise<ImportItemResult[] | null> => {
     if (!planned || picks.length === 0) return [];
     setApplyError(null);
     setProgress({ done: 0, total: picks.length });
     try {
-      return await applyInChunks(
-        api,
-        planned.orgId,
-        { bundle: planned.bundle, pick: picks, enableSkills: [] },
-        done.current,
-        (n) => setProgress({ done: n, total: picks.length }),
+      return await applyInChunks(api, planned.orgId, { bundle: planned.bundle, pick: picks }, done.current, (n) =>
+        setProgress({ done: n, total: picks.length }),
       );
     } catch (e) {
       setApplyError(e);

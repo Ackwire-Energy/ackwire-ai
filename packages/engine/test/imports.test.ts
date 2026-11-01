@@ -13,7 +13,7 @@ import {
   type ImportPlan,
   insertMessage,
   type MigrationBundle,
-  setRoutineActive,
+  setAgentSkills,
   updateMyProfile,
   ValidationError,
 } from "../src";
@@ -129,7 +129,7 @@ describe("planning and applying an import", () => {
     expect(byKey(plan.items).get("agent:closer")?.reason).toBeUndefined();
   });
 
-  test("apply creates everything (routines paused, skills off); again: all unchanged; a changed source: update", async () => {
+  test("apply creates everything (routines active, skills on for their agents); again: all unchanged; a changed source: update", async () => {
     f = await setup();
     const plan = await run({ bundle: bundle() });
     expect(plan.items.every((i) => i.action === "create" && i.targetId)).toBe(true);
@@ -150,7 +150,7 @@ describe("planning and applying an import", () => {
       .select()
       .from(schema.agentSkills)
       .where(eq(schema.agentSkills.skillId, skill?.id ?? ""));
-    expect(on.filter((r) => r.enabled)).toEqual([]);
+    expect(on.filter((r) => r.enabled).map((r) => r.agentId)).toEqual([scout?.id ?? ""]);
 
     const [room] = await f.db.select().from(schema.channels).where(eq(schema.channels.name, "vendas"));
     expect(room?.topic).toBe("Pipeline da semana");
@@ -169,12 +169,8 @@ describe("planning and applying an import", () => {
       .select()
       .from(schema.routines)
       .where(eq(schema.routines.id, ids.get("routine:daily")?.targetId ?? ""));
-    expect(routine).toMatchObject({
-      active: false,
-      nextRunAt: null,
-      triggerType: "schedule",
-      timezone: "America/Sao_Paulo",
-    });
+    expect(routine).toMatchObject({ active: true, triggerType: "schedule", timezone: "America/Sao_Paulo" });
+    expect(routine?.nextRunAt?.getTime()).toBeGreaterThan(Date.now());
     expect(routine?.target).toEqual({ type: "channel", channelId: room?.id });
 
     const notes = await f.db.select().from(schema.contextItems).where(eq(schema.contextItems.orgId, f.org.id));
@@ -257,9 +253,9 @@ describe("planning and applying an import", () => {
     expect(byKey(plan.items).get("routine:daily")).toMatchObject({ action: "skip", reason: "channel_not_picked" });
   });
 
-  test("skills land off unless enabled, and never as defaults for new agents", async () => {
+  test("skills arrive on for the agents that had them, never as defaults; one turned off stays off", async () => {
     f = await setup();
-    const plan = await run({ bundle: bundle(), enableSkills: ["skill:weekly"] });
+    const plan = await run({ bundle: bundle() });
     const scout = byKey(plan.items).get("agent:scout")?.targetId ?? "";
     const closer = byKey(plan.items).get("agent:closer")?.targetId ?? "";
     const skillId = byKey(plan.items).get("skill:weekly")?.targetId ?? "";
@@ -268,6 +264,11 @@ describe("planning and applying an import", () => {
     expect(rows.some((r) => r.agentId === closer)).toBe(false);
     const [skill] = await f.db.select().from(schema.skills).where(eq(schema.skills.id, skillId));
     expect(skill?.defaultForNewAgents).toBe(false);
+
+    await setAgentSkills(f.db, f.owner.id, f.org.id, scout, [{ skillId, enabled: false }]);
+    await run({ bundle: bundle() });
+    const after = await f.db.select().from(schema.agentSkills).where(eq(schema.agentSkills.skillId, skillId));
+    expect(after.filter((r) => r.enabled)).toEqual([]);
   });
 
   test("text that looks like a credential never comes; what depends on a skipped agent is skipped", async () => {
@@ -327,7 +328,7 @@ describe("planning and applying an import", () => {
     });
   });
 
-  test("schedules: a one-off and the picker's once land as one-time rules (paused, still fire once on); the past and nonsense are skipped", async () => {
+  test("schedules: a one-off and the picker's once land as one-time rules (active, with a next run); the past and nonsense are skipped", async () => {
     f = await setup();
     const soon = new Date(Date.now() + 3 * 86_400_000);
     const day = soon.toISOString().slice(0, 10);
@@ -358,10 +359,9 @@ describe("planning and applying an import", () => {
       const id = items.get(`routine:${key}`)?.targetId ?? "";
       expect(items.get(`routine:${key}`)?.action).toBe("create");
       const [row] = await f.db.select().from(schema.routines).where(eq(schema.routines.id, id));
-      expect(row).toMatchObject({ active: false, nextRunAt: null, triggerType: "schedule" });
+      expect(row).toMatchObject({ active: true, triggerType: "schedule" });
+      expect(row?.nextRunAt?.getTime()).toBeGreaterThan(Date.now());
       expect(row?.target).toEqual({ type: "dm" });
-      const resumed = await setRoutineActive({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, id, true);
-      expect(resumed.nextRunAt).not.toBeNull();
     }
     const [once] = await f.db
       .select()
@@ -479,17 +479,17 @@ describe("importing the same package again", () => {
     expect(byKey((await run({ bundle: bundle(), dryRun: true })).items).get("agent:scout")?.action).toBe("unchanged");
   });
 
-  test("a skill it made and an admin deleted comes back off for every agent, as on a first import", async () => {
+  test("a skill it made and an admin deleted comes back on only for the agents that bring it, as on a first import", async () => {
     f = await setup();
-    const first = await run({ bundle: bundle(), enableSkills: ["skill:weekly"] });
+    const first = await run({ bundle: bundle() });
+    const scout = byKey(first.items).get("agent:scout")?.targetId ?? "";
     const skillId = byKey(first.items).get("skill:weekly")?.targetId ?? "";
     await deleteSkill(f.db, f.owner.id, f.org.id, skillId);
 
     const again = await run({ bundle: bundle() });
     expect(byKey(again.items).get("skill:weekly")).toMatchObject({ action: "create", targetId: skillId });
     const rows = await f.db.select().from(schema.agentSkills).where(eq(schema.agentSkills.skillId, skillId));
-    expect(rows.length).toBeGreaterThan(0);
-    expect(rows.filter((r) => r.enabled)).toEqual([]);
+    expect(rows.filter((r) => r.enabled).map((r) => r.agentId)).toEqual([scout]);
   });
 });
 
