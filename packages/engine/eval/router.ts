@@ -466,6 +466,23 @@ export const ROUTER_CASES: RouterCase[] = [
     message: "how much cpu and ram is our machine using right now?",
     answers: ["atlas"],
   },
+  // The same follow-up sent while every agent is still on the first question, before any reply.
+  {
+    id: "pt-shared-machine-mid-run",
+    lang: "pt",
+    kind: "anyone",
+    before: [{ from: "Ana", text: "como tá o limite de uso de vocês?" }],
+    message: "quanto de cpu e ram nossa máquina tá usando agora?",
+    answers: ["atlas"],
+  },
+  {
+    id: "en-shared-machine-mid-run",
+    lang: "en",
+    kind: "anyone",
+    before: [{ from: "Ana", text: "how are your usage limits looking, all of you?" }],
+    message: "how much cpu and ram is our machine using right now?",
+    answers: ["atlas"],
+  },
   {
     id: "pt-person",
     lang: "pt",
