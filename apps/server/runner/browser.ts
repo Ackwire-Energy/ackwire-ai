@@ -5,6 +5,7 @@ import { existsSync, lstatSync, mkdirSync, readdirSync, statSync } from "node:fs
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { AGENT_BROWSER_PROFILE } from "@agenteschat/adapters/command-policy";
 import { cgroupCounters } from "@agenteschat/adapters/host-stats";
 import {
   AGENT_BROWSER_SHA256,
@@ -1753,7 +1754,7 @@ export class BrowserManager {
       void this.stopChrome(s);
     }
     await this.ensureReady();
-    await mkdir(path.join(folder, ".agentes", "browser"), { recursive: true });
+    await mkdir(path.join(folder, AGENT_BROWSER_PROFILE), { recursive: true });
     // Where screenshots and downloads land: there before the first one (the browser doesn't make them).
     await mkdir(path.join(folder, "screenshots"), { recursive: true });
     await mkdir(path.join(folder, "downloads"), { recursive: true });

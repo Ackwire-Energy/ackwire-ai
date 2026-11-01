@@ -1,7 +1,7 @@
 import type { Dirent } from "node:fs";
 import { lstat, mkdir, readdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { ASK_AGAIN } from "@agenteschat/adapters/command-policy";
+import { ASK_AGAIN, inBrowserProfile } from "@agenteschat/adapters/command-policy";
 import {
   type AgentScope,
   browserSetupOf,
@@ -312,10 +312,16 @@ async function doExec(
   });
 }
 
-/** A file that holds a secret is only for programs on this machine, never sent out. */
+/**
+ * A file that holds a secret is only for programs on this machine, never sent out (nor a folder that holds it), and
+ * so is an agent browser's profile, its logins: a folder that holds one goes without it (`zipFolder`).
+ */
 async function refuseSecretFile(ctx: HandlerContext, secrets: Secrets, requested: string) {
-  if (!secrets || secrets.files.length === 0) return;
   const target = await resolvePath(ctx, requested);
+  if (inBrowserProfile(target.abs)) {
+    throw new RunnerError("bad_request", `${requested} holds your browser's logins. It stays on this computer.`);
+  }
+  if (!secrets || secrets.files.length === 0) return;
   for (const file of secrets.files) {
     const held = await resolveInWorkspace(ctx.workspaceReal, file).catch(() => null);
     if (held && (held.abs === target.abs || isInside(target.abs, held.abs))) {

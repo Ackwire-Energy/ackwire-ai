@@ -463,7 +463,34 @@ describe("secrets are refused to every read tool", () => {
     const mission = "/Users/w/agentes/ada/mission-1/.agentes/mission.md";
     expect(secretRead("Read", { file_path: mission }, scope)).toBe(false);
     expect(bash(`cat ${mission}`)).toBe(true);
-    expect(SECRET_READ_DENY_RULES.some((r) => r.startsWith("Read(**/.agentes/"))).toBe(false);
+    expect(SECRET_READ_DENY_RULES).not.toContain("Read(**/.agentes/**)");
+  });
+
+  test("the agent's browser profile (its logins) stays out of its commands; its mission files don't", () => {
+    const agentScope = { cwd: "/Users/w/agentes/ada", folders: ["/Users/w/agentes/ada"], home: "/Users/w" };
+    const cookies = ".agentes/browser/Default/Cookies";
+    for (const spelled of [cookies, `./${cookies}`, `/Users/w/agentes/ada/${cookies}`, ".agentes/browser"]) {
+      expect([spelled, secretRead("Read", { file_path: spelled }, agentScope)]).toEqual([spelled, true]);
+      expect([spelled, secretRead("Bash", { command: `cat ${spelled}` }, agentScope)]).toEqual([spelled, true]);
+      expect([spelled, readOnlyCall("Bash", { command: `ls ${spelled}` }, agentScope)]).toEqual([spelled, false]);
+    }
+    expect(secretRead("Bash", { command: `cp -r .agentes/browser /tmp/b` }, agentScope)).toBe(true);
+    expect(localVerdict("Bash", { command: `sqlite3 ${cookies} .dump` }, agentScope, "work")).toEqual({
+      behavior: "deny",
+      message: SECRET_MESSAGE,
+    });
+    // Claude Code refuses it itself, however it is spelled, also where a mission's settings allow `cat`.
+    expect(SECRET_READ_DENY_RULES).toContain("Read(**/.agentes/browser/**)");
+    const denied = (command: string) => SECRET_BASH_DENY_RULES.some((r) => ruleMatches(r, "Bash", { command }));
+    expect(denied(`cat ${cookies}`)).toBe(true);
+    expect(denied(`tar czf b.tgz /Users/w/agentes/ada/${cookies}`)).toBe(true);
+    // The rest of its `.agentes` is its own to read: the mission's files, the folder's listing.
+    for (const ok of [".agentes/mission.md", ".agentes/notes.md"]) {
+      expect(secretRead("Read", { file_path: ok }, agentScope)).toBe(false);
+      expect(readOnlyCall("Bash", { command: `cat ${ok}` }, agentScope)).toBe(true);
+      expect(denied(`cat ${ok}`)).toBe(false);
+    }
+    expect(readOnlyCall("Bash", { command: "ls .agentes" }, agentScope)).toBe(true);
   });
 });
 
