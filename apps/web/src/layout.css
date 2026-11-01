@@ -362,7 +362,7 @@ p {
   color: var(--ink-muted);
 }
 
-/* The agent's one card while it waits for its computer (instead of repeated messages). */
+/* The agent's one card while it waits for its computer (instead of repeated messages); a card face, never the well. */
 .waitcard {
   display: flex;
   flex-direction: column;
@@ -370,7 +370,9 @@ p {
   max-width: var(--msg-card-w);
   padding: 12px 14px;
   border-radius: var(--radius-md);
-  background: var(--surface-sunken);
+  border-bottom-left-radius: var(--radius-cut);
+  background: var(--surface-raised);
+  box-shadow: var(--card-shadow);
 }
 .waitcard__top {
   font-weight: 600;
@@ -9770,7 +9772,9 @@ a.machine-row__name:hover {
   margin: 8px 0 0;
   padding: 10px 12px;
   border-radius: var(--radius-md);
-  background: var(--sunken);
+  border-bottom-left-radius: var(--radius-cut);
+  background: var(--surface-raised);
+  box-shadow: var(--card-shadow);
   max-width: var(--msg-card-w);
 }
 .correction-ask__title {

@@ -7,6 +7,7 @@ const css = await builtCss(
   "src/components/issue-work.css",
   "src/components/missions/missions.css",
   "src/components/browser/browser.css",
+  "src/components/request-card.css",
 );
 const value = (selector: string, property: string) =>
   declarations(css, selector).findLast(([p]) => p === property)?.[1];
@@ -66,11 +67,18 @@ test("nothing in a message wears the hover plate's own gray: cards a step up, we
   // Light: a well is the plate's tint over the row (darker hovered or not); dark: its own darker ground.
   expect(declarations(css, '[data-theme="light"]')).toContainEqual(["--msg-well", "var(--plate-soft)"]);
   expect(declarations(css, '[data-theme="dark"]')).toContainEqual(["--msg-well", "var(--sunken)"]);
-  // Receipts are cards like the tools: the card face and its hairline, never the sunken gray.
-  for (const selector of [".ag-rc", ".ag-rcg", ".ac-tools"]) {
-    expect(value(selector, "background")).toBe("var(--surface-raised)");
-    expect(value(selector, "box-shadow")).toBe("var(--card-shadow)");
+  // Receipts, and what waits for a click (connect an AI, a stretch, waiting for its computer, "refazer ou
+  // explicar?"), are cards like the tools: the card face and its hairline, never the sunken gray.
+  for (const selector of [".ag-rc", ".ag-rcg", ".ac-tools", ".waitcard", ".correction-ask"]) {
+    expect([selector, value(selector, "background")]).toEqual([selector, "var(--surface-raised)"]);
+    expect([selector, value(selector, "box-shadow")]).toEqual([selector, "var(--card-shadow)"]);
   }
+  // A request (an agent's proposal with Revisar/Recusar, an approval, a question) is a face with its hairline.
+  expect(value(".rq", "background")).toBe("var(--raised)");
+  expect(value(".rq", "box-shadow")).toBe("0 0 0 1px var(--line2)");
+  // No card in a message sits on the well: the well is the hover plate's tint.
+  for (const selector of [".ag-rc", ".ag-rcg", ".ac-tools", ".waitcard", ".correction-ask", ".ac-approval", ".rq"])
+    expect(`${selector} ${value(selector, "background")}`).not.toMatch(/sunken|msg-well|plate/);
 });
 
 test("a receipt's sentence and a tool's line wrap, whole: no ellipsis", () => {
