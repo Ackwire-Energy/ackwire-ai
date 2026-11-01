@@ -68,11 +68,11 @@ export function ownerSignIn(deps: OwnerSignInDeps) {
     });
     // What the sign-up hooks do for any other first account.
     await onUserCreated(db, input.id).catch((error) =>
-      log.error("post-signup setup failed", { userId: input.id, error: String(error) }),
+      log.error("post-signup setup failed", { userId: input.id, error }),
     );
     if (input.passwordHash) {
       await recordSignUp(db, { userId: input.id, providerId: "credential" }).catch((error) =>
-        log.error("operator event failed", { type: "user.signed_up", error: String(error) }),
+        log.error("operator event failed", { type: "user.signed_up", error }),
       );
     }
   }

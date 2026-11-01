@@ -1042,6 +1042,21 @@ export async function notifyComputerReady(
   });
 }
 
+/**
+ * The workspace used its Composio calls for the month (ADR 0107 §7): who manages its connectors hears it once that
+ * month (the caller marks the month capped first).
+ */
+export async function notifyComposioLimit(deps: NotificationDeps, orgId: string, month: string, calls: number) {
+  await notify(deps, {
+    orgId,
+    userIds: await adminsOf(deps, orgId, "manage_connectors"),
+    kind: "composio_limit",
+    groupKey: `composio_limit:${month}`,
+    source: {},
+    latest: { title: month, calls },
+  });
+}
+
 // ── Workspace standing (ADR 0056 §8) ──────────────────────────────────────────
 
 /**

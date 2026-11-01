@@ -109,6 +109,30 @@ export function whenAt(t: TFunction, locale: string, iso: string, now = new Date
   return formatShortDate(locale, iso);
 }
 
+/** A time ahead, weekday and time on this device's clock: "seg 20 out, 09:00". */
+export const nextLabel = (locale: string, iso: string) =>
+  new Intl.DateTimeFormat(locale, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+    .format(new Date(iso))
+    .replace(/\./g, "")
+    .replace(/ de /g, " ");
+
+/** When something is coming: "hoje 18:00", "amanhã 09:00", "sex 10:00" within the week, then "12 out". */
+export function upcomingAt(t: TFunction, locale: string, iso: string, now = new Date()) {
+  const days = -daysBetween(iso, now);
+  const time = formatTime(locale, iso);
+  if (days <= 0) return t("format.todayAt", { time });
+  if (days === 1) return t("format.tomorrowAt", { time });
+  if (days < 7)
+    return `${new Intl.DateTimeFormat(locale, { weekday: "short" }).format(new Date(iso)).replace(/\.$/, "")} ${time}`;
+  return formatShortDate(locale, iso);
+}
+
 /** Time left: "23 h", "5 dias", "12 min". */
 export function timeLeft(t: TFunction, iso: string, now = new Date()) {
   const ms = new Date(iso).getTime() - now.getTime();

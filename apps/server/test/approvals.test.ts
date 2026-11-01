@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { grantScopes, type ToolSource } from "@agenteschat/engine";
+import { schema } from "@agenteschat/db";
+import { createReminder, grantScopes, type ToolSource } from "@agenteschat/engine";
 import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
 
 const merged: Record<string, unknown>[] = [];
@@ -72,6 +73,67 @@ test("approvals API: list, approve (resumes the run), and decisions are final", 
   expect((await owner(`/api/app/organizations/${orgId}/approvals/${id}/refuse`, { json: {} })).status).toBe(409);
   const one = (await (await owner(`/api/app/organizations/${orgId}/approvals/${id}`)).json()) as { status: string };
   expect(one.status).toBe("approved");
+});
+
+test("approvals API: an action approved ahead is on its routine and withdrawn with cancel before its time", async () => {
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const ownerId = ((await (await owner("/api/app/me")).json()) as { user: { id: string } }).user.id;
+  const { orgId, channelId, agentId } = await seedOrg(owner);
+  const at = new Date(Date.now() + 2 * 3600_000);
+  const routine = await createReminder({ db: t.db, pubsub: t.adapters.pubsub }, ownerId, orgId, {
+    agentId,
+    channelId,
+    threadId: null,
+    at,
+    timezone: "UTC",
+    description: "in two hours",
+    message: "Post de lançamento",
+    askAgent: true,
+    access: "act",
+  });
+  const row = (id: string, runAt: Date | null) => ({
+    id,
+    orgId,
+    agentId,
+    channelId,
+    threadRootId: crypto.randomUUID(),
+    toolUseId: `call-${id}`,
+    tool: "composio_COMPOSIO_MULTI_EXECUTE_TOOL",
+    scope: "custom:x:write",
+    params: { tools: [{ tool_slug: "LINKEDIN_PUBLISH_POST" }] },
+    actionHash: "hash",
+    title: "Composio: LINKEDIN_PUBLISH_POST",
+    status: "approved" as const,
+    expiresAt: at,
+    ownerUserId: ownerId,
+    routineId: runAt ? routine.id : null,
+    runAt,
+  });
+  const ahead = crypto.randomUUID();
+  const now = crypto.randomUUID();
+  await t.db.insert(schema.approvals).values([row(ahead, at), row(now, null)]);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  const listed = (await (await api("/routines")).json()) as { routines: { id: string; ahead: unknown[] }[] };
+  expect(listed.routines.find((r) => r.id === routine.id)?.ahead).toEqual([
+    expect.objectContaining({ id: ahead, status: "approved", runAt: at.toISOString(), canCancel: true }),
+  ]);
+
+  const canceled = await api(`/approvals/${ahead}/cancel`, { json: {} });
+  expect(canceled.status).toBe(200);
+  expect(await canceled.json()).toMatchObject({ status: "canceled", runAt: at.toISOString(), canCancel: false });
+  const after = (await (await api("/routines")).json()) as {
+    routines: { id: string; active: boolean; ahead: unknown[] }[];
+  };
+  // Its one-off had nothing else to do: it no longer fires.
+  expect(after.routines.find((r) => r.id === routine.id)).toMatchObject({ active: false, ahead: [] });
+  const again = await api(`/approvals/${ahead}/cancel`, { json: {} });
+  expect(again.status).toBe(409);
+  expect(await again.json()).toMatchObject({ error: { code: "approval.not_cancelable" } });
+  const plain = await api(`/approvals/${now}/cancel`, { json: {} });
+  expect(plain.status).toBe(409);
+  expect(await plain.json()).toMatchObject({ error: { code: "approval.not_ahead" } });
 });
 
 test("approvals API: 'Aprovar tudo' decides exactly the ids sent and resumes the run once", async () => {

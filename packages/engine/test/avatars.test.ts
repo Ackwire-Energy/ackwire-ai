@@ -221,4 +221,22 @@ describe("agent appearance", () => {
     });
     expect((await setAgentAppearance(f.db, f.owner.id, f.org.id, f.agent.id, null)).appearance).toBeNull();
   });
+
+  test("a custom color is a #rrggbb in the same field, stored lowercase; presets still pass", async () => {
+    f = await setup();
+    const look = { color: "#1A2B3C", eyes: "round", accessory: "none" };
+    expect((await setAgentAppearance(f.db, f.owner.id, f.org.id, f.agent.id, look)).appearance).toEqual({
+      ...look,
+      color: "#1a2b3c",
+    });
+    expect((await getAgent(f.db, f.org.id, f.agent.id))?.appearance?.color).toBe("#1a2b3c");
+    for (const color of ["#12345", "#1234567", "123456", "#ggg000", "rgb(1,2,3)", " #123456"]) {
+      await expect(
+        setAgentAppearance(f.db, f.owner.id, f.org.id, f.agent.id, { ...look, color }),
+      ).rejects.toBeInstanceOf(ValidationError);
+    }
+    expect(
+      (await setAgentAppearance(f.db, f.owner.id, f.org.id, f.agent.id, { ...look, color: "violet" })).appearance,
+    ).toEqual({ ...look, color: "violet" });
+  });
 });

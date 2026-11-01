@@ -25,6 +25,7 @@ import { DeletingScreen, HoldBanner, SuspendedScreen } from "@/components/Standi
 import { useWebPushClear, useWebPushRefresh, WebPushAsk } from "@/components/WebPush";
 import { ComputerSetupNotice } from "@/components/WorkspaceComputer";
 import { inDesktopApp } from "@/lib/desktop";
+import { rememberPlace, showWorkspace } from "@/lib/start";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
 import { RealtimeProvider } from "@/realtime/context";
 
@@ -58,8 +59,12 @@ function OrgLayout() {
   // …and the ones it still shows for what was already read elsewhere close.
   useWebPushClear();
   useEffect(() => {
-    if (membership) storage.set(STORAGE_KEYS.lastOrg, membership.id);
-  }, [membership]);
+    if (!membership) return;
+    storage.set(STORAGE_KEYS.lastOrg, membership.id);
+    // Where "Onde você parou" opens, and the workspace on screen: its bare address now means Início (ADR 0108).
+    showWorkspace(membership.id);
+    rememberPlace(membership.id, path);
+  }, [membership, path]);
   // A workspace shown as being deleted that leaves `GET /me` was deleted for good: on to the person's start.
   const closing = useRef<string | null>(null);
   if (membership) closing.current = membership.deletion ? orgId : null;

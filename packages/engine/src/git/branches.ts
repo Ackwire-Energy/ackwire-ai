@@ -60,8 +60,15 @@ export async function githubToken(
     ? await appTokenForRepo(deps.app, http, tenant, repo.owner, repo.repo, permissions).catch(() => null)
     : null;
   if (app) return app;
-  const headers = await connectionHeaders(deps.connectors, connection).catch(() => ({}) as Record<string, string>);
-  return headers.authorization?.replace(/^Bearer\s+/i, "") || null;
+  return connectionToken(deps.connectors, connection).catch(() => null);
+}
+
+/**
+ * The GitHub connection's own token (a key pasted in Conectores, or OAuth's, refreshed when it is about to expire).
+ * Null when it has none. Throws what refreshing it threw: the provider refusing (`ValidationError`), or no answer.
+ */
+export async function connectionToken(connectors: ConnectorDeps, connection: ConnectorConnection) {
+  return (await connectionHeaders(connectors, connection)).authorization?.replace(/^Bearer\s+/i, "") || null;
 }
 
 /** A branch as GitHub has it: missing (no branch by that exact name), or its classic protection and ruleset rules. */

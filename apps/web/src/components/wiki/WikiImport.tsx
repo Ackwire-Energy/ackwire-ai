@@ -1,4 +1,5 @@
 import { keys, useWikiTree } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { Button, Checkbox, Dialog, DialogBody, DialogFooter, Icon, Input, Segmented } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -363,7 +364,7 @@ export function WikiImportDialog({
           "error",
         );
     } catch (e) {
-      toast.show((e as Error).message, "error");
+      toast.show(errorText(t, e, i18n.language), "error");
     } finally {
       setImporting(null);
     }

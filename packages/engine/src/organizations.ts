@@ -84,6 +84,17 @@ export interface Membership {
   orgLogo?: string | null;
   /** The workspace's standing (`standing.ts`). */
   standing?: WorkspaceStanding;
+  /** What opens when the app starts here (listMemberships). */
+  start?: StartChoice;
+}
+
+/** What opens when the app starts in a workspace (ADR 0108), the person's own. */
+export const START_PAGES = schema.START_PAGES;
+export type StartPage = schema.StartPage;
+export interface StartChoice {
+  page: StartPage;
+  /** With `channel`; the apps open the home when the person is no longer in it. */
+  channelId: string | null;
 }
 
 /** Whether a membership (or none) may `permission`. */
@@ -118,6 +129,8 @@ export async function listMemberships(db: Database, userId: string): Promise<Mem
       role: organizationMembers.role,
       orgLogo: organizations.logo,
       standing: STANDING_COLUMNS,
+      startPage: organizationMembers.startPage,
+      startChannelId: organizationMembers.startChannelId,
       ...ROLE_COLUMNS,
     })
     .from(organizationMembers)
@@ -125,7 +138,10 @@ export async function listMemberships(db: Database, userId: string): Promise<Mem
     .innerJoin(users, eq(users.id, organizationMembers.userId))
     .where(and(eq(organizationMembers.userId, userId), isNull(users.blockedAt)))
     .orderBy(asc(organizations.createdAt));
-  return rows.map(withPermissions);
+  return rows.map(({ startPage, startChannelId, ...row }) => ({
+    ...withPermissions(row),
+    start: { page: startPage, channelId: startPage === "channel" ? startChannelId : null },
+  }));
 }
 
 /**
@@ -700,6 +716,43 @@ export async function updateMyProfile(
   const me = (await listMembers(db, orgId)).find((m) => m.userId === userId);
   if (!me) throw new ForbiddenError("You are not a member of this organization");
   return me;
+}
+
+/**
+ * What opens when the app starts in this workspace, for this person (ADR 0108). A channel is one of the workspace's
+ * (not a DM), not archived, with the person in it (`start.channel_unknown`).
+ */
+export async function setStartPage(
+  db: Database,
+  userId: string,
+  orgId: string,
+  input: { page: StartPage; channelId?: string | null },
+): Promise<StartChoice> {
+  await requirePermission(db, userId, orgId, "read");
+  if (!START_PAGES.includes(input.page)) throw new ValidationError("page must be home, last or channel");
+  const channelId = input.page === "channel" ? (input.channelId ?? null) : null;
+  if (input.page === "channel") {
+    const [inIt] = channelId
+      ? await db
+          .select({ id: channels.id })
+          .from(channels)
+          .innerJoin(channelMembers, and(eq(channelMembers.channelId, channels.id), eq(channelMembers.userId, userId)))
+          .where(
+            and(
+              eq(channels.orgId, orgId),
+              eq(channels.id, channelId),
+              eq(channels.kind, "channel"),
+              isNull(channels.archivedAt),
+            ),
+          )
+      : [];
+    if (!inIt) throw new ValidationError("Not a channel you are in", "start.channel_unknown");
+  }
+  await db
+    .update(organizationMembers)
+    .set({ startPage: input.page, startChannelId: channelId })
+    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+  return { page: input.page, channelId };
 }
 
 /** The languages of the app (`users.locale`): emails and pushes are written in it. */

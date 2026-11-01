@@ -517,7 +517,7 @@ function EmailInvitation({
       return true;
     } catch (e) {
       // A known code in the invited person's words (a full workspace says whom to tell), never the server's English.
-      setError(invitedErrorText(t, e, i18n.language) ?? t("common.unknownError"));
+      setError(invitedErrorText(t, e, i18n.language) ?? errorText(t, e, i18n.language));
       // Signed in now, the account stays: trying again only accepts.
       if (signedInNow) {
         setStep("accept");

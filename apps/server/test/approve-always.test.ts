@@ -63,6 +63,7 @@ async function workspace() {
       orgId,
       connector: "custom:suporte",
       label: "Suporte",
+      toolPrefix: "suporte",
       serverUrl: "https://tickets.example.com/mcp",
       authType: "none",
     })

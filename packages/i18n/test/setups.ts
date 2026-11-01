@@ -154,6 +154,9 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "deleteAccount.serverOwner",
     // Where no email goes, which the Cloud always sends, a password proves it's you (`deletionProof`).
     "proof.addPassword",
+    // The catalog's line for a server without Composio (`composioOffText`): the Cloud always has its key.
+    "connectors.composio.off_one",
+    "connectors.composio.off_other",
   ],
   email: [
     "auth.newLinkSent",

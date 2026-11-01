@@ -7,16 +7,19 @@ import {
   type Executor,
   eq,
   gt,
+  gte,
   inArray,
   isNull,
   lt,
   ne,
   or,
+  type SQL,
   schema,
   sql,
 } from "@agenteschat/db";
 import { addApprovalRules, type RememberedKind, rememberedKindOf } from "./approval-rules";
 import { recordAudit } from "./audit";
+import { CONNECTOR_CATALOG } from "./connectors/catalog";
 import { learnFromRefusal } from "./context/feedback";
 import type { MemoryJudging } from "./context/items";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
@@ -26,7 +29,7 @@ import { notifyApproval, resolveApprovalNotifications } from "./notification-pro
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { maySql } from "./permissions";
-import type { Approval } from "./tools/gateway";
+import { AHEAD_GRACE_MS, type Approval } from "./tools/gateway";
 import { REQUEST_PERMISSION_TOOL } from "./tools/permission";
 import type { ApprovalOrigin } from "./tools/run-policy";
 
@@ -41,6 +44,7 @@ const {
   issues,
   mailAccounts,
   messages,
+  routines,
 } = schema;
 
 /** The email a mail approval would write (a draft, a send, a reply or a forward), as its card shows it. */
@@ -98,6 +102,11 @@ export interface ApprovalView {
   trail?: { text: string; at: string }[];
   /** "Aprovar sempre" is offered: the server's tool and the actions approving for good covers; null: not offered. */
   approveAlways: RememberedKind | null;
+  /** Approved ahead: when the routine's run does it by itself (`routineId`); null: it runs once approved. */
+  runAt: string | null;
+  routineId: string | null;
+  /** Approved ahead and not run yet, and the person asking may still withdraw it (`cancelAheadApproval`). */
+  canCancel: boolean;
 }
 
 /** What the approval row alone doesn't say: the connector, the issue (and, for one, the trail). */
@@ -141,6 +150,7 @@ async function approvalContexts(db: Database, rows: Approval[]): Promise<Map<str
           .select({
             id: connectorConnections.id,
             connector: connectorConnections.connector,
+            label: connectorConnections.label,
             account: connectorConnections.accountLabel,
           })
           .from(connectorConnections)
@@ -197,7 +207,7 @@ async function approvalContexts(db: Database, rows: Approval[]): Promise<Map<str
     const mailbox = row.connectionId ? mailboxOf.get(row.connectionId) : undefined;
     out.set(row.id, {
       connector: connection?.connector ?? (mailbox ? "email" : null),
-      connectorAccount: connection?.account ?? mailbox?.address ?? null,
+      connectorAccount: connection ? accountNote(connection) : (mailbox?.address ?? null),
       email: mailbox ? approvalEmail(row, mailbox) : null,
       issue: row.runId ? (issueOfRun.get(row.runId) ?? null) : null,
       trail: trail.slice(-12),
@@ -206,12 +216,24 @@ async function approvalContexts(db: Database, rows: Approval[]): Promise<Map<str
   return out;
 }
 
+/**
+ * The account an approval card names beside the service. A server by address goes by its connection's name
+ * ("Stripe (Acme)"), so only an account that name doesn't say; a catalog connector goes by the catalog's
+ * name, so a renamed connection says its own.
+ */
+function accountNote(c: { connector: string; label: string; account: string | null }) {
+  const catalog = CONNECTOR_CATALOG[c.connector];
+  if (catalog && c.label !== catalog.label) return c.label;
+  return c.account && !c.label.includes(c.account) ? c.account : null;
+}
+
 const MAIL_VERBS = ["draft", "send", "reply", "forward"] as const;
 
 /** The provider's name for people: "Gmail", "Outlook", the IMAP preset's ("iCloud"); null for a custom server. */
 function mailProviderName(m: { provider: string; preset: string | null }) {
   if (m.provider === "gmail") return "Gmail";
   if (m.provider === "outlook") return "Outlook";
+  if (m.provider === "millionsend") return "MillionSend";
   const preset = m.preset && m.preset !== "custom" ? MAIL_PRESETS.find((p) => p.id === m.preset) : undefined;
   return preset ? preset.label.replace(/\s*\(.*\)$/, "") : null;
 }
@@ -371,7 +393,14 @@ export const approvalView = (a: Approval, canDecide = false): ApprovalView => ({
   origin: approvalOriginOf(a.origin),
   issue: null,
   approveAlways: a.connectionId ? rememberedKindOf(a.approveAlways) : null,
+  runAt: a.runAt ? a.runAt.toISOString() : null,
+  routineId: a.routineId,
+  canCancel: canDecide && aheadLive(a) && a.status === "approved",
 });
+
+/** An approval ahead that may still run: waiting for a person, or approved and not run yet. */
+const aheadLive = (a: Pick<Approval, "runAt" | "status" | "executedAt">) =>
+  a.runAt !== null && (a.status === "pending" || a.status === "approved") && !a.executedAt;
 
 /**
  * Whether only admins decide it: `request_permission` turns a connector or a built-in on for good, which
@@ -414,7 +443,10 @@ export async function publishApproval(
   await publishChannelEvent(deps.pubsub, { type, channelId: approval.channelId, approval: view });
   const deciders = await approverIds(deps.db, approval);
   for (const userId of deciders) {
-    await publishUserEvent(deps.pubsub, approval.orgId, userId, { type, approval: { ...view, canDecide: true } });
+    await publishUserEvent(deps.pubsub, approval.orgId, userId, {
+      type,
+      approval: { ...view, canDecide: true, canCancel: approval.status === "approved" && aheadLive(approval) },
+    });
   }
   // The inbox: waiting for whoever may decide; out of it once decided or expired.
   if (type === "approval.created" && approval.status === "pending") {
@@ -500,6 +532,7 @@ export async function decideApproval(
     if (always) {
       await addApprovalRules(tx, { orgId, agentId: row.agentId, connectionId: always.connectionId }, always, actorId);
     }
+    if (updated?.status === "refused") await settleAheadRoutine(tx, updated);
     if (updated) await auditDecision(tx, updated, expired ? null : actorId, always);
     return expired ? { error: "This request has expired" as const, row: updated } : { row: updated };
   });
@@ -507,7 +540,8 @@ export async function decideApproval(
   if (outcome.error || !outcome.row) throw new ConflictError(outcome.error ?? "approval vanished");
   // A refusal (with its reason) becomes an outcome and a lesson for the agent.
   if (outcome.row.status === "refused") await learnFromRefusal(deps, outcome.row).catch(() => null);
-  const [view = approvalView(outcome.row)] = await viewsOf(db, [outcome.row], () => false);
+  // The person who decided may decide it: an action they approved ahead, they may still withdraw.
+  const [view = approvalView(outcome.row, true)] = await viewsOf(db, [outcome.row], () => true);
   return view;
 }
 
@@ -558,6 +592,7 @@ export async function decideApprovals(
         .returning();
       if (!updated) continue;
       await auditDecision(tx, updated, expired ? null : actorId);
+      if (updated.status === "refused") await settleAheadRoutine(tx, updated);
       if (!row.runId || !resumed.has(row.runId)) await enqueueResume(tx, row);
       if (row.runId) resumed.add(row.runId);
       out.push(updated);
@@ -610,7 +645,11 @@ function auditDecision(
   });
 }
 
-/** Marks pending approvals past their deadline as expired and resumes their runs (worker, every minute). */
+/**
+ * Marks pending approvals past their deadline as expired and resumes their runs (worker, every minute), and actions
+ * approved ahead that didn't run by their time and grace (a routine paused or moved, a run too late): from then on
+ * their run asks a person again.
+ */
 export async function expireApprovals(deps: { db: Database; pubsub: PubSub }, now = new Date()) {
   const expired = await deps.db.transaction(async (tx) => {
     const rows = await tx
@@ -622,11 +661,209 @@ export async function expireApprovals(deps: { db: Database; pubsub: PubSub }, no
       await enqueueResume(tx, row);
       await auditDecision(tx, row, null);
     }
-    return rows;
+    const lapsed = await tx
+      .update(approvals)
+      .set({ status: "expired" })
+      .where(
+        and(
+          eq(approvals.status, "approved"),
+          isNull(approvals.executedAt),
+          lt(approvals.runAt, new Date(now.getTime() - AHEAD_GRACE_MS)),
+        ),
+      )
+      .returning();
+    for (const row of lapsed) await auditDecision(tx, row, null);
+    return [...rows, ...lapsed];
   });
   for (const row of expired) await publishApproval(deps, row, "approval.decided");
   return expired.length;
 }
+
+/**
+ * A one-off whose every action approved ahead was refused or withdrawn has nothing left to do at its time: it no
+ * longer fires. A recurring routine keeps its schedule.
+ */
+async function settleAheadRoutine(tx: Executor, row: Pick<Approval, "orgId" | "routineId">) {
+  if (!row.routineId) return;
+  await tx
+    .update(routines)
+    .set({ active: false, nextRunAt: null, updatedAt: new Date() })
+    .where(
+      and(
+        eq(routines.orgId, row.orgId),
+        eq(routines.id, row.routineId),
+        eq(routines.triggerType, "once"),
+        eq(routines.active, true),
+        sql`not exists (select 1 from ${approvals} a where a.routine_id = ${row.routineId}
+          and a.executed_at is null and a.status in ('pending', 'approved'))`,
+      ),
+    );
+}
+
+/**
+ * Withdraws the actions approved ahead `where` picks that may still run (waiting for a person, or approved and not
+ * run): they never run, a run still waiting on one hears it was canceled, and their cards update. `settle`: their
+ * one-offs stop too (`settleAheadRoutine`).
+ */
+async function withdrawAhead(
+  deps: { db: Database; pubsub: PubSub },
+  where: SQL | undefined,
+  actorId: string | null,
+  settle: boolean,
+) {
+  const rows = await deps.db.transaction(async (tx) => {
+    const ended = await tx
+      .update(approvals)
+      .set({ status: "canceled", decidedByUserId: actorId, decidedAt: new Date() })
+      .where(
+        and(
+          where,
+          sql`${approvals.runAt} is not null`,
+          isNull(approvals.executedAt),
+          inArray(approvals.status, ["pending", "approved"]),
+        ),
+      )
+      .returning();
+    for (const row of ended) {
+      await enqueueResume(tx, row);
+      if (settle) await settleAheadRoutine(tx, row);
+      await auditDecision(tx, row, actorId);
+    }
+    return ended;
+  });
+  for (const row of rows) await publishApproval(deps, row, "approval.decided");
+  return rows;
+}
+
+/**
+ * An action approved ahead that `actorId` may withdraw, still able to run, or why not: of those who see it, whoever
+ * may decide it and whoever manages its routine (its creator, the agent's owner, who may manage routines). One they
+ * don't see is not found, as on Aprovações.
+ */
+export async function cancelableAhead(db: Database, actorId: string, orgId: string, approvalId: string) {
+  const membership = await requirePermission(db, actorId, orgId, "read");
+  const [current] = await db
+    .select()
+    .from(approvals)
+    .where(
+      and(
+        eq(approvals.id, approvalId),
+        eq(approvals.orgId, orgId),
+        can(membership, "approve_actions") ? undefined : seenBy(db, orgId, actorId),
+      ),
+    );
+  if (!current) throw new NotFoundError("Approval not found");
+  const [routine] = current.routineId
+    ? await db
+        .select({ createdByUserId: routines.createdByUserId })
+        .from(routines)
+        .where(and(eq(routines.id, current.routineId), eq(routines.orgId, orgId)))
+    : [];
+  const may =
+    can(membership, "approve_actions") ||
+    can(membership, "manage_routines") ||
+    current.ownerUserId === actorId ||
+    routine?.createdByUserId === actorId;
+  if (!may) throw new ForbiddenError("Only who may decide it or manage its routine can cancel this");
+  if (!current.runAt) throw new ConflictError("Only an action approved ahead can be canceled", "approval.not_ahead");
+  if (!aheadLive(current)) throw new ConflictError("This action already ran or ended", "approval.not_cancelable");
+  return current;
+}
+
+/**
+ * Withdraws one action approved ahead before its time (or its request, still waiting): the routine's run won't do
+ * it, and a one-off left with nothing to do no longer fires.
+ */
+export async function cancelAheadApproval(
+  deps: { db: Database; pubsub: PubSub },
+  actorId: string,
+  orgId: string,
+  approvalId: string,
+): Promise<ApprovalView> {
+  const current = await cancelableAhead(deps.db, actorId, orgId, approvalId);
+  const [ended] = await withdrawAhead(deps, eq(approvals.id, current.id), actorId, true);
+  if (!ended) throw new ConflictError("This action already ran or ended", "approval.not_cancelable");
+  const [view = approvalView(ended)] = await viewsOf(deps.db, [ended], () => false);
+  return view;
+}
+
+/** An action approved ahead (or waiting to be) for one of a routine's runs, as the routine's page lists it. */
+export interface RoutineAheadView {
+  /** The approval. */
+  id: string;
+  tool: string;
+  scope: string;
+  title: string;
+  params: Record<string, unknown>;
+  status: "pending" | "approved";
+  runAt: string;
+  /** The person viewing may withdraw it (`cancelAheadApproval`). */
+  canCancel: boolean;
+}
+
+/**
+ * Each routine's actions approved ahead (or waiting to be) that may still run, soonest first: for `viewerId`, those
+ * they see on Aprovações (all with `approve_actions`, else `seenBy`); null, the engine itself, all of them.
+ */
+export async function routinesAhead(
+  db: Database,
+  orgId: string,
+  routineIds: string[],
+  viewerId: string | null,
+  now = new Date(),
+) {
+  const out = new Map<string, Omit<RoutineAheadView, "canCancel">[]>();
+  if (routineIds.length === 0) return out;
+  const rows = await db
+    .select()
+    .from(approvals)
+    .where(
+      and(
+        eq(approvals.orgId, orgId),
+        inArray(approvals.routineId, routineIds),
+        isNull(approvals.executedAt),
+        inArray(approvals.status, ["pending", "approved"]),
+        gte(approvals.runAt, new Date(now.getTime() - AHEAD_GRACE_MS)),
+        viewerId ? or(maySql(orgId, viewerId, "approve_actions"), seenBy(db, orgId, viewerId)) : undefined,
+      ),
+    )
+    .orderBy(approvals.runAt, approvals.createdAt);
+  for (const r of rows) {
+    if (!r.routineId || !r.runAt) continue;
+    const item = {
+      id: r.id,
+      tool: r.tool,
+      scope: r.scope,
+      title: r.title,
+      params: r.params,
+      status: r.status as RoutineAheadView["status"],
+      runAt: r.runAt.toISOString(),
+    };
+    out.set(r.routineId, [...(out.get(r.routineId) ?? []), item]);
+  }
+  return out;
+}
+
+/** A routine's time changed or it was deleted: what was approved ahead for it no longer covers anything. */
+export const cancelRoutineAhead = (
+  deps: { db: Database; pubsub: PubSub },
+  orgId: string,
+  routineId: string,
+  actorId: string | null,
+) => withdrawAhead(deps, and(eq(approvals.orgId, orgId), eq(approvals.routineId, routineId)), actorId, false);
+
+/** The approvals someone sees who doesn't see them all (`approve_actions`): their agents', and their conversations'. */
+const seenBy = (db: Database, orgId: string, actorId: string) =>
+  or(
+    eq(approvals.ownerUserId, actorId),
+    inArray(
+      approvals.channelId,
+      db
+        .select({ id: channelMembers.channelId })
+        .from(channelMembers)
+        .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.userId, actorId))),
+    ),
+  );
 
 /**
  * Approvals a person can see: admins see all; others see those of agents they
@@ -640,10 +877,6 @@ export async function listApprovals(
 ): Promise<ApprovalView[]> {
   const membership = await requirePermission(db, actorId, orgId, "read");
   const admin = can(membership, "approve_actions");
-  const myChannels = db
-    .select({ id: channelMembers.channelId })
-    .from(channelMembers)
-    .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.userId, actorId)));
   const rows = await db
     .select()
     .from(approvals)
@@ -657,7 +890,7 @@ export async function listApprovals(
             : undefined,
         options.agentId ? eq(approvals.agentId, options.agentId) : undefined,
         options.messageId ? eq(approvals.messageId, options.messageId) : undefined,
-        admin ? undefined : or(eq(approvals.ownerUserId, actorId), inArray(approvals.channelId, myChannels)),
+        admin ? undefined : seenBy(db, orgId, actorId),
       ),
     )
     .orderBy(desc(approvals.createdAt))

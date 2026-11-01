@@ -88,6 +88,10 @@ export async function validateAgentFields(db: Database, orgId: string, input: Pa
   if (input.handle !== undefined && !HANDLE_PATTERN.test(input.handle)) {
     throw new ValidationError("handle must be 2–32 characters: lower-case letters, digits, - or _");
   }
+  // An id-shaped handle is how mentions written before migration 0132 still name an imported agent (`currentHandles`).
+  if (input.handle !== undefined && isIdHandle(input.handle)) {
+    throw new ValidationError("handle can't look like an id; pick one from the agent's name");
+  }
   // "auto": each run picks the model from the line of the agent's key (any provider).
   const model = input.model && !isAutoModel(input.model) ? await modelInfoFor(db, input.model) : undefined;
   if (input.model !== undefined && !isAutoModel(input.model) && !model) {

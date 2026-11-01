@@ -373,8 +373,9 @@ describe("reminders from the chat", () => {
     const [mine] = await listReminders(f.db, f.owner.id, f.org.id);
     expect(mine?.message).toBe("reunião");
     expect(await listReminders(f.db, bob.id, f.org.id)).toEqual([]);
-    await expect(cancelReminder(f.db, bob.id, f.org.id, mine?.id ?? "")).rejects.toBeInstanceOf(NotFoundError);
-    expect((await cancelReminder(f.db, f.owner.id, f.org.id, mine?.id ?? "")).done).toBe(true);
+    const deps = { db: f.db, pubsub: f.pubsub };
+    await expect(cancelReminder(deps, bob.id, f.org.id, mine?.id ?? "")).rejects.toBeInstanceOf(NotFoundError);
+    expect((await cancelReminder(deps, f.owner.id, f.org.id, mine?.id ?? "")).done).toBe(true);
     await fireNow();
     expect((await f.db.select().from(schema.messages)).some((m) => m.meta.reminder === true)).toBe(false);
 

@@ -30,6 +30,9 @@ test("matching, pending, changed and newer-database cases", () => {
       known,
     ),
   ).toContain("migrated by a newer version");
+  // A migration merged after a newer one with its own older date: drizzle would skip it.
+  const late = [...known, { tag: "0002_late", hash: "c", when: 2 }];
+  expect(checkMigrations([{ hash: "a", createdAt: 1 }], late)).toContain("0002_late is dated before 0001_more");
 });
 
 test("a migrated test database matches this build; tampering is refused before migrating", async () => {

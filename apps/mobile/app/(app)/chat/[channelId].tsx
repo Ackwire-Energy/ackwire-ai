@@ -1,5 +1,7 @@
 import { type ErrorBoundaryProps, useLocalSearchParams } from "expo-router";
 import { ChatScreen } from "@/features/chat/ChatScreen";
+import { chatHref } from "@/features/links/logic";
+import { useRememberPlace } from "@/features/me/useStart";
 import { isSafeId } from "@/features/shared/logic";
 import { FocusLive } from "@/features/shared/parts";
 import { ScreenError } from "@/features/shared/ScreenError";
@@ -19,12 +21,15 @@ export default function ChatRoute() {
     thread?: string;
     handoff?: string;
   }>();
+  const threadId = isSafeId(thread) ? thread : null;
+  // Where "Onde você parou" opens the next time the app starts (ADR 0108).
+  useRememberPlace(chatHref(channelId, threadId));
   return (
     <FocusLive>
       <ChatScreen
         key={`${channelId}:${thread ?? ""}`}
         channelId={channelId}
-        threadId={isSafeId(thread) ? thread : null}
+        threadId={threadId}
         handoffId={isSafeId(handoff) ? handoff : null}
       />
     </FocusLive>

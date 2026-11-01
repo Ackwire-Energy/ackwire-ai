@@ -56,6 +56,8 @@ export const STORED = {
   sounds: "sounds",
   /** Offline-computer notices the person closed, by outage (JSON list; features/outages). */
   outagesDismissed: "outages-dismissed",
+  /** The last conversation opened in each workspace (JSON by workspace id): "Onde você parou" (ADR 0108). */
+  lastPlace: "last-place",
 } as const;
 
 export async function clearStoredValues(): Promise<void> {

@@ -400,6 +400,13 @@ export const approvals = pgTable(
      * server's own tool name and the actions it wraps, `approval_rules`). Null = not offered.
      */
     approveAlways: jsonb().$type<{ tool: string; actions: string[] }>(),
+    /**
+     * Approved ahead (ADR 0015 addendum, 2026-10-31): the routine whose run at `run_at` (that run's slot) this exact
+     * action is for. Once approved, that run does it without asking until `run_at` plus a short grace. Both null for
+     * an action that runs as soon as it is approved.
+     */
+    routineId: uuid(),
+    runAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -407,6 +414,7 @@ export const approvals = pgTable(
     unique().on(t.runId, t.toolUseId),
     index().on(t.orgId, t.status, t.createdAt),
     index().on(t.expiresAt).where(sql`${t.status} = 'pending'`),
+    index().on(t.routineId, t.runAt).where(sql`${t.runAt} is not null`),
   ],
 );
 

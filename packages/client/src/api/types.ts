@@ -74,6 +74,14 @@ export interface AuthConfig {
   billingUrl?: string | null;
   /** The bot check's site key (Cloudflare Turnstile, ADR 0075); null or absent: no check, nothing from Cloudflare. */
   turnstileSiteKey?: string | null;
+  /** Where the app reports its own errors (a Sentry-compatible server, ADR 0104); null or absent: nowhere. */
+  errorReports?: ErrorReportsConfig | null;
+}
+
+export interface ErrorReportsConfig {
+  dsn: string;
+  environment: string;
+  release: string;
 }
 
 /** A workspace's use against its limits (ADR 0079, `GET …/limits`), for any member; a null limit: none. */
@@ -185,6 +193,17 @@ export interface OrgSummary {
   onboarding?: OrgOnboarding;
   /** From `GET /me` while an owner's deletion is pending, set at once by `org.deleting`: the workspace is closed. */
   deletion?: OrgDeletion;
+  /** From `GET /me`: what opens when the app starts here (ADR 0108). Absent from older servers: the home. */
+  start?: StartChoice;
+}
+
+/** What opens when the app starts in a workspace (ADR 0108): the app's home, where the person was, or a channel. */
+export type StartPage = "home" | "last" | "channel";
+
+export interface StartChoice {
+  page: StartPage;
+  /** With `channel`, else null. */
+  channelId: string | null;
 }
 
 /** A workspace being deleted. Any owner restores it until `dueAt`. */
@@ -1300,6 +1319,12 @@ export interface Approval {
    * actions; none: the tool itself) without asking again, with any values. Null or absent: not offered.
    */
   approveAlways?: { tool: string; actions: string[] } | null;
+  /** Approved ahead (`schedule_action`): when the routine's run does it by itself; null: it runs once approved. */
+  runAt?: string | null;
+  /** The routine whose run at `runAt` it is for. */
+  routineId?: string | null;
+  /** Approved ahead and not run yet, and you may withdraw it (`approvals.cancel`). */
+  canCancel?: boolean;
 }
 
 /** A kind of call the agent runs without asking, approved for good by someone who decides its approvals. */
@@ -1364,22 +1389,24 @@ export interface ConnectorDef {
   label: string;
   description: string;
   /**
-   * `catalog`: our connector with its own scopes (GitHub, Drive…);
-   * `remote_mcp`: the vendor's official MCP server (one click, then the same
-   * tools review as a custom server).
+   * `catalog`: our connector with its own scopes (GitHub, Sentry, Linear);
+   * `remote_mcp`: a server connected by its address in one click, the vendor's
+   * official MCP server or the service through Composio (`via`), then the same
+   * tools review as a custom server.
    */
   kind: "catalog" | "remote_mcp";
   category: ConnectorCategory;
   auth: ("oauth" | "api_key")[];
-  /** Signs in with OAuth here: our OAuth app, or the vendor's MCP OAuth. */
+  /** Signs in with OAuth here: our OAuth app, the vendor's MCP OAuth, or Composio's. */
   oauthConfigured: boolean;
   /** Can be connected on this server; `false` shows "Em breve". */
   available: boolean;
   /** The vendor hasn't approved agentes.chat yet: greyed out with a lock, nothing to open. Older servers leave it out. */
   soon?: boolean;
-  needsServerUrl: boolean;
-  /** The MCP endpoint (`remote_mcp`). */
-  serverUrl: string | null;
+  /** Connects through Composio (ADR 0107): its page signs in. Unavailable on a server without Composio. */
+  via?: "composio";
+  /** Where it connects, by the way this server picked (a `remote_mcp` entry's address). */
+  serverUrl: string;
   /** Brand icon served by this app, null for a monogram: one color (`/connectors/github.svg`) or its maker's colors (`/brands/paypal.svg`). */
   iconUrl: string | null;
   /** Tint of the icon; null = the ink. */
@@ -1840,22 +1867,45 @@ export interface CustomTool {
 export interface CustomServer {
   id: string;
   serverUrl: string;
+  /** The account's name here ("Stripe (Acme)", "Stripe 2"): admins rename it. */
   label: string;
+  /** The account as the provider names it ("Acme"), when it says. */
+  accountLabel?: string | null;
   authType: "oauth" | "api_key";
   /** The server's own icon, kept and served by the backend (`/api/app/connector-icons/…`); null = a monogram. */
   iconUrl?: string | null;
+  /** A service through Composio (ADR 0107): its address means nothing to people. */
+  via?: "composio";
+  /** `needs_reconnect`: its Composio account stopped working; no tools until Reconectar. Older servers leave it out. */
+  status?: "active" | "needs_reconnect";
   tools: CustomTool[];
   /** Last time an admin saved the classification; null = never (nothing exposed). */
   reviewedAt: string | null;
   createdAt: string;
 }
 
+/** The workspace's Composio calls this month (UTC): connectors and mailboxes together (ADR 0107 §7). */
+export interface ComposioUsage {
+  calls: number;
+  /** The month's cap; null: none. */
+  limit: number | null;
+  /** `2026-11`. */
+  month: string;
+}
+
+/** What connecting did: a new account, a new sign-in for one ("Reconectar"), or the same account again. */
+export type ConnectOutcome = "connected" | "reconnected" | "same_account";
+
 /** What connecting to a URL needs: OAuth (discovery + dynamic client registration) or an API key. */
 export type CustomConnectStart =
-  | { status: "connected"; server: CustomServer }
+  /** `outcome`: absent from an older server. */
+  | { status: "connected"; server: CustomServer; outcome?: ConnectOutcome }
   | { status: "oauth"; authorizeUrl: string }
-  /** `not_approved`: it has OAuth but only lets in apps it approved, and agentes.chat isn't one yet. */
-  | { status: "needs_key"; reason?: "not_approved" };
+  /**
+   * `not_approved`: it has OAuth but only lets in apps it approved, and agentes.chat isn't one yet. `detail`: how it
+   * refused our registration, in its own words (`error: error_description`, short).
+   */
+  | { status: "needs_key"; reason?: "not_approved"; detail?: string };
 
 // ── Knowledge (phase 5: apps/server/src/routes/app/knowledge.ts) ─────────────
 
@@ -2556,7 +2606,41 @@ export type RoutineTrigger =
   | { type: "event"; event: RoutineEvent }
   /** A one-off (reminders, "amanhã às 9h"): fires once at `at`, then the routine is inactive. */
   | { type: "once"; at: string; timezone: string; description: string }
-  | RoutineEmailTrigger;
+  | RoutineEmailTrigger
+  | RoutineWebhookTrigger;
+
+/**
+ * "Quando o webhook for chamado" (ADR 0106): a call to the routine's own address starts it. `url` only for who may
+ * manage it (null for everyone else); `signed`: calls must carry a signature of their body.
+ */
+export interface RoutineWebhookTrigger {
+  type: "webhook";
+  url: string | null;
+  signed: boolean;
+}
+
+/** How a call to a routine's address ended: `duplicate` repeated an idempotency key within 24 hours. */
+export type RoutineHookOutcome = "accepted" | "duplicate" | "bad_signature" | "too_large" | "rate_limited";
+
+export interface RoutineHookCall {
+  id: string;
+  at: string;
+  outcome: RoutineHookOutcome;
+  /** The HTTP status it got. */
+  status: number;
+  bytes: number;
+  /** The routine run it went into. */
+  runId: string | null;
+  /** Sent with Testar. */
+  test: boolean;
+}
+
+/** `GET …/routines/{id}/hook`: the address, whether calls are signed, the latest calls (newest first). */
+export interface RoutineHook {
+  url: string;
+  signed: boolean;
+  calls: RoutineHookCall[];
+}
 
 /** "Quando chegar um email" (ADR 0038): new mail in a folder of a connected mailbox, optionally filtered. */
 export interface RoutineEmailTrigger {
@@ -2660,8 +2744,23 @@ export interface Routine {
   recentRuns: RoutineRun[];
   /** The last 7 days: tokens on a plan (Claude Code, Codex), cost on the API. */
   usage: { runs: number; tokens: number; costNanoUsd: number; billedTo: "api" | "plan" | "mixed" };
-  /** Event routines that can be triggered by a webhook: the URL to call. */
-  webhookUrl?: string | null;
+  /** Actions prepared for its runs that may still run (waiting for a person, or approved ahead), soonest first. */
+  ahead?: RoutineAhead[];
+}
+
+/** An action prepared ahead for one of a routine's runs (`schedule_action`): its approval, in short. */
+export interface RoutineAhead {
+  /** The approval. */
+  id: string;
+  tool: string;
+  scope: string;
+  title: string;
+  params: Record<string, unknown>;
+  status: "pending" | "approved";
+  /** When its run does it by itself. */
+  runAt: string;
+  /** You may withdraw it. */
+  canCancel: boolean;
 }
 
 /**
@@ -2713,7 +2812,8 @@ export interface RoutineInput {
     | { type: "schedule"; rule: ApiRule }
     | { type: "event"; event: RoutineEvent }
     | { type: "once"; at: string; timezone?: string }
-    | Omit<RoutineEmailTrigger, "status">;
+    | Omit<RoutineEmailTrigger, "status">
+    | { type: "webhook" };
   /** Default `read` ("Só olhar e contar"). */
   access?: RoutineAccess;
   /** Default `when_new` ("Só quando tiver novidade"). */
@@ -2891,6 +2991,8 @@ export interface Skill {
   source: SkillSourceKind;
   /** The link it came from (`url` skills). */
   sourceUrl: string | null;
+  /** Which of the workspace's GitHub connections read its private repository; updating reads through it first. */
+  sourceVia?: SkillVia | null;
   /** Turned on for agents created from now on. */
   defaultForNewAgents: boolean;
   metadata: Record<string, unknown>;
@@ -2933,7 +3035,12 @@ export interface SkillSkipped {
 export interface SkillPick {
   choices: SkillChoice[];
   skipped?: SkillSkipped[];
+  /** Which of the workspace's GitHub connections read it, when the repository is private. */
+  via?: SkillVia;
 }
+
+/** How a private repository was read: the GitHub App installed on its account, or the workspace's GitHub connection. */
+export type SkillVia = "github_app" | "github";
 
 /** `GET …/agents/{id}/skills`: every skill of the library, with whether this agent has it. */
 export interface AgentSkill extends Skill {
@@ -4819,7 +4926,9 @@ export type NotificationKind =
    * ADR 0090: someone accepted the email invitation this person sent. The person as actor, `latest.title` their
    * name, `source.label` the workspace's. Inbox only. Opens Members.
    */
-  | "invitation_accepted";
+  | "invitation_accepted"
+  /** ADR 0107 §7: the workspace used its Composio calls for the month (connector admins). `latest.title`: the month. */
+  | "composio_limit";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {
@@ -5110,6 +5219,28 @@ export interface MailProviders {
   /** iCloud and any other mailbox (IMAP/SMTP). */
   imap: boolean;
   presets: MailPreset[];
+  /**
+   * MillionSend inboxes, null when off. `connectorKey`: the workspace's MillionSend connector holds a key a person
+   * may choose to reuse; `keysUrl`: where MillionSend Cloud makes keys (null: a self-hosted MillionSend).
+   */
+  millionsend: { connectorKey: boolean; keysUrl: string | null } | null;
+}
+
+/** An inbox a MillionSend key reaches. */
+export interface MillionSendInbox {
+  id: string;
+  address: string;
+  name: string | null;
+  kind: "agent" | "human";
+  shared: boolean;
+  /** Already a mailbox of this workspace. */
+  connected: boolean;
+}
+
+/** A MillionSend key: pasted, or the MillionSend connector's (the person chose it). */
+export interface MillionSendKeyInput {
+  apiKey?: string;
+  useConnector?: boolean;
 }
 
 export type MailLevel = "read" | "read_write";
@@ -5117,8 +5248,8 @@ export type MailLevel = "read" | "read_write";
 /** A mailbox the organization connected (never its password). */
 export interface MailAccount {
   id: string;
-  provider: "gmail" | "outlook" | "imap";
-  via: "composio" | "imap";
+  provider: "gmail" | "outlook" | "imap" | "millionsend";
+  via: "composio" | "imap" | "millionsend";
   address: string;
   label: string;
   status: "pending" | "active" | "needs_reconnect";
@@ -5160,6 +5291,8 @@ export interface MailAccountUpdate {
   label?: string;
   /** A new app password (IMAP): tested first, a `422` carries `MailConnectError`. */
   password?: string;
+  /** A new API key (MillionSend): it must still reach the inbox, a `422` carries `auth`. */
+  apiKey?: string;
   offActions?: MailActionName[];
   askActions?: MailActionName[];
   /** The mailbox's other addresses (replaces the list). */

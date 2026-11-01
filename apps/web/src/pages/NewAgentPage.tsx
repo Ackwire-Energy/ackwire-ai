@@ -45,6 +45,7 @@ import {
   Button,
   Card,
   CheckboxPill,
+  colorKey,
   EmptyState,
   type Expression,
   Field,
@@ -1392,7 +1393,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
                 </span>
                 <span className="small muted">
                   {[
-                    t(`look.colors.${look.color}`),
+                    t(`look.colors.${colorKey(look.color)}`),
                     t(`look.eyesNames.${look.eyes}`),
                     ...(look.accessory !== "none" ? [t(`look.accessories.${look.accessory}`)] : []),
                   ].join(" · ")}

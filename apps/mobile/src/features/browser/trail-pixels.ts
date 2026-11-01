@@ -1,5 +1,5 @@
 import type { BrowserTrailKind } from "@agenteschat/client";
-import { AGENT_GRADIENTS, type AgentColorName, bodyTones, mixHex } from "@agenteschat/ui/agent/engine";
+import { type AgentColorName, bodyTones, gradientOf, mixHex } from "@agenteschat/ui/agent/engine";
 import type { CellRun } from "../../computer/cells";
 
 /**
@@ -114,7 +114,7 @@ export const SKY_CELL = 3;
 /** The thin edge of the agent's sky along the top of the card, still and greyed (the web's `SkyStrip muted`). */
 export function skyEdgeCells(width: number, color: AgentColorName, raised: string, dark: boolean): CellRun[] {
   const w = Math.max(8, Math.ceil(width / SKY_CELL));
-  const [top, bottom] = AGENT_GRADIENTS[color] ?? AGENT_GRADIENTS.sky;
+  const [top, bottom] = gradientOf(color);
   const pal = (
     dark
       ? [raised, mixHex(raised, bottom, 0.45), mixHex(bottom, top, 0.35), mixHex(top, bottom, 0.2)]
@@ -154,7 +154,7 @@ export const pageGrid = (width: number, height: number) => ({
 
 /** The shape of a page, never the real one, fading into the agent's tone toward the bottom (the web's `PageSilhouette`). */
 export function pageCells(w: number, h: number, color: AgentColorName, dark: boolean): CellRun[] {
-  const [top, bottom] = AGENT_GRADIENTS[color] ?? AGENT_GRADIENTS.sky;
+  const [top, bottom] = gradientOf(color);
   const paper = dark ? "#26252b" : "#e9e8ef";
   const ink = dark ? "#3b3946" : "#cfcdd9";
   const tint = dark ? mixHex(bottom, "#0d0d10", 0.6) : mixHex(top, "#ffffff", 0.35);

@@ -3,9 +3,10 @@ import type { Config } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
 import { type MachineHub, type SessionScreening, safeEqual } from "@agenteschat/engine";
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { apiError, domainErrorResponse, validationHook } from "../http/errors";
+import { apiError, domainErrorResponse, routeOf, validationHook } from "../http/errors";
 import type { Logger } from "../logger";
 import { registerOperatorAccess } from "./access";
+import { registerOperatorAnalytics } from "./analytics";
 import { registerOperatorEvents } from "./events";
 import { registerOperatorLimits } from "./limits";
 import { registerOperatorMachines } from "./machines";
@@ -60,13 +61,14 @@ export function createOperatorApp(deps: OperatorDeps, token: string) {
   registerOperatorEvents(api, deps);
   registerOperatorMachines(api, deps);
   registerOperatorAccess(api, deps);
+  registerOperatorAnalytics(api, deps);
   api.doc31("/openapi.json", {
     openapi: "3.1.0",
     info: {
       title: "agentes.chat operator API",
       version: deps.version,
       description:
-        "Workspace and account lookups, workspace standing, billing holds and limits (ADR 0079), the events feed and review blocks, the workspaces' computers from an external provisioner, and who may sign up (the waiting list and early-access invitations, ADR 0078), for the people who run this instance (ADR 0056).",
+        "Workspace and account lookups, workspace standing, billing holds and limits (ADR 0079), the events feed and review blocks, the workspaces' computers from an external provisioner, who may sign up (the waiting list and early-access invitations, ADR 0078), and how connectors are used (ADR 0103), for the people who run this instance (ADR 0056).",
     },
     servers: [{ url: OPERATOR_API_PREFIX }],
     security: [{ operator: [] }],
@@ -79,7 +81,10 @@ export function createOperatorApp(deps: OperatorDeps, token: string) {
     deps.log.error("unhandled error", {
       method: c.req.method,
       path: c.req.path,
-      error: String(error),
+      route: routeOf(c),
+      status: 500,
+      orgId: c.req.param("orgId"),
+      error,
       stack: error.stack,
     });
     return apiError(c, 500, "internal_error", "Something went wrong on our side");

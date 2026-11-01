@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import { QueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
-import { ApiError, type ApprovalEmail } from "../src/index";
-import { emailTitleWords } from "../src/lib/approval-kind";
+import { ApiError, type Approval, type ApprovalEmail, cacheApproval, keys } from "../src/index";
+import { aheadPhase, emailTitleWords } from "../src/lib/approval-kind";
 import { approvalOriginShort } from "../src/lib/approval-origin";
 import {
   actionName,
+  aheadEndLine,
   approvalRuleWords,
   approvalSummary,
   approvalValues,
@@ -140,5 +142,37 @@ describe("an approval's values", () => {
     ]);
     // A list of objects still says nothing.
     expect(approvalValues({ params: { tools: [{ slug: "X" }] }, connector: "x" })).toEqual([]);
+  });
+});
+
+describe("an action prepared ahead", () => {
+  test("asks, waits for its time once approved, then ran, or how it ended; nothing for one that runs once approved", () => {
+    const runAt = "2026-11-03T13:00:00.000Z";
+    const decidedAt = "2026-11-02T18:00:00.000Z";
+    const at = (status: Approval["status"], over: Partial<Approval> = {}) =>
+      aheadPhase({ runAt, status, executedAt: null, decidedAt: null, ...over });
+    expect(at("pending")).toBe("asking");
+    expect(at("approved", { decidedAt })).toBe("scheduled");
+    expect(at("approved", { decidedAt, executedAt: "2026-11-03T13:00:04.000Z" })).toBe("ran");
+    // Approved but its run didn't do it in time, nobody approved it by then, withdrawn: each says so.
+    expect(at("expired", { decidedAt })).toBe("lapsed");
+    expect(at("expired")).toBe("unapproved");
+    expect(at("canceled", { decidedAt })).toBe("canceled");
+    const say = ((key: string) => key) as unknown as TFunction;
+    expect(aheadEndLine(say, { runAt, status: "expired", executedAt: null, decidedAt })).toBe("approval.ahead.lapsed");
+    expect(aheadEndLine(say, { runAt, status: "approved", executedAt: null, decidedAt })).toBeNull();
+    expect(at("refused", { decidedAt })).toBeNull();
+    expect(aheadPhase({ runAt: null, status: "approved", executedAt: null, decidedAt })).toBeNull();
+    expect(aheadPhase({ status: "pending", executedAt: null, decidedAt: null })).toBeNull();
+  });
+
+  test("news about one (it ran, it was withdrawn) makes its routine's page read again", () => {
+    const qc = new QueryClient();
+    qc.setQueryData(keys.routines("o1"), []);
+    const ran = { id: "a1", status: "approved", executedAt: "2026-11-03T13:00:04.000Z" } as Approval;
+    cacheApproval(qc, "o1", { ...ran, routineId: null });
+    expect(qc.getQueryState(keys.routines("o1"))?.isInvalidated).toBe(false);
+    cacheApproval(qc, "o1", { ...ran, routineId: "r1", runAt: "2026-11-03T13:00:00.000Z" });
+    expect(qc.getQueryState(keys.routines("o1"))?.isInvalidated).toBe(true);
   });
 });

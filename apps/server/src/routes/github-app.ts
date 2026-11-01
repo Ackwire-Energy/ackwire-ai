@@ -7,11 +7,13 @@ import {
   handleGitHubAppWebhook,
   listGitHubAppInstallations,
   listOrgRepositories,
+  peekOAuthState,
   removeGitHubAppInstallation,
   startGitHubAppInstall,
   validGitHubAppSignature,
 } from "@agenteschat/engine";
 import { createRoute, type OpenAPIHono, z } from "@hono/zod-openapi";
+import { isExpectedError } from "../http/errors";
 import {
   type AppDeps,
   body,
@@ -20,8 +22,11 @@ import {
   json,
   noContent,
   OrgParams,
+  oauthFailedUrl,
+  oauthFailure,
   requireSession,
   security,
+  signInFirst,
 } from "./app/context";
 import { readWebhookText } from "./webhook-body";
 
@@ -55,6 +60,8 @@ function installDeps(deps: AppDeps): GitHubAppInstallDeps {
  */
 export function githubAppRoutes(deps: AppDeps) {
   const app = createAppRouter(deps);
+  // GitHub's return is a browser navigation: no session in this browser, the sign-in page first.
+  app.use("/github-app/callback", signInFirst(deps.auth, deps.config.PUBLIC_URL));
   for (const path of ["/organizations/*", "/github-app/*"]) app.use(path, requireSession(deps.auth));
   const install = installDeps(deps);
   const base = deps.config.PUBLIC_URL.replace(/\/$/, "");
@@ -198,10 +205,14 @@ export function githubAppRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const q = c.req.valid("query");
-      const fail = (reason: string) => c.redirect(`${base}/?github_app_error=${encodeURIComponent(reason)}`, 302);
+      // Back where it started (its state's page) while the state can still be read, else the start.
+      const started = q.state ? await peekOAuthState(deps, q.state) : null;
+      const fail = (reason: string) =>
+        c.redirect(oauthFailedUrl(base, started?.returnTo ?? "/", "github_app_error", reason), 302);
       // `request`: someone without rights on that GitHub account asked its owner to install; nothing to bind yet.
       if (q.setup_action === "request") return fail("requested");
-      if (q.error || !q.state || !q.code || !q.installation_id) return fail(q.error ?? "missing_installation");
+      if (q.error) return fail("cancelled");
+      if (!q.state || !q.code || !q.installation_id) return fail("failed");
       try {
         const { installation, returnTo } = await completeGitHubAppInstall(install, c.get("user"), {
           state: q.state,
@@ -212,7 +223,12 @@ export function githubAppRoutes(deps: AppDeps) {
         const sep = returnTo.includes("?") ? "&" : "?";
         return c.redirect(`${base}${returnTo}${sep}github_app=installed`, 302);
       } catch (error) {
-        return fail(error instanceof Error ? error.message : "failed");
+        const reason = oauthFailure(error);
+        if (reason === "failed") {
+          const log = isExpectedError(error) ? deps.log?.warn : deps.log?.error;
+          log?.("github app install failed", { error });
+        }
+        return fail(reason);
       }
     },
   );

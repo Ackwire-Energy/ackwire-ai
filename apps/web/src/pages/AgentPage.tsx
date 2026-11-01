@@ -24,6 +24,7 @@ import { type RepoChoice, repoChoiceOf, repoListOf, reposText } from "@agentesch
 import {
   type AgentAppearance,
   Button,
+  colorKey,
   cx,
   Dialog,
   DialogFooter,
@@ -225,7 +226,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
   const ownerFirst = agent.ownerUserId ? (dir.memberById.get(agent.ownerUserId)?.name.split(/\s+/)[0] ?? null) : null;
   const lookText = (l: Look) =>
     [
-      t(`look.colors.${l.color}`),
+      t(`look.colors.${colorKey(l.color)}`),
       t(`look.eyesNames.${l.eyes}`),
       ...(l.accessory !== "none" ? [t(`look.accessories.${l.accessory}`)] : []),
     ].join(" · ");

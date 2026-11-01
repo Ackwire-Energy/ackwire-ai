@@ -34,6 +34,7 @@ import {
 import { agentSections } from "@agenteschat/client/lib/agent-groups";
 import { audienceChip, audienceNotice, listsAgent } from "@agenteschat/client/lib/audience";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { waitingAgents } from "@agenteschat/client/lib/outages";
 import { can, managesChannel } from "@agenteschat/client/lib/permissions";
@@ -415,6 +416,10 @@ export function Sidebar() {
       <div className="sidebar__scroll" ref={navRef}>
         {/* The tools each person keeps in sight; the rest open beside the sidebar from More. */}
         <div className="sidebar__group sidebar__tools">
+          <Link to="/org/$orgId/home" params={{ orgId }} className="sidebar__item" title={t("shell.home")}>
+            <Icon name="home" />
+            <span className="sidebar__item-label">{t("shell.home")}</span>
+          </Link>
           {listed.map(toolRow)}
           <MoreTools items={inMore} row={toolRow} countOf={countOf} />
         </div>
@@ -734,7 +739,7 @@ function SidebarChannels({
   const [moving, setMoving] = useState<Channel | null>(null);
   const drag = useRef<Dragging | null>(null);
   const [mark, setMark] = useState<DropMark>(null);
-  const failed = (e: unknown) => toast.show(e instanceof Error ? e.message : String(e), "error");
+  const failed = (e: unknown) => toast.show(errorText(t, e), "error");
 
   const list = categories.data ?? [];
   const known = new Set(list.map((c) => c.id));

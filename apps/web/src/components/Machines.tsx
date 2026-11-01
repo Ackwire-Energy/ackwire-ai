@@ -126,8 +126,8 @@ function useCopy() {
   };
 }
 
-/** A terminal command in a code block, with Copiar. */
-export function CommandBlock({ command }: { command: string }) {
+/** A terminal command (or anything to paste) in a code block, with Copiar; `copied`: what the toast says. */
+export function CommandBlock({ command, copied }: { command: string; copied?: string }) {
   const { t } = useTranslation();
   const copy = useCopy();
   return (
@@ -143,7 +143,7 @@ export function CommandBlock({ command }: { command: string }) {
         className="machine-command__copy"
         aria-label={t("common.copy")}
         title={t("common.copy")}
-        onClick={() => void copy(command, t("machines.commandCopied"))}
+        onClick={() => void copy(command, copied ?? t("machines.commandCopied"))}
       />
     </div>
   );

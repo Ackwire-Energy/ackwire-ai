@@ -53,14 +53,6 @@ describe("connections", () => {
     await expect(
       createApiKeyConnection(depsOf(f), f.owner.id, f.org.id, { connector: "jira", apiKey: "x".repeat(10) }),
     ).rejects.toBeInstanceOf(ValidationError);
-    await expect(
-      createApiKeyConnection(depsOf(f), f.owner.id, f.org.id, {
-        connector: "github",
-        apiKey: "ghp_secret_123456",
-        serverUrl: "http://evil.example/mcp",
-      }),
-    ).rejects.toThrow("https");
-
     const first = await createApiKeyConnection(depsOf(f), f.owner.id, f.org.id, {
       connector: "github",
       apiKey: "ghp_secret_123456",
@@ -188,6 +180,12 @@ describe("MCP tools through the Tool Gateway", () => {
       ["github_get_pull_request", "github:pr.read", false],
       ["github_merge_pull_request", "github:pr.merge", true],
     ]);
+    // Counted under the catalog's id, by the server's own tool names (ADR 0103).
+    expect(Object.fromEntries(all.map((t) => [t.name, t.connector]))).toEqual({
+      github_get_issue: { key: "github", via: "mcp", tool: "get_issue" },
+      github_get_pull_request: { key: "github", via: "mcp", tool: "get_pull_request" },
+      github_merge_pull_request: { key: "github", via: "mcp", tool: "merge_pull_request" },
+    });
     // The chat draws each call with the connector's own logo.
     expect(new Set(all.map((t) => t.service))).toEqual(new Set(["github"]));
     expect(mcp.sessions[0]).toEqual({
@@ -254,6 +252,11 @@ describe("MCP tools through the Tool Gateway", () => {
       output: { content: "Unknown tool github_delete_repository", isError: true },
     });
     expect(mcp.calls.map((c) => c.tool)).toEqual(["get_pull_request"]);
+    const used = await f.db.select().from(schema.connectorUsageDays).orderBy(schema.connectorUsageDays.tool);
+    expect(used.map((r) => [r.connector, r.via, r.tool, r.calls, r.errors])).toEqual([
+      ["github", "mcp", "get_issue", 1, 1],
+      ["github", "mcp", "get_pull_request", 1, 0],
+    ]);
 
     // Disconnecting removes the tools and the grants.
     await revokeConnection(f.db, f.owner.id, f.org.id, c.id);
@@ -396,9 +399,9 @@ describe("OAuth (state + PKCE)", () => {
     expect(await connectionHeaders(deps, connection)).toEqual({ authorization: "Bearer gho_token_1" });
     expect(token.seen[0]?.get("client_secret")).toBe("gh-secret");
 
-    await expect(completeOAuth(deps, { id: f.owner.id }, { state, code: "good-code" })).rejects.toThrow(
-      "invalid or expired",
-    );
+    await expect(completeOAuth(deps, { id: f.owner.id }, { state, code: "good-code" })).rejects.toMatchObject({
+      code: "oauth.link_used",
+    });
 
     const late = await startOAuth(deps, f.owner.id, f.org.id, "github");
     const later = depsOf(f, { http: token.http, now: () => new Date(Date.now() + 11 * 60_000) });

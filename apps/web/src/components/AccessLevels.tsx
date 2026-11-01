@@ -96,7 +96,10 @@ export function toolLabel(t: TFunction, r: AccessResource, tool: AccessTool) {
   if (r.custom) return tool.label;
   if (r.kind === "builtin") return builtinToolText(t, tool).label;
   const prefix = r.connector ? `${r.connector}_` : "";
-  return prefix && tool.name.startsWith(prefix) ? humanize(tool.name.slice(prefix.length)) : tool.label;
+  // A numbered connection's tools (`linear_2_create_issue`) lose the number too.
+  return prefix && tool.name.startsWith(prefix)
+    ? humanize(tool.name.slice(prefix.length).replace(/^\d+_/, ""))
+    : tool.label;
 }
 
 /**

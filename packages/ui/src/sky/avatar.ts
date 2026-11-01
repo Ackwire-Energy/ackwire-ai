@@ -6,6 +6,7 @@
  * under the agent.
  */
 import { gradientOf, mixHex } from "../agent/engine.js";
+import { BoundedMap } from "../bounded-map";
 import { bayerAt } from "./math";
 
 /** [top, bottom] of an agent's tile sky: light mixes its light tone into white, dark its deep tone into the dark surface. */
@@ -24,9 +25,10 @@ export function avatarSkyCell(x: number, y: number, n: number): 0 | 1 {
 /** Sky cells per side for a tile of `px` device pixels (about 4 device pixels per cell). */
 export const avatarSkyCells = (px: number) => Math.max(8, Math.round(px / 4));
 
-const cache = new Map<string, HTMLCanvasElement | null>();
+// Bounded: the custom color picker's live preview asks for a new color on every pointer move.
+const cache = new BoundedMap<string, HTMLCanvasElement | null>(256);
 // Asked every frame for every avatar: the color math once per color and theme.
-const looked = new Map<string, HTMLCanvasElement | null>();
+const looked = new BoundedMap<string, HTMLCanvasElement | null>(256);
 
 /** The sky as a `px`×`px` canvas, cached per color, size and theme (null without a DOM canvas). */
 export function avatarSky(color: string | undefined, px: number, dark: boolean): HTMLCanvasElement | null {

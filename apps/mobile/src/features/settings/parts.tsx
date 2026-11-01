@@ -116,8 +116,11 @@ export function confirmAction({
   ]);
 }
 
-/** A terminal command, in mono (it is code), and Copiar under it ("Comando copiado. Cole no Terminal…"). */
-export function CommandBlock({ command }: { command: string }) {
+/**
+ * A terminal command (or anything to paste), in mono (it is code), and Copiar under it; `copiedTitle`: the toast
+ * ("Comando copiado. Cole no Terminal…" by default).
+ */
+export function CommandBlock({ command, copiedTitle }: { command: string; copiedTitle?: string }) {
   const { t } = useTranslation();
   const c = useColors();
   const toast = useToast();
@@ -142,7 +145,7 @@ export function CommandBlock({ command }: { command: string }) {
             if (!ok) return;
             successHaptic();
             setCopied(true);
-            toast({ title: t("machines.commandCopied"), icon: "copy" });
+            toast({ title: copiedTitle ?? t("machines.commandCopied"), icon: "copy" });
           })
         }
       />

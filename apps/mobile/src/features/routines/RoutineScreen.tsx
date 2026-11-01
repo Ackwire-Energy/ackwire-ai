@@ -1,4 +1,11 @@
-import { type Routine, type RoutineRun, useRoutineRuns, useRoutines, useRuleDescribe } from "@agenteschat/client";
+import {
+  type Routine,
+  type RoutineAhead,
+  type RoutineRun,
+  useRoutineRuns,
+  useRoutines,
+  useRuleDescribe,
+} from "@agenteschat/client";
 import { formatTokensShort, formatUsd, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -32,8 +39,10 @@ import {
   IconButton,
   type IconName,
   InfoHint,
+  LineIcon,
   Text,
 } from "@/ui";
+import { approvalTitleText, useCancelAhead } from "../approvals/parts";
 import { chatHref } from "../links/logic";
 import { openSwitchComputer } from "../outages/OutageNotice";
 import { useMachineOutages } from "../outages/queries";
@@ -64,6 +73,7 @@ import { hasFired, isDoneOnce, isPaused, isReminder, isRunning, mailTrouble, rou
 import { FixButton, StateChip } from "./parts";
 import { RunStrip } from "./RunPixels";
 import { nextLabel } from "./rule";
+import { WebhookCard } from "./WebhookCard";
 
 /** At most this many runs on the screen (the web's details show as many). */
 const RUNS_SHOWN = 30;
@@ -74,7 +84,8 @@ const RUNS_SHOWN = 30;
  * for an offline computer on a self-host) for whoever may change it; then the week, what it does, when, where it
  * delivers, where it runs (only where the workspace has more than one computer, by its name), what it may do on its
  * own, when it posts, and its runs, each opening the agent's message
- * (or the approval it waits for). "…" in the bar: Editar, Duplicar, Copiar URL do webhook, Apagar. The routine comes
+ * (or the approval it waits for); a webhook routine's address card for who manages it. "…" in the bar: Editar,
+ * Duplicar, Copiar URL do webhook, Apagar. The routine comes
  * from the list (there is no single-routine endpoint).
  */
 export function RoutineScreen({ id }: { id: string }) {
@@ -326,6 +337,10 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
                 <Text variant="footnote" tone="muted">
                   {t("mail.routine.every")}
                 </Text>
+              ) : r.trigger.type === "webhook" ? (
+                <Text variant="footnote" tone="muted">
+                  {t("routines.webhook.every")}
+                </Text>
               ) : r.trigger.type === "event" ? (
                 <Text variant="footnote" tone="muted">
                   {t("routines.panel.eventEvery")}
@@ -356,6 +371,33 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
               ) : null}
             </Block>
           </Section>
+
+          {r.trigger.type === "webhook" ? (
+            r.canManage ? (
+              <WebhookCard routine={r} runs={list} />
+            ) : (
+              <Section title={t("routines.form.kind.webhook")}>
+                <Block>
+                  <Text variant="footnote" tone="muted">
+                    {t("routines.webhook.hidden")}
+                  </Text>
+                </Block>
+              </Section>
+            )
+          ) : null}
+
+          {r.ahead && r.ahead.length > 0 ? (
+            <Section title={t("routines.panel.ahead")}>
+              {r.ahead.map((a) => (
+                <AheadItem key={a.id} action={a} />
+              ))}
+              <Block>
+                <Text variant="footnote" tone="muted">
+                  {t("routines.ahead.hint")}
+                </Text>
+              </Block>
+            </Section>
+          ) : null}
 
           <Section title={t("routines.panel.where")}>
             <GroupedRow
@@ -440,6 +482,48 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 /** Text inside a section's card. */
 function Block({ children }: { children: ReactNode }) {
   return <View style={styles.block}>{children}</View>;
+}
+
+/**
+ * An action prepared for one of its runs (`schedule_action`): what it does and when, opening its request; the
+ * "x" withdraws it (it won't run) for whoever may.
+ */
+function AheadItem({ action: a }: { action: RoutineAhead }) {
+  const { t, i18n } = useTranslation();
+  const c = useColors();
+  const cancel = useCancelAhead();
+  const title = approvalTitleText(t, { ...a, email: null });
+  const sub = t(a.status === "approved" ? "routines.ahead.approved" : "routines.ahead.pending", {
+    when: nextLabel(i18n.language, a.runAt),
+  });
+  return (
+    <View style={styles.ahead}>
+      <Pressable
+        onPress={() => router.push(`/approval/${a.id}`)}
+        accessibilityRole="button"
+        accessibilityLabel={`${title}, ${sub}`}
+        style={({ pressed }) => [styles.aheadMain, pressed ? { opacity: 0.6 } : null]}
+      >
+        <LineIcon name={a.status === "approved" ? "clock" : "wait"} size={16} color={c.muted} variant="subhead" />
+        <View style={styles.grow}>
+          <Text variant="subhead" style={styles.bold}>
+            {title}
+          </Text>
+          <Text variant="footnote" tone="muted">
+            {sub}
+          </Text>
+        </View>
+      </Pressable>
+      {a.canCancel ? (
+        <IconButton
+          icon="x"
+          label={`${t("approval.ahead.cancel")}: ${title}`}
+          disabled={cancel.pending}
+          onPress={() => cancel.cancel(a.id)}
+        />
+      ) : null}
+    </View>
+  );
 }
 
 /** A run's mark on the timeline, as the web's: done, nothing new (a dash), failed, skipped, at work. */
@@ -535,4 +619,14 @@ const styles = StyleSheet.create({
   underline: { textDecorationLine: "underline" },
   open: { marginTop: 2 },
   when: { paddingTop: 2 },
+  // The "x" glyph sits 10 px inside its 40 px button: 4 px more on the right reads as the left's 14.
+  ahead: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 4,
+    paddingLeft: 14,
+    paddingRight: 4,
+    paddingVertical: 6,
+  },
+  aheadMain: { flex: 1, flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 4 },
 });

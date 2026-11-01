@@ -154,6 +154,9 @@ describe("humanized activity", () => {
     expect(toolActivity("himetrica_get_analytics")).toEqual({ kind: "consulting", app: "himetrica" });
     expect(toolActivity("drive_search_files")).toEqual({ kind: "readingDrive" });
     expect(toolActivity("x_query", "Google Drive")).toEqual({ kind: "readingDrive" });
+    // Google Drive through Composio: its tools' names, and its accounts' names.
+    expect(toolActivity("google_drive_find_file")).toEqual({ kind: "readingDrive" });
+    expect(toolActivity("google_drive_2_find_file", "Google Drive (ana@acme.com) 2")).toEqual({ kind: "readingDrive" });
     expect(toolActivity("query", "Himetrica")).toEqual({ kind: "consulting", app: "Himetrica" });
     expect(toolActivity("send_email")).toEqual({ kind: "usingTool" });
     expect(toolActivity("weird")).toEqual({ kind: "usingTool" });

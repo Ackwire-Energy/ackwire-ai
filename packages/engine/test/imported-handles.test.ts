@@ -34,6 +34,14 @@ async function importedNina() {
   return nina;
 }
 
+test("a new agent can't take an id-shaped handle, so an imported agent's old one stays its own", async () => {
+  f = await setup();
+  await importedNina();
+  const made = createAgent(f.db, f.owner.id, f.org.id, { name: "Other", handle: OLD }, { model: "claude-sonnet-5-5" });
+  await expect(made).rejects.toThrow("look like an id");
+  expect(await currentHandles(f.db, f.org.id, [OLD])).toEqual(["nina"]);
+});
+
 const runsOf = async (agentId: string) =>
   f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.agentId, agentId));
 
@@ -42,8 +50,8 @@ test("an imported agent's old handle names it again; any other handle stays as w
   await importedNina();
   const unknown = "agent-11111111-2222-3333-4444-55";
   expect(await currentHandles(f.db, f.org.id, [OLD, "dev", unknown])).toEqual(["nina", "dev", unknown]);
-  // An agent that has that handle as its own now keeps it.
-  await createAgent(f.db, f.owner.id, f.org.id, { name: "Other", handle: OLD }, { model: "claude-sonnet-5-5" });
+  // An agent that has that handle as its own (made before such handles were refused) keeps it.
+  await f.db.update(schema.agents).set({ handle: OLD }).where(eq(schema.agents.id, f.agent.id));
   expect(await currentHandles(f.db, f.org.id, [OLD])).toEqual([OLD]);
 });
 

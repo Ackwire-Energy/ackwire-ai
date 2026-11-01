@@ -3,6 +3,8 @@ import {
   createFakeMailConnector,
   createFakeMailPoller,
   createFakeMailTester,
+  createFakeMillionSend,
+  FAKE_MILLIONSEND_KEY,
   type MailAdapters,
   type MailPreset,
 } from "@agenteschat/adapters";
@@ -11,6 +13,7 @@ import {
   createImapAccount,
   createLocalKeyWrapper,
   createMailToolSource,
+  createMillionSendAccount,
   type MailDeps,
   type MailPolicy,
   type MailToolDeps,
@@ -35,21 +38,28 @@ export const ICLOUD: MailPreset = {
 export const PUBLIC_URL = "http://localhost:3000";
 
 /**
- * The engine fixture plus fake mail adapters (Composio and IMAP, one fake
- * mailbox behind both), the mail tool source in the Tool Gateway, and
+ * The engine fixture plus fake mail adapters (Composio, IMAP and MillionSend, one fake
+ * mailbox and one fake poller behind all three), the mail tool source in the Tool Gateway, and
  * `MailDeps` for accounts and inbound mail. No network.
  */
-export async function mailSetup(options: { composio?: boolean; imap?: boolean } = {}) {
+export async function mailSetup(
+  options: { composio?: boolean; imap?: boolean; millionsend?: boolean; publicUrl?: string } = {},
+) {
   const box = createFakeMailConnector();
   const poller = createFakeMailPoller();
   const tester = createFakeMailTester();
   const composio = createFakeComposioClient();
+  const millionsend = createFakeMillionSend();
   const mail: MailAdapters = {
     composio: options.composio === false ? null : { client: composio.client, connector: box.connector },
     imap:
       options.imap === false
         ? null
         : { connector: box.connector, poller: poller.poller, tester: tester.tester, presets: [ICLOUD] },
+    millionsend:
+      options.millionsend === false
+        ? null
+        : { client: millionsend.client, connector: box.connector, poller: poller.poller },
   };
   const keyWrappers = [createLocalKeyWrapper(SECRET)];
   const toolDeps: MailToolDeps = { keyWrappers, mail, publicUrl: PUBLIC_URL };
@@ -59,11 +69,21 @@ export async function mailSetup(options: { composio?: boolean; imap?: boolean } 
     db: f.db,
     keyWrappers,
     mail,
-    publicUrl: PUBLIC_URL,
+    publicUrl: options.publicUrl ?? PUBLIC_URL,
     resolveHost: async (host) => (host.endsWith("example.com") ? ["93.184.216.34"] : ["10.0.0.5"]),
     composioPollMs: 0,
   };
-  return { f, deps, mail, box, poller, tester, composio, tools: f.tools as NonNullable<Fixture["tools"]> };
+  return {
+    f,
+    deps,
+    mail,
+    box,
+    poller,
+    tester,
+    composio,
+    millionsend,
+    tools: f.tools as NonNullable<Fixture["tools"]>,
+  };
 }
 
 export type MailFixture = Awaited<ReturnType<typeof mailSetup>>;
@@ -77,6 +97,15 @@ export async function imapAccount(m: MailFixture, address = "support@example.com
   });
   if (!r.ok) throw new Error(`imap account: ${r.error}`);
   return r.account;
+}
+
+/** The fake MillionSend's inbox, connected by the owner with the full access key. */
+export async function millionSendAccount(m: MailFixture, apiKey = FAKE_MILLIONSEND_KEY) {
+  const inbox = m.millionsend.state.inboxes[0];
+  if (!inbox) throw new Error("no fake inbox");
+  const r = await createMillionSendAccount(m.deps, m.f.owner.id, m.f.org.id, { apiKey, inboxId: inbox.id });
+  if (!r.ok) throw new Error(`millionsend account: ${r.error}`);
+  return r;
 }
 
 /** A Gmail mailbox through the fake Composio, already active. */

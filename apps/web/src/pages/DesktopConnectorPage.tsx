@@ -1,4 +1,5 @@
 import { useCompleteOAuth } from "@agenteschat/client";
+import { errorCode, oauthReturnText } from "@agenteschat/client/lib/errors";
 import { safeRedirect } from "@agenteschat/client/lib/guards";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
@@ -36,8 +37,9 @@ export function DesktopConnectorPage({
     started.current = true;
     // Replacing this page: the code it carried leaves the history.
     const go = (href: string) => void navigate({ href, replace: true });
+    // `reason`: why, as the callbacks say it (oauthReturnText), or the API's code when finishing here failed.
     const fail = (reason: string) => {
-      toast.show(t("connectors.errorToast", { reason }), "error");
+      toast.show(oauthReturnText(t, reason), "error");
       go(org ? `/org/${encodeURIComponent(org)}/settings/connectors` : "/");
     };
     if (state === DESKTOP_MAIL_STATE) {
@@ -49,15 +51,19 @@ export function DesktopConnectorPage({
       toast.show(t("mail.failed"), "error");
       return go("/");
     }
-    if (!org || error || !state || !code) return fail(error ?? "missing_code");
+    // The provider's own refusal (its `error`): cancelled. No code and no reason: it failed.
+    // A connector's own refusal (Composio's unfinished sign-in) comes as its full code.
+    if (error?.startsWith("connector.")) return fail(error);
+    if (!org || error || !state || !code) return fail(error && error !== "missing_code" ? "cancelled" : "failed");
     complete.mutate(
       { state, code },
       {
         onSuccess: (done) => {
           const to = safeRedirect(done.returnTo) ?? `/org/${encodeURIComponent(org)}/settings/connectors`;
-          go(`${to}${to.includes("?") ? "&" : "?"}connected=${encodeURIComponent(done.connector)}`);
+          const back = `connected=${encodeURIComponent(done.connector)}&outcome=${done.outcome}`;
+          go(`${to}${to.includes("?") ? "&" : "?"}${back}`);
         },
-        onError: (failed) => fail(failed instanceof Error ? failed.message : "failed"),
+        onError: (failed) => fail(errorCode(failed) ?? "failed"),
       },
     );
   }, [org, state, code, error, complete, navigate, toast, t]);

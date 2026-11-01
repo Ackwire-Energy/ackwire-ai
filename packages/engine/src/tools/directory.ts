@@ -320,7 +320,8 @@ export function presentTools(
     const chars = group.reduce((n, t) => n + sizeOf(t), 0);
     if (group.length <= DIRECTORY_MAX_TOOLS && chars <= DIRECTORY_MAX_CHARS) continue;
     const label = group[0]?.connectorLabel ?? "Connector";
-    let prefix = prefixOf(group, label);
+    // Two accounts of one server share their names' first word: each connection's own prefix keeps them apart.
+    let prefix = group[0]?.toolPrefix ?? prefixOf(group, label);
     // A name a real tool already has can't be taken by the directory.
     if (taken.has(`${prefix}_find_tools`) || taken.has(`${prefix}_use_tool`)) prefix = `${prefix}_dir`;
     big.set(id, directoryTools(prefix, label, group, id, sensitive));
@@ -372,7 +373,6 @@ const GROUP_LABELS: Record<string, string> = {
   github: "GitHub",
   sentry: "Sentry",
   linear: "Linear",
-  gdrive: "Google Drive",
 };
 
 export interface ToolGroup {

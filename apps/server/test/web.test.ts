@@ -37,9 +37,18 @@ describe("web app serving", () => {
   test("hashed assets open from disk; index.html is always revalidated", async () => {
     const asset = await app.request("/assets/app.js");
     expect(asset.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
-    for (const path of ["/", "/org/abc/c/def", "/assets/missing.js"]) {
+    for (const path of ["/", "/org/abc/c/def"]) {
       const res = await app.request(path);
       expect(res.headers.get("cache-control")).toBe("no-cache");
+    }
+  });
+
+  test("a build file that isn't there is a 404 nobody keeps, never index.html", async () => {
+    for (const path of ["/assets/missing.js", "/assets/index-old.css"]) {
+      const res = await app.request(path);
+      expect(res.status).toBe(404);
+      expect(res.headers.get("cache-control")).toBe("no-store");
+      expect(await res.text()).not.toContain('<div id="root">');
     }
   });
 

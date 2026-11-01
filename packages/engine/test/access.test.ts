@@ -233,6 +233,7 @@ test("names every object has (constructor, toString) are no app or scope", async
     .values({
       orgId: f.org.id,
       connector: "linear",
+      toolPrefix: "linear",
       label: "Linear",
       serverUrl: "https://linear.example.com/mcp",
       authType: "none",

@@ -99,3 +99,14 @@ describe("what an agent changed reads whole", () => {
     }
   });
 });
+
+describe("a shared approval card with actions approved ahead", () => {
+  test("each waiting item says it approves a future action; an approved one says when and can be canceled", () => {
+    const cards = source("cards.tsx");
+    const start = cards.indexOf("function ApprovalGroupAsk(");
+    const group = cards.slice(start, cards.indexOf("\nfunction ", start + 1));
+    expect(group).toContain("<ApprovalAheadLine approval={a} />");
+    expect(group).toContain('t("approval.ahead.scheduled"');
+    expect(group).toContain("cancelAhead.cancel(a.id)");
+  });
+});

@@ -33,7 +33,14 @@ import {
 import { expo } from "@better-auth/expo";
 import { type BetterAuthPlugin, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError, createAuthEndpoint, createAuthMiddleware, formCsrfMiddleware, getOAuthState } from "better-auth/api";
+import {
+  APIError,
+  createAuthEndpoint,
+  createAuthMiddleware,
+  formCsrfMiddleware,
+  getOAuthState,
+  isAPIError,
+} from "better-auth/api";
 import { setSessionCookie } from "better-auth/cookies";
 import { z } from "zod";
 import { desktopSignIn, FRESH_SIGN_IN_MS } from "./desktop-sign-in";
@@ -117,10 +124,6 @@ export function createAuth(deps: {
     secret: deriveSecret(config.AGENTES_SECRET, "sessions"),
     // Apple posts the sign-in result back from its own origin (`response_mode=form_post`).
     trustedOrigins: [config.PUBLIC_URL, ...devOrigins, ...appOrigins, ...(apple ? [APPLE_ORIGIN] : [])],
-    // A provider's refusal lands on the sign-in page, which says why, when the sign-in named no page for it: the web's
-    // and the Mac app's name it, the phone's browser sign-in doesn't. Without this, Better Auth's error page sends a
-    // production server to `/?error=`, which drops the code on its way to the sign-in page (its HTML page is dev-only).
-    onAPIError: { errorURL: "/login" },
     plugins: [
       expo(),
       phoneSignIn,
@@ -267,6 +270,17 @@ export function createAuth(deps: {
     advanced: {
       ipAddress: { trustedProxies: config.TRUSTED_PROXIES },
     },
+    // Better Auth answers what its endpoints throw with a 500 of its own, so the app's onError never sees it: this
+    // is that error's log line, and its report (ADR 0104). Its refusals (below 500) stay quiet, as before.
+    onAPIError: {
+      // A sign-in that failed (a provider's refusal, an expired state) lands on our sign-in page, which says why:
+      // never Better Auth's own page (it shows outside production, where native installs set NODE_ENV too late),
+      // nor production's silent `/?error=`.
+      errorURL: signInPageUrl(config.PUBLIC_URL),
+      onError: (error) => {
+        if (!isAPIError(error) || error.statusCode >= 500) log.error("auth request failed", { error });
+      },
+    },
     hooks: {
       // Checked before the endpoint runs so the person sees the real reason.
       // The database hook below also guards social sign-in.
@@ -314,12 +328,12 @@ export function createAuth(deps: {
             try {
               await onUserCreated(db, user.id);
             } catch (error) {
-              log.error("post-signup setup failed", { userId: user.id, error: String(error) });
+              log.error("post-signup setup failed", { userId: user.id, error });
             }
             const access = await accessOf(context);
             if (access && (!isSocial(context) || user.emailVerified === true)) {
               await useEarlyAccess(db, { access, email: user.email, userId: user.id }).catch((error) =>
-                log.error("early access not recorded", { userId: user.id, error: String(error) }),
+                log.error("early access not recorded", { userId: user.id, error }),
               );
             }
           },
@@ -331,7 +345,7 @@ export function createAuth(deps: {
         create: {
           after: async (account) => {
             await recordSignUp(db, account).catch((error) =>
-              log.error("operator event failed", { type: "user.signed_up", error: String(error) }),
+              log.error("operator event failed", { type: "user.signed_up", error }),
             );
           },
         },
@@ -353,7 +367,7 @@ export function createAuth(deps: {
           },
           after: async (session) => {
             await recordSession(db, session).catch((error) =>
-              log.error("operator event failed", { type: "session.created", error: String(error) }),
+              log.error("operator event failed", { type: "session.created", error }),
             );
           },
         },
@@ -403,6 +417,12 @@ export function authHandler(auth: Auth, db: Database) {
 }
 
 export type SessionUser = { id: string; name: string; email: string; image?: string | null };
+
+/** The web app's sign-in page (`/login`), with `query` (`error`, `redirect`) when given. */
+export function signInPageUrl(publicUrl: string, query?: Record<string, string>) {
+  const page = `${publicUrl.replace(/\/$/, "")}/login`;
+  return query ? `${page}?${new URLSearchParams(query)}` : page;
+}
 
 /** Resolves the signed-in person from request headers (cookie), or null. Used by HTTP and WebSocket. */
 export async function sessionUser(auth: Auth, headers: Headers): Promise<SessionUser | null> {

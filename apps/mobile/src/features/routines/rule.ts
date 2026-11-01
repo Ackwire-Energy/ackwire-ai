@@ -131,17 +131,7 @@ export function upcomingLabels(locale: string, rule: RecurrenceRule, from = new 
 }
 
 /** A next run on this phone's clock: "seg 20 out, 09:00". */
-export const nextLabel = (locale: string, iso: string) =>
-  new Intl.DateTimeFormat(locale, {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-    .format(new Date(iso))
-    .replace(/\./g, "")
-    .replace(/ de /g, " ");
+export { nextLabel } from "@agenteschat/client/lib/format";
 
 // ── The API's rule ⇄ the form's ────────────────────────────────────────────
 

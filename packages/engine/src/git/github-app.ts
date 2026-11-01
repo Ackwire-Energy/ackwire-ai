@@ -57,6 +57,17 @@ async function boundToOrg(db: Database, orgId: string, installationId: number) {
   return Boolean(row);
 }
 
+/** The installations bound to this organization and not suspended, with the account each is on. */
+export function boundInstallations(db: Database, orgId: string) {
+  return db
+    .select({
+      installationId: githubAppInstallations.installationId,
+      accountLogin: githubAppInstallations.accountLogin,
+    })
+    .from(githubAppInstallations)
+    .where(and(eq(githubAppInstallations.orgId, orgId), isNull(githubAppInstallations.suspendedAt)));
+}
+
 /**
  * An installation token for one repository (1 hour, cached until 5 minutes
  * before it expires), only when the repository's installation belongs to

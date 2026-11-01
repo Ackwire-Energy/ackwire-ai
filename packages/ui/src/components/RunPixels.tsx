@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { AGENT_GRADIENTS, bodyTones, mixHex, spriteGrid } from "../agent/engine.js";
+import { AGENT_GRADIENTS, bodyTones, gradientOf, mixHex, spriteGrid } from "../agent/engine.js";
 import { cx } from "../cx";
 import type { AgentColor, AgentEyes } from "./AgentLook";
 
@@ -540,7 +540,7 @@ export function WorkSweep({
     if (canvas.width !== w) canvas.width = w;
     if (canvas.height !== 2) canvas.height = 2;
     const surface = token(canvas, "--raised", "#ffffff");
-    const [top, bottom] = AGENT_GRADIENTS[color] ?? AGENT_GRADIENTS.sky;
+    const [top, bottom] = gradientOf(color);
     const pal = [
       surface,
       mixHex(surface, top, 0.2),
@@ -702,7 +702,7 @@ export function ExpiryFuse({
     if (canvas.width !== w) canvas.width = w;
     if (canvas.height !== 2) canvas.height = 2;
     const surface = token(canvas, "--raised", "#ffffff");
-    const [top, bottom] = AGENT_GRADIENTS[color] ?? AGENT_GRADIENTS.sky;
+    const [top, bottom] = gradientOf(color);
     const pal = [
       surface,
       mixHex(surface, top, 0.14),
@@ -755,7 +755,7 @@ export function SkyStrip({
     // Its holder's own ground: inside a raised container (a dialog) the strip itself reads one step up (`--raised-2`).
     const surface = token(canvas.parentElement ?? canvas, "--raised", "#ffffff");
     const dark = document.documentElement.dataset.theme === "dark";
-    const [top, bottom] = AGENT_GRADIENTS[color] ?? AGENT_GRADIENTS.sky;
+    const [top, bottom] = gradientOf(color);
     const pal = dark
       ? [surface, mixHex(surface, bottom, 0.45), mixHex(bottom, top, 0.35), mixHex(top, bottom, 0.2)]
       : [surface, mixHex(surface, top, 0.35), mixHex(surface, top, 0.7), top];
@@ -800,7 +800,7 @@ export function PageSilhouette({ color = "sky", className }: { color?: AgentColo
     if (canvas.width !== w) canvas.width = w;
     if (canvas.height !== h) canvas.height = h;
     const dark = document.documentElement.dataset.theme === "dark";
-    const [top, bottom] = AGENT_GRADIENTS[color] ?? AGENT_GRADIENTS.sky;
+    const [top, bottom] = gradientOf(color);
     const paper = dark ? "#26252b" : "#e9e8ef";
     const ink = dark ? "#3b3946" : "#cfcdd9";
     const tint = dark ? mixHex(bottom, "#0d0d10", 0.6) : mixHex(top, "#ffffff", 0.35);

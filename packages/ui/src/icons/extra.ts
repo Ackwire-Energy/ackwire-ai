@@ -54,6 +54,11 @@ export const extraIcons = {
     ["path", { d: "M7 3h6a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4H3V7a4 4 0 0 1 4-4z" }],
     ["path", { d: "M7 8h6M7 12h4" }],
   ],
+  /** Sidebar: Início, the workspace's home. */
+  home: [
+    ["path", { d: "M3.5 9 10 3.5 16.5 9" }],
+    ["path", { d: "M5 7.8v6.7A1.5 1.5 0 0 0 6.5 16h2v-4h3v4h2a1.5 1.5 0 0 0 1.5-1.5V7.8" }],
+  ],
   /** Sidebar: Drive. */
   drive: [["path", { d: "M3 6.5A2.5 2.5 0 0 1 5.5 4H8l2 2h4.5A2.5 2.5 0 0 1 17 8.5v5a2.5 2.5 0 0 1-2.5 2.5H3z" }]],
   /** Sidebar: Membros. */

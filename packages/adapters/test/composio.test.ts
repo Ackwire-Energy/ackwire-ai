@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { createHmac } from "node:crypto";
 import {
+  ComposioActionError,
   ComposioSignatureError,
   createComposioClient,
   createComposioMailConnector,
+  FileTooLargeError,
   gmailMessage,
   gmailQueryFromFilter,
   gmailSearchQuery,
@@ -250,7 +252,13 @@ describe("Composio client", () => {
   test("getConnectedAccount: status mapping, address from the mailbox profile, 404 = failed", async () => {
     const accounts: Record<string, unknown> = {
       ca_gmail: { id: "ca_gmail", status: "ACTIVE", toolkit: { slug: "gmail" }, is_disabled: false },
-      ca_outlook: { id: "ca_outlook", status: "ACTIVE", toolkit: { slug: "outlook" }, is_disabled: false },
+      ca_outlook: {
+        id: "ca_outlook",
+        status: "ACTIVE",
+        toolkit: { slug: "outlook" },
+        is_disabled: false,
+        state: { val: { displayName: " Ana Lima ", access_token: "never read" } },
+      },
       ca_pending: { id: "ca_pending", status: "INITIATED", toolkit: { slug: "gmail" } },
       ca_expired: { id: "ca_expired", status: "EXPIRED", toolkit: { slug: "gmail" } },
       ca_failed: { id: "ca_failed", status: "FAILED", toolkit: { slug: "gmail" } },
@@ -272,11 +280,16 @@ describe("Composio client", () => {
     expect(await client.getConnectedAccount("ca_gmail", "org_1", { readAddress: false })).toEqual({
       status: "active",
       address: null,
+      displayName: null,
     });
     expect(calls.map((c) => c.url)).toEqual([`${BASE}/connected_accounts/ca_gmail`]);
     const state = (id: string) => client.getConnectedAccount(id, "org_1");
-    expect(await state("ca_gmail")).toEqual({ status: "active", address: "ana@acme.com" });
-    expect(await state("ca_outlook")).toEqual({ status: "active", address: "ana@contoso.com" });
+    expect(await state("ca_gmail")).toEqual({ status: "active", address: "ana@acme.com", displayName: null });
+    expect(await state("ca_outlook")).toEqual({
+      status: "active",
+      address: "ana@contoso.com",
+      displayName: "Ana Lima",
+    });
     expect(await state("ca_pending")).toEqual({ status: "pending", address: null });
     expect(await state("ca_expired")).toEqual({ status: "expired", address: null });
     expect(await state("ca_failed")).toEqual({ status: "failed", address: null });
@@ -333,7 +346,7 @@ describe("Composio client", () => {
       });
     const run = (client: ReturnType<typeof createComposioClient>) =>
       client
-        .executeTool("GMAIL_FETCH_EMAILS", { connectedAccountId: "ca_1", userId: "org_1" }, {})
+        .executeTool("GMAIL_FETCH_EMAILS", { connectedAccountId: "ca_1", userId: "org_1", toolkit: "gmail" }, {})
         .catch((e: unknown) => e as Error);
 
     const expired = await run(
@@ -356,6 +369,8 @@ describe("Composio client", () => {
       expect(error).toBeInstanceOf(MailError);
       expect((error as MailError).retryable).toBe(retryable);
       expect(String((error as Error).message)).not.toContain("ck_super_secret");
+      // Only an action that ran and failed is the service's own answer.
+      expect(error instanceof ComposioActionError).toBe(status === 200);
     }
     const offline = createComposioClient({
       apiKey: "k",
@@ -366,6 +381,88 @@ describe("Composio client", () => {
     const error = await run(offline);
     expect(error).toBeInstanceOf(MailError);
     expect((error as MailError).retryable).toBe(true);
+  });
+
+  test("onExecute: each execution Composio answered, failed ones too, never one that didn't reach it", async () => {
+    const seen: unknown[] = [];
+    const answering = (status: number, body: unknown) =>
+      (async () => Response.json(body, { status })) as unknown as typeof fetch;
+    const offline = (async () => {
+      throw new Error("ECONNRESET");
+    }) as unknown as typeof fetch;
+    const client = (fetch: typeof globalThis.fetch, onExecute = (e: unknown) => void seen.push(e)) =>
+      createComposioClient({ apiKey: "k", fetch, onExecute });
+    const account = { connectedAccountId: "ca_1", userId: "org_1", toolkit: "gmail" };
+    const ok = { data: { n: 1 }, successful: true };
+    const failed = { data: {}, successful: false, error: "Invalid id value" };
+
+    expect(await client(answering(200, ok)).executeTool("GMAIL_FETCH_EMAILS", account, {})).toEqual({ n: 1 });
+    await client(answering(200, failed))
+      .executeTool("GMAIL_FETCH_EMAILS", account, {})
+      .catch(() => {});
+    await client(answering(503, {}))
+      .executeTool("ONE_DRIVE_GET_ITEM", { ...account, toolkit: "one_drive" }, {})
+      .catch(() => {});
+    await client(offline)
+      .executeTool("GMAIL_FETCH_EMAILS", account, {})
+      .catch(() => {});
+    expect(seen).toEqual([
+      { userId: "org_1", toolkit: "gmail", slug: "GMAIL_FETCH_EMAILS", ok: true },
+      { userId: "org_1", toolkit: "gmail", slug: "GMAIL_FETCH_EMAILS", ok: false },
+      // The account's toolkit: the slug's first word isn't it.
+      { userId: "org_1", toolkit: "one_drive", slug: "ONE_DRIVE_GET_ITEM", ok: false },
+    ]);
+
+    // A hook that throws changes nothing.
+    const throwing = () => {
+      throw new Error("hook");
+    };
+    expect(await client(answering(200, ok), throwing).executeTool("GMAIL_FETCH_EMAILS", account, {})).toEqual({
+      n: 1,
+    });
+    const refused = await client(answering(200, failed), throwing)
+      .executeTool("GMAIL_FETCH_EMAILS", account, {})
+      .catch((e: unknown) => e);
+    expect(refused).toBeInstanceOf(MailError);
+    expect(String(refused)).toContain("Invalid id value");
+  });
+
+  test("fetchFile never follows a redirect: the link's own address answers, or nothing does", async () => {
+    const asked: (RequestInit | undefined)[] = [];
+    const client = createComposioClient({
+      apiKey: "k",
+      fetch: (async (_url: string, init?: RequestInit) => {
+        asked.push(init);
+        // The link redirects into our own network: following it would answer this.
+        if (init?.redirect !== "error") return new Response("internal secret");
+        throw new TypeError("unexpected redirect");
+      }) as unknown as typeof fetch,
+    });
+    await expect(client.fetchFile("https://files.example/r1")).rejects.toBeInstanceOf(MailError);
+    expect(asked.map((init) => init?.redirect)).toEqual(["error"]);
+  });
+
+  test("fetchFile reads no further than the cap: by the length it declares, else by what arrives", async () => {
+    const chunks = (n: number) =>
+      new ReadableStream<Uint8Array>({
+        start(c) {
+          for (let i = 0; i < n; i++) c.enqueue(new Uint8Array(4));
+          c.close();
+        },
+      });
+    const bodies: Record<string, () => Response> = {
+      "https://files.example/small": () => new Response(chunks(2)),
+      "https://files.example/declared": () => new Response("12345678901", { headers: { "content-length": "11" } }),
+      "https://files.example/streamed": () => new Response(chunks(4)),
+    };
+    const client = createComposioClient({
+      apiKey: "k",
+      fetch: (async (url: string) => bodies[url]?.() ?? new Response(null, { status: 404 })) as unknown as typeof fetch,
+    });
+    expect(await client.fetchFile("https://files.example/small", 10)).toEqual(new Uint8Array(8));
+    for (const url of ["https://files.example/declared", "https://files.example/streamed"]) {
+      await expect(client.fetchFile(url, 10)).rejects.toBeInstanceOf(FileTooLargeError);
+    }
   });
 });
 

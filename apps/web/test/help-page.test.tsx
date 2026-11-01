@@ -8,7 +8,7 @@ import { legalDocument } from "@agenteschat/i18n/legal";
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { Block } from "@/pages/help/HelpPage";
 import { LegalPage } from "@/pages/LegalPage";
-import { createFakeApi, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
+import { createFakeApi, ORG_ID, seedState } from "./fake-api";
 import { renderApp, renderPage, screen, settle } from "./render";
 
 afterEach(() => {
@@ -96,7 +96,7 @@ describe("help pages", () => {
     cleanup();
     const signedIn = await renderApp("/help/nope?lang=en", { api: createFakeApi() });
     await settle();
-    expect(signedIn.router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
+    expect(signedIn.router.state.location.pathname).toBe(`/org/${ORG_ID}/home`);
   });
 
   test("the tab reads the page's title while it shows, and what it read before once it's left", async () => {

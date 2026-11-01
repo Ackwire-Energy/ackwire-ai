@@ -1,12 +1,13 @@
-import { AGENT_GRADIENTS } from "@agenteschat/ui/agent/engine";
+import { colorKey, gradientOf, isHexColor } from "@agenteschat/ui/agent/engine";
 import { LinearGradient } from "expo-linear-gradient";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AgentAvatar, Button, Icon, Text } from "@/ui";
 import { useColors } from "../shared/hooks";
 import { AGENT_ACCESSORIES, AGENT_COLORS, AGENT_EYES } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
+import { ColorSheet } from "./ColorSheet";
 import { type FullLook, shuffleLook } from "./edit";
 
 /**
@@ -16,6 +17,10 @@ import { type FullLook, shuffleLook } from "./edit";
 export function LookPicker({ look, onChange }: { look: FullLook; onChange: (next: FullLook) => void }) {
   const { t } = useTranslation();
   const c = useColors();
+  const [picking, setPicking] = useState(false);
+  // A new sheet per opening starts from the color shown then; the same key lets it animate away.
+  const [opens, setOpens] = useState(0);
+  const custom = isHexColor(look.color);
   const set = (patch: Partial<FullLook>) => {
     tapHaptic();
     onChange({ ...look, ...patch });
@@ -23,7 +28,7 @@ export function LookPicker({ look, onChange }: { look: FullLook; onChange: (next
   return (
     <View style={styles.wrap}>
       <View style={styles.head}>
-        <Label text={t("look.color")} value={t(`look.colors.${look.color}`)} />
+        <Label text={t("look.color")} value={t(`look.colors.${colorKey(look.color)}`)} />
         <Button
           variant="secondary"
           size="sm"
@@ -37,7 +42,7 @@ export function LookPicker({ look, onChange }: { look: FullLook; onChange: (next
       </View>
       <View style={styles.swatches} accessibilityRole="radiogroup" accessibilityLabel={t("look.color")}>
         {AGENT_COLORS.map((color) => {
-          const [top, bottom] = AGENT_GRADIENTS[color];
+          const [top, bottom] = gradientOf(color);
           const on = look.color === color;
           return (
             <Pressable
@@ -55,7 +60,35 @@ export function LookPicker({ look, onChange }: { look: FullLook; onChange: (next
             </Pressable>
           );
         })}
+        <Pressable
+          onPress={() => {
+            tapHaptic();
+            setOpens((n) => n + 1);
+            setPicking(true);
+          }}
+          accessibilityRole="radio"
+          accessibilityLabel={t("look.customColor")}
+          accessibilityState={{ selected: custom }}
+          hitSlop={4}
+          style={[styles.swatchRing, { borderColor: custom ? c.ink : "transparent" }]}
+        >
+          <LinearGradient
+            colors={custom ? gradientOf(look.color) : RAINBOW}
+            start={custom ? undefined : { x: 0, y: 0 }}
+            end={custom ? undefined : { x: 1, y: 1 }}
+            style={styles.swatch}
+          >
+            {custom ? <Icon name="check" size={16} color="#fff" /> : null}
+          </LinearGradient>
+        </Pressable>
       </View>
+      <ColorSheet
+        key={opens}
+        open={picking}
+        value={look.color}
+        onChange={(color) => onChange({ ...look, color })}
+        onClose={() => setPicking(false)}
+      />
 
       <Label text={t("look.eyes")} value={t(`look.eyesNames.${look.eyes}`)} />
       <Choices label={t("look.eyes")}>
@@ -137,6 +170,9 @@ function Choice({
     </Pressable>
   );
 }
+
+/** The ninth swatch before a custom color is picked: the presets' tops, as a rainbow. */
+const RAINBOW = ["#f58aa6", "#f3c25c", "#5fcf8b", "#8cc3ff", "#ae8cf7"] as const;
 
 const styles = StyleSheet.create({
   wrap: { gap: 10 },

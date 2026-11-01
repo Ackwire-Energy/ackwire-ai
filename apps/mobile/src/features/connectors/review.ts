@@ -35,7 +35,8 @@ export const STEP_KEYS: Record<Step, string> = {
 
 /**
  * Where a sheet opens. A new service: on what it does. A connection: on who uses it (a connection opens its own
- * screen from the gallery); `start` asks for a step (back from a sign-in, the tools still in the flow).
+ * screen from the gallery); `start` asks for a step (back from a sign-in, the tools still in the flow; connecting
+ * again over a connection, for an admin).
  */
 export function firstStep(
   existing: Pick<ConnectedItem, "needsReview"> | undefined,
@@ -43,6 +44,7 @@ export function firstStep(
   start?: Step,
 ): Step {
   if (!existing) return "about";
+  if (start === "connect") return admin ? "connect" : "who";
   if (start === "review" || start === "who") return start === "review" && !admin ? "who" : start;
   return "who";
 }

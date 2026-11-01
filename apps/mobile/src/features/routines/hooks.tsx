@@ -10,7 +10,7 @@ import { knownErrorText } from "@agenteschat/client/lib/errors";
 import { relativeTime, toYmd, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { type RoutineFix, routineChannelOf, runPixels, type Words } from "@agenteschat/client/lib/routine-view";
-import { browserTimezone, onceParts, timezoneName } from "@agenteschat/client/lib/routines";
+import { browserTimezone, onceParts, routineHookUrl, timezoneName } from "@agenteschat/client/lib/routines";
 import { router } from "expo-router";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -63,6 +63,7 @@ export function useWhenText() {
           : t("mail.routine.when", { address });
       }
       if (r.trigger.type === "event") return t(`routines.event.${r.trigger.event}`);
+      if (r.trigger.type === "webhook") return t("routines.webhook.when");
       const zone = r.trigger.timezone || "UTC";
       const zoneNote = zone !== myZone ? ` (${timezoneName(zone, i18n.language)})` : "";
       if (r.trigger.type === "once")
@@ -98,6 +99,8 @@ export function useNextText() {
           return n.week > 0 ? t("mail.routine.thisWeek", { count: n.week }) : t("mail.routine.waiting");
         case "event":
           return n.week > 0 ? t("routines.eventThisWeek", { count: n.week }) : t("routines.waitingEvent");
+        case "webhook":
+          return n.week > 0 ? t("routines.eventThisWeek", { count: n.week }) : t("routines.webhook.waiting");
         case "none":
           return "";
         case "soon":
@@ -299,8 +302,9 @@ export function useRoutineMenu(r: Routine, from: "list" | "screen", onDeleted?: 
         onError: failed,
       },
     );
+  const hookUrl = routineHookUrl(r);
   const copyWebhook = async () => {
-    const ok = await copyText(r.webhookUrl ?? "");
+    const ok = await copyText(hookUrl ?? "");
     toast(ok ? { title: t("routines.webhookCopied") } : { title: t("mobile.app.failed"), icon: "x" });
   };
   const items: MenuItem[] = [];
@@ -320,7 +324,7 @@ export function useRoutineMenu(r: Routine, from: "list" | "screen", onDeleted?: 
       run: () => router.push(routineHref(r.id)),
     });
   if (r.canManage) items.push({ key: "duplicate", icon: "copy", label: t("routines.duplicate"), run: duplicate });
-  if (r.canManage && r.webhookUrl)
+  if (r.canManage && hookUrl)
     items.push({
       key: "webhook",
       icon: "share",

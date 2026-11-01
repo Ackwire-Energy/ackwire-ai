@@ -3,9 +3,10 @@ import type { Database } from "@agenteschat/db";
 import { type MailAccountRow, mailProviders, orgMailAccounts, usableAccount } from "../mail/accounts";
 import type { ToolDefinition } from "../tools/types";
 import { CONNECTOR_CATALOG, type ConnectorCategory } from "./catalog";
+import type { ComposioConnectors } from "./composio";
 import { activeConnections } from "./connections";
 import { isCustom } from "./custom";
-import { MCP_PRESETS, presetForServer } from "./presets";
+import { composioToolkitUrl, MCP_PRESETS, type McpPreset, presetForServer } from "./presets";
 
 /**
  * Brand icons the web app serves, keyed by icon name. One color, from
@@ -21,6 +22,15 @@ export const CONNECTOR_BRANDS: Record<string, { file: string; color: string | nu
   sentry: { file: "sentry", color: null },
   notion: { file: "notion", color: null },
   drive: { file: "googledrive", color: "#4285F4" },
+  "google-docs": { file: "googledocs", color: "#4285F4" },
+  "google-sheets": { file: "googlesheets", color: "#34A853" },
+  "google-calendar": { file: "googlecalendar", color: "#4285F4" },
+  onedrive: { file: "onedrive", color: null, own: true },
+  slack: { file: "slack", color: null, own: true },
+  "microsoft-teams": { file: "microsoftteams", color: null, own: true },
+  hubspot: { file: "hubspot", color: "#FF7A59" },
+  salesforce: { file: "salesforce", color: null, own: true },
+  zendesk: { file: "zendesk", color: null },
   atlassian: { file: "atlassian", color: "#0052CC" },
   asana: { file: "asana", color: "#F06A6A" },
   stripe: { file: "stripe", color: "#635BFF" },
@@ -82,19 +92,24 @@ export interface ConnectorListingEntry {
   id: string;
   label: string;
   description: string;
-  /** `catalog`: our connector with its own scopes; `remote_mcp`: a vendor's official MCP server (one click). */
+  /**
+   * `catalog`: our connector with its own scopes; `remote_mcp`: a server connected by its address, in one click (the
+   * vendor's MCP server, or the service through Composio, `via`).
+   */
   kind: "catalog" | "remote_mcp";
   category: ConnectorCategory;
+  /** How it connects. A one-click server takes a key too, except one marked `cloudOAuthOnly`, on the Cloud. */
   auth: ("oauth" | "api_key")[];
-  /** Signs in with OAuth here: our OAuth app, or the vendor's MCP OAuth (no app to register). */
+  /** Signs in with OAuth here: our OAuth app, the vendor's MCP OAuth, or Composio's. */
   oauthConfigured: boolean;
-  /** Can be connected on this server (an OAuth app or an API key). */
+  /** Can be connected on this server (an OAuth app, an API key, or Composio). */
   available: boolean;
-  /** A one-click server whose vendor hasn't approved agentes.chat yet: listed, not connectable ("Em breve"). */
+  /** A one-click server whose vendor hasn't approved agentes.chat yet, which Composio doesn't serve here ("Em breve"). */
   soon: boolean;
-  needsServerUrl: boolean;
-  /** The MCP endpoint of a `remote_mcp` entry. */
-  serverUrl: string | null;
+  /** Connects through Composio (its page, its OAuth app): available only with `COMPOSIO_API_KEY` (ADR 0107). */
+  via?: "composio";
+  /** Where it connects, by the way this server picked (a `remote_mcp` entry's address). */
+  serverUrl: string;
   /** Served by the web app: `/connectors/{file}.svg` (one color) or `/brands/{file}.svg` (its own colors); null for a monogram. */
   iconUrl: string | null;
   brandColor: string | null;
@@ -108,17 +123,50 @@ const brand = (key: string) => {
 };
 
 /**
- * One list for "Adicionar conector": our catalog connectors and the one-click
- * presets. A service in both (Linear, Sentry) shows once: our connector when
- * this server has its OAuth app, else the one-click preset.
+ * Whether this server offers our catalog connector: always, except one a one-click preset stands in for (Linear,
+ * Sentry), which only with its OAuth app.
  */
-export function connectorListing(oauthApps: Record<string, unknown>): ConnectorListingEntry[] {
-  const presetIds = new Set(MCP_PRESETS.map((p) => p.id));
+export const offersCatalog = (id: string, oauthApps: Record<string, unknown> = {}) =>
+  !MCP_PRESETS.some((p) => p.id === id) || Boolean(CONNECTOR_CATALOG[id]?.oauth && oauthApps[id]);
+
+/**
+ * What this server's "Adicionar conector" can connect: its OAuth apps (`connectorOAuthApps`), its mail paths and
+ * Composio (null without `COMPOSIO_API_KEY`).
+ */
+export interface ServerCatalog {
+  oauthApps: Record<string, unknown>;
+  mail?: MailAdapters | null;
+  composio?: ComposioConnectors | null;
+  /** The agentes.chat Cloud: a one-click server marked `cloudOAuthOnly` takes no key there. */
+  cloud?: boolean;
+}
+
+/**
+ * The one way a preset connects here (ADR 0107 §1): the vendor's server when it connects today, else Composio when this
+ * server is set up for it, else "Em breve" for a vendor that hasn't approved agentes.chat, else unavailable.
+ */
+function presetWay(p: McpPreset, composio: ComposioConnectors | null | undefined) {
+  const viaComposio = p.composio ? composioToolkitUrl(p.composio.toolkit) : null;
+  if (!p.soon && p.serverUrl !== viaComposio) return { serverUrl: p.serverUrl, available: true, soon: false };
+  if (viaComposio && composio) {
+    return { serverUrl: viaComposio, available: true, soon: false, via: "composio" as const };
+  }
+  if (p.soon) return { serverUrl: p.serverUrl, available: false, soon: true };
+  return { serverUrl: p.serverUrl, available: false, soon: false, via: "composio" as const };
+}
+
+/**
+ * One list for "Adicionar conector": our catalog connectors and the one-click presets, each service once. A service in
+ * both (Linear, Sentry) is our connector when this server has its OAuth app, else the preset, which connects by the way
+ * `presetWay` picks.
+ */
+export function connectorListing(server: ServerCatalog): ConnectorListingEntry[] {
+  const { oauthApps } = server;
   const builtinWins = new Set<string>();
   const builtins: ConnectorListingEntry[] = [];
   for (const d of Object.values(CONNECTOR_CATALOG)) {
+    if (!offersCatalog(d.id, oauthApps)) continue;
     const oauthConfigured = Boolean(d.oauth && oauthApps[d.id]);
-    if (presetIds.has(d.id) && !oauthConfigured) continue;
     builtinWins.add(d.id);
     const sensitiveScopes = new Set(Object.values(d.tools).flatMap((t) => (t.sensitive ? [t.scope] : [])));
     builtins.push({
@@ -131,7 +179,6 @@ export function connectorListing(oauthApps: Record<string, unknown>): ConnectorL
       oauthConfigured,
       available: oauthConfigured || d.auth.includes("api_key"),
       soon: false,
-      needsServerUrl: d.serverUrl === null,
       serverUrl: d.serverUrl,
       ...brand(d.id),
       scopes: Object.entries(d.scopes).map(([id, s]) => ({
@@ -147,29 +194,24 @@ export function connectorListing(oauthApps: Record<string, unknown>): ConnectorL
       })),
     });
   }
-  const presets: ConnectorListingEntry[] = MCP_PRESETS.filter((p) => !builtinWins.has(p.id)).map((p) => ({
-    id: p.id,
-    label: p.label,
-    description: p.description,
-    kind: "remote_mcp",
-    category: p.category,
-    auth: ["oauth"],
-    oauthConfigured: true,
-    available: !p.soon,
-    soon: p.soon === true,
-    needsServerUrl: false,
-    serverUrl: p.serverUrl,
-    ...brand(p.icon),
-    scopes: [],
-    tools: [],
-  }));
+  const presets = MCP_PRESETS.filter((p) => !builtinWins.has(p.id)).map((p): ConnectorListingEntry => {
+    const way = presetWay(p, server.composio);
+    return {
+      id: p.id,
+      label: p.label,
+      description: p.description,
+      kind: "remote_mcp",
+      category: p.category,
+      // A service through Composio signs in there; a vendor's own server takes a key too.
+      auth: way.via === "composio" || (p.cloudOAuthOnly && server.cloud) ? ["oauth"] : ["oauth", "api_key"],
+      oauthConfigured: true,
+      ...way,
+      ...brand(p.icon),
+      scopes: [],
+      tools: [],
+    };
+  });
   return [...builtins, ...presets];
-}
-
-/** What this server's "Adicionar conector" can connect: its OAuth apps (`connectorOAuthApps`) and its mail paths. */
-export interface ServerCatalog {
-  oauthApps: Record<string, unknown>;
-  mail?: MailAdapters | null;
 }
 
 /** A connector of "Adicionar conector" the agent has no tool of, as `find_tools` names it (ADR 0043). */
@@ -180,8 +222,8 @@ export interface MissingConnector {
   names: string[];
   /**
    * `unavailable`: this server can't connect it; `soon`: its vendor hasn't approved agentes.chat yet (a `soon`
-   * preset); `not_connected`: the workspace hasn't; `not_given`: the agent lacks it; `needs_reconnect`: a mailbox of
-   * it stopped working.
+   * preset); `not_connected`: the workspace hasn't; `not_given`: the agent lacks it; `needs_reconnect`: a mailbox or
+   * a Composio account of it stopped working.
    */
   state: "unavailable" | "soon" | "not_connected" | "not_given" | "needs_reconnect";
 }
@@ -215,9 +257,9 @@ const MAILBOXES: {
   },
   {
     label: "Email",
-    description: "A mailbox: Gmail, Outlook, iCloud or another provider.",
-    names: ["mail", "mailbox"],
-    offered: (m) => m.composio || m.imap,
+    description: "A mailbox: a MillionSend inbox, Gmail, Outlook, iCloud or another provider.",
+    names: ["mail", "mailbox", "inbox"],
+    offered: (m) => m.composio || m.imap || m.millionsend,
     holds: () => true,
   },
 ];
@@ -262,7 +304,7 @@ export async function missingConnectors(
     services.set(key, found);
     return found;
   };
-  for (const entry of connectorListing(catalog.oauthApps)) {
+  for (const entry of connectorListing(catalog)) {
     const s = service(entry.label, entry.description);
     s.names.add(entry.id);
     s.offered ||= entry.available;
@@ -283,7 +325,11 @@ export async function missingConnectors(
     const label = isCustom(c)
       ? (presetForServer(c.serverUrl)?.label ?? c.label)
       : (CONNECTOR_CATALOG[c.connector]?.label ?? c.label);
-    services.get(label.toLowerCase())?.held.push(c.id);
+    const s = services.get(label.toLowerCase());
+    if (!s) continue;
+    // A Composio account that stopped working has no tools until Reconectar.
+    if (c.status === "needs_reconnect") s.reconnect = true;
+    else s.held.push(c.id);
   }
   const ids = (list: Tools) => new Set([...list].map((t) => t.connectionId));
   const [usable, listed] = [ids(tools.usable), ids(tools.listed)];

@@ -278,6 +278,7 @@ describe("routeMessage", () => {
         orgId: f.org.id,
         connector: "sentry",
         label: "Sentry",
+        toolPrefix: "sentry",
         serverUrl: "https://mcp.sentry.dev",
         authType: "none",
       })

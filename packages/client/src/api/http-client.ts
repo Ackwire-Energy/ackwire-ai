@@ -52,9 +52,11 @@ import type {
   ChannelMember,
   CodeSent,
   CommandApproval,
+  ComposioUsage,
   ComputerSetup,
   ComputerTarget,
   Connection,
+  ConnectOutcome,
   ConnectorCatalog,
   ConsultationConversation,
   Credential,
@@ -107,6 +109,7 @@ import type {
   Memory,
   Message,
   MessagePin,
+  MillionSendInbox,
   Mission,
   MissionBrain,
   MissionCommand,
@@ -142,6 +145,7 @@ import type {
   Reminder,
   RosterMember,
   Routine,
+  RoutineHook,
   RoutineRun,
   RuleInfo,
   Run,
@@ -158,6 +162,7 @@ import type {
   Skill,
   SkillDetail,
   SkillPick,
+  StartChoice,
   StorageConfig,
   StorageMigration,
   StorageTestResult,
@@ -184,6 +189,9 @@ import type {
 const org = (orgId: string) => `/api/app/organizations/${enc(orgId)}`;
 /** The most agents one `POST …/agent-setup` takes (the server's `SETUP_AGENTS_MAX`). */
 const SETUP_AGENTS_PER_CALL = 200;
+
+/** The server's health: 200 while it serves, 503 while it drains or its database is down. */
+export const HEALTH_PATH = "/api/health";
 
 /** The list's query string (booleans as "true"; nothing for what isn't set). */
 const threadQuery = (f: Partial<ThreadFilters>) => ({
@@ -252,6 +260,11 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       accounts: async (orgId) => (await request<{ accounts: MailAccount[] }>(`${org(orgId)}/mail/accounts`)).accounts,
       connectImap: async (orgId, input) =>
         (await request<{ account: MailAccount }>(`${org(orgId)}/mail/accounts/imap`, { json: input })).account,
+      millionsendInboxes: async (orgId, input) =>
+        (await request<{ inboxes: MillionSendInbox[] }>(`${org(orgId)}/mail/millionsend/inboxes`, { json: input }))
+          .inboxes,
+      connectMillionSend: (orgId, input) =>
+        request<{ account: MailAccount; instant: boolean }>(`${org(orgId)}/mail/accounts/millionsend`, { json: input }),
       connectComposio: (orgId, input) =>
         request<{ accountId: string; redirectUrl: string }>(`${org(orgId)}/mail/accounts/composio`, { json: input }),
       update: async (orgId, accountId, input) =>
@@ -358,7 +371,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
     system: {
       health: async () => {
         try {
-          return await request<Health>("/api/health");
+          return await request<Health>(HEALTH_PATH);
         } catch (error) {
           // 503 still carries the edition; anything else: assume Cloud.
           if (error instanceof ApiError) return { status: "degraded", version: "", edition: "cloud" };
@@ -420,6 +433,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       limits: (orgId) => request<WorkspaceLimits>(`${org(orgId)}/limits`),
       updateMe: (orgId, input) => request<Person>(`${org(orgId)}/me`, { method: "PATCH", json: input }),
       setStatus: (orgId, input) => request<Person>(`${org(orgId)}/me/status`, { method: "PUT", json: input }),
+      setStart: (orgId, input) => request<StartChoice>(`${org(orgId)}/me/start`, { method: "PUT", json: input }),
       sidebarItems: async (orgId) => (await request<{ items: SidebarItems }>(`${org(orgId)}/me/sidebar`)).items,
       setSidebarItem: async (orgId, item, place) =>
         (await request<{ items: SidebarItems }>(`${org(orgId)}/me/sidebar`, { method: "PATCH", json: { item, place } }))
@@ -720,6 +734,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         }),
       refuse: (orgId, id, reason) =>
         request<Approval>(`${org(orgId)}/approvals/${enc(id)}/refuse`, { json: reason ? { reason } : {} }),
+      cancel: (orgId, id) => request<Approval>(`${org(orgId)}/approvals/${enc(id)}/cancel`, { json: {} }),
       decideMany: (orgId, input) =>
         request<{ approvals: Approval[]; skipped: string[] }>(`${org(orgId)}/approvals/decide`, { json: input }),
       rules: async (orgId, agentId) =>
@@ -737,13 +752,16 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
             json: input,
           })
         ).authorizeUrl,
+      composioUsage: (orgId) => request<ComposioUsage>(`${org(orgId)}/usage/composio`),
       completeOAuth: (orgId, input) =>
-        request<{ connectionId: string; connector: string; returnTo?: string }>(
+        request<{ connectionId: string; connector: string; outcome?: ConnectOutcome; returnTo?: string }>(
           `${org(orgId)}/connectors/oauth/complete`,
           {
             json: input,
           },
         ),
+      rename: (orgId, connectionId, label) =>
+        request<Connection>(`${org(orgId)}/connectors/${enc(connectionId)}`, { method: "PATCH", json: { label } }),
       disconnect: (orgId, connectionId) =>
         request<void>(`${org(orgId)}/connectors/${enc(connectionId)}`, { method: "DELETE" }),
     },
@@ -1176,6 +1194,17 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       remove: (orgId, id) => request<void>(`${org(orgId)}/routines/${enc(id)}`, { method: "DELETE" }),
       duplicate: (orgId, id, name) =>
         request<Routine>(`${org(orgId)}/routines/${enc(id)}/duplicate`, { json: name ? { name } : {} }),
+      hook: (orgId, id) => request<RoutineHook>(`${org(orgId)}/routines/${enc(id)}/hook`),
+      newHookAddress: (orgId, id) =>
+        request<RoutineHook>(`${org(orgId)}/routines/${enc(id)}/hook/address`, { json: {} }),
+      newHookSecret: (orgId, id) =>
+        request<{ secret: string; hook: RoutineHook }>(`${org(orgId)}/routines/${enc(id)}/hook/secret`, { json: {} }),
+      removeHookSecret: (orgId, id) =>
+        request<RoutineHook>(`${org(orgId)}/routines/${enc(id)}/hook/secret`, { method: "DELETE" }),
+      testHook: (orgId, id) =>
+        request<{ runId: string | null; hook: RoutineHook }>(`${org(orgId)}/routines/${enc(id)}/hook/test`, {
+          json: {},
+        }),
     },
     wiki: {
       tree: async (orgId) => (await request<{ pages: WikiPageSummary[] }>(`${org(orgId)}/wiki/pages`)).pages,

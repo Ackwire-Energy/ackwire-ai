@@ -40,7 +40,7 @@ import { forgetInstallationTokens } from "./git/github-app";
 import { announceReleasedAccounts, type ReleasedAccounts, releaseOrgAccounts } from "./machine-accounts";
 import type { MachineHub } from "./machine-hub";
 import { MACHINE_CONTROL_TOPIC, machineOnline, personalMachines } from "./machines";
-import { composioGrantShared, forgetAtComposio } from "./mail/accounts";
+import { composioGrantShared, forgetAtComposio, forgetAtMillionSend } from "./mail/accounts";
 import { recordOperatorEvent } from "./operator-events";
 import {
   can,
@@ -81,6 +81,7 @@ const {
   mailAccounts,
   mailWatches,
   connectorConnections,
+  oauthStates,
   githubAppInstallations,
   auditLog,
   providerCredentials,
@@ -570,7 +571,7 @@ export interface PurgeDeps {
   pubsub?: PubSub;
   /** Revokes its GitHub OAuth grants at GitHub (absent, or without the GitHub app: none can be). */
   connectors?: ConnectorDeps;
-  /** Has Composio forget its mailboxes (absent, or without Composio: none can be). */
+  /** Has Composio forget its mailboxes and MillionSend its inboxes' webhooks (absent, or without them: none can be). */
   mail?: MailAdapters | null;
   log?: {
     info(message: string, data?: Record<string, unknown>): void;
@@ -710,18 +711,63 @@ async function accountsSignedOut(db: Database, orgId: string, released: Released
 }
 
 /**
- * Revokes the grants a workspace holds outside: Composio forgets its mailboxes (their triggers, and the accounts, which
- * revokes them at Google or Microsoft unless another connection still uses the same mailbox) and GitHub its OAuth
- * tokens. Each is marked as it goes, so a retry skips it. Returns the ids of the mailboxes and connections that failed;
- * never a token.
+ * Revokes the grants a workspace holds outside: Composio forgets the accounts of its connectors and of every Connect
+ * Link it made for one (never revoked there: Composio's apps share one grant across toolkits and workspaces) and its
+ * mailboxes (their triggers, and the accounts, which revokes them at Google or Microsoft unless another connection
+ * still uses the same grant), MillionSend the webhooks of its inboxes (their sealed keys open with the connectors' key
+ * wrappers), and GitHub its OAuth tokens. Each is marked as it goes, so a retry skips it. Returns the ids of the
+ * mailboxes, connections and Composio accounts that failed; never a token.
  */
 async function revokeGrants(deps: PurgeDeps, orgId: string): Promise<string[]> {
   const { db } = deps;
   const left: string[] = [];
   const composio = deps.mail?.composio;
   if (composio) {
+    // Connectors first: once they are gone, they no longer keep this workspace's mailboxes' grants (below).
+    const accounts = await db
+      .select({ id: connectorConnections.id, accountId: connectorConnections.composioAccountId })
+      .from(connectorConnections)
+      .where(and(eq(connectorConnections.orgId, orgId), isNotNull(connectorConnections.composioAccountId)));
+    const forgotten = new Set<string>();
+    for (const account of accounts) {
+      try {
+        await composio.client.deleteConnectedAccount(account.accountId ?? "", { revoke: false });
+      } catch {
+        left.push(account.id);
+        continue;
+      }
+      forgotten.add(account.accountId ?? "");
+      await db
+        .update(connectorConnections)
+        .set({ composioAccountId: null, revokedAt: sql`coalesce(${connectorConnections.revokedAt}, now())` })
+        .where(eq(connectorConnections.id, account.id));
+    }
+    // A link's account that no connection holds: a sign-in that never finished, or one someone else finished on it.
+    const links = await db
+      .select({ accountId: oauthStates.composioAccountId })
+      .from(oauthStates)
+      .where(and(eq(oauthStates.orgId, orgId), isNotNull(oauthStates.composioAccountId)));
+    for (const accountId of new Set(links.map((l) => l.accountId ?? ""))) {
+      if (!forgotten.has(accountId)) {
+        try {
+          await composio.client.deleteConnectedAccount(accountId, { revoke: false });
+        } catch {
+          left.push(accountId);
+          continue;
+        }
+      }
+      await db
+        .update(oauthStates)
+        .set({ composioAccountId: null })
+        .where(and(eq(oauthStates.orgId, orgId), eq(oauthStates.composioAccountId, accountId)));
+    }
     const boxes = await db
-      .select({ id: mailAccounts.id, address: mailAccounts.address, externalAccountId: mailAccounts.externalAccountId })
+      .select({
+        id: mailAccounts.id,
+        address: mailAccounts.address,
+        provider: mailAccounts.provider,
+        externalAccountId: mailAccounts.externalAccountId,
+      })
       .from(mailAccounts)
       .where(and(eq(mailAccounts.orgId, orgId), eq(mailAccounts.via, "composio")));
     const watches = await db
@@ -748,6 +794,36 @@ async function revokeGrants(deps: PurgeDeps, orgId: string): Promise<string[]> {
           .set({ externalTriggerId: null, updatedAt: now })
           .where(eq(mailWatches.accountId, box.id));
       });
+    }
+  }
+  const millionsend = deps.mail?.millionsend;
+  const keyWrappers = deps.connectors?.keyWrappers;
+  if (millionsend && keyWrappers) {
+    const inboxes = await db
+      .select()
+      .from(mailAccounts)
+      .where(
+        and(
+          eq(mailAccounts.orgId, orgId),
+          eq(mailAccounts.via, "millionsend"),
+          isNotNull(mailAccounts.externalAccountId),
+        ),
+      );
+    for (const box of inboxes) {
+      try {
+        await forgetAtMillionSend(millionsend.client, { keyWrappers }, box);
+      } catch {
+        left.push(box.id);
+        continue;
+      }
+      await db
+        .update(mailAccounts)
+        .set({
+          externalAccountId: null,
+          revokedAt: sql`coalesce(${mailAccounts.revokedAt}, now())`,
+          updatedAt: new Date(),
+        })
+        .where(eq(mailAccounts.id, box.id));
     }
   }
   const connectors = deps.connectors;

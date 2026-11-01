@@ -1,12 +1,13 @@
 import type { Agent, Approval, Member } from "@agenteschat/client";
 import { approveAllScope, approveAlwaysOn, cardDeadline, itemOwnWords } from "@agenteschat/client/lib/approval-card";
-import { approveAlwaysOffered } from "@agenteschat/client/lib/approval-kind";
+import { aheadPhase, approveAlwaysOffered } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalWhy } from "@agenteschat/client/lib/approval-origin";
 import { approvalSummary, approvalTitle, decisionOutcome } from "@agenteschat/client/lib/approval-words";
+import { nextLabel } from "@agenteschat/client/lib/format";
 import { Button } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ApproveAlways } from "@/components/ApprovalItem";
+import { AheadLine, ApproveAlways, CancelAhead } from "@/components/ApprovalItem";
 import { useOrg } from "@/components/org-context";
 import {
   ApproveAll,
@@ -77,6 +78,7 @@ export function ApprovalAsk({
           )}
         </>
       }
+      body={<AheadLine approval={approval} className="ap-ask__ahead" />}
       actions={
         !approval.canDecide ? undefined : refusing ? (
           <RefuseBox approval={approval} agent={agent} onCancel={() => setRefusing(false)} />
@@ -185,6 +187,8 @@ function GroupItem({
     : (approval.connector ? approvalSummary(approval, i18n.language) : approval.detail) || undefined;
   const pending = approval.status === "pending";
   const own = itemOwnWords(approval, lead);
+  const ahead = aheadPhase(approval);
+  const runAt = approval.runAt ? nextLabel(i18n.language, approval.runAt) : "";
   const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
   return (
     <li className={pending ? "rq__item" : "rq__item rq__item--done"} data-status={approval.status}>
@@ -197,6 +201,11 @@ function GroupItem({
           {detail && <small>{detail}</small>}
           {own.why && <small className="rq__item-why">{own.why}</small>}
           {own.origin && <small className="rq__item-why">{tt(own.origin.key, own.origin.values)}</small>}
+          {runAt && (ahead === "asking" || ahead === "scheduled") && (
+            <small className="rq__item-why">
+              {t(ahead === "asking" ? "approval.ahead.line" : "approval.ahead.scheduled", { when: runAt })}
+            </small>
+          )}
         </span>
         {pending ? (
           approval.canDecide &&
@@ -211,6 +220,7 @@ function GroupItem({
         ) : (
           <span className="rq__item-outcome">
             {decisionOutcome(t, approval, me.user.id, (id) => members.get(id)?.name)}
+            {ahead === "scheduled" && approval.canCancel && <CancelAhead id={approval.id} />}
           </span>
         )}
         <button type="button" className="rq__more" aria-expanded={open} onClick={() => setOpen(!open)}>

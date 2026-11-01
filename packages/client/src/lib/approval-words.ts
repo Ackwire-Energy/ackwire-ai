@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { Approval, ApprovalRule } from "../api/types";
-import { approvalAction, emailTitleWords } from "./approval-kind";
+import { aheadPhase, approvalAction, emailTitleWords } from "./approval-kind";
 import { humanize } from "./custom-tools";
 import { agentGrammar } from "./grammar";
 import { partsOf, toolName } from "./tool-review";
@@ -218,6 +218,12 @@ export const approvalRuleWords = (t: TFunction, rule: Pick<ApprovalRule, "tool" 
     : rule.action
       ? actionName(t, rule.action)
       : rule.toolLabel;
+
+/** How an action prepared ahead ended without running, in a line (its card, Aprovações, the phone's sheet). */
+export function aheadEndLine(t: TFunction, a: Pick<Approval, "runAt" | "status" | "executedAt" | "decidedAt">) {
+  const phase = aheadPhase(a);
+  return phase === "lapsed" || phase === "unapproved" || phase === "canceled" ? t(`approval.ahead.${phase}`) : null;
+}
 
 /**
  * How a decided approval ended, as the line that takes its card's place says it, the same on the web and the
