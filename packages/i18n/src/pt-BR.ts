@@ -2423,7 +2423,7 @@ export const ptBR = {
     identityHelp: "É como todo mundo vê o agente. As menções continuam por @{{handle}}.",
     nameLabel: "Nome",
     roleLabel: "Cargo",
-    roleHelp: "Uma linha, ex.: PM, Dev, Pesquisa.",
+    roleHelp: "O que faz na equipe, nas suas palavras.",
     edit: "Editar",
     chat: "Conversar",
     moreActions: "Mais ações",

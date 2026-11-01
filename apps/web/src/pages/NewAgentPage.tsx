@@ -85,6 +85,7 @@ import {
 } from "@/components/AgentFields";
 import { useConnectAi } from "@/components/ConnectAi";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
+import { ImportFlow, useImportFlow } from "@/components/ImportFlow";
 import { MailIcon } from "@/components/MailConnect";
 import { useMediaQuery } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
@@ -253,6 +254,9 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
   const [tried, setTried] = useState<Set<NewAgentStep>>(new Set());
   const [created, setCreated] = useState<Created | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  // Bringing agents from another app, in place of the role cards (the same flow as Configurações → Importar).
+  const [importing, setImporting] = useState(false);
+  const importFlow = useImportFlow(org.id);
   // The draft
   const [role, setRole] = useState<RoleId | null>(draft ? "custom" : null);
   const [roleText, setRoleText] = useState(draft?.role ?? "");
@@ -456,7 +460,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
   useEffect(() => {
     if (moved.current) heading.current?.focus();
     moved.current = true;
-  }, [index, created]);
+  }, [index, created, importing]);
 
   const fail = (s: NewAgentStep) => {
     setTried((prev) => new Set(prev).add(s));
@@ -553,7 +557,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
     if (connectAfter) connect?.open({ agentId: agent.id, agentIds: [agent.id] });
   };
   const next = () => {
-    if (created || create.isPending) return;
+    if (created || create.isPending || importing) return;
     if (stepErrors(step, check).length > 0) {
       fail(step);
       setTimeout(() => root.current?.querySelector<HTMLElement>("[aria-invalid='true']")?.focus());
@@ -567,6 +571,10 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
     goTo(index + 1);
   };
   const back = () => {
+    if (importing) {
+      setImporting(false);
+      return;
+    }
     if (created || index === 0) return;
     goTo(index - 1);
   };
@@ -635,6 +643,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
       return nextTried;
     });
     mood.react(id === "custom" ? "wink" : "happy", 1400);
+    if (id === "custom") setTimeout(() => document.getElementById("ag-role")?.focus());
     // A proposal keeps its draft: only the role changes.
     if (from) return;
     const preset = ROLE_PRESETS[id];
@@ -733,119 +742,134 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
   };
 
   const views: Record<NewAgentStep, () => ReactNode> = {
-    role: () => (
-      <>
-        {head(
-          t("newAgent.steps.role.title"),
-          t("newAgent.steps.role.lead"),
-          undefined,
-          !from && (
-            <p className="ac-iconline newag__import">
-              <Icon name="archiveBox" size={16} />
-              <Link
-                to="/org/$orgId/settings/$section"
-                params={{ orgId: org.id, section: "import" }}
-                className="ac-link"
+    role: () => {
+      if (importing) {
+        return (
+          <>
+            {head(t("shell.importAgents"))}
+            <ImportFlow flow={importFlow} orgId={org.id} standalone />
+          </>
+        );
+      }
+      const roleHead = (tile: ReactNode, title: string, sub: string) => (
+        <span className="newag__role-head">
+          {tile}
+          <span className="newag__role-name">
+            <b>{title}</b>
+            <span>{sub}</span>
+          </span>
+        </span>
+      );
+      return (
+        <>
+          {head(
+            t("newAgent.steps.role.title"),
+            t("newAgent.steps.role.lead"),
+            undefined,
+            !from && (
+              <p className="ac-iconline newag__import">
+                <Icon name="archiveBox" size={16} />
+                <button type="button" className="ac-link" onClick={() => setImporting(true)}>
+                  {t("shell.importAgents")}
+                </button>
+              </p>
+            ),
+          )}
+          {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
+          <div className="newag__role-groups" role="group" aria-label={t("newAgent.steps.role.name")}>
+            <div className="newag__scratch">
+              <button
+                type="button"
+                className="newag__role newag__role--blank"
+                aria-pressed={role === "custom"}
+                onClick={() => pickRole("custom")}
               >
-                {t("shell.importAgents")}
-              </Link>
-            </p>
-          ),
-        )}
-        {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
-        <div className="newag__role-groups" role="group" aria-label={t("newAgent.steps.role.name")}>
-          {ROLE_GROUPS.map((group) => (
-            <section key={group.id} className="newag__section" aria-labelledby={`ag-roles-${group.id}`}>
-              <div className={group.id === ROLE_GROUPS[0].id ? "newag__sect newag__sect--first" : "newag__sect"}>
-                <h2 id={`ag-roles-${group.id}`}>
-                  <Icon name={GROUP_ICON[group.id]} />
-                  {t(`newAgent.roleGroups.${group.id}`)}
-                </h2>
-              </div>
-              <div className="newag__roles">
-                {group.roles.map((id) => {
-                  const preset = ROLE_PRESETS[id];
-                  const kit = connectedList.filter((i) => i.def && (preset.levels[i.def.id] ?? "none") !== "none");
-                  const room = presetChannels(id, myChannels)
-                    .map((cid) => myChannels.find((c) => c.id === cid)?.name)
-                    .filter(Boolean)[0];
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      className="newag__role"
-                      aria-pressed={role === id}
-                      onClick={() => pickRole(id)}
-                    >
-                      <span className="newag__check" aria-hidden="true">
-                        <Icon name="check" size={14} />
-                      </span>
-                      <span className="ac-faceline">
-                        <AgentAvatar
-                          name={t(`newAgent.roles.${id}.agent`)}
-                          appearance={preset.look}
-                          size="lg"
-                          className="newag__role-agent"
-                        />
-                        <span className="newag__role-name">
-                          <b className="ac-captop">{t(`newAgent.roles.${id}.name`)}</b>
-                          <span>{t("newAgent.startsAs", { name: t(`newAgent.roles.${id}.agent`) })}</span>
+                <span className="newag__check" aria-hidden="true">
+                  <Icon name="check" size={14} />
+                </span>
+                {roleHead(
+                  <span className="newag__blank-icon" aria-hidden="true">
+                    <Icon name="plus" />
+                  </span>,
+                  t("newAgent.roles.custom.name"),
+                  t("newAgent.roles.custom.desc"),
+                )}
+              </button>
+              {role === "custom" && (
+                <Card as="div" className="newag__card">
+                  <Field label={t("agent.roleLabel")} id="ag-role" help={t("agent.roleHelp")}>
+                    <Input
+                      value={roleText}
+                      maxLength={200}
+                      autoComplete="off"
+                      onChange={(e) => {
+                        setRoleText(e.target.value);
+                        mood.onTyping();
+                      }}
+                    />
+                  </Field>
+                </Card>
+              )}
+            </div>
+            {ROLE_GROUPS.map((group) => (
+              <section key={group.id} className="newag__section" aria-labelledby={`ag-roles-${group.id}`}>
+                <div className="newag__sect">
+                  <h2 id={`ag-roles-${group.id}`}>
+                    <Icon name={GROUP_ICON[group.id]} />
+                    {t(`newAgent.roleGroups.${group.id}`)}
+                  </h2>
+                </div>
+                <div className="newag__roles">
+                  {group.roles.map((id) => {
+                    const preset = ROLE_PRESETS[id];
+                    const kit = connectedList.filter((i) => i.def && (preset.levels[i.def.id] ?? "none") !== "none");
+                    const room = presetChannels(id, myChannels)
+                      .map((cid) => myChannels.find((c) => c.id === cid)?.name)
+                      .filter(Boolean)[0];
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        className="newag__role"
+                        aria-pressed={role === id}
+                        onClick={() => pickRole(id)}
+                      >
+                        <span className="newag__check" aria-hidden="true">
+                          <Icon name="check" size={14} />
                         </span>
-                      </span>
-                      <span className="newag__role-desc">{t(`newAgent.roles.${id}.desc`)}</span>
-                      {(kit.length > 0 || room) && (
-                        <span className="newag__chips">
-                          {kit.slice(0, 3).map((i) => (
-                            <span key={i.id} className="ac-chip">
-                              <ConnectorIcon def={i.def} image={i.image} label={itemName(t, i)} />
-                              {itemName(t, i)}
-                            </span>
-                          ))}
-                          {room && chip("channel", room)}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
-          <button
-            type="button"
-            className="newag__role newag__role--blank"
-            aria-pressed={role === "custom"}
-            onClick={() => pickRole("custom")}
-          >
-            <span className="newag__check" aria-hidden="true">
-              <Icon name="check" size={14} />
-            </span>
-            <span className="newag__blank-icon" aria-hidden="true">
-              <Icon name="plus" />
-            </span>
-            <span className="newag__role-name">
-              <b className="ac-captop">{t("newAgent.roles.custom.name")}</b>
-              <span>{t("newAgent.roles.custom.desc")}</span>
-            </span>
-          </button>
-        </div>
-        {role === "custom" && (
-          <Card as="div" className="newag__card">
-            <Field label={t("agent.roleLabel")} id="ag-role" help={t("agent.roleHelp")}>
-              <Input
-                value={roleText}
-                maxLength={200}
-                autoComplete="off"
-                onChange={(e) => {
-                  setRoleText(e.target.value);
-                  mood.onTyping();
-                }}
-              />
-            </Field>
-          </Card>
-        )}
-        {errorLine(errorOf("role"))}
-      </>
-    ),
+                        {roleHead(
+                          <AgentAvatar
+                            name={t(`newAgent.roles.${id}.agent`)}
+                            appearance={preset.look}
+                            size="lg"
+                            className="newag__role-agent"
+                          />,
+                          t(`newAgent.roles.${id}.name`),
+                          t("newAgent.startsAs", { name: t(`newAgent.roles.${id}.agent`) }),
+                        )}
+                        <span className="newag__role-desc">{t(`newAgent.roles.${id}.desc`)}</span>
+                        {(kit.length > 0 || room) && (
+                          <span className="newag__chips">
+                            {kit.slice(0, 3).map((i) => (
+                              <span key={i.id} className="ac-chip">
+                                <ConnectorIcon def={i.def} image={i.image} label={itemName(t, i)} />
+                                {itemName(t, i)}
+                              </span>
+                            ))}
+                            {room && chip("channel", room)}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+          </div>
+          {errorLine(errorOf("role"))}
+        </>
+      );
+    },
     identity: () => (
       <>
         {head(t("newAgent.steps.identity.title"), t("newAgent.steps.identity.lead"))}
@@ -1390,6 +1414,10 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
   /* ---------- The preview ---------- */
 
   const last = index === total - 1;
+  // Never an all-empty preview: it comes with a role's template or the first thing typed.
+  const showPreview =
+    !importing &&
+    ((role !== null && role !== "custom") || Boolean(roleText.trim() || name.trim() || instructions.trim()));
   const footErrors = errors.map(errorText);
   const hint: Record<NewAgentStep, ReactNode> = {
     role: role
@@ -1417,14 +1445,14 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
   return (
     <div className="onb newag" ref={root}>
       <NewAgentRail index={index} reached={reached} total={total} onGo={goTo} done={false} />
-      <div className="newag__work">
+      <div className="newag__work" data-preview={showPreview || undefined}>
         <main className="newag__main">
           <div className="newag__content" key={step}>
             {views[step]()}
           </div>
           <div className="newag__foot">
             <span className="newag__hint" data-bad={footErrors.length > 0 || undefined}>
-              {footErrors.length > 0 ? (
+              {importing ? null : footErrors.length > 0 ? (
                 <>
                   <Icon name="info" size={14} />
                   {footErrors[0]}
@@ -1433,7 +1461,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
                 hint[step]
               )}
             </span>
-            {index > 0 ? (
+            {index > 0 || importing ? (
               <Button variant="ghost" size="lg" icon="chevronLeft" onClick={back}>
                 {t("common.back")}
               </Button>
@@ -1462,19 +1490,21 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
                 {t("approval.refuse")}
               </Button>
             )}
-            <Button
-              variant="primary"
-              size="lg"
-              kbd={["↵"]}
-              loading={create.isPending}
-              aria-disabled={footErrors.length > 0 || undefined}
-              onClick={next}
-            >
-              {last ? t("newAgent.create", { name: displayName }) : t("common.continue")}
-            </Button>
+            {!importing && (
+              <Button
+                variant="primary"
+                size="lg"
+                kbd={["↵"]}
+                loading={create.isPending}
+                aria-disabled={footErrors.length > 0 || undefined}
+                onClick={next}
+              >
+                {last ? t("newAgent.create", { name: displayName }) : t("common.continue")}
+              </Button>
+            )}
           </div>
         </main>
-        {role && (
+        {showPreview && (
           <aside className="newag__aside" data-step={step} aria-label={t("newAgent.preview.label")}>
             <div className="newag__cap">
               <span className="onb__eyebrow">{t("newAgent.preview.title")}</span>

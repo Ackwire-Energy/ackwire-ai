@@ -5,7 +5,7 @@ setupDom();
 
 import type { AgentInput } from "@agenteschat/client";
 import { en, ptBR } from "@agenteschat/i18n";
-import { cleanup, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import {
   freeHandle,
   handleProblem,
@@ -80,14 +80,21 @@ describe("Criar agente: steps", () => {
     );
   });
 
-  test("the preview waits for a role: none before a pick, then the picked role's agent, on to the next steps", async () => {
+  test("the preview waits for something in it: a template, or the first thing typed; never all empty", async () => {
     await open();
     const preview = () => screen().queryByRole("complementary", { name: "Prévia do agente" });
+    const work = () => document.querySelector(".newag__work");
     expect(preview()).toBeNull();
-    // A pick shows it on the role step itself: Do zero has no name yet, QA starts as Iris.
+    expect(work()?.hasAttribute("data-preview")).toBe(false);
+    // Do zero alone has nothing to show yet: no preview, the form keeps the width.
     await click(screen().getByRole("button", { name: /^Do zero/ }));
     expect(title()).toBe("Qual vai ser o papel?");
-    expect(preview()?.textContent).toContain("Seu agente");
+    expect(preview()).toBeNull();
+    expect(work()?.hasAttribute("data-preview")).toBe(false);
+    await typeIn(screen().getByLabelText("Cargo"), "Pesquisa de preços");
+    expect(preview()?.textContent).toContain("Pesquisa de preços");
+    expect(work()?.hasAttribute("data-preview")).toBe(true);
+    // A template shows it on the role step itself: QA starts as Iris.
     await click(screen().getByRole("button", { name: /^QA/ }));
     expect(preview()?.textContent).toContain("Iris");
     // Headed by its name alone. It says which step it's on: a narrow screen keeps it out of the role step.
@@ -196,7 +203,7 @@ describe("Criar agente: steps", () => {
     });
   });
 
-  test("roles for any team, in groups (tech, customers, operations); Do zero last", async () => {
+  test("roles for any team, in groups (tech, customers, operations); Do zero first", async () => {
     await open();
     const step = screen().getByRole("group", { name: "Papel" });
     expect(
@@ -211,13 +218,31 @@ describe("Criar agente: steps", () => {
     expect(names("Produto e tecnologia")).toEqual(["Dev", "Ops", "QA", "PM"]);
     expect(names("Clientes")).toEqual(["Atendimento", "Vendas", "Marketing", "Conteúdo"]);
     expect(names("Operação")).toEqual(["Dados", "Financeiro", "Pessoas", "Pesquisa", "Assistente"]);
-    expect(within(step).getAllByRole("button").at(-1)?.textContent).toContain("Do zero");
-    // A preset's first row under the card's padding is the shared face line alone: no class of its own to add room
-    // above the face.
-    const firstRows = [...step.querySelectorAll(".newag__role:not(.newag__role--blank)")].map(
+    expect(within(step).getAllByRole("button")[0]?.textContent).toContain("Do zero");
+    // Every card, Do zero too, opens on its tile with the name and its line centred beside it (no cap-top rise).
+    const firstRows = [...step.querySelectorAll(".newag__role")].map(
       (card) => [...card.children].find((c) => !c.classList.contains("newag__check"))?.className,
     );
-    expect(firstRows).toEqual(ROLE_IDS.filter((id) => id !== "custom").map(() => "ac-faceline"));
+    expect(firstRows).toEqual(ROLE_IDS.map(() => "newag__role-head"));
+    expect(step.querySelector(".newag__role .ac-captop, .newag__role .ac-faceline")).toBeNull();
+    const css = await Bun.file(new URL("../src/layout.css", import.meta.url).pathname).text();
+    expect(css).toMatch(/\n\.newag__role-head \{\s*display: flex;\s*align-items: center;/);
+    // Smaller tiles than a profile's 56px face, the + as big as a face.
+    expect(css).toMatch(/\n\.newag__role-head > \.ac-avatar \{\s*width: 44px;\s*height: 44px;/);
+    expect(css).toMatch(/\n\.newag__blank-icon \{[^}]*width: 44px;\s*height: 44px;/);
+
+    // Do zero's Cargo comes right under its card, in the same column with the cards' gap, before the templates; the
+    // field has the focus, and its hint doesn't ask for one short word.
+    await click(within(step).getByRole("button", { name: /^Do zero/ }));
+    const scratch = step.querySelector(".newag__scratch");
+    expect([...(scratch?.children ?? [])].map((c) => c.className)).toEqual([
+      "newag__role newag__role--blank",
+      expect.stringContaining("newag__card"),
+    ]);
+    expect(scratch?.nextElementSibling?.tagName).toBe("SECTION");
+    expect(css).toMatch(/\n\.newag__scratch \{[^}]*gap: 12px;/);
+    expect(document.activeElement).toBe(screen().getByLabelText("Cargo"));
+    expect(screen().getByText("O que faz na equipe, nas suas palavras.")).toBeTruthy();
 
     // A role outside engineering fills the rest the same way.
     await click(within(step).getByRole("button", { name: /^Atendimento/ }));
@@ -229,6 +254,67 @@ describe("Criar agente: steps", () => {
     expect((screen().getByLabelText("Instruções") as HTMLTextAreaElement).value).toContain(
       "Enviar mensagem ao cliente, reembolso e desconto só com aprovação.",
     );
+  });
+
+  test("Trazer agentes de outro app: the import flow in place of the cards, Voltar (or Esc) back to them", async () => {
+    const state = await open();
+    await click(screen().getByRole("button", { name: "Trazer agentes de outro app" }));
+    // Still here (the rail on its first step): the import's sources in the cards' place, no preview, no Continuar.
+    expect(title()).toBe("Trazer agentes de outro app");
+    expect(railStep("Papel").getAttribute("aria-current")).toBe("step");
+    expect(document.activeElement).toBe(screen().getByRole("heading", { level: 1 }));
+    expect(screen().getByRole("group", { name: "De onde vêm os agentes" })).toBeTruthy();
+    expect(screen().queryByRole("group", { name: "Papel" })).toBeNull();
+    expect(screen().queryByRole("complementary", { name: "Prévia do agente" })).toBeNull();
+    expect(screen().queryByRole("button", { name: /^Continuar/ })).toBeNull();
+    // Enter in its field reads what's there, never moves the steps on.
+    const field = screen().getByLabelText("Ou cole um link do GitHub ou a resposta do outro app");
+    await press(field, "Enter");
+    expect(title()).toBe("Trazer agentes de outro app");
+
+    // A pasted reply: planned, then Importar brings the agent, and the report links to it.
+    const reply = {
+      format: "agenteschat.bundle",
+      version: 1,
+      source: { app: "claude", ref: "my-bots", name: "Minhas automações", files: [] },
+      agents: [
+        {
+          key: "news",
+          name: "Newsy",
+          handle: "news",
+          role: "Notícias do dia",
+          instructions: "Resume as notícias do dia.",
+          model: null,
+          appearance: {},
+          skills: [],
+        },
+      ],
+      skills: [],
+      channels: [],
+      routines: [],
+      notes: [],
+      todo: [],
+      leftOut: [],
+    };
+    const pasted = `\`\`\`json\n${JSON.stringify(reply)}\n\`\`\``;
+    await act(async () => fireEvent.paste(field, { clipboardData: { getData: () => pasted } }));
+    await settle(10);
+    expect(screen().getByRole("heading", { name: "Minhas automações" })).toBeTruthy();
+    await click(screen().getByRole("button", { name: /^Importar 1 / }));
+    await settle(8);
+    expect(state.calls.some((c) => c.method === "imports.apply" && !(c.args[1] as { dryRun?: boolean }).dryRun)).toBe(
+      true,
+    );
+    const link = screen().getByRole("link", { name: /Newsy/ });
+    expect(link.getAttribute("href")).toMatch(new RegExp(`^/org/${ORG_ID}/agents/`));
+
+    // Voltar goes back to the cards; so does Esc outside a field.
+    await click(screen().getByRole("button", { name: "Voltar" }));
+    expect(title()).toBe("Qual vai ser o papel?");
+    expect(screen().getByRole("group", { name: "Papel" })).toBeTruthy();
+    await click(screen().getByRole("button", { name: "Trazer agentes de outro app" }));
+    await press(document.body, "Escape");
+    expect(title()).toBe("Qual vai ser o papel?");
   });
 
   test("Dev starts as Ada, whose @ is taken: the error suggests a free one and blocks the step", async () => {
