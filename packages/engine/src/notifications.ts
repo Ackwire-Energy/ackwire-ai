@@ -197,6 +197,8 @@ const MERGING: ReadonlySet<NotificationKind> = new Set([
   "issue_comment",
   "reaction",
   "join_request",
+  // One per approval card: requests joining it update it, read or not (`notifyApproval`).
+  "approval",
 ]);
 /** "Menções" in the inbox: what was said to me. */
 const MENTION_KINDS: NotificationKind[] = ["mention", "dm", "agent_reply", "agent_question"];
@@ -372,9 +374,14 @@ async function upsertOne(deps: NotificationDeps, input: NotifyInput, userId: str
         and(
           sameGroup,
           isNull(notifications.doneAt),
-          reaction
-            ? or(isNull(notifications.readAt), gt(notifications.updatedAt, new Date(now.getTime() - REACTION_MERGE_MS)))
-            : isNull(notifications.readAt),
+          input.kind === "approval"
+            ? undefined
+            : reaction
+              ? or(
+                  isNull(notifications.readAt),
+                  gt(notifications.updatedAt, new Date(now.getTime() - REACTION_MERGE_MS)),
+                )
+              : isNull(notifications.readAt),
         ),
       )
       .orderBy(sql`${notifications.readAt} is not null`, desc(notifications.updatedAt))

@@ -1226,6 +1226,21 @@ export function useDecideApproval(orgId: string) {
   });
 }
 
+/** A card's "Aprovar tudo" / "Agora não para todos": exactly the ids it listed at the click. */
+export function useDecideApprovals(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { ids: string[]; decision: "approve" | "refuse"; reason?: string }) =>
+      api.approvals.decideMany(orgId, input),
+    onSuccess: (result, { decision }) => {
+      playSound(decision === "approve" ? "approved" : "error");
+      for (const approval of result.approvals) cacheApproval(qc, orgId, approval);
+      void qc.invalidateQueries({ queryKey: keys.approvals(orgId) });
+    },
+  });
+}
+
 /** What the agent runs without asking ("Aprovar sempre"), on its page. */
 export const useApprovalRules = (orgId: string, agentId: string) => {
   const api = useApi();

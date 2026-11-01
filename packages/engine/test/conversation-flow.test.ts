@@ -98,7 +98,10 @@ test("a message sent while the agent's run waits on an approval: the new run kno
   expect(resumed).toContain("recorded 2026-10");
   expect(resumed).toContain("While you waited, the conversation went on");
   expect(resumed).toContain("@dev grava a de influencer também");
-  expect(resumed).toContain("[You, in another run]: Approval request: Painel: goal upsert");
+  // Its sibling's request joined the card already waiting in this conversation: no second card was posted.
+  expect(resumed).not.toContain("[You, in another run]: Approval request");
+  const cards = new Set((await f.db.select().from(schema.approvals)).map((a) => a.messageId));
+  expect(cards.size).toBe(1);
   // …and what its other run still waits on, so it files no second card for it.
   expect(resumed).toContain("# Already waiting for approval here");
   expect(resumed).toContain("role=creator, month=2026-11");

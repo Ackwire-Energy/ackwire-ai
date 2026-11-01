@@ -1,5 +1,20 @@
 import { MAIL_PRESETS, type PubSub } from "@agenteschat/adapters";
-import { and, type Database, desc, type Executor, eq, inArray, lt, ne, or, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  asc,
+  type Database,
+  desc,
+  type Executor,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  lt,
+  ne,
+  or,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { addApprovalRules, type RememberedKind, rememberedKindOf } from "./approval-rules";
 import { recordAudit } from "./audit";
 import { learnFromRefusal } from "./context/feedback";
@@ -250,6 +265,50 @@ export async function approvalCardThreads(db: Executor, rows: Pick<Approval, "id
   );
 }
 
+/**
+ * The card an agent's new approval joins instead of posting its own: the one holding a pending request of the
+ * same agent in the same conversation, as `heldHere` reads it: the run's conversation (`threadRootId`: a thread,
+ * which for a run asked in the main timeline is its trigger, so a reply under it lands on its card), or the
+ * main timeline for a card posted there. Each approval keeps its own row, hash and audit; only the card is shared.
+ */
+export async function openApprovalCard(
+  db: Executor,
+  at: {
+    orgId: string;
+    agentId: string;
+    channelId: string;
+    /** Where this approval's own card would go (null: the main timeline). */
+    threadId: string | null;
+    threadRootId: string;
+    exceptId: string;
+  },
+  now = new Date(),
+): Promise<string | null> {
+  const [open] = await db
+    .select({ messageId: approvals.messageId })
+    .from(approvals)
+    .innerJoin(messages, and(eq(messages.orgId, approvals.orgId), eq(messages.id, approvals.messageId)))
+    .where(
+      and(
+        eq(approvals.orgId, at.orgId),
+        eq(approvals.agentId, at.agentId),
+        eq(approvals.status, "pending"),
+        gt(approvals.expiresAt, now),
+        ne(approvals.id, at.exceptId),
+        eq(messages.channelId, at.channelId),
+        or(
+          eq(approvals.threadRootId, at.threadRootId),
+          at.threadId ? undefined : isNull(messages.threadId),
+          at.threadId ? eq(messages.threadId, at.threadId) : undefined,
+        ),
+        isNull(messages.deletedAt),
+      ),
+    )
+    .orderBy(asc(approvals.createdAt))
+    .limit(1);
+  return open?.messageId ?? null;
+}
+
 /** Views with their context (connector, issue); `trail` only when asked (one approval's details). */
 async function viewsOf(db: Database, rows: Approval[], canDecide: (row: Approval) => boolean, trail = false) {
   const [contexts, cardThreads] = await Promise.all([
@@ -361,7 +420,7 @@ export async function publishApproval(
   if (type === "approval.created" && approval.status === "pending") {
     await notifyApproval(deps, approval, deciders).catch(() => {});
   } else if (type === "approval.decided") {
-    await resolveApprovalNotifications(deps, approval.orgId, approval.id).catch(() => {});
+    await resolveApprovalNotifications(deps, approval).catch(() => {});
   }
 }
 
@@ -450,6 +509,78 @@ export async function decideApproval(
   if (outcome.row.status === "refused") await learnFromRefusal(deps, outcome.row).catch(() => null);
   const [view = approvalView(outcome.row)] = await viewsOf(db, [outcome.row], () => false);
   return view;
+}
+
+/**
+ * "Aprovar tudo" / "Agora não para todos" on a card: decides exactly these approvals (the items the card listed
+ * when the person clicked, never one that joined since), each its own row, decision and audit. Only the items
+ * this person may decide are decided (`mayDecide`, per item); the rest come back in `skipped`. Each run that
+ * asked resumes once, after all of its items here are decided in the same transaction.
+ */
+export async function decideApprovals(
+  deps: { db: Database; pubsub: PubSub; now?: () => Date; memory?: MemoryJudging },
+  actorId: string,
+  orgId: string,
+  input: { ids: string[]; decision: "approve" | "refuse"; reason?: string },
+): Promise<{ approvals: ApprovalView[]; skipped: string[] }> {
+  const { db } = deps;
+  const at = deps.now?.() ?? new Date();
+  const ids = [...new Set(input.ids)];
+  const membership = await requirePermission(db, actorId, orgId, "read");
+  const admin = can(membership, "approve_actions");
+  const allowed = (r: Approval) => admin || (r.ownerUserId === actorId && !adminsDecide(r));
+  const decided = await db.transaction(async (tx) => {
+    const rows = ids.length
+      ? await tx
+          .select()
+          .from(approvals)
+          .where(and(eq(approvals.orgId, orgId), inArray(approvals.id, ids), eq(approvals.status, "pending")))
+          .orderBy(asc(approvals.createdAt))
+          .for("update")
+      : [];
+    const out: Approval[] = [];
+    const resumed = new Set<string>();
+    for (const row of rows.filter(allowed)) {
+      const expired = row.expiresAt <= at;
+      const [updated] = await tx
+        .update(approvals)
+        .set(
+          expired
+            ? { status: "expired" }
+            : {
+                status: input.decision === "approve" ? "approved" : "refused",
+                decidedByUserId: actorId,
+                decidedAt: at,
+                reason: input.reason?.trim().slice(0, 1000) || null,
+              },
+        )
+        .where(eq(approvals.id, row.id))
+        .returning();
+      if (!updated) continue;
+      await auditDecision(tx, updated, expired ? null : actorId);
+      if (!row.runId || !resumed.has(row.runId)) await enqueueResume(tx, row);
+      if (row.runId) resumed.add(row.runId);
+      out.push(updated);
+    }
+    return out;
+  });
+  if (decided.length === 0 && ids.length > 0) {
+    const [any] = await db
+      .select({ id: approvals.id })
+      .from(approvals)
+      .where(and(eq(approvals.orgId, orgId), inArray(approvals.id, ids), eq(approvals.status, "pending")))
+      .limit(1);
+    if (any) throw new ForbiddenError("Only the agent's owner or an admin can decide this");
+  }
+  for (const row of decided) await publishApproval(deps, row, "approval.decided");
+  for (const row of decided) {
+    if (row.status === "refused") await learnFromRefusal(deps, row).catch(() => null);
+  }
+  const done = new Set(decided.map((r) => r.id));
+  return {
+    approvals: await viewsOf(db, decided, () => false),
+    skipped: ids.filter((id) => !done.has(id)),
+  };
 }
 
 /**

@@ -608,6 +608,11 @@ export interface ApiClient {
     /** `always`: also approve this kind for good (409 `approval.always_unavailable` where it isn't offered). */
     approve(orgId: string, approvalId: string, reason?: string, always?: boolean): Promise<Approval>;
     refuse(orgId: string, approvalId: string, reason?: string): Promise<Approval>;
+    /** A card's "Aprovar tudo" / "Agora não para todos": exactly these ids; `skipped` the ones not decided. */
+    decideMany(
+      orgId: string,
+      input: { ids: string[]; decision: "approve" | "refuse"; reason?: string },
+    ): Promise<{ approvals: Approval[]; skipped: string[] }>;
     /** What the agent runs without asking ("Aprovar sempre"), oldest first. */
     rules(orgId: string, agentId: string): Promise<ApprovalRule[]>;
     /** The agent asks again for that kind (admins and the agent's owner). */

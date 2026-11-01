@@ -1986,8 +1986,11 @@ test("two gated bridged calls in one turn both wait; a gated call for a run that
   const pending =
     (after?.transcript as { pending?: { calls: { toolUseId: string }[] } } | undefined)?.pending?.calls ?? [];
   expect(pending.map((c) => c.toolUseId).sort()).toEqual(["m-1", "m-2"]);
+  // Both requests share one card, each its own row.
   const cards = (await f.db.select().from(schema.messages)).filter((m) => typeof m.meta.approvalId === "string");
-  expect(cards.length).toBe(2);
+  expect(cards.length).toBe(1);
+  const asked = await f.db.select().from(schema.approvals).where(eq(schema.approvals.runId, run.id));
+  expect(asked.map((a) => a.messageId)).toEqual([cards[0]?.id ?? "", cards[0]?.id ?? ""]);
 
   // The run ended: the gated call is refused before anything is posted, and its request canceled.
   await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, run.id));
@@ -1999,7 +2002,7 @@ test("two gated bridged calls in one turn both wait; a gated call for a run that
   expect(late).toMatchObject({ code: "bridge.run_not_running", result: { isError: true } });
   expect(late.result.pause).toBeUndefined();
   const all = (await f.db.select().from(schema.messages)).filter((m) => typeof m.meta.approvalId === "string");
-  expect(all.length).toBe(2);
+  expect(all.length).toBe(1);
   const [third] = await f.db.select().from(schema.approvals).where(eq(schema.approvals.toolUseId, "m-3"));
   expect(third?.status).toBe("canceled");
   expect(gh.executed).toEqual([]);

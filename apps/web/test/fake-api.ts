@@ -2345,6 +2345,26 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         return decided;
       },
       refuse: async (orgId, id, reason) => decide(orgId, id, "refused", reason),
+      decideMany: async (orgId, input) => {
+        log("approvals.decideMany", orgId, input.ids, input.decision);
+        const out: Approval[] = [];
+        const skipped: string[] = [];
+        for (const approvalId of input.ids) {
+          const a = state.approvals.find((x) => x.id === approvalId);
+          if (a?.status !== "pending" || !a.canDecide) skipped.push(approvalId);
+          else {
+            Object.assign(a, {
+              status: input.decision === "approve" ? "approved" : "refused",
+              decidedByUserId: state.me?.user.id ?? null,
+              decidedAt: new Date().toISOString(),
+              reason: input.reason ?? null,
+              canDecide: false,
+            });
+            out.push({ ...a });
+          }
+        }
+        return { approvals: out, skipped };
+      },
       rules: async (orgId, agentId) => {
         log("approvals.rules", orgId, agentId);
         return structuredClone(state.approvalRules?.[agentId] ?? []);
