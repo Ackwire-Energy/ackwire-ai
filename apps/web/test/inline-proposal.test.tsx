@@ -86,6 +86,9 @@ describe("a change proposed for several agents in the chat", () => {
     const state = await openCard([row("p-ada"), atlas("p-atlas")]);
     const card = screen().getByRole("group", { name: "Proposta de mudança de Atlas para 2 agentes" });
     expect(card.textContent).toContain("Atlas propõe · instruções de 2 agentes");
+    // The change once, behind "Ver a mudança", its first line in the well.
+    expect(card.querySelector(".rq__wt")?.textContent).toContain("Responder em português.");
+    await click(within(card).getByRole("button", { name: "Ver a mudança" }));
     expect(card.querySelectorAll(".ac-diff")).toHaveLength(1);
     expect(card.querySelector(".ac-diff__line--add:last-child")?.textContent).toContain("- Responder em português.");
     expect(within(card).getByRole("switch", { name: "Incluir Ada" })).toBeTruthy();

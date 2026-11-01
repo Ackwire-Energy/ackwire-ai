@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { LiveRun, SecretRequest } from "@agenteschat/client";
+import { firstChange } from "@agenteschat/client/lib/proposals";
 import {
   APPROVAL_TTL_MS,
   AskStore,
@@ -264,5 +265,18 @@ describe("the line's stop while it shows a request", () => {
   test("several agents: the line can't say whose, so the box's own stop is the one", () => {
     const runs = [run({ runId: "r1", agentId: "dev" }), run({ runId: "r2", agentId: "infra" })];
     expect(lineStops(workingEntries(runs, [], name), runs, () => true)).toEqual([]);
+  });
+});
+
+describe("a proposal's short form", () => {
+  test("the first line it adds, past a heading; what it removes when it adds nothing", () => {
+    const add = (text: string) => ({ kind: "add" as const, text });
+    const del = { kind: "del" as const, text: "Responder em inglês." };
+    expect(firstChange([del, add("## Aprendido"), add("- Responder em português.")])?.text).toBe(
+      "- Responder em português.",
+    );
+    expect(firstChange([add("## Aprendido")])?.text).toBe("## Aprendido");
+    expect(firstChange([del])?.text).toBe("Responder em inglês.");
+    expect(firstChange(undefined)).toBeUndefined();
   });
 });

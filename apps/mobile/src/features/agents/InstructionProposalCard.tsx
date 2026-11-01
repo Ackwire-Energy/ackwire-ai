@@ -1,11 +1,15 @@
 import { type Message, type Proposal, useCardProposals, useDecideProposals } from "@agenteschat/client";
 import {
   appLabel,
+  type ChangedLine,
   cardHead,
   chosenRows,
+  firstChange,
   isOpen,
   messageProposalCards,
   proposalSections,
+  proposalTarget,
+  proposalTitle,
   proposerOf,
   rowStatus,
   staleCount,
@@ -17,6 +21,7 @@ import { useOrg } from "@/providers/org";
 import { Button, Chip, DiffView, haptics, Icon, Text, ToggleSwitch, useTheme, useToast } from "@/ui";
 import { boldRuns } from "../chat/actions";
 import { AskButtons, AskCard, AskFoot } from "../chat/asks";
+import { IconTile } from "../connectors/ConnectorIcon";
 import { useFailed } from "../routines/hooks";
 import { Face } from "../shared/Face";
 import { useDirectory } from "../shared/hooks";
@@ -80,10 +85,9 @@ function InstructionProposalCard({ ids }: { ids: string[] }) {
         },
       },
     );
-  const sections = proposalSections(rows).map((section) => (
-    <View key={section.rows[0]?.id} style={styles.section}>
-      {section.kind === "text" && section.lines.length > 0 ? <DiffView prose lines={section.lines} /> : null}
-      {section.rows.map((p) => {
+  const rowList = (list: Proposal[]) => (
+    <>
+      {list.map((p) => {
         const name = p.target.type === "org_context" ? orgName : agentName(p.agentId);
         const status = rowStatus(t, p);
         const on = p.canDecide && !off.has(p.id);
@@ -129,8 +133,14 @@ function InstructionProposalCard({ ids }: { ids: string[] }) {
           </View>
         );
       })}
-    </View>
-  ));
+    </>
+  );
+  const groups = proposalSections(rows);
+  const texts = groups.flatMap((g) => (g.kind === "text" && g.lines.length > 0 ? [g] : []));
+  const firstLine = firstChange(texts[0]?.lines);
+  const change =
+    texts.length > 0 ? { label: t("ask.seeChange"), content: <Diffs lines={texts.map((g) => g.lines)} /> } : null;
+  const only = many ? undefined : first;
   // Waiting on the person: a request card like every other, the rows and their switches above the decision.
   if (decides)
     return (
@@ -139,8 +149,31 @@ function InstructionProposalCard({ ids }: { ids: string[] }) {
         kind="proposal"
         agentId={proposerOf(first)}
         waitsFor="you"
-        lead={runs.map((r) => r.text).join("")}
-        body={sections}
+        lead={only ? proposalTitle(t, only, orgName, agentName) : runs.map((r) => r.text).join("")}
+        well={
+          only
+            ? {
+                tile: <IconTile name={only.target.type === "agent_access" ? "bolt" : "file"} size={32} />,
+                title: proposalTarget(t, only, agentName, orgName),
+                detail:
+                  only.target.type === "agent_role"
+                    ? t("proposals.roleLine", { from: only.before, to: only.after })
+                    : firstLine?.text,
+                more: change,
+              }
+            : firstLine
+              ? { tile: <IconTile name="file" size={32} />, title: firstLine.text, more: change }
+              : null
+        }
+        body={
+          only ? (
+            only.target.type === "agent_access" ? (
+              <SettingChange p={only} />
+            ) : undefined
+          ) : (
+            rowList(groups.flatMap((g) => g.rows))
+          )
+        }
         foot={
           <AskFoot>
             <AskButtons
@@ -191,8 +224,24 @@ function InstructionProposalCard({ ids }: { ids: string[] }) {
           )}
         </Text>
       </View>
-      {sections}
+      {groups.map((section) => (
+        <View key={section.rows[0]?.id} style={styles.section}>
+          {section.kind === "text" && section.lines.length > 0 ? <DiffView prose lines={section.lines} /> : null}
+          {rowList(section.rows)}
+        </View>
+      ))}
     </View>
+  );
+}
+
+/** What "Ver a mudança" opens: each change once. */
+function Diffs({ lines }: { lines: ChangedLine[][] }) {
+  return (
+    <>
+      {lines.map((l) => (
+        <DiffView key={l.map((x) => x.text).join("\n")} prose lines={l} />
+      ))}
+    </>
   );
 }
 

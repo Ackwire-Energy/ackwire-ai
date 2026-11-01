@@ -7,6 +7,7 @@ import {
   cardHead,
   cardProposalIds,
   chosenRows,
+  firstChange,
   isOpen,
   proposalSections,
   proposalTarget,
@@ -181,11 +182,11 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
         object={{
           logo: (
             <RequestTile>
-              <Icon name="file" size={16} />
+              <Icon name={p.target.type === "agent_access" ? "layers" : "file"} size={16} />
             </RequestTile>
           ),
           title: target,
-          detail: firstNew,
+          detail: p.target.type === "agent_role" ? t("proposals.roleLine", { from: p.before, to: p.after }) : firstNew,
           ...(isText(p) ? { more: t("ask.seeChange") } : {}),
         }}
         details={
@@ -209,8 +210,14 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
             </>
           ) : undefined
         }
-        // A role or an app is short: it shows as it is, with nothing to open.
-        body={isText(p) ? undefined : <SettingChange p={p} />}
+        // A new role reads in the well; the apps are chips, under it. Neither has anything to open.
+        body={
+          p.target.type === "agent_access" ? (
+            <div className="rq__field">
+              <SettingChange p={p} />
+            </div>
+          ) : undefined
+        }
         actions={
           p.canDecide ? (
             <>
@@ -332,50 +339,43 @@ export function ProposalGroup({ proposalIds }: { proposalIds: string[] }) {
 
   const label = t("inlineProposal.groupMany", { name: proposer, count: agents });
   const who = <Trans i18nKey={head.key} values={head.values} components={{ b: <b /> }} {...TYPED_VALUES} />;
-  const sections = proposalSections(rows).map((section) => (
-    <div key={section.rows[0]?.id} className="proposal-section">
-      {section.kind === "text" && section.lines.length > 0 && (
-        <Diff
-          aria-label={t("proposals.changeLabel")}
-          addedLabel={t("proposals.added")}
-          removedLabel={t("proposals.removed")}
-          lines={section.lines}
-        />
-      )}
-      <ul className="proposal-rows">
-        {section.rows.map((p) => {
-          const name = p.target.type === "org_context" ? org.name : agentName(p.agentId);
-          const status = rowStatus(t, p);
-          return (
-            <li key={p.id} className="proposal-row">
-              {p.target.type === "org_context" ? (
-                <Icon name="layers" size={20} />
-              ) : (
-                <AgentAvatar agentId={p.agentId} size="sm" name={name} />
-              )}
-              <span className="proposal-row__what">
-                <span className="proposal-row__name">{name}</span>
-                {!isText(p) && <SettingChange p={p} />}
-              </span>
-              {status && <span className="proposal-row__status">{status}</span>}
-              {isOpen(p) && (
-                <Switch
-                  checked={p.canDecide && !off.has(p.id)}
-                  disabled={!p.canDecide || decide.isPending}
-                  onCheckedChange={(on) => toggle(p.id, on)}
-                  aria-label={t("proposals.include", { name })}
-                />
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  ));
+  const rowList = (list: Proposal[]) => (
+    <ul className="proposal-rows">
+      {list.map((p) => {
+        const name = p.target.type === "org_context" ? org.name : agentName(p.agentId);
+        const status = rowStatus(t, p);
+        return (
+          <li key={p.id} className="proposal-row">
+            {p.target.type === "org_context" ? (
+              <Icon name="layers" size={20} />
+            ) : (
+              <AgentAvatar agentId={p.agentId} size="sm" name={name} />
+            )}
+            <span className="proposal-row__what">
+              <span className="proposal-row__name">{name}</span>
+              {!isText(p) && <SettingChange p={p} />}
+            </span>
+            {status && <span className="proposal-row__status">{status}</span>}
+            {isOpen(p) && (
+              <Switch
+                checked={p.canDecide && !off.has(p.id)}
+                disabled={!p.canDecide || decide.isPending}
+                onCheckedChange={(on) => toggle(p.id, on)}
+                aria-label={t("proposals.include", { name })}
+              />
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+  const groups = proposalSections(rows);
 
   // Waiting: a request card like every other, the rows and their switches above its decision.
   if (rows.some(isOpen)) {
     const tt = t as unknown as (key: string, options: Record<string, unknown>) => string;
+    const texts = groups.flatMap((g) => (g.kind === "text" && g.lines.length > 0 ? [g] : []));
+    const firstLine = firstChange(texts[0]?.lines);
     return (
       <RequestCard
         id={first.id}
@@ -384,32 +384,60 @@ export function ProposalGroup({ proposalIds }: { proposalIds: string[] }) {
         label={label}
         mine={decides}
         lead={who}
-        body={sections}
+        object={
+          firstLine
+            ? {
+                logo: (
+                  <RequestTile>
+                    <Icon name="file" size={16} />
+                  </RequestTile>
+                ),
+                title: firstLine.text,
+                more: t("ask.seeChange"),
+              }
+            : undefined
+        }
+        details={
+          texts.length > 0 ? (
+            <>
+              {texts.map((g) => (
+                <Diff
+                  key={g.rows[0]?.id}
+                  aria-label={t("proposals.changeLabel")}
+                  addedLabel={t("proposals.added")}
+                  removedLabel={t("proposals.removed")}
+                  lines={g.lines}
+                />
+              ))}
+              <div className="ac-acts">
+                <ProposalsLink agentId={first.agentId} />
+              </div>
+            </>
+          ) : undefined
+        }
+        body={rowList(groups.flatMap((g) => g.rows))}
         actions={
-          <>
-            {decides && (
-              <>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  disabled={decide.isPending || chosen.length === 0}
-                  loading={decide.isPending && decide.variables?.decision === "accept"}
-                  onClick={() => run("accept")}
-                >
-                  {all ? t("proposals.acceptAll") : t("proposals.acceptSome", { count: chosen.length })}
-                </Button>
-                <Button
-                  size="sm"
-                  disabled={decide.isPending || chosen.length === 0}
-                  loading={decide.isPending && decide.variables?.decision === "refuse"}
-                  onClick={() => run("refuse")}
-                >
-                  {t("proposals.refuse")}
-                </Button>
-              </>
-            )}
-            <ProposalsLink agentId={first.agentId} />
-          </>
+          decides ? (
+            <>
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={decide.isPending || chosen.length === 0}
+                loading={decide.isPending && decide.variables?.decision === "accept"}
+                onClick={() => run("accept")}
+              >
+                {all ? t("proposals.acceptAll") : t("proposals.acceptSome", { count: chosen.length })}
+              </Button>
+              <Button
+                size="sm"
+                disabled={decide.isPending || chosen.length === 0}
+                loading={decide.isPending && decide.variables?.decision === "refuse"}
+                onClick={() => run("refuse")}
+              >
+                {t("proposals.refuse")}
+              </Button>
+            </>
+          ) : undefined
         }
         what={tt(head.key, head.values).replace(/<\/?b>/g, "")}
       />
@@ -423,7 +451,19 @@ export function ProposalGroup({ proposalIds }: { proposalIds: string[] }) {
       <div className="ac-approval__head">
         <span className="ac-approval__who">{who}</span>
       </div>
-      {sections}
+      {groups.map((section) => (
+        <div key={section.rows[0]?.id} className="proposal-section">
+          {section.kind === "text" && section.lines.length > 0 && (
+            <Diff
+              aria-label={t("proposals.changeLabel")}
+              addedLabel={t("proposals.added")}
+              removedLabel={t("proposals.removed")}
+              lines={section.lines}
+            />
+          )}
+          {rowList(section.rows)}
+        </div>
+      ))}
       <div className="ac-approval__actions ac-acts">
         <ProposalsLink agentId={first.agentId} />
       </div>

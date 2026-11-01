@@ -45,6 +45,12 @@ export function changedLines(p: Pick<Proposal, "before" | "after">): ChangedLine
   ];
 }
 
+/** The line that says what a text proposal changes, for a card's short form: the first it adds, past any heading. */
+export function firstChange(lines: ChangedLine[] | undefined): ChangedLine | undefined {
+  const added = (lines ?? []).filter((l) => l.kind === "add");
+  return added.find((l) => !l.text.trim().startsWith("#")) ?? added[0] ?? lines?.[0];
+}
+
 export type ProposalSection =
   | { kind: "text"; lines: ChangedLine[]; rows: Proposal[] }
   | { kind: "role" | "access"; rows: Proposal[] };
