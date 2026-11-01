@@ -2027,7 +2027,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const brain = input.brain ?? b.brain;
         const changed = brain !== b.brain;
         // ADR 0059 §5: onto a plan, only its owner talks to it; letting others in is its owner's alone.
-        const onlyOwner = input.onlyOwner ?? (changed && brain !== "model" ? true : b.onlyOwner);
+        const row = state.agents.find((a) => a.id === agentId);
+        // "Só algumas pessoas" with nobody picked already answers its owner alone: the server leaves it as it is.
+        const restricted = row?.audience?.mode === "people" && !answersOthers(audienceOf(row), row.ownerUserId);
+        const onlyOwner = restricted || (input.onlyOwner ?? (changed && brain !== "model" ? true : b.onlyOwner));
         if (brain !== "model" && !onlyOwner && (changed || b.onlyOwner) && !b.canUsePlans)
           throw new ApiError(403, "audience.plan_owner_only", "Only the plan's owner");
         const model = brain === "model" ? null : input.model !== undefined ? input.model : changed ? null : b.model;
@@ -2046,8 +2049,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         brains.set(agentId, next);
         // Its row, as the server keeps it: onto a plan only its owner, its "who can talk" list kept; on, back to that
         // list, or everyone with none.
-        const row = state.agents.find((a) => a.id === agentId);
-        if (row && (changed || input.onlyOwner !== undefined)) {
+        if (row && !restricted && (changed || input.onlyOwner !== undefined)) {
           const was = audienceOf(row);
           const base: AgentAudience = changed && brain !== "model" ? { mode: "owner", userIds: was.userIds } : was;
           row.audience =
