@@ -77,20 +77,36 @@ const RATE_LIMIT_WINDOWS = new Map<string, Pick<PlanWindow, "kind" | "label">>([
   ["overage", { kind: "other", label: "Extra usage" }],
 ]);
 
+/** A utilization up to 1 is a fraction. */
+const usedOf = (u: number) => (u <= 1 ? u * 100 : u);
+const windowKey = (w: Pick<PlanWindow, "kind" | "label">) => `${w.kind}:${w.label ?? ""}`;
+
 /**
  * One `rate_limit_event` (its `rate_limit_info`) folded into what was known: its
- * window replaced (`utilization` up to 1 is a fraction), `limited` as its status
- * says. Null when it says nothing new.
+ * windows replaced, `limited` as its status says. Null when it says nothing new.
+ * Its own `utilization` comes only past a warning threshold; each window's
+ * reading is in `unifiedWindows`, also on a `claude setup-token` sign-in, whose
+ * `get_usage` has no limits to read (Claude Code 2.1.312 to 2.1.316, read
+ * 2026-10-31).
  */
 export function withRateLimit(prev: PlanUsage | undefined, info: unknown, now = Date.now()): PlanUsage | null {
   if (!isObj(info)) return null;
   const limited = info.status === "rejected";
+  const read = new Map<string, PlanWindow>();
   const where = typeof info.rateLimitType === "string" ? RATE_LIMIT_WINDOWS.get(info.rateLimitType) : undefined;
   const u = finite(info.utilization);
-  const used = u !== undefined ? (u <= 1 ? u * 100 : u) : limited ? 100 : undefined;
-  if ((!where || used === undefined) && limited === Boolean(prev?.limited)) return null;
-  const windows = (prev?.windows ?? []).filter((w) => !where || w.kind !== where.kind || w.label !== where.label);
-  if (where && used !== undefined) windows.push(planWindow(where, used, info.resetsAt));
+  const used = u !== undefined ? usedOf(u) : limited ? 100 : undefined;
+  if (where && used !== undefined) read.set(windowKey(where), planWindow(where, used, info.resetsAt));
+  const unified = isObj(info.unifiedWindows) ? info.unifiedWindows : {};
+  for (const [name, at] of RATE_LIMIT_WINDOWS) {
+    const w = unified[name];
+    const reading = isObj(w) ? finite(w.utilization) : undefined;
+    if (isObj(w) && reading !== undefined && !read.has(windowKey(at)))
+      read.set(windowKey(at), planWindow(at, usedOf(reading), w.resetsAt));
+  }
+  if (read.size === 0 && limited === Boolean(prev?.limited)) return null;
+  const windows = (prev?.windows ?? []).filter((w) => !read.has(windowKey(w)));
+  windows.push(...read.values());
   return {
     windows: windows.slice(-PLAN_USAGE_LIMITS.windows),
     ...(limited ? { limited: true } : {}),

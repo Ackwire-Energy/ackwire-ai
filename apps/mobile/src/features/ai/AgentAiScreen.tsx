@@ -107,7 +107,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
   const row = useAiAccounts(orgId, view?.canUsePlans === true && kind !== null).data?.computers.find(
     (c) => c.machineId === view?.computer?.machineId,
   );
-  const thinks = brainLine(t, agent?.brain, t("brain.model"));
+  const thinks = brainLine(t, agent?.brain, t("brain.model"), { agents: dir.agents });
   const model = view && kind ? modelRows(t, view, brainPlan(view)).find((r) => r.checked) : undefined;
   const accounts = view && kind ? agentAccounts(view, kind) : [];
   const current = view ? accounts.find((a) => a.id === view.account) : undefined;

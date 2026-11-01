@@ -106,6 +106,44 @@ test("a turn's rate_limit_event: its window replaced (a fraction ×100), the lim
   ).toBe("seven_day");
 });
 
+test("a turn's rate_limit_event below every warning: each window's reading (unifiedWindows), as Codex's turns tell", () => {
+  const WEEK = RESET + 500_000;
+  // As Claude Code 2.1.316 sends it under its warnings, on a `claude setup-token` sign-in too.
+  const quiet = {
+    status: "allowed",
+    resetsAt: RESET,
+    rateLimitType: "five_hour",
+    isUsingOverage: false,
+    unifiedWindows: {
+      five_hour: { utilization: 0.12, resetsAt: RESET, status: "allowed" },
+      seven_day: { utilization: 0.31, resetsAt: WEEK },
+      seven_day_overage_included: { utilization: 0.4, resetsAt: WEEK },
+    },
+  };
+  const known = {
+    windows: [
+      { kind: "seven_day", usedPercent: 20 },
+      { kind: "other", label: "Fable", usedPercent: 7 },
+    ],
+    source: "probe",
+    at: new Date(NOW).toISOString(),
+  } satisfies PlanUsage;
+  expect(withRateLimit(known, quiet, NOW)).toEqual({
+    windows: [
+      // What only a probe tells stays; the week counts as itself, never as its overage-included twin.
+      { kind: "other", label: "Fable", usedPercent: 7 },
+      { kind: "five_hour", usedPercent: 12, resetsAt: new Date(RESET * 1000).toISOString() },
+      { kind: "seven_day", usedPercent: 31, resetsAt: new Date(WEEK * 1000).toISOString() },
+    ],
+    source: "turn",
+    at: new Date(NOW).toISOString(),
+  });
+  // A reading that isn't a number is no window.
+  expect(withRateLimit(undefined, { status: "allowed", unifiedWindows: { five_hour: { resetsAt: RESET } } }, NOW)).toBe(
+    null,
+  );
+});
+
 test("get_usage: each window 0–100 with its reset, per-model and extra usage as named windows; no plan limits → null", () => {
   const usage = claudeUsage(
     {

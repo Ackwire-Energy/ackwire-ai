@@ -1466,8 +1466,13 @@ describe("the dialog's size (computer.css)", () => {
     expect(rule(kit, ".ac-btn--ghost.ac-btn--glyph::before")).toContain("inset: 0 var(--glyph-air, 0px)");
     expect(rule(kit, ".ac-btn--ghost.ac-btn--glyph > *")).toContain("position: relative");
     expect(rule(kit, ".ac-btn--ghost.ac-btn--glyph:hover::before")).toContain("background: var(--plate)");
-    expect(rule(kit, ".ac-btn--ghost.ac-btn--glyph:focus-visible::before")).toContain("box-shadow: var(--focus-ring)");
-    expect(rule(kit, ".ac-btn--ghost.ac-btn--glyph:is(:hover, :focus-visible)")).toContain("box-shadow: none");
+    // Rings only for the keys (`trackInput`): with the pointer, a focused button looks as it does unfocused.
+    expect(rule(kit, "html:not([data-pointer]) .ac-btn--ghost.ac-btn--glyph:focus-visible::before")).toContain(
+      "box-shadow: var(--focus-ring)",
+    );
+    expect(rule(kit, "html:not([data-pointer]) .ac-btn--ghost.ac-btn--glyph:focus-visible")).toContain(
+      "box-shadow: none",
+    );
     await dialog();
     await connected();
     expect(view().getByRole("button", { name: "Tela cheia" }).className).toContain("cmp-full ac-btn--glyph");

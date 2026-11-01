@@ -80,8 +80,9 @@ describe("provider marks where a provider is named", () => {
     };
     const brainLine = () => document.querySelector(".channel__brain") as HTMLElement;
 
+    // The workspace's one computer: its name tells nothing apart.
     await open(`dm/agent/${ADA_ID}`, withBrain({ kind: "claude_code", model: "Sonnet", computer: "MacBook" }));
-    expect(brainLine().textContent).toBe("Claude Code · Sonnet no MacBook");
+    expect(brainLine().textContent).toBe("Claude Code · Sonnet");
     expect(marks(brainLine())).toEqual(["claude"]);
     expect(brainLine().querySelector(".ac-brand")?.getAttribute("aria-hidden")).toBe("true");
     cleanup();

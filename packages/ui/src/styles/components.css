@@ -31,6 +31,21 @@ samp {
 }
 
 /*
+ * Focus rings only for the keys: from a press of a mouse, a finger or a pen until a key moves the focus, <html> has
+ * data-pointer (`trackInput`). A browser's :focus-visible also matches what a script focuses after any key, typing
+ * included (the button a dialog gives the focus back to once Enter sent its form), so every rule that draws a ring
+ * starts with html:not([data-pointer]): with the pointer, a focused control looks as it does unfocused.
+ */
+html[data-pointer] :focus-visible {
+  outline: none;
+}
+/* Whatever has no ring of its own takes the design system's, never the browser's (no weight: any rule wins). */
+:where(html:not([data-pointer])) :where(:focus-visible) {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 1px;
+}
+
+/*
  * Scrollbars, ours wherever something scrolls under a mouse or a trackpad. A touch screen keeps the platform's
  * indicator, which shows while scrolling and takes no room: ours would take 8px there, and one shown only on hover
  * (the sidebar's) would never show. WebKit and Blink draw ours from the pseudo-elements; the standard properties go
@@ -254,14 +269,15 @@ samp {
 .ac-btn--ghost.ac-btn--glyph > * {
   position: relative;
 }
-.ac-btn--ghost.ac-btn--glyph:is(:hover, :focus-visible) {
+.ac-btn--ghost.ac-btn--glyph:hover,
+html:not([data-pointer]) .ac-btn--ghost.ac-btn--glyph:focus-visible {
   background: transparent;
   box-shadow: none;
 }
 .ac-btn--ghost.ac-btn--glyph:hover::before {
   background: var(--plate);
 }
-.ac-btn--ghost.ac-btn--glyph:focus-visible::before {
+html:not([data-pointer]) .ac-btn--ghost.ac-btn--glyph:focus-visible::before {
   box-shadow: var(--focus-ring);
 }
 
@@ -292,7 +308,7 @@ samp {
 .ac-btn:hover {
   background: var(--surface);
 }
-.ac-btn:focus-visible {
+html:not([data-pointer]) .ac-btn:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -392,7 +408,7 @@ samp {
 .ac-link--muted:hover {
   color: var(--ink);
 }
-.ac-link:focus-visible {
+html:not([data-pointer]) .ac-link:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: var(--radius-cut);
@@ -959,7 +975,7 @@ textarea.ac-input {
   cursor: default;
   border-radius: var(--radius-cut);
 }
-.ac-msg__time--details:focus-visible {
+html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -1410,7 +1426,7 @@ textarea.ac-input {
 .ac-select__trigger:hover {
   border-color: var(--line-strong);
 }
-.ac-select__trigger:focus-visible,
+html:not([data-pointer]) .ac-select__trigger:focus-visible,
 .ac-select__trigger[aria-expanded="true"] {
   outline: none;
   background: var(--raised);
@@ -1563,7 +1579,7 @@ textarea.ac-input {
   user-select: none;
 }
 .ac-menu__item:hover,
-.ac-menu__item:focus-visible,
+html:not([data-pointer]) .ac-menu__item:focus-visible,
 .ac-menu__item[data-highlighted] {
   background: var(--surface-sunken);
   outline: none;
@@ -1724,8 +1740,8 @@ textarea.ac-input {
   background: var(--action);
   border-color: var(--action);
 }
-.ac-check:focus-visible,
-.ac-radio:focus-visible {
+html:not([data-pointer]) .ac-check:focus-visible,
+html:not([data-pointer]) .ac-radio:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -1803,14 +1819,14 @@ textarea.ac-input {
 [data-theme="dark"] .ac-option[aria-pressed="true"]::after {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23111110' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4L18 8.5'/%3E%3C/svg%3E");
 }
-.ac-option:focus-visible,
-.ac-option:has(:focus-visible) {
+html:not([data-pointer]) .ac-option:focus-visible,
+html:not([data-pointer]) .ac-option:has(:focus-visible) {
   outline: none;
   box-shadow: var(--e1), var(--field-ring);
 }
-.ac-option[aria-pressed="true"]:has(:focus-visible),
-.ac-option[data-state="checked"]:has(:focus-visible),
-.ac-option[aria-pressed="true"]:focus-visible {
+html:not([data-pointer]) .ac-option[aria-pressed="true"]:has(:focus-visible),
+html:not([data-pointer]) .ac-option[data-state="checked"]:has(:focus-visible),
+html:not([data-pointer]) .ac-option[aria-pressed="true"]:focus-visible {
   box-shadow: var(--pressed), var(--field-ring);
 }
 .ac-option__text {
@@ -1880,10 +1896,10 @@ textarea.ac-input {
 .ac-pill .ac-check {
   margin: 0;
 }
-.ac-pill:has(:focus-visible) {
+html:not([data-pointer]) .ac-pill:has(:focus-visible) {
   box-shadow: var(--focus-ring);
 }
-.ac-pill:has(:focus-visible) .ac-check {
+html:not([data-pointer]) .ac-pill:has(:focus-visible) .ac-check {
   box-shadow: none;
 }
 
@@ -1909,7 +1925,7 @@ textarea.ac-input {
   border-bottom-color: var(--ink);
   color: var(--ink);
 }
-.ac-tab:focus-visible {
+html:not([data-pointer]) .ac-tab:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
@@ -2252,7 +2268,7 @@ textarea.ac-input {
 a.ac-list__row:hover {
   background: var(--surface);
 }
-a.ac-list__row:focus-visible {
+html:not([data-pointer]) a.ac-list__row:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -2276,7 +2292,7 @@ a.ac-list__row:focus-visible {
 .ac-row:hover {
   background: var(--plate-soft);
 }
-.ac-row:focus-visible {
+html:not([data-pointer]) .ac-row:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -2463,7 +2479,7 @@ a.ac-list__row:focus-visible {
 .ac-back:hover {
   color: var(--ink);
 }
-.ac-back:focus-visible {
+html:not([data-pointer]) .ac-back:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: var(--radius-cut);
@@ -2695,7 +2711,7 @@ a.ac-list__row:focus-visible {
   box-shadow: var(--chosen-shadow);
   transform: var(--chosen-lift);
 }
-.ac-navcard:focus-visible {
+html:not([data-pointer]) .ac-navcard:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -2802,7 +2818,7 @@ a.ac-list__row:focus-visible {
   text-decoration: underline;
   cursor: pointer;
 }
-.ac-receipt__action:focus-visible {
+html:not([data-pointer]) .ac-receipt__action:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: var(--radius-cut);
@@ -3019,7 +3035,7 @@ a.ac-list__row:focus-visible {
 .ac-receipt__check:hover {
   color: var(--ink);
 }
-.ac-receipt__check:focus-visible {
+html:not([data-pointer]) .ac-receipt__check:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -3155,7 +3171,7 @@ a.ac-list__row:focus-visible {
   color: var(--surface-raised);
   font-weight: 600;
 }
-.ac-date__day:focus-visible {
+html:not([data-pointer]) .ac-date__day:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -3218,7 +3234,7 @@ a.ac-list__row:focus-visible {
   color: var(--ink);
   background: var(--surface-raised);
 }
-.ac-token__remove:focus-visible {
+html:not([data-pointer]) .ac-token__remove:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -3256,7 +3272,7 @@ a.ac-list__row:focus-visible {
 .ac-switch[data-state="checked"] {
   background: var(--action);
 }
-.ac-switch:focus-visible {
+html:not([data-pointer]) .ac-switch:focus-visible {
   box-shadow: var(--focus-ring);
 }
 .ac-switch[data-disabled] {
@@ -3739,7 +3755,7 @@ a.ac-list__row:focus-visible {
   background: var(--plate);
   box-shadow: none;
 }
-.ac-btn:focus-visible {
+html:not([data-pointer]) .ac-btn:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -3762,7 +3778,7 @@ a.ac-list__row:focus-visible {
     0 1px 2px rgba(0, 0, 0, 0.18),
     0 10px 22px -8px rgba(0, 0, 0, 0.5);
 }
-.ac-btn--primary:focus-visible {
+html:not([data-pointer]) .ac-btn--primary:focus-visible {
   box-shadow: var(--focus-ring);
 }
 .ac-btn--ghost {
@@ -4037,7 +4053,7 @@ a.ac-list__row:focus-visible {
   font-size: 12px;
   color: var(--faint);
 }
-.ac-seg__item:focus-visible {
+html:not([data-pointer]) .ac-seg__item:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -4390,8 +4406,8 @@ a.ac-list__row:focus-visible {
  * The target reaches 1px into the label, so the ring is drawn well inside it (20px across, clear of the glyph), not
  * around it, where it would cover the label's last letter.
  */
-.ac-hint:focus-visible {
-  outline: 2px solid var(--ink);
+html:not([data-pointer]) .ac-hint:focus-visible {
+  outline: 2px solid var(--focus-color);
   outline-offset: -4px;
 }
 .ac-hint__bubble {
@@ -4698,7 +4714,7 @@ a.ac-list__row:focus-visible {
   background: var(--plate-soft);
   color: var(--ink);
 }
-.ac-work__head:focus-visible {
+html:not([data-pointer]) .ac-work__head:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -4814,7 +4830,7 @@ a.ac-list__row:focus-visible {
     inset 0 1px 3px rgba(23, 23, 22, 0.12),
     inset 0 0 0 1px var(--line);
 }
-.ac-react:focus-visible {
+html:not([data-pointer]) .ac-react:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -4941,7 +4957,7 @@ a.ac-list__row:focus-visible {
 .ac-composer__send:active:not([disabled]) {
   transform: scale(0.96);
 }
-.ac-composer__send:focus-visible {
+html:not([data-pointer]) .ac-composer__send:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5133,7 +5149,7 @@ a.ac-list__row:focus-visible {
 .ac-composer__format-btn:active {
   transform: scale(0.94);
 }
-.ac-composer__format-btn:focus-visible {
+html:not([data-pointer]) .ac-composer__format-btn:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5245,7 +5261,7 @@ a.ac-list__row:focus-visible {
 .ac-composer__file-remove:hover {
   background: var(--raised);
 }
-.ac-composer__file-remove:focus-visible {
+html:not([data-pointer]) .ac-composer__file-remove:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5282,7 +5298,10 @@ a.ac-list__row:focus-visible {
   color: var(--faint);
 }
 .ac-emoji__search:focus-within {
-  box-shadow: var(--focus-ring);
+  background: var(--raised);
+  box-shadow:
+    inset 0 0 0 1px var(--field-line),
+    var(--field-ring);
 }
 .ac-emoji__search input {
   flex: 1;
@@ -5364,7 +5383,7 @@ a.ac-list__row:focus-visible {
 .ac-emoji__cell:hover {
   transform: scale(1.12);
 }
-.ac-emoji__cell:focus-visible {
+html:not([data-pointer]) .ac-emoji__cell:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -5835,8 +5854,8 @@ a.ac-list__row:focus-visible {
   background: var(--plate-soft);
 }
 /* Inside the card's clip: the ring goes inward. */
-.ac-tools__head:focus-visible {
-  outline: 2px solid var(--ink);
+html:not([data-pointer]) .ac-tools__head:focus-visible {
+  outline: 2px solid var(--focus-color);
   outline-offset: -2px;
 }
 .ac-tools__logos {
@@ -5950,7 +5969,7 @@ button.ac-tools__row:hover {
 button.ac-tools__row[aria-pressed="true"] {
   background: var(--plate);
 }
-button.ac-tools__row:focus-visible {
+html:not([data-pointer]) button.ac-tools__row:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -6165,7 +6184,7 @@ button.ac-tools__row:focus-visible {
   box-shadow: var(--chosen-shadow);
   transform: var(--chosen-lift);
 }
-.ac-recur__day:focus-visible {
+html:not([data-pointer]) .ac-recur__day:focus-visible {
   outline: none;
   box-shadow: var(--field-ring);
 }
@@ -6573,7 +6592,7 @@ button.ac-tools__row:focus-visible {
 .ac-searchfield__clear:hover {
   background: var(--plate);
 }
-.ac-searchfield__clear:focus-visible {
+html:not([data-pointer]) .ac-searchfield__clear:focus-visible {
   outline: none;
   box-shadow: var(--field-ring);
 }
@@ -6611,7 +6630,7 @@ button.ac-tools__row:focus-visible {
 .ac-filtertoggle:active {
   transform: scale(0.97);
 }
-.ac-filtertoggle:focus-visible {
+html:not([data-pointer]) .ac-filtertoggle:focus-visible {
   outline: none;
   box-shadow: var(--field-ring);
 }
@@ -6686,8 +6705,8 @@ button.ac-tools__row:focus-visible {
 .ac-filter--active .ac-filter__trigger {
   padding-right: 4px;
 }
-.ac-filter__trigger:focus-visible,
-.ac-filter__clear:focus-visible {
+html:not([data-pointer]) .ac-filter__trigger:focus-visible,
+html:not([data-pointer]) .ac-filter__clear:focus-visible {
   outline: none;
   box-shadow: var(--field-ring);
 }
@@ -6749,7 +6768,7 @@ button.ac-tools__row:focus-visible {
   cursor: pointer;
 }
 .ac-filter__option:hover,
-.ac-filter__option:focus-visible {
+html:not([data-pointer]) .ac-filter__option:focus-visible {
   background: var(--plate-soft);
   outline: none;
 }
@@ -7199,7 +7218,7 @@ button.ac-tools__row:focus-visible {
 .ac-optrow:active {
   transform: scale(0.993);
 }
-.ac-optrow:focus-visible {
+html:not([data-pointer]) .ac-optrow:focus-visible {
   outline: none;
   box-shadow:
     inset 0 0 0 1px var(--line2),
@@ -7210,7 +7229,7 @@ button.ac-tools__row:focus-visible {
   background: var(--chosen-bg);
   transform: var(--chosen-lift);
 }
-.ac-optrow[data-state="checked"]:focus-visible {
+html:not([data-pointer]) .ac-optrow[data-state="checked"]:focus-visible {
   box-shadow: var(--chosen-shadow), var(--field-ring);
 }
 .ac-optrow__dot {
@@ -7315,7 +7334,7 @@ button.ac-tools__row:focus-visible {
   box-shadow: none;
   transform: none;
 }
-.ac-optcard > .ac-optrow:focus-visible {
+html:not([data-pointer]) .ac-optcard > .ac-optrow:focus-visible {
   box-shadow: var(--field-ring);
 }
 .ac-optlist--attached .ac-optrow--lead {
@@ -7367,7 +7386,7 @@ button.ac-tools__row:focus-visible {
 .ac-effort__ramp:active {
   cursor: grabbing;
 }
-.ac-effort:focus-visible .ac-effort__ramp {
+html:not([data-pointer]) .ac-effort:focus-visible .ac-effort__ramp {
   border-radius: 4px;
   box-shadow: var(--field-ring);
 }
@@ -7666,9 +7685,9 @@ label.ac-setrow__title {
 .ac-setmore__toggle:hover {
   background: var(--plate-soft);
 }
-.ac-setmore__toggle:focus-visible {
+html:not([data-pointer]) .ac-setmore__toggle:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--ink);
+  box-shadow: var(--focus-ring);
 }
 .ac-setmore__text {
   flex: 1;
@@ -7758,7 +7777,7 @@ label.ac-setrow__title {
 .ac-consult__head:hover {
   background: rgba(127, 127, 127, 0.05);
 }
-.ac-consult__head:focus-visible {
+html:not([data-pointer]) .ac-consult__head:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -7867,7 +7886,7 @@ label.ac-setrow__title {
   border-bottom: 1px dotted var(--line2);
   cursor: default;
 }
-.ac-msg__note:focus-visible {
+html:not([data-pointer]) .ac-msg__note:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: 4px;
@@ -8197,7 +8216,7 @@ label.ac-setrow__title {
   opacity: 0;
   pointer-events: none;
 }
-.ac-carousel__arrow:focus-visible {
+html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   outline: none;
   box-shadow: var(--e1), var(--field-ring);
 }
