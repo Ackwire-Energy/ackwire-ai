@@ -994,8 +994,8 @@ describe("tell_agent: what comes of work handed off comes back by itself (ADR 00
     if (!run) throw new Error("no run for the note");
     return run;
   };
-  /** `agent` answered `run`'s note with `body`: its last message there, and its run ends. */
-  const answered = async (run: AgentRun, body: string) => {
+  /** `run` is done with `body`, its last message there, as its end commits (before its end hook). */
+  const endsWith = async (run: AgentRun, body: string) => {
     const said = await insertMessage(f.db, {
       orgId: f.org.id,
       channelId: run.channelId,
@@ -1006,7 +1006,14 @@ describe("tell_agent: what comes of work handed off comes back by itself (ADR 00
       .update(schema.agentRuns)
       .set({ status: "done", replyMessageId: said.id })
       .where(eq(schema.agentRuns.id, run.id));
-    return onConsultedRunFinished({ db: f.db, pubsub: f.pubsub, judge: f.context.judge }, run, "done");
+  };
+  /** The end hook of a run in an agents' DM (`executor.ts` runs it after the end commits). */
+  const endHook = (run: AgentRun, status: "done" | "failed" = "done", error?: string) =>
+    onConsultedRunFinished({ db: f.db, pubsub: f.pubsub, judge: f.context.judge }, run, status, error);
+  /** `agent` answered `run`'s note with `body`: its last message there, and its run ends. */
+  const answered = async (run: AgentRun, body: string) => {
+    await endsWith(run, body);
+    return endHook(run);
   };
 
   /**
@@ -1250,6 +1257,11 @@ describe("tell_agent: what comes of work handed off comes back by itself (ADR 00
     const back = await notesBack();
     expect(back.map((m) => refsOf(m).agentId)).toEqual([ops.id]);
     expect((await consultations()).find((c) => c.targetAgentId === infra.id)?.status).toBe("open");
+    // The wake says who is still out, so the agent doesn't tell the people everything is back.
+    expect(back[0]?.meta.notice).toMatchObject({ refs: { wake: "1", pending: "@infra" } });
+    const read = f.provider.calls.map((c) => lastText(c.request)).find((t) => t.includes("[What @ops did"));
+    expect(read).toContain("Still out, waiting on a person or a computer: @infra.");
+    expect(read).not.toContain("Everything you handed off in that turn is back");
     // Its approval card is where the person asked.
     const [approval] = await f.db.select().from(schema.approvals);
     expect(approval).toMatchObject({ agentId: infra.id, channelId: f.general.id, status: "pending" });
@@ -1318,6 +1330,29 @@ describe("tell_agent: what comes of work handed off comes back by itself (ADR 00
     expect(pending.map((m) => (m.meta.notice as { kind?: string } | undefined)?.kind)).toEqual(["consult_reply"]);
     expect((await consultations()).find((c) => c.id === toInfra?.id)).toMatchObject({ status: "open", answer: null });
     expect(await runsOf(infra.id)).toHaveLength(1);
+  });
+
+  test("colleagues whose runs both ended before either row closed: the sender still wakes once", async () => {
+    f = await setup({ askAgent: true, judge: notesMatter });
+    const infra = await addInfra();
+    const ops = await addAgent("Ops");
+    const dev = await devRun("@dev confere com o infra e o ops");
+    await ended(dev.id);
+    await tell(dev, "@infra", "Confere a taxa de erro.");
+    await tell(dev, "@ops", "Confere a fila.");
+    const runOf = async (agentId: string) => runFor((await consultations()).find((c) => c.targetAgentId === agentId));
+    const [infraRun, opsRun] = [await runOf(infra.id), await runOf(ops.id)];
+    // Both are done about together: each row closes only after its end hook's judge call.
+    await endsWith(infraRun, "Taxa de erro normal.");
+    await endsWith(opsRun, "Fila vazia.");
+    await endHook(infraRun);
+    expect(await notesBack()).toEqual([]);
+    await endHook(opsRun);
+    expect((await notesBack()).map((m) => [refsOf(m).agentId, refsOf(m).wake ?? null])).toEqual([
+      [infra.id, null],
+      [ops.id, "1"],
+    ]);
+    expect(await runsOf(f.agent.id)).toHaveLength(2);
   });
 
   test("an agent that fails after handing part on: what it owed fails at once, and what comes back later wakes nobody", async () => {

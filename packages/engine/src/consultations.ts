@@ -438,7 +438,8 @@ export function consultationResult(c: Pick<AgentConsultationRow, "status" | "ans
 /**
  * What the asker reads when the answer comes as a notice (`consult_reply`: it didn't wait, or a person woke it
  * meanwhile), with its question, since it may have asked other things since. A note's says what came of the work
- * (`refs.kind` `note`); `wake`: the notice of a report that wakes the agent (`reportHandOffs`).
+ * (`refs.kind` `note`); `wake`: the notice of a report that wakes the agent (`reportHandOffs`); `pending`: the
+ * colleagues of that turn still waiting on a person or their computer when it wakes.
  */
 export function consultationNotice(
   c: Pick<
@@ -446,7 +447,7 @@ export function consultationNotice(
     "id" | "kind" | "status" | "answer" | "question" | "askerRunId" | "askerAgentId" | "targetAgentId"
   >,
   handle: string,
-  options: { wake?: boolean } = {},
+  options: { wake?: boolean; pending?: string } = {},
 ): Notice {
   const quoted = `"${c.question.slice(0, 300)}${c.question.length > 300 ? "…" : ""}"`;
   const note = c.kind === "note";
@@ -479,6 +480,7 @@ export function consultationNotice(
       ...(c.answer ? { answer: c.answer.slice(0, NOTICE_ANSWER_MAX) } : {}),
       ...(note ? { kind: "note" } : {}),
       ...(options.wake ? { wake: "1" } : {}),
+      ...(options.pending ? { pending: options.pending } : {}),
     },
   };
 }
@@ -751,11 +753,12 @@ async function handBack(deps: Deps, asker: AgentRun, closed: AgentConsultationRo
 
 /**
  * Report once (ADR 0094): the results of the notes run `asker` sent come back together, once none of them is still
- * being worked on (queued or running, not started yet, or waiting on what its colleague handed on; one waiting on a
- * person holds up no one). One claim after each close commits, so the last closer sees every row closed, and row
- * locks with `reported_at` keep a second claim from taking them again: exactly one wake. Oldest first, every notice
- * but the last is only written; the last wakes the agent, and a run of its already at work there that takes it
- * reads the earlier ones with it. Only for a run in a person's conversation (an agents' DM hands back instead).
+ * being worked on (queued or running, not started yet, its run ended but the row not closed yet, or waiting on what
+ * its colleague handed on). One waiting on a person or its computer holds up no one: the wake names it
+ * (`refs.pending`). One claim after each close commits, so the last closer sees every row closed, and row locks with
+ * `reported_at` keep a second claim from taking them again: exactly one wake. Oldest first, every notice but the last
+ * is only written; the last wakes the agent, and a run of its already at work there that takes it reads the earlier
+ * ones with it. Only for a run in a person's conversation (an agents' DM hands back instead).
  */
 export async function reportHandOffs(deps: Pick<Deps, "db" | "pubsub">, asker: AgentRun) {
   const delivered = await deps.db.transaction(async (tx) => {
@@ -772,17 +775,31 @@ export async function reportHandOffs(deps: Pick<Deps, "db" | "pubsub">, asker: A
           sql`not exists (select 1 from ${agentConsultations} o left join ${agentRuns} t on t.id = o.target_run_id
             where o.org_id = ${asker.orgId}::uuid and o.asker_run_id = ${asker.id}::uuid
               and o.kind = 'note' and o.status = 'open'
-              and (t.id is null or t.status in ('queued', 'running') or exists (select 1 from ${agentConsultations} s
-                where s.asker_run_id = t.id and s.status = 'open')))`,
+              and (t.id is null or t.status not in ('waiting_approval', 'waiting_input')
+                or exists (select 1 from ${agentConsultations} s where s.asker_run_id = t.id and s.status = 'open')))`,
         ),
       )
       .returning();
     if (claimed.length === 0) return [];
+    const waiting = await tx
+      .selectDistinct({ handle: agents.handle })
+      .from(agentConsultations)
+      .innerJoin(agents, eq(agents.id, agentConsultations.targetAgentId))
+      .where(
+        and(
+          eq(agentConsultations.orgId, asker.orgId),
+          eq(agentConsultations.askerRunId, asker.id),
+          eq(agentConsultations.kind, "note"),
+          eq(agentConsultations.status, "open"),
+        ),
+      );
+    const pending = waiting.map((w) => `@${w.handle}`).join(", ");
     claimed.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : 1));
     const out: Awaited<ReturnType<typeof deliverNoticeToRun>>[] = [];
     for (const [i, row] of claimed.entries()) {
       const wake = i === claimed.length - 1;
-      const notice = consultationNotice(row, await handleOf(tx, row.orgId, row.targetAgentId), { wake });
+      const handle = await handleOf(tx, row.orgId, row.targetAgentId);
+      const notice = consultationNotice(row, handle, { wake, ...(wake && pending ? { pending } : {}) });
       out.push(await deliverNoticeToRun(tx, asker, notice, { wake }));
     }
     const last = out.at(-1)?.message.id;

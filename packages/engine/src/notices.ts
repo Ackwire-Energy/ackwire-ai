@@ -79,6 +79,10 @@ export function handoffGuidance(report: string | undefined) {
 export const HANDED_BACK_GUIDANCE =
   "Everything you handed off in that turn is back (each reply is above). Tell the people here once what came of it: what each one did, where it is, what is left and who has it. If one couldn't finish, decide first: hand it again with what was missing, give it to another agent, or say what was tried and what is left.";
 
+/** The same, when colleagues of that turn still wait on a person or their computer (`pending`: their handles). */
+export const handedBackPartly = (pending: string) =>
+  `Part of what you handed off in that turn is back (each reply is above). Still out, waiting on a person or a computer: ${pending}. Tell the people here once what came of the parts that are back, and who still has the rest: what comes of it reaches you here by itself. If one couldn't finish, decide first: hand it again with what was missing, give it to another agent, or say what was tried and what is left.`;
+
 /** A notice as the agent it is for reads it in its conversation (null when the message isn't one). */
 export function noticeText(meta: Record<string, unknown> | null | undefined, current = false): string | null {
   const n = noticeOf(meta);
@@ -96,7 +100,7 @@ export function noticeText(meta: Record<string, unknown> | null | undefined, cur
       // that woke the run (`refs.wake`): the earlier ones of the same report come before it.
       if (n.refs?.kind === "note")
         return `[What ${from ?? "another agent"} did with the work you handed it]: ${n.text}${
-          current && n.refs.wake ? `\n${HANDED_BACK_GUIDANCE}` : ""
+          current && n.refs.wake ? `\n${n.refs.pending ? handedBackPartly(n.refs.pending) : HANDED_BACK_GUIDANCE}` : ""
         }`;
       return `[Reply to your question to ${from ?? "another agent"}]: ${n.text}`;
     case "agent_note":
