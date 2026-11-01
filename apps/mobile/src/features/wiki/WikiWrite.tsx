@@ -18,13 +18,13 @@ import {
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Button, fieldText, Icon, type IconName, Segmented, SheetScreen, Text, useToast } from "@/ui";
+import { Button, DiffView, fieldText, Icon, type IconName, Segmented, SheetScreen, Text, useToast } from "@/ui";
 import { useFailed } from "../routines/hooks";
 import { useColors, useOrgId } from "../shared/hooks";
 import { goBack, MONO, PushedHeader, successHaptic, Tile, tapHaptic } from "../shared/parts";
 import { foldersIn, suggestPages } from "./logic";
 import { WikiDoc } from "./WikiDoc";
-import { cleanFolder, DiffView, FolderChips, openWikiPage } from "./WikiScreen";
+import { cleanFolder, FolderChips, openWikiPage } from "./WikiScreen";
 
 type Mode = "write" | "view";
 type Sel = { start: number; end: number };

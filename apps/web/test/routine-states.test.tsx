@@ -424,6 +424,8 @@ describe("Approval cards: why, and asked while nobody watched", () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(6);
     const group = screen().getByRole("group", { name: "Pedido de aprovação" });
+    // Where it came from is with the rest of the action, behind "Ver detalhes".
+    await act(async () => fireEvent.click(within(group).getByRole("button", { name: "Ver detalhes" })));
     const text = group.textContent ?? "";
     const why = text.indexOf("O PR #42 corrige o login");
     const action = text.indexOf("Merge PR #42 into main");

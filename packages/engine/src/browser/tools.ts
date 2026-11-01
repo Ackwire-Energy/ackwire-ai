@@ -70,6 +70,8 @@ export {
   browserUnavailableText,
 } from "./status";
 
+import { cutText } from "../format";
+
 const { agents, secretRequests } = schema;
 
 /** Where the agent's browser runs now (`agents.browser_machine_id`): written only when it changes. */
@@ -195,7 +197,7 @@ export const PAGE_UNTRUSTED_NOTE =
 const MARKER = /<\s*\/?\s*page_content\b[^>]*>/gi;
 export function wrapPage(text: string) {
   const cut = text.length > MAX_PAGE_TEXT;
-  const body = (cut ? text.slice(0, MAX_PAGE_TEXT) : text).replace(MARKER, "[marker removed]");
+  const body = (cut ? cutText(text, MAX_PAGE_TEXT) : text).replace(MARKER, "[marker removed]");
   return `${PAGE_UNTRUSTED_NOTE}\n<page_content untrusted="true">\n${body}\n</page_content>${
     cut
       ? "\n[The page is longer: read a part with `selector`, ask for something with `find`, or `interactive_only` for just the controls.]"

@@ -26,7 +26,7 @@ import { audienceChip, audienceNotice, listsAgent } from "@agenteschat/client/li
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { waitingAgents } from "@agenteschat/client/lib/outages";
-import { can } from "@agenteschat/client/lib/permissions";
+import { can, managesChannel } from "@agenteschat/client/lib/permissions";
 import { AVAILABILITIES, clearsText, presenceOfAvailability } from "@agenteschat/client/lib/presence";
 import {
   type AgentColor,
@@ -99,6 +99,7 @@ import {
 import { MoveChannelDialog, NewCategoryDialog, RenameCategoryDialog } from "./ChannelCategoryDialogs";
 import { openPalette } from "./CommandMenu";
 import { DeleteAccountDialog } from "./DeleteAccount";
+import { useInviteDialog } from "./invite/InviteDialog";
 import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
 import { NewChannelDialog } from "./NewChannelDialog";
 import { OpenOnPhoneDialog } from "./OpenOnPhone";
@@ -706,8 +707,7 @@ function SidebarChannels({
   const recreate = useCreateChannelCategory(orgId);
   const manages = can(org, "manage_channels");
   const mayCreate = can(org, "create_channels");
-  // A channel's creator edits and moves it too, as the server allows.
-  const mayChange = (c: Channel) => c.createdByUserId === me.user.id || manages;
+  const mayChange = (c: Channel) => managesChannel(c, me.user.id, org);
   const [newCategory, setNewCategory] = useState<{ withChannel?: string } | null>(null);
   const [renaming, setRenaming] = useState<ChannelCategory | null>(null);
   const [moving, setMoving] = useState<Channel | null>(null);
@@ -1590,11 +1590,19 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
   const managesAgents = can(org, "manage_agents");
   const connections = useConnections(org.id);
   const skills = useSkills(org.id, managesAgents);
+  const invite = useInviteDialog();
   const go = (section?: SettingsSection) => () => {
     onDone();
     void (section
       ? navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section } })
       : navigate({ to: "/org/$orgId/settings", params: { orgId: org.id } }));
+  };
+  // The workspace's invite dialog (ADR 0090), over the page this menu was opened on.
+  const inviteNow = () => {
+    if (invite) {
+      onDone();
+      invite.open();
+    } else go("members")();
   };
   let key = 0;
   const next = () => String(++key);
@@ -1602,7 +1610,7 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
     <>
       <MenuOverlayGroup label={t("shell.workspaceMenuOf", { name: org.name })}>
         {can(org, "invite_people") && (
-          <MenuOverlayItem icon="plus" shortcut={next()} description={t("shell.inviteHint")} onSelect={go("members")}>
+          <MenuOverlayItem icon="plus" shortcut={next()} description={t("shell.inviteHint")} onSelect={inviteNow}>
             {t("shell.invite")}
           </MenuOverlayItem>
         )}

@@ -1,4 +1,5 @@
 import type { MailAddress } from "@agenteschat/adapters";
+import { cutText } from "../format";
 
 /**
  * Mailbox text is untrusted (ADR 0038): anyone can email the mailbox, so
@@ -22,13 +23,13 @@ export function wrapUntrusted(text: string) {
 export const MAX_BODY_CHARS = 20_000;
 
 export function cutBody(text: string, max = MAX_BODY_CHARS) {
-  return text.length <= max ? text : `${text.slice(0, max)}\n[… older part of the thread cut]`;
+  return text.length <= max ? text : `${cutText(text, max)}\n[… older part of the thread cut]`;
 }
 
 /** One line, at most `max` characters. */
 export const oneLine = (s: string, max = 200) => {
   const flat = s.replace(/\s+/g, " ").trim();
-  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
+  return flat.length > max ? `${cutText(flat, max - 1)}…` : flat;
 };
 
 export const formatAddress = (a: MailAddress | null | undefined) =>

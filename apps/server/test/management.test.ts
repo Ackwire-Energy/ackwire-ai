@@ -45,7 +45,8 @@ test("management API: settings, overview, people, invitations, credentials, agen
   const resent = (await (await api(`/invitations/${batch.results[0]?.invitationId}/resend`, { json: {} })).json()) as {
     url: string;
   };
-  expect(resent.url).not.toBe(batch.results[0]?.url);
+  // Sending it again keeps its link (ADR 0090).
+  expect(resent.url).toBe(batch.results[0]?.url ?? "");
   const all = (await (await api("/invitations/all")).json()) as { invitations: { status: string }[] };
   expect(all.invitations.map((i) => i.status)).toEqual(["pending", "pending"]);
 

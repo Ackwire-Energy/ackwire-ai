@@ -173,4 +173,18 @@ describe("streaming words", () => {
       "escrevendo",
     ]);
   });
+
+  test("words before inline code stay once as an answer streams past it, with their spaces", () => {
+    const full = "Vou pedir `calendar:read` (ver a agenda), só leitura.";
+    const r = render(<MessageBody body="" live />);
+    for (let i = 1; i <= full.length; i++) {
+      r.rerender(<MessageBody body={full.slice(0, i)} live />);
+      // Written so far, the backticks of a closed code span gone.
+      const shown = full
+        .slice(0, i)
+        .replace(/`([^`]*)`/, "$1")
+        .trimEnd();
+      expect(r.container.textContent).toBe(shown);
+    }
+  });
 });

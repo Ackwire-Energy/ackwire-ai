@@ -22,6 +22,7 @@ import { publishDelivery } from "./delivery";
 import { createAgentRuns, startOrJoinRun } from "./dispatch";
 import { isAgentOnlyDm, openAgentDm } from "./dms";
 import { publishChannelEvent } from "./events";
+import { cutText } from "./format";
 import type { Judge } from "./judge";
 import { getMessage, insertMessage, type MessageView, withMessageDetails } from "./messages";
 import type { Notice } from "./notices";
@@ -371,7 +372,7 @@ async function sameRequestRun(
         .where(and(eq(messages.orgId, ctx.orgId), eq(messages.id, run.replyMessageId)))
     : [];
   return {
-    content: `@${run.handle} already answered this person's request here (run ${run.id})${reply?.body ? `:\n\n${reply.body.slice(0, 4000)}` : "."}\n\nDon't ask it again; build on its answer.`,
+    content: `@${run.handle} already answered this person's request here (run ${run.id})${reply?.body ? `:\n\n${cutText(reply.body, 4000)}` : "."}\n\nDon't ask it again; build on its answer.`,
     data,
   };
 }
@@ -421,8 +422,8 @@ export function consultationNotice(
       askerAgentId: c.askerAgentId,
       agentId: c.targetAgentId,
       status: c.status,
-      question: c.question.slice(0, NOTICE_QUESTION_MAX),
-      ...(c.answer ? { answer: c.answer.slice(0, NOTICE_ANSWER_MAX) } : {}),
+      question: cutText(c.question, NOTICE_QUESTION_MAX),
+      ...(c.answer ? { answer: cutText(c.answer, NOTICE_ANSWER_MAX) } : {}),
     },
   };
 }
@@ -484,8 +485,8 @@ async function closeConsultation(
       agentId: closed.targetAgentId,
       consultationId: closed.id,
       status,
-      question: closed.question.slice(0, 2000),
-      answer: status === "answered" ? (closed.answer?.slice(0, 4000) ?? null) : null,
+      question: cutText(closed.question, 2000),
+      answer: status === "answered" ? (closed.answer == null ? null : cutText(closed.answer, 4000)) : null,
     },
     late: { kind: notice.kind, text: notice.text, from: notice.from },
     pubsub: deps.pubsub,
@@ -561,7 +562,7 @@ export async function onConsultedRunFinished(
       status !== "done"
         ? await closeConsultation(deps, row, "failed", error?.slice(0, 500) ?? status)
         : answer
-          ? await closeConsultation(deps, row, "answered", answer.slice(0, 16_000))
+          ? await closeConsultation(deps, row, "answered", cutText(answer, 16_000))
           : await closeConsultation(deps, row, "failed", "no reply");
     if (c) closed.push(c);
   }
@@ -634,7 +635,7 @@ async function noteReply(
   const delivered = await deps.db.transaction((tx) =>
     deliverNoticeToRun(tx, sender, {
       kind: "agent_note",
-      text: reply.slice(0, 16_000),
+      text: cutText(reply, 16_000),
       from: `@${handle}`,
       refs: { runId: run.id },
     }),
@@ -653,7 +654,7 @@ export async function noteReplyMatters(
     agentId: input.agentId,
     runId: input.runId,
     kind: "note_reply",
-    state: { note: input.note.slice(0, 2000), reply: input.reply.slice(0, 2000) },
+    state: { note: cutText(input.note, 2000), reply: cutText(input.reply, 2000) },
     questions: {
       matters: {
         type: "noul",

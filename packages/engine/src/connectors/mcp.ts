@@ -2,6 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { recordAudit } from "../audit";
+import { cutText } from "../format";
 import type { ToolDefinition, ToolSource } from "../tools/types";
 import { CONNECTOR_CATALOG, connectorScope, fillTitle } from "./catalog";
 import { activeConnections, type ConnectorConnection, type ConnectorDeps, connectionHeaders } from "./connections";
@@ -162,7 +163,7 @@ export function createConnectorToolSource(deps: ConnectorDeps & { connect?: McpC
       return [
         {
           name: exposedToolName(prefix, tool.name),
-          description: `[${connection.label}] ${row.label}: ${said}`.slice(0, 1024),
+          description: cutText(`[${connection.label}] ${row.label}: ${said}`, 1024),
           inputSchema: tool.inputSchema?.type === "object" ? tool.inputSchema : { type: "object" },
           scope: customScope(connection.id, access),
           connectionId: connection.id,
@@ -229,7 +230,7 @@ export function createConnectorToolSource(deps: ConnectorDeps & { connect?: McpC
           if (!mapped || mapped.ours) continue; // not in our catalog, or one we serve: never exposed
           out.push({
             name: exposedToolName(def.id, tool.name),
-            description: `[${def.label}] ${tool.description ?? tool.name}`.slice(0, 1024),
+            description: cutText(`[${def.label}] ${tool.description ?? tool.name}`, 1024),
             inputSchema: tool.inputSchema?.type === "object" ? tool.inputSchema : { type: "object" },
             scope: connectorScope(def.id, mapped.scope),
             connectionId: connection.id,

@@ -163,14 +163,28 @@ export const contextUsage = pgTable(
   (t) => [primaryKey({ columns: [t.runId, t.itemId] }), index().on(t.itemId)],
 );
 
-export const proposalTargetEnum = pgEnum("proposal_target", ["agent_instructions", "org_context"]);
+export const proposalTargetEnum = pgEnum("proposal_target", [
+  "agent_instructions",
+  "org_context",
+  "agent_role",
+  "agent_access",
+]);
 export const proposalStatusEnum = pgEnum("proposal_status", ["pending", "accepted", "rejected", "stale"]);
 
+/** An app turned on or off for an agent: `request_permission`'s unit (a built-in scope or `connector:<connectionId>`). */
+export interface ProposedAccessLine {
+  id: string;
+  /** Its name when proposed (the connection's label, the scope's English label). */
+  label: string;
+  on: boolean;
+}
+
 /**
- * A proposed change to an agent's instructions or the org context, made from
- * a recurring or high-confidence verified item. Stored as a diff; never
- * applied without a person: the agent's owner (instructions) or an admin
- * (org context). Stale when the text changed since.
+ * A proposed change to an agent's instructions, role or access, or to the org
+ * context: made from a recurring or high-confidence verified item, or by an
+ * agent a person asked in conversation (`proposed_by_agent_id`). Text changes
+ * are stored as a diff, access as lines. Never applied without a person who
+ * may make that change. Stale when what it was made against changed since.
  */
 export const contextProposals = pgTable(
   "context_proposals",
@@ -183,10 +197,14 @@ export const contextProposals = pgTable(
       .references(() => organizations.id, { onDelete: "cascade" }),
     target: proposalTargetEnum().notNull(),
     agentId: uuid(),
-    /** SHA-256 of the text the diff applies to. */
+    /** The agent that proposed it; null for memory promotions with no agent and older rows (their target agent). */
+    proposedByAgentId: uuid().references(() => agents.id, { onDelete: "set null" }),
+    /** SHA-256 of the text the diff applies to (`agent_access`: of the agent's grants). */
     baseHash: text().notNull(),
     proposedText: text().notNull(),
     diff: text().notNull(),
+    /** `agent_access` only. */
+    access: jsonb().$type<ProposedAccessLine[]>(),
     rationale: text().notNull(),
     itemIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
     status: proposalStatusEnum().notNull().default("pending"),

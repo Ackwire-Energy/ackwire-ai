@@ -581,97 +581,8 @@ html:has(.onb) {
   margin: -4px -4px 0 0;
   color: var(--muted);
 }
-.onb__emails {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  min-height: 46px;
-  padding: 8px;
-  border-radius: 12px;
-  background: var(--sunken);
-  box-shadow: inset 0 0 0 1px var(--line);
-  cursor: text;
-}
-.onb__emails:focus-within {
-  box-shadow:
-    inset 0 0 0 1px var(--line2),
-    var(--field-ring);
-}
-.onb__emails-input {
-  flex: 1;
-  min-width: min(100%, 180px);
-  padding: 4px 6px;
-  border: 0;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  outline: none;
-}
-.onb__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 100%;
-  min-height: 32px;
-  padding: 2px 2px 2px 4px;
-  border-radius: 999px;
-  background: var(--raised);
-  box-shadow: var(--e1);
-  font-size: 13px;
-}
-.onb__chip[data-invalid] {
-  box-shadow: 0 0 0 1px var(--danger);
-}
-.onb__chip-email {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.onb__chip-bad {
-  padding-right: 2px;
-  color: var(--danger);
-  font-size: 12px;
-  font-weight: 600;
-}
-.onb__welcome {
-  position: relative;
-  min-height: 220px;
-  padding: 24px;
-  border-radius: 24px;
-  overflow: hidden;
-  background: #2b74e6;
-  color: var(--sky-ink);
-  isolation: isolate;
-}
-.onb__welcome-text {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: fit-content;
-  max-width: 52ch;
-}
-.onb__welcome-title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-weight: var(--font-display-weight, 300);
-  font-size: 30px;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-}
-.onb__welcome-lead {
-  margin: 0;
-  color: var(--sky-ink2);
-  font-weight: 500;
-}
-.onb__crew {
-  position: relative;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-top: 16px;
-}
+/* The addresses as chips and the welcome card on a sky are shared with the invite dialog and a newcomer's first
+   #general (components/invite/invite.css, components/welcome.css). */
 /* Their computer after the faces: its portrait on a plate of the sky's glass, shaped like a face's tile. Spaced by
    the row's gap alone, so a plate wrapped onto a line of its own starts under the first face. */
 .onb__crew-computer {
@@ -716,10 +627,6 @@ html:has(.onb) {
   .onb__ask .onb__title {
     font-size: 18px;
   }
-  /* Four faces and the computer on one line from 360 px wide; the portrait keeps its 48 px, whole pixels. */
-  .onb__crew {
-    gap: 8px;
-  }
   /* Two agents a side around the computer from 360 px wide; the checklist counts the rest. */
   .onb__scene {
     gap: 8px;
@@ -752,23 +659,19 @@ html:has(.onb) {
   .onb__later {
     align-self: center;
   }
-  .onb__crew .ac-avatar--lg,
+  /* Four faces and the computer on one line from 360 px wide (the faces' 48 px: components/welcome.css); the
+     portrait keeps its 48 px, whole pixels. */
   .onb__crew-computer {
     width: 48px;
     height: 48px;
   }
 }
-/* Clear the home bar; the e-mail chips field stays at 16px (no zoom on focus). */
+/* Clear the home bar. */
 @media (max-width: 760px) {
   .onb__actions {
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
   }
   html:has(.onb) {
     scroll-padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 140px);
-  }
-}
-@media (max-width: 760px), (pointer: coarse) {
-  .onb__emails-input {
-    font-size: 16px;
   }
 }

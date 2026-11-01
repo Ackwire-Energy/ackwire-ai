@@ -39,6 +39,7 @@ import {
   setAgentAppearance,
   setAgentAudience,
   setAgentBrain,
+  setCoordinator,
   talksToAgents,
   updateAgent,
   updateAgentGroup,
@@ -126,6 +127,10 @@ const AgentFields = z.object({
   }),
   appearance: AgentAppearance.nullable().optional().openapi({
     description: "Its look (fixed allow-list). The agent's owner or admins can change it; null = the default.",
+  }),
+  mediaReplies: z.boolean().optional().openapi({
+    description:
+      "It may send a sticker or a GIF (ADR 0091): when someone asks for one, and after a light reply as often as the workspace's `agentMedia` allows; off: never. Like the other fields, editing it needs `manage_agents`. Default on.",
   }),
 });
 
@@ -607,6 +612,10 @@ export function agentRoutes(deps: AppDeps) {
         params: AgentParams,
         body: body(
           AgentFields.partial().extend({
+            coordinator: z.boolean().optional().openapi({
+              description:
+                "It coordinates the team (ADR 0093): true takes it from whoever had it, false leaves the team with none. Admins (audited); the workspace's open apps hear `agent.coordinator`.",
+            }),
             acceptPlanTerms: z.boolean().optional().openapi({
               deprecated: true,
               description: "Ignored. Older apps send it when an agent on a plan replies to everyone.",
@@ -618,11 +627,12 @@ export function agentRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      const { monthlyBudgetUsd, audience, appearance, acceptPlanTerms: _, ...input } = c.req.valid("json");
+      const { monthlyBudgetUsd, audience, appearance, coordinator, acceptPlanTerms: _, ...input } = c.req.valid("json");
       const actor = c.get("user").id;
-      // The audience and the look can be changed by the agent's owner too; everything else needs an admin.
+      // The audience and the look can be changed by the agent's owner too, and who coordinates has its own call;
+      // everything else needs an admin.
       const other =
-        (!audience && appearance === undefined) ||
+        (!audience && appearance === undefined && coordinator === undefined) ||
         Object.values(input).some((v) => v !== undefined) ||
         monthlyBudgetUsd !== undefined;
       let agent = other
@@ -630,6 +640,8 @@ export function agentRoutes(deps: AppDeps) {
         : null;
       if (audience) agent = await setAgentAudience(db, actor, orgId, agentId, audience);
       if (appearance !== undefined) agent = await setAgentAppearance(db, actor, orgId, agentId, appearance);
+      if (coordinator !== undefined)
+        agent = await setCoordinator({ db, pubsub: adapters.pubsub }, actor, orgId, agentId, coordinator);
       if (!agent) {
         agent = await getAgent(db, orgId, agentId);
         if (!agent) throw new NotFoundError("Agent not found");

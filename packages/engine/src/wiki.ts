@@ -21,6 +21,7 @@ import { caches } from "./cache";
 import { requireChannelAccess } from "./channels";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
+import { cutText } from "./format";
 import { getForumTopic } from "./forum";
 import { getMessage } from "./messages";
 import { can, type Membership, requireActiveMembership } from "./organizations";
@@ -1771,8 +1772,8 @@ export async function retrieveWikiForRun(
     const body = p.body.trim();
     const where = `${p.folder ? `${p.folder}/` : ""}${p.slug}, v${p.version}`;
     const text = full.has(p.id)
-      ? `## [[${p.title}]] (${where})\n${body.length > room ? `${body.slice(0, room)}\n[… continues: read it with read_wiki_page]` : body}`
-      : `- [[${p.title}]] (${where}): ${body.replace(/\s+/g, " ").slice(0, room)}${body.length > room ? "… [read it with read_wiki_page]" : ""}`;
+      ? `## [[${p.title}]] (${where})\n${body.length > room ? `${cutText(body, room)}\n[… continues: read it with read_wiki_page]` : body}`
+      : `- [[${p.title}]] (${where}): ${cutText(body.replace(/\s+/g, " "), room)}${body.length > room ? "… [read it with read_wiki_page]" : ""}`;
     lines.push(text);
     ids.push(p.id);
     used += text.length;

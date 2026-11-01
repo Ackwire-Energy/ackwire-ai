@@ -8,6 +8,7 @@ import {
 } from "@agenteschat/client";
 import { approvalTitle } from "@agenteschat/client/lib/approval-words";
 import { restrictionLine } from "@agenteschat/client/lib/errors";
+import { mediaWord } from "@agenteschat/client/lib/media";
 import { restrictionOf } from "@agenteschat/client/lib/notifications";
 import { router, useLocalSearchParams } from "expo-router";
 import { Fragment, memo, useEffect, useMemo, useState } from "react";
@@ -350,9 +351,11 @@ const ActivityRow = memo(function ActivityRow({ item: n, divider }: { item: AppN
     const tt = t as unknown as (key: string, options?: Record<string, unknown>) => string;
     return tt(w.key, { ...w.values, defaultValue: w.fallback ? tt(w.fallback) : otherwise });
   };
+  // A GIF or a sticker with no words says which (ADR 0091).
+  const line = subtitleOf(n, say, (kind) => mediaWord(t, kind));
   const sub = restriction
     ? restrictionLine(t, restriction.code, restriction.facts)
-    : [emojisOf(n).join(" "), [subtitleOf(n, say), placeOf(n)].filter(Boolean).join(" · ")].filter(Boolean).join(" ");
+    : [emojisOf(n).join(" "), [line, placeOf(n)].filter(Boolean).join(" · ")].filter(Boolean).join(" ");
   const time = when.short(n.updatedAt);
 
   // The swipe taps on its own (SwipeRow); VoiceOver's actions call these too.

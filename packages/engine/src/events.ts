@@ -20,8 +20,10 @@ export interface MemoryUpdate {
   requestedByUserId: string;
   /** Undo: `POST /api/app/organizations/{orgId}/memories/{itemId}/revert`. Absent for proposals. */
   undo?: { method: "POST"; path: string };
-  /** For `proposed`: the proposal to accept inline, and whether the requester can decide it. */
+  /** For `proposed`: the proposal to accept inline (the card's first), and whether the requester can decide one. */
   proposalId?: string;
+  /** For `proposed`: every proposal on the card, one per agent and kind of change (older apps read `proposalId`). */
+  proposalIds?: string[];
   canDecide?: boolean;
   /** `memory.remembered` | `memory.updated` | `memory.forgot` | `memory.proposed`: the app's own words, with `params`. */
   code?: string;
@@ -39,12 +41,15 @@ export type DecidedBy =
   | { step: "model"; model: string; provider: string }
   /** The author's own plan: `ownerId` is the author. */
   | { step: "plan"; brand: "claude" | "chatgpt"; ownerId: string }
-  | { step: "rule"; rule: "reply" | "only_agent" | "follow_up" };
+  /** `coordinator`: nobody else took it, so the team's coordinator did (ADR 0093). */
+  | { step: "rule"; rule: RouterRule };
+
+type RouterRule = "reply" | "only_agent" | "follow_up" | "coordinator";
 
 /** Why a routed message reached no agent: no step could read it, and no rule fit (`strategy` `none`). */
 export const MENTION_NEEDED = "mention_needed";
 
-const RULES = new Set(["reply", "only_agent", "follow_up"]);
+const RULES = new Set(["reply", "only_agent", "follow_up", "coordinator"]);
 
 /**
  * `DecidedBy` from a stored decision's `strategy` (`jev`, `llm:<model>`, `plan:<kind>`, `rule:<name>`). Undefined
@@ -57,7 +62,7 @@ export function decidedByOf(strategy: string, authorUserId: string | null): Deci
   if (step === "plan" && authorUserId && (rest === "claude_code" || rest === "codex")) {
     return { step: "plan", brand: rest === "codex" ? "chatgpt" : "claude", ownerId: authorUserId };
   }
-  if (step === "rule" && RULES.has(rest)) return { step: "rule", rule: rest as "reply" | "only_agent" | "follow_up" };
+  if (step === "rule" && RULES.has(rest)) return { step: "rule", rule: rest as RouterRule };
   return undefined;
 }
 

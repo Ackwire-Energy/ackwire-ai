@@ -94,7 +94,9 @@ describe("agents without an owner", () => {
     const admin = await addMember(f.db, f.org.id, "admin", "bia");
     const member = await addMember(f.db, f.org.id, "member", "caio");
     await unowned();
-    const { proposal, canDecide } = await proposeChange(
+    const {
+      proposals: [proposal],
+    } = await proposeChange(
       { db: f.db },
       {
         orgId: f.org.id,
@@ -105,9 +107,9 @@ describe("agents without an owner", () => {
         requesterId: member.id,
       },
     );
-    expect(canDecide).toBe(false);
-    await expect(decideProposal(f.db, member.id, f.org.id, proposal.id, "reject")).rejects.toThrow();
-    const decided = await decideProposal(f.db, admin.id, f.org.id, proposal.id, "reject");
+    expect(proposal?.canDecide).toBe(false);
+    await expect(decideProposal(f.db, member.id, f.org.id, proposal?.id ?? "", "reject")).rejects.toThrow();
+    const decided = await decideProposal(f.db, admin.id, f.org.id, proposal?.id ?? "", "reject");
     expect(decided.status).toBe("rejected");
     const lessons = await f.db
       .select()
