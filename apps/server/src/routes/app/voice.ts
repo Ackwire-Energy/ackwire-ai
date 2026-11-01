@@ -66,7 +66,7 @@ function audioResponse(c: Context, audio: Uint8Array, contentType: string) {
 }
 
 /**
- * Voice messages (ADR 0098): the app sends the finished recording and shows it at once; the message arrives over the
+ * Voice messages (ADR 0100): the app sends the finished recording and shows it at once; the message arrives over the
  * socket when its words are ready, or `voice.dropped` on the sender's topic when nothing was said.
  */
 export function voiceRoutes(deps: AppDeps) {
@@ -235,7 +235,7 @@ const SaveKey = z.object({
 
 const notFound = "404 for everyone but the installation's pinned owner (ADR 0073), and on agentes.chat itself.";
 
-/** Who turns voice into text on this server (ADR 0098): only its pinned owner, and never on agentes.chat's servers. */
+/** Who turns voice into text on this server (ADR 0100): only its pinned owner, and never on agentes.chat's servers. */
 export function speechKeyRoutes(deps: AppDeps) {
   const { db, config } = deps;
   const app = createAppRouter(deps);

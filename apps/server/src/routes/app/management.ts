@@ -103,7 +103,7 @@ const Settings = z
         "How often agents follow a light reply with a sticker or a GIF on their own: `never`, `sometimes` (the default) or `often`. Needs `agentMediaAvailable`; each agent can be turned off (`mediaReplies`). When someone asks for one, agents send it at any level.",
     }),
     voiceMessages: z.boolean().openapi({
-      description: "People can send voice messages (ADR 0098); they also need `voiceAvailable`. On by default.",
+      description: "People can send voice messages (ADR 0100); they also need `voiceAvailable`. On by default.",
     }),
     voiceAvailable: z.boolean().openapi({
       description: "Read only: this server has a speech engine now, from its environment or from its owner's Settings.",
@@ -345,7 +345,7 @@ export function managementRoutes(deps: AppDeps) {
             voiceMessages: z
               .boolean()
               .optional()
-              .openapi({ description: "People can send voice messages (ADR 0098)." }),
+              .openapi({ description: "People can send voice messages (ADR 0100)." }),
             gifs: z.boolean().optional().openapi({ description: "People can send GIFs in chat (ADR 0091)." }),
             gifRating: z.enum(GIF_RATINGS).optional(),
             agentStickers: z.boolean().optional(),

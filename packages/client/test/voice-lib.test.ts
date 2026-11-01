@@ -10,7 +10,7 @@ const t = ((key: string, params?: { time?: string }) =>
   key === "voice.wordTime" ? `Voz · ${params?.time}` : key === "voice.word" ? "Voz" : key) as unknown as TFunction;
 const voice = { clipId: "c1", durationMs: 12_000, peaks: [0.2, 0.5] };
 
-describe("voice messages' helpers (ADR 0098)", () => {
+describe("voice messages' helpers (ADR 0100)", () => {
   test("voiceOf reads what the server writes and refuses anything else", () => {
     expect(voiceOf({ voice: { ...voice, noWords: true, expiresAt: "2030-01-01T00:00:00Z" } })).toEqual({
       ...voice,

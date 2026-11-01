@@ -497,7 +497,7 @@ const notAt = (orgId: string, target: string | null) =>
     target ? undefined : sql`${artifactVersions.storageConfigId} is not null`,
   );
 
-/** Voice recordings not yet where new files go; those already swept have nothing to copy (ADR 0098). */
+/** Voice recordings not yet where new files go; those already swept have nothing to copy (ADR 0100). */
 const clipsNotAt = (orgId: string, target: string | null) =>
   and(
     eq(voiceClips.orgId, orgId),

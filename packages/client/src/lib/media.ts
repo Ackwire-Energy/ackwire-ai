@@ -198,7 +198,7 @@ export const mediaWord = (t: TFunction, kind: MediaKind) =>
  * no text: `meta.media` as a message stores it, or the kind a preview's meta carries.
  */
 export function textOrMedia(t: TFunction, body: string, meta: Meta): string {
-  // A voice message's words are the agents': people read its name, whatever the body holds (ADR 0098).
+  // A voice message's words are the agents': people read its name, whatever the body holds (ADR 0100).
   if (isVoiceMeta(meta)) return voiceWord(t, voiceLength(meta));
   if (body.trim()) return body;
   const kind = messageMediaOf(meta)?.kind ?? mediaKindOf(meta?.media);

@@ -13,7 +13,7 @@ import { enqueue } from "./outbox";
 const { voiceClips, agents, channels, organizationMembers, organizationSettings, users } = schema;
 
 /**
- * Voice messages (ADR 0098). To people a voice message is its audio: the app never shows the words. To agents it is
+ * Voice messages (ADR 0100). To people a voice message is its audio: the app never shows the words. To agents it is
  * those words, in `messages.body`, so routing, context and search work as for any message. The recording is stored
  * first and the message posted from a job, so what was said survives a closed app or a provider's bad minute.
  */
@@ -45,7 +45,7 @@ const VOICE_TYPES = [
   "audio/wav",
 ];
 
-/** Limits on agentes.chat's own servers (ADR 0098); null everywhere else. Zero turns a limit off. */
+/** Limits on agentes.chat's own servers (ADR 0100); null everywhere else. Zero turns a limit off. */
 export interface VoiceLimits {
   personMinutesPerDay: number;
   orgMinutesPerMember: number;
@@ -80,7 +80,7 @@ const minutesSince = async (db: Database, where: ReturnType<typeof eq>, since: D
 };
 
 /**
- * Fair use (ADR 0098): whether this person may record now. Checked before a recording starts and again when it
+ * Fair use (ADR 0100): whether this person may record now. Checked before a recording starts and again when it
  * arrives, never cutting one short, so at most one recording goes over. Nobody sees a counter or a price.
  */
 export async function voiceAllowed(deps: Pick<VoiceDeps, "db" | "limits">, userId: string, orgId: string) {

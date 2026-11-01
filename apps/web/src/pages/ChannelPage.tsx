@@ -1494,7 +1494,7 @@ function ChannelView({
   };
   const sendMedia = useCallback((media: MessageMedia) => sendMediaNow.current(media), []);
   const mediaTabs = useMediaTabs(sendMedia);
-  // Voice messages (ADR 0098), where this person can write and the workspace has them; a reply to a mission goes in
+  // Voice messages (ADR 0100), where this person can write and the workspace has them; a reply to a mission goes in
   // text, to the mission. The recording goes in the box's thread, and the box stays as it was.
   const voiceSettings = useSettings(org.id);
   const voiceOn = Boolean(voiceSettings.data?.voiceAvailable && voiceSettings.data.voiceMessages);
@@ -3281,7 +3281,7 @@ export const TimelineMessage = memo(function TimelineMessage({
   const artifacts = artifactRefs(meta);
   // A GIF or a sticker (ADR 0091); with no words, the message is the picture alone.
   const media = useMemo(() => messageMediaOf(m.meta), [m.meta]);
-  // A voice message is its recording: the player, and no text (ADR 0098).
+  // A voice message is its recording: the player, and no text (ADR 0100).
   const voice = useMemo(() => voiceOf(m.meta), [m.meta]);
   // The one an agent adds after its own reply: a message of its own, not a reply (no feedback, no run's cards).
   const mediaAfter = isMediaAfterReply(m.meta);

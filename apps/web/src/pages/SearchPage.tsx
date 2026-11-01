@@ -130,7 +130,7 @@ function HitBody({ snippet, meta }: { snippet: string; meta: string }) {
   const { t } = useTranslation();
   return (
     <span className="list-col">
-      {/* A voice message comes with no snippet: it is found by its words, and shows as audio (ADR 0098). */}
+      {/* A voice message comes with no snippet: it is found by its words, and shows as audio (ADR 0100). */}
       <span>{snippet || t("voice.word")}</span>
       <span className="small muted">{meta}</span>
     </span>

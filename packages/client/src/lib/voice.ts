@@ -2,7 +2,7 @@ import type { TFunction } from "i18next";
 import type { MessageVoice } from "../api/types";
 
 /**
- * Voice messages (ADR 0098), the half the web and the phone app share. To people a voice message is its audio: a list,
+ * Voice messages (ADR 0100), the half the web and the phone app share. To people a voice message is its audio: a list,
  * a quote or a notification names it, and its words open only on demand, in the player.
  */
 

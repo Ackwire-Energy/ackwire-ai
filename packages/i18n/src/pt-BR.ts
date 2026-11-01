@@ -5779,7 +5779,7 @@ export const ptBR = {
       symbols: "Símbolos",
     },
   },
-  /** Voice messages (ADR 0098). */
+  /** Voice messages (ADR 0100). */
   voice: {
     word: "Mensagem de voz",
     wordTime: "Mensagem de voz · {{time}}",

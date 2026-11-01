@@ -107,7 +107,7 @@ export async function createTestServer(
     giphyFetch?: typeof fetch;
     /** `false`: a store with no signed links, as on disk or in Postgres, so the server sends files itself. */
     signedBlobs?: boolean;
-    /** Fake speech providers (ADR 0098), for an engine set through `env`. */
+    /** Fake speech providers (ADR 0100), for an engine set through `env`. */
     speechFetch?: typeof fetch;
   } = {},
 ) {

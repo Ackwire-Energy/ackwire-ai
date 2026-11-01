@@ -269,13 +269,13 @@ export interface ApiClient {
     /** Checked with GIPHY first: `gif_key_invalid` (422) when it refuses, `gif_key_env` (409) with an env key. */
     saveGifKey(apiKey: string): Promise<GifKey>;
     removeGifKey(): Promise<GifKey>;
-    /** The speech engine (ADR 0098): `null` unless I am the installation's owner on a self-hosted server. */
+    /** The speech engine (ADR 0100): `null` unless I am the installation's owner on a self-hosted server. */
     speechKey(): Promise<SpeechKey | null>;
     /** Tried with the provider first: `speech_key_invalid` (422) when it refuses. */
     saveSpeechKey(input: SpeechKeyInput): Promise<SpeechKey>;
     removeSpeechKey(): Promise<SpeechKey>;
   };
-  /** Voice messages (ADR 0098). */
+  /** Voice messages (ADR 0100). */
   voice: {
     /** Whether I may record now: fair use, on agentes.chat's own servers. */
     allowed(orgId: string): Promise<{ allowed: boolean }>;

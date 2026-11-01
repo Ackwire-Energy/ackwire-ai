@@ -2,7 +2,7 @@ import type { Message } from "@agenteschat/client";
 import { VOICE_COUNTDOWN_MS, VOICE_MAX_MS, voiceOf } from "@agenteschat/client/lib/voice";
 
 /**
- * Voice messages on the phone (ADR 0098), the part with no device in it: how a recording's gestures read and how
+ * Voice messages on the phone (ADR 0100), the part with no device in it: how a recording's gestures read and how
  * levels become a wave. What the web shares is in `@agenteschat/client/lib/voice`.
  */
 /** How long a press is held before it records. */

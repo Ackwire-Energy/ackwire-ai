@@ -22,7 +22,7 @@ const card = () => screen().getByRole("region", { name: "Mensagens de voz" });
 const field = () => within(card()).getByLabelText("Chave da AssemblyAI") as HTMLInputElement;
 const test_ = () => within(card()).getByRole("button", { name: "Testar" });
 
-describe("voice messages in Configurações (ADR 0098)", () => {
+describe("voice messages in Configurações (ADR 0100)", () => {
   test("nobody but the server's owner picks a provider, and no cost shows", async () => {
     await go({ media: { voiceAvailable: true } });
     expect(within(card()).queryByRole("button", { name: "Testar" })).toBeNull();

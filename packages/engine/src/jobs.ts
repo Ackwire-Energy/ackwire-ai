@@ -115,7 +115,7 @@ export interface JobDeps extends RunExecutorDeps {
   gifs?: GifProvider | null;
   /** Org storage (job `storage.migrate`). */
   storage?: StorageDeps;
-  /** Voice messages (job `voice.transcribe`, ADR 0098). */
+  /** Voice messages (job `voice.transcribe`, ADR 0100). */
   voice?: VoiceDeps;
   /** Connectors: job `org.delete` revokes a workspace's GitHub OAuth grants at GitHub before its rows go. */
   connectors?: ConnectorDeps;

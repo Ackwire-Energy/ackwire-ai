@@ -60,7 +60,7 @@ export interface AppExtras {
    * servers) = those routes answer 404.
    */
   gifKey?: GifKey;
-  /** Speech engines and what voice messages need (ADR 0098); absent: no voice messages. */
+  /** Speech engines and what voice messages need (ADR 0100); absent: no voice messages. */
   speech?: SpeechSettings;
   voice?: VoiceDeps;
 }

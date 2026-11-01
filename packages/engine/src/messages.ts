@@ -123,7 +123,7 @@ export interface ReplyRef {
   author: { type: "person" | "agent"; id: string | null };
   authorName: string;
   excerpt: string;
-  /** The quoted message's GIF, sticker (ADR 0091) or voice (ADR 0098): a quote of one with no text still says what it was. */
+  /** The quoted message's GIF, sticker (ADR 0091) or voice (ADR 0100): a quote of one with no text still says what it was. */
   mediaKind?: MessageMedia["kind"] | "voice";
 }
 

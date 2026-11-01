@@ -64,7 +64,7 @@ export interface OrgSettings extends MediaSettings {
   defaultAgentBudgetNanoUsd: number;
   /** Agents check what the team already did before an outside action (ADR 0064). On by default. */
   actionCheck: boolean;
-  /** People can send voice messages (ADR 0098); they also need `voiceAvailable`. On by default. */
+  /** People can send voice messages (ADR 0100); they also need `voiceAvailable`. On by default. */
   voiceMessages: boolean;
   /** Per provider, the models "Automático" picks per tier where the workspace chose its own (ADR 0087). */
   autoModels: AutoModels;

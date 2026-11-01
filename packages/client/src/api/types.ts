@@ -47,12 +47,12 @@ export interface GifKey {
   state: "off" | "ok" | "invalid";
 }
 
-/** Who can turn voice into text on this server (ADR 0098). */
+/** Who can turn voice into text on this server (ADR 0100). */
 export type SpeechProvider = "assemblyai" | "elevenlabs" | "soniox" | "groq" | "openai" | "local";
 
 /**
  * The installation's speech engine, for its pinned owner on a server that isn't agentes.chat's own (`GET
- * /api/app/speech-key`, ADR 0098): with one, every workspace has voice messages (`OrgSettings.voiceAvailable`).
+ * /api/app/speech-key`, ADR 0100): with one, every workspace has voice messages (`OrgSettings.voiceAvailable`).
  */
 export interface SpeechKey {
   /** The one chosen in Settings. Null: none. */
@@ -1573,7 +1573,7 @@ export interface OrgSettings {
   agentStickers: boolean;
   /** How often agents follow a light reply with a sticker or a GIF. */
   agentMedia: AgentMediaLevel;
-  /** People can send voice messages (ADR 0098); only with `voiceAvailable` too. On by default. */
+  /** People can send voice messages (ADR 0100); only with `voiceAvailable` too. On by default. */
   voiceMessages: boolean;
   /** Read only: this server has a speech engine. */
   voiceAvailable: boolean;
@@ -1951,7 +1951,7 @@ export interface ReplyRef {
 export type MediaKind = "gif" | "sticker" | "voice";
 
 /**
- * `message.meta.voice` (ADR 0098): the message is this recording. `message.body` holds its words for the agents; people
+ * `message.meta.voice` (ADR 0100): the message is this recording. `message.body` holds its words for the agents; people
  * read them only by opening them in the player.
  */
 export interface MessageVoice {

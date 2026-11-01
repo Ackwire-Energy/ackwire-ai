@@ -309,7 +309,7 @@ export async function describeHits<H extends SearchHit>(
     }
     const m = h.kind === "message" ? byId.get(h.sourceId) : undefined;
     if (!m) return { ...h, messageId: null, threadId: null, author: null };
-    // A voice message is found by its words, and shows as its audio (ADR 0098).
+    // A voice message is found by its words, and shows as its audio (ADR 0100).
     const snippet = readableBody(h.snippet, m.meta);
     const author =
       m.authorType === "agent" && m.agentId

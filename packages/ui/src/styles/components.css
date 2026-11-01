@@ -5114,7 +5114,7 @@ html:not([data-pointer]) .ac-composer__send:focus-visible {
   gap: 8px;
   padding: 6px 14px;
 }
-/* Voice messages (ADR 0098). The recording sits on the text's first line and hides nothing but the text, which keeps
+/* Voice messages (ADR 0100). The recording sits on the text's first line and hides nothing but the text, which keeps
    its place: the box never changes height, whatever was typed. */
 .ac-composer__text {
   position: relative;

@@ -11491,7 +11491,7 @@ html:not([data-pointer]) .settings-row--open:focus-visible {
   }
 }
 
-/* Configurações › Mensagens de voz: who turns voice into text (ADR 0098). */
+/* Configurações › Mensagens de voz: who turns voice into text (ADR 0100). */
 .voice-engine {
   margin: var(--card-pad) calc(-1 * var(--card-pad)) calc(-1 * var(--card-pad));
 }

@@ -122,7 +122,7 @@ export interface ComposerChoice {
   hint?: (choice: SendChoice, mod: string) => ReactNode;
 }
 
-/** Voice messages in the box: what it says, and what the app does with a recording (ADR 0098). */
+/** Voice messages in the box: what it says, and what the app does with a recording (ADR 0100). */
 export interface ComposerVoice {
   /** Where this recording would go: when it changes, one under way is dropped. */
   scope: string;

@@ -35,7 +35,7 @@ export interface PushTextInput {
   suggestedBy?: string | null;
   /** Snippet of what was said. */
   text?: string | null;
-  /** A GIF or a sticker with no words (ADR 0091), or a voice message (ADR 0098): the push says so in place of the snippet. */
+  /** A GIF or a sticker with no words (ADR 0091), or a voice message (ADR 0100): the push says so in place of the snippet. */
   media?: "gif" | "sticker" | "voice" | null;
   /** An approval of a production, irreversible or external action. */
   highRisk?: boolean;

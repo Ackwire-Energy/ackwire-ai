@@ -47,7 +47,7 @@ export interface WorkerDeps {
   context?: ContextDeps;
   /** Drive files (purging deleted ones after 30 days). */
   artifacts?: ArtifactDeps;
-  /** Voice recordings (deleting them past their retention, ADR 0098). */
+  /** Voice recordings (deleting them past their retention, ADR 0100). */
   voice?: VoiceDeps;
   /** Approval reminder emails. */
   approvalDigest?: { publicUrl: string; afterHours: number };

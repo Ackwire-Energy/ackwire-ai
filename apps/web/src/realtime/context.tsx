@@ -541,7 +541,7 @@ export function RealtimeProvider({
       // The workspace's own computer on its way, its standing (the hold banner, the suspended screen), and the groups
       // of agents (the sidebar's sections).
       applyWorkspaceEvent(qc, orgId, event);
-      // A recording that won't become a message: its bubble goes, and the person hears why (ADR 0098).
+      // A recording that won't become a message: its bubble goes, and the person hears why (ADR 0100).
       if (event.type === "voice.dropped" && "clientId" in event) {
         const dropped = event as VoiceDroppedEvent;
         dropLocalVoice(qc, orgId, dropped.channelId, dropped.clientId);

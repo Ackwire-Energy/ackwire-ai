@@ -235,7 +235,7 @@ function useGifKeyChange<T>(change: (api: ApiClient, input: T) => Promise<GifKey
 export const useSaveGifKey = () => useGifKeyChange((api, apiKey: string) => api.system.saveGifKey(apiKey), true);
 export const useRemoveGifKey = () => useGifKeyChange<void>((api) => api.system.removeGifKey());
 
-/** The installation's speech engine (ADR 0098): `null` for everyone but its owner on a self-hosted server. */
+/** The installation's speech engine (ADR 0100): `null` for everyone but its owner on a self-hosted server. */
 export const useSpeechKey = () => {
   const api = useApi();
   return useQuery({ queryKey: keys.speechKey, queryFn: () => api.system.speechKey() });
@@ -1157,7 +1157,7 @@ export function dropLocalVoice(qc: QueryClient, orgId: string, channelId: string
 }
 
 /**
- * Sends a recording (ADR 0098): its bubble appears at once and stays until the server's message replaces it (same
+ * Sends a recording (ADR 0100): its bubble appears at once and stays until the server's message replaces it (same
  * `clientId`). Without a connection the recording waits in memory and goes when it comes back, with the same
  * `clientId`, so a send whose answer was lost is stored once. `onRefused`: the server said no, and the bubble went.
  */
