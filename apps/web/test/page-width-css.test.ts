@@ -49,3 +49,9 @@ test("what is narrow on purpose stays narrow: forms, empty states and the Terms'
   expect(maxWidth(".settings")).toBe("1120px");
   expect(maxWidth(".newag__content")).toBe("660px");
 });
+
+test("the wiki graph's box has a set height, so its drawing can take the box's shape", () => {
+  const svg = Object.fromEntries(declarations(css, ".wiki-graph__svg"));
+  expect(svg.height).toBe("calc(100vh - 220px)");
+  expect(svg["max-height"]).toBeUndefined();
+});
