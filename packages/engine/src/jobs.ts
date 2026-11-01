@@ -374,6 +374,9 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         // A notice is for its own agent (`deliverNotice` starts or joins its run), a no-AI card says why
         // its agent didn't answer, and an action card waits for a person's click: nobody else chimes in.
         if (message.meta.notice || message.meta.noAi || message.meta.actionCard) return;
+        // A routine's own message (hand_off, no run behind it, ADR 0053 addendum 2026-11-01) wakes nobody: its
+        // mentions and the router would start runs outside the routine's bounds, from text it may have read.
+        if (message.meta.routine && !message.meta.reminder && !message.agentRunId) return;
         // Agents' mentions go through the hop limit here; a person's mentions and DMs already
         // started their runs in the same statement as the message (postPersonMessage).
         if (message.mentionedAgentIds.length > 0) {

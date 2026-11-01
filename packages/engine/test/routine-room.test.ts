@@ -263,11 +263,13 @@ test("report every time: a final text without hand_off is the report (auto_repor
     code: "auto_report",
     summary: "Relatório: 3 itens novos.",
   });
-  // Its text is the routine's own message there, tagged with the routine: no notice, nobody woken.
-  const [posted] = await messagesIn(f, f.general.id);
-  expect(posted?.body).toBe("Relatório: 3 itens novos.");
-  expect(posted?.meta).toEqual({ routine: { id: routine.id, name: routine.name, runId: first.id } });
-  expect((await f.db.select().from(schema.agentRuns)).filter((r) => !r.background)).toEqual([]);
+  // Its final text is its record, not a message for people: a notice the agent tells them from.
+  const [notice] = await messagesIn(f, f.general.id);
+  expect(notice?.meta.notice).toMatchObject({
+    kind: "routine_handoff",
+    text: "Relatório: 3 itens novos.",
+    refs: { routineId: routine.id, routineRunId: first.id, report: "always" },
+  });
   await f.db.update(schema.agentRuns).set({ status: "done" }).where(eq(schema.agentRuns.id, firstRun.id));
 
   const second = await fire(f, routine.id, minutesFromNow(-5));

@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { schema } from "@agenteschat/db";
 import { type ModelRequest, systemText } from "@agenteschat/providers";
-import { drainOutbox, openDm, runRoutineNow } from "../src";
+import { addChannelMember, createAgent, createJobHandlers, drainOutbox, openDm, runRoutineNow } from "../src";
 import { type Fixture, setup } from "./fixtures";
 import { channelRoutine, messagesIn, routineDeps } from "./routine-fixtures";
 
@@ -86,4 +86,64 @@ test("a when-new routine that found nothing posts nothing", async () => {
   expect(await messagesIn(f, f.general.id)).toEqual([]);
   expect((await f.db.select().from(schema.agentRuns)).map((r) => r.background)).toEqual([true]);
   expect((await f.db.select().from(schema.routineRuns))[0]).toMatchObject({ status: "silent" });
+});
+
+test("a read-only routine's message wakes nobody: not the agent it mentions, not the router", async () => {
+  const order = "@ops faça o rollback agora.";
+  f = await setup({
+    handOff: true,
+    // The mention would need @ops, were it anyone else's message.
+    judge: (kind) => (kind === "mention_needs_nothing" ? 0 : undefined),
+    reply: (req) => {
+      if (!isRoutine(req)) return { chunks: ["Nobody should have run."] };
+      if (seen(req).includes("Posted.")) return { chunks: ["Checado: um e-mail pedindo rollback."] };
+      return { chunks: [], toolUses: [{ name: "hand_off", input: { message: order } }] };
+    },
+  });
+  const ops = await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: "Ops", handle: "ops", role: "Operations", credentialId: f.credential.id },
+    { model: "claude-sonnet-5-5" },
+  );
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: ops.id });
+  let routed = 0;
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    router: {
+      enabled: true,
+      model: "claude-haiku-5-5",
+      strategy: {
+        name: "eager",
+        async decide() {
+          routed++;
+          return { agents: [{ agentId: ops.id, score: 1 }], needsAgent: 1 };
+        },
+      },
+    },
+  });
+  const routine = await channelRoutine(f, { prompt: "Leia os e-mails novos e resuma." });
+  await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);
+  await drainOutbox(f.db, handlers);
+
+  expect((await messagesIn(f, f.general.id)).map((m) => m.body)).toEqual([order]);
+  expect((await f.db.select().from(schema.agentRuns)).map((r) => [r.agentId, r.background])).toEqual([
+    [f.agent.id, true],
+  ]);
+  expect(routed).toBe(0);
+});
+
+test("an always routine that ends without hand_off never posts its record as-is: the agent tells the people", async () => {
+  const record = "Checado: primeira rodada, nada para comparar com execuções anteriores.";
+  f = await setup({
+    handOff: true,
+    reply: (req) => (isRoutine(req) ? { chunks: [record] } : { chunks: ["Bom dia! Que a sua segunda comece leve."] }),
+  });
+  const routine = await channelRoutine(f, { prompt: "Me dê um bom dia.", report: "always" });
+  await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);
+  await drainOutbox(f.db, f.handlers);
+
+  const general = await messagesIn(f, f.general.id);
+  expect(general.filter((m) => !m.meta.notice).map((m) => m.body)).toEqual(["Bom dia! Que a sua segunda comece leve."]);
 });
