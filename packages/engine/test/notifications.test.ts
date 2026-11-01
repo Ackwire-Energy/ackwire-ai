@@ -8,8 +8,10 @@ import {
   commentIssue,
   createIssue,
   drainOutbox,
+  insertMessage,
   listMembers,
   listNotifications,
+  type MachineTaskRow,
   markAllNotificationsRead,
   markChannelRead,
   markNotificationDone,
@@ -18,11 +20,13 @@ import {
   notificationCounts,
   notificationSnippet,
   notify,
+  notifyMessage,
   openDm,
   postPersonMessage,
   resolveNotifications,
   setNoticePref,
   snoozeNotification,
+  taskEndNotice,
   updateIssue,
   ValidationError,
   wakeSnoozedNotifications,
@@ -370,6 +374,44 @@ test("issues: assigned (resolved when unassigned), status by others, comments me
     .from(schema.notifications)
     .where(and(eq(schema.notifications.userId, bia.id), eq(schema.notifications.kind, "issue_assigned")));
   expect(row?.doneAt).not.toBeNull();
+});
+
+test("a task's end in a thread names its computer only where the workspace has more than one", async () => {
+  f = await setup();
+  const { bia } = await people();
+  const root = await post(bia.id, "Can someone run the tests?");
+  const computer = "agentes.chat's computer";
+  await f.db.insert(schema.machines).values({ orgId: f.org.id, name: computer, kind: "managed" });
+  const task = {
+    id: "00000000-0000-4000-8000-000000000001",
+    title: "Run the tests",
+    status: "done",
+    exitCode: 0,
+    seconds: 134,
+    endedAt: new Date(),
+    executor: "claude",
+    files: [],
+  } as unknown as MachineTaskRow;
+  const end = async () => {
+    const m = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      threadId: root.id,
+      author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0, stretchId: null },
+      ...taskEndNotice(task, computer),
+    });
+    await notifyMessage(deps(), f.org.id, m.id);
+    return m;
+  };
+  const latest = async () => (await inbox(bia.id)).items.find((n) => n.kind === "thread_reply")?.latest.text;
+  // The Cloud's one computer: Bia hears how it ended, not where. The agent still reads where.
+  const first = await end();
+  expect(first.body).toBe(`Task "Run the tests" finished on ${computer} after 2 min.`);
+  expect(await latest()).toBe('Task "Run the tests" finished after 2 min.');
+  // A second computer: the line says which.
+  await f.db.insert(schema.machines).values({ orgId: f.org.id, name: "MacBook" });
+  await end();
+  expect(await latest()).toBe(`Task "Run the tests" finished on ${computer} after 2 min.`);
 });
 
 test("snippets are plain text and at most 280 characters", () => {
