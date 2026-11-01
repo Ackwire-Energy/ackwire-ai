@@ -289,7 +289,8 @@ async function dropAgents(tx: Executor, orgId: string, profileId: string, agentI
 
 /**
  * "Mudar quem pode usar": the profile's agents become exactly these (`manage_connectors`, and only agents the
- * person may edit are given or taken). One audit row per agent given or taken.
+ * person may edit are given or taken). An agent's owner may always take their own agents off, never give.
+ * One audit row per agent given or taken.
  */
 export async function setBrowserProfileAgents(
   db: Database,
@@ -298,13 +299,23 @@ export async function setBrowserProfileAgents(
   profileId: string,
   agentIds: string[],
 ) {
-  const membership = await requirePermission(db, actorId, orgId, "manage_connectors");
+  const membership = await requireActiveMembership(db, actorId, orgId);
   const wanted = [...new Set(agentIds)];
   return db.transaction(async (tx) => {
     const row = await requireProfile(tx, orgId, profileId);
     const had = (await grantsOf(tx, [profileId])).get(profileId) ?? [];
     const added = wanted.filter((a) => !had.includes(a));
     const removed = had.filter((a) => !wanted.includes(a));
+    if (!can(membership, "manage_connectors")) {
+      const owned =
+        removed.length === 0
+          ? []
+          : await tx
+              .select({ id: agents.id })
+              .from(agents)
+              .where(and(eq(agents.orgId, orgId), inArray(agents.id, removed), eq(agents.ownerUserId, actorId)));
+      if (added.length > 0 || removed.length === 0 || owned.length !== removed.length) throw new ForbiddenError();
+    }
     await requireEditableAgents(tx, membership, orgId, actorId, [...added, ...removed]);
     if (added.length > 0) {
       await tx

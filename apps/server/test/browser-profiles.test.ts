@@ -136,3 +136,32 @@ test("an agent's owner asks for a profile but can't grant one", async () => {
     .where(eq(schema.notifications.kind, "browser_profile_request"));
   expect(asked.length).toBe(1);
 });
+
+test("an agent's owner can take their own agent off a profile, but not someone else's", async () => {
+  const { owner, org, api, machine } = await seeded();
+  const member = await joinByInvitation(t, owner, org.orgId, "ana@example.com");
+  const [ana] = await t.db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(eq(schema.users.email, "ana@example.com"));
+  const p = await json<Profile>(
+    await api("/browser-profiles", {
+      json: { machineId: machine.machineId, name: "Shop chat", agentIds: [org.agentId] },
+    }),
+  );
+  const asAna = (path: string, init?: Parameters<typeof member>[1]) =>
+    member(`/api/app/organizations/${org.orgId}${path}`, init);
+  // Not her agent yet.
+  expect((await asAna(`/browser-profiles/${p.id}`, { method: "PATCH", json: { agentIds: [] } })).status).toBe(403);
+  await t.db
+    .update(schema.agents)
+    .set({ ownerUserId: ana?.id ?? "" })
+    .where(eq(schema.agents.id, org.agentId));
+  const res = await asAna(`/browser-profiles/${p.id}`, { method: "PATCH", json: { agentIds: [] } });
+  expect(res.status).toBe(200);
+  expect((await json<Profile>(res)).agentIds).toEqual([]);
+  // Taking off is all she may do: giving it back is still an admin's.
+  expect(
+    (await asAna(`/browser-profiles/${p.id}`, { method: "PATCH", json: { agentIds: [org.agentId] } })).status,
+  ).toBe(403);
+});
