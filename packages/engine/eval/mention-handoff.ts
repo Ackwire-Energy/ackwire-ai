@@ -528,7 +528,6 @@ const DM_FOLLOW_THROUGH: Record<string, Record<DmKind, { request: string; reply:
   },
 };
 
-const THRESHOLD = 0.6;
 const ORG = "00000000-0000-0000-0000-000000000000";
 const which = process.argv.includes("--judge") ? process.argv[process.argv.indexOf("--judge") + 1] : "jev";
 const noUsage = { recordExternalUsage: async () => null };
