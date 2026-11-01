@@ -144,7 +144,10 @@ scenario("S56", "a 'couldn't' with one empty attempt is told its means once, the
   expect(
     w.f.provider.calls.some((c) => JSON.stringify(c.request.messages).includes("You ended saying you couldn't")),
   ).toBe(true);
-  expect((await w.posts("rui")).at(-1)?.body).toContain("cartão sem anuidade");
+  // The give-up the judge held is never posted: only the answer is.
+  expect((await w.posts("rui")).map((p) => p.body)).toEqual([
+    "O Banco Azul lançou um cartão sem anuidade nesta semana.",
+  ]);
   expect(await untriedSteps(w)).toHaveLength(1);
   await assertInvariants(w);
 });

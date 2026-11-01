@@ -3069,8 +3069,9 @@ async function executeRunInner(
       if (decision.outcome === "continue" && decision.nudge) {
         appendUserText(t, decision.nudge);
         if (plan.kind !== "model") nextPrompt = decision.nudge;
-        // Nothing to post first: it simply goes on.
-        if (decision.rule === "decision" || decision.rule === "answer") {
+        // Nothing to post first: it simply goes on. A give-up judged untried isn't posted either: it would send people
+        // after something the next turn may do itself.
+        if (decision.rule === "decision" || decision.rule === "answer" || decision.rule === "untried") {
           await saveTranscript(db, t);
           continue;
         }
