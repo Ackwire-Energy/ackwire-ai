@@ -94,7 +94,12 @@ function budget() {
   let peeked = 0;
   return {
     wants: (path: string, size: number) => {
-      if (isSecretPath(path) || !TEXT_PATH.test(path) || size > IMPORT_MAX_BYTES || total + size > ARCHIVE_LIMITS.text) {
+      if (
+        isSecretPath(path) ||
+        !TEXT_PATH.test(path) ||
+        size > IMPORT_MAX_BYTES ||
+        total + size > ARCHIVE_LIMITS.text
+      ) {
         return false;
       }
       total += size;

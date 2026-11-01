@@ -1,6 +1,6 @@
+import { isSecretFile } from "@agenteschat/ui/names";
 import type { MigrationBundle } from "../../api/types";
 import { MAX_UPLOAD_BYTES } from "../files";
-import { isSecretFile } from "@agenteschat/ui/names";
 import { excerpt } from "../text";
 import * as agenteschat from "./agenteschat";
 import * as hermes from "./hermes";

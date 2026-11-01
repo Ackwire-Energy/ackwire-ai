@@ -48,4 +48,3 @@ export function openSearch(search: Record<string, unknown>): { open?: string | n
   if (typeof v !== "string" || !v) return {};
   return /^\d{1,15}$/.test(v) ? { open: Number(v) } : { open: v };
 }
-
