@@ -410,6 +410,8 @@ export function Sidebar() {
     : [];
   const newGroupItem = (label: string) =>
     arranges ? [item("new-group", label, "layers", () => setGroupDialog({ mode: "create" }))] : [];
+  // A tool's link keeps the browser's menu, from the mouse and the keyboard alike.
+  const spaceEvent = (e: { target: EventTarget }) => !(e.target instanceof Element && e.target.closest("a[href]"));
   const sidebarMenu = entityMenu(() => [
     { kind: "header", label: t("shell.sidebarMenu.title") },
     item("customize", t("shell.customizeSidebar"), "settings", () => setCustomizing(true)),
@@ -618,10 +620,8 @@ export function Sidebar() {
       <div
         className="sidebar__scroll"
         ref={navRef}
-        onKeyDown={sidebarMenu.onKeyDown}
-        onContextMenu={(e) => {
-          if (!(e.target instanceof Element && e.target.closest("a[href]"))) sidebarMenu.onContextMenu(e);
-        }}
+        onKeyDown={(e) => spaceEvent(e) && sidebarMenu.onKeyDown(e)}
+        onContextMenu={(e) => spaceEvent(e) && sidebarMenu.onContextMenu(e)}
       >
         {sectionOrder.order.filter((id) => blocks[id]).map((id) => sectionOrder.block(id, blocks[id], !rail))}
       </div>
@@ -646,8 +646,9 @@ export function Sidebar() {
           total={dir.agents.length}
           clear={() => [meRow.current?.querySelector(".ac-avatar")]}
         />
-        {/* The full sidebar creates from the Agentes header's + (always shown on touch screens); the rail has no headers. */}
-        {rail && can(org, "create_agents") && (
+        {/* The full sidebar creates from the Agentes header's + (always shown on touch screens); the rail has no headers,
+            and with no agents the full sidebar has no Agentes header either. */}
+        {(rail || !agentsShown) && can(org, "create_agents") && (
           <Button asChild block variant="ghost" className="sidebar__create">
             <Link to="/org/$orgId/agents/new" params={{ orgId }} title={t("shell.createAgent")}>
               <Icon name="plus" />

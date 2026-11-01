@@ -118,6 +118,19 @@ describe("the parts' headers", () => {
     await go();
     expect(nav().querySelector(".sidebar__create")).toBeNull();
   });
+
+  test("with no agents there's no Agentes header, so the footer's Criar agente row comes back", async () => {
+    const state = seedState();
+    state.agents = [];
+    await go(state);
+    expect(within(nav()).queryByRole("button", { name: "Agentes" })).toBeNull();
+    expect(within(nav()).getByRole("link", { name: "Criar agente" }).getAttribute("href")).toBe(
+      `/org/${ORG_ID}/agents/new`,
+    );
+    cleanup();
+    await go(asMember(Object.assign(seedState(), { agents: [] })));
+    expect(nav().querySelector(".sidebar__create")).toBeNull();
+  });
 });
 
 describe("one + per part", () => {
@@ -213,6 +226,32 @@ describe("the sidebar's own menu, on its empty space", () => {
     const tool = within(nav()).getByRole("link", { name: /^Threads/ });
     const event = await rightClick(tool);
     expect(event.defaultPrevented).toBe(false);
+    await act(async () => fireEvent.keyDown(tool, { key: "F10", shiftKey: true }));
+    await settle(2);
+    expect(screen().queryByRole("menuitem", { name: "Personalizar a barra lateral" })).toBeNull();
+  });
+
+  test("a right click or Shift+F10 inside a + menu or a dialog (portaled out of the sidebar) opens no menu of ours", async () => {
+    const ours = () =>
+      screen()
+        .queryAllByRole("menuitem")
+        .map((i) => i.textContent)
+        .filter((l) => l === "Personalizar a barra lateral" || l === "Mover para cima");
+    await go(withCategory());
+    const menu = await openPlus("Novo canal ou categoria");
+    const item = within(menu).getByRole("menuitem", { name: "Novo canal" });
+    await rightClick(item);
+    expect(ours()).toEqual([]);
+    await act(async () => fireEvent.keyDown(item, { key: "F10", shiftKey: true }));
+    await settle(2);
+    expect(ours()).toEqual([]);
+    await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
+    await settle(2);
+    await rightClick(nav().querySelector('a.sidebar__item[title="#general"]') as Element);
+    await click(within(appMenu()).getByRole("menuitem", { name: /^Mover para/ }));
+    const dialog = screen().getByRole("dialog");
+    await rightClick(within(dialog).getAllByRole("button")[0] as Element);
+    expect(ours()).toEqual([]);
   });
 });
 
