@@ -74,6 +74,18 @@ export async function deliverLive(
   });
 }
 
+/**
+ * The executing side before its listener (`listenLiveSteering`) exists: from the claim on, this instance answers
+ * "no turn" at once, so a person's send never waits `LIVE_STEER_WAIT_MS` while the run is still starting. Only an
+ * instance that owns the run may answer: another one running it would race this false against its true.
+ */
+export function answerNoTurn(pubsub: PubSub, runId: string): () => void {
+  return pubsub.subscribe(steerTopic(runId), (e) => {
+    if (e.type !== "run.steer" || typeof e.requestId !== "string") return;
+    pubsub.publish(steerReplyTopic(e.requestId), { type: "run.steer.reply", delivered: false }).catch(() => {});
+  });
+}
+
 /** A message taken from the inbox, as the run reads it. */
 export interface SteeredText {
   id: string;

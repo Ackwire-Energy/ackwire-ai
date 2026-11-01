@@ -173,6 +173,8 @@ test("a message during a computer turn is handed to it live; read ones join it, 
   const [run] = await fx.db.select().from(schema.agentRuns);
   expect(run?.status).toBe("done");
   expect(run?.pendingMessageIds).toEqual([]);
+  // Read mid-turn, it updates the task the judges hold the reply to (ADR 0112), not only the brain's prompt.
+  expect((run?.transcript as { request?: string } | null)?.request).toContain("e atualiza a doc");
   const steps = await fx.db
     .select()
     .from(schema.agentRunSteps)
@@ -223,6 +225,47 @@ test("a burst before the first computer turn (ADR 0112): one turn whose prompt h
   expect(seen[0]?.trigger).toContain("[ana]: preciso de uma coisa");
   expect(seen[0]?.trigger).toContain("[ana]: olha o relatório de ontem");
   expect(seen[0]?.trigger).not.toContain("while you were working");
+  const all = await fx.db.select().from(schema.agentRuns);
+  expect(all).toHaveLength(1);
+  expect(all[0]?.status).toBe("done");
+});
+
+test("a message to a computer-brain run still starting answers at once: the send never waits for a live delivery", async () => {
+  f = await setup();
+  const fx = f;
+  await computerAgent(fx);
+  const checking = gate();
+  const release = gate();
+  let calls = 0;
+  const brain: Brain = {
+    kind: "claude_code",
+    async *run() {
+      yield { type: "done", text: "Feito." };
+    },
+  };
+  const handlers = createJobHandlers({
+    ...fx.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: {
+      status: async (id) => {
+        // The run's first look at its computer (before any turn): held here, the run is claimed but not listening yet.
+        if (calls++ === 0) {
+          checking.open();
+          await release.promise;
+        }
+        return statusOf(id);
+      },
+    },
+  });
+  await post(fx, "@dev oi");
+  const drained = drainOutbox(fx.db, handlers);
+  await checking.promise;
+  const start = Date.now();
+  await post(fx, "preciso de uma coisa");
+  expect(Date.now() - start).toBeLessThan(1500);
+  release.open();
+  await drained;
+  await drainOutbox(fx.db, handlers);
   const all = await fx.db.select().from(schema.agentRuns);
   expect(all).toHaveLength(1);
   expect(all[0]?.status).toBe("done");

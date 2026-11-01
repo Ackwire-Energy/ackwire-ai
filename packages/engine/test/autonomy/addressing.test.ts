@@ -403,24 +403,26 @@ scenario(
   },
 );
 
-scenario("S56", "an update sent while the agent works joins its run and the next turn takes it", async () => {
-  let update: Promise<unknown> = Promise.resolve();
-  const w = await world({
+scenario("S56", "an update sent during the agent's model call joins its run and widens the task", async () => {
+  let w!: Awaited<ReturnType<typeof world>>;
+  w = await world({
     agents: ["otto"],
     dmWith: "otto",
     script: {
+      // The update is sent while the first model call is in flight, and that call ends only once it is in.
       otto: ({ n, last }) =>
         n === 1
-          ? { text: "Montando o relatório desta semana.", hold: update }
+          ? { text: "Montando o relatório desta semana.", hold: w.say("ah, e inclui a semana passada também") }
           : last.includes("inclui a semana passada")
             ? { text: "Pronto, com a semana passada também." }
             : undefined,
     },
   });
   await w.say("monta o relatório desta semana");
-  update = new Promise((resolve) => setTimeout(resolve, 0)).then(() => w.say("ah, e inclui a semana passada também"));
   await w.settle();
-  expect(await w.runs()).toHaveLength(1);
+  const runs = await w.runs();
+  expect(runs).toHaveLength(1);
+  expect((runs[0]?.transcript as { request?: string } | null)?.request).toContain("inclui a semana passada");
   expect((await w.posts("otto")).at(-1)?.body).toBe("Pronto, com a semana passada também.");
   await assertInvariants(w);
 });

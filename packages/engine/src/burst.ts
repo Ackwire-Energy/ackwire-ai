@@ -1,4 +1,4 @@
-import { and, type Database, desc, eq, gt, isNull, schema } from "@agenteschat/db";
+import { and, type Database, eq, gte, isNull, schema, sql } from "@agenteschat/db";
 import type { Message } from "./messages";
 
 const { messages } = schema;
@@ -17,18 +17,18 @@ export async function waitForBurst(
   db: Database,
   trigger: Pick<Message, "orgId" | "channelId" | "threadId" | "authorUserId" | "createdAt">,
   quietMs: number,
-  now: () => number = Date.now,
 ): Promise<void> {
   const author = trigger.authorUserId;
   if (!author || quietMs <= 0) return;
-  const cap = trigger.createdAt.getTime() + quietMs * BURST_MAX_WINDOWS;
-  let last = trigger.createdAt;
+  const from = trigger.createdAt.getTime();
+  const cap = from + quietMs * BURST_MAX_WINDOWS;
   for (;;) {
-    const wait = Math.min(last.getTime() + quietMs, cap) - now();
-    if (wait <= 0) return;
-    await Bun.sleep(wait);
-    const [next] = await db
-      .select({ createdAt: messages.createdAt })
+    // Message times come from the database's clock: the wait is measured on it too, never the app's.
+    const [row] = await db
+      .select({
+        latest: sql<number>`extract(epoch from max(${messages.createdAt})) * 1000`.mapWith(Number),
+        now: sql<number>`extract(epoch from clock_timestamp()) * 1000`.mapWith(Number),
+      })
       .from(messages)
       .where(
         and(
@@ -37,12 +37,13 @@ export async function waitForBurst(
           trigger.threadId ? eq(messages.threadId, trigger.threadId) : isNull(messages.threadId),
           eq(messages.authorUserId, author),
           isNull(messages.deletedAt),
-          gt(messages.createdAt, last),
+          gte(messages.createdAt, trigger.createdAt),
         ),
-      )
-      .orderBy(desc(messages.createdAt))
-      .limit(1);
-    if (!next) return;
-    last = next.createdAt;
+      );
+    if (!row) return;
+    const last = Math.max(from, row.latest || 0);
+    const wait = Math.min(last + quietMs, cap) - row.now;
+    if (wait <= 0) return;
+    await Bun.sleep(Math.min(wait, quietMs));
   }
 }

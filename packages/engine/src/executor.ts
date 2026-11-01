@@ -119,7 +119,7 @@ import type { ModelGateway } from "./gateway";
 import { agentRepositoryList, repositoriesPrompt } from "./git/repos";
 import { UPDATE_ISSUE_TOOL } from "./issue-tools";
 import { linkRunToIssue, mirrorReplyToIssue } from "./issues";
-import { listenLiveSteering, renderSteered } from "./live-steer";
+import { answerNoTurn, listenLiveSteering, renderSteered } from "./live-steer";
 import { touchMachineAccount } from "./machine-accounts";
 import { computerBackSoon, type MachineStatus } from "./machine-hub";
 import { MEDIA_TOOLS } from "./media";
@@ -648,9 +648,11 @@ export async function executeRun(deps: EngineDeps, runId: string, options: RunJo
       .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, "running")))
       .catch(() => undefined);
   const heartbeat = setInterval(() => void beat(), RUN_HEARTBEAT_MS);
+  const steerGate = { close: () => {} };
   try {
-    return await executeRunInner(deps, runId, options, prof, abort.signal);
+    return await executeRunInner(deps, runId, options, prof, abort.signal, steerGate);
   } finally {
+    steerGate.close();
     clearInterval(heartbeat);
     unregisterRunAbort(runId, abort);
     if (prof.stages.length > 0) deps.onRunProfile?.({ runId, stages: prof.stages, total: prof.total() });
@@ -663,6 +665,7 @@ async function executeRunInner(
   options: RunJobOptions,
   prof: ReturnType<typeof createProfiler>,
   signal: AbortSignal,
+  steerGate: { close: () => void },
 ) {
   const { db } = deps;
   // A job for one wait for the computer (back, grace, plan reset, room): only while the run still waits on it.
@@ -740,6 +743,7 @@ async function executeRunInner(
   }
   // status is `running` here.
   prof.mark("claim");
+  steerGate.close = answerNoTurn(deps.pubsub, run.id);
   const claimedAt = Date.now();
   // Asked in the main timeline, the run answers there; asked in a thread, in that thread.
   // A top-level trigger is read here, together with the channel, and reused for the context below.
@@ -2333,6 +2337,7 @@ async function executeRunInner(
   let firstTurn = true;
   // Live steering (`live-steer.ts`): while a computer turn is in flight, a person's message goes to it
   // (read at its next tool boundary) instead of waiting for the turn's end; any other time, it waits.
+  steerGate.close();
   const live = listenLiveSteering({ db, pubsub: deps.pubsub }, run, replyThreadId, {
     take: takeSteering,
     onHanded: (ids) => {
@@ -2358,11 +2363,11 @@ async function executeRunInner(
       }
     },
   });
-  // A person who writes in a few messages gets one answer: what they add in the next seconds is read with the first.
-  if (deps.quietMs && run.turns === 0 && !run.background && triggerMessage?.authorType === "person") {
-    await waitForBurst(db, triggerMessage, deps.quietMs);
-  }
   try {
+    // A person who writes in a few messages gets one answer: what they add in the next seconds is read with the first.
+    if (deps.quietMs && run.turns === 0 && !run.background && triggerMessage?.authorType === "person") {
+      await waitForBurst(db, triggerMessage, deps.quietMs);
+    }
     for (;;) {
       if (await isCanceled()) return stopCanceled("");
       // At the cap the inbox stays as it is: a message never gets marked read and then lost (the run's end

@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { schema } from "@agenteschat/db";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import { eq, schema, sql } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
-import { drainOutbox, getMessage, listMessages, openDm, postPersonMessage, type ToolSource } from "../src";
+import { drainOutbox, executeRun, getMessage, listMessages, openDm, postPersonMessage, type ToolSource } from "../src";
 import { waitForBurst } from "../src/burst";
 import { type Fixture, setup } from "./fixtures";
 
@@ -197,6 +197,38 @@ describe("messages in a row (ADR 0112)", () => {
     expect(run?.pendingMessageIds).toHaveLength(1);
   });
 
+  test("a database error during the wait, on the last try: the run fails and stops listening for live messages", async () => {
+    f = await setup({ quietMs: 400 });
+    await post("@dev oi");
+    const [queued] = await runs();
+    const open = new Set<object>();
+    const subscribe = f.pubsub.subscribe.bind(f.pubsub);
+    const subs = spyOn(f.pubsub, "subscribe").mockImplementation((topic, handler) => {
+      const off = subscribe(topic, handler);
+      if (!topic.startsWith("run-steer:")) return off;
+      const key = {};
+      open.add(key);
+      return () => {
+        open.delete(key);
+        off();
+      };
+    });
+    const select = f.db.select.bind(f.db);
+    const broken = spyOn(f.db, "select").mockImplementation(((fields?: Record<string, unknown>) => {
+      if (fields && "latest" in fields) throw new Error("connection reset");
+      return select(fields as never);
+    }) as typeof f.db.select);
+    try {
+      await executeRun(f.jobDeps, queued?.id ?? "", { finalAttempt: true });
+    } finally {
+      broken.mockRestore();
+      subs.mockRestore();
+    }
+    const [run] = await runs();
+    expect(run?.status).toBe("failed");
+    expect(open.size).toBe(0);
+  });
+
   test("a lone message waits only what is left of the quiet window, measured from when it was sent", async () => {
     f = await setup();
     const row = async (body: string) => {
@@ -205,9 +237,15 @@ describe("messages in a row (ADR 0112)", () => {
       if (!m) throw new Error("not posted");
       return m;
     };
-    const old = await row("@dev oi");
+    const sent = await row("@dev oi");
+    const [old] = await f.db
+      .update(schema.messages)
+      .set({ createdAt: sql`now() - interval '10 seconds'` })
+      .where(eq(schema.messages.id, sent.id))
+      .returning();
+    if (!old) throw new Error("not moved");
     const start = Date.now();
-    await waitForBurst(f.db, { ...old, createdAt: new Date(Date.now() - 10_000) }, 2500);
+    await waitForBurst(f.db, old, 2500);
     expect(Date.now() - start).toBeLessThan(200);
     const fresh = await row("@dev oi de novo");
     await waitForBurst(f.db, fresh, 600);
