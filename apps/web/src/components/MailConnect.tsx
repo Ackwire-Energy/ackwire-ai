@@ -9,7 +9,7 @@ import {
 } from "@agenteschat/client";
 import { LEVELS, type Level } from "@agenteschat/client/lib/access-levels";
 import { canTalk } from "@agenteschat/client/lib/audience";
-import { errorText } from "@agenteschat/client/lib/errors";
+import { errorText, knownErrorText } from "@agenteschat/client/lib/errors";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import {
   CUSTOM_PRESET,
@@ -55,7 +55,7 @@ import { FlowTitle } from "@/components/FlowTitle";
 import { LoadingList, useStepText } from "@/components/Loading";
 import { MailRulesPanel } from "@/components/MailRules";
 import { useOrg } from "@/components/org-context";
-import { reviewNote, ToolReview, type ToolReviewState } from "@/components/ToolReview";
+import { reviewNote, ToolLevelsView, ToolReview, type ToolReviewState } from "@/components/ToolReview";
 import { useDirectory } from "@/hooks/useDirectory";
 import { takesConnectorReturn } from "@/lib/desktop";
 import { navigateAway } from "@/lib/navigate";
@@ -526,7 +526,7 @@ function AddressesStep({
       <DialogBody className="cflow__body">
         <p className="muted cflow__text">{t("mail.addresses.lead")}</p>
         <AddressesFields account={account} draft={draft} />
-        {update.isError && <Alert>{t("mail.actionsError")}</Alert>}
+        {update.isError && <Alert>{knownErrorText(t, update.error) ?? t("mail.actionsError")}</Alert>}
       </DialogBody>
       <DialogFooter bar note={t("mail.addresses.later")}>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
@@ -575,7 +575,7 @@ function AddressesDialogBody({ account, onClose }: { account: MailAccount; onClo
     <>
       <DialogBody className="cflow__body">
         <AddressesFields account={account} draft={draft} />
-        {update.isError && <Alert>{t("mail.actionsError")}</Alert>}
+        {update.isError && <Alert>{knownErrorText(t, update.error) ?? t("mail.actionsError")}</Alert>}
       </DialogBody>
       <DialogFooter>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
@@ -592,10 +592,28 @@ function AddressesDialogBody({ account, onClose }: { account: MailAccount; onClo
   );
 }
 
-/** Step 2: what agents may do in this mailbox, in the standard tool review (Consulta · Muda · Aprovação · Desligada). */
+/** "Só Ana pode dar acesso…" for anyone but who connected the mailbox; nothing for them. */
+function OwnerOnlyNote({ account }: { account: MailAccount }) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
+  if (account.ownerUserId === me.user.id) return null;
+  const owner = dir.memberById.get(account.ownerUserId ?? "")?.name;
+  return (
+    <p className="small muted cflow__text">
+      {owner ? t("mail.agent.ownerOnly", { name: owner }) : t("mail.agent.ownerOnlyUnknown")}
+    </p>
+  );
+}
+
+/**
+ * Step 2: what agents may do in this mailbox, in the standard tool review (Consulta · Muda · Aprovação · Desligada).
+ * Only who connected it loosens these, so anyone else sees them read-only.
+ */
 function ActionsStep({ account, onNext, onClose }: { account: MailAccount; onNext: () => void; onClose: () => void }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
+  const mine = account.ownerUserId === me.user.id;
   const toast = useToast();
   const { update } = useMailAction(org.id);
   const tools = mailReviewTools(t, account);
@@ -610,18 +628,25 @@ function ActionsStep({ account, onNext, onClose }: { account: MailAccount; onNex
     <>
       <DialogBody className="cflow__body tr-body">
         <p className="muted cflow__text">{t("mail.toolsLead", { name: account.address })}</p>
-        <ToolReview
-          name={account.address}
-          tools={tools}
-          state={state}
-          onChange={setState}
-          onMoved={(m) => toast.show(m)}
-        />
-        {update.isError && <Alert>{t("mail.actionsError")}</Alert>}
+        {mine ? (
+          <ToolReview
+            name={account.address}
+            tools={tools}
+            state={state}
+            onChange={setState}
+            onMoved={(m) => toast.show(m)}
+          />
+        ) : (
+          <>
+            <OwnerOnlyNote account={account} />
+            <ToolLevelsView tools={tools} />
+          </>
+        )}
+        {update.isError && <Alert>{knownErrorText(t, update.error) ?? t("mail.actionsError")}</Alert>}
       </DialogBody>
-      <DialogFooter bar note={reviewNote(t, tools, state)}>
+      <DialogFooter bar note={mine ? reviewNote(t, tools, state) : undefined}>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
-        <Button variant="primary" disabled={update.isPending} loading={update.isPending} onClick={next}>
+        <Button variant="primary" disabled={update.isPending} loading={update.isPending} onClick={mine ? next : onNext}>
           {t("connectFlow.next")}
         </Button>
       </DialogFooter>
@@ -650,7 +675,6 @@ function WhoStep({
 }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
-  const dir = useDirectory(org.id);
   const api = useApi();
   const qc = useQueryClient();
   const toast = useToast();
@@ -666,7 +690,6 @@ function WhoStep({
     if (may.gives) return LEVELS;
     return may.removes ? LEVELS.slice(0, LEVELS.indexOf(current(a.id)) + 1) : [current(a.id)];
   };
-  const owner = account.ownerUserId === me.user.id ? null : dir.memberById.get(account.ownerUserId ?? "")?.name;
   const [who, setWho] = useState<Record<string, Level>>({});
   const levelOf = (agentId: string) => who[agentId] ?? current(agentId);
   const levelLabel = (l: Level) => t(`access.level.${l}`);
@@ -688,7 +711,8 @@ function WhoStep({
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.mail(org.id) });
       toast.show(t("connectFlow.saved", { count: granted.length, name: account.address }));
-      if (granted.length > 0) onRules(granted.map((a) => a.id));
+      // The rules are only for who connected the mailbox to set (anyone else's are ignored).
+      if (granted.length > 0 && account.ownerUserId === me.user.id) onRules(granted.map((a) => a.id));
       else onClose();
     },
   });
@@ -743,11 +767,7 @@ function WhoStep({
           {t("connectFlow.asksCount", { count: MAIL_ACTIONS.approval.length })}
         </p>
         <p className="small muted cflow__text">{t("mail.whoLead")}</p>
-        {account.ownerUserId !== me.user.id && (
-          <p className="small muted cflow__text">
-            {owner ? t("mail.agent.ownerOnly", { name: owner }) : t("mail.agent.ownerOnlyUnknown")}
-          </p>
-        )}
+        <OwnerOnlyNote account={account} />
         {grant.isError && <Alert>{errorText(t, grant.error)}</Alert>}
       </DialogBody>
       <DialogFooter bar>
