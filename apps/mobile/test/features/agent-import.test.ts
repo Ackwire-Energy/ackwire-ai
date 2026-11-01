@@ -13,6 +13,7 @@ import {
   phonePicks,
   planIn,
   reportCounts,
+  takesFiles,
 } from "../../src/features/agents/import";
 import { featureKeysEn } from "../../src/features/i18n/keys.en";
 import { featureKeysPtBR } from "../../src/features/i18n/keys.pt-BR";
@@ -70,6 +71,11 @@ describe("Importar agentes on the phone: which picked files are read", () => {
     expect(IMPORT_CARDS.filter(isRequestCard)).toEqual(["grok-bot", "chatgpt-dots", "other"]);
   });
 
+  test("Choose files is hidden only for the apps that answer in chat", () => {
+    expect(IMPORT_CARDS.filter((c) => !takesFiles(c))).toEqual(["grok-bot", "chatgpt-dots"]);
+    expect(takesFiles(null)).toBe(true);
+  });
+
   test("every other card has its phone how-to, in both languages", () => {
     const cards = IMPORT_CARDS.filter((c) => !isRequestCard(c));
     expect(Object.keys(featureKeysPtBR.newAgent.import.where).sort()).toEqual([...cards].sort());
@@ -108,7 +114,25 @@ describe("Importar agentes on the phone: the preview", () => {
       ["Otto", "otto", "unchanged", false, true, null],
     ]);
     expect(rows[0]?.role).toBe("Vendas");
+    expect(rows.map((r) => r.wanted)).toEqual(["vera", null]);
     expect(agentRows(b, items, new Set(), new Map())[0]?.on).toBe(false);
+  });
+
+  test("an id another app gave an agent is no handle and no rename", () => {
+    const id = "0f8e2a1c-4b3d-4e5f-9a7b-1c2d3e4f5a6b";
+    const b = bundle({
+      agents: [
+        { key: "x", name: "X", handle: id, role: "", instructions: "", model: null, appearance: {}, skills: [] },
+      ],
+    });
+    expect(agentRows(b, [item("agent", "x", "create")], new Set(), new Map())[0]).toMatchObject({
+      handle: null,
+      wanted: null,
+    });
+    expect(agentRows(b, [item("agent", "x", "create", { renamedTo: "x2" })], new Set(), new Map())[0]).toMatchObject({
+      handle: "x2",
+      wanted: null,
+    });
   });
 
   test("the rest by kind: one switch over what can be picked, skipped ones left out", () => {

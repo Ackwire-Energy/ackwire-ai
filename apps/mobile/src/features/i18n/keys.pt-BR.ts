@@ -699,6 +699,12 @@ export const featureKeysPtBR = {
         "O celular não abre .zip nem .tar.gz. No app Arquivos, toque no .zip para descompactar e escolha os arquivos de dentro, ou importe pelo computador.",
       privacy: "Lido neste celular. Arquivos de chaves e logins nunca são abertos.",
       also: "Também vem junto",
+      arrives: {
+        both: "As skills chegam desligadas e as rotinas chegam pausadas.",
+        skill: "As skills chegam desligadas.",
+        routine: "As rotinas chegam pausadas.",
+      },
+      change: "Trocar",
       leftOut: "Não vem junto: {{groups}}",
       arrived_one: "{{name}} chegou",
       arrived_other: "{{count}} agentes chegaram",

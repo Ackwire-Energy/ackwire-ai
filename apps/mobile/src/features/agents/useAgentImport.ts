@@ -30,7 +30,12 @@ export function useAgentImport(orgId: string) {
   const [card, setCard] = useState<ImportCard | null>(null);
   const [busy, setBusy] = useState<"reading" | "planning" | null>(null);
   const [failure, setFailure] = useState<ImportFailure | null>(null);
-  const [plan, setPlan] = useState<{ orgId: string; bundle: MigrationBundle; items: ImportItemResult[] } | null>(null);
+  const [plan, setPlan] = useState<{
+    orgId: string;
+    bundle: MigrationBundle;
+    items: ImportItemResult[];
+    from: ImportFailure["from"];
+  } | null>(null);
   const planned = planIn(plan, orgId);
   const [applyError, setApplyError] = useState<unknown>(null);
   const [pick, setPick] = useState<Set<string>>(new Set());
@@ -71,7 +76,7 @@ export function useAgentImport(orgId: string) {
       const plan = await api.imports.apply(orgId, { bundle, dryRun: true });
       if (!current()) return;
       done.current = new Map();
-      setPlan({ orgId, bundle, items: plan.items });
+      setPlan({ orgId, bundle, items: plan.items, from });
       setPick(new Set(plan.items.filter(choosable).map(itemId)));
       setCard(bundleOrigin(bundle).card);
     } catch (cause) {

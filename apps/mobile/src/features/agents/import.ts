@@ -7,6 +7,7 @@ import {
   type RequestCard,
 } from "@agenteschat/client/lib/import/flow";
 import { ARCHIVE_PATH, IMPORT_MAX_BYTES, isSecretPath, TEXT_PATH } from "@agenteschat/client/lib/import/shared";
+import { isIdHandle } from "@agenteschat/tokens/names";
 
 /**
  * Bringing agents from another app on the phone, the pure part: which picked files are read, the preview's rows
@@ -17,6 +18,9 @@ import { ARCHIVE_PATH, IMPORT_MAX_BYTES, isSecretPath, TEXT_PATH } from "@agente
 /** The cards whose app answers the export request (pasted back), not a file. */
 export const isRequestCard = (card: ImportCard | null): card is RequestCard =>
   card === "grok-bot" || card === "chatgpt-dots" || card === "other";
+
+/** Whether "Choose files" applies: not for the apps that only answer in chat ("Another app" may still be files). */
+export const takesFiles = (card: ImportCard | null) => card !== "grok-bot" && card !== "chatgpt-dots";
 
 /** A file from the system picker. */
 export interface PickedAsset {
@@ -42,8 +46,10 @@ export interface AgentRow {
   id: string;
   name: string;
   role: string;
-  /** The @ it gets here (another when the bundle's is taken). */
-  handle: string;
+  /** The @ it gets here (another when the bundle's is taken); null for an id another app gave it, not yet renamed. */
+  handle: string | null;
+  /** The bundle's @ when it was taken here and the agent gets `handle` instead. */
+  wanted: string | null;
   appearance: MigrationBundle["agents"][number]["appearance"];
   status: RowStatus;
   /** Why it doesn't come, or a note on a create (its model isn't here). */
@@ -68,11 +74,13 @@ export function agentRows(
       const agent = byKey.get(item.key);
       const id = itemId(item);
       const free = choosable(item) && !blocked.has(id);
+      const own = agent?.handle ?? item.key;
       return {
         id,
         name: agent?.name ?? item.label,
         role: agent?.role ?? "",
-        handle: item.renamedTo ?? agent?.handle ?? item.key,
+        handle: item.renamedTo ?? (isIdHandle(own) ? null : own),
+        wanted: item.renamedTo && !isIdHandle(own) ? own : null,
         appearance: agent?.appearance ?? {},
         status: item.action,
         reason: item.reason ?? blocked.get(id) ?? null,
