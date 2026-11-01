@@ -102,7 +102,14 @@ import {
 } from "./continuation";
 import { modelInfoFor } from "./credentials";
 import { isAgentOnlyDm } from "./dms";
-import { BudgetExceededError, MissingCredentialError, NotFoundError, ValidationError } from "./errors";
+import {
+  BudgetExceededError,
+  codedErrorMessage,
+  dataExceptionMessage,
+  MissingCredentialError,
+  NotFoundError,
+  ValidationError,
+} from "./errors";
 import { type ChannelEvent, type MemoryUpdate, publishChannelEvent, publishMessageCreated } from "./events";
 import { FOLLOW_UP_TOOL, wakesLater } from "./follow-through";
 import { cutText } from "./format";
@@ -3119,6 +3126,21 @@ async function executeRunInner(
   } catch (error) {
     // A state change lost to a cancel (the final or suspend transition found `canceled`): end as canceled.
     if (await isCanceled().catch(() => false)) return stopCanceled("");
+    // A value the database refuses fails every retry, and a last try has none left: the run fails now and says
+    // why, or the stale-run sweep would end it later as cut by a restart.
+    const refused = dataExceptionMessage(error);
+    const gaveUp = refused || (options.finalAttempt && !(error instanceof PermanentJobError));
+    const [current] = gaveUp
+      ? await db.select({ status: agentRuns.status }).from(agentRuns).where(eq(agentRuns.id, run.id))
+      : [];
+    if (current?.status === "running") {
+      // The conversation shows this reason to everyone: a driver's message, never SQL text or a bug's raw words.
+      const detail = refused ?? codedErrorMessage(error);
+      if (!refused) await addRunStep(db, run, "error", { reason: "gave_up", message: String(error) }).catch(() => {});
+      return fail(
+        detail ? `Stopped after an error: ${cutText(detail, 300)}` : "Stopped after an error that kept repeating.",
+      );
+    }
     throw error;
   } finally {
     live.close();

@@ -107,3 +107,31 @@ export function isUniqueViolation(error: unknown): boolean {
   }
   return false;
 }
+
+/** The first error in `error`'s cause chain with a string `code` (the driver's, under Drizzle's wrapper), or null. */
+function codedError(error: unknown): { code: string; message?: string } | null {
+  let e: unknown = error;
+  for (let i = 0; i < 4 && e; i++) {
+    if (typeof (e as { code?: unknown }).code === "string") return e as { code: string; message?: string };
+    e = (e as { cause?: unknown }).cause;
+  }
+  return null;
+}
+
+/**
+ * The Postgres message of a data exception (SQLSTATE class 22: a value the database refuses), which fails the
+ * same way on every try; null for anything else. Works with postgres.js and PGlite (Drizzle wraps the error).
+ */
+export function dataExceptionMessage(error: unknown): string | null {
+  const e = codedError(error);
+  return e?.code.startsWith("22") ? e.message || e.code : null;
+}
+
+/**
+ * The message of the coded error under `error` (a driver's or a domain error's), never Drizzle's
+ * "Failed query: <SQL> params: <values>" wrapper; null when nothing in the chain has a code.
+ */
+export const codedErrorMessage = (error: unknown): string | null => {
+  const e = codedError(error);
+  return e ? e.message || e.code : null;
+};
