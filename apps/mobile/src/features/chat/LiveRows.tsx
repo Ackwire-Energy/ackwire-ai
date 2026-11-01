@@ -11,7 +11,7 @@ import {
 } from "@agenteschat/client/lib/activity";
 import { initialReveal, rebaseReveal, revealStep } from "@agenteschat/client/lib/reveal";
 import { formatDuration, waitStep } from "@agenteschat/client/lib/work";
-import { AGENT_GRADIENTS, type AgentColorName } from "@agenteschat/ui/agent/engine";
+import { type AgentColorName, gradientOf } from "@agenteschat/ui/agent/engine";
 import { memo, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -187,7 +187,7 @@ function WaitLine({ work, color }: { work: LiveRun["work"]; color: AgentColorNam
   const { scheme } = useTheme();
   const reduced = useReducedMotion();
   const time = useFrameTime(!reduced, 0);
-  const [light, deep] = AGENT_GRADIENTS[color] ?? AGENT_GRADIENTS.sky;
+  const [light, deep] = gradientOf(color);
   const step = waitStep(t, work);
   return (
     <View style={styles.wait} accessible accessibilityLiveRegion="polite" accessibilityLabel={step}>

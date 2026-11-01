@@ -2954,6 +2954,10 @@ function ActivityBar({
   // The time, "Ver" and the stop are one agent's: with several, the line can't say whose (the composer still stops).
   const soloRun = agents.length === 1 && firstAgent ? runs.find((r) => r.agentId === firstAgent.id) : undefined;
   const took = barElapsed(t, entries, runs, now);
+  // One agent on its own: its face is on its row in the conversation once the row shows, not here again. With no
+  // faces in the bar, the orbit stands in for them.
+  const stackShown = !(entries.length === 1 && soloRun && rowShows(soloRun, now) && !barAsking(entries));
+  const facesShown = stackShown && barFaces(entries).length > 0;
   // Agents running code: "Ver código" with the live code and output.
   const coding = runs.filter(
     (r) => outOfView(r.runId) && r.code && (r.work ?? []).some((w) => w.kind === "call" && w.running),

@@ -1,4 +1,4 @@
-import { AGENT_GRADIENTS, type AgentColorName } from "@agenteschat/ui/agent/engine";
+import { type AgentColorName, gradientOf } from "@agenteschat/ui/agent/engine";
 import { Canvas, Path, Skia } from "@shopify/react-native-skia";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -185,7 +185,7 @@ export function Constellation({ map, selected, height, onSelect }: Constellation
       dim: squares(line(false), 1.5),
       hot: squares(line(true), 2),
       white: squares(white, 2),
-      tinted: [...tinted].map(([color, pts]) => ({ color: AGENT_GRADIENTS[color][0], path: squares(pts, 2) })),
+      tinted: [...tinted].map(([color, pts]) => ({ color: gradientOf(color)[0], path: squares(pts, 2) })),
     };
   }, [map, at, selected, dir]);
 

@@ -220,8 +220,6 @@ export const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (c) => `&#$
 
 const oneSpaced = (text: string) => text.replace(/\s+/g, " ").trim();
 
-const WORD_CHAR = /[\p{L}\p{N}]/u;
-
 /**
  * Whether `whole` already holds `part` word for word (line breaks and extra spaces aside), as whole words: "Ok" is
  * not in "Okay", "Vou ver." is not in "Vou verificar".

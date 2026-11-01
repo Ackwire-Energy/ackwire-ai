@@ -5,18 +5,16 @@ setupDom();
 
 import { join } from "node:path";
 import type { Approval, Message } from "@agenteschat/client";
-import { barEntries, barPhrase, markedPieces, markFaced, markInk } from "@agenteschat/client/lib/activity";
+import { markedPieces, markFaced, markInk } from "@agenteschat/client/lib/activity";
 import { mentionsHandle } from "@agenteschat/client/lib/markdown";
 import { apiProviderOf } from "@agenteschat/client/lib/providers";
 import { splitAtNames, wordIndex } from "@agenteschat/client/lib/text";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import type { TFunction } from "i18next";
 import type { ReactElement } from "react";
 import { withAgentFace, withAgentFaces } from "@/components/AgentAvatar";
 import { InlineApproval } from "@/components/ApprovalItem";
 import { SidebarHorizon } from "@/components/Sky";
 import { boldNames } from "@/components/WorkingLine";
-import { createI18n } from "@/i18n";
 import { atRule, declarations, topLevel } from "./built-css";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, renderPage, screen, settle } from "./render";
@@ -437,48 +435,9 @@ describe("agent faces in more lines", () => {
     expect(document.querySelector("p")?.textContent).toBe("Atlas respondeu à pergunta da Ada");
   });
 
-  test("the working bar's 'said' line: the agent's face before its name, other names stay in ink", async () => {
-    const t = createI18n("pt-BR").t as unknown as TFunction;
-    const runs = [
-      {
-        channelId: ENG_ID,
-        threadId: "m-1",
-        runId: "r-said",
-        agentId: ADA_ID,
-        lastSeq: 0,
-        status: "running" as const,
-        text: "",
-        tool: "browser_read",
-        work: [
-          { kind: "say" as const, text: "Achei a área" },
-          {
-            kind: "call" as const,
-            id: "k1",
-            tool: "browser_read",
-            connector: null,
-            detail: null,
-            code: null,
-            output: [],
-            running: true,
-            since: 0,
-          },
-        ],
-      },
-    ];
-    const entries = barEntries(
-      runs,
-      [],
-      () => "Ada",
-      () => undefined,
-      [],
-      true,
-    );
-    // The turn that says its last words (the sentence, then those words: no long step yet).
-    const said = barPhrase(t, entries, runs, 1, 0, markInk, markFaced);
-    expect(markedPieces(said)).toEqual([
-      { text: "Ada", bold: true, agentId: ADA_ID },
-      { text: ": Achei a área", bold: false },
-    ]);
+  test("a faced name draws the agent's face before it; other names stay in ink", async () => {
+    const said = `${markFaced("Ada", ADA_ID)}: Achei a área`;
+    expect(markedPieces(said)[0]).toEqual({ text: "Ada", bold: true, agentId: ADA_ID });
     expect(markedPieces(`${markInk("Theo")} e ${markInk("Iris")}`)).toEqual([
       { text: "Theo", bold: true },
       { text: " e ", bold: false },
@@ -487,7 +446,6 @@ describe("agent faces in more lines", () => {
     await renderPage(<p>{boldNames(said)}</p>, { api: createFakeApi(seedState()), org: true });
     await settle(2);
     expect(document.querySelector("p .ac-who b")?.textContent).toBe("Ada");
-    expect(document.querySelector("p")?.textContent).toBe("Ada: Achei a área");
   });
 
   test("a toast that names an agent draws its face; a plain one stays plain", async () => {

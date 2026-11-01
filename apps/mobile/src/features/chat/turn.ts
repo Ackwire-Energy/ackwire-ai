@@ -1,6 +1,6 @@
 import type { LiveRun } from "@agenteschat/client";
-import { holdsText } from "@agenteschat/client/lib/text";
 import { waitsForWords } from "@agenteschat/client/lib/activity";
+import { holdsText } from "@agenteschat/client/lib/text";
 import { type ToolItem, toolItemsLive } from "@agenteschat/client/lib/work";
 
 /**
@@ -52,7 +52,10 @@ export function turnOpener(items: readonly ToolItem[], posted = ""): { said: str
   const first = items.find((x) => x.kind === "say");
   // Said before a call and then posted as the saved reply (`posted`, the lead before a card): the reply shows it.
   if (first)
-    return { said: posted && holdsText(posted, first.text) ? null : first.text, lines: items.filter((x) => x !== first) };
+    return {
+      said: posted && holdsText(posted, first.text) ? null : first.text,
+      lines: items.filter((x) => x !== first),
+    };
   return { said: null, lines: [...items] };
 }
 

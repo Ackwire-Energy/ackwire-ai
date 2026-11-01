@@ -1,7 +1,7 @@
 import type { Issue, IssueColumn } from "@agenteschat/client";
 import { dueLabel } from "@agenteschat/client/lib/format";
 import { stepPhrase } from "@agenteschat/client/lib/work";
-import { AGENT_GRADIENTS, type AgentColorName } from "@agenteschat/ui/agent/engine";
+import { type AgentColorName, gradientOf } from "@agenteschat/ui/agent/engine";
 import { router } from "expo-router";
 import { memo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
@@ -90,7 +90,7 @@ export function CriteriaTrack({ issue, color, going }: { issue: Issue; color: Ag
   const c = useColors();
   const p = criteriaProgress(issue);
   if (!p) return null;
-  const [top, bottom] = AGENT_GRADIENTS[color];
+  const [top, bottom] = gradientOf(color);
   return (
     <View
       style={styles.track}

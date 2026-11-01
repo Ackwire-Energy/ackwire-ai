@@ -8,13 +8,7 @@ import type {
   ReactionCount,
 } from "@agenteschat/client";
 import { agentProposalOf, stretchCardOf } from "@agenteschat/client/lib/action-cards";
-import {
-  type ActivityEntry,
-  barEntries,
-  type barWords,
-  markedPieces,
-  markInk,
-} from "@agenteschat/client/lib/activity";
+import { type ActivityEntry, barEntries, type barWords, markedPieces, markInk } from "@agenteschat/client/lib/activity";
 import { splitChannelRefs } from "@agenteschat/client/lib/channel-refs";
 import { type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
 import {
