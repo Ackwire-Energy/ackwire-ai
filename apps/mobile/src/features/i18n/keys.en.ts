@@ -1361,8 +1361,7 @@ export const featureKeysEn: FeatureTranslations = {
   browser: {
     card: {
       needs: "{{name}} needs help",
-      needsFor_one: "{{name}} needs help · {{count}} min",
-      needsFor_other: "{{name}} needs help · {{count}} min",
+      needsFor: "{{name}} needs help · {{time}}",
       inControlAt: "You're in control · {{host}}",
       doing: "{{name}} · {{doing}}",
       startingF: "Opening {{name}}'s browser…",
@@ -1400,10 +1399,10 @@ export const featureKeysEn: FeatureTranslations = {
       page: "The browser's page. Tap to click.",
       graceF: "If you leave, {{name}} waits 2 min.",
       graceM: "If you leave, {{name}} waits 2 min.",
-      closedHelpF: "Its sign-ins stay saved.",
-      closedHelpM: "Its sign-ins stay saved.",
-      stuckHelpF: "Try again restarts the browser. Its sign-ins stay saved.",
-      stuckHelpM: "Try again restarts the browser. Its sign-ins stay saved.",
+      closedHelpF: "Logins stay saved for next time.",
+      closedHelpM: "Logins stay saved for next time.",
+      stuckHelpF: "Try again restarts the browser. Logins stay saved.",
+      stuckHelpM: "Try again restarts the browser. Logins stay saved.",
       hidden: "{{name}} is in control · screen hidden",
       key: {
         Tab: "Tab",

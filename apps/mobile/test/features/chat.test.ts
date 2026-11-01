@@ -829,6 +829,11 @@ describe("an agent's turn as one block", () => {
     const opened = turnOpener(said, turnItems(said));
     expect(opened).toMatchObject({ said: "Vou pedir pro Josh", opener: null });
     expect(opened.lines.map((x) => x.kind)).toEqual(["call"]);
+    // Then posted as the saved reply (the lead before a card): the reply shows it, never twice.
+    const posted = turnOpener(said, turnItems(said), "Vou pedir pro Josh.\n\nEle sabe onde está.");
+    expect(posted.said).toBeNull();
+    expect(posted.lines.map((x) => x.kind)).toEqual(["call"]);
+    expect(turnOpener(said, turnItems(said), "Vou pedir pro Joshua").said).toBe("Vou pedir pro Josh");
 
     expect(turnOpener(run({ runId: "w", status: "running", text: "Ontem" }), []).opener).toBeNull();
     expect(turnOpener(run({ runId: "s", status: "canceled" }), []).opener).toBeNull();

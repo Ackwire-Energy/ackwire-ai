@@ -1,4 +1,5 @@
 import type { LiveRun } from "@agenteschat/client";
+import { holdsText } from "@agenteschat/client/lib/text";
 import { type ToolItem, toolItemsLive } from "@agenteschat/client/lib/work";
 
 /**
@@ -47,9 +48,16 @@ export const OPENERS = 3;
 export function turnOpener(
   run: Pick<LiveRun, "runId" | "status" | "text">,
   items: readonly ToolItem[],
+  posted = "",
 ): { said: string | null; opener: number | null; lines: ToolItem[] } {
   const first = items.find((x) => x.kind === "say");
-  if (first) return { said: first.text, opener: null, lines: items.filter((x) => x !== first) };
+  // Said before a call and then posted as the saved reply (`posted`, the lead before a card): the reply shows it.
+  if (first)
+    return {
+      said: posted && holdsText(posted, first.text) ? null : first.text,
+      opener: null,
+      lines: items.filter((x) => x !== first),
+    };
   const generic = run.text.length === 0 && run.status !== "canceled";
   let h = 0;
   for (const ch of run.runId) h = (h * 31 + ch.charCodeAt(0)) >>> 0;

@@ -1,7 +1,7 @@
 import type { Agent } from "@agenteschat/client";
 import {
   controlledBy,
-  handoffMinutesLeft,
+  handoffTimeLeft,
   isWaitingHandoff,
   useBrowserHandoffMutations,
   useMachineOutages,
@@ -394,13 +394,13 @@ function ComputerStage({
                   ? t("agentComputer.ask.banner", {
                       ...g,
                       ask: waiting.instructions,
-                      count: handoffMinutesLeft(waiting, now) ?? 0,
+                      time: handoffTimeLeft(t, waiting, now) ?? "",
                     })
                   : t("agentComputer.ask.bannerOther", {
                       ...g,
                       person: person(waiting.requestedForUserId),
                       ask: waiting.instructions,
-                      count: handoffMinutesLeft(waiting, now) ?? 0,
+                      time: handoffTimeLeft(t, waiting, now) ?? "",
                     })
               }
               action={

@@ -147,8 +147,8 @@ describe("the agent's computer without screens (a Mac): its browser's page, in t
 
     // Closed after 15 unused minutes: never "it opens when", nothing about waking.
     await push({ type: "browser.unavailable", agentId: ADA_ID, reason: "closed" });
-    expect(card().textContent).toContain("O navegador da Ada está fechado");
-    expect(card().textContent).toContain("Os logins continuam salvos.");
+    expect(card().textContent).toContain("O navegador da Ada está fechado.");
+    expect(card().textContent).toContain("Os logins continuam salvos para a próxima vez.");
     expect(card().textContent).not.toContain("Abre quando");
     // One surface: the agent's sky over the whole stage, its card on it, no frost over a blank page.
     expect(card().querySelector(".brw-ac__stage > .brw-dim--sky > .cmp-sky")).not.toBeNull();

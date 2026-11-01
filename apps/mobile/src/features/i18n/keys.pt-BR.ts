@@ -1364,8 +1364,7 @@ export const featureKeysPtBR = {
   browser: {
     card: {
       needs: "{{name}} precisa de ajuda",
-      needsFor_one: "{{name}} precisa de ajuda · {{count}} min",
-      needsFor_other: "{{name}} precisa de ajuda · {{count}} min",
+      needsFor: "{{name}} precisa de ajuda · {{time}}",
       inControlAt: "Você no controle · {{host}}",
       doing: "{{name}} · {{doing}}",
       startingF: "Abrindo o navegador da {{name}}…",
@@ -1403,8 +1402,8 @@ export const featureKeysPtBR = {
       page: "A página do navegador. Toque para clicar.",
       graceF: "Se você sair, a {{name}} espera 2 min.",
       graceM: "Se você sair, o {{name}} espera 2 min.",
-      closedHelpF: "Os logins continuam salvos.",
-      closedHelpM: "Os logins continuam salvos.",
+      closedHelpF: "Os logins continuam salvos para a próxima vez.",
+      closedHelpM: "Os logins continuam salvos para a próxima vez.",
       stuckHelpF: "Tentar de novo reinicia o navegador. Os logins continuam salvos.",
       stuckHelpM: "Tentar de novo reinicia o navegador. Os logins continuam salvos.",
       hidden: "{{name}} está no controle · tela oculta",

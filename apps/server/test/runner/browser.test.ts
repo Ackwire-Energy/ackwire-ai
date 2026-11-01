@@ -1308,6 +1308,125 @@ test.if(posix)("an idle browser's Chrome stops, but not while someone watches or
 });
 
 test.if(posix)(
+  "a help request forgotten on a dropped connection still holds its browser for the idle time",
+  async () => {
+    let now = 1_000_000;
+    const t = setup({ now: () => now, idleMs: 60_000 });
+    await t.act("open", ["https://b.example"], { agent: ops });
+    now += 50_000;
+    t.manager.setHandoff(ops.id, { status: "pending" });
+    t.manager.clearHandoffs();
+    now += 20_000;
+    await t.manager.sweep();
+    expect(t.chromes[0]?.killed).toBe(false);
+    now += 41_000;
+    await t.manager.sweep();
+    expect(t.chromes[0]?.killed).toBe(true);
+  },
+);
+
+test.if(posix)("while a help request is open, agent-browser's own idle timeout never comes", async () => {
+  let now = 1_000_000;
+  const t = setup({ now: () => now, idleMs: 300_000 });
+  await t.act("open", ["https://b.example"]);
+  t.manager.setHandoff(dev.id, { status: "pending" });
+  const touches = () => t.logged().filter((c) => c.args.slice(-2).join(" ") === "stream status").length;
+  now += 100_000;
+  await t.manager.sweep();
+  expect(touches()).toBe(0);
+  now += 100_000;
+  await t.manager.sweep();
+  expect(touches()).toBe(1);
+  // Touched: not again until it nears the timeout once more.
+  now += 60_000;
+  await t.manager.sweep();
+  expect(touches()).toBe(1);
+  expect(t.chromes[0]?.killed).toBe(false);
+});
+
+test.if(posix)(
+  "a watched page's frames don't hold off agent-browser's own idle timeout under a help request",
+  async () => {
+    let now = 1_000_000;
+    const t = setup({ now: () => now, idleMs: 300_000 });
+    await t.act("open", ["https://b.example"]);
+    t.manager.setHandoff(dev.id, { status: "pending" });
+    await t.manager.streamStart(dev, "watch");
+    const touches = () => t.logged().filter((c) => c.args.slice(-2).join(" ") === "stream status").length;
+    const before = touches();
+    const frame = (seq: number) =>
+      t.sockets[0]?.push({ type: "frame", seq, data: "/9j/A", metadata: { deviceWidth: 1280, deviceHeight: 720 } });
+    now += 150_000;
+    frame(1);
+    await t.manager.sweep();
+    expect(touches()).toBe(before);
+    // Frames kept coming (a spinner), but agent-browser got no command for nearly its timeout.
+    now += 100_000;
+    frame(2);
+    await t.manager.sweep();
+    expect(touches()).toBe(before + 1);
+  },
+);
+
+test.if(posix)(
+  "under an open help request, a view after agent-browser let go of Chrome opens the page again",
+  async () => {
+    const t = setup();
+    await t.act("open", ["https://shop.example.com/login"], { allowedDomains: ["shop.example.com"] });
+    t.manager.setHandoff(dev.id, { status: "pending", request: "Sign in" });
+    t.page({ open: false });
+    expect(await t.manager.streamStart(dev, "watch")).toEqual({ mode: "watch" });
+    expect(t.logged().some((c) => c.args.slice(-2).join(" ") === "open https://shop.example.com/login")).toBe(true);
+    await t.manager.streamStop(dev);
+    // No request open: it says the browser is closed.
+    t.manager.setHandoff(dev.id, null);
+    t.page({ open: false });
+    expect(await errorCode(() => t.manager.streamStart(dev, "watch"))).toBe("browser_closed");
+  },
+);
+
+test.if(posix)(
+  "a browser reopened for a help request never goes back to a page off the agent's allowed sites",
+  async () => {
+    const t = setup();
+    await t.act("open", ["https://shop.example.com/login"], { allowedDomains: ["shop.example.com"] });
+    // The page moved off the sites (a redirect seen in the live view), then Chrome crashed.
+    t.manager.setHandoff(dev.id, { status: "pending", request: "Sign in" });
+    await t.manager.streamStart(dev, "watch");
+    t.sockets[0]?.push({ type: "url", url: "https://evil.example/x" });
+    await t.manager.streamStop(dev);
+    t.chromes[0]?.close();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(await t.manager.streamStart(dev, "watch")).toEqual({ mode: "watch" });
+    const opens = t
+      .logged()
+      .filter((c) => c.args.at(-2) === "open")
+      .map((c) => c.args.at(-1));
+    expect(opens).toEqual(["https://shop.example.com/login", "about:blank"]);
+  },
+);
+
+test.if(posix)(
+  "a browser that closed under an open help request opens again on its last page for the view",
+  async () => {
+    const t = setup();
+    await t.act("open", ["https://shop.example.com/login"]);
+    t.manager.setHandoff(dev.id, { status: "pending", request: "Sign in" });
+    t.chromes[0]?.close();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(await t.manager.streamStart(dev, "watch")).toEqual({ mode: "watch" });
+    expect(t.chromes).toHaveLength(2);
+    expect(t.logged().some((c) => c.args.slice(-2).join(" ") === "open https://shop.example.com/login")).toBe(true);
+    await t.manager.streamStop(dev);
+    // With no request open, a closed browser stays closed: the view says so.
+    t.manager.setHandoff(dev.id, null);
+    t.chromes[1]?.close();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(await errorCode(() => t.manager.streamStart(dev, "watch"))).toBe("browser_closed");
+  },
+);
+
+test.if(posix)(
   "a site's session (kept only until the browser closes) outlives an idle stop, and the last tabs don't come back",
   async () => {
     let now = 1_000_000;

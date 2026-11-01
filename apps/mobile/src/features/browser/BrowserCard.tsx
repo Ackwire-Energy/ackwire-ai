@@ -2,7 +2,7 @@ import {
   type BrowserHandoff,
   browserSteps,
   handoffFuse,
-  handoffMinutesLeft,
+  handoffTimeLeft,
   isOpenHandoff,
   type LiveRun,
   profileLiveKey,
@@ -230,14 +230,14 @@ export function BrowserCard({
     host ||
     (surface ? "" : idle ? t("browser.inCard.group", agentGrammar(t, name)) : t("browser.watch.title"));
   const hasAction = Boolean(mine && handoff) || waiting || (!controller && canTake);
-  const minutes = waiting ? handoffMinutesLeft(handoff, now) : null;
+  const left = waiting ? handoffTimeLeft(t, handoff, now) : null;
   const subtitle = mine
     ? host
       ? t("mobile.browser.card.inControlAt", { host })
       : t("mobile.browser.live.inControl")
     : waiting
-      ? minutes !== null
-        ? t("mobile.browser.card.needsFor", { name, count: minutes })
+      ? left !== null
+        ? t("mobile.browser.card.needsFor", { name, time: left })
         : t("mobile.browser.card.needs", { name })
       : helper
         ? t("mobile.browser.live.helping", { name: helper })

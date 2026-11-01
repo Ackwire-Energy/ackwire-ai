@@ -115,6 +115,7 @@ import { localMeta, replyOf } from "@agenteschat/client/lib/reply";
 import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
+import { holdsText } from "@agenteschat/client/lib/text";
 import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@agenteschat/client/lib/threads";
 import { buildTimeline, groupsWith, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
 import { splitCanceled } from "@agenteschat/client/lib/work";
@@ -3282,8 +3283,10 @@ export const TimelineMessage = memo(function TimelineMessage({
       ? keptAll.filter((w) => !(w.kind === "call" && onCards.some((s) => isScreenTool(w.tool, s))))
       : keptAll;
   // The line it opened with live stays where it was, above the steps: it never vanishes into the fold.
-  const keptSaid = keptWork?.find((w) => w.kind === "say");
-  const keptSteps = keptSaid && keptWork ? keptWork.filter((w) => w !== keptSaid) : keptWork;
+  const keptFirst = keptWork?.find((w) => w.kind === "say");
+  const keptSteps = keptFirst && keptWork ? keptWork.filter((w) => w !== keptFirst) : keptWork;
+  // Said before a call and then posted as this message (the lead before a card): the body already shows it.
+  const keptSaid = keptFirst?.kind === "say" && !holdsText(body, keptFirst.text) ? keptFirst : undefined;
   // People see name, time and text; the date, model and tokens wait behind the time. An agent's sticker after its
   // reply carries the reply's run: its model and tokens are the reply's, never said twice.
   const usage = m.author.type === "agent" && !mediaAfter ? messageUsage(m) : null;
