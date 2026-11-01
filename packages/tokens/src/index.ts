@@ -24,6 +24,8 @@ export interface ThemeColors {
   ink2: string;
   muted: string;
   faint: string;
+  /** The keyboard focus ring's color (`--focus-color`, the strong line). */
+  focusColor: string;
   agent: string;
   agent2: string;
   agentSoft: string;
@@ -67,6 +69,7 @@ export const light: ThemeColors = {
   ink2: "#2a2a28",
   muted: "#5c5c58",
   faint: "#6f6f6a",
+  focusColor: "#82827d",
   agent: "#0063d1",
   agent2: "#3d8bff",
   agentSoft: "#e3eefd",
@@ -109,6 +112,7 @@ export const dark: ThemeColors = {
   ink2: "#d6d6d2",
   muted: "#a3a39e",
   faint: "#8f8f89",
+  focusColor: "#71716c",
   agent: "#5aa8ff",
   agent2: "#8cc3ff",
   agentSoft: "#11253f",

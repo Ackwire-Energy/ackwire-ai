@@ -16,6 +16,8 @@ describe("focus rings only for the keys", () => {
   test("a key that moves the focus turns them on, one that moves nothing doesn't; a press turns them off", () => {
     trackInput();
     const html = document.documentElement;
+    // Other test files in the same process may have pressed keys: start from a press, as a page load with the mouse would.
+    fireEvent.pointerDown(document.body, { pointerType: "mouse" });
     document.body.innerHTML =
       '<button type="button">Ver perfil</button><textarea></textarea><input type="radio" name="r"><input type="radio" name="r">';
     const [button, box, radio, radio2] = [...document.querySelectorAll<HTMLElement>("button, textarea, input")];
