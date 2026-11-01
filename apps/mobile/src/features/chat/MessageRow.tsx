@@ -19,6 +19,7 @@ import { CONTINUE_ERRORS, errorCode, errorText } from "@agenteschat/client/lib/e
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
 import { brainUnavailableOf } from "@agenteschat/client/lib/machine-outages";
+import { isMediaAfterReply, messageMediaOf } from "@agenteschat/client/lib/media";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import { missionSetupOf } from "@agenteschat/client/lib/missions";
 import { isTalkerReply, routineReportText } from "@agenteschat/client/lib/notices";
@@ -32,6 +33,7 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { CHROME_MAX_SCALE, Count, Icon, InkOrbit, PixelStopped, PressScale, Text, useTheme, useToast } from "@/ui";
+import { InstructionProposals } from "../agents/InstructionProposalCard";
 import { ProposalCard } from "../agents/ProposalCard";
 import { NoAiCard } from "../ai/NoAiCard";
 import { StretchCard } from "../ai/StretchCard";
@@ -46,6 +48,8 @@ import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/h
 import { agentLook } from "../shared/logic";
 import { tapHaptic } from "../shared/parts";
 import { ReceiptMark } from "./AgentReceipts";
+import { secretRequestOf } from "./ask-store";
+import { ChatMedia } from "./ChatMedia";
 import { ConsultGroup } from "./ConsultGroup";
 import { ApprovalInline, ConsultationCard, QuestionCard, ThreadLink } from "./cards";
 import { IssueWorkCard } from "./issue-work";
@@ -66,6 +70,7 @@ import {
 import { MemoryMarks } from "./MemoryMark";
 import { MessageText } from "./MessageText";
 import { Receipts } from "./Receipts";
+import { SecretCard } from "./SecretCard";
 import { TeamChecks } from "./TeamChecks";
 import { SavedTools, TurnTools } from "./ToolCalls";
 import { recentTurn, stepLimitOf, stoppedOf, turnOpener } from "./turn";
@@ -144,13 +149,22 @@ export const MessageRow = memo(function MessageRow({
   // What the server wrote itself is said in the person's language; a stopped reply drops the server's note.
   const body = hidesBody(m) ? "" : reminderBody(splitCanceled(serverBody(t, m.body, meta), meta).body, meta);
   const consulted = isAgent && m.author.id ? consultationsOf(meta) : [];
+  // A GIF or a sticker (ADR 0091); with no words, the message is the picture alone (no empty bubble).
+  const media = messageMediaOf(meta);
+  // The one an agent adds after its own reply carries the reply's run: the run's tools, questions and stop line
+  // stay on the reply, never shown twice.
+  const mediaAfter = isAgent && isMediaAfterReply(meta);
   // A question to another agent (in their DM) carries the asking run: its work shows on that run's reply.
-  const ownWork = isAgent && Boolean(m.agentRunId) && !meta?.consultation;
+  const ownWork = isAgent && Boolean(m.agentRunId) && !meta?.consultation && !mediaAfter;
   const steps = ownWork ? workStepsOf(meta) : null;
   // Posted by a run answering another agent's question from here (its approval, question, secret): whom it helps.
-  const consultations = useConsultations(orgId, m.channelId, isAgent && Boolean(m.agentRunId) && !readOnly);
+  const consultations = useConsultations(
+    orgId,
+    m.channelId,
+    isAgent && Boolean(m.agentRunId) && !readOnly && !mediaAfter,
+  );
   const helping =
-    isAgent && m.agentRunId && !readOnly
+    isAgent && m.agentRunId && !readOnly && !mediaAfter
       ? consultations.data?.find((x) => x.consultedRunId === m.agentRunId)
       : undefined;
   const press = readOnly
@@ -159,9 +173,9 @@ export const MessageRow = memo(function MessageRow({
         tapHaptic();
         onLongPress?.(m);
       };
-  const stopped = isAgent && m.agentRunId ? stoppedOf(meta) : null;
+  const stopped = isAgent && m.agentRunId && !mediaAfter ? stoppedOf(meta) : null;
   // The reply of a run that reached its step limit: the same line, with Continuar.
-  const atLimit = isAgent && m.agentRunId && !stopped ? stepLimitOf(meta) : null;
+  const atLimit = isAgent && m.agentRunId && !stopped && !mediaAfter ? stepLimitOf(meta) : null;
   // This reply just took its live block's place here: the same tools (and the messages it read) stay.
   const [kept] = useState(() => (ownWork && m.agentRunId ? recentTurn(m.agentRunId, Date.now()) : null));
   // The line its block opened with stays above the tools, where it was, instead of moving into them (`turnOpener`).
@@ -176,6 +190,9 @@ export const MessageRow = memo(function MessageRow({
   const link = missionLinkOf(meta);
   const files = artifactsOf(meta);
   const question = isAgent ? questionOf(meta) : null;
+  // An agent asks a person for a secret for its computer (ADR 0027).
+  const secret = isAgent ? secretRequestOf(meta) : null;
+  // An agent proposes a change to the workspace's context or to an agent's instructions: decided right here.
   // The agent needs a person in its browser (ADR 0040): the request, live.
   const handoff = isAgent ? browserHandoffOf(meta) : null;
   // Where it browsed, or what it did on its desktop, after the run (as on the web): the steps' card.
@@ -240,10 +257,15 @@ export const MessageRow = memo(function MessageRow({
   );
 
   if (mine) {
-    // The bubble, or the files of a message with no words, leads; the receipt's mark stands beside it.
+    // The bubble, or the GIF or sticker or the files of a message with no words, leads; the receipt's mark stands
+    // beside it.
     const lead = body ? (
       <View style={[styles.bubble, styles.lead, { backgroundColor: c.bubble }]}>
         <MessageText body={body} muted={m.local === "pending"} selectable={false} accent={accent} />
+      </View>
+    ) : media ? (
+      <View style={styles.grow}>
+        <ChatMedia media={media} align="end" liveId={m.id} />
       </View>
     ) : files.length > 0 ? (
       <View style={styles.grow}>
@@ -273,7 +295,12 @@ export const MessageRow = memo(function MessageRow({
             {lead}
           </View>
         ) : null}
-        {body && files.length > 0 ? (
+        {body && media ? (
+          <View style={styles.meFiles}>
+            <ChatMedia media={media} align="end" liveId={m.id} />
+          </View>
+        ) : null}
+        {(body || media) && files.length > 0 ? (
           <View style={styles.meFiles}>
             <MessageFiles files={files} align="end" />
           </View>
@@ -364,7 +391,7 @@ export const MessageRow = memo(function MessageRow({
         {consulted.map((cs) => (
           <ConsultationCard key={cs.consultationId} askerId={m.author.id ?? ""} consultation={cs} />
         ))}
-        {isAgent && m.agentRunId && !m.local && !readOnly && consulted.length === 0 ? (
+        {isAgent && m.agentRunId && !m.local && !readOnly && !mediaAfter && consulted.length === 0 ? (
           <ConsultGroup message={m} color={color} />
         ) : null}
         {opened?.said ? <MessageText body={opened.said} selectable={false} accent={accent} /> : null}
@@ -396,12 +423,13 @@ export const MessageRow = memo(function MessageRow({
         ) : body ? (
           <MessageText body={body} muted={m.local === "pending"} selectable={false} accent={accent} />
         ) : null}
+        {media ? <ChatMedia media={media} liveId={m.id} /> : null}
         {(stopped || atLimit) && m.agentRunId ? (
           <StoppedLine
             message={m}
             runId={m.agentRunId}
             stopped={stopped ?? { byUserId: null, continuedRunId: atLimit?.continuedRunId ?? null }}
-            limit={Boolean(atLimit)}
+            limit={atLimit ? (atLimit.stuck ? "stuck" : "steps") : undefined}
           />
         ) : null}
         {isAgent && m.actions?.length ? <Receipts message={m} /> : null}
@@ -409,6 +437,7 @@ export const MessageRow = memo(function MessageRow({
         {isAgent ? <NoAiCard message={m} /> : null}
         {isAgent ? <StretchCard message={m} /> : null}
         {isAgent ? <ProposalCard message={m} /> : null}
+        {isAgent ? <InstructionProposals message={m} /> : null}
         {files.length > 0 ? <MessageFiles files={files} /> : null}
         {approvalId ? <ApprovalInline approvalId={approvalId} /> : null}
         {handoff ? <HandoffCard handoff={handoff} /> : null}
@@ -431,6 +460,7 @@ export const MessageRow = memo(function MessageRow({
           />
         ) : null}
         {question ? <QuestionCard key={`${question.id}:${question.status}`} question={question} /> : null}
+        {secret ? <SecretCard key={`${secret.id}:${secret.status}`} request={secret} /> : null}
         {cards}
       </View>
     </Pressable>
@@ -466,12 +496,13 @@ function StoppedLine({
   message: m,
   runId,
   stopped,
-  limit = false,
+  limit,
 }: {
   message: Message;
   runId: string;
   stopped: { byUserId: string | null; continuedRunId: string | null };
-  limit?: boolean;
+  /** It ended at its step limit, or because it got stuck: nobody stopped it. */
+  limit?: "steps" | "stuck";
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
@@ -487,7 +518,7 @@ function StoppedLine({
   const continued = useContinuedRun(m.id) ?? stopped.continuedRunId;
   const byMe = Boolean(meId) && stopped.byUserId === meId;
   const by = limit
-    ? t("mobile.chat.stopped.limit")
+    ? t(limit === "stuck" ? "mobile.chat.stopped.stuck" : "mobile.chat.stopped.limit")
     : byMe
       ? t("mobile.chat.stopped.byYou")
       : stopped.byUserId

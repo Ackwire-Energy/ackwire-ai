@@ -57,7 +57,8 @@ export function ChannelMembersStack({
   onDetails: () => void;
 }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
+  // How it opened: hover leaves the focus where it is (the box someone types in), a press or a key brings it in.
+  const [open, setOpen] = useState<false | "hover" | "press">(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clear = () => {
     if (timer.current) clearTimeout(timer.current);
@@ -74,7 +75,7 @@ export function ChannelMembersStack({
     clear();
     timer.current = setTimeout(() => {
       timer.current = null;
-      setOpen(next);
+      setOpen(next && "hover");
     }, ms);
   };
   const total = people.length + agents.length;
@@ -87,11 +88,12 @@ export function ChannelMembersStack({
   if (total === 0) return null;
   return (
     <Popover
-      open={open}
+      open={open !== false}
       onOpenChange={(o) => {
         clear();
-        setOpen(o);
+        setOpen(o && "press");
       }}
+      moveFocus={open !== "hover"}
       label={t("channel.membersButton", { count: total })}
       side="bottom"
       align="end"
@@ -269,7 +271,11 @@ function AgentRow({ agent, channelId, autoReply }: { agent: Agent; channelId: st
           </span>
         )}
       </span>
-      {autoReply && <span className="members-pop__chip">{t("channel.autoReplyChip")}</span>}
+      {autoReply && (
+        <span className="members-pop__chip">
+          {t(agent.coordinator ? "channel.coordinatorChip" : "channel.autoReplyChip")}
+        </span>
+      )}
     </ProfileTrigger>
   );
 }

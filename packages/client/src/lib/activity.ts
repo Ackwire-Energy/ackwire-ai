@@ -26,6 +26,8 @@ export type ActivityKind =
   | "schedulingEvent"
   | "askingQuestion"
   | "reacting"
+  | "sendingGif"
+  | "sendingSticker"
   | "openingSkill"
   | "consultingSkill"
   | "runningCode"
@@ -82,6 +84,7 @@ export type ActivityKind =
   | "requestingAccess"
   | "requestingSecret"
   | "queryingDatabase"
+  | "checkingUsage"
   | "usingTool";
 
 /** The computer's own permission check before a command (`PERMISSION_TOOL` in `@agenteschat/adapters`). */
@@ -129,6 +132,9 @@ const BUILTIN: Record<string, ActivityKind> = {
   propose_event: "schedulingEvent",
   ask_user: "askingQuestion",
   react: "reacting",
+  // A GIF or the agent's sticker (ADR 0091): the message itself shows it, the block says it was sent.
+  send_gif: "sendingGif",
+  send_sticker: "sendingSticker",
   // The agent's PC (sandbox).
   run_code: "runningCode",
   write_file: "pcFiles",
@@ -189,6 +195,7 @@ const BUILTIN: Record<string, ActivityKind> = {
   request_secret: "requestingSecret",
   use_tool: "findingTools",
   follow_up: "followingUp",
+  get_my_usage: "checkingUsage",
   cancel_follow_up: "cancelingFollowUp",
 };
 

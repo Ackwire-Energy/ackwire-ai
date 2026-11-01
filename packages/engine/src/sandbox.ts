@@ -3,6 +3,7 @@ import { type Database, eq, schema } from "@agenteschat/db";
 import { getAgent, getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { ForbiddenError, NotFoundError } from "./errors";
+import { cutText, cutTextEnd } from "./format";
 import { computerBackSoon, type MachineCaller } from "./machine-hub";
 import { createMachineSandboxProvider } from "./machine-provider";
 import { computerPreparing } from "./machine-provisioning";
@@ -298,5 +299,5 @@ export function truncateOutput(text: string, max: number) {
   if (text.length <= max) return text;
   const head = Math.floor(max * 0.6);
   const tail = max - head;
-  return `${text.slice(0, head)}\n[… ${text.length - max} characters cut …]\n${text.slice(-tail)}`;
+  return `${cutText(text, head)}\n[… ${text.length - max} characters cut …]\n${cutTextEnd(text, tail)}`;
 }

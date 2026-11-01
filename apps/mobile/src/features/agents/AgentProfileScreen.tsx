@@ -170,8 +170,10 @@ function Profile({ id }: { id: string }) {
   const memories = knownAboutMe(knows.data);
   const uses = usesOf(access.data);
   const connected = useConnectedById();
-  // A computer brain: its maker's mark and line ("Claude Code · Sonnet no MacBook"; where only for its owner and admins).
-  const thinks = agent?.brain && agent.brain.kind !== "model" ? brainLine(t, agent.brain, "") : null;
+  // A computer brain: its maker's mark and the model by the plan that pays for it ("Sonnet pelo plano do Claude"; its
+  // computer only where it tells two apart).
+  const thinks =
+    agent?.brain && agent.brain.kind !== "model" ? brainLine(t, agent.brain, "", { agents: dir.agents }) : null;
   const spend = detail.data
     ? spendOf({
         budgetUsedPercent: detail.data.budgetUsedPercent,
@@ -292,6 +294,14 @@ function Profile({ id }: { id: string }) {
             <Text variant="small" tone="muted" style={styles.center}>
               {ownerLine}
             </Text>
+          ) : null}
+          {agent?.coordinator ? (
+            <View style={styles.coordinates}>
+              <Icon name="flag" size={14} color={c.muted} />
+              <Text variant="small" tone="muted">
+                {t("coordinator.chip")}
+              </Text>
+            </View>
           ) : null}
           {status ? (
             <Text variant="small" tone="muted" style={styles.center}>
@@ -794,6 +804,7 @@ const styles = StyleSheet.create({
   monthCards: { gap: 10 },
   foot: { paddingHorizontal: 4, marginTop: 8 },
   src: { flexDirection: "row", alignItems: "center", gap: 6 },
+  coordinates: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   spend: { padding: 14, gap: 10 },
   spendHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
   warn: { flexDirection: "row", alignItems: "center", gap: 6 },

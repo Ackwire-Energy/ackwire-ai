@@ -26,11 +26,12 @@ export function receiptIcon(view: ReceiptView): IconName {
   return "check";
 }
 
-/** A rule's line leads with what it follows: the reply, the one person with the agent, the talk. */
+/** A rule's line leads with what it follows: the reply, the one person with the agent, the talk, the coordinator. */
 const RULE_ICON: Record<Extract<DecidedBy, { step: "rule" }>["rule"], IconName> = {
   reply: "reply",
   only_agent: "person",
   follow_up: "thread",
+  coordinator: "flag",
 };
 
 /** A dot and the action after it: one piece, which wraps whole. */
@@ -65,9 +66,19 @@ function SteerMark({ steer, name, size }: { steer: SteerState; name: string; siz
  * clock, and "Chamar um agente" is in its popover. A message sent into a task at work wears what became of it there
  * instead of the check ("Ada leu" is Ada's face), the words said to screen readers as they change. Words only for what
  * you can act on ("Nenhum agente vai responder", a failure, no AI connected): then the whole receipt is a line under
- * the message (`part="line"`), so the text still follows the name.
+ * the message (`part="line"`), so the text still follows the name. "Nenhum agente vai responder" is said that way only
+ * under the conversation's newest message (`latest`): in a talk among people, or where agents answer only when
+ * called, it repeated under every message. Older ones keep the check, whose popover says it.
  */
-export function MessageReceipts({ message, part }: { message: Message; part: "check" | "line" }) {
+export function MessageReceipts({
+  message,
+  part,
+  latest = true,
+}: {
+  message: Message;
+  part: "check" | "line";
+  latest?: boolean;
+}) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
@@ -88,9 +99,11 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
         <CallAgentMenu />
       </ReceiptAction>
     ) : null;
+  // Nobody answers an older message: its check says so in the popover, not a line under each message.
+  const quietNobody = status?.kind === "nobody" && !latest;
   // "Tentar de novo" sends the words again as mine: never an agent's.
   const worded =
-    status?.kind === "nobody" ||
+    (status?.kind === "nobody" && !quietNobody) ||
     status?.kind === "no_ai" ||
     status?.kind === "platform_cap" ||
     (status?.kind === "failed" && actions !== null && message.author.type === "person");
@@ -192,6 +205,14 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
             <Icon name={RULE_ICON[by.mark.rule]} size={14} />
           )}
           <span>{by.text}</span>
+        </div>
+      )}
+      {quietNobody && (
+        <div className="who-by">
+          <span className="ac-receipt__words">
+            <span>{statusText}</span>
+            {callAgent}
+          </span>
         </div>
       )}
       {mentionNeeded && (

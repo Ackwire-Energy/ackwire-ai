@@ -1,4 +1,5 @@
 import { and, desc, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
+import { cutText } from "../format";
 import type { Judge, JudgeQuestion } from "../judge";
 import { type ContextItem, type ContextKind, evidenceWeight, type NewContextItem, normalizeSubject } from "./items";
 
@@ -143,11 +144,11 @@ export async function judgeRelations(
     kind: "memory_relation",
     calibrated: true,
     state: {
-      new_item: { kind: input.kind, title: input.title || null, content: input.content.slice(0, 2000) },
+      new_item: { kind: input.kind, title: input.title || null, content: cutText(input.content, 2000) },
       existing_items: candidates.map((c) => ({
         kind: c.kind,
         title: c.title || null,
-        content: c.content.slice(0, 2000),
+        content: cutText(c.content, 2000),
         recorded_at: c.updatedAt.toISOString().slice(0, 10),
       })),
     },

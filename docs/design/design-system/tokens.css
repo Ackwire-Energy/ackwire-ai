@@ -48,7 +48,9 @@
   --action: var(--ink); --on-action: var(--bg);
   --attention: var(--warn); --on-attention: var(--on-warn); --attention-soft: var(--warn-soft);
   --success: var(--ink);
-  --focus-ring: 0 0 0 2px var(--raised), 0 0 0 4px var(--ink);
+  /* Keyboard focus: a gray ring a pixel off the control, as strong as a control's border (3:1). */
+  --focus-color: var(--line-strong);
+  --focus-ring: 0 0 0 1px var(--raised), 0 0 0 3px var(--focus-color);
   --overlay: var(--e3);
   /* Chosen, pressed the same in both themes (each theme's --chosen-bg and --chosen-press): held down into the page
      like a pressed key, inside a hairline (--chosen-press alone for a card that keeps its own outline). Never a thick

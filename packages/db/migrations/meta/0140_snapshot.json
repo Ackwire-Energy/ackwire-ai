@@ -1,5 +1,5 @@
 {
-  "id": "cc4577ed-f528-49a5-98df-397c35f5dce8",
+  "id": "fd191436-7816-49cc-a3c2-d57fa82a5dda",
   "prevId": "7370c9c5-68b3-4e46-b77d-1f97637b0b87",
   "version": "7",
   "dialect": "postgresql",
@@ -3790,6 +3790,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "proposed_by_agent_id": {
+          "name": "proposed_by_agent_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "base_hash": {
           "name": "base_hash",
           "type": "text",
@@ -3807,6 +3813,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "access": {
+          "name": "access",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         },
         "rationale": {
           "name": "rationale",
@@ -3884,6 +3896,19 @@
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "context_proposals_proposed_by_agent_id_agents_id_fk": {
+          "name": "context_proposals_proposed_by_agent_id_agents_id_fk",
+          "tableFrom": "context_proposals",
+          "tableTo": "agents",
+          "columnsFrom": [
+            "proposed_by_agent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         },
         "context_proposals_decided_by_user_id_users_id_fk": {
@@ -15944,13 +15969,6 @@
           "notNull": true,
           "default": "'{}'::jsonb"
         },
-        "sidebar_items": {
-          "name": "sidebar_items",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -18554,7 +18572,9 @@
       "schema": "public",
       "values": [
         "agent_instructions",
-        "org_context"
+        "org_context",
+        "agent_role",
+        "agent_access"
       ]
     },
     "public.context_trust": {

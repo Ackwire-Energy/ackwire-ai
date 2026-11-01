@@ -1,5 +1,6 @@
 import { and, eq, schema } from "@agenteschat/db";
 import { actWithUndo } from "./agent-actions";
+import { cutText } from "./format";
 import { personBehindCall } from "./requester";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import {
@@ -86,7 +87,7 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
             content: pages
               .map(
                 (p) =>
-                  `- [[${p.title}]] (${p.folder ? `${p.folder}/` : ""}${p.slug}, v${p.version}): ${p.body.replace(/\s+/g, " ").slice(0, 200)}`,
+                  `- [[${p.title}]] (${p.folder ? `${p.folder}/` : ""}${p.slug}, v${p.version}): ${cutText(p.body.replace(/\s+/g, " "), 200)}`,
               )
               .join("\n"),
           };
@@ -120,7 +121,7 @@ export function createWikiToolSource(deps: Omit<WikiDeps, "db">): ToolSource {
             content: [
               `# ${p.title} (slug ${p.slug}, version ${p.version}${p.folder ? `, folder ${p.folder}` : ""}${p.locked ? ", locked" : ""})`,
               p.tags.length ? `Tags: ${p.tags.join(", ")}` : "",
-              p.body.slice(0, 40_000),
+              cutText(p.body, 40_000),
               backlinks.length ? `Linked from: ${backlinks.join(", ")}` : "",
             ]
               .filter(Boolean)

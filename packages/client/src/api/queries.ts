@@ -8,13 +8,14 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { moveInGroups } from "../lib/agent-groups";
 import { artifactRefs } from "../lib/artifacts";
 import { newerSetup } from "../lib/computer";
 import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS } from "../lib/consult-group";
 import { sendWaits } from "../lib/errors";
 import { LoginReadError, loginReadPasses } from "../lib/machines";
+import { GIF_PAGE, messageMediaOf, postedMedia } from "../lib/media";
 import {
   allItems,
   matchesFilter,
@@ -46,6 +47,7 @@ import type {
   AgentMailbox,
   AgentMailboxInput,
   AgentProposalDecision,
+  AgentSetup,
   AiStatus,
   ApiRule,
   AppNotification,
@@ -72,6 +74,9 @@ import type {
   ForumSuggestionOverrides,
   ForumTopicDetail,
   ForumTopicInput,
+  GifCategory,
+  GifKey,
+  InviteBatch,
   IssueColumn,
   IssueInput,
   IssuePatch,
@@ -92,6 +97,7 @@ import type {
   NotificationFilter,
   OrgRoles,
   Person,
+  Proposal,
   ReactionCount,
   ReminderInput,
   Role,
@@ -145,6 +151,13 @@ export const channelsQuery = (api: ApiClient, orgId: string) =>
 /** An invitation's preview (its page, and the sign-in that leads to it). */
 export const invitationQuery = (api: ApiClient, token: string) =>
   queryOptions({ queryKey: keys.invitation(token), queryFn: () => api.orgs.previewInvitation(token), retry: false });
+/** An email invitation that no longer opens: accepted or expired (ADR 0090). */
+export const invitationStateQuery = (api: ApiClient, token: string) =>
+  queryOptions({
+    queryKey: keys.invitationState(token),
+    queryFn: () => api.orgs.invitationState(token),
+    retry: false,
+  });
 
 // ── Account ─────────────────────────────────────────────────────────────────
 
@@ -193,6 +206,31 @@ function useJevChange<T>(change: (api: ApiClient, input: T) => Promise<JevKey>, 
 export const useSaveJevKey = () => useJevChange((api, apiKey: string) => api.system.saveJev(apiKey), true);
 export const useCheckJevKey = () => useJevChange<void>((api) => api.system.checkJev());
 export const useRemoveJevKey = () => useJevChange<void>((api) => api.system.removeJev());
+
+/** The installation's GIPHY key (ADR 0091): `null` for everyone but its owner on a self-hosted server. */
+export const useGifKey = () => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.gifKey, queryFn: () => api.system.gifKey() });
+};
+
+function useGifKeyChange<T>(change: (api: ApiClient, input: T) => Promise<GifKey>, silent = false) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: T) => change(api, input),
+    onSuccess: (gifKey) => {
+      qc.setQueryData(keys.gifKey, gifKey);
+      // The key is the server's: every workspace's GIFs come and go with it (`gifsAvailable`, the picker's tab).
+      void qc.invalidateQueries({
+        predicate: (q) => q.queryKey[0] === "org" && (q.queryKey[2] === "settings" || q.queryKey[2] === "gifs"),
+      });
+    },
+    // A refused key is said under its field.
+    ...(silent ? { meta: { silent: true } } : {}),
+  });
+}
+export const useSaveGifKey = () => useGifKeyChange((api, apiKey: string) => api.system.saveGifKey(apiKey), true);
+export const useRemoveGifKey = () => useGifKeyChange<void>((api) => api.system.removeGifKey());
 
 /**
  * The server's Web Push key (ADR 0071): `null` when this server has Web Push off. Asked only where this
@@ -909,12 +947,13 @@ export const newClientId = () =>
     : `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 
 /**
- * What `chat.post` gets for a message of mine: the quoted message and the files by id, from which the server
- * builds the real meta (it checks them).
+ * What `chat.post` gets for a message of mine: the quoted message, the files by id and a GIF or a sticker by what
+ * names it (ADR 0091), from which the server builds the real meta (it checks them).
  */
 function postBody({ body, clientId, threadId, meta, steer }: PostInput) {
   const replyTo = replyOf(meta)?.messageId;
   const attachments = artifactRefs(meta).map((r) => r.id);
+  const media = messageMediaOf(meta);
   return {
     body,
     clientId,
@@ -923,6 +962,7 @@ function postBody({ body, clientId, threadId, meta, steer }: PostInput) {
     ...(attachments.length > 0 ? { attachments } : {}),
     ...(threadId && meta?.[OPEN_THREAD] === true ? { openThread: true } : {}),
     ...(steer ? { steer } : {}),
+    ...(media ? { media: postedMedia(media) } : {}),
   };
 }
 
@@ -1020,8 +1060,8 @@ export function usePostMessage(
 export const OPEN_THREAD = "openThread";
 
 /**
- * A message to post. `meta` is the optimistic copy's (`replyTo`, `artifacts`): only the quoted
- * message id and the file ids go to the server, which writes the real meta.
+ * A message to post. `meta` is the optimistic copy's (`replyTo`, `artifacts`, `media`): only the quoted
+ * message id, the file ids and what names a GIF or a sticker go to the server, which writes the real meta.
  */
 interface PostInput {
   body: string;
@@ -1460,6 +1500,8 @@ export function useUpdateSettings(orgId: string) {
       // The default agent budget moves every percentage that follows it.
       void qc.invalidateQueries({ queryKey: keys.usageReport(orgId) });
       void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      // A new GIF rating (or GIFs back on) changes what every search finds (ADR 0091).
+      void qc.invalidateQueries({ queryKey: keys.gifs(orgId) });
       void qc.invalidateQueries({
         predicate: (q) => q.queryKey[0] === "org" && q.queryKey[1] === orgId && q.queryKey[4] === "detail",
       });
@@ -1544,8 +1586,58 @@ export function useInviteMany(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { emails: string[]; roleIds?: string[] }) => api.orgs.inviteMany(orgId, input),
+    mutationFn: (input: InviteBatch) => api.orgs.inviteMany(orgId, input),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
+  });
+}
+
+/** The roles a pending invitation gives (ADR 0090): the same link, nothing is sent. */
+export function useSetInvitationRoles(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; roleIds: string[] }) =>
+      api.orgs.setInvitationRoles(orgId, input.id, input.roleIds),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
+  });
+}
+
+/** 30 more days for the same link (ADR 0090). */
+export function useRenewInviteLink(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (linkId: string) => api.invites.renewLink(orgId, linkId),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.inviteLinks(orgId) }),
+  });
+}
+
+/** A member's suggestions that still wait (ADR 0090). */
+export const useMySuggestions = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.mySuggestions(orgId), queryFn: () => api.joinRequests.mine(orgId), enabled });
+};
+
+/**
+ * A member suggests someone to the people who may invite (ADR 0090). Its refusals are about the person suggested
+ * (`join.member`: they're in already), so the screen says them in its own words, never the generic toast's.
+ */
+export function useSuggestPerson(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { email: string; note?: string }) => api.joinRequests.suggest(orgId, input),
+    meta: { silent: true },
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
+  });
+}
+
+export function useCancelSuggestion(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.joinRequests.cancel(orgId, id),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.invitations(orgId) }),
   });
 }
 
@@ -2086,6 +2178,36 @@ export const useProposals = (orgId: string) => {
   return useQuery({ queryKey: keys.proposals(orgId), queryFn: () => api.proposals.list(orgId) });
 };
 
+/**
+ * A proposal card's rows, in the card's order, read by id: the list only holds the newest, and a card stays whole
+ * however many came after it. (A server without `ids` sends the list: the card's rows are picked from it.)
+ */
+export function useCardProposals(orgId: string, ids: string[]) {
+  const api = useApi();
+  const query = useQuery({
+    queryKey: keys.cardProposals(orgId, ids),
+    queryFn: () => api.proposals.list(orgId, { ids }),
+  });
+  return (query.data ?? []).filter((p) => ids.includes(p.id)).sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+}
+
+/**
+ * What accepted proposals changed on their agents' pages, wherever they were accepted: the instructions and role
+ * (profile card, hero, team), and the apps (the Access tab and the matrix).
+ */
+function refreshAccepted(qc: QueryClient, orgId: string, decided: Proposal[]) {
+  const accepted = decided.filter((p) => p.status === "accepted" && p.target.type !== "org_context");
+  if (accepted.length === 0) return;
+  void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+  void qc.invalidateQueries({ queryKey: keys.team(orgId) });
+  for (const p of accepted) {
+    void qc.invalidateQueries({ queryKey: keys.agentDetail(orgId, p.agentId) });
+    if (p.target.type === "agent_access") void qc.invalidateQueries({ queryKey: keys.scopes(orgId, p.agentId) });
+  }
+  if (accepted.some((p) => p.target.type === "agent_access"))
+    void qc.invalidateQueries({ queryKey: keys.access(orgId) });
+}
+
 export function useDecideProposal(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();
@@ -2096,6 +2218,35 @@ export function useDecideProposal(orgId: string) {
         : api.proposals.refuse(orgId, input.id),
     // The page explains a stale proposal (409) itself.
     meta: { silent: true },
+    onSuccess: (row) => refreshAccepted(qc, orgId, [row]),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.proposals(orgId) }),
+  });
+}
+
+/**
+ * A card's rows accepted or refused at once: one request per row, so each applies on its own and a stale one
+ * never stops the rest, then one refresh. Resolves with the rows decided and the ones that failed and why.
+ */
+export function useDecideProposals(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { ids: string[]; decision: "accept" | "refuse" }) => {
+      const decided: Proposal[] = [];
+      const failed: { id: string; error: unknown }[] = [];
+      for (const id of input.ids) {
+        try {
+          decided.push(
+            await (input.decision === "accept" ? api.proposals.accept(orgId, id) : api.proposals.refuse(orgId, id)),
+          );
+        } catch (error) {
+          failed.push({ id, error });
+        }
+      }
+      return { decided, failed };
+    },
+    meta: { silent: true },
+    onSuccess: ({ decided }) => refreshAccepted(qc, orgId, decided),
     onSettled: () => qc.invalidateQueries({ queryKey: keys.proposals(orgId) }),
   });
 }
@@ -2612,6 +2763,30 @@ export const useBrainMachines = (orgId: string) => {
     queryKey: keys.brainMachines(orgId),
     queryFn: () => api.agents.brainMachines(orgId),
     retry: false,
+  });
+};
+
+/** "Criar agente": what a new agent starts thinking with (ADR 0094), for whoever creates agents. */
+export const useNewAgentSetup = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.newAgentSetup(orgId),
+    queryFn: () => api.agents.newAgentSetup(orgId),
+    enabled,
+    retry: false,
+  });
+};
+
+/** "Usar em outros agentes": what the setup would do to each agent, nothing kept; asked again when either changes. */
+export const useSetupPreview = (orgId: string, setup: AgentSetup | null, agentIds: readonly string[]) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.setupPreview(orgId, JSON.stringify([setup, agentIds])),
+    queryFn: () => api.agents.applySetup(orgId, { setup: setup as AgentSetup, agentIds: [...agentIds], preview: true }),
+    enabled: setup !== null && agentIds.length > 0,
+    retry: false,
+    // Each run walks every agent through its rules: once per opening is enough.
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -3492,7 +3667,7 @@ export function useNotificationReply(orgId: string) {
 // ── Phone app: read state, pins, following, working now, reminders ─────────────
 
 /** The optional parts of the client (`ApiClient.pins`…): throws when this client lacks one. */
-function part<K extends "pins" | "threadFollows" | "working" | "reminders" | "actions" | "agentForYou">(
+function part<K extends "pins" | "threadFollows" | "working" | "reminders" | "actions" | "agentForYou" | "gifs">(
   api: ApiClient,
   name: K,
 ): NonNullable<ApiClient[K]> {
@@ -3607,6 +3782,52 @@ export function useReminderAction(orgId: string) {
       void qc.invalidateQueries({ queryKey: keys.reminders(orgId) });
       void qc.invalidateQueries({ queryKey: keys.routines(orgId) });
     },
+  });
+}
+
+// ── GIFs (ADR 0091) ─────────────────────────────────────────────────────────
+
+/** What a search box holds, once it has been still for `ms` (at once when it is emptied). */
+export function useSettled(value: string, ms: number) {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    if (value === settled) return;
+    const timer = setTimeout(() => setSettled(value), value.trim() ? ms : 0);
+    return () => clearTimeout(timer);
+  }, [value, settled, ms]);
+  return settled;
+}
+
+/**
+ * The picker's GIF search, a page at a time (`fetchNextPage` while `hasNextPage`): free text, a category, or
+ * neither (what is trending), in the person's language (`lang`, two letters). Off while `enabled` is false or this
+ * client has no GIF search. A search is kept a few minutes: going back to a chip shows it at once.
+ */
+export function useGifSearch(
+  orgId: string,
+  search: { q: string; category: GifCategory | null; lang: string },
+  enabled = true,
+) {
+  const api = useApi();
+  const q = search.q.trim();
+  // Free text wins: a chip only searches with an empty box.
+  const category = q ? null : search.category;
+  return useInfiniteQuery({
+    queryKey: keys.gifSearch(orgId, q, category, search.lang),
+    queryFn: ({ pageParam }) =>
+      part(api, "gifs").search(orgId, {
+        ...(q ? { q } : {}),
+        ...(category ? { category } : {}),
+        offset: pageParam,
+        limit: GIF_PAGE,
+        lang: search.lang,
+      }),
+    initialPageParam: 0,
+    getNextPageParam: (page) => page.next ?? undefined,
+    enabled: enabled && Boolean(api.gifs),
+    staleTime: 5 * 60_000,
+    // The words already on screen stay while the next search loads (no flash of the empty state).
+    placeholderData: (prev) => prev,
   });
 }
 

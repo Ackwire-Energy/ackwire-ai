@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 29;
+export const MACHINE_PROTOCOL_VERSION = 30;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -390,6 +390,15 @@ export function browserSetupOf(v: unknown): BrowserSetup | null {
  */
 export const SHARED_ACCOUNTS_PROTOCOL = 29;
 
+/**
+ * From this protocol on (ADR 0058 §17): a desktop stream changes mode in place, on its own data socket, when its
+ * person takes control or hands it back. The server sends `{"type":"mode","mode"}` there; the runner logs in to the
+ * desktop again with that mode's password, sends the same frame back where the old session's bytes end, and a new
+ * RFB session follows on the same sockets. The server never sends it to an older runner, whose streams close and
+ * open again in the new mode.
+ */
+export const DESKTOP_SWITCH_PROTOCOL = 30;
+
 /** Which CLI an account signs in. */
 export type AccountKind = "claude_code" | "codex";
 export const ACCOUNT_KINDS: readonly AccountKind[] = ["claude_code", "codex"];
@@ -655,9 +664,10 @@ export const STREAM_CLOSE = {
  * server may add a desktop's `keyboard` (a layout): it is ignored, as Xvnc types what the person's own layout made
  * (ADR 0058 §16).
  */
-export type StreamRequest =
-  | { kind: "desktop"; mode: "watch" | "control" }
-  | { kind: "terminal"; cols: number; rows: number };
+export type StreamRequest = { kind: "desktop"; mode: DesktopMode } | { kind: "terminal"; cols: number; rows: number };
+
+/** A desktop stream's mode: `watch` logs in with the view-only password, `control` with the full one. */
+export type DesktopMode = "watch" | "control";
 
 /**
  * `stream.open` (protocol 18): one viewer of the request's agent's desktop
@@ -683,9 +693,12 @@ export interface StreamHello {
 /**
  * Text frames on a stream once it is ready (binary frames are the bytes): a
  * terminal's new size (viewer → runner) and how its shell ended (runner →
- * viewer).
+ * viewer); a desktop's mode (protocol 30, `DESKTOP_SWITCH_PROTOCOL`).
  */
-export type StreamControl = { type: "resize"; cols: number; rows: number } | { type: "exit"; code: number | null };
+export type StreamControl =
+  | { type: "resize"; cols: number; rows: number }
+  | { type: "exit"; code: number | null }
+  | { type: "mode"; mode: DesktopMode };
 
 /**
  * A person's turn in an agent's browser (`browser.handoff`, ADR 0040 §6), as
@@ -2757,6 +2770,7 @@ export function parseStreamControl(raw: string): StreamControl | null {
   if (f.type === "exit" && (f.code === null || Number.isInteger(f.code))) {
     return { type: "exit", code: f.code as number | null };
   }
+  if (f.type === "mode" && (f.mode === "watch" || f.mode === "control")) return { type: "mode", mode: f.mode };
   return null;
 }
 

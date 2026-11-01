@@ -43,7 +43,7 @@
   background: var(--plate);
   border-color: var(--ink);
 }
-.vault-drop__area:focus-visible {
+html:not([data-pointer]) .vault-drop__area:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }

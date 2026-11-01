@@ -6,6 +6,8 @@ export const keys = {
   instance: ["instance"] as const,
   telemetry: ["telemetry"] as const,
   jev: ["jev"] as const,
+  /** The installation's GIPHY key (ADR 0091), not a workspace's: it stays when switching organizations. */
+  gifKey: ["gif-key"] as const,
   authConfig: ["auth-config"] as const,
   me: ["me"] as const,
   accountDeletion: ["account-deletion"] as const,
@@ -14,6 +16,7 @@ export const keys = {
   webPushKey: ["push", "web-key"] as const,
   models: ["models"] as const,
   invitation: (token: string) => ["invitation", token] as const,
+  invitationState: (token: string) => ["invitation", token, "state"] as const,
   org: (orgId: string) => ["org", orgId] as const,
   members: (orgId: string) => ["org", orgId, "members"] as const,
   /** The workspace's roles (ADR 0085). */
@@ -74,6 +77,7 @@ export const keys = {
   allInvitations: (orgId: string) => ["org", orgId, "invitations", "all"] as const,
   /** Under `invitations`: an approval (which may invite) refreshes the pending list too. */
   joinRequests: (orgId: string) => ["org", orgId, "invitations", "join-requests"] as const,
+  mySuggestions: (orgId: string) => ["org", orgId, "invitations", "suggestions"] as const,
   inviteLinks: (orgId: string) => ["org", orgId, "invitations", "links"] as const,
   usageReport: (orgId: string) => ["org", orgId, "usage-report"] as const,
   audit: (orgId: string, query: object) => ["org", orgId, "audit", query] as const,
@@ -87,6 +91,8 @@ export const keys = {
   memoryAboutMe: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "memory", "me"] as const,
   agentForYou: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "for-you"] as const,
   proposals: (orgId: string) => ["org", orgId, "proposals"] as const,
+  /** A chat card's rows (under `proposals`: deciding any refreshes it too). */
+  cardProposals: (orgId: string, ids: string[]) => ["org", orgId, "proposals", "card", ids.join(",")] as const,
   dms: (orgId: string) => ["org", orgId, "dms"] as const,
   dmReads: (orgId: string, channelId: string) => ["org", orgId, "dmReads", channelId] as const,
   storage: (orgId: string) => ["org", orgId, "storage"] as const,
@@ -100,6 +106,10 @@ export const keys = {
   machines: (orgId: string) => ["org", orgId, "machines"] as const,
   /** Under `machines`: a computer that changes refreshes what a new agent could think with. */
   brainMachines: (orgId: string) => ["org", orgId, "machines", "brains"] as const,
+  /** What a new agent starts thinking with (ADR 0094). */
+  newAgentSetup: (orgId: string) => ["org", orgId, "agent-setup"] as const,
+  /** What a setup would do to each agent (`sig`: the setup and the agents, as JSON). */
+  setupPreview: (orgId: string, sig: string) => ["org", orgId, "setup-preview", sig] as const,
   /** The server's own computer here (under `machines`: a machines refetch refreshes it too). */
   hostComputer: (orgId: string) => ["org", orgId, "machines", "host"] as const,
   /** Offline computers agents wait for (under `machines`: a machines refetch refreshes it too). */
@@ -164,6 +174,11 @@ export const keys = {
   wikiGraph: (orgId: string) => ["org", orgId, "wiki", "graph"] as const,
   wikiReads: (orgId: string) => ["org", orgId, "wiki", "reads"] as const,
   pins: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "pins"] as const,
+  /** Every GIF search (prefix): the workspace's rating or its GIFs switch changing refreshes them all (ADR 0091). */
+  gifs: (orgId: string) => ["org", orgId, "gifs"] as const,
+  /** One search's pages: free text or a category (neither: what is trending), in the person's language. */
+  gifSearch: (orgId: string, q: string, category: string | null, lang: string) =>
+    ["org", orgId, "gifs", q, category ?? "", lang] as const,
   working: (orgId: string) => ["org", orgId, "working"] as const,
   reminders: (orgId: string) => ["org", orgId, "reminders"] as const,
   /** Every mailbox read (prefix). */

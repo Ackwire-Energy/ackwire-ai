@@ -9,6 +9,7 @@ import type {
   AgentProposalCard,
   AgentQuestion,
   AgentSecret,
+  AgentSetupResult,
   AgentStatus,
   AiStatus,
   ApiClient,
@@ -29,6 +30,8 @@ import type {
   Credential,
   Edition,
   FormerAgent,
+  Gif,
+  GifKey,
   GitHubAppInstallation,
   GitHubRepositories,
   HttpApi,
@@ -37,10 +40,12 @@ import type {
   ImportItemResult,
   Instance,
   InvitationPreview,
+  InvitationState,
   InvitationWithStatus,
   InviteLink,
   JevKey,
   JoinApproval,
+  JoinClaim,
   JoinRequest,
   Me,
   Member,
@@ -50,6 +55,8 @@ import type {
   Message,
   Model,
   ModelTier,
+  MySuggestion,
+  NewAgentSetup,
   OrgRole,
   OrgSettings,
   Person,
@@ -225,6 +232,15 @@ export interface FakeState {
   actionCheck?: boolean;
   /** Automático's models per provider and tier (Settings › Chaves); none when unset. */
   autoModels?: OrgSettings["autoModels"];
+  /**
+   * Configurações › GIFs e figurinhas (ADR 0091); unset: GIFs on at any age, stickers on, agents now and then, and a
+   * server that has GIF search and decides when agents send one.
+   */
+  media?: Partial<Pick<OrgSettings, MediaSetting>>;
+  /** What `gifs.search` finds (trending and any search alike, by title); unset: `FAKE_GIFS`. */
+  gifResults?: Gif[];
+  /** Make `gifs.search` fail with this error (`gifs.off`…). */
+  gifsError?: ApiError;
   /** What agents did outside (search kind `action`), as the search returns it. */
   teamActions?: SearchHit[];
   /** My inbox (`notifications.*`); empty unless a test fills it. */
@@ -251,6 +267,10 @@ export interface FakeState {
   instance?: Partial<Instance>;
   /** `agents.brainMachines`: the computers a new agent could think on ("Criar agente"); unset = none. */
   brainMachines?: BrainMachine[];
+  /** `agents.newAgentSetup`: what a new agent starts thinking with; unset = none ("Automático"). */
+  newAgentSetup?: NewAgentSetup | null;
+  /** `agents.applySetup`, per agent: what the setup does to it; unset = it takes it. */
+  setupResults?: Record<string, Omit<AgentSetupResult, "agentId">>;
   /** `system.telemetry`: the usage report's switch; unset = I'm not the installation's owner (null). */
   telemetry?: ServerTelemetry;
   /** `system.jev`: the installation's Jev key; unset = I'm not its owner on a self-hosted server (null). */
@@ -260,6 +280,13 @@ export interface FakeState {
    * `rate_limited`: the server's limit answers the first try (429), and the next one goes through.
    */
   jevVerdicts?: Record<string, "invalid" | "no_credit" | "rate_limited">;
+  /**
+   * `system.gifKey`: the installation's GIPHY key (ADR 0091); unset = I'm not its owner on a self-hosted server
+   * (null). Saving one makes GIFs available here (`media.gifsAvailable`), removing it takes them away.
+   */
+  gifKey?: GifKey;
+  /** The keys GIPHY refuses when `system.saveGifKey` checks them (422, nothing kept); any other works. */
+  gifKeyRefused?: string[];
   /** Where the server keeps files itself (`storage.get`'s `platform`); unset = its disk, no folder. */
   storagePlatform?: StoragePlatform;
   /** What the workspace's files take (`storage.get`'s `usage`); unset = none yet, no disk told. */
@@ -272,6 +299,16 @@ export interface FakeState {
   previews?: Record<string, InvitationPreview>;
   /** Make `invites.ask` fail with this error (`join.full`, `join.rate_limited`…). */
   askError?: ApiError;
+  /** Make `invites.requestNew` fail with this error (a replaced or cancelled invitation answers 404). */
+  requestNewError?: ApiError;
+  /** What `orgs.invitationState` answers per token (ADR 0090): an accepted or expired invitation; unset: null. */
+  invitationStates?: Record<string, InvitationState>;
+  /** What `invites.claim` answers, in turn (the last one repeats); unset: null (the key matches nothing). */
+  claims?: JoinClaim[];
+  /** A member's suggestions that still wait (`joinRequests.mine`, ADR 0090). */
+  suggestions?: MySuggestion[];
+  /** Make `joinRequests.suggest` fail with this error (`join.member`, `join.waiting`…). */
+  suggestError?: ApiError;
   /** The code `invites.checkCode` takes (default 123456); any other is `join.code_wrong`. */
   joinCode?: string;
   /** Make `invites.sendCode` fail with this error (`join.code_wait`, `join.code_limit`…). */
@@ -441,6 +478,27 @@ export const OPENROUTER_KEY: Credential = {
   createdAt: "2026-10-30T12:00:00.000Z",
   revokedAt: null,
 };
+
+type MediaSetting = "gifs" | "gifRating" | "agentStickers" | "agentMedia" | "gifsAvailable" | "agentMediaAvailable";
+
+/** What the fake GIF search finds (ADR 0091): three GIFs of their own proportions. */
+export const FAKE_GIFS: Gif[] = [
+  { id: "gif-party", title: "party cat", width: 480, height: 360 },
+  { id: "gif-thanks", title: "thank you", width: 480, height: 480 },
+  { id: "gif-coffee", title: "coffee time", width: 360, height: 480 },
+];
+
+/** The GIFs and stickers settings as the server sends them (defaults: everything on and available). */
+function mediaSettings(state: FakeState): Pick<OrgSettings, MediaSetting> {
+  return {
+    gifs: state.media?.gifs ?? true,
+    gifRating: state.media?.gifRating ?? "g",
+    agentStickers: state.media?.agentStickers ?? true,
+    agentMedia: state.media?.agentMedia ?? "sometimes",
+    gifsAvailable: state.media?.gifsAvailable ?? true,
+    agentMediaAvailable: state.media?.agentMediaAvailable ?? true,
+  };
+}
 
 /** A small in-memory backend with the design's demo data ("Acme"). */
 export function seedState(overrides: Partial<FakeState> = {}): FakeState {
@@ -1064,6 +1122,24 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.jev = { ...state.jev, source: null, hint: null, state: "off" };
         return state.jev;
       },
+      gifKey: async () => state.gifKey ?? null,
+      saveGifKey: async (apiKey) => {
+        log("system.saveGifKey", apiKey);
+        if (!state.gifKey) throw new ApiError(404, "not_found", "Not found");
+        if (state.gifKeyRefused?.includes(apiKey)) {
+          throw new ApiError(422, "gif_key_invalid", "GIPHY didn't accept this key.");
+        }
+        state.gifKey = { source: "settings", hint: apiKey.slice(-4), state: "ok" };
+        state.media = { ...state.media, gifsAvailable: true };
+        return state.gifKey;
+      },
+      removeGifKey: async () => {
+        log("system.removeGifKey");
+        if (!state.gifKey) throw new ApiError(404, "not_found", "Not found");
+        state.gifKey = { source: null, hint: null, state: "off" };
+        state.media = { ...state.media, gifsAvailable: false };
+        return state.gifKey;
+      },
     },
     account: {
       authConfig: async () => ({
@@ -1359,8 +1435,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       previewInvitation: async (token) =>
         state.previews?.[token] ??
         (token === "valid" ? { orgName: "Acme", email: "marina@acme.com.br", role: "member" } : null),
-      acceptInvitation: async (token) => {
-        log("orgs.acceptInvitation", token);
+      invitationState: async (token) => state.invitationStates?.[token] ?? null,
+      acceptInvitation: async (token, mail) => {
+        // With its email's proof only when the page had one (ADR 0090).
+        if (mail) log("orgs.acceptInvitation", token, mail);
+        else log("orgs.acceptInvitation", token);
         return { orgId: ORG_ID };
       },
       settings: async (orgId) => ({
@@ -1372,6 +1451,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         timezone: "America/Sao_Paulo",
         actionCheck: state.actionCheck ?? true,
         autoModels: state.autoModels ?? {},
+        ...mediaSettings(state),
         // Money: admins only, like the backend.
         ...(seesCost() ? { defaultAgentBudgetUsd: state.defaultAgentBudgetUsd ?? 50 } : {}),
       }),
@@ -1381,6 +1461,14 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (input.defaultCredentialId !== undefined) state.defaultCredentialId = input.defaultCredentialId;
         if (input.defaultAgentBudgetUsd !== undefined) state.defaultAgentBudgetUsd = input.defaultAgentBudgetUsd;
         if (input.actionCheck !== undefined) state.actionCheck = input.actionCheck;
+        const { gifs, gifRating, agentStickers, agentMedia } = input;
+        state.media = {
+          ...state.media,
+          ...(gifs !== undefined ? { gifs } : {}),
+          ...(gifRating !== undefined ? { gifRating } : {}),
+          ...(agentStickers !== undefined ? { agentStickers } : {}),
+          ...(agentMedia !== undefined ? { agentMedia } : {}),
+        };
         for (const [provider, tiers] of Object.entries(input.autoModels ?? {})) {
           const next = { ...state.autoModels?.[provider] };
           for (const [tier, model] of Object.entries(tiers ?? {}) as [ModelTier, string | null][]) {
@@ -1398,6 +1486,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           timezone: input.timezone ?? "America/Sao_Paulo",
           actionCheck: state.actionCheck ?? true,
           autoModels: state.autoModels ?? {},
+          ...mediaSettings(state),
         };
       },
       overview: async () => ({
@@ -1417,10 +1506,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       allInvitations: async () => structuredClone(state.invitations),
       inviteMany: async (orgId, input) => {
         log("orgs.inviteMany", orgId, input);
-        return input.emails.map((email) => {
+        const asked = input.invites ?? (input.emails ?? []).map((email) => ({ email, roleIds: input.roleIds }));
+        return asked.map(({ email, roleIds }) => {
           if (state.members.some((m) => m.email === email)) return { email, status: "already_member" as const };
           if (state.invitations.some((i) => i.email === email)) return { email, status: "already_invited" as const };
-          const inv = newInvitation(email, "member", input.roleIds);
+          const inv = newInvitation(email, "member", roleIds);
+          inv.channelIds = input.channelIds ?? [];
+          inv.url = `http://localhost:3000/invite/tok-${inv.id}`;
           state.invitations.push(inv);
           return {
             email,
@@ -1436,8 +1528,16 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         if (inv) {
           inv.status = "pending";
           inv.expiresAt = new Date(Date.now() + 7 * 86_400_000).toISOString();
+          // The same link, as the server keeps it (ADR 0090).
+          inv.url ??= `http://localhost:3000/invite/tok-${invitationId}`;
         }
-        return { url: `http://localhost:3000/invite/tok-new-${invitationId}`, expiresAt: inv?.expiresAt ?? "" };
+        return { url: inv?.url ?? `http://localhost:3000/invite/tok-${invitationId}`, expiresAt: inv?.expiresAt ?? "" };
+      },
+      setInvitationRoles: async (orgId, invitationId, roleIds) => {
+        log("orgs.setInvitationRoles", orgId, invitationId, roleIds);
+        const inv = state.invitations.find((i) => i.id === invitationId);
+        if (inv) inv.roleIds = roleIds;
+        return { roleIds };
       },
       planUsage: async () => ({
         month: new Date().toISOString().slice(0, 7),
@@ -1641,6 +1741,8 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         log("agents.update", orgId, agentId, input);
         const agent = state.agents.find((a) => a.id === agentId);
         if (!agent) throw new ApiError(404, "not_found", "Agent not found");
+        // One agent coordinates the team at a time (ADR 0093).
+        if (input.coordinator) for (const a of state.agents) a.coordinator = false;
         Object.assign(agent, input);
         return { ...agent };
       },
@@ -1794,6 +1896,38 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       brainMachines: async (orgId) => {
         log("agents.brainMachines", orgId);
         return structuredClone(state.brainMachines ?? []);
+      },
+      newAgentSetup: async (orgId) => {
+        log("agents.newAgentSetup", orgId);
+        return structuredClone(state.newAgentSetup ?? null);
+      },
+      // Each agent takes it unless `setupResults` says otherwise; applied, its brain view thinks so. A setup without
+      // an Autonomia changes none.
+      applySetup: async (orgId, input) => {
+        log("agents.applySetup", orgId, input);
+        return input.agentIds.map((agentId) => {
+          const { autonomy, ...given } = state.setupResults?.[agentId] ?? {};
+          const result: AgentSetupResult = {
+            agentId,
+            status: "applied",
+            ...given,
+            ...(input.setup.autonomy && autonomy ? { autonomy } : {}),
+          };
+          if (!input.preview && result.status === "applied") {
+            const b = brainOf(agentId);
+            const s = input.setup;
+            brains.set(agentId, {
+              ...b,
+              brain: s.brain,
+              model: s.brain === "model" ? null : s.model,
+              effectiveModel: s.brain === "model" ? null : s.model,
+              ...(s.brain !== "model" && !result.keeps ? { account: s.account ?? null } : {}),
+              ...(s.effort !== undefined ? { effort: s.effort } : {}),
+              ...(s.contextTokens !== undefined ? { contextTokens: s.contextTokens } : {}),
+            });
+          }
+          return result;
+        });
       },
       setBrain: async (orgId, agentId, input) => {
         log("agents.setBrain", orgId, agentId, input);
@@ -2095,6 +2229,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const id = "agentId" in member ? member.agentId : member.userId;
         state.channelMembers[channelId] = (state.channelMembers[channelId] ?? []).filter((m) => m.id !== id);
       },
+      setAutoReply: async (orgId, channelId, agentId, autoReply) => {
+        log("chat.setAutoReply", orgId, channelId, agentId, autoReply);
+        state.autoReply[`${agentId}:${channelId}`] = autoReply;
+      },
       addMember: async (orgId, channelId, member) => {
         log("chat.addMember", orgId, channelId, member);
         const list = state.channelMembers[channelId] ?? [];
@@ -2145,6 +2283,13 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
           };
         }
         if (input.attachments?.length) meta.artifacts = input.attachments.map((a) => ({ id: a, version: 1 }));
+        // Like the server (ADR 0091): a GIF looked up again (its size and title are the provider's), a sticker as sent.
+        const media = input.media;
+        if (media?.kind === "gif") {
+          const gif = (state.gifResults ?? FAKE_GIFS).find((g) => g.id === media.id);
+          if (!gif) throw new ApiError(422, "message.media_not_found", "That GIF isn't available");
+          meta.media = { kind: "gif", provider: "giphy", ...gif };
+        } else if (media?.kind === "sticker") meta.media = { ...media };
         const message: Message = {
           id: input.clientId ? `srv-${input.clientId}` : id("msg"),
           channelId,
@@ -2165,6 +2310,24 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         // Like the server: a reply from the thread panel marks when "Responder" opened the thread.
         if (input.openThread && input.threadId) await state.openThread?.(orgId, input.threadId, message.createdAt);
         return message;
+      },
+    },
+    // GIF search (ADR 0091): titles that hold the words, a page at a time; `gifs.off` like the server's.
+    gifs: {
+      search: async (orgId, query) => {
+        log("gifs.search", orgId, query);
+        if (state.gifsError) throw state.gifsError;
+        const media = mediaSettings(state);
+        if (!media.gifsAvailable || !media.gifs) throw new ApiError(404, "gifs.off", "GIFs are off");
+        const words = query.q?.trim().toLowerCase();
+        const all = state.gifResults ?? FAKE_GIFS;
+        const found = words ? all.filter((g) => g.title.toLowerCase().includes(words)) : all;
+        const offset = query.offset ?? 0;
+        const limit = query.limit ?? 24;
+        return {
+          gifs: structuredClone(found.slice(offset, offset + limit)),
+          next: offset + limit < found.length ? offset + limit : null,
+        };
       },
     },
     approvals: {
@@ -2381,7 +2544,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       },
     },
     proposals: {
-      list: async () => structuredClone(state.proposals),
+      list: async (_orgId, filter) => {
+        const ids = filter?.ids;
+        return structuredClone(ids ? state.proposals.filter((p) => ids.includes(p.id)) : state.proposals);
+      },
       accept: async (orgId, id, text) => {
         log("proposals.accept", orgId, id, text);
         const p = findProposal(id);
@@ -2668,6 +2834,13 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
         state.calls.push({ method: "invites.turnOff", args: [orgId, linkId] });
         state.inviteLinks = (state.inviteLinks ?? []).filter((l) => l.id !== linkId);
       },
+      renewLink: async (orgId, linkId) => {
+        state.calls.push({ method: "invites.renewLink", args: [orgId, linkId] });
+        const link = state.inviteLinks?.find((l) => l.id === linkId);
+        const expiresAt = new Date(Date.now() + 30 * 86_400_000).toISOString();
+        if (link) link.expiresAt = expiresAt;
+        return { expiresAt };
+      },
       sendCode: async (token, input, humanCheck) => {
         state.calls.push({
           method: "invites.sendCode",
@@ -2685,10 +2858,22 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
       ask: async (token, input) => {
         state.calls.push({ method: "invites.ask", args: [token, input] });
         if (state.askError) throw state.askError;
-        return { status: "pending", email: (input.email ?? state.me?.user.email ?? "").toLowerCase(), emailed: true };
+        return {
+          status: "pending",
+          email: (input.email ?? state.me?.user.email ?? "").toLowerCase(),
+          emailed: true,
+          // With a password the server answers the page's key (ADR 0090).
+          ...(input.password ? { key: "00000000-0000-4000-8000-000000000001.page-secret" } : {}),
+        };
+      },
+      claim: async (token, key) => {
+        state.calls.push({ method: "invites.claim", args: [token, key] });
+        const claims = state.claims ?? [];
+        return claims.length > 1 ? (claims.shift() ?? null) : (claims[0] ?? null);
       },
       requestNew: async (token) => {
         state.calls.push({ method: "invites.requestNew", args: [token] });
+        if (state.requestNewError) throw state.requestNewError;
       },
     },
     joinRequests: {
@@ -2724,6 +2909,24 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
         state.calls.push({ method: "joinRequests.deny", args: [orgId, requestId, reason] });
         if (state.answerError) throw state.answerError;
         state.joinRequests = state.joinRequests?.filter((r) => r.id !== requestId);
+      },
+      suggest: async (orgId, input) => {
+        state.calls.push({ method: "joinRequests.suggest", args: [orgId, input] });
+        if (state.suggestError) throw state.suggestError;
+        const id = `sug-${(state.suggestions?.length ?? 0) + 1}`;
+        state.suggestions = [
+          { id, email: input.email.toLowerCase(), note: input.note ?? null, createdAt: new Date().toISOString() },
+          ...(state.suggestions ?? []),
+        ];
+        return { id };
+      },
+      mine: async (orgId) => {
+        state.calls.push({ method: "joinRequests.mine", args: [orgId] });
+        return structuredClone(state.suggestions ?? []);
+      },
+      cancel: async (orgId, requestId) => {
+        state.calls.push({ method: "joinRequests.cancel", args: [orgId, requestId] });
+        state.suggestions = state.suggestions?.filter((s) => s.id !== requestId);
       },
     },
     storage: createMockStorage(

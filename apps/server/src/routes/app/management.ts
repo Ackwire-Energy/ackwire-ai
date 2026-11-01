@@ -1,4 +1,5 @@
 import {
+  AGENT_MEDIA_LEVELS,
   agentDetail,
   agentView,
   audienceOf,
@@ -7,8 +8,10 @@ import {
   canTalkTo,
   canViewCost,
   continueRun,
+  GIF_RATINGS,
   getOrgSettings,
   getRun,
+  INVITE_NOTE_MAX,
   inviteMany,
   listAgentChannels,
   listInvitationsWithStatus,
@@ -31,6 +34,7 @@ import {
   STATUS_EMOJI_MAX,
   STATUS_TEXT_MAX,
   setAgentChannels,
+  setInvitationRoles,
   setMySidebarItem,
   setMySidebarItems,
   setMyStatus,
@@ -84,6 +88,27 @@ const Settings = z
     autoModels: z.record(z.string(), z.partialRecord(ModelTier, z.string())).openapi({
       description:
         "Per provider, the models Automático picks per tier where the workspace chose its own (`{ openrouter: { small, medium, large } }`, ADR 0087); a tier left out is the provider's default.",
+    }),
+    gifs: z.boolean().openapi({
+      description: "People can send GIFs in chat (ADR 0091); they also need `gifsAvailable`. On by default.",
+    }),
+    gifRating: z.enum(GIF_RATINGS).openapi({
+      description: "The most a GIF may be rated: `g` (any age, the default) or `pg`.",
+    }),
+    agentStickers: z.boolean().openapi({
+      description: "The agents' own stickers, drawn from each agent's look (ADR 0091). On by default.",
+    }),
+    agentMedia: z.enum(AGENT_MEDIA_LEVELS).openapi({
+      description:
+        "How often agents follow a light reply with a sticker or a GIF on their own: `never`, `sometimes` (the default) or `often`. Needs `agentMediaAvailable`; each agent can be turned off (`mediaReplies`). When someone asks for one, agents send it at any level.",
+    }),
+    gifsAvailable: z.boolean().openapi({
+      description:
+        "Read only: this server has a GIF provider with a key now (`GIPHY_API_KEY`, or the one the installation's owner added in Settings). Without it there are no GIFs at all.",
+    }),
+    agentMediaAvailable: z.boolean().openapi({
+      description:
+        "Read only: this installation has a Jev key (ADR 0073), which decides when an agent sends a sticker or a GIF. Without it agents send none.",
     }),
   })
   .openapi("OrgSettings");
@@ -152,9 +177,19 @@ const InvitationWithStatus = z
     email: z.string(),
     role: Role,
     roleIds: z.array(z.string()),
+    channelIds: z.array(z.string()).openapi({ description: "Channels it adds them to, besides #general (ADR 0090)." }),
     status: z.enum(["pending", "expired"]),
     expiresAt: z.string(),
     createdAt: z.string(),
+    invitedBy: z.string().nullable().openapi({ description: "Who sent it (their name)." }),
+    url: z
+      .string()
+      .nullable()
+      .openapi({
+        description:
+          "Its link, the same one the email carries, to copy at any time (ADR 0090). Null for an invitation sent " +
+          "before links could be shown again: sending it again gives it one.",
+      }),
   })
   .openapi("InvitationWithStatus");
 
@@ -190,6 +225,10 @@ const AgentDetail = z
     audienceMode: z.enum(["everyone", "people", "owner"]),
     canTalk: z.boolean(),
     appearance: AgentAppearance.nullable(),
+    mediaReplies: z.boolean().openapi({
+      description:
+        "It may send a sticker or a GIF (ADR 0091): when someone asks for one, and after a light reply as often as the workspace's `agentMedia` allows.",
+    }),
   })
   .openapi("AgentDetail");
 
@@ -239,6 +278,12 @@ export function managementRoutes(deps: AppDeps) {
   const app = createAppRouter(deps);
   app.use("/organizations/*", requireSession(deps.auth));
   const AgentParams = OrgParams.extend({ agentId: z.uuid() });
+  /** What this server can do for GIFs and agents' stickers (ADR 0091 §5), so no switch does nothing. */
+  const mediaAvailable = async () => ({
+    // The provider follows the installation's key, which its owner may add or remove at any time.
+    gifsAvailable: adapters.gifs?.available() ?? false,
+    agentMediaAvailable: Boolean((await deps.extras?.jevKey?.view())?.source),
+  });
 
   // ── Organization ──────────────────────────────────────────────────────────
   app.openapi(
@@ -255,7 +300,8 @@ export function managementRoutes(deps: AppDeps) {
       const { orgId } = c.req.valid("param");
       const actor = c.get("user").id;
       const settings = await getOrgSettings(db, actor, orgId);
-      return c.json(settingsFor(settings, await canViewCost(db, actor, orgId)), 200);
+      const seesCost = await canViewCost(db, actor, orgId);
+      return c.json({ ...settingsFor(settings, seesCost), ...(await mediaAvailable()) }, 200);
     },
   );
 
@@ -289,6 +335,10 @@ export function managementRoutes(deps: AppDeps) {
               description:
                 "Per provider and tier, one of that provider's models; null puts the tier back on its default.",
             }),
+            gifs: z.boolean().optional().openapi({ description: "People can send GIFs in chat (ADR 0091)." }),
+            gifRating: z.enum(GIF_RATINGS).optional(),
+            agentStickers: z.boolean().optional(),
+            agentMedia: z.enum(AGENT_MEDIA_LEVELS).optional(),
           }),
         ),
       },
@@ -304,7 +354,8 @@ export function managementRoutes(deps: AppDeps) {
           ? { defaultAgentBudgetNanoUsd: usdToNanoUsd(defaultAgentBudgetUsd) }
           : {}),
       });
-      return c.json(settingsFor(settings, await canViewCost(db, actor, orgId)), 200);
+      const seesCost = await canViewCost(db, actor, orgId);
+      return c.json({ ...settingsFor(settings, seesCost), ...(await mediaAvailable()) }, 200);
     },
   );
 
@@ -495,7 +546,8 @@ export function managementRoutes(deps: AppDeps) {
       responses: { 200: json(z.object({ invitations: z.array(InvitationWithStatus) })), ...errors },
     }),
     async (c) => {
-      const rows = await listInvitationsWithStatus(db, c.get("user").id, c.req.valid("param").orgId);
+      const { orgId } = c.req.valid("param");
+      const rows = await listInvitationsWithStatus(db, c.get("user").id, orgId, new Date(), config.AGENTES_SECRET);
       return c.json(
         {
           invitations: rows.map((i) => ({
@@ -503,9 +555,12 @@ export function managementRoutes(deps: AppDeps) {
             email: i.email,
             role: i.role,
             roleIds: i.roleIds,
+            channelIds: i.channelIds,
             status: i.status,
             expiresAt: i.expiresAt.toISOString(),
             createdAt: i.createdAt.toISOString(),
+            invitedBy: i.invitedBy,
+            url: i.token ? inviteUrl(i.token) : null,
           })),
         },
         200,
@@ -521,18 +576,47 @@ export function managementRoutes(deps: AppDeps) {
       security,
       summary: "Invite several emails at once",
       description:
-        "One outcome per email. Links are returned once; only a hash of each token is stored (7-day expiry).",
+        "One outcome per email: exactly one of `invites`, each address with its own roles (ADR 0090), or `emails`, " +
+        "all with `roleIds`. `channelIds` and `note` go with every one. Only a hash of each token is stored " +
+        "(7-day expiry); the link can be copied again from the list.",
       request: {
         params: OrgParams,
         body: body(
-          z.object({
-            emails: z.array(z.string().max(320)).min(1).max(100),
-            roleIds: z
-              .array(z.string().uuid())
-              .max(50)
-              .optional()
-              .openapi({ description: "Roles they get on accepting, below your own (ADR 0085)." }),
-          }),
+          z
+            .object({
+              emails: z.array(z.string().max(320)).min(1).max(100).optional(),
+              invites: z
+                .array(
+                  z.object({
+                    email: z.string().max(320),
+                    roleIds: z.array(z.string().uuid()).max(50).optional(),
+                  }),
+                )
+                .min(1)
+                .max(100)
+                .optional(),
+              roleIds: z
+                .array(z.string().uuid())
+                .max(50)
+                .optional()
+                .openapi({ description: "Roles they get on accepting, below your own (ADR 0085)." }),
+              channelIds: z
+                .array(z.string().uuid())
+                .max(20)
+                .optional()
+                .openapi({ description: "Channels they join on accepting, besides #general (ADR 0090)." }),
+              note: z
+                .string()
+                .max(INVITE_NOTE_MAX)
+                .optional()
+                .openapi({ description: "Your words, in the invitation email (ADR 0090)." }),
+            })
+            .refine((b) => b.emails !== undefined || b.invites !== undefined, {
+              message: "Send `emails` or `invites`",
+            })
+            .refine((b) => b.emails === undefined || b.invites === undefined, {
+              message: "Send `emails` or `invites`, not both",
+            }),
         ),
       },
       responses: {
@@ -553,7 +637,10 @@ export function managementRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId } = c.req.valid("param");
-      const results = await inviteMany(db, c.get("user").id, orgId, c.req.valid("json"));
+      const results = await inviteMany(db, c.get("user").id, orgId, {
+        ...c.req.valid("json"),
+        secret: config.AGENTES_SECRET,
+      });
       for (const r of results) {
         if (r.status !== "invited") continue;
         await queueInvitationEmail(db, {
@@ -563,6 +650,7 @@ export function managementRoutes(deps: AppDeps) {
           role: "member",
           url: inviteUrl(r.token),
           inviterId: c.get("user").id,
+          secret: config.AGENTES_SECRET,
         });
       }
       deps.wakeWorkers?.();
@@ -585,13 +673,21 @@ export function managementRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/invitations/{invitationId}/resend",
       tags: ["Members"],
       security,
-      summary: "Resend: new link (the old one stops working), new 7-day expiry",
+      summary: "Resend: the same link, a new 7-day expiry (ADR 0090)",
+      description: "An invitation sent before links could be shown again gets a new link: the old one stops working.",
       request: { params: OrgParams.extend({ invitationId: z.uuid() }), body: body(z.object({})) },
       responses: { 200: json(z.object({ url: z.string(), expiresAt: z.string() })), ...errors },
     }),
     async (c) => {
       const { orgId, invitationId } = c.req.valid("param");
-      const { invitation, token } = await resendInvitation(db, c.get("user").id, orgId, invitationId);
+      const { invitation, token } = await resendInvitation(
+        db,
+        c.get("user").id,
+        orgId,
+        invitationId,
+        new Date(),
+        config.AGENTES_SECRET,
+      );
       await queueInvitationEmail(db, {
         orgId,
         invitationId,
@@ -599,9 +695,30 @@ export function managementRoutes(deps: AppDeps) {
         role: invitation.role,
         url: inviteUrl(token),
         inviterId: c.get("user").id,
+        secret: config.AGENTES_SECRET,
       });
       deps.wakeWorkers?.();
       return c.json({ url: inviteUrl(token), expiresAt: invitation.expiresAt.toISOString() }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "patch",
+      path: "/organizations/{orgId}/invitations/{invitationId}",
+      tags: ["Members"],
+      security,
+      summary: "Change the roles a pending invitation gives (ADR 0090): the same link, nothing is sent",
+      request: {
+        params: OrgParams.extend({ invitationId: z.uuid() }),
+        body: body(z.object({ roleIds: z.array(z.string().uuid()).max(50) })),
+      },
+      responses: { 200: json(z.object({ roleIds: z.array(z.string()) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, invitationId } = c.req.valid("param");
+      const result = await setInvitationRoles(db, c.get("user").id, orgId, invitationId, c.req.valid("json").roleIds);
+      return c.json(result, 200);
     },
   );
 
@@ -795,6 +912,7 @@ export function managementRoutes(deps: AppDeps) {
           audienceMode: d.agent.audienceMode,
           canTalk: canTalkTo(d.agent, c.get("user").id, await talksToAgents(db, orgId, c.get("user").id)),
           appearance: v.appearance,
+          mediaReplies: v.mediaReplies,
           channels: d.channels,
           createdAt: v.createdAt.toISOString(),
         },
@@ -959,9 +1077,9 @@ export function managementRoutes(deps: AppDeps) {
       tags: ["Usage"],
       security,
       summary:
-        "Continue a run a person stopped, or one that reached its step limit (same people as stopping it): a new run of the agent picks up where it stopped",
+        "Continue a run a person stopped, or one that reached its step limit or stopped because it got stuck (same people as stopping it): a new run of the agent picks up where it stopped",
       description:
-        "Only for a run stopped by a person while it worked, or one that ended at its step limit (its reply has `meta.stepLimit`); once per reply (`meta.canceled.continuedRunId`, `meta.stepLimit.continuedRunId`). 409 `run.not_continuable` otherwise, 409 `run.agent_busy` while the agent already works in that conversation. The channel hears `run.continued`.",
+        "Only for a run stopped by a person while it worked, or one that ended at its step limit (its reply has `meta.stepLimit`, with `stuck: true` when it stopped because it went in circles); once per reply (`meta.canceled.continuedRunId`, `meta.stepLimit.continuedRunId`). 409 `run.not_continuable` otherwise, 409 `run.agent_busy` while the agent already works in that conversation. The channel hears `run.continued`.",
       request: { params: OrgParams.extend({ runId: z.uuid() }) },
       responses: { 200: json(z.object({ runId: z.uuid() })), ...errors },
     }),
