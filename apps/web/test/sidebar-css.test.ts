@@ -25,8 +25,10 @@ test("a channel's # is no louder than a category's chevron, in its column, and e
   expect(value('.sidebar:not([data-rail="true"]) .sidebar__section-body', "padding-left")).toBeUndefined();
 });
 
-test("the lines between the sidebar's parts never shrink to nothing in a list that scrolls", () => {
-  expect(value(".sidebar__divider", "flex")).toBe("none");
+test("space, not lines, sets the sidebar's parts apart: 14px over each one with the list's gap", () => {
+  expect(declarations(css, ".sidebar__divider")).toEqual([]);
+  expect(value('.sidebar:not([data-rail="true"]) .sidebar__block + .sidebar__block', "margin-top")).toBe("10px");
+  expect(value('.sidebar:not([data-rail="true"]) .sidebar__scroll', "gap")).toBe("4px");
 });
 
 test("an agent's role sits under its name, up to two lines, with the face at the top and gone in the rail", () => {
@@ -48,16 +50,16 @@ test("an agent's role sits under its name, up to two lines, with the face at the
   expect(value('.sidebar[data-rail="true"] .sidebar__item-role', "display")).toBe("none");
 });
 
-test("an owner's … on an agent's row gets its own room instead of covering the name and role", () => {
-  // The button is 24px at 4px from the row's end.
-  for (const state of [
-    ".sidebar__row:hover:has(> .sidebar__row-menu) > .sidebar__item",
-    '.sidebar__row:has(> .sidebar__row-menu:is(:focus-visible, [data-state="open"])) > .sidebar__item',
-  ]) {
-    expect(value(state, "padding-right")).toBe("32px");
-  }
-  const twoLines = ".sidebar__row:has(> .sidebar__item .sidebar__item-role) > .sidebar__row-menu.ac-btn";
+test("a row's hover buttons get their own room instead of covering the name and role, and Tab shows them", () => {
+  // Each button is 24px, from 4px before the row's end.
+  const open = '.sidebar__row[data-acts]:is(:hover, :focus-within, :has([data-state="open"]))';
+  expect(value(`${open} > .sidebar__row-acts`, "opacity")).toBe("1");
+  expect(value(`${open} > .sidebar__item`, "padding-right")).toBe("var(--acts-room, 32px)");
+  expect(value('.sidebar__row[data-acts="2"]', "--acts-room")).toBe("56px");
+  expect(value(".sidebar__row-acts", "opacity")).toBe("0");
+  const twoLines = ".sidebar__row:has(> .sidebar__item .sidebar__item-role) > .sidebar__row-acts";
   expect([value(twoLines, "top"), value(twoLines, "translate")]).toEqual(["4px", "none"]);
+  expect(value('.sidebar[data-rail="true"] .sidebar__row-acts', "display")).toBe("none");
 });
 
 test("Equipe on the Agentes header shows like the header's +, and stays in sight on a plate while its page is open", () => {

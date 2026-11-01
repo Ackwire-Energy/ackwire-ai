@@ -42,6 +42,7 @@ import { inSidebarList, SIDEBAR_ITEMS, sidebarPlace } from "@agenteschat/client/
 import {
   type AgentColor,
   Avatar,
+  agentGradient,
   Button,
   CountBadge,
   CountChip,
@@ -86,6 +87,7 @@ import { useApi } from "@/api/context";
 import { useAuth } from "@/auth/context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { agentLine, availabilityOf, personLine, useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
+import { requestChannelDetails } from "@/lib/channel-details";
 import type { MenuEntry } from "@/lib/context-menu";
 import { onPhoneAsk, takePhoneAsk } from "@/lib/desktop";
 import { entityMenu } from "@/lib/entity-menu";
@@ -110,6 +112,7 @@ import {
 import { MoveChannelDialog, NewCategoryDialog, RenameCategoryDialog } from "./ChannelCategoryDialogs";
 import { openPalette } from "./CommandMenu";
 import { DeleteAccountDialog } from "./DeleteAccount";
+import { MenuEntries } from "./DesktopMenus";
 import { useAgentMenu, useChannelMenu, usePersonMenu } from "./entity-menus";
 import { useInviteDialog } from "./invite/InviteDialog";
 import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
@@ -207,6 +210,10 @@ export function Sidebar() {
   const overview = useOverview(orgId);
   // A new channel: `true` with no category, or the category whose + opened it.
   const [creatingChannel, setCreatingChannel] = useState<boolean | string>(false);
+  // A new category: empty, or with the channel whose menu asked for it.
+  const [newCategory, setNewCategory] = useState<{ withChannel?: string } | null>(null);
+  const [customizing, setCustomizing] = useState(false);
+  const navigate = useNavigate();
   useEffect(() => {
     const open = () => setCreatingChannel(true);
     window.addEventListener(NEW_CHANNEL_EVENT, open);
@@ -377,12 +384,52 @@ export function Sidebar() {
   const sectionOrder = useSectionOrder(orgId);
   const sectionMenu = (id: SectionKey) =>
     entityMenu(() => [{ kind: "header", label: sectionName(t, id) }, ...sectionOrder.entries(id)]);
+  // What the headers' + and the sidebar's own menu (right click on its empty space) create, each as far as the role allows.
+  const item = (id: string, label: string, icon: IconName, run: () => void): MenuEntry => ({
+    kind: "item",
+    id,
+    label,
+    icon,
+    run,
+  });
+  const newChannelItem = can(org, "create_channels")
+    ? [item("new-channel", t("shell.sidebarMenu.newChannel"), "channel", () => setCreatingChannel(true))]
+    : [];
+  const newCategoryItem = can(org, "manage_channels")
+    ? [item("new-category", t("channelCategories.newCategory"), "layers", () => setNewCategory({}))]
+    : [];
+  const createAgentItem = can(org, "create_agents")
+    ? [
+        item(
+          "create-agent",
+          t("shell.createAgent"),
+          "plus",
+          () => void navigate({ to: "/org/$orgId/agents/new", params: { orgId } }),
+        ),
+      ]
+    : [];
+  const newGroupItem = (label: string) =>
+    arranges ? [item("new-group", label, "layers", () => setGroupDialog({ mode: "create" }))] : [];
+  const sidebarMenu = entityMenu(() => [
+    { kind: "header", label: t("shell.sidebarMenu.title") },
+    item("customize", t("shell.customizeSidebar"), "settings", () => setCustomizing(true)),
+    { kind: "separator" },
+    ...newChannelItem,
+    ...newCategoryItem,
+    { kind: "separator" },
+    ...createAgentItem,
+    ...newGroupItem(t("shell.sidebarMenu.newAgentGroup")),
+    item("team", t("shell.team"), "agent", () => void navigate({ to: "/org/$orgId/team", params: { orgId } })),
+    { kind: "separator" },
+    sectionOrder.restore,
+  ]);
+  const agentsUnread = unreadOf([...byGroup.ungrouped, ...shownGroups.flatMap((g) => g.items)]);
   const blocks: Record<SectionKey, ReactNode> = {
     tools: (
       // The tools each person keeps in sight; the rest open beside the sidebar from More.
       <div className="sidebar__group sidebar__tools">
         {listed.map(toolRow)}
-        <MoreTools items={inMore} row={toolRow} countOf={countOf} />
+        <MoreTools items={inMore} row={toolRow} countOf={countOf} onCustomize={() => setCustomizing(true)} />
       </div>
     ),
     channels: (
@@ -391,8 +438,10 @@ export function Sidebar() {
         loading={channels.isLoading}
         sections={sections}
         onNewChannel={(categoryId) => setCreatingChannel(categoryId ?? true)}
+        onNewCategory={(withChannel) => setNewCategory(withChannel ? { withChannel } : {})}
         onPrefetch={prefetch}
         headProps={sectionMenu("channels")}
+        addEntries={[...newChannelItem, ...newCategoryItem]}
       />
     ),
     agents: agentsShown && (
@@ -418,7 +467,8 @@ export function Sidebar() {
             sections={sections}
             className="sidebar__section--part"
             headProps={sectionMenu("agents")}
-            summary={unreadOf(byGroup.ungrouped) > 0 && <UnreadCount count={unreadOf(byGroup.ungrouped)} />}
+            // Closed, the part hides its groups too: their unread count with its own.
+            summary={agentsUnread > 0 && <UnreadCount count={agentsUnread} />}
             action={
               <>
                 <Button asChild variant="ghost" size="sm" iconOnly className="sidebar__section-add">
@@ -426,18 +476,10 @@ export function Sidebar() {
                     <Icon name="agent" />
                   </Link>
                 </Button>
-                {organize && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    iconOnly
-                    icon="plus"
-                    className="sidebar__section-add"
-                    aria-label={t("agentGroups.newGroup")}
-                    title={t("agentGroups.newGroup")}
-                    onClick={() => setGroupDialog({ mode: "create" })}
-                  />
-                )}
+                <SectionAdd
+                  label={t("shell.sidebarMenu.addToAgents")}
+                  entries={[...createAgentItem, ...newGroupItem(t("agentGroups.newGroup"))]}
+                />
               </>
             }
             drop={organize ? drag.zone(null) : undefined}
@@ -501,6 +543,19 @@ export function Sidebar() {
         className="sidebar__section--part"
         headProps={sectionMenu("people")}
         summary={peopleUnread > 0 && <UnreadCount count={peopleUnread} />}
+        // Every person is listed already: "Nova mensagem" is Ir para…, which finds anyone (people and agents).
+        action={
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon="plus"
+            className="sidebar__section-add"
+            aria-label={t("shell.sidebarMenu.newMessage")}
+            title={t("shell.sidebarMenu.newMessage")}
+            onClick={openPalette}
+          />
+        }
       >
         {people.map((m) => (
           <ErrorBoundary key={m.userId} resetKey={m} fallback={unshownRow}>
@@ -556,16 +611,19 @@ export function Sidebar() {
         </div>
       </div>
 
-      <div className="sidebar__scroll" ref={navRef}>
-        {/* Lines between the tools, the channels, the agents and the people: parts of the sidebar, not categories. */}
-        {sectionOrder.order
-          .filter((id) => blocks[id])
-          .map((id, i) => (
-            <Fragment key={id}>
-              {i > 0 && <span className="sidebar__divider" aria-hidden="true" />}
-              {sectionOrder.block(id, blocks[id], !rail)}
-            </Fragment>
-          ))}
+      {/* Space, not lines, between the tools, the channels, the agents and the people. A right click on the space
+          between the rows (not on a row or a header, which have their own) opens the sidebar's menu; a link with no
+          menu of its own (a tool) keeps the browser's. */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: the right click and Shift+F10 of the sidebar's own menu */}
+      <div
+        className="sidebar__scroll"
+        ref={navRef}
+        onKeyDown={sidebarMenu.onKeyDown}
+        onContextMenu={(e) => {
+          if (!(e.target instanceof Element && e.target.closest("a[href]"))) sidebarMenu.onContextMenu(e);
+        }}
+      >
+        {sectionOrder.order.filter((id) => blocks[id]).map((id) => sectionOrder.block(id, blocks[id], !rail))}
       </div>
 
       <NewChannelDialog
@@ -573,6 +631,12 @@ export function Sidebar() {
         onOpenChange={(open) => setCreatingChannel(open)}
         category={typeof creatingChannel === "string" ? creatingChannel : null}
       />
+      <NewCategoryDialog
+        open={newCategory !== null}
+        onOpenChange={(open) => !open && setNewCategory(null)}
+        withChannel={newCategory?.withChannel}
+      />
+      <SidebarSetupDialog open={customizing} onClose={() => setCustomizing(false)} />
       {groupDialog && <GroupNameDialog purpose={groupDialog} onClose={() => setGroupDialog(null)} />}
       {deletingGroup && <DeleteGroupDialog group={deletingGroup} onClose={() => setDeletingGroup(null)} />}
 
@@ -582,7 +646,8 @@ export function Sidebar() {
           total={dir.agents.length}
           clear={() => [meRow.current?.querySelector(".ac-avatar")]}
         />
-        {can(org, "create_agents") && (
+        {/* The full sidebar creates from the Agentes header's + (always shown on touch screens); the rail has no headers. */}
+        {rail && can(org, "create_agents") && (
           <Button asChild block variant="ghost" className="sidebar__create">
             <Link to="/org/$orgId/agents/new" params={{ orgId }} title={t("shell.createAgent")}>
               <Icon name="plus" />
@@ -671,7 +736,8 @@ function SidebarSection({
   sections: ReturnType<typeof useSidebarSections>;
   summary?: ReactNode;
   action?: ReactNode;
-  drop?: ReturnType<ReturnType<typeof useAgentDrag>["zone"]>;
+  /** It takes a drop: dragged agents (`useAgentDrag`), or channels taken out of their category. */
+  drop?: HTMLAttributes<HTMLDivElement> & { "data-drop"?: string | boolean };
   className?: string;
   /** A channel category's header: its right click and dragging. */
   headProps?: HTMLAttributes<HTMLDivElement>;
@@ -702,6 +768,46 @@ function SidebarSection({
   );
 }
 
+/** A part header's +: a menu of what it creates (none of it allowed: no +). */
+function SectionAdd({ label, entries }: { label: string; entries: MenuEntry[] }) {
+  if (!entries.length) return null;
+  return (
+    <Menu
+      align="end"
+      label={label}
+      trigger={
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          icon="plus"
+          className="sidebar__section-add"
+          aria-label={label}
+          title={label}
+        />
+      }
+    >
+      <MenuEntries entries={entries} />
+    </Menu>
+  );
+}
+
+/** A button over a row's end on hover or focus (`.sidebar__row-acts`), in place of its count or role. */
+function RowAction({ icon, label, onClick }: { icon: IconName; label: string; onClick: () => void }) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      iconOnly
+      icon={icon}
+      className="sidebar__row-menu"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+    />
+  );
+}
+
 /** Where a dragged channel or category would land: the row or header it is over, and how. */
 type DropMark = { key: string; where: "before" | "after" | "into" } | null;
 type Dragging = { kind: "channel" | "category"; id: string };
@@ -717,32 +823,39 @@ interface CategoryAction {
 const CATEGORY_KEY = "category:";
 
 /**
- * The channels (ADR 0080). With no categories, the "Canais" section as before. With them, the channels with
- * none come first with no header, then one section per category, like Agentes; closed, a category keeps the
- * open channel and the unread ones in sight (CSS). Who may manage channels arranges the categories; they and a
- * channel's creator move it by dragging, from its right click in the desktop app ("Mover para…") or in its details.
+ * The channels (ADR 0080): the "Canais" part, its channels with no category first, then one section per category
+ * (closed, "Canais" hides them too, but the open channel's); closed, a category keeps the open channel and the unread
+ * ones in sight (CSS). Who may manage channels arranges the categories; they and a channel's creator move it by
+ * dragging, from its right click ("Mover para…") or in its details.
  */
 function SidebarChannels({
   channels,
   loading,
   sections,
   onNewChannel,
+  onNewCategory,
   onPrefetch,
   headProps,
+  addEntries,
 }: {
   channels: Channel[];
   loading: boolean;
   sections: ReturnType<typeof useSidebarSections>;
-  /** The + of a category (its id) or of "Canais" (null). */
+  /** A category's + (its id), or a new channel with none (null). */
   onNewChannel: (categoryId: string | null) => void;
+  /** A new category, with the channel whose menu asked for it. */
+  onNewCategory: (withChannel?: string) => void;
   onPrefetch: (channelId: string) => void;
-  /** "Canais"' header, with no categories: the section's own menu (its place in the sidebar). */
+  /** "Canais"' header: the section's own menu (its place in the sidebar). */
   headProps?: HTMLAttributes<HTMLDivElement>;
+  /** What "Canais"' + creates. */
+  addEntries: MenuEntry[];
 }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
   const orgId = org.id;
   const toast = useToast();
+  const navigate = useNavigate();
   const categories = useChannelCategories(orgId);
   const place = usePlaceChannel(orgId);
   const placeCategory = usePlaceChannelCategory(orgId);
@@ -751,7 +864,6 @@ function SidebarChannels({
   const manages = can(org, "manage_channels");
   const mayCreate = can(org, "create_channels");
   const mayChange = (c: Channel) => managesChannel(c, me.user.id, org);
-  const [newCategory, setNewCategory] = useState<{ withChannel?: string } | null>(null);
   const [renaming, setRenaming] = useState<ChannelCategory | null>(null);
   const [moving, setMoving] = useState<Channel | null>(null);
   const drag = useRef<Dragging | null>(null);
@@ -860,7 +972,7 @@ function SidebarChannels({
                 id: "new-category",
                 label: t("channelCategories.newWithChannel"),
                 icon: "layers",
-                run: () => setNewCategory({ withChannel: c.id }),
+                run: () => onNewCategory(c.id),
               },
             ] satisfies MenuEntry[])
           : []),
@@ -923,7 +1035,7 @@ function SidebarChannels({
           id: "new-category",
           label: t("channelCategories.newCategory"),
           icon: "layers",
-          run: () => setNewCategory({}),
+          run: () => onNewCategory(),
         },
         {
           id: "delete",
@@ -939,7 +1051,7 @@ function SidebarChannels({
 
   const row = (c: Channel) => {
     const unread = c.unreadCount ?? 0;
-    return (
+    const link = (
       <Link
         key={c.id}
         to="/org/$orgId/c/$channelId"
@@ -966,6 +1078,21 @@ function SidebarChannels({
         {unread > 0 && <UnreadCount count={unread} />}
       </Link>
     );
+    // On hover or focus, like Discord's invite and settings: who manages the channel adds members or opens its details.
+    if (!mayChange(c)) return link;
+    const open = (ask: "details" | "add") => () => {
+      requestChannelDetails(c.id, ask);
+      void navigate({ to: "/org/$orgId/c/$channelId", params: { orgId, channelId: c.id } });
+    };
+    return (
+      <div key={c.id} className="sidebar__row" data-unread={unread > 0} data-acts={2}>
+        {link}
+        <span className="sidebar__row-acts">
+          <RowAction icon="personAdd" label={t("shell.sidebarMenu.addMembers")} onClick={open("add")} />
+          <RowAction icon="settings" label={t("shell.sidebarMenu.channelSettings")} onClick={open("details")} />
+        </span>
+      </div>
+    );
   };
   const addButton = (categoryId: string | null, label: string) =>
     mayCreate ? (
@@ -982,54 +1109,28 @@ function SidebarChannels({
     ) : null;
   const dialogs = (
     <>
-      <NewCategoryDialog
-        open={newCategory !== null}
-        onOpenChange={(open) => !open && setNewCategory(null)}
-        withChannel={newCategory?.withChannel}
-      />
       <RenameCategoryDialog category={renaming} onOpenChange={(open) => !open && setRenaming(null)} />
       <MoveChannelDialog channel={moving} onOpenChange={(open) => !open && setMoving(null)} canCreate={manages} />
     </>
   );
-  const newCategoryRow = manages && (
-    <button type="button" className="sidebar__item sidebar__new-category" onClick={() => setNewCategory({})}>
-      <Icon name="plus" />
-      <span className="sidebar__item-label">{t("channelCategories.newCategory")}</span>
-    </button>
-  );
+  const unread = channels.reduce((n, c) => n + (c.unreadCount ?? 0), 0);
 
-  if (shown.length === 0) {
-    return (
-      <>
-        <SidebarSection
-          id="channels"
-          label={t("shell.channels")}
-          sections={sections}
-          className="sidebar__section--part"
-          headProps={headProps}
-          action={addButton(null, t("newChannel.open"))}
-        >
-          {loading && <SidebarSkeleton count={3} label={t("common.loadingList")} />}
-          {channels.map(row)}
-        </SidebarSection>
-        {!loading && newCategoryRow}
-        {dialogs}
-      </>
-    );
-  }
   return (
     <>
-      {/* biome-ignore lint/a11y/useSemanticElements: the channels with no category, a drop target, not a form group */}
-      <div
-        className="sidebar__group"
-        role="group"
-        aria-label={t("shell.channels")}
-        data-drop={dropMark("loose")}
-        onDragOver={overLoose}
-        onDrop={drop}
+      <SidebarSection
+        id="channels"
+        label={t("shell.channels")}
+        sections={sections}
+        className="sidebar__section--part"
+        headProps={headProps}
+        summary={unread > 0 && <UnreadCount count={unread} />}
+        action={<SectionAdd label={t("shell.sidebarMenu.addToChannels")} entries={addEntries} />}
+        // The channels with no category take a channel dragged out of one.
+        drop={shown.length > 0 ? { "data-drop": dropMark("loose"), onDragOver: overLoose, onDrop: drop } : undefined}
       >
+        {loading && <SidebarSkeleton count={3} label={t("common.loadingList")} />}
         {loose.map(row)}
-      </div>
+      </SidebarSection>
       {shown.map((category) => {
         const actions = categoryActions(category);
         return (
@@ -1095,7 +1196,6 @@ function SidebarChannels({
           </SidebarSection>
         );
       })}
-      {newCategoryRow}
       {dialogs}
     </>
   );
@@ -1110,15 +1210,16 @@ function MoreTools({
   items,
   row,
   countOf,
+  onCustomize,
 }: {
   items: SidebarItem[];
   row: (id: SidebarItem) => ReactNode;
   countOf: (id: SidebarItem) => ReactNode;
+  onCustomize: () => void;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const [open, setOpen] = useState(false);
-  const [setup, setSetup] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   return (
     <>
@@ -1161,7 +1262,7 @@ function MoreTools({
             setOpen(false);
             // Closing the dialog brings focus back to More, not to this line, gone with the panel.
             trigger.current?.focus();
-            setSetup(true);
+            onCustomize();
           }}
         >
           <Icon name="settings" />
@@ -1169,7 +1270,6 @@ function MoreTools({
         </button>
       </Popover>
       <div className="sidebar__more-active">{items.map(row)}</div>
-      <SidebarSetupDialog open={setup} onClose={() => setSetup(false)} />
     </>
   );
 }
@@ -1197,7 +1297,7 @@ function AgentRow({
   menu?: ReactNode;
 }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
   const state = useStreams((st) => agentStateIn(st, a.id));
   const busy = state !== "idle" && !waitingFor;
   const color = colorOf(a);
@@ -1208,10 +1308,13 @@ function AgentRow({
   const word = shown ? t(`presence.${shown.presence}`) : null;
   const line = agentLine(t, shown?.line ?? null);
   const dir = useDirectory(org.id);
+  const navigate = useNavigate();
   const agentEntries = useAgentMenu();
   const rowMenu = entityMenu(() => agentEntries(a));
+  // Its owner and the admins: its settings on hover, like a channel's.
+  const edits = can(org, "manage_agents") || a.ownerUserId === me.user.id;
   return (
-    <div className="sidebar__row" data-agent-row={a.id}>
+    <div className="sidebar__row" data-agent-row={a.id} data-acts={Number(edits) + Number(Boolean(menu)) || undefined}>
       <Link
         {...rowMenu}
         to="/org/$orgId/dm/agent/$agentId"
@@ -1224,7 +1327,7 @@ function AgentRow({
         data-unread={unread > 0}
         data-busy={busy}
         data-presence={shown?.presence}
-        style={selectionSky(color)}
+        style={{ ...selectionSky(color), "--sel-glow-color": agentGradient(color)[1] } as CSSProperties}
         {...drag}
       >
         {busy && <AgentTrail color={color} />}
@@ -1265,7 +1368,24 @@ function AgentRow({
           )
         )}
       </Link>
-      {menu}
+      {(edits || menu) && (
+        <span className="sidebar__row-acts">
+          {edits && (
+            <RowAction
+              icon="settings"
+              label={t("shell.sidebarMenu.agentSettings", { name: a.name })}
+              onClick={() =>
+                void navigate({
+                  to: "/org/$orgId/agents/$agentId",
+                  params: { orgId: org.id, agentId: a.id },
+                  search: { tab: "settings" },
+                })
+              }
+            />
+          )}
+          {menu}
+        </span>
+      )}
     </div>
   );
 }

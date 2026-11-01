@@ -1159,6 +1159,18 @@ export const ptBR = {
       forum: "Quando a decisão pede várias opiniões",
     },
     customizeSidebar: "Personalizar a barra lateral",
+    /** The sidebar's own menu (right click on its empty space), its headers' + and its rows' hover buttons. */
+    sidebarMenu: {
+      title: "Barra lateral",
+      newChannel: "Novo canal",
+      newAgentGroup: "Novo grupo de agentes",
+      addToChannels: "Novo canal ou categoria",
+      addToAgents: "Criar agente ou grupo",
+      newMessage: "Nova mensagem",
+      addMembers: "Adicionar pessoas ou agentes",
+      channelSettings: "Configurações do canal",
+      agentSettings: "Configurações de {{name}}",
+    },
     sidebarSetup: {
       description: "Escolha o que fica à vista no topo da sua barra lateral. Vale só para você, neste workspace.",
       always: "Sempre",

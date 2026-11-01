@@ -658,12 +658,17 @@ function ChannelView({
     if (draftKey) clearDraft(draftKey);
   }, [draftKey]);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  // Opened from a sidebar row's "Adicionar pessoas ou agentes": straight to adding, and closing that closes it all.
+  const [addFirst, setAddFirst] = useState(false);
   const channelEntries = useChannelMenu();
   // "Editar canal" from the sidebar's right click: the details open once this channel shows.
   useEffect(() => {
     if (chrome?.header) return;
     const open = () => {
-      if (takeChannelDetails(channel.id)) setDetailsOpen(true);
+      const ask = takeChannelDetails(channel.id);
+      if (!ask) return;
+      setAddFirst(ask === "add");
+      setDetailsOpen(true);
     };
     open();
     return onChannelDetails(open);
@@ -2064,7 +2069,17 @@ function ChannelView({
               </>
             )}
 
-            {!chrome?.header && <ChannelDetails open={detailsOpen} onOpenChange={setDetailsOpen} channel={channel} />}
+            {!chrome?.header && (
+              <ChannelDetails
+                open={detailsOpen}
+                onOpenChange={(open) => {
+                  setDetailsOpen(open);
+                  if (!open) setAddFirst(false);
+                }}
+                channel={channel}
+                startAdding={addFirst}
+              />
+            )}
             {missionDraft !== null && (
               <NewMissionDialog
                 open
@@ -3789,10 +3804,13 @@ function ChannelDetails({
   open,
   onOpenChange,
   channel,
+  startAdding = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   channel: Channel;
+  /** Open on adding members (who manages the channel), with no details under it. */
+  startAdding?: boolean;
 }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
@@ -3816,7 +3834,8 @@ function ChannelDetails({
   const [q, setQ] = useState("");
   const [topic, setTopic] = useState(channel.topic);
   const [saved, setSaved] = useState(false);
-  const [adding, setAdding] = useState(false);
+  const [addingHere, setAdding] = useState(false);
+  const adding = addingHere || (startAdding && editable);
   // Who is about to be removed: asked first, in a dialog of its own.
   const [removing, setRemoving] = useState<{ kind: "person" | "agent"; id: string; name: string } | null>(null);
   // The last description sent: blur and close both save, and closing with the X does both.
@@ -4169,7 +4188,10 @@ function ChannelDetails({
       </Dialog>
       <AddMembersDialog
         open={open && adding}
-        onClose={() => setAdding(false)}
+        onClose={() => {
+          setAdding(false);
+          if (startAdding) onOpenChange(false);
+        }}
         onInvite={inviteInstead}
         channel={channel}
         exclude={inChannel}

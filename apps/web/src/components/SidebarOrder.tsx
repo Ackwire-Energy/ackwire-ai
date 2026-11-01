@@ -33,6 +33,14 @@ export function useSectionOrder(orgId: string) {
     if (!sameOrder(next, order)) save.mutate(sameOrder(next, SIDEBAR_SECTIONS) ? null : next);
   };
 
+  const restore: MenuEntry = {
+    kind: "item",
+    id: "restore-order",
+    label: t("contextMenu.restoreOrder"),
+    icon: "undo",
+    disabled: sameOrder(order, SIDEBAR_SECTIONS),
+    run: () => put([...SIDEBAR_SECTIONS]),
+  };
   const entries = (id: SidebarSection): MenuEntry[] => {
     const i = order.indexOf(id);
     return [
@@ -52,14 +60,7 @@ export function useSectionOrder(orgId: string) {
         disabled: i >= order.length - 1,
         run: () => put(moveSection(order, id, 1)),
       },
-      {
-        kind: "item",
-        id: "restore-order",
-        label: t("contextMenu.restoreOrder"),
-        icon: "undo",
-        disabled: sameOrder(order, SIDEBAR_SECTIONS),
-        run: () => put([...SIDEBAR_SECTIONS]),
-      },
+      restore,
     ];
   };
 
@@ -122,5 +123,5 @@ export function useSectionOrder(orgId: string) {
     </div>
   );
 
-  return { order, entries, block, put };
+  return { order, entries, restore, block, put };
 }

@@ -1158,6 +1158,18 @@ export const en: Translations = {
       forum: "When a decision needs several views",
     },
     customizeSidebar: "Customize sidebar",
+    /** The sidebar's own menu (right click on its empty space), its headers' + and its rows' hover buttons. */
+    sidebarMenu: {
+      title: "Sidebar",
+      newChannel: "New channel",
+      newAgentGroup: "New agent group",
+      addToChannels: "New channel or category",
+      addToAgents: "Create agent or group",
+      newMessage: "New message",
+      addMembers: "Add people or agents",
+      channelSettings: "Channel settings",
+      agentSettings: "{{name}} settings",
+    },
     sidebarSetup: {
       description: "Choose what stays in sight at the top of your sidebar. Just for you, in this workspace.",
       always: "Always",

@@ -201,19 +201,23 @@ describe("the sidebar's sections, in my order", () => {
   });
 });
 
-describe("the open channel's highlight", () => {
-  test("the active row's plate has a soft accent glow from the right, not an agent's row", async () => {
-    await go();
-    const active = nav().querySelector('.sidebar__item[data-status="active"]');
-    expect(active?.textContent).toContain("eng");
-    expect(active?.closest("[data-agent-row]")).toBeNull();
+describe("the open row's highlight", () => {
+  test("the active row's plate has a soft glow from the right: the accent's, an agent's in its own color", async () => {
+    const { router } = await go();
+    const active = () => nav().querySelector<HTMLElement>('.sidebar__item[data-status="active"]');
+    expect(active()?.textContent).toContain("eng");
     const css = readFileSync(new URL("../src/layout.css", import.meta.url), "utf8");
     const start = css.indexOf('.sidebar__item[data-status="active"]::before {\n  background:\n    linear-gradient(');
     const rule = css.slice(start, css.indexOf("}", start));
     expect(start).toBeGreaterThan(-1);
     expect(rule).toContain("to left");
-    expect(rule).toContain("var(--agent)");
+    expect(rule).toContain("var(--sel-glow-color, var(--agent))");
     expect(rule).toContain("transparent var(--sel-glow-reach, 44px)");
-    expect(css).toContain('.sidebar__row[data-agent-row] > .sidebar__item[data-status="active"]::before');
+    // No agent row is left out of it.
+    expect(css).not.toContain('.sidebar__row[data-agent-row] > .sidebar__item[data-status="active"]::before');
+    await act(() => router.navigate({ to: `/org/${ORG_ID}/dm/agent/${seedState().agents[0]?.id}` }));
+    await settle(4);
+    expect(active()?.closest("[data-agent-row]")).not.toBeNull();
+    expect(active()?.style.getPropertyValue("--sel-glow-color")).toMatch(/^#[0-9a-f]{6}$/i);
   });
 });

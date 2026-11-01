@@ -105,7 +105,7 @@ describe("groups of agents in the sidebar (ADR 0083)", () => {
 
   test("owners and admins create, rename, reorder and delete groups; deleting puts its agents back", async () => {
     const { state } = await go(withGroups());
-    await click(within(category("Agentes").root).getByRole("button", { name: "Novo grupo" }));
+    await click(within(await openMenu("Criar agente ou grupo")).getByRole("menuitem", { name: "Novo grupo" }));
     const dialog = screen().getByRole("dialog", { name: "Novo grupo" });
     await type(within(dialog).getByLabelText("Nome"), "  Produto ");
     await click(within(dialog).getByRole("button", { name: "Criar grupo" }));

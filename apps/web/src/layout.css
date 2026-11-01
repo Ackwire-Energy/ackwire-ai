@@ -4984,22 +4984,19 @@ html:not([data-pointer]) .tr-ok:focus-visible {
 .sidebar__item[data-status="active"] > .sidebar__item-meta {
   color: var(--ink2);
 }
-/* The open channel (or tool, or person): on the plate, a soft glow of the accent from the right edge inward, faded out
-   well before the label. An agent's row keeps its own color's sky alone. */
+/* The open channel, tool, person or agent: on the plate, a soft glow from the right edge inward, faded out well before
+   the label; the accent's, or an agent's own color (`--sel-glow-color`). */
 .sidebar__item[data-status="active"]::before {
   background:
     linear-gradient(
       to left,
-      color-mix(in srgb, var(--agent) var(--sel-glow, 11%), transparent),
+      color-mix(in srgb, var(--sel-glow-color, var(--agent)) var(--sel-glow, 11%), transparent),
       transparent var(--sel-glow-reach, 44px)
     ),
     var(--side-active);
 }
 [data-theme="dark"] .sidebar__item[data-status="active"] {
   --sel-glow: 16%;
-}
-.sidebar__row[data-agent-row] > .sidebar__item[data-status="active"]::before {
-  background: var(--side-active);
 }
 
 /* The icon rail is too narrow for a frame. */
@@ -10220,8 +10217,8 @@ html[data-menu-overlay] .shell {
 }
 
 /* ── Sidebar ──────────────────────────────────────────────────────
-   The tools each person keeps in sight are plain rows; the rest open beside the sidebar from More. Lines set
-   the sidebar's parts apart (tools, channels, agents, people). Conversations sit in categories that open and
+   The tools each person keeps in sight are plain rows; the rest open beside the sidebar from More. Space, not
+   lines, sets the sidebar's parts apart (tools, channels, agents, people), each under a small-capitals title. Conversations sit in categories that open and
    close, every mark (an icon, a "#", a face, a category's chevron) in one column and every name in the next;
    closed, a category shows only the open page's row and a count. Dense, so a small workspace fits a laptop's
    screen without scrolling. The icon rail ignores the headers. */
@@ -10381,6 +10378,12 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
   > :not([data-status="active"], :has(> [data-status="active"])) {
   display: none;
 }
+/* A part closed (Canais, Agentes) also hides its categories or groups after it, but the one with the open page. */
+.sidebar:not([data-rail="true"])
+  .sidebar__section--part[data-open="false"]
+  ~ .sidebar__section:not(:has([data-status="active"])) {
+  display: none;
+}
 /* A row coming back into sight (its category opened, or it is new) slides in; closing is instant. */
 @media (prefers-reduced-motion: no-preference) {
   .sidebar__section-body > :is(.sidebar__item, .sidebar__row) {
@@ -10422,18 +10425,6 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
 .sidebar__section--category[data-open="false"] .sidebar__section-body > [data-unread="true"] {
   display: flex;
 }
-.sidebar__new-category {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  font: inherit;
-  color: var(--ink-muted);
-  text-align: left;
-  cursor: pointer;
-}
-.sidebar__new-category:hover {
-  color: var(--ink);
-}
 /* Dragging a channel or a category: a 2px line where it lands, or the header that takes it. */
 .sidebar [data-drop="before"] {
   box-shadow: inset 0 2px 0 var(--ink);
@@ -10468,8 +10459,9 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
     opacity: 1;
   }
 }
-/* An agent's row with its "…" (owners and admins: its group), over the row's end on hover or focus, where it
-   takes the place of the role or the count. Touch screens move agents from the agent's page. */
+/* A row's buttons over its end on hover or focus, like Discord's: a channel's Adicionar and settings, an agent's
+   settings and its "…" (its group). They take the place of the count, the role's end or the state, and Tab reaches
+   them after the row. Touch screens have the same actions in the row's page. */
 .sidebar__row {
   position: relative;
   display: flex;
@@ -10478,38 +10470,40 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
   flex: 1;
   min-width: 0;
 }
-.sidebar__row-menu.ac-btn {
+.sidebar__row-acts {
   position: absolute;
   top: 50%;
   right: 4px;
-  /* `translate`, not `transform`: the button's press (`transform: scale(…)`) would drop the centering and jump it. */
   translate: 0 -50%;
+  display: flex;
   opacity: 0;
   transition: opacity 0.15s;
 }
-.sidebar__row:hover > .sidebar__row-menu,
-.sidebar__row-menu:focus-visible,
-.sidebar__row-menu[data-state="open"] {
+.sidebar__row[data-acts]:is(:hover, :focus-within, :has([data-state="open"])) > .sidebar__row-acts {
   opacity: 1;
 }
-.sidebar__row:hover:has(> .sidebar__row-menu) > .sidebar__item > :is(.sidebar__item-meta, .sidebar__unread),
-.sidebar__row:has(> .sidebar__row-menu:is(:focus-visible, [data-state="open"]))
+.sidebar__row[data-acts]:is(:hover, :focus-within, :has([data-state="open"]))
   > .sidebar__item
   > :is(.sidebar__item-meta, .sidebar__unread) {
   visibility: hidden;
 }
-/* The name and role run the row's width, so the `…` gets its own room instead of covering their ends; on a two-line
-   row it sits on the name's line, beside the face. */
-.sidebar__row:hover:has(> .sidebar__row-menu) > .sidebar__item,
-.sidebar__row:has(> .sidebar__row-menu:is(:focus-visible, [data-state="open"])) > .sidebar__item {
-  padding-right: 32px;
+/* The name and role run the row's width, so the buttons (`data-acts`: how many) get their own room instead of
+   covering their ends; on a two-line row they sit on the name's line, beside the face. */
+.sidebar__row[data-acts]:is(:hover, :focus-within, :has([data-state="open"])) > .sidebar__item {
+  padding-right: var(--acts-room, 32px);
 }
-.sidebar__row:has(> .sidebar__item .sidebar__item-role) > .sidebar__row-menu.ac-btn {
+.sidebar__row[data-acts="2"] {
+  --acts-room: 56px;
+}
+.sidebar__row:has(> .sidebar__item .sidebar__item-role) > .sidebar__row-acts {
   top: 4px;
   translate: none;
 }
+.sidebar[data-rail="true"] .sidebar__row-acts {
+  display: none;
+}
 @media (hover: none) {
-  .sidebar__row-menu.ac-btn {
+  .sidebar__row-acts {
     display: none;
   }
 }
@@ -10583,7 +10577,11 @@ html:not([data-pointer]) .sidebar__more:focus-visible {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 2px;
+}
+/* 14px over each part's title with the list's own gap. */
+.sidebar:not([data-rail="true"]) .sidebar__block + .sidebar__block {
+  margin-top: 10px;
 }
 .sidebar[data-rail="true"] .sidebar__block {
   display: contents;
@@ -10636,10 +10634,10 @@ html:not([data-pointer]) .sidebar__grip:focus-visible {
   pointer-events: none;
 }
 .sidebar__block[data-drop="before"]::after {
-  top: -11px;
+  top: -8px;
 }
 .sidebar__block[data-drop="after"]::after {
-  bottom: -11px;
+  bottom: -8px;
 }
 @media (pointer: coarse) {
   .sidebar__grip {
@@ -10666,13 +10664,6 @@ html:not([data-pointer]) .sidebar__grip:focus-visible {
 .sidebar-setup--order .settings-row__icon {
   font-size: 12px;
   font-weight: 650;
-}
-/* Empty, so in a list longer than its room the column would shrink it to nothing. */
-.sidebar__divider {
-  flex: none;
-  height: 1px;
-  margin: 4px 8px;
-  background: var(--line);
 }
 /* The bell at the end of the account row: the inbox, its unread count beside it, both on the row's middle. */
 .sidebar__bell {
@@ -10788,8 +10779,7 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
     transition: none;
   }
 }
-.sidebar[data-rail="true"] .sidebar__section-head,
-.sidebar[data-rail="true"] .sidebar__divider {
+.sidebar[data-rail="true"] .sidebar__section-head {
   display: none;
 }
 .sidebar[data-rail="true"] .sidebar__section-body {
