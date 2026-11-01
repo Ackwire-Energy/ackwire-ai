@@ -556,4 +556,40 @@ describe("Chat: what a routine found", () => {
     await click(within(row).getByRole("button", { name: "Ver relatório" }));
     expect(row.textContent).toContain("Relatório: 3 erros novos no checkout desde ontem.");
   });
+
+  test("a run's Abrir na conversa into the conversation underneath closes the details over it", async () => {
+    const state = seedState();
+    state.messages.push({
+      id: "m-told",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ATLAS_ID },
+      body: "Bom dia, time!",
+      mentionedAgentIds: [],
+      agentRunId: null,
+      meta: { routine: { id: "rt-bd", name: "Bom dia diário", runId: "rr-1" } },
+      createdAt: ago(2),
+    });
+    const runs = {
+      "rt-bd": [
+        routineRun({
+          at: ago(2),
+          status: "reported",
+          summary: "Bom dia",
+          link: { channelId: ENG_ID, threadId: null, messageId: "m-told" },
+        }),
+      ],
+    };
+    const { api } = withRoutines([routine({ id: "rt-bd", name: "Bom dia diário" })], runs, state);
+    const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(6);
+    await click(screen().getByRole("link", { name: "Rotina «Bom dia diário»" }));
+    await settle(4);
+    const dialog = screen().getByRole("dialog", { name: "Bom dia diário" });
+    await click(within(dialog).getByRole("link", { name: "Abrir na conversa" }));
+    await settle(4);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
+    expect(router.state.location.search).toEqual({ m: "m-told" });
+    expect(screen().queryByRole("dialog", { name: "Bom dia diário" })).toBeNull();
+  });
 });

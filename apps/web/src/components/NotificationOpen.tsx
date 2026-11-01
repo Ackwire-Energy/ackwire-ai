@@ -54,7 +54,12 @@ export function goToTarget(navigate: Navigate, orgId: string, target: OpenTarget
 
 /** The inbox itself, with nothing to open. */
 function goToInbox(navigate: Navigate, orgId: string, replace: boolean) {
-  void navigate({ to: "/org/$orgId/notifications", params: { orgId }, search: {}, replace });
+  return navigate({ to: "/org/$orgId/notifications", params: { orgId }, search: {}, replace });
+}
+
+/** The routine whose details a target opens, when it is one. */
+function routineOf(target: OpenTarget): string | null {
+  return target.to === "/org/$orgId/routines" && target.search ? target.search.open : null;
 }
 
 /** What opening did: moved to a page, opened a dialog over this one, or found nowhere to go. */
@@ -78,8 +83,9 @@ export function useNotificationOpener() {
       const target = openTarget(n);
       if (!target) return null;
       // A routine's trouble: its details over the page the person is on, its state and fix in view.
-      if (openDetails && target.to === "/org/$orgId/routines" && target.search) {
-        openDetails({ kind: "routine", id: target.search.open });
+      const routineId = routineOf(target);
+      if (openDetails && routineId) {
+        openDetails({ kind: "routine", id: routineId });
         return "dialog";
       }
       // An agent asked for help in its browser: its card opens there, in control (no page of its own).
@@ -117,10 +123,14 @@ export function useOpenPushed() {
                 })
                 .catch(() => undefined)
             : undefined;
+        // A dialog over the inbox: the inbox first (without `?open`, so a reload doesn't redo it), since any
+        // navigation after it would close the dialog (`DetailsHost`).
+        const target = openTarget(n);
+        const overInbox = replace && target && routineOf(target);
+        if (overInbox) await goToInbox(navigate, orgId, true);
         const opened = open(n, orgId, { ai, replace });
-        if (opened === "page") return;
-        // A dialog over the inbox, or nowhere of its own: the inbox (without `?open`, so a reload doesn't redo it).
-        if (opened === null || replace) goToInbox(navigate, orgId, replace);
+        if (!overInbox && (opened === null || (opened === "dialog" && replace)))
+          void goToInbox(navigate, orgId, replace);
         return;
       }
       const target = fallbackTarget(data);

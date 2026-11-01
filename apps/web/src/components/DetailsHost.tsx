@@ -6,15 +6,15 @@ import { RoutineDetailsDialog } from "@/pages/RoutinesPage";
 
 /**
  * One details dialog for the workspace, over the page the person is on: a `DetailsLink` opens it in place and
- * the page underneath keeps its place. Like the agent panel, it lives outside the URL; going to another page
- * (a run's "Abrir na conversa") closes it.
+ * the page underneath keeps its place. Like the agent panel, it lives outside the URL; any navigation closes it,
+ * a search change too (a run's "Abrir na conversa" into the conversation underneath only sets `?m=`).
  */
 export function DetailsHost({ children }: { children: ReactNode }) {
   const [item, setItem] = useState<DetailsItem | null>(null);
   const close = useCallback(() => setItem(null), []);
-  const path = useRouterState({ select: (s) => s.location.pathname });
-  // biome-ignore lint/correctness/useExhaustiveDependencies: closes on every change of page
-  useEffect(() => setItem(null), [path]);
+  const href = useRouterState({ select: (s) => s.location.href });
+  // biome-ignore lint/correctness/useExhaustiveDependencies: closes on every navigation
+  useEffect(() => setItem(null), [href]);
   return (
     <OpenDetailsContext.Provider value={setItem}>
       {children}
