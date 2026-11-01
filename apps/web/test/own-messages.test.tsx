@@ -75,6 +75,53 @@ describe("my own messages sit on the right", () => {
     expect(row("w3").querySelector(".ac-msg__own-time")?.getAttribute("aria-hidden")).toBe("true");
   });
 
+  test("a run's rows before its last keep their time for hover and keyboard, in the left column", async () => {
+    await open([
+      said("w1", "u-walter", "Vi o alerta também", 9),
+      said("w2", "u-walter", "Estou no celular", 9),
+      said("w3", "u-walter", "Já volto", 8),
+    ]);
+    expect(
+      ["w1", "w2", "w3"].map((id) => row(id).querySelector(".ac-msg__gutter-time time")?.textContent ?? null),
+    ).toEqual([
+      row("w1").querySelector("time")?.textContent ?? "",
+      row("w2").querySelector("time")?.textContent ?? "",
+      null,
+    ]);
+    expect(row("w1").querySelector(".ac-msg__gutter-time")?.textContent).toMatch(/\d{2}:\d{2}/);
+    // Never read twice: the hidden head reads it.
+    expect(row("w1").querySelector(".ac-msg__gutter")?.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  test("something under a bubble ends the run's look: the next bubble doesn't square off against it", async () => {
+    await open([
+      said("w1", "u-walter", "Vi o alerta também", 9, {
+        reactions: [{ reaction: "+1", count: 1, userIds: ["u-joao"] }] as Message["reactions"],
+      }),
+      said("w2", "u-walter", "Estou no celular", 9),
+      said("w3", "u-walter", "Já volto", 8),
+    ]);
+    // The rule finds what hangs as the bubble's later siblings (its style is checked in Chrome: happy-dom's :has is
+    // unreliable): the reactions here, and on the rows under it only the bar and an empty foot, which don't count.
+    expect(row("w1").querySelector(".ac-msg__text ~ .ac-reacts")).toBeTruthy();
+    for (const id of ["w2", "w3"])
+      expect(
+        [...row(id).querySelectorAll(".ac-msg__text ~ *")].every(
+          (e) => e.matches(".ac-msg__actions") || e.childNodes.length === 0,
+        ),
+      ).toBe(true);
+    const css = (await Bun.file(`${ROOT}packages/ui/src/styles/components.css`).text())
+      .replace(/\s+/g, " ")
+      .replace(/\( /g, "(")
+      .replace(/ \)/g, ")");
+    const hanging =
+      ".ac-msg--own:has(> .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-time:not(.ac-msg__status), :empty))";
+    expect(css).toContain(`${hanging} { padding-bottom: 6px; }`);
+    expect(css).toContain(`${hanging} .ac-msg__text { border-bottom-right-radius: 18px; }`);
+    expect(css).toContain(`${hanging} + .ac-msg--own { padding-top: 6px; }`);
+    expect(css).toContain(`${hanging} + .ac-msg--own .ac-msg__text { border-top-right-radius: 18px; }`);
+  });
+
   test("a code block or a table takes the whole width; plain words stay a bubble", async () => {
     await open([
       said("w1", "u-walter", "Assim:\n\n```ts\nconst a = 1;\n```", 9),
@@ -125,6 +172,21 @@ describe("own message styles", () => {
     expect(r.get(".ac-msg--own > .ac-msg__body > .ac-msg__aside--floating")).toContain("right: calc(100% + 8px)");
     // The check gives way to the bar (`:is(:hover, :focus-within, [data-menu-open]) …`, split at its commas).
     expect(r.get('[data-menu-open="true"]) > .ac-msg__body > .ac-msg__aside--floating')).toContain("opacity: 0");
+  });
+
+  test("a narrow window keeps room for the bar left of the bubble; a touch screen's bar sits over its top edge", async () => {
+    const r = await rules();
+    // Beside a full-width bubble, at any width with a mouse, the 96px padding holds it (82px) left of the bubble.
+    expect(r.get(".ac-msg--own")).toContain("padding-left: 96px");
+    const css = await Bun.file(`${ROOT}packages/ui/src/styles/components.css`).text();
+    expect(css).toContain("@media (max-width: 600px) and (hover: none) {\n  .ac-msg--own {\n    padding-left: 40px;");
+    const narrow = css.split("@media (hover: none), (pointer: coarse) {")[1]?.split("\n}")[0] ?? "";
+    expect(narrow).toContain(".ac-msg--own > .ac-msg__body > .ac-msg__actions");
+    expect(narrow).toContain("top: -4px;\n    right: 8px;");
+    // Keyboard focus in my row opens its time's details (the head that has them is hidden).
+    expect(css).toMatch(
+      /\.ac-msg--own:has\(:focus-visible\) :is\(\.ac-msg__gutter-time, \.ac-msg__own-time\) > \.ac-msg__tip \{\s*visibility: visible;/,
+    );
   });
 
   test("the bubble's colors come from the theme's tokens, and wide rows take the row", async () => {

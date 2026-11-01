@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { LiveConsult, LiveRun, LiveWork, Message, RunConsultation } from "@agenteschat/client";
 import { activitySentence, barElapsed, barFaces, barWords } from "@agenteschat/client/lib/activity";
-import { runPosition } from "@agenteschat/client/lib/chat";
+import { runAround, runPosition } from "@agenteschat/client/lib/chat";
 import { consultBlocksNearEnd, consultsForLine } from "@agenteschat/client/lib/consult-group";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { secretRequestOf, secretValueProblem, secretWhere } from "@agenteschat/client/lib/secret-requests";
@@ -12,6 +12,7 @@ import {
   buildRows,
   consultationsOf,
   eventLineOf,
+  hangsUnder,
   hidesBody,
   type LineWords,
   leavingWords,
@@ -107,6 +108,39 @@ describe("timeline", () => {
       runPosition(true, true),
       runPosition(true, false),
     ]).toEqual(["solo", "start", "mid", "end"]);
+  });
+
+  test("what hangs under a bubble (reactions, a thread, files, a send in flight) cuts the run there", () => {
+    const rows = buildRows([
+      message({ id: "1", createdAt: "2026-10-17T12:00:00.000Z" }),
+      message({
+        id: "2",
+        createdAt: "2026-10-17T12:01:00.000Z",
+        reactions: [{ reaction: "+1", count: 1, userIds: ["joao"] }] as Message["reactions"],
+      }),
+      message({ id: "3", createdAt: "2026-10-17T12:02:00.000Z" }),
+      message({ id: "4", createdAt: "2026-10-17T12:03:00.000Z" }),
+    ]);
+    const runs = rows.flatMap((r) =>
+      r.kind === "message"
+        ? [
+            runAround(
+              runPosition(r.grouped, r.continued ?? false),
+              r.above ? hangsUnder(r.above, false, undefined, "me") : false,
+              hangsUnder(r.message, false, undefined, "me"),
+            ),
+          ]
+        : [],
+    );
+    expect(runs).toEqual(["start", "end", "start", "end"]);
+    const plain = message({ id: "5" });
+    expect([
+      hangsUnder(plain, false, undefined, "me"),
+      hangsUnder(plain, true, undefined, "me"),
+      hangsUnder({ ...plain, local: "pending" } as Message, false, undefined, "me"),
+      hangsUnder(plain, false, [{ reaction: "+1", count: 1, userIds: ["joao"] }] as Message["reactions"], "me"),
+    ]).toEqual([false, true, true, true]);
+    expect(runAround("mid", true, true)).toBe("solo");
   });
 
   test("my row takes its place in the run: the bubble's corners and the time under the run's last", async () => {

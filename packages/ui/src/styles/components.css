@@ -4999,7 +4999,8 @@ html:not([data-pointer]) .ac-hint:focus-visible {
 .ac-msg--own.ac-msg--wide .ac-msg__text {
   align-self: stretch;
 }
-@media (max-width: 600px) {
+/* A phone's width (a narrow window with a mouse keeps the 96px: the bar needs it, left of the bubble). */
+@media (max-width: 600px) and (hover: none) {
   .ac-msg--own {
     padding-left: 40px;
   }
@@ -5110,6 +5111,71 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   top: 20px;
   right: calc(100% + 8px);
   left: auto;
+}
+/*
+ * A touch screen's bar (a keyboard's there: a tap opens the menu) has no room left of a phone-width bubble, and a
+ * finger's is bigger: it sits over the bubble's top edge on its right, 4px up so it clears the first line.
+ */
+@media (hover: none), (pointer: coarse) {
+  .ac-msg--own > .ac-msg__body > .ac-msg__actions,
+  .ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
+    top: -4px;
+    right: 8px;
+  }
+}
+/*
+ * A run's rows before its last: the time on hover or keyboard focus, in the left column where everyone's grouped
+ * rows show theirs, on the bubble's first line (7px padding, 26px line). Keyboard focus in any of my rows opens the
+ * time's details too: its head is hidden, so nothing else would.
+ */
+.ac-msg--own > .ac-msg__gutter {
+  position: absolute;
+  left: var(--msg-inline);
+  margin-top: 7px;
+}
+/* Beside a full-width bubble the bar fills that column on the first line: the time goes under it. */
+.ac-msg--own.ac-msg--wide > .ac-msg__gutter {
+  margin-top: 40px;
+}
+.ac-msg--own:is(:hover, :focus-within) > .ac-msg__gutter .ac-msg__gutter-time {
+  visibility: visible;
+}
+.ac-msg--own:has(:focus-visible) :is(.ac-msg__gutter-time, .ac-msg__own-time) > .ac-msg__tip {
+  visibility: visible;
+  opacity: 1;
+}
+@media (max-width: 600px) and (hover: none) {
+  .ac-msg--own.ac-msg--wide {
+    padding-left: 64px;
+  }
+}
+/*
+ * Something under a bubble (reactions, a file, the thread line, an error, receipt words) ends the run's look there:
+ * the usual gap under it, its corner round, and the next bubble's top corner round too.
+ */
+.ac-msg--own:has(
+  > .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-time:not(.ac-msg__status), :empty)
+) {
+  padding-bottom: 6px;
+}
+.ac-msg--own:has(
+    > .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-time:not(.ac-msg__status), :empty)
+  )
+  .ac-msg__text {
+  border-bottom-right-radius: 18px;
+}
+.ac-msg--own:has(
+    > .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-time:not(.ac-msg__status), :empty)
+  )
+  + .ac-msg--own {
+  padding-top: 6px;
+}
+.ac-msg--own:has(
+    > .ac-msg__body > .ac-msg__text ~ :not(.ac-msg__actions, .ac-msg__own-time:not(.ac-msg__status), :empty)
+  )
+  + .ac-msg--own
+  .ac-msg__text {
+  border-top-right-radius: 18px;
 }
 
 /* Work under an agent message: a quiet 32px button ("Ver o que ela fez · 7 passos · 38 s");

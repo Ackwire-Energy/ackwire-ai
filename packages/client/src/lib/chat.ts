@@ -54,6 +54,9 @@ export function entersWithMotion(key: string, createdAt: string, initialKeys: Re
 export type RunPosition = "solo" | "start" | "mid" | "end";
 export const runPosition = (grouped: boolean, nextGrouped: boolean): RunPosition =>
   grouped ? (nextGrouped ? "mid" : "end") : nextGrouped ? "start" : "solo";
+/** A run cut where something hangs under a bubble (reactions, files, a thread, a status): no corner points at it. */
+export const runAround = (run: RunPosition, aboveHangs: boolean, hangs: boolean): RunPosition =>
+  runPosition((run === "mid" || run === "end") && !aboveHangs, (run === "start" || run === "mid") && !hangs);
 
 /** Close enough to the bottom to keep following new messages. */
 export const NEAR_BOTTOM_PX = 120;

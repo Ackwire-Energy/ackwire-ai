@@ -1385,6 +1385,8 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                 message={item.message}
                 grouped={item.grouped}
                 run={runPosition(item.grouped, item.continued ?? false)}
+                above={item.above}
+                aboveThread={item.above && !isThread ? linkThreads.has(item.above.id) : false}
                 meId={meId}
                 thread={isThread ? undefined : linkThreads.get(item.message.id)}
                 onLongPress={onLongPress}

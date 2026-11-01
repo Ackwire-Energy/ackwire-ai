@@ -16,7 +16,7 @@ import {
   useWaiting,
 } from "@agenteschat/client";
 import { channelRefsOf } from "@agenteschat/client/lib/channel-refs";
-import type { RunPosition } from "@agenteschat/client/lib/chat";
+import { type RunPosition, runAround } from "@agenteschat/client/lib/chat";
 import { CONTINUE_ERRORS, errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueWorkOf } from "@agenteschat/client/lib/issues";
@@ -61,6 +61,7 @@ import {
   approvalIdOf,
   artifactsOf,
   consultationsOf,
+  hangsUnder,
   hidesBody,
   mayStopRun,
   missionCardRef,
@@ -104,12 +105,17 @@ export const MessageRow = memo(function MessageRow({
   receipt,
   seenBy,
   readOnly = false,
-  run = "solo",
+  run: runAt = "solo",
+  above,
+  aboveThread = false,
 }: {
   message: Message;
   grouped: boolean;
   /** My own row's place in a run of my rows (`runPosition`): the corners it shares square off, the time ends it. */
   run?: RunPosition;
+  /** The message it groups under, and whether that one shows its thread's link: what hangs under it ends the run. */
+  above?: Message;
+  aboveThread?: boolean;
   meId: string | null;
   /** Its thread, when it is the root of one the conversation shows as a link. */
   thread?: ThreadInfo;
@@ -200,6 +206,13 @@ export const MessageRow = memo(function MessageRow({
   const setup = missionSetupOf(meta);
   const link = missionLinkOf(meta);
   const files = artifactsOf(meta);
+  const aboveReactions = useReactions(orgId, above?.id ?? "", false).data;
+  const ownReactions = useReactions(orgId, m.id, false).data;
+  const run = runAround(
+    runAt,
+    above ? hangsUnder(above, aboveThread, aboveReactions, meId) : false,
+    hangsUnder(m, Boolean(thread), ownReactions, meId),
+  );
   const question = isAgent ? questionOf(meta) : null;
   // An agent asks a person for a secret for its computer (ADR 0027).
   const secret = isAgent ? secretRequestOf(meta) : null;

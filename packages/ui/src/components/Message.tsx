@@ -162,8 +162,9 @@ export function Message({
       }}
       {...rest}
     >
-      {own ? null : grouped ? (
-        // Same width as the avatar column; the time shows here on hover (it's also in the hidden header).
+      {own && (status || run === "solo" || run === "end") ? null : grouped || own ? (
+        // Same width as the avatar column; the time shows here on hover (it's also in the hidden header). My own
+        // rows before a run's last have no time under them: theirs shows here, in the same column as everyone's.
         <span className="ac-msg__gutter" aria-hidden="true">
           <span className="ac-msg__gutter-time">
             {time}

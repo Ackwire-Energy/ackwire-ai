@@ -10,7 +10,9 @@ import type {
 import { agentProposalOf, stretchCardOf } from "@agenteschat/client/lib/action-cards";
 import { type ActivityEntry, barEntries, type barWords, markedPieces, markInk } from "@agenteschat/client/lib/activity";
 import { splitChannelRefs } from "@agenteschat/client/lib/channel-refs";
+import { issueWorkOf } from "@agenteschat/client/lib/issues";
 import { type TableAlign, tableAt } from "@agenteschat/client/lib/markdown";
+import { messageMediaOf } from "@agenteschat/client/lib/media";
 import {
   answeredNotices,
   followUpLine,
@@ -70,6 +72,8 @@ export type ChatRow =
       grouped: boolean;
       /** The next row groups under this one (with `grouped`, its place in the run: `runPosition`). */
       continued?: boolean;
+      /** The message it groups under (what hangs under that one ends the run: `runAround`). */
+      above?: Message;
     };
 
 /** A row's key: an optimistic message keeps it when the server copy (same `clientId`) replaces it. */
@@ -121,8 +125,9 @@ export function buildRows(messages: Message[], hidden: (m: Message) => boolean =
       continuesReply(prev, m) ||
       (!standsAlone(m) && !(prev && standsAlone(prev)) && !isTalkerReply(m.meta) && groupsWith(prev, m));
     const last = rows.at(-1);
-    if (grouped && last?.kind === "message") last.continued = true;
-    rows.push({ kind: "message", key: messageKey(m), message: m, grouped });
+    const above = grouped && last?.kind === "message" ? last : undefined;
+    if (above) above.continued = true;
+    rows.push({ kind: "message", key: messageKey(m), message: m, grouped, ...(above && { above: above.message }) });
     prev = m;
   }
   return rows;
@@ -470,6 +475,22 @@ export function reactionPills(reactions: ReactionCount[] | undefined, meId: stri
     }))
     .filter((p) => p.people > 0 || p.agentIds.length > 0);
 }
+
+/** What my row shows under its bubble (`MessageRow`'s foot, files and cards): it ends a run's look (`runAround`). */
+export const hangsUnder = (
+  m: Message,
+  thread: boolean,
+  reactions: ReactionCount[] | undefined,
+  meId: string | null,
+): boolean =>
+  Boolean(m.local) ||
+  thread ||
+  Boolean(m.meta?.missionStart) ||
+  reactionPills(reactions ?? m.reactions, meId).length > 0 ||
+  (m.memories?.length ?? 0) > 0 ||
+  artifactsOf(m.meta).length > 0 ||
+  Boolean(messageMediaOf(m.meta)) ||
+  Boolean(issueWorkOf(m.meta));
 
 /** Toggle my reaction: the new list as the server will see it (optimistic). */
 export function toggleReaction(
