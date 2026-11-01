@@ -6,6 +6,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Icon, Text } from "@/ui";
+import { LiveBlockCard } from "../blocks/LiveBlock";
+import { PollCard } from "../blocks/PollCard";
 import { useColors, useOrgId } from "../shared/hooks";
 import { tapHaptic, useSurface } from "../shared/parts";
 import { encodeFileList, extensionOf, type FileInfo, fileInfo, imageRows, singleImageHeight } from "./logic";
@@ -41,10 +43,16 @@ export function MessageFiles({ files, align = "start" }: { files: MessageFile[];
   const [width, setWidth] = useState(0);
 
   const images: { file: MessageFile; detail: ArtifactDetail | undefined }[] = [];
+  // What lives in the conversation isn't a file: the thing itself (ADR 0109).
+  const blocks: ArtifactDetail[] = [];
   const others: { file: MessageFile; detail: ArtifactDetail | undefined; failed: boolean }[] = [];
   live.forEach((file, i) => {
     const q = queries[i];
     const detail = q?.data;
+    if (detail?.kind === "block" || detail?.kind === "poll") {
+      blocks.push(detail);
+      return;
+    }
     // Until it loads, a name like "print.png" already says it's a picture (no jump into the grid).
     const isImage = detail ? fileInfo(detail).view === "image" : !q?.isError && IMAGE_EXT.has(extensionOf(file.title));
     if (isImage) images.push({ file, detail });
@@ -96,6 +104,13 @@ export function MessageFiles({ files, align = "start" }: { files: MessageFile[];
           ))}
         </View>
       ) : null}
+      {blocks.map((b) =>
+        b.kind === "poll" ? (
+          <PollCard key={b.id} id={b.id} version={b.shownVersion} />
+        ) : (
+          <LiveBlockCard key={b.id} id={b.id} version={b.shownVersion} />
+        ),
+      )}
       {others.map(({ file, detail, failed }) => (
         <FileCard key={file.id} file={file} detail={detail} failed={failed} />
       ))}

@@ -295,6 +295,8 @@ const FILE_KIND: Record<string, string> = {
   html: "document",
   diagram: "image",
   file: "file",
+  block: "document",
+  poll: "document",
 };
 
 /** "O que fez por você", in the profile's words (third person: "Abriu a issue #131"). */

@@ -138,7 +138,10 @@ export function cardPreview(title: string, content: ArtifactContent): CardPrevie
     case "diagram":
       return { kind: "file", ext: "MMD" };
     case "html":
+    case "block":
       return { kind: "file", ext: "HTML" };
+    case "poll":
+      return { kind: "file", ext: "POLL" };
   }
 }
 
