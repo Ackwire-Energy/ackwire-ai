@@ -208,34 +208,38 @@ scenario("S45", "a second promise after real tool work gets its second continue,
   await assertInvariants(w);
 });
 
-scenario("S46", "at the cap, a turn that still describes its need after the ask nudge becomes the question", async () => {
-  const w = await world({
-    agents: ["otto"],
-    judge: {
-      followThrough: (s) => {
-        const reply = String(s.reply);
-        if (reply.includes("token")) return "ask";
-        return /Vou começar|vou criar a próxima/.test(reply) ? "continue" : "done";
+scenario(
+  "S46",
+  "at the cap, a turn that still describes its need after the ask nudge becomes the question",
+  async () => {
+    const w = await world({
+      agents: ["otto"],
+      judge: {
+        followThrough: (s) => {
+          const reply = String(s.reply);
+          if (reply.includes("token")) return "ask";
+          return /Vou começar|vou criar a próxima/.test(reply) ? "continue" : "done";
+        },
       },
-    },
-    script: {
-      otto: [
-        { text: "Vou começar pelas issues." },
-        { calls: [{ name: "create_issue", input: { title: "Sentry: erro 500 no login" } }] },
-        { text: "Criei uma; vou criar a próxima." },
-        { calls: [{ name: "create_issue", input: { title: "Sentry: timeout no export" } }] },
-        { text: "Para ligar o alerta falta o token do Sentry e acesso ao banco." },
-        { text: "Preciso do token do Sentry e de acesso ao banco." },
-      ],
-    },
-  });
-  await w.grant("otto", ["issues:write"]);
-  await w.say("@otto liga os alertas do Sentry");
-  await w.settle();
-  expect(await nudges(w, "promise")).toBe(2);
-  expect(await nudges(w, "ask")).toBe(1);
-  const [run] = await w.runs("otto");
-  expect(run?.status).toBe("waiting_input");
-  expect(await openQuestions(w)).toHaveLength(1);
-  await assertInvariants(w);
-});
+      script: {
+        otto: [
+          { text: "Vou começar pelas issues." },
+          { calls: [{ name: "create_issue", input: { title: "Sentry: erro 500 no login" } }] },
+          { text: "Criei uma; vou criar a próxima." },
+          { calls: [{ name: "create_issue", input: { title: "Sentry: timeout no export" } }] },
+          { text: "Para ligar o alerta falta o token do Sentry e acesso ao banco." },
+          { text: "Preciso do token do Sentry e de acesso ao banco." },
+        ],
+      },
+    });
+    await w.grant("otto", ["issues:write"]);
+    await w.say("@otto liga os alertas do Sentry");
+    await w.settle();
+    expect(await nudges(w, "promise")).toBe(2);
+    expect(await nudges(w, "ask")).toBe(1);
+    const [run] = await w.runs("otto");
+    expect(run?.status).toBe("waiting_input");
+    expect(await openQuestions(w)).toHaveLength(1);
+    await assertInvariants(w);
+  },
+);

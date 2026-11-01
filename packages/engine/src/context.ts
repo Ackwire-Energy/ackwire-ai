@@ -802,7 +802,11 @@ function handOffState(h: HandOff) {
   if (t.status === "queued") return "starting";
   if (t.status === "waiting_approval") return "waiting for a person's approval";
   if (t.status === "waiting_input")
-    return t.waitingMachineId ? "waiting for its computer to come back" : "waiting for a person's answer";
+    return t.waitingMachineId
+      ? "waiting for its computer to come back"
+      : t.outage
+        ? "its AI provider isn't answering; it picks the work up again by itself"
+        : "waiting for a person's answer";
   if (t.status !== "running" && t.handedOn) return "did its part and waits for agents it handed some to";
   return "working on it";
 }

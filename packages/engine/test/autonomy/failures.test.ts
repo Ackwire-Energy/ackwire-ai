@@ -1,5 +1,7 @@
 import { afterEach, expect } from "bun:test";
+import { schema } from "@agenteschat/db";
 import { ProviderError } from "@agenteschat/providers";
+import { consultationWait, outageParkedSql } from "../../src";
 import { closeWorlds, world } from "./harness";
 import { assertInvariants } from "./invariants";
 import { scenario } from "./known";
@@ -19,6 +21,20 @@ scenario("S29", "a provider outage parks the run, which finishes when the provid
   await w.say("@otto o build passou?");
   await w.settle();
   expect((await w.runs("otto"))[0]?.status).not.toBe("failed");
+  // The wait is said once, as the provider's (no question to a person), and stays one note while it lasts.
+  await w.advance(2);
+  const notes = (await w.posts("otto")).filter((m) => m.meta.bodyCode === "provider_unavailable");
+  expect(notes).toHaveLength(1);
+  // Nobody reads the park as a wait on a person (hand-off lines, the agent's status).
+  const [parked] = await w.db
+    .select({
+      status: schema.agentRuns.status,
+      waitingMachineId: schema.agentRuns.waitingMachineId,
+      outage: outageParkedSql,
+    })
+    .from(schema.agentRuns);
+  expect(parked?.status).toBe("waiting_input");
+  expect(consultationWait(parked as NonNullable<typeof parked>)).toBeNull();
   down = false;
   await w.advance(60);
   expect((await w.runs("otto")).map((r) => r.status)).toEqual(["done"]);
@@ -70,3 +86,17 @@ scenario(
     await assertInvariants(w);
   },
 );
+
+scenario("S47", "an error that won't pass by waiting fails at once and reaches the person", async () => {
+  const w = await world({
+    agents: ["otto"],
+    script: { otto: () => ({ error: new TypeError("Cannot read properties of undefined") }) },
+  });
+  await w.say("@otto o build passou?");
+  await w.settle();
+  expect((await w.runs("otto")).map((r) => r.status)).toEqual(["failed"]);
+  expect((await w.posts("otto")).filter((m) => m.meta.bodyCode === "provider_unavailable")).toHaveLength(0);
+  const failed = (await w.db.select().from(schema.notifications)).filter((n) => n.kind === "run_failed");
+  expect(failed.map((n) => n.userId)).toEqual([w.owner.id]);
+  await assertInvariants(w);
+});

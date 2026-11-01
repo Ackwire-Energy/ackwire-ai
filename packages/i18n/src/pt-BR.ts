@@ -9305,6 +9305,7 @@ export const ptBR = {
         "{{computer}} voltou: “{{title}}” retoma de onde parou quando o projeto estiver pronto.",
       machine_offline: "{{computer}} ficou offline.",
       brain_unavailable: "O {{brain}} não está disponível agora. Respondo quando ele voltar.",
+      provider_unavailable: "Meu provedor de IA não está respondendo agora. Respondo assim que ele voltar.",
       brain_busy: "Meu computador está ocupado com outras tarefas agora. Respondo assim que ele estiver livre.",
       brain_interrupted: "O {{brain}} parou antes de terminar. Já feito, sem repetir: {{tools}}.",
       no_ai: "Ainda não consigo responder: não tenho uma IA conectada.",

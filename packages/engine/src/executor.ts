@@ -499,6 +499,13 @@ const userFacing = (error: unknown): string | null => {
   return null;
 };
 
+/** A provider (or brain) failure that may pass by itself: the run waits it out (`OUTAGE_PARK`), anything else fails. */
+const retryableOutage = (error: unknown) =>
+  (error instanceof ProviderError || error instanceof BrainFailure) && error.retryable;
+
+/** The note a run parked on a provider outage posts once (`bodyCode` `provider_unavailable`). */
+const PROVIDER_UNAVAILABLE_TEXT = "My AI provider isn't answering right now. I'll answer as soon as it's back.";
+
 /** The result of a call in a step cut by a server restart that never started. */
 const NOT_RUN_BY_RESTART =
   "Interrupted by a server restart before it ran: nothing was done. Call it again if it's still needed.";
@@ -1202,6 +1209,27 @@ async function executeRunInner(
     t.outage = { since, n: n + 1, waitId };
     await deferred;
     await addRunStep(db, run, "error", { reason: "provider_outage", message, parked: n + 1 });
+    // Said once where it answers, so the wait reads as the provider's, not as a question to a person.
+    const note =
+      n === 0 && !run.background && viaRoutine === null
+        ? await db.transaction(async (tx) => {
+            const m = await post(
+              tx,
+              replyThreadId,
+              PROVIDER_UNAVAILABLE_TEXT,
+              bodyCode("provider_unavailable"),
+              undefined,
+              true,
+            );
+            t.postedCount++;
+            t.postedUpTo = t.messages.length;
+            return m;
+          })
+        : null;
+    if (note) {
+      const [view] = await withWikiLinks(db, run.orgId, [messageView(note)]);
+      if (view) await publishMessageCreated(deps.pubsub, view);
+    }
     const minutes = OUTAGE_PARK.ladderMinutes[Math.min(n, OUTAGE_PARK.ladderMinutes.length - 1)] ?? 60;
     await enqueue(db, {
       orgId: run.orgId,
@@ -2322,7 +2350,7 @@ async function executeRunInner(
         if (reason) return fail(reason);
         if (options.finalAttempt) {
           const message = error instanceof Error ? error.message : String(error);
-          if (await parkOutage(message)) return;
+          if (retryableOutage(error) && (await parkOutage(message))) return;
           return fail(`gave_up: ${message}`);
         }
         await addRunStep(db, run, "error", { reason: "transient", message: String(error), willRetry: true });

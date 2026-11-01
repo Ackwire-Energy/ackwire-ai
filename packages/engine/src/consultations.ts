@@ -31,7 +31,7 @@ import type { Notice } from "./notices";
 import { personBehindCall, routineCreatorOfCall } from "./requester";
 import { isRoutineRoomKey } from "./routine-brief";
 import { deliverNoticeToRun, resumeRunWithResult } from "./run-resume";
-import { type AgentRun, isTerminal, type RunStatus, replyThreadOf } from "./runs";
+import { type AgentRun, isTerminal, outageParkedSql, type RunStatus, replyThreadOf } from "./runs";
 import { MAX_HANDOFF_LINKS, refusedAtLimit } from "./stretch";
 import { noAgentText } from "./team";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
@@ -609,7 +609,7 @@ export interface HandOff {
   /** The sender heard what came of it. */
   reportedAt: Date | null;
   /** Null: nobody started it (the stretch held it). */
-  target: { status: RunStatus; waitingMachineId: string | null; handedOn: boolean } | null;
+  target: { status: RunStatus; waitingMachineId: string | null; handedOn: boolean; outage?: boolean } | null;
 }
 
 /** How many of them the block lists. */
@@ -642,10 +642,12 @@ export async function handOffsFrom(
     target_status: RunStatus | null;
     waiting_machine_id: string | null;
     handed_on: boolean | string | null;
+    outage: boolean | string | null;
   }>(
     await db.execute(sql`select c.id, c.kind, c.status, c.question, c.answer, a.handle, c.created_at, c.answered_at,
         c.reported_at, t.status as target_status, t.waiting_machine_id,
-        exists (select 1 from agent_consultations s where s.asker_run_id = t.id and s.status = 'open') as handed_on
+        exists (select 1 from agent_consultations s where s.asker_run_id = t.id and s.status = 'open') as handed_on,
+        (t.status = 'waiting_input' and t.transcript -> 'outage' is not null) as outage
       from agent_consultations c
       join agent_runs r on r.id = c.asker_run_id
       join channels ch on ch.id = r.channel_id
@@ -675,6 +677,7 @@ export async function handOffsFrom(
           status: r.target_status,
           waitingMachineId: r.waiting_machine_id,
           handedOn: r.handed_on === true || r.handed_on === "t",
+          outage: r.outage === true || r.outage === "t",
         }
       : null,
   }));
@@ -1175,9 +1178,11 @@ export function consultationWait(run: {
   waitingMachineId: string | null;
   /** Something it asked or handed off is still out (`handedOnSql`). */
   handedOn?: boolean;
+  /** Parked on a provider outage (`outageParkedSql`): still on it, nobody to answer. */
+  outage?: boolean;
 }): ConsultationWait | null {
   if (run.status === "waiting_approval") return "approval";
-  if (run.status === "waiting_input") return run.waitingMachineId ? "computer" : "input";
+  if (run.status === "waiting_input") return run.waitingMachineId ? "computer" : run.outage ? null : "input";
   return run.handedOn && isTerminal(run.status as AgentRun["status"]) ? "agents" : null;
 }
 
@@ -1259,6 +1264,7 @@ export async function consultationsIn(db: Executor, orgId: string, channelId: st
           status: agentRuns.status,
           waitingMachineId: agentRuns.waitingMachineId,
           handedOn: handedOnSql,
+          outage: outageParkedSql,
         })
         .from(agentRuns)
         .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.id, held)))
@@ -1378,6 +1384,7 @@ export async function consultationConversation(
           status: agentRuns.status,
           waitingMachineId: agentRuns.waitingMachineId,
           handedOn: handedOnSql,
+          outage: outageParkedSql,
           createdAt: agentRuns.createdAt,
         })
         .from(agentRuns)

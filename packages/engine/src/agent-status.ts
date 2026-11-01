@@ -4,6 +4,7 @@ import { publishOrgEvent } from "./events";
 import { cutText } from "./format";
 import type { Judge } from "./judge";
 import { requirePermission } from "./organizations";
+import { outageParkedSql } from "./runs";
 import { toolGroupKey } from "./tools/directory";
 import type { ToolContext, ToolDefinition, ToolSource } from "./tools/types";
 
@@ -129,6 +130,7 @@ export async function loadAgentStatuses(
         heartbeatAt: agentRuns.heartbeatAt,
         updatedAt: agentRuns.updatedAt,
         waitingMachineId: agentRuns.waitingMachineId,
+        outage: outageParkedSql,
       })
       .from(agentRuns)
       .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.status, [...ACTIVE, ...WAITING]), ...ofRuns)),
@@ -170,7 +172,8 @@ export async function loadAgentStatuses(
           ? runs.find((r) => !isWorking(r))
           : undefined;
     if (waits && !(stored?.line.by === "self" && a.statusUntil)) {
-      status = ms - waits.updatedAt.getTime() < AGENT_WAIT_LINE_MS ? waitLine(waits) : null;
+      // Parked on a provider outage it waits on nobody: no line says a person keeps it.
+      status = ms - waits.updatedAt.getTime() < AGENT_WAIT_LINE_MS && !waits.outage ? waitLine(waits) : null;
     }
     const heavy =
       working.some((r) => r.background || r.issueId !== null || long(r)) ||

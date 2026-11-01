@@ -9233,6 +9233,7 @@ export const en: Translations = {
         "{{computer}} is back: “{{title}}” resumes where it stopped once the project is ready.",
       machine_offline: "{{computer}} went offline.",
       brain_unavailable: "{{brain}} can't answer right now. I'll answer when it's back.",
+      provider_unavailable: "My AI provider isn't answering right now. I'll answer as soon as it's back.",
       brain_busy: "My computer is busy with other tasks right now. I'll answer as soon as it's free.",
       brain_interrupted: "{{brain}} stopped before finishing. Already done, not repeated: {{tools}}.",
       no_ai: "I can't answer yet: I have no AI connected.",
