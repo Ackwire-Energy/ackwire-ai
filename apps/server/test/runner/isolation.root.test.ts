@@ -245,7 +245,9 @@ async function hold(user: AgentUser | null, argv: string[], ready: (lines: strin
   };
   child.stdout?.setEncoding("utf8").on("data", take);
   child.stderr?.setEncoding("utf8").on("data", take);
-  await until(() => ready(lines), 30_000);
+  await until(() => ready(lines), 30_000).catch((err: Error) => {
+    throw new Error(`${err.message}: ${argv[0]} said ${JSON.stringify([...lines, rest].slice(-15))}`);
+  });
   return lines;
 }
 
@@ -793,24 +795,31 @@ describe.if(ROOT)("the agents' isolation on this computer, as root", () => {
       const cookie = "0123456789abcdef0123456789abcdef";
       const auth = path.join(systemLauncher(A).home, "x-abstract-auth");
       expect(runAs(A, [XAUTH, "-f", auth, "add", ":61", "MIT-MAGIC-COOKIE-1", cookie]).code).toBe(0);
+      // The desktops' own flags (`xvncArgs`), but for VNC's password: its screen only on a 0600 Unix socket.
       const xvnc = (display: number) => [
         XVNC,
         `:${display}`,
+        "-geometry",
+        "800x600",
+        "-depth",
+        "24",
+        "-rfbport",
+        "-1",
+        "-rfbunixpath",
+        path.join(systemLauncher(A).home, `vnc-${display}.sock`),
+        "-rfbunixmode",
+        "0600",
+        "-SecurityTypes",
+        "None",
         "-auth",
         auth,
         "-nolisten",
         "tcp",
-        "-rfbport",
-        "-1",
-        "-SecurityTypes",
-        "None",
-        "-geometry",
-        "800x600",
         "-s",
         "0",
       ];
-      const held = (display: number) => readFileSync("/proc/net/unix", "utf8").includes(`@/tmp/.X11-unix/X${display}`);
-      await hold(A, xvnc(61), () => held(61));
+      // Up once its file socket is in the agent's own /tmp; whether it holds the abstract name is what's looked at.
+      await hold(A, xvnc(61), () => existsSync(path.join(agentTmp(A.uid), ".X11-unix", "X61")));
       const x61 = running.at(-1) as ChildProcess;
       const squatter: ChildProcess[] = [];
       try {

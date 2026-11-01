@@ -971,7 +971,8 @@ organizations share, so Kotlin compiles inside Gradle there. Two things stay sha
 server an agent binds to `0.0.0.0` is as reachable from outside the computer as your firewall lets it
 be, so agents should bind private servers to `127.0.0.1`; and abstract Unix sockets (a name, not a file)
 have no owner, so a program an agent runs that listens on one without checking who connects is open to
-the other agents.
+the other agents, and an agent can take a name another agent's program wants (an X display's: its
+desktop then starts on another one).
 
 Mac and Windows computers get no agents' desktops: the agent's browser runs headless, and its card
 shows it live. A Mac connected with the command above opens terminals
