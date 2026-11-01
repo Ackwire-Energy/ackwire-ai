@@ -50,6 +50,48 @@
     }
   },
   {
+    "id": "theo-c6-routine-verbatim",
+    "title": "O caso real do Theo, palavra por palavra: rotina semanal de notícias do C6 Bank",
+    "source": "production 2026-11-01 (the owner's own test workspace; routine text verbatim)",
+    "agent": {
+      "name": "Theo",
+      "handle": "theo",
+      "role": "PM",
+      "instructions": "Ajuda o time com pesquisa e organização."
+    },
+    "org": {
+      "name": "Teste",
+      "context": "Workspace de teste do dono do produto."
+    },
+    "conversation": {
+      "where": "routine",
+      "channel": "general",
+      "trigger": {
+        "author": "Rotina",
+        "body": "Pesquise na web as notícias mais recentes (da última semana) sobre o C6 Bank (Brasil): produtos, resultados, regulação, segurança/incidentes, parcerias, lançamentos. Escreva um resumo curto em português, em tom de conversa, com os principais pontos e as fontes (links). Se não houver nada relevante, diga isso em uma frase."
+      }
+    },
+    "web": {
+      "search": [
+        {
+          "when": ["c6 bank"],
+          "results": [
+            {
+              "title": "C6 Bank lança conta global para pessoa jurídica",
+              "url": "https://news.example.com/c6-conta-global-pj",
+              "snippet": "O C6 Bank anunciou nesta semana a conta global em dólar e euro para empresas."
+            }
+          ]
+        }
+      ]
+    },
+    "facts": ["conta global"],
+    "expect": {
+      "behavior": "Searches the web, then posts a short summary with the source link; never says it has no web search."
+    },
+    "brain": "claude_code"
+  },
+  {
     "id": "weekly-news-routine-en",
     "title": "Weekly competitor news routine, in English",
     "source": "synthetic (ADR 0109)",
