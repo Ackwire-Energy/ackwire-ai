@@ -165,6 +165,9 @@ configs:
   caddyfile:
     content: |
       ${DOMAIN:-localhost} {
+      	request_body /mcp {
+      		max_size 128KB
+      	}
       	reverse_proxy agentes:3000
       	handle_errors 502 503 504 {
       		root * /etc/caddy/errors
