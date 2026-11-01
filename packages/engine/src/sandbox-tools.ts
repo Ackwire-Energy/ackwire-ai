@@ -340,9 +340,11 @@ export function parseCsv(text: string): string[][] {
 function binaryFileNote(path: string, data: Uint8Array): string {
   const image = sniffImage(data) ?? (data[0] === 0x47 && data[1] === 0x49 && data[2] === 0x46 ? "image/gif" : null);
   const type = image ?? /\.([a-z0-9]{1,8})$/i.exec(path)?.[1]?.toLowerCase() ?? "unknown type";
-  const instead = image
-    ? "To know what a screen says, use desktop_read; to show the picture to people, upload_file puts it in the Drive."
-    : "Inspect it with run_code (`file`, `unzip -l`, a script), or give it to people with upload_file.";
+  const instead = !image
+    ? "Inspect it with run_code (`file`, `unzip -l`, a script), or give it to people with upload_file."
+    : path.startsWith("screenshots/")
+      ? "desktop_read tells what the screen shows now; upload_file shows the picture to people."
+      : "Inspect it with run_code (`tesseract` for its text, `exiftool`), or show it to people with upload_file.";
   return `${path}: binary file (${formatBytes(data.byteLength)}, ${type}): not shown as text. ${instead}`;
 }
 

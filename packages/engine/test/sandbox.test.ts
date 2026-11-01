@@ -72,6 +72,7 @@ describe("binary files", () => {
     for (const [path, bytes] of [
       ["screenshots/before.jpg", jpeg],
       ["out/data.zip", zip],
+      ["out/chart.jpg", jpeg],
     ] as const) {
       expect((await call(ctx, "write_file", { path, content: "x" })).isError).toBeFalsy();
       const key = [...runner.files.keys()].find((k) => k.endsWith(path)) as string;
@@ -80,7 +81,12 @@ describe("binary files", () => {
     const shot = await call(ctx, "read_file", { path: "screenshots/before.jpg" });
     expect(shot.isError).toBeFalsy();
     expect(shot.content).toBe(
-      "screenshots/before.jpg: binary file (14 bytes, image/jpeg): not shown as text. To know what a screen says, use desktop_read; to show the picture to people, upload_file puts it in the Drive.",
+      "screenshots/before.jpg: binary file (14 bytes, image/jpeg): not shown as text. desktop_read tells what the screen shows now; upload_file shows the picture to people.",
+    );
+    // desktop_read reads the live screen: never offered for a picture that isn't a screenshot.
+    const chart = await call(ctx, "read_file", { path: "out/chart.jpg" });
+    expect(chart.content).toEndWith(
+      "not shown as text. Inspect it with run_code (`tesseract` for its text, `exiftool`), or show it to people with upload_file.",
     );
     const archive = await call(ctx, "read_file", { path: "out/data.zip" });
     expect(archive.content).toStartWith(
