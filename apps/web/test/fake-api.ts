@@ -2621,6 +2621,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
     },
     memory: {
       list: async (_orgId, agentId) => structuredClone(state.memories.filter((m) => m.agentId === agentId)),
+      listAll: async () => structuredClone(state.memories),
       edit: async (orgId, id, text) => patchMemory(orgId, id, { text }),
       setPinned: async (orgId, id, pinned) => patchMemory(orgId, id, { pinned }),
       setArchived: async (orgId, id, archived) => patchMemory(orgId, id, { archived }),

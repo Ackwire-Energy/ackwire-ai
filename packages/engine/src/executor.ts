@@ -63,6 +63,8 @@ import {
   UNAVAILABLE_CODES,
 } from "./brains/select";
 import type { Brain, BrainEvent, BrainIO, BrainKind, BrainTool, BrainTurn, ToolResult } from "./brains/types";
+import { agentBrowserProfiles } from "./browser/profiles";
+import { browsersPrompt } from "./browser/tools";
 import { BROWSER_SCOPE } from "./browser/types";
 import {
   canceledBy,
@@ -1183,6 +1185,10 @@ async function executeRunInner(
     const repositories = granted.some((t) => t.scope.startsWith("github:"))
       ? repositoriesPrompt(await agentRepositoryList(db, run.orgId, agent.id).catch(() => []))
       : "";
+    // Its shared browser profiles (ADR 0110), by name.
+    const browsers = tools.some((t) => t.name === "browser_profile")
+      ? browsersPrompt(await agentBrowserProfiles(db, run.orgId, agent.id), agent.browserProfileId)
+      : "";
     const [context, memory, wikiPages] = await Promise.all([
       buildRunContext(db, run, agent, {
         maxMessages: deps.contextMessages,
@@ -1190,7 +1196,7 @@ async function executeRunInner(
         askUser: tools.some((t) => t.name === ASK_USER_TOOL),
         react: tools.some((t) => t.name === REACT_TOOL),
         followUp: tools.some((t) => t.name === FOLLOW_UP_TOOL),
-        capabilities: [describeCapabilities(tools, pending), repositories].filter(Boolean).join("\n\n"),
+        capabilities: [describeCapabilities(tools, pending), browsers, repositories].filter(Boolean).join("\n\n"),
         skills: skillList,
         team: tools.some((t) => t.name === FIND_AGENT_TOOL),
         // Granted is enough: on demand (ADR 0043) it is one `use_tool` away.

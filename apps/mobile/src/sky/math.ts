@@ -47,6 +47,40 @@ export function fromSurface(surface: string, depth = 1, color: AgentColorName = 
   ];
 }
 
+/** A pixel agent going up an agent's computer's sky: its column, pace (sky cells a second) and where it starts. */
+export interface ComputerSprite {
+  x: number;
+  speed: number;
+  phase: number;
+  blink: number;
+  ghost: boolean;
+}
+
+/** At the sides, so they stay clear of the card in the middle. */
+export const COMPUTER_SPRITES: readonly ComputerSprite[] = [
+  { x: 0.03, speed: 5, phase: 0.1, blink: 0.4, ghost: true },
+  { x: 0.16, speed: 3.5, phase: 0.6, blink: 2.1, ghost: false },
+  { x: 0.84, speed: 4.5, phase: 0.35, blink: 1.2, ghost: true },
+  { x: 0.97, speed: 3.8, phase: 0.85, blink: 3, ghost: false },
+];
+
+/** Where a sprite stands at `t` seconds, in sky cells of a `w`×`h` sky: up from under it and over its top, swaying. */
+export function computerSpriteAt(sprite: ComputerSprite, t: number, w: number, h: number) {
+  "worklet";
+  const cells = 9;
+  const travel = h + 2 * cells;
+  const risen = t * sprite.speed + sprite.phase * travel;
+  const y = h + cells - (risen - travel * Math.floor(risen / travel));
+  const sway = Math.sin(t * 0.7 + sprite.phase * 6.28) * 2;
+  return { x: Math.round(sprite.x * (w - cells) + sway), y: Math.round(y) };
+}
+
+/** A sprite blinks for a moment every 4 s. */
+export function computerSpriteBlinks(sprite: ComputerSprite, t: number): boolean {
+  "worklet";
+  return (t + sprite.blink) % 4 < 0.16;
+}
+
 /** A field gives the tone position (0 = first tone, 1 = last) of the cell (x, y) at (u, v), time t. */
 export type Field = (u: number, v: number, t: number, x: number, y: number) => number;
 

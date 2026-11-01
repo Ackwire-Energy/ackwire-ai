@@ -2354,3 +2354,95 @@ test.skipIf(!posix)("tray state: a browser left idle stops counting as open", as
   now += 61_000;
   expect(t.manager.states()).toEqual([]);
 });
+
+// ── Browser profiles (ADR 0110) ─────────────────────────────────────────────
+
+const PROFILE = "0b1d2c3e-4f50-7000-8000-00000000abcd";
+const profileScope = { signal: new AbortController().signal, output: () => {} } satisfies RequestScope;
+const browserOn = (): RunnerAccess => ({
+  folders: [],
+  tools: { claude: false, codex: false, commands: true, browser: true },
+});
+
+test.if(posix)(
+  "two agents' commands in one profile share one session and one Chrome, in the profile's own folder",
+  async () => {
+    const t = setup();
+    const ctx = { workspaceReal: t.ws, exec: true, token: "agm_x", access: browserOn, browser: t.manager };
+    const open = (agent: typeof dev, url: string): MachineRequest => ({
+      agent,
+      profile: { id: PROFILE },
+      op: "browser.act",
+      command: "open",
+      args: [url],
+      timeoutSeconds: 5,
+      desktop: true,
+    });
+    await Promise.all([
+      handleRequest(ctx, open(dev, "https://a.example"), profileScope),
+      handleRequest(ctx, open(ops, "https://b.example"), profileScope),
+    ]);
+    expect(t.chromes).toHaveLength(1);
+    const chrome = t.chromes[0] as FakeChrome;
+    // Its folder is under the runner's home, in no agent's folder; asked for a desktop, it still runs headless.
+    expect(chrome.profile).toBe(path.join(t.home, "browser-profiles", PROFILE, ".agentes", "browser"));
+    expect(chrome.args.some((a) => a.startsWith("--headless"))).toBe(true);
+    const sessions = new Set(
+      t
+        .logged()
+        .map((l) => l.args[l.args.indexOf("--session") + 1])
+        .filter(Boolean),
+    );
+    expect([...sessions]).toEqual([`profile-${PROFILE.slice(0, 8)}`]);
+    // No agent folder was made for it.
+    expect(readdirSync(t.ws).some((d) => d.includes("profile"))).toBe(false);
+    // A person's "show it on the desktop" is refused for a profile.
+    expect(
+      await errorCode(() =>
+        t.manager.show(
+          { id: `profile:${PROFILE}`, handle: "dev" },
+          path.join(t.home, "browser-profiles", PROFILE),
+          () => {},
+        ),
+      ),
+    ).toBe("not_allowed");
+  },
+);
+
+test.if(posix)(
+  "a stale Chrome lock (a restore onto another computer) is cleared before the profile's Chrome starts",
+  async () => {
+    const t = setup();
+    const folder = path.join(t.home, "browser-profiles", PROFILE, ".agentes", "browser");
+    mkdirSync(folder, { recursive: true });
+    for (const f of ["SingletonLock", "SingletonCookie", "SingletonSocket"])
+      writeFileSync(path.join(folder, f), "old-host-4242");
+    const ctx = { workspaceReal: t.ws, exec: true, token: "agm_x", access: browserOn, browser: t.manager };
+    await handleRequest(ctx, { agent: dev, profile: { id: PROFILE }, op: "browser.warm" }, profileScope);
+    expect(t.chromes).toHaveLength(1);
+    expect(readdirSync(folder).filter((f) => f.startsWith("Singleton"))).toEqual([]);
+  },
+);
+
+test.if(posix)("deleting a profile stops its Chrome and removes its folder; system mode refuses profiles", async () => {
+  const t = setup();
+  const ctx = { workspaceReal: t.ws, exec: true, token: "agm_x", access: browserOn, browser: t.manager };
+  await handleRequest(ctx, { agent: dev, profile: { id: PROFILE }, op: "browser.warm" }, profileScope);
+  const root = path.join(t.home, "browser-profiles", PROFILE);
+  expect(existsSync(root)).toBe(true);
+  expect(await handleRequest(ctx, { profile: { id: PROFILE }, op: "browser.profile.delete" }, profileScope)).toEqual({
+    deleted: true,
+  });
+  expect(existsSync(root)).toBe(false);
+  expect((t.chromes[0] as FakeChrome).killed || (t.chromes[0] as FakeChrome).closed).toBe(true);
+  // Not a profile id: refused before anything touches the disk.
+  expect(await errorCode(() => handleRequest(ctx, { profile: { id: "../x" }, op: "browser.warm" }, profileScope))).toBe(
+    "bad_request",
+  );
+  const system = { ...ctx, systemMode: () => true, workers: { run: async () => ({}) } };
+  expect(
+    await errorCode(() =>
+      handleRequest(system, { agent: dev, profile: { id: PROFILE }, op: "browser.warm" }, profileScope),
+    ),
+  ).toBe("not_allowed");
+});

@@ -1721,3 +1721,27 @@ html:not([data-pointer]) .brw-mf-end__row:focus-visible {
   border-radius: calc(var(--radius-item) - 5px) calc(var(--radius-item) - 5px) calc(var(--radius-item) - 5px) 2px;
   background: var(--raised);
 }
+
+/* Waiting for a shared profile (ADR 0110): two short lines that don't wrap, each with its agent's face. */
+.brw-dim__lines {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.brw-dim__l1,
+.brw-dim__lines > small {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.brw-dim__lines > small .ac-who > b {
+  color: var(--ink2);
+  font-weight: 600;
+}
+.cmp-status.is-done .ac-who > b {
+  font-weight: 600;
+}

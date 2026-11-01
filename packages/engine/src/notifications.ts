@@ -111,6 +111,11 @@ export const NOTIFICATION_KINDS = [
    * connectors hears it once that month, `latest.title` the month (`2026-11`) and `latest.calls` the cap.
    */
   "composio_limit",
+  /**
+   * An agent's owner asks for one more browser profile for it (ADR 0110): the people who can grant profiles
+   * (`manage_connectors`), one row per agent, `source.agentId` and its name in `source.label`. Waiting until seen.
+   */
+  "browser_profile_request",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 

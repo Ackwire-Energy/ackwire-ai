@@ -1100,8 +1100,29 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   color: var(--ink);
   background: var(--surface-sunken);
   font-weight: 600;
-  padding: 0 3px;
-  border-radius: var(--radius-cut);
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+}
+/* A face before an agent's name in a line of text: text-sized, centred on the capitals. `font-size: inherit` keeps
+   `em` on the line's size, not the avatar's own 9px. */
+.ac-who {
+  white-space: nowrap;
+}
+.ac-who > .ac-avatar {
+  font-size: inherit;
+  display: inline-block;
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: calc(var(--cap-top) - var(--cap-mid) - 0.575em);
+  margin-right: 0.25em;
+}
+.ac-who > b {
+  font-weight: inherit;
+  color: var(--ink);
+}
+.ac-mention--me {
+  color: var(--attention);
+  background: color-mix(in srgb, var(--attention) 18%, transparent);
 }
 /* With Markdown blocks, the cursor follows the last block's text. */
 .ac-msg--streaming .ac-msg__text:has(> .md)::after {

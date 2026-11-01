@@ -295,6 +295,9 @@ export function openTarget(n: AppNotification): OpenTarget | null {
     return s.machineId
       ? { to: "/org/$orgId/settings/computers/$machineId", params: { machineId: s.machineId } }
       : { to: "/org/$orgId/settings/$section", params: { section: "computers" } };
+  // Someone asks for a browser profile for an agent: the computers, where profiles are given.
+  if (n.kind === "browser_profile_request")
+    return { to: "/org/$orgId/settings/$section", params: { section: "computers" } };
   // A routine couldn't call the agent: its page, where who talks to it is set (the report's room may be private).
   if (n.kind === "agent_unreached" && s.agentId)
     return { to: "/org/$orgId/agents/$agentId", params: { agentId: s.agentId } };

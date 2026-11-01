@@ -7,6 +7,7 @@ import {
   createTouchInput,
   handoffIsMine,
   heldTakeoversHere,
+  machineProfiles,
 } from "@agenteschat/client";
 import { sortWaiting, waitingCardOf } from "../../src/features/activity/logic";
 import {
@@ -57,14 +58,8 @@ describe("the help request card", () => {
     expect(cardStateOf({ status: "expired", controllerUserId: null }, "u1")).toBe("expired");
   });
 
-  test("a request on the agent's desktop opens on a computer: never the browser card, never taken here", () => {
-    const desktop = { screen: "desktop" as const, controllerUserId: null };
-    expect(cardStateOf({ ...desktop, status: "pending" }, "u1")).toBe("computer");
-    expect(cardStateOf({ ...desktop, status: "active", controllerUserId: "u1" }, "u1")).toBe("computer");
-    // How it ended reads as any request's.
-    expect(cardStateOf({ ...desktop, status: "done" }, "u1")).toBe("done");
-    expect(cardStateOf({ screen: "browser", status: "pending", controllerUserId: null }, "u1")).toBe("waiting");
-    for (const keys of [featureKeysPtBR, featureKeysEn]) expect(keys.browser.card.computer).toContain("{{title}}");
+  test("no word left sends a request on the agent's screen to a laptop", () => {
+    for (const keys of [featureKeysPtBR, featureKeysEn]) expect(keys.browser.card).not.toHaveProperty("computer");
   });
 
   test("the site's host", () => {
@@ -320,4 +315,18 @@ describe("fingers on the page in control (ADR 0040 §14)", () => {
     touch.down(4, { x: 200, y: 100 });
     expect(said(touch.move(3, { x: 100, y: 80 }))).toEqual(["wheel@600,320:0,40"]);
   });
+});
+
+test("the computer's screen lists its browser profiles only on a single-mode computer, never the Cloud's", () => {
+  const p = { createdAt: "", agentIds: ["ada"], holder: null, lastUsedAt: null };
+  const profiles = [
+    { ...p, id: "p1", machineId: "m1", name: "Empresa A" },
+    { ...p, id: "p2", machineId: "m2", name: "Empresa B" },
+  ];
+  expect(machineProfiles(profiles, { id: "m1", mode: "single" }).map((x) => x.name)).toEqual(["Empresa A"]);
+  // An older server says no mode: single.
+  expect(machineProfiles(profiles, { id: "m2" }).map((x) => x.name)).toEqual(["Empresa B"]);
+  expect(machineProfiles(profiles, { id: "m1", mode: "system" })).toEqual([]);
+  // The Cloud's computer still being prepared: no hello yet, so its view says single, but it's managed.
+  expect(machineProfiles(profiles, { id: "m1", mode: "single", kind: "managed" })).toEqual([]);
 });

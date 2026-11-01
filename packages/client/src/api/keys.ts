@@ -88,6 +88,8 @@ export const keys = {
   agentPlanUsage: (orgId: string, agentId: string) => ["org", orgId, "plan-usage", "agent", agentId] as const,
   platformKey: (orgId: string) => ["org", orgId, "platform-key"] as const,
   roster: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "roster"] as const,
+  /** All the agents' memories, for the workspace's map. */
+  orgMemories: (orgId: string) => ["org", orgId, "memories"] as const,
   memory: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "memory"] as const,
   /** Under `memory`: invalidating an agent's memories also refreshes "O que sabe sobre você". */
   memoryAboutMe: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "memory", "me"] as const,
@@ -199,6 +201,8 @@ export const keys = {
   /** The agent browser (ADR 0040): an agent's settings, its open request on each screen, one request (prefix). */
   browser: (orgId: string) => ["org", orgId, "browser"] as const,
   agentBrowser: (orgId: string, agentId: string) => ["org", orgId, "browser", "agent", agentId] as const,
+  /** The workspace's browser profiles (ADR 0110). */
+  browserProfiles: (orgId: string) => ["org", orgId, "browser", "profiles"] as const,
   agentBrowserHandoff: (orgId: string, agentId: string, screen: ScreenKind = "browser") =>
     ["org", orgId, "browser", "agent", agentId, "handoff", screen] as const,
   agentBrowserControl: (orgId: string, agentId: string, screen: ScreenKind = "browser") =>

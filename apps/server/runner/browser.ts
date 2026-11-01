@@ -1226,6 +1226,9 @@ function parseAnswer(stdout: string, stderr: string, exitCode: number | null): B
   return { success: false, data: null, error: why.slice(0, 2000) };
 }
 
+/** A browser profile's session key (`profile:<id>`, ADR 0110) rather than an agent's id. */
+export const isProfileKey = (key: string) => key.startsWith("profile:");
+
 export class BrowserManager {
   private readonly sessions = new Map<string, Session>();
   /** A person's turn in each agent's browser, as the server last told (`browser.handoff`). */
@@ -1831,7 +1834,7 @@ export class BrowserManager {
     if (live.length >= this.maxSessions) {
       throw new RunnerError(
         "browser_unavailable",
-        `This computer already has ${live.length} agent browsers open (its limit). Try again in a few minutes.`,
+        `This computer already has ${live.length} browsers open (its limit). Try again in a few minutes.`,
       );
     }
     for (const [id, s] of this.sessions) {
@@ -1848,7 +1851,9 @@ export class BrowserManager {
     if (!existsSync(this.configFile)) await writeFile(this.configFile, "{}\n", { mode: 0o600 });
     const session: Session = {
       agentId,
-      name: `agent-${agentFolderName(agent).suffix.slice(1)}`,
+      name: isProfileKey(agentId)
+        ? `profile-${agentId.slice(8, 16)}`
+        : `agent-${agentFolderName(agent).suffix.slice(1)}`,
       folder,
       queue: Promise.resolve(),
       lastUsed: this.now(),
@@ -1874,11 +1879,15 @@ export class BrowserManager {
   private async ensureOwnChrome(
     agent: AgentScope,
     session: Session,
-    desktop: boolean,
+    onDesktop: boolean,
     allowed: string[],
     asked = false,
     setup?: BrowserSetup,
   ): Promise<OwnChrome> {
+    // A profile's Chrome never goes on a desktop: there the acting agent's own tools could read the shared account.
+    const profileSession = isProfileKey(session.agentId);
+    if (profileSession && asked) throw new RunnerError("not_allowed", "A browser profile only runs in the background");
+    const desktop = onDesktop && !profileSession;
     const running = session.chrome;
     if (!running && session.chromeStarting) return session.chromeStarting;
     if (running && ((running.display !== undefined) === desktop || (!asked && this.inView(session)))) return running;
@@ -1899,6 +1908,7 @@ export class BrowserManager {
       const exe = this.chromePath ?? this.chrome();
       if (!exe) throw new RunnerError("browser_unavailable", "No browser is installed for the agent yet");
       const start = this.opts.startChrome ?? launchChrome;
+      await this.clearStaleLock(profile);
       const launch = async (on: ChromeDisplay | null) => {
         if (on) prepareProfile(profile);
         await forgetTabs(profile);
@@ -2190,6 +2200,32 @@ export class BrowserManager {
       cwd: this.opts.home,
     });
     return out.stdout.includes(`--user-data-dir=${profile}`);
+  }
+
+  /**
+   * Chrome's `Singleton*` files name the host and pid that holds a profile. Restored onto another computer they make
+   * Chrome exit with 21 (in use elsewhere), so before a launch they go when no Chrome this runner recorded for the
+   * folder still runs.
+   */
+  private async clearStaleLock(profile: string) {
+    for (const { pid, profile: held } of await this.readPids()) {
+      if (held === profile && (await this.isOurChrome(pid, profile).catch(() => false))) return;
+    }
+    await Promise.all(
+      ["SingletonLock", "SingletonCookie", "SingletonSocket"].map((f) => rm(path.join(profile, f), { force: true })),
+    );
+  }
+
+  /** A browser profile's folder: under the runner's home, outside every agent's folder. */
+  profileFolder(profileId: string) {
+    return path.join(this.opts.home, "browser-profiles", profileId);
+  }
+
+  /** `browser.profile.delete`: its Chrome stops and its folder goes (logins with it). */
+  async deleteProfile(agent: AgentScope, folder: string): Promise<{ deleted: boolean }> {
+    await this.stop(agent);
+    await rm(folder, { recursive: true, force: true });
+    return { deleted: true };
   }
 
   /** Chromes a previous run of this runner home left (it crashed or was killed): stopped. */
@@ -2554,6 +2590,8 @@ export class BrowserManager {
     const ids = new Set([...this.sessions.keys(), ...this.handoffs.keys()]);
     const out: ControlBrowser[] = [];
     for (const agentId of [...ids].sort()) {
+      // The tray lists agents (Ver, Parar): a profile is the workspace's, watched from its page.
+      if (isProfileKey(agentId)) continue;
       const s = this.sessions.get(agentId);
       const handoff = this.handoffs.get(agentId);
       const open = !!s && (!!s.stream || (s.aliveAt !== null && this.now() - s.lastUsed < this.idleMs));
