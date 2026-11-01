@@ -21,9 +21,11 @@ import {
   type RoutineAccess,
   type RoutineBrief,
   type RunAuthority,
+  replyPolicyFor,
   runAuthorityById,
   type ToolContext,
   type ToolSource,
+  taskNotice,
   toolPolicy,
   wakeConversationForTask,
   wakeForAccessDecision,
@@ -32,7 +34,7 @@ import { deliverNotice } from "../src/delivery";
 import { openRoutineRoom } from "../src/routine-room";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
-import { fire, routineDeps } from "./routine-fixtures";
+import { channelRoutine, fire, routineDeps } from "./routine-fixtures";
 
 /**
  * ADR 0053, addendum of 2026-10-31: whoever woke it, a run works within the agent's own permissions. Work that
@@ -95,7 +97,7 @@ const briefOf = (access: RoutineAccess, channelId = f.general.id): RoutineBrief 
 
 /** A routine's background run in its own room, reporting to #general. */
 async function routineRun(access: RoutineAccess) {
-  const brief = briefOf(access);
+  const brief = { ...briefOf(access), routineId: (await channelRoutine(f)).id };
   const room = await f.db.transaction((tx) => openRoutineRoom(tx, f.org.id, f.agent.id, brief.routineId));
   const fired = await insertMessage(f.db, {
     orgId: f.org.id,
@@ -104,7 +106,7 @@ async function routineRun(access: RoutineAccess) {
     body: "Confira os erros novos do Sentry.",
     meta: { routineBrief: brief, background: true },
   });
-  return { run: await runOn(fired.id, { background: true }), room };
+  return { run: await runOn(fired.id, { background: true }), room, brief };
 }
 
 /** The run a routine's report woke in #general (the routine's run `run` handed it off). */
@@ -257,6 +259,47 @@ describe("work that comes back goes on for the person behind it", () => {
       behind: { kind: "unattended", personId: null, reason: "routine" },
       profile: "work",
     });
+  });
+
+  test("a routine's task end follows its report policy, and wakes nobody once it can't speak where it reports", async () => {
+    f = await setup();
+    const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "MacBook" });
+    const ends = async (change?: Partial<typeof schema.routines.$inferInsert>) => {
+      const { run, room, brief } = await routineRun("act");
+      if (change) await f.db.update(schema.routines).set(change).where(eq(schema.routines.id, brief.routineId));
+      const [task] = await f.db
+        .insert(schema.machineTasks)
+        .values({
+          orgId: f.org.id,
+          agentId: f.agent.id,
+          machineId,
+          channelId: room.id,
+          runId: run.id,
+          title: "Corrigir o erro do checkout",
+          executor: "shell",
+          command: "bun test",
+          status: "done",
+          exitCode: 0,
+          endedAt: new Date(),
+        })
+        .returning();
+      return { woke: await wakeConversationForTask({ db: f.db }, task?.id ?? "", { maxHops: 100 }), room };
+    };
+    // Live: in #general, and the run it wakes may pass when nothing is new (the routine reports only news).
+    const live = await ends();
+    const notice = live.woke?.message;
+    if (!notice) throw new Error("no notice");
+    expect(notice.channelId).toBe(f.general.id);
+    const woken = live.woke?.runs[0];
+    if (!woken) throw new Error("no run");
+    expect(replyPolicyFor(woken, notice).mayPass).toBe(true);
+    expect(taskNotice(notice, true)).toContain("If nothing in it is new for them");
+    // Paused or deleted: the record stays in its room and nobody is woken.
+    for (const change of [{ active: false }, { deletedAt: new Date() }]) {
+      const { woke, room } = await ends(change);
+      expect(woke?.message?.channelId).toBe(room.id);
+      expect(woke?.runs).toEqual([]);
+    }
   });
 
   test("a folder decision: the run that asked for the folder goes on", async () => {

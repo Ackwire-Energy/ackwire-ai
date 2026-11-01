@@ -65,6 +65,9 @@ export function replyPolicyFor(
   // for the people (only what it already told them) and stay quiet. One that reports every time always posts.
   if (notice?.kind === "routine_handoff" && notice.refs?.report !== "always")
     return { mayPass: true, background: false };
+  // The end of a task a routine started follows the same report policy (`wakeConversationForTask`).
+  const task = trigger?.meta?.machineTask as { routine?: { report?: unknown } } | undefined;
+  if (task?.routine && task.routine.report !== "always") return { mayPass: true, background: false };
   if (run.trigger !== "router" || options.followUp) return { mayPass: false, background: false };
   const meta = trigger?.meta ?? {};
   // A routine's call is a person's message written for its creator; an agent's message about a routine's

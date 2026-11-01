@@ -16,6 +16,7 @@ import { recordAudit } from "./audit";
 import { createAgentRuns, eligibleChannelAgents } from "./dispatch";
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import { cutText } from "./format";
+import { routineDeliveryBlock } from "./hand-off";
 import {
   getMachineById,
   MachineDroppedError,
@@ -1245,9 +1246,13 @@ export async function wakeConversationForTask(deps: TaskDeps, taskId: string, op
   // The work it ends is the origin run's, in its stretch (ADR 0089).
   const stretchId = origin ? runStretchOf(origin) : null;
   // A routine's task ends where the routine reports, like its approval cards: nobody reads its room (ADR 0053 §4).
-  const report = origin?.background
-    ? routineBriefOf((await getMessage(deps.db, row.orgId, origin.triggerMessageId))?.meta)?.deliverTo
-    : undefined;
+  // Only while the routine may still speak there (deleted, paused, or its creator can't post there: its room keeps
+  // the record and nobody is woken), and the run it wakes follows the routine's report policy.
+  const brief = origin?.background
+    ? routineBriefOf((await getMessage(deps.db, row.orgId, origin.triggerMessageId))?.meta)
+    : null;
+  const blocked = brief ? await routineDeliveryBlock(deps.db, brief) : null;
+  const report = brief && !blocked ? brief.deliverTo : undefined;
   const channelId = report?.channelId ?? row.channelId;
   const eligible = await eligibleChannelAgents(
     deps.db,
@@ -1257,6 +1262,11 @@ export async function wakeConversationForTask(deps: TaskDeps, taskId: string, op
     row.requestedByUserId ? { requesterUserId: row.requestedByUserId } : {},
   );
   const notice = taskEndNotice(row, computer);
+  const machineTask = {
+    ...notice.meta.machineTask,
+    ...(row.runId ? { runId: row.runId } : {}),
+    ...(report && brief ? { routine: { name: brief.name, report: brief.report } } : {}),
+  };
   const result = await deps.db.transaction(async (tx) => {
     const [claimed] = await tx
       .update(machineTasks)
@@ -1271,10 +1281,10 @@ export async function wakeConversationForTask(deps: TaskDeps, taskId: string, op
       author: { type: "agent", agentId: row.agentId, runId: null, hop, stretchId },
       body: notice.body,
       // The run that started it: the work it ends continues for whoever is behind that run (`authority.ts`).
-      meta: row.runId ? { ...notice.meta, machineTask: { ...notice.meta.machineTask, runId: row.runId } } : notice.meta,
+      meta: { ...notice.meta, machineTask },
     });
     const runs =
-      eligible.length > 0 && !(await hopLimitReached(tx, message, options.maxHops))
+      !blocked && eligible.length > 0 && !(await hopLimitReached(tx, message, options.maxHops))
         ? await createAgentRuns(tx, message, [row.agentId], "mention")
         : [];
     return { message, runs };
