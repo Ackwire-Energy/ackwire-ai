@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { GIT_PROTOCOL, type GitSyncRepo, MACHINE_PROTOCOL_VERSION, type ServerFrame } from "@agenteschat/adapters";
+import { generateKeyPairSync } from "node:crypto";
+import {
+  GIT_DIRECT_PROTOCOL,
+  GIT_PROTOCOL,
+  type GitSyncRepo,
+  MACHINE_PROTOCOL_VERSION,
+  type ServerFrame,
+} from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
   type ConnectorDeps,
@@ -8,9 +15,13 @@ import {
   createApiKeyConnection,
   createGitToolSource,
   deleteMachine,
+  directFetchTokens,
   drainOutbox,
+  type GitHubAppConfig,
   handleGitProxy,
   issueGitToken,
+  MACHINE_CLONE_SECONDS,
+  MACHINE_CLONE_WAIT_SECONDS,
   type MachineHub,
   machineGitSetup,
   namedRepo,
@@ -245,8 +256,11 @@ describe("git on a connected machine through the proxy (ADR 0024 addendum)", () 
       author: { email: "dev@agents.agentes.test" },
       stream: true,
     });
-    expect(sync?.timeoutSeconds).toBeGreaterThanOrEqual(1800);
-    expect(requestTimeoutMs(sync as never)).toBeGreaterThan(1800_000);
+    // The runner answers `cloning` after this and the download goes on there (ADR 0116).
+    expect(sync?.timeoutSeconds).toBe(MACHINE_CLONE_WAIT_SECONDS);
+    expect(requestTimeoutMs(sync as never)).toBeGreaterThan(MACHINE_CLONE_WAIT_SECONDS * 1000);
+    // No GitHub App here: no GitHub token either; the fetch goes through the proxy.
+    expect(sync?.repos[0]?.github).toBeUndefined();
     expect(verifyGitToken(SECRET, sync?.proxy.token ?? "")?.kind).toBe("machine");
     // Nothing GitHub's reaches the machine.
     expect(JSON.stringify(w.runner.sent)).not.toContain(GH_TOKEN);
@@ -359,6 +373,108 @@ describe("git on a connected machine through the proxy (ADR 0024 addendum)", () 
       throw new Error("boom");
     };
     expect(await prepareAgentCode(w.machineDeps, turn("x"))).toBeNull();
+  });
+});
+
+const APP: GitHubAppConfig = {
+  appId: "123",
+  privateKey: generateKeyPairSync("rsa", { modulusLength: 2048 })
+    .privateKey.export({ type: "pkcs1", format: "pem" })
+    .toString(),
+};
+const API = "https://api.github.test";
+
+describe("fetches straight from GitHub with the App (ADR 0116)", () => {
+  /** Our App installed (installation 9) for this org; GitHub mints `ghs_…` tokens and records what was asked. */
+  async function appWorld(protocol?: number) {
+    const w = await world(protocol ? { protocol } : {});
+    await f.db
+      .insert(schema.githubAppInstallations)
+      .values({ orgId: f.org.id, installationId: 9, accountLogin: "acme", accountType: "Organization" });
+    const asked: unknown[] = [];
+    const fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (/\/repos\/acme\/[^/]+\/installation$/.test(url)) return Response.json({ id: 9 });
+      if (url.endsWith("/app/installations/9/access_tokens")) {
+        asked.push(JSON.parse(String(init?.body)));
+        return Response.json({
+          token: `ghs_${"t".repeat(36)}`,
+          expires_at: new Date(Date.now() + 3600_000).toISOString(),
+        });
+      }
+      return new Response("unexpected", { status: 500 });
+    }) as typeof globalThis.fetch;
+    return { ...w, asked, github: { apiUrl: API, fetch } };
+  }
+
+  test("git_clone hands the runner a one-repository read token; pushes stay on the proxy; never the connection's token", async () => {
+    const w = await appWorld();
+    await setAgentRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app"]);
+    const source = createGitToolSource({
+      sandbox: { db: f.db, machines: { hub: w.hub }, git: w.git } as never,
+      connectors: w.connectors,
+      app: APP,
+      github: w.github,
+    });
+    const ctx = await runCtx();
+    const clone = (await source.tools(ctx)).find((t) => t.name === "git_clone");
+    expect((await clone?.execute({ repo: "acme/app" }, ctx))?.isError).toBeFalsy();
+    const [sync] = w.runner.syncs();
+    expect(sync?.repos[0]?.github).toBe(`ghs_${"t".repeat(36)}`);
+    expect(w.asked).toEqual([{ repositories: ["app"], permissions: { contents: "read" } }]);
+    // The proxy credential still comes along: the checkout pushes there.
+    expect(verifyGitToken(SECRET, sync?.proxy.token ?? "")?.kind).toBe("machine");
+    expect(JSON.stringify(w.runner.sent)).not.toContain(GH_TOKEN);
+
+    // A repository the agent wasn't given: no token (the proxy refuses it, as before).
+    await clone?.execute({ repo: "acme/secret" }, ctx);
+    expect(w.runner.syncs()[1]?.repos[0]?.github).toBeUndefined();
+    expect(w.asked).toHaveLength(1);
+
+    // Still downloading when the wait ends: said plainly, not an error.
+    w.answers.fn = (req) => [
+      { repo: "acme/app", dir: req.repos[0]?.dir ?? "", status: "cloning", message: "Receiving objects: 40%" },
+    ];
+    const later = await clone?.execute({ repo: "acme/app" }, ctx);
+    expect(later?.isError).toBeFalsy();
+    expect(later?.content).toContain("still downloading");
+
+    // Before a chat turn the token is handed again, so fetches keep working past its hour.
+    w.answers.fn = (req) => req.repos.map((r) => ({ repo: r.repo, dir: r.dir, status: "updated" as const }));
+    await prepareAgentCode(
+      { ...w.machineDeps, github: { app: APP, http: w.github } },
+      {
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        threadRootId: null,
+        trigger: "hi",
+        messages: [],
+        session: { machineId: w.paired.machineId, cwd: "" },
+      },
+    );
+    expect(w.runner.syncs().at(-1)?.repos).toEqual([
+      { repo: "acme/app", dir: "repos/acme/app", clone: false, github: `ghs_${"t".repeat(36)}` },
+    ]);
+  });
+
+  test("an older runner gets no token and the whole clone deadline", async () => {
+    const w = await appWorld(GIT_DIRECT_PROTOCOL - 1);
+    await setAgentRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app"]);
+    const target = { orgId: f.org.id, agentId: f.agent.id };
+    const deps = { ...w.machineDeps, github: { app: APP, http: w.github } };
+    expect((await directFetchTokens(deps, target, GIT_DIRECT_PROTOCOL - 1, ["acme/app"])).size).toBe(0);
+    expect((await directFetchTokens(deps, target, GIT_DIRECT_PROTOCOL, ["acme/app"])).size).toBe(1);
+    const source = createGitToolSource({
+      sandbox: { db: f.db, machines: { hub: w.hub }, git: w.git } as never,
+      connectors: w.connectors,
+      app: APP,
+      github: w.github,
+    });
+    const ctx = await runCtx();
+    await (await source.tools(ctx)).find((t) => t.name === "git_clone")?.execute({ repo: "acme/app" }, ctx);
+    const [sync] = w.runner.syncs();
+    expect(sync?.repos[0]?.github).toBeUndefined();
+    expect(sync?.timeoutSeconds).toBe(MACHINE_CLONE_SECONDS);
   });
 });
 

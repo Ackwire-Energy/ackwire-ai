@@ -924,6 +924,8 @@ export class RunnerDaemon implements RequestObserver {
       server: config.server,
       secretsDir,
       gitDir: path.join(home, "git"),
+      // Agents here share the runner's user, so they may share one cache (system mode: each agent's worker, none).
+      gitCache: path.join(home, "git-cache"),
       tasks,
       brains,
       codex: { runnerHome: home, mcp: mcpCommand, runs: codexRuns, app: codexApp },

@@ -1,5 +1,6 @@
 import {
   type AgentScope,
+  GIT_DIRECT_PROTOCOL,
   GIT_PROTOCOL,
   type GitSyncRepo,
   type GitSyncRequest,
@@ -13,6 +14,7 @@ import { MachineOfflineError, MachinePausedError, REMOVED_COMPUTER_MESSAGE } fro
 import { missionOfRun } from "../mission-context";
 import { grantedScopeKeys } from "../tools/scopes";
 import { agentCommitEmail, GIT_TOKEN_TTL_SECONDS, gitProxyBase, issueGitToken, machineGitGen } from "./credential";
+import { appTokenForRepo, type GitHubAppConfig, type GitHubHttp } from "./github-app";
 import { gitAccess } from "./proxy";
 import { agentRepositoryList, type CodeCheckout, codePrompt, repoInList } from "./repos";
 
@@ -23,17 +25,28 @@ import { agentRepositoryList, type CodeCheckout, codePrompt, repoInList } from "
  * (`repos/<owner>/<name>`) with `git.sync` (protocol 11). Only our
  * credential reaches the machine (revocable, scoped to the agent's granted
  * repositories, pushes only to `agentes/<handle>/…`); GitHub's token stays here.
+ *
+ * ADR 0116: with our GitHub App installed for a repository, a runner on
+ * protocol 35 also gets a one-hour installation token for that repository
+ * alone (contents: read), so its fetches go straight to GitHub instead of
+ * through this server; pushes still go through the proxy. Never the
+ * connection's own (OAuth or pasted) token: without the App, all of it goes
+ * through the proxy.
  */
 export interface MachineGitDeps {
   db: Database;
   hub: MachineCaller;
   /** Our public URL and AGENTES_SECRET (the proxy credential is an HMAC of it). */
   git: { publicUrl: string; secret: string };
+  /** Our GitHub App (ADR 0116): fetches straight from GitHub where it is installed. */
+  github?: { app: GitHubAppConfig; http: GitHubHttp } | null;
   now?: () => Date;
 }
 
-/** A clone may take this long (partial clone, but a big checkout on a slow link). */
+/** An older runner's clone may take this long (partial clone, but a big checkout on a slow link). */
 export const MACHINE_CLONE_SECONDS = 1800;
+/** A runner on protocol 35 answers `cloning` after this long and the download goes on there. */
+export const MACHINE_CLONE_WAIT_SECONDS = 600;
 /** Before a chat turn: every fetch of the agent's checkouts together, at most this long. */
 export const PRE_TURN_SYNC_SECONDS = 20;
 
@@ -90,26 +103,58 @@ export async function machineGitSetup(
   };
 }
 
+/**
+ * Single-repository read tokens of our GitHub App for the repositories among `repos` the agent may use, keyed by
+ * repository; empty without the App, on an older runner, or where the App isn't installed. Never the connection's
+ * own token.
+ */
+export async function directFetchTokens(
+  deps: MachineGitDeps,
+  target: { orgId: string; agentId: string },
+  protocol: number,
+  repos: readonly string[],
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const github = deps.github;
+  if (!github || protocol < GIT_DIRECT_PROTOCOL || repos.length === 0) return out;
+  const list = await agentRepositoryList(deps.db, target.orgId, target.agentId);
+  await Promise.all(
+    repos.map(async (repo) => {
+      const [owner = "", name = ""] = repo.split("/");
+      if (!repoInList(list, owner, name)) return;
+      const token = await appTokenForRepo(github.app, github.http, { db: deps.db, orgId: target.orgId }, owner, name, {
+        contents: "read",
+      }).catch(() => null);
+      if (token) out.set(repo, token);
+    }),
+  );
+  return out;
+}
+
 /** `git_clone` on a connected machine: clones (or, when it is there, updates) one repository in the agent's folder. */
 export async function cloneOnMachine(
   deps: MachineGitDeps,
   target: { orgId: string; agentId: string; machineId: string },
   input: { repo: string; dir?: string; signal?: AbortSignal; onOutput?: MachineCallOptions["onOutput"] },
 ): Promise<GitSyncRepo> {
-  const unavailable = machineGitUnavailable(await deps.hub.status(target.machineId), target.orgId);
-  if (unavailable) throw unavailable;
+  const status = await deps.hub.status(target.machineId);
+  const unavailable = machineGitUnavailable(status, target.orgId);
+  if (unavailable || !status) throw unavailable;
   const setup = await machineGitSetup(deps, target.orgId, target.agentId, target.machineId);
   if (!setup)
     throw new Error("You have no git access to GitHub here (scope github:git.read), or GitHub isn't connected.");
   const { agent, ...rest } = setup;
+  const github = (await directFetchTokens(deps, target, status.protocol, [input.repo])).get(input.repo);
   const reply = await deps.hub.call(
     target.machineId,
     {
       op: "git.sync",
       agent,
       ...rest,
-      repos: [{ repo: input.repo, dir: input.dir || gitCheckoutDir(input.repo), clone: true }],
-      timeoutSeconds: MACHINE_CLONE_SECONDS,
+      repos: [
+        { repo: input.repo, dir: input.dir || gitCheckoutDir(input.repo), clone: true, ...(github ? { github } : {}) },
+      ],
+      timeoutSeconds: status.protocol >= GIT_DIRECT_PROTOCOL ? MACHINE_CLONE_WAIT_SECONDS : MACHINE_CLONE_SECONDS,
       stream: Boolean(input.onOutput),
     },
     { ...(input.signal ? { signal: input.signal } : {}), ...(input.onOutput ? { onOutput: input.onOutput } : {}) },
@@ -171,19 +216,26 @@ export async function prepareAgentCode(
     if (turn.threadRootId && (await missionOfRun({ db: deps.db, ...turn, threadRootId: turn.threadRootId }))) {
       return null;
     }
-    if (machineGitUnavailable(await deps.hub.status(session.machineId), turn.orgId)) return null;
+    const status = await deps.hub.status(session.machineId);
+    if (!status || machineGitUnavailable(status, turn.orgId)) return null;
     const setup = await machineGitSetup(deps, turn.orgId, turn.agentId, session.machineId);
     if (!setup) return null;
     const list = await agentRepositoryList(deps.db, turn.orgId, turn.agentId);
     const explicit = list.filter((r) => !r.endsWith("/*"));
     const { agent, ...rest } = setup;
+    // Fresh each turn (GitHub's tokens last an hour; cached until a few minutes before), so the agent's own
+    // `git fetch` keeps working between syncs.
+    const tokens = await directFetchTokens(deps, turn, status.protocol, explicit);
     const reply = await deps.hub.call(
       session.machineId,
       {
         op: "git.sync",
         agent,
         ...rest,
-        repos: explicit.map((repo) => ({ repo, dir: gitCheckoutDir(repo), clone: false })),
+        repos: explicit.map((repo) => {
+          const github = tokens.get(repo);
+          return { repo, dir: gitCheckoutDir(repo), clone: false, ...(github ? { github } : {}) };
+        }),
         existing: true,
         timeoutSeconds: PRE_TURN_SYNC_SECONDS,
       },

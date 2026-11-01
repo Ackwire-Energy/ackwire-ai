@@ -171,6 +171,8 @@ export interface HandlerContext {
   gitDir?: string;
   /** Tests: the git command (default `git` on the PATH). */
   gitCommand?: string;
+  /** `<runner home>/git-cache`: shared read-only mirrors for clones (ADR 0116); single-user runners only. */
+  gitCache?: string;
   /** Brain turns (protocol 8); without it the runner refuses `brain.turn`. */
   brains?: BrainManager;
   /**
@@ -531,6 +533,7 @@ export async function handleRequest(ctx: HandlerContext, req: MachineRequest, sc
           signal: scope.signal,
           ...(req.stream === true ? { output: scope.output } : {}),
           ...(ctx.gitCommand ? { gitCommand: ctx.gitCommand } : {}),
+          ...(ctx.gitCache ? { gitCache: ctx.gitCache } : {}),
         },
         req,
       );

@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 34;
+export const MACHINE_PROTOCOL_VERSION = 35;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -344,6 +344,15 @@ export const DESKTOP_TEXT_MAX = 16_000;
  * no `setup`.
  */
 export const BROWSER_WARM_PROTOCOL = 27;
+
+/**
+ * Protocol 35 (ADR 0116): `git.sync` repos may carry `github`, a short-lived single-repository GitHub App token
+ * (contents: read). The checkout then fetches straight from github.com with it and pushes through our proxy
+ * (`remote.origin.pushurl`). A clone outlives its request: past `timeoutSeconds` the answer is `cloning` and the
+ * download goes on (at most two at once per runner, the rest wait); a later `git.sync` of the same folder waits
+ * for it again. The server sends `github` only to these runners and gives older ones the full clone deadline.
+ */
+export const GIT_DIRECT_PROTOCOL = 35;
 
 /**
  * Protocol 34: browser profiles (ADR 0110). Every `browser.*` op may carry `profile: { id }`: it runs in that
@@ -855,8 +864,11 @@ export interface GitSyncRequest {
   proxy: { base: string; token: string };
   /** The commit author set in each checkout ("Theo (agentes)", "theo@agents.agentes.chat"). */
   author: { name: string; email: string };
-  /** `clone: false`: update it only when it is already there. `dir` is relative to the agent's folder. */
-  repos: { repo: string; dir: string; clone: boolean }[];
+  /**
+   * `clone: false`: update it only when it is already there. `dir` is relative to the agent's folder. `github`
+   * (protocol 35): a GitHub App installation token for this repository only (contents: read, 1 hour).
+   */
+  repos: { repo: string; dir: string; clone: boolean; github?: string }[];
   /** Also update every checkout already under `repos/` (one `owner/name` level). */
   existing?: boolean;
   /** For the whole request; each fetch stops at the deadline (a slow or offline network never blocks). */
@@ -871,8 +883,11 @@ export interface GitSyncRepo {
   dir: string;
   /** Absolute path on the machine. */
   path?: string;
-  /** `missing`: not cloned (and not asked to); `failed`: see `message` (offline, refused by the proxy…). */
-  status: "cloned" | "updated" | "missing" | "failed";
+  /**
+   * `missing`: not cloned (and not asked to); `failed`: see `message` (offline, refused by the proxy…);
+   * `cloning` (protocol 35): still downloading in the background, or waiting for another download (`message`).
+   */
+  status: "cloned" | "updated" | "missing" | "failed" | "cloning";
   /** The branch checked out now, and the remote's default branch. */
   branch?: string;
   defaultBranch?: string;
