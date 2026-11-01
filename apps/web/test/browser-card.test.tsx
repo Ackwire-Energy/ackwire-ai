@@ -557,6 +557,10 @@ describe("a card whose page doesn't come never stays on Opening", () => {
     );
     await act(async () => socket.push(page()));
     expect(card.querySelector(".brw-dim")).toBeNull();
+    // Closed, nothing waiting: the cover says so plainly, and the logins sentence once, not under the title too.
+    await act(async () => socket.push({ type: "browser.unavailable", agentId: ADA_ID, reason: "closed" }));
+    expect(cover()).toContain("O navegador da Ada está fechado.");
+    expect(card.textContent?.split("Os logins continuam salvos").length).toBe(2);
   });
 
   test("off screen the wait doesn't count: shown after 75 s it's still opening; too many browsers says so", async () => {

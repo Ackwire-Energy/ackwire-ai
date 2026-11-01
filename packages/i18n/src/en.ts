@@ -9970,7 +9970,7 @@ export const en: Translations = {
       closed: "{{name}}'s browser is closed.",
       closedHelp: "Logins stay saved for next time.",
       closedControl: "Type an address above to open a site.",
-      subClosed: "Closed. Logins stay saved for next time.",
+      subClosed: "Closed",
       subStuck: "Didn't open · try again",
       openBrowser: "Open the browser",
       hiddenHelp: "For privacy, the screen stays hidden until it's back with {{name}}.",

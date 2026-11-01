@@ -10047,7 +10047,7 @@ export const ptBR = {
       closed: "O navegador {{of}} {{name}} está fechado.",
       closedHelp: "Os logins continuam salvos para a próxima vez.",
       closedControl: "Digite um endereço acima para abrir um site.",
-      subClosed: "Fechado. Os logins continuam salvos para a próxima vez.",
+      subClosed: "Fechado",
       subStuck: "Não abriu · tente de novo",
       openBrowser: "Abrir o navegador",
       hiddenHelp: "Por privacidade, a tela fica oculta até voltar para {{article}} {{name}}.",
