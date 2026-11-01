@@ -106,24 +106,21 @@ async function runOf(agentId: string): Promise<ToolContext> {
 
 async function profilesSetup() {
   const holder: { hub?: MachineCaller } = {};
-  f = await setup({
-    toolSources: [
-      createBrowserToolSource({
-        machines: {
-          hub: {
-            status: (id) => (holder.hub as MachineCaller).status(id),
-            call: (id, request, options) => (holder.hub as MachineCaller).call(id, request, options),
-          },
-        },
-        pubsub: {
-          publish: (topic, event) => f.pubsub.publish(topic, event),
-          subscribe: (topic, fn) => f.pubsub.subscribe(topic, fn),
-        } as Fixture["pubsub"],
-        profileWaitMs: 150,
-        profilePollMs: 30,
-      }),
-    ],
+  const source = createBrowserToolSource({
+    machines: {
+      hub: {
+        status: (id) => (holder.hub as MachineCaller).status(id),
+        call: (id, request, options) => (holder.hub as MachineCaller).call(id, request, options),
+      },
+    },
+    pubsub: {
+      publish: (topic, event) => f.pubsub.publish(topic, event),
+      subscribe: (topic, fn) => f.pubsub.subscribe(topic, fn),
+    } as Fixture["pubsub"],
+    profileWaitMs: 150,
+    profilePollMs: 30,
   });
+  f = await setup({ toolSources: [source] });
   const paired = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "Laptop" });
   await f.db
     .update(schema.machines)
@@ -156,7 +153,7 @@ async function profilesSetup() {
       agentIds,
     });
   const ops = () => fake.calls.filter((c) => c.op === "browser.act" || c.op === "browser.batch");
-  return { ...fake, machineId: paired.machineId, bia, call, names, profile, ops };
+  return { ...fake, machineId: paired.machineId, bia, call, names, profile, ops, readPage: source.readPage };
 }
 
 const audits = async (action: string) =>
@@ -336,6 +333,22 @@ test("a revoke stops the holder's very next command and sends its run back to it
   expect(run?.browserProfileOwn).toBe(true);
   const [row] = await f.db.select().from(schema.browserProfiles).where(eq(schema.browserProfiles.id, p.id));
   expect(row?.heldByRunId).toBeNull();
+});
+
+test("a web search's page opens in the agent's own browser, never its default profile, and takes no turn", async () => {
+  const b = await profilesSetup();
+  const p = await b.profile([f.agent.id, b.bia.id]);
+  await setAgentBrowserProfile(f.db, f.owner.id, f.org.id, f.agent.id, p.id);
+  const bia = await runOf(b.bia.id);
+  expect(
+    (await takeProfileTurn(f.db, { orgId: f.org.id, profileId: p.id, agentId: b.bia.id, runId: bia.runId })).ok,
+  ).toBe(true);
+  const ada = await runOf(f.agent.id);
+  const page = await b.readPage(ada, "https://search.example/?q=x");
+  expect(page?.text).toContain("Send");
+  const sent = b.ops();
+  expect(sent.length).toBeGreaterThan(0);
+  expect(sent.every((c) => c.profile === undefined)).toBe(true);
 });
 
 test("revoking or deleting an agent's default profile tells its next command, not its own browser", async () => {

@@ -565,7 +565,10 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
    * The agent's browser for this call: its computer, the agent, its sites (or why it can't be used), and what the
    * runner's answers say their commands waited on, summed (`setup`, protocol 27).
    */
-  async function linkFor(ctx: ToolContext): Promise<
+  async function linkFor(
+    ctx: ToolContext,
+    opts: { own?: boolean } = {},
+  ): Promise<
     | {
         ok: true;
         link: BrowserLink;
@@ -578,7 +581,8 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
   > {
     if (!hub) return { ok: false, text: "Connected computers are not available on this server." };
     const caller = hub;
-    const profileId = await runBrowserProfile(ctx.db, ctx);
+    // `own`: a web search's page never goes to a shared, signed-in profile, nor takes its turn.
+    const profileId = opts.own ? null : await runBrowserProfile(ctx.db, ctx);
     let status: Extract<AgentBrowserStatus, { available: true }>;
     let turn: Extract<TurnResult, { ok: true }> | null = null;
     if (profileId) {
@@ -1355,7 +1359,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
     const open = definitions.find((d) => d.name === "browser_open");
     const granted = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
     if (!open || !isAllowed(toolAccess(granted, open))) return null;
-    const linked = await linkFor(ctx);
+    const linked = await linkFor(ctx, { own: true });
     if (!linked.ok) return null;
     const [opened, look] = await linked.link.batch([
       { command: "open", args: [url], timeoutSeconds: OPEN_SECONDS },
