@@ -298,6 +298,8 @@ export function accessDecisionNotice(row: AccessRequestRow, computer: string) {
         ...(row.scope ? { scope: row.scope } : {}),
         computer,
         machineId: row.machineId,
+        // The run that asked: the work it needed the folder for continues for whoever is behind it (`authority.ts`).
+        ...(row.runId ? { runId: row.runId } : {}),
       },
       bodyCode: `machine_access_${row.status}`,
       bodyParams: { path: row.path, computer },

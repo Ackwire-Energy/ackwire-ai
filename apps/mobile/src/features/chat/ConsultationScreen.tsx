@@ -1,5 +1,5 @@
 import { useChannels, useConsultationConversation } from "@agenteschat/client";
-import { consultLineState } from "@agenteschat/client/lib/consult-group";
+import { consultLineState, consultOriginKey } from "@agenteschat/client/lib/consult-group";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { groupsWith } from "@agenteschat/client/lib/timeline";
 import { router } from "expo-router";
@@ -79,7 +79,7 @@ function Consultation({ consultationId, channelId }: { consultationId: string; c
           <View style={[styles.line, styles.pad]}>
             <Icon name="agent" size={14} color={c.faint} />
             <Text variant="caption" tone="faint" style={styles.grow}>
-              {t(channelName ? "chat.consultPanel.origin" : "chat.consultPanel.originDm", {
+              {t(consultOriginKey(q, Boolean(channelName)), {
                 from: from.name,
                 toArticle: to.to,
                 to: to.name,
@@ -111,7 +111,11 @@ function Consultation({ consultationId, channelId }: { consultationId: string; c
             {state === "working" ? (
               <PixelOrbit color={agentLook(consulted).color} size={12} />
             ) : (
-              <Icon name={state === "waiting" || state === "offline" ? "wait" : "clock"} size={14} color={c.faint} />
+              <Icon
+                name={state === "waiting" || state === "offline" || state === "handedOn" ? "wait" : "clock"}
+                size={14}
+                color={c.faint}
+              />
             )}
             <Text variant="caption" tone="faint" style={styles.grow}>
               {consultLineLabel(t, state, q, to)}

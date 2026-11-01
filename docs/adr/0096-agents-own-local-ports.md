@@ -1,4 +1,4 @@
-# 0092. Each agent reaches its own local ports, and only its own
+# 0096. Each agent reaches its own local ports, and only its own
 
 - Status: Accepted (built: core's runner). The agentes.chat Cloud takes it with a new runner pin, after the acceptance run in §7
 - Date: 2026-11-01
@@ -62,7 +62,7 @@ The loopback table that kept agents apart polled `ss` every 2 s, so a new listen
 
 ### What stays open
 
-- **Abstract Unix sockets** belong to the network namespace and have no permissions: a program an agent runs that listens on an abstract name without checking its peer is open to the other agents. The runner's own is Xvnc's, which takes the X cookie. Closing them takes a network namespace per agent (egress keyed on `meta skuid`, the Cloud's counters and quarantines, DNS and every launcher path change with it) or one Landlock domain per agent (Linux 6.12's abstract-socket scope is per launch, and libxcb doesn't fall back from EPERM to the path socket, so the desktop's session couldn't reach its X server without a per-agent zygote). Not built here.
+- **Abstract Unix sockets** are still shared between agents, a known limit: they belong to the network namespace and have no permissions, so a program an agent runs that listens on an abstract name without checking its peer is open to the other agents. The runner's own is Xvnc's, which takes the X cookie. Closing it takes a network namespace per agent (egress keyed on `meta skuid`, the Cloud's counters and quarantines, DNS and every launcher path change with it) or one Landlock domain per agent (Linux 6.12's abstract-socket scope is per launch, and libxcb doesn't fall back from EPERM to the path socket, so the desktop's session couldn't reach its X server without a per-agent zygote). Neither is built, and whether to close it is not decided.
 - **A non-loopback listener** an agent binds (0.0.0.0) is reachable from outside the computer wherever the host's firewall lets it be (the Cloud's guard closes inbound), so another agent can reach it through an outside relay. Agents should bind private servers to 127.0.0.1; SELF_HOSTING.md says so.
 - **`agents.slice` stopped and started by root** while the runner runs: until the next check (2 s) the table names the old cgroup, agents fall back to their uid (owning nothing), and a setuid-root program inside counts as root. Root-triggered and narrow; `setpriv --no-new-privs` in the launcher would close it, and the Cloud guard's uid-keyed egress with it, at the cost of FUSE mounts and rootless podman.
 - **Another tool writing `ct mark`** on `lo` after this table makes that connection read as another local user's: it can reach root's listeners, never an agent's. Nothing does by default; the probe's check of root's listener catches it at the next worker start.

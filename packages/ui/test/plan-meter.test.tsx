@@ -7,9 +7,11 @@ import { cleanup, render } from "@testing-library/react";
 import {
   limitOffers,
   type OfferAccount,
+  PLAN_TONE,
   PlanMeter,
   type PlanMeterText,
   type PlanMeterUsage,
+  planLevel,
   planLine,
   planState,
   planWindows,
@@ -89,6 +91,62 @@ test("from 80% it says so; at 100% it is at the limit until every full window re
     until: null,
     used: 40,
   });
+});
+
+test("each bar by how close its window is to the limit: ink, amber from 80, red from 90 and at the limit", () => {
+  expect([0, 79, 80, 89, 90, 99, 100].map((used) => planLevel(used))).toEqual([
+    "ok",
+    "ok",
+    "almost",
+    "almost",
+    "critical",
+    "critical",
+    "limited",
+  ]);
+  // A plan that refused a request is at its limit whatever its windows read.
+  expect(planLevel(40, true)).toBe("limited");
+  expect(PLAN_TONE).toEqual({ ok: "ink", almost: "warn", critical: "danger", limited: "danger" });
+  const levels = (el: Element) =>
+    [...el.querySelectorAll(".ac-planmeter__window")].map((li) => li.getAttribute("data-level"));
+  const usage: PlanMeterUsage = {
+    windows: [
+      { kind: "five_hour", usedPercent: 96 },
+      { kind: "seven_day", usedPercent: 85 },
+      { kind: "monthly", usedPercent: 20 },
+    ],
+    at: at(0),
+  };
+  const meter = render(<PlanMeter usage={usage} text={text} now={NOW} />).container.querySelector(".ac-planmeter");
+  expect(meter?.getAttribute("data-level")).toBe("critical");
+  expect(levels(meter as Element)).toEqual(["critical", "almost", "ok"]);
+  cleanup();
+  // Refused at 40%: red words over ink bars.
+  const refused = render(
+    <PlanMeter
+      usage={{ windows: [{ kind: "five_hour", usedPercent: 40 }], limited: true, at: at(0) }}
+      text={text}
+      now={NOW}
+    />,
+  ).container.querySelector(".ac-planmeter");
+  expect(refused?.getAttribute("data-level")).toBe("limited");
+  expect(levels(refused as Element)).toEqual(["ok"]);
+  cleanup();
+  // Compact: its one bar and its words by the tightest window.
+  const compact = render(
+    <PlanMeter
+      usage={{
+        windows: [
+          { kind: "seven_day", usedPercent: 85 },
+          { kind: "five_hour", usedPercent: 10 },
+        ],
+        at: at(0),
+      }}
+      text={text}
+      now={NOW}
+      compact
+    />,
+  ).container.querySelector(".ac-planmeter--compact");
+  expect(compact?.getAttribute("data-level")).toBe("almost");
 });
 
 test("a window whose reset already passed is empty again, and the limit with it", () => {

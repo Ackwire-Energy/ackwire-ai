@@ -92,6 +92,14 @@ export const kindOf = (choice: PlanChoice): MachineAccountKind =>
 export const planOfAccount = (a: Pick<MachineAccount, "kind" | "provider">): PlanChoice =>
   isPlanId(a.provider) ? a.provider : a.kind === "codex" ? "chatgpt" : "claude";
 /**
+ * What an agent's brain view thinks with, as the picker's choice: the API key on the model brain, else the plan of the
+ * account it thinks with (the computer's own sign-in: Claude's or ChatGPT's).
+ */
+export const aiChoiceOf = (view: Pick<AgentBrain, "brain" | "account" | "accounts">): AiChoice =>
+  view.brain === "model"
+    ? "key"
+    : planOfAccount({ kind: view.brain, provider: view.accounts.find((a) => a.id === view.account)?.provider ?? null });
+/**
  * The sign-in a row of what the person already has asks for (`existingAi`), in its plan's panel: one more login of
  * that account for the agent (`email`, Claude's hint), or a free login of it signed back in (`again`). `from`: the
  * row's login.

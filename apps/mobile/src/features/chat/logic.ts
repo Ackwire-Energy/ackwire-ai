@@ -22,6 +22,7 @@ import {
 } from "@agenteschat/client/lib/notices";
 import { isRoutineCall, routineReplyOf } from "@agenteschat/client/lib/routines";
 import { previewOf } from "../shared/logic";
+import { continuesReply } from "./media";
 
 /**
  * The conversation screen's pure rules: which messages it shows and how they
@@ -87,7 +88,8 @@ export function standsAlone(m: Message) {
 /**
  * Day dividers and messages, oldest first (the list draws them newest at the bottom). What a routine
  * found, told by its agent, stands alone with its own header; the report it answers folds into it, and a
- * routine's call written as its creator is left out, like the web's `buildTimeline`.
+ * routine's call written as its creator is left out, like the web's `buildTimeline`. The sticker or GIF an agent
+ * adds right after its own reply (ADR 0091) always groups under that reply, whatever the reply carries.
  */
 export function buildRows(messages: Message[], hidden: (m: Message) => boolean = () => false): ChatRow[] {
   const rows: ChatRow[] = [];
@@ -103,7 +105,9 @@ export function buildRows(messages: Message[], hidden: (m: Message) => boolean =
       prev = null;
     }
     // A fast reply while its task works keeps its header ("enquanto trabalha"), as on the web.
-    const grouped = !standsAlone(m) && !(prev && standsAlone(prev)) && !isTalkerReply(m.meta) && groupsWith(prev, m);
+    const grouped =
+      continuesReply(prev, m) ||
+      (!standsAlone(m) && !(prev && standsAlone(prev)) && !isTalkerReply(m.meta) && groupsWith(prev, m));
     rows.push({ kind: "message", key: messageKey(m), message: m, grouped });
     prev = m;
   }
@@ -282,6 +286,7 @@ export const hidesBody = (m: Message) =>
       m.meta?.threadStart ||
       m.meta?.issueWork ||
       m.meta?.browserHandoff ||
+      m.meta?.secretRequest ||
       m.meta?.missionSetup ||
       questionOf(m.meta)?.text.trim() === m.body.trim(),
   );
@@ -311,6 +316,17 @@ export function workingEntries(
  */
 export const stoppableInLine = (runs: LiveRun[]) =>
   runs.filter((r) => !r.provisional && (r.status === "thinking" || r.status === "queued" || r.status === "running"));
+
+/**
+ * What the line above the composer stops with its own "Parar" (the working line, or the requests' line while it
+ * takes its place): the runs I may stop of the one agent at work here. With several, the line can't say whose (the
+ * box's own stop stops them all).
+ */
+export function lineStops(entries: ActivityEntry[], runs: LiveRun[], canStop: (run: LiveRun) => boolean): LiveRun[] {
+  const agents = entries.filter((e) => e.type === "agent");
+  const solo = agents.length === 1 ? agents[0] : undefined;
+  return solo ? stoppableInLine(runs).filter((r) => r.agentId === solo.id && canStop(r)) : [];
+}
 
 /**
  * Who may press "Parar" (the web's `useStopRun`): admins, the agent's owner,

@@ -87,7 +87,7 @@
 .ap-card:hover {
   box-shadow: var(--e2), var(--top);
 }
-.ap-card:focus-visible {
+html:not([data-pointer]) .ap-card:focus-visible {
   box-shadow: var(--focus-ring);
 }
 .ap-card.is-selected {
@@ -129,7 +129,7 @@
   text-decoration-color: var(--line2);
   text-underline-offset: 3px;
 }
-.ap-card__open:focus-visible {
+html:not([data-pointer]) .ap-card__open:focus-visible {
   box-shadow: var(--focus-ring);
 }
 .ap-card__body {
@@ -221,11 +221,12 @@
   border-radius: 7px;
   font-size: 10.5px;
 }
-.ap-conn-mark:focus-visible {
+html:not([data-pointer]) .ap-conn-mark:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-.ap-conn-mark:is(:hover, :focus-visible)::after {
+.ap-conn-mark:hover::after,
+html:not([data-pointer]) .ap-conn-mark:focus-visible::after {
   content: attr(data-tip);
   position: absolute;
   bottom: calc(100% + 6px);
@@ -434,7 +435,7 @@
 .ap-refuse__suggest button:hover {
   color: var(--ink);
 }
-.ap-refuse__suggest button:focus-visible {
+html:not([data-pointer]) .ap-refuse__suggest button:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -474,7 +475,7 @@
 .ap-row:hover {
   background: color-mix(in srgb, var(--sunken) 45%, transparent);
 }
-.ap-row:focus-visible {
+html:not([data-pointer]) .ap-row:focus-visible {
   box-shadow: inset var(--focus-ring);
 }
 .ap-row.is-selected {
@@ -529,7 +530,7 @@
   text-decoration-color: var(--line2);
   text-underline-offset: 3px;
 }
-.ap-mi__mission:focus-visible {
+html:not([data-pointer]) .ap-mi__mission:focus-visible {
   border-radius: 4px;
   box-shadow: var(--focus-ring);
 }
@@ -608,7 +609,7 @@
 .ap-link:hover {
   background: color-mix(in srgb, var(--ink) 8%, transparent);
 }
-.ap-link:focus-visible {
+html:not([data-pointer]) .ap-link:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -802,98 +803,4 @@
   .ap-hold.is-holding::before {
     transition: none;
   }
-}
-
-/*
- * A request in the conversation (ApprovalAsk): the agent asking, no card. Its words, the exact
- * action in one line with the app's mark, the whole of it a click away, the decision and the fuse to its expiry.
- */
-.ap-ask {
-  margin: 2px 0 8px;
-  max-width: 560px;
-}
-.ap-ask__text {
-  margin: 0;
-  color: var(--ink2);
-}
-.ap-ask__action {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
-  margin: 8px 0 0;
-  font-size: 13.5px;
-  color: var(--muted);
-}
-.ap-ask__action b {
-  font-weight: 600;
-  color: var(--ink);
-}
-.ap-ask__origin {
-  margin: 4px 0 0;
-  font-size: 12.5px;
-  color: var(--faint);
-}
-.ap-ask__more {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 28px;
-  margin: 4px 0 0 -8px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--muted);
-  cursor: pointer;
-}
-.ap-ask__more:hover {
-  background: var(--plate);
-  color: var(--ink);
-}
-.ap-ask__more:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.ap-ask__more svg {
-  transition: transform 0.2s var(--out);
-}
-.ap-ask__more[aria-expanded="true"] svg {
-  transform: rotate(90deg);
-}
-.ap-ask__exact {
-  margin-top: 6px;
-}
-.ap-ask__acts {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin: 12px 0 0;
-}
-.ap-ask__waiting {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--muted);
-}
-.ap-ask__fuse {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-  font-size: 12px;
-  color: var(--faint);
-  white-space: nowrap;
-}
-/* The fuse in line here, not along a card's edge. */
-.ap-ask__fuse .ac-expiry-fuse {
-  position: static;
-  width: 72px;
-  height: 4px;
-}
-.ap-ask .ap-refuse {
-  margin-top: 12px;
 }

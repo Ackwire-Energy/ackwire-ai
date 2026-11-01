@@ -3,8 +3,10 @@ import { join } from "node:path";
 import { EmailError, type EmailSender } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, inArray, isNull, lt, schema } from "@agenteschat/db";
 import { appLocale } from "@agenteschat/i18n/locale";
+import { nanoUsdToUsd } from "@agenteschat/providers";
 import { z } from "zod";
 import { approverIds } from "./approvals";
+import { invitationMailProof } from "./crypto";
 import { inertText } from "./email/inert";
 import {
   type Block,
@@ -28,7 +30,7 @@ import { budgetPercent } from "./usage";
 
 export { EMAIL_PICTURES, type EmailArt, type EmailLocale } from "./email/layout";
 
-const { users, organizations, agents, approvals } = schema;
+const { users, organizations, organizationInvitations, agents, approvals } = schema;
 
 /**
  * The sender's name when `EMAIL_FROM` is unset: the name on the logo and in the subjects. The self-host setup
@@ -62,6 +64,8 @@ export type EmailTemplate =
       crew?: Look[];
       url: string;
       role: string;
+      /** The inviter's words (ADR 0090), made inert in the body. */
+      note?: string | null;
     }
   | { kind: "password_reset"; locale?: EmailLocale; url: string }
   /** Someone invited you to an event (in-app too). `when` is already formatted in your time zone and language. */
@@ -213,6 +217,23 @@ export type EmailTemplate =
       crew?: Look[];
       /** The workspace in the app; the button adds its step's path. */
       url: string;
+    }
+  /**
+   * The daily stall-and-noise report to the people who run the server (`OPS_REPORT_EMAIL`, `autonomy-report.ts`):
+   * each count of the UTC `day` against its daily average over the 7 days before, and the workspaces with the most.
+   * Workspace names and counts only. `url`: the server's own address, for the pictures.
+   */
+  | {
+      kind: "autonomy_report";
+      locale?: EmailLocale;
+      day: string;
+      /** The day's stalls, each once (a line can be part of the one above it). */
+      totalStalls: number;
+      stalls: { metric: string; today: number; average: number }[];
+      noise: { metric: string; today: number; average: number }[];
+      topStalls: { name: string; count: number }[];
+      topNoise: { name: string; count: number; costNanoUsd: number }[];
+      url: string;
     };
 
 /** Pictures linked from this server's own `/email/`. */
@@ -270,6 +291,8 @@ export async function emailCrew(db: Executor, orgId: string): Promise<Look[]> {
 /** A picture's agents: a job's own (cut to `CREW`), or the onboarding's when it has none. */
 const crewOr = (crew: Look[] | undefined) => (crew?.length ? crew.slice(0, CREW) : ONBOARDING_CREW);
 
+/** The inviter's note as the invitation shows it (ADR 0090). */
+const INVITE_NOTE_SHOWN = 300;
 /** A name typed on an invitation link's page, as the admins' email shows it (ADR 0068). */
 const JOIN_NAME_SHOWN = 60;
 /** An admin's reason for denying a request to join, as long as it is kept. */
@@ -330,6 +353,9 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
         c.headline,
         [
           { p: c.body(inertText(t.inviterName), t.inviterEmail ? inertText(t.inviterEmail) : null, org, role) },
+          ...(t.note?.trim()
+            ? [{ note: c.noteFrom(inertText(t.inviterName), inertText(t.note, INVITE_NOTE_SHOWN)) }]
+            : []),
           { p: c.what },
           { button: c.button, url: t.url },
           { small: c.small },
@@ -587,6 +613,50 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
         org === null ? c.whyAccount : c.whyWorkspace(org),
       );
     }
+    case "autonomy_report": {
+      const c = w.autonomy;
+      const num = (v: number, digits = 0) => v.toLocaleString(lang, { maximumFractionDigits: digits });
+      const money = (nano: number) =>
+        `US$\u00a0${nanoUsdToUsd(nano).toLocaleString(lang, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      // An average keeps a decimal, except a count of tokens.
+      const shown = (metric: string, v: number, average = false) =>
+        metric === "noiseCostNanoUsd" ? money(v) : num(v, average && metric !== "noiseTokens" ? 1 : 0);
+      const counts = (list: { metric: string; today: number; average: number }[]): Block => ({
+        facts: list.map((m) => [
+          c.metric[m.metric] ?? m.metric,
+          c.value(shown(m.metric, m.today), shown(m.metric, m.average, true)),
+        ]),
+      });
+      // A workspace's name is typed text: a fact's value, which wraps, never its label.
+      const top = (list: { name: string; count: number; costNanoUsd?: number }[]): Block =>
+        list.length > 0
+          ? {
+              facts: list.map((x) => [
+                num(x.count),
+                x.costNanoUsd === undefined ? inertText(x.name) : `${inertText(x.name)} · ${money(x.costNanoUsd)}`,
+              ]),
+            }
+          : { small: c.none };
+      const noise = t.noise.find((m) => m.metric === "noiseRuns")?.today ?? 0;
+      return doc(
+        c.subject(t.day, num(t.totalStalls), num(noise)),
+        c.preheader,
+        c.headline(t.day),
+        [
+          { p: c.body },
+          { h2: c.stalls },
+          counts(t.stalls),
+          { h2: c.noise },
+          counts(t.noise),
+          { h2: c.topStalls },
+          top(t.topStalls),
+          { h2: c.topNoise },
+          top(t.topNoise),
+          { small: c.table(t.day) },
+        ],
+        c.why,
+      );
+    }
     case "workspace_deleting": {
       const c = w.deleting;
       const org = inertText(t.orgName);
@@ -834,14 +904,39 @@ export async function queueApprovalDigests(db: Database, publicUrl: string, afte
   return queued;
 }
 
+/** The query parameter an emailed invitation link carries its `invitationMailProof` in (ADR 0090). */
+export const INVITATION_MAIL_PARAM = "mail";
+
+/**
+ * An invitation's link as its own email carries it (ADR 0090): `url` (the link anyone it's shown to can copy) with the
+ * proof that only the message has, so accepting from it confirms the address.
+ */
+export function invitationMailLink(secret: string, invitationId: string, url: string): string {
+  return `${url}?${INVITATION_MAIL_PARAM}=${invitationMailProof(secret, invitationId)}`;
+}
+
 /**
  * Invitation email (create, batch and resend). The key changes with each new link.
- * In the invitee's language when they already have an account, else the inviter's.
+ * In the invitee's language when they already have an account, else the inviter's. With `secret` (`AGENTES_SECRET`,
+ * always there on a server), its link carries the proof that it came by email (`invitationMailLink`); without it, the
+ * link alone, which confirms no address.
  */
 export async function queueInvitationEmail(
   db: Executor,
-  input: { orgId: string; invitationId: string; email: string; role: string; url: string; inviterId: string },
+  input: {
+    orgId: string;
+    invitationId: string;
+    email: string;
+    role: string;
+    url: string;
+    inviterId: string;
+    secret?: string;
+  },
 ) {
+  const [invitation] = await db
+    .select({ note: organizationInvitations.note, expiresAt: organizationInvitations.expiresAt })
+    .from(organizationInvitations)
+    .where(eq(organizationInvitations.id, input.invitationId));
   const [inviter] = await db
     .select({ name: users.name, email: users.email, locale: users.locale })
     .from(users)
@@ -856,7 +951,8 @@ export async function queueInvitationEmail(
     .where(eq(organizations.id, input.orgId));
   await queueEmail(db, {
     orgId: input.orgId,
-    key: `invite:${input.invitationId}:${input.url.slice(-16)}`,
+    // One per sending: the link stays the same when sent again (ADR 0090), its expiry doesn't.
+    key: `invite:${input.invitationId}:${invitation?.expiresAt.getTime() ?? input.url.slice(-16)}`,
     to: [input.email],
     template: {
       kind: "invitation",
@@ -865,8 +961,9 @@ export async function queueInvitationEmail(
       inviterName: inviter?.name ?? "",
       inviterEmail: inviter?.email,
       crew: await emailCrew(db, input.orgId),
-      url: input.url,
+      url: input.secret ? invitationMailLink(input.secret, input.invitationId, input.url) : input.url,
       role: input.role,
+      note: invitation?.note ?? null,
     },
   });
 }

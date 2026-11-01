@@ -120,7 +120,7 @@ describe("members", () => {
     await limit({ members: 2 });
     const { token } = await createInvitation(f.db, f.owner.id, f.org.id, { email: "bia@example.com", role: "member" });
     const bia = await person("bia@example.com");
-    expect(await acceptInvitation(f.db, bia, token)).toEqual({ orgId: f.org.id });
+    expect(await acceptInvitation(f.db, bia, token)).toMatchObject({ orgId: f.org.id });
 
     // Full: 2 of 2. Nothing goes out that couldn't be accepted.
     const full = { code: "org.members_full", params: { members: 2, limit: 2 } };
@@ -157,7 +157,7 @@ describe("members", () => {
       invitedBy: f.owner.id,
       ownersOk: true,
     });
-    expect(await acceptInvitation(f.db, f.owner, self.token)).toEqual({ orgId: f.org.id });
+    expect(await acceptInvitation(f.db, f.owner, self.token)).toMatchObject({ orgId: f.org.id });
 
     // A blocked account still takes its seat; one more seat lets the request in.
     await f.db.update(schema.users).set({ blockedAt: new Date() }).where(eq(schema.users.id, bia.id));

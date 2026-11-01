@@ -2,6 +2,8 @@ import { and, asc, eq, inArray, isNotNull, schema } from "@agenteschat/db";
 import { approvalCardThreads, approvalOriginOf } from "./approvals";
 import { accountablePerson, runAuthorityById } from "./authority";
 import { threadFollowChoices } from "./follows";
+import { isMediaAfterReply } from "./media";
+import { previewMediaKind } from "./message-preview";
 import {
   type NotificationActor,
   type NotificationDeps,
@@ -86,6 +88,14 @@ export async function humanBehindRun(
   return runId ? (await runAuthorityById(deps.db, orgId, runId)).personId : null;
 }
 
+async function isOrgMember(deps: Pick<NotificationDeps, "db">, orgId: string, userId: string) {
+  const [row] = await deps.db
+    .select({ userId: organizationMembers.userId })
+    .from(organizationMembers)
+    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+  return Boolean(row);
+}
+
 async function agentOwner(deps: Pick<NotificationDeps, "db">, agentId: string) {
   const [a] = await deps.db.select({ owner: agents.ownerUserId }).from(agents).where(eq(agents.id, agentId));
   return a?.owner ?? null;
@@ -117,16 +127,21 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
   if (!message || message.deletedAt) return;
   const meta = message.meta;
   if (meta.questionId || meta.approvalId || meta.secretRequestId || meta.forum) return;
+  // An agent's sticker or GIF after its own reply (ADR 0091) is silent: the reply already told whoever it was for.
+  if (isMediaAfterReply(meta)) return;
   // An agent's follow-up line, and the notice that wakes it: the reply it brings notifies instead.
   if ((meta.notice as { kind?: unknown } | undefined)?.kind === "follow_up") return;
   const [channel] = await db
-    .select({ kind: channels.kind, name: channels.name })
+    .select({ kind: channels.kind, name: channels.name, visibility: channels.visibility })
     .from(channels)
     .where(and(eq(channels.id, message.channelId), eq(channels.orgId, orgId)));
   if (!channel || channel.kind === "forum") return;
   const actor = message.authorType === "person" ? person(message.authorUserId) : agent(message.authorAgentId);
   const authorUser = message.authorUserId;
   const text = notificationSnippet(message.body);
+  // Only a GIF or a sticker (ADR 0091): the apps and the push say which, in the person's language.
+  const media = previewMediaKind(message.body, meta);
+  const latest = media ? { text, media } : { text };
   const label = channel.kind === "channel" ? channel.name : undefined;
   const where: NotificationSource = {
     channelId: message.channelId,
@@ -143,12 +158,23 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
     message.authorType === "agent" && message.agentRunId && !meta.viaRoutine && !meta.canceled && !meta.agentDm
       ? await humanBehindRun(deps, orgId, message.agentRunId)
       : null;
-  // A stretch's pause card (ADR 0089) also tells the routine's creator when nobody asked for the work.
-  const asker = behind ?? (message.authorType === "agent" ? (stretchCardOf(meta)?.forUserId ?? null) : null);
+  // A stretch's pause card (ADR 0089) also tells the routine's creator when nobody asked for the work, and when
+  // nobody is behind it at all, the owner of the agent it last stopped at (ADR 0053, addendum of 2026-10-31): they
+  // hear it in any public channel of the workspace, joined or not, since they answer for their agent's work there.
+  const card = message.authorType === "agent" ? stretchCardOf(meta) : null;
+  const stoppedAt = card?.agentIds.at(-1);
+  const owner = !behind && !card?.forUserId && stoppedAt ? await agentOwner(deps, stoppedAt) : null;
+  const asker = behind ?? card?.forUserId ?? owner;
+  const ownerSees =
+    asker !== null &&
+    asker === owner &&
+    channel.kind === "channel" &&
+    channel.visibility === "public" &&
+    (await isOrgMember(deps, orgId, asker));
   if (
     asker &&
     !message.mentionedUserIds.includes(asker) &&
-    (await inChannel(deps, message.channelId, [asker])).length > 0
+    (ownerSees || (await inChannel(deps, message.channelId, [asker])).length > 0)
   ) {
     await notify(deps, {
       orgId,
@@ -157,7 +183,7 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
       groupKey: agentReplyGroup(message.channelId, message.threadId),
       actor,
       source: { ...where, ...(label ? { label } : {}) },
-      latest: { text },
+      latest,
     });
     done.add(asker);
   }
@@ -179,7 +205,7 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
       groupKey: `dm:${message.id}`,
       actor,
       source: where,
-      latest: { text },
+      latest,
     });
     return;
   }
@@ -199,7 +225,7 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
       groupKey: `mention:${message.id}`,
       actor,
       source: { ...where, label: threadLabel ?? label },
-      latest: { text },
+      latest,
     });
     for (const u of mentioned) done.add(u);
   }
@@ -237,7 +263,7 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
     groupKey: `thread:${message.threadId}`,
     actor,
     source: { ...where, label: threadLabel ?? label },
-    latest: { text },
+    latest,
   });
 }
 

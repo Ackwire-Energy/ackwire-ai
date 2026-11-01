@@ -1,39 +1,12 @@
 import { Popover as RPopover } from "radix-ui";
 import { type PointerEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
-import { hoverPointer } from "../device";
+import { hoverPointer, movesByKeys, trackInput } from "../device";
 import { Icon } from "../icons/Icon";
 
 /** The app's own tooltip delay (`.ac-msg__tip`): a pointer resting this long on the ⓘ opens the hint. */
 const OPEN_MS = 250;
 /** Long enough for the pointer to cross from the ⓘ onto the bubble. */
 const CLOSE_MS = 150;
-
-/**
- * Whether the last input was a key rather than a press. Focus that a key brings opens a hint; focus that a press
- * brings opens nothing, since the press's own click decides, so one click never opens and closes it at once. A key
- * held with ⌘, Ctrl or Alt is a shortcut, not a move, except Tab: by default, Safari and the macOS app reach a button
- * only with ⌥Tab.
- */
-let lastInputKey = false;
-let tracking = false;
-function trackLastInput() {
-  if (tracking) return;
-  tracking = true;
-  document.addEventListener(
-    "keydown",
-    (e) => {
-      if (e.key === "Tab" || !(e.metaKey || e.ctrlKey || e.altKey)) lastInputKey = true;
-    },
-    true,
-  );
-  document.addEventListener(
-    "pointerdown",
-    () => {
-      lastInputKey = false;
-    },
-    true,
-  );
-}
 
 /** Why the hint is open: a resting pointer, keyboard focus, or a press that pinned it. */
 type Why = "hover" | "focus" | "pin" | null;
@@ -62,7 +35,7 @@ export function InfoHint({ name, children, id, side = "top", align = "center" }:
   const anchor = useRef<HTMLButtonElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
-    trackLastInput();
+    trackInput();
     return () => clearTimeout(timer.current);
   }, []);
   const after = (ms: number, next: (why: Why) => Why) => {
@@ -99,8 +72,10 @@ export function InfoHint({ name, children, id, side = "top", align = "center" }:
           data-state={why ? "open" : "closed"}
           onPointerEnter={enter}
           onPointerLeave={leave}
+          // Focus the keys bring opens it; a press's focus opens nothing, since the press's own click decides, so
+          // one click never opens and closes it at once.
           onFocus={() => {
-            if (!lastInputKey) return;
+            if (!movesByKeys()) return;
             clearTimeout(timer.current);
             setWhy((w) => (w === "pin" ? w : "focus"));
           }}

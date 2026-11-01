@@ -5,7 +5,7 @@ import { endOfCategory, requireCategoryInOrg } from "./channel-categories";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishOrgEvent, publishUserEvent } from "./events";
 import { followsThreadSql } from "./follows";
-import { type PreviewMeta, previewMeta } from "./message-preview";
+import { type PreviewMeta, previewMediaKind, previewMeta } from "./message-preview";
 import { notificationSnippet } from "./notifications";
 import { can, getMembership, type Membership, requireActiveMembership, requirePermission } from "./organizations";
 import { memberKeysSql, memberRankSql, resolvePermissions } from "./permissions";
@@ -71,6 +71,8 @@ export interface ChannelLastMessage {
   preview: string;
   /** What the app needs to show a server-written body in the reader's language; null for a plain message. */
   meta: PreviewMeta | null;
+  /** A GIF or a sticker sent with no text (ADR 0091): the app says which where `preview` is empty; else null. */
+  mediaKind: "gif" | "sticker" | null;
   createdAt: Date;
 }
 
@@ -147,6 +149,8 @@ export async function listChannels(db: Database, userId: string, orgId: string):
         where cm.id is not null and m.org_id = ${orgId}::uuid and m.channel_id = c.id
           and m.thread_id is null and m.deleted_at is null
           and not (m.author_type = 'person' and m.meta->'routine' is not null)
+          -- An agent's sticker or GIF after its own reply (ADR 0091) is part of that reply: the reply is the preview.
+          and m.meta->>'mediaAfter' is null
         order by m.created_at desc, m.id desc
         limit 1
       ) lm on true
@@ -159,6 +163,8 @@ export async function listChannels(db: Database, userId: string, orgId: string):
             and u.created_at > coalesce(cr.last_read_at, cm.created_at)
             and (u.author_user_id is null or u.author_user_id <> ${userId})
             and (u.thread_id is null or ${followsThreadSql(orgId, userId, sql`u.thread_id`)})
+            -- Nor one more unread (ADR 0091): it is silent.
+            and u.meta->>'mediaAfter' is null
           limit ${MAX_CHANNEL_UNREAD}
         ) unread
       ) un on true
@@ -166,31 +172,36 @@ export async function listChannels(db: Database, userId: string, orgId: string):
         and (c.visibility = 'public' or cm.id is not null)
       order by c.position asc, c.name asc`),
   );
-  return rows.map((r) => ({
-    id: r.id,
-    orgId: r.org_id,
-    name: r.name,
-    topic: r.topic,
-    visibility: r.visibility,
-    createdByUserId: r.created_by_user_id,
-    createdAt: asDate(r.created_at),
-    categoryId: r.category_id,
-    position: Number(r.position),
-    isMember: r.is_member === true,
-    unreadCount: Number(r.unread_count ?? 0),
-    lastMessage:
-      r.last_id && r.last_at && r.last_author_type
-        ? {
-            id: r.last_id,
-            authorType: r.last_author_type,
-            authorId: r.last_author_type === "person" ? r.last_user_id : r.last_agent_id,
-            authorName: r.last_author_name,
-            preview: notificationSnippet(r.last_body, CHANNEL_PREVIEW_LENGTH),
-            meta: previewMeta(typeof r.last_meta === "string" ? JSON.parse(r.last_meta) : r.last_meta),
-            createdAt: asDate(r.last_at),
-          }
-        : null,
-  }));
+  return rows.map((r) => {
+    const stored = r.last_meta;
+    const lastMeta: Record<string, unknown> | null = typeof stored === "string" ? JSON.parse(stored) : stored;
+    return {
+      id: r.id,
+      orgId: r.org_id,
+      name: r.name,
+      topic: r.topic,
+      visibility: r.visibility,
+      createdByUserId: r.created_by_user_id,
+      createdAt: asDate(r.created_at),
+      categoryId: r.category_id,
+      position: Number(r.position),
+      isMember: r.is_member === true,
+      unreadCount: Number(r.unread_count ?? 0),
+      lastMessage:
+        r.last_id && r.last_at && r.last_author_type
+          ? {
+              id: r.last_id,
+              authorType: r.last_author_type,
+              authorId: r.last_author_type === "person" ? r.last_user_id : r.last_agent_id,
+              authorName: r.last_author_name,
+              preview: notificationSnippet(r.last_body, CHANNEL_PREVIEW_LENGTH),
+              meta: previewMeta(lastMeta),
+              mediaKind: previewMediaKind(r.last_body, lastMeta),
+              createdAt: asDate(r.last_at),
+            }
+          : null,
+    };
+  });
 }
 
 export async function isChannelMember(db: Database, orgId: string, channelId: string, userId: string) {

@@ -145,7 +145,7 @@ export interface CodeTurn {
   threadRootId: string | null;
   trigger: string;
   messages: ReadonlyArray<{ content: string }>;
-  session?: { machineId: string; cwd: string } | undefined;
+  session?: { machineId: string; cwd: string; ownFolder?: boolean } | undefined;
 }
 
 /**
@@ -162,8 +162,9 @@ export async function prepareAgentCode(
   turn: CodeTurn,
   options: { signal?: AbortSignal } = {},
 ): Promise<{ cwd: string; prompt: string } | null> {
-  // A chat turn starts in the agent's folder (""); a mission's turn has its own folder.
-  const session = turn.session?.cwd === "" ? turn.session : null;
+  // A chat turn starts in the agent's folder (""); a mission's turn has its own folder; a session started afresh
+  // there because its folder was gone stays there.
+  const session = turn.session?.cwd === "" && !turn.session.ownFolder ? turn.session : null;
   if (!session) return null;
   try {
     // A mission's thread works in the mission's own folder.

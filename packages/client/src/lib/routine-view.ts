@@ -80,6 +80,7 @@ export const RUN_CODES = [
   "model_refused",
   "runner_outdated",
   "too_many_tool_calls",
+  "stuck",
   "missing_credential",
   "credential_revoked",
   "credential_wrong_provider",
@@ -190,7 +191,7 @@ const PAUSED_REASONS = [
  * said by the page (`whenAt`), so it comes in as a word.
  */
 export function routineStateWords(
-  r: Pick<Routine, "state" | "active" | "pausedReason" | "failuresInRow" | "waitingFor">,
+  r: Pick<Routine, "state" | "active" | "pausedReason" | "failuresInRow" | "waitingFor" | "trigger">,
   since = "",
 ): Words & { icon: "repeat" | "pause" | "alert" | "computer" | "waiting" | "spinner"; tone: "neutral" | "waiting" } {
   switch (r.state) {
@@ -211,6 +212,13 @@ export function routineStateWords(
       return {
         key: "routines.state.failing",
         values: { count: Math.max(1, r.failuresInRow) },
+        icon: "alert",
+        tone: "waiting",
+      };
+    case "needs_webhook":
+      return {
+        key: "routines.state.needsWebhook",
+        values: { provider: r.trigger.type === "event" && r.trigger.event.startsWith("sentry.") ? "Sentry" : "GitHub" },
         icon: "alert",
         tone: "waiting",
       };

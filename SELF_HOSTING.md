@@ -731,6 +731,16 @@ far each one is, and asks for a single-use code that the computer connects with
 `agentes-runner pair --server <url> --enroll-file <file>` there (or pass `--enroll-file` to the installer),
 which removes the file as soon as it is read. Leave it `off` and people connect their own computers.
 
+**Stall-and-noise report (optional).** With `OPS_REPORT_EMAIL` set (one address, or several separated by
+commas) and email set up, the server emails the previous UTC day's report every day at about 01:00 UTC: for
+each workspace, where agents stopped although someone waited on them (a mention that woke nobody, a run that
+could only read, work an agent said it would do and didn't, a hand-off or a person left without an answer, a
+limit, a background task that failed at its start) and where they acted for nothing (runs that ended without a
+word, answered only a thanks, or were woken with nothing to do, with their tokens and cost), against the daily
+average of the 7 days before. Workspace names and counts only, never what anyone wrote.
+`docker compose exec agentes bun run report:autonomy` prints the same table at any time (`--day 2026-10-30`
+for another day, `--org <workspace id>` for one workspace).
+
 </details>
 
 <details>

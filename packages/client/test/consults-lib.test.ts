@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import type { ChannelEvent } from "../src/api/types";
-import { applyConsultEvent, type ConsultsState, consultsIn, reconcileConsults } from "../src/realtime/consults";
+import {
+  applyConsultEvent,
+  CONSULT_ASKING_MAX_MS,
+  type ConsultsState,
+  consultsIn,
+  reconcileConsults,
+} from "../src/realtime/consults";
 
 type Ev = Parameters<typeof applyConsultEvent>[1];
 const at = 1_000;
@@ -56,6 +62,22 @@ describe("live consultations", () => {
     const back = apply([asked("r1"), answered("r1")]);
     const delta = { type: "agent.delta", channelId: "c1", threadId: "t1", runId: "r9", agentId: "lisa" } as Ev;
     expect(consultsIn(applyConsultEvent(back, delta, at), "c1", at)).toHaveLength(1);
+  });
+
+  test("work handed off never takes the line: the reply that handed it shows where it is", () => {
+    const note = (e: Ev) => ({ ...e, kind: "note" }) as Ev;
+    expect(apply([note(asked("r1"))])).toEqual({});
+    expect(apply([asked("r1"), note(answered("r1"))])).toEqual(apply([asked("r1")]));
+  });
+
+  test("a question whose colleague is still at it stays past the usual window: each word of it renews the line", () => {
+    const later = at + CONSULT_ASKING_MAX_MS - 1000;
+    const still = { type: "agent.consultation", channelId: "c1", threadId: "t1", runId: "r1", consultationId: "k1" };
+    const kept = applyConsultEvent(apply([asked("r1")]), still as Ev, later);
+    expect(consultsIn(kept, "c1", at + CONSULT_ASKING_MAX_MS + 1000)).toHaveLength(1);
+    expect(consultsIn(apply([asked("r1")]), "c1", at + CONSULT_ASKING_MAX_MS + 1000)).toEqual([]);
+    // Nothing out under that run: nothing to keep.
+    expect(applyConsultEvent({}, still as Ev, later)).toEqual({});
   });
 });
 

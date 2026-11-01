@@ -6,6 +6,7 @@ import type {
   AgentUsage,
   Approval,
   DirectMessage,
+  MediaKind,
   Memory,
   Mission,
   OrgSummary,
@@ -119,6 +120,8 @@ export interface TeamLine {
   preview: string | null;
   /** Free: that message's body was written by the server; show it in the reader's language (`previewBody`). */
   previewMeta?: PreviewMeta | null;
+  /** Free: that message was a GIF or a sticker with no text (ADR 0091): its word stands for it. */
+  previewMedia?: MediaKind | null;
   /** Its brain's computer is offline and it waits for it ("Esperando o MacBook Air"): the computer's name. */
   computer?: string;
 }
@@ -179,6 +182,7 @@ export function teamLines(
         at: last?.createdAt ?? null,
         preview: last ? previewOf(last.body) || null : null,
         ...(last?.meta ? { previewMeta: last.meta } : {}),
+        ...(last?.mediaKind ? { previewMedia: last.mediaKind } : {}),
         ...(offline.has(agent.id) ? { computer: offline.get(agent.id)?.name ?? "" } : {}),
       };
     })

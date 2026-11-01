@@ -981,6 +981,48 @@
       "when": 1793451323712,
       "tag": "0139_agent_stretches",
       "breakpoints": true
+    },
+    {
+      "idx": 140,
+      "version": "7",
+      "when": 1793480678546,
+      "tag": "0140_proposal_proposer",
+      "breakpoints": true
+    },
+    {
+      "idx": 141,
+      "version": "7",
+      "when": 1793480769977,
+      "tag": "0141_coordinator",
+      "breakpoints": true
+    },
+    {
+      "idx": 142,
+      "version": "7",
+      "when": 1793498158970,
+      "tag": "0142_invitation_flow",
+      "breakpoints": true
+    },
+    {
+      "idx": 143,
+      "version": "7",
+      "when": 1793508158970,
+      "tag": "0143_gifs_and_stickers",
+      "breakpoints": true
+    },
+    {
+      "idx": 144,
+      "version": "7",
+      "when": 1793526234818,
+      "tag": "0144_agent_setup",
+      "breakpoints": true
+    },
+    {
+      "idx": 145,
+      "version": "7",
+      "when": 1793531394389,
+      "tag": "0145_agent_handoffs",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,248 @@
+/*
+ * Bringing a teammate in (ADR 0090): the addresses as chips (the onboarding's Team step and the invite dialog), the
+ * invite dialog's channels and note, and the workspace's link. Tokens only, so light and dark follow the theme.
+ */
+
+/* The addresses: chips in a sunken box, typed or pasted, the field after the last one. */
+.email-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 46px;
+  padding: 8px;
+  border-radius: 12px;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+  cursor: text;
+}
+.email-chips:focus-within {
+  box-shadow:
+    inset 0 0 0 1px var(--line2),
+    var(--field-ring);
+}
+.email-chips__input {
+  flex: 1;
+  min-width: min(100%, 180px);
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  outline: none;
+}
+.email-chips__input::placeholder {
+  color: var(--faint);
+}
+.email-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 32px;
+  padding: 2px 2px 2px 4px;
+  border-radius: 999px;
+  background: var(--raised);
+  box-shadow: var(--e1);
+  font-size: 13px;
+}
+.email-chip[data-invalid] {
+  box-shadow: 0 0 0 1px var(--danger);
+}
+.email-chip__email {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* Why an address isn't sent: "confira" in danger, "já está na Acme" quiet. */
+.email-chip__bad,
+.email-chip__soft {
+  padding-right: 2px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.email-chip__bad {
+  color: var(--danger);
+}
+.email-chip__soft {
+  color: var(--muted);
+}
+/* A phone keeps the field at 16px, so focusing it doesn't zoom the page. */
+@media (max-width: 760px), (pointer: coarse) {
+  .email-chips__input {
+    font-size: 16px;
+  }
+}
+
+/* The invite dialog: the addresses, the line under them, "Canais e recado" folded, then the link. */
+.invite-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.invite-compose {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.invite-compose__help {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+}
+.invite-compose__help[data-bad] {
+  color: var(--danger);
+}
+.invite-more {
+  all: unset;
+  box-sizing: border-box;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 8px 0 4px;
+  margin-left: -4px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink2);
+  cursor: pointer;
+}
+.invite-more:hover {
+  background: var(--plate);
+  color: var(--ink);
+}
+html:not([data-pointer]) .invite-more:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+.invite-more > .ac-icon {
+  color: var(--muted);
+  transition: transform 0.2s var(--out);
+}
+.invite-more[aria-expanded="true"] > .ac-icon {
+  transform: rotate(90deg);
+}
+.invite-more__sum {
+  font-weight: 500;
+  color: var(--muted);
+}
+.invite-more__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 2px 0 4px 22px;
+}
+.invite-more__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+.invite-optional {
+  font-weight: 500;
+  color: var(--faint);
+}
+/* A channel they also join: raised, pressed in once chosen (a check), a plus while not. #general is always on. */
+.invite-chans {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.invite-chan {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: var(--control-h-sm);
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--control-r-sm);
+  background: var(--raised);
+  box-shadow: var(--e1), var(--top);
+  color: var(--ink2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 0.18s var(--spring),
+    color 0.15s;
+}
+.invite-chan > .ac-icon {
+  color: var(--muted);
+}
+.invite-chan:hover {
+  color: var(--ink);
+}
+.invite-chan:active:not(:disabled) {
+  transform: scale(0.96);
+}
+.invite-chan[aria-pressed="true"] {
+  color: var(--ink);
+  background: var(--chosen-bg);
+  box-shadow: var(--chosen-shadow);
+}
+.invite-chan[aria-pressed="true"] > .ac-icon {
+  color: var(--ink);
+}
+.invite-chan:disabled {
+  cursor: default;
+}
+html:not([data-pointer]) .invite-chan:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+/* "ou mande o link": a hairline each side. */
+.invite-or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+.invite-or::before,
+.invite-or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+/* The workspace's link (ADR 0068): the address to copy, until when it works, renew and turn off; earlier links. */
+.invite-link {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.invite-link__row {
+  display: flex;
+  gap: var(--space-2);
+}
+.invite-link__row > .ac-input {
+  flex: 1;
+  min-width: 0;
+}
+.invite-link__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.invite-link__foot > .ac-icon {
+  color: var(--faint);
+}
+/* Renew and Turn off are text buttons at the line's end: the last word ends where Copy ends above it. */
+.invite-link__foot > .ac-btn--ghost:first-of-type {
+  margin-left: auto;
+}
+.invite-link__foot > .ac-btn--ghost:last-child {
+  margin-right: calc(-1 * var(--control-px-sm));
+}
+.invite-link__none {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}

@@ -1,6 +1,7 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
 import { createHash } from "node:crypto";
 import {
+  chmodSync,
   existsSync,
   linkSync,
   mkdirSync,
@@ -448,6 +449,56 @@ test("an account root keeps goes with each turn as root's own grant, never the s
   });
   await lent;
   expect(usage).toHaveLength(1);
+});
+
+test("protocol 31: a Claude Code or Codex task's account goes to its agent's user as a turn's, before the task reaches the worker", async () => {
+  const ACCOUNT = "0193ffff-0000-7000-8000-000000000001";
+  const SHARED = "0193ffff-0000-7000-8000-000000000002";
+  const TOKEN = "sk-ant-oat01-fake-token-for-tests-only";
+  const lends: [string, string, number][] = [];
+  const t = setup({
+    grant: async (_kind, id) => (id === SHARED ? { kind: "token", token: TOKEN } : null),
+    lend: async (kind, id, uid) => {
+      lends.push([kind, id, uid]);
+    },
+  });
+  t.sup.boot();
+  t.sup.attach();
+  let n = 0;
+  /** A task start as the worker gets it, answered as started. */
+  const started = async (executor: string, account?: string) => {
+    const taskId = `0193aaaa-0000-7000-8000-00000000010${++n}`;
+    const req = {
+      op: "task.start",
+      taskId,
+      executor,
+      ...(executor === "shell" ? { command: "true" } : { prompt: "go" }),
+      ...(account ? { account } : {}),
+      // What the server can't give: only root hands an account over.
+      grant: { kind: "token", token: "sk-ant-oat01-forged-by-the-server" },
+      agent: BIA,
+    } as unknown as MachineRequest;
+    const run = handleRequest(t.ctx, req, scope().scope);
+    await waitFor(() => t.workers.length === 1);
+    const bia = t.last(BIA.id);
+    if (n === 1) bia.hello();
+    const q = await requestOn(bia, n);
+    const data = { taskId, pid: 42, startedAt: new Date().toISOString(), cwd: "", command: executor };
+    bia.send({ type: "result", id: q.id, ok: true, data });
+    await run;
+    return q;
+  };
+  // Lent to Bia's user before her worker gets the task, as for a turn; the server's grant never passes.
+  expect((await started("claude", ACCOUNT)).grant).toBeUndefined();
+  expect(lends).toEqual([["claude_code", ACCOUNT, 21001]]);
+  await started("codex", ACCOUNT);
+  expect(lends.at(-1)).toEqual(["codex", ACCOUNT, 21001]);
+  // One root keeps goes with the task as root's own grant, lent to nobody.
+  expect((await started("claude", SHARED)).grant).toEqual({ kind: "token", token: TOKEN });
+  // A shell task signs nothing in, whatever it carries; nor does a task with no account.
+  expect((await started("shell", ACCOUNT)).grant).toBeUndefined();
+  await started("claude");
+  expect(lends).toHaveLength(2);
 });
 
 test("each worker hears which account its own agent thinks with, and again when that changes", async () => {
@@ -1460,6 +1511,87 @@ test.if(posix)(
       delete process.env.FAKE_CLAUDE_LOG;
     }
   },
+);
+
+test.if(posix)(
+  "a real worker: a Claude Code task on an account root keeps signs in as a turn, with root's token on a descriptor, and stops when its agent leaves the account",
+  async () => {
+    const ACCOUNT = "0193ffff-0000-7000-8000-000000000001";
+    const TOKEN = "sk-ant-oat01-fake-token-for-tests-only";
+    const TASK = "0193aaaa-0000-7000-8000-000000000201";
+    const dir = tempDir("worker-task-");
+    dirs.push(dir);
+    const log = path.join(dir, "claude.log");
+    const bin = path.join(dir, "bin");
+    const agentHome = path.join(dir, "agent");
+    const ownHome = path.join(dir, "worker");
+    mkdirSync(bin);
+    mkdirSync(agentHome);
+    // The task's shell finds the fake CLI as `claude`.
+    const shim = path.join(bin, "claude");
+    writeFileSync(
+      shim,
+      `#!/bin/sh\nexec "${process.execPath}" "${path.join(import.meta.dir, "fake-claude.mjs")}" "$@"\n`,
+    );
+    chmodSync(shim, 0o755);
+    const path0 = process.env.PATH;
+    process.env.PATH = `${bin}:${path0 ?? ""}`;
+    process.env.FAKE_CLAUDE_LOG = log;
+    let thinksWith: string | null = ACCOUNT;
+    try {
+      const t = setup({
+        start: (user) => {
+          const stdin = new PassThrough();
+          const stdout = new PassThrough();
+          const done = runWorker({
+            agentId: user.id,
+            home: ownHome,
+            dir: agentHome,
+            input: stdin,
+            output: stdout,
+            log: () => {},
+            self: { command: [process.execPath, "/nonexistent/agentes-runner.mjs"], compiled: false },
+          });
+          workerRuns.push(done);
+          return { stdin, stdout, exited: done, kill: () => stdin.end() };
+        },
+        grant: async () => ({ kind: "token", token: TOKEN }),
+        lend: async () => {
+          throw new Error("an account root keeps is never lent");
+        },
+        account: () => thinksWith,
+      });
+      t.sup.boot();
+      t.sup.attach();
+      const start = {
+        op: "task.start",
+        taskId: TASK,
+        executor: "claude",
+        prompt: "SLOWTASK",
+        account: ACCOUNT,
+        agent: ANA,
+      } as MachineRequest;
+      await handleRequest(t.ctx, start, scope().scope);
+      await waitFor(() => existsSync(log) && readFileSync(log, "utf8").includes(TOKEN), 10_000);
+      const [run] = readFileSync(log, "utf8")
+        .trim()
+        .split("\n")
+        .map((l) => JSON.parse(l) as { configDir: string; oauthToken: string | null; oauthEnv: string | null });
+      expect(run?.configDir).toBe(path.join(ownHome, "accounts", "claude_code", ACCOUNT));
+      expect(run?.oauthToken).toBe(TOKEN);
+      expect(run?.oauthEnv).toBeNull();
+      // The agent thinks with something else now: root says so, and the task that holds the token stops.
+      thinksWith = null;
+      t.sup.stateChanged();
+      await waitFor(() => t.up.some((f) => f.type === "task.done" && f.taskId === TASK), 15_000);
+      expect(t.up.find((f) => f.type === "task.done" && f.taskId === TASK)).toMatchObject({ canceled: true });
+    } finally {
+      if (path0 === undefined) delete process.env.PATH;
+      else process.env.PATH = path0;
+      delete process.env.FAKE_CLAUDE_LOG;
+    }
+  },
+  30_000,
 );
 
 test.if(posix)(

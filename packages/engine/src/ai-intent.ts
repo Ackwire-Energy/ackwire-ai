@@ -1,4 +1,5 @@
 import { isKnownProvider, PROVIDERS } from "@agenteschat/providers";
+import { cutText } from "./format";
 import type { Judge, JudgeAnswer } from "./judge";
 
 /** What a person who met "no AI" wants: a Connect dialog step, or `task` (only the Connect button). */
@@ -57,7 +58,7 @@ export async function aiConnectIntent(
       ...(input.runId ? { runId: input.runId } : {}),
       kind: "ai_intent",
       calibrated: true,
-      state: { workspace_has_ai_connected: false, message: text.slice(0, 4000) },
+      state: { workspace_has_ai_connected: false, message: cutText(text, 4000) },
       questions: {
         intent: {
           type: "choice",

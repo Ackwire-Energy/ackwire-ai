@@ -5,6 +5,7 @@ import {
   agentBudgetsThisMonth,
   agentStatuses,
   agentView,
+  applyAgentSetup,
   archiveAgent,
   audienceOf,
   budgetPercent,
@@ -21,6 +22,7 @@ import {
   getAgent,
   getAgentBrain,
   getAgentProposal,
+  getNewAgentSetup,
   getTeam,
   listAgentGroups,
   listAgents,
@@ -36,9 +38,11 @@ import {
   publishMachineAgentsChanged,
   requirePermission,
   revokeCredential,
+  SETUP_AGENTS_MAX,
   setAgentAppearance,
   setAgentAudience,
   setAgentBrain,
+  setCoordinator,
   talksToAgents,
   updateAgent,
   updateAgentGroup,
@@ -64,13 +68,17 @@ import {
   AgentAppearance,
   AgentAudience,
   AgentBrain,
+  AgentSetup,
+  AgentSetupResult,
   BrainEffortSetting,
   BrainKind,
   BrainMachine,
+  CommandApproval,
   ContextLimit,
   Credential,
   FormerAgent,
   Model,
+  NewAgentSetup,
   ProviderId,
   Usage,
 } from "./schemas";
@@ -126,6 +134,10 @@ const AgentFields = z.object({
   }),
   appearance: AgentAppearance.nullable().optional().openapi({
     description: "Its look (fixed allow-list). The agent's owner or admins can change it; null = the default.",
+  }),
+  mediaReplies: z.boolean().optional().openapi({
+    description:
+      "It may send a sticker or a GIF (ADR 0091): when someone asks for one, and after a light reply as often as the workspace's `agentMedia` allows; off: never. Like the other fields, editing it needs `manage_agents`. Default on.",
   }),
 });
 
@@ -534,6 +546,10 @@ export function agentRoutes(deps: AppDeps) {
             proposal: z.uuid().optional().openapi({
               description: "The card of an agent's proposal it comes from (ADR 0081): it is marked created.",
             }),
+            autonomy: CommandApproval.optional().openapi({
+              description:
+                "The Autonomia it starts with (ADR 0094, the last setup's): only from an admin or its own owner, else 403. Default: low_risk_auto.",
+            }),
           }),
         ),
       },
@@ -550,6 +566,8 @@ export function agentRoutes(deps: AppDeps) {
           { ...input, monthlyBudgetNanoUsd: budget(monthlyBudgetUsd) },
           // New agents start on "Automático".
           NEW_AGENT_DEFAULTS,
+          // The person's Criar agente: what they pick is what the next one starts with (ADR 0094).
+          { remember: true },
         );
       let agent = proposal
         ? await createAgentFromProposal({ db, pubsub: adapters.pubsub }, c.get("user").id, orgId, proposal, make)
@@ -607,6 +625,10 @@ export function agentRoutes(deps: AppDeps) {
         params: AgentParams,
         body: body(
           AgentFields.partial().extend({
+            coordinator: z.boolean().optional().openapi({
+              description:
+                "It coordinates the team (ADR 0093): true takes it from whoever had it, false leaves the team with none. Admins (audited); the workspace's open apps hear `agent.coordinator`.",
+            }),
             acceptPlanTerms: z.boolean().optional().openapi({
               deprecated: true,
               description: "Ignored. Older apps send it when an agent on a plan replies to everyone.",
@@ -618,11 +640,12 @@ export function agentRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, agentId } = c.req.valid("param");
-      const { monthlyBudgetUsd, audience, appearance, acceptPlanTerms: _, ...input } = c.req.valid("json");
+      const { monthlyBudgetUsd, audience, appearance, coordinator, acceptPlanTerms: _, ...input } = c.req.valid("json");
       const actor = c.get("user").id;
-      // The audience and the look can be changed by the agent's owner too; everything else needs an admin.
+      // The audience and the look can be changed by the agent's owner too, and who coordinates has its own call;
+      // everything else needs an admin.
       const other =
-        (!audience && appearance === undefined) ||
+        (!audience && appearance === undefined && coordinator === undefined) ||
         Object.values(input).some((v) => v !== undefined) ||
         monthlyBudgetUsd !== undefined;
       let agent = other
@@ -630,6 +653,8 @@ export function agentRoutes(deps: AppDeps) {
         : null;
       if (audience) agent = await setAgentAudience(db, actor, orgId, agentId, audience);
       if (appearance !== undefined) agent = await setAgentAppearance(db, actor, orgId, agentId, appearance);
+      if (coordinator !== undefined)
+        agent = await setCoordinator({ db, pubsub: adapters.pubsub }, actor, orgId, agentId, coordinator);
       if (!agent) {
         agent = await getAgent(db, orgId, agentId);
         if (!agent) throw new NotFoundError("Agent not found");
@@ -891,6 +916,55 @@ export function agentRoutes(deps: AppDeps) {
       // Its computer hears which account each agent thinks with (system mode lends the folders by it).
       if (view.computer) await publishMachineAgentsChanged(adapters.pubsub, orgId);
       return c.json(view, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/agent-setup",
+      tags,
+      security,
+      summary:
+        'What a new agent starts thinking with (ADR 0094): the last "Quem pensa" someone saved or used on other agents, with its Autonomia, as it stands now. Whoever creates agents.',
+      request: { params: OrgParams },
+      responses: { 200: json(z.object({ setup: NewAgentSetup.nullable() })), ...errors },
+    }),
+    async (c) => {
+      const setup = await getNewAgentSetup({ db }, c.get("user").id, c.req.valid("param").orgId);
+      return c.json({ setup }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/agent-setup",
+      tags,
+      security,
+      summary:
+        'Use one agent\'s "Quem pensa" and its Autonomia on these agents (ADR 0094), each by its own rules: who may change it, whose plan thinks for it. Each change is audited as its own (`agent.brain`, `agent.mission_command_approval`, `via: setup`); `preview` says what each would do and keeps nothing. Applied, it is what new agents start with.',
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            setup: AgentSetup,
+            agentIds: z.array(z.uuid()).min(1).max(SETUP_AGENTS_MAX),
+            preview: z.boolean().optional(),
+          }),
+        ),
+      },
+      responses: { 200: json(z.object({ results: z.array(AgentSetupResult) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const input = c.req.valid("json");
+      const results = await applyAgentSetup({ db }, c.get("user").id, orgId, input);
+      // Their computers hear which account each agent thinks with now (system mode lends the folders by it).
+      if (!input.preview && results.some((r) => r.status === "applied")) {
+        await publishMachineAgentsChanged(adapters.pubsub, orgId);
+      }
+      return c.json({ results }, 200);
     },
   );
 
