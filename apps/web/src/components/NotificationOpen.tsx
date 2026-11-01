@@ -3,9 +3,10 @@ import { cacheNotification, keys, useApi } from "@agenteschat/client";
 import { type OpenTarget, opensConnectAi, openTarget } from "@agenteschat/client/lib/notifications";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useContext, useEffect, useRef } from "react";
 import { requestBrowserCard } from "@/components/browser/open";
 import { useConnectAi } from "@/components/ConnectAi";
+import { OpenDetailsContext } from "@/components/details-link";
 import { LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { fallbackTarget, type PushOpenData, setPushOpenHandler } from "@/lib/push-open";
@@ -67,6 +68,7 @@ export type Opened = "page" | "dialog" | null;
 export function useNotificationOpener() {
   const navigate = useNavigate();
   const connect = useConnectAi();
+  const openDetails = useContext(OpenDetailsContext);
   return useCallback(
     (n: AppNotification, orgId: string, options: { ai?: AiStatus; replace?: boolean } = {}): Opened => {
       if (connect && opensConnectAi(n, options.ai)) {
@@ -75,12 +77,17 @@ export function useNotificationOpener() {
       }
       const target = openTarget(n);
       if (!target) return null;
+      // A routine's trouble: its details over the page the person is on, its state and fix in view.
+      if (openDetails && target.to === "/org/$orgId/routines" && target.search) {
+        openDetails({ kind: "routine", id: target.search.open });
+        return "dialog";
+      }
       // An agent asked for help in its browser: its card opens there, in control (no page of its own).
       if (n.kind === "browser_handoff" && n.source.handoffId) requestBrowserCard({ handoffId: n.source.handoffId });
       goToTarget(navigate, orgId, target, options.replace ?? false);
       return "page";
     },
-    [navigate, connect],
+    [navigate, connect, openDetails],
   );
 }
 

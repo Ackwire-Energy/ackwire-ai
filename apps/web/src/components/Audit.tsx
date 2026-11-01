@@ -28,6 +28,7 @@ import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
+import { DetailsLink } from "@/components/details-link";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -371,9 +372,9 @@ function AuditPanel({ row, onClose }: { row: AuditRow; onClose: () => void }) {
           <footer className="audit-panel__foot">
             {row.approval?.status === "pending" && (
               <Button asChild variant="primary" icon="waiting">
-                <Link to="/org/$orgId/approvals" params={{ orgId: org.id }} search={{ open: row.approval.id }}>
+                <DetailsLink item={{ kind: "approval", id: row.approval.id }}>
                   {t("audit.panel.openApproval")}
-                </Link>
+                </DetailsLink>
               </Button>
             )}
             {row.channel && (

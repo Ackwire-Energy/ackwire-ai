@@ -1,5 +1,5 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { useCallback } from "react";
+import { type MouseEvent, useCallback } from "react";
 
 /**
  * The item a list page has open in its details dialog, kept in the URL
@@ -48,3 +48,10 @@ export function openSearch(search: Record<string, unknown>): { open?: string | n
   if (typeof v !== "string" || !v) return {};
   return /^\d{1,15}$/.test(v) ? { open: Number(v) } : { open: v };
 }
+
+/** Opens in place on a plain click; a link's own href still serves a new tab, a middle or a modified click. */
+export const panelClick = (e: MouseEvent, open: () => void) => {
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+  e.preventDefault();
+  open();
+};

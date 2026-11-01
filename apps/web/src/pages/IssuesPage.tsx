@@ -27,7 +27,7 @@ import {
   WorkSweep,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import { type DragEvent, type MouseEvent, useDeferredValue, useEffect, useRef, useState } from "react";
+import { type DragEvent, useDeferredValue, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
 import { actorFromKey, NO_ACTOR, useActors } from "@/components/actors";
@@ -52,7 +52,7 @@ import {
   useStageName,
   useStepText,
 } from "@/lib/issues";
-import { useOpenParam } from "@/lib/open-param";
+import { panelClick, useOpenParam } from "@/lib/open-param";
 import { useToast } from "@/lib/toast";
 import { AddColumnDialog, Board } from "./IssueBoard";
 import { IssueDialog } from "./IssuePage";
@@ -487,13 +487,6 @@ function WhoLine({ issue: i }: { issue: Issue }) {
     </>
   );
 }
-
-/** Opens the panel on a plain click; the link still goes to the issue's page (new tab, middle click). */
-const panelClick = (e: MouseEvent, open: () => void) => {
-  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-  e.preventDefault();
-  open();
-};
 
 function IssueCard({
   issue: i,

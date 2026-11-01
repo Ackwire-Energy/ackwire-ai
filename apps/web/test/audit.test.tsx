@@ -147,6 +147,17 @@ describe("Configurações → Auditoria", () => {
     );
   });
 
+  test("the request opens over Auditoria, not on Aprovações", async () => {
+    const audit = AUDIT.map((x) => (x.approval ? { ...x, approval: { ...x.approval, id: "ap-deploy" } } : x));
+    const { r } = await go(seedState({ audit }));
+    await click(section().querySelector(".audit-row") as HTMLElement);
+    const panel = screen().getByRole("complementary", { name: "Detalhe da auditoria" });
+    await click(within(panel).getByRole("link", { name: "Ver o pedido" }));
+    await settle(4);
+    expect(r.router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/audit`);
+    expect(document.querySelector(".ap-dialog")?.textContent).toContain("Run deploy workflow");
+  });
+
   test("a call waiting for a secret says what became of it", async () => {
     const asked = (status: NonNullable<AuditRow["secret"]>["status"]) =>
       row({

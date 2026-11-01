@@ -529,7 +529,8 @@ describe("Chat: what a routine found", () => {
         createdAt: at(2),
       },
     );
-    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    const { api } = withRoutines([routine({ id: "rt-s", name: "Sentry diário" })], {}, state);
+    const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(6);
     // The report's own line is folded into the message that tells it.
     expect(screen().queryByText(/Rotina «Sentry diário» entregou um relatório/)).toBeNull();
@@ -537,7 +538,20 @@ describe("Chat: what a routine found", () => {
       .getAllByRole("article")
       .find((a) => a.textContent?.includes("Achei 3 erros novos")) as HTMLElement;
     const tag = within(row).getByRole("link", { name: "Rotina «Sentry diário»" });
+    // A new tab still lands on Rotinas with the routine open; a click opens it here, over the conversation.
     expect(tag.getAttribute("href")).toContain("open=rt-s");
+    await click(tag);
+    await settle(4);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
+    const dialog = screen().getByRole("dialog", { name: "Sentry diário" });
+    expect(within(dialog).getByRole("button", { name: "Editar" })).toBeTruthy();
+    await click(within(dialog).getByRole("button", { name: "Fechar detalhes" }));
+    expect(screen().queryByRole("dialog", { name: "Sentry diário" })).toBeNull();
+    expect(
+      screen()
+        .getAllByRole("article")
+        .some((a) => a === row),
+    ).toBe(true);
     expect(row.textContent).not.toContain("Relatório: 3 erros novos");
     await click(within(row).getByRole("button", { name: "Ver relatório" }));
     expect(row.textContent).toContain("Relatório: 3 erros novos no checkout desde ontem.");

@@ -8,12 +8,14 @@ import { Button, Chip, Icon } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { useOpenAgentPanel } from "@/components/agent-panel-context";
 import { useConnectAi } from "@/components/ConnectAi";
 import { useOrg } from "@/components/org-context";
 import { RequestCard, RequestFuse, useExpired } from "@/components/RequestCard";
 import { StretchCardView } from "@/components/StretchCard";
 import { useDirectory } from "@/hooks/useDirectory";
 import { lookOf } from "@/lib/look";
+import { panelClick } from "@/lib/open-param";
 import { useToast } from "@/lib/toast";
 import { expiryText } from "@/pages/ApprovalsPage";
 
@@ -88,6 +90,7 @@ export function ActionCard({ message }: { message: Message }) {
  * Then what was decided; created, it links to the agent.
  */
 function AgentProposalCardView({ message, card }: { message: Message; card: AgentProposalCard }) {
+  const openPanel = useOpenAgentPanel();
   const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
@@ -166,7 +169,14 @@ function AgentProposalCardView({ message, card }: { message: Message; card: Agen
             </Chip>
             {card.agentId && (
               <Button asChild size="sm" variant="ghost">
-                <Link to="/org/$orgId/agents/$agentId" params={{ orgId: org.id, agentId: card.agentId }}>
+                <Link
+                  to="/org/$orgId/agents/$agentId"
+                  params={{ orgId: org.id, agentId: card.agentId }}
+                  onClick={(e) => {
+                    const id = card.agentId;
+                    if (openPanel && id) panelClick(e, () => openPanel(id));
+                  }}
+                >
                   {t("newAgent.openProfile")}
                 </Link>
               </Button>

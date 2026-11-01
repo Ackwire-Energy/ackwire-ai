@@ -82,6 +82,7 @@ import { type CSSProperties, useDeferredValue, useEffect, useMemo, useState } fr
 import { useTranslation } from "react-i18next";
 import { AgentAvatar, AgentSpinner } from "@/components/AgentAvatar";
 import { useActors } from "@/components/actors";
+import { DetailsLink } from "@/components/details-link";
 import { cleanFilter, type EmailTriggerDraft, EmailTriggerFields, emailWhen, INBOX } from "@/components/EmailTrigger";
 import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
@@ -949,6 +950,34 @@ function AgentFace({ agentId }: { agentId: string }) {
 }
 
 /**
+ * A routine's details over whatever page is open (`DetailsHost`): the chat's routine tag, an agent's receipts,
+ * the calendar. "Editar" opens the routine's form there too.
+ */
+export function RoutineDetailsDialog({ routineId, onClose }: { routineId: string; onClose: () => void }) {
+  const { org } = useOrg();
+  const routines = useRoutines(org.id);
+  const now = useNow();
+  const [editing, setEditing] = useState(false);
+  const routine = routines.data?.find((r) => r.id === routineId);
+  // Gone, or not one the viewer may see: nothing to show.
+  useEffect(() => {
+    if (routines.isSuccess && !routine) onClose();
+  }, [routines.isSuccess, routine, onClose]);
+  if (!routine) return null;
+  return (
+    <>
+      <RoutineDetails routine={routine} now={now} onClose={onClose} onEdit={() => setEditing(true)} />
+      <RoutineDialog
+        key={editing ? "edit" : "none"}
+        open={editing}
+        onClose={() => setEditing(false)}
+        routine={routine}
+      />
+    </>
+  );
+}
+
+/**
  * The routine's details: its state, the week, what it does, when, where, how it works and its runs. Where it runs
  * only where the workspace has more than one computer, by its name. Short sections sit two to a row when the dialog
  * is wide enough (`routine-details__pair`).
@@ -1195,14 +1224,9 @@ function RunItem({ run: x, routine: r }: { run: RoutineRun; routine: Routine }) 
       </span>
       <span>
         {x.status === "waiting" && x.approvalId ? (
-          <Link
-            to="/org/$orgId/approvals"
-            params={{ orgId: org.id }}
-            search={{ open: x.approvalId }}
-            className="routine-runs__link"
-          >
+          <DetailsLink item={{ kind: "approval", id: x.approvalId }} className="routine-runs__link">
             {outcome}
-          </Link>
+          </DetailsLink>
         ) : (
           <b>{outcome}</b>
         )}

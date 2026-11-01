@@ -8,6 +8,7 @@ import type { CSSProperties, ReactNode, PointerEvent as ReactPointerEvent } from
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useActors } from "@/components/actors";
+import { DetailsLink } from "@/components/details-link";
 import { useOrg } from "@/components/org-context";
 import { lookOf } from "@/lib/look";
 
@@ -208,16 +209,16 @@ export function ItemDetails({ item, onEdit, onDelete }: { item: CalItem; onEdit?
             {t("calendar.openIssue")}
           </Link>
         )}
-        {item.kind === "routine" && (
-          <Link
-            to="/org/$orgId/routines"
-            params={{ orgId: org.id }}
-            search={item.routineId ? { open: item.routineId } : {}}
-            className="ac-link small"
-          >
-            {t("calendar.openRoutines")}
-          </Link>
-        )}
+        {item.kind === "routine" &&
+          (item.routineId ? (
+            <DetailsLink item={{ kind: "routine", id: item.routineId }} className="ac-link small">
+              {t("calendar.openRoutine")}
+            </DetailsLink>
+          ) : (
+            <Link to="/org/$orgId/routines" params={{ orgId: org.id }} className="ac-link small">
+              {t("calendar.openRoutines")}
+            </Link>
+          ))}
         {onDelete && (
           <Button size="sm" variant="ghost" icon="trash" onClick={onDelete}>
             {t("calendar.delete")}
