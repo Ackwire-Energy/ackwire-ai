@@ -2,7 +2,7 @@ import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CodeBlock } from "@/components/CodeBlock";
 import { useDarkTheme } from "@/lib/grow";
-import { type Drawing, drawWithMermaid, MERMAID_MAX_TEXT, svgDrawing } from "@/lib/mermaid";
+import { type Drawing, drawWithMermaid, mermaidDrawable, svgDrawing } from "@/lib/mermaid";
 
 /** Source → SVG markup in the page's theme. Swappable for tests (the real one needs a browser layout engine). */
 export type MermaidRenderer = (id: string, source: string, dark: boolean) => Promise<string>;
@@ -13,10 +13,10 @@ let counter = 0;
 let queue: Promise<void> = Promise.resolve();
 
 /**
- * Diagrams already drawn, by theme and source: drawn again (the streamed answer giving way to the message, a page
- * opened again) they show at once.
+ * Diagrams already drawn, by theme and source, and those mermaid couldn't draw (null): shown again (the streamed answer
+ * giving way to the message, a page opened again) they show at once, and mermaid isn't asked again.
  */
-const drawn = new Map<string, Drawing>();
+const drawn = new Map<string, Drawing | null>();
 
 export function setMermaidRenderer(next: MermaidRenderer | null) {
   renderer = next ?? drawWithMermaid;
@@ -24,13 +24,14 @@ export function setMermaidRenderer(next: MermaidRenderer | null) {
 }
 
 /**
- * The diagram in the page's theme: undefined until it's drawn, null when it can't be (it doesn't parse, or it's longer
- * than mermaid draws). While another source or theme is being drawn, the block keeps what it showed last.
+ * The diagram in the page's theme: undefined until it's drawn, null when it can't be (mermaid refuses it, or it doesn't
+ * go to mermaid: see `mermaidDrawable`). While another source or theme is being drawn, the block keeps what it showed
+ * last.
  */
 function useMermaid(source: string): Drawing | null | undefined {
   const dark = useDarkTheme();
   const key = `${dark ? "dark" : "light"}\n${source}`;
-  const drawable = source.length <= MERMAID_MAX_TEXT;
+  const drawable = mermaidDrawable(source);
   const [last, setLast] = useState<Drawing | null | undefined>(() => drawn.get(key));
   const asked = useRef<string | undefined>(undefined);
   useEffect(() => {
@@ -39,9 +40,8 @@ function useMermaid(source: string): Drawing | null | undefined {
     const wait = asked.current === undefined || asked.current === key ? 0 : 300;
     asked.current = key;
     if (!drawable) return;
-    const hit = drawn.get(key);
-    if (hit) {
-      setLast(hit);
+    if (drawn.has(key)) {
+      setLast(drawn.get(key));
       return;
     }
     let live = true;
@@ -49,24 +49,24 @@ function useMermaid(source: string): Drawing | null | undefined {
       queue = queue.then(async () => {
         // Checked when its turn comes: the block may be gone, or another one may have drawn the same diagram.
         if (!live) return;
-        const ready = drawn.get(key);
-        if (ready) {
-          setLast(ready);
+        if (drawn.has(key)) {
+          setLast(drawn.get(key));
           return;
         }
+        let drawing: Drawing | null;
         try {
-          const drawing = svgDrawing(await renderer(`mmd-${++counter}`, source, dark));
-          drawn.set(key, drawing);
-          // ponytail: the last 100 drawn, oldest out first; move a hit to the end (least recently used) if pages
-          // ever show more diagrams than that.
-          for (const old of drawn.keys()) {
-            if (drawn.size <= 100) break;
-            drawn.delete(old);
-          }
-          if (live) setLast(drawing);
+          drawing = svgDrawing(await renderer(`mmd-${++counter}`, source, dark));
         } catch {
-          if (live) setLast(null);
+          drawing = null;
         }
+        drawn.set(key, drawing);
+        // ponytail: the last 100, oldest out first; move a hit to the end (least recently used) if pages ever show
+        // more diagrams than that.
+        for (const old of drawn.keys()) {
+          if (drawn.size <= 100) break;
+          drawn.delete(old);
+        }
+        if (live) setLast(drawing);
       });
     }, wait);
     return () => {
@@ -74,7 +74,8 @@ function useMermaid(source: string): Drawing | null | undefined {
       clearTimeout(timer);
     };
   }, [key, source, dark, drawable]);
-  return drawable ? (drawn.get(key) ?? last) : null;
+  if (!drawable) return null;
+  return drawn.has(key) ? drawn.get(key) : last;
 }
 
 /**

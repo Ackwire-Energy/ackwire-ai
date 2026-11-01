@@ -9,7 +9,14 @@ import { cleanup, render } from "@testing-library/react";
 import { MermaidDiagram, setMermaidRenderer } from "@/components/artifacts/Mermaid";
 import { createI18n } from "@/i18n";
 import { Markdown } from "@/lib/markdown";
-import { drawWithMermaid, type MermaidFrame, mermaidFrameDocument, setMermaidFrame, svgDrawing } from "@/lib/mermaid";
+import {
+  drawWithMermaid,
+  type MermaidFrame,
+  mermaidDrawable,
+  mermaidFrameDocument,
+  setMermaidFrame,
+  svgDrawing,
+} from "@/lib/mermaid";
 import { settle } from "./render";
 
 const fence = (source: string) => `\`\`\`mermaid\n${source}\n\`\`\``;
@@ -123,6 +130,39 @@ describe("the frame mermaid draws in", () => {
       post(from, data);
     post(made.win, { id: "d2", svg: SVG });
     expect(await drawing).toBe(SVG);
+  });
+
+  test("a message from another frame while the frame is still being made is dropped, not an error", async () => {
+    // Until the outer frame has parsed the inner one, reading the inner one's window throws (Chromium).
+    const proto = HTMLIFrameElement.prototype;
+    const own = Object.getOwnPropertyDescriptor(proto, "contentWindow");
+    const blocked = new Proxy(
+      {},
+      {
+        get() {
+          throw new DOMException(
+            'Blocked a frame with origin "null" from accessing a cross-origin frame.',
+            "SecurityError",
+          );
+        },
+      },
+    );
+    Object.defineProperty(proto, "contentWindow", { configurable: true, get: () => blocked });
+    const errors: unknown[] = [];
+    const report = (event: ErrorEvent) => errors.push(event.error);
+    window.addEventListener("error", report);
+    try {
+      // The real frame (happy-dom runs none of its scripts).
+      setMermaidFrame(null);
+      const drawing = drawWithMermaid("early", FLOW, false, 30);
+      post({ postMessage() {} }, { ready: true });
+      await expect(drawing).rejects.toThrow("didn't finish");
+      expect(errors).toEqual([]);
+    } finally {
+      window.removeEventListener("error", report);
+      if (own) Object.defineProperty(proto, "contentWindow", own);
+      setMermaidFrame(fakeFrame);
+    }
   });
 
   test("a frame that doesn't answer in time is thrown away, and the next drawing gets a fresh one", async () => {
@@ -421,6 +461,48 @@ describe("inside the frame, mermaid-frame.js", () => {
     const failed = await frame.ask({ id: "blank", source: "sequenceDiagram\n  A->>B: a<br> <br>b", dark: false });
     expect(failed).toEqual({ id: "blank", error: expect.stringContaining("not in render tree") });
     expect(document.body.children).toHaveLength(0);
+  });
+
+  test("front matter goes to mermaid when mermaid reads it, and stays code when mermaid would refuse it", async () => {
+    const flow = "flowchart LR\n  A --> B";
+    const cases: [string, boolean][] = [
+      [`---\ntitle: Fluxo\n---\n${flow}`, true],
+      [`  ---\n  title: Fluxo\n  ---\n${flow}`, true],
+      [`--- \r\ntitle: Fluxo\r\n---\t\r\n${flow}`, true],
+      [`---\ntitle: Fluxo\n${flow}`, false],
+      [`---\ntitle: Fluxo\n  ---\n${flow}`, false],
+      [`---\n---\n${flow}`, false],
+      [`---\n${flow}\n---`, false],
+    ];
+    for (const [source, reads] of cases) {
+      expect(mermaidDrawable(source)).toBe(reads);
+      expect(Boolean(await mermaid.parse(source, { suppressErrors: true }))).toBe(reads);
+    }
+  });
+
+  test("runs of whitespace as long as the page sends are drawn in a moment; longer ones stay code", async () => {
+    // Safari and Firefox draw on the page's thread, and these took them seconds: mermaid's own regexes backtrack over
+    // long runs of whitespace (front matter that never closes, blank lines, a label of spaces).
+    for (const source of [
+      `---${"\n".repeat(39_960)}x`,
+      `---${"\n".repeat(49_990)}`,
+      `flowchart LR\n${"\n".repeat(40_000)}  A --> B`,
+      `flowchart LR\n  A[a${" ".repeat(40_000)}b] --> B`,
+    ])
+      expect(mermaidDrawable(source)).toBe(false);
+    const fill = (unit: string) => unit.repeat(Math.floor(47_000 / unit.length));
+    const blankLines = fill(`${"\n".repeat(1000)}A --> B`);
+    const frame = frameScript();
+    for (const source of [
+      `flowchart LR${blankLines}`,
+      `flowchart LR\n${fill(`  A[a${" ".repeat(1000)}b] --> B\n`)}`,
+      `---${"\n".repeat(1000)}title: Fluxo\n---\nflowchart LR${blankLines}`,
+    ]) {
+      expect(mermaidDrawable(source)).toBe(true);
+      const start = performance.now();
+      expect(await frame.ask({ id: "long", source, dark: false })).toHaveProperty("svg");
+      expect(performance.now() - start).toBeLessThan(1000);
+    }
   });
 
   test("a gantt is drawn 720px wide, which a card fits, not as wide as the frame", async () => {

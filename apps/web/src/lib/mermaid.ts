@@ -13,16 +13,40 @@ import frameScript from "./mermaid-frame.js?url&no-inline";
  *   mermaid's bundle and mermaid-frame.js, plus inline styles and data: images. The outer one's `default-src 'none'`
  *   is also the inner one's frame-src, which refuses the inner frame navigating itself away (a `<meta
  *   http-equiv="refresh">`): CSP has no other say over a document's own navigations, and the sandbox allows them.
- *   Chromium 156 still opens a connection to a refused address, so the tags that navigate are left to the second layer
- *   too.
+ *   Chromium 156 still opens a connection to a refused address, and preconnects and looks up `<link rel=preconnect>`
+ *   and `dns-prefetch` hosts whatever the CSP says, so the tags that navigate and `<link>` are left to the second layer.
  * - The page sends `{id, source, dark}` and takes `{id, svg}` or `{id, error}` back only from the inner frame's
  *   window, so another frame on the page (an agent's HTML page) can't post a drawing. The SVG still goes into an
  *   `<img>`, where nothing in it runs or loads.
  * - Mermaid's own settings in mermaid-frame.js (strict, no HTML labels, its sanitizer) are a second layer.
+ *
+ * Desktop Chrome and Edge give the frame a process of its own, where a drawing that takes long only holds up the next
+ * one. Safari and Firefox draw on the page's own thread, where it holds up the page: see `mermaidDrawable`.
  */
 
 /** Mermaid's own `maxTextSize`: past it mermaid draws a red "Maximum text size" box instead of the diagram. */
-export const MERMAID_MAX_TEXT = 50_000;
+const MERMAID_MAX_TEXT = 50_000;
+/** More whitespace in a row than a diagram's indentation and blank lines ever take. */
+const MERMAID_MAX_SPACE = 1000;
+
+/**
+ * Whether a source goes to mermaid, checked in linear time. Not past mermaid's size, nor with front matter mermaid
+ * refuses, nor with a longer run of whitespace: mermaid's comment regexes try each place in a run over the rest of
+ * it, and its front matter regex each line break after the opening `---` over the rest of the source, so 40,000 blank
+ * lines take them seconds.
+ */
+export function mermaidDrawable(source: string): boolean {
+  if (source.length > MERMAID_MAX_TEXT || source.match(/\s+/g)?.some((run) => run.length > MERMAID_MAX_SPACE))
+    return false;
+  // Front matter ends at a `---` line in the opening one's indent, from the third line on and followed by a line break
+  // (mermaid's regex, once mermaid has made every `\r\n` a `\n`). Without one mermaid refuses the diagram.
+  const lines = source.split(/\r\n?|\n/);
+  const first = lines[0] ?? "";
+  if (first.trim() !== "---") return true;
+  const closing = `${first.slice(0, first.indexOf("-"))}---`;
+  return lines.slice(2, -1).some((line) => line.startsWith(closing) && !line.slice(closing.length).trim());
+}
+
 /** Both frames' sandbox. Not the agent pages' (HtmlFrame): what those may be allowed must never reach this one. */
 const SANDBOX = "allow-scripts";
 
@@ -47,10 +71,20 @@ function sandboxFrame(): MermaidFrame {
   el.tabIndex = -1;
   // Off screen but laid out (not display: none): mermaid measures its text.
   el.style.cssText = "position:fixed;left:-10000px;top:0;width:1280px;height:900px;border:0";
+  // The price of the opaque origin: Chrome never takes such a frame's scripts from its cache, so each frame (one per
+  // page load, a fresh one after a timeout) downloads mermaid's bundle again. Safari and Firefox take it from theirs.
   el.srcdoc = mermaidFrameDocument([mermaidBundle, frameScript].map((url) => new URL(url, document.baseURI).href));
   const loaded = new Promise((resolve) => el.addEventListener("load", resolve, { once: true }));
   document.body.append(el);
-  return { window: () => el.contentWindow?.[0], loaded, remove: () => el.remove() };
+  const inner = () => {
+    // Until the outer frame has parsed the inner one, reading its first child is a cross-origin access, which throws.
+    try {
+      return el.contentWindow?.[0];
+    } catch {
+      return undefined;
+    }
+  };
+  return { window: inner, loaded, remove: () => el.remove() };
 }
 
 let makeFrame = sandboxFrame;
