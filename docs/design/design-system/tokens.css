@@ -95,6 +95,12 @@
   --frame-ink: #fff;
   --frame-control-a: #3a3a3c;
   --frame-control-b: #1c1c1e;
+  /* Ink and plates on a dark or agent-colored surface (an agent's frame, a graphite bar), the same in both themes. */
+  --on-dark: #fff;
+  --on-dark-soft: rgba(255, 255, 255, 0.85);
+  --on-dark-faint: rgba(255, 255, 255, 0.45);
+  --on-dark-plate: rgba(255, 255, 255, 0.16);
+  --on-dark-plate-strong: rgba(255, 255, 255, 0.26);
   --text-xs: 12px; --text-sm: 13px; --text-md: 14.5px; --text-base: 15px; --text-lg: 16px;
   --text-h3: 17px; --text-h2: 20px; --text-h1: 28px; --text-display: 32px;
   --track-tight: -0.025em; --track-tighter: -0.035em;
