@@ -11,7 +11,7 @@ import { REFUSALS } from "./tools/run-policy";
  *
  * Stalls:
  * - `mentionNoRun`: an agent @mentioned another agent and that agent got no run and never read the message in
- *   one; mentions the judge read as only a reference ("Só mencionado") are left out.
+ *   one; mentions the judge read as only a reference ("Só mencionado") are left out, never those it failed to read.
  * - `readOnly`: conversation runs the policy kept from tools the agent's scopes grant, for who was behind them
  *   (ADR 0053), from the run's first `context` step (`heldBack`), and runs with a tool call refused for that
  *   (`tool.call` audit rows with a run-policy refusal).
@@ -353,7 +353,7 @@ export function autonomySql(range: AutonomyRange) {
               and r.created_at > m.created_at - interval '1 day' and r.created_at < m.created_at
               and s.kind = 'context' and s.data->'steeredMessageIds' ? m.id::text) as reached,
         exists (select 1 from routing_decisions d
-          where d.message_id = m.id and not (a.agent_id = any(d.selected_agent_ids))) as referenced
+          where d.message_id = m.id and d.error is null and not (a.agent_id = any(d.selected_agent_ids))) as referenced
       from messages m
       join orgs o on o.id = m.org_id
       join channels c on c.org_id = m.org_id and c.id = m.channel_id

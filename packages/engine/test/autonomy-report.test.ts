@@ -117,7 +117,7 @@ async function run(r: {
   return row;
 }
 
-const decide = (messageId: string, selected: string[]) =>
+const decide = (messageId: string, selected: string[], error: string | null = null) =>
   f.db.insert(schema.routingDecisions).values({
     orgId: f.org.id,
     channelId: f.general.id,
@@ -125,6 +125,7 @@ const decide = (messageId: string, selected: string[]) =>
     strategy: "rule:test",
     candidates: [],
     selectedAgentIds: selected,
+    error,
   });
 
 const posted: Step = ["message", { messageId: crypto.randomUUID() }];
@@ -422,6 +423,25 @@ describe("one workspace's day", () => {
     }
     const [day] = await autonomyRows(f.db, { from: other, days: 1 });
     expect(day?.ackReplies).toBe(acks.length);
+  });
+
+  test("a mention the judge failed to read woke nobody; one it read as only a reference didn't count", async () => {
+    const other = "2026-10-16";
+    const dev = f.agent.id;
+    for (const [time, error] of [
+      ["10:00:00", "judge: provider 529"],
+      ["11:00:00", null],
+    ] as const) {
+      const said = await message({
+        at: at(time, other),
+        by: ops,
+        body: "Feito o build; agora @dev precisa subir o staging",
+        mentions: [dev],
+      });
+      await decide(said.id, [], error);
+    }
+    const [day] = await autonomyRows(f.db, { from: other, days: 1 });
+    expect(day?.mentionNoRun).toBe(1);
   });
 
   test("a mission its stuck guard paused stopped at a limit; its other lines didn't", async () => {
