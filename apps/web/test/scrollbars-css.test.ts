@@ -75,6 +75,7 @@ const SIDEWAYS: Record<string, "strip" | "content"> = {
   ".ac-carousel__track": "strip",
   ".dk-orgpick": "strip",
   ".code-card__code": "content",
+  ".code-card__preview": "content",
   ".level-matrix": "content",
   ".machine-command__code": "content",
   ".issues-boardwrap": "content",

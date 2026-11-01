@@ -8,7 +8,7 @@ import {
   useDecideApproval,
 } from "@agenteschat/client";
 import { approvalWhy } from "@agenteschat/client/lib/approval-origin";
-import { approvalSummary } from "@agenteschat/client/lib/approval-words";
+import { approvalSummary, decisionOutcome } from "@agenteschat/client/lib/approval-words";
 import { consultAskedKey } from "@agenteschat/client/lib/consult-group";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { router } from "expo-router";
@@ -33,8 +33,9 @@ import { genderOf, previewOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
 import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
-import { AskButtons, AskCard, AskFoot, ExpiryLine, useAskStore } from "./asks";
-import { threadFaces } from "./logic";
+import { askEndedAt } from "./ask-store";
+import { AskButtons, AskCard, AskDone, AskFoot, ExpiryLine, useAskStore } from "./asks";
+import { markName, threadFaces } from "./logic";
 
 /**
  * The cards inside a message: the agent it consulted, the approval it asks for, an agent's question and a change
@@ -122,23 +123,34 @@ export function ConsultationCard({
 export function ApprovalInline({ approvalId }: { approvalId: string }) {
   const { t, i18n } = useTranslation();
   const orgId = useOrgId();
-  const c = useColors();
-  const surface = useSurface();
+  const meId = useMeId();
+  const dir = useDirectory();
   const approval = useApproval(orgId, approvalId);
   const a = approval.data;
   if (!a) return null;
   if (a.status === "pending") return <ApprovalAsk approval={a} />;
-  const ok = a.status === "approved";
+  const outcome = decisionOutcome(t, a, meId, (id) => dir.memberById.get(id)?.name);
   return (
-    <View style={[styles.done, surface]}>
-      <Icon name={ok ? "checkc" : "x"} size={16} color={ok ? c.ok : c.muted} />
-      <Text variant="small" tone="muted" style={styles.grow}>
-        {t(`mobile.chat.approval.${a.status}`, {
-          // What was decided, so several requests for one tool are told apart.
-          title: [approvalTitleText(t, a), approvalSummary(a, i18n.language)].filter(Boolean).join(" · "),
-        })}
-      </Text>
-    </View>
+    <AskDone
+      done={a.status === "approved"}
+      // What was decided, so several requests for one tool are told apart.
+      words={[`${outcome}: ${markName(approvalTitleText(t, a))}`, approvalSummary(a, i18n.language)]
+        .filter(Boolean)
+        .join(" · ")}
+      at={askEndedAt(a)}
+      more={
+        a.reason
+          ? {
+              label: t("approval.seeDetails"),
+              content: (
+                <Text variant="small" tone="muted">
+                  {t("approval.reasonLine", { reason: a.reason })}
+                </Text>
+              ),
+            }
+          : undefined
+      }
+    />
   );
 }
 
@@ -286,7 +298,6 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
   const c = useColors();
   const toast = useToast();
   const sheet = useSheet();
-  const surface = useSurface();
   const asks = useAskStore();
   const [answered, setAnswered] = useState<AgentQuestion | null>(null);
   const [picking, setPicking] = useState<string | null>(null);
@@ -313,15 +324,16 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
 
   if (q.status === "answered") {
     const who = q.answeredByUserId && q.answeredByUserId !== meId ? dir.memberById.get(q.answeredByUserId)?.name : null;
+    const said = markName(q.answer ?? "");
     return (
-      <View style={[styles.qdone, surface]}>
-        <Icon name="checkc" size={16} color={c.ok} />
-        <Text variant="small" tone="muted" style={styles.shrink}>
-          {who
-            ? t("mobile.chat.question.answered", { name: who, answer: q.answer ?? "" })
-            : t("mobile.chat.question.answeredByYou", { answer: q.answer ?? "" })}
-        </Text>
-      </View>
+      <AskDone
+        done
+        words={
+          who
+            ? t("mobile.chat.question.answered", { name: who, answer: said })
+            : t("mobile.chat.question.answeredByYou", { answer: said })
+        }
+      />
     );
   }
   // A free answer in a sheet: "Outra resposta" beside the choices, or the question's only button.
@@ -454,15 +466,6 @@ const styles = StyleSheet.create({
   hidden: { opacity: 0 },
   flip: { transform: [{ rotate: "180deg" }] },
   pressed: { opacity: 0.85 },
-  done: {
-    marginTop: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 20,
-  },
   origin: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   // A question's answers: full-width rows in the card's strip.
   opts: { gap: 8 },
@@ -477,17 +480,6 @@ const styles = StyleSheet.create({
   },
   optPressed: { transform: [{ scale: 0.98 }] },
   other: { backgroundColor: "transparent", borderWidth: 1 },
-  qdone: {
-    marginTop: 12,
-    alignSelf: "flex-start",
-    maxWidth: "100%",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 13,
-    paddingVertical: 9,
-    borderRadius: 16,
-  },
   tlink: {
     marginTop: 8,
     alignSelf: "flex-start",

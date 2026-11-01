@@ -913,9 +913,10 @@ describe("memory changes and proposals in the chat", () => {
       "prop-1",
       "Só PRs pequenos.",
     ]);
-    // Decided: the settled card takes its place (another element).
+    // Decided: one line takes its place (another element).
     const done = screen().getByRole("group", { name: "Proposta de mudança de Ada" });
-    expect(done.querySelector(".ac-chip--done")?.textContent).toBe("Aceita");
+    expect(done.querySelector(".rq-done__mark[data-done]")).not.toBeNull();
+    expect(done.textContent).toContain("Aceita");
   });
 });
 

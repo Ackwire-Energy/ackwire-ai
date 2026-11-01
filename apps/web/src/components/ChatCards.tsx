@@ -1,10 +1,11 @@
 import type { AgentQuestion, MemoryUpdate, Proposal, SecretRequest } from "@agenteschat/client";
 import { keys, useCardProposals, useDecideProposal, useDecideProposals } from "@agenteschat/client";
-import { formatTime } from "@agenteschat/client/lib/format";
+import { formatTime, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
   appLabel,
   cardHead,
+  cardOutcome,
   cardProposalIds,
   chosenRows,
   firstChange,
@@ -17,10 +18,11 @@ import {
   staleCount,
 } from "@agenteschat/client/lib/proposals";
 import { MAX_SECRET_BYTES, sealSecret, secretAad } from "@agenteschat/client/lib/secret-box";
-import { Button, Chip, Diff, diffLines, Field, Icon, Input, Switch, Textarea } from "@agenteschat/ui";
+import { secretEndedAt, secretOutcome } from "@agenteschat/client/lib/secret-words";
+import { Button, Chip, Diff, diffLines, Field, Icon, Input, MessageText, Switch, Textarea } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -31,7 +33,7 @@ import { AgentAvatar } from "./AgentAvatar";
 import { SiteIcon } from "./browser/SiteIcon";
 import { useChannelActions } from "./channel-actions";
 import { useOrg } from "./org-context";
-import { RequestCard, RequestTile, useExpired } from "./RequestCard";
+import { RequestCard, RequestDone, RequestTile, useExpired } from "./RequestCard";
 import "./proposals.css";
 
 /** The host of a site the request names (`https://host`), or null. */
@@ -251,35 +253,45 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
     );
   }
 
-  // Decided, or overtaken by a newer text: the settled card with the change as it was.
+  // Decided, or overtaken by a newer text: one line, the change as it was behind "Ver a mudança".
   return (
-    // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
-    <div className="ac-approval" role="group" aria-label={t("inlineProposal.group", { name })}>
-      <div className="ac-approval__head">
-        <span className="ac-approval__who">
-          <Trans
-            i18nKey="proposals.proposes"
-            values={{ agent: name, target }}
-            components={{ b: <b /> }}
-            {...TYPED_VALUES}
-          />
-        </span>
-        {p.stale ? (
-          <Chip icon="close">{t("proposals.stale")}</Chip>
-        ) : p.status === "accepted" ? (
-          <Chip icon="check" tone="done">
-            {t("proposals.accepted")}
-          </Chip>
-        ) : (
-          <Chip icon="close">{t("proposals.refused")}</Chip>
-        )}
-      </div>
-      <p className="ac-approval__title">{proposalTitle(t, p, org.name, agentName)}</p>
+    <ProposalDone
+      label={t("inlineProposal.group", { name })}
+      what={<b>{proposalTitle(t, p, org.name, agentName)}</b>}
+      rows={[p]}
+    >
       {isText(p) ? diff : <SettingChange p={p} />}
-      <div className="ac-approval__actions ac-acts">
+      <div className="ac-acts">
         <ProposalsLink agentId={p.agentId} />
       </div>
-    </div>
+    </ProposalDone>
+  );
+}
+
+/** A decided proposal's line: what it was, how it ended and when the last row was decided; the rest when asked for. */
+function ProposalDone({
+  label,
+  what,
+  rows,
+  children,
+}: {
+  label: string;
+  what: ReactNode;
+  rows: Proposal[];
+  children: ReactNode;
+}) {
+  const { t, i18n } = useTranslation();
+  const outcome = cardOutcome(t, rows);
+  // A row overtaken by a newer text was never decided.
+  const at = rows
+    .flatMap((p) => p.decidedAt ?? [])
+    .sort()
+    .at(-1);
+  return (
+    <RequestDone done={outcome.accepted} label={label} more={{ label: t("ask.seeChange"), content: children }}>
+      {outcome.label}: {what}
+      {at && ` · ${whenAt(t, i18n.language, at)}`}
+    </RequestDone>
   );
 }
 
@@ -446,11 +458,7 @@ export function ProposalGroup({ proposalIds }: { proposalIds: string[] }) {
 
   // Decided, or overtaken by a newer text.
   return (
-    // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
-    <div className="ac-approval" role="group" aria-label={label}>
-      <div className="ac-approval__head">
-        <span className="ac-approval__who">{who}</span>
-      </div>
+    <ProposalDone label={label} what={who} rows={rows}>
       {groups.map((section) => (
         <div key={section.rows[0]?.id} className="proposal-section">
           {section.kind === "text" && section.lines.length > 0 && (
@@ -464,10 +472,10 @@ export function ProposalGroup({ proposalIds }: { proposalIds: string[] }) {
           {rowList(section.rows)}
         </div>
       ))}
-      <div className="ac-approval__actions ac-acts">
+      <div className="ac-acts">
         <ProposalsLink agentId={first.agentId} />
       </div>
-    </div>
+    </ProposalDone>
   );
 }
 
@@ -542,25 +550,29 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
       />
     );
   }
-  // Answered: the settled card, who answered and what.
+  // Answered: the question stays in the open as the agent's words; one line says who answered and what.
+  const answerText = current.answer ?? "";
   return (
-    // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
-    <div className="ac-approval ac-approval--done" role="group" aria-label={t("question.group", { agent: name })}>
-      <div className="ac-approval__head">
-        <span className="ac-approval__who">
-          <Trans i18nKey="question.asks" values={{ agent: name }} components={{ b: <b /> }} {...TYPED_VALUES} />
-        </span>
-        <Chip icon="check" tone="done">
-          {t("question.chipDone")}
-        </Chip>
-      </div>
-      <p className="ac-approval__title">{current.text}</p>
-      <p className="small muted" style={{ margin: 0 }}>
-        {who
-          ? t("question.answered", { name: who, answer: current.answer ?? "" })
-          : t("question.answeredByYou", { answer: current.answer ?? "" })}
-      </p>
-    </div>
+    <>
+      <MessageText>{current.text}</MessageText>
+      <RequestDone done label={t("question.group", { agent: name })}>
+        {who ? (
+          <Trans
+            i18nKey="question.answered"
+            values={{ name: who, answer: answerText }}
+            components={{ b: <b /> }}
+            {...TYPED_VALUES}
+          />
+        ) : (
+          <Trans
+            i18nKey="question.answeredByYou"
+            values={{ answer: answerText }}
+            components={{ b: <b /> }}
+            {...TYPED_VALUES}
+          />
+        )}
+      </RequestDone>
+    </>
   );
 }
 
@@ -616,20 +628,6 @@ export function SecretCard({ request }: { request: SecretRequest }) {
     if (new TextEncoder().encode(value).byteLength > MAX_SECRET_BYTES) return setError(t("secret.tooLarge"));
     deliver.mutate(value);
   };
-  const closed: Record<Exclude<SecretRequest["status"], "pending">, { chip: string; line: string }> = {
-    delivered: {
-      chip: t("secret.chipDone"),
-      line: current.deliveredAt
-        ? mine
-          ? t("secret.deliveredByYou", { time: formatTime(i18n.language, current.deliveredAt) })
-          : t("secret.delivered", { person, time: formatTime(i18n.language, current.deliveredAt) })
-        : t("secret.chipDone"),
-    },
-    declined: { chip: t("secret.chipDeclined"), line: t("secret.declined") },
-    expired: { chip: t("secret.chipExpired"), line: t("secret.expired") },
-    canceled: { chip: t("secret.chipCanceled"), line: t("secret.canceled") },
-  };
-  const status = pending ? null : closed[current.status === "pending" ? "expired" : current.status];
   const where =
     current.target.kind === "file"
       ? t("secret.targetFile", { path: current.target.path, agent: agentName })
@@ -711,52 +709,23 @@ export function SecretCard({ request }: { request: SecretRequest }) {
       />
     );
   }
-  // Closed: the settled card, how it ended.
+  // Closed: one line, how it ended and which secret, never its value; what it was for behind "Ver detalhes".
+  const ended = secretEndedAt(current);
   return (
-    // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
-    <div
-      className="ac-approval ac-approval--done secret-card"
-      role="group"
-      aria-label={t("secret.group", { agent: agentName })}
-    >
-      <div className="ac-approval__head">
-        <span className="ac-approval__who">
-          {mine ? (
-            <Trans i18nKey="secret.asks" values={{ agent: agentName }} components={{ b: <b /> }} {...TYPED_VALUES} />
-          ) : (
-            <Trans
-              i18nKey="secret.asksPerson"
-              values={{ agent: agentName, person }}
-              components={{ b: <b /> }}
-              {...TYPED_VALUES}
-            />
-          )}
-        </span>
-        {status && (
-          <Chip
-            icon={current.status === "delivered" ? "check" : "close"}
-            tone={current.status === "delivered" ? "done" : "neutral"}
-          >
-            {status.chip}
-          </Chip>
-        )}
-      </div>
-      <p className="ac-approval__title">
-        <code>{current.name}</code> · {current.purpose}
-      </p>
-      <p className="small muted" style={{ margin: 0 }}>
-        {where}
-      </p>
-      {status && (
-        <p className="small muted" style={{ margin: 0 }}>
-          {status.line}
-        </p>
-      )}
+    <>
+      <RequestDone
+        done={current.status === "delivered"}
+        label={t("secret.group", { agent: agentName })}
+        more={{ label: t("approval.seeDetails"), content: `${current.purpose}\n${where}` }}
+      >
+        {secretOutcome(t, current, mine, person)}: <b>{current.name}</b>
+        {ended && ` · ${whenAt(t, i18n.language, ended)}`}
+      </RequestDone>
       {error && (
-        <p className="small muted" role="alert" style={{ margin: 0 }}>
+        <p className="rq__error" role="alert">
           {error}
         </p>
       )}
-    </div>
+    </>
   );
 }

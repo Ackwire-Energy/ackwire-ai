@@ -194,7 +194,11 @@ describe("Canal", () => {
     await settle(4);
     expect(state.calls.find((c) => c.method === "approvals.approve")?.args).toEqual([ORG_ID, "ap-merge", undefined]);
     const done = screen().getByRole("group", { name: "Aprovação concluída" });
-    expect(done.textContent).toContain("Aprovado por você · agora");
+    expect(done.textContent).toContain("Aprovado por você: Merge PR #42 into main");
+    expect(done.querySelector(".rq-done__text b")?.textContent).toBe("Merge PR #42 into main");
+    expect(done.querySelector(".rq-done__mark[data-done]")).not.toBeNull();
+    // Nothing behind the line: no reason to show.
+    expect(within(done).queryByRole("button")).toBeNull();
     // Someone else refuses another approval: the event updates the card live.
     const deploy = {
       ...state.approvals[1],
@@ -275,8 +279,47 @@ describe("Canal", () => {
     await until(expiresAt);
     await settle(2);
     expect(document.querySelector('[data-ask-id="ap-merge"]')).toBeNull();
-    expect(screen().getByRole("group", { name: "Pedido expirado" }).textContent).toContain("Expirou");
+    const expired = screen().getByRole("group", { name: "Pedido expirado" });
+    expect(expired.textContent).toContain("Expirou");
+    expect(expired.querySelector(".rq-done__mark[data-done]")).toBeNull();
   }, 15_000);
+
+  test("a refused request is one line: 'Ver detalhes' opens its reason under the line and closes it", async () => {
+    const state = seedState();
+    const merge = state.approvals.find((a) => a.id === "ap-merge");
+    if (merge)
+      Object.assign(merge, {
+        status: "refused",
+        decidedByUserId: "u-walter",
+        decidedAt: new Date().toISOString(),
+        reason: "Falta a revisão.",
+      });
+    await open(state);
+    await settle(2);
+    const line = screen().getByRole("group", { name: "Pedido recusado" });
+    expect(line.textContent).toContain("Recusado por você: Merge PR #42 into main");
+    expect(line.querySelector(".rq-done__mark[data-done]")).toBeNull();
+    expect(line.textContent).not.toContain("Falta a revisão.");
+    const see = within(line).getByRole("button", { name: "Ver detalhes" });
+    expect(see.getAttribute("aria-expanded")).toBe("false");
+    await act(async () => fireEvent.click(see));
+    expect(see.getAttribute("aria-expanded")).toBe("true");
+    expect(line.querySelector(".rq__details")?.textContent).toBe("Motivo: Falta a revisão.");
+    await act(async () => fireEvent.click(see));
+    expect(see.getAttribute("aria-expanded")).toBe("false");
+    expect(line.querySelector(".rq__details")).toBeNull();
+  });
+
+  test("a request whose run stopped reads as canceled, not as refused by no one", async () => {
+    const state = seedState();
+    const merge = state.approvals.find((a) => a.id === "ap-merge");
+    if (merge) Object.assign(merge, { status: "canceled", decidedAt: new Date().toISOString() });
+    await open(state);
+    await settle(2);
+    const line = screen().getByRole("group", { name: "Pedido cancelado" });
+    expect(line.textContent).toContain("Cancelado: Merge PR #42 into main");
+    expect(line.querySelector(".rq-done__mark[data-done]")).toBeNull();
+  });
 
   test("not a member of a public channel: join instead of the composer", async () => {
     const state = seedState();
