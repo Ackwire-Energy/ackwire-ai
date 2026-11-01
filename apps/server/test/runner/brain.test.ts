@@ -203,6 +203,36 @@ test("parser: partial deltas, our tool calls with results, usage, and the final 
   expect(p.session).toBe(SESSION(1));
 });
 
+test("parser: a streamed message said again in a later assistant event (with its tool call) adds no text", () => {
+  const p = new ClaudeStreamParser();
+  p.beginTurn();
+  const stream = (event: Record<string, unknown>) =>
+    p.push(line({ type: "stream_event", parent_tool_use_id: null, event })).events;
+  stream({ type: "message_start", message: { id: "msg_1" } });
+  expect(stream({ type: "content_block_delta", delta: { type: "text_delta", text: "Vou olhar." } })).toEqual([
+    { type: "text_delta", text: "Vou olhar." },
+  ]);
+  const assistant = (content: unknown[]) =>
+    p.push(line({ type: "assistant", parent_tool_use_id: null, message: { id: "msg_1", content } })).events;
+  expect(assistant([{ type: "text", text: "Vou olhar." }])).toEqual([]);
+  expect(
+    assistant([
+      { type: "text", text: "Vou olhar." },
+      { type: "tool_use", id: "t1", name: "Bash", input: { command: "ls" } },
+    ]),
+  ).toEqual([]);
+  // The next API message, never streamed (no partials for it): its text comes whole.
+  expect(
+    p.push(
+      line({
+        type: "assistant",
+        parent_tool_use_id: null,
+        message: { id: "msg_2", content: [{ type: "text", text: "Vou olhar." }] },
+      }),
+    ).events,
+  ).toEqual([{ type: "text_delta", text: "Vou olhar." }]);
+});
+
 test("parser: without partial messages the assistant text comes whole", () => {
   const p = new ClaudeStreamParser();
   p.beginTurn();

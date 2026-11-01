@@ -397,6 +397,10 @@ export class CodexAppMapper {
   private answer?: string;
   /** Agent messages streamed so far (by item id): a message that came whole is sent whole. */
   private readonly streamed = new Set<string>();
+  /** Streamed messages not completed yet: their text, by item id. */
+  private readonly open = new Map<string, string>();
+  /** Messages already sent whole (by item id): Codex may complete one twice. */
+  private readonly sentWhole = new Set<string>();
   private lastDeltaItem: string | null = null;
   private anyText = false;
   /** The thread's totals before this `brain.turn`, and now. */
@@ -433,6 +437,7 @@ export class CodexAppMapper {
     const delta = str(params.delta);
     if (!delta) return "";
     this.streamed.add(itemId);
+    this.open.set(itemId, (this.open.get(itemId) ?? "") + delta);
     return this.textOf(itemId, delta);
   }
 
@@ -446,7 +451,20 @@ export class CodexAppMapper {
         const t = str(item.text);
         if (!t.trim()) return { events: [] };
         this.answer = this.clean(t);
-        return this.streamed.has(id) ? { events: [] } : { events: [], text: this.textOf(id, t) };
+        if (this.streamed.has(id)) {
+          this.open.delete(id);
+          return { events: [] };
+        }
+        if (this.sentWhole.has(id)) return { events: [] };
+        // Codex runs tool calls while the reply still streams, and the message's completion can come after them
+        // under another id than its deltas': the streamed message with the same text is this one, not a new one.
+        for (const [streamedId, text] of this.open) {
+          if (text.trim() !== t.trim()) continue;
+          this.open.delete(streamedId);
+          return { events: [] };
+        }
+        this.sentWhole.add(id);
+        return { events: [], text: this.textOf(id, t) };
       }
       case "commandExecution":
         return {

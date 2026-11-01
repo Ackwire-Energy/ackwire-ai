@@ -1990,6 +1990,7 @@ export const ptBR = {
   },
   question: {
     answer: "Responder",
+    placeholder: "Sua resposta",
     answered: "Respondida por {{name}}: <b>{{answer}}</b>",
     answeredByYou: "Você respondeu: <b>{{answer}}</b>",
     chip: "Esperando resposta",

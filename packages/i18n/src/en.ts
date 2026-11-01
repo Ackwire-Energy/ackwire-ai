@@ -1973,6 +1973,7 @@ export const en: Translations = {
   },
   question: {
     answer: "Answer",
+    placeholder: "Your answer",
     answered: "Answered by {{name}}: <b>{{answer}}</b>",
     answeredByYou: "You answered: <b>{{answer}}</b>",
     chip: "Waiting for an answer",

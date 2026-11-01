@@ -235,7 +235,7 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
     expect(box.value).toContain("@ada");
   });
 
-  test("a question card in the panel keeps its button: 'Responder' closes it for the channel's composer", async () => {
+  test("a question card in the panel answers in place: 'Responder' opens its field there", async () => {
     const c = consultation({ waiting: "input" });
     const asks: Message = {
       id: "msg-atlas-question",
@@ -262,7 +262,7 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
       },
       createdAt: ago(20),
     };
-    await open(withTalk(withAsk([c]), c, [asks]));
+    const { state } = await open(withTalk(withAsk([c]), c, [asks]));
     const line = within(group() as HTMLElement).getByRole("button", { name: /Atlas espera uma resposta/ });
     await act(async () => fireEvent.click(line));
     await settle(3);
@@ -270,8 +270,17 @@ describe("the questions inside the reply that asked (ConsultGroup)", () => {
     expect(side.textContent).toContain("Uso a fonte paga para a curva?");
     await act(async () => fireEvent.click(within(side).getByRole("button", { name: "Responder" })));
     await settle(1);
-    expect(panel()).toBeNull();
-    expect(document.activeElement).toBe(screen().getByRole("combobox", { name: "Mensagem para #eng" }));
+    const field = within(side).getByRole("textbox", { name: "Sua resposta" });
+    expect(document.activeElement).toBe(field);
+    await act(async () => fireEvent.change(field, { target: { value: "Pode usar" } }));
+    await act(async () => fireEvent.keyDown(field, { key: "Enter" }));
+    await settle(4);
+    // The answer goes to the question itself, from the panel (the fake keeps the agents' DM elsewhere).
+    expect(state.calls.find((call) => call.method === "questions.answer")?.args).toEqual([
+      ORG_ID,
+      "aq1",
+      { text: "Pode usar" },
+    ]);
   });
 
   test("a card the consulted agent posts here says whom it helps, and opens the conversation", async () => {

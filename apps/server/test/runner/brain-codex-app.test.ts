@@ -615,3 +615,32 @@ test("a refusal known by its words after a command says the turn worked", () => 
     worked: true,
   });
 });
+
+test("an agent message is sent once: its completion after tool calls, under another id or twice, adds nothing", () => {
+  const m = new CodexAppMapper({ cwd: "" });
+  const said = "Vou procurar a integração e consultar os gastos.";
+  const sent: string[] = [];
+  const text = (t: string | undefined) => t && sent.push(t);
+  text(m.delta({ itemId: "msg_a", delta: said.slice(0, 10) }));
+  text(m.delta({ itemId: "msg_a", delta: said.slice(10) }));
+  // Codex runs the calls while the reply still streams; the message completes after them, with another id.
+  for (const id of ["c1", "c2", "c3"])
+    m.completed({ id, type: "commandExecution", command: "curl -s x", aggregatedOutput: "", status: "completed" });
+  text(m.completed({ id: "item_7", type: "agentMessage", text: said }).text);
+  text(m.completed({ id: "msg_a", type: "agentMessage", text: said }).text);
+  expect(sent.join("")).toBe(said);
+  // A message that came whole, completed twice: once.
+  text(m.completed({ id: "msg_b", type: "agentMessage", text: "Achei a chave." }).text);
+  text(m.completed({ id: "msg_b", type: "agentMessage", text: "Achei a chave." }).text);
+  expect(sent.join("")).toBe(`${said}\n\nAchei a chave.`);
+});
+
+test("two different messages that read alike are both sent", () => {
+  const m = new CodexAppMapper({ cwd: "" });
+  const sent: string[] = [];
+  for (const id of ["msg_1", "msg_2"]) {
+    sent.push(m.delta({ itemId: id, delta: "Feito." }));
+    expect(m.completed({ id, type: "agentMessage", text: "Feito." }).text).toBeUndefined();
+  }
+  expect(sent.join("")).toBe("Feito.\n\nFeito.");
+});
