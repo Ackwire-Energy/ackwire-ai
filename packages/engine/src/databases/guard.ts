@@ -1,5 +1,5 @@
 import { parse } from "libpg-query";
-import { identPath, parseIdentPath, quoteIdent } from "./identifiers";
+import { identPath, parseIdentPath, quoteIdent, tableRuleNames } from "./identifiers";
 
 /**
  * What an agent's SQL may be (ADR 0039), checked with Postgres's own parser
@@ -132,14 +132,24 @@ export function relationName(name: string): RelationName | null {
 export const allowedRelations = (tables: string[]) =>
   new Set(tables.map(relationName).filter((n): n is RelationName => n !== null));
 
+/** Whether `allowedRelations` lets the agent read one table (empty = every table). */
+export const relationAllowed = (allowed: Set<string>, schema: string, table: string) =>
+  allowed.size === 0 || tableRuleNames(schema, table).some((n) => allowed.has(n));
+
 /**
  * The hidden columns of one table, matched case-insensitively: rules saved before names were kept exact are
- * lowercase, and hiding a column that differs only in case is the safe side.
+ * lowercase, and hiding a column that differs only in case is the safe side. A stored entry that doesn't parse
+ * hides its last part on every table rather than nothing.
  */
 export function hiddenColumnsOf(hiddenColumns: string[], schema: string, table: string): string[] {
   return hiddenColumns.flatMap((h) => {
-    const [s = "", t = "", column = ""] = parseIdentPath(h, 3) ?? [];
-    return column && lower(s) === lower(schema) && lower(t) === lower(table) ? [column] : [];
+    const parts = parseIdentPath(h, 3);
+    if (!parts) {
+      const last = h.slice(h.lastIndexOf(".") + 1).trim();
+      return last ? [last] : [];
+    }
+    const [s = "", t = "", column = ""] = parts;
+    return lower(s) === lower(schema) && lower(t) === lower(table) ? [column] : [];
   });
 }
 
@@ -246,7 +256,7 @@ export async function guardSql(text: string, rules: SqlRules): Promise<GuardResu
   for (const r of resolved) {
     if (BLOCKED_RELATIONS.has(r.name)) return { ok: false, reason: `${r.name} is not allowed (it holds data values).` };
     if (CATALOG_SCHEMAS.has(r.schema)) continue;
-    if (allowed.size > 0 && !allowed.has(r.name))
+    if (!relationAllowed(allowed, r.schema, r.table))
       return {
         ok: false,
         reason: `Not allowed: this agent may only read the tables ${[...allowed].join(", ")}.`,
@@ -279,7 +289,8 @@ export async function guardSql(text: string, rules: SqlRules): Promise<GuardResu
       const last = ref.at(-1);
       if (last && hidden.has(lower(last)))
         return { ok: false, reason: `The column ${quoteIdent(last)} is hidden from this agent (${list}).` };
-      if (ref.length === 1 && last && rowNames.has(lower(last)))
+      // `t`, `dbo.t` or `(dbo.t).col`: the whole row of a table (a column named like its table is refused too).
+      if (last && rowNames.has(lower(last)))
         return { ok: false, reason: `Some columns are hidden from this agent (${list}); name the columns you need.` };
     }
   }

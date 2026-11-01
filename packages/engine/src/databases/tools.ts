@@ -13,7 +13,7 @@ import {
   markDatabaseNeedsReconnect,
   orgDbConnections,
 } from "./connections";
-import { allowedRelations, guardSql, hiddenColumnsOf, relationName } from "./guard";
+import { allowedRelations, guardSql, hiddenColumnsOf, relationAllowed } from "./guard";
 import { identPath, parseIdentPath, quoteIdent } from "./identifiers";
 import { agentDatabasePolicies, type DatabasePolicy } from "./policies";
 import { formatRows, MAX_ROWS, wrapRows } from "./text";
@@ -163,9 +163,7 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
           try {
             const client = await clientFor({ ...deps, db: ctx.db }, connection);
             const rows = await client.readOnly(CATALOG_LIMITS, async (run) => (await run(LIST_TABLES_SQL)).rows);
-            const visible = rows.filter(
-              (r) => allowed.size === 0 || allowed.has(identPath([String(r[0]), String(r[1])])),
-            );
+            const visible = rows.filter((r) => relationAllowed(allowed, String(r[0]), String(r[1])));
             await log(ctx.db, ctx, connection, {
               kind: "list_tables",
               statement: "list tables",
@@ -188,10 +186,12 @@ export function createDatabaseToolSource(deps: DatabaseToolDeps): ToolSource {
       },
     );
 
-    const tableAllowed = (table: string): CallCheck =>
-      allowed.size > 0 && !allowed.has(relationName(table) ?? "")
+    const tableAllowed = (table: string): CallCheck => {
+      const [schemaName, tableName] = parseIdentPath(table, 2) ?? [];
+      return allowed.size > 0 && !(schemaName && tableName && relationAllowed(allowed, schemaName, tableName))
         ? { ok: false, message: `Not allowed: this agent may only read the tables ${[...allowed].join(", ")}.` }
         : { ok: true };
+    };
 
     const describeTable = make(
       "describe_table",
