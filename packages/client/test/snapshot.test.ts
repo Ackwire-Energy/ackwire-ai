@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { QueryClient } from "@tanstack/react-query";
 import type { Me, Message, SnapshotStorage } from "../src/index";
-import { createSnapshot, keys, SNAPSHOT_MAX_AGE_MS, SNAPSHOT_VERSION } from "../src/index";
+import { createSnapshot, keys, MISSIONS_WAITING_COUNT, SNAPSHOT_MAX_AGE_MS, SNAPSHOT_VERSION } from "../src/index";
 import { recentConversations } from "../src/lib/recent";
 
 const memory = () => {
@@ -42,6 +42,11 @@ test("keeps the lists and the latest messages of a chat, without anything off th
   qc.setQueryData(keys.me, me("u1"));
   qc.setQueryData(keys.channels("o1"), [{ id: "c1" }]);
   qc.setQueryData(keys.sidebarItems("o1"), { wiki: "always" });
+  qc.setQueryData(keys.overview("o1"), { approvalsWaitingForMe: 2 });
+  const waiting = keys.missionList("o1", JSON.stringify(MISSIONS_WAITING_COUNT));
+  qc.setQueryData(waiting, { missions: [], counts: { waitingYou: 1 } });
+  const missoes = keys.missionList("o1", JSON.stringify({ status: "open" }));
+  qc.setQueryData(missoes, { missions: [], counts: { waitingYou: 1 } });
   qc.setQueryData(keys.credentials("o1"), [{ id: "secret" }]);
   const many = Array.from({ length: 60 }, (_, i) => msg(`m${i}`));
   qc.setQueryData(keys.messages("o1", "c1"), [...many, msg("local", { local: "pending" })]);
@@ -51,8 +56,12 @@ test("keeps the lists and the latest messages of a chat, without anything off th
   expect(await createSnapshot(next, store).restore()).toBe(true);
   expect(next.getQueryData<Me>(keys.me)?.user.id).toBe("u1");
   expect(next.getQueryData(keys.channels("o1"))).toEqual([{ id: "c1" }]);
-  // Where I put the sidebar's tools: they don't move when the server answers.
+  // Where I put the sidebar's tools and the counts that list one "when there's something": none moves in when the
+  // server answers. The Missões tab's lists aren't kept.
   expect(next.getQueryData(keys.sidebarItems("o1"))).toEqual({ wiki: "always" });
+  expect(next.getQueryData(keys.overview("o1"))).toEqual({ approvalsWaitingForMe: 2 });
+  expect(next.getQueryData(waiting)).toEqual({ missions: [], counts: { waitingYou: 1 } });
+  expect(next.getQueryData(missoes)).toBeUndefined();
   expect(next.getQueryData(keys.credentials("o1"))).toBeUndefined();
   const kept = next.getQueryData<Message[]>(keys.messages("o1", "c1")) ?? [];
   expect(kept).toHaveLength(50);

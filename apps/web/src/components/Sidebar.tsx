@@ -9,6 +9,7 @@ import type {
 } from "@agenteschat/client";
 import {
   agentStateIn,
+  MISSIONS_WAITING_COUNT,
   runningAgents,
   useAgentGroups,
   useAgentStatuses,
@@ -220,7 +221,7 @@ export function Sidebar() {
     lastUnread.current = unreadNotifications;
   }, [unreadNotifications]);
   // Threads: how many open missions wait for me (the server counts: a decision, a review, a suggestion…).
-  const missionList = useMissionList(orgId, { status: "waiting_you", limit: 1 });
+  const missionList = useMissionList(orgId, MISSIONS_WAITING_COUNT);
   const missionsWaiting = missionList.data?.counts.waitingYou ?? 0;
   // The tools on top, each where I put it (the rest in More); one there "when there's something" while its count is.
   const sidebarItems = useSidebarItems(orgId).data;
