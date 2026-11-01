@@ -449,23 +449,27 @@ test.if(posix)(
   },
 );
 
-test.if(posix)("our tool calls arrive executed; the bridge relays them for the run that is thinking now", async () => {
-  const { m, spawns, turn } = setup();
-  const pending = turn(1, "SLOW TOOL");
-  await waitFor(() => spawns().length === 1);
-  const args = spawns()[0]?.args ?? [];
-  const config = JSON.parse(readFileSync(args[args.indexOf("--mcp-config") + 1] as string, "utf8")) as {
-    mcpServers: { agentes: { args: string[] } };
-  };
-  const bridgeId = config.mcpServers.agentes.args.at(-1) as string;
-  expect(m.mcpTask(bridgeId)).toMatchObject({ running: true, runId: RUN(1), serverToken: `agr_${"t".repeat(24)}1` });
-  const { events } = await pending;
-  expect(events.filter((e) => e.type === "tool_call")).toEqual([
-    { type: "tool_call", id: "t1", name: "search_context", input: { query: "x" }, executed: { content: "found it" } },
-  ]);
-  expect(m.mcpTask(bridgeId)).toMatchObject({ running: false });
-  expect(m.mcpTask(bridgeId)?.runId).toBeUndefined();
-});
+test.if(posix)(
+  "tool calls arrive executed, Claude Code's own too; the bridge relays ours for the run thinking now",
+  async () => {
+    const { m, spawns, turn } = setup();
+    const pending = turn(1, "SLOW TOOL");
+    await waitFor(() => spawns().length === 1);
+    const args = spawns()[0]?.args ?? [];
+    const config = JSON.parse(readFileSync(args[args.indexOf("--mcp-config") + 1] as string, "utf8")) as {
+      mcpServers: { agentes: { args: string[] } };
+    };
+    const bridgeId = config.mcpServers.agentes.args.at(-1) as string;
+    expect(m.mcpTask(bridgeId)).toMatchObject({ running: true, runId: RUN(1), serverToken: `agr_${"t".repeat(24)}1` });
+    const { events } = await pending;
+    expect(events.filter((e) => e.type === "tool_call")).toEqual([
+      { type: "tool_call", id: "t1", name: "search_context", input: { query: "x" }, executed: { content: "found it" } },
+      { type: "tool_call", id: "t2", name: "Bash", input: { command: "ls" }, executed: { content: "a.txt" } },
+    ]);
+    expect(m.mcpTask(bridgeId)).toMatchObject({ running: false });
+    expect(m.mcpTask(bridgeId)?.runId).toBeUndefined();
+  },
+);
 
 test.if(posix)(
   "two turns on one process: each turn's calls carry its own run and token; between turns the list waits quietly",
