@@ -508,15 +508,12 @@ html:not([data-pointer]) .brw-key:focus-visible {
 .brw-ac {
   position: relative;
   margin-top: 6px;
-  max-width: 720px;
+  max-width: var(--msg-card-w);
   border-radius: 18px;
   background: var(--raised);
   box-shadow: var(--e1), var(--top);
   overflow: hidden;
   animation: brw-grow-in 0.24s var(--out);
-}
-.brw-ac:not(.is-open) {
-  max-width: var(--msg-card-w);
 }
 .brw-ac__hint {
   color: var(--faint);

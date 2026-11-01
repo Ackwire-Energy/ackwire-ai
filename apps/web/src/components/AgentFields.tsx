@@ -116,7 +116,13 @@ export function ModelSelect({
  * Key choices by their provider's mark: the workspace default first (with its masked hint), then the other
  * stored keys.
  */
-export function keyOptions(t: TFunction, credentials: Credential[], defaultId: string | null): SelectOption[] {
+/** `provider`: whose key the default would be when the workspace has none set (the chosen model's maker). */
+export function keyOptions(
+  t: TFunction,
+  credentials: Credential[],
+  defaultId: string | null,
+  provider?: string,
+): SelectOption[] {
   const live = credentials.filter((c) => !c.revokedAt);
   const def = live.find((c) => c.id === defaultId);
   return [
@@ -126,13 +132,14 @@ export function keyOptions(t: TFunction, credentials: Credential[], defaultId: s
       description: def
         ? t("newAgent.defaultKeyDesc", { provider: providerLabel(def.provider), hint: def.keyHint })
         : undefined,
-      leading: def ? (
-        <ProviderLogo id={def.provider} size="sm" />
-      ) : (
-        <span className="newag__ib">
-          <Icon name="key" size={16} />
-        </span>
-      ),
+      leading:
+        def || provider ? (
+          <ProviderLogo id={def?.provider ?? provider ?? ""} size="sm" />
+        ) : (
+          <span className="newag__ib">
+            <Icon name="key" size={16} />
+          </span>
+        ),
     },
     ...live
       .filter((c) => c.id !== defaultId)
@@ -471,7 +478,7 @@ function ModelCard({
         </span>
       ) : (
         <span className="newag__cost">
-          <Icon name="key" size={14} />
+          <ProviderLogo id={provider} size="xs" />
           {t("newAgent.noKeyFor", providerGrammar(t, provider))}
         </span>
       )}

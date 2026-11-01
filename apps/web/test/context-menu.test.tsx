@@ -96,7 +96,7 @@ describe("one list, two looks", () => {
 });
 
 describe("right click on a message", () => {
-  test("in the app: our menu with reactions, Responder, Copiar texto, Copiar link, Salvar na wiki", async () => {
+  test("in the app: our menu with reactions, Responder, Copiar texto, Copiar link, Fixar, Salvar na wiki", async () => {
     inTheApp();
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState()) });
     await settle(8);
@@ -107,8 +107,20 @@ describe("right click on a message", () => {
     expect(
       within(menu)
         .getAllByRole("menuitem")
-        .map((i) => i.textContent),
-    ).toEqual(["👍", "🎉", "👀", "✅", "❤️", "Responder", "Copiar texto", "Copiar link", "Salvar na wiki"]);
+        .map((i) => i.getAttribute("aria-label") ?? i.textContent),
+    ).toEqual([
+      "👍",
+      "🎉",
+      "👀",
+      "✅",
+      "❤️",
+      "Adicionar reação",
+      "Responder",
+      "Copiar texto",
+      "Copiar link",
+      "Fixar mensagem",
+      "Salvar na wiki",
+    ]);
 
     await act(async () => fireEvent.click(within(menu).getByRole("menuitem", { name: "Copiar link" })));
     await settle(2);
@@ -135,13 +147,19 @@ describe("right click on a message", () => {
     expect(copied.length).toBe(before);
   });
 
-  test("in the browser: the browser's own menu", async () => {
+  test("in the browser: a message gets our menu too; empty space keeps the browser's", async () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState()) });
     await settle(8);
-    const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
-    await act(async () => void messageOf("o login está devolvendo 401").dispatchEvent(event));
-    expect(event.defaultPrevented).toBe(false);
+    const page = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    await act(async () => void document.body.dispatchEvent(page));
+    expect(page.defaultPrevented).toBe(false);
     expect(screen().queryByRole("menu")).toBeNull();
+    const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 40, clientY: 60 });
+    await act(async () => void messageOf("o login está devolvendo 401").dispatchEvent(event));
+    await settle(2);
+    expect(event.defaultPrevented).toBe(true);
+    const menu = screen().getByRole("menu", { name: "Ações" });
+    expect(within(menu).getByRole("menuitem", { name: "Fixar mensagem" })).toBeTruthy();
   });
 });
 

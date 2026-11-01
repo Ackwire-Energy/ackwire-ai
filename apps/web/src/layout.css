@@ -896,6 +896,15 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 }
 /* Turns are told apart by space: ~10px between messages; the same author
    within 5 minutes continues the row above. */
+/* A message that @mentions the viewer: a tinted row with an accent bar on its left edge. */
+.channel__messages .ac-msg--mentions-me {
+  background: color-mix(in srgb, var(--attention) 9%, transparent);
+  box-shadow: inset 2px 0 0 var(--attention);
+  border-radius: 0 14px 14px 0;
+}
+.channel__messages .ac-msg--mentions-me:hover {
+  background: color-mix(in srgb, var(--attention) 13%, transparent);
+}
 .channel__messages > .ac-msg + .ac-msg:not(.ac-msg--grouped) {
   margin-top: 6px;
 }
@@ -5756,6 +5765,10 @@ html:not([data-pointer]) .run-continue:focus-visible {
   background: var(--glass-solid);
   box-shadow: var(--e1), var(--top);
 }
+/* Faces opening the pill sit as far in as the globe's ink at the other end. */
+.ac-typing[data-active="true"]:has(> .ac-typing__avatars):not(:has(> .ac-typing__dots, > .ac-pixspin)) {
+  padding-left: 7px;
+}
 /* An agent in its browser: the whole pill opens the live view; the globe says so. */
 .ac-typing[data-browser="true"] {
   cursor: pointer;
@@ -8965,8 +8978,14 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   gap: 16px;
   min-width: 0;
 }
+/* 12px above and below, as the attention tiles (`.agp-attn`): the head's 32px row (its ghost button) reaches 6px into
+   the padding, so the title still sits 12px in. */
 .agp-card.ac-card {
   gap: 12px;
+  padding-block: 12px;
+}
+.agp-card > .ac-card__head:first-child {
+  margin-block: -6px -2px;
 }
 /* Something changed in it: a bar on its left edge, inside the card's line. */
 .agp-card[data-changed] {
@@ -8976,7 +8995,7 @@ html:not([data-pointer]) .agp-cell:focus-visible {
 }
 /* "Como trabalha" isn't a `Card`: the same face as the root card beside it. */
 .agp-aside__work {
-  padding: 20px;
+  padding: 12px 20px;
   border-radius: var(--radius-section) var(--radius-section) var(--radius-section) 4px;
   background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised) 64px);
   box-shadow: var(--card-shadow);

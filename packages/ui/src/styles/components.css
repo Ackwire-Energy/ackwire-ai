@@ -907,7 +907,7 @@ textarea.ac-input {
  * (code, a quote, "Leu seu recado") is `--msg-well`, darker than the row whether it is hovered or not.
  */
 :root {
-  --msg-card-w: 560px;
+  --msg-card-w: 640px;
 }
 .ac-msg > * {
   --raised: var(--raised-2);
@@ -1100,8 +1100,29 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   color: var(--ink);
   background: var(--surface-sunken);
   font-weight: 600;
-  padding: 0 3px;
-  border-radius: var(--radius-cut);
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+}
+/* A face before an agent's name in a line of text: text-sized, centred on the capitals. `font-size: inherit` keeps
+   `em` on the line's size, not the avatar's own 9px. */
+.ac-who {
+  white-space: nowrap;
+}
+.ac-who > .ac-avatar {
+  font-size: inherit;
+  display: inline-block;
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: calc(var(--cap-top) - var(--cap-mid) - 0.575em);
+  margin-right: 0.25em;
+}
+.ac-who > b {
+  font-weight: inherit;
+  color: var(--ink);
+}
+.ac-mention--me {
+  color: var(--attention);
+  background: color-mix(in srgb, var(--attention) 18%, transparent);
 }
 /* With Markdown blocks, the cursor follows the last block's text. */
 .ac-msg--streaming .ac-msg__text:has(> .md)::after {
@@ -4676,19 +4697,18 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   background: var(--plate);
 }
 /*
- * A raised bar of 32px ghost icon buttons at the end of the row's first line: react, reply, more. Hidden at rest,
- * shown on hover and on keyboard focus inside the row. Its middle is on that line's capitals, as the receipt's
- * check's is, and it stands left of the check. So it only reaches into the room between rows: never over the row
- * above, still in view at the top of a scrolled list, and clear of a receipt's line under the text.
+ * A small raised bar of 26px ghost icon buttons: react, reply, more. Hidden at rest, shown on hover and on keyboard
+ * focus inside the row. Its middle sits on the row's top edge, so half of it is in the gap above and it never covers
+ * the first line of text.
  */
 .ac-msg__actions {
-  /* The name's 20px line starts at the row's 6px padding (`.ac-msg__head`): its capitals' middle. */
-  top: calc(16px - var(--cap-mid));
-  right: 10px;
+  top: 0;
+  right: 12px;
   z-index: var(--z-sticky);
-  padding: 3px;
+  gap: 0;
+  padding: 2px;
   border: 0;
-  border-radius: 13px;
+  border-radius: 10px;
   background: var(--raised);
   box-shadow: var(--e2);
   /* Placed by its middle (-50%), 4px lower at rest. One transform: the build's minifier (Lightning CSS) drops a
@@ -4704,21 +4724,22 @@ html:not([data-pointer]) .ac-hint:focus-visible {
 .ac-msg__actions:has([aria-expanded="true"]) {
   transform: translateY(-50%);
 }
-/* A grouped row's first line is its text's, under the text's 2px margin (`.ac-msg__text`, 26.35px lines). */
 .ac-msg--grouped > .ac-msg__body > .ac-msg__actions {
-  top: calc(4px + 13.175px - var(--cap-mid));
-}
-/* A grouped row with a line under its text: under one line of text, the room between that line and the row above's
-   last one (6px up) is 38.35px, so the bar (38px, on touch too) takes that room's middle. */
-.ac-msg--grouped:has(> .ac-msg__body > .ac-msg__foot:not(:empty)) > .ac-msg__body > .ac-msg__actions {
-  top: 13.175px;
+  top: 0;
 }
 /* Left of the check (20px wide), 8px from it, past the row's side padding. */
 .ac-msg:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
   right: calc(var(--msg-inline) + 28px);
 }
 .ac-msg__actions .ac-btn--sm {
-  min-width: 32px;
+  min-width: 26px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+}
+.ac-msg__actions .ac-btn--sm .ac-icon {
+  width: 16px;
+  height: 16px;
 }
 /* The row being hovered stays above its neighbours, so its bar is never under the next row. */
 .ac-msg:hover,

@@ -36,7 +36,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { choiceOf, defaultPolicy, MAIL_ACTIONS, toMailLevel } from "@agenteschat/client/lib/mail";
 import { planOfKind } from "@agenteschat/client/lib/no-ai";
 import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
-import { AUTO, isAuto, modelChoices, usableModels } from "@agenteschat/client/lib/providers";
+import { AUTO, apiProviderOf, isAuto, modelChoices, usableModels } from "@agenteschat/client/lib/providers";
 import { scopeText } from "@agenteschat/client/lib/scopes";
 import {
   AffixInput,
@@ -55,6 +55,7 @@ import {
   Kbd,
   Logo,
   modKey,
+  ProviderLogo,
   prefersReducedMotion,
   randomAppearance,
   SettingNote,
@@ -450,7 +451,12 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
       : isAuto(model)
         ? t("brain.auto.label")
         : (modelInfo?.label ?? model);
-  const keys = keyOptions(t, credentials.data ?? [], settings.data?.defaultCredentialId ?? null);
+  const apiProvider = apiProviderOf(model, models.data?.models ?? []);
+  const keys = keyOptions(t, credentials.data ?? [], settings.data?.defaultCredentialId ?? null, apiProvider);
+  // The key's maker: the one picked, else the workspace's default key, else the model's.
+  const keyProvider =
+    (credentials.data ?? []).find((c) => c.id === (key === DEFAULT_KEY ? settings.data?.defaultCredentialId : key))
+      ?.provider ?? apiProvider;
   const keyLabel = keys.find((k) => k.value === key)?.label ?? t("newAgent.defaultKey");
   const granted = connectedList.filter((i) => (levels[i.id] ?? "none") !== "none");
   const grantedMail = mailboxes.filter((a) => (mailLevels[a.id] ?? "none") !== "none");
@@ -1305,7 +1311,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
           {errorLine(errorOf("model"))}
           <div className="newag__sect">
             <h2>
-              <Icon name="key" />
+              {keyProvider ? <ProviderLogo id={keyProvider} size="xs" /> : <Icon name="key" />}
               {t("newAgent.key")}
             </h2>
           </div>

@@ -69,7 +69,14 @@ import {
   useWikiTree,
 } from "@agenteschat/client";
 import { actionCardOf } from "@agenteschat/client/lib/action-cards";
-import { activityVerb, barElapsed, barEntries, isWriting, toolActivity } from "@agenteschat/client/lib/activity";
+import {
+  activityVerb,
+  barElapsed,
+  barEntries,
+  barFaces,
+  isWriting,
+  toolActivity,
+} from "@agenteschat/client/lib/activity";
 import type { AgentTab } from "@agenteschat/client/lib/agent-edit";
 import { looksLikeApiKey } from "@agenteschat/client/lib/api-key-text";
 import { approvalCardItems, asOfNow, cardDeadline } from "@agenteschat/client/lib/approval-card";
@@ -93,6 +100,7 @@ import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@
 import { dayLabel, formatFullDate, formatTime, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
+import { mentionsHandle } from "@agenteschat/client/lib/markdown";
 import { isMediaAfterReply, messageMediaOf, quoteText } from "@agenteschat/client/lib/media";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import {
@@ -3001,9 +3009,12 @@ function ActivityBar({
         {pill && (
           <>
             {firstAgent && <ActivitySky color={colorOf(dir.agentById.get(firstAgent.id))} />}
-            {/* Agents at work: the pixel orbit in the first one's color; people only typing: the dots. */}
+            {/* Agents at work: their faces open the pill, else the pixel orbit in the first one's color; people only
+                typing: the dots. */}
             {firstAgent ? (
-              <AgentSpinner agentId={firstAgent.id} size={14} />
+              barFaces(entries).length > 0 ? null : (
+                <AgentSpinner agentId={firstAgent.id} size={14} />
+              )
             ) : (
               <span className="ac-typing__dots" aria-hidden="true">
                 <span />
@@ -3174,10 +3185,14 @@ export const TimelineMessage = memo(function TimelineMessage({
   const channelName = useChannels(org.id).data?.find((c) => c.id === m.channelId)?.name;
   // A plain reminder: the agent's own message, with a small "Reminder" label.
   const reminder = isReminderMessage(m.meta);
+  const myHandle = dir.memberById.get(me.user.id)?.handle?.toLowerCase();
+  const mentionsMe =
+    !!myHandle && !(m.author.type === "person" && m.author.id === me.user.id) && mentionsHandle(body, myHandle);
   const renderMention = (handle: string, key: string) => {
     const a = dir.agentByHandle.get(handle.toLowerCase());
     const p = a ? undefined : dir.memberByHandle.get(handle.toLowerCase());
     if (!a && !p) return <Mention key={key}>@{handle}</Mention>;
+    const isMe = !!p && p.userId === me.user.id;
     const actor = a ? { type: "agent" as const, id: a.id } : { type: "person" as const, id: p?.userId ?? "" };
     const shown = a?.name ?? p?.name ?? handle;
     return (
@@ -3187,7 +3202,7 @@ export const TimelineMessage = memo(function TimelineMessage({
         label={t("profile.of", { name: shown })}
         className="profile-trigger--mention"
       >
-        <Mention>@{shown}</Mention>
+        <Mention className={isMe ? "ac-mention--me" : undefined}>@{shown}</Mention>
       </ProfileTrigger>
     );
   };
@@ -3323,7 +3338,11 @@ export const TimelineMessage = memo(function TimelineMessage({
       grouped={grouped}
       entering={entering && !replacesLive}
       streaming={Boolean(live) && !liveFailed && !liveWaiting && !liveStopped}
-      className={cx(local && `ac-msg--local ac-msg--${local}`, contextMark && "msg--context")}
+      className={cx(
+        local && `ac-msg--local ac-msg--${local}`,
+        contextMark && "msg--context",
+        mentionsMe && "ac-msg--mentions-me",
+      )}
       onMouseEnter={feedback ? () => setActive(true) : undefined}
       onFocus={feedback ? () => setActive(true) : undefined}
       onContextMenu={live || readOnly ? undefined : menu.onContextMenu}
@@ -3679,12 +3698,12 @@ export const TimelineMessage = memo(function TimelineMessage({
               active={active}
               initial={m.reactions}
               quick={<ReplyButton message={m} />}
-              more={<MessageMoreMenu message={m} channelName={channelName ?? ""} />}
+              more={<MessageMoreMenu entries={menu.more} />}
             />
           )}
           {feedback && <CorrectionAsk message={m} agentName={agent?.name ?? t("channel.unknownAgent")} />}
           {personBar && !(mediaAfter && readOnly) && (
-            <PersonMessageActions message={m} authorName={name} channelName={channelName ?? ""} />
+            <PersonMessageActions message={m} authorName={name} more={menu.more} />
           )}
           {menu.dialog}
         </Parts>
