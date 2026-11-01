@@ -902,20 +902,21 @@ textarea.ac-input {
   padding-top: 2px;
 }
 /*
- * Only the words select: a double or triple click on a message's text, copied, gives that text and nothing after it.
- * The rest of the row (its header, cards, reactions, bars, receipts, hidden lines) would add blank lines.
+ * The row's chrome never selects: a double or triple click on a message's text, copied, gives that text and nothing
+ * after it (its header, hidden lines, reactions, bars, receipts would add blank lines). Cards keep their text.
  */
-.ac-msg {
+.ac-msg__avatar,
+.ac-msg__gutter,
+.ac-msg__head,
+.ac-msg__aside,
+.ac-msg__foot,
+.ac-msg__actions,
+.ac-msg .ac-visually-hidden,
+.ac-msg .ac-reacts,
+.ac-msg .ac-receipt,
+.ac-msg .thread-line {
   -webkit-user-select: none;
   user-select: none;
-}
-.ac-msg .ac-msg__text,
-.ac-msg pre,
-.ac-msg input,
-.ac-msg textarea,
-.ac-msg [contenteditable="true"] {
-  -webkit-user-select: text;
-  user-select: text;
 }
 /*
  * The cards in a message (its tools, what it changed, a request, a file): one width, short of the text's. The row's

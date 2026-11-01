@@ -15,10 +15,19 @@ async function userSelect(path: string) {
 }
 
 describe("copying a message gives its text, never blank lines after it", () => {
-  test("the row selects nothing but its words (and code, and what is typed into it)", async () => {
+  test("the row's chrome selects nothing; its text and its cards' text still select", async () => {
     const rules = await userSelect("packages/ui/src/styles/components.css");
-    expect(rules.get(".ac-msg")).toBe("none");
-    for (const selector of [".ac-msg .ac-msg__text", ".ac-msg pre", ".ac-msg input", ".ac-msg textarea"])
-      expect([selector, rules.get(selector)]).toEqual([selector, "text"]);
+    for (const selector of [
+      ".ac-msg__head",
+      ".ac-msg__foot",
+      ".ac-msg__actions",
+      ".ac-msg .ac-visually-hidden",
+      ".ac-msg .ac-reacts",
+      ".ac-msg .ac-receipt",
+    ])
+      expect([selector, rules.get(selector)]).toEqual([selector, "none"]);
+    // A routine's report, a consulted agent's answer, a failure's reason: real text inside the row, copyable.
+    for (const selector of [".ac-msg", ".ac-msg__body", ".ac-msg__text", ".ac-msg__error", ".cn-report"])
+      expect([selector, rules.get(selector)]).toEqual([selector, undefined]);
   });
 });
