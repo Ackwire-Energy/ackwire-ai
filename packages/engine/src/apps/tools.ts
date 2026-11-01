@@ -256,7 +256,7 @@ async function taskState(deps: AppsToolDeps, p: AppPrincipal, message: Message, 
     return Date.now() - message.createdAt.getTime() > NO_RUN_AFTER_MS
       ? {
           status: "no_run" as TaskStatus,
-          detail: "No agent run started for this message; the agent may not reply to it.",
+          detail: "No agent run started for this message. The agent may not reply to it.",
         }
       : { status: "still_running" as TaskStatus };
   }
@@ -419,11 +419,31 @@ export function appsInstructions(p: AppPrincipal) {
   return [
     `agentes.chat is a workspace where people and AI agents work together. This connection acts as ${p.personName} in the workspace "${p.orgName}".`,
     `Messages sent here are posted as ${p.personName} and marked as sent through ${p.app.name}.`,
-    "Agents may stop to ask for approval of sensitive actions; approvals are decided by people inside agentes.chat, and no tool here can approve, deny or change permissions.",
+    "Agents may stop to ask for approval of sensitive actions. Approvals are decided by people inside agentes.chat, and no tool here can approve, deny or change permissions.",
     "Ids come from list_agents, list_channels and earlier results.",
   ]
     .join(" ")
     .slice(0, 900);
+}
+
+/**
+ * A tool's input schema as `tools/list` shows it: the zod schema's own validation, its JSON Schema without the
+ * `$schema` key every tool would repeat (clients' tool lists have a size budget).
+ */
+function listed(schema: z.ZodObject) {
+  const standard = schema["~standard"] as unknown as {
+    jsonSchema: { input: (o: unknown) => Record<string, unknown>; output: (o: unknown) => Record<string, unknown> };
+  };
+  const drop = ({ $schema: _drop, ...rest }: Record<string, unknown>) => rest;
+  return {
+    "~standard": {
+      ...standard,
+      jsonSchema: {
+        input: (o: unknown) => drop(standard.jsonSchema.input(o)),
+        output: (o: unknown) => drop(standard.jsonSchema.output(o)),
+      },
+    },
+  };
 }
 
 type ToolConfig<S extends z.ZodObject> = {
@@ -541,7 +561,7 @@ export function buildAppsMcpServer(deps: AppsToolDeps, p: AppPrincipal, version:
       {
         title: cfg.title,
         description: cfg.description,
-        inputSchema: cfg.input as never,
+        inputSchema: listed(cfg.input) as never,
         annotations: {
           title: cfg.title,
           readOnlyHint: cfg.readOnly,
@@ -642,7 +662,7 @@ export function buildAppsMcpServer(deps: AppsToolDeps, p: AppPrincipal, version:
       scope: "read",
       title: "Wait for an agent's reply",
       description:
-        "Waits up to timeout_seconds for the agent's reply to a task sent with send_to_agent and returns its status: done (with the reply), waiting_approval (a person decides in agentes.chat, approval_url links there), waiting_input (the agent asked a question; send_to_agent with the same thread answers it), failed, canceled, no_run, or still_running. Repeating the call with the same task_id continues waiting.",
+        "Waits up to timeout_seconds for the agent's reply to a task sent with send_to_agent and returns its status: done (with the reply), waiting_approval (a person decides in agentes.chat, approval_url links there), waiting_input (the agent asked a question, and send_to_agent with the same thread answers it), failed, canceled, no_run, or still_running. Repeating the call with the same task_id continues waiting.",
       input: waitInput,
       readOnly: true,
       destructive: false,
@@ -694,7 +714,7 @@ export function buildAppsMcpServer(deps: AppsToolDeps, p: AppPrincipal, version:
     {
       scope: "read",
       title: "List channels",
-      description: `Lists the channels ${person} can read in this workspace: public channels and private channels ${person} is in. Direct conversations are not listed; send_to_agent without channel_id uses the direct conversation with that agent. Reading or posting in a channel needs is_member true.`,
+      description: `Lists the channels ${person} can read in this workspace: public channels and private channels ${person} is in. Direct conversations are not listed: send_to_agent without channel_id uses the direct conversation with that agent. Reading or posting in a channel needs is_member true.`,
       input: listChannelsInput,
       readOnly: true,
       destructive: false,
