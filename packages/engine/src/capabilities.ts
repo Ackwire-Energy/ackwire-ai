@@ -91,6 +91,7 @@ export function describeCapabilities(
   pending: { label: string; reason: string }[] = [],
 ) {
   const lines = ["# What you can do"];
+  let means: string[] = [];
   if (tools.length === 0) {
     lines.push(
       "You only write messages in this chat: you have no tools and you don't act outside this conversation (files, code, external systems).",
@@ -141,8 +142,7 @@ export function describeCapabilities(
     }
     // What the guidance below is about: every tool the run can reach, loaded or on demand.
     const names = new Set([...tools, ...(onDemand?.tools ?? [])].map((t) => t.name));
-    const means = turnMeans(names);
-    if (means.length > 0) lines.push(`## Your means\n${means.map((m) => `- ${m}`).join("\n")}`);
+    means = turnMeans(names);
     if (names.has("create_artifact")) {
       lines.push(
         '- Requests for a PDF (or Word file): create a document with `create_artifact` (kind `document`); the file\'s card offers "Download PDF".',
@@ -194,6 +194,8 @@ export function describeCapabilities(
       "If someone asks for something from these connectors, say exactly what is missing and who can fix it. Never say the connector doesn't exist.",
     );
   }
+  // Last, after the approvals and the connectors not usable yet: those are what it doesn't have on its own.
+  if (means.length > 0) lines.push(`## Your means\n${means.map((m) => `- ${m}`).join("\n")}`);
   lines.push(CAPABILITIES_LIMIT);
   return lines.join("\n");
 }
