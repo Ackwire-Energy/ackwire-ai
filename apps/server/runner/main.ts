@@ -319,7 +319,7 @@ async function pair(p: Parsed): Promise<number> {
     grant,
     workspace: workspaceReal,
     ...(name ? { name } : {}),
-    tools: { claude: exec, codex: exec, commands: exec },
+    tools: { claude: exec, codex: exec, cursor: exec, commands: exec },
     desktop: false,
   });
   writeConfig(next, home);
@@ -884,6 +884,7 @@ function tools(p: Parsed): number {
   const label: Record<keyof RunnerTools, string> = {
     claude: "Claude Code",
     codex: "Codex",
+    cursor: "Cursor",
     commands: "Commands",
     browser: "Browser",
     desktop: "Desktops (each agent's own screen, watched and controlled from the app)",

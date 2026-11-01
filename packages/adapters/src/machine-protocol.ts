@@ -6,7 +6,7 @@
  */
 
 /** Bumped on breaking changes; the server refuses runners older than `MIN_RUNNER_PROTOCOL`. */
-export const MACHINE_PROTOCOL_VERSION = 34;
+export const MACHINE_PROTOCOL_VERSION = 35;
 export const MIN_RUNNER_PROTOCOL = 1;
 /** From this protocol on, requests carry `agent` and each agent works in its own folder. */
 export const AGENT_FOLDERS_PROTOCOL = 2;
@@ -413,10 +413,20 @@ export const CODEX_FOLDER_PROTOCOL = 32;
  */
 export const DESKTOP_SWITCH_PROTOCOL = 30;
 
+/**
+ * From this protocol on (ADR 0114): the Cursor brain. `brain.turn` takes `kind: "cursor"` (Cursor's CLI, `agent -p`,
+ * one process per turn), `account` takes `kind: "cursor"` (a browser sign-in, or a Cursor API key sealed to the
+ * machine: `begin` with `provider: "cursor"`), `hello.executors.cursor` reports the CLI with the models its sign-in
+ * lists, and `access.tools.cursor` turns it on or off. The server never sends any of these to an older runner.
+ */
+export const CURSOR_PROTOCOL = 35;
+/** `account` `begin`'s `provider` for a Cursor account made with an API key (`CURSOR_API_KEY`) instead of a sign-in. */
+export const CURSOR_KEY_PROVIDER = "cursor";
+
 /** Which CLI an account signs in. */
-export type AccountKind = "claude_code" | "codex";
-export const ACCOUNT_KINDS: readonly AccountKind[] = ["claude_code", "codex"];
-export const isAccountKind = (v: unknown): v is AccountKind => v === "claude_code" || v === "codex";
+export type AccountKind = "claude_code" | "codex" | "cursor";
+export const ACCOUNT_KINDS: readonly AccountKind[] = ["claude_code", "codex", "cursor"];
+export const isAccountKind = (v: unknown): v is AccountKind => v === "claude_code" || v === "codex" || v === "cursor";
 /** Account and sign-in ids: UUIDs (the server makes them; the desktop app's runner too). */
 export const isAccountId = (v: unknown): v is string =>
   typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v);
@@ -481,7 +491,11 @@ export interface PlanUsage {
 export type OwnPlanUsage = Partial<Record<AccountKind, PlanUsage>>;
 
 /** `list.fresh` ids for the computer's own sign-ins (the rest are account ids). */
-export const OWN_USAGE_ID: Record<AccountKind, string> = { claude_code: "own:claude_code", codex: "own:codex" };
+export const OWN_USAGE_ID: Record<AccountKind, string> = {
+  claude_code: "own:claude_code",
+  codex: "own:codex",
+  cursor: "own:cursor",
+};
 
 export const PLAN_USAGE_LIMITS = { windows: 8, label: 40 } as const;
 
@@ -1021,7 +1035,20 @@ export interface RunnerExecutorInfo {
   /** Protocol 8, `claude` only: how it is logged in (`claude.ai`, `api_key`…) and the plan (`pro`, `max`, `ultra`…). */
   authMethod?: string;
   plan?: string;
+  /** Protocol 35, `cursor` only: the models its sign-in lists (`agent models`), and which its plan includes when the CLI says. */
+  models?: CursorModelInfo[];
 }
+
+/** A model Cursor's CLI lists (`agent models`). */
+export interface CursorModelInfo {
+  id: string;
+  label?: string;
+  /** The CLI said the plan includes it (absent: it didn't say; other models are billed at API prices). */
+  inPlan?: boolean;
+}
+
+/** Most models kept from `agent models`, and their longest id and label. */
+export const CURSOR_MODEL_LIMITS = { models: 60, id: 80, label: 80 } as const;
 
 /**
  * One event of a brain turn on the wire (`brain.event`), the same shape as
@@ -1094,7 +1121,8 @@ export const STEER_LIMITS = { messages: 20, text: 100_000 } as const;
  */
 export interface BrainTurnRequest {
   runId: string;
-  kind: "claude_code" | "codex";
+  /** `cursor`: protocol 35 (`CURSOR_PROTOCOL`). */
+  kind: "claude_code" | "codex" | "cursor";
   /** The executor's session (a UUID, stable per thread); `resume`: the server knows it ran before (a hint). */
   session: { id: string; resume: boolean };
   /** Relative to the agent's folder ("" = the folder). */
@@ -1265,6 +1293,8 @@ export interface RunnerPause {
 export interface RunnerTools {
   claude: boolean;
   codex: boolean;
+  /** Protocol 35: Cursor's CLI (ADR 0114). Absent = off (older runners). */
+  cursor?: boolean;
   /** Shell commands (`exec`, `shell` tasks). The same as `exec` in `hello` once protocol 10 is in use. */
   commands: boolean;
   /** Protocol 12: the agent browser (ADR 0040). Absent = off (older runners). */
@@ -1313,7 +1343,7 @@ export interface RunnerInfo {
   /** `false` when started with `--no-exec`: files and uploads only. */
   exec: boolean;
   /** Protocol 7: the coding CLIs found on the machine's PATH (best effort, cached by the runner). */
-  executors?: { claude?: RunnerExecutorInfo; codex?: RunnerExecutorInfo };
+  executors?: { claude?: RunnerExecutorInfo; codex?: RunnerExecutorInfo; cursor?: RunnerExecutorInfo };
   /** Protocol 9: whether the owner paused this computer. */
   paused?: RunnerPause;
   /** Protocol 10: folders and tools allowed on the machine. */
@@ -1889,11 +1919,25 @@ const denialList = (v: unknown): TaskDenial[] => {
   return out;
 };
 
-/** `hello.executors`: only `claude` and `codex`, each with a short version line (and Claude Code's login). */
+/** `cursor`'s `models` (protocol 35), cut to `CURSOR_MODEL_LIMITS`; ids are short words only. */
+export function parseCursorModels(v: unknown): CursorModelInfo[] {
+  if (!Array.isArray(v)) return [];
+  const out: CursorModelInfo[] = [];
+  for (const m of v) {
+    if (!isObject(m) || !isString(m.id) || !/^[\w.:/-]{1,80}$/.test(m.id)) continue;
+    if (out.some((x) => x.id === m.id)) continue;
+    const label = isString(m.label) ? m.label.replace(/\s+/g, " ").trim().slice(0, CURSOR_MODEL_LIMITS.label) : "";
+    out.push({ id: m.id, ...(label ? { label } : {}), ...(m.inPlan === true ? { inPlan: true } : {}) });
+    if (out.length >= CURSOR_MODEL_LIMITS.models) break;
+  }
+  return out;
+}
+
+/** `hello.executors`: only `claude`, `codex` and `cursor`, each with a short version line (and Claude Code's login). */
 export function parseExecutors(v: Record<string, unknown>): NonNullable<RunnerInfo["executors"]> {
   const out: NonNullable<RunnerInfo["executors"]> = {};
   const word = (x: unknown) => (isString(x) && /^[\w.-]{1,40}$/.test(x) ? x : undefined);
-  for (const name of ["claude", "codex"] as const) {
+  for (const name of ["claude", "codex", "cursor"] as const) {
     const e = v[name];
     if (!isObject(e) || !isString(e.version)) continue;
     const authMethod = word(e.authMethod);
@@ -1904,6 +1948,8 @@ export function parseExecutors(v: Record<string, unknown>): NonNullable<RunnerIn
       ...(authMethod ? { authMethod } : {}),
       ...(plan ? { plan } : {}),
     };
+    const models = name === "cursor" ? parseCursorModels(e.models) : [];
+    if (models.length) out[name] = { ...out[name], models } as RunnerExecutorInfo;
   }
   return out;
 }
@@ -2713,6 +2759,7 @@ export function parseAccess(v: unknown): RunnerAccess | undefined {
     tools: {
       claude: t.claude === true,
       codex: t.codex === true,
+      ...(t.cursor === true ? { cursor: true } : {}),
       commands: t.commands === true,
       ...(t.browser === true ? { browser: true } : {}),
       ...(t.desktop === true ? { desktop: true } : {}),

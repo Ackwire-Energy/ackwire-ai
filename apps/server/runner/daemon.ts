@@ -700,6 +700,7 @@ export class RunnerDaemon implements RequestObserver {
     const label: Record<keyof RunnerTools, string> = {
       claude: "Claude Code",
       codex: "Codex",
+      cursor: "Cursor",
       commands: "commands",
       browser: "the browser",
       desktop: "the agents' desktops",

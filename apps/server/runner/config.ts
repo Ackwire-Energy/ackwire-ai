@@ -203,11 +203,16 @@ export function pairedConfig(stored: StoredConfig, file = "config.json"): Runner
 /**
  * What the machine allows: the stored `access`, or for a home paired before
  * protocol 10 the old behaviour (commands, Claude Code and Codex follow `exec`).
+ * Stored before Cursor's switch (protocol 35), Cursor follows Codex's: both are
+ * a coding CLI on a person's own plan.
  */
 export function effectiveAccess(config: StoredConfig | null): RunnerAccess {
-  if (config?.access) return config.access;
+  if (config?.access) {
+    const { tools } = config.access;
+    return tools.cursor === undefined ? { ...config.access, tools: { ...tools, cursor: tools.codex } } : config.access;
+  }
   const on = config ? config.exec !== false : false;
-  return { folders: [], tools: { claude: on, codex: on, commands: on } };
+  return { folders: [], tools: { claude: on, codex: on, cursor: on, commands: on } };
 }
 
 /** The pause as the protocol says it (an `until` already past counts as not paused). */

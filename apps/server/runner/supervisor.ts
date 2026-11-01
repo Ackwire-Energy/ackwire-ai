@@ -198,7 +198,7 @@ export type WorkerLinkFrame =
   /** From the worker: what its agent's Chrome sent and received since it last said (protocol 23). */
   | { type: "browser.traffic"; up: number; down: number }
   /** From the worker: a turn's plan usage (`rate_limit_event`, Codex's rate limits), for the account it thinks with. */
-  | { type: "usage"; kind: "claude_code" | "codex"; account: string; info: unknown }
+  | { type: "usage"; kind: "claude_code" | "codex" | "cursor"; account: string; info: unknown }
   /** From the worker: its process `pid`, held until the answer, into the agent's slice for `kind` (`scope-gate.ts`). */
   | { type: "scope.enter"; enterId: string; pid: number; kind: ScopeKind }
   /** To the worker: it is there, or why not (it starts where it is either way). */

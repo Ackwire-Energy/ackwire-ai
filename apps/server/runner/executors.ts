@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { accessSync, constants } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
-import type { RunnerInfo } from "@agenteschat/adapters/machine-protocol";
+import type { CursorModelInfo, RunnerInfo } from "@agenteschat/adapters/machine-protocol";
 import { readSmallJson } from "./json-file";
 
 /**
@@ -124,6 +124,50 @@ export function claudeAuth(
   }
 }
 
+/** Cursor's CLI, named `agent` since it was renamed from `cursor-agent`. */
+export const CURSOR_BIN = "agent";
+
+/**
+ * `agent models` → the models its sign-in lists. One per line, `<id> - <label>` (or the id alone); a line that says
+ * the plan includes it (`included`) marks it `inPlan`. Headers and anything that isn't a model id are skipped.
+ */
+export function parseCursorModels(output: string): CursorModelInfo[] {
+  const out: CursorModelInfo[] = [];
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: the CLI's colors
+  const clean = output.replace(/\u001b\[[0-9;]*m/g, "");
+  for (const raw of clean.split("\n")) {
+    const line = raw.replace(/^[\s*•>-]+/, "").trim();
+    const m = /^([a-z0-9][\w.:/-]{0,79})(?:\s+[-–—:]\s+(.+))?$/i.exec(line);
+    if (!m?.[1] || !/[\d-]/.test(m[1]) || out.some((x) => x.id === m[1])) continue;
+    const rest = m[2]?.trim() ?? "";
+    const inPlan = /\bincluded\b/i.test(rest);
+    const label = rest
+      .replace(/\(?\s*(?:current|default|included(?: in (?:your )?plan)?)\s*\)?/gi, "")
+      .trim()
+      .slice(0, 80);
+    out.push({ id: m[1], ...(label ? { label } : {}), ...(inPlan ? { inPlan: true } : {}) });
+    if (out.length >= 60) break;
+  }
+  return out;
+}
+
+/** Cursor's CLI versions are dated (`2026.10.28-1a2b3c4`): an `agent` on the PATH that isn't Cursor's is skipped. */
+const CURSOR_VERSION = /^\d{4}\.\d{1,2}\.\d{1,2}\b/;
+
+/**
+ * Protocol 35 (ADR 0114): Cursor's CLI (`agent`) and the models its sign-in lists (`agent models`, which asks
+ * Cursor: none when signed out or offline).
+ */
+function detectCursor(run: Run): NonNullable<RunnerInfo["executors"]>["cursor"] {
+  const r = run(CURSOR_BIN, ["--version"]);
+  if (r.error || r.status !== 0) return undefined;
+  const version = r.stdout.trim().split("\n")[0]?.trim().slice(0, 80) ?? "";
+  if (!CURSOR_VERSION.test(version)) return undefined;
+  const m = run(CURSOR_BIN, ["models"]);
+  const models = !m.error && m.status === 0 ? parseCursorModels(m.stdout) : [];
+  return { version, ...(models.length ? { models } : {}) };
+}
+
 export function detectExecutors(run: Run = defaultRun): NonNullable<RunnerInfo["executors"]> {
   const out: NonNullable<RunnerInfo["executors"]> = {};
   for (const name of ["claude", "codex"] as const) {
@@ -135,6 +179,12 @@ export function detectExecutors(run: Run = defaultRun): NonNullable<RunnerInfo["
     } catch {
       // not installed
     }
+  }
+  try {
+    const cursor = detectCursor(run);
+    if (cursor) out.cursor = cursor;
+  } catch {
+    // not installed
   }
   return out;
 }
