@@ -35,6 +35,7 @@ Autonomy rules are unchanged (ADR 0097): nothing here grants anything, starts wo
 - A lone message to an agent starts its first model call up to 2.5 s later than before (less the time to build the context). Bursts get one answer.
 - A message that arrives after the window, while the first call is under way, is still read right after it: the first answer is posted and the run goes on with the rest, as before.
 - The runner and the brains didn't change: everything happens in the engine before a turn starts. Mid-turn delivery on the runner side (Claude Code's stdin message and its read receipts, Codex's `turn/steer`) is the existing protocol 15 path, covered by the runner tests with the fake CLIs (`apps/server/test/runner/brain.test.ts` "Live steering", `brain-codex-app.test.ts`); the engine side of a mid-turn update (read receipt, widened request) is covered in `packages/engine/test/live-steer.test.ts`.
+- A message sent while a computer brain's CLI is still starting (Claude Code before `system/init`, Codex "is starting") no longer waits for the whole CLI turn: when the turn becomes steerable, the listener hands it what waited in the inbox, and while the runner answers `no_turn` it asks again every `LIVE_STEER_RETRY_MS` (1 s, at most 30 times) as long as the same turn is in flight, stopping on delivery, a refusal (`unsupported`), the turn's end or the run's close (`live-steer.ts`). Receipts and the widened request are the usual ones.
 
 ## Alternatives considered
 

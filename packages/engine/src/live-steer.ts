@@ -29,6 +29,10 @@ const { agentRuns, messages, users, agents } = schema;
  * - No such turn (the model brain, a turn between steps, an older runner or
  *   CLI, Codex run as `codex exec`): the messages stay in the inbox and
  *   `deliverLive` is false.
+ * - A turn that becomes steerable takes what waited in the inbox at once, and
+ *   one whose CLI is still starting (`no_turn`: Claude Code before its init,
+ *   Codex before its thread) is asked again every `LIVE_STEER_RETRY_MS`, so a
+ *   message sent in a turn's first seconds doesn't wait for the whole turn.
  */
 
 /** Cross-instance: the instance executing the run hands it a message now (if its turn can take one). */
@@ -37,6 +41,10 @@ const steerReplyTopic = (requestId: string) => `run-steer-reply:${requestId}`;
 
 /** How long `deliverLive` waits for the executing instance (no answer: nobody can take it now). */
 export const LIVE_STEER_WAIT_MS = 3000;
+
+/** A turn whose CLI is still starting is asked again this often, at most `LIVE_STEER_RETRIES` times. */
+export const LIVE_STEER_RETRY_MS = 1000;
+const LIVE_STEER_RETRIES = 30;
 
 /**
  * Live delivery to a computer brain mid-turn (Claude Code reads a message at
@@ -186,7 +194,7 @@ export interface LiveSteering {
  * run executes here (false at once when no turn can take a message).
  */
 export function listenLiveSteering(
-  deps: { db: Database; pubsub: PubSub },
+  deps: { db: Database; pubsub: PubSub; retryMs?: number },
   run: InboxRun,
   threadId: string | null,
   hooks: LiveSteeringHooks,
@@ -199,11 +207,20 @@ export function listenLiveSteering(
   const handed = new Map<string, SteeredText>();
   let chain: Promise<unknown> = Promise.resolve();
   const reads = new Set<Promise<unknown>>();
+  let retry: ReturnType<typeof setTimeout> | undefined;
+  let retries = 0;
+  const stopRetry = () => {
+    clearTimeout(retry);
+    retry = undefined;
+  };
 
-  const deliver = async (messageId: string, urgent: boolean): Promise<boolean> => {
-    if ([...handed.values()].some((h) => h.id === messageId)) return true;
-    const turn = steer;
-    if (!turn || refused) return false;
+  /**
+   * Hands the run's inbox to `turn` while it is still the turn in flight. `messageId`: the one a send asks
+   * about (true when it was handed); null flushes whatever waits.
+   */
+  const deliver = async (turn: Steer | null, messageId: string | null, urgent: boolean): Promise<boolean> => {
+    if (messageId && [...handed.values()].some((h) => h.id === messageId)) return true;
+    if (!turn || turn !== steer || refused) return false;
     const ids = await hooks.take();
     if (ids.length === 0) return false;
     const rows = await renderSteered(deps.db, run.orgId, ids);
@@ -220,20 +237,33 @@ export function listenLiveSteering(
     // Deleted meanwhile (not rendered): dropped, as the loop drops them.
     await returnToInbox(deps.db, deps.pubsub, run, back);
     if (back.length) hooks.onReturned?.(back);
+    if (reply.status === "no_turn" && back.length) retryLater(turn);
     if (taken.length === 0) return false;
     const takenIds = taken.map((s) => s.row.id);
     hooks.onHanded?.(takenIds);
     await publishChannelEvent(deps.pubsub, { type: "agent.run.delivered", ...where, messageIds: takenIds });
-    return takenIds.includes(messageId);
+    return messageId !== null && takenIds.includes(messageId);
+  };
+
+  // One at a time: each takes the inbox whole.
+  const flush = (turn: Steer) => {
+    chain = chain.then(() => deliver(turn, null, false)).catch(() => {});
+  };
+  const retryLater = (turn: Steer) => {
+    if (retry || turn !== steer || retries >= LIVE_STEER_RETRIES) return;
+    retries++;
+    retry = setTimeout(() => {
+      retry = undefined;
+      flush(turn);
+    }, deps.retryMs ?? LIVE_STEER_RETRY_MS);
   };
 
   const off = deps.pubsub.subscribe(steerTopic(run.id), (e) => {
     if (e.type !== "run.steer" || typeof e.requestId !== "string" || typeof e.messageId !== "string") return;
     const { requestId, messageId } = e;
     const urgent = e.urgent === true;
-    // One at a time: each takes the inbox whole.
     const next = chain.then(async () => {
-      const delivered = await deliver(messageId, urgent).catch(() => false);
+      const delivered = await deliver(steer, messageId, urgent).catch(() => false);
       await deps.pubsub.publish(steerReplyTopic(requestId), { type: "run.steer.reply", delivered }).catch(() => {});
     });
     chain = next.catch(() => {});
@@ -241,8 +271,15 @@ export function listenLiveSteering(
 
   return {
     steerable(next) {
+      if (next !== steer) {
+        stopRetry();
+        retries = 0;
+      }
       steer = next;
-      if (next) refused = false;
+      if (next) {
+        refused = false;
+        flush(next);
+      }
     },
     read(uuids) {
       const rows = uuids.flatMap((u) => {
@@ -261,6 +298,7 @@ export function listenLiveSteering(
     },
     async endTurn() {
       steer = null;
+      stopRetry();
       await chain;
       await Promise.all([...reads]);
       const left = [...handed.values()].map((r) => r.id);
@@ -271,6 +309,7 @@ export function listenLiveSteering(
     },
     close() {
       steer = null;
+      stopRetry();
       off();
     },
   };

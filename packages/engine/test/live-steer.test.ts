@@ -22,7 +22,8 @@ import {
   type SteerMessage,
   type SteerReply,
 } from "../src";
-import { deliverLive } from "../src/live-steer";
+import { deliverLive, listenLiveSteering } from "../src/live-steer";
+import { takeInbox } from "../src/run-inbox";
 import { type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
@@ -269,6 +270,150 @@ test("a message to a computer-brain run still starting answers at once: the send
   const all = await fx.db.select().from(schema.agentRuns);
   expect(all).toHaveLength(1);
   expect(all[0]?.status).toBe("done");
+});
+
+test("a message sent before the turn is steerable is handed to it as soon as it is, and read in that turn", async () => {
+  f = await setup();
+  const fx = f;
+  await computerAgent(fx);
+  const events = fx.listen(fx.general.id);
+  const inTurn = gate();
+  const ready = gate();
+  const handed: SteerMessage[][] = [];
+  const seen: BrainTurn[] = [];
+  const brain: Brain = {
+    kind: "claude_code",
+    async *run(turn: BrainTurn, io: BrainIO) {
+      seen.push({ ...turn, system: "", messages: [] });
+      if (seen.length > 1) {
+        yield { type: "done", text: "Turn 2." };
+        return;
+      }
+      // The CLI is still starting: the turn runs, but can't take messages yet.
+      inTurn.open();
+      await ready.promise;
+      io.steerable?.(async (messages) => {
+        handed.push(messages);
+        return { status: "accepted", accepted: messages.map((m) => m.uuid) };
+      });
+      try {
+        await waitUntil(() => handed.length > 0);
+        yield { type: "steer_read", uuids: handed[0]?.map((m) => m.uuid) ?? [] };
+        yield { type: "done", text: "Feito, com a doc." };
+      } finally {
+        io.steerable?.(null);
+      }
+    },
+  };
+  const handlers = createJobHandlers({
+    ...fx.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  await post(fx, "@dev roda os testes");
+  const drained = drainOutbox(fx.db, handlers);
+  await inTurn.promise;
+  const msg = await post(fx, "@dev e atualiza a doc");
+  expect(handed).toHaveLength(0);
+  ready.open();
+  await drained;
+  await drainOutbox(fx.db, handlers);
+  expect(handed).toHaveLength(1);
+  expect(handed[0]?.[0]?.text).toContain("@dev e atualiza a doc");
+  expect(events.filter((e) => e.type === "agent.run.delivered").map((e) => e.messageIds)).toEqual([[msg.id]]);
+  expect(events.filter((e) => e.type === "agent.run.read").map((e) => e.messageIds)).toEqual([[msg.id]]);
+  // Read in the turn it was sent in: no second turn, and the request grew with it.
+  expect(seen).toHaveLength(1);
+  const [run] = await fx.db.select().from(schema.agentRuns);
+  expect(run?.status).toBe("done");
+  expect((run?.transcript as { request?: string } | null)?.request).toContain("e atualiza a doc");
+});
+
+/** A queued run with one message in its inbox, and a listener for it that retries fast. */
+async function inboxRun(fx: Fixture) {
+  await post(fx, "@dev roda os testes");
+  const msg = await post(fx, "@dev e a doc");
+  const [run] = await fx.db.select().from(schema.agentRuns);
+  if (!run) throw new Error("no run");
+  expect(run.pendingMessageIds).toEqual([msg.id]);
+  const live = listenLiveSteering({ db: fx.db, pubsub: fx.pubsub, retryMs: 20 }, run, null, {
+    take: () => takeInbox(fx.db, run.id),
+    onRead: () => {},
+  });
+  const pending = async () => (await fx.db.select().from(schema.agentRuns))[0]?.pendingMessageIds;
+  return { msg, live, pending };
+}
+
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+test("a turn whose CLI is still starting (no_turn) gets the message on a retry once it can take it", async () => {
+  f = await setup();
+  const fx = f;
+  const events = fx.listen(fx.general.id);
+  const { msg, live, pending } = await inboxRun(fx);
+  const calls: SteerMessage[][] = [];
+  live.steerable(async (messages) => {
+    calls.push(messages);
+    return calls.length <= 2 ? { status: "no_turn" } : { status: "accepted", accepted: messages.map((m) => m.uuid) };
+  });
+  await waitUntil(() => calls.length >= 3);
+  await waitUntil(() => events.some((e) => e.type === "agent.run.delivered"));
+  expect(calls.map((c) => c.map((m) => m.text.includes("@dev e a doc")))).toEqual([[true], [true], [true]]);
+  expect(events.filter((e) => e.type === "agent.run.delivered").map((e) => e.messageIds)).toEqual([[msg.id]]);
+  expect(await pending()).toEqual([]);
+  // Delivered: no more asking.
+  await pause(100);
+  expect(calls).toHaveLength(3);
+  live.close();
+});
+
+test("no retry once the turn ended or the run closed: the message waits in the inbox", async () => {
+  f = await setup();
+  const fx = f;
+  const { msg, live, pending } = await inboxRun(fx);
+  let calls = 0;
+  live.steerable(async () => {
+    calls++;
+    return { status: "no_turn" };
+  });
+  await waitUntil(() => calls >= 2);
+  expect(await live.endTurn()).toEqual([]);
+  const after = calls;
+  await pause(100);
+  expect(calls).toBe(after);
+  expect(await pending()).toEqual([msg.id]);
+
+  live.steerable(async () => {
+    calls++;
+    return { status: "no_turn" };
+  });
+  await waitUntil(() => calls >= after + 2);
+  live.close();
+  const closed = calls;
+  await pause(100);
+  expect(calls).toBeLessThanOrEqual(closed + 1);
+  const settled = calls;
+  await pause(100);
+  expect(calls).toBe(settled);
+  expect(await pending()).toEqual([msg.id]);
+});
+
+test("a turn that refuses (unsupported) after a no_turn is not asked again", async () => {
+  f = await setup();
+  const fx = f;
+  const { msg, live, pending } = await inboxRun(fx);
+  let calls = 0;
+  live.steerable(async (): Promise<SteerReply> => {
+    calls++;
+    if (calls === 1) return { status: "no_turn" };
+    if (calls === 2) return { status: "unsupported", reason: "Claude Code 2.1.100 reads messages only between turns" };
+    return { status: "accepted", accepted: [] };
+  });
+  await waitUntil(() => calls >= 2);
+  await pause(100);
+  expect(calls).toBe(2);
+  expect(await pending()).toEqual([msg.id]);
+  live.close();
 });
 
 test("a turn that can't take messages: not live, the message waits for the turn's end (asked once per turn)", async () => {
