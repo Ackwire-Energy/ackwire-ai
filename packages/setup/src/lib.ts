@@ -782,6 +782,11 @@ export interface ThisMachine {
   root: boolean;
   /** Whether systemd runs it: on Linux the agents' computer is a systemd unit. */
   systemd: boolean;
+  /**
+   * Whether that systemd is built with BPF_FRAMEWORK (`systemctl --version`): each agent's user is kept off the
+   * others' ports with it, and no agent's process starts without it.
+   */
+  bpf: boolean;
   /** Whether apt-get is here: the computers' installer installs the screens' and browsers' packages with it. */
   apt: boolean;
   /** Whether it's already connected to an agentes.chat as a computer (`connectedConfig`). */
@@ -838,6 +843,12 @@ export function computerOffer(machine: ThisMachine, content: string | null, imag
   }
   if (!mac && !machine.systemd) {
     return no("The agents' computer runs as a system service, and systemd isn't running here.", `So ${later}.`);
+  }
+  if (!mac && !machine.bpf) {
+    return no(
+      "This machine's systemd isn't built with BPF_FRAMEWORK (Ubuntu's isn't), which keeps each agent's user off the others' ports.",
+      `Use Debian 13 for it, or ${later}.`,
+    );
   }
   if (machine.connected) {
     // Its service would be replaced, and the server it's connected to would lose this computer.

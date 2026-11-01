@@ -415,6 +415,13 @@ test.skipIf(process.platform === "win32")(
 function rootLinux() {
   const pc = fakeComputer({});
   writeFileSync(path.join(pc.fake, "id"), "#!/bin/sh\necho 0\n", { mode: 0o755 });
+  writeFileSync(
+    path.join(pc.fake, "systemctl"),
+    '#!/bin/sh\necho "systemd 257 (257.9)"\necho "+PAM +BPF_FRAMEWORK"\n',
+    {
+      mode: 0o755,
+    },
+  );
   writeFileSync(path.join(pc.fake, "chown"), "#!/bin/sh\n", { mode: 0o755 });
   symlinkSync(Bun.which("dirname") as string, path.join(pc.fake, "dirname"));
   const at = (dir: string) => path.join(pc.home, "system", dir);

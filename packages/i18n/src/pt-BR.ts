@@ -10634,8 +10634,10 @@ export const ptBR = {
     closeAsk: "{{The}} {{name}} espera 2 min você voltar.",
     openAccess: "Abrir Ferramentas e acesso",
     phone: {
-      otherApp: "{{The}} {{name}} está usando outro app na própria tela",
-      fromComputer: "Para ver a tela, abra o agentes.chat num notebook",
+      now: "Agora",
+      trackpad: "Trackpad",
+      trackpadHint: "Arraste para mover · Toque para clicar · Segure para arrastar · Dois dedos para rolar",
+      message: "Mensagem para {{name}}",
       chooseOnWeb: "Escolha no agentes.chat, em Configurações\u00a0›\u00a0Computadores.",
     },
   },

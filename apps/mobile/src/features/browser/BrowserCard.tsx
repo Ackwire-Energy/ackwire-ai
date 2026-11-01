@@ -31,11 +31,10 @@ import { Sky } from "@/sky/Sky";
 import { Button, Fuse, Icon, PixelOrbit, Text, useToast } from "@/ui";
 import { useColors, useDirectory, useEdition, useMeId, useNow, useOrgId } from "../shared/hooks";
 import { agentLook, genderOf } from "../shared/logic";
-import { PromptForm } from "../shared/PromptForm";
 import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
-import { useSheet } from "../shared/SheetHost";
-import { FAILED_REASONS, NOTE_MAX, pageGapKey, pageNoteOf, siteOf, skyBehind, stepText, waitsForPage } from "./logic";
-import { AddressBar, FrameView, TypeBar, useLiveConnection } from "./parts";
+import { pageGapKey, pageNoteOf, siteOf, skyBehind, stepText, waitsForPage } from "./logic";
+import { AddressBar, browserTyping, FrameView, TypeBar, useLiveConnection } from "./parts";
+import { useFinishHandoff } from "./useFinishHandoff";
 
 /** The log's last lines under the page (the design shows three). */
 const LOG_LINES = 3;
@@ -97,7 +96,6 @@ export function BrowserCard({
   const dir = useDirectory();
   const c = useColors();
   const toast = useToast();
-  const sheet = useSheet();
   const raised = useSurface("e2");
   // The Cloud's computer is always on: when it doesn't answer, it says so.
   const cloud = useEdition() === "cloud";
@@ -194,39 +192,13 @@ export function BrowserCard({
       else failedToast();
     }
   };
-  const finish = async (ok: boolean, said?: string) => {
-    if (profile) {
-      await profileActions.handback.mutateAsync(profile.id).then(successHaptic, failedToast);
-      return;
-    }
-    if (!handoff) return;
-    const text = said?.slice(0, NOTE_MAX) || undefined;
-    try {
-      if (ok) await actions.done(handoff.id, text);
-      else await actions.failed(handoff.id, text);
-      successHaptic();
-    } catch {
-      failedToast();
-    }
-  };
-  // Pronto / Devolver: what the person wants the agent to know, which it reads as their own words.
+  const finishing = useFinishHandoff(handoff, name, doneLabel);
+  const couldnt = finishing.couldnt;
+  // A profile's control has no task to report on: Devolver just hands it back.
   const handBack = () => {
+    if (!profile) return finishing.handBack();
     tapHaptic();
-    if (profile) return void finish(true);
-    sheet.open(
-      <PromptForm
-        title={t("mobile.browser.done.title")}
-        intro={t(`mobile.browser.done.intro${g}`, { name })}
-        placeholder={t("mobile.browser.done.placeholder")}
-        submitLabel={doneLabel}
-        icon="check"
-        allowEmpty
-        onSubmit={async (text) => {
-          sheet.close();
-          await finish(true, text);
-        }}
-      />,
-    );
+    void profileActions.handback.mutateAsync(profile.id).then(successHaptic, failedToast);
   };
   const stop = () => {
     tapHaptic();
@@ -246,37 +218,6 @@ export function BrowserCard({
     setAttempt((n) => n + 1);
     if (mayDrive && !profile) void actions.restart(agentId).catch(failedToast).finally(live.retry);
     else live.retry();
-  };
-  const couldnt = () => {
-    tapHaptic();
-    sheet.open(
-      <PromptForm
-        title={t("mobile.browser.failed.title")}
-        intro={t(`mobile.browser.failed.intro${g}`, { name })}
-        placeholder={t("mobile.browser.failed.placeholder")}
-        submitLabel={t("mobile.browser.failed.send")}
-        allowEmpty
-        onSubmit={async (text) => {
-          sheet.close();
-          await finish(false, text.trim() || undefined);
-        }}
-      >
-        <View style={styles.reasons}>
-          {FAILED_REASONS.map((r) => (
-            <Button
-              key={r}
-              variant="secondary"
-              size="sm"
-              label={t(`mobile.browser.failed.reason.${r}`)}
-              onPress={() => {
-                sheet.close();
-                void finish(false, t(`mobile.browser.failed.reason.${r}`));
-              }}
-            />
-          ))}
-        </View>
-      </PromptForm>,
-    );
   };
 
   // ── The header: what the card says it is ──
@@ -452,7 +393,7 @@ export function BrowserCard({
                   }
                 />
               ) : null}
-              <TypeBar onInput={live.sendInput} />
+              <TypeBar {...browserTyping(live.sendInput)} />
               {/* A take over asked for nothing: it only hands back. */}
               {handoff?.kind === "ask" ? (
                 <Pressable onPress={couldnt} accessibilityRole="button" hitSlop={6} style={styles.couldnt}>
@@ -551,6 +492,5 @@ const styles = StyleSheet.create({
   note: { paddingHorizontal: 12, paddingVertical: 10 },
   log: { paddingHorizontal: 12, paddingVertical: 6 },
   step: { flexDirection: "row", alignItems: "center", paddingVertical: 6 },
-  reasons: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   fuse: { marginTop: 0 },
 });

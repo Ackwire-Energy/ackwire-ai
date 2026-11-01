@@ -21,6 +21,7 @@ import {
   DESKTOP_CJK_APT_PACKAGES,
   DESKTOP_DOCK_APT_PACKAGES,
   DESKTOP_LOOK_APT_PACKAGES,
+  ISOLATION_APT_PACKAGES,
   installScript,
   RUNNER_BUN_SHA256,
   RUNNER_BUN_VERSION,
@@ -31,6 +32,8 @@ import {
   agentLimits,
   agentSlice,
   agentSliceLimitsPath,
+  agentTmp,
+  agentTmpCleanupPath,
   allAgentsLimitsPath,
   installSystemService,
   SYSTEM_UNIT_PATH,
@@ -123,7 +126,7 @@ test.if(posix)("service install --system refuses without root and off Linux, and
 
 test.if(posix)("service install --system: a system home, and it starts only when asked and connected", () => {
   const h = home();
-  const unitPath = path.join(h, "systemd", "agentes-runner.service");
+  const unitPath = path.join(h, "etc/systemd/system/agentes-runner.service");
   const calls: string[] = [];
   let lines: string[] = [];
   let fail = "";
@@ -160,7 +163,7 @@ test.if(posix)("service install --system: a system home, and it starts only when
   // computer's RAM (systemd works it out as it loads the units) where it stops, nothing that only slows it down,
   // swap for a third of that (8 GiB here: 1638 MiB), and room for threads.
   expect(agentSlice(21003)).toBe("agents-21003.slice");
-  expect(agentSliceLimitsPath(unitPath)).toBe(path.join(h, "systemd", "agents-.slice.d", "limits.conf"));
+  expect(agentSliceLimitsPath(unitPath)).toBe(path.join(h, "etc/systemd/system/agents-.slice.d/limits.conf"));
   expect(agentSliceLimitsPath()).toBe("/etc/systemd/system/agents-.slice.d/limits.conf");
   expect(readFileSync(agentSliceLimitsPath(unitPath), "utf8").split("\n")).toEqual([
     "[Slice]",
@@ -172,7 +175,7 @@ test.if(posix)("service install --system: a system home, and it starts only when
   ]);
   // All of them together (agents.slice): with their swap in RAM at 2:1, 87.5% of it, and the rest of the computer
   // stays for the system, the runner and the guard.
-  expect(allAgentsLimitsPath(unitPath)).toBe(path.join(h, "systemd", "agents.slice.d", "limits.conf"));
+  expect(allAgentsLimitsPath(unitPath)).toBe(path.join(h, "etc/systemd/system/agents.slice.d/limits.conf"));
   expect(allAgentsLimitsPath()).toBe("/etc/systemd/system/agents.slice.d/limits.conf");
   expect(readFileSync(allAgentsLimitsPath(unitPath), "utf8").split("\n")).toEqual([
     "[Slice]",
@@ -186,6 +189,13 @@ test.if(posix)("service install --system: a system home, and it starts only when
   // Where their counters are read (memory.events).
   expect(AGENTS_CGROUP).toBe("/sys/fs/cgroup/agents.slice");
   expect(agentCgroup(21003)).toBe("/sys/fs/cgroup/agents.slice/agents-21003.slice");
+  // Each agent's own temporary folders: /tmp, /dev/shm and /run/lock in memory, /var/tmp on disk; what it leaves
+  // goes after 10 days, 30 in /var/tmp, as in a stock system.
+  expect(agentTmpCleanupPath()).toBe("/etc/tmpfiles.d/agentes-runner.conf");
+  expect(agentTmp(21003)).toBe("/run/agentes-runner-tmp/21003/tmp");
+  expect(readFileSync(agentTmpCleanupPath(unitPath), "utf8")).toBe(
+    "# agentes.chat runner: each agent's own temporary folders\ne /run/agentes-runner-tmp/*/* - - - 10d\ne /var/lib/agentes-runner-tmp/*/* - - - 30d\n",
+  );
 
   // Not connected yet: an unpaired runner would only restart in a loop.
   expect(install()).toBe(0);
@@ -227,7 +237,7 @@ test.if(posix)(
   "service install --host: the server's own computer keeps room for Docker, Postgres and the server",
   () => {
     const h = home();
-    const unitPath = path.join(h, "systemd", "agentes-runner.service");
+    const unitPath = path.join(h, "etc/systemd/system/agentes-runner.service");
     const install = (o: { args?: string[] } = {}) =>
       installSystemService({
         print: () => {},
@@ -276,7 +286,7 @@ test.if(posix)(
   () => {
     for (const umask of [0o077, 0o022]) {
       const h = home();
-      const unitPath = path.join(h, "systemd", "agentes-runner.service");
+      const unitPath = path.join(h, "etc/systemd/system/agentes-runner.service");
       const limits = agentSliceLimitsPath(unitPath);
       const all = allAgentsLimitsPath(unitPath);
       // As a run under umask 077 left them: PID 1 warned at every read.
@@ -310,7 +320,7 @@ test.if(posix && process.getuid?.() !== 0)(
   () => {
     for (const which of [(unit: string) => unit, agentSliceLimitsPath, allAgentsLimitsPath]) {
       const h = home();
-      const unitPath = path.join(h, "systemd", "agentes-runner.service");
+      const unitPath = path.join(h, "etc/systemd/system/agentes-runner.service");
       const masked = which(unitPath);
       mkdirSync(path.dirname(masked), { recursive: true });
       symlinkSync("/dev/null", masked);
@@ -499,9 +509,14 @@ test.if(posix)(
     const tools = home();
     for (const tool of ["xargs", "sed", "grep", "dirname"])
       symlinkSync(Bun.which(tool) as string, path.join(tools, tool));
-    // Root on Linux, as far as the script can tell.
+    // Root on Linux, as far as the script can tell, with Debian's systemd.
     writeFileSync(path.join(tools, "id"), "#!/bin/sh\necho 0\n", { mode: 0o755 });
     writeFileSync(path.join(tools, "uname"), "#!/bin/sh\necho Linux\n", { mode: 0o755 });
+    const systemctl = (features: string) =>
+      writeFileSync(path.join(tools, "systemctl"), `#!/bin/sh\necho "systemd 257 (257.9)"\necho "${features}"\n`, {
+        mode: 0o755,
+      });
+    systemctl("+PAM +AUDIT +SECCOMP +BPF_FRAMEWORK +TPM2");
     // apt-get notes its calls (and has none of the packages in $MISSING); apt-cache knows the packages in $KNOWN
     // once apt-get update has fetched the lists.
     writeFileSync(
@@ -539,15 +554,25 @@ test.if(posix)(
     const install = (packages: readonly string[]) =>
       `apt-get -qq -o DPkg::Lock::Timeout=600 install -y --no-install-recommends ${packages.join(" ")}\n`;
 
-    // --system alone, on Debian 12 or Ubuntu 22.04: the names as they are.
+    // Ubuntu's systemd has no BPF_FRAMEWORK: no agent's process could start, so nothing is installed.
+    systemctl("+PAM +AUDIT +SECCOMP -BPF_FRAMEWORK +TPM2");
+    let r = step(false);
+    expect(r.status).toBe(1);
+    expect(r.out).toContain("--system needs systemd built with BPF_FRAMEWORK");
+    expect(r.calls).toBe("");
+    systemctl("+PAM +AUDIT +SECCOMP +BPF_FRAMEWORK +TPM2");
+
+    // --system alone, on Debian 12: the names as they are.
     // Without a terminal: the title, then each wait once and its line, whole.
     const head = "agentes.chat connect this computer\n";
-    let r = step(false);
+    r = step(false);
     expect(r.status).toBe(0);
     expect(r.out).toBe(
-      `${head}◒  Installing the packages for the agents' browser\n◇  The packages for the agents' browser\n`,
+      `${head}◒  Installing the packages for the agents' isolation and browser\n◇  The packages for the agents' isolation and browser\n`,
     );
-    expect(r.calls).toBe(update + install(BROWSER_APT_PACKAGES));
+    // nft for the loopback guard (system mode won't start without it), ss for the bind check.
+    expect(ISOLATION_APT_PACKAGES).toEqual(["nftables", "iproute2"]);
+    expect(r.calls).toBe(update + install([...ISOLATION_APT_PACKAGES, ...BROWSER_APT_PACKAGES]));
     // What a computer with the desktops' packages still lacks: they bring every other library Chrome links.
     expect(BROWSER_APT_PACKAGES).toEqual(expect.arrayContaining(["libnss3", "libnspr4", "libasound2"]));
 
@@ -555,13 +580,13 @@ test.if(posix)(
     const renamed = ["libasound2", "libatk-bridge2.0-0", "libatk1.0-0", "libatspi2.0-0", "libcups2", "libglib2.0-0"];
     const t64 = BROWSER_APT_PACKAGES.map((p) => (renamed.includes(p) ? `${p}t64` : p));
     r = step(false, { known: t64 });
-    expect(r.calls).toBe(update + install(t64));
+    expect(r.calls).toBe(update + install([...ISOLATION_APT_PACKAGES, ...t64]));
     expect(r.calls).toContain(" libasound2t64 ");
 
     // With --desktop: one install with the screens' packages too.
     r = step(true, { known: t64 });
     const screens =
-      "◒  Installing the packages for the agents' browser and screens\n◇  The packages for the agents' browser and screens\n";
+      "◒  Installing the packages for the agents' isolation, browser and screens\n◇  The packages for the agents' isolation, browser and screens\n";
     expect(r.out).toBe(`${head}${screens}`);
     // Then the screens' theme, their CJK fonts and their dock, each in its own call where apt has it: a failure
     // only says so.
@@ -570,7 +595,9 @@ test.if(posix)(
     const dock = install(DESKTOP_DOCK_APT_PACKAGES);
     expect(DESKTOP_CJK_APT_PACKAGES).toEqual(["fonts-noto-cjk"]);
     expect(DESKTOP_DOCK_APT_PACKAGES).toEqual(["xfce4-docklike-plugin"]);
-    expect(r.calls).toBe(update + install([...t64, ...DESKTOP_APT_PACKAGES]) + look + cjk + dock);
+    expect(r.calls).toBe(
+      update + install([...ISOLATION_APT_PACKAGES, ...t64, ...DESKTOP_APT_PACKAGES]) + look + cjk + dock,
+    );
     // No Orchis (Ubuntu 22.04): the fonts and the dock are still asked for, each on its own.
     r = step(true, { known: t64, missing: ["orchis-gtk-theme"] });
     expect(r.status).toBe(0);
@@ -596,7 +623,7 @@ test.if(posix)(
     expect(r.status).toBe(0);
     expect(r.calls).toBe("");
     expect(r.out).toBe(
-      `${head}▲  For the agents' browser and screens, install these packages (Debian names) with this computer's package manager: ${[...BROWSER_APT_PACKAGES, ...DESKTOP_APT_PACKAGES].join(" ")}\n`,
+      `${head}▲  For the agents' isolation, browser and screens, install these packages (Debian names) with this computer's package manager: ${[...ISOLATION_APT_PACKAGES, ...BROWSER_APT_PACKAGES, ...DESKTOP_APT_PACKAGES].join(" ")}\n`,
     );
   },
 );

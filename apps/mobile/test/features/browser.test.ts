@@ -58,14 +58,8 @@ describe("the help request card", () => {
     expect(cardStateOf({ status: "expired", controllerUserId: null }, "u1")).toBe("expired");
   });
 
-  test("a request on the agent's desktop opens on a computer: never the browser card, never taken here", () => {
-    const desktop = { screen: "desktop" as const, controllerUserId: null };
-    expect(cardStateOf({ ...desktop, status: "pending" }, "u1")).toBe("computer");
-    expect(cardStateOf({ ...desktop, status: "active", controllerUserId: "u1" }, "u1")).toBe("computer");
-    // How it ended reads as any request's.
-    expect(cardStateOf({ ...desktop, status: "done" }, "u1")).toBe("done");
-    expect(cardStateOf({ screen: "browser", status: "pending", controllerUserId: null }, "u1")).toBe("waiting");
-    for (const keys of [featureKeysPtBR, featureKeysEn]) expect(keys.browser.card.computer).toContain("{{title}}");
+  test("no word left sends a request on the agent's screen to a laptop", () => {
+    for (const keys of [featureKeysPtBR, featureKeysEn]) expect(keys.browser.card).not.toHaveProperty("computer");
   });
 
   test("the site's host", () => {

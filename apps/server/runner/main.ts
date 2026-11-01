@@ -22,9 +22,14 @@ import {
   setTool,
   TOOL_NAMES,
 } from "./access";
-import { AgentUsers, agentGid, systemLauncher } from "./agent-users";
-import { verifyBrowserBindPolicy } from "./browser-bind-check";
-import { ensureBrowserBindPolicy } from "./browser-bind-policy";
+import { type AgentUser, AgentUsers, agentGid, denySchedulers, systemLauncher } from "./agent-users";
+import {
+  POLICY_NOT_IN_FORCE_EXIT,
+  PolicyNotInForce,
+  parseBindCheck,
+  verifyBrowserBindPolicy,
+} from "./browser-bind-check";
+import { ensureBrowserBindPolicy, prepareAgents } from "./browser-bind-policy";
 import { browserPortsForUid } from "./browser-ports";
 import {
   configPath,
@@ -33,6 +38,7 @@ import {
   expandHome,
   normalizeServerUrl,
   pairedConfig,
+  parseService,
   parseUidRange,
   readConfig,
   readStoredConfig,
@@ -53,7 +59,7 @@ import { hasBunTerminal, runningCompiled, thisRunner } from "./launch";
 import { acquireLock, lockedMessage, pidAlive, readLock } from "./lock";
 import { RotatingFile } from "./logfile";
 import { adoptLoginPath } from "./login-path";
-import { LoopbackGuard } from "./loopback-guard";
+import { LoopbackGuard, loopbackEndpoints, runnerEndpoints } from "./loopback-guard";
 import { MCP_TOKEN_FILE, mcpSocketPath, runMcpServer } from "./mcp";
 import {
   type DeviceGrant,
@@ -114,6 +120,9 @@ Usage:
   agentes-runner tools [list | enable <tool> | disable <tool>]
       Turns claude (Claude Code), codex (Codex), commands, browser, desktop or terminal on or off on
       this computer.
+  agentes-runner services [list | allow <tcp|udp>/<port> | remove <tcp|udp>/<port>]
+      System mode: what of this computer's own servers agents may reach besides DNS (an Ollama on
+      tcp/11434, say). Each agent always reaches its own local ports, never another agent's.
   agentes-runner desktop-check --agent <handle>
       Checks an agent's desktop and terminal here (Linux): starts its desktop, logs in to it as the
       person in control and as a watcher (who can't move the pointer), reads it and acts on it the
@@ -455,17 +464,19 @@ async function worker(p: Parsed): Promise<number> {
   });
 }
 
-/** Internal kernel self-check run by root in the candidate agent slice. */
-async function bindCheck(portText: string | undefined, allowedText: string[]): Promise<number> {
-  const port = Number(portText);
-  const allowed = allowedText.map(Number);
-  if (process.getuid?.() === 0) return 1;
+/** Internal kernel self-check run by root in the candidate agent slice; prints the /tmp it sees for root to check. */
+async function bindCheck(args: string[]): Promise<number> {
+  const check = parseBindCheck(args);
+  if (!check || process.getuid?.() === 0) {
+    console.error("bind-check runs as an agent, started by the runner");
+    return 1;
+  }
   try {
-    await verifyBrowserBindPolicy(port, allowed);
+    console.log(`tmp ${await verifyBrowserBindPolicy(check)}`);
     return 0;
   } catch (err) {
     console.error(err instanceof Error ? err.message : String(err));
-    return 1;
+    return err instanceof PolicyNotInForce ? POLICY_NOT_IN_FORCE_EXIT : 1;
   }
 }
 
@@ -531,11 +542,18 @@ async function host(p: Parsed): Promise<number> {
     log,
     start: runnerChild(thisRunner(), (line) => console.log(line)),
   });
+  // One guard for every organization's agents: a guard per child would replace the others' table with its own.
+  // Agents reach the server itself where it is on this computer (its git proxy, its pages).
   const guard = system
     ? new LoopbackGuard({
         home: flags.state,
         agentUids: () => computer.agentUids(),
         uidRange: DEFAULT_AGENT_UID_RANGE,
+        services: () => [
+          ...(storedOrNull(flags.state)?.services ?? []),
+          ...runnerEndpoints(),
+          ...loopbackEndpoints([flags.server]),
+        ],
         log,
       })
     : null;
@@ -545,7 +563,14 @@ async function host(p: Parsed): Promise<number> {
   log(`agentes-runner ${RUNNER_VERSION}: this server's computer for ${flags.server} (${flags.state})`);
   try {
     guard?.start();
-    if (system) for (const user of computer.agentUsers()) ensureBrowserBindPolicy(user, thisRunner());
+    if (system) {
+      const policy = { uidRange: DEFAULT_AGENT_UID_RANGE, refresh: () => void guard?.reconcile() };
+      const prepare = (user: AgentUser) => {
+        denySchedulers(user.user);
+        ensureBrowserBindPolicy(user, thisRunner(), policy);
+      };
+      prepareAgents(computer.agentUsers(), prepare, policy, log);
+    }
     await computer.run();
     log("stopped");
     return 0;
@@ -880,6 +905,40 @@ function tools(p: Parsed): number {
   return 1;
 }
 
+const SERVICES_USAGE = "Usage: agentes-runner services [list | allow <tcp|udp>/<port> | remove <tcp|udp>/<port>]";
+
+/**
+ * `agentes-runner services …`: what of this computer's own listeners agents may reach besides DNS. The running
+ * runner's guard reads it within 2 s.
+ */
+function services(p: Parsed): number {
+  const home = runnerHome();
+  const [, sub = "list", spec] = p.positional;
+  const listed = storedOrNull(home)?.services ?? [];
+  if (sub === "list") {
+    console.log("Agents reach DNS on this computer (tcp/53, udp/53), the runner's own local proxies, and:");
+    console.log(listed.length ? listed.map((s) => `  ${s}`).join("\n") : "  nothing else");
+    return 0;
+  }
+  const service = spec === undefined ? null : parseService(spec);
+  if ((sub !== "allow" && sub !== "remove") || !service) {
+    console.error(SERVICES_USAGE);
+    return 1;
+  }
+  if (sub === "remove" && !listed.includes(service)) {
+    console.error(`${service} isn't allowed (see agentes-runner services list).`);
+    return 1;
+  }
+  const next = sub === "allow" ? [...new Set([...listed, service])] : listed.filter((s) => s !== service);
+  updateConfig((c) => ({ ...c, services: next }), home);
+  console.log(
+    sub === "allow"
+      ? `Agents can reach ${service} on this computer.`
+      : `Agents can't reach ${service} on this computer any more.`,
+  );
+  return 0;
+}
+
 /**
  * `agentes-runner desktop-check --agent <handle>` (ADR 0058): the agent's
  * desktop and terminal on this computer, through the runner's own code, as
@@ -1196,7 +1255,9 @@ async function main(argv: string[]): Promise<number> {
     case "worker":
       return worker(p);
     case "bind-check":
-      return bindCheck(sub, p.positional.slice(2));
+      return bindCheck(p.positional.slice(1));
+    case "services":
+      return services(p);
     case "desktop-browser":
       if (!sub) {
         console.error("Usage: agentes-runner desktop-browser <socket>");

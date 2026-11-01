@@ -786,6 +786,7 @@ export interface ApiClient {
   memory: {
     /** `about: "me"`: only what came from the viewer, each with `from` (the message). */
     list(orgId: string, agentId: string, filter?: { about?: "me" }): Promise<Memory[]>;
+    listAll(orgId: string): Promise<Memory[]>;
     edit(orgId: string, memoryId: string, text: string): Promise<Memory>;
     setPinned(orgId: string, memoryId: string, pinned: boolean): Promise<Memory>;
     setArchived(orgId: string, memoryId: string, archived: boolean): Promise<Memory>;

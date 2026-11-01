@@ -1,8 +1,15 @@
-import { type BrowserHandoff, handoffIsMine, useBrowserHandoff, useBrowserHandoffActions } from "@agenteschat/client";
+import {
+  type BrowserHandoff,
+  handoffIsMine,
+  handoffScreen,
+  useBrowserHandoff,
+  useBrowserHandoffActions,
+} from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
+import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { Button, Icon, Text, useToast } from "@/ui";
 import { AskButtons, AskCard, AskFoot, ExpiryLine, useAskStore } from "../chat/asks";
@@ -21,8 +28,9 @@ import { FrameView, useLiveConnection } from "./parts";
  * An agent's request for help in its browser, in the conversation. While nobody has opened it, it is the
  * request card: what the agent needs, "Ver a tela" showing its page as it is now, Abrir (takes the control
  * right here: the card becomes the agent's browser card) and "Agora não" (tells the agent, with an optional
- * reason). A request on the agent's desktop is the same card, saying it opens on a computer, and one line
- * once someone helps there. Once someone is in control of the browser it is the agent's browser card; once
+ * reason). A request on the agent's desktop is the same card, Abrir taking it into the computer's full view (the
+ * screen needs its room, ADR 0098), and one line that opens that view once someone helps there. Once someone is
+ * in control of the browser it is the agent's browser card; once
  * it ends, one line with how. The state comes from the message (`meta.browserHandoff`) and is refreshed
  * from the server. A push or the inbox opens this card.
  */
@@ -33,9 +41,11 @@ export function HandoffCard({ handoff: fromMessage }: { handoff: BrowserHandoff 
   const c = useColors();
   const surface = useSurface();
   const openId = useOpenHandoffId();
+  const dir = useDirectory();
   const fresh = useBrowserHandoff(orgId, fromMessage.id);
   const h: BrowserHandoff = fresh.data ?? fromMessage;
   const state = cardStateOf(h, meId);
+  const desktop = handoffScreen(h) === "desktop";
   // Opened from here (Abrir, a push): the browser card that takes the request's place starts open.
   const [open, setOpen] = useState(false);
 
@@ -52,18 +62,25 @@ export function HandoffCard({ handoff: fromMessage }: { handoff: BrowserHandoff 
       </View>
     );
   }
-  if (state === "computer" && h.status !== "pending") {
+  if (desktop && (state === "mine" || state === "helping")) {
+    const helper = h.controllerUserId ? dir.memberById.get(h.controllerUserId)?.name : undefined;
     return (
-      <View style={[styles.done, surface]}>
+      <Pressable
+        onPress={() => router.push(`/computer/${h.agentId}`)}
+        accessibilityRole="button"
+        style={[styles.done, surface]}
+      >
         <Icon name="laptop" size={16} color={c.muted} />
         <Text variant="small" tone="muted" style={styles.grow}>
-          {t("mobile.browser.card.computer", { title: h.instructions })}
+          {state === "mine"
+            ? t("mobile.browser.live.inControl")
+            : t("mobile.browser.live.helping", { name: helper ?? t("channel.unknownPerson") })}
         </Text>
-      </View>
+      </Pressable>
     );
   }
-  if (state === "computer" || state === "waiting") {
-    return <HandoffAsk handoff={h} desktop={state === "computer"} claim={openId === h.id} onOpened={setOpen} />;
+  if (state === "waiting") {
+    return <HandoffAsk handoff={h} desktop={desktop} claim={openId === h.id} onOpened={setOpen} />;
   }
   return <BrowserCard agentId={h.agentId} handoff={h} claim={openId === h.id} open={open} onToggle={setOpen} />;
 }
@@ -103,6 +120,7 @@ function HandoffAsk({
     try {
       await actions.takeControl(h.id);
       asks?.settle(h.id);
+      if (desktop) router.push(`/computer/${h.agentId}`);
     } catch {
       failed();
     }
@@ -111,10 +129,15 @@ function HandoffAsk({
   const claimed = useRef(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: once per request, when it opened the conversation
   useEffect(() => {
-    if (!claim || desktop || !mine || claimed.current || h.status !== "pending") return;
+    if (!claim || !mine || claimed.current || h.status !== "pending") return;
     claimed.current = true;
     onOpened(true);
-    actions.takeControl(h.id).catch(() => {});
+    actions.takeControl(h.id).then(
+      () => {
+        if (desktop) router.push(`/computer/${h.agentId}`);
+      },
+      () => {},
+    );
   }, [claim, desktop, mine, h.id, h.status]);
 
   // "Agora não": the agent hears it couldn't be done now, with the reason if one is given.
@@ -150,14 +173,12 @@ function HandoffAsk({
       well={{
         tile: <IconTile name={desktop ? "laptop" : "globe"} size={32} />,
         title: name,
-        detail: desktop ? t("agentComputer.phone.fromComputer") : null,
+        detail: null,
         more: desktop ? null : { label: t("ask.seeScreen"), content: <ScreenPeek agentId={h.agentId} /> },
       }}
       foot={
         <AskFoot expiry={h.expiresAt ? <ExpiryLine createdAt={h.createdAt} expiresAt={h.expiresAt} /> : null}>
-          {mine && desktop ? (
-            <Button variant="secondary" size="card" wide label={t("approval.notNow")} onPress={notNow} />
-          ) : mine ? (
+          {mine ? (
             <AskButtons
               primary={
                 <Button variant="primary" size="card" wide label={t("mobile.browser.card.open")} onPress={take} />

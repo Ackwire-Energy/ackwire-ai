@@ -1,4 +1,5 @@
-import type { Issue, IssuePriority, IssueStatus } from "../api/types";
+import type { TFunction } from "i18next";
+import type { Issue, IssueActivity, IssuePriority, IssueStatus } from "../api/types";
 
 export const BOARD: IssueStatus[] = ["todo", "in_progress", "in_review", "done"];
 export const STATUSES: IssueStatus[] = [...BOARD, "canceled"];
@@ -12,6 +13,17 @@ export const STATUS_ICON: Record<IssueStatus, "stageTodo" | "stageProgress" | "s
   done: "stageDone",
   canceled: "close",
 };
+
+/** An event of a task in the person's language from its code (`issues.event.*`); the server's words as the fallback. */
+export function issueEventText(t: TFunction, a: Pick<IssueActivity, "text" | "textCode" | "textParams">) {
+  if (!a.textCode) return a.text;
+  const p = a.textParams ?? {};
+  const extra = {
+    ...(p.status ? { status: t(`issues.status.${p.status}`, { defaultValue: p.status }) } : {}),
+    ...(p.priority ? { priority: t(`issues.priority.${p.priority}`, { defaultValue: p.priority }) } : {}),
+  };
+  return t(`issues.event.${a.textCode}`, { ...p, ...extra, defaultValue: a.text });
+}
 
 /** Description text → description + acceptance criteria (lines starting with "-", "*" or "[ ]"). */
 export function splitCriteria(text: string) {

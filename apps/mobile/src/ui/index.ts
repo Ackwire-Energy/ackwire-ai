@@ -9,6 +9,7 @@ export { PersonAvatar, type PersonAvatarProps } from "@/agent/PersonAvatar";
 export { InkOrbit, PixelDone, PixelFail, PixelStop, PixelStopped } from "@/agent/PixelMarks";
 export { PixelOrbit, type PixelOrbitProps } from "@/agent/PixelOrbit";
 export type { AgentMode } from "@/agent/poses";
+export { ComputerSky } from "@/sky/ComputerSky";
 export { Fuse, type FuseProps } from "@/sky/Fuse";
 export type { PlanState } from "@/sky/math";
 export { PlanTrack, type PlanTrackProps } from "@/sky/PlanTrack";
