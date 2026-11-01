@@ -123,3 +123,80 @@ export function toggleTask(body: string, line: number): string {
   lines[line] = next;
   return lines.join("\n");
 }
+
+export interface Placed {
+  slug: string;
+  x: number;
+  y: number;
+}
+
+/**
+ * A small force-directed layout (no library): nodes repel, links pull,
+ * everything drifts to the center. Deterministic (starts on a circle), so
+ * the same graph always lands the same way.
+ */
+export function layoutGraph(graph: { nodes: { slug: string }[]; edges: { from: string; to: string }[] }, width = 720, height = 460, steps = 240): Placed[] {
+  const n = graph.nodes.length;
+  if (n === 0) return [];
+  const pos = graph.nodes.map((node, i) => {
+    const a = (2 * Math.PI * i) / n;
+    return {
+      slug: node.slug,
+      x: width / 2 + Math.cos(a) * width * 0.3,
+      y: height / 2 + Math.sin(a) * height * 0.3,
+      vx: 0,
+      vy: 0,
+    };
+  });
+  const index = new Map(pos.map((p, i) => [p.slug, i]));
+  const edges = graph.edges
+    .map((e) => [index.get(e.from), index.get(e.to)] as const)
+    .filter((e): e is readonly [number, number] => e[0] !== undefined && e[1] !== undefined && e[0] !== e[1]);
+  const k = Math.sqrt((width * height) / n) * 0.6;
+  for (let step = 0; step < steps; step++) {
+    const cool = 1 - step / steps;
+    for (let i = 0; i < n; i++) {
+      const a = pos[i] as (typeof pos)[number];
+      for (let j = i + 1; j < n; j++) {
+        const b = pos[j] as (typeof pos)[number];
+        let dx = a.x - b.x;
+        let dy = a.y - b.y;
+        let d2 = dx * dx + dy * dy;
+        if (d2 < 0.01) {
+          dx = 0.1 * (i - j);
+          dy = 0.1;
+          d2 = dx * dx + dy * dy;
+        }
+        const f = (k * k) / d2;
+        a.vx += dx * f * 0.02;
+        a.vy += dy * f * 0.02;
+        b.vx -= dx * f * 0.02;
+        b.vy -= dy * f * 0.02;
+      }
+    }
+    for (const [i, j] of edges) {
+      const a = pos[i] as (typeof pos)[number];
+      const b = pos[j] as (typeof pos)[number];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const d = Math.sqrt(dx * dx + dy * dy) || 1;
+      const f = ((d - k) / d) * 0.06;
+      a.vx += dx * f;
+      a.vy += dy * f;
+      b.vx -= dx * f;
+      b.vy -= dy * f;
+    }
+    for (const p of pos) {
+      p.vx += (width / 2 - p.x) * 0.004;
+      p.vy += (height / 2 - p.y) * 0.004;
+      const max = 12 * cool + 1;
+      p.x += Math.max(-max, Math.min(max, p.vx));
+      p.y += Math.max(-max, Math.min(max, p.vy));
+      p.vx *= 0.6;
+      p.vy *= 0.6;
+      p.x = Math.max(24, Math.min(width - 24, p.x));
+      p.y = Math.max(24, Math.min(height - 24, p.y));
+    }
+  }
+  return pos.map(({ slug, x, y }) => ({ slug, x: Math.round(x), y: Math.round(y) }));
+}

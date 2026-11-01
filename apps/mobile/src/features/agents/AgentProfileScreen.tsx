@@ -68,15 +68,14 @@ import { openAgentEdit } from "./AgentEditScreen";
 import {
   canEditMemories,
   type DidLine,
-  dayWord,
   didLines,
   knownAboutMe,
-  memoryOrigin,
   plainRole,
   spendOf,
   usesOf,
 } from "./logic";
 import { MonthPixels } from "./MonthPixels";
+import { useMemoryOriginText } from "./useMemoryOriginText";
 import { workTitle } from "./work";
 
 /** Rows of "O que fez por você" before "Ver tudo". */
@@ -188,27 +187,7 @@ function Profile({ id }: { id: string }) {
     new Intl.NumberFormat(i18n.language || "pt-BR", { style: "currency", currency: "USD" }).format(v);
   const date = (iso: string) =>
     new Intl.DateTimeFormat(when.locale, { day: "numeric", month: "short" }).format(new Date(iso)).replace(".", "");
-  const dayText = (iso: string) => {
-    const d = dayWord(iso);
-    return d.kind === "date"
-      ? t("mobile.intentAgents.knows.when.date", { date: date(iso) })
-      : t(`mobile.intentAgents.knows.when.${d.kind}`);
-  };
-  const originText = (m: Memory) => {
-    const o = memoryOrigin(m, meId);
-    switch (o.kind) {
-      case "saidDm":
-        return t("mobile.intentAgents.knows.saidDm", { when: dayText(o.at) });
-      case "saidChannel":
-        return o.channel
-          ? t("mobile.intentAgents.knows.saidChannel", { channel: o.channel, date: date(o.at) })
-          : t("mobile.intentAgents.knows.saidSomewhere", { date: date(o.at) });
-      case "wrote":
-        return t("mobile.intentAgents.knows.wrote", { date: date(o.at) });
-      case "learned":
-        return t("mobile.intentAgents.knows.learned", { date: date(o.at) });
-    }
-  };
+  const originText = useMemoryOriginText();
 
   const openDm = () =>
     api.dms
@@ -686,7 +665,7 @@ function NowPill({ leading, label, onPress }: { leading: ReactNode; label: strin
 }
 
 /** "Corrigir uma memória": edit the text (the old one stays in the history) or forget it (archived). */
-function MemoryFix({
+export function MemoryFix({
   memory: m,
   agentId,
   agentName,

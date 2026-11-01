@@ -43,7 +43,6 @@ export function listState(i: Pick<Issue, "status" | "work" | "pullRequests">): I
 export const waitsOnYou = (i: Pick<Issue, "status" | "work">) => issueState(i) === "waiting";
 
 export type IssueFilter = "open" | "mine" | "agents" | "done";
-export const ISSUE_FILTERS: IssueFilter[] = ["open", "mine", "agents", "done"];
 
 export function passesFilter(
   i: Pick<Issue, "status" | "work" | "assignee">,
@@ -60,14 +59,6 @@ export function passesFilter(
     case "done":
       return !isOpen(i);
   }
-}
-
-/** The counts on the "Abertas" and "Com você" chips (the others show none, as designed). */
-export function filterCounts(list: Pick<Issue, "status" | "work" | "assignee">[], meId: string | null) {
-  return {
-    open: list.filter((i) => passesFilter(i, "open", meId)).length,
-    mine: list.filter((i) => passesFilter(i, "mine", meId)).length,
-  };
 }
 
 /** The list's stages: what is moving first, then what waits to start; closed ones under "Concluídas". */
@@ -137,6 +128,44 @@ export function issueSections(
     out.push({ key: stage, count: items.length, showColumns: stageCustomized(cols), groups });
   }
   return out;
+}
+
+/** The board's columns on the phone, always these four, so a swipe lands in the same place. */
+export const BOARD_STAGES: readonly IssueStatus[] = ["in_progress", "in_review", "todo", "done"];
+
+/** What needs someone comes first in a column, then what is moving. */
+const urgency = (i: Issue) => {
+  const state = issueState(i);
+  return state === "waiting" ? 0 : state === "running" ? 1 : state === "stalled" ? 2 : 3;
+};
+
+export interface BoardColumn {
+  stage: IssueStatus;
+  count: number;
+  showColumns: boolean;
+  groups: IssueColumnGroup<Issue>[];
+}
+
+/** The board: each stage with its tasks, canceled ones in "Feito"; a stage with nothing stays as an empty column. */
+export function issueBoard(list: Issue[], columns: IssueColumn[] = []): BoardColumn[] {
+  const sections = [
+    ...issueSections(list, "open", null, columns),
+    ...issueSections(list, "done", null, columns),
+  ];
+  return BOARD_STAGES.map((stage) => {
+    const here = sections.filter((s) => s.key === stage || (stage === "done" && s.key === "canceled"));
+    return {
+      stage,
+      count: here.reduce((n, s) => n + s.count, 0),
+      showColumns: here.some((s) => s.showColumns),
+      groups: here.flatMap((s) =>
+        s.groups.map((g) => ({
+          ...g,
+          items: [...g.items].sort((x, y) => urgency(x) - urgency(y)),
+        })),
+      ),
+    };
+  });
 }
 
 /** The column picker: the stages in board order, each with its columns (stages without columns left out). */

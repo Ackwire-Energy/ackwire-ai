@@ -86,6 +86,8 @@ export const keys = {
   agentPlanUsage: (orgId: string, agentId: string) => ["org", orgId, "plan-usage", "agent", agentId] as const,
   platformKey: (orgId: string) => ["org", orgId, "platform-key"] as const,
   roster: (orgId: string, channelId: string) => ["org", orgId, "channel", channelId, "roster"] as const,
+  /** All the agents' memories, for the workspace's map. */
+  orgMemories: (orgId: string) => ["org", orgId, "memories"] as const,
   memory: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "memory"] as const,
   /** Under `memory`: invalidating an agent's memories also refreshes "O que sabe sobre você". */
   memoryAboutMe: (orgId: string, agentId: string) => ["org", orgId, "agent", agentId, "memory", "me"] as const,

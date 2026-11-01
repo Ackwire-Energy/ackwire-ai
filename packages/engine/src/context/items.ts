@@ -19,7 +19,7 @@ import { can, requirePermission } from "../organizations";
 import { enqueueIndex, userVisibleChannels } from "../search";
 import { type Plan, planConsolidation } from "./judgments";
 
-const { contextItems } = schema;
+const { agents, contextItems } = schema;
 
 export type ContextItem = typeof contextItems.$inferSelect;
 export type ContextKind = ContextItem["kind"];
@@ -397,6 +397,30 @@ export async function listAgentMemoryRows(db: Database, actorId: string, orgId: 
       ),
     );
   return { items, visible };
+}
+
+/**
+ * What all the agents know, for a map of the workspace's memory: the current items of agents still here, under the
+ * same rule as `listAgentMemoryRows`, most recently changed first.
+ */
+export async function listOrgMemoryRows(db: Database, actorId: string, orgId: string, limit = 300) {
+  await requirePermission(db, actorId, orgId, "read");
+  const visible = await userVisibleChannels(db, orgId, actorId);
+  const rows = await db
+    .select({ item: contextItems })
+    .from(contextItems)
+    .innerJoin(agents, and(eq(agents.id, contextItems.agentId), isNull(agents.archivedAt)))
+    .where(
+      and(
+        eq(contextItems.orgId, orgId),
+        eq(contextItems.status, "active"),
+        isNull(contextItems.supersededBy),
+        arrayContained(contextItems.channelIds, visible),
+      ),
+    )
+    .orderBy(desc(contextItems.updatedAt))
+    .limit(limit);
+  return { items: rows.map((r) => r.item), visible };
 }
 
 /**

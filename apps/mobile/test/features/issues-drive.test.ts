@@ -8,9 +8,10 @@ import {
   criteriaProgress,
   currentStep,
   dueDateOf,
-  filterCounts,
   isLate,
   issueNumberOf,
+  issueBoard,
+  issueBoard,
   issueSections,
   issueState,
   latestPr,
@@ -123,9 +124,22 @@ describe("issue filters and sections", () => {
     expect(nums("mine")).toEqual([129, 126]);
     expect(nums("agents")).toEqual([134, 131, 129, 127]);
     expect(nums("done")).toEqual([120, 119]);
-    expect(filterCounts(list, "me")).toEqual({ open: 5, mine: 2 });
-    // Signed-in person not known yet: only what waits counts as "with you".
-    expect(filterCounts(list, null).mine).toBe(1);
+  });
+
+  test("the board: always four columns, what waits first, canceled under Feito", () => {
+    const board = issueBoard([
+      issue({ number: 1, status: "in_progress" }),
+      issue({ number: 2, status: "in_progress", work: work("running") }),
+      issue({ number: 3, status: "in_progress", work: work("waiting_input") }),
+      issue({ number: 4, status: "canceled" }),
+    ]);
+    expect(board.map((b) => [b.stage, b.count])).toEqual([
+      ["in_progress", 3],
+      ["in_review", 0],
+      ["todo", 0],
+      ["done", 1],
+    ]);
+    expect(board[0]?.groups[0]?.items.map((i) => i.number)).toEqual([3, 2, 1]);
   });
 
   const shape = (sections: ReturnType<typeof issueSections>) =>
