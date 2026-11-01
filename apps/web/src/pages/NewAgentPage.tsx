@@ -452,6 +452,7 @@ function NewAgentFlow({ from }: { from?: AgentProposal }) {
     setIndex(next);
     setReached((r) => Math.max(r, next));
     setPreviewOpen(false);
+    setImporting(false);
     scrollTop();
   };
   // Moving between steps puts the focus on the new step's title (not on the first render).

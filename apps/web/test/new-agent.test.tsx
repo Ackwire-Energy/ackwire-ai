@@ -317,6 +317,20 @@ describe("Criar agente: steps", () => {
     expect(title()).toBe("Qual vai ser o papel?");
   });
 
+  test("the rail during an import leaves it: the step it goes to is whole (Continuar, Enter)", async () => {
+    await open();
+    await startAs("Assistente");
+    expect(title()).toBe("Quem é");
+    await click(screen().getByRole("button", { name: "Voltar" }));
+    await click(screen().getByRole("button", { name: "Trazer agentes de outro app" }));
+    expect(title()).toBe("Trazer agentes de outro app");
+    await click(railStep("Identidade"));
+    expect(title()).toBe("Quem é");
+    expect(screen().getByRole("button", { name: /^Continuar/ })).toBeTruthy();
+    await press(document.body, "Enter");
+    expect(title()).not.toBe("Quem é");
+  });
+
   test("Dev starts as Ada, whose @ is taken: the error suggests a free one and blocks the step", async () => {
     await open();
     await startAs("Dev");
