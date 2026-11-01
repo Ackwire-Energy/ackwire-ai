@@ -15,6 +15,7 @@ export * from "./ai-status";
 export * from "./appearance";
 export * from "./approval-rules";
 export * from "./approvals";
+export * from "./apps";
 export * from "./artifact-tools";
 export * from "./artifacts";
 export * from "./audience";
