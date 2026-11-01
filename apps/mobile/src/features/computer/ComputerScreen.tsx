@@ -1,10 +1,4 @@
-import {
-  type BrowserHandoff,
-  controlledBy,
-  handoffScreen,
-  screenSteps,
-  useBrowserHandoffActions,
-} from "@agenteschat/client";
+import { type BrowserHandoff, controlledBy, handoffScreen, useBrowserHandoffActions } from "@agenteschat/client";
 import { liveSubLine } from "@agenteschat/client/lib/agent-computer";
 import { computerName, READY_FLASH_MS, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import { clockAt } from "@agenteschat/client/lib/format";
@@ -14,20 +8,21 @@ import { can } from "@agenteschat/client/lib/permissions";
 import { useNavigation } from "expo-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ComputerPortrait } from "@/computer/ComputerPortrait";
 import { useOrg } from "@/providers/org";
 import { Button, Icon, IconButton, type IconName, Text, ToastHost, useToast } from "@/ui";
 import { BrowserCard } from "../browser/BrowserCard";
-import { stepText } from "../browser/logic";
 import { openSwitchComputer } from "../outages/OutageNotice";
 import { useMachineOutages } from "../outages/queries";
 import { useColors, useDirectory, useMeId, useNow } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { goBack } from "../shared/parts";
 import { SheetHostProvider } from "../shared/SheetHost";
-import { offersSwitch, onScreen, type PhoneStage, phoneStage, screenRequest, setupSub } from "./logic";
+import { AgentScreen } from "./AgentScreen";
+import { Cover } from "./Cover";
+import { offersSwitch, type PhoneStage, phoneStage, setupSub } from "./logic";
 import { SetupWait } from "./SetupWait";
 import { useAgentComputer, useAgentRun } from "./useAgentComputer";
 
@@ -37,10 +32,9 @@ const PAGE_POLL_MS = 30_000;
 
 /**
  * An agent's computer full screen on the phone (`/computer/<agentId>`, a full-screen modal): close, "Computador
- * da Ada" and the sub-line on top, then the web dialog's states in its words. The stage is the agent's page live
- * (the browser card: watch, take control, tap to click, type, the keys): on the phone, take control means the
- * browser. While the agent works in another app on its screen, it says so and to watch it from a laptop.
- * Leaving in control of a take over (✕ or Android's back) hands it back at once; the agent's own request keeps
+ * da Ada" and the sub-line on top, then the web dialog's states in its words. The stage is the agent's screen where
+ * its computer serves one (`AgentScreen`), and otherwise its page live (the browser card: watch, take control, tap
+ * to click, type, the keys). Leaving in control of a take over (✕ or Android's back) hands it back at once; the agent's own request keeps
  * its 2 minutes.
  */
 export function ComputerScreen({ agentId }: { agentId: string }) {
@@ -103,9 +97,8 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
   const [poll, setPoll] = useState<number | false>(POLL_MS);
   const view = useAgentComputer(agentId, poll);
   const run = useAgentRun(agentId);
-  const steps = screenSteps(run?.work);
   const f = view.facts;
-  const stage = f ? phoneStage(f, f.working && onScreen(steps)) : null;
+  const stage = f ? phoneStage(f) : null;
   useEffect(() => setPoll(stage === "page" ? PAGE_POLL_MS : POLL_MS), [stage]);
   const flashing = useReadyFlash(stage);
   const outages = useMachineOutages();
@@ -117,9 +110,8 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
   const computer = computerName(t, org?.name ?? "", machine);
   const manages = can(org, "manage_agents") || (Boolean(meId) && agent?.ownerUserId === meId);
   const person = (id: string) => dir.nameOf({ type: "person", id }) || t("channel.unknownPerson");
-  // What leaving hands back: the agent's browser in this person's hands (the phone never holds its screen).
-  const mine =
-    f?.handoff && controlledBy(f.handoff, f.userId) && handoffScreen(f.handoff) === "browser" ? f.handoff : null;
+  // What leaving hands back: the agent's browser or screen in this person's hands.
+  const mine = f?.handoff && controlledBy(f.handoff, f.userId) ? f.handoff : null;
   const leaving = useRef(() => {});
   useEffect(() => {
     leaving.current = () => onLeave(mine);
@@ -132,11 +124,57 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
   }, [navigation]);
   const pausedUntil = f?.edition === "selfhost" && machine && isPaused(machine, now) ? machine.paused : null;
 
+  const pauseBanner = f?.held ? (
+    <Banner icon="pause" text={t("agentComputer.state.held", g)} help={t("agentComputer.state.heldHelp")} />
+  ) : pausedUntil ? (
+    <Banner
+      icon="pause"
+      text={
+        pausedUntil.until
+          ? t("agentComputer.state.paused", { computer, time: clockAt(i18n.language, pausedUntil.until) })
+          : t("agentComputer.state.pausedPlain", { computer })
+      }
+      help={t("machines.pausedHint")}
+    />
+  ) : null;
+  const top = (line: string, action?: ReactNode) => (
+    <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
+      <IconButton icon="x" plate label={t("mobile.common.close")} onPress={goBack} />
+      <View style={styles.title}>
+        <Text variant="subhead" style={styles.bold} numberOfLines={1} accessibilityRole="header">
+          {t("agentComputer.title", g)}
+        </Text>
+        {line ? (
+          <Text variant="footnote" tone="faint" numberOfLines={1} accessibilityLiveRegion="polite">
+            {line}
+          </Text>
+        ) : null}
+      </View>
+      {action}
+    </View>
+  );
+
+  // The agent's screen takes the whole view: there is no page to scroll.
+  if (f && view.ready && !view.forbidden && !flashing && stage === "screen") {
+    return (
+      <View style={[styles.screen, { backgroundColor: c.bg }]}>
+        <AgentScreen
+          agentId={agentId}
+          view={view}
+          run={run}
+          canTakeOver={!f.held && !pausedUntil}
+          banner={pauseBanner}
+          top={top}
+        />
+      </View>
+    );
+  }
+
   // The header's sub-line says only what a cover or a banner doesn't, as on the web: each thing once.
   let sub = "";
   let body: ReactNode;
   if (!f || !view.ready) {
-    body = <Cover spinner text={t("agentComputer.state.opening", g)} />;
+    body = <Cover sky spinner color={agentLook(agent).color} text={t("agentComputer.state.opening", g)} />;
   } else if (view.forbidden) {
     body = <Cover icon="lock" text={t("agentComputer.state.forbidden")} />;
   } else if (flashing) {
@@ -146,58 +184,25 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
   } else if (stage === "preparing" && f.setup) {
     sub = setupSub(t, f.setup);
     body = <SetupWait view={f.setup} said />;
-  } else if (stage === "page" || stage === "otherApp") {
+  } else if (stage === "page") {
     const controlled = f.handoff?.status === "active" && Boolean(f.handoff.controllerUserId);
     // A closed browser shows nothing live to watch: "Ao vivo" alone, as on the web.
-    sub =
-      stage === "page" && pageClosed && !controlled
-        ? t("browser.watch.live")
-        : liveSubLine(t, f, { name, person, nowMs: now });
-    const ask = screenRequest(f.handoff, now);
-    const last = steps.at(-1);
+    sub = pageClosed && !controlled ? t("browser.watch.live") : liveSubLine(t, f, { name, person, nowMs: now });
     body = (
       <>
-        {f.held ? (
-          <Banner icon="pause" text={t("agentComputer.state.held", g)} help={t("agentComputer.state.heldHelp")} />
-        ) : pausedUntil ? (
-          <Banner
-            icon="pause"
-            text={
-              pausedUntil.until
-                ? t("agentComputer.state.paused", { computer, time: clockAt(i18n.language, pausedUntil.until) })
-                : t("agentComputer.state.pausedPlain", { computer })
-            }
-            help={t("machines.pausedHint")}
-          />
-        ) : ask ? (
-          // A request on the agent's screen is never taken from the phone: it would hold the screen for
-          // someone who can't see it.
-          <Banner icon="laptop" tone="warn" text={t("mobile.browser.card.computer", { title: ask.instructions })} />
-        ) : null}
-        {stage === "page" ? (
-          <BrowserCard
-            agentId={agentId}
-            run={run}
-            busy={f.working}
-            handoff={f.handoff && handoffScreen(f.handoff) === "browser" ? f.handoff : null}
-            canTakeOver={!f.held && !pausedUntil}
-            surface
-            onClosed={setPageClosed}
-            style={styles.flush}
-          />
-        ) : (
-          <Cover
-            icon="laptop"
-            text={t("agentComputer.phone.otherApp", g)}
-            help={[last ? stepText(t, last, last.screen) : null, t("agentComputer.phone.fromComputer")]
-              .filter(Boolean)
-              .join("\n")}
-          />
-        )}
+        {pauseBanner}
+        <BrowserCard
+          agentId={agentId}
+          run={run}
+          busy={f.working}
+          handoff={f.handoff && handoffScreen(f.handoff) === "browser" ? f.handoff : null}
+          canTakeOver={!f.held && !pausedUntil}
+          surface
+          onClosed={setPageClosed}
+          style={styles.flush}
+        />
       </>
     );
-  } else if (stage === "laptop") {
-    body = <Cover icon="laptop" text={t("agentComputer.phone.fromComputer")} />;
   } else if (stage === "offline" && machine) {
     const since = machine.lastSeenAt ? clockAt(i18n.language, machine.lastSeenAt) : null;
     const outage = outages.outages.find((o) => o.machineId === machine.id);
@@ -231,7 +236,7 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
     }
   } else if (stage === "joining") {
     // The workspace's computer is ready and this agent gets it at its first hello: a moment more.
-    body = <Cover spinner text={t("agentComputer.state.opening", g)} />;
+    body = <Cover sky spinner color={agentLook(agent).color} text={t("agentComputer.state.opening", g)} />;
   } else if (stage === "noComputer") {
     sub = t("agentComputer.status.noComputer");
     // The phone has no computer picker: who may choose one is told where.
@@ -273,19 +278,7 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
 
   return (
     <View style={[styles.screen, { backgroundColor: c.bg }]}>
-      <View style={[styles.top, { paddingTop: insets.top + 8 }]}>
-        <IconButton icon="x" plate label={t("mobile.common.close")} onPress={goBack} />
-        <View style={styles.title}>
-          <Text variant="subhead" style={styles.bold} numberOfLines={1} accessibilityRole="header">
-            {t("agentComputer.title", g)}
-          </Text>
-          {sub ? (
-            <Text variant="footnote" tone="faint" numberOfLines={1} accessibilityLiveRegion="polite">
-              {sub}
-            </Text>
-          ) : null}
-        </View>
-      </View>
+      {top(sub)}
       <ScrollView
         style={styles.fill}
         contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 24 }]}
@@ -294,44 +287,6 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
       >
         {body}
       </ScrollView>
-    </View>
-  );
-}
-
-/** The stage with nothing live on it: what it is, and why. */
-function Cover({
-  icon,
-  art,
-  spinner = false,
-  text,
-  help,
-  action,
-}: {
-  icon?: IconName;
-  art?: ReactNode;
-  spinner?: boolean;
-  text: string;
-  help?: string;
-  action?: ReactNode;
-}) {
-  const c = useColors();
-  return (
-    <View style={[styles.cover, { backgroundColor: c.sunken }]}>
-      {art ??
-        (spinner ? (
-          <ActivityIndicator color={c.muted} />
-        ) : icon ? (
-          <Icon name={icon} size={22} color={c.muted} />
-        ) : null)}
-      <Text variant="callout" tone="ink" style={[styles.bold, styles.center]}>
-        {text}
-      </Text>
-      {help ? (
-        <Text variant="small" tone="muted" style={styles.center}>
-          {help}
-        </Text>
-      ) : null}
-      {action}
     </View>
   );
 }
@@ -362,17 +317,8 @@ const styles = StyleSheet.create({
   top: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingBottom: 10 },
   title: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
-  center: { textAlign: "center" },
   grow: { flex: 1, minWidth: 0 },
   body: { paddingHorizontal: 12, gap: 12 },
   flush: { marginTop: 0 },
-  cover: {
-    minHeight: 220,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    padding: 20,
-  },
   banner: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 14, padding: 12 },
 });
