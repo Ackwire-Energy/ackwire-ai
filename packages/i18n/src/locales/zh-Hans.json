@@ -3729,6 +3729,13 @@
     "defaultKeyDesc": "{{provider}} · 尾号 {{hint}}",
     "otherKeyDesc": "{{provider}} · 尾号 {{hint}}",
     "modelNeedsKey": "需要 {{provider}} API 密钥",
+    "brainPick": {
+      "searchPlaceholder": "模型、套餐或厂商",
+      "connect": "连接 {{plan}}",
+      "connectText": "需要 {{plan}} 密钥。创建智能体后马上添加。",
+      "needsKey": "需要 {{plan}} 密钥",
+      "other": "选择其他"
+    },
     "noKeys": "还没有密钥",
     "budgetTitle": "每月预算",
     "budget": "每月预算（US$）",
@@ -7388,6 +7395,7 @@
       "freeTraining": "这个模型的服务商可能会用请求内容训练模型。在 OpenCode 的 设置 › 隐私 中开启免费模型的该权限。否则这个模型不会回答。"
     },
     "recommended": "推荐",
+    "free": "免费",
     "modelHelp": "模型越大，思考越多，套餐额度消耗也越快。",
     "hidden": "由 {{owner}} 或管理员选择思考方式。",
     "hiddenAdmins": "只有管理员可以选择思考方式。",

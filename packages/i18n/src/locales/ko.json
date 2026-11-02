@@ -3681,6 +3681,13 @@
     "defaultKeyDesc": "{{provider}} · 끝자리 {{hint}}",
     "otherKeyDesc": "{{provider}} · 끝자리 {{hint}}",
     "modelNeedsKey": "{{provider}} API 키 필요",
+    "brainPick": {
+      "searchPlaceholder": "모델, 요금제 또는 제조사",
+      "connect": "{{plan}} 연결",
+      "connectText": "{{plan}} 키가 필요해요. 에이전트를 만든 직후에 추가해요.",
+      "needsKey": "{{plan}} 키 필요",
+      "other": "다른 것 선택"
+    },
     "noKeys": "아직 키가 없어요",
     "budgetTitle": "월 예산",
     "budget": "월 예산(US$)",
@@ -7300,6 +7307,7 @@
       "freeTraining": "이 모델의 제공업체는 요청을 학습에 사용할 수 있어요. OpenCode의 설정 › 개인정보에서 무료 모델 권한을 켜세요. 켜지 않으면 이 모델은 답하지 않아요."
     },
     "recommended": "추천",
+    "free": "무료",
     "modelHelp": "큰 모델일수록 더 많이 생각하고 요금제를 더 빨리 소진해요.",
     "hidden": "생각하는 AI는 {{owner}}님이나 관리자가 골라요.",
     "hiddenAdmins": "생각하는 AI는 관리자만 고를 수 있어요.",

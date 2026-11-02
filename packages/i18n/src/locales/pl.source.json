@@ -9294,6 +9294,21 @@
   "newAgent.modelNeedsKey": {
     "value": "{{provider}} API key needed"
   },
+  "newAgent.brainPick.searchPlaceholder": {
+    "value": "Model, plan or maker"
+  },
+  "newAgent.brainPick.connect": {
+    "value": "Connect {{plan}}"
+  },
+  "newAgent.brainPick.connectText": {
+    "value": "Needs a {{plan}} key. You add it right after creating the agent."
+  },
+  "newAgent.brainPick.needsKey": {
+    "value": "Needs a {{plan}} key"
+  },
+  "newAgent.brainPick.other": {
+    "value": "Choose another"
+  },
   "newAgent.noKeys": {
     "value": "No keys yet"
   },
@@ -18639,6 +18654,9 @@
   },
   "brain.recommended": {
     "value": "Recommended"
+  },
+  "brain.free": {
+    "value": "Free"
   },
   "brain.modelHelp": {
     "value": "Bigger models think more and use up the plan faster."

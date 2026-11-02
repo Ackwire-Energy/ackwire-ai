@@ -3711,6 +3711,13 @@
     "defaultKeyDesc": "{{provider}} · berakhiran {{hint}}",
     "otherKeyDesc": "{{provider}} · berakhiran {{hint}}",
     "modelNeedsKey": "Perlu kunci API {{provider}}",
+    "brainPick": {
+      "searchPlaceholder": "Model, paket, atau pembuat",
+      "connect": "Hubungkan {{plan}}",
+      "connectText": "Perlu kunci {{plan}}. Kamu menambahkannya tepat setelah membuat agen.",
+      "needsKey": "Perlu kunci {{plan}}",
+      "other": "Pilih yang lain"
+    },
     "noKeys": "Belum ada kunci",
     "budgetTitle": "Anggaran bulanan",
     "budget": "Anggaran bulanan (US$)",
@@ -7373,6 +7380,7 @@
       "freeTraining": "Penyedia model ini mungkin memakai permintaan untuk melatihnya. Di OpenCode, di Settings › Privacy, nyalakan izin untuk model gratis. Tanpa itu, model ini tidak menjawab."
     },
     "recommended": "Disarankan",
+    "free": "Gratis",
     "modelHelp": "Model yang lebih besar berpikir lebih banyak dan menghabiskan paket lebih cepat.",
     "hidden": "{{owner}} atau admin yang memilih siapa yang berpikir.",
     "hiddenAdmins": "Hanya admin yang memilih siapa yang berpikir.",
