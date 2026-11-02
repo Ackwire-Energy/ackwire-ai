@@ -19,7 +19,8 @@ const mask = (text: string) =>
   text
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, "<id>")
     .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z/g, "<iso>")
-    .replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun), [A-Z][a-z]{2} \d{1,2}, \d{4}, \d{2}:\d{2}/g, "<now>");
+    // No \b before the weekday: after a line break the JSON text reads `\nMon`, with no word boundary.
+    .replace(/(Mon|Tue|Wed|Thu|Fri|Sat|Sun), [A-Z][a-z]{2} \d{1,2}, \d{4}, \d{2}:\d{2}/g, "<now>");
 
 /** What the model reads from a request: the system text, the messages and the tools, without cache metadata. */
 function words(request: ModelRequest) {
