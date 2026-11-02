@@ -201,6 +201,45 @@ describe("the sidebar's sections, in my order", () => {
   });
 });
 
+describe("dragging in the sidebar", () => {
+  test("a section's ghost is its header row, not the whole section over the others", async () => {
+    await go();
+    const images: Element[] = [];
+    const dataTransfer = { setData: () => {}, setDragImage: (el: Element) => void images.push(el) };
+    const grip = within(nav()).getByRole("button", { name: "Arrastar Canais" });
+    await act(async () => fireEvent.dragStart(grip, { dataTransfer }));
+    expect(images).toHaveLength(1);
+    expect(images[0]?.classList.contains("sidebar__section-head")).toBe(true);
+    expect(images[0]?.textContent).toContain("Canais");
+    await act(async () => fireEvent.dragEnd(grip, { dataTransfer }));
+    await act(async () =>
+      fireEvent.dragStart(within(nav()).getByRole("button", { name: "Arrastar Ferramentas" }), { dataTransfer }),
+    );
+    expect(images[1]?.classList.contains("sidebar__item")).toBe(true);
+  });
+
+  test("one mark where a drag lands, the same for sections, channels, categories and agents", () => {
+    const css = readFileSync(new URL("../src/layout.css", import.meta.url), "utf8");
+    const rule = (selector: string) => {
+      const start = css.indexOf(`${selector} {`);
+      return start < 0 ? "" : css.slice(start, css.indexOf("}", start));
+    };
+    // The line: the accent at reduced strength, 2px, round ends, from the names' column.
+    const line = rule('.sidebar :is([data-drop="before"], [data-drop="after"])::after,\n.sidebar__drop-line');
+    expect(line).toContain("height: 2px");
+    expect(line).toContain("border-radius: 999px");
+    expect(line).toContain("color-mix(in srgb, var(--agent) 60%, transparent)");
+    expect(line).toContain("left: var(--drop-inset, 36px)");
+    // No second line in ink stacked on it (a section's box once drew both).
+    expect(css).not.toMatch(/data-drop[^{]*\{[^}]*inset 0 -?2px 0 var\(--ink\)/);
+    expect(rule(".sidebar__block[data-drop]::after")).not.toContain("background");
+    expect(rule(".sidebar__drop-line")).not.toContain("var(--ink)");
+    // The desktop app lets the section's grip (a draggable button) start its drag.
+    const desktop = readFileSync(new URL("../src/desktop.css", import.meta.url), "utf8");
+    expect(desktop).toContain('button:not([draggable="true"])');
+  });
+});
+
 describe("the open row's highlight", () => {
   test("the active row's plate has a soft glow from the right: the accent's, an agent's in its own color", async () => {
     const { router } = await go();
@@ -212,7 +251,14 @@ describe("the open row's highlight", () => {
     expect(start).toBeGreaterThan(-1);
     expect(rule).toContain("to left");
     expect(rule).toContain("var(--sel-glow-color, var(--agent))");
-    expect(rule).toContain("transparent var(--sel-glow-reach, 44px)");
+    expect(rule).toContain("transparent var(--sel-glow-reach, 45%)");
+    // Strong enough to see at a glance, in both themes (the app always sets data-theme, the system's included).
+    expect(Number(rule.match(/var\(--sel-glow, (\d+)%\)/)?.[1])).toBeGreaterThanOrEqual(20);
+    expect(
+      Number(
+        css.match(/\[data-theme="dark"\] \.sidebar__item\[data-status="active"\] \{\n {2}--sel-glow: (\d+)%/)?.[1],
+      ),
+    ).toBeGreaterThanOrEqual(26);
     // No agent row is left out of it.
     expect(css).not.toContain('.sidebar__row[data-agent-row] > .sidebar__item[data-status="active"]::before');
     await act(() => router.navigate({ to: `/org/${ORG_ID}/dm/agent/${seedState().agents[0]?.id}` }));

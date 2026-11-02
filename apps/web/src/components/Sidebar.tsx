@@ -905,7 +905,11 @@ function SidebarChannels({
   };
   const overChannel = (e: DragEvent, c: Channel) => {
     const d = drag.current;
-    if (d?.kind === "channel" && d.id !== c.id) over(e, `channel:${c.id}`, half(e));
+    if (d?.kind !== "channel") return;
+    if (d.id !== c.id) return over(e, `channel:${c.id}`, half(e));
+    // Over its own row it lands nowhere: not at the end of the section around it.
+    e.stopPropagation();
+    if (mark) setMark(null);
   };
   const overCategory = (e: DragEvent, category: ChannelCategory) => {
     const d = drag.current;
@@ -914,6 +918,10 @@ function SidebarChannels({
   };
   const overLoose = (e: DragEvent) => {
     if (drag.current?.kind === "channel") over(e, "loose", "into");
+  };
+  // Anywhere in a category but on a row (its empty end, a row's hover buttons): a channel goes in, at its end.
+  const overCategoryBody = (e: DragEvent, category: ChannelCategory) => {
+    if (drag.current?.kind === "channel") over(e, `${CATEGORY_KEY}${category.id}`, "into");
   };
   const drop = (e: DragEvent) => {
     const d = drag.current;
@@ -1141,6 +1149,7 @@ function SidebarChannels({
             label={category.name}
             sections={sections}
             className="sidebar__section--category"
+            drop={{ onDragOver: (e) => overCategoryBody(e, category), onDrop: drop }}
             headProps={
               {
                 draggable: manages,
