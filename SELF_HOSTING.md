@@ -630,11 +630,11 @@ and read the reply, and see recent tasks. It acts with exactly the person's perm
 agent's action (approvals stay with people in the chat) and changes no settings. It is on by default, with
 nothing to configure: Settings → Apps de IA shows the address and the steps for each app.
 
-- **The address** is `PUBLIC_URL` + `/mcp`, for example `https://chat.example.com/mcp`.
+- **The address** is `PUBLIC_URL` + `/mcp`, for example `https://chat.example.com/mcp` (`/mcp/` works too).
 - **Sign-in** is OAuth 2.1 on this server itself (PKCE, the app registers on its own), which needs https
   except on `localhost`. A server reached over plain http on a LAN: use a **personal token** instead
   (Settings → Apps de IA → Tokens pessoais), sent as `Authorization: Bearer agp_…`. It works on `/mcp` only, in
-  one workspace.
+  one workspace. One with no expiry takes a sign-in in the last 10 minutes.
 - **Who calls from where**: claude.ai, the Claude apps and ChatGPT call from their own servers, so the server
   needs a public https address (a domain, or Tailscale Funnel: What needs a public URL). Claude Code, Cursor and
   VS Code call from the computer they run on.
