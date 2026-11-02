@@ -201,10 +201,25 @@ const SETUP_FIELDS = [
  * closing screen takes its place at once. `org.limits` (a new plan, ADR 0079) asks for the limits again, so a full
  * workspace's invitations open by themselves. `agent.groups` (ADR 0083) says the groups of agents changed: they are
  * read again, and `agent.coordinator` (ADR 0093) that another agent coordinates the team, or none: the agents are.
- * `member.status` and `agent.status` (ADR 0084) refetch the people and the agents' presence. Returns whether the
+ * `member.status` and `agent.status` (ADR 0084) refetch the people and the agents' presence. `org.members` (someone
+ * joined or left, or a role changed, ADR 0085) refetches the people, Members, the roles and `me`, and the agents it
+ * names (their owner or brain changed when someone left). Returns whether the
  * event was one of these.
  */
 export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { type: string }): boolean {
+  if (event.type === "org.members") {
+    for (const key of [keys.people(orgId), keys.members(orgId), keys.overview(orgId), keys.roles(orgId), keys.me])
+      void qc.invalidateQueries({ queryKey: key });
+    const agents = (event as { agents?: unknown }).agents;
+    if (Array.isArray(agents) && agents.length) {
+      void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
+      for (const id of agents.filter((a): a is string => typeof a === "string")) {
+        void qc.invalidateQueries({ queryKey: keys.agentDetail(orgId, id) });
+        void qc.invalidateQueries({ queryKey: keys.agentBrain(orgId, id) });
+      }
+    }
+    return true;
+  }
   if (event.type === "agent.groups") {
     void qc.invalidateQueries({ queryKey: keys.agentGroups(orgId) });
     return true;

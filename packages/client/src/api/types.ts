@@ -257,6 +257,20 @@ export interface Organization extends OrgSummary {
   context?: string;
 }
 
+/** What removing a member (or leaving) does (`GET …/members/{userId}/removal`). */
+export interface RemovalPreview {
+  /** Who answers for their agents from then on: whoever removes them, or the longest-standing other owner. */
+  heir: { userId: string; name: string } | null;
+  /** The agents they answer for. */
+  agents: { id: string; name: string }[];
+  /** Agents that think with a plan they signed in (or on their computer): they lose it. */
+  losePlan: { id: string; name: string }[];
+  /** The computers they connected here: removed. */
+  computers: { id: string; name: string }[];
+  /** Their routines still on: paused. */
+  routines: number;
+}
+
 export interface Member {
   userId: string;
   name: string;

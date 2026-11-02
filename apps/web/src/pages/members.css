@@ -113,3 +113,14 @@
     margin-left: calc(24px + var(--space-3));
   }
 }
+
+/* Remover do workspace: what goes with the person, one fact per line. */
+.members-remove__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink);
+  line-height: 1.45;
+}

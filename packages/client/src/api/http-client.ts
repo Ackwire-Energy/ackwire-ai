@@ -144,6 +144,7 @@ import type {
   Proposal,
   ReactionCount,
   Reminder,
+  RemovalPreview,
   RosterMember,
   Routine,
   RoutineHook,
@@ -478,6 +479,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       members: async (orgId) => (await request<{ members: Member[] }>(`${org(orgId)}/members`)).members,
       changeRole: (orgId, userId, role) =>
         request<void>(`${org(orgId)}/members/${enc(userId)}`, { method: "PATCH", json: { role } }),
+      removal: (orgId, userId) => request<RemovalPreview>(`${org(orgId)}/members/${enc(userId)}/removal`),
       removeMember: (orgId, userId) => request<void>(`${org(orgId)}/members/${enc(userId)}`, { method: "DELETE" }),
       invitations: async (orgId) =>
         (await request<{ invitations: Invitation[] }>(`${org(orgId)}/invitations`)).invitations,

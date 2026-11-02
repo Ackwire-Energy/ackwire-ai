@@ -185,6 +185,7 @@ import type {
   ReadOnlyOrgSettings,
   Reminder,
   ReminderInput,
+  RemovalPreview,
   Role,
   RoleInput,
   RosterMember,
@@ -383,6 +384,8 @@ export interface ApiClient {
     members(orgId: string): Promise<Member[]>;
     /** Makes a member an owner or not (owners only). What anyone may do is their roles (`roles.setFor`). */
     changeRole(orgId: string, userId: string, role: Role): Promise<void>;
+    /** What removing them (or leaving) does; refused as the removal would be. */
+    removal(orgId: string, userId: string): Promise<RemovalPreview>;
     removeMember(orgId: string, userId: string): Promise<void>;
     invitations(orgId: string): Promise<Invitation[]>;
     invite(
