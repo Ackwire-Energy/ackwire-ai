@@ -179,7 +179,7 @@ test("the methods it answers are chosen on the routine: GET passes its query str
   expect(get.status).toBe(202);
   const { runId } = (await get.json()) as { runId: string };
   const [run] = (await t.db.select().from(schema.routineRuns)).filter((r) => r.id === runId);
-  expect((run?.event?.calls as { body: string; method: string }[])[0]).toMatchObject({
+  expect((run?.event?.calls as { body: string; method: string }[] | undefined)?.[0]).toMatchObject({
     body: '{"status":"paid","order":"42"}',
     method: "GET",
   });
