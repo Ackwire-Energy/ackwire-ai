@@ -68,3 +68,8 @@ test("Equipe on the Agentes header shows like the header's +, and stays in sight
   const active = '.sidebar__section-add.ac-btn[data-status="active"]';
   expect([value(active, "background"), value(active, "color")]).toEqual(["var(--plate)", "var(--ink)"]);
 });
+
+test("a row's hidden hover buttons don't catch the pointer, so a drag over a row's end lands before or after it", () => {
+  const shown = '.sidebar__row[data-acts]:is(:hover, :focus-within, :has([data-state="open"])) > .sidebar__row-acts';
+  expect([value(".sidebar__row-acts", "pointer-events"), value(shown, "pointer-events")]).toEqual(["none", "auto"]);
+});
