@@ -1,5 +1,5 @@
 import { isReservedSecretName } from "@agenteschat/adapters";
-import { and, eq, schema } from "@agenteschat/db";
+import { and, eq, isNull, schema } from "@agenteschat/db";
 import { recordAudit } from "./audit";
 import type { ComputerHandle } from "./sandbox";
 import { MAX_PENDING_SECRETS, REQUEST_SECRET_TOOL, requesterOfRun, SECRET_TTL_MS, secretOnComputer } from "./secrets";
@@ -16,6 +16,10 @@ export function secretSite(raw: string): string | null {
     return null;
   }
 }
+
+/** Asking again under a held name is how a refused key gets replaced: the newest delivery wins on the computer. */
+const AGAIN =
+  "If a key you were given is refused (401, 403, invalid or expired), ask once for a new one under the same `name`, with a `purpose` that says in one line what failed: it replaces the old one.";
 
 const failed = (error: unknown): ToolOutput => ({
   content: `Failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -44,9 +48,12 @@ export function requestSecretTool(opts: {
   } as const;
   return {
     name: REQUEST_SECRET_TOOL,
-    description: opts.browserOnly
-      ? "Ask the person who asked you for a password or code to sign in on a site in your browser. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you, and it will only ever be typed on that one site (`site`, the login page's address). Never ask for passwords or codes in a normal message. `name` is UPPER_SNAKE_CASE. Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Type it with `browser_type_secret`."
-      : "Ask the person who asked you for a secret your computer needs: a token or password for a CLI, the code that finishes a sign-in, .env values. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you. Never ask for passwords, tokens or codes in a normal message. `name` is UPPER_SNAKE_CASE; `target` is `env` (an environment variable in your commands) or `file` (a path in your workspace, e.g. `.npmrc` or `.env`, written with mode 600). Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Use it by name, never print it.",
+    description: [
+      opts.browserOnly
+        ? "Ask the person who asked you for a password or code to sign in on a site in your browser. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you, and it will only ever be typed on that one site (`site`, the login page's address). Never ask for passwords or codes in a normal message. `name` is UPPER_SNAKE_CASE. Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Type it with `browser_type_secret`."
+        : "Ask the person who asked you for a secret your computer needs: a token or password for a CLI, the code that finishes a sign-in, .env values. They type it in a private card; it goes encrypted straight to your computer, never through the chat or you. Never ask for passwords, tokens or codes in a normal message. `name` is UPPER_SNAKE_CASE; `target` is `env` (an environment variable in your commands) or `file` (a path in your workspace, e.g. `.npmrc` or `.env`, written with mode 600). Your run pauses until they answer (15 minutes at most); you then get only whether it arrived. Use it by name, never print it.",
+      AGAIN,
+    ].join(" "),
     scope: opts.scope,
     inputSchema: opts.browserOnly
       ? {
@@ -119,6 +126,20 @@ export function requestSecretTool(opts: {
           const id = Bun.randomUUIDv7();
           const { publicKey, sites } = await secretOnComputer(computer, { action: "keypair", requestId: id });
           if (!publicKey) throw new Error("the computer made no key");
+          const [held] = await ctx.db
+            .select({ id: schema.secretRequests.id })
+            .from(schema.secretRequests)
+            .where(
+              and(
+                eq(schema.secretRequests.orgId, ctx.orgId),
+                eq(schema.secretRequests.agentId, ctx.agentId),
+                eq(schema.secretRequests.name, name),
+                eq(schema.secretRequests.machineId, computer.machineId),
+                eq(schema.secretRequests.status, "delivered"),
+                isNull(schema.secretRequests.removedAt),
+              ),
+            )
+            .limit(1);
           // A site's password is for the browser alone where the runner keeps it so; an older one gets a variable.
           const kind = file ? "file" : origin && sites === true ? "site" : "env";
           const [inserted] = await ctx.db
@@ -139,6 +160,7 @@ export function requestSecretTool(opts: {
               targetPath: file ? path : null,
               machineId: computer.machineId,
               publicKey,
+              replaces: held !== undefined,
               expiresAt: new Date(Date.now() + SECRET_TTL_MS),
             })
             .returning();
@@ -153,6 +175,7 @@ export function requestSecretTool(opts: {
               name,
               target: kind === "file" ? { kind, path } : kind === "site" && origin ? { kind, site: origin } : { kind },
               requestedFor: requester,
+              ...(held ? { replaces: true } : {}),
             },
           });
           return inserted;

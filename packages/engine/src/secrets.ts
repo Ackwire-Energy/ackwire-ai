@@ -50,6 +50,8 @@ export interface SecretRequestView {
   expiresAt: string;
   deliveredAt: string | null;
   removed: boolean;
+  /** The agent already held this name on this computer: a delivery replaces that value. */
+  replaces: boolean;
 }
 
 const targetOf = (row: Pick<SecretRequestRow, "targetKind" | "targetPath" | "site">): SecretTarget =>
@@ -84,6 +86,7 @@ export function secretRequestView(row: SecretRequestRow): SecretRequestView {
     expiresAt: row.expiresAt.toISOString(),
     deliveredAt: row.deliveredAt?.toISOString() ?? null,
     removed: row.removedAt !== null,
+    replaces: row.replaces,
   };
 }
 
@@ -100,11 +103,11 @@ export function secretResult(row: SecretRequestRow | undefined): { content: stri
     case "delivered":
       if (target.kind === "site") {
         return {
-          content: `${row.name} was delivered to your computer for ${new URL(target.site).host}: your browser types it there (browser_type_secret, or a type_secret step), only into a password or code field on that site. It isn't in your commands' environment; for a command, ask for it again without \`site\`.`,
+          content: `${row.name} was delivered to your computer for ${new URL(target.site).host}${row.replaces ? ", replacing the one you had" : ""}: your browser types it there (browser_type_secret, or a type_secret step), only into a password or code field on that site. It isn't in your commands' environment; for a command, ask for it again without \`site\`.`,
         };
       }
       return {
-        content: `${row.name} was delivered to your computer: ${
+        content: `${row.name} was delivered to your computer${row.replaces ? ", replacing the one you had" : ""}: ${
           target.kind === "file"
             ? `written to ${target.path} (mode 600)`
             : `available as the environment variable ${row.name} in your commands`

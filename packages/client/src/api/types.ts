@@ -2279,6 +2279,8 @@ export interface SecretRequest {
   expiresAt: string;
   deliveredAt: string | null;
   removed: boolean;
+  /** The agent already held this name on this computer: a delivery replaces that value. */
+  replaces?: boolean;
 }
 
 /** A secret on an agent's computer, by name (the agent page). */

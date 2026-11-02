@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { MACHINE_PROTOCOL_VERSION, orgTopic, type ServerFrame, sealSecret, secretAad } from "@agenteschat/adapters";
 import { and, eq, isNull, schema } from "@agenteschat/db";
+import { systemText } from "@agenteschat/providers";
 import {
   authenticateMachine,
   cancelRun,
@@ -1089,6 +1090,126 @@ describe("secrets for a connected machine (ADR 0027)", () => {
     );
     expect(runner.secrets.has("NPM_TOKEN")).toBe(false);
     expect(await listAgentSecrets(f.db, f.owner.id, f.org.id, f.agent.id)).toEqual([]);
+  });
+
+  test("a refused key is asked for again under the same name: the card says it replaces the held one, and none of it reaches the model", async () => {
+    const OLD = "tsk_old_key_value_000000000";
+    const NEW = "tsk_new_key_value_111111111";
+    const asks: Record<string, unknown>[] = [];
+    let api: "401" | "200" = "401";
+    f = await setup({
+      machines: true,
+      reply: (req) => {
+        const last = JSON.stringify(req.messages.at(-1)?.content);
+        const ask = (purpose: string) => {
+          const input = { name: "TYPESAFE_API_KEY", purpose, target: "env" };
+          asks.push(input);
+          return { chunks: [""], toolUses: [{ name: "request_secret", input }] };
+        };
+        if (last.includes("401 Unauthorized"))
+          return ask("A chave TYPESAFE_API_KEY foi recusada (401). Manda uma nova?");
+        if (last.includes("tool_result")) return { chunks: ["Pronto."] };
+        if (last.includes("conecta")) return ask("acessar a API do Typesafe");
+        if (last.includes("lista")) {
+          return {
+            chunks: [""],
+            toolUses: [
+              {
+                name: "run_code",
+                input: {
+                  language: "bash",
+                  code: 'curl -s -H "Authorization: Bearer $TYPESAFE_API_KEY" https://api.typesafe.example/v1/items',
+                },
+              },
+            ],
+          };
+        }
+        return { chunks: ["ok"] };
+      },
+    });
+    await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
+    const paired = await pair();
+    const runner = fakeRunner(f.machineHub as MachineHub, {
+      // Like the real runner: the value is in the command's env, its output comes back redacted.
+      exec: () =>
+        api === "401"
+          ? { exitCode: 22, stdout: "", stderr: "401 Unauthorized: invalid api key [secret:TYPESAFE_API_KEY]" }
+          : { exitCode: 0, stdout: '{"items":[]}', stderr: "" },
+    });
+    await runner.hello(paired.token);
+    await setAgentComputerTarget(deps(), f.owner.id, f.org.id, f.agent.id, paired.machineId);
+    const sandbox = { ...(f.sandboxDeps as NonNullable<typeof f.sandboxDeps>), pubsub: f.pubsub };
+    const say = async (body: string) => {
+      await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body });
+      await drainOutbox(f.db, f.handlers);
+    };
+    const give = async (value: string) => {
+      const [row] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.status, "pending"));
+      if (!row) throw new Error("no pending secret request");
+      const box = await sealSecret(
+        row.publicKey,
+        value,
+        secretAad({ requestId: row.id, orgId: f.org.id, name: row.name, target: { kind: "env" } }),
+      );
+      await deliverSecret(sandbox, f.owner.id, f.org.id, row.id, box);
+      await drainOutbox(f.db, f.handlers);
+      return row;
+    };
+
+    await say("@dev conecta no Typesafe");
+    const first = await give(OLD);
+    expect(first.replaces).toBe(false);
+    // The model is told how a refused key gets replaced, in its rules and in the tool.
+    const request = f.provider.calls.at(-1)?.request;
+    expect(systemText(request?.system ?? "")).toContain("When a key you were given is refused");
+    expect(request?.tools?.find((t) => t.name === "request_secret")?.description).toContain(
+      "ask once for a new one under the same `name`",
+    );
+
+    // The key works: nothing is asked.
+    api = "200";
+    await say("@dev lista os itens");
+    expect(asks).toHaveLength(1);
+
+    // The API refuses it: the agent asks once, under the same name, saying what failed.
+    api = "401";
+    await say("@dev lista os itens de novo");
+    expect(asks).toHaveLength(2);
+    const [again] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.status, "pending"));
+    expect(again).toMatchObject({ name: "TYPESAFE_API_KEY", replaces: true });
+    const [card] = await f.db
+      .select()
+      .from(schema.messages)
+      .where(eq(schema.messages.id, again?.messageId as string));
+    expect((card?.meta as { secretRequest?: SecretRequestView } | undefined)?.secretRequest).toMatchObject({
+      name: "TYPESAFE_API_KEY",
+      purpose: "A chave TYPESAFE_API_KEY foi recusada (401). Manda uma nova?",
+      replaces: true,
+    });
+
+    // The new one replaces the old on the computer; the agent hears it did.
+    await give(NEW);
+    expect(runner.secrets.get("TYPESAFE_API_KEY")).toBe(NEW);
+    const [old] = await f.db.select().from(schema.secretRequests).where(eq(schema.secretRequests.id, first.id));
+    expect(old?.removedAt).not.toBeNull();
+    const results = (await f.db.select().from(schema.agentRunSteps))
+      .filter((x) => x.kind === "tool_result")
+      .map((x) => (x.data as { content: string }).content);
+    expect(
+      results.some((r) => r.includes("TYPESAFE_API_KEY was delivered to your computer, replacing the one you had")),
+    ).toBe(true);
+
+    // Neither value ever reached the model or our database.
+    const everything = JSON.stringify([
+      f.provider.calls.map((c) => c.request),
+      await f.db.select().from(schema.messages),
+      await f.db.select().from(schema.agentRunSteps),
+      await f.db.select().from(schema.auditLog),
+      await f.db.select().from(schema.outbox),
+      await f.db.select().from(schema.secretRequests),
+    ]);
+    expect(everything).not.toContain(OLD);
+    expect(everything).not.toContain(NEW);
   });
 
   test("a decline during staging prevents activation and leaves no live secret", async () => {

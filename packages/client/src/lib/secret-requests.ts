@@ -18,13 +18,21 @@ export function siteHost(site: string): string {
 
 /**
  * Where the value goes, in the person's words: a variable in the agent's commands, a file in its folder, or only its
- * browser's typing on one site.
+ * browser's typing on one site; and that it replaces the one the agent has when it holds that name already.
  */
-export function secretWhere(t: TFunction, r: Pick<SecretRequest, "name" | "target">, agent: string): string {
+export function secretWhere(
+  t: TFunction,
+  r: Pick<SecretRequest, "name" | "target" | "replaces">,
+  agent: string,
+): string {
   const target = r.target;
-  if (target.kind === "file") return t("secret.targetFile", { path: target.path, agent });
-  if (target.kind === "site") return t("secret.targetSite", { host: siteHost(target.site), agent });
-  return t("secret.targetEnv", { name: r.name, agent });
+  const where =
+    target.kind === "file"
+      ? t("secret.targetFile", { path: target.path, agent })
+      : target.kind === "site"
+        ? t("secret.targetSite", { host: siteHost(target.site), agent })
+        : t("secret.targetEnv", { name: r.name, agent });
+  return r.replaces ? `${where} ${t("secret.replaces", { agent })}` : where;
 }
 
 /** A request's notification (`secret_request`) in one line, as its card says it: the secret's name, what it is for. */

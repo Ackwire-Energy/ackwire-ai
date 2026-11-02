@@ -1149,6 +1149,14 @@ describe("an agent's secret request (ADR 0027), as its card reads it", () => {
     expect(secretWhere(pt, { ...request, target: { kind: "file", path: ".npmrc" } }, "Theo")).toBe(
       "Vai para o arquivo .npmrc no computador de Theo.",
     );
+    // Asked again under a name the agent holds (a key that was refused): the card says it replaces that one.
+    const again = { ...request, name: "TYPESAFE_API_KEY", target: { kind: "env" as const }, replaces: true };
+    expect(secretWhere(pt, again, "Theo")).toBe(
+      "Vai como a variável TYPESAFE_API_KEY no computador de Theo. Substitui a que Theo já tem.",
+    );
+    expect(secretWhere(en, again, "Theo")).toBe(
+      "Goes in as the variable TYPESAFE_API_KEY on Theo's computer. Replaces the one Theo has now.",
+    );
   });
 
   test("an empty or too large value is caught before it is sealed", async () => {
