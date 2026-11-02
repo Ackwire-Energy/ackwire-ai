@@ -15,6 +15,7 @@ import {
 import { resolveApps } from "../access";
 import { recordAgentActions } from "../agent-actions";
 import { agentsByHandle, handleOf } from "../agents";
+import { isPlaybook } from "../audience";
 import { caches } from "../cache";
 import type { MemoryUpdate } from "../events";
 import { cutText } from "../format";
@@ -37,7 +38,7 @@ import {
   howToSql,
   howToSubject,
   isHowTo,
-  isPlaybook,
+  receiptLine,
   supersede,
 } from "./items";
 import { kindFamily, overlap } from "./judgments";
@@ -132,7 +133,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
     {
       name: "save_how_to",
       description:
-        "Save how you did something that took figuring out (several tries, a new API, a script you wrote), so next time you do it right away: what it is for, the exact way (address, command, parameters, which key it needs from a person through request_secret, never a secret's value, name or where it is kept) and where the script is on your computer. Write the method only, without private details from this conversation. Saving again under the same title replaces the old version. It comes back in your memory when a later request is about it. Save it on your own, before you answer; no one needs to ask.",
+        "Save how you did something that took figuring out (several tries, a new API, a script you wrote), so next time you do it right away: what it is for, the exact way (address, command, parameters, which key it needs from a person through request_secret, never a secret's value, name or where it is kept) and where the script is on your computer. Write the method only, without private details from this conversation. Saving again under the same key replaces the old version. It comes back in your memory when a later request is about it. Save it on your own, before you answer; no one needs to ask.",
       scope: "memory:write",
       inputSchema: {
         type: "object",
@@ -144,9 +145,15 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             description:
               "One plain line a person who doesn't code understands, in the language of the conversation, no paths, code or ids, e.g. 'Listar os modelos da API da Acme'. The technical detail goes in how.",
           },
+          key: {
+            type: "string",
+            minLength: 3,
+            maxLength: 120,
+            description: KEY_DESCRIPTION,
+          },
           how: { type: "string", minLength: 10, maxLength: 1500 },
         },
-        required: ["title", "how"],
+        required: ["title", "key", "how"],
         additionalProperties: false,
       },
       describe: (input) => ({ title: `Save how to: ${str(input.title)}` }),
@@ -165,7 +172,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               scopeId: ctx.agentId,
               agentId: ctx.agentId,
               title,
-              subject: howToSubject(title),
+              subject: howToSubject(str(input.key).trim() || title),
               content: str(input.how).trim(),
               sourceIds: [ctx.triggerMessageId],
               // Where it was worked out: a public channel's reaches every run, a private one's stays there.
@@ -272,12 +279,8 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         properties: {
           content: { type: "string", minLength: 3, maxLength: 2000 },
           kind: { type: "string", enum: ["fact", "preference", "decision", "note"] },
-          title: {
-            type: "string",
-            maxLength: 200,
-            description:
-              "One plain line a person who doesn't code understands, in the language of the conversation (shown first; content holds the detail).",
-          },
+          title: { type: "string", minLength: 3, maxLength: 200, description: PLAIN_TITLE },
+          key: { type: "string", maxLength: 120, description: KEY_DESCRIPTION },
           everywhere: { type: "boolean" },
           basis: { type: "string", enum: ["person_said", "found"] },
         },
@@ -316,7 +319,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               scopeId: ctx.agentId,
               agentId: ctx.agentId,
               title: str(input.title),
-              subject: str(input.title) || content.slice(0, 120),
+              subject: str(input.key).trim() || str(input.title) || content.slice(0, 120),
               content,
               sourceIds: [ctx.triggerMessageId],
               // A rule about the agent's own conduct holds in every conversation: no channel keeps it out of a run.
@@ -362,7 +365,11 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
       scope: "memory:write",
       inputSchema: {
         type: "object",
-        properties: { item_id: { type: "string" }, content: { type: "string", minLength: 3, maxLength: 2000 } },
+        properties: {
+          item_id: { type: "string" },
+          content: { type: "string", minLength: 3, maxLength: 2000 },
+          title: { type: "string", minLength: 3, maxLength: 200, description: PLAIN_TITLE },
+        },
         required: ["item_id", "content"],
         additionalProperties: false,
       },
@@ -381,7 +388,8 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               scopeId: item.scopeId,
               agentId: item.agentId,
               subject: item.subjectKey,
-              title: item.title,
+              // A title describing the old text would be shown above the new one: none rather than a stale one.
+              title: str(input.title).trim(),
               content: str(input.content),
               sourceIds: [...item.sourceIds, ctx.triggerMessageId],
               channelIds: [...new Set([...item.channelIds, ctx.channelId])],
@@ -399,7 +407,10 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
                 {
                   kind: "memory.updated",
                   target: { type: "memory", id: row.id },
-                  params: { text: cutText(row.content, 500), previousText: cutText(item.content, 500) },
+                  params: {
+                    text: cutText(row.title || row.content, 500),
+                    previousText: cutText(item.title || item.content, 500),
+                  },
                   before: { itemId: item.id },
                   after: { itemId: row.id },
                 },
@@ -439,7 +450,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               {
                 kind: "memory.forgotten",
                 target: { type: "memory", id: item.id },
-                params: { text: cutText(item.content, 500) },
+                params: { text: cutText(item.title || item.content, 500) },
                 before: { itemId: item.id },
                 after: { itemId: item.id },
               },
@@ -628,19 +639,29 @@ const personMayRead = (item: ContextItem | undefined, person: string | null, age
   !item || ((!item.agentId || item.agentId === agentId) && (item.scopeType !== "person" || item.scopeId === person));
 
 /**
+ * What a memory is about, apart from its plain title (shown to people, in their language): the same thing saved again,
+ * from any conversation, lands on the same key and replaces or strengthens the old one.
+ */
+const PLAIN_TITLE =
+  "One plain line a person who doesn't code understands, in the language of the conversation, no paths, code or ids (shown first; content holds the detail).";
+const KEY_DESCRIPTION =
+  "A short, stable name for what this is about, in English, technical words welcome ('northwind api list models'; for a term, the term itself). The same thing always gets the same key; two different things never share one.";
+
+/**
  * A new memory, or a new version of one: a receipt with Undo, its line the plain summary (the title). The same thing
  * again (merged) has nothing to undo; the agent's playbook has no receipt (`isPlaybook`), it lives in the Memory tab.
  */
 async function recordSave(ctx: ToolContext, res: ConsolidateResult) {
   if (res.action !== "created" && res.action !== "superseded" && res.action !== "disputed") return;
-  if (isPlaybook(res.item)) return;
+  const line = receiptLine(res.item);
+  if (isPlaybook(res.item) || !line) return;
   const replaced = res.action === "superseded" ? res.previous : undefined;
   await recordAgentActions(ctx.db, ctx, [
     {
       kind: "memory.saved",
       target: { type: "memory", id: res.item.id },
       params: {
-        text: cutText(res.item.title || res.item.content, 500),
+        text: cutText(line, 500),
         ...(replaced ? { previousText: cutText(replaced.title || replaced.content, 500) } : {}),
       },
       before: replaced ? { itemId: replaced.id } : null,

@@ -1,8 +1,8 @@
 import { and, asc, eq, inArray, isNull, lt, lte, or, schema, sql } from "@agenteschat/db";
+import { isPlaybook } from "../audience";
 import { enqueue } from "../outbox";
 import {
   type ContextItem,
-  isPlaybook,
   isVerified,
   mergeEvidence,
   type NewContextItem,
@@ -126,6 +126,7 @@ export async function consolidateOrg(deps: ContextDeps, orgId: string, now = new
       ),
     )
     .returning({ id: contextItems.id });
+  const expireBefore = new Date(now.getTime() - LEARNED_EXPIRE_DAYS * 86_400_000);
   const fleeting = await db
     .update(contextItems)
     .set({ status: "archived", updatedAt: now })
@@ -140,7 +141,9 @@ export async function consolidateOrg(deps: ContextDeps, orgId: string, now = new
         inArray(contextItems.kind, ["note", "lesson", "fact"]),
         eq(contextItems.useCount, 0),
         lte(contextItems.recurrence, 1),
-        lt(contextItems.createdAt, new Date(now.getTime() - LEARNED_EXPIRE_DAYS * 86_400_000)),
+        lt(contextItems.createdAt, expireBefore),
+        // A person who restored it gives it another full stretch, not a daily re-archive.
+        lt(contextItems.updatedAt, expireBefore),
       ),
     )
     .returning({ id: contextItems.id });

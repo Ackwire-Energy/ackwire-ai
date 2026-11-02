@@ -3410,7 +3410,7 @@
       "forgotten": "Olvidado. Está en Archivados si lo quieres recuperar.",
       "saved": "Guardado. Ahora cuenta como verificado.",
       "playbook": "Cómo trabaja {{name}}",
-      "playbookNote": "Formas de trabajar que guarda para sí. No aparecen en el chat; lo que no vuelve a usar se va solo y queda en Archivado.",
+      "playbookNote": "Formas de trabajar que guarda para sí. No aparecen en el chat. Lo que tomó de fuera y no volvió a usar se va solo y queda en Archivado.",
       "details": "Detalles técnicos",
       "skills": "Habilidades que creó",
       "skillUses_one": "cargada una vez",

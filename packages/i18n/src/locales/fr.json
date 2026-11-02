@@ -3449,7 +3449,7 @@
       "saved": "Enregistré. C'est maintenant considéré comme vérifié.",
       "playbook": "Comment {{name}} travaille",
       "playbook_female": "Comment {{name}} travaille",
-      "playbookNote": "Des façons de travailler qu'il garde pour lui. Elles n'apparaissent pas dans la conversation ; ce qu'il ne réutilise pas part tout seul et reste dans Archivés.",
+      "playbookNote": "Des façons de travailler qu'il garde pour lui. Elles n'apparaissent pas dans la conversation. Ce qu'il a pris de l'extérieur et n'a plus jamais utilisé part tout seul et reste dans Archivés.",
       "details": "Détails techniques",
       "skills": "Compétences qu'il a créées",
       "skillUses_one": "chargée {{count}} fois",

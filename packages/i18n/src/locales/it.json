@@ -3447,7 +3447,7 @@
       "saved": "Salvato. Ora conta come verificato.",
       "playbook": "Come lavora {{name}}",
       "playbook_female": "Come lavora {{name}}",
-      "playbookNote": "Modi di lavorare che tiene per sé. Non compaiono nella chat; ciò che non riusa se ne va da solo e resta in Archiviati.",
+      "playbookNote": "Modi di lavorare che tiene per sé. Non compaiono nella chat. Ciò che ha preso dall'esterno e non ha più usato se ne va da solo e resta in Archiviati.",
       "details": "Dettagli tecnici",
       "skills": "Skill create",
       "skillUses_one": "caricata una volta",

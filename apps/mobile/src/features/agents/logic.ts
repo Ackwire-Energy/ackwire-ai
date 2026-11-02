@@ -258,6 +258,15 @@ export function knownAboutMe(list: Memory[] | undefined): Memory[] {
     .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt));
 }
 
+/**
+ * What matters to people (their preferences, business facts, decisions) apart from the agent's playbook (its own
+ * how-tos and lessons, ADR 0120 addendum), listed under "Como ela trabalha".
+ */
+export const byPlaybook = (list: Memory[]) => ({
+  people: list.filter((m) => !m.playbook),
+  playbook: list.filter((m) => m.playbook),
+});
+
 /** "hoje", "ontem" or the date, for "Você disse hoje". */
 export type DayWord = { kind: "today" | "yesterday" } | { kind: "date"; iso: string };
 export function dayWord(iso: string, now = new Date()): DayWord {

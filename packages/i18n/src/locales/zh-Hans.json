@@ -3229,7 +3229,7 @@
       "saved": "已保存，现在算作已验证。",
       "playbook": "{{name}} 的工作方式",
       "playbook_female": "{{name}} 的工作方式",
-      "playbookNote": "它为自己保留的工作方法。不会出现在聊天中；不再使用的会自动移走，保留在“已归档”中。",
+      "playbookNote": "它为自己保留的工作方法。不会出现在聊天中。从外部获得且再也没用过的会自动移走，保留在“已归档”中。",
       "details": "技术细节",
       "skills": "它创建的技能",
       "skillUses_other": "已加载 {{count}} 次",

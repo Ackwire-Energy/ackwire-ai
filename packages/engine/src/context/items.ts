@@ -14,7 +14,7 @@ import {
 } from "@agenteschat/db";
 import { setsCredential } from "@agenteschat/ui/names";
 import { getAgent } from "../agents";
-import { agentIdsWithDetails, seesAgentDetails } from "../audience";
+import { agentIdsSeen, isPlaybook, readsPlaybook, seesAgentDetails } from "../audience";
 import { caches } from "../cache";
 import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { type Judge, triesToChangePermissions } from "../judge";
@@ -128,11 +128,11 @@ export const howToSubject = (title: string) => `${HOW_TO_WORD} ${title}`;
 export const isHowTo = (i: Pick<ContextItem, "kind" | "subjectKey">) =>
   i.kind === "note" && i.subjectKey.split(" ").includes(HOW_TO_WORD);
 /**
- * The agent's playbook (ADR 0120 addendum): how-tos, lessons and notes it wrote for its own work. Quiet in the chat
- * (no receipt), never a proposal for a person to confirm, its technical text only for the agent's owner and admins.
+ * What a chat receipt for a saved memory says: its plain title, or a person's own words. An agent's untitled finding
+ * has none (its text may be technical): it gets no receipt and stays in the Memory tab.
  */
-export const isPlaybook = (i: Pick<ContextItem, "kind" | "agentId" | "scopeType" | "createdByKind">) =>
-  !!i.agentId && i.scopeType === "agent" && i.createdByKind === "agent" && (i.kind === "note" || i.kind === "lesson");
+export const receiptLine = (i: Pick<ContextItem, "title" | "content" | "createdByKind">) =>
+  i.title.trim() || (i.createdByKind === "person" ? i.content : "");
 export const howToSql = () =>
   sql`(${contextItems.kind} = 'note' and ${HOW_TO_WORD} = any(string_to_array(${contextItems.subjectKey}, ' ')))`;
 
@@ -443,16 +443,16 @@ export async function listContextItems(
   const membership = await requirePermission(db, actorId, orgId, "read");
   const [visible, seen] = await Promise.all([
     userVisibleChannels(db, orgId, actorId),
-    agentIdsWithDetails(db, actorId, orgId),
+    agentIdsSeen(db, actorId, orgId),
   ]);
-  return db
+  const rows = await db
     .select()
     .from(contextItems)
     .where(
       and(
         eq(contextItems.orgId, orgId),
         // An agent's memory is part of how it works: only for who sees its details.
-        or(isNull(contextItems.agentId), inArray(contextItems.agentId, [...seen])),
+        or(isNull(contextItems.agentId), inArray(contextItems.agentId, [...seen.details])),
         // A person's preferences: theirs, and who reviews memory.
         can(membership, "review_memory")
           ? undefined
@@ -466,6 +466,7 @@ export async function listContextItems(
     )
     .orderBy(desc(contextItems.pinned), desc(contextItems.relevance), desc(contextItems.updatedAt))
     .limit(Math.min(filter.limit ?? 100, 500));
+  return rows.filter((i) => !isPlaybook(i) || seen.playbook.has(i.agentId ?? ""));
 }
 
 /** Whether someone who reads `visible` may see an item: every channel it came from (org-wide ones too). */
@@ -493,10 +494,6 @@ export async function listAgentMemoryRows(db: Database, actorId: string, orgId: 
   const playbook = !!agent && readsPlaybook(agent, actorId, membership);
   return { items: rows.filter((i) => playbook || !isPlaybook(i)), visible };
 }
-
-/** Who reads an agent's playbook (`isPlaybook`): its owner and who manages agents. */
-const readsPlaybook = (agent: { ownerUserId: string | null }, actorId: string, membership: Parameters<typeof can>[0]) =>
-  agent.ownerUserId === actorId || can(membership, "manage_agents");
 
 /**
  * What all the agents know, for a map of the workspace's memory: the current items of agents still here, under the
@@ -585,7 +582,8 @@ export async function editContextItem(
         scopeId: item.scopeId,
         agentId: item.agentId,
         subject: item.subjectKey,
-        title: input.title ?? item.title,
+        // A summary of the old text would sit above the new one: kept only when the person edited it too.
+        title: input.title ?? "",
         content: input.content ?? item.content,
         sourceIds: item.sourceIds,
         channelIds: item.channelIds,

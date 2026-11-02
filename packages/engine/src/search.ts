@@ -7,7 +7,7 @@ import type {
   SearchQuery,
 } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, gt, inArray, isNull, schema } from "@agenteschat/db";
-import { agentIdsWithDetails } from "./audience";
+import { agentIdsSeen, isPlaybook } from "./audience";
 import { caches } from "./cache";
 import { cutText } from "./format";
 import type { ModelGateway } from "./gateway";
@@ -284,17 +284,21 @@ export async function searchForUser(
           agentId: contextItems.agentId,
           scopeType: contextItems.scopeType,
           scopeId: contextItems.scopeId,
+          kind: contextItems.kind,
+          createdByKind: contextItems.createdByKind,
         })
         .from(contextItems)
         .where(and(eq(contextItems.orgId, orgId), inArray(contextItems.id, items))),
-      agentIdsWithDetails(deps.db, userId, orgId),
+      agentIdsSeen(deps.db, userId, orgId),
     ]);
     const reviews = can(membership, "review_memory");
     const shown = new Set(
       rows
         .filter(
           (r) =>
-            (!r.agentId || agentsSeen.has(r.agentId)) && (reviews || r.scopeType !== "person" || r.scopeId === userId),
+            (!r.agentId || agentsSeen.details.has(r.agentId)) &&
+            (!isPlaybook(r) || agentsSeen.playbook.has(r.agentId ?? "")) &&
+            (reviews || r.scopeType !== "person" || r.scopeId === userId),
         )
         .map((r) => r.id),
     );

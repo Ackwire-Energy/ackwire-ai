@@ -3205,7 +3205,7 @@ export const en = {
       /** The agent's own how-tos, lessons and notes, apart from what it learned about people. */
       playbook: "How {{name}} works",
       playbookNote:
-        "Ways of working it keeps for itself. They don't show in the chat; what it doesn't use again leaves on its own and stays in Archived.",
+        "Ways of working it keeps for itself. They don't show in the chat. What it picked up from outside and never used again leaves on its own and stays in Archived.",
       /** Folds the technical text under a learned item's plain summary. */
       details: "Technical details",
       skills: "Skills it made",

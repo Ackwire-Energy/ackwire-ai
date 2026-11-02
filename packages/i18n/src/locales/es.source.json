@@ -8104,7 +8104,7 @@
     "value": "How {{name}} works"
   },
   "agentPage.memory.playbookNote": {
-    "value": "Ways of working it keeps for itself. They don't show in the chat; what it doesn't use again leaves on its own and stays in Archived."
+    "value": "Ways of working it keeps for itself. They don't show in the chat. What it picked up from outside and never used again leaves on its own and stays in Archived."
   },
   "agentPage.memory.details": {
     "value": "Technical details"

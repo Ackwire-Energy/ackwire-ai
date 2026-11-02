@@ -3288,7 +3288,7 @@
       "forgotten": "Unutuldu. Geri isterseniz Arşivlenenler bölümünde.",
       "saved": "Kaydedildi. Artık doğrulanmış sayılıyor.",
       "playbook": "{{name}} nasıl çalışır",
-      "playbookNote": "Kendisi için sakladığı çalışma yolları. Sohbette görünmezler; tekrar kullanmadığı kendiliğinden çıkar ve Arşivlenenler'de kalır.",
+      "playbookNote": "Kendisi için sakladığı çalışma yolları. Sohbette görünmezler. Dışarıdan edinip bir daha kullanmadığı kendiliğinden çıkar ve Arşivlenenler'de kalır.",
       "details": "Teknik ayrıntılar",
       "skills": "Oluşturduğu beceriler",
       "skillUses_one": "bir kez yüklendi",

@@ -3204,7 +3204,7 @@
       "forgotten": "Dilupakan. Ada di Arsip jika kamu ingin mengembalikannya.",
       "saved": "Tersimpan. Sekarang dihitung terverifikasi.",
       "playbook": "Cara kerja {{name}}",
-      "playbookNote": "Cara kerja yang disimpannya untuk dirinya sendiri. Tidak muncul di obrolan; yang tidak dipakainya lagi hilang sendiri dan tetap ada di Diarsipkan.",
+      "playbookNote": "Cara kerja yang disimpannya untuk dirinya sendiri. Tidak muncul di obrolan. Yang didapatnya dari luar dan tidak pernah dipakai lagi hilang sendiri dan tetap ada di Diarsipkan.",
       "details": "Detail teknis",
       "skills": "Skill yang dibuatnya",
       "skillUses_other": "dimuat {{count}} kali",

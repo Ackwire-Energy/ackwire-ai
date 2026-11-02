@@ -2,6 +2,7 @@ import type { ErrorTags } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, inArray, isNull, lte, or, schema, sql } from "@agenteschat/db";
 import { modelInfo } from "@agenteschat/providers";
 import { recordAgentActions } from "../agent-actions";
+import { isPlaybook } from "../audience";
 import { callLine, type LearnSignal, type RunCall, runCalls } from "../continuation";
 import { cutText, cutTextEnd } from "../format";
 import { agentBudgetState } from "../gateway";
@@ -15,9 +16,9 @@ import {
   type Evidence,
   howToSql,
   howToSubject,
-  isPlaybook,
   looksLikeSecret,
   type NewContextItem,
+  receiptLine,
 } from "./items";
 import { changeSkillAsAgent } from "./learned-skills";
 import { type ContextDeps, isTrustedMessage, judgeOf, memoryJudging, resolveSummaryModel } from "./summaries";
@@ -218,7 +219,7 @@ const LEARN_SYSTEM = [
   "You keep the memory of an AI agent that works in a team of people and agents. Read one finished turn of its work and extract what is worth keeping for next time, as JSON.",
   "Kinds: how_to (a way it worked out and will reuse: the exact address, command, parameters, script path; steps first), preference (how a person wants things done), fact (a lasting fact about the company, its business or its people), decision, lesson (what to do differently, or keep doing), term (a word or name the team uses, and what it means).",
   "How its systems work (where code lives, which file does what, how a tool behaves) is a how_to or a lesson, never a fact.",
-  'title: one plain line a person who doesn\'t code understands, in the language the people in the conversation write, with no paths, code or ids ("Como gravar senhas no Supabase sem expô-las"); content holds the technical detail.',
+  'title: one plain line a person who doesn\'t code understands, in the language the people in the conversation write, with no paths, code or ids ("Como gravar senhas no Supabase sem expô-las"); content holds the technical detail. key: a short stable name for what it is about, in English, technical words welcome ("supabase secrets storage"; for a term, the term itself): the same thing learned again gets the same key, two different things never share one.',
   "Scope: own (only this agent), team (how the team works), workspace (everyone should know), person (one person's own preference: give their name as it appears in the messages in about_person).",
   "Ground everything: cite refs (m1… messages, s1… tool calls) for each item. Never infer traits, roles, moods or preferences. A one-off request is not a standing preference. If unsure, leave it out.",
   'Write each item as a statement of fact ("Ana prefers reports in Portuguese"), never as an order ("Always write in Portuguese").',
@@ -241,10 +242,11 @@ const LEARN_SCHEMA = {
           scope: { type: "string", enum: ["own", "team", "workspace", "person"] },
           about_person: { type: "string" },
           title: { type: "string" },
+          key: { type: "string" },
           content: { type: "string" },
           refs: { type: "array", items: { type: "string" } },
         },
-        required: ["kind", "scope", "about_person", "title", "content", "refs"],
+        required: ["kind", "scope", "about_person", "title", "key", "content", "refs"],
         additionalProperties: false,
       },
     },
@@ -267,6 +269,8 @@ interface LearnedItem {
   scope: "own" | "team" | "workspace" | "person";
   about_person: string;
   title: string;
+  /** What it is about, stable across languages and conversations: the identity, apart from the plain title. */
+  key?: string;
   content: string;
   refs: string[];
 }
@@ -500,6 +504,7 @@ export async function learnRun(deps: ContextDeps, input: { orgId: string; runId:
       trust !== "high" || item.kind === "how_to" ? "own" : item.scope === "person" && !person ? "own" : item.scope;
     const confidence = trust === "low" ? 0.5 : evidence.some((e) => e.type === "human") ? 0.7 : 0.8;
     const title = item.title.trim().slice(0, 200);
+    const key = (typeof item.key === "string" ? item.key.trim().slice(0, 200) : "") || title;
     const base: NewContextItem = {
       orgId: run.orgId,
       kind: item.kind === "how_to" ? "note" : item.kind === "term" ? "fact" : item.kind,
@@ -507,8 +512,7 @@ export async function learnRun(deps: ContextDeps, input: { orgId: string; runId:
       scopeId: scope === "own" ? agent.id : scope === "person" ? person : run.orgId,
       agentId: scope === "own" ? agent.id : null,
       title,
-      subject:
-        item.kind === "how_to" ? howToSubject(title) : item.kind === "term" ? `term ${title}` : title || undefined,
+      subject: item.kind === "how_to" ? howToSubject(key) : item.kind === "term" ? `term ${key}` : key || undefined,
       content: item.content.trim(),
       sourceIds: [...new Set(cited.messages.map((m) => m.id))],
       channelIds: [run.channelId],
@@ -525,14 +529,15 @@ export async function learnRun(deps: ContextDeps, input: { orgId: string; runId:
       // The agent's playbook stays out of the chat (`isPlaybook`); what matters to people is one plain line.
       if (
         (res.action === "created" || res.action === "superseded" || res.action === "disputed") &&
-        !isPlaybook(res.item)
+        !isPlaybook(res.item) &&
+        receiptLine(res.item)
       )
         await recordAgentActions(db, ctx, [
           {
             kind: "memory.saved",
             target: { type: "memory", id: res.item.id },
             params: {
-              text: cutText(res.item.title || res.item.content, 500),
+              text: cutText(receiptLine(res.item), 500),
               ...(res.previous && res.action === "superseded"
                 ? { previousText: cutText(res.previous.title || res.previous.content, 500) }
                 : {}),

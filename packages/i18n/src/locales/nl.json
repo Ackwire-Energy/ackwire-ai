@@ -3341,7 +3341,7 @@
       "saved": "Opgeslagen. Het telt nu als geverifieerd.",
       "playbook": "Hoe {{name}} werkt",
       "playbook_female": "Hoe {{name}} werkt",
-      "playbookNote": "Werkwijzen die het voor zichzelf bewaart. Ze verschijnen niet in de chat; wat het niet opnieuw gebruikt, verdwijnt vanzelf en blijft in Gearchiveerd.",
+      "playbookNote": "Werkwijzen die het voor zichzelf bewaart. Ze verschijnen niet in de chat. Wat het van buitenaf oppikte en nooit opnieuw gebruikte, verdwijnt vanzelf en blijft in Gearchiveerd.",
       "details": "Technische details",
       "skills": "Skills die hij maakte",
       "skillUses_one": "{{count}} keer geladen",

@@ -67,7 +67,7 @@ import { PlanMeter } from "../usage/parts";
 import { openAgentUsage } from "../usage/UsageScreen";
 import { openAgentEdit } from "./AgentEditScreen";
 import { AgentMailSection } from "./AgentMailSection";
-import { canEditMemories, type DidLine, didLines, knownAboutMe, plainRole, spendOf, usesOf } from "./logic";
+import { byPlaybook, canEditMemories, type DidLine, didLines, knownAboutMe, plainRole, spendOf, usesOf } from "./logic";
 import { MonthPixels } from "./MonthPixels";
 import { useMemoryOriginText } from "./useMemoryOriginText";
 import { workTitle } from "./work";
@@ -163,6 +163,7 @@ function Profile({ id }: { id: string }) {
   const decides = mine || can(org, "manage_agents");
   const did = didLines(forYou.data?.items);
   const memories = knownAboutMe(knows.data);
+  const learned = byPlaybook(memories);
   const uses = usesOf(access.data);
   const connected = useConnectedById();
   // A computer brain: its maker's mark and the model by the plan that pays for it ("Sonnet pelo plano do Claude"; its
@@ -220,6 +221,17 @@ function Profile({ id }: { id: string }) {
         onDone={sheet.close}
       />,
     );
+
+  const memoryRow = (m: Memory) => (
+    <Row
+      key={m.id}
+      leading={<Tile icon="brain" />}
+      title={m.summary ?? m.text}
+      subtitle={originText(m)}
+      chevron={editable}
+      {...(editable ? { onPress: () => fix(m) } : {})}
+    />
+  );
 
   const ownerLine = mine
     ? t("mobile.intentAgents.ownerYou")
@@ -403,18 +415,18 @@ function Profile({ id }: { id: string }) {
               <Section title={t("mobile.intentAgents.knows.title", agentGrammar(name))}>
                 {memories.length > 0 ? (
                   <>
-                    <Card>
-                      {memories.map((m) => (
-                        <Row
-                          key={m.id}
-                          leading={<Tile icon="brain" />}
-                          title={m.summary ?? m.text}
-                          subtitle={originText(m)}
-                          chevron={editable}
-                          {...(editable ? { onPress: () => fix(m) } : {})}
-                        />
-                      ))}
-                    </Card>
+                    {learned.people.length > 0 ? <Card>{learned.people.map(memoryRow)}</Card> : null}
+                    {learned.playbook.length > 0 ? (
+                      <>
+                        <Text variant="small" tone="ink" accessibilityRole="header" style={styles.playbook}>
+                          {t("agentPage.memory.playbook", agentGrammar(name))}
+                        </Text>
+                        <Text variant="small" tone="muted" style={styles.foot}>
+                          {t("agentPage.memory.playbookNote")}
+                        </Text>
+                        <Card>{learned.playbook.map(memoryRow)}</Card>
+                      </>
+                    ) : null}
                     <Text variant="small" tone="muted" style={styles.foot}>
                       {editable
                         ? t(`mobile.intentAgents.knows.foot${g}`)
@@ -791,6 +803,7 @@ const styles = StyleSheet.create({
   pixels: { paddingHorizontal: 4, marginBottom: 12 },
   monthCards: { gap: 10 },
   foot: { paddingHorizontal: 4, marginTop: 8 },
+  playbook: { paddingHorizontal: 4, marginTop: 16, fontWeight: "600" },
   src: { flexDirection: "row", alignItems: "center", gap: 6 },
   coordinates: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   spend: { padding: 14, gap: 10 },

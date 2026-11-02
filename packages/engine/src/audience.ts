@@ -151,13 +151,35 @@ export async function requireAgentDetails(db: Database, userId: string, orgId: s
   return agent;
 }
 
+/**
+ * The agent's playbook (ADR 0120 addendum): how-tos, lessons and notes it wrote for its own work. Quiet in the chat
+ * (no receipt), never a proposal for a person to confirm, its technical text only for the agent's owner and admins.
+ */
+export const isPlaybook = (i: { kind: string; agentId: string | null; scopeType: string; createdByKind: string }) =>
+  !!i.agentId && i.scopeType === "agent" && i.createdByKind === "agent" && (i.kind === "note" || i.kind === "lesson");
+
+/** Who reads an agent's playbook (`isPlaybook`, ADR 0120 addendum): its owner and who manages agents. */
+export const readsPlaybook = (
+  a: { ownerUserId: string | null },
+  userId: string,
+  membership: Pick<Membership, "permissions" | "roleIds"> | null,
+) => a.ownerUserId === userId || can(membership, "manage_agents");
+
 /** The ids of the workspace's agents whose details this person sees (`seesAgentDetails`). */
 export async function agentIdsWithDetails(db: Database, userId: string, orgId: string) {
+  return (await agentIdsSeen(db, userId, orgId)).details;
+}
+
+/** `agentIdsWithDetails`, plus the agents whose playbook this person reads (`readsPlaybook`). */
+export async function agentIdsSeen(db: Database, userId: string, orgId: string) {
   const [membership, rows] = await Promise.all([
     getMembership(db, userId, orgId),
     db.select().from(agents).where(eq(agents.orgId, orgId)),
   ]);
-  return new Set(rows.filter((a) => seesAgentDetails(a, userId, membership)).map((a) => a.id));
+  return {
+    details: new Set(rows.filter((a) => seesAgentDetails(a, userId, membership)).map((a) => a.id)),
+    playbook: new Set(rows.filter((a) => readsPlaybook(a, userId, membership)).map((a) => a.id)),
+  };
 }
 
 /**
