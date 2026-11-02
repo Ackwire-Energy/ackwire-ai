@@ -100,6 +100,7 @@ import type {
   JoinApproval,
   JoinClaim,
   JoinRequest,
+  LearnedSkill,
   Machine,
   MachineAccess,
   MachineAccount,
@@ -941,6 +942,10 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
             json: { skills },
           })
         ).skills,
+      learned: async (orgId, agentId) =>
+        (await request<{ skills: LearnedSkill[] }>(`${org(orgId)}/agents/${enc(agentId)}/learned-skills`)).skills,
+      revert: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/revert`, { json: {} }),
+      restore: (orgId, id) => request<SkillDetail>(`${org(orgId)}/skills/${enc(id)}/restore`, { json: {} }),
     },
     access: {
       get: (orgId, agentId) => request<AgentAccess>(`${org(orgId)}/agents/${enc(agentId)}/access`),

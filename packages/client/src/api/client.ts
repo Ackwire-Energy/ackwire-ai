@@ -125,6 +125,7 @@ import type {
   JoinApproval,
   JoinClaim,
   JoinRequest,
+  LearnedSkill,
   Machine,
   MachineAccess,
   MachineAccessReduce,
@@ -803,6 +804,12 @@ export interface ApiClient {
     /** Every library skill with `enabled` for this agent. */
     forAgent(orgId: string, agentId: string): Promise<AgentSkill[]>;
     setForAgent(orgId: string, agentId: string, skills: { skillId: string; enabled: boolean }[]): Promise<AgentSkill[]>;
+    /** Skills the agent made from its own how-tos, archived ones too (older servers: absent). */
+    learned?(orgId: string, agentId: string): Promise<LearnedSkill[]>;
+    /** Undo the agent's last change to its own skill. */
+    revert?(orgId: string, id: string): Promise<SkillDetail>;
+    /** Bring back a skill archived for disuse. */
+    restore?(orgId: string, id: string): Promise<SkillDetail>;
   };
   access: {
     /** The agent's tool tree with each node's state. 404 while the backend doesn't have it. */

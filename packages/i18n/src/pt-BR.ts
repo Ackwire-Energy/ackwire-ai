@@ -1816,6 +1816,10 @@ export const ptBR = {
       renamed: "Renomeei a conversa para <b>{{to}}</b>",
       closed: "Encerrei a conversa <b>{{title}}</b>",
     },
+    skill: {
+      created: "Transformei o que aprendi na skill <b>{{name}}</b>",
+      updated: "Corrigi a skill <b>{{name}}</b>",
+    },
     /** A kind this app doesn't know yet (a newer server's). */
     other: "Fiz uma mudança",
     issueFields: {
@@ -3141,6 +3145,31 @@ export const ptBR = {
       refused: "Proposta recusada. {{The}} {{name}} guardou o motivo.",
       decides: "{{who}} decide.",
       adminDecides: "Um admin decide.",
+      learned: "Aprendizados",
+      learnedEmpty:
+        "Nada aprendido por conta própria ainda. Correções, preferências e jeitos de fazer que descobrir aparecem aqui.",
+      howTo: "Como fazer",
+      disputed: "Em disputa",
+      edit: "Editar",
+      forget: "Esquecer",
+      save: "Salvar",
+      cancel: "Cancelar",
+      forgotten: "Esquecido. Fica em Arquivadas se quiser de volta.",
+      saved: "Salvo. Agora conta como verificado.",
+      skills: "Skills que criou",
+      skillUses_zero: "nunca carregada",
+      skillUses_one: "carregada uma vez",
+      skillUses_other: "carregada {{count}} vezes",
+      view: "Ver",
+      hide: "Esconder",
+      undoChange: "Desfazer última mudança",
+      undone: "Voltou a como era antes da última mudança.",
+      lock: "Travar",
+      unlock: "Destravar",
+      locked: "Travada",
+      share: "Dar a outros agentes",
+      archivedSkill: "Arquivada por falta de uso",
+      restore: "Restaurar",
     },
     activity: {
       title: "Execuções",
@@ -3330,6 +3359,7 @@ export const ptBR = {
     targetInstructions: "instruções {{of}} {{name}}",
     targetRole: "papel {{of}} {{name}}",
     targetAccess: "acesso {{of}} {{name}}",
+    targetSkill: "a skill {{skill}}",
     targetChanges: "mudanças para {{article}} {{name}}",
     targetContext: "contexto da {{org}}",
     roleLine: "Papel: {{from}} → {{to}}",
@@ -3374,6 +3404,7 @@ export const ptBR = {
     titleInstructions: "Atualizar as instruções {{of}} {{name}}",
     titleRole: "Mudar o papel {{of}} {{name}}",
     titleAccess: "Mudar o acesso {{of}} {{name}}",
+    titleSkill: "Corrigir a skill {{skill}}",
     titleContext: "Atualizar o contexto da {{org}}",
     evidence: {
       outcome: "Resultado observado",
@@ -10244,7 +10275,11 @@ export const ptBR = {
     },
     remember: {
       label: "Lembrar",
-      description: "Guarda uma nota quando alguém pede.",
+      description: "Guarda o que aprendeu: uma correção, uma preferência, um fato.",
+    },
+    save_how_to: {
+      label: "Guardar como fazer",
+      description: "Guarda como fez algo que deu trabalho descobrir, para reaproveitar depois.",
     },
     update_memory: {
       label: "Atualizar memória",
@@ -10314,6 +10349,10 @@ export const ptBR = {
     read_skill_file: {
       label: "Ler arquivo de skill",
       description: "Lê um arquivo de referência de uma skill.",
+    },
+    update_skill: {
+      label: "Corrigir skill",
+      description: "Corrige uma skill que carregou. A skill de uma pessoa vira proposta.",
     },
     schedule_reminder: {
       label: "Criar lembrete",

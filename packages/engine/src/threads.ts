@@ -1333,6 +1333,7 @@ export async function threadRunInfo(db: Database, orgId: string, rootId: string)
       contextExcludedMessageIds: threads.contextExcludedMessageIds,
       title: threads.title,
       missionId: schema.missions.id,
+      missionMachineId: schema.missions.machineId,
     })
     .from(threads)
     .leftJoin(
@@ -1350,7 +1351,7 @@ export async function threadRunInfo(db: Database, orgId: string, rootId: string)
           title: row.title,
         }
       : null;
-  return { range, missionId: row?.missionId ?? null };
+  return { range, missionId: row?.missionId ?? null, missionMachineId: row?.missionMachineId ?? null };
 }
 
 /** A thread's context range for the run's context builder (see `threadRunInfo`). */

@@ -180,7 +180,7 @@ export function ProposalsPage({ agentId }: { agentId?: string }) {
                   </Button>
                 )}
               </div>
-              {!isText(current) ? (
+              {!isText(current) && current.target.type !== "skill" ? (
                 <SettingChange p={current} />
               ) : editing && current.status === "pending" ? (
                 <Field

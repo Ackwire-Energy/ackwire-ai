@@ -1798,6 +1798,10 @@ export const en: Translations = {
       renamed: "Renamed the conversation to <b>{{to}}</b>",
       closed: "Closed the conversation <b>{{title}}</b>",
     },
+    skill: {
+      created: "Turned what I learned into the skill <b>{{name}}</b>",
+      updated: "Fixed the skill <b>{{name}}</b>",
+    },
     other: "Made a change",
     issueFields: {
       title: "the title",
@@ -3110,6 +3114,30 @@ export const en: Translations = {
       refused: "Proposal declined. {{name}} kept the reason.",
       decides: "{{who}} decides.",
       adminDecides: "An admin decides.",
+      learned: "What it learned",
+      learnedEmpty: "Nothing learned on its own yet. Corrections, preferences and ways it works out show up here.",
+      howTo: "How-to",
+      disputed: "Disputed",
+      edit: "Edit",
+      forget: "Forget",
+      save: "Save",
+      cancel: "Cancel",
+      forgotten: "Forgotten. It's in Archived if you want it back.",
+      saved: "Saved. It counts as verified now.",
+      skills: "Skills it made",
+      skillUses_zero: "never loaded",
+      skillUses_one: "loaded once",
+      skillUses_other: "loaded {{count}} times",
+      view: "View",
+      hide: "Hide",
+      undoChange: "Undo last change",
+      undone: "Back to how it was before its last change.",
+      lock: "Lock",
+      unlock: "Unlock",
+      locked: "Locked",
+      share: "Give to other agents",
+      archivedSkill: "Archived for disuse",
+      restore: "Restore",
     },
     activity: {
       title: "Runs",
@@ -3299,6 +3327,7 @@ export const en: Translations = {
     targetInstructions: "{{name}}'s instructions",
     targetRole: "{{name}}'s role",
     targetAccess: "{{name}}'s access",
+    targetSkill: "the skill {{skill}}",
     targetChanges: "changes for {{name}}",
     targetContext: "{{org}} context",
     roleLine: "Role: {{from}} → {{to}}",
@@ -3342,6 +3371,7 @@ export const en: Translations = {
     titleInstructions: "Update {{name}}'s instructions",
     titleRole: "Change {{name}}'s role",
     titleAccess: "Change {{name}}'s access",
+    titleSkill: "Fix the skill {{skill}}",
     titleContext: "Update the {{org}} context",
     evidence: {
       outcome: "Observed outcome",
@@ -10155,7 +10185,11 @@ export const en: Translations = {
     },
     remember: {
       label: "Remember",
-      description: "Saves a note when someone asks.",
+      description: "Saves what it learned: a correction, a preference, a fact.",
+    },
+    save_how_to: {
+      label: "Save how-to",
+      description: "Saves how it did something that took figuring out, to reuse next time.",
     },
     update_memory: {
       label: "Update memory",
@@ -10226,6 +10260,10 @@ export const en: Translations = {
     read_skill_file: {
       label: "Read skill file",
       description: "Reads a reference file of a skill.",
+    },
+    update_skill: {
+      label: "Fix skill",
+      description: "Fixes a skill it loaded. A person's skill becomes a proposal.",
     },
     schedule_reminder: {
       label: "Create reminder",

@@ -71,9 +71,10 @@ export const ROUTINE_NO_REPLY = "NO_REPLY";
 export const HOW_YOU_WORK = [
   "# How you work",
   "- Be proactive. Before answering about code, bugs, data or errors, look first with your tools (the repository, logs, errors, analytics, issues, memory, routines) and cite what you read (file and line, numbers, links). Reading never needs anyone's ok.",
+  "- Before a task, look for how it was done before: your memory (# What you know) and `search_context` (past conversations, notes and your own earlier steps) for the same or a similar task. Reuse what worked (the method, the address, a script on your computer, a secret you already hold) instead of working it out again.",
   "- Read whole files, not just search snippets, and keep going until you can answer. Never stop to ask whether to keep looking, and never end with something left to check ('I have not checked X yet', 'I will look for Y'): check it now, then answer.",
   "- Come back with what you found and one concrete next step: the exact change (file, line, what changes), or open it yourself (a draft PR, an issue). Choosing the fix is your job: recommend one instead of asking the person to pick among options, unless it is a product choice. A plan made without looking is not an answer.",
-  "- Internal changes you can undo need no permission: do them and say what you did. That is creating or updating issues (status, priority, assignee, labels, due date), assigning work, saving or changing memories you were asked to keep, creating or changing routines, adding an agent to a channel, writing the wiki when asked, renaming or closing a thread. The person sees each change under your reply with an Undo button. If work you were asked about has no owner, don't just say someone must take it: assign it (to the agent or person whose role fits, or yourself) or do it.",
+  "- Internal changes you can undo need no permission: do them and say what you did. That is creating or updating issues (status, priority, assignee, labels, due date), assigning work, saving what you learned (a correction, a preference someone stated, a fact about the company, how you got something working), creating or changing routines, adding an agent to a channel, writing the wiki when asked, renaming or closing a thread. The person sees each change under your reply with an Undo button. If work you were asked about has no owner, don't just say someone must take it: assign it (to the agent or person whose role fits, or yourself) or do it.",
   "- Ask only for decisions that are really the person's (product choices, priorities) or before actions that are external or can't be undone: merge, deploy, rollback, anything sent outside the organization (email, messages, payments), deleting what can't be restored. Never ask permission to look, and never ask for information your tools can find. When you recommend a sensitive action nobody asked for (a rollback, a deploy), say it in your reply with what and why; don't call its tool or `ask_user` for it. For a product choice, lay out the data and the trade-off, then ask the one question that decides it.",
   "- State only what your tools or your context returned; when your searches find nothing, say so instead of filling the gap. Never claim you lack access to something a tool just returned.",
   "- An empty or blocked result is not a closed way: when a search, a page or a tool gives nothing, fails or is blocked, change the words, the source or the tool and try again. When a way is really closed (no access, a refusal), take another that still gets the people what they need: another tool, the colleague whose role covers it, a document or a copy instead of a move. A refusal for safety (a credential, private data in an address, secrets, sending data out) is final: never send that data another way. Say what was refused.",
@@ -171,6 +172,7 @@ const QUIET_TOOLS = [
   "send_gif",
   "send_sticker",
   "search_context",
+  "save_how_to",
   "get_summary",
   "expand",
   "list_artifacts",
@@ -354,8 +356,13 @@ export async function buildRunContext(
   const machineAccess = agent.machineId
     ? machineAccessOf(db, run.orgId, agent.id, agent.machineId).catch(() => null)
     : null;
-  // The keys it holds there by name (never values): a refused one is asked for again under that name.
-  const heldKeys = agent.machineId ? heldKeysOf(db, run.orgId, agent.id, agent.machineId).catch(() => []) : null;
+  // The secrets people already gave it (names only), so it uses them instead of asking again. In a mission's
+  // thread its tools act on the mission's computer (ADR 0029): that one's secrets, none when it has no computer.
+  const heldSecrets = threadInfo?.missionId
+    ? threadInfo.missionMachineId
+      ? heldSecretsOf(db, run.orgId, agent.id, threadInfo.missionMachineId).catch(() => [])
+      : Promise.resolve([])
+    : heldSecretsOf(db, run.orgId, agent.id, agent.machineId).catch(() => []);
   // A routine's run keeps to its own task, as with "Your recent work" below.
   const openTasks =
     options.routine || run.background
@@ -772,7 +779,7 @@ export async function buildRunContext(
             : [],
         )
       : []),
-    ...(heldKeys ? await heldKeys.then((k) => (k.length > 0 ? [{ text: heldKeysText(k) }] : [])) : []),
+    ...(await heldSecrets.then((rows) => (rows.length > 0 ? [{ text: heldSecretsText(rows) }] : []))),
     // A routine's background run (ADR 0053 §4): its routine and what people said where it reports.
     ...(routine ? [{ text: routine.block }, { text: routine.deliverToView }] : []),
     // Per turn from here on: a computer brain reads these in "# This turn" (`thisTurnText`).
@@ -1416,35 +1423,42 @@ async function machineAccessOf(db: Database, orgId: string, agentId: string, mac
   };
 }
 
-/** The keys delivered to the agent on its computer and still there: names and where they go, never values. */
-async function heldKeysOf(db: Database, orgId: string, agentId: string, machineId: string) {
-  const r = schema.secretRequests;
+/** The secrets delivered to the agent's current computer and still there (names and where, never values). */
+async function heldSecretsOf(db: Database, orgId: string, agentId: string, machineId: string | null) {
+  const { secretRequests } = schema;
   return db
-    .select({ name: r.name, kind: r.targetKind, path: r.targetPath, site: r.site })
-    .from(r)
+    .selectDistinct({
+      name: secretRequests.name,
+      kind: secretRequests.targetKind,
+      path: secretRequests.targetPath,
+      site: secretRequests.site,
+    })
+    .from(secretRequests)
     .where(
       and(
-        eq(r.orgId, orgId),
-        eq(r.agentId, agentId),
-        eq(r.status, "delivered"),
-        isNull(r.removedAt),
-        eq(r.machineId, machineId),
+        eq(secretRequests.orgId, orgId),
+        eq(secretRequests.agentId, agentId),
+        eq(secretRequests.status, "delivered"),
+        isNull(secretRequests.removedAt),
+        machineId ? eq(secretRequests.machineId, machineId) : isNull(secretRequests.machineId),
       ),
     )
-    .orderBy(r.name);
+    .orderBy(secretRequests.name)
+    .limit(30);
 }
 
-export function heldKeysText(keys: { name: string; kind: string; path: string | null; site: string | null }[]) {
-  const where = (k: (typeof keys)[number]) =>
-    k.kind === "file"
-      ? `the file ${k.path}`
-      : k.kind === "site" && k.site
-        ? `typed on ${new URL(k.site).host}`
-        : "a variable";
-  return `# Your keys on your computer\nGiven to you through request_secret; use them by name, never print them: ${keys
-    .slice(0, 50)
-    .map((k) => `${k.name} (${where(k)})`)
-    .join(", ")}.`;
+export function heldSecretsText(rows: { name: string; kind: string; path: string | null; site: string | null }[]) {
+  const where = (r: (typeof rows)[number]) =>
+    r.kind === "file" && r.path
+      ? `the file ${r.path}`
+      : r.kind === "site" && r.site
+        ? `a password your browser types on ${new URL(r.site).host}`
+        : "an environment variable in your commands";
+  return [
+    "# Secrets on your computer",
+    "People already gave you these; they stay on your computer between conversations. Use them by name, never print them, and don't ask for them again (ask again only when one is refused or stopped working):",
+    ...rows.map((r) => `- ${r.name}: ${where(r)}`),
+  ].join("\n");
 }
 
 /** The block about the agent's connected computer: the folders the machine allows it and the tools that are off. */

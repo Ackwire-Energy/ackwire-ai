@@ -20,6 +20,7 @@ import type { ConnectorDeps } from "./connectors/connections";
 import { getChannelCached } from "./context";
 import { consolidateOrg } from "./context/consolidate";
 import { applyReactionFeedback } from "./context/feedback";
+import { LEARN_JOB, learnRun } from "./context/learn";
 import { REFLECT_DEFAULTS, reflectThread } from "./context/reflect";
 import { judgeOf } from "./context/summaries";
 import { reportDroppedMentions } from "./continuation";
@@ -660,6 +661,12 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     "context.reflect": async (job) => {
       if (!deps.context) return;
       await reflectThread(deps.context, { orgId: orgOf(job), threadRootId: String(job.payload.threadRootId) });
+    },
+    [LEARN_JOB]: async (job) => {
+      if (!deps.context) return;
+      const res = await learnRun(deps.context, { orgId: orgOf(job), runId: String(job.payload.runId) });
+      // Its run went on after the turn that queued it: the outbox's backoff brings it back once the run ends.
+      if (res.skipped === "running") throw Object.assign(new Error("its run is still going"), { retryable: true });
     },
     // A reply a while ago: the thread's title and "resolved?" suggestion, unless a newer reply came.
     "threads.assess": async (job) => {

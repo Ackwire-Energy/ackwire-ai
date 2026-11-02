@@ -131,6 +131,7 @@ export async function world(options: WorldOptions) {
   const unscripted: { handle: string; last: string }[] = [];
   const unknownJudgments: string[] = [];
   const judgments: { kind: string; state: Record<string, unknown> }[] = [];
+  const asked = new WeakSet<object>();
   const table = options.judge ?? {};
 
   const reply = (request: ModelRequest): FakeReply | Error => {
@@ -161,8 +162,11 @@ export async function world(options: WorldOptions) {
     _id: string,
     state: Record<string, unknown>,
     q: JudgeQuestion,
+    request: object,
   ): number | string | undefined => {
-    judgments.push({ kind, state });
+    // One judgment per call, however many questions it asks (the turn end also asks `learn`).
+    if (!asked.has(request)) judgments.push({ kind, state });
+    asked.add(request);
     const handleOf = () => (q.instructions as { agent?: { handle?: string } } | undefined)?.agent?.handle?.slice(1);
     switch (kind) {
       case "follow_through": {

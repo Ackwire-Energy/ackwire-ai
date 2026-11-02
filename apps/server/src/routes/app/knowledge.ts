@@ -69,6 +69,9 @@ const Item = z
     confidence: z.number(),
     relevance: z.number(),
     recurrence: z.number(),
+    useCount: z.number().openapi({ description: "Runs whose memory carried it." }),
+    disputed: z.boolean().openapi({ description: "Another item says otherwise, until a person decides." }),
+    channelIds: z.array(z.uuid()).openapi({ description: "Where it was learned." }),
     pinned: z.boolean(),
     status: z.enum(["active", "archived"]),
     supersededBy: z.uuid().nullable(),
@@ -94,6 +97,9 @@ const toItem = (i: ContextItem) => ({
   confidence: i.confidence,
   relevance: i.relevance,
   recurrence: i.recurrence,
+  useCount: i.useCount,
+  disputed: i.disputed,
+  channelIds: i.channelIds,
   pinned: i.pinned,
   status: i.status,
   supersededBy: i.supersededBy,
@@ -212,6 +218,10 @@ export function knowledgeRoutes(deps: AppDeps) {
             .openapi({ description: `Comma-separated: ${KINDS.join(", ")}` }),
           includeArchived: z.stringbool().optional(),
           limit: z.coerce.number().int().min(1).max(500).optional(),
+          createdBy: z
+            .string()
+            .optional()
+            .openapi({ description: 'Comma-separated: agent, job, person ("What it learned": agent,job).' }),
         }),
       },
       responses: { 200: json(z.object({ items: z.array(Item) })), ...errors },
@@ -227,6 +237,10 @@ export function knowledgeRoutes(deps: AppDeps) {
         kinds,
         includeArchived: q.includeArchived,
         limit: q.limit,
+        createdBy: q.createdBy
+          ?.split(",")
+          .map((k) => k.trim())
+          .filter((k): k is "agent" | "job" | "person" => k === "agent" || k === "job" || k === "person"),
       });
       return c.json({ items: rows.map(toItem) }, 200);
     },

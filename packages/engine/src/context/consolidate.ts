@@ -9,6 +9,8 @@ import {
   similarity,
 } from "./items";
 import { decide, findCandidates, judgeRelations } from "./judgments";
+import { learnConfig } from "./learn";
+import { decayAgentSkills, promoteHowTos, shareAcrossAgents } from "./learned-skills";
 import { proposeFromItem } from "./proposals";
 import { REFLECT_DEFAULTS } from "./reflect";
 import { type ContextDeps, ensurePeriodSummary, judgeOf } from "./summaries";
@@ -29,7 +31,9 @@ export const DECAY = { factor: 0.95, unusedDays: 7, archiveBelow: 0.1, archiveAf
  * 2. decay the relevance of unused items and archive stale ones (pinned items
  *    never decay; archived ones stay reachable through `expand`);
  * 3. refresh last week's period summaries of busy channels;
- * 4. propose promotions for items that became strong enough.
+ * 4. propose promotions for items that became strong enough;
+ * 5. what agents learned (ADR 0120): how-tos reused enough become skills, what two agents learned alike becomes the
+ *    team's, agent-made skills unused for a month are archived.
  */
 export async function consolidateOrg(deps: ContextDeps, orgId: string, now = new Date()) {
   const { db } = deps;
@@ -150,7 +154,10 @@ export async function consolidateOrg(deps: ContextDeps, orgId: string, now = new
       ),
     );
   for (const item of candidates) if (await proposeFromItem(deps, item)) proposals++;
-  return { merged, archived: stale.length, proposals, linked: judged.linked };
+  const skills = await promoteHowTos(deps, orgId, learnConfig(deps).skillAfter).catch(() => 0);
+  const shared = await shareAcrossAgents(deps, orgId).catch(() => 0);
+  const skillsArchived = await decayAgentSkills(deps, orgId, now).catch(() => 0);
+  return { merged, archived: stale.length, proposals, linked: judged.linked, skills, shared, skillsArchived };
 }
 
 /** Items re-judged per org and run, and how far back "recent" goes (a missed day is caught up). */
