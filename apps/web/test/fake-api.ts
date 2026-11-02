@@ -75,6 +75,7 @@ import type {
   SidebarItems,
   SidebarSection,
   SignInOptions,
+  SpeechKey,
   StoragePlatform,
   StorageUsage,
   TaskManagerView,
@@ -307,6 +308,12 @@ export interface FakeState {
    * (null). Saving one makes GIFs available here (`media.gifsAvailable`), removing it takes them away.
    */
   gifKey?: GifKey;
+  /** `system.speechKey`: unset = I'm not the installation's owner on a self-hosted server (null). */
+  speechKey?: SpeechKey;
+  /** The keys a provider refuses when `system.saveSpeechKey` tries them (422, nothing kept). */
+  speechKeyRefused?: string[];
+  /** `voice.allowed`'s answer (default: yes). */
+  voiceAllowed?: boolean;
   /** The keys GIPHY refuses when `system.saveGifKey` checks them (422, nothing kept); any other works. */
   gifKeyRefused?: string[];
   /** Where the server keeps files itself (`storage.get`'s `platform`); unset = its disk, no folder. */
@@ -525,7 +532,15 @@ export const OPENROUTER_KEY: Credential = {
   revokedAt: null,
 };
 
-type MediaSetting = "gifs" | "gifRating" | "agentStickers" | "agentMedia" | "gifsAvailable" | "agentMediaAvailable";
+type MediaSetting =
+  | "voiceMessages"
+  | "voiceAvailable"
+  | "gifs"
+  | "gifRating"
+  | "agentStickers"
+  | "agentMedia"
+  | "gifsAvailable"
+  | "agentMediaAvailable";
 
 /** What the fake GIF search finds (ADR 0091): three GIFs of their own proportions. */
 export const FAKE_GIFS: Gif[] = [
@@ -541,6 +556,8 @@ function mediaSettings(state: FakeState): Pick<OrgSettings, MediaSetting> {
     gifRating: state.media?.gifRating ?? "g",
     agentStickers: state.media?.agentStickers ?? true,
     agentMedia: state.media?.agentMedia ?? "sometimes",
+    voiceMessages: state.media?.voiceMessages ?? true,
+    voiceAvailable: state.media?.voiceAvailable ?? false,
     gifsAvailable: state.media?.gifsAvailable ?? true,
     agentMediaAvailable: state.media?.agentMediaAvailable ?? true,
   };
@@ -1179,6 +1196,32 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.gifKey = { source: null, hint: null, state: "off" };
         state.media = { ...state.media, gifsAvailable: false };
         return state.gifKey;
+      },
+      speechKey: async () => state.speechKey ?? null,
+      saveSpeechKey: async (input) => {
+        log("system.saveSpeechKey", input);
+        if (!state.speechKey) throw new ApiError(404, "not_found", "Not found");
+        if (input.apiKey && state.speechKeyRefused?.includes(input.apiKey)) {
+          throw new ApiError(422, "speech_key_invalid", "The provider didn't accept this key.");
+        }
+        const hint = input.provider === "local" ? (input.baseUrl ?? "") : (input.apiKey ?? "").slice(-4);
+        state.speechKey = { provider: input.provider, hint, state: "ok", envProviders: [] };
+        state.media = { ...state.media, voiceAvailable: true };
+        return state.speechKey;
+      },
+      removeSpeechKey: async () => {
+        log("system.removeSpeechKey");
+        if (!state.speechKey) throw new ApiError(404, "not_found", "Not found");
+        state.speechKey = { provider: null, hint: null, state: "off", envProviders: [] };
+        state.media = { ...state.media, voiceAvailable: false };
+        return state.speechKey;
+      },
+    },
+    voice: {
+      allowed: async () => ({ allowed: state.voiceAllowed ?? true }),
+      send: async (_orgId, channelId, input) => {
+        log("voice.send", channelId, input.clientId, input.durationMs);
+        return { clipId: `clip-${input.clientId}` };
       },
     },
     account: {

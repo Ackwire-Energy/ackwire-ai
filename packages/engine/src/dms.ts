@@ -6,7 +6,7 @@ import { caches } from "./cache";
 import { sha256 } from "./crypto";
 import { NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
-import { type PreviewMeta, previewMediaKind, previewMeta } from "./message-preview";
+import { type PreviewMeta, previewMediaKind, previewMeta, readableBody } from "./message-preview";
 import { quietNoticeSql } from "./notices";
 import { resolveNotifications } from "./notifications";
 import { getMembership, requirePermission } from "./organizations";
@@ -188,7 +188,7 @@ export interface DmSummary {
     /** What the app needs to show a server-written body in the reader's language; null for a plain message. */
     meta: PreviewMeta | null;
     /** A GIF or a sticker sent with no text (ADR 0091): the app says which where `body` is empty; else null. */
-    mediaKind: "gif" | "sticker" | null;
+    mediaKind: "gif" | "sticker" | "voice" | null;
     createdAt: Date;
     authorType: string;
   } | null;
@@ -290,7 +290,7 @@ export async function listDms(db: Database, actorId: string, orgId: string): Pro
           lastMessage: m
             ? {
                 id: m.id,
-                body: m.body.slice(0, 200),
+                body: readableBody(m.body, m.meta as Record<string, unknown> | null).slice(0, 200),
                 meta: previewMeta(m.meta as Record<string, unknown> | null),
                 mediaKind: previewMediaKind(m.body, m.meta as Record<string, unknown> | null),
                 createdAt: m.createdAt,

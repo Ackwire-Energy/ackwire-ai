@@ -35,6 +35,7 @@ import { type Judge, personMentionAddressees } from "./judge";
 import { PLATFORM_CAP } from "./limits";
 import { isMediaAfterReply, isStickerMood, type MessageMedia, mediaOf, mediaSettings, type StickerMood } from "./media";
 import { type MessageMemory, memoriesFor } from "./message-memories";
+import { readableBody, voiceOf } from "./message-preview";
 import { quietNoticeSql } from "./notices";
 import { can } from "./organizations";
 import { afterReplyAnswered } from "./questions";
@@ -126,8 +127,8 @@ export interface ReplyRef {
   author: { type: "person" | "agent"; id: string | null };
   authorName: string;
   excerpt: string;
-  /** The quoted message's GIF or sticker (ADR 0091): a quote of one with no text still says what it was. */
-  mediaKind?: MessageMedia["kind"];
+  /** The quoted message's GIF, sticker (ADR 0091) or voice (ADR 0100): a quote of one with no text still says what it was. */
+  mediaKind?: MessageMedia["kind"] | "voice";
 }
 
 export const REPLY_EXCERPT_LENGTH = 200;
@@ -1316,8 +1317,8 @@ async function replyRefFor(db: Database, orgId: string, channelId: string, messa
     threadId: row.threadId,
     author: { type: row.authorType, id: person ? row.authorUserId : row.authorAgentId },
     authorName: (person ? row.userName : row.agentName) ?? "",
-    excerpt: replyExcerpt(row.body),
-    ...(media ? { mediaKind: media.kind } : {}),
+    excerpt: replyExcerpt(readableBody(row.body, row.meta)),
+    ...(voiceOf(row.meta) ? { mediaKind: "voice" as const } : media ? { mediaKind: media.kind } : {}),
   };
 }
 

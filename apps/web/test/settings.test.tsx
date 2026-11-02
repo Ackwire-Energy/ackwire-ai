@@ -515,7 +515,7 @@ describe("Configurações do workspace", () => {
     expect(line()?.textContent).toBe("Os agentes só respondem quando mencionados.");
   });
 
-  test("members see only their own settings: no Geral, roles or GIFs, never the workspace's keys or money", async () => {
+  test("members see only their own settings: no Geral, roles, GIFs or voice, never the workspace's keys or money", async () => {
     const state = seedState();
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
     await go(state);
