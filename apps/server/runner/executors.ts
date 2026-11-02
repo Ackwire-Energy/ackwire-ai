@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
 import type { RunnerInfo } from "@agenteschat/adapters/machine-protocol";
 import { readSmallJson } from "./json-file";
+import { SHARED_BIN_ENV } from "./shared-folder";
 
 /**
  * Which coding CLIs this machine has (protocol 7, ADR 0029): `claude` and
@@ -20,17 +21,22 @@ type Run = (command: string, args: string[]) => { status: number | null; stdout:
  * shell's PATH after start (`adoptLoginPath`); a compiled runner still looks commands up on the PATH it
  * started with (macOS's bare one from Finder) unless told otherwise, so we resolve it ourselves.
  */
-export function resolveCommand(command: string, pathList = process.env.PATH ?? ""): string {
+export function resolveCommand(
+  command: string,
+  pathList = process.env.PATH ?? "",
+  sharedBin = process.env[SHARED_BIN_ENV],
+): string {
   if (process.platform === "win32" || command.includes("/")) return command;
-  for (const dir of pathList.split(delimiter)) {
-    if (!dir) continue;
+  const dirs = pathList.split(delimiter).filter((dir) => dir && dir !== sharedBin);
+  for (const dir of dirs) {
     const full = join(dir, command);
     try {
       accessSync(full, constants.X_OK);
       return full;
     } catch {}
   }
-  return command;
+  // A bare name would be looked up on the PATH again, shared `bin/` included: a path that isn't there fails the same.
+  return sharedBin && dirs[0] ? join(dirs[0], command) : command;
 }
 
 const defaultRun: Run = (command, args) => {

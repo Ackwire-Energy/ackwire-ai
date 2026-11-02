@@ -1,4 +1,4 @@
-import type { RunnerFolderGrant } from "@agenteschat/adapters/machine-protocol";
+import { ALL_AGENTS, type RunnerFolderGrant } from "@agenteschat/adapters/machine-protocol";
 import { Button, Checkbox, Dialog, DialogFooter, Icon, Popover, Segmented } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -25,7 +25,8 @@ export function Folders() {
   // Preferences shows this tab only while an organization's agents work here: no empty state of its own.
   if (!home) return <PrefHead title={t("desktop.prefs.folders.title")} lead={t("desktop.prefs.folders.lead")} />;
 
-  const folders = home.access?.folders ?? [];
+  // The shared folder (ADR 0115) is every agent's, always: nothing to choose here.
+  const folders = (home.access?.folders ?? []).filter((f) => !f.agents.includes(ALL_AGENTS));
   const org = orgName(home);
 
   const add = async () => {

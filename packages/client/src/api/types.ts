@@ -3187,6 +3187,11 @@ export interface Machine {
    * user); `reason`, in the runner's words, says what is missing. Null or absent when its runner doesn't say.
    */
   desktopUse?: { available: boolean; reason: string | null } | null;
+  /**
+   * ADR 0115: its workspace disk (free GB, share in use) and the shared folder's size (GB, measured hourly), as its
+   * runner last said; null or absent for people who don't manage it, or when its runner doesn't say.
+   */
+  disk?: { freeGb: number; use: number | null; sharedGb: number | null } | null;
 }
 
 /** Whether the organization uses the server's own computer (`GET …/machines/host`). */
@@ -4997,7 +5002,9 @@ export type NotificationKind =
    * ADR 0117: a connected MCP server changed tools an admin approved (connector admins). Waiting; `source.label` the
    * connection's name, `latest.title` the tools. Opens Conectores, where it is accepted.
    */
-  | "connector_tool_changed";
+  | "connector_tool_changed"
+  /** ADR 0115: a computer's disk passed 85% in use (admins). `source.machineId`; `latest.diskUse`, `latest.diskFreeGb`. */
+  | "computer_disk_full";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {
@@ -5071,6 +5078,9 @@ export interface NotificationLatest {
   names?: string[];
   /** `join_request` from a member's suggestion (ADR 0090): who suggested. */
   suggestedBy?: string;
+  /** `computer_disk_full`: the share of the disk in use (0 to 1) and the GB left. */
+  diskUse?: number;
+  diskFreeGb?: number;
 }
 
 export interface AppNotification {

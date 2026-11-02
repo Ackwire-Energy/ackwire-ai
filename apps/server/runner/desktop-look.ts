@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { type AgentScope, DESKTOP_SIZE } from "@agenteschat/adapters/machine-protocol";
 import MARK_BASE64 from "./assets/desktop-mark.png.b64" with { type: "text" };
 import WALLPAPER_BASE64 from "./assets/desktop-wallpaper.png.b64" with { type: "text" };
@@ -64,6 +65,8 @@ export interface LookOptions {
   shell: string;
   /** What Browser runs: this runner's `desktop-browser` with the desktop's socket (`desktop-browser.ts`). */
   browser: string[];
+  /** The computer's shared folder (ADR 0115): a bookmark in the file manager's side pane. */
+  shared?: string | null;
 }
 
 /** The agent's name as its desktop shows it: the name viewers see, the terminal's prompt. */
@@ -560,6 +563,9 @@ export function lookFiles(home: string, o: LookOptions): LookFile[] {
     [`${XFCONF}/xfce4-terminal.xml`, terminal(home, bash)],
     ...dock,
     [".config/gtk-3.0/gtk.css", GTK_CSS],
+    ...(o.shared
+      ? [[".config/gtk-3.0/bookmarks", `${pathToFileURL(o.shared).href} Shared\n`] as [string, string]]
+      : []),
     [".config/menus/xfce-applications.menu", menu(apps)],
     [".local/share/desktop-directories/xfce-network.directory", INTERNET_MENU],
     ...apps.map((app): [string, string] => [`.local/share/applications/${app.id}.desktop`, desktopEntry(app)]),

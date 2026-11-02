@@ -1033,6 +1033,22 @@ have no owner, so a program an agent runs that listens on one without checking w
 the other agents, and an agent can take a name another agent's program wants (an X display's: its
 desktop then starts on another one).
 
+**The shared folder.** Every computer has one folder all of its agents read and write, so what one of
+them downloads, clones or installs, the others use instead of fetching it again. With `--system` it is
+`/srv/agentes/shared`, owned by root and the group `agentes-shared`, which the runner makes and adds
+every agent's user to; each agent also finds it at `~/shared`, in its desktop's file manager, and its
+`bin/` folder at the end of its `PATH`, so a command-line tool one agent installs there (without root)
+works for all of them. A tool there runs as whichever agent calls it, with that agent's files, so only
+agents you trust with each other's work should share a computer; the runner itself never starts Claude
+Code or Codex from there. Install the `acl` package (`apt install acl`): with it, what an agent makes there
+stays writable by the others whatever its umask; without it, it stays readable only, until the agent runs
+`chmod g+w`. The runner never changes anything inside the folder. On this server's own computer each
+organization gets a folder and a group of its own (`/srv/agentes/shared-<id>`), so nothing crosses between
+organizations. Without `--system` it is `shared` in the runner's workspace. Agents are told to look there
+before downloading anything big, to keep credentials, `.env` files and sign-in folders out of it, and to
+check the free space first. **Settings → Computers** shows its path, its size (measured hourly) and the
+free space on the disk, and the workspace's admins get a notification when that disk passes 85%.
+
 Mac and Windows computers get no agents' desktops: the agent's browser runs headless, and its card
 shows it live. A Mac connected with the command above opens terminals
 (`agentes-runner tools enable terminal`); the desktop app doesn't have them yet.

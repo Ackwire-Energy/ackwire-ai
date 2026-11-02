@@ -16,6 +16,7 @@ import { formatBytes } from "@agenteschat/client/lib/files";
 import { clockAt, joinNames, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
+  allowedFolders,
   allowsInApp,
   canReduceAccess,
   computerKind,
@@ -30,6 +31,8 @@ import {
   MACHINE_TOOLS,
   machineTitle,
   platformOf,
+  sharedFolderFacts,
+  sharedFolderOf,
 } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
@@ -717,12 +720,14 @@ function ReduceDialog({ machine, reduce, onClose }: { machine: Machine; reduce: 
 
 /** Pastas liberadas: each folder, which agents use it, and (for the owner) Remover. */
 function FoldersCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r: Reduce) => void }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const agents = useAgents(org.id);
   const nameOf = (id: string) =>
     agents.data?.find((a) => a.id === id)?.name ?? m.agents.find((a) => a.id === id)?.name ?? "";
   const access = m.access;
+  const shared = sharedFolderOf(access);
+  const folders = allowedFolders(access);
   // This very Mac with an app too old to report: update it from here (agentes for Mac, ADR 0036).
   const here = useIsThisMac(org.id, m.id);
   return (
@@ -753,12 +758,25 @@ function FoldersCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r:
               <span className="small muted">{t("machines.access.ownFolderText")}</span>
             </span>
           </div>
-          {access.folders.length === 0 && (
+          {shared && (
+            <div className="ac-list__row machine-folder" data-shared-folder>
+              <span className="machine-row__icon">
+                <Icon name="members" />
+              </span>
+              <span className="list-col" style={{ flex: "1 1 220px", minWidth: 0 }}>
+                <span className="machine-folder__name">{t("machines.shared.title")}</span>
+                <span className="small muted">{t("machines.shared.text")}</span>
+                <code className="machine-folder__path">{shared}</code>
+                <span className="small muted">{sharedFolderFacts(t, i18n.language, m.disk)}</span>
+              </span>
+            </div>
+          )}
+          {folders.length === 0 && (
             <div className="ac-list__row machine-folder">
               <span className="small muted">{t("machines.access.noFolders")}</span>
             </div>
           )}
-          {access.folders.map((f) => {
+          {folders.map((f) => {
             const folder = folderName(f.path);
             const label = t("machines.access.folderActions", { folder });
             return (

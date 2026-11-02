@@ -72,6 +72,12 @@ export interface MachineLoadRecord {
   hours: number;
   /** Processes stopped for memory in the agents' slices over those hours (`MachineLoad.oomKills`). */
   oomKills?: number;
+  /** The workspace disk's free GB and share in use, and the shared folder's GB (ADR 0115). */
+  diskFreeGb?: number;
+  diskUse?: number;
+  sharedGb?: number;
+  /** The server's own mark: its admins heard of this disk passing the line, and won't again until it drops under 80%. */
+  diskWarned?: boolean;
   at: string;
 }
 

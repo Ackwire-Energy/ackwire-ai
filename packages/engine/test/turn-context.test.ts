@@ -296,6 +296,16 @@ describe("# This turn", () => {
       .update(schema.agents)
       .set({ machineId: paired.machineId, brain: "claude_code" })
       .where(eq(schema.agents.id, f.agent.id));
+    // The computer's shared folder (ADR 0115): granted to every agent, told in a block of its own.
+    await f.db
+      .update(schema.machines)
+      .set({
+        access: {
+          folders: [{ path: "/Users/w/agentes/shared", agents: ["*"] }],
+          tools: { claude: true, codex: true, commands: true },
+        },
+      })
+      .where(eq(schema.machines.id, paired.machineId));
     const status = (id: string): MachineStatus => ({
       id,
       orgId: f.org.id,
@@ -339,6 +349,9 @@ describe("# This turn", () => {
       expect(turn.system).not.toContain("# Now");
       expect(turn.system).not.toContain("# Where you are");
       expect(turn.system).toContain("Acme builds rockets.");
+      expect(turn.system).toContain("Only your own folder there");
+      expect(turn.system).toContain('# Shared folder on "MacBook"\n/Users/w/agentes/shared is shared by every agent');
+      expect(turn.system).not.toContain("~/shared");
     }
     // The resumed turn reads where it is now: in the thread.
     expect(seen[1]?.prompt).toContain("replying in a thread");

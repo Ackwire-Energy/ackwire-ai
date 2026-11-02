@@ -8785,6 +8785,14 @@ export const en: Translations = {
       agentFolders: "Uses {{folders}} and {{hers}} own folder",
       agentOwnFolder: "Only {{hers}} own folder",
     },
+    shared: {
+      title: "Shared folder",
+      text: "Every agent here reads and writes it. What one downloads or installs in its bin folder, the others use.",
+      size: "{{size}} in it",
+      free: "{{free}} free on the disk",
+      measuring: "Size not measured yet",
+      diskFullNotice: "The disk of {{name}} is almost full",
+    },
     access: {
       folders: "Allowed folders",
       ownFolder: "Each agent's folder",

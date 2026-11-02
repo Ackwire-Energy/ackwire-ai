@@ -69,6 +69,7 @@ const STATE: WorkerState = {
     folders: [
       { path: "/srv/ana", agents: [ANA.id] },
       { path: "/srv/shared", agents: [ANA.id, BIA.id] },
+      { path: "/srv/agentes/shared", agents: ["*"] },
     ],
     tools: { claude: true, codex: false, commands: true, browser: true },
   },
@@ -343,8 +344,10 @@ test("the computer's own ops stay in the supervisor; an agent's go to its worker
   const bia = t.last(BIA.id);
   bia.hello();
   const r2 = await requestOn(bia);
+  // The computer's shared folder (granted to every agent) reaches every worker.
   expect((bia.got[0] as unknown as WorkerState).access.folders).toEqual([
     { path: "/srv/shared", agents: [ANA.id, BIA.id] },
+    { path: "/srv/agentes/shared", agents: ["*"] },
   ]);
   bia.send({ type: "result", id: r2.id, ok: false, error: { code: "not_found", message: "No such file" } });
   expect(await errorCode(() => read)).toBe("not_found");

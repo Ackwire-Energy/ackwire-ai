@@ -1,6 +1,7 @@
 import {
   ACCESS_LIMITS,
   ACCESS_PROTOCOL,
+  grantedTo,
   type PubSub,
   type RunnerAccess,
   type RunnerFrame,
@@ -50,7 +51,7 @@ export interface AccessDeps {
 /** The folders a machine allows for one agent (absolute paths). */
 export function agentFolders(access: RunnerAccess | null | undefined, agentId: string): string[] {
   if (!access) return [];
-  return access.folders.filter((f) => f.agents.includes(agentId)).map((f) => f.path);
+  return access.folders.filter((f) => grantedTo(f, agentId)).map((f) => f.path);
 }
 
 /** The runner's report, stored as is (the machine is the source of truth), and told to the org. */

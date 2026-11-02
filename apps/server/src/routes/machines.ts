@@ -148,6 +148,17 @@ export const Machine = z
         description:
           "Whether agents can use their own desktops there (protocol 21, ADR 0062): only where each agent works as its own OS user. Null when its runner doesn't report it.",
       }),
+    disk: z
+      .object({
+        freeGb: z.number().openapi({ description: "Free GB on the workspace's disk." }),
+        use: z.number().nullable().openapi({ description: "Share of that disk in use, 0 to 1." }),
+        sharedGb: z.number().nullable().openapi({ description: "The shared folder's size in GB (measured hourly)." }),
+      })
+      .nullable()
+      .openapi({
+        description:
+          "Its disk and shared folder (ADR 0115), as its runner last measured them; null unless admin or the person who paired it, or when the runner doesn't say. The shared folder is the `access` folder granted to every agent (`*`).",
+      }),
     canManage: z.boolean().openapi({ description: "This person may rename, delete or reduce its access." }),
     createdAt: z.string(),
   })

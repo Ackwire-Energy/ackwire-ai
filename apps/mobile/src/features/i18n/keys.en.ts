@@ -795,6 +795,8 @@ export const featureKeysEn: FeatureTranslations = {
       browser_profile_request_other: "{{names}} ask for one more browser profile",
       connector_tool_changed_one: "A connected server changed tools you approved",
       connector_tool_changed_other: "A connected server changed tools you approved",
+      computer_disk_full_one: "A computer's disk is almost full",
+      computer_disk_full_other: "A computer's disk is almost full",
     },
     markRead: "Mark as read",
     markUnread: "Mark as unread",

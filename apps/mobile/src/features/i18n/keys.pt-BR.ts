@@ -801,6 +801,8 @@ export const featureKeysPtBR = {
       browser_profile_request_other: "{{names}} pedem mais um perfil do navegador",
       connector_tool_changed_one: "Um servidor conectado mudou ferramentas que você aprovou",
       connector_tool_changed_other: "Um servidor conectado mudou ferramentas que você aprovou",
+      computer_disk_full_one: "O disco de um computador está quase cheio",
+      computer_disk_full_other: "O disco de um computador está quase cheio",
     },
     markRead: "Marcar como lida",
     markUnread: "Marcar como não lida",
