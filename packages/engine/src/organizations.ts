@@ -1041,11 +1041,31 @@ export async function removeMember(
     await tx
       .delete(channelMembers)
       .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.userId, targetUserId)));
-    // And the wiki pages they were named on: rejoining later doesn't give a restricted page back.
+    // And the wiki pages and folders they were named on: rejoining later doesn't give a restricted page back.
     await tx
       .update(schema.wikiPages)
-      .set({ audienceUserIds: sql`array_remove(${schema.wikiPages.audienceUserIds}, ${targetUserId})` })
-      .where(and(eq(schema.wikiPages.orgId, orgId), sql`${targetUserId} = any(${schema.wikiPages.audienceUserIds})`));
+      .set({
+        audienceUserIds: sql`array_remove(${schema.wikiPages.audienceUserIds}, ${targetUserId})`,
+        editorUserIds: sql`array_remove(${schema.wikiPages.editorUserIds}, ${targetUserId})`,
+      })
+      .where(
+        and(
+          eq(schema.wikiPages.orgId, orgId),
+          sql`${targetUserId} = any(${schema.wikiPages.audienceUserIds} || ${schema.wikiPages.editorUserIds})`,
+        ),
+      );
+    await tx
+      .update(schema.wikiFolderAudiences)
+      .set({
+        audienceUserIds: sql`array_remove(${schema.wikiFolderAudiences.audienceUserIds}, ${targetUserId})`,
+        editorUserIds: sql`array_remove(${schema.wikiFolderAudiences.editorUserIds}, ${targetUserId})`,
+      })
+      .where(
+        and(
+          eq(schema.wikiFolderAudiences.orgId, orgId),
+          sql`${targetUserId} = any(${schema.wikiFolderAudiences.audienceUserIds} || ${schema.wikiFolderAudiences.editorUserIds})`,
+        ),
+      );
     // And the agents' "only some people" lists, for the same reason.
     const unlisted = await tx
       .update(schema.agents)

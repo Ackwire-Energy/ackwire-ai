@@ -8,12 +8,13 @@ import { cutText } from "../format";
 import { announceMessageMemories } from "../message-memories";
 import { can, getMembership } from "../organizations";
 import { personWords, runReadOutsideById, UNASKED_DESTINATION, unaskedDestination } from "../outside";
-import { personBehindCall } from "../requester";
+import { personBehindCall, wikiActorOfCall } from "../requester";
 import { agentSearchChannels, agentVisibleChannels, indexSource, searchVisible } from "../search";
 import { closedRefusal } from "../standing";
 import { noAgentText } from "../team";
 import type { ToolContext, ToolDefinition, ToolSource } from "../tools/types";
 import { untrustedBlock } from "../untrusted";
+import { wikiHitsForAgent } from "../wiki";
 import { type ContextItem, checkPermissionText, consolidateItem, getContextItems, supersede } from "./items";
 import { kindFamily, overlap } from "./judgments";
 import { CARD_MAX_AGENTS, ownerDecides, type Proposal, proposeChange } from "./proposals";
@@ -67,13 +68,17 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         additionalProperties: false,
       },
       async execute(input, ctx) {
-        const hits = await searchVisible(deps, {
-          orgId: ctx.orgId,
-          text: str(input.query),
-          visibleChannelIds: await visible(ctx),
-          kinds: Array.isArray(input.kinds) ? (input.kinds as never[]) : undefined,
-          limit: typeof input.limit === "number" ? input.limit : 8,
-        });
+        const hits = await wikiHitsForAgent(
+          ctx.db,
+          await wikiActorOfCall(ctx),
+          await searchVisible(deps, {
+            orgId: ctx.orgId,
+            text: str(input.query),
+            visibleChannelIds: await visible(ctx),
+            kinds: Array.isArray(input.kinds) ? (input.kinds as never[]) : undefined,
+            limit: typeof input.limit === "number" ? input.limit : 8,
+          }),
+        );
         if (hits.length === 0) return { content: "No results." };
         const items = new Map(
           (

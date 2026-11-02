@@ -9,8 +9,10 @@ import {
   getWikiPage,
   insertMessage,
   listWikiPages,
+  NotFoundError,
+  openPersonAgentDm,
   parseWikiLinks,
-  RESTRICTED_WIKI_RULE,
+  RESTRICTED_HERE,
   recordWikiReads,
   removeMember,
   renameWikiPage,
@@ -29,6 +31,8 @@ import {
   wikiGraph,
   withWikiLinks,
 } from "../src";
+import { personBehindCall, wikiPersonOf } from "../src/requester";
+import type { RoutineBrief } from "../src/routine-brief";
 import { addMember, adminRoleId, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
@@ -66,14 +70,22 @@ async function restricted() {
 const code = (e: unknown) => (e as { code?: string }).code;
 
 describe("restricted wiki pages", () => {
-  test("the audience and agents read it; anyone else gets a plain no access", async () => {
+  test("the audience reads it, an agent only for them; anyone else gets a plain no access", async () => {
     const { ana, bia, view } = await restricted();
     expect(view.audience?.userIds).toEqual([]);
     expect(view.audience?.roleIds).toHaveLength(1);
     expect((await getWikiPage(f.db, person(ana.id), f.org.id, "margens")).title).toBe("Margens");
     expect((await getWikiPage(f.db, person(f.owner.id), f.org.id, "margens")).title).toBe("Margens");
-    const agent: WikiActor = { type: "agent", agentId: f.agent.id, requestedByUserId: bia.id };
-    expect((await getWikiPage(f.db, agent, f.org.id, "margens")).body).toContain("40%");
+    const agentFor = (userId: string | null): WikiActor => ({
+      type: "agent",
+      agentId: f.agent.id,
+      requestedByUserId: userId,
+    });
+    expect((await getWikiPage(f.db, agentFor(ana.id), f.org.id, "margens")).body).toContain("40%");
+    for (const nobody of [bia.id, null]) {
+      const hidden = await getWikiPage(f.db, agentFor(nobody), f.org.id, "margens").catch((e) => e);
+      expect(hidden).toBeInstanceOf(NotFoundError);
+    }
     const refused = await getWikiPage(f.db, person(bia.id), f.org.id, "margens").catch((e) => e);
     expect(refused).toBeInstanceOf(ForbiddenError);
     expect(code(refused)).toBe("wiki.no_access");
@@ -111,9 +123,8 @@ describe("restricted wiki pages", () => {
     expect((await topWikiReads(f.db, person(ana.id), f.org.id)).map((r) => r.title)).toEqual(["Margens"]);
     const run = await retrieveWikiForRun(wikiDeps(), {
       orgId: f.org.id,
-      agentId: f.agent.id,
       text: "qual a margem mínima dos contratos?",
-      readers: { channelId: null, person: async () => ana.id },
+      reader: async () => ({ type: "agent", agentId: f.agent.id, requestedByUserId: ana.id }),
     });
     expect(run.pageIds).toContain(secret.id);
     const [linked] = await withWikiLinks(f.db, f.org.id, [
@@ -140,7 +151,9 @@ describe("restricted wiki pages", () => {
     const edit = (actor: WikiActor) =>
       updateWikiPage(deps, actor, f.org.id, "margens", { baseVersion: secret.version, body: "nada" }).catch((e) => e);
     expect(code(await edit(person(bia.id)))).toBe("wiki.no_access");
-    expect(code(await edit({ type: "agent", agentId: f.agent.id, requestedByUserId: bia.id }))).toBe("wiki.no_access");
+    expect(code(await edit({ type: "agent", agentId: f.agent.id, requestedByUserId: bia.id }))).toBe(
+      "wiki.page_not_found",
+    );
     const ok = await edit({ type: "agent", agentId: f.agent.id, requestedByUserId: f.owner.id });
     expect(ok.body).toBe("nada");
   });
@@ -164,9 +177,9 @@ describe("restricted wiki pages", () => {
     }).catch((e) => e);
     expect(outside).toBeInstanceOf(ValidationError);
     expect(code(outside)).toBe("wiki.audience_excludes_you");
-    // Agents only (and owners): an owner may leave both lists empty.
-    const agentsOnly = await setWikiPageAudience(deps, f.owner.id, f.org.id, "processos", { roleIds: [], userIds: [] });
-    expect(agentsOnly.audience).toEqual({ roleIds: [], userIds: [] });
+    // Owners only: an owner may leave both lists empty.
+    const ownersOnly = await setWikiPageAudience(deps, f.owner.id, f.org.id, "processos", { roleIds: [], userIds: [] });
+    expect(ownersOnly.audience).toEqual({ roleIds: [], userIds: [] });
     expect(code(await getWikiPage(f.db, person(ana.id), f.org.id, "processos").catch((e) => e))).toBe("wiki.no_access");
     // A person named on the page sees it; opening it again shows it to everyone.
     await setWikiPageAudience(deps, f.owner.id, f.org.id, "processos", { roleIds: [], userIds: [bia.id, "nobody"] });
@@ -180,66 +193,143 @@ describe("restricted wiki pages", () => {
 });
 
 describe("agents with a restricted page", () => {
-  const ask = (text: string, readers: { channelId: string | null; person: string | null }) =>
+  const ask = (text: string, run: { channelId: string | null; person: string | null }) =>
     retrieveWikiForRun(wikiDeps(), {
       orgId: f.org.id,
-      agentId: f.agent.id,
       text,
-      readers: { channelId: readers.channelId, person: async () => readers.person },
+      reader: async () => ({
+        type: "agent",
+        agentId: f.agent.id,
+        requestedByUserId: run.person,
+        channelId: run.channelId,
+      }),
     });
 
-  test("an outsider naming it gets no text in the run, only the rule; the audience gets it, marked when others read", async () => {
+  test("a run for someone outside gets nothing at all, naming it or searching for it", async () => {
     const { ana, bia, secret } = await restricted();
-    const outsider = await ask("resuma [[Margens]]", { channelId: null, person: bia.id });
-    expect(outsider.pageIds).toContain(secret.id);
-    expect(outsider.text).not.toContain("40%");
-    expect(outsider.text).toContain(RESTRICTED_WIKI_RULE);
-    const alone = await ask("resuma [[Margens]]", { channelId: null, person: ana.id });
-    expect(alone.text).toContain("40%");
-    expect(alone.text).not.toContain(RESTRICTED_WIKI_RULE);
-    // Bia reads #geral: Ana asking there gets the text with the rule.
-    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: bia.id });
-    const shared = await ask("resuma [[Margens]]", { channelId: f.general.id, person: ana.id });
-    expect(shared.text).toContain("40%");
-    expect(shared.text).toContain(RESTRICTED_WIKI_RULE);
-    // Nobody to tell (no channel, no person): marked.
-    expect((await ask("resuma [[Margens]]", { channelId: null, person: null })).text).toContain(RESTRICTED_WIKI_RULE);
+    for (const text of ["resuma [[Margens]]", "qual a margem mínima dos contratos?"]) {
+      const outsider = await ask(text, { channelId: null, person: bia.id });
+      expect(outsider.pageIds).not.toContain(secret.id);
+      expect(outsider.text).not.toContain("40%");
+      expect(outsider.text).not.toContain("[[Margens]] (");
+    }
+    expect((await ask("resuma [[Margens]]", { channelId: null, person: ana.id })).text).toContain("40%");
+    // Nobody behind the run: nothing limited to people.
+    expect((await ask("resuma [[Margens]]", { channelId: null, person: null })).pageIds).not.toContain(secret.id);
   });
 
-  test("the wiki tools mark it and the edit receipt leaves out its title", async () => {
+  test("a run stops reading it as soon as someone reading the conversation can't", async () => {
+    const { ana, bia, secret } = await restricted();
+    const private_ = () =>
+      f.db.update(schema.channels).set({ visibility: "private" }).where(eq(schema.channels.id, f.general.id));
+    const inChannel = () => ask("resuma [[Margens]]", { channelId: f.general.id, person: ana.id });
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: ana.id });
+    // A public channel is the whole workspace's, Bia's too, member or not.
+    expect((await inChannel()).pageIds).not.toContain(secret.id);
+    await private_();
+    expect((await inChannel()).pageIds).toContain(secret.id);
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: bia.id });
+    expect((await inChannel()).pageIds).not.toContain(secret.id);
+  });
+
+  test("someone with access asking in an open channel gets it by DM; someone without gets nothing", async () => {
+    f = await setup({ wikiTools: true });
+    const deps = wikiDeps();
+    const ana = await addMember(f.db, f.org.id, "member", "ana");
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await createWikiPage(deps, person(f.owner.id), f.org.id, { title: "Margens", body: "Margem mínima de 40%." });
+    await setWikiPageAudience(deps, f.owner.id, f.org.id, "margens", { roleIds: [], userIds: [ana.id] });
+    const askIn = async (userId: string): Promise<ToolContext> => {
+      const trigger = await insertMessage(f.db, {
+        orgId: f.org.id,
+        channelId: f.general.id,
+        author: { type: "person", userId },
+        body: "@dev qual é a margem mínima?",
+      });
+      const [run] = await f.db
+        .insert(schema.agentRuns)
+        .values({
+          orgId: f.org.id,
+          agentId: f.agent.id,
+          channelId: f.general.id,
+          threadRootId: trigger.id,
+          triggerMessageId: trigger.id,
+          trigger: "mention",
+          hop: 0,
+        })
+        .returning();
+      return {
+        db: f.db,
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        runId: (run as { id: string }).id,
+        channelId: f.general.id,
+        threadRootId: trigger.id,
+        triggerMessageId: trigger.id,
+      };
+    };
+    const ctx = await askIn(ana.id);
+    const tools = await createWikiToolSource({ pubsub: f.pubsub, search: f.context }).tools(ctx);
+    const read = tools.find((t) => t.name === "read_wiki_page");
+    if (!read) throw new Error("read_wiki_page missing");
+    // In the open channel the run gets a line, no title and no text; the question goes to Ana's DM.
+    const here = await read.execute({ page: "margens" }, ctx);
+    expect(here.content).toBe(RESTRICTED_HERE);
+    expect(here.content).not.toContain("40%");
+    await read.execute({ page: "margens" }, ctx);
+    const dm = await openPersonAgentDm(f.db, f.org.id, ana.id, f.agent.id);
+    const notes = await f.db.select().from(schema.messages).where(eq(schema.messages.channelId, dm.id));
+    expect(notes).toHaveLength(1);
+    expect(notes[0]?.body).toContain("qual é a margem mínima?");
+    expect(notes[0]?.body).not.toContain("40%");
+    const [woken] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.channelId, dm.id));
+    expect(woken).toBeTruthy();
+    // That run acts for Ana, and there the page is there.
+    const inDm = { ...ctx, channelId: dm.id, runId: (woken as { id: string }).id };
+    expect(await personBehindCall(inDm)).toBe(ana.id);
+    expect((await read.execute({ page: "margens" }, inDm)).content).toContain("40%");
+    // Bia: no line, no DM, the page isn't there.
+    const hers = await askIn(bia.id);
+    const refused = await read.execute({ page: "margens" }, hers);
+    expect(refused.isError).toBe(true);
+    expect(refused.content).not.toBe(RESTRICTED_HERE);
+    const biaDm = await openPersonAgentDm(f.db, f.org.id, bia.id, f.agent.id);
+    expect(await f.db.select().from(schema.messages).where(eq(schema.messages.channelId, biaDm.id))).toEqual([]);
+  });
+
+  test("the wiki tools act for the person behind the call, and the receipt leaves out the title", async () => {
     f = await setup({ wikiTools: true });
     const deps = wikiDeps();
     const bia = await addMember(f.db, f.org.id, "member", "bia");
     await createWikiPage(deps, person(f.owner.id), f.org.id, { title: "Margens", body: "Margem mínima de 40%." });
     await setWikiPageAudience(deps, f.owner.id, f.org.id, "margens", { roleIds: [], userIds: [] });
-    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: bia.id });
-    const trigger = await insertMessage(f.db, {
-      orgId: f.org.id,
-      channelId: f.general.id,
-      author: { type: "person", userId: f.owner.id },
-      body: "@dev documenta na wiki Margens que vale para 2027",
-    });
-    const ctx: ToolContext = {
-      db: f.db,
-      orgId: f.org.id,
-      agentId: f.agent.id,
-      runId: crypto.randomUUID(),
-      channelId: f.general.id,
-      threadRootId: trigger.id,
-      triggerMessageId: trigger.id,
+    await f.db.update(schema.channels).set({ visibility: "private" }).where(eq(schema.channels.id, f.general.id));
+    const context = async (userId: string): Promise<ToolContext> => {
+      const trigger = await insertMessage(f.db, {
+        orgId: f.org.id,
+        channelId: f.general.id,
+        author: { type: "person", userId },
+        body: "@dev documenta na wiki Margens que vale para 2027",
+      });
+      return {
+        db: f.db,
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        runId: crypto.randomUUID(),
+        channelId: f.general.id,
+        threadRootId: trigger.id,
+        triggerMessageId: trigger.id,
+      };
     };
+    const ctx = await context(f.owner.id);
     const tools = await createWikiToolSource({ pubsub: f.pubsub, search: f.context }).tools(ctx);
     const tool = (name: string) => {
       const t = tools.find((x) => x.name === name);
       if (!t) throw new Error(`${name} missing`);
       return t;
     };
-    const read = await tool("read_wiki_page").execute({ page: "margens" }, ctx);
-    expect(read.content).toContain(RESTRICTED_WIKI_RULE);
-    expect(read.content).toContain("40%");
-    const found = await tool("search_wiki").execute({ query: "margem" }, ctx);
-    expect(found.content).toContain(RESTRICTED_WIKI_RULE);
-    expect(found.content).not.toContain("40%");
+    expect((await tool("read_wiki_page").execute({ page: "margens" }, ctx)).content).toContain("40%");
+    expect((await tool("search_wiki").execute({ query: "margem" }, ctx)).content).toContain("40%");
     const saved = await tool("update_wiki_page").execute(
       { page: "margens", mode: "append", content: "Vale para 2027." },
       ctx,
@@ -248,6 +338,25 @@ describe("agents with a restricted page", () => {
     const [receipt] = await f.db.select().from(schema.agentActions).where(eq(schema.agentActions.orgId, f.org.id));
     expect(JSON.stringify([receipt?.target, receipt?.params])).not.toContain("argens");
     expect(receipt?.params).toEqual({ restricted: true });
+    // The same agent, asked by someone outside: the text never reaches it. Bia isn't in the channel here, so only
+    // who asked keeps it from the page.
+    const theirs = await context(bia.id);
+    const read = await tool("read_wiki_page").execute({ page: "margens" }, theirs);
+    expect(read.isError).toBe(true);
+    expect(read.content).not.toContain("40%");
+    const found = await tool("search_wiki").execute({ query: "margem" }, theirs);
+    expect(found.content).toBe("No wiki pages match.");
+    const edit = await tool("update_wiki_page").execute({ page: "margens", mode: "append", content: "Mudei." }, theirs);
+    expect(edit.isError).toBe(true);
+    expect((await getWikiPage(f.db, person(f.owner.id), f.org.id, "margens")).body).not.toContain("Mudei");
+  });
+
+  test("a routine reads with its creator's access, and a run with nobody behind it with none", () => {
+    const brief = { creatorUserId: "creator" } as RoutineBrief;
+    expect(wikiPersonOf({ kind: "person", personId: "ana" })).toBe("ana");
+    expect(wikiPersonOf({ kind: "routine", personId: null, brief })).toBe("creator");
+    expect(wikiPersonOf({ kind: "unattended", personId: null, reason: "routine_report", brief })).toBe("creator");
+    expect(wikiPersonOf({ kind: "unattended", personId: null, reason: "agent" })).toBeNull();
   });
 
   test("an agent creating a page for an outsider takes the next address instead of naming the hidden page", async () => {
