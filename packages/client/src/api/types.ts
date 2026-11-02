@@ -1509,7 +1509,7 @@ export interface Memory {
   /** "Written by Walter in #eng · Oct 12" (the server's English; `origin` has the parts). */
   source: string;
   origin?: {
-    by: "person" | "agent" | "lesson" | "recorded";
+    by: "person" | "app" | "agent" | "lesson" | "recorded";
     name: string | null;
     channel: string | null;
     at: string;
@@ -1570,7 +1570,7 @@ export interface Proposal {
     where: string;
     what: string;
     channelId?: string | null;
-    type?: "outcome" | "human" | "agent" | "self";
+    type?: "outcome" | "human" | "agent" | "app" | "self";
   }[];
   /** `agent_role`: the role then and the one proposed; `agent_access`: both empty. */
   before: string;

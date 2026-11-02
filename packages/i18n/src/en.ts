@@ -3324,6 +3324,7 @@ export const en: Translations = {
     editHelp: "The previous version stays in the history. {{source}}",
     origin: {
       person: "Written by {{name}}",
+      app: "Sent by {{name}} through an AI app",
       agent: "Noted by the agent",
       lesson: "Learned",
       recorded: "Recorded",

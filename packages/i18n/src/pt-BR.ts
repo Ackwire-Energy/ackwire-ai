@@ -3356,6 +3356,7 @@ export const ptBR = {
     editHelp: "A versão anterior fica no histórico. {{source}}",
     origin: {
       person: "Escrito por {{name}}",
+      app: "Enviado por {{name}} por um app de IA",
       agent: "Anotado pelo agente",
       lesson: "Aprendido",
       recorded: "Registrado",

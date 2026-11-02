@@ -383,7 +383,7 @@ export function registerManageTools(deps: AppsToolDeps, p: AppPrincipal, tool: R
     {
       scope: "manage",
       title: "Add to an agent's memory",
-      description: `Adds a fact or a preference to an agent's memory, as said by ${p.personName}. Needs to be the agent's owner or to manage agents.`,
+      description: `Adds a fact or a preference to an agent's own memory, marked as sent through this app for ${p.personName} to review. Needs to be the agent's owner or to manage agents.`,
       input: z
         .object({
           agent: AGENT_REF,
@@ -406,7 +406,7 @@ export function registerManageTools(deps: AppsToolDeps, p: AppPrincipal, tool: R
         deps.db,
         p.userId,
         p.orgId,
-        { kind: args.kind ?? "fact", content: args.text, agentId: agent.id },
+        { kind: args.kind ?? "fact", content: args.text, agentId: agent.id, viaApp: true },
         deps.judge,
       );
       await made("memory", item.id, agent.name, args.idempotency_key);

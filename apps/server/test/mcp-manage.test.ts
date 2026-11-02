@@ -5,6 +5,7 @@ import {
   APP_TOOL_NAMES,
   appAccessOf,
   appScopesFor,
+  isPromotable,
   MACHINE_CONTROL_TOPIC,
   parseScopes,
   reachableFromInternet,
@@ -349,7 +350,7 @@ describe("rate limit", () => {
 });
 
 describe("add_memory and create_channel", () => {
-  test("a memory said by the person; the key answers once", async () => {
+  test("a memory sent through the app: the agent's own, unverified, never promoted; the key answers once", async () => {
     const { b, orgId, ownerId, agentId } = await setup();
     const app = await connectApp(t, b, orgId, MANAGE);
     const args = { agent: "dev", text: "The team ships on Thursdays.", idempotency_key: "m-1" };
@@ -359,7 +360,35 @@ describe("add_memory and create_channel", () => {
     const items = await t.db.select().from(schema.contextItems).where(eq(schema.contextItems.agentId, agentId));
     const mine = items.filter((i) => i.content === "The team ships on Thursdays.");
     expect(mine).toHaveLength(1);
-    expect(mine[0]).toMatchObject({ kind: "fact", createdByKind: "person", createdById: ownerId, trust: "high" });
+    const item = mine[0] as (typeof mine)[number];
+    expect(item.kind).toBe("fact");
+    expect(item.scopeType).toBe("agent");
+    expect(item.scopeId).toBe(agentId);
+    expect(item.createdByKind).toBe("person");
+    expect(item.createdById).toBe(ownerId);
+    expect(item.trust).toBe("high");
+    expect(item.verified).toBe(false);
+    expect(item.evidence.map((e) => e.type)).toEqual(["app"]);
+    // Strong enough to propose by its numbers, still never promoted until a person confirms it.
+    expect(isPromotable({ ...item, recurrence: 5, confidence: 1, relevance: 1 })).toBe(false);
+
+    const res = await b(`/api/app/organizations/${orgId}/agents/${agentId}/memories`);
+    const { memories } = (await res.json()) as {
+      memories: { id: string; origin?: { by: string }; learned?: boolean; verified: boolean }[];
+    };
+    const view = memories.find((m) => m.id === made.id);
+    expect(view?.origin?.by).toBe("app");
+    expect(view?.learned).toBe(true);
+    expect(view?.verified).toBe(false);
+
+    // A person's edit confirms it: verified, theirs, promotable.
+    const edited = await b(`/api/app/organizations/${orgId}/memories/${made.id}`, {
+      method: "PATCH",
+      json: { text: "The team ships on Thursdays, before noon." },
+    });
+    const after = (await edited.json()) as { id: string; origin?: { by: string }; verified: boolean };
+    expect(after.origin?.by).toBe("person");
+    expect(after.verified).toBe(true);
   });
 
   test("a member can't write the memory of an agent they don't own", async () => {
