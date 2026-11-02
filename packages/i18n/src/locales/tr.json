@@ -9622,6 +9622,12 @@
     }
   },
   "machines": {
+    "egress": {
+      "draining": "Ağ değişiyor. Bilgisayarın açık oturumları {{when}} saatinde yeniden başlayacak.",
+      "restart": "Bilgisayar oturumları ağı uygulamak için yeniden başlıyor. Yeni işler bu bitene kadar bekler.",
+      "line": "Çıkış IP’si {{ip}}",
+      "hint": "Ajanlar gezinirken sitelerin gördüğü adres. Bilgisayarın ağı değişince güncellenir."
+    },
     "online": "Çevrimiçi",
     "offline": "Çevrimdışı",
     "execOff": "Komutlar kapalı",
@@ -11964,6 +11970,11 @@
     }
   },
   "desktop": {
+    "ask": {
+      "watching": "Yalnızca izliyorsunuz.",
+      "title": "Kontrolü almak ister misiniz?",
+      "working": "Kontrol sizdeyken {{name}} duraklar."
+    },
     "sub": {
       "control": "Kontrol sizde · {{name}} bekliyor",
       "controlAsked": "Kontrol sizde · {{name}} istedi",

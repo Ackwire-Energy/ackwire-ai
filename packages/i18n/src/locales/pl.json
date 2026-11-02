@@ -10356,6 +10356,12 @@
     }
   },
   "machines": {
+    "egress": {
+      "draining": "Sieć się zmienia. Otwarte sesje komputera uruchomią się ponownie o {{when}}.",
+      "restart": "Sesje komputera uruchamiają się ponownie, aby zastosować sieć. Nowa praca czeka, aż to się skończy.",
+      "line": "IP wyjściowe {{ip}}",
+      "hint": "Adres, który widzą strony, gdy agenci przeglądają sieć. Zmienia się razem z siecią komputera."
+    },
     "online": "Online",
     "offline": "Offline",
     "execOff": "Polecenia wyłączone",
@@ -12855,6 +12861,11 @@
     }
   },
   "desktop": {
+    "ask": {
+      "watching": "Tylko oglądasz.",
+      "title": "Chcesz przejąć kontrolę?",
+      "working": "{{name}} wstrzymuje pracę, gdy masz kontrolę."
+    },
     "sub": {
       "control": "Masz kontrolę · {{name}} czeka",
       "controlAsked": "Masz kontrolę · {{name}} o to prosi",

@@ -1884,3 +1884,111 @@ describe("the person's clipboard", () => {
     expect(reads).toEqual([]);
   });
 });
+
+describe("watching offers control after deliberate interaction", () => {
+  test("a first screen click offers control without passing input; Escape dismisses before closing", async () => {
+    const t = await dialog();
+    await connected();
+    await act(async () => fireEvent.pointerDown(rfb().canvas, { pointerType: "mouse", button: 0 }));
+    await settle(3);
+    expect(document.querySelector(".dsk-ask")).not.toBeNull();
+    expect(rfb().viewOnly).toBe(true);
+    expect(rfb().log).toEqual([]);
+    await act(async () => fireEvent.keyDown(document, { key: "Escape" }));
+    await settle(3);
+    expect(document.querySelector(".dsk-ask")).toBeNull();
+    expect(t.closed()).toBe(0);
+    await act(async () => fireEvent.pointerDown(rfb().canvas, { pointerType: "mouse", button: 0 }));
+    await settle(2);
+    expect(document.querySelector(".dsk-ask")).toBeNull();
+  });
+  test("typing offers control without moving focus or sending the triggering key", async () => {
+    await dialog();
+    await connected();
+    const before = document.activeElement;
+    await act(async () => fireEvent.keyDown(document.body, { key: "a", code: "KeyA" }));
+    await settle(3);
+    expect(document.querySelector(".dsk-ask")).not.toBeNull();
+    expect(document.activeElement).toBe(before);
+    expect(rfb().log).toEqual([]);
+  });
+});
+
+test("confirming the watching prompt takes control once and never replays the first click", async () => {
+  const t = await dialog();
+  await connected();
+  const watching = rfb();
+  await act(async () => fireEvent.pointerDown(watching.canvas, { pointerType: "mouse", button: 0 }));
+  await settle(3);
+  const prompt = document.querySelector(".dsk-ask") as HTMLElement;
+  await click(within(prompt).getByRole("button", { name: "Assumir o controle" }));
+  await connected();
+  expect(calls(t, "browser.takeover")).toEqual([[ORG_ID, ADA_ID, "desktop"]]);
+  expect(document.querySelector(".dsk-ask")).toBeNull();
+  expect(watching.log).toEqual([]);
+  expect(rfb().log).toEqual([]);
+});
+
+test("a touch scroll does not offer control; a later tap does", async () => {
+  await dialog();
+  await connected();
+  const canvas = rfb().canvas;
+  await act(async () => {
+    fireEvent.pointerDown(canvas, { pointerType: "touch", clientX: 30, clientY: 30 });
+    fireEvent.pointerUp(canvas, { pointerType: "touch", clientX: 30, clientY: 80 });
+  });
+  await settle(2);
+  expect(document.querySelector(".dsk-ask")).toBeNull();
+  await act(async () => {
+    fireEvent.pointerDown(canvas, { pointerType: "touch", clientX: 30, clientY: 30 });
+    fireEvent.pointerUp(canvas, { pointerType: "touch", clientX: 32, clientY: 31 });
+  });
+  await settle(3);
+  expect(document.querySelector(".dsk-ask")).not.toBeNull();
+  expect(rfb().log).toEqual([]);
+});
+
+test("modifier shortcuts, Space, and typing into a field never offer control", async () => {
+  await dialog();
+  await connected();
+  await act(async () => {
+    fireEvent.keyDown(document.body, { key: "a", ctrlKey: true });
+    fireEvent.keyDown(document.body, { key: "a", metaKey: true });
+    fireEvent.keyDown(document.body, { key: " " });
+    fireEvent.keyDown(document.body, { key: "Tab" });
+    fireEvent.keyDown(document.body, { key: "a", isComposing: true });
+  });
+  await settle(2);
+  expect(document.querySelector(".dsk-ask")).toBeNull();
+  const input = document.createElement("input");
+  document.body.appendChild(input);
+  try {
+    await act(async () => {
+      input.focus();
+      fireEvent.keyDown(input, { key: "a" });
+    });
+    await settle(2);
+    expect(document.querySelector(".dsk-ask")).toBeNull();
+  } finally {
+    input.remove();
+  }
+});
+
+test("a connection quality change adjusts the active screen without reopening its socket", async () => {
+  const network = new EventTarget() as EventTarget & { effectiveType: string; downlink: number; saveData: boolean };
+  Object.assign(network, { effectiveType: "4g", downlink: 10, saveData: false });
+  replaceOn(navigator, "connection", network);
+  const t = await dialog();
+  await connected();
+  const active = rfb();
+  const count = t.sockets.desktops.length;
+  expect(active.qualityLevel).toBe(3);
+  await act(async () => {
+    network.saveData = true;
+    network.dispatchEvent(new Event("change"));
+  });
+  expect(active.qualityLevel).toBe(1);
+  expect(active.compressionLevel).toBe(6);
+  expect(t.sockets.desktops).toHaveLength(count);
+  expect(rfb()).toBe(active);
+});

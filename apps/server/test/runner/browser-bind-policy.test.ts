@@ -281,6 +281,24 @@ test("a reserved browser port held by another uid fails before or after the kern
   }
 });
 
+test.if(process.platform !== "win32")("namespace diagnostics use the same launcher as the agent bind check", () => {
+  const pc = computer();
+  const hook = "/usr/bin/true";
+  ensureBrowserBindPolicy({ ...user, networkLauncher: hook }, runner, pc.opts);
+  const look = pc.calls.filter((c) => c.file === hook);
+  expect(look).toHaveLength(2);
+  expect(look[0]?.args).toEqual([String(user.uid), "--", "/usr/bin/ss", "-Htln", "-e"]);
+  const args = pc.calls.find((c) => c.file === "/usr/bin/systemd-run")?.args ?? [];
+  expect(args.slice(args.indexOf(hook), args.indexOf(hook) + 6)).toEqual([
+    hook,
+    String(user.uid),
+    "--",
+    "/usr/sbin/runuser",
+    "-u",
+    user.user,
+  ]);
+});
+
 test("a listener on a browser port must be its owner's: only that agent's pair is looked at", () => {
   const ss = [
     "LISTEN 0 0 127.0.0.1:10002 0.0.0.0:* uid:20001",

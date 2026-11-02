@@ -16,6 +16,8 @@ export interface DialogHeadSlots {
   setFull: (full: boolean) => void;
   /** What the sub-line says while live and watching (the dialog knows of requests, holds and pauses). */
   watching: string;
+  /** The screen asks before taking control; Escape dismisses that question first. */
+  setAsk?: (dismiss: (() => void) | null) => void;
   /** An action that failed, said in place of the sub-line for a moment (`useSayFailed`). */
   say: (text: string) => void;
 }

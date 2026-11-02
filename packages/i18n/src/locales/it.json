@@ -10091,6 +10091,12 @@
     }
   },
   "machines": {
+    "egress": {
+      "draining": "La rete sta cambiando. Le sessioni aperte del computer si riavvieranno alle {{when}}.",
+      "restart": "Le sessioni del computer si stanno riavviando per applicare la rete. Il nuovo lavoro aspetta che finisca.",
+      "line": "IP di uscita {{ip}}",
+      "hint": "L’indirizzo che i siti vedono quando gli agenti navigano. Si aggiorna quando cambia la rete del computer."
+    },
     "online": "Online",
     "offline": "Offline",
     "execOff": "Comandi disattivati",
@@ -12574,6 +12580,11 @@
     }
   },
   "desktop": {
+    "ask": {
+      "watching": "Stai solo guardando.",
+      "title": "Vuoi prendere il controllo?",
+      "working": "{{name}} si mette in pausa mentre hai il controllo."
+    },
     "sub": {
       "control": "Hai il controllo · {{name}} aspetta",
       "control_female": "Hai il controllo · {{name}} aspetta",

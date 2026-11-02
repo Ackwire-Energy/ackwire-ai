@@ -9395,6 +9395,12 @@
     }
   },
   "machines": {
+    "egress": {
+      "draining": "网络正在变更。电脑上打开的会话将在 {{when}} 重启。",
+      "restart": "电脑会话正在重启以应用网络设置。新工作会等到完成后再开始。",
+      "line": "出口 IP {{ip}}",
+      "hint": "智能体浏览网页时网站看到的地址。电脑的网络变化时会随之更新。"
+    },
     "online": "在线",
     "offline": "离线",
     "execOff": "命令已关闭",
@@ -11790,6 +11796,11 @@
     }
   },
   "desktop": {
+    "ask": {
+      "watching": "你只是在观看。",
+      "title": "要接管控制吗？",
+      "working": "你控制期间，{{name}} 会暂停。"
+    },
     "sub": {
       "control": "由你控制 · {{name}} 等待中",
       "control_female": "由你控制 · {{name}} 等待中",

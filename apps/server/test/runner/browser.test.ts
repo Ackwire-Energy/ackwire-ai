@@ -1469,7 +1469,7 @@ test.if(posix)(
     expect(t.chromes[1]?.profile).toBe(profile);
     expect(t.chromes[1]?.cookies).toEqual(["shop_session", "shop_prefs"]);
     // One page, as before: the agent's command goes on it.
-    expect(t.chromes[1]?.tabs).toEqual(["about:blank"]);
+    expect(t.chromes[1]?.tabs).toEqual(["chrome://newtab/"]);
   },
 );
 
@@ -1614,7 +1614,7 @@ test.if(posix)(
     expect(twice.map((w) => w.started).sort()).toEqual([false, true]);
     expect(t.chromes).toHaveLength(1);
     expect(headless(t.chromes[0])).toBe(true);
-    expect(t.chromes[0]?.args.at(-1)).toBe("about:blank");
+    expect(t.chromes[0]?.args.at(-1)).toBe("chrome://newtab/");
     expect(t.logged()).toEqual([]);
     expect(t.sockets).toHaveLength(0);
     expect(t.frames).toEqual([]);
