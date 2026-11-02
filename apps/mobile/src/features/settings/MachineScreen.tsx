@@ -20,6 +20,7 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import {
+  allowedFolders,
   allowsInApp,
   canReduceAccess,
   commandInReason,
@@ -29,6 +30,8 @@ import {
   hostDescKey,
   isPaused,
   MACHINE_TOOLS,
+  sharedFolderFacts,
+  sharedFolderOf,
   toolOnCommand,
 } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -322,9 +325,11 @@ function useAgentName(m: Pick<Machine, "agents"> | undefined) {
  * it away (the web's menu, with a row per agent).
  */
 function FoldersSection({ machine: m }: { machine: Machine }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const nameOf = useAgentName(m);
   const access = m.access;
+  const shared = sharedFolderOf(access);
+  const folders = allowedFolders(access);
   const reduces = canReduceAccess(m);
   const open = (path: string) =>
     router.push({ pathname: "/settings/computers/folder", params: { machineId: m.id, path } });
@@ -343,7 +348,20 @@ function FoldersSection({ machine: m }: { machine: Machine }) {
               sub={t("machines.access.ownFolderText")}
               subLines={2}
             />
-            {access.folders.map((f) => (
+            {shared ? (
+              <GroupedRow
+                icon="members"
+                label={t("machines.shared.title")}
+                sub={shared}
+                subLines={2}
+                below={
+                  <Text variant="caption" tone="faint" numberOfLines={4}>
+                    {`${t("machines.shared.text")} ${sharedFolderFacts(t, i18n.language, m.disk)}`}
+                  </Text>
+                }
+              />
+            ) : null}
+            {folders.map((f) => (
               <GroupedRow
                 key={f.path}
                 icon="drive"
@@ -362,7 +380,7 @@ function FoldersSection({ machine: m }: { machine: Machine }) {
               />
             ))}
           </GroupedList>
-          {access.folders.length === 0 ? <GroupedFooter>{t("machines.access.noFolders")}</GroupedFooter> : null}
+          {folders.length === 0 ? <GroupedFooter>{t("machines.access.noFolders")}</GroupedFooter> : null}
         </>
       )}
     </>

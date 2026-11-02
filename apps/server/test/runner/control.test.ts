@@ -450,6 +450,10 @@ test("folders, tools and settings from the app: system folders refused, everythi
   expect(await c.data({ type: "folders.remove", path: sharedPath })).toMatchObject({
     folders: [sharedGrant()],
   });
+  // Nor taken from "every agent", which would leave an empty grant behind in config.json.
+  expect(await c.data({ type: "folders.remove", path: sharedPath, agentId: "*" })).toMatchObject({
+    folders: [sharedGrant()],
+  });
   expect(stored(home)).toMatchObject({ access: { folders: [] } });
   expect(await c.request({ type: "folders.remove", path: folder })).toMatchObject({
     ok: false,

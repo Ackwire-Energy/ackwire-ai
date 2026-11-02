@@ -1,3 +1,4 @@
+import type { TFunction } from "i18next";
 import type {
   AccountLoginStatus,
   DeviceLocation,
@@ -9,6 +10,7 @@ import type {
   MachineToolName,
 } from "../api/types";
 import { errorCode, sendWaits } from "./errors";
+import { formatBytes } from "./files";
 
 /**
  * Connected computers (ADR 0025, ADR 0036): the device code, the commands the
@@ -96,6 +98,19 @@ const ALL_AGENTS = "*";
 /** The computer's shared folder (ADR 0115): its folder granted to every agent; null when its runner has none. */
 export const sharedFolderOf = (access: MachineAccess | null | undefined): string | null =>
   access?.folders.find((f) => f.agents.includes(ALL_AGENTS))?.path ?? null;
+
+/** The folders people allowed, without the shared folder (a row of its own that nobody removes). */
+export const allowedFolders = (access: MachineAccess | null | undefined): MachineFolderGrant[] =>
+  (access?.folders ?? []).filter((f) => !f.agents.includes(ALL_AGENTS));
+
+/** The shared folder row's facts: its size (or not measured yet) and what is free on the disk. */
+export function sharedFolderFacts(t: TFunction, locale: string, disk: Machine["disk"]): string {
+  const gb = (n: number) => formatBytes(locale, n * 2 ** 30);
+  return [
+    disk?.sharedGb != null ? t("machines.shared.size", { size: gb(disk.sharedGb) }) : t("machines.shared.measuring"),
+    ...(disk ? [t("machines.shared.free", { free: gb(disk.freeGb) })] : []),
+  ].join(" · ");
+}
 
 /** Paused now: `until` absent or still ahead. */
 export function isPaused(m: Pick<Machine, "paused">, now = Date.now()): boolean {

@@ -718,7 +718,7 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
     expect(folderRow(LOJA).textContent).toContain("loja-v5");
   });
 
-  test("the shared folder before its size is measured; a runner without one has no row", async () => {
+  test("the shared folder before its size is measured, with no folder allowed; a runner without one has no row", async () => {
     await open();
     expect(document.querySelector("[data-shared-folder]")).toBeNull();
     cleanup();
@@ -729,7 +729,8 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
       },
     });
     expect(document.querySelector("[data-shared-folder]")?.textContent).toContain("Tamanho ainda não medido");
-    expect(document.body.textContent).not.toContain("Nenhuma pasta a mais");
+    // Nobody allowed a folder: the shared one doesn't count as one.
+    expect(document.body.textContent).toContain("Nenhuma pasta a mais");
   });
 
   test("owner: tools on/off; Desligar turns one off; granting is never a button here", async () => {

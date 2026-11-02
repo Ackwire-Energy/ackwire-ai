@@ -5,6 +5,7 @@ import { keys } from "../src/api/keys";
 import type { AccountLoginStatus, AppNotification, MachineAccount } from "../src/api/types";
 import {
   type AccountLoginInput,
+  allowedFolders,
   allowFolderCommand,
   allowsInApp,
   beginLogin,
@@ -28,6 +29,7 @@ import {
   normalizeUserCode,
   otherThanHint,
   platformOf,
+  sharedFolderFacts,
   sharedFolderOf,
   shellQuote,
   toolOffReason,
@@ -331,5 +333,23 @@ describe("the shared folder (ADR 0115)", () => {
       to: "/org/$orgId/settings/computers/$machineId",
       params: { machineId: "m1" },
     });
+  });
+
+  test("the folders people allowed leave it out (web and phone show it on its own row); its facts", () => {
+    const access = {
+      folders: [
+        { path: "/srv/data", agents: ["ada"] },
+        { path: "/srv/agentes/shared", agents: ["*"] },
+      ],
+      tools: { claude: true, codex: true, commands: true },
+    };
+    expect(allowedFolders(access).map((f) => f.path)).toEqual(["/srv/data"]);
+    expect(allowedFolders({ ...access, folders: [access.folders[1] as (typeof access.folders)[0]] })).toEqual([]);
+    expect(allowedFolders(null)).toEqual([]);
+    const t = ((key: string, o?: Record<string, unknown>) => `${key}${o ? JSON.stringify(o) : ""}`) as never;
+    expect(sharedFolderFacts(t, "en", { freeGb: 42.5, use: 0.8, sharedGb: 3.2 })).toBe(
+      'machines.shared.size{"size":"3.2 GB"} · machines.shared.free{"free":"43 GB"}',
+    );
+    expect(sharedFolderFacts(t, "en", null)).toBe("machines.shared.measuring");
   });
 });

@@ -614,7 +614,10 @@ export class RunnerDaemon implements RequestObserver {
 
   private writeAccess(next: RunnerAccess) {
     // The shared folder's grant is the session's (`access()`), never the config's.
-    const access = { ...next, folders: next.folders.filter((f) => !f.agents.includes(ALL_AGENTS)) };
+    const access = {
+      ...next,
+      folders: next.folders.filter((f) => f.path !== this.shared && !f.agents.includes(ALL_AGENTS)),
+    };
     this.write({ ...(this.stored ?? {}), access, exec: next.tools.commands });
   }
 
