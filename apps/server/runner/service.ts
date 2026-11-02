@@ -29,11 +29,14 @@ export const agentCategorySlice = (uid: number, kind: ScopeKind) => `${AGENT_SLI
  * What the agents may use, as two drop-ins: `each` for the slice prefix, which every agent's slice and its
  * sub-slices get, and `all` for `agents.slice`, all of them together. The agents share the computer: no agent has
  * memory or CPUs of its own, so one busy agent may use all the agents have, and each sees what the others use
- * (`agentes-runner computer`). `each` only keeps one agent's runaway processes from taking every task. `all` keeps
+ * (`agentes-runner computer`). `each` gives every agent the same CPU weight, which keeps the CPU controller on
+ * below `agents.slice` (with no CPU setting systemd turns it off there): busy agents then get an equal share each,
+ * however many threads one runs. It also keeps one agent's runaway processes from taking every task. `all` keeps
  * the rest of the computer for the system: half its tasks, so it can still start a process when the agents run
  * away, and a share of its RAM, which systemd works out each time it loads the units (every boot and
  * `daemon-reload`), so the file fits any computer. At `MemoryMax` the kernel takes back the agents' cache and swaps
- * their idle memory out where it can, then stops the process using the most. No `MemoryHigh`: past it, agents with
+ * their idle memory out where it can, then stops the process its OOM score ranks first (the biggest, Chrome's pages
+ * before anything else). No `MemoryHigh`: past it, agents with
  * nothing left to give back (no swap) only crawl until their commands time out, where one should fail. Their swap
  * holds a third of their memory at most (`MemorySwapMax`, in bytes from the RAM at install: systemd's share there
  * is of the swap, and only in recent versions). Swap in RAM (the Cloud's zram) holds it outside the slices,
@@ -45,7 +48,7 @@ export function agentLimits(memoryBytes: number, host: boolean): { each: string;
   const share = host ? HOST_AGENTS_SHARE : AGENTS_SHARE;
   const swapMiB = Math.floor((memoryBytes * share) / 100 / 3 / 2 ** 20);
   return {
-    each: "[Slice]\nTasksMax=4096\n",
+    each: "[Slice]\nCPUWeight=100\nTasksMax=4096\n",
     all: `[Slice]\nMemoryMax=${share}%\nMemorySwapMax=${swapMiB}M\nTasksMax=50%\n`,
   };
 }

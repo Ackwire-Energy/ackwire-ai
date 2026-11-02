@@ -3,15 +3,15 @@ import os from "node:os";
 import path from "node:path";
 import { cgroupCounters, memAvailable } from "@agenteschat/adapters/host-stats";
 import { AGENTS_CGROUP } from "./service";
-import { isSharedGroup } from "./shared-folder";
+import { isOrgSharedGroup } from "./shared-folder";
 
 /**
  * `agentes-runner computer`: what this computer has and which of its agents use it now, so an agent about to start
  * something heavy can tell whether it fits and, when it doesn't, who is using the computer (in system mode the
  * agents share it: `agentLimits`). It reads only what every user may read (`/proc`, the cgroup tree, `/etc/passwd`
  * and `/etc/group`), so an agent runs it as itself. Agents are named by their user's comment, which is the agent's
- * name; only those of the caller's own runner (its shared group's members), so on the server's own computer
- * another organization's agents count together, unnamed.
+ * name: all of them on a computer with one runner (one workspace's agents), and on the server's own computer only the
+ * caller's organization's, so another organization's agents count together, unnamed.
  */
 export interface ComputerIo {
   /** The agents' slice in the cgroup tree. */
@@ -84,16 +84,21 @@ function passwdUsers(text: string) {
   return users;
 }
 
-/** The users of the caller's runner: the members of its shared group (`isSharedGroup`); null when it has none. */
+/**
+ * The agents the caller may see by name: null for all of them, unless this is the server's own computer, where each
+ * organization's runner has a group of its own (`isOrgSharedGroup`): then its group's members, none yet before the
+ * caller joined it.
+ */
 function sideBySide(groupText: string, groups: number[]): Set<string> | null {
-  let members: Set<string> | null = null;
+  let host = false;
+  const members = new Set<string>();
   for (const line of groupText.split("\n")) {
     const [name = "", , gid = "", list = ""] = line.split(":");
-    if (!isSharedGroup(name) || !groups.includes(Number(gid))) continue;
-    members ??= new Set();
-    for (const m of list.split(",")) if (m.trim()) members.add(m.trim());
+    if (!isOrgSharedGroup(name)) continue;
+    host = true;
+    if (groups.includes(Number(gid))) for (const m of list.split(",")) if (m.trim()) members.add(m.trim());
   }
-  return members;
+  return host ? members : null;
 }
 
 const gb = (bytes: number) => `${(bytes / GIB).toFixed(1)} GB`;
@@ -152,7 +157,9 @@ export async function computerNow(io: ComputerIo = {}): Promise<string> {
   lines.push(`Free for new work: about ${gb(room)} of memory.`);
 
   const users = passwdUsers(readText(path.join(etc, "passwd")) ?? "");
-  const named = sideBySide(readText(path.join(etc, "group")) ?? "", io.groups ?? process.getgroups?.() ?? []);
+  // Root (a person on the computer) sees everyone.
+  const named =
+    uid === 0 ? null : sideBySide(readText(path.join(etc, "group")) ?? "", io.groups ?? process.getgroups?.() ?? []);
   const micros = sampleMs * 1000;
   const agents: AgentUse[] = slices.map((u) => {
     const dir = path.join(cgroup, `agents-${u}.slice`);

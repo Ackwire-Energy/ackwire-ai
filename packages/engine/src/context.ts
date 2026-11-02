@@ -1,4 +1,4 @@
-import { grantedTo, sharedFolderOf } from "@agenteschat/adapters";
+import { grantedTo, SHARED_COMPUTER_PROTOCOL, sharedFolderOf } from "@agenteschat/adapters";
 import {
   and,
   asc,
@@ -796,7 +796,7 @@ export async function buildRunContext(
                 { text: machineAccessText(a) },
                 // Cursor's sandbox can't write a folder outside the turn's workspace (ADR 0114), so its shell couldn't use it.
                 ...(a.shared && agent.brain !== "cursor" ? [{ text: sharedFolderText(a.name, a.shared) }] : []),
-                ...(a.system && a.tools.commands ? [{ text: sharingText(a.name, a.size) }] : []),
+                ...(a.shares && a.tools.commands ? [{ text: sharingText(a.name, a.size) }] : []),
               ]
             : [],
         )
@@ -1446,6 +1446,7 @@ async function machineAccessOf(db: Database, orgId: string, agentId: string, mac
       access: schema.machines.access,
       executors: schema.machines.executors,
       size: schema.machines.size,
+      protocol: schema.machines.protocol,
     })
     .from(schema.machines)
     .where(and(eq(schema.machines.orgId, orgId), eq(schema.machines.id, machineId), isNull(schema.machines.deletedAt)));
@@ -1457,7 +1458,8 @@ async function machineAccessOf(db: Database, orgId: string, agentId: string, mac
     folders: m.access.folders.filter((f) => f.path !== shared && grantedTo(f, agentId)).map((f) => f.path),
     tools: m.access.tools,
     shared: shared ? { dir: shared, system, os: m.os } : null,
-    system,
+    // Its agents share it (`sharingText`), with `agentes-runner computer` to see who uses it.
+    shares: system && m.protocol >= SHARED_COMPUTER_PROTOCOL,
     size: m.size ? (m.size.limit ?? m.size) : null,
   };
 }
@@ -1532,12 +1534,14 @@ export function machineAccessText(a: {
  * who is using the computer when it doesn't fit or something was stopped for memory.
  */
 export function sharingText(computer: string, size: { cpus: number; memoryGb: number } | null) {
-  const what = size ? `its ${size.cpus} CPUs and ${size.memoryGb} GB of memory` : "its CPUs and memory";
+  // The agents together may use most of the memory, not all: the rest keeps the computer itself running.
+  const what = size ? `its ${size.cpus} CPUs and most of its ${size.memoryGb} GB of memory` : "its CPUs and memory";
   return [
     `# Sharing "${computer}"`,
     `All the agents on "${computer}" share ${what}, with no part set aside for any of you: one agent's heavy work leaves the others little.`,
     "- Before something heavy (a build, a big install or download, a dataset or a model, many browser tabs), run agentes-runner computer: it shows what is free now and which agents use the most. If what you are about to start needs more than is free, tell the person which agent is using the computer and what you'll do: wait until it frees up, or do a lighter version now.",
     '- When a command is killed (exit code 137, "Killed") or your commands are much slower than usual, run agentes-runner computer before trying again, and tell the person what happened and why.',
+    "- When something heavy is done, stop what it left running in the background (a build's daemons: ./gradlew --stop), so the others get the memory back.",
   ].join("\n");
 }
 

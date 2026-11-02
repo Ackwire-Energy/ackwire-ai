@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { MACHINE_PROTOCOL_VERSION } from "@agenteschat/adapters";
+import { MACHINE_PROTOCOL_VERSION, SHARED_COMPUTER_PROTOCOL } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
 import { systemText } from "@agenteschat/providers";
 import {
@@ -379,19 +379,27 @@ describe("# This turn", () => {
     expect(seen[2]?.system).toContain("Only your own folder there");
     expect(seen[2]?.system).not.toContain("# Shared folder");
 
-    // System mode: the agents share the computer's CPUs and memory, of the size its runner reported.
+    // System mode: the agents share the computer's CPUs and memory, of the size its runner reported, once its runner
+    // has `agentes-runner computer` and caps no agent (an older one still does).
     const [row] = await f.db.select().from(schema.machines).where(eq(schema.machines.id, paired.machineId));
-    await f.db
-      .update(schema.machines)
-      .set({
-        executors: { ...row?.executors, mode: "system" },
-        size: { cpus: 4, memoryGb: 8, diskGb: 100 },
-      })
-      .where(eq(schema.machines.id, paired.machineId));
-    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
-    await drainOutbox(f.db, handlers);
-    expect(seen).toHaveLength(4);
-    expect(seen[3]?.system).toContain('# Sharing "MacBook"\nAll the agents on "MacBook" share its 4 CPUs and 8 GB');
+    const ask = async (protocol: number) => {
+      await f.db
+        .update(schema.machines)
+        .set({
+          executors: { ...row?.executors, mode: "system" },
+          size: { cpus: 4, memoryGb: 8, diskGb: 100 },
+          protocol,
+        })
+        .where(eq(schema.machines.id, paired.machineId));
+      await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
+      await drainOutbox(f.db, handlers);
+      return seen.at(-1)?.system ?? "";
+    };
+    expect(await ask(SHARED_COMPUTER_PROTOCOL - 1)).not.toContain("# Sharing");
+    expect(await ask(SHARED_COMPUTER_PROTOCOL)).toContain(
+      '# Sharing "MacBook"\nAll the agents on "MacBook" share its 4 CPUs and most of its 8 GB',
+    );
+    expect(seen).toHaveLength(5);
   });
 });
 

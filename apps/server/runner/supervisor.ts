@@ -1320,8 +1320,8 @@ export function retireLegacyPending(
 }
 
 /** `agentes-runner worker` for one agent through its launcher (its user, its slice, only its environment). */
-export function workerCommand(user: AgentUser, runner: string[], home: string, systemd?: boolean) {
-  const l = systemLauncher(user, systemd);
+export function workerCommand(user: AgentUser, runner: string[], home: string, systemd?: boolean, oomPolicy?: boolean) {
+  const l = systemLauncher(user, systemd, oomPolicy);
   return {
     argv: [...l.prefix, ...runner, "worker", "--agent", user.id, "--dir", l.home, "--home", home],
     cwd: l.home,

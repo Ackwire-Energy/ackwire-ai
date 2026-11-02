@@ -1104,13 +1104,15 @@ or restarted desktop on the computer, and on this server's own computer the name
 organizations.
 
 **Memory and CPUs.** With `--system` the agents share the computer: none has memory or CPUs of its own,
-so one agent's build may use every CPU and all the memory the agents have. All of them together stop at
-75% of the RAM (50% on this server's own computer), plus swap for a third of that, which keeps the rest
-for the system, the runner and, here, the server. At that limit the kernel stops the process using the
-most, and only that process: the command it belonged to fails, and the agent is told it was most likely
-memory. `agentes-runner computer`, which any agent (or you) can run, prints what the computer has, what
-is free for new work and which agents use the most; agents are told to run it before something heavy
-and to tell the person when another agent's work leaves no room.
+so one agent's build may use every CPU and all the memory the agents have; when several want the CPUs,
+each gets an equal share. All of them together stop at 75% of the RAM (50% on this server's own
+computer), plus swap for a third of that, which keeps the rest for the system, the runner and, here,
+the server. At that limit the kernel stops one process, usually the biggest (Chrome's pages first), and
+only that process: the command it belonged to fails, and the agent is told it was most likely memory.
+`agentes-runner computer`, which any agent (or you) can run, prints what the computer has, what is free
+for new work and which agents use the most; agents are told to run it before something heavy, to tell
+the person when another agent's work leaves no room, and to stop what a finished build left running.
+Expo's default Android debug build fits an 8 GB computer this way, using nearly all the agents' memory.
 
 **The shared folder.** Every computer has one folder all of its agents read and write, so what one of
 them downloads, clones or installs, the others use instead of fetching it again. With `--system` it is

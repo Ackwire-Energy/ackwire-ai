@@ -41,11 +41,8 @@ function computer() {
       "ag-cccccccc:x:20002:20002::/home/ag-cccccccc:/bin/bash",
       "ag-dddddddd:x:21000:21000:Dora:/home/ag-dddddddd:/bin/bash",
     ].join("\n"),
-    group: [
-      "root:x:0:",
-      "agentes-shared:x:997:ag-aaaaaaaa,ag-bbbbbbbb,ag-cccccccc",
-      "agentes-sh-1a2b3c4d:x:996:ag-dddddddd",
-    ].join("\n"),
+    // One runner (a workspace's computer): Dora hasn't joined the shared group yet, and is one of its agents all the same.
+    group: ["root:x:0:", "agentes-shared:x:997:ag-aaaaaaaa,ag-bbbbbbbb,ag-cccccccc"].join("\n"),
   });
   return { root, cgroup, proc, etc, agent, put, cpuStat };
 }
@@ -56,7 +53,7 @@ test("cpuTimes: busy and all of /proc/stat's CPU line, guest time left out (it i
   expect(cpuTimes("")).toBeNull();
 });
 
-test("what the agents share, what is free for new work, and who uses the most, named for the caller's runner", async () => {
+test("what the agents share, what is free for new work, and who uses the most, by name", async () => {
   const c = computer();
   c.put(c.cgroup, {
     "memory.current": `${5.5 * GIB}\n`,
@@ -65,7 +62,7 @@ test("what the agents share, what is free for new work, and who uses the most, n
     "memory.swap.current": `${0.75 * GIB}\n`,
     "memory.swap.max": `${2 * GIB}\n`,
   });
-  // Bia builds, Ada (the caller) reads a page, the agent with no name does nothing, Dora is another organization's.
+  // Bia builds, Ada (the caller) reads a page, the agent with no name does nothing, Dora holds a little.
   c.agent(20001, { bytes: 3.5 * GIB, cache: 0.3 * GIB, swap: 0.6 * GIB, usec: 1_000_000 });
   c.agent(20000, { bytes: 0.4 * GIB, usec: 500_000 });
   c.agent(20002, { bytes: 0.01 * GIB, usec: 0 });
@@ -93,13 +90,27 @@ test("what the agents share, what is free for new work, and who uses the most, n
     "Free for new work: about 1.0 GB of memory.",
     "Using the most now:",
     "- Bia: 3.5 GB (and 0.6 GB in swap), 2.5 CPUs",
+    "- Dora: 0.6 GB, 0.0 CPUs",
     "- Ada (you): 0.4 GB, 0.2 CPUs",
-    "- Other agents: 0.6 GB, 0.0 CPUs",
   ]);
 
-  // As a person (root, in no agents' group): every agent by name, and the computer's free memory when it is less.
+  // The server's own computer: each organization's runner has a group, and another one's agents go unnamed.
+  writeFileSync(
+    path.join(c.etc, "group"),
+    ["agentes-sh-aaaaaaaa:x:996:ag-aaaaaaaa,ag-bbbbbbbb,ag-cccccccc", "agentes-sh-dddddddd:x:995:ag-dddddddd"].join(
+      "\n",
+    ),
+  );
+  const still = { ...io, sleep: async () => {} };
+  const host = await computerNow({ ...still, groups: [20000, 996] });
+  expect(host).toContain("\n- Bia: 3.5 GB (and 0.6 GB in swap), 0.0 CPUs\n- Ada (you): 0.4 GB, 0.0 CPUs\n");
+  expect(host).toEndWith("\n- Other agents: 0.6 GB, 0.0 CPUs");
+  // Before the caller joined its organization's group: only itself by name.
+  const alone = await computerNow({ ...still, groups: [20000] });
+  expect(alone).toContain("\n- Ada (you): 0.4 GB, 0.0 CPUs\n- Other agents: 4.1 GB (and 0.6 GB in swap), 0.0 CPUs");
+  // As a person (root): every agent by name, and the computer's free memory when it is less than the agents' room.
   writeFileSync(path.join(c.proc, "meminfo"), `MemAvailable: ${0.5 * 1024 * 1024} kB\n`);
-  const asRoot = await computerNow({ ...io, uid: 0, groups: [0], sleep: async () => {} });
+  const asRoot = await computerNow({ ...still, uid: 0, groups: [0] });
   expect(asRoot).toContain("\nFree for new work: about 0.5 GB of memory.\n");
   expect(asRoot).toContain("\n- Dora: 0.6 GB, 0.0 CPUs");
   expect(asRoot).not.toContain("(you)");

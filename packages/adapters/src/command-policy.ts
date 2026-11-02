@@ -802,6 +802,9 @@ function readOnlySimple(s: Simple, scope: CommandScope, plan = false): boolean {
       return !plan && readOnlyCurl(s.argv, scope);
     case "wget":
       return !plan && readOnlyWget(s.argv, scope);
+    // What the computer has and which agents use it: reads /proc, the cgroup tree and /etc only.
+    case "agentes-runner":
+      return args.length === 1 && args[0] === "computer";
     default:
       return false;
   }

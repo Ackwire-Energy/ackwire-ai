@@ -2384,9 +2384,10 @@ test("the launch line: the agent's launcher, then this runner's worker with the 
   const ana = USERS[0] as AgentUser;
   const runner = ["/opt/agentes-runner/bin/bun", "/opt/agentes-runner/agentes-runner.mjs"];
   const home = "/var/lib/agentes-runner-agents/ag-a1b2c3d4";
-  const cmd = workerCommand(ana, runner, home, true);
+  // A systemd older than 253 (no OOMPolicy on scopes): the same on any computer the test runs on.
+  const cmd = workerCommand(ana, runner, home, true, false);
   expect(cmd.argv).toEqual([
-    ...systemLauncher(ana, true).prefix,
+    ...systemLauncher(ana, true, false).prefix,
     ...runner,
     "worker",
     "--agent",

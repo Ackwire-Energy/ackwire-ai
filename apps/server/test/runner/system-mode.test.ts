@@ -160,11 +160,17 @@ test.if(posix)("service install --system: a system home, and it starts only when
   expect(readFileSync(unitPath, "utf8")).toBe(systemdSystemUnit(launch));
   expect(readStoredConfig(h)).toEqual({ mode: "system", agentUidRange: [21000, 21099] });
   // Every agent's slice (agents-<uid>.slice) gets the same drop-in for the prefix: the agents share the computer's
-  // memory and CPUs, so one agent has none of its own, only room for threads.
+  // memory and CPUs, so one agent has none of its own, only an equal weight when they all want the CPUs, and room
+  // for threads.
   expect(agentSlice(21003)).toBe("agents-21003.slice");
   expect(agentSliceLimitsPath(unitPath)).toBe(path.join(h, "etc/systemd/system/agents-.slice.d/limits.conf"));
   expect(agentSliceLimitsPath()).toBe("/etc/systemd/system/agents-.slice.d/limits.conf");
-  expect(readFileSync(agentSliceLimitsPath(unitPath), "utf8").split("\n")).toEqual(["[Slice]", "TasksMax=4096", ""]);
+  expect(readFileSync(agentSliceLimitsPath(unitPath), "utf8").split("\n")).toEqual([
+    "[Slice]",
+    "CPUWeight=100",
+    "TasksMax=4096",
+    "",
+  ]);
   // All of them together (agents.slice): a share of the computer's RAM (systemd works it out as it loads the units)
   // where it stops, nothing that only slows it down, and swap for a third of that (8 GiB here: 2048 MiB). With their
   // swap in RAM at 2:1, 87.5% of it, and the rest of the computer stays for the system, the runner and the guard.
@@ -249,13 +255,13 @@ test.if(posix)(
     // RAM at 2:1 they leave 42% (1.7 GiB here). One agent may use all of it.
     expect(install({ args: ["host", "--server", "http://127.0.0.1:3000", "--token-file", `${h}/token`] })).toBe(0);
     expect(dropIns()).toEqual([
-      "[Slice]\nTasksMax=4096\n",
+      "[Slice]\nCPUWeight=100\nTasksMax=4096\n",
       "[Slice]\nMemoryMax=50%\nMemorySwapMax=682M\nTasksMax=50%\n",
     ]);
     // The same computer for agents alone: theirs is more of it.
     expect(install()).toBe(0);
     expect(dropIns()).toEqual([
-      "[Slice]\nTasksMax=4096\n",
+      "[Slice]\nCPUWeight=100\nTasksMax=4096\n",
       "[Slice]\nMemoryMax=75%\nMemorySwapMax=1024M\nTasksMax=50%\n",
     ]);
   },

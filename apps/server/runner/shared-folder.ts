@@ -43,8 +43,8 @@ export const systemShared = (id8?: string): Required<SharedSpec> =>
     ? { path: `${SHARED_ROOT}/shared-${id8}`, group: `${ORG_SHARED_GROUP}${id8}` }
     : { path: SHARED_DIR, group: SHARED_GROUP };
 
-/** Whether a group is the one a runner's agents all join (`systemShared`): who an agent works beside. */
-export const isSharedGroup = (name: string) => name === SHARED_GROUP || name.startsWith(ORG_SHARED_GROUP);
+/** Whether a group is one organization's runner's on the server's own computer (`systemShared` with an `id8`). */
+export const isOrgSharedGroup = (name: string) => name.startsWith(ORG_SHARED_GROUP);
 
 const ACL = "g:%g:rwx,d:g:%g:rwX,d:m::rwX,d:o::-";
 
