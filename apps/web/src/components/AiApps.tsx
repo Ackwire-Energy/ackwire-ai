@@ -346,9 +346,10 @@ export function ConnectAppDialog({
   const { org } = useOrg();
   const [client, setClient] = useState<AppClientId | null>(null);
   const [known] = useState(() => new Set(seen));
+  const [since, setSince] = useState(0);
   const [watching, setWatching] = useState(false);
   const list = useApps(org.id, false, watching ? POLL_MS : false);
-  const connected = client ? newlyConnected(list.data, known) : null;
+  const connected = client ? newlyConnected(list.data, known, since) : null;
   const [timedOut, setTimedOut] = useState(false);
   useEffect(() => {
     if (!client || connected || timedOut) {
@@ -375,7 +376,15 @@ export function ConnectAppDialog({
         {!picked ? (
           <div className="apps-clients">
             {APP_CLIENTS.map((c) => (
-              <button key={c.id} type="button" className="apps-client" onClick={() => setClient(c.id)}>
+              <button
+                key={c.id}
+                type="button"
+                className="apps-client"
+                onClick={() => {
+                  setClient(c.id);
+                  setSince(Date.now());
+                }}
+              >
                 <ClientMark mark={c.mark} />
                 <span className="list-col">
                   <span className="apps-client__name">{t(`apps.dialog.client.${c.id}`)}</span>

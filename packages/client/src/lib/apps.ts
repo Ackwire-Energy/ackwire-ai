@@ -89,9 +89,12 @@ export function consentErrorOf(error: unknown): ConsentError {
 /** Nothing connected and no token: the page shows its empty state. */
 export const isAppsEmpty = (list: AppsList | undefined) => !!list && list.apps.length === 0 && list.tokens.length === 0;
 
-/** A grant new since `seen` (the ids the dialog opened with): the app that just connected. */
-export const newlyConnected = (list: AppsList | undefined, seen: ReadonlySet<string>) =>
-  list?.apps.find((a) => !seen.has(a.id)) ?? null;
+/**
+ * The app that just connected: a grant new since `seen` (the ids the dialog opened with), or one connected again
+ * since `since` (ms): connecting an app that is already connected keeps its grant and moves its time forward.
+ */
+export const newlyConnected = (list: AppsList | undefined, seen: ReadonlySet<string>, since: number) =>
+  list?.apps.find((a) => !seen.has(a.id) || Date.parse(a.connectedAt) >= since) ?? null;
 
 /** A connected app's line under its name: where it runs, whose (in the whole workspace's list), when connected and used. */
 export function appFacts(t: TFunction, locale: string, app: ConnectedApp, now = new Date()) {

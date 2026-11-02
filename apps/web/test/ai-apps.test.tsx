@@ -279,6 +279,20 @@ describe("Configurações › Apps de IA (ADR 0113)", () => {
     expect(list.querySelector(".ac-brand")?.getAttribute("data-mark")).toBe("claude");
   });
 
+  test("connecting an app that is already connected shows it connected too (same grant, a new time)", async () => {
+    const { apps, services } = await go(seedState(), (fake) => {
+      fake.connect({ name: "Claude", brand: "claude", host: "claude.ai", connectedAt: "2026-10-01T12:00:00.000Z" });
+    });
+    await click(section().getAllByRole("button", { name: "Conectar um app" })[0] as HTMLElement);
+    await click(dialog().getByRole("button", { name: /^Claude claude\.ai/ }));
+    expect(screen().getByRole("dialog").textContent).toContain("Esperando o app se conectar");
+    const claude = apps.apps[0];
+    if (claude) claude.connectedAt = new Date(Date.now() + 1000).toISOString();
+    await act(() => services.queryClient.refetchQueries({ queryKey: ["org", ORG_ID, "apps"] }));
+    await settle(4);
+    expect(screen().getByRole("dialog").textContent).toContain("Conectado: Claude");
+  });
+
   test("Desconectar asks first, then the app loses access", async () => {
     const { state } = await go(seedState(), (apps) => {
       apps.connect({ name: "Claude Code", displayKind: "loopback", access: "read" });
