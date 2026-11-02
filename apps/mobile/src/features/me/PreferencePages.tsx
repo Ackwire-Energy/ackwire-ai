@@ -9,7 +9,7 @@ import {
   useSetShowActivity,
   useSetStart,
 } from "@agenteschat/client";
-import { type AppLocale, localeInfo, readyLocales } from "@agenteschat/i18n/locale";
+import { type AppLocale, readyLocales } from "@agenteschat/i18n/locale";
 import { SOUND_STYLES, type SoundStyle } from "@agenteschat/ui/sfx";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
@@ -308,31 +308,27 @@ export function AppearancePage() {
 }
 
 /**
- * Idioma: Automático (the phone's language) first, then each language by its own name. Signed out, the pick waits on
- * the phone for the next sign-in.
+ * Idioma: each language by its own name, the one in use checked. Someone who never picked sees the phone's language
+ * checked and keeps following it (ADR 0122). Signed out, the pick waits on the phone for the next sign-in.
  */
 export function LanguagePage({ signedIn = true }: { signedIn?: boolean }) {
   const { t } = useTranslation();
   const api = useApi();
-  const [choice, setChoice] = useState(() => readLocaleState().stored ?? "auto");
-  const pick = (next: AppLocale | "auto") => {
+  const [choice, setChoice] = useState<AppLocale>(() => {
+    const { stored } = readLocaleState();
+    return stored && stored !== "auto" ? stored : deviceLocale();
+  });
+  const pick = (next: AppLocale) => {
     setChoice(next);
-    const code = next === "auto" ? deviceLocale() : next;
     rememberLocale(next, !signedIn);
-    setLocale(code);
+    setLocale(next);
     // Not heard: kept as pending, so the next start sends it.
-    if (signedIn)
-      void api.account.updateMe({ locale: code, auto: next === "auto" }).catch(() => rememberLocale(next, true));
+    if (signedIn) void api.account.updateMe({ locale: next, auto: false }).catch(() => rememberLocale(next, true));
   };
   return (
     <Page title={t("mobile.me.language")}>
       <View style={styles.gap} />
       <GroupedList>
-        <GroupedRow
-          label={t("shell.languageAuto", { language: localeInfo(deviceLocale()).native })}
-          checked={choice === "auto"}
-          onPress={() => pick("auto")}
-        />
         {readyLocales().map((l) => (
           <GroupedRow key={l.code} label={l.native} checked={choice === l.code} onPress={() => pick(l.code)} />
         ))}
