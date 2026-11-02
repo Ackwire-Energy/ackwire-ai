@@ -870,21 +870,28 @@ test.if(posix)(
   async () => {
     const dir = tempDir("cgroup-");
     dirs.push(dir);
-    const events = path.join(dir, "memory.events");
-    writeFileSync(events, "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\n");
+    // The agent's own slice and all the agents', whose memory they share.
+    const agent = path.join(dir, "agent.events");
+    const agents = path.join(dir, "agents.events");
+    writeFileSync(agent, "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\n");
+    writeFileSync(agents, "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\n");
     const devtools = fakeDevtools([]);
     try {
-      const t = setup({ startChrome: chromesAt(devtools).start, memoryEvents: events });
+      const t = setup({ startChrome: chromesAt(devtools).start, memoryEvents: { agent, agents } });
       await t.act("open", ["https://heavy.example/"]);
       await waitFor(() => devtools.asked.includes("Network.enable page-0"));
       const ran = (command: string) => t.logged().filter((l) => l.args.includes(command)).length;
       t.page({ delayMs: 400 });
-      // The agent's slice reached its limit and the page died while a click ran.
+      // The agents reached their limit and the kernel stopped the page while a click ran.
       const clicked = t.act("click", ["@e1"]);
       await waitFor(() => ran("click") === 1);
-      writeFileSync(events, "low 0\nhigh 9\nmax 2\noom 1\noom_kill 1\n");
+      writeFileSync(agent, "low 0\nhigh 0\nmax 0\noom 0\noom_kill 1\n");
+      writeFileSync(agents, "low 0\nhigh 0\nmax 2\noom 1\noom_kill 1\n");
       devtools.crash(0);
       expect(await clicked).toMatchObject({ success: false, data: null, error: OUT_OF_MEMORY_UNDER });
+      // From here the agents' cache sits at their limit (`max` rises at every allocation) and another agent's process
+      // is stopped for memory: neither says this agent's page died of it.
+      writeFileSync(agents, "low 0\nhigh 0\nmax 900\noom 1\noom_kill 2\n");
 
       const folder = await t.folder();
       const batch = () =>
