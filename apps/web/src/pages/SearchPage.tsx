@@ -16,7 +16,7 @@ import {
 } from "@agenteschat/client/lib/search-filters";
 import { Button, EmptyState, List, Select, TabPanel, Tabs } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar } from "@/components/AgentAvatar";
 import { ErrorState, LoadingList } from "@/components/Loading";
@@ -85,10 +85,14 @@ export function SearchPage({ scope }: { scope?: string }) {
   };
 
   const [chips, setChips] = useState<SearchChip[]>([]);
-  // The channel or DM it was opened from, once its name is known.
+  // The channel or DM it was opened from, once its name is known; only once, so removing the chip sticks
+  // when the channel list refetches.
+  const scoped = useRef(false);
   useEffect(() => {
-    const place = scope ? places.find((p) => p.id === scope) : undefined;
-    if (place) setChips((cs) => (cs.some((c) => c.op === "in") ? cs : [{ op: "in", place }, ...cs]));
+    const place = scope && !scoped.current ? places.find((p) => p.id === scope) : undefined;
+    if (!place) return;
+    scoped.current = true;
+    setChips((cs) => (cs.some((c) => c.op === "in") ? cs : [{ op: "in", place }, ...cs]));
   }, [scope, places]);
   const [input, setInput] = useState("");
   const [q, setQ] = useState("");
@@ -111,6 +115,7 @@ export function SearchPage({ scope }: { scope?: string }) {
   const hits = search.data ?? [];
   const active = hasSearch(chips, q);
   const placeOf = (id: string | undefined) => places.find((p) => p.id === id);
+  const dmWith = (id: string | undefined) => dms.data?.find((d) => d.channelId === id)?.with;
   const remember = () => {
     const text = formatSearch(chips, parseSearch(input, directory, words).text);
     if (text) saveRecent(rememberSearch(recent, text));
@@ -170,6 +175,7 @@ export function SearchPage({ scope }: { scope?: string }) {
                       orgId={org.id}
                       hit={h}
                       channelId={place ? channelId : undefined}
+                      dm={dmWith(channelId)}
                       onOpen={remember}
                     />
                   ))}
@@ -195,6 +201,7 @@ export function SearchPage({ scope }: { scope?: string }) {
                     orgId={org.id}
                     hit={h}
                     channelId={c?.id}
+                    dm={dmWith(c?.id)}
                     channel={c?.name}
                     onOpen={remember}
                   />
@@ -245,17 +252,23 @@ export function SearchPage({ scope }: { scope?: string }) {
   );
 }
 
-/** One hit: its author's face and name, when, the text; a message opens at itself (a reply at its thread). */
+/**
+ * One hit: its author's face and name, when, the text. A message opens at itself: a reply in its thread, a DM's
+ * message in the DM (the channel route only knows channels).
+ */
 function HitRow({
   orgId,
   hit,
   channelId,
+  dm,
   channel,
   onOpen,
 }: {
   orgId: string;
   hit: SearchHit;
   channelId?: string;
+  /** Who the DM is with, when the hit's place is a DM. */
+  dm?: { type: "person" | "agent"; id: string };
   /** Shown in the line (hits not grouped by channel). */
   channel?: string;
   onOpen: () => void;
@@ -279,16 +292,16 @@ function HitRow({
     </span>
   );
   if (!channelId) return <div className="ac-list__row">{body}</div>;
-  const m = hit.kind === "message" ? (hit.threadId ?? hit.messageId ?? undefined) : undefined;
-  return (
-    <Link
-      to="/org/$orgId/c/$channelId"
-      params={{ orgId, channelId }}
-      search={m ? { m } : {}}
-      onClick={onOpen}
-      className="ac-list__row"
-    >
-      {body}
-    </Link>
-  );
+  const m = hit.kind === "message" ? (hit.messageId ?? undefined) : undefined;
+  const search = m ? { m } : {};
+  const link = { onClick: onOpen, className: "ac-list__row", children: body };
+  if (m && hit.threadId && hit.threadId !== m)
+    return (
+      <Link to="/org/$orgId/threads/$threadId" params={{ orgId, threadId: hit.threadId }} search={search} {...link} />
+    );
+  if (dm?.type === "agent")
+    return <Link to="/org/$orgId/dm/agent/$agentId" params={{ orgId, agentId: dm.id }} search={search} {...link} />;
+  if (dm)
+    return <Link to="/org/$orgId/dm/person/$userId" params={{ orgId, userId: dm.id }} search={search} {...link} />;
+  return <Link to="/org/$orgId/c/$channelId" params={{ orgId, channelId }} search={search} {...link} />;
 }

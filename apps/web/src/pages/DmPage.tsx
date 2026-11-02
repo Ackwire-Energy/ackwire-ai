@@ -21,7 +21,7 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { ChannelPage, ChannelSkeleton } from "./ChannelPage";
 
 /** A direct message with an agent or a person: the channel layout with its own header and empty state. */
-export function DmPage({ target }: { target: DmTarget }) {
+export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMessageId?: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
@@ -101,6 +101,7 @@ export function DmPage({ target }: { target: DmTarget }) {
   return (
     <ChannelPage
       channelId={dm.data.channelId}
+      focusMessageId={focusMessageId}
       fallback={{
         id: dm.data.channelId,
         name,

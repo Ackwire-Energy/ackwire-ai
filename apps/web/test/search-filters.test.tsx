@@ -3,6 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import { keys } from "@agenteschat/client";
 import { act, cleanup, fireEvent } from "@testing-library/react";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -96,5 +97,72 @@ describe("search filters (ADR 0123)", () => {
     await act(async () => fireEvent.focus(box()));
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Limpar" })));
     expect(screen().queryByRole("option", { name: "in:eng deploy" })).toBeNull();
+  });
+
+  test("a DM's message opens in the DM and a thread reply in its thread, each at the message", async () => {
+    const state = seedState();
+    state.dms.push({ channelId: "dm-ada", with: { type: "agent", id: ADA_ID, name: "Ada", handle: "ada" } });
+    state.channelMembers["dm-ada"] = [
+      { type: "person", id: state.me?.user.id ?? "" },
+      { type: "agent", id: ADA_ID },
+    ];
+    const at = new Date().toISOString();
+    state.messages.push(
+      {
+        id: "m-dm",
+        channelId: "dm-ada",
+        threadId: null,
+        author: { type: "agent", id: ADA_ID },
+        body: "zebra no privado",
+        mentionedAgentIds: [],
+        agentRunId: null,
+        createdAt: at,
+      },
+      {
+        id: "m-reply",
+        channelId: ENG_ID,
+        threadId: "m-1",
+        author: { type: "agent", id: ADA_ID },
+        body: "zebra na resposta",
+        mentionedAgentIds: [],
+        agentRunId: null,
+        createdAt: at,
+      },
+    );
+    const api = createFakeApi(state);
+    const { router } = await renderApp(`/org/${ORG_ID}/search?in=dm-ada`, { api });
+    await settle(6);
+    await typeIn("zebra");
+    expect(screen().queryByText("zebra na resposta")).toBeNull();
+    await act(async () => fireEvent.click(screen().getByRole("link", { name: /zebra no privado/ })));
+    await settle(6);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/dm/agent/${ADA_ID}`);
+    expect(router.state.location.search).toEqual({ m: "m-dm" });
+    expect(text()).not.toContain("Este canal não existe");
+    expect(text()).toContain("zebra no privado");
+
+    await act(() => router.navigate({ to: "/org/$orgId/search", params: { orgId: ORG_ID } }));
+    await settle(6);
+    await typeIn("zebra");
+    await act(async () => fireEvent.click(screen().getByRole("link", { name: /zebra na resposta/ })));
+    await settle(4);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/threads/m-1`);
+    expect(router.state.location.search).toEqual({ m: "m-reply" });
+  });
+
+  test("a removed scope chip stays removed when the channel list refetches", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const { services } = await renderApp(`/org/${ORG_ID}/search?in=${ENG_ID}`, { api });
+    await settle(6);
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Remover em: #eng" })));
+    // A new message anywhere rewrites the channel list (a new array).
+    await act(async () =>
+      services.queryClient.setQueryData(keys.channels(ORG_ID), (cs: { topic: string }[] | undefined) =>
+        cs?.map((c) => ({ ...c, topic: `${c.topic} ` })),
+      ),
+    );
+    await settle(6);
+    expect(screen().queryByRole("button", { name: "Remover em: #eng" })).toBeNull();
   });
 });
