@@ -13,7 +13,7 @@ import { cutText, editDistance } from "./format";
 import type { MachineCaller, MachineStatus } from "./machine-hub";
 import { parseMentionHandles } from "./messages";
 import { can, requirePermission } from "./organizations";
-import { personBehindCall } from "./requester";
+import { personBehindCall, routineCreatorOfCall } from "./requester";
 import { getSandboxSettings, SANDBOX_SCOPE } from "./sandbox";
 import type { ToolContext, ToolDefinition, ToolSource } from "./tools/types";
 
@@ -209,6 +209,22 @@ export const teammatesFor = (
   skip: Set<string>,
   talks = true,
 ) => team.filter((a) => a.id !== selfId && !skip.has(a.id) && canTalkTo(a, requester, talks));
+
+/**
+ * The teammates a run can reach, as `@handle (role)` (at most 10), for its general means (ADR 0109): those the
+ * person behind it, or its routine's creator, may talk to.
+ */
+export async function teammateMeans(
+  ctx: Pick<ToolContext, "db" | "orgId" | "agentId" | "runId" | "triggerMessageId">,
+  /** Whose agents they are, when the caller knows it already (the executor, from its run in memory). */
+  known?: string | null,
+) {
+  const person = known !== undefined ? known : ((await personBehindCall(ctx)) ?? (await routineCreatorOfCall(ctx)));
+  const [team, talks] = await Promise.all([loadTeam(ctx.db, ctx.orgId), talksToAgents(ctx.db, ctx.orgId, person)]);
+  return teammatesFor(team, ctx.agentId, person, new Set(), talks)
+    .slice(0, 10)
+    .map((a) => `@${a.handle}${a.role ? ` (${cutText(a.role, 60)})` : ""}`);
+}
 
 /**
  * "# Your team" for the system prompt: the other agents the person

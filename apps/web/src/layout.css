@@ -896,11 +896,34 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 }
 /* Turns are told apart by space: ~10px between messages; the same author
    within 5 minutes continues the row above. */
+/* A message that @mentions the viewer: a tinted row with an accent bar on its left edge. */
+.channel__messages .ac-msg--mentions-me {
+  background: color-mix(in srgb, var(--attention) 9%, transparent);
+  box-shadow: inset 2px 0 0 var(--attention);
+  border-radius: 0 14px 14px 0;
+}
+.channel__messages .ac-msg--mentions-me:hover {
+  background: color-mix(in srgb, var(--attention) 13%, transparent);
+}
 .channel__messages > .ac-msg + .ac-msg:not(.ac-msg--grouped) {
   margin-top: 6px;
 }
 .channel__messages > .ac-msg--grouped {
   margin-top: -4px;
+}
+/* My own rows (`.ac-msg--own`): files and the thread line hang under the bubble on its right edge. */
+.ac-msg--own .artifact-cards {
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+/* A table on my bubble is cut from the page's color, as its code blocks are (the kit's `--surface-sunken` there). */
+.ac-msg--own .ac-msg__text .md__table {
+  background: var(--bg);
+}
+.ac-msg--own .thread-line {
+  align-self: flex-end;
+  margin: 4px -6px 0 0;
+  border-radius: 10px 10px 3px 10px;
 }
 .channel__composer {
   position: relative;
@@ -1757,8 +1780,12 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   padding: 0 20px;
 }
 /* The rest of a longer block scrolls into its 420px in a message too, where the kit keeps code from scrolling up and
-   down. */
+   down. The kit's plate for a bare `pre` (its own background, margins and corners) stays off: the card is the plate. */
 .ac-msg__text .code-card__code {
+  margin: 0;
+  padding: 0 16px 14px;
+  background: none;
+  border-radius: 0;
   overflow-y: auto;
 }
 .md .code-card code,
@@ -5044,6 +5071,22 @@ html:not([data-pointer]) .tr-ok:focus-visible {
 .sidebar__item[data-status="active"] > .sidebar__item-meta {
   color: var(--ink2);
 }
+/* The open channel, tool, person or agent: on the plate, a glow from the right edge inward that reads at a glance
+   (like a chosen row's raised fill) and fades out over the row's last 45%, light enough under a long name to keep its
+   contrast; the accent's, or an agent's own color (`--sel-glow-color`). */
+.sidebar__item[data-status="active"]::before {
+  background:
+    linear-gradient(
+      to left,
+      color-mix(in srgb, var(--sel-glow-color, var(--agent)) var(--sel-glow, 24%), transparent),
+      transparent var(--sel-glow-reach, 45%)
+    ),
+    var(--side-active);
+}
+[data-theme="dark"] .sidebar__item[data-status="active"] {
+  --sel-glow: 30%;
+}
+
 /* The icon rail is too narrow for a frame. */
 .sidebar[data-rail="true"] .sidebar__item[data-status="active"] {
   background-image: none;
@@ -5815,6 +5858,10 @@ html:not([data-pointer]) .run-continue:focus-visible {
   border-radius: var(--radius-full);
   background: var(--glass-solid);
   box-shadow: var(--e1), var(--top);
+}
+/* Faces opening the pill sit as far in as the globe's ink at the other end. */
+.ac-typing[data-active="true"]:has(> .ac-typing__avatars):not(:has(> .ac-typing__dots, > .ac-pixspin)) {
+  padding-left: 7px;
 }
 /* An agent in its browser: the whole pill opens the live view; the globe says so. */
 .ac-typing[data-browser="true"] {
@@ -7144,6 +7191,36 @@ html:not([data-pointer]) .machine-connect__toggle:focus-visible {
 }
 .machine-page__agent-row + .machine-page__agent-row {
   border-top: 1px solid var(--line);
+}
+/* Browser profiles (ADR 0110): the stacks, counts and actions line up across rows. */
+.pf-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content max-content max-content;
+  overflow: visible;
+}
+.pf-list > .machine-page__agent-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  align-items: center;
+}
+.pf-stack {
+  justify-self: end;
+  display: flex;
+  padding-right: 8px;
+}
+.pf-count {
+  padding-right: 24px;
+}
+.pf-acts {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  margin-right: 10px;
+}
+.ac-dialog__body > .ac-setnote {
+  margin: 0;
 }
 .machine-page__agent {
   flex: 1;
@@ -9028,8 +9105,17 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   gap: 16px;
   min-width: 0;
 }
+/* 12px above and below, as the attention tiles (`.agp-attn`): a head with a button (a 32px row) reaches 6px into
+   the padding, so the title still sits 12px in. The foot meets the card's edge, so it pulls 12px, not --card-pad. */
 .agp-card.ac-card {
   gap: 12px;
+  padding-block: 12px;
+}
+.agp-card > .ac-card__head:first-child:has(.ac-card__action .ac-btn) {
+  margin-block: -6px -2px;
+}
+.agp-card > .ac-card__foot {
+  margin-bottom: -12px;
 }
 /* Something changed in it: a bar on its left edge, inside the card's line. */
 .agp-card[data-changed] {
@@ -9039,7 +9125,7 @@ html:not([data-pointer]) .agp-cell:focus-visible {
 }
 /* "Como trabalha" isn't a `Card`: the same face as the root card beside it. */
 .agp-aside__work {
-  padding: 20px;
+  padding: 12px 20px;
   border-radius: var(--radius-section) var(--radius-section) var(--radius-section) 4px;
   background: linear-gradient(180deg, var(--card-face-top), var(--surface-raised) 64px);
   box-shadow: var(--card-shadow);
@@ -10265,8 +10351,8 @@ html[data-menu-overlay] .shell {
 }
 
 /* ── Sidebar ──────────────────────────────────────────────────────
-   The tools each person keeps in sight are plain rows; the rest open beside the sidebar from More. Lines set
-   the sidebar's parts apart (tools, channels, agents, people). Conversations sit in categories that open and
+   The tools each person keeps in sight are plain rows; the rest open beside the sidebar from More. Space, not
+   lines, sets the sidebar's parts apart (tools, channels, agents, people), each under a small-capitals title. Conversations sit in categories that open and
    close, every mark (an icon, a "#", a face, a category's chevron) in one column and every name in the next;
    closed, a category shows only the open page's row and a count. Dense, so a small workspace fits a laptop's
    screen without scrolling. The icon rail ignores the headers. */
@@ -10308,19 +10394,25 @@ html[data-menu-overlay] .shell {
   margin: 0 2px;
   color: var(--faint);
 }
+/* Faces in the lists: a step up from the kit's small (24px), here and on the rail. */
+.sidebar__item > .ac-avatar--sm {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+}
 .sidebar:not([data-rail="true"]) .sidebar__item:has(> .ac-avatar) {
   padding-left: 6px;
-  gap: 6px;
+  gap: 8px;
 }
-/* An agent with a role: the face at the top beside the name (20px line, 2px down, centred on the 24px face), the role
-   under the name, 4px above the face and below the role like a 30px row's face (46px with a one-line role, 62px with
-   two); the count, lock or state stays centred at the end. */
+/* An agent with a role: the face at the top beside the name (20px line, 4px down, centred on the 28px face), the role
+   under the name, 4px above the face and below the role (48px with a one-line role, 64px with two); the count, lock or
+   state stays centred at the end. */
 .sidebar:not([data-rail="true"]) .sidebar__item:has(> .sidebar__item-text > .sidebar__item-role) {
   align-items: flex-start;
   padding-block: 4px;
 }
 .sidebar:not([data-rail="true"]) .sidebar__item:has(> .sidebar__item-text > .sidebar__item-role) > .sidebar__item-text {
-  padding-top: 2px;
+  padding-top: 4px;
 }
 .sidebar:not([data-rail="true"]) .sidebar__item-text > .sidebar__item-label {
   line-height: 20px;
@@ -10420,6 +10512,12 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
   > :not([data-status="active"], :has(> [data-status="active"])) {
   display: none;
 }
+/* A part closed (Canais, Agentes) also hides its categories or groups after it, but the one with the open page. */
+.sidebar:not([data-rail="true"])
+  .sidebar__section--part[data-open="false"]
+  ~ .sidebar__section:not(:has([data-status="active"])) {
+  display: none;
+}
 /* A row coming back into sight (its category opened, or it is new) slides in; closing is instant. */
 @media (prefers-reduced-motion: no-preference) {
   .sidebar__section-body > :is(.sidebar__item, .sidebar__row) {
@@ -10461,27 +10559,32 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
 .sidebar__section--category[data-open="false"] .sidebar__section-body > [data-unread="true"] {
   display: flex;
 }
-.sidebar__new-category {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  font: inherit;
-  color: var(--ink-muted);
-  text-align: left;
-  cursor: pointer;
+/* Every drag in the sidebar (a section, a channel, a category, an agent) marks where it lands the same way: one 2px
+   line of the accent at reduced strength with round ends, in the gap before or after the row, from the names' column
+   to the row's end. A line, not an opened gap: the rows stay under the pointer while it moves. A category that takes
+   a channel (`into`), or the group of agents it would land in, takes a faint tint of the accent. */
+.sidebar :is([data-drop="before"], [data-drop="after"]) {
+  position: relative;
 }
-.sidebar__new-category:hover {
-  color: var(--ink);
+.sidebar :is([data-drop="before"], [data-drop="after"])::after,
+.sidebar__drop-line {
+  content: "";
+  position: absolute;
+  left: var(--drop-inset, 36px);
+  right: 8px;
+  height: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--agent) 60%, transparent);
+  pointer-events: none;
 }
-/* Dragging a channel or a category: a 2px line where it lands, or the header that takes it. */
-.sidebar [data-drop="before"] {
-  box-shadow: inset 0 2px 0 var(--ink);
+.sidebar [data-drop="before"]::after {
+  top: -2px;
 }
-.sidebar [data-drop="after"] {
-  box-shadow: inset 0 -2px 0 var(--ink);
+.sidebar [data-drop="after"]::after {
+  bottom: -2px;
 }
-.sidebar [data-drop="into"] {
-  background: var(--plate);
+.sidebar :is([data-drop="into"], .sidebar__section[data-drop="true"]) {
+  background: color-mix(in srgb, var(--agent) 9%, transparent);
 }
 .channel-category__channel {
   display: inline-flex;
@@ -10507,8 +10610,9 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
     opacity: 1;
   }
 }
-/* An agent's row with its "…" (owners and admins: its group), over the row's end on hover or focus, where it
-   takes the place of the role or the count. Touch screens move agents from the agent's page. */
+/* A row's buttons over its end on hover or focus, like Discord's: a channel's Adicionar and settings, an agent's
+   settings and its "…" (its group). They take the place of the count, the role's end or the state, and Tab reaches
+   them after the row. Touch screens have the same actions in the row's page. */
 .sidebar__row {
   position: relative;
   display: flex;
@@ -10517,52 +10621,57 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
   flex: 1;
   min-width: 0;
 }
-.sidebar__row-menu.ac-btn {
+.sidebar__row-acts {
   position: absolute;
   top: 50%;
   right: 4px;
-  /* `translate`, not `transform`: the button's press (`transform: scale(…)`) would drop the centering and jump it. */
   translate: 0 -50%;
+  display: flex;
   opacity: 0;
   transition: opacity 0.15s;
+  /* Hidden, they don't catch the pointer: a drag over another row's end lands before/after it, not in its part. */
+  pointer-events: none;
 }
-.sidebar__row:hover > .sidebar__row-menu,
-.sidebar__row-menu:focus-visible,
-.sidebar__row-menu[data-state="open"] {
+.sidebar__row[data-acts]:is(:hover, :focus-within, :has([data-state="open"])) > .sidebar__row-acts {
   opacity: 1;
+  pointer-events: auto;
 }
-.sidebar__row:hover:has(> .sidebar__row-menu) > .sidebar__item > :is(.sidebar__item-meta, .sidebar__unread),
-.sidebar__row:has(> .sidebar__row-menu:is(:focus-visible, [data-state="open"]))
+.sidebar__row[data-acts]:is(:hover, :focus-within, :has([data-state="open"]))
   > .sidebar__item
   > :is(.sidebar__item-meta, .sidebar__unread) {
   visibility: hidden;
 }
-/* The name and role run the row's width, so the `…` gets its own room instead of covering their ends; on a two-line
-   row it sits on the name's line, beside the face. */
-.sidebar__row:hover:has(> .sidebar__row-menu) > .sidebar__item,
-.sidebar__row:has(> .sidebar__row-menu:is(:focus-visible, [data-state="open"])) > .sidebar__item {
-  padding-right: 32px;
+/* The name and role run the row's width, so the buttons (`data-acts`: how many) get their own room instead of
+   covering their ends; on a two-line row they sit on the name's line, beside the face. */
+.sidebar__row[data-acts]:is(:hover, :focus-within, :has([data-state="open"])) > .sidebar__item {
+  padding-right: var(--acts-room, 32px);
 }
-.sidebar__row:has(> .sidebar__item .sidebar__item-role) > .sidebar__row-menu.ac-btn {
+.sidebar__row[data-acts="2"] {
+  --acts-room: 56px;
+}
+.sidebar__row:has(> .sidebar__item .sidebar__item-role) > .sidebar__row-acts {
   top: 4px;
   translate: none;
 }
+.sidebar[data-rail="true"] .sidebar__row-acts {
+  display: none;
+}
 @media (hover: none) {
-  .sidebar__row-menu.ac-btn {
+  .sidebar__row-acts {
     display: none;
   }
 }
-/* Dragging an agent: the category it would land in, and inside a group the line where it would go. */
+/* Dragging an agent: the group it would land in, and inside it the line where it would go, an element in the list
+   with no height of its own (its margins take back its 2px and the gap it adds). */
 .sidebar__section[data-drop="true"] {
   border-radius: var(--control-r-sm);
-  background: var(--plate-soft);
 }
 .sidebar__drop-line {
-  height: 3px;
-  margin: -2px 8px;
-  border-radius: 2px;
-  background: var(--ink);
-  opacity: 0.55;
+  position: relative;
+  left: auto;
+  right: auto;
+  flex: none;
+  margin: -2px 8px -2px var(--drop-inset, 36px);
 }
 /* An empty group, for whoever organizes: where its agents go, in the column of the agents' names. */
 .sidebar__drop-hint {
@@ -10616,12 +10725,93 @@ html:not([data-pointer]) .sidebar__more:focus-visible {
 .sidebar__more-active > :not([data-status="active"]) {
   display: none;
 }
-/* Empty, so in a list longer than its room the column would shrink it to nothing. */
-.sidebar__divider {
-  flex: none;
-  height: 1px;
-  margin: 4px 8px;
-  background: var(--line);
+/* A section of the sidebar in the person's order (SidebarOrder.tsx): its parts keep the list's spacing; a grip in the
+   gutter on hover drags it, and a line in the gap shows where it would land. The rail lays the parts out alone. */
+.sidebar__block {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+/* 14px over each part's title with the list's own gap. */
+.sidebar:not([data-rail="true"]) .sidebar__block + .sidebar__block {
+  margin-top: 10px;
+}
+.sidebar[data-rail="true"] .sidebar__block {
+  display: contents;
+}
+.sidebar__grip {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: -13px;
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--faint);
+  cursor: grab;
+  opacity: 0;
+  transition:
+    opacity 0.15s,
+    color 0.15s;
+}
+.sidebar__block:has(> .sidebar__grip + :is(.sidebar__tools, .sidebar__group[role="group"])) > .sidebar__grip {
+  top: 6px;
+}
+.sidebar__block:hover > .sidebar__grip,
+.sidebar__grip:focus-visible {
+  opacity: 1;
+}
+.sidebar__grip:hover {
+  color: var(--ink);
+}
+.sidebar__grip:active {
+  cursor: grabbing;
+}
+html:not([data-pointer]) .sidebar__grip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+/* A section's line sits in the middle of the 10px between the parts, from the headers' titles. */
+.sidebar__block[data-drop]::after {
+  left: 9px;
+}
+.sidebar__block[data-drop="before"]::after {
+  top: -6px;
+}
+.sidebar__block[data-drop="after"]::after {
+  bottom: -6px;
+}
+@media (pointer: coarse) {
+  .sidebar__grip {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar__grip {
+    transition: none;
+  }
+}
+/* "Personalizar a barra lateral": the sections' order under the tools, a number and the arrows on each line. */
+.sidebar-setup__heading {
+  margin: 20px 0 2px;
+  font-size: 14px;
+  font-weight: 650;
+}
+.sidebar-setup__hint {
+  margin: 0 0 4px;
+}
+.sidebar-setup.sidebar-setup--order {
+  grid-template-columns: auto 1fr auto auto;
+}
+.sidebar-setup--order .settings-row__icon {
+  font-size: 12px;
+  font-weight: 650;
 }
 /* The bell at the end of the account row: the inbox, its unread count beside it, both on the row's middle. */
 .sidebar__bell {
@@ -10737,8 +10927,7 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
     transition: none;
   }
 }
-.sidebar[data-rail="true"] .sidebar__section-head,
-.sidebar[data-rail="true"] .sidebar__divider {
+.sidebar[data-rail="true"] .sidebar__section-head {
   display: none;
 }
 .sidebar[data-rail="true"] .sidebar__section-body {
@@ -10869,6 +11058,16 @@ html:not([data-pointer]) .channel__newpill:focus-visible {
 .ac-typing__elapsed {
   flex: none;
   color: var(--faint);
+}
+/* "Ada · 2 s": the time right after the phrase, what follows kept at the end. */
+.ac-typing[data-active="true"] .ac-typing__text:has(+ .ac-typing__elapsed) {
+  flex: 0 1 auto;
+}
+.ac-typing__text + .ac-typing__elapsed {
+  margin-right: auto;
+}
+.ac-typing__text + .ac-typing__elapsed::before {
+  content: "· ";
 }
 .ac-typing__see {
   flex: none;

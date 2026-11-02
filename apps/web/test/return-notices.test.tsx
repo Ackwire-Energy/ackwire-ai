@@ -18,7 +18,10 @@ const CONNECTORS = `/org/${ORG_ID}/settings/connectors`;
 function open(path: string, lng: "pt-BR" | "en" = "pt-BR") {
   window.history.replaceState(null, "", path);
   const shown: [string, string | undefined][] = [];
-  showReturnNotices(createI18n(lng).t, (text, tone) => void shown.push([text, tone]));
+  showReturnNotices(
+    createI18n(lng).t,
+    (text, tone) => void shown.push([typeof text === "string" ? text : text.text, tone]),
+  );
   return { shown, left: window.location.pathname + window.location.search + window.location.hash };
 }
 

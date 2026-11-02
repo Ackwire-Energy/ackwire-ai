@@ -61,7 +61,7 @@ export interface Route {
 }
 
 /** How the follow-through (or continuation) judgment reads a turn's end, in the controller's words. */
-export type Verdict = "done" | "continue" | "ask";
+export type Verdict = "done" | "continue" | "ask" | "untried" | "secret";
 
 export interface JudgeTable {
   /**
@@ -78,6 +78,8 @@ export interface JudgeTable {
   stuck?: number;
   /** `note_reply`: whether a note's reply matters to its sender (default 0.9). */
   noteReply?: number;
+  /** `ask_check`: what an `ask_user` question asks for (default: something only a person can give); "fail" errors. */
+  ask?: (state: Record<string, unknown>) => "findable" | "secret" | "person" | "fail";
 }
 
 /** Judgments the engine asks along the way that the scenarios leave at the fake's defaults. */
@@ -179,6 +181,11 @@ export async function world(options: WorldOptions) {
       }
       case "stuck_run":
         return table.stuck ?? 0;
+      case "ask_check": {
+        const v = table.ask?.(state) ?? "person";
+        if (v === "fail") throw new Error("judge unavailable");
+        return v;
+      }
       case "note_reply":
       case "note_reply_matters":
         return table.noteReply ?? 0.9;

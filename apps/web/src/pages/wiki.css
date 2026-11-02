@@ -194,7 +194,7 @@ html:not([data-pointer]) .wiki-tag:focus-visible {
   align-items: center;
   gap: 10px;
   margin-top: auto;
-  padding: 10px 12px;
+  padding: 12px;
   border: 0;
   border-radius: 14px;
   background: var(--raised);
@@ -939,7 +939,7 @@ a.wiki-embed:hover {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 10px 12px;
+  padding: 12px;
   border-radius: 14px;
   background: var(--raised);
   box-shadow: var(--e1), var(--top);

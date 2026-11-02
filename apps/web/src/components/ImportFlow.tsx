@@ -48,10 +48,8 @@ import { useOrg } from "@/components/org-context";
 import {
   type AgentFile,
   EXPORT_PROMPT,
-  groupLeftOut,
   IMPORT_ACCEPT,
   type ImportFile,
-  type LeftOutKind,
   type PickedFile,
   parsePackage,
   readImportFiles,
@@ -84,6 +82,7 @@ import {
   picksOf,
   type RequestCard,
   retryable,
+  todoLine,
 } from "@/lib/import-flow";
 import { hasFiles } from "@/lib/obsidian";
 import { useTheme } from "@/lib/theme";
@@ -96,24 +95,6 @@ const KIND_ICON: Record<ImportItemKind, IconName> = {
   channel: "channel",
   routine: "routines",
   note: "book",
-};
-const LEFT_OUT_ICON: Record<LeftOutKind, IconName> = {
-  skill: "bulb",
-  routine: "routines",
-  notes: "book",
-  connection: "plug",
-  messaging: "message",
-  plugin: "bolt",
-  remote: "cloud",
-  model: "settings",
-  task: "issues",
-  team: "members",
-  preset: "agent",
-  picture: "image",
-  secret: "lock",
-  redacted: "lock",
-  file: "file",
-  other: "more",
 };
 const TODO_ICON: Record<BundleTodo["kind"], IconName> = {
   connection: "plug",
@@ -166,7 +147,6 @@ export function useImportFlow(orgId: string | null) {
     files: AgentFile[];
   } | null>(null);
   const [pick, setPick] = useState<Set<string>>(new Set());
-  const [skillsOn, setSkillsOn] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [report, setReport] = useState<ImportItemResult[] | null>(null);
   // "Copiar os arquivos para o Drive", on until turned off; then the copy, which runs after the import.
@@ -238,7 +218,6 @@ export function useImportFlow(orgId: string | null) {
       focus.current = "preview";
       setPlanned({ bundle, items: plan.items, skipped, files: parsed.files });
       setPick(new Set(plan.items.filter(choosable).map(itemId)));
-      setSkillsOn(new Set());
       setReport(null);
       setCopyFiles(parsed.files.filter((f) => !f.skip).length <= MANY_FILES);
       setCopy(null);
@@ -299,13 +278,12 @@ export function useImportFlow(orgId: string | null) {
     if (!orgId || !planned) return [];
     const ids = picksOf(planned.items, pick, blockedItems(planned.bundle, planned.items, pick));
     if (ids.length === 0) return [];
-    const enableSkills = [...skillsOn].filter((id) => pick.has(id));
     setProgress({ done: 0, total: ids.length });
     try {
       const items = await applyInChunks(
         api,
         orgId,
-        { bundle: prepare ? prepare(planned.bundle) : planned.bundle, pick: ids, enableSkills },
+        { bundle: prepare ? prepare(planned.bundle) : planned.bundle, pick: ids },
         done.current,
         (n) => setProgress({ done: n, total: ids.length }),
       );
@@ -342,7 +320,6 @@ export function useImportFlow(orgId: string | null) {
     failure,
     planned,
     pick,
-    skillsOn,
     progress,
     report,
     touched,
@@ -358,7 +335,6 @@ export function useImportFlow(orgId: string | null) {
     },
     apply,
     toggle: (ids: string[], on: boolean) => toggle(ids, on),
-    toggleSkill: (id: string, on: boolean) => toggle([id], on, setSkillsOn),
     copyFiles,
     setCopyFiles,
     copy,
@@ -738,7 +714,6 @@ function Preview({
   const applying = flow.progress !== null;
   const picks = picksOf(items, flow.pick, blocked);
   const summary = kindsLine(t, (kind) => items.filter((i) => i.kind === kind && i.action !== "skip").length);
-  const left = groupLeftOut(bundle.leftOut);
   const sub = (level + 1) as 3 | 4;
 
   return (
@@ -774,32 +749,14 @@ function Preview({
         <FilesGroup flow={flow} index={index} level={sub} />
       </fieldset>
 
-      {bundle.todo.length > 0 && (
-        <Todos todo={bundle.todo} nameOf={index.nameOf} level={sub} orgId={orgId} newTab linked={standalone} />
-      )}
-
-      {(left.length > 0 || skipped.length > 0) && (
-        <section className="imp-block" aria-labelledby="imp-left-title">
-          <Heading level={sub} id="imp-left-title" className="imp-block__title">
-            {t("onboarding.import.leftOutTitle")}
-          </Heading>
-          <ul className="imp-left">
-            {left.map((g) => (
-              <li key={g.kind}>
-                <Chip icon={LEFT_OUT_ICON[g.kind]}>{t(`onboarding.import.leftOut.${g.kind}`)}</Chip>
-                <span className="small">{g.labels.join(", ")}</span>
-              </li>
-            ))}
-            {skipped.length > 0 && (
-              <li>
-                <Chip icon="file">{t("onboarding.import.linkSkipped", { count: skipped.length })}</Chip>
-                <span className="small">
-                  {skipped.join(", ")} · {t("onboarding.import.linkSkippedHelp")}
-                </span>
-              </li>
-            )}
-          </ul>
-        </section>
+      {skipped.length > 0 && (
+        <p className="imp-note ac-iconline">
+          <Icon name="file" size={16} />
+          <span>
+            {t("onboarding.import.linkSkipped", { count: skipped.length })}: {skipped.join(", ")} ·{" "}
+            {t("onboarding.import.linkSkippedHelp")}
+          </span>
+        </p>
       )}
       <p className="imp-note ac-iconline">
         <Icon name="lock" size={16} />
@@ -891,10 +848,6 @@ function Group({
           {title}
         </Heading>
         <CountChip size="sm">{rows.length}</CountChip>
-        {/* Only what changes what happens after the import: skills arrive off, routines paused. */}
-        {(kind === "skill" || kind === "routine") && (
-          <span className="imp-group__help">{t(`onboarding.import.groupHelp.${kind}`)}</span>
-        )}
       </div>
       <ul className="imp-rows">
         {(open ? rows : rows.slice(0, SHOWN)).map((item, i) => (
@@ -925,8 +878,8 @@ function Group({
 
 /**
  * The agents' own files (OpenBot.run's `files/`, an OpenClaw workspace): the choice to copy them to the Drive, on
- * unless turned off; where each agent's go, how many and how big; what stays behind and why (keys and sign-ins are
- * in "O que não vem junto").
+ * unless turned off; where each agent's go, how many and how big; what stays behind and why (keys and sign-ins never
+ * come, as the preview's lock line says).
  */
 function FilesGroup({ flow, index, level }: { flow: ImportFlowState; index: Index; level: 3 | 4 }) {
   const { t, i18n } = useTranslation();
@@ -1009,20 +962,21 @@ function FilesLeft({ left }: { left: FilesCopy["left"] }) {
   );
 }
 
-/** The chip of a row: what the import does with it. */
+/** The chip of a row: what the import does with it, when that's worth saying. */
 function statusOf(
   item: ImportItemResult,
   reason: ImportSkipReason | undefined,
 ): {
   icon: IconName;
   tone?: ChipTone;
-  key: "create" | "update" | "unchanged" | "skip" | "join";
-} {
+  key: "update" | "unchanged" | "skip" | "join";
+} | null {
   if (item.action === "skip" || reason) return { icon: "block", key: "skip" };
   if (item.action === "update" && item.reason === "exists") return { icon: "link", key: "join" };
   if (item.action === "update") return { icon: "refresh", key: "update" };
   if (item.action === "unchanged") return { icon: "check", tone: "done", key: "unchanged" };
-  return { icon: "plus", key: "create" };
+  // A new item says nothing: it's what every row would say.
+  return null;
 }
 
 function Row({
@@ -1049,7 +1003,6 @@ function Row({
   let title = item.label;
   let lead: ReactNode = <Icon name={KIND_ICON[item.kind]} size={16} />;
   const lines: string[] = [];
-  let extra: ReactNode = null;
   if (item.kind === "agent") {
     const a = index.agents.get(item.key);
     if (a) {
@@ -1064,22 +1017,6 @@ function Row({
     const s = index.skills.get(item.key);
     const about = s ? frontmatter(s.markdown)?.data.description : undefined;
     if (typeof about === "string" && about.trim()) lines.push(about.trim());
-    // Only agents this import creates or changes get it turned on (one already here gets it on its own page).
-    const users = [...index.agents.values()].filter((a) => a.skills.includes(item.key) && index.picked("agent", a.key));
-    if (checked && users.length > 0) {
-      extra = (
-        <span className="imp-row__switch">
-          <Switch
-            id={`${rowId}-on`}
-            checked={flow.skillsOn.has(id)}
-            onCheckedChange={(on) => flow.toggleSkill(id, on)}
-          />
-          <label htmlFor={`${rowId}-on`}>
-            {t("onboarding.import.skillOn", { names: names(users.map((a) => a.name)) })}
-          </label>
-        </span>
-      );
-    } else if (pickable && users.length === 0) lines.push(t("onboarding.import.noUsers"));
   } else if (item.kind === "channel") {
     const c = index.channels.get(item.key);
     title = `#${item.label}`;
@@ -1149,7 +1086,7 @@ function Row({
           checked={checked}
           onCheckedChange={(on) => flow.toggle([id], on)}
           aria-label={t("onboarding.import.bring", { name: item.label })}
-          aria-describedby={`${rowId}-about ${rowId}-status`}
+          aria-describedby={status ? `${rowId}-about ${rowId}-status` : `${rowId}-about`}
         />
       ) : (
         <span className="imp-row__mark" aria-hidden="true">
@@ -1166,37 +1103,31 @@ function Row({
       ) : (
         <span className="imp-row__text">{text}</span>
       )}
-      {extra}
-      <Chip id={`${rowId}-status`} icon={status.icon} tone={status.tone} className="imp-row__chip">
-        {t(`onboarding.import.status.${status.key}`)}
-      </Chip>
+      {status && (
+        <Chip id={`${rowId}-status`} icon={status.icon} tone={status.tone} className="imp-row__chip">
+          {t(`onboarding.import.status.${status.key}`)}
+        </Chip>
+      )}
     </li>
   );
 }
 
 /** Where a to-do is done: Conectores, the team or the Drive. A secret has no page: the agent asks for it in the chat. */
-function TodoLink({ kind, orgId, newTab }: { kind: BundleTodo["kind"]; orgId: string; newTab: boolean }) {
+function TodoLink({ kind, orgId }: { kind: BundleTodo["kind"]; orgId: string }) {
   const { t } = useTranslation();
   if (kind === "secret") return null;
-  // Before the import is applied, the page opens in another tab: the plan stays here.
-  const target = newTab ? { target: "_blank", rel: "noopener" } : {};
-  const body = (
-    <>
-      {t(`onboarding.import.todoOpen.${kind}`)}
-      {newTab && <Icon name="external" size={14} />}
-    </>
-  );
+  const label = t(`onboarding.import.needDo.${kind}`);
   if (kind === "model") {
     return (
-      <Link to="/org/$orgId/team" params={{ orgId }} className="ac-link imp-todo__link" {...target}>
-        {body}
+      <Link to="/org/$orgId/team" params={{ orgId }} className="ac-link imp-todo__link">
+        {label}
       </Link>
     );
   }
   if (kind === "file") {
     return (
-      <Link to="/org/$orgId/drive" params={{ orgId }} className="ac-link imp-todo__link" {...target}>
-        {body}
+      <Link to="/org/$orgId/drive" params={{ orgId }} className="ac-link imp-todo__link">
+        {label}
       </Link>
     );
   }
@@ -1205,53 +1136,36 @@ function TodoLink({ kind, orgId, newTab }: { kind: BundleTodo["kind"]; orgId: st
       to="/org/$orgId/settings/$section"
       params={{ orgId, section: "connectors" }}
       className="ac-link imp-todo__link"
-      {...target}
     >
-      {body}
+      {label}
     </Link>
   );
 }
 
-/** "Depois de importar": what the person sets up by hand (connect an app, choose a model…), with where. */
+/** What the person sets up by hand, one line each: "Ada usa o HubSpot. Conectar". */
 function Todos({
   todo,
   nameOf,
-  level,
   orgId,
-  newTab = false,
-  linked = true,
+  linked,
 }: {
   todo: BundleTodo[];
   nameOf: (key: string) => string;
-  level: 3 | 4;
   orgId: string;
-  newTab?: boolean;
   /** Where each one is done, as a link. */
-  linked?: boolean;
+  linked: boolean;
 }) {
   const { t } = useTranslation();
   return (
-    <section className="imp-block" aria-labelledby="imp-todo-title">
-      <Heading level={level} id="imp-todo-title" className="imp-block__title">
-        {t("onboarding.import.todoTitle")}
-      </Heading>
-      <ul className="imp-todo">
-        {todo.map((x) => (
-          <li key={`${x.kind}:${x.label}`} className="ac-iconline">
-            <Icon name={TODO_ICON[x.kind]} size={16} />
-            <span className="imp-todo__text">
-              <span>{t(`onboarding.import.todo.${x.kind}`, { label: x.label })}</span>
-              {x.agents.length > 0 && (
-                <span className="imp-todo__for">
-                  {t("onboarding.import.todoFor", { names: joinNames(x.agents.map(nameOf), t("newAgent.and")) })}
-                </span>
-              )}
-            </span>
-            {linked && <TodoLink kind={x.kind} orgId={orgId} newTab={newTab} />}
-          </li>
-        ))}
-      </ul>
-    </section>
+    <ul className="imp-todo" aria-label={t("onboarding.import.needLabel")}>
+      {todo.map((x) => (
+        <li key={`${x.kind}:${x.label}`} className="ac-iconline">
+          <Icon name={TODO_ICON[x.kind]} size={16} />
+          <span className="imp-todo__text">{todoLine(t, x, nameOf)}</span>
+          {linked && <TodoLink kind={x.kind} orgId={orgId} />}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -1291,6 +1205,7 @@ export function ImportReport({
   const kept = [...(flow.planned?.items ?? []).filter((i) => !sent.has(itemId(i))), ...report].filter(
     (i) => i.action === "unchanged",
   ).length;
+  const capped = made.filter((i) => i.reason === "too_many_routines").length;
   const agentId = new Map(report.filter((i) => i.kind === "agent" && i.targetId).map((i) => [i.key, i.targetId]));
   const sub = (level + 1) as 3 | 4;
 
@@ -1385,8 +1300,6 @@ export function ImportReport({
               </span>
               <span className="imp-made__text">
                 <b>{t(`onboarding.import.report.kinds.${kind}`, { count: list.length })}</b>
-                {kind === "routine" && <span className="muted">{t("onboarding.import.report.paused")}</span>}
-                {kind === "skill" && <span className="muted">{t("onboarding.import.report.skillsOff")}</span>}
                 <span className="imp-made__links">{links(kind, list)}</span>
               </span>
             </li>
@@ -1436,6 +1349,7 @@ export function ImportReport({
         )}
       </ul>
       {kept > 0 && <p className="small muted">{t("onboarding.import.report.kept", { count: kept })}</p>}
+      {capped > 0 && <p className="small muted">{t("onboarding.import.report.capped", { count: capped })}</p>}
 
       {copy?.result && copy.result.left.length > 0 && (
         <section className="imp-block" aria-labelledby="imp-files-left-title">
@@ -1478,9 +1392,7 @@ export function ImportReport({
         </section>
       )}
 
-      {bundle.todo.length > 0 && (
-        <Todos todo={bundle.todo} nameOf={index.nameOf} level={sub} orgId={orgId} linked={linked} />
-      )}
+      {bundle.todo.length > 0 && <Todos todo={bundle.todo} nameOf={index.nameOf} orgId={orgId} linked={linked} />}
 
       {onAnother && (
         <div>

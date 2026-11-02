@@ -25,6 +25,8 @@ export interface AgentBrowserView {
   /** The runner's own words when it isn't ready ("Chrome's libraries are missing…"). */
   detail: string | null;
   machine: { id: string; name: string } | null;
+  /** Its default browser: a shared profile it may use (ADR 0110); null = its own. */
+  profileId: string | null;
 }
 
 /** The agent's browser settings and whether its computer can serve the browser (every member may look). */
@@ -46,6 +48,7 @@ export async function getAgentBrowser(
     reason: status.available ? null : status.code,
     detail: status.available ? null : status.detail,
     machine,
+    profileId: agent.browserProfileId ?? null,
   };
 }
 

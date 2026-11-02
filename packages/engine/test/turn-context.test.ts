@@ -174,7 +174,7 @@ describe("notices", () => {
 });
 
 describe("the prompt's rules", () => {
-  test("the honesty line, another way before giving up, and what comes of ask_agent and tell_agent", async () => {
+  test("the honesty line, another way before giving up (ADR 0109), and what comes of ask_agent and tell_agent", async () => {
     f = await setup();
     const infra = await addAgent("Infra", "infra");
     await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { agentId: infra.id });
@@ -186,10 +186,13 @@ describe("the prompt's rules", () => {
     const ctx = await buildRunContext(f.db, run, f.agent, { maxMessages: 30, toolsAvailable: true });
     const text = systemText(ctx.system);
     expect(text).toContain(
-      "When a way is closed (no access, a refusal, nothing found), take another that still gets the people what they need: another tool, the colleague whose role covers it, a document or a copy instead of a move.",
+      "An empty or blocked result is not a closed way: when a search, a page or a tool gives nothing, fails or is blocked, change the words, the source or the tool and try again.",
     );
     expect(text).toContain(
-      "Only when none works, say so plainly: what you tried, who has the access (a person or another agent here) and the one thing a person must do. Never say you haven't looked yet",
+      "Before saying you can't or don't have a tool, check your means (listed under Your means): your tools and find_tools, your computer, browser and terminal, and the teammates whose role covers it.",
+    );
+    expect(text).toContain(
+      "A real blocker is only something a person must give: a code, a sign-in, a payment, a permission, a decision. Only then stop, and say in one line what you tried and the one thing a person must do.",
     );
     expect(text).toContain(
       "ask it yourself (ask_agent) when you need its answer, or hand it work or news (tell_agent): what comes of either reaches you here by itself.",
@@ -478,10 +481,10 @@ describe("a routine's background run", () => {
     const { ctx, text } = await routineRun();
     expect(text).toContain("# This is a routine run\nYour routine «Vigiar e-mails» started this run");
     expect(text).toContain("Its instructions, set up by ana:\nLeia a caixa de suporte e conte o que é novo.");
-    // A read-only run is told why: its creator set it to only look and tell.
-    expect(text).toContain(
-      "What it may do: look and tell. ana set this routine to only look and tell, so this run is read-only",
-    );
+    // Every routine does what its agent can (ADR 0109), the web included.
+    expect(text).toContain("What it may do: what you can do in any other run.");
+    expect(text).toContain("The web is yours to read (search, open pages, your browser) like anywhere else.");
+    expect(text).not.toContain("look and tell");
     expect(text).toContain("When it speaks: only when there is news.");
     expect(text).toContain("Do not manage routines from a routine run");
     // Its last record and its event: outside content, in the envelope, markers neutralised.
@@ -513,7 +516,7 @@ describe("a routine's background run", () => {
   test("access act and report always say what they allow; a late run says how late and since when", async () => {
     f = await setup();
     const { text } = await routineRun({ access: "act", report: "always", lateMinutes: 310 });
-    expect(text).toContain("What it may do: look and act.");
+    expect(text).toContain("What it may do: what you can do in any other run.");
     expect(text).toContain("agentes/dev/");
     expect(text).toContain("Any change in a connected app asks a person first: an approval card in #general");
     expect(text).toContain("When it speaks: every run.");

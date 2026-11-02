@@ -12,14 +12,7 @@ import { nextCronTime, zonedParts } from "./cron";
 import { sha256 } from "./crypto";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import { can, requirePermission } from "./organizations";
-import {
-  createRoutine,
-  type RoutineDeps,
-  type RoutineTriggerInput,
-  routineTimezone,
-  setRoutineActive,
-  updateRoutine,
-} from "./routines";
+import { createRoutine, type RoutineDeps, type RoutineTriggerInput, routineTimezone, updateRoutine } from "./routines";
 import { localDate, nextOccurrence, normalizeRule, type ScheduleRule } from "./rrule";
 import { type ParsedSkill, parseSkillMarkdown, saveSkill, setAgentSkills } from "./skills";
 import { canonicalJson } from "./tools/json-schema";
@@ -106,7 +99,9 @@ export type ImportSkipReason =
   | "agent_not_picked"
   | "channel_not_picked"
   | "invalid"
-  | "failed";
+  | "failed"
+  /** A note on a created routine: its agent already had the most active routines, so it arrived paused. */
+  | "too_many_routines";
 
 export interface ImportItemResult {
   kind: ImportItemKind;
@@ -125,8 +120,6 @@ export interface ImportInput {
   dryRun: boolean;
   /** `kind:key` of the items to apply; default every item. Items left out aren't in the result. */
   pick?: string[];
-  /** `skill:key` of the skills to turn on for the agents that had them. */
-  enableSkills?: string[];
 }
 
 export interface ImportPlan {
@@ -248,7 +241,7 @@ function lookOf(input: BundleAgent["appearance"] | undefined, trimmed: string[])
 
 /**
  * A bundle rule as ours, nulls dropped. The picker's `once` becomes a
- * one-time rule: a paused one-off has no next run once turned on, a rule does.
+ * one-time rule (daily, count 1), which the schedule runs once.
  */
 function asRule(input: BundleRule): ScheduleRule {
   const rule = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== null)) as unknown as ScheduleRule;
@@ -653,7 +646,7 @@ function failure(error: unknown): ImportSkipReason {
  * Plans the bundle (`dryRun`: only that, nothing is written) or applies the
  * picked items through the usual create functions, in dependency order:
  * skills, agents (look, skills turned on), channels (agents and auto-reply),
- * routines (always paused), notes. Each item stands alone (a failure is
+ * routines (active, like one made by hand), notes. Each item stands alone (a failure is
  * reported and the rest goes on) and leaves a provenance row as soon as it
  * exists, so running it again picks up where it stopped. One audit entry,
  * `import.applied`. Admins only (`manage_agents`); never brings chat history.
@@ -743,7 +736,7 @@ export async function applyImport(
           source: "upload",
           ...(create ? { defaultForNewAgents: false } : {}),
         });
-        // A skill deleted here comes back with its agents' old assignments: as an import it lands off for all.
+        // A skill deleted here comes back with its agents' old assignments: only the agents that bring it get it on.
         if (create) {
           await db.update(schema.agentSkills).set({ enabled: false }).where(eq(schema.agentSkills.skillId, saved.id));
         }
@@ -790,10 +783,10 @@ export async function applyImport(
           await remember(item, item.targetId);
           return;
         }
-        // Created and paused in one transaction: an imported prompt never runs on a schedule by itself.
-        const routine = await db.transaction(async (tx) => {
-          const created = await createRoutine({ db: tx, pubsub }, actorId, orgId, fields);
-          return setRoutineActive({ db: tx, pubsub }, actorId, orgId, created.id, false);
+        const routine = await createRoutine(routineDeps, actorId, orgId, fields).catch((error) => {
+          if (!(error instanceof ValidationError && error.code === "routine.too_many")) throw error;
+          item.reason = "too_many_routines";
+          return createRoutine(routineDeps, actorId, orgId, { ...fields, paused: true });
         });
         await remember(item, routine.id);
         return;
@@ -828,14 +821,17 @@ export async function applyImport(
     }
   }
 
-  // Imported skills land off; only those the person turned on go on, for the agents that had them.
-  const enable = new Set(input.enableSkills ?? []);
+  // Imported skills arrive on for the agents that had them, only where the agent or the skill is new: a pair that
+  // came in an earlier import stays as the person left it.
+  const createdSkills = new Set(
+    plan.items.filter((i) => i.kind === "skill" && i.action === "create").map((i) => i.key),
+  );
   const wanted = new Map<string, string[]>();
   for (const item of plan.items) {
     if (item.work?.kind !== "agent" || item.action === "skip") continue;
     const agentId = ids.agent.get(item.key);
     const skillIds = item.work.skills.flatMap((key) => {
-      const id = enable.has(`skill:${key}`) ? ids.skill.get(key) : undefined;
+      const id = item.action === "create" || createdSkills.has(key) ? ids.skill.get(key) : undefined;
       return id ? [id] : [];
     });
     if (agentId && skillIds.length > 0) wanted.set(agentId, skillIds);

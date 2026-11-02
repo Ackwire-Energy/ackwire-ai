@@ -1,6 +1,6 @@
 {
   "id": "56f68492-c987-493d-a399-3bc84b8eae60",
-  "prevId": "59c60961-d6ab-4c6f-9475-a91dedc4507f",
+  "prevId": "6ae3543b-5234-44ba-acd9-6c8bb45d3c1a",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -245,6 +245,12 @@
         },
         "browser_machine_id": {
           "name": "browser_machine_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "browser_profile_id": {
+          "name": "browser_profile_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -12075,6 +12081,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "browser_profile_id": {
+          "name": "browser_profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "browser_profile_own": {
+          "name": "browser_profile_own",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "browser_profile_turn_at": {
+          "name": "browser_profile_turn_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "heartbeat_at": {
           "name": "heartbeat_at",
           "type": "timestamp with time zone",
@@ -20130,6 +20154,312 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.browser_profile_grants": {
+      "name": "browser_profile_grants",
+      "schema": "",
+      "columns": {
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agent_id": {
+          "name": "agent_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "granted_by": {
+          "name": "granted_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "browser_profile_grants_agent_id_index": {
+          "name": "browser_profile_grants_agent_id_index",
+          "columns": [
+            {
+              "expression": "agent_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "browser_profile_grants_org_id_organizations_id_fk": {
+          "name": "browser_profile_grants_org_id_organizations_id_fk",
+          "tableFrom": "browser_profile_grants",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "org_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "browser_profile_grants_granted_by_users_id_fk": {
+          "name": "browser_profile_grants_granted_by_users_id_fk",
+          "tableFrom": "browser_profile_grants",
+          "tableTo": "users",
+          "columnsFrom": [
+            "granted_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "browser_profile_grants_org_id_profile_id_browser_profiles_org_id_id_fk": {
+          "name": "browser_profile_grants_org_id_profile_id_browser_profiles_org_id_id_fk",
+          "tableFrom": "browser_profile_grants",
+          "tableTo": "browser_profiles",
+          "columnsFrom": [
+            "org_id",
+            "profile_id"
+          ],
+          "columnsTo": [
+            "org_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "browser_profile_grants_org_id_agent_id_agents_org_id_id_fk": {
+          "name": "browser_profile_grants_org_id_agent_id_agents_org_id_id_fk",
+          "tableFrom": "browser_profile_grants",
+          "tableTo": "agents",
+          "columnsFrom": [
+            "org_id",
+            "agent_id"
+          ],
+          "columnsTo": [
+            "org_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "browser_profile_grants_profile_id_agent_id_pk": {
+          "name": "browser_profile_grants_profile_id_agent_id_pk",
+          "columns": [
+            "profile_id",
+            "agent_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.browser_profiles": {
+      "name": "browser_profiles",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "org_id": {
+          "name": "org_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "machine_id": {
+          "name": "machine_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "held_by_run_id": {
+          "name": "held_by_run_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "held_by_agent_id": {
+          "name": "held_by_agent_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "held_by_user_id": {
+          "name": "held_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "held_until": {
+          "name": "held_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "held_since": {
+          "name": "held_since",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_used_at": {
+          "name": "last_used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "browser_profiles_name": {
+          "name": "browser_profiles_name",
+          "columns": [
+            {
+              "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lower(\"name\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"browser_profiles\".\"deleted_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "browser_profiles_held_by_run_id_index": {
+          "name": "browser_profiles_held_by_run_id_index",
+          "columns": [
+            {
+              "expression": "held_by_run_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "browser_profiles_org_id_organizations_id_fk": {
+          "name": "browser_profiles_org_id_organizations_id_fk",
+          "tableFrom": "browser_profiles",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "org_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "browser_profiles_created_by_users_id_fk": {
+          "name": "browser_profiles_created_by_users_id_fk",
+          "tableFrom": "browser_profiles",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "browser_profiles_org_id_machine_id_machines_org_id_id_fk": {
+          "name": "browser_profiles_org_id_machine_id_machines_org_id_id_fk",
+          "tableFrom": "browser_profiles",
+          "tableTo": "machines",
+          "columnsFrom": [
+            "org_id",
+            "machine_id"
+          ],
+          "columnsTo": [
+            "org_id",
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "browser_profiles_orgId_id_unique": {
+          "name": "browser_profiles_orgId_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "org_id",
+            "id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

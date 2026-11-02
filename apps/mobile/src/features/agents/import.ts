@@ -1,4 +1,10 @@
-import type { ImportItemKind, ImportItemResult, ImportSkipReason, MigrationBundle } from "@agenteschat/client";
+import type {
+  BundleTodo,
+  ImportItemKind,
+  ImportItemResult,
+  ImportSkipReason,
+  MigrationBundle,
+} from "@agenteschat/client";
 import {
   choosable,
   IMPORT_KINDS,
@@ -7,6 +13,7 @@ import {
   type RequestCard,
 } from "@agenteschat/client/lib/import/flow";
 import { ARCHIVE_PATH, IMPORT_MAX_BYTES, isSecretPath, TEXT_PATH } from "@agenteschat/client/lib/import/shared";
+import { isIdHandle } from "@agenteschat/tokens/names";
 
 /**
  * Bringing agents from another app on the phone, the pure part: which picked files are read, the preview's rows
@@ -17,6 +24,9 @@ import { ARCHIVE_PATH, IMPORT_MAX_BYTES, isSecretPath, TEXT_PATH } from "@agente
 /** The cards whose app answers the export request (pasted back), not a file. */
 export const isRequestCard = (card: ImportCard | null): card is RequestCard =>
   card === "grok-bot" || card === "chatgpt-dots" || card === "other";
+
+/** Whether "Choose files" applies: not for Grok Bot, which only answers in chat (ChatGPT dots hands back a file). */
+export const takesFiles = (card: ImportCard | null) => card !== "grok-bot";
 
 /** A file from the system picker. */
 export interface PickedAsset {
@@ -42,8 +52,10 @@ export interface AgentRow {
   id: string;
   name: string;
   role: string;
-  /** The @ it gets here (another when the bundle's is taken). */
-  handle: string;
+  /** The @ it gets here (another when the bundle's is taken); null for an id another app gave it, not yet renamed. */
+  handle: string | null;
+  /** The bundle's @ when it was taken here and the agent gets `handle` instead. */
+  wanted: string | null;
   appearance: MigrationBundle["agents"][number]["appearance"];
   status: RowStatus;
   /** Why it doesn't come, or a note on a create (its model isn't here). */
@@ -68,11 +80,13 @@ export function agentRows(
       const agent = byKey.get(item.key);
       const id = itemId(item);
       const free = choosable(item) && !blocked.has(id);
+      const own = agent?.handle ?? item.key;
       return {
         id,
         name: agent?.name ?? item.label,
         role: agent?.role ?? "",
-        handle: item.renamedTo ?? agent?.handle ?? item.key,
+        handle: item.renamedTo ?? (isIdHandle(own) ? null : own),
+        wanted: item.renamedTo && !isIdHandle(own) ? own : null,
         appearance: agent?.appearance ?? {},
         status: item.action,
         reason: item.reason ?? blocked.get(id) ?? null,
@@ -151,6 +165,11 @@ export const phoneOffline = (e: unknown) => e instanceof TypeError;
 
 /** What the apply brought against what was asked: everything arrived, or how much did. */
 export function reportCounts(report: readonly ImportItemResult[], asked: number) {
-  const done = report.filter((i) => i.action === "create" || i.action === "update").length;
-  return { done, total: asked, partial: done < asked };
+  const made = report.filter((i) => i.action === "create" || i.action === "update");
+  const capped = made.filter((i) => i.reason === "too_many_routines").length;
+  return { done: made.length, total: asked, partial: made.length < asked, capped };
 }
+
+/** Where a to-do's action opens on the phone: Conectores or the Drive. A key is asked in the chat; a model has no page. */
+export const todoHref = (kind: BundleTodo["kind"]): "/connectors" | "/drive" | null =>
+  kind === "connection" || kind === "app" ? "/connectors" : kind === "file" ? "/drive" : null;

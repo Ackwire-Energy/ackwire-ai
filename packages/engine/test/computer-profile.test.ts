@@ -1,22 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
-import {
-  computerProfile,
-  computerTurnProfile,
-  createAgentRuns,
-  insertMessage,
-  type RoutineBrief,
-  runAuthority,
-  runPermissionPrompt,
-} from "../src";
+import { createAgentRuns, insertMessage, runAuthority, runPermissionPrompt } from "../src";
 import { type BrainTurnRequest, CodexBrain, type ComputerBrainLink } from "../src/brains/codex";
 import type { BrainEvent, BrainTurn } from "../src/brains/types";
 import { type Fixture, setup } from "./fixtures";
 
 /**
- * ADR 0053 §3: a computer turn's permission profile follows who is behind its
- * run, on Claude Code and Codex alike; Codex never runs on a runner too old
- * to keep it within that profile.
+ * ADR 0053 §3 and 0109: every run but a mission's before Start works (`work`), whoever woke it; a mission's
+ * plan turn keeps its profile on Codex, which never runs on a runner too old to keep it.
  */
 
 let f: Fixture;
@@ -46,85 +37,19 @@ const runFor = async (messageId: string, options: { background?: boolean } = {})
   if (!run) throw new Error("no run");
   return run;
 };
-const brief = (access: "read" | "act"): RoutineBrief => ({
-  routineId: crypto.randomUUID(),
-  routineRunId: crypto.randomUUID(),
-  name: "Revisar PRs",
-  creatorUserId: f.owner.id,
-  deliverTo: { channelId: f.general.id, threadId: null },
-  access,
-  report: "when_new",
-  trigger: "schedule",
-  dueAt: new Date().toISOString(),
-});
-const profileOf = (runId: string) => computerTurnProfile(f.db, { orgId: f.org.id, runId });
-
-describe("the profile follows who is behind the run", () => {
-  test("rules: only a routine set to only look and tell reads; every other run works, whoever woke it", () => {
-    expect(computerProfile({ kind: "person", personId: "p" })).toBe("work");
-    expect(computerProfile({ kind: "routine", personId: null, brief: { ...briefShape, access: "act" } })).toBe("work");
-    expect(computerProfile({ kind: "routine", personId: null, brief: { ...briefShape, access: "read" } })).toBe("plan");
-    // A routine whose brief is missing (an older firing) only reads.
-    expect(computerProfile({ kind: "routine", personId: null, brief: null })).toBe("plan");
-    // Nobody behind it (an agent's own message): it works as the agent itself.
-    expect(computerProfile({ kind: "unattended", personId: null, reason: "agent" })).toBe("work");
-    // Woken by a routine's report or work: within that routine's access (only reading when unknown).
-    for (const reason of ["routine_report", "routine"] as const) {
-      expect(
-        computerProfile({ kind: "unattended", personId: null, reason, brief: { ...briefShape, access: "act" } }),
-      ).toBe("work");
-      expect(
-        computerProfile({ kind: "unattended", personId: null, reason, brief: { ...briefShape, access: "read" } }),
-      ).toBe("plan");
-      expect(computerProfile({ kind: "unattended", personId: null, reason })).toBe("plan");
-    }
-  });
-
-  test("a routine that reads gets plan, one that acts gets work, a person's run work", async () => {
-    f = await setup();
-    const read = await message("person", "Confira a INBOX", { routineBrief: brief("read"), background: true });
-    const readRun = await runFor(read.id, { background: true });
-    expect(await profileOf(readRun.id)).toBe("plan");
-
-    const act = await message("person", "Faça as issues", { routineBrief: brief("act"), background: true });
-    const actRun = await runFor(act.id, { background: true });
-    expect(await profileOf(actRun.id)).toBe("work");
-
-    const ask = await message("person", "@dev olha os PRs");
-    const personRun = await runFor(ask.id);
-    expect(await profileOf(personRun.id)).toBe("work");
-  });
-
-  test("a run a routine's report woke works as that routine may; a person who writes into it is behind it from then on", async () => {
+describe("who is behind the run", () => {
+  test("a person who writes into a run a routine's report woke is behind it from then on", async () => {
     f = await setup();
     const report = await message("agent", "Erro novo no checkout", {
       notice: { kind: "routine_handoff", text: "Erro novo no checkout", from: "Routine «Sentry»", refs: {} },
     });
     const woken = await runFor(report.id);
-    // No routine run named: what it read may be anyone's, so it only reads.
-    expect(await profileOf(woken.id)).toBe("plan");
-    await f.db
-      .update(schema.agentRuns)
-      .set({ transcript: { ...(woken.transcript as Record<string, unknown>), steeredBy: f.owner.id } as never })
-      .where(eq(schema.agentRuns.id, woken.id));
-    expect(await profileOf(woken.id)).toBe("work");
+    expect((await runAuthority(f.db, woken)).kind).toBe("unattended");
     expect(await runAuthority(f.db, { ...woken, transcript: { steeredBy: f.owner.id } })).toMatchObject({
       kind: "person",
     });
   });
 });
-
-const briefShape: RoutineBrief = {
-  routineId: "r",
-  routineRunId: "rr",
-  name: "x",
-  creatorUserId: null,
-  deliverTo: { channelId: "c", threadId: null },
-  access: "read",
-  report: "when_new",
-  trigger: "schedule",
-  dueAt: "",
-};
 
 // ── Codex: the profile goes with the turn, never to a runner that can't keep it ──
 

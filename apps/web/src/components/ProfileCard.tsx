@@ -11,7 +11,7 @@ import { timezoneName } from "@agenteschat/client/lib/routines";
 import { Avatar, Button, Meter, PlanMeter, Popover, ProviderLogo, useHoverCard } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
-import type { ReactNode } from "react";
+import { type ReactNode, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOpenAgentPanel } from "@/components/agent-panel-context";
@@ -20,7 +20,9 @@ import { NoAiChip } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { type AgentShown, agentLine, personLine, useAgentPresence, usePersonPresence } from "@/hooks/usePresence";
+import { entityMenu } from "@/lib/entity-menu";
 import { planMeterText, usageShown } from "@/lib/plan-usage";
+import { useAgentMenu, usePersonMenu } from "./entity-menus";
 
 /** Hover delay before the card opens (mouse and pen only; touch opens on tap). */
 export const HOVER_OPEN_MS = 400;
@@ -47,6 +49,19 @@ export function ProfileTrigger({
   const { t } = useTranslation();
   // Hover leaves the focus where it is (the box someone types in), a press or a key brings it in.
   const card = useHoverCard(HOVER_OPEN_MS);
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const agentEntries = useAgentMenu();
+  const personEntries = usePersonMenu();
+  const button = useRef<HTMLButtonElement>(null);
+  const menu = entityMenu(() => {
+    if (actor.type === "agent") {
+      const agent = dir.agentById.get(actor.id);
+      return agent ? agentEntries(agent) : [];
+    }
+    const member = dir.memberById.get(actor.id);
+    return member ? personEntries(member, () => button.current?.click()) : [];
+  });
   return (
     <Popover
       hover={card}
@@ -55,7 +70,9 @@ export function ProfileTrigger({
       className="profile-card"
       trigger={
         <button
+          ref={button}
           type="button"
+          {...menu}
           className={className ? `profile-trigger ${className}` : "profile-trigger"}
           aria-label={label}
           aria-haspopup="dialog"

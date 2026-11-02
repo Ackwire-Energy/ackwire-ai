@@ -73,7 +73,7 @@ const child = spawn(
 const t0 = Date.now();
 const log = (...parts: unknown[]) => console.log(String(Date.now() - t0).padStart(6), ...parts);
 const short = (v: unknown, n = 300) => JSON.stringify(v)?.slice(0, n);
-const parser = new ClaudeStreamParser(true);
+const parser = new ClaudeStreamParser();
 parser.beginTurn();
 
 let quiet: ReturnType<typeof setTimeout> | null = null;

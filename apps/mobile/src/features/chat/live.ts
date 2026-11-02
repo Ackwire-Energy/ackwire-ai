@@ -15,6 +15,7 @@ import {
   cacheMessageActions,
   cacheMessageMemories,
   cacheMessageMeta,
+  cachePinned,
   catchUpChannel,
   consultSeeds,
   consultsIn,
@@ -167,20 +168,6 @@ function cacheReactions(
     const list = data as Message[];
     if (!list.some((m) => m && m.id === messageId)) return data;
     return list.map((m) => (m.id === messageId ? { ...m, reactions } : m));
-  });
-}
-
-/**
- * A message was pinned or unpinned: its mark in every loaded list of the
- * channel (the pins list itself is refetched). Also used optimistically by
- * "Fixar" / "Desafixar".
- */
-export function cachePinned(qc: QueryClient, orgId: string, channelId: string, messageId: string, pinned: boolean) {
-  qc.setQueriesData({ queryKey: ["org", orgId, "channel", channelId] }, (data: unknown) => {
-    if (!Array.isArray(data)) return data;
-    const list = data as Message[];
-    if (!list.some((m) => m && m.id === messageId)) return data;
-    return list.map((m) => (m.id === messageId ? { ...m, pinned } : m));
   });
 }
 

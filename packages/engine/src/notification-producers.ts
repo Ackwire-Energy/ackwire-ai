@@ -12,6 +12,7 @@ import {
   type NotificationSource,
   notificationSnippet,
   notify,
+  remindNotifications,
   resolveNotifications,
   retargetNotifications,
 } from "./notifications";
@@ -753,7 +754,7 @@ export async function notifyRoutineFailed(
 }
 
 /**
- * A routine set to act couldn't call an agent its creator can't talk to (`reach.ts`, and its own tell_agent or
+ * A routine couldn't call an agent its creator can't talk to (`reach.ts`, and its own tell_agent or
  * ask_agent, `consultations.ts`): the agent's owner hears it once per routine and agent, or who manages agents when
  * it has none. It opens the agent's page (who talks to it), the place they may not otherwise reach being private;
  * `source.userId` is the routine's creator, whom its one-click action lets talk to the agent.
@@ -1144,25 +1145,36 @@ export async function notifyBrowserHandoff(
     .select({ kind: channels.kind, name: channels.name })
     .from(channels)
     .where(eq(channels.id, where.channelId));
-  await notify(deps, {
+  const handoff = { handoffId: h.id, agentId: h.agentId, ...(h.screen !== "browser" ? { screen: h.screen } : {}) };
+  const base = {
     orgId: h.orgId,
-    userIds,
     kind: "browser_handoff",
     groupKey: `browser_handoff:${h.id}`,
     waiting: true,
     actor: agent(h.agentId),
+    latest: { text: notificationSnippet(h.instructions), expiresAt: h.expiresAt.toISOString() },
+  } as const;
+  const members = await inChannel(deps, where.channelId, userIds);
+  await notify(deps, {
+    ...base,
+    userIds: members,
     source: {
       channelId: where.channelId,
       ...(where.threadId ? { threadId: where.threadId } : {}),
       messageId: h.id,
       ...(channel?.kind === "dm" ? { dmId: where.channelId } : {}),
       ...(channel?.kind === "channel" ? { label: channel.name } : {}),
-      handoffId: h.id,
-      ...(h.screen !== "browser" ? { screen: h.screen } : {}),
+      ...handoff,
     },
-    latest: { text: notificationSnippet(h.instructions), expiresAt: h.expiresAt.toISOString() },
   });
+  // Who can't open the card's conversation gets no link to it: the request opens on the agent's computer.
+  const others = userIds.filter((id) => !members.includes(id));
+  if (others.length > 0) await notify(deps, { ...base, userIds: others, source: handoff });
 }
+
+/** Still unanswered an hour later: back on top, unread, and pushed once more saying the agent still needs them. */
+export const remindBrowserHandoffNotifications = (deps: NotificationDeps, orgId: string, handoffId: string) =>
+  remindNotifications(deps, orgId, `browser_handoff:${handoffId}`, { reminder: true }, "reminder");
 
 /** Done, couldn't, canceled or expired: out of everyone's inbox. */
 export async function resolveBrowserHandoffNotifications(deps: NotificationDeps, orgId: string, handoffId: string) {

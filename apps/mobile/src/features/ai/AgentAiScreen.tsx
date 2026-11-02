@@ -1,5 +1,5 @@
 import type { AgentBrain, AgentBrainInput, MachineAccount } from "@agenteschat/client";
-import { keys, useAgentBrain, useAiAccounts, useAiStatus, useApi, useMachines } from "@agenteschat/client";
+import { keys, useAgentBrain, useAiAccounts, useAiStatus, useApi, useMachines, useModels } from "@agenteschat/client";
 import { accountChoices, ownSignInListed, ownSignInName } from "@agenteschat/client/lib/ai-accounts";
 import { brainLine, thinksWith } from "@agenteschat/client/lib/brain";
 import { advancedSummary } from "@agenteschat/client/lib/brain-advanced";
@@ -7,7 +7,7 @@ import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiChoiceOf, planOfKind } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { brainPlan, isPlanId, planOf } from "@agenteschat/client/lib/plans";
-import { isAuto, providerLabel } from "@agenteschat/client/lib/providers";
+import { apiProviderOf, isAuto, providerLabel } from "@agenteschat/client/lib/providers";
 import { limitOffers, planState } from "@agenteschat/ui/plan-state";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -113,6 +113,9 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
     (c) => c.machineId === view?.computer?.machineId,
   );
   const thinks = brainLine(t, agent?.brain, t("brain.model"), { agents: dir.agents });
+  // Through the API: its maker's mark.
+  const models = useModels().data?.models;
+  const thinksMark = thinks.mark ?? apiProviderOf(agent?.model, models ?? []);
   const model = view && kind ? modelRows(t, view, brainPlan(view)).find((r) => r.checked) : undefined;
   const accounts = view && kind ? agentAccounts(view, kind) : [];
   const current = view ? accounts.find((a) => a.id === view.account) : undefined;
@@ -167,7 +170,7 @@ export function AgentAiScreen({ agentId }: { agentId: string }) {
         contentContainerStyle={[styles.in, { paddingBottom: insets.bottom + 24 }]}
       >
         <View style={styles.hero}>
-          {thinks.mark ? <ProviderLogo id={thinks.mark} size="hero" /> : null}
+          {thinksMark ? <ProviderLogo id={thinksMark} size="hero" /> : null}
           <Text variant="title2" tone="ink" style={styles.center}>
             {thinks.text}
           </Text>

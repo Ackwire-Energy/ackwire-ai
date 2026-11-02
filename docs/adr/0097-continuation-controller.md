@@ -1,6 +1,6 @@
 # 0097. One controller decides how every turn ends
 
-- Status: Accepted (built: the server, the web and the phone app)
+- Status: Accepted (built: the server, the web and the phone app). Amended by ADR 0109: a new `untried` verdict (the judge reads `means` and `tried`), a routine's untried `hand_off` held once; no routine only looks and tells any more.
 - Date: 2026-11-01
 - Amends: ADR 0089 (the follow-through check becomes the controller's judgment; its once-per-run flag becomes a shared budget), ADR 0095 (rolled-up hand-offs count as reported; the reply block shows the work in progress), ADR 0034 (a chain may go 4 agents deep), ADR 0053 (an agent's event routine that nothing can fire is refused)
 - Code: `packages/engine/src/continuation.ts` (`decideTurnEnd`, `continuationVerdict`, `reportRunFailure`, `reportDroppedMentions`), `executor.ts` (the final-answer block, `askWithCard`, `parkOutage`, the `finished` hook), `notification-producers.ts` (`notifyRunFailed`), `dispatch.ts` (`dropped`), `jobs.ts`, `messages.ts` (`unreachedAgents`' `handedTo`), `consultations.ts` (`MAX_CONSULTATION_CHAIN`, `progress`, `handBack`'s `reported_at`), `schedule-tools.ts` (`neverFires`), `routines.ts` (`missingEventSource`), `packages/client/src/lib/consult-group.ts` (`consultProgress`), the web and phone `ConsultGroup` and notice lines, `packages/engine/test/autonomy/*`

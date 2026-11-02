@@ -1,12 +1,13 @@
 import type { IconName } from "@agenteschat/ui";
 import type { MouseEvent } from "react";
+import { matchesNow, TOUCH } from "@/hooks/useMatchMedia";
 import { inDesktopApp } from "./desktop";
 import { STORAGE_KEYS, storage } from "./storage";
 
 /**
- * The right click in the desktop app: each screen says what its menu has, once,
- * and this draws it either as our menu (`MenuAt`, the default) or as the system's own (`context_menu` in
- * apps/desktop/src-tauri/src/menus.rs), as the person chose. In the browser the browser's menu stays.
+ * The right click: each screen says what its menu has, once, and this draws it as our menu (`MenuAt`, the default)
+ * or, in the desktop app, as the system's own (`context_menu` in apps/desktop/src-tauri/src/menus.rs), as the person
+ * chose. In the browser, links and empty space keep the browser's menu.
  */
 export type MenuEntry =
   | { kind: "item"; id: string; label: string; icon?: IconName; danger?: boolean; disabled?: boolean; run: () => void }
@@ -78,12 +79,14 @@ export function toSystem(entries: MenuEntry[]): { items: SystemItem[]; runs: Map
   return { items, runs };
 }
 
-/** Where the system's menu keeps its place: typing (spelling, paste). */
+/**
+ * Where the system's menu keeps its place: typing (spelling, paste) and, in the browser, links, images, video and
+ * code (open in a new tab, copy the address, save the image).
+ */
 export function keepsSystemMenu(target: EventTarget | null): boolean {
-  return (
-    target instanceof Element &&
-    Boolean(target.closest("input, textarea, select, [contenteditable='true'], [contenteditable='']"))
-  );
+  if (!(target instanceof Element)) return false;
+  if (target.closest("input, textarea, select, [contenteditable='true'], [contenteditable='']")) return true;
+  return !inDesktopApp() && Boolean(target.closest("a[href], img, video, pre, code"));
 }
 
 /** The text selected where the right click landed (empty when the click was elsewhere). */
@@ -145,8 +148,8 @@ export function openContextMenu(x: number, y: number, raw: MenuEntry[]) {
   show?.({ key: ++seq, x, y, entries });
 }
 
-/** The desktop app has its own right click; the browser keeps its menu. */
-export const contextMenusOn = () => inDesktopApp() && show !== null;
+/** Things with their own menu (a message, a channel) get it on right click, in the browser too. */
+export const contextMenusOn = () => show !== null;
 
 /**
  * `onContextMenu` for something with its own menu (a message, a channel): the innermost one wins, and
@@ -155,6 +158,8 @@ export const contextMenusOn = () => inDesktopApp() && show !== null;
 export function contextMenuHandler(build: (e: MouseEvent) => MenuEntry[]) {
   return (e: MouseEvent) => {
     if (e.defaultPrevented || !contextMenusOn() || keepsSystemMenu(e.target)) return;
+    // A long press on touch fires `contextmenu` too: it keeps selecting text (taps have their own menu).
+    if ((e.nativeEvent as PointerEvent).pointerType === "touch" || matchesNow(TOUCH)) return;
     const entries = build(e);
     if (!entries.length) return;
     e.preventDefault();

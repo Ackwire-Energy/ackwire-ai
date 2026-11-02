@@ -72,7 +72,8 @@ export function appColors(scheme: Scheme): AppColors {
   return {
     ...base,
     grouped: "#f2f2f7",
-    bubble: "#eef0f3",
+    // The web's own bubble on white: the ink at 6%, no tint.
+    bubble: "#efefee",
     amber: "#b26a00",
     chip: "rgba(120, 120, 128, 0.1)",
     badge: "#ff3b30",

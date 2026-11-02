@@ -17,7 +17,6 @@ import {
   updateRoutine,
 } from "../src";
 import { openRoutineRoom } from "../src/routine-room";
-import { REFUSALS } from "../src/tools/run-policy";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { briefs, channelRoutine, fire, messagesIn, routineDeps } from "./routine-fixtures";
 import { fakeGithub } from "./tool-fixtures";
@@ -127,43 +126,6 @@ test("a routine set to act tells another agent: it wakes, and its reply reaches 
   // Its routine block says what it may reach.
   const asked = f.provider.calls.map((c) => c.request).find(isRoutine);
   expect(JSON.stringify(asked)).toContain("tell_agent leaves an agent a note");
-});
-
-test("a routine that only looks and tells can't reach other agents or post, and its run is told why", async () => {
-  const results: string[] = [];
-  f = await setup({
-    handOff: true,
-    askAgent: true,
-    chatTools: true,
-    reply: (req) => {
-      if (!isRoutine(req)) return { chunks: ["ok"] };
-      if (seen(req).includes("tool_result")) results.push(seen(req));
-      return routineTurn(
-        req,
-        [
-          { name: "tell_agent", input: { agent: "@iris", message: "O PR #42 já está pronto?" } },
-          { name: "post_message", input: { channel: "general", text: "@iris o PR #42 já está pronto?" } },
-        ],
-        "Não consegui cobrar a Iris.",
-      );
-    },
-  });
-  await agentIn(f, "Iris", "iris");
-  const routine = await channelRoutine(f, { prompt: "Cobre a Iris até o PR #42 ficar pronto." });
-  await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);
-  await drainOutbox(f.db, f.handlers);
-
-  // Not offered, and refused with the reason when called anyway.
-  const offered = f.provider.calls.map((c) => c.request).find(isRoutine);
-  const names = (offered?.tools ?? []).map((t) => t.name);
-  for (const name of ["tell_agent", "ask_agent", "post_message", "send_dm"]) expect(names).not.toContain(name);
-  expect(JSON.stringify(offered)).toContain("don't post, send DMs, react");
-  expect(JSON.stringify(offered)).toContain('a person can set the routine to \\"Pode agir\\"');
-  expect(JSON.stringify(offered)).not.toContain("tell_agent leaves an agent a note");
-  expect(results[0]?.split(REFUSALS.routineReachReadOnly).length).toBe(3);
-  // Nobody woke, and nothing was posted.
-  expect((await runsOf(f)).map((r) => r.background)).toEqual([true]);
-  expect(await messagesIn(f, f.general.id)).toEqual([]);
 });
 
 test("a routine posts only where its creator can post, and writes in a DM only to its creator; its @mention wakes the agent", async () => {
@@ -384,21 +346,20 @@ test("a routine's tell_agent at the limit is refused, and the card goes where th
   expect((await runsOf(f)).filter((r) => r.agentId === iris.id && r.status !== "done")).toEqual([]);
 });
 
-test("only its creator sets what a routine does as it acts: anyone else takes it over first", async () => {
+test("only its creator sets what a routine does: anyone else takes it over first", async () => {
   f = await setup();
   const bob = await addMember(f.db, f.org.id, "member", "bob");
   const routine = await channelRoutine(f, { prompt: "Veja o PR #42." });
-  // Bob's routine on an agent Ana owns: as it acts it would reach Bob's rooms and the agents Bob talks to.
+  // Bob's routine on an agent Ana owns: it acts (ADR 0109), so it would reach Bob's rooms and the agents Bob talks to.
   await f.db.update(schema.routines).set({ createdByUserId: bob.id }).where(eq(schema.routines.id, routine.id));
   const edit = (actorId: string, patch: Parameters<typeof updateRoutine>[4]) =>
     updateRoutine(routineDeps(f), actorId, f.org.id, routine.id, patch);
   const refused = { code: "routine.act_take_over" };
-  await expect(edit(f.owner.id, { access: "act" })).rejects.toMatchObject(refused);
-  expect((await edit(bob.id, { access: "act" })).access).toBe("act");
   await expect(edit(f.owner.id, { prompt: "Cobre o @hr-bot e poste no #m-team." })).rejects.toMatchObject(refused);
-  // The rest stays hers to change, and so does turning it back to only looking.
-  expect((await edit(f.owner.id, { name: "PR #42", prompt: "Veja o PR #42." })).name).toBe("PR #42");
-  expect((await edit(f.owner.id, { access: "read" })).access).toBe("read");
+  expect((await edit(bob.id, { prompt: "Cobre o PR #42." })).prompt).toBe("Cobre o PR #42.");
+  // The rest stays hers to change; an old client's "read" changes nothing: every routine acts.
+  expect((await edit(f.owner.id, { name: "PR #42", prompt: "Cobre o PR #42." })).name).toBe("PR #42");
+  expect((await edit(f.owner.id, { access: "read" })).access).toBe("act");
 });
 
 test("a routine set to act posts the file its run made, and the post's audit names the routine", async () => {

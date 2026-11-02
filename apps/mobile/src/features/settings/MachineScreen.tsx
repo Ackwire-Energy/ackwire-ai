@@ -3,10 +3,13 @@ import {
   BROWSER_TOOL_SCOPE,
   isOpenHandoff,
   keys,
+  machineProfiles,
   useAgents,
   useAgentsBrowserHandoffs,
   useApi,
   useBrowserHandoffMutations,
+  useBrowserProfileMutations,
+  useBrowserProfiles,
   useComputerSetup,
   useMachineAction,
   useMachines,
@@ -28,6 +31,7 @@ import {
   MACHINE_TOOLS,
   toolOnCommand,
 } from "@agenteschat/client/lib/machines";
+import { can } from "@agenteschat/client/lib/permissions";
 import { helpUrl } from "@agenteschat/client/lib/server";
 import { useQueries } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -50,7 +54,7 @@ import {
 } from "@/ui";
 import { Note, openPage } from "../ai/parts";
 import { AgentFace } from "../shared/Face";
-import { useColors, useOrgId } from "../shared/hooks";
+import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { goBack, MONO, successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { DESKTOP_TURN_ON, grantCommand, osOf, pauseText, type Reduce, reduceTexts, seenText } from "./logic";
@@ -245,6 +249,7 @@ export function MachineScreen({ machineId }: { machineId: string }) {
           <FoldersSection machine={m} />
           <ToolsSection machine={m} onReduce={askReduce} />
           <BrowserSection machine={m} onTurnOff={() => askReduce({ kind: "tool", tool: "browser" })} />
+          <ProfilesSection machine={m} />
           <DesktopUseSection machine={m} />
           <GrantSection machine={m} />
         </>
@@ -400,6 +405,70 @@ function ToolsSection({ machine: m, onReduce }: { machine: Machine; onReduce: (r
       {reduces && MACHINE_TOOLS.some((tool) => access.tools[tool]) ? (
         <GroupedFooter>{t("mobile.settings.machine.toolsHow")}</GroupedFooter>
       ) : null}
+    </>
+  );
+}
+
+/**
+ * Perfis do navegador (ADR 0110), read-only: each profile, free or who uses it, and how many agents may. "Fazer
+ * login" (for who may drive it) takes control and opens its live view. Creating, choosing agents and deleting stay
+ * on the web.
+ */
+function ProfilesSection({ machine: m }: { machine: Machine }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const { orgId, org } = useOrg();
+  const dir = useDirectory();
+  const profiles = useBrowserProfiles(orgId);
+  const actions = useBrowserProfileMutations(orgId);
+  const mine = machineProfiles(profiles.data, m);
+  if (mine.length === 0) return null;
+  const drive = can(org, "manage_connectors") && can(org, "control_computers");
+  const login = (profileId: string) =>
+    actions.takeover.mutate(profileId, {
+      onSuccess: () => router.push(`/browser-profile/${profileId}`),
+      onError: (err) =>
+        toast({
+          title:
+            (err as { status?: number }).status === 409 ? t("browser.profiles.busy") : t("browser.profiles.failed"),
+          icon: "x",
+        }),
+    });
+  return (
+    <>
+      <GroupedHeader>{t("browser.profiles.title")}</GroupedHeader>
+      <GroupedList>
+        {mine.map((p) => (
+          <GroupedRow
+            key={p.id}
+            icon="globe"
+            label={p.name}
+            sub={
+              p.holder
+                ? t("browser.profiles.inUsePerson", {
+                    name:
+                      p.holder.type === "agent"
+                        ? dir.nameOf({ type: "agent", id: p.holder.agentId })
+                        : dir.nameOf({ type: "person", id: p.holder.userId }),
+                  })
+                : t("browser.profiles.free")
+            }
+            value={t("browser.profiles.agents", { count: p.agentIds.length })}
+            {...(drive
+              ? {
+                  chevron: true,
+                  onPress: () =>
+                    chooseAction(
+                      p.name,
+                      [{ label: t("browser.profiles.login"), onPress: () => login(p.id) }],
+                      t("common.cancel"),
+                    ),
+                }
+              : {})}
+          />
+        ))}
+      </GroupedList>
+      <GroupedFooter>{t("browser.profiles.sub")}</GroupedFooter>
     </>
   );
 }

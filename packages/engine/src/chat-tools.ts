@@ -100,7 +100,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
       async execute(input, ctx) {
         try {
           const requester = await personBehindCall(ctx);
-          // A routine set to act posts where its creator can post, as itself: never with their files.
+          // A routine posts where its creator can post, as itself: never with their files.
           const routine = requester ? null : await actingRoutineOfCall(ctx);
           const creator = routine?.creatorUserId ?? null;
           const name = str(input.channel).trim().replace(/^#/, "").toLowerCase();
@@ -232,7 +232,7 @@ export function createChatToolSource(deps: { pubsub?: PubSub; artifacts: Artifac
       async execute(input, ctx) {
         try {
           const requester = await personBehindCall(ctx);
-          // A routine set to act writes in its creator's DM with the agent, and no one else's.
+          // A routine writes in its creator's DM with the agent, and no one else's.
           const routine = requester ? null : await actingRoutineOfCall(ctx);
           const creator = routine?.creatorUserId ?? null;
           if (!requester && !creator) return { content: "Only a person's request can send a DM.", isError: true };

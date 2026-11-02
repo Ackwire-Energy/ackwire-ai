@@ -130,9 +130,9 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
           {
             list: [
               "Agentes, com nome, papel, instruções e aparência.",
-              "Skills. Chegam desligadas: ligue as que os agentes já devem usar.",
+              "Skills, ligadas para os agentes que as tinham.",
               "Canais públicos, com os agentes dentro.",
-              "Rotinas. Chegam pausadas: você liga em **Rotinas** quando quiser.",
+              "Rotinas, ativas e no horário delas. Dá para pausar em **Rotinas** quando quiser.",
               "Memória: o que cada agente lembra.",
               "Os arquivos de cada agente (a pasta files do OpenBot.run, o workspace do OpenClaw), numa pasta com o nome dele no **Drive**. Chaves, logins e arquivos do sistema ficam de fora, e o que já estiver lá não é substituído.",
             ],
@@ -174,7 +174,7 @@ export const helpPtBR: Record<HelpSlug, HelpDocument> = {
               "Agentes, com instruções, modelo e aparência",
               "Skills, com o SKILL.md inteiro",
               "Canais públicos, com os agentes de cada um",
-              "Rotinas agendadas (chegam pausadas do outro lado)",
+              "Rotinas agendadas (chegam ativas do outro lado)",
               "A memória que todo mundo no workspace pode ver",
             ],
           },

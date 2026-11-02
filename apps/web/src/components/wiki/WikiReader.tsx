@@ -19,8 +19,6 @@ import {
   Input,
   Kbd,
   Menu,
-  MenuItem,
-  MenuSeparator,
   modKey,
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -30,12 +28,15 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { usePreviewUrl } from "@/components/artifacts/FileView";
+import { MenuEntries } from "@/components/DesktopMenus";
 import { ErrorState, LoadingList, LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { WikiSky } from "@/components/Sky";
 import { WikiEditor } from "@/components/WikiEditor";
 import { useWikiLinkRenderer } from "@/components/WikiLinks";
 import { useDirectory } from "@/hooks/useDirectory";
+import { copyText, type MenuEntry } from "@/lib/context-menu";
+import { entityMenu } from "@/lib/entity-menu";
 import { type EmbedRenderer, Markdown } from "@/lib/markdown";
 import { isAttachmentName } from "@/lib/obsidian";
 import { useToast } from "@/lib/toast";
@@ -589,6 +590,67 @@ export function WikiReader({
 
   const crumbs = (editing ? draft.folder : (p?.folder ?? "")).split("/").filter(Boolean);
   const outline = p && !editing ? outlineOf(p.body).filter((h) => !(h.level === 1 && h.text.trim() === p.title)) : [];
+  // The page's actions: its "…" and the right click on its title.
+  const pageEntries = (p: WikiPageData): MenuEntry[] => [
+    {
+      kind: "item",
+      id: "copy-link",
+      label: t("wiki.copyLink"),
+      icon: "link",
+      run: () => void copyText(`[[${p.title}]]`, () => toast.show(t("wiki.linkCopied", { title: p.title }))),
+    },
+    { kind: "item", id: "history", label: t("wiki.history"), icon: "clock", run: () => setHistoryOpen(true) },
+    ...(writes || admin ? ([{ kind: "separator" }] satisfies MenuEntry[]) : []),
+    ...(writes
+      ? ([
+          { kind: "item", id: "rename", label: t("wiki.renameOrMove"), icon: "edit", run: startEdit },
+          {
+            kind: "item",
+            id: "pin",
+            label: p.pinned ? t("wiki.unpin") : t("wiki.pin"),
+            icon: "pin",
+            run: () =>
+              action.mutate(
+                { type: "pin", slug: p.slug, pinned: !p.pinned },
+                { onSuccess: (x) => toast.show(x.pinned ? t("wiki.pinned") : t("wiki.unpinned")) },
+              ),
+          },
+        ] satisfies MenuEntry[])
+      : []),
+    ...(choosesAudience
+      ? ([
+          { kind: "item", id: "audience", label: t("wiki.audience"), icon: "eye", run: () => setAudienceOpen(true) },
+        ] satisfies MenuEntry[])
+      : []),
+    ...(admin
+      ? ([
+          {
+            kind: "item",
+            id: "lock",
+            label: p.locked ? t("wiki.unlock") : t("wiki.lock"),
+            icon: "lock",
+            run: () =>
+              action.mutate(
+                { type: "lock", slug: p.slug, locked: !p.locked },
+                { onSuccess: (x) => toast.show(x.locked ? t("wiki.lockedDone") : t("wiki.unlockedDone")) },
+              ),
+          },
+        ] satisfies MenuEntry[])
+      : []),
+    ...(writes
+      ? ([
+          { kind: "separator" },
+          {
+            kind: "item",
+            id: "delete",
+            label: t("wiki.delete"),
+            icon: "trash",
+            danger: true,
+            run: () => setConfirmDelete(true),
+          },
+        ] satisfies MenuEntry[])
+      : []),
+  ];
   let actions: ReactNode;
   if (editing) {
     actions = (
@@ -631,61 +693,7 @@ export function WikiReader({
           label={t("wiki.more")}
           trigger={<Button iconOnly icon="more" aria-label={t("wiki.more")} title={t("wiki.more")} />}
         >
-          <MenuItem
-            icon="link"
-            onSelect={() => {
-              void navigator.clipboard?.writeText(`[[${p.title}]]`);
-              toast.show(t("wiki.linkCopied", { title: p.title }));
-            }}
-          >
-            {t("wiki.copyLink")}
-          </MenuItem>
-          <MenuItem icon="clock" onSelect={() => setHistoryOpen(true)}>
-            {t("wiki.history")}
-          </MenuItem>
-          {(writes || admin) && <MenuSeparator />}
-          {writes && (
-            <MenuItem icon="edit" onSelect={startEdit}>
-              {t("wiki.renameOrMove")}
-            </MenuItem>
-          )}
-          {writes && (
-            <MenuItem
-              icon="pin"
-              onSelect={() =>
-                action.mutate(
-                  { type: "pin", slug: p.slug, pinned: !p.pinned },
-                  { onSuccess: (x) => toast.show(x.pinned ? t("wiki.pinned") : t("wiki.unpinned")) },
-                )
-              }
-            >
-              {p.pinned ? t("wiki.unpin") : t("wiki.pin")}
-            </MenuItem>
-          )}
-          {choosesAudience && (
-            <MenuItem icon="eye" onSelect={() => setAudienceOpen(true)}>
-              {t("wiki.audience")}
-            </MenuItem>
-          )}
-          {admin && (
-            <MenuItem
-              icon="lock"
-              onSelect={() =>
-                action.mutate(
-                  { type: "lock", slug: p.slug, locked: !p.locked },
-                  { onSuccess: (x) => toast.show(x.locked ? t("wiki.lockedDone") : t("wiki.unlockedDone")) },
-                )
-              }
-            >
-              {p.locked ? t("wiki.unlock") : t("wiki.lock")}
-            </MenuItem>
-          )}
-          {writes && <MenuSeparator />}
-          {writes && (
-            <MenuItem icon="trash" danger onSelect={() => setConfirmDelete(true)}>
-              {t("wiki.delete")}
-            </MenuItem>
-          )}
+          <MenuEntries entries={pageEntries(p)} />
         </Menu>
       </>
     );
@@ -710,7 +718,7 @@ export function WikiReader({
               <EditHead draft={draft} setDraft={setDraft} folders={folders} autoFocus={isNew && !draft.title} />
             ) : (
               p && (
-                <h1 id="wiki-title" className="wiki-title">
+                <h1 id="wiki-title" className="wiki-title" {...entityMenu(() => pageEntries(p))}>
                   {p.title}
                 </h1>
               )

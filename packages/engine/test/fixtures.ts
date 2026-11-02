@@ -58,6 +58,7 @@ import {
   type SandboxDeps,
   type ServerCatalog,
   type StorageDeps,
+  type ToolGateway,
   type ToolSource,
   zonedParts,
 } from "../src";
@@ -219,6 +220,8 @@ export async function setup(
      * own stickers only.
      */
     gifs?: GifProvider | null;
+    /** How long a run started on a person's message waits for their next one (`waitForBurst`). None: no wait. */
+    quietMs?: number;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -312,7 +315,9 @@ export async function setup(
   };
   const sources = [
     ...(options.missionTools && machineHub ? [createMissionToolSource(missionDeps)] : []),
-    ...(options.askUser ? [createAskUserToolSource()] : []),
+    ...(options.askUser
+      ? [createAskUserToolSource({ judge: context.judge, tools: (): ToolGateway | undefined => tools })]
+      : []),
     ...(options.permissionTools ? [createPermissionToolSource()] : []),
     ...(options.askAgent
       ? [
@@ -323,7 +328,9 @@ export async function setup(
     ...(options.react ? [createReactToolSource({ pubsub })] : []),
     ...(options.mediaTools ? [createMediaToolSource({ pubsub, gifs: options.gifs ?? null })] : []),
     ...(options.followUps ? [createFollowUpToolSource({ pubsub })] : []),
-    ...(options.handOff ? [createHandOffToolSource({ pubsub })] : []),
+    ...(options.handOff
+      ? [createHandOffToolSource({ pubsub, judge: context.judge, tools: (): ToolGateway | undefined => tools })]
+      : []),
     ...(options.artifactTools ? [createArtifactToolSource(artifactDeps)] : []),
     ...(options.chatTools ? [createChatToolSource({ pubsub, artifacts: artifactDeps })] : []),
     ...(options.issueTools ? [createIssueToolSource({ db, pubsub })] : []),
@@ -345,7 +352,8 @@ export async function setup(
       : []),
     ...(options.toolSources ?? []),
   ];
-  const tools = sources.length > 0 ? createToolGateway({ sources, catalog: options.catalog }) : undefined;
+  const tools: ToolGateway | undefined =
+    sources.length > 0 ? createToolGateway({ sources, catalog: options.catalog }) : undefined;
   machineHub?.setMissionHooks(createMissionHooks({ db, ...missionDeps, tools }));
   const jobDeps = {
     db,
@@ -364,6 +372,7 @@ export async function setup(
     toolsOnDemand: options.toolsOnDemand ?? false,
     ...(options.warmBrowser ? { warmBrowser: options.warmBrowser } : {}),
     ...(options.gifs ? { gifs: options.gifs } : {}),
+    ...(options.quietMs ? { quietMs: options.quietMs } : {}),
   };
   const handlers = createJobHandlers(jobDeps);
 

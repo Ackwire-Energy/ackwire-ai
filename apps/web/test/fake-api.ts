@@ -72,6 +72,7 @@ import type {
   SecretRequest,
   ServerTelemetry,
   SidebarItems,
+  SidebarSection,
   SignInOptions,
   StoragePlatform,
   StorageUsage,
@@ -351,6 +352,8 @@ export interface FakeState {
   sidebarItems?: SidebarItems;
   /** Make `orgs.setSidebarItem` and `orgs.setSidebarItems` fail with this error. */
   sidebarItemsError?: ApiError;
+  /** The sidebar's sections in my order (`orgs.sidebarOrder`); unset = the default. */
+  sidebarOrder?: SidebarSection[];
 }
 
 /** A new workspace's "Admin" role (ADR 0085); João holds it. */
@@ -1406,6 +1409,12 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         state.sidebarItems = structuredClone(items);
         return structuredClone(items);
       },
+      sidebarOrder: async () => [...(state.sidebarOrder ?? ["tools", "channels", "agents", "people"])],
+      setSidebarOrder: async (orgId, order) => {
+        log("orgs.setSidebarOrder", orgId, order);
+        state.sidebarOrder = order ? [...order] : undefined;
+        return [...(order ?? ["tools", "channels", "agents", "people"])];
+      },
       setAvatar: async (orgId, input) => {
         log("orgs.setAvatar", orgId, { contentType: input.contentType, bytes: input.imageBase64.length });
         const m = state.members.find((x) => x.userId === state.me?.user.id);
@@ -2020,7 +2029,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const brain = input.brain ?? b.brain;
         const changed = brain !== b.brain;
         // ADR 0059 §5: onto a plan, only its owner talks to it; letting others in is its owner's alone.
-        const onlyOwner = input.onlyOwner ?? (changed && brain !== "model" ? true : b.onlyOwner);
+        const row = state.agents.find((a) => a.id === agentId);
+        // "Só algumas pessoas" with nobody picked already answers its owner alone: the server leaves it as it is.
+        const restricted = row?.audience?.mode === "people" && !answersOthers(audienceOf(row), row.ownerUserId);
+        const onlyOwner = restricted || (input.onlyOwner ?? (changed && brain !== "model" ? true : b.onlyOwner));
         if (brain !== "model" && !onlyOwner && (changed || b.onlyOwner) && !b.canUsePlans)
           throw new ApiError(403, "audience.plan_owner_only", "Only the plan's owner");
         const model = brain === "model" ? null : input.model !== undefined ? input.model : changed ? null : b.model;
@@ -2039,8 +2051,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         brains.set(agentId, next);
         // Its row, as the server keeps it: onto a plan only its owner, its "who can talk" list kept; on, back to that
         // list, or everyone with none.
-        const row = state.agents.find((a) => a.id === agentId);
-        if (row && (changed || input.onlyOwner !== undefined)) {
+        if (row && !restricted && (changed || input.onlyOwner !== undefined)) {
           const was = audienceOf(row);
           const base: AgentAudience = changed && brain !== "model" ? { mode: "owner", userIds: was.userIds } : was;
           row.audience =
@@ -2654,7 +2665,7 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         });
         return { channelId };
       },
-      markRead: async () => {},
+      markRead: async (orgId, channelId) => log("dms.markRead", orgId, channelId),
       reads: async () => [],
     },
     questions: {
@@ -2926,6 +2937,7 @@ export function createFakeApi(state: FakeState = seedState(), options: { seed?: 
       channels: (orgId) => http.chat.channels(orgId),
       members: (orgId) => http.orgs.members(orgId),
       messages: async () => state.messages,
+      dms: async () => state.dms,
     },
   };
   const threads = createFakeThreads(ctx, (method, ...args) => state.calls.push({ method, args }));

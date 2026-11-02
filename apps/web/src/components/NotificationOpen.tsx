@@ -1,11 +1,12 @@
 import type { AiStatus, AppNotification } from "@agenteschat/client";
 import { cacheNotification, keys, useApi } from "@agenteschat/client";
-import { type OpenTarget, opensConnectAi, openTarget } from "@agenteschat/client/lib/notifications";
+import { type OpenTarget, opensConnectAi, opensOnComputer, openTarget } from "@agenteschat/client/lib/notifications";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useContext, useEffect, useRef } from "react";
 import { requestBrowserCard } from "@/components/browser/open";
 import { useConnectAi } from "@/components/ConnectAi";
+import { useOpenComputer } from "@/components/computer/open";
 import { OpenDetailsContext } from "@/components/details-link";
 import { LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
@@ -76,10 +77,17 @@ export function useNotificationOpener() {
   const navigate = useNavigate();
   const connect = useConnectAi();
   const openDetails = useContext(OpenDetailsContext);
+  const openComputer = useOpenComputer();
   return useCallback(
     (n: AppNotification, orgId: string, options: { ai?: AiStatus; replace?: boolean } = {}): Opened => {
       if (connect && opensConnectAi(n, options.ai)) {
         connect.open({ ready: true });
+        return "dialog";
+      }
+      // A help request whose conversation I can't open: the agent's computer, its request and Ajudar in view.
+      const computerOf = opensOnComputer(n);
+      if (computerOf) {
+        openComputer(computerOf);
         return "dialog";
       }
       const target = openTarget(n);
@@ -95,7 +103,7 @@ export function useNotificationOpener() {
       goToTarget(navigate, orgId, target, options.replace ?? false);
       return "page";
     },
-    [navigate, connect, openDetails],
+    [navigate, connect, openDetails, openComputer],
   );
 }
 
@@ -128,7 +136,7 @@ export function useOpenPushed() {
         // A dialog over the inbox: the inbox first (without `?open`, so a reload doesn't redo it), since any
         // navigation after it would close the dialog (`DetailsHost`).
         const target = openTarget(n);
-        const overInbox = replace && target && routineOf(target);
+        const overInbox = replace && ((target && routineOf(target)) || opensOnComputer(n));
         if (overInbox) await goToInbox(navigate, orgId, true);
         const opened = open(n, orgId, { ai, replace });
         if (!overInbox && (opened === null || (opened === "dialog" && replace)))

@@ -24,7 +24,7 @@ test("a message's words use the whole column; a code block or a table scrolls in
 });
 
 test("the cards in a message share one width: the tools, a lone call's line, every receipt and the other cards", () => {
-  expect(value(":root", "--msg-card-w")).toBe("560px");
+  expect(value(":root", "--msg-card-w")).toBe("640px");
   for (const selector of [
     ".ac-tools",
     ".ag-rc",
@@ -44,7 +44,11 @@ test("the cards in a message share one width: the tools, a lone call's line, eve
     ".mi-linkcard",
     ".mi-cmd",
     ".brw-rq",
-    ".brw-ac:not(.is-open)",
+    // Open or not, the browser card; a request or its decided line; a mission's card.
+    ".brw-ac",
+    ".rq",
+    ".rq-done",
+    ".mi-card",
     ".brw-ac.brw-trail.is-open",
     ".brw-ac.brw-trail.brw-mf-end",
   ])

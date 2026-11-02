@@ -6,6 +6,7 @@ import {
   isExpandable,
   matchesFilter,
   type NotificationPages,
+  opensOnComputer,
   openTarget,
   removeFromPages,
   replyTarget,
@@ -162,6 +163,17 @@ describe("answering and opening", () => {
     expect(
       openTarget(notification({ id: "3", kind: "dm", actors: [{ type: "agent", id: "ada" }], source: { dmId: "d" } })),
     ).toEqual({ to: "/org/$orgId/dm/agent/$agentId", params: { agentId: "ada" } });
+    // An agent's request in my DM with it: that DM (the web has no channel page for a DM).
+    const asked = notification({
+      id: "3h",
+      kind: "browser_handoff",
+      actors: [{ type: "agent", id: "ada" }],
+      source: { channelId: "d", dmId: "d", messageId: "h", handoffId: "h", agentId: "ada" },
+    });
+    expect(openTarget(asked)).toEqual({ to: "/org/$orgId/dm/agent/$agentId", params: { agentId: "ada" } });
+    expect(opensOnComputer(asked)).toBeNull();
+    // One whose conversation I can't open names none: it opens on the agent's computer.
+    expect(opensOnComputer({ ...asked, source: { handoffId: "h", agentId: "ada" } })).toBe("ada");
     expect(openTarget(notification({ id: "4", kind: "issue_assigned", source: { issueNumber: 131 } }))).toEqual({
       to: "/org/$orgId/issues/$number",
       params: { number: "131" },

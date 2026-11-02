@@ -130,9 +130,9 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
           {
             list: [
               "Agents, with their name, role, instructions and look.",
-              "Skills. They arrive off: turn on the ones the agents should use right away.",
+              "Skills, on for the agents that had them.",
               "Public channels, with the agents in them.",
-              "Routines. They arrive paused: turn them on in **Routines** when you want.",
+              "Routines, active and on their schedule. Pause them in **Routines** if you want.",
               "Memory: what each agent remembers.",
               "Each agent's own files (OpenBot.run's files folder, an OpenClaw workspace), in a folder with its name in the **Drive**. Keys, logins and system files stay behind, and nothing already there is replaced.",
             ],
@@ -174,7 +174,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
               "Agents, with their instructions, model and look",
               "Skills, with the whole SKILL.md",
               "Public channels, with their agents",
-              "Scheduled routines (they arrive paused on the other side)",
+              "Scheduled routines (they arrive active on the other side)",
               "The memory everyone in the workspace can see",
             ],
           },
