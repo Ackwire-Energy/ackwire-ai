@@ -1,7 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { APP_LINK_EXCLUDED, APP_LINK_PATHS } from "../../../server/src/app-links";
+import { APP_LINK_PATHS, APP_LINK_WEB_QUERIES } from "../../../server/src/app-links";
 import { APP_LINK_PATTERNS } from "../../app.config";
-import { appLinkFromUrl, resolveLink } from "../../src/features/links/app-links";
+import {
+  appLinkFromUrl,
+  linkWorkspace,
+  resolveLink,
+  SETTINGS_SCREENS,
+  WEB_ONLY_QUERIES,
+} from "../../src/features/links/app-links";
 import { rememberLink, takeLink } from "../../src/features/links/pending";
 
 const W = "https://app.agentes.chat";
@@ -10,12 +16,14 @@ const O = "org-1";
 const linkOf = (url: string) => {
   const link = appLinkFromUrl(url);
   if (!link || !("href" in link) || !link.href.startsWith("/link?")) return link;
-  return Object.fromEntries(
+  const { web, ...params } = Object.fromEntries(
     link.href
       .slice("/link?".length)
       .split("&")
       .map((pair) => pair.split("=").map(decodeURIComponent)),
   );
+  expect(web).toBe(url.slice(W.length));
+  return params;
 };
 
 describe("web addresses → the app's screens", () => {
@@ -34,7 +42,7 @@ describe("web addresses → the app's screens", () => {
     expect(to("/home")).toBe("/");
     expect(to("/threads")).toBe("/threads");
     expect(to("/agents/a1")).toBe("/agent/a1");
-    expect(to("/agents/a1/memory")).toBe("/agent/a1");
+    expect(to("/agents/a1/memory")).toBe("/memory?agent=a1");
     expect(to("/agents/new")).toBe("/new-agent");
     expect(to("/approvals?open=ap1")).toBe("/approval/ap1");
     expect(to("/approvals")).toBe("/activity");
@@ -51,7 +59,9 @@ describe("web addresses → the app's screens", () => {
     expect(to("/wiki/onboarding")).toBe("/wiki/onboarding");
     expect(to("/members")).toBe("/me/members");
     expect(to("/settings")).toBe("/settings");
-    expect(to("/settings/connectors?connected=1")).toBe("/connectors");
+    expect(to("/settings/connectors")).toBe("/connectors");
+    expect(to("/settings/members?request=r1&do=approve")).toBe("/join-requests?request=r1");
+    expect(to("/settings/members")).toBe("/me/members");
     expect(to("/settings/keys")).toBe("/ai-accounts");
     expect(to("/settings/usage")).toBe("/usage");
     expect(to("/settings/computers")).toBe("/settings/computers");
@@ -68,6 +78,15 @@ describe("web addresses → the app's screens", () => {
   test("pages the app lacks, and odd ids, open the website; the app's own links stay as they are", () => {
     expect(appLinkFromUrl(`${W}/org/${O}/forum/f1`)).toEqual({ web: `/org/${O}/forum/f1` });
     expect(appLinkFromUrl(`${W}/org/${O}/settings/billing`)).toEqual({ web: `/org/${O}/settings/billing` });
+    // A sign-in's result or an action only the website runs stays the website's.
+    for (const path of [
+      "/settings/connectors?mail=connected&account=x",
+      "/settings/connectors?connected=github",
+      "/settings/apps?install=1",
+      "/settings/connectors?review=1",
+      "/settings/general?delete=1",
+    ])
+      expect(appLinkFromUrl(`${W}/org/${O}${path}`)).toEqual({ web: `/org/${O}${path}` });
     expect(appLinkFromUrl(`${W}/org/${O}/calendar`)).toEqual({ web: `/org/${O}/calendar` });
     expect(appLinkFromUrl(`${W}/org/${O}/c/..%2F..`)).toEqual({ web: `/org/${O}/c/..%2F..` });
     expect(appLinkFromUrl(`${W}/help/start`)).toEqual({ web: "/help/start" });
@@ -81,7 +100,6 @@ describe("web addresses → the app's screens", () => {
     const real: Record<string, string> = {
       "/org/*/dm/*": "/org/*/dm/agent/x1",
       "/org/*/issues/*": "/org/*/issues/7",
-      "/org/*/settings/*": "/org/*/settings/general",
     };
     const sample = (pattern: string) =>
       `${W}${(real[pattern] ?? pattern).replace("/org/*", `/org/${O}`).replace(/\*/g, "x1")}`;
@@ -89,10 +107,12 @@ describe("web addresses → the app's screens", () => {
       const link = appLinkFromUrl(sample(pattern));
       expect([pattern, link && "href" in link]).toEqual([pattern, true]);
     }
-    for (const pattern of APP_LINK_EXCLUDED) {
-      const link = appLinkFromUrl(sample(pattern.replace(/\*$/, "")));
-      expect([pattern, link && "web" in link]).toEqual([pattern, true]);
-    }
+    // Settings sections one by one (billing, roles, voice stay the website's, on Android too), all the app has.
+    expect(APP_LINK_PATHS.filter((p) => /^\/org\/\*\/settings\/[a-z]+$/.test(p)).map((p) => p.split("/")[4])).toEqual(
+      Object.keys(SETTINGS_SCREENS),
+    );
+    expect(APP_LINK_PATHS.some((p) => /settings\/(\*|billing|roles|voice)/.test(p))).toBe(false);
+    expect(WEB_ONLY_QUERIES).toEqual(APP_LINK_WEB_QUERIES);
   });
 });
 
@@ -114,6 +134,13 @@ describe("the link screen", () => {
     expect(await resolveLink(api, O, { person: "u1", m: "m2" })).toBe("/chat/d-person?m=m2");
     expect(await resolveLink(api, O, { notification: "n1" })).toBe("/chat/c2?m=m9");
     expect(await resolveLink(api, O, {})).toBe("/");
+  });
+
+  test("a workspace the person isn't in opens the address on the website, never its ids in the current one", () => {
+    expect(linkWorkspace({ org: "o2", web: "/org/o2/c/c1" }, ["o1", "o2"], "o1")).toEqual({ org: "o2" });
+    expect(linkWorkspace({}, ["o1"], "o1")).toEqual({ org: "o1" });
+    expect(linkWorkspace({ org: "o3", web: "/org/o3/c/c1?m=m1" }, ["o1"], "o1")).toEqual({ web: "/org/o3/c/c1?m=m1" });
+    expect(linkWorkspace({ org: "o3", web: "//evil.example" }, ["o1"], "o1")).toEqual({ web: "/" });
   });
 
   test("a link opened while signed out is taken once", () => {

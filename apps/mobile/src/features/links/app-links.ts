@@ -17,7 +17,7 @@ import { chatHref, notificationHref } from "./logic";
 export type AppLink = { href: string } | { web: string } | null;
 
 /** Settings sections the app has, by the web's section id (apps/web/src/pages/settings-sections.ts). */
-const SETTINGS_SCREENS: Record<string, string> = {
+export const SETTINGS_SCREENS: Record<string, string> = {
   account: "/me/account",
   notifications: "/me/notifications",
   apps: "/settings/apps",
@@ -34,6 +34,12 @@ const SETTINGS_SCREENS: Record<string, string> = {
   import: "/settings/import",
   media: "/settings/media",
 };
+
+/**
+ * A settings address with a sign-in's result or an action only the website runs: the website, never the app's
+ * section without it (the server's `APP_LINK_WEB_QUERIES`, which iOS already leaves out).
+ */
+export const WEB_ONLY_QUERIES = ["mail", "connected", "outcome", "review", "install", "delete"];
 
 /** Paths outside a workspace the app has its own screen for, under the same path (expo-router opens them). */
 const OWN_PATHS = /^\/(invite\/[^/]+|reset-password|signup)\/?$/;
@@ -82,7 +88,8 @@ function workspaceScreen(rest: string[], q: Record<string, string>): Record<stri
       return isSafeId(id) ? { thread: id, m } : null;
     case "agents":
       if (id === "new") return "/new-agent";
-      return isSafeId(id) ? `/agent/${id}` : null;
+      if (!isSafeId(id)) return null;
+      return sub === "memory" ? `/memory?agent=${id}` : `/agent/${id}`;
     case "approvals":
       return open ? `/approval/${open}` : "/activity";
     case "notifications":
@@ -105,6 +112,9 @@ function workspaceScreen(rest: string[], q: Record<string, string>): Record<stri
       return "/me/members";
     case "settings":
       if (id === undefined) return "/settings";
+      if (WEB_ONLY_QUERIES.some((key) => key in q)) return null;
+      // A join request's Approve/Deny in its email: that request, on top of the requests.
+      if (id === "members" && isSafeId(q.request)) return `/join-requests?request=${q.request}`;
       if (id === "computers" && sub !== undefined) return isSafeId(sub) ? `/settings/computers/${sub}` : null;
       return SETTINGS_SCREENS[id] ?? null;
     default:
@@ -127,7 +137,24 @@ export function appLinkFromUrl(url: string): AppLink {
   if (parts[0] !== "org" || !isSafeId(parts[1])) return web;
   const screen = workspaceScreen(parts.slice(2), queryOf(query));
   if (screen === null) return web;
-  return { href: linkHref(typeof screen === "string" ? { org: parts[1], to: screen } : { org: parts[1], ...screen }) };
+  // `web`: the address itself, opened in the browser when the person isn't in that workspace.
+  const at = { org: parts[1], web: web.web };
+  return { href: linkHref(typeof screen === "string" ? { ...at, to: screen } : { ...at, ...screen }) };
+}
+
+/**
+ * The workspace a `/link` opens in: the link's when the person is in it, else the current one for a link naming none.
+ * A workspace they aren't in (removed, another account) gives its web address back, or `/` without one: its ids
+ * mean nothing in the current workspace.
+ */
+export function linkWorkspace(
+  p: { org?: unknown; web?: unknown },
+  orgIds: string[],
+  current: string,
+): { org: string } | { web: string } {
+  if (!isSafeId(p.org)) return { org: current };
+  if (orgIds.includes(p.org)) return { org: p.org };
+  return { web: typeof p.web === "string" && p.web.startsWith("/") && !p.web.startsWith("//") ? p.web : "/" };
 }
 
 /** What `/link` was opened with (`appLinkFromUrl`), unchecked. */

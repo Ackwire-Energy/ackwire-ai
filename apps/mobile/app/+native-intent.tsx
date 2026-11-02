@@ -1,4 +1,4 @@
-import { openPage } from "@/features/ai/parts";
+import { openOwnPage } from "@/features/ai/parts";
 import { appLinkFromUrl } from "@/features/links/app-links";
 import { rememberLink } from "@/features/links/pending";
 
@@ -12,7 +12,7 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     const link = appLinkFromUrl(path);
     if (!link) return path;
     if ("web" in link) {
-      openPage(path);
+      openOwnPage(path);
       return initial ? "/" : "";
     }
     // Signed out, the sign-in comes first; the link is opened right after it.

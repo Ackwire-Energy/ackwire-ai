@@ -12,7 +12,7 @@ import type { Context } from "hono";
  * iOS reads the paths from here (`*` is any text); Android from the app's build (`APP_LINK_PATTERNS` in
  * apps/mobile/app.config.ts, kept equal by a test). The app maps each one to its screen
  * (apps/mobile/src/features/links/app-links.ts). The API, sign-in callbacks, billing and the pages the app lacks
- * (forum, calendar, proposals, team) are left out: they open the website.
+ * (forum, calendar, proposals, team, the settings sections not listed) are left out: they open the website.
  */
 export const APP_LINK_PATHS = [
   "/invite/*",
@@ -35,11 +35,31 @@ export const APP_LINK_PATHS = [
   "/org/*/wiki/*",
   "/org/*/members",
   "/org/*/settings",
-  "/org/*/settings/*",
+  "/org/*/settings/account",
+  "/org/*/settings/notifications",
+  "/org/*/settings/apps",
+  "/org/*/settings/general",
+  "/org/*/settings/members",
+  "/org/*/settings/audit",
+  "/org/*/settings/access",
+  "/org/*/settings/connectors",
+  "/org/*/settings/skills",
+  "/org/*/settings/keys",
+  "/org/*/settings/storage",
+  "/org/*/settings/computers",
+  "/org/*/settings/usage",
+  "/org/*/settings/import",
+  "/org/*/settings/media",
+  "/org/*/settings/computers/*",
 ];
 
-/** Settings sections the app has no screen for: iOS opens them on the website (Android can't, see above). */
-export const APP_LINK_EXCLUDED = ["/org/*/settings/billing*", "/org/*/settings/roles*", "/org/*/settings/voice*"];
+/**
+ * A settings address carrying a sign-in's result or an action only the website runs (`?mail=`, `?connected=`…, read by
+ * apps/web/src/routes/org.$orgId.settings_.$section.tsx): iOS leaves it to the website. Android can't match a query,
+ * so the app sends those to the browser itself (`WEB_ONLY_QUERIES` in apps/mobile/src/features/links/app-links.ts,
+ * kept equal by a test).
+ */
+export const APP_LINK_WEB_QUERIES = ["mail", "connected", "outcome", "review", "install", "delete"];
 
 /** A comma-separated variable's entries (several apps: the store's and its preview or development builds). */
 export const listOf = (value: string | undefined) =>
@@ -59,7 +79,7 @@ export function appleAppSiteAssociation(config: Pick<Config, "APPLE_TEAM_ID" | "
           appIDs: bundles.map((bundle) => `${config.APPLE_TEAM_ID}.${bundle}`),
           // Apple takes the first component that matches: the exclusions go first.
           components: [
-            ...APP_LINK_EXCLUDED.map((path) => ({ "/": path, exclude: true })),
+            ...APP_LINK_WEB_QUERIES.map((key) => ({ "/": "/org/*/settings/*", "?": { [key]: "*" }, exclude: true })),
             ...APP_LINK_PATHS.map((path) => ({ "/": path })),
           ],
         },

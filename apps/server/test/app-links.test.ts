@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import {
-  APP_LINK_EXCLUDED,
   APP_LINK_PATHS,
+  APP_LINK_WEB_QUERIES,
   androidAssetLinks,
   appleAppSiteAssociation,
   listOf,
@@ -18,17 +18,22 @@ test("iOS: the app's pages open the app once team and bundle ids are set, the on
   });
   const details = aasa?.applinks.details[0];
   expect(details?.appIDs).toEqual(["ABCDE12345.chat.agentes.app", "ABCDE12345.chat.agentes.app.preview"]);
-  expect(details?.components.slice(0, APP_LINK_EXCLUDED.length) as unknown[]).toEqual([
-    { "/": "/org/*/settings/billing*", exclude: true },
-    { "/": "/org/*/settings/roles*", exclude: true },
-    { "/": "/org/*/settings/voice*", exclude: true },
-  ]);
-  const paths = details?.components.slice(APP_LINK_EXCLUDED.length).map((c) => c["/"]);
+  // A settings address with a sign-in's result or a website-only action is left to the website.
+  expect(details?.components.slice(0, APP_LINK_WEB_QUERIES.length) as unknown[]).toEqual(
+    ["mail", "connected", "outcome", "review", "install", "delete"].map((key) => ({
+      "/": "/org/*/settings/*",
+      "?": { [key]: "*" },
+      exclude: true,
+    })),
+  );
+  const paths = details?.components.slice(APP_LINK_WEB_QUERIES.length).map((c) => c["/"]);
   expect(paths).toEqual(APP_LINK_PATHS);
   for (const path of ["/invite/*", "/reset-password", "/signup", "/org/*/c/*", "/org/*/threads/*", "/org/*/dm/*"])
     expect(paths).toContain(path);
   // Never the API, sign-in callbacks or pages the app has no screen for.
-  expect(paths?.some((p) => p.startsWith("/api") || /forum|calendar|billing/.test(p))).toBe(false);
+  expect(paths?.some((p) => p.startsWith("/api") || /forum|calendar|billing|roles|voice|settings\/\*/.test(p))).toBe(
+    false,
+  );
 });
 
 test("Android: every package with every signing fingerprint, upper-cased; nothing without them", () => {

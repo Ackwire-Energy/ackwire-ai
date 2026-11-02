@@ -23,9 +23,9 @@ const linkHost = new URL(apiUrl).host;
 /**
  * The website's pages that open the app on Android (its intent filters; `*` is any text), the same list the server
  * gives iOS (`APP_LINK_PATHS` in apps/server/src/app-links.ts, a test keeps them equal): what the app has a screen for
- * (`appLinkFromUrl`, src/features/links/app-links.ts). Android can't leave a page out of a filter, so a settings
- * section the app lacks (billing) opens in the browser from the app. A change here reaches phones only with a new
- * build.
+ * (`appLinkFromUrl`, src/features/links/app-links.ts). Settings sections are listed one by one: Android can't
+ * leave a page out of a filter, and billing (Stripe returns there) must stay the website's. A change here reaches
+ * phones only with a new build.
  */
 export const APP_LINK_PATTERNS = [
   "/invite/*",
@@ -48,7 +48,22 @@ export const APP_LINK_PATTERNS = [
   "/org/*/wiki/*",
   "/org/*/members",
   "/org/*/settings",
-  "/org/*/settings/*",
+  "/org/*/settings/account",
+  "/org/*/settings/notifications",
+  "/org/*/settings/apps",
+  "/org/*/settings/general",
+  "/org/*/settings/members",
+  "/org/*/settings/audit",
+  "/org/*/settings/access",
+  "/org/*/settings/connectors",
+  "/org/*/settings/skills",
+  "/org/*/settings/keys",
+  "/org/*/settings/storage",
+  "/org/*/settings/computers",
+  "/org/*/settings/usage",
+  "/org/*/settings/import",
+  "/org/*/settings/media",
+  "/org/*/settings/computers/*",
 ];
 // Our EAS project on expo.dev (not a secret: it only names the project).
 const projectId = process.env.EAS_PROJECT_ID ?? "8514d5b3-87e0-4980-89a0-4c692f6f4702";

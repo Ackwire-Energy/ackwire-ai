@@ -2,15 +2,17 @@ import { useApi } from "@agenteschat/client";
 import { type Href, router, useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
-import { resolveLink } from "@/features/links/app-links";
+import { openOwnPage } from "@/features/ai/parts";
+import { linkWorkspace, resolveLink } from "@/features/links/app-links";
 import { takeLink } from "@/features/links/pending";
 import { useColors } from "@/features/shared/hooks";
-import { isSafeId } from "@/features/shared/logic";
+import { serverUrl } from "@/lib/server";
 import { useOrg } from "@/providers/org";
 
 /**
  * A link to the website opened in the app (`app/+native-intent.tsx`): switches to the link's workspace when the
- * person is in it, then opens the screen it names (`resolveLink`), in place of this one.
+ * person is in it, then opens the screen it names (`resolveLink`), in place of this one. A workspace they aren't in
+ * opens the address on the website instead.
  */
 export default function LinkRoute() {
   const p = useLocalSearchParams<{
@@ -21,14 +23,26 @@ export default function LinkRoute() {
     person?: string;
     notification?: string;
     m?: string;
+    web?: string;
   }>();
   const { orgId, orgs, setOrgId } = useOrg();
   const api = useApi();
   const c = useColors();
-  const wanted = isSafeId(p.org) && orgs.some((o) => o.id === p.org) ? p.org : orgId;
+  const place = linkWorkspace(
+    p,
+    orgs.map((o) => o.id),
+    orgId,
+  );
+  const wanted = "org" in place ? place.org : orgId;
+  const foreign = "web" in place ? place.web : null;
   const { to, thread, agent, person, notification, m } = p;
   useEffect(() => {
     takeLink();
+    if (foreign !== null) {
+      if (foreign !== "/") openOwnPage(`${serverUrl()}${foreign}`);
+      router.replace("/");
+      return;
+    }
     if (wanted !== orgId) {
       setOrgId(wanted);
       return;
@@ -42,7 +56,7 @@ export default function LinkRoute() {
     return () => {
       alive = false;
     };
-  }, [api, orgId, wanted, setOrgId, to, thread, agent, person, notification, m]);
+  }, [api, orgId, wanted, foreign, setOrgId, to, thread, agent, person, notification, m]);
   return (
     <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: c.bg }}>
       <ActivityIndicator color={c.muted} />
