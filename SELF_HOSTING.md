@@ -1082,7 +1082,7 @@ computer (`tailscale serve`, an nginx or a Caddy outside Docker) takes
 `sudo agentes-runner services allow tcp/443` too, or agents can't push to its git. Container and VM
 networks on the computer are closed to agents, except ports published on an address other than
 loopback. Each agent also has its own `/tmp`, `/dev/shm` and `/run/lock`, in memory as the computer's
-are (a tmpfs of its own, which counts in its memory limit), and its own `/var/tmp` on disk (in
+are (a tmpfs of its own, which counts in the agents' memory), and its own `/var/tmp` on disk (in
 `/var/lib/agentes-runner-tmp`), cleared of what is 10 days old (30 in `/var/tmp`), so a socket or file
 another agent leaves there is out of its reach, and its own adb server port
 (`ANDROID_ADB_SERVER_PORT`). Agents can't schedule cron or at jobs, which would run outside their own
@@ -1098,8 +1098,19 @@ organizations share, so Kotlin compiles inside Gradle there. Two things stay sha
 server an agent binds to `0.0.0.0` is as reachable from outside the computer as your firewall lets it
 be, so agents should bind private servers to `127.0.0.1`; and abstract Unix sockets (a name, not a file)
 have no owner, so a program an agent runs that listens on one without checking who connects is open to
-the other agents, and an agent can take a name another agent's program wants (an X display's: its
-desktop then starts on another one).
+the other agents, and an agent can take a name another agent's program wants. An X display's name taken
+before a desktop starts sends that desktop to another display, but an agent holding all 50 stops every new
+or restarted desktop on the computer, and on this server's own computer the names span its
+organizations.
+
+**Memory and CPUs.** With `--system` the agents share the computer: none has memory or CPUs of its own,
+so one agent's build may use every CPU and all the memory the agents have. All of them together stop at
+75% of the RAM (50% on this server's own computer), plus swap for a third of that, which keeps the rest
+for the system, the runner and, here, the server. At that limit the kernel stops the process using the
+most, and only that process: the command it belonged to fails, and the agent is told it was most likely
+memory. `agentes-runner computer`, which any agent (or you) can run, prints what the computer has, what
+is free for new work and which agents use the most; agents are told to run it before something heavy
+and to tell the person when another agent's work leaves no room.
 
 **The shared folder.** Every computer has one folder all of its agents read and write, so what one of
 them downloads, clones or installs, the others use instead of fetching it again. With `--system` it is

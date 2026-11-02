@@ -360,6 +360,8 @@ describe("# This turn", () => {
       expect(turn.system).toContain("Only your own folder there");
       expect(turn.system).toContain('# Shared folder on "MacBook"\n/Users/w/agentes/shared is shared by every agent');
       expect(turn.system).not.toContain("~/shared");
+      // One person's own computer: no agents' slices, so nothing to look at with agentes-runner computer.
+      expect(turn.system).not.toContain("# Sharing");
     }
     // The resumed turn reads where it is now: in the thread.
     expect(seen[1]?.prompt).toContain("replying in a thread");
@@ -376,6 +378,20 @@ describe("# This turn", () => {
     expect(seen).toHaveLength(3);
     expect(seen[2]?.system).toContain("Only your own folder there");
     expect(seen[2]?.system).not.toContain("# Shared folder");
+
+    // System mode: the agents share the computer's CPUs and memory, of the size its runner reported.
+    const [row] = await f.db.select().from(schema.machines).where(eq(schema.machines.id, paired.machineId));
+    await f.db
+      .update(schema.machines)
+      .set({
+        executors: { ...row?.executors, mode: "system" },
+        size: { cpus: 4, memoryGb: 8, diskGb: 100 },
+      })
+      .where(eq(schema.machines.id, paired.machineId));
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
+    await drainOutbox(f.db, handlers);
+    expect(seen).toHaveLength(4);
+    expect(seen[3]?.system).toContain('# Sharing "MacBook"\nAll the agents on "MacBook" share its 4 CPUs and 8 GB');
   });
 });
 

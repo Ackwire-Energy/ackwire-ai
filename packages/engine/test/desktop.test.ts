@@ -35,6 +35,7 @@ import {
   reduceMachineAccess,
   setAgentComputerTarget,
   sharedFolderText,
+  sharingText,
   startDeviceCode,
   type ToolContext,
   UNAVAILABLE_CODES,
@@ -736,6 +737,18 @@ describe("folders and tools on the machine (protocol 10)", () => {
     expect(sharedFolderText("Box", { dir: "/home/me/agentes/shared", system: false, os: "linux" })).toContain(
       "flock /home/me/agentes/shared/.lock",
     );
+  });
+
+  test("the sharing block: the agents share the computer, look before something heavy, tell the person (ADR 0057)", () => {
+    const text = sharingText("Build box", { cpus: 4, memoryGb: 8 });
+    expect(text).toStartWith(
+      '# Sharing "Build box"\nAll the agents on "Build box" share its 4 CPUs and 8 GB of memory',
+    );
+    expect(text).toContain("run agentes-runner computer");
+    expect(text).toContain("tell the person which agent is using the computer");
+    expect(text).toContain('exit code 137, "Killed"');
+    // A size the runner never reported: no numbers.
+    expect(sharingText("Build box", null)).toContain("share its CPUs and memory, with no part");
   });
 
   test("the runner's new frames are parsed and cut", () => {

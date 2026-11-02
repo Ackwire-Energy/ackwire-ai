@@ -297,7 +297,7 @@ export function agentBrowserTarget(
   return null;
 }
 
-/** The counters in the agent's `memory.events` that rise when it runs out of memory (`max`: it reached its limit). */
+/** The counters in the agents' `memory.events` that rise when they run out of memory (`max`: they reached their limit). */
 const OUT_OF_MEMORY = ["max", "oom", "oom_kill"];
 
 /** How a tab's page died (`pageCrashed`): `again` before the agent heard of the first time, so it wasn't reloaded. */
@@ -1022,7 +1022,7 @@ export interface BrowserManagerOptions {
   connectStream?: (url: string) => StreamSocket;
   /** Tests: opens a Chrome's browser endpoint (its traffic and its pages that die). */
   connectDevtools?: (url: string) => StreamSocket;
-  /** The agent's slice's `memory.events` (system mode): whether a page that died ran out of memory. */
+  /** The agents' slice's `memory.events` (system mode): whether a page that died ran out of memory. */
   memoryEvents?: string;
   /** Tests: how long a new stream waits for Chrome's first frame (`FIRST_FRAME_MS`). */
   firstFrameMs?: number;
@@ -2017,8 +2017,8 @@ export class BrowserManager {
    * A tab's page died: opened again once, and the agent's next action is told. One that dies again before the
    * agent heard of it shows our notice instead, once: a page that can't even start there (the slice's last task
    * taken, or its memory held by another process) would die again at once, and from then on it stays on Chrome's
-   * own page, so nothing starts again and again while the agent isn't there. It ran out of memory when the agent's
-   * slice reached its limit since its Chrome started or a page last died.
+   * own page, so nothing starts again and again while the agent isn't there. It ran out of memory when the agents'
+   * memory, which they share, reached its limit since its Chrome started or a page last died.
    */
   private pageCrashed(session: Session, chrome: OwnChrome, page: CrashedPage) {
     if (session.chrome !== chrome) return;

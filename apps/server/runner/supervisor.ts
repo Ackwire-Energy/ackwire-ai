@@ -49,7 +49,7 @@ import { readLines } from "./lines";
 import { type FetchLike, UPLOAD_TIMEOUT_MS, uploadUrl } from "./push";
 import type { ScopeKind } from "./scope-gate";
 import { type ActivatedSecret, activatedSecret, handleSecret } from "./secrets";
-import { agentCategorySlice, agentSlice } from "./service";
+import { agentCategorySlice, agentSlice, scopeOomPolicy } from "./service";
 import type { RelayCount } from "./streams";
 
 /**
@@ -288,6 +288,8 @@ export interface SupervisorOptions {
   /** Tests: where processes are read (`/proc`), and how systemd is asked to move one. */
   proc?: string;
   busctl?: (args: string[]) => Promise<{ code: number; output: string }>;
+  /** Tests: whether systemd takes `OOMPolicy=` on scopes (`scopeOomPolicy`). */
+  scopeOomPolicy?: () => boolean;
 }
 
 type Outcome = { ok: true; data: unknown } | { ok: false; error: RunnerError };
@@ -1147,6 +1149,8 @@ export class Supervisor {
     const cgroup = async () => /^0::(\/.*)$/m.exec(await read("cgroup"))?.[1] ?? "";
     if (!(await cgroup()).startsWith(agentDir)) return "That process isn't in this agent's slice";
     const slice = agentCategorySlice(uid, kind);
+    // As the launcher's scopes (`systemLauncher`): a tab or a tool's command stopped for memory takes only itself.
+    const oom = (this.opts.scopeOomPolicy ?? scopeOomPolicy)() ? ["OOMPolicy", "s", "continue"] : [];
     const asked = await (this.opts.busctl ?? busctl)([
       "call",
       "--timeout=5",
@@ -1157,7 +1161,8 @@ export class Supervisor {
       "ssa(sv)a(sa(sv))",
       `agentes-${kind}-${uid}-${pid}.scope`,
       "fail",
-      "3",
+      String(oom.length > 0 ? 4 : 3),
+      ...oom,
       "PIDs",
       "au",
       "1",
