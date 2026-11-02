@@ -2481,14 +2481,21 @@ async function executeRunInner(
   };
   /** A routine's run started by Rodar agora isn't long by kind (a person just asked for it): read once. */
   let byHand: boolean | null = null;
+  /**
+   * A mission's work is long by kind; a person's message in its thread starts a quick reply (it roots in that
+   * person), not more of the mission's work: read once.
+   */
+  let missionWork: boolean | null = null;
   /** Long work at the pause line, unless Continuar agora let it go on or it may use the plan's extra usage. */
   const longWorkPause = async () => {
     const t = transcript as Transcript;
     if (forum || overrideHolds(t.usagePause?.override)) return null;
     if (run.background && byHand === null) byHand = await routineRunByHand(db, run.id).catch(() => false);
+    if (plan.missionId && missionWork === null)
+      missionWork = !(await personOfMessage(db, run.orgId, run.triggerMessageId).catch(() => null));
     const long = isLongWork({
       routine: run.background && !byHand,
-      mission: Boolean(plan.missionId),
+      mission: Boolean(missionWork),
       pausedBefore: Boolean(t.usagePause?.paused),
       computer: plan.kind !== "model",
       calls: plan.kind === "model" ? run.turns - turnsAtClaim : computerTurns,

@@ -12,7 +12,9 @@ import {
   createJobHandlers,
   createRoutine,
   drainOutbox,
+  enqueueRunJob,
   holdsMessages,
+  insertMessage,
   isLongWork,
   listMessages,
   type MachineStatus,
@@ -112,6 +114,11 @@ const stepper = (steps: number) => (_: unknown, call: number) =>
 const runs = (fx: Fixture) => fx.db.select().from(schema.agentRuns).orderBy(schema.agentRuns.createdAt);
 const cards = async (fx: Fixture) =>
   (await listMessages(fx.db, fx.owner.id, fx.org.id, fx.general.id)).filter(
+    (m) => (m.meta.actionCard as { kind?: string } | undefined)?.kind === "usage_paused",
+  );
+/** Usage cards anywhere, threads too. */
+const allCards = async (fx: Fixture) =>
+  (await fx.db.select().from(schema.messages).where(eq(schema.messages.orgId, fx.org.id))).filter(
     (m) => (m.meta.actionCard as { kind?: string } | undefined)?.kind === "usage_paused",
   );
 const post = (fx: Fixture, body: string, userId = fx.owner.id) =>
@@ -350,4 +357,59 @@ test("from 90% of its plan the agent reads where it stands; at 50% it doesn't", 
   });
   await drainOutbox(f.db, handlers);
   expect(seen[1]?.thisTurn ?? "").not.toContain("Your Claude plan");
+});
+
+test("a paused mission: a person's question in its thread gets an answer, its notices wait for the work", async () => {
+  f = await setup({
+    contextTools: true,
+    budgetNanoUsd: BUDGET,
+    reply: (req, call) =>
+      JSON.stringify(req).includes("qual o status") ? { chunks: ["Pausado."] } : stepper(12)(req, call),
+  });
+  await spend(f, 96);
+  const root = await post(f, "Migrar o login");
+  await f.db.insert(schema.missions).values({
+    orgId: f.org.id,
+    agentId: f.agent.id,
+    channelId: f.general.id,
+    threadRootId: root.id,
+    ownerId: f.owner.id,
+    title: "Migrar o login",
+    goal: "Trocar a biblioteca de sessão",
+    status: "active",
+    brain: "model",
+    mainSessionId: crypto.randomUUID(),
+  });
+  const notice = (text: string) =>
+    f.db.transaction(async (tx) => {
+      const m = await insertMessage(tx, {
+        orgId: f.org.id,
+        channelId: f.general.id,
+        threadId: root.id,
+        author: { type: "agent", agentId: f.agent.id, runId: null, hop: 0, stretchId: null },
+        body: text,
+        meta: { missionInbox: { text } },
+      });
+      return enqueueRunJob(tx, { ...m, threadId: root.id }, f.agent.id);
+    });
+  await notice("Siga o plano.");
+  await drainOutbox(f.db, f.handlers);
+  const [main] = await runs(f);
+  expect(main?.status).toBe("waiting_input");
+  expect(await allCards(f)).toHaveLength(1);
+
+  await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+    body: "@dev qual o status?",
+    threadId: root.id,
+  });
+  await drainOutbox(f.db, f.handlers);
+  const all = await runs(f);
+  expect(all).toHaveLength(2);
+  expect(all[1]?.status).toBe("done");
+  expect(await allCards(f)).toHaveLength(1);
+
+  // The mission's next notice joins its paused work: no new run, no second card.
+  const told = await notice("Mais um passo.");
+  expect(told.steered).toBe(main?.id ?? "");
+  expect(await runs(f)).toHaveLength(2);
 });
