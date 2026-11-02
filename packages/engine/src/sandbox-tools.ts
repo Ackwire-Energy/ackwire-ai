@@ -372,7 +372,10 @@ const fileOfArtifact = (a: Awaited<ReturnType<typeof getArtifact>>) => {
     case "diagram":
       return { ext: "mmd", text: c.mermaid };
     case "html":
+    case "block":
       return { ext: "html", text: c.html };
+    case "poll":
+      return { ext: "md", text: [c.question, ...c.options.map((o) => `- ${o}`)].join("\n") };
     case "file":
       // Bytes, not text: `import_file` copies them as they are.
       return null;

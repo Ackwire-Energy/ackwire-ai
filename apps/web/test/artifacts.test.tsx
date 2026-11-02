@@ -149,7 +149,7 @@ describe("artifact cards in the chat", () => {
     await settle(3);
     expect(within(html).getByRole("img", { name: "Página interativa. Abra para ver." })).toBeTruthy();
     const thumb = html.querySelector("iframe") as HTMLIFrameElement;
-    expect(thumb.getAttribute("sandbox")).toBe("allow-scripts");
+    expect(thumb.getAttribute("sandbox")).toBe("allow-scripts allow-forms");
     expect(thumb.getAttribute("scrolling")).toBe("no");
     expect(thumb.getAttribute("tabindex")).toBe("-1");
     expect(thumb.getAttribute("aria-hidden")).toBe("true");
@@ -266,14 +266,14 @@ describe("artifact viewer", () => {
     expect(img?.getAttribute("src")?.startsWith("data:image/svg+xml")).toBe(true);
   });
 
-  test("html: only in a sandboxed iframe with allow-scripts and never allow-same-origin", async () => {
+  test("html: only in a sandboxed iframe, with scripts and forms and never allow-same-origin", async () => {
     await openChannel();
     const dialog = await openCard("Painel de erros da semana");
     await settle(3);
     const frame = dialog.querySelector("iframe") as HTMLIFrameElement;
     expect(frame).not.toBeNull();
-    expect(frame.getAttribute("sandbox")).toBe("allow-scripts");
-    expect(HTML_SANDBOX).toBe("allow-scripts");
+    expect(frame.getAttribute("sandbox")).toBe("allow-scripts allow-forms");
+    expect(HTML_SANDBOX).toBe("allow-scripts allow-forms");
     expect(frame.getAttribute("sandbox")).not.toContain("allow-same-origin");
     expect(frame.hasAttribute("srcdoc")).toBe(false);
     expect(frame.getAttribute("src")).toMatch(/^(blob:|data:text\/html)/);
@@ -908,13 +908,11 @@ describe("deleting a file", () => {
 });
 
 describe("html shim", () => {
-  test("goes after <head>, else after the doctype, else first", () => {
-    const head = withShim("<!doctype html><html><head><title>x</title></head><body></body></html>");
-    expect(head.startsWith("<!doctype html><html><head><script>")).toBe(true);
-    expect(head.indexOf("<script>")).toBeLessThan(head.indexOf("<title>"));
-    const doctype = withShim("<!DOCTYPE html>\n<body><h1>a</h1></body>");
-    expect(doctype.startsWith("<!DOCTYPE html><script>")).toBe(true);
-    expect(withShim("<h1>a</h1>").startsWith("<script>")).toBe(true);
-    expect(withShim("<header>a</header>").startsWith("<script>")).toBe(true);
+  test("runs before the page, behind the policy", () => {
+    const page = withShim("<!doctype html><html><head><title>x</title></head><body></body></html>");
+    expect(page.startsWith("<!doctype html><html><head>")).toBe(true);
+    expect(page.indexOf("Content-Security-Policy")).toBeLessThan(page.indexOf("<script>"));
+    expect(page.indexOf("<script>")).toBeLessThan(page.indexOf("<title>"));
+    expect(withShim("<h1>a</h1>").indexOf("<script>")).toBeLessThan(withShim("<h1>a</h1>").indexOf("<h1>"));
   });
 });

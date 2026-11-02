@@ -1,6 +1,6 @@
 # 0019. File storage per organization, and artifacts
 
-- Status: Accepted. Amended 2026-10-30 by ADR 0088 (deleted workspaces go at the end of their 7 days; a deleted account's photos)
+- Status: Accepted. Amended 2026-10-30 by ADR 0088 (deleted workspaces go at the end of their 7 days; a deleted account's photos). Amended 2026-11-01 (a page has no network)
 - Date: 2026-10-14
 
 ## Decision
@@ -20,6 +20,8 @@
 **Artifacts.** `artifacts` (kind, title, channel and thread of origin, current version, creator and last editor, `untrusted`) and `artifact_versions` (storage, key, size, SHA-256, note, author, run). Kinds: `document` (Markdown), `table` (columns + rows, CSV export), `diff` (files with unified patches, `.patch` export), `html` (a self-contained page), `diagram` (Mermaid). Sizes and shapes are validated. Visibility comes from the channel: org-wide when there is none; people see channels they belong to and public ones; agents see their run's channel, public channels they are in, and org-wide files. A file you can't see is "not found". People create in the Drive or in their channels and save new versions of documents and tables (a stale `baseVersion` is 409); the creator or an admin deletes. Agents use `create_artifact`, `update_artifact` (`drive:write`), `read_artifact`, `list_artifacts` (`drive:read`) through the Tool Gateway; the reply carries `meta.artifacts`, and the channel gets `artifact.created` / `artifact.updated`. Artifacts are indexed for search (kind `file`) through the outbox with the channel's visibility. Downloads are short-lived signed URLs (5 minutes) after the visibility check, or our streaming endpoint, always as attachments.
 
 **HTML is untrusted.** A page an agent (or a person) writes can contain anything. It is stored as is and flagged `untrusted`. The app renders it only in a sandboxed iframe served from a separate origin, never inline on the app's origin; our own endpoint serves it as an attachment with `Content-Security-Policy: sandbox` and `nosniff`. Agents reading it get it labeled as data, never instructions.
+
+*Amended 2026-11-01:* "Separate origin" means the opaque origin of a sandboxed blob frame. The sandbox alone left a page free to send what it held to any address, and the card on a message runs it as soon as it shows, with no click and no approval: an agent led astray by something it read had a way out. So a page now starts with a fixed prefix holding its policy (`isolatedPage`, `packages/client/src/lib/isolated-page.ts`): no network, no outside script, image or font. It is a fixed prefix because inserting after the first `<head>` lands inside `<!-- <head> -->`. The app's own pages carry `frame-src` so a frame can't navigate itself away, which no policy inside it can stop. The sandbox gains `allow-forms`: a browser fires no `submit` without it, and `form-action 'none'` still keeps a form from leaving.
 
 ## Consequences
 

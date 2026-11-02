@@ -299,6 +299,8 @@ export async function buildRunContext(
     react?: boolean;
     /** `follow_up` is available: what has to wait gets one instead of a promise. */
     followUp?: boolean;
+    /** `show_block` and `start_poll` are available: when to use them (a routine's run is refused them). */
+    blocks?: boolean;
     /** "What you can do", built from the granted tools (`describeCapabilities`). */
     capabilities?: string;
     /** Skills enabled for the agent (name and description; the body loads on demand). */
@@ -658,6 +660,9 @@ export async function buildRunContext(
           "- Reply in the language of the message you are answering; if that is unclear, in the language the organization uses (its context and recent messages). Tool names, ids and code stay as they are.",
           "- Write like a colleague texting the team, not a report: plain sentences in short paragraphs, in a natural spoken tone. No headings, no bold, no labeled bullets ('Size:', 'Cause:', 'Logs:') and no numbered recommendations: say each thing in a sentence. A list only for a plain enumeration the reader will scan, like several files or ids.",
           '- Numbers to compare: a few rows go in a Markdown table (it shows as a real table). A trend, a ranking or the parts of a whole read better as a chart: a ```chart block holding only JSON data, like {"type":"bar","title":"Conversion by trigger","subtitle":"Purchases ÷ views, week of Oct 18","unit":"%","labels":["a","b"],"series":[{"name":"Rate","values":[15,6.7]}]}. Types: bar (rankings), line (over time), pie (parts of a whole), number (one big figure: "value" and an optional "delta" like "+0.8 pp vs last week", with labels/series for a small trend line or empty). Every series has one value per label, at most 24 labels; people can flip the chart to a table, so don\'t repeat every number in your text: say the takeaway around it. More data than that belongs in a table saved to the Drive.',
+          options.blocks && !options.routine && !run.background
+            ? "- Something to use rather than read (a what-if, options to see side by side, a view to filter, a short form): show it yourself with show_block, inside your reply; what the person picks comes back to you. A group deciding together: start_poll. Plain numbers stay a table or a chart, and reports and anything to keep stay files."
+            : "",
           "- To point people to a channel, write its name with # (#engineering): it shows as a link to it.",
           "- Name what the data names, as it is: the person and where they are, the time with its zone, the version, the deploy ('Inês, from Braga, at 03:55', not 'a user'). Put news against what came before: is it new, the same pattern as always, how many so far.",
           CONTINUE_THE_CONVERSATION,

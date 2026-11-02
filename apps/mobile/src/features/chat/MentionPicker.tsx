@@ -120,6 +120,7 @@ export function MentionPicker({
                   accessibilityLabel={t("mobile.mention.addA11y", { name: o.name })}
                   hitSlop={6}
                   style={[styles.add, { backgroundColor: c.sunken }]}
+                  contentStyle={styles.addIn}
                 >
                   <Text variant="footnote" style={[styles.addText, { color: c.ink2 }]}>
                     {t("mobile.mention.add")}
@@ -149,6 +150,7 @@ const styles = StyleSheet.create({
   tx: { flex: 1, minWidth: 0 },
   name: { fontWeight: "600" },
   mark: { textDecorationLine: "underline" },
-  add: { height: 26, paddingHorizontal: 10, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  add: { height: 26, paddingHorizontal: 10, borderRadius: 13 },
+  addIn: { alignItems: "center", justifyContent: "center" },
   addText: { fontWeight: "600" },
 });
