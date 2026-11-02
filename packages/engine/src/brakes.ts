@@ -388,11 +388,19 @@ export async function decideCostlyProposal(
 
 // --- 4–7. One item is worked once, noise waits for a digest, repeats stop, caps -----------------------------
 
+/** A first line that reports a failure: an error, an exception, a crash, a timeout, a freeze. */
+const FAILURE_LINE =
+  /error|exception|traceback|panic|fatal|crash|timeout|timed out|\bANR\b|freeze|\bfail|\bfalh|\berro\b|travou/i;
+/** A link to one item (an issue, an event, a run, a PR): some segment of its path carries a number. */
+const ITEM_PATH = /\/[^/]*\d[^/]*(?:\/|$)/;
+
 /**
- * The item a message is about, as a stable fingerprint: its first link (an issue's or an error's page, without the
- * query), else its first line with numbers, ids and hashes taken out. Null when there is nothing to key on.
+ * The item a message is about, as a stable fingerprint: its first link to one item (an issue's or an error's page,
+ * without the query), else its first line with numbers, ids and hashes taken out. `alert`: it reports one item (that
+ * link, or a failure line), the only kind duplicates and repeats are counted for (§4, §6); a hand-off, a question or a
+ * recurring report with a dashboard's link is not one. Null when there is nothing to key on.
  */
-export function signatureOf(body: string): { key: string; title: string } | null {
+export function signatureOf(body: string): { key: string; title: string; alert: boolean } | null {
   const text = body.replace(/```[\s\S]*?```/g, " ");
   const url = /https?:\/\/[^\s)>\]]+/i.exec(text)?.[0];
   const first =
@@ -414,11 +422,14 @@ export function signatureOf(body: string): { key: string; title: string } | null
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 160);
-  const basis = url ? url.split(/[?#]/)[0]?.replace(/\/+$/, "").toLowerCase() : normalized;
+  const link = url?.split(/[?#]/)[0]?.replace(/\/+$/, "").toLowerCase();
+  const item = link ? ITEM_PATH.test(link.replace(/^https?:\/\/[^/]+/, "")) : false;
+  const basis = item ? link : normalized || link;
   if (!basis) return null;
   return {
     key: createHash("sha256").update(basis).digest("hex").slice(0, 32),
     title: cutText(unmention(first || url || ""), 200),
+    alert: item || FAILURE_LINE.test(first),
   };
 }
 
@@ -513,7 +524,7 @@ async function brakeOne(
   deps: { db: Database; pubsub?: PubSub },
   message: Message,
   agentId: string,
-  sig: { key: string; title: string } | null,
+  sig: { key: string; title: string; alert: boolean } | null,
   crowded: boolean,
   triage: () => Promise<"work" | "noise">,
   look: number,
@@ -532,7 +543,7 @@ async function brakeOne(
       runId: extra.runId ?? null,
       ...(extra.doneAt ? { doneAt: extra.doneAt } : {}),
     });
-  if (sig) {
+  if (sig?.alert) {
     // §4: open work on the same item (a run still at it) takes the new report instead of a second run.
     const [open] = await db
       .select({ run: agentRuns })

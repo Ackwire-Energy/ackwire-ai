@@ -449,6 +449,23 @@ describe("one item is worked once, noise waits for a digest, repeats stop (§4�
     expect(later?.payload).toMatchObject({ messageId: second.id, agentId: ada.id, look: 1 });
   });
 
+  test("only alerts count as items: hand-offs and recurring reports with a dashboard link never link or stop", async () => {
+    f = await setup();
+    const ada = await agentOf("Ada", "ada");
+    expect(signatureOf("@bob pode revisar?")?.alert).toBe(false);
+    expect(signatureOf("Relatório de vendas — 14h: https://dash.example.com")?.alert).toBe(false);
+    expect(signatureOf("Novo erro https://sentry.example.com/issues/42/")?.alert).toBe(true);
+    expect(signatureOf("TypeError: x is undefined")?.alert).toBe(true);
+    for (let i = 0; i < LOOP_MAX + 2; i++) {
+      const m = await alert(f.agent.id, `@ada Relatório de vendas — ${8 + i}h: https://dash.example.com`);
+      expect((await brakeWakes({ db: f.db, judge: fakeJudge(0) }, m, [ada.id])).wake).toEqual([ada.id]);
+      // Still working on the first one: a new report is no duplicate of it.
+      await working(ada.id, m.id, i === 0 ? "running" : "done");
+    }
+    expect(await signalsOf("loop")).toEqual([]);
+    expect(await signalsOf("linked")).toEqual([]);
+  });
+
   test("signatures: the same issue link or the same line without its numbers", () => {
     const a = signatureOf("Sentry: TypeError x https://sentry.example.com/issues/42/?ref=a");
     const b = signatureOf("TypeError x again https://sentry.example.com/issues/42");
