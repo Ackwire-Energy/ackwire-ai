@@ -198,6 +198,32 @@ describe("costly work nobody asked for needs a go (§3)", () => {
     expect(await signalsOf("pr")).toHaveLength(1);
   });
 
+  test("a go clicked after the asking run ended reaches the run it wakes: no second card", async () => {
+    f = await setup();
+    const trigger = await alert(f.agent.id, "Erro novo em produção");
+    const run = await working(f.agent.id, trigger.id);
+    const at = {
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: run.id,
+      channelId: f.general.id,
+      threadRootId: trigger.id,
+    };
+    expect((await costlyGate(f, at, UNATTENDED, "pr", "gh pr create"))?.code).toBe("autonomy.needs_go");
+    await f.db.update(agentRuns).set({ status: "done" }).where(eq(agentRuns.id, run.id));
+    const [proposal] = await signalsOf("proposal");
+    await decideCostlyProposal(f, f.owner.id, f.org.id, proposal?.id ?? "", "go");
+    const woken = (await f.db.select().from(agentRuns)).filter((r) => r.id !== run.id);
+    expect(woken).toHaveLength(1);
+    const next = woken[0];
+    if (!next) throw new Error("no woken run");
+    expect(await costlyGate(f, { ...at, runId: next.id }, UNATTENDED, "pr", "gh pr create")).toBeNull();
+    const cards = (await f.db.select().from(messages)).filter(
+      (m) => (m.meta as { actionCard?: { kind?: string } }).actionCard?.kind === "autonomy_proposal",
+    );
+    expect(cards).toHaveLength(1);
+  });
+
   test("always and never are remembered on the agent; the hourly PR cap holds even with a go", async () => {
     f = await setup();
     const trigger = await alert(f.agent.id, "Sentry: TypeError em checkout");

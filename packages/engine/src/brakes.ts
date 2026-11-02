@@ -353,6 +353,24 @@ export async function decideCostlyProposal(
           refs: { runId: run.id, signalId },
         })
       : null;
+    // The asking run usually ended before anyone clicked: the notice wakes a run of its own, which carries the
+    // decision, so its retry finds it instead of posting another card.
+    const woken = (delivered?.runs ?? []).filter((r) => r.id !== signal.runId);
+    if (woken.length > 0)
+      await tx.insert(autonomySignals).values(
+        woken.map((r) => ({
+          orgId,
+          agentId: signal.agentId,
+          kind: "proposal",
+          signature: cost,
+          title: signal.title,
+          channelId: r.channelId,
+          runId: r.id,
+          state: decision,
+          decidedByUserId: actorId,
+          doneAt: new Date(),
+        })),
+      );
     return { updated, delivered };
   });
   if (!out) throw new ConflictError("This proposal was already decided");
