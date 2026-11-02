@@ -833,8 +833,7 @@ export function createMachineHub(deps: MachineHubDeps) {
         : load;
     const wasWarned = prev?.diskWarned === true;
     const use = next?.diskUse;
-    const diskWarned =
-      use === undefined ? wasWarned : use >= DISK_WARN_USE || (wasWarned && use >= DISK_REARM_USE);
+    const diskWarned = use === undefined ? wasWarned : use >= DISK_WARN_USE || (wasWarned && use >= DISK_REARM_USE);
     await db
       .update(machines)
       .set({
