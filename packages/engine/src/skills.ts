@@ -208,6 +208,12 @@ export interface SkillView {
   sourceVia: SkillVia | null;
   defaultForNewAgents: boolean;
   metadata: Record<string, unknown>;
+  /** `person` or `agent` (promoted from an agent's how-tos, ADR 0120). */
+  origin: "person" | "agent";
+  ownerAgentId: string | null;
+  locked: boolean;
+  useCount: number;
+  lastUsedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -227,6 +233,11 @@ const view = (s: SkillRow): SkillView => ({
   sourceVia: s.sourceVia as SkillVia | null,
   defaultForNewAgents: s.defaultForNewAgents,
   metadata: s.metadata,
+  origin: s.origin === "agent" ? "agent" : "person",
+  ownerAgentId: s.ownerAgentId,
+  locked: s.locked,
+  useCount: s.useCount,
+  lastUsedAt: s.lastUsedAt?.toISOString() ?? null,
   createdAt: s.createdAt.toISOString(),
   updatedAt: s.updatedAt.toISOString(),
 });
@@ -983,6 +994,68 @@ export async function deleteSkill(db: Database, actorId: string, orgId: string, 
     target: { type: "skill", id: s.id },
     details: { name: s.name },
   });
+}
+
+/**
+ * A skill's body as a new version, its files carried over to it (they are stored per version). For changes that
+ * come from use, not from a person's editor: an agent's own skill (`update_skill`), an accepted proposal, an undo.
+ */
+export async function writeSkillBody(db: Database, s: SkillRow, body: string): Promise<SkillRow> {
+  const [row] = await db
+    .update(skills)
+    .set({ body, version: sql`${skills.version} + 1`, updatedAt: new Date() })
+    .where(eq(skills.id, s.id))
+    .returning();
+  if (!row) throw new NotFoundError("Skill not found");
+  await db.execute(sql`insert into skill_files (org_id, skill_id, version, path, size, mime, status, storage_config_id, blob_key)
+    select org_id, skill_id, ${row.version}, path, size, mime, status, storage_config_id, blob_key
+    from skill_files where skill_id = ${s.id}::uuid and version = ${row.version - 1}`);
+  return row;
+}
+
+/** A person locks or unlocks a skill: a locked one agents can't change and is never archived for disuse. */
+export async function setSkillLocked(db: Database, actorId: string, orgId: string, id: string, locked: boolean) {
+  await requirePermission(db, actorId, orgId, "manage_agents");
+  const s = await loadSkill(db, orgId, id);
+  await db.update(skills).set({ locked, updatedAt: new Date() }).where(eq(skills.id, s.id));
+  await recordAudit(db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: locked ? "skill.locked" : "skill.unlocked",
+    target: { type: "skill", id: s.id },
+    details: { name: s.name },
+  });
+  return getSkill(db, actorId, orgId, id);
+}
+
+/** Brings back a skill archived for disuse (or deleted), with its agents' assignments. */
+export async function restoreSkill(db: Database, actorId: string, orgId: string, id: string) {
+  await requirePermission(db, actorId, orgId, "manage_agents");
+  const [s] = await db
+    .update(skills)
+    .set({ deletedAt: null, lastUsedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(skills.id, id), eq(skills.orgId, orgId)))
+    .returning();
+  if (!s) throw new NotFoundError("Skill not found");
+  await recordAudit(db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: "skill.restored",
+    target: { type: "skill", id: s.id },
+    details: { name: s.name },
+  });
+  return getSkill(db, actorId, orgId, id);
+}
+
+/** The skills an agent made itself (`origin` agent), archived ones too, newest first: "What it learned". */
+export async function agentMadeSkills(db: Database, actorId: string, orgId: string, agentId: string) {
+  await requirePermission(db, actorId, orgId, "read");
+  const rows = await db
+    .select()
+    .from(skills)
+    .where(and(eq(skills.orgId, orgId), eq(skills.origin, "agent"), eq(skills.ownerAgentId, agentId)))
+    .orderBy(sql`${skills.createdAt} desc`);
+  return rows.map((r) => ({ ...view(r), body: r.body, archived: r.deletedAt !== null }));
 }
 
 /** The org's skills with whether this agent has each one on. */

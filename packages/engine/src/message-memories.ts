@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, arrayOverlaps, type Database, eq, inArray, isNotNull, isNull, schema } from "@agenteschat/db";
+import { and, arrayOverlaps, type Database, eq, inArray, isNotNull, isNull, ne, schema } from "@agenteschat/db";
 import { publishChannelEvent } from "./events";
 
 const { contextItems, messages } = schema;
@@ -50,6 +50,8 @@ export async function memoriesFor(
         eq(contextItems.status, "active"),
         isNotNull(contextItems.agentId),
         isNull(contextItems.supersededBy),
+        // What the agent learned on its own stays quiet: a receipt with Undo, no mark (ADR 0120).
+        ne(contextItems.createdByKind, "agent"),
         inArray(contextItems.kind, [...SHOWN]),
         arrayOverlaps(contextItems.sourceIds, [...byId.keys()]),
       ),

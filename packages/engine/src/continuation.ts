@@ -98,6 +98,11 @@ export async function continuationVerdict(
     runKind: TurnKind;
     /** Agents its reply @named that aren't in the conversation (`unreachedNote`), "" none. */
     unreached?: string;
+    /**
+     * Asks the same call whether the turn taught something worth keeping (ADR 0120) and hands the answer here: no
+     * extra model call on any turn.
+     */
+    onLearn?: (signal: LearnSignal) => void;
   },
 ): Promise<ContinuationVerdict> {
   const answers = await judge.ask({
@@ -129,8 +134,13 @@ export async function continuationVerdict(
             "It asks a person to type or paste a secret into the chat (a password, an API key, a token, a private key), or it needs one from a person and hasn't asked for it through a secure request (`tried` has no request_secret call).",
         },
       },
+      ...(input.onLearn ? { learn: LEARN_QUESTION } : {}),
     },
   });
+  if (input.onLearn) {
+    const choice = answers.learn?.choice;
+    input.onLearn(LEARN_SIGNALS.includes(choice as LearnSignal) ? (choice as LearnSignal) : "none");
+  }
   const a = answers.verdict;
   const p = (k: ContinuationVerdict) => a?.probabilities?.[k] ?? (a?.choice === k ? 1 : 0);
   if (p("secret") >= 0.45 && (["untried", "continue", "ask"] as const).every((k) => p("secret") >= p(k)))
@@ -140,6 +150,24 @@ export async function continuationVerdict(
   if (p("ask") >= 0.45) return "ask";
   return "done";
 }
+
+/** What a finished turn taught, as the turn-end judgment reads it (ADR 0120): `none` starts no learning. */
+export type LearnSignal = "none" | "method" | "correction" | "fact";
+const LEARN_SIGNALS: readonly LearnSignal[] = ["none", "method", "correction", "fact"];
+
+const LEARN_QUESTION = {
+  type: "choice" as const,
+  instructions:
+    "Did this turn show something durable the agent should keep for next time, as `request`, `reply` and `tried` show it?",
+  criteria: {
+    method:
+      "It worked out a way it will reuse: several tries before one worked, a new API or address, a command or a script it wrote.",
+    correction:
+      "A person corrected it or said how they want things done from now on ('always…', 'from now on…', 'don't… again').",
+    fact: "A person's message or a tool result gave a lasting fact about the company, its people or its systems.",
+    none: "Anything else: a one-off request, a passing error, a plain answer or a story.",
+  },
+};
 
 /** One tool call as the judge reads it: `name(argument) → outcome`, short. */
 export function callLine(name: string, input: unknown, result?: { content: string; isError?: boolean } | null) {
@@ -163,6 +191,12 @@ const oneLineCut = (text: string, max: number) => cutText(text.replace(/\s+/g, "
  * `tool_call` events with `executed` and the run keeps in `transcript.harnessTried`.
  */
 export async function triedCalls(db: Database, run: { id: string; orgId: string }, harness: string[] = []) {
+  const calls = await runCalls(db, run);
+  return [...calls.map((c) => callLine(c.name, c.input, c.result)), ...harness].slice(-20);
+}
+
+/** A run's tool calls through the gateway, oldest first, each with its result once it came. */
+export async function runCalls(db: Database, run: { id: string; orgId: string }) {
   const steps = await db
     .select({ kind: schema.agentRunSteps.kind, data: schema.agentRunSteps.data })
     .from(schema.agentRunSteps)
@@ -174,7 +208,7 @@ export async function triedCalls(db: Database, run: { id: string; orgId: string 
       ),
     )
     .orderBy(schema.agentRunSteps.seq);
-  const calls = new Map<string, { name: string; input: unknown; result?: { content: string; isError?: boolean } }>();
+  const calls = new Map<string, RunCall>();
   for (const { kind, data } of steps) {
     const id = typeof data.toolUseId === "string" ? data.toolUseId : `step:${calls.size}`;
     const name = typeof data.name === "string" ? data.name : "";
@@ -185,7 +219,13 @@ export async function triedCalls(db: Database, run: { id: string; orgId: string 
       calls.set(id, call);
     }
   }
-  return [...[...calls.values()].map((c) => callLine(c.name, c.input, c.result)), ...harness].slice(-20);
+  return [...calls.values()];
+}
+
+export interface RunCall {
+  name: string;
+  input: unknown;
+  result?: { content: string; isError?: boolean };
 }
 
 export type TurnKind = "conversation" | "agents_dm" | "routine";

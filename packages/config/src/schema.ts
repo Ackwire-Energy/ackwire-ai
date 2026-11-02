@@ -393,6 +393,23 @@ export const envVars = {
     description: "Upper bound on reflections per thread (bounds cost and agent-to-agent loops).",
     section: "Agents",
   },
+  LEARN_MAX_PER_AGENT_DAY: {
+    schema: z.coerce.number().int().min(0).max(1000).default(20),
+    description:
+      "Upper bound on background learning jobs per agent and day (an agent's run that figured something out or was corrected). 0 turns them off.",
+    section: "Agents",
+  },
+  LEARN_MIN_TOOL_CALLS: {
+    schema: z.coerce.number().int().min(1).max(100).default(6),
+    description:
+      "Without a judge, a run learns after a failed tool call later fixed only when it made at least this many tool calls.",
+    section: "Agents",
+  },
+  LEARN_SKILL_AFTER: {
+    schema: z.coerce.number().int().min(2).max(100).default(3),
+    description: "A how-to an agent reused successfully this many times becomes one of its skills.",
+    section: "Agents",
+  },
   EMBEDDINGS_PROVIDER: {
     schema: z.enum(["none", "voyage"]).default("none"),
     description:

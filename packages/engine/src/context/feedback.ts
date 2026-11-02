@@ -285,7 +285,8 @@ export async function recordContextUse(db: Database, orgId: string, runId: strin
     .update(contextItems)
     .set({
       useCount: sql`${contextItems.useCount} + 1`,
-      relevance: sql`least(1, ${contextItems.relevance} + 0.05)`,
+      // Each use moves it less the more it already has, so the most used items stop climbing (ADR 0120).
+      relevance: sql`${contextItems.relevance} + 0.05 * (1 - ${contextItems.relevance})`,
       lastUsedAt: new Date(),
     })
     .where(and(eq(contextItems.orgId, orgId), inArray(contextItems.id, itemIds)));

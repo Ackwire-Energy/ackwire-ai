@@ -2935,6 +2935,16 @@ export const useAgentSkills = (orgId: string, agentId: string, enabled = true) =
   });
 };
 
+/** Skills the agent made from its own how-tos ("Aprendizados"); empty on a server without them. */
+export const useLearnedSkills = (orgId: string, agentId: string) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.learnedSkills(orgId, agentId),
+    queryFn: () => api.skills.learned?.(orgId, agentId) ?? Promise.resolve([]),
+    retry: false,
+  });
+};
+
 /** Which agents use each skill (the API lists skills per agent): skillId → agents. */
 export function useSkillUsage(orgId: string, enabled: boolean) {
   const api = useApi();
@@ -2973,6 +2983,8 @@ export function useSkillAction(orgId: string, { silent = false } = {}) {
         | { type: "update"; id: string; patch: SkillPatch }
         | { type: "reimport"; id: string }
         | { type: "remove"; id: string }
+        | { type: "revert"; id: string }
+        | { type: "restore"; id: string }
         | { type: "assign"; agentId: string; skills: { skillId: string; enabled: boolean }[] },
     ): Promise<unknown> => {
       switch (action.type) {
@@ -2990,8 +3002,13 @@ export function useSkillAction(orgId: string, { silent = false } = {}) {
           return api.skills.remove(orgId, action.id);
         case "assign":
           return api.skills.setForAgent(orgId, action.agentId, action.skills);
+        case "revert":
+          return api.skills.revert?.(orgId, action.id) ?? Promise.resolve();
+        case "restore":
+          return api.skills.restore?.(orgId, action.id) ?? Promise.resolve();
       }
     },
+    // The library and every agent's lists (`keys.skills` is their prefix).
     onSettled: () => qc.invalidateQueries({ queryKey: keys.skills(orgId) }),
   });
 }

@@ -333,7 +333,9 @@ export async function setup(
     ...(options.chatTools ? [createChatToolSource({ pubsub, artifacts: artifactDeps })] : []),
     ...(options.issueTools ? [createIssueToolSource({ db, pubsub })] : []),
     ...(options.calendarTools ? [createCalendarToolSource({ db, pubsub })] : []),
-    ...(options.skillTools ? [createSkillToolSource({ db, blobs: artifactDeps.blobs })] : []),
+    ...(options.skillTools
+      ? [createSkillToolSource({ db, blobs: artifactDeps.blobs, pubsub, judge: context.judge })]
+      : []),
     ...(options.contextTools ? [createContextToolSource(context)] : []),
     ...(options.scheduleTools ? [createScheduleToolSource({ pubsub, context })] : []),
     ...(options.forumTools ? [createForumToolSource({ pubsub, artifacts: artifactDeps })] : []),

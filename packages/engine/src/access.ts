@@ -45,7 +45,7 @@ export const BUILTIN_TOOLS: Record<string, string[]> = {
   "issues:write": ["create_issue", "update_issue", "comment_issue"],
   "calendar:read": ["list_events", "find_free_time"],
   "calendar:write": ["propose_event"],
-  "skills:read": ["load_skill", "read_skill_file"],
+  "skills:read": ["load_skill", "read_skill_file", "update_skill"],
   "schedule:write": [
     "schedule_reminder",
     "create_routine",

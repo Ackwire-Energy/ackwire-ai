@@ -25,8 +25,17 @@ import { agentSearchChannels, agentVisibleChannels, indexSource, searchVisible }
 import { closedRefusal } from "../standing";
 import { noAgentText } from "../team";
 import type { ToolContext, ToolDefinition, ToolSource } from "../tools/types";
-import { type ContextItem, checkPermissionText, consolidateItem, getContextItems, supersede } from "./items";
+import {
+  type ConsolidateResult,
+  type ContextItem,
+  checkPermissionText,
+  consolidateItem,
+  getContextItems,
+  supersede,
+} from "./items";
 import { kindFamily, overlap } from "./judgments";
+import { learnTrust } from "./learn";
+import { HOW_TO_CREATOR } from "./learned-skills";
 import { CARD_MAX_AGENTS, ownerDecides, type Proposal, proposeChange } from "./proposals";
 import { type ContextDeps, ensureThreadSummary, judgeOf, memoryJudging } from "./summaries";
 
@@ -100,18 +109,21 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             )
           ).map((i) => [i.id, i]),
         );
-        const lines = hits.map((h) => {
-          const item = items.get(h.sourceId);
-          const label = item ? itemLabel(item) : `[${h.kind}]`;
-          return `${label} id=${h.sourceId} (${h.createdAt.toISOString().slice(0, 10)}) ${h.snippet.replace(/\s+/g, " ")}`;
-        });
+        const person = await personRequester(ctx);
+        const lines = hits
+          .filter((h) => personMayRead(items.get(h.sourceId), person, ctx.agentId))
+          .map((h) => {
+            const item = items.get(h.sourceId);
+            const label = item ? itemLabel(item) : `[${h.kind}]`;
+            return `${label} id=${h.sourceId} (${h.createdAt.toISOString().slice(0, 10)}) ${h.snippet.replace(/\s+/g, " ")}`;
+          });
         return { content: [...lines, ...steps].join("\n"), data: { hits: hits.length + steps.length } };
       },
     },
     {
       name: "save_how_to",
       description:
-        "Save how you did something that took figuring out (several tries, a new API, a script you wrote), so next time you do it right away: what it is for, the exact way (address, command, parameters, the names of the secrets it uses, never their values) and where the script is on your computer. Write the method only, without private details from this conversation. Saving again under the same title replaces the old version. You read these in your memory in every conversation.",
+        "Save how you did something that took figuring out (several tries, a new API, a script you wrote), so next time you do it right away: what it is for, the exact way (address, command, parameters, the names of the secrets it uses, never their values) and where the script is on your computer. Write the method only, without private details from this conversation. Saving again under the same title replaces the old version. It comes back in your memory when a later request is about it. Save it on your own, before you answer; no one needs to ask.",
       scope: "memory:write",
       inputSchema: {
         type: "object",
@@ -130,8 +142,9 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
       describe: (input) => ({ title: `Save how to: ${str(input.title)}` }),
       async execute(input, ctx) {
         try {
-          // Read from a page, an email or a routine's input, a how-to is only data until a person stands behind the run.
-          const requester = await personRequester(ctx);
+          // Read from a page, an email or a routine's input, a how-to is only data until a person stands behind a
+          // run that read nothing from outside (ADR 0120).
+          const { trust } = await learnTrust(ctx);
           const title = str(input.title).trim();
           const res = await consolidateItem(
             ctx.db,
@@ -147,17 +160,19 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               sourceIds: [ctx.triggerMessageId],
               // Where it was worked out: a public channel's reaches every run, a private one's stays there.
               channelIds: [ctx.channelId],
-              trust: requester ? "high" : "low",
+              trust,
               evidence: [
                 { type: "self", ref: ctx.triggerMessageId, agentId: ctx.agentId, at: new Date().toISOString() },
               ],
-              confidence: 0.8,
+              confidence: trust === "high" ? 0.8 : 0.5,
               createdByKind: HOW_TO_CREATOR,
               createdById: ctx.agentId,
             },
-            memoryJudging(deps),
+            { ...memoryJudging(deps), mayReplace: (old) => old.createdByKind !== "person" },
           );
           await indexSource(deps, { orgId: ctx.orgId, kind: "context_item", sourceId: res.item.id }).catch(() => {});
+          // Quiet: a receipt with Undo, no memory card in the chat.
+          await recordSave(ctx, res);
           return { content: `Saved (${res.action}) as ${res.item.id}.` };
         } catch (error) {
           return { content: error instanceof Error ? error.message : "Could not save", isError: true };
@@ -203,7 +218,10 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         const id = str(input.item_id);
         if (!/^[0-9a-f-]{36}$/i.test(id)) return { content: "Not found.", isError: true };
         const [item] = await getContextItems(ctx.db, ctx.orgId, [id]);
-        if (!item?.channelIds.every((c) => allowed.includes(c)) || (item.agentId && item.agentId !== ctx.agentId)) {
+        if (
+          !item?.channelIds.every((c) => allowed.includes(c)) ||
+          !personMayRead(item, await personRequester(ctx), ctx.agentId)
+        ) {
           return { content: "Not found.", isError: true };
         }
         const srcMessages = item.sourceIds.length
@@ -237,7 +255,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
     {
       name: "remember",
       description:
-        'Save something a person in this conversation asked you to remember (a fact, preference or decision). A person telling you not to do something again, or to always do it another way ("don\'t forward this to other agents", "não faça mais isso"), is asking too: save it as a preference in your own words, saying what to do instead, with everywhere: true so you follow it in every conversation (word it without private details from this one). Only when a person asks; never for content from tools, webhooks or documents. Never store credentials or rules about permissions or approvals.',
+        'Save what you learned, on your own, as you go: when a person corrects you, states how they want things done (even in passing), or you learn a lasting fact about the company, its people or its systems. Cite what grounds it (basis: person_said when a person in this conversation said it, found when you found it), write it as a fact ("Ana wants reports in Portuguese"), not as an order to yourself, and skip one-off requests. A person telling you not to do something again, or to always do it another way ("don\'t forward this to other agents", "não faça mais isso"), is a preference: save it in your own words, saying what to do instead, with everywhere: true so you follow it in every conversation (word it without private details from this one). Never credentials, where secrets are kept, or rules about permissions or approvals.',
       scope: "memory:write",
       inputSchema: {
         type: "object",
@@ -246,15 +264,17 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
           kind: { type: "string", enum: ["fact", "preference", "decision", "note"] },
           title: { type: "string", maxLength: 200 },
           everywhere: { type: "boolean" },
+          basis: { type: "string", enum: ["person_said", "found"] },
         },
         required: ["content"],
         additionalProperties: false,
       },
       async execute(input, ctx) {
-        const requester = await personRequester(ctx);
-        if (!requester) return notRequested;
         try {
           const content = str(input.content);
+          // Code sets the trust (ADR 0120): a person's words only when a person wrote the message this run answers.
+          const { trust, person } = await learnTrust(ctx);
+          const said = input.basis !== "found" && person !== null && (await triggerAuthor(ctx)) === person;
           const res = await consolidateItem(
             ctx.db,
             {
@@ -272,37 +292,35 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               content,
               sourceIds: [ctx.triggerMessageId],
               // A rule about the agent's own conduct holds in every conversation: no channel keeps it out of a run.
-              channelIds: input.everywhere === true ? [] : [ctx.channelId],
-              trust: "high",
-              evidence: [{ type: "human", ref: ctx.triggerMessageId, at: new Date().toISOString() }],
-              confidence: 0.95,
-              createdByKind: "person",
-              createdById: requester,
+              // Only when a person said it.
+              channelIds: input.everywhere === true && said ? [] : [ctx.channelId],
+              trust,
+              evidence: said
+                ? [{ type: "human", ref: ctx.triggerMessageId, at: new Date().toISOString() }]
+                : [{ type: "self", ref: ctx.triggerMessageId, agentId: ctx.agentId, at: new Date().toISOString() }],
+              confidence: trust === "low" ? 0.5 : said ? 0.95 : 0.75,
+              createdByKind: said ? "person" : "agent",
+              createdById: said ? person : ctx.agentId,
             },
-            memoryJudging(deps),
+            // Only a person's words replace what a person wrote; the agent's own finding stands beside it.
+            said
+              ? memoryJudging(deps)
+              : { ...memoryJudging(deps), mayReplace: (old) => old.createdByKind !== "person" },
           );
           await indexSource(deps, { orgId: ctx.orgId, kind: "context_item", sourceId: res.item.id }).catch(() => {});
-          await announceMessageMemories({ db: ctx.db, pubsub: deps.pubsub }, ctx.orgId, res.item).catch(() => {});
+          // The memory card in the chat only for what a person said; the rest is a quiet receipt.
+          if (said)
+            await announceMessageMemories({ db: ctx.db, pubsub: deps.pubsub }, ctx.orgId, res.item).catch(() => {});
           if (res.action === "outweighed") {
             return {
               content: `Not saved as current: it contradicts memory ${res.item.id} ("${cutText(res.item.content, 200)}"), which has stronger evidence (an observed outcome). It was kept as history. Tell the person what you have on record and ask them to confirm which is right; if they confirm, use update_memory on ${res.item.id}.`,
             };
           }
-          // A new item (or a new version of one): a receipt with Undo. The same thing again (merged) changes nothing to undo.
-          if (res.action === "created" || res.action === "superseded") {
-            await recordAgentActions(ctx.db, ctx, [
-              {
-                kind: "memory.saved",
-                target: { type: "memory", id: res.item.id },
-                params: {
-                  text: cutText(res.item.content, 500),
-                  ...(res.previous ? { previousText: cutText(res.previous.content, 500) } : {}),
-                },
-                before: res.previous ? { itemId: res.previous.id } : null,
-                after: { itemId: res.item.id },
-              },
-            ]);
-          }
+          await recordSave(ctx, res);
+          if (res.action === "disputed")
+            return {
+              content: `Saved as ${res.item.id}, beside memory ${res.previous?.id} ("${cutText(res.previous?.content ?? "", 200)}"), which a person wrote and says otherwise: both are marked disputed until a person decides. Ask them which is right.`,
+            };
           return { content: `Saved (${res.action}) as ${res.item.id}.` };
         } catch (error) {
           return { content: error instanceof Error ? error.message : "Could not save", isError: true };
@@ -312,7 +330,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
     {
       name: "update_memory",
       description:
-        "Change one of your memories (by id) because a person in this conversation asked. Keeps the old version (it can be undone).",
+        "Change one of your memories (by id): when a person in this conversation asks, or on your own when it is something you or your learning saved and it turned out wrong or outdated. Keeps the old version (it can be undone).",
       scope: "memory:write",
       inputSchema: {
         type: "object",
@@ -322,11 +340,11 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
       },
       async execute(input, ctx) {
         const requester = await personRequester(ctx);
-        if (!requester) return notRequested;
         const item = await changeableItem(ctx, str(input.item_id), requester);
         if (typeof item === "string") return { content: item, isError: true };
         try {
           await checkPermissionText(judgeOf(deps), ctx.orgId, str(input.content));
+          const { trust } = requester ? { trust: "high" as const } : await learnTrust(ctx);
           const next = await ctx.db.transaction(async (tx) => {
             const row = await supersede(tx, item, {
               orgId: ctx.orgId,
@@ -339,12 +357,14 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
               content: str(input.content),
               sourceIds: [...item.sourceIds, ctx.triggerMessageId],
               channelIds: [...new Set([...item.channelIds, ctx.channelId])],
-              trust: "high",
-              evidence: [{ type: "human", ref: ctx.triggerMessageId, at: new Date().toISOString() }],
-              confidence: 0.95,
+              trust,
+              evidence: requester
+                ? [{ type: "human", ref: ctx.triggerMessageId, at: new Date().toISOString() }]
+                : [{ type: "self", ref: ctx.triggerMessageId, agentId: ctx.agentId, at: new Date().toISOString() }],
+              confidence: requester ? 0.95 : trust === "low" ? 0.5 : 0.75,
               pinned: item.pinned,
-              createdByKind: "person",
-              createdById: requester,
+              createdByKind: requester ? "person" : (item.createdByKind as "agent" | "job"),
+              createdById: requester ?? ctx.agentId,
             });
             await recordAgentActions(tx, ctx, [
               {
@@ -368,7 +388,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
     {
       name: "forget",
       description:
-        "Archive a memory (by id) because a person in this conversation asked you to forget it. It can be undone; people still see the history.",
+        "Archive a memory (by id): when a person in this conversation asks you to forget it, or on your own when it is something you or your learning saved and it no longer holds. It can be undone; people still see the history.",
       scope: "memory:write",
       inputSchema: {
         type: "object",
@@ -378,7 +398,6 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
       },
       async execute(input, ctx) {
         const requester = await personRequester(ctx);
-        if (!requester) return notRequested;
         const item = await changeableItem(ctx, str(input.item_id), requester);
         if (typeof item === "string") return { content: item, isError: true };
         await ctx.db.transaction(async (tx) => {
@@ -554,15 +573,50 @@ const decidedBy = (p: Proposal) =>
 const personRequester = (ctx: ToolContext): Promise<string | null> => personBehindCall(ctx);
 
 const notRequested = {
-  content: "Memory changes need a person's request in this conversation; nothing was changed.",
+  content:
+    "Changes to what a person wrote, or to what the whole team knows, need a person's request in this conversation; nothing was changed.",
   isError: true,
 };
 
+/** Who wrote the message this run answers, when a person did. */
+async function triggerAuthor(ctx: ToolContext) {
+  const [m] = await ctx.db
+    .select({ type: messages.authorType, userId: messages.authorUserId })
+    .from(messages)
+    .where(and(eq(messages.orgId, ctx.orgId), eq(messages.id, ctx.triggerMessageId)));
+  return m?.type === "person" ? m.userId : null;
+}
+
 /**
- * An item this run may change for `requester`: visible here, active, and
- * either this agent's own memory or a shared item the requester administers.
+ * An item a run may read: not another agent's, and a person's preference only in a run that person is behind
+ * (ADR 0120).
  */
-async function changeableItem(ctx: ToolContext, id: string, requester: string): Promise<ContextItem | string> {
+const personMayRead = (item: ContextItem | undefined, person: string | null, agentId: string) =>
+  !item || ((!item.agentId || item.agentId === agentId) && (item.scopeType !== "person" || item.scopeId === person));
+
+/** A new memory, or a new version of one: a receipt with Undo. The same thing again (merged) has nothing to undo. */
+async function recordSave(ctx: ToolContext, res: ConsolidateResult) {
+  if (res.action !== "created" && res.action !== "superseded" && res.action !== "disputed") return;
+  const replaced = res.action === "superseded" ? res.previous : undefined;
+  await recordAgentActions(ctx.db, ctx, [
+    {
+      kind: "memory.saved",
+      target: { type: "memory", id: res.item.id },
+      params: {
+        text: cutText(res.item.content, 500),
+        ...(replaced ? { previousText: cutText(replaced.content, 500) } : {}),
+      },
+      before: replaced ? { itemId: replaced.id } : null,
+      after: { itemId: res.item.id },
+    },
+  ]);
+}
+
+/**
+ * An item this run may change: visible here, active, and either this agent's own memory or a shared item the
+ * requester administers. With no person behind the run, only what the agent or its learning wrote itself (ADR 0120).
+ */
+async function changeableItem(ctx: ToolContext, id: string, requester: string | null): Promise<ContextItem | string> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return "Not found.";
   const [item] = await getContextItems(ctx.db, ctx.orgId, [id]);
   const allowed = await agentVisibleChannels(ctx.db, ctx.orgId, ctx.agentId);
@@ -570,6 +624,10 @@ async function changeableItem(ctx: ToolContext, id: string, requester: string): 
     return "Not found.";
   }
   if (item.agentId && item.agentId !== ctx.agentId) return "That memory belongs to another agent.";
+  if (!requester) {
+    if (item.agentId === ctx.agentId && item.createdByKind !== "person") return item;
+    return notRequested.content;
+  }
   if (!item.agentId) {
     const membership = await getMembership(ctx.db, requester, ctx.orgId);
     if (!membership || closedRefusal(membership.standing) || !can(membership, "review_memory")) {
@@ -694,6 +752,8 @@ export async function retrieveForRun(
     budgetChars?: number;
     /** What the prompt already says (the agent's instructions, the org context): an item repeating it stays out. */
     known?: string;
+    /** The people this run is for (its requester, the trigger's author): their own preferences come in (ADR 0120). */
+    personIds?: string[];
   },
 ): Promise<{ text: string; itemIds: string[] }> {
   const { db } = deps;
@@ -708,14 +768,23 @@ export async function retrieveForRun(
   })) as boolean;
   if (!hasAny) return { text: "", itemIds: [] };
   const allowed = await injectableChannels(db, input.orgId, input.agentId, input.channelId);
+  const people = [...new Set(input.personIds ?? [])];
+  const forPeople = (i: Pick<ContextItem, "scopeType" | "scopeId">) =>
+    i.scopeType !== "person" || people.includes(i.scopeId ?? "");
   const base = and(
     eq(contextItems.orgId, input.orgId),
     eq(contextItems.status, "active"),
     isNull(contextItems.supersededBy),
     arrayContained(contextItems.channelIds, allowed),
     or(isNull(contextItems.agentId), eq(contextItems.agentId, input.agentId)),
+    // A person's preferences reach only the runs they are behind.
+    people.length
+      ? or(sql`${contextItems.scopeType} <> 'person'`, inArray(contextItems.scopeId, people))
+      : sql`${contextItems.scopeType} <> 'person'`,
   );
-  const [pinned, own, shared] = await Promise.all([
+  // Fresh beats merely popular: relevance with a 30-day recency, so what was used most doesn't stay on top forever.
+  const freshness = sql`0.7 * ${contextItems.relevance} + 0.3 * exp(-extract(epoch from now() - ${contextItems.updatedAt}) / 2592000.0)`;
+  const [pinned, own, shared, personal] = await Promise.all([
     db
       .select()
       .from(contextItems)
@@ -733,7 +802,7 @@ export async function retrieveForRun(
           sql`not (${contextItems.kind} = 'note' and ${contextItems.createdByKind} = ${HOW_TO_CREATOR})`,
         ),
       )
-      .orderBy(desc(contextItems.verified), desc(contextItems.relevance), desc(contextItems.updatedAt))
+      .orderBy(desc(contextItems.verified), desc(freshness))
       .limit(15),
     db
       .select()
@@ -741,6 +810,14 @@ export async function retrieveForRun(
       .where(and(base, isNull(contextItems.agentId), eq(contextItems.kind, "lesson")))
       .orderBy(desc(contextItems.relevance))
       .limit(10),
+    people.length
+      ? db
+          .select()
+          .from(contextItems)
+          .where(and(base, eq(contextItems.scopeType, "person")))
+          .orderBy(desc(freshness))
+          .limit(5)
+      : Promise.resolve([] as ContextItem[]),
   ]);
   let searched: ContextItem[] = [];
   if (input.text.trim()) {
@@ -761,18 +838,19 @@ export async function retrieveForRun(
       )
     )
       .filter((i) => i.status === "active" && !i.supersededBy && (!i.agentId || i.agentId === input.agentId))
-      .filter((i) => i.kind !== "thread_summary")
+      .filter((i) => i.kind !== "thread_summary" && forPeople(i))
       .sort((a, b) => (rank.get(a.id) ?? 99) - (rank.get(b.id) ?? 99) - (b.relevance - a.relevance));
     searched = await withLinked(db, base, searched);
   }
   const budget = input.budgetChars ?? MEMORY_BUDGET_CHARS;
-  const picked = pickDistinct([...pinned, ...own, ...shared, ...searched], input.known ?? "");
+  const picked = pickDistinct([...pinned, ...own, ...personal, ...shared, ...searched], input.known ?? "");
   const seen = new Set<string>();
   const lines: string[] = [];
   let used = 0;
   for (const item of picked) {
     // Context on demand (ADR 0043): a long item goes in cut short; `expand` opens it in full by its id.
-    const room = item.pinned ? 600 : MEMORY_ITEM_CHARS;
+    // A how-to's method is the point: it gets the room a pinned item does.
+    const room = item.pinned || isHowTo(item) ? 600 : MEMORY_ITEM_CHARS;
     const content = item.content.replace(/\s+/g, " ");
     const line = `- ${itemLabel(item)}${item.pinned ? " (pinned)" : ""} ${item.title ? `${item.title}: ` : ""}${content.length > room ? `${cutText(content, room)}… [more with expand]` : content} (id ${item.id})`;
     if (used + line.length > budget && !item.pinned) continue;
@@ -782,6 +860,9 @@ export async function retrieveForRun(
   }
   return { text: lines.join("\n"), itemIds: [...seen] };
 }
+
+const isHowTo = (i: Pick<ContextItem, "kind" | "createdByKind">) =>
+  i.kind === "note" && i.createdByKind === HOW_TO_CREATOR;
 
 /** Memory in a run's prompt, at most (characters), pinned items aside. */
 export const MEMORY_BUDGET_CHARS = 3500;
@@ -828,9 +909,6 @@ export function pickDistinct(candidates: ContextItem[], known: string): ContextI
   }
   return out;
 }
-
-/** Who a how-to note (`save_how_to`) is created by: the only notes an agent writes itself. */
-const HOW_TO_CREATOR = "agent";
 
 /** Tools whose calls say nothing about how a task was done. */
 const STEP_NOISE = ["search_context", "get_summary", "expand", "react", "ask_user", "save_how_to"];

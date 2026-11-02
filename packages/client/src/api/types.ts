@@ -1504,6 +1504,14 @@ export interface Memory {
   supersedes: string | null;
   /** Set when a person edited it ("Editado por você · agora"). */
   editedByUserId: string | null;
+  /** What the agent learned itself ("Aprendizados"); older servers leave it out. */
+  learned?: boolean;
+  /** A how-to it worked out. */
+  howTo?: boolean;
+  /** Another memory says otherwise, until a person decides. */
+  disputed?: boolean;
+  /** Where it was learned. */
+  channelId?: string | null;
   updatedAt: string;
   /** `about: "me"` only: the viewer's message it came from ("Você disse hoje, nesta conversa"). */
   from?: { messageId: string; channelId: string; threadId: string | null; dm: boolean; at: string } | null;
@@ -1529,7 +1537,8 @@ export interface Proposal {
     | { type: "agent_instructions"; agentId: string }
     | { type: "org_context" }
     | { type: "agent_role"; agentId: string }
-    | { type: "agent_access"; agentId: string };
+    | { type: "agent_access"; agentId: string }
+    | { type: "skill"; agentId: string; skillId: string; name: string };
   /** `agent_access`: each app turned on or off. */
   access?: ProposalAccessLine[] | null;
   title: string;
@@ -2074,12 +2083,14 @@ export const AGENT_ACTION_KINDS = [
   "wiki.page_edited",
   "thread.renamed",
   "thread.closed",
+  "skill.created",
+  "skill.updated",
 ] as const;
 export type AgentActionKind = (typeof AGENT_ACTION_KINDS)[number];
 
 /** What the change was made to (link it: issue → Issues, wiki_page → Wiki, routine → Rotinas…). */
 export interface AgentActionTarget {
-  type: "issue" | "memory" | "routine" | "channel" | "wiki_page" | "thread";
+  type: "issue" | "memory" | "routine" | "channel" | "wiki_page" | "thread" | "skill";
   id: string;
   /** Issues. */
   number?: number;
@@ -3014,6 +3025,13 @@ export interface Skill {
   /** Turned on for agents created from now on. */
   defaultForNewAgents: boolean;
   metadata: Record<string, unknown>;
+  /** `agent`: made from an agent's own how-tos (older servers leave it out). */
+  origin?: "person" | "agent";
+  ownerAgentId?: string | null;
+  /** Agents can't change it; never archived for disuse. */
+  locked?: boolean;
+  useCount?: number;
+  lastUsedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -3078,6 +3096,14 @@ export interface SkillPatch {
   description?: string;
   body?: string;
   defaultForNewAgents?: boolean;
+  /** Freeze it: agents can't change it. */
+  locked?: boolean;
+}
+
+/** A skill an agent made from its own how-tos (ADR 0120), archived ones too. */
+export interface LearnedSkill extends Skill {
+  body: string;
+  archived: boolean;
 }
 
 // ── Agent computer and Run code settings: apps/server/src/routes/app/sandboxes.ts ──

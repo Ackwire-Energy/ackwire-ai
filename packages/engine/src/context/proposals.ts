@@ -38,6 +38,7 @@ import { enqueue } from "../outbox";
 import { maySql } from "../permissions";
 import { deliverNoticeToRun } from "../run-resume";
 import { userVisibleChannels } from "../search";
+import { writeSkillBody } from "../skills";
 import { ALL_TOOLS } from "../tools/scopes";
 import {
   type ContextItem,
@@ -175,7 +176,8 @@ async function announce(deps: { db: Database; pubsub?: PubSub }, proposals: Prop
 }
 
 /** Role and access are decided as on the agent's page: by who manages agents (its owner only takes access away). */
-const isAgentSetting = (p: Pick<Proposal, "target">) => p.target === "agent_role" || p.target === "agent_access";
+const isAgentSetting = (p: Pick<Proposal, "target">) =>
+  p.target === "agent_role" || p.target === "agent_access" || p.target === "skill";
 
 /** The agent's owner decides it too: its instructions, or access that only goes away. */
 export const ownerDecides = (p: Pick<Proposal, "target" | "access">) =>
@@ -294,7 +296,9 @@ export async function decideProposal(
   const decided = await db.transaction(async (tx) => {
     const as = tx as unknown as Database;
     let status: Proposal["status"] = decision === "accept" ? "accepted" : "rejected";
-    if (decision === "accept" && p.target === "org_context") {
+    if (decision === "accept" && p.target === "skill") {
+      if (!(await appliedToSkill(as, p))) status = "stale";
+    } else if (decision === "accept" && p.target === "org_context") {
       const [org] = await tx.select().from(organizations).where(eq(organizations.id, orgId)).for("update");
       if (!org || sha256(org.context) !== p.baseHash) status = "stale";
       else await tx.update(organizations).set({ context: finalText }).where(eq(organizations.id, orgId));
@@ -358,6 +362,51 @@ export async function decideProposal(
   return decided;
 }
 
+/** The skill a `skill` proposal changes: its id is the proposal's one access line (`proposeSkillChange`). */
+export const proposalSkillId = (p: Pick<Proposal, "access">) => p.access?.[0]?.id ?? null;
+
+/**
+ * An agent's change to a skill a person made or installed (ADR 0120): the new body as a diff, applied only when a
+ * person who manages agents accepts it and the skill is still as it was.
+ */
+export async function proposeSkillChange(
+  deps: { db: Database; pubsub?: PubSub },
+  input: { orgId: string; agentId: string; skill: { id: string; name: string; body: string }; body: string },
+): Promise<Proposal | null> {
+  checkContent(input.body);
+  if (input.body === input.skill.body) return null;
+  const [proposal] = await deps.db
+    .insert(contextProposals)
+    .values({
+      orgId: input.orgId,
+      target: "skill",
+      agentId: input.agentId,
+      proposedByAgentId: input.agentId,
+      baseHash: sha256(input.skill.body),
+      proposedText: input.body,
+      diff: lineDiff(input.skill.body, input.body),
+      access: [{ id: input.skill.id, label: input.skill.name, on: true }],
+      rationale: `A fix to the skill ${input.skill.name} from using it.`,
+    })
+    .returning();
+  if (!proposal) return null;
+  await announce(deps, [proposal]);
+  return proposal;
+}
+
+async function appliedToSkill(db: Database, p: Proposal) {
+  const id = proposalSkillId(p);
+  if (!id) return false;
+  const [skill] = await db
+    .select()
+    .from(schema.skills)
+    .where(and(eq(schema.skills.id, id), eq(schema.skills.orgId, p.orgId), isNull(schema.skills.deletedAt)))
+    .for("update");
+  if (!skill || sha256(skill.body) !== p.baseHash) return false;
+  await writeSkillBody(db, skill, p.proposedText);
+  return true;
+}
+
 /** Applies an accepted change to its agent (locked by the caller); false when what it was made against changed. */
 async function applied(db: Database, actorId: string, p: Proposal, agent: Agent, finalText: string) {
   if (p.target === "agent_instructions") {
@@ -395,6 +444,7 @@ function refusedChange(p: Proposal) {
       .filter((l) => l && l !== LEARNED)
       .join(" ");
   if (p.target === "agent_role") return `role: ${p.proposedText}`;
+  if (p.target === "skill") return `skill ${p.access?.[0]?.label ?? ""}: ${lines("+")}`.trim();
   if (p.target === "agent_access")
     return `access: ${(p.access ?? []).map((l) => `${l.label} ${l.on ? "on" : "off"}`).join(", ")}`;
   return lines("+") || (lines("-") ? `removing "${lines("-")}"` : "");

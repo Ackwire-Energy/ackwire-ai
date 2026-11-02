@@ -90,6 +90,7 @@ import {
   thisTurnText,
 } from "./context";
 import { recordContextUse } from "./context/feedback";
+import { afterTurnDone } from "./context/learn";
 import { type ContextDeps, ensureThreadSummary } from "./context/summaries";
 import { itemLabel, retrieveForRun } from "./context/tools";
 import { fitContextWindow } from "./context-budget";
@@ -99,6 +100,7 @@ import {
   callLine,
   continuationVerdict,
   decideTurnEnd,
+  type LearnSignal,
   reportRunFailure,
   type TurnEndDecision,
   triedCalls,
@@ -887,6 +889,19 @@ async function executeRunInner(
   const later = (write: () => Promise<unknown>) => {
     deferred = deferred.then(write).catch(() => {});
   };
+  /** What the turn-end judgment said a turn taught (ADR 0120), read once that turn is done. */
+  let learned: LearnSignal | undefined;
+  /**
+   * A turn ended done: its reused how-tos count, and learning is queued when the turn taught something (the judge's
+   * `learn` answer, or code signals with no judge). Never on a turn that wasn't judged done.
+   */
+  const learnLater = (d: TurnEndDecision) => {
+    const context = deps.context;
+    if (!context || (d.verdict !== "done" && d.rule !== "no_judge")) return;
+    const judged = d.verdict === "done";
+    const signal = learned;
+    later(() => afterTurnDone(context, run, { judged, signal }));
+  };
   /** Messages people sent to this conversation while the run was active (one run per agent and conversation). */
   const takeSteering = () => takeInbox(db, run.id);
   /**
@@ -1228,6 +1243,13 @@ async function executeRunInner(
             channelId: run.channelId,
             text: trigger?.body ?? "",
             known: agent.instructions,
+            // A person's own preferences come in for the runs they are behind (ADR 0120).
+            personIds: [
+              ...(trigger?.authorUserId ? [trigger.authorUserId] : []),
+              ...(await runAuthority(db, run)
+                .then((a) => (a.personId ? [a.personId] : []))
+                .catch(() => [] as string[])),
+            ],
           }).catch(() => ({ text: "", itemIds: [] as string[] }))
         : Promise.resolve({ text: "", itemIds: [] as string[] }),
       // A routine's instructions name what it checks; the wiki stays one `read_wiki_page` away.
@@ -2984,10 +3006,14 @@ async function executeRunInner(
                   reply: record,
                   ...(await judging.gather()),
                   runKind: "routine",
+                  onLearn: (signal) => {
+                    learned = signal;
+                  },
                 })
             : null,
           evidence: judging.evidence,
         });
+        if (decision.outcome === "done") learnLater(decision);
         transcript.continuation = advanceContinuation(state, decision, transcript.executedCalls ?? 0);
         const { nudge, ...recorded } = { ...decision, count: transcript.continuation.count };
         later(() =>
@@ -3119,11 +3145,15 @@ async function executeRunInner(
                 ...(await judging.gather()),
                 runKind: betweenAgents ? "agents_dm" : "conversation",
                 unreached,
+                onLearn: (signal) => {
+                  learned = signal;
+                },
               })
           : null,
         evidence: judging.evidence,
       });
       turnEnd = decision;
+      if (decision.outcome === "done") learnLater(decision);
       if (decision.verdict) t.followThroughVerdict = verdictRecord(decision.verdict);
       t.continuation = advanceContinuation(state, decision, transcript.executedCalls ?? 0);
       const nudgedAs = {

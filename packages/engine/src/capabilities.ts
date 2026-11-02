@@ -173,6 +173,9 @@ export function describeCapabilities(
         `- When something took figuring out (several tries, a new API, a script), save how you did it with \`save_how_to\` before you answer${names.has("run_code") ? ", and keep a script you will run again in `scripts/` in your folder (in the shared folder instead, when your computer has one, if other agents will use it)" : ""}. Next time, find it there and reuse it.`,
       );
     }
+    if (names.has("update_skill")) {
+      lines.push("- If a skill you loaded was wrong or missing a step, fix it with `update_skill` before you answer.");
+    }
     if (names.has("share_artifact")) {
       lines.push(
         "- A request for a file you already made (here, in a DM or in another channel): find it with `list_artifacts` and bring it with `share_artifact` instead of creating it again.",

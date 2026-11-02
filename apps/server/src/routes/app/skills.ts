@@ -1,5 +1,6 @@
 import { connectorOAuthApps, githubAppConfig } from "@agenteschat/config";
 import {
+  agentMadeSkills,
   agentSkillList,
   deleteSkill,
   getSkill,
@@ -10,9 +11,12 @@ import {
   listSkills,
   parseSkillMarkdown,
   reimportSkill,
+  restoreSkill,
+  revertSkillChange,
   type SkillDeps,
   saveSkill,
   setAgentSkills,
+  setSkillLocked,
   updateSkill,
   ValidationError,
 } from "@agenteschat/engine";
@@ -45,6 +49,14 @@ const Skill = z
     }),
     defaultForNewAgents: z.boolean(),
     metadata: z.record(z.string(), z.unknown()),
+    origin: z.enum(["person", "agent"]).openapi({ description: "`agent`: promoted from an agent's how-tos." }),
+    ownerAgentId: z
+      .uuid()
+      .nullable()
+      .openapi({ description: "An agent-made skill's agent (the only one that changes it)." }),
+    locked: z.boolean().openapi({ description: "Agents can't change it; never archived for disuse." }),
+    useCount: z.number(),
+    lastUsedAt: z.string().nullable(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -302,6 +314,7 @@ export function skillRoutes(deps: AppDeps) {
             description: z.string().max(1024).optional(),
             body: z.string().max(200_000).optional(),
             defaultForNewAgents: z.boolean().optional(),
+            locked: z.boolean().optional().openapi({ description: "Freeze it: agents can't change it." }),
           }),
         ),
       },
@@ -309,7 +322,47 @@ export function skillRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, skillId } = c.req.valid("param");
-      return c.json(await updateSkill(skills(), c.get("user").id, orgId, skillId, c.req.valid("json")), 200);
+      const { locked, ...rest } = c.req.valid("json");
+      const actor = c.get("user").id;
+      if (locked !== undefined) {
+        const detail = await setSkillLocked(db, actor, orgId, skillId, locked);
+        if (Object.values(rest).every((v) => v === undefined)) return c.json(detail, 200);
+      }
+      return c.json(await updateSkill(skills(), actor, orgId, skillId, rest), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/skills/{skillId}/restore",
+      tags,
+      security,
+      summary: "Bring back a skill archived for disuse (or deleted), with its agents' assignments",
+      request: { params: SkillParams },
+      responses: { 200: json(SkillDetail), ...errors },
+    }),
+    async (c) => {
+      const { orgId, skillId } = c.req.valid("param");
+      return c.json(await restoreSkill(db, c.get("user").id, orgId, skillId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/skills/{skillId}/revert",
+      tags,
+      security,
+      summary: "Undo an agent's last change to its own skill (its owner or admins)",
+      request: { params: SkillParams },
+      responses: { 200: json(SkillDetail), ...errors },
+    }),
+    async (c) => {
+      const { orgId, skillId } = c.req.valid("param");
+      const actor = c.get("user").id;
+      await revertSkillChange(db, actor, orgId, skillId);
+      return c.json(await getSkill(db, actor, orgId, skillId), 200);
     },
   );
 
@@ -354,6 +407,24 @@ export function skillRoutes(deps: AppDeps) {
 
   const AgentParams = OrgParams.extend({ agentId: z.uuid() });
   const AgentSkill = Skill.extend({ enabled: z.boolean() });
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/agents/{agentId}/learned-skills",
+      tags,
+      security,
+      summary: "Skills the agent made from its own how-tos, archived ones too, newest first",
+      request: { params: AgentParams },
+      responses: {
+        200: json(z.object({ skills: z.array(Skill.extend({ body: z.string(), archived: z.boolean() })) })),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, agentId } = c.req.valid("param");
+      return c.json({ skills: await agentMadeSkills(db, c.get("user").id, orgId, agentId) }, 200);
+    },
+  );
   app.openapi(
     createRoute({
       method: "get",
