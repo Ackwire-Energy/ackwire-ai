@@ -22,6 +22,9 @@ export interface Words {
 export const isRunAtWork = (status: RoutineRunStatus) =>
   status === "queued" || status === "running" || status === "waiting";
 
+/** Parar, not "Rodar agora": a run working now, or one paused near its plan's limit (it picks up again by itself). */
+export const isStoppable = (r: Pick<Routine, "state">) => r.state === "running" || r.state === "usage_paused";
+
 /**
  * A run as the pixel strip and the calendar draw it: told people (`ok`), nothing new (`silent`),
  * `failed`, or it didn't run (`skipped`: stopped, replaced, too late or never started). Null while at
@@ -193,6 +196,21 @@ export function routineStateTime(
 ) {
   if (r.state === "usage_paused") return r.usagePause?.resetsAt ? clockAt(locale, r.usagePause.resetsAt, now) : "";
   return r.waitingFor ? whenAt(t, locale, r.waitingFor.since, now) : "";
+}
+
+/**
+ * Milliseconds until the earliest reset among routines paused near a limit, so the list is read again then (the
+ * server says the next state once `resetsAt` passes). False: nothing to wait for.
+ */
+export function usagePauseRefetchMs(
+  list: readonly Pick<Routine, "state" | "usagePause">[] | undefined,
+  now = Date.now(),
+) {
+  const resets = (list ?? [])
+    .map((r) => (r.state === "usage_paused" && r.usagePause?.resetsAt ? Date.parse(r.usagePause.resetsAt) : Number.NaN))
+    .filter((at) => Number.isFinite(at));
+  if (resets.length === 0) return false as const;
+  return Math.max(Math.min(...resets) - now, 0) + 1000;
 }
 
 /**

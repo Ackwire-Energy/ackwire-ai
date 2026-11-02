@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
-import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
+import { browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
 let t: TestServer;
 beforeEach(async () => {
@@ -26,7 +26,7 @@ async function withRoutine(extra: Record<string, unknown> = {}) {
   });
   expect(created.status).toBe(201);
   const routine = (await created.json()) as Record<string, unknown> & { id: string };
-  return { api, routine, orgId };
+  return { api, routine, orgId, owner };
 }
 
 test("create and edit the report, every routine acting; resuming clears the pause reason and the failure streak", async () => {
@@ -94,4 +94,55 @@ test("take-over: an admin becomes the creator of a routine whose creator left", 
   expect(await taken.json()).toMatchObject({ id: routine.id, canManage: true });
   const [row] = await t.db.select().from(schema.routines).where(eq(schema.routines.id, routine.id));
   expect(row?.createdByUserId).toBe(me?.id ?? "");
+});
+
+test("continue: a routine paused near its plan's limit goes on for its owner; a plain member is refused", async () => {
+  const { api, routine, orgId, owner } = await withRoutine();
+  await api(`/routines/${routine.id}/run`, { json: {} });
+  await t.drain();
+  // Its run parked at 95% of a plan window (the engine's tests park it for real).
+  const [ledger] = await t.db.select().from(schema.routineRuns).where(eq(schema.routineRuns.routineId, routine.id));
+  const resetsAt = new Date(Date.now() + 3_600_000).toISOString();
+  await t.db
+    .update(schema.routineRuns)
+    .set({ status: "started" })
+    .where(eq(schema.routineRuns.id, ledger?.id ?? ""));
+  const [run] = await t.db
+    .select()
+    .from(schema.agentRuns)
+    .where(eq(schema.agentRuns.id, ledger?.agentRunId ?? ""));
+  await t.db
+    .update(schema.agentRuns)
+    .set({
+      status: "waiting_input",
+      transcript: {
+        ...(run?.transcript as Record<string, unknown>),
+        waitingForBrain: {
+          kind: "claude_code",
+          machineId: "",
+          code: "usage_pause",
+          waitId: "wait-1",
+          source: "plan",
+          resetsAt,
+        },
+        usagePause: { paused: true },
+      },
+    })
+    .where(eq(schema.agentRuns.id, run?.id ?? ""));
+  const list = (await (await api("/routines")).json()) as { routines: { state: string; usagePause: unknown }[] };
+  const [paused] = list.routines;
+  expect(paused?.state).toBe("usage_paused");
+  expect(paused?.usagePause).toEqual({ source: "plan", resetsAt, extraOff: false });
+
+  const ana = await joinByInvitation(t, owner, orgId, "ana@example.com");
+  const refused = await ana(`/api/app/organizations/${orgId}/routines/${routine.id}/continue`, { json: {} });
+  expect(refused.status).toBe(403);
+  expect(await refused.json()).toMatchObject({ error: { code: "routine.editor_only" } });
+
+  const continued = await api(`/routines/${routine.id}/continue`, { json: {} });
+  expect(continued.status).toBe(200);
+  const view = (await continued.json()) as { id: string; state: string; usagePause: unknown };
+  expect(view.id).toBe(routine.id);
+  expect(view.state).not.toBe("usage_paused");
+  expect(view.usagePause).toBeNull();
 });

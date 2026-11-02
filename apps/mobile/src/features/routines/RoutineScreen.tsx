@@ -13,6 +13,7 @@ import {
   busyOnComputer,
   healthWords,
   isRunAtWork,
+  isStoppable,
   pausedFix,
   routineChannelOf,
   runMessageLink,
@@ -158,6 +159,7 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
   const done = isDoneOnce(r);
   const fired = hasFired(r);
   const running = isRunning(r);
+  const stoppable = isStoppable(r);
   const reminder = isReminder(r);
   const trouble = mailTrouble(r);
   const described = useRuleDescribe(
@@ -254,8 +256,8 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
                 onPress={() => router.push(editRoutineHref(r.id))}
               />
               {/* Parar for a run at work (a paused routine's too); "Rodar agora" while it may run. */}
-              {(running || !fired) && !reminder ? (
-                running ? (
+              {(stoppable || !fired) && !reminder ? (
+                stoppable ? (
                   <Button
                     size="sm"
                     variant="secondary"

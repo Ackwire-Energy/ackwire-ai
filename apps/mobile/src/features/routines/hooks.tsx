@@ -226,7 +226,11 @@ export function useRoutineControls(r: Routine) {
     continueUsage: () =>
       action.mutate(
         { type: "continueUsage", id: r.id },
-        { onSuccess: () => say(t("routines.usagePause.continuedToast")), onError: failed },
+        {
+          onSuccess: (saved) =>
+            (saved as Routine).state !== "usage_paused" && say(t("routines.usagePause.continuedToast")),
+          onError: failed,
+        },
       ),
     fix: (fix: RoutineFix) => {
       const channelId = routineChannelOf(r.target);

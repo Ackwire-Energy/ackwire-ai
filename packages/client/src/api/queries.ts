@@ -27,6 +27,7 @@ import {
 } from "../lib/notifications";
 import { recentConversations } from "../lib/recent";
 import { replyOf } from "../lib/reply";
+import { usagePauseRefetchMs } from "../lib/routine-view";
 import { withRead } from "../lib/seen";
 import { SIDEBAR_DEFAULTS, SIDEBAR_SECTIONS, withSidebarPlace } from "../lib/sidebar-items";
 import { playSound } from "../lib/sounds";
@@ -2731,7 +2732,11 @@ export function useIssueColumnAction(orgId: string) {
 
 export const useRoutines = (orgId: string) => {
   const api = useApi();
-  return useQuery({ queryKey: keys.routines(orgId), queryFn: () => api.routines.list(orgId) });
+  return useQuery({
+    queryKey: keys.routines(orgId),
+    queryFn: () => api.routines.list(orgId),
+    refetchInterval: (q) => usagePauseRefetchMs(q.state.data),
+  });
 };
 
 export const useRoutineRuns = (orgId: string, id: string | null) => {

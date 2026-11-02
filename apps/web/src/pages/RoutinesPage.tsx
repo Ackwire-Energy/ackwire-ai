@@ -42,6 +42,7 @@ import {
   busyOnComputer,
   healthWords,
   isRunAtWork,
+  isStoppable,
   pausedFix,
   type RoutineFix,
   routineChannelOf,
@@ -553,7 +554,8 @@ function useRoutineControls(r: Routine) {
       action.mutate(
         { type: "continueUsage", id: r.id },
         {
-          onSuccess: () => toast.show(t("routines.usagePause.continuedToast")),
+          onSuccess: (saved) =>
+            (saved as Routine).state !== "usage_paused" && toast.show(t("routines.usagePause.continuedToast")),
           onError: (error) => toast.show(errorText(t, error), "error"),
         },
       ),
@@ -675,6 +677,7 @@ function RoutineRow({
   const fired = hasFired(r);
   const paused = isPaused(r);
   const running = isRunning(r);
+  const stoppable = isStoppable(r);
   const more = t("routines.more", { name: title });
   // Something needs a look (a reason it paused, failures, waiting for a computer or a person): a chip says it.
   const needsLook = !done && routineStateWords(r).tone === "waiting";
@@ -683,9 +686,9 @@ function RoutineRow({
   const showState = needsLook || r.state === "usage_paused";
   // Its "…" and its right click: run or stop, pause or resume, then what the "…" always had.
   const entries = (): MenuEntry[] => [
-    ...(r.canManage && !reminder && (running || !fired)
+    ...(r.canManage && !reminder && (stoppable || !fired)
       ? ([
-          running
+          stoppable
             ? { kind: "item", id: "stop", label: t("routines.stop"), icon: "stop", run: controls.stop }
             : { kind: "item", id: "run", label: t("routines.runNow"), icon: "play", run: controls.run },
         ] satisfies MenuEntry[])
@@ -831,8 +834,8 @@ function RoutineRow({
           />
         )}
         {/* Parar for a run at work, also a paused routine's or a fired one-off's; "Rodar agora" while it may run. */}
-        {(running || !fired) && !reminder && r.canManage ? (
-          running ? (
+        {(stoppable || !fired) && !reminder && r.canManage ? (
+          stoppable ? (
             <Button
               size="sm"
               variant="ghost"
@@ -1106,6 +1109,7 @@ function RoutineDetails({
   const done = isDoneOnce(r);
   const fired = hasFired(r);
   const running = isRunning(r);
+  const stoppable = isStoppable(r);
   const reminder = r.target.type === "conversation" && r.target.reminder === true;
   const described = useRuleDescribe(
     org.id,
@@ -1173,9 +1177,9 @@ function RoutineDetails({
           <Button size="sm" icon="edit" onClick={onEdit}>
             {t("routines.edit")}
           </Button>
-          {(running || !fired) &&
+          {(stoppable || !fired) &&
             !reminder &&
-            (running ? (
+            (stoppable ? (
               <Button size="sm" icon="stop" disabled={action.isPending} onClick={controls.stop}>
                 {t("routines.stop")}
               </Button>
