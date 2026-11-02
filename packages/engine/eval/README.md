@@ -51,7 +51,7 @@ Output: PASS/FAIL per case with each check (printed as each case ends), totals p
 | `issues`, `seedIssues` | the built-in issue tools, and issues already there |
 | `workspace` | `add_agent_to_channel` and `update_thread` (internal changes with undo) |
 | `chat` | the real `post_message` and `send_dm` (speaking elsewhere or for someone; a routine's run never gets them) |
-| `blocks` | the real `show_block` and `start_poll` (ADR 0109), next to `create_artifact` and the Drive's other tools |
+| `blocks` | the real `show_block` and `start_poll` (ADR 0113), next to `create_artifact` and the Drive's other tools |
 | `missions` | a `propose_mission` with the real description and findings schema (no computer: the proposal is only recorded) |
 | `memory` | the agent's memory items (found with `search_context`) |
 | `fixtures` | per tool name, canned results: the first entry whose `when` words all appear in the call's input (no `when` = default) |
@@ -62,3 +62,14 @@ Checkers are unit-tested in `test/behavior-checks.test.ts`; `test/behavior-eval.
 ### Hand-offs between agents (ADR 0095)
 
 `handoff-before-delete`, `status-while-colleague-works`, `note-announces-work`, `nested-handoff-one-report`, `fyi-note-no-report` and `colleague-cannot-finish` run agents working together: colleagues that really run, production's judge for how they work together (Jev, the cheap model without `TYPESAFE_API_KEY`), and production's depth backstop. On every prompt change run `bun run eval:mentions` and `bun run eval:behavior --only <these> --repeat 3` with `--lang pt` and `--lang en`; before a release, in all six languages. Each case must pass most of its runs in every language, and the rest of the suite must not regress at `--repeat 3` (the "How you work" and team lines changed with it). About US$ 0.5 to 1 per case and language.
+
+## Resilience eval
+
+`bun run eval:resilience [--only id,id] [--model …] [--repeat 3] [--concurrency 4] [--no-computer]` (ADR 0109):
+cases with an obstacle (no dedicated tool, an empty first search, a site that blocks, a dead link, a page that
+errors, a missing connector, a teammate holding the information), a real blocker (a code only the person has) and no
+obstacle at all. `resilience-cases.json` adds to a behavior case `web` (the fake web: search results by words, pages by
+address, `behavior-fakes.ts` `fakeWebFetch`), `facts` (words the answer must have), `never` (words an invented answer
+would have), `blocker` and `maxCalls`. API-brain cases run the real engine path with the real turn-end judge; a
+`"brain": "claude_code"` case runs this computer's `claude` headless with the agents' prompt rules and our web tools
+over MCP. It prints the success and give-up rates and the cost per success; `--repeat` passes a case on a majority.

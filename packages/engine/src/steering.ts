@@ -90,14 +90,17 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
     // stops the turn and starts the next one with it: `live-steer.ts`); else
     // the task stops for real, and stopping it starts it again from this message
     // (`restartAfterStopAndSend`). Who may not stop it just leaves the message for its next step.
+    // The brain this run thinks with (a conversation run may have fallen back to the model brain). A model-brain run
+    // reads its inbox at every step: asking it live would only hold the send while its executor is still starting.
+    const computer =
+      active.status === "running" &&
+      (await getAgentCached(deps.db, orgId, active.agentId).then((a) => !!a && runBrainOf(active, a) !== "model"));
     if (now && active.status === "running") {
-      const agent = await getAgentCached(deps.db, orgId, active.agentId);
-      // The brain this run thinks with (a conversation run may have fallen back to the model brain).
-      if (agent && runBrainOf(active, agent) !== "model") {
+      if (computer) {
         live = await deliverLive(deps, active, { messageId: message.id, urgent: true }).catch(() => false);
         if (!live) await cancelRun(deps, userId, orgId, runId).catch(() => undefined);
       } else await interruptRun(deps.pubsub, runId, message.id);
-    } else if (active.status === "running") {
+    } else if (computer) {
       live = await deliverLive(deps, active, { messageId: message.id, urgent: false }).catch(() => false);
     }
     // Parked waiting for its computer, its plan or its budget: look again now. Back (or never really away): the

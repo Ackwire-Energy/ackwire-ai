@@ -171,6 +171,7 @@ export const keys = {
   notificationCount: (orgId: string) => ["org", orgId, "notifications", "count"] as const,
   noticePrefs: (orgId: string) => ["org", orgId, "notice-prefs"] as const,
   sidebarItems: (orgId: string) => ["org", orgId, "sidebar-items"] as const,
+  sidebarOrder: (orgId: string) => ["org", orgId, "sidebar-order"] as const,
   forum: (orgId: string) => ["org", orgId, "forum"] as const,
   forumTopic: (orgId: string, topicId: string) => ["org", orgId, "forum", topicId] as const,
   wiki: (orgId: string) => ["org", orgId, "wiki"] as const,
@@ -202,6 +203,8 @@ export const keys = {
   /** The agent browser (ADR 0040): an agent's settings, its open request on each screen, one request (prefix). */
   browser: (orgId: string) => ["org", orgId, "browser"] as const,
   agentBrowser: (orgId: string, agentId: string) => ["org", orgId, "browser", "agent", agentId] as const,
+  /** The workspace's browser profiles (ADR 0110). */
+  browserProfiles: (orgId: string) => ["org", orgId, "browser", "profiles"] as const,
   agentBrowserHandoff: (orgId: string, agentId: string, screen: ScreenKind = "browser") =>
     ["org", orgId, "browser", "agent", agentId, "handoff", screen] as const,
   agentBrowserControl: (orgId: string, agentId: string, screen: ScreenKind = "browser") =>

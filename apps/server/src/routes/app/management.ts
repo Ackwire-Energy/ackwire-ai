@@ -21,6 +21,7 @@ import {
   memberPresence,
   memberStatus,
   mySidebarItems,
+  mySidebarOrder,
   orgOverview,
   pickerModels,
   queueInvitationEmail,
@@ -30,6 +31,7 @@ import {
   runErrorDetail,
   SIDEBAR_ITEMS,
   SIDEBAR_PLACES,
+  SIDEBAR_SECTIONS,
   type SidebarItem,
   START_PAGES,
   STATUS_EMOJI_MAX,
@@ -38,6 +40,7 @@ import {
   setInvitationRoles,
   setMySidebarItem,
   setMySidebarItems,
+  setMySidebarOrder,
   setMyStatus,
   setStartPage,
   sidebarPlaceAllowed,
@@ -558,6 +561,48 @@ export function managementRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId } = c.req.valid("param");
       return c.json({ items: await setMySidebarItems(db, orgId, c.get("user").id, c.req.valid("json").items) }, 200);
+    },
+  );
+
+  const SidebarOrder = z
+    .array(z.enum(SIDEBAR_SECTIONS))
+    .length(SIDEBAR_SECTIONS.length)
+    .refine((order) => new Set(order).size === order.length, { message: "Each section once" })
+    .openapi("SidebarOrder", {
+      description:
+        "The sidebar's sections in your order: `tools` (the tools on top), `channels`, `agents`, `people` (direct messages).",
+    });
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/me/sidebar/order",
+      tags: ["Members"],
+      security,
+      summary: "The order of the sections in your sidebar in this workspace",
+      request: { params: OrgParams },
+      responses: { 200: json(z.object({ order: SidebarOrder })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ order: await mySidebarOrder(db, orgId, c.get("user").id) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/me/sidebar/order",
+      tags: ["Members"],
+      security,
+      summary: "Order the sections of your sidebar in this workspace",
+      description: "Yours alone, on every device. `order: null` goes back to the default; the tools' places stay.",
+      request: { params: OrgParams, body: body(z.object({ order: SidebarOrder.nullable() })) },
+      responses: { 200: json(z.object({ order: SidebarOrder })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json({ order: await setMySidebarOrder(db, orgId, c.get("user").id, c.req.valid("json").order) }, 200);
     },
   );
 

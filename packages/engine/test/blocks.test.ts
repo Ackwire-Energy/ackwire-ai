@@ -19,6 +19,7 @@ import {
   ValidationError,
   validateContent,
   votePoll,
+  withPersonFacts,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
@@ -57,6 +58,17 @@ const ask = async (body: string) => {
   if (!row) throw new Error("nothing shown");
   return row;
 };
+
+const factsOf = async (id: string) =>
+  withPersonFacts(f.db, f.owner.id, f.org.id, [await getArtifact(f.artifactDeps, person(f.owner.id), f.org.id, id)]);
+
+test("a block goes to the trash only once it is in the Drive", async () => {
+  f = await setup({ blockTools: true, reply: agent });
+  const row = await ask("@dev simula");
+  expect((await factsOf(row.id))[0]?.canDelete).toBe(false);
+  await keepBlock(f.artifactDeps, f.owner.id, f.org.id, row.id);
+  expect((await factsOf(row.id))[0]?.canDelete).toBe(true);
+});
 
 describe("the prompt", () => {
   test("says when to show a block only where the tools are, and never in a routine's run", async () => {

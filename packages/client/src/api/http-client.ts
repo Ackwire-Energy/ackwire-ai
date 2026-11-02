@@ -44,6 +44,7 @@ import type {
   BatchInviteResult,
   BrainMachine,
   BrowserHandoff,
+  BrowserProfile,
   CalendarEvent,
   CalendarRange,
   Channel,
@@ -159,6 +160,7 @@ import type {
   SecretRequest,
   ServerTelemetry,
   SidebarItems,
+  SidebarSection,
   SignInOptions,
   Skill,
   SkillDetail,
@@ -348,6 +350,29 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       stop: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/stop`, { json: {} }),
       restart: (orgId, agentId) => request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser/restart`, { json: {} }),
     },
+    browserProfiles: {
+      list: async (orgId, machineId) =>
+        (
+          await request<{ profiles: BrowserProfile[] }>(`${org(orgId)}/browser-profiles`, {
+            query: machineId ? { machineId } : {},
+          })
+        ).profiles,
+      create: (orgId, input) => request<BrowserProfile>(`${org(orgId)}/browser-profiles`, { json: input }),
+      update: (orgId, profileId, input) =>
+        request<BrowserProfile>(`${org(orgId)}/browser-profiles/${enc(profileId)}`, { method: "PATCH", json: input }),
+      remove: (orgId, profileId) =>
+        request<void>(`${org(orgId)}/browser-profiles/${enc(profileId)}`, { method: "DELETE" }),
+      takeover: (orgId, profileId) =>
+        request<BrowserProfile>(`${org(orgId)}/browser-profiles/${enc(profileId)}/takeover`, { json: {} }),
+      handback: (orgId, profileId) =>
+        request<BrowserProfile>(`${org(orgId)}/browser-profiles/${enc(profileId)}/handback`, { json: {} }),
+      open: (orgId, profileId, url) =>
+        request<void>(`${org(orgId)}/browser-profiles/${enc(profileId)}/open`, { json: { url } }),
+      setDefault: (orgId, agentId, profileId) =>
+        request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser-profile`, { method: "PUT", json: { profileId } }),
+      request: (orgId, agentId) =>
+        request<void>(`${org(orgId)}/agents/${enc(agentId)}/browser-profile/request`, { json: {} }),
+    },
     desktop: {
       status: (orgId, agentId) => request<DesktopStatus>(`${org(orgId)}/agents/${enc(agentId)}/desktop`),
     },
@@ -441,6 +466,15 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
           .items,
       setSidebarItems: async (orgId, items) =>
         (await request<{ items: SidebarItems }>(`${org(orgId)}/me/sidebar`, { method: "PUT", json: { items } })).items,
+      sidebarOrder: async (orgId) =>
+        (await request<{ order: SidebarSection[] }>(`${org(orgId)}/me/sidebar/order`)).order,
+      setSidebarOrder: async (orgId, order) =>
+        (
+          await request<{ order: SidebarSection[] }>(`${org(orgId)}/me/sidebar/order`, {
+            method: "PUT",
+            json: { order },
+          })
+        ).order,
       update: (orgId, input) => request<void>(org(orgId), { method: "PATCH", json: input }),
       members: async (orgId) => (await request<{ members: Member[] }>(`${org(orgId)}/members`)).members,
       changeRole: (orgId, userId, role) =>
@@ -1007,6 +1041,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       },
       restore: (orgId, id) =>
         request<ArtifactDetail | undefined>(`${org(orgId)}/artifacts/${enc(id)}/restore`, { json: {} }),
+      purge: (orgId, id) => request<void>(`${org(orgId)}/artifacts-trash/${enc(id)}`, { method: "DELETE" }),
     },
     issues: {
       list: async (orgId, filters = {}) =>

@@ -931,8 +931,9 @@ describe("Criar agente: what gets created", () => {
         .getAttribute("aria-checked"),
     ).toBe("true");
     await click(within(audience).getByRole("radio", { name: /^Só algumas pessoas/ }));
-    expect(document.body.textContent).toContain("João sempre pode, como responsável.");
+    expect(document.body.textContent).toContain("Só João, por enquanto");
     await click(screen().getAllByLabelText(/Walter/)[0] as HTMLElement);
+    expect(document.body.textContent).toContain("João sempre pode, como responsável.");
     await proceed(2);
     // The owner and who can talk each under a label of their own, in the review and the preview: under "Responde a",
     // next to who can talk, the owner would read as whom the agent replies to.

@@ -10,7 +10,15 @@ import { steerStore } from "./steer";
  *   events arrive only from then on, so what a page read before may be behind;
  * - reconnects with backoff; tells listeners so they catch up over HTTP
  *   (real-time is best effort, the database is the source of truth);
- * - pings to keep the connection alive through proxies.
+ * - pings to keep the connection alive through proxies, and drops a socket whose pong doesn't come back
+ *   (`pongTimeoutMs`): after a network change or a sleep the browser can keep a dead socket "open" for
+ *   minutes while HTTP still works, so messages send and nothing arrives live;
+ * - asks again, with backoff, for a channel someone still listens to when the server drops or refuses its
+ *   subscription (`unsubscribed`, an error about the channel, `rate_limited`): the socket stays up and keeps
+ *   bringing the person's own events (the reply sound) while that channel would stay silent until a refresh;
+ * - when a notification names a message in a channel listened to here whose `message.created` never came
+ *   (`MISSED_MESSAGE_GRACE_MS` later), subscribes that channel anew: the server's `subscribed` has every screen
+ *   catch up (`onSubscribed`), and a subscription the server lost without a word is made again.
  */
 
 export type ServerFrame =
@@ -55,6 +63,10 @@ const defaultTimers: Timers = {
 };
 
 export const BACKOFF_MS = [500, 1000, 2000, 5000, 10_000];
+/** How long after a notification its message's own `message.created` may still come (it is normally first). */
+export const MISSED_MESSAGE_GRACE_MS = 3000;
+/** How many `message.created` ids are remembered for that check. */
+const HEARD_LIMIT = 500;
 const OPEN = 1;
 
 /** Where the server is: the page's location (web) or the server's origin, e.g. "https://app.agentes.chat" (phone app). */
@@ -115,6 +127,12 @@ export class RealtimeConnection {
   private attempt = 0;
   private retryTimer: unknown = null;
   private pingTimer: unknown = null;
+  private pongTimer: unknown = null;
+  /** Channels the server confirmed on this socket. */
+  private readonly confirmed = new Set<string>();
+  private readonly retries = new Map<string, { timer: unknown; attempt: number }>();
+  /** Recent `message.created` ids, oldest first. */
+  private readonly heard = new Set<string>();
   private everOpened = false;
   private stopped = true;
   status: ConnectionStatus = "idle";
@@ -125,6 +143,8 @@ export class RealtimeConnection {
       createSocket: SocketFactory;
       timers?: Timers;
       pingMs?: number;
+      /** How long after a ping with nothing heard back the socket counts as dead and is replaced. */
+      pongTimeoutMs?: number;
       backoffMs?: number[];
     },
   ) {}
@@ -160,13 +180,17 @@ export class RealtimeConnection {
       this.listeners.set(channelId, set);
     }
     set.add(listener);
-    if (first) this.send({ type: "subscribe", channelId });
+    if (first) {
+      this.clearRetry(channelId);
+      this.send({ type: "subscribe", channelId });
+    }
     return () => {
       const current = this.listeners.get(channelId);
       if (!current) return;
       current.delete(listener);
       if (current.size === 0) {
         this.listeners.delete(channelId);
+        this.confirmed.delete(channelId);
         this.send({ type: "unsubscribe", channelId });
       }
     };
@@ -236,6 +260,28 @@ export class RealtimeConnection {
     this.send(frame);
   }
 
+  /**
+   * Pings now and replaces the socket if nothing comes back in time (`pongTimeoutMs`). Runs on the ping interval;
+   * call it too when the page may have slept or changed networks (visible again, back online).
+   */
+  checkAlive() {
+    if (!this.isOpen || this.pongTimer !== null) return;
+    this.send({ type: "ping" });
+    const socket = this.socket;
+    this.pongTimer = this.timers.setTimeout(() => {
+      this.pongTimer = null;
+      if (this.socket !== socket || !socket) return;
+      // Its close event may never come (or come late, after the new socket opened): detach it first.
+      socket.onclose = null;
+      socket.onmessage = null;
+      socket.onerror = null;
+      try {
+        socket.close(4000, "no pong");
+      } catch {}
+      this.lost();
+    }, this.options.pongTimeoutMs ?? 10_000);
+  }
+
   /** Whether frames can go out now. */
   get isOpen() {
     return this.socket !== null && this.socket.readyState === OPEN;
@@ -263,21 +309,29 @@ export class RealtimeConnection {
       this.everOpened = true;
       this.attempt = 0;
       this.setStatus("open");
+      this.confirmed.clear();
       for (const channelId of this.listeners.keys()) this.send({ type: "subscribe", channelId });
       // The agents' browsers someone is looking at (a watch sent before the socket opened was dropped).
       this.browserWatches.resumeAll();
       this.startPing();
       if (reconnected) for (const l of this.reconnectListeners) l();
     };
-    socket.onmessage = (ev) => this.handle(parseServerFrame(ev.data));
+    socket.onmessage = (ev) => {
+      // Anything heard proves the socket alive.
+      if (this.pongTimer !== null) this.timers.clearTimeout(this.pongTimer);
+      this.pongTimer = null;
+      this.handle(parseServerFrame(ev.data));
+    };
     socket.onerror = () => {
       // `onclose` follows and schedules the retry.
     };
-    socket.onclose = () => {
-      this.socket = null;
-      this.clearTimers();
-      if (!this.stopped) this.scheduleReconnect();
-    };
+    socket.onclose = () => this.lost();
+  }
+
+  private lost() {
+    this.socket = null;
+    this.clearTimers();
+    if (!this.stopped) this.scheduleReconnect();
   }
 
   private handle(frame: ServerFrame | null) {
@@ -287,18 +341,71 @@ export class RealtimeConnection {
       return;
     }
     if (frame.type === "event" && "scope" in frame) {
+      this.checkHeard(frame.event);
       for (const l of this.userListeners) l(frame.event);
     } else if (frame.type === "event") {
+      if (frame.event.type === "message.created") {
+        this.heard.add(frame.event.messageId);
+        if (this.heard.size > HEARD_LIMIT) this.heard.delete(this.heard.values().next().value as string);
+      }
       // "lê na próxima pausa" / "leu" under your messages: one store for every screen (`useSteerState`).
       steerStore.apply(frame.event);
       const set = this.listeners.get(frame.channelId);
       if (!set) return;
       for (const l of [...set]) l(frame.event);
     } else if (frame.type === "subscribed") {
+      this.confirmed.add(frame.channelId);
+      this.clearRetry(frame.channelId);
       for (const l of this.subscribedListeners) l(frame.channelId);
+    } else if (frame.type === "unsubscribed") {
+      // Dropped by the server (archived, membership recheck), or the answer to an unsubscribe overtaken by a new
+      // listener: ask again while someone listens.
+      this.confirmed.delete(frame.channelId);
+      this.retrySubscribe(frame.channelId);
     } else if (frame.type === "error") {
+      if (frame.channelId) this.retrySubscribe(frame.channelId);
+      // Refused before the server read which channel: every one not confirmed yet may be the one.
+      else if (frame.code === "rate_limited")
+        for (const channelId of this.listeners.keys())
+          if (!this.confirmed.has(channelId)) this.retrySubscribe(channelId);
       for (const l of this.errorListeners) l(frame.code, frame.channelId);
     }
+  }
+
+  /** A notification about a message in a channel open here: if its `message.created` doesn't come, subscribe anew. */
+  private checkHeard(event: UserEvent) {
+    if (event.type !== "notification.upserted" || !("notification" in event)) return;
+    const { source, readAt } = event.notification;
+    const { channelId, messageId } = source;
+    if (!channelId || !messageId || readAt || !this.listeners.has(channelId) || this.heard.has(messageId)) return;
+    this.timers.setTimeout(() => {
+      if (this.heard.has(messageId) || !this.listeners.has(channelId)) return;
+      this.confirmed.delete(channelId);
+      this.send({ type: "unsubscribe", channelId });
+      this.send({ type: "subscribe", channelId });
+    }, MISSED_MESSAGE_GRACE_MS);
+  }
+
+  private clearRetry(channelId: string) {
+    const retry = this.retries.get(channelId);
+    if (retry && retry.timer !== null) this.timers.clearTimeout(retry.timer);
+    this.retries.delete(channelId);
+  }
+
+  /** Subscribes again after a backoff; gives up after the last step (a real refusal), until the next reconnect. */
+  private retrySubscribe(channelId: string) {
+    if (!this.listeners.has(channelId)) return;
+    const prev = this.retries.get(channelId);
+    if (prev && prev.timer !== null) return;
+    const attempt = prev?.attempt ?? 0;
+    const backoff = this.options.backoffMs ?? BACKOFF_MS;
+    if (attempt >= backoff.length) return;
+    const entry = { attempt: attempt + 1, timer: null as unknown };
+    entry.timer = this.timers.setTimeout(() => {
+      entry.timer = null;
+      if (this.listeners.has(channelId)) this.send({ type: "subscribe", channelId });
+    }, backoff[attempt] ?? 10_000);
+    this.retries.set(channelId, entry);
   }
 
   private send(frame: unknown) {
@@ -319,14 +426,18 @@ export class RealtimeConnection {
   private startPing() {
     const ms = this.options.pingMs ?? 30_000;
     if (ms <= 0) return;
-    this.pingTimer = this.timers.setInterval(() => this.send({ type: "ping" }), ms);
+    this.pingTimer = this.timers.setInterval(() => this.checkAlive(), ms);
   }
 
   private clearTimers() {
     if (this.retryTimer !== null) this.timers.clearTimeout(this.retryTimer);
     if (this.pingTimer !== null) this.timers.clearInterval(this.pingTimer);
+    if (this.pongTimer !== null) this.timers.clearTimeout(this.pongTimer);
     this.retryTimer = null;
     this.pingTimer = null;
+    this.pongTimer = null;
+    for (const retry of this.retries.values()) if (retry.timer !== null) this.timers.clearTimeout(retry.timer);
+    this.retries.clear();
   }
 
   private setStatus(status: ConnectionStatus) {

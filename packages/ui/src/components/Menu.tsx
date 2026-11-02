@@ -103,15 +103,15 @@ export function MenuRadioGroup({
       <DropdownMenu.RadioGroup value={value} onValueChange={onValueChange}>
         {options.map((o) => (
           <DropdownMenu.RadioItem key={o.value} value={o.value} className="ac-menu__item">
-            <svg className="ac-menu__check" viewBox="0 0 20 20" aria-hidden="true">
-              <path d="m5.5 10.5 3 3 6-7" />
-            </svg>
             {o.leading && (
               <span className="ac-menu__leading" aria-hidden="true">
                 {o.leading}
               </span>
             )}
             <span className="ac-menu__label">{o.label}</span>
+            <svg className="ac-menu__check" viewBox="0 0 20 20" aria-hidden="true">
+              <path d="m5.5 10.5 3 3 6-7" />
+            </svg>
           </DropdownMenu.RadioItem>
         ))}
       </DropdownMenu.RadioGroup>
@@ -142,15 +142,18 @@ export function MenuSub({ icon, label, children }: { icon?: IconName; label: Rea
   );
 }
 
-/** An on/off item ("Mostrar canceladas"): a check when on; the menu stays open. */
+/** An on/off item ("Mostrar canceladas"): a check at its end when on; the menu stays open. */
 export function MenuCheckboxItem({
   checked,
   onCheckedChange,
+  icon,
   children,
   hint,
 }: {
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
+  /** Lines its name up with the icon items around it. */
+  icon?: IconName;
   children: ReactNode;
   /** Quiet text on the right (how many it shows). */
   hint?: ReactNode;
@@ -162,11 +165,12 @@ export function MenuCheckboxItem({
       onCheckedChange={(v) => onCheckedChange(v === true)}
       onSelect={(e) => e.preventDefault()}
     >
+      {icon && <Icon name={icon} />}
+      <span className="ac-menu__label">{children}</span>
+      {hint && <span className="ac-menu__hint">{hint}</span>}
       <svg className="ac-menu__check" viewBox="0 0 20 20" aria-hidden="true">
         <path d="m5.5 10.5 3 3 6-7" />
       </svg>
-      <span className="ac-menu__label">{children}</span>
-      {hint && <span className="ac-menu__hint">{hint}</span>}
     </DropdownMenu.CheckboxItem>
   );
 }

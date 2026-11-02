@@ -2,6 +2,7 @@ import { and, type Database, eq, gte, isNull, schema, sql } from "@agenteschat/d
 import { caches } from "./cache";
 import { can, getMembership, requirePermission } from "./organizations";
 import { closedRefusal } from "./standing";
+import { WEB_USAGE_PROVIDER } from "./web-tools";
 
 const { usageRecords, agents, organizationSettings } = schema;
 
@@ -127,7 +128,13 @@ export async function usageSummary(db: Database, actorId: string, orgId: string,
     })
     .from(usageRecords)
     .innerJoin(agents, eq(agents.id, usageRecords.agentId))
-    .where(and(eq(usageRecords.orgId, orgId), gte(usageRecords.createdAt, since)))
+    .where(
+      and(
+        eq(usageRecords.orgId, orgId),
+        gte(usageRecords.createdAt, since),
+        sql`${usageRecords.provider} <> ${WEB_USAGE_PROVIDER}`,
+      ),
+    )
     .groupBy(usageRecords.agentId, agents.handle);
   return rows.map((r) => ({
     agentId: r.agentId ?? "",

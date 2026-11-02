@@ -16,6 +16,7 @@ import {
 import { AUTO_MODEL, isAutoModel, MODEL_CATALOG } from "@agenteschat/providers";
 import { isIdHandle } from "@agenteschat/ui/names";
 import type { AgentAppearance } from "./appearance";
+import { answersOthers, audienceOf } from "./audience";
 import { recordAudit } from "./audit";
 import { isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
@@ -169,12 +170,12 @@ export async function createAgent(
   db: Database,
   actorId: string,
   orgId: string,
-  input: AgentInput & { autonomy?: CommandApproval },
+  input: AgentInput & { autonomy?: CommandApproval; audienceMode?: Agent["audienceMode"] },
   defaults: { model: string },
   options: { remember?: boolean } = {},
 ): Promise<Agent> {
   const membership = await requirePermission(db, actorId, orgId, "create_agents");
-  const { autonomy, ...fields } = input;
+  const { autonomy, audienceMode, ...fields } = input;
   // `create_agents` makes the creator's own agent (ADR 0085 §5): another owner, or none, is for who edits any agent.
   // So whoever gets this far may also set its Autonomia (ADR 0094): an admin or the new agent's owner.
   if (input.ownerUserId !== undefined && input.ownerUserId !== actorId && !can(membership, "manage_agents")) {
@@ -217,6 +218,7 @@ export async function createAgent(
         orgId,
         ownerUserId,
         ...(autonomy ? { missionCommandApproval: autonomy } : {}),
+        ...(audienceMode ? { audienceMode } : {}),
       })
       .returning();
     if (!agent) throw new Error("agent insert returned nothing");
@@ -333,7 +335,9 @@ export async function updateAgent(
   const handover =
     before && before.ownerUserId !== owner && isComputerBrain(before.brain)
       ? owner && (await planOwner(db, before)) === owner
-        ? { audienceMode: "owner" as const }
+        ? answersOthers(audienceOf(before), owner)
+          ? { audienceMode: "owner" as const }
+          : {}
         : { brain: "model", brainAccountId: null }
       : {};
   // The handle it leaves joins the ones it had, so what names it there still reaches it; taking one back takes it out.

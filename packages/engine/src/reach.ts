@@ -17,7 +17,7 @@ const { agents, agentConsultations, channels, messages, routingDecisions } = sch
  * Why an agent's mention didn't wake the agent it names, the one vocabulary every skip uses (`routing_decisions.reason`,
  * `meta.reach`): `not_in_channel`, it isn't a member there (delivered as a note instead, when it may be reached);
  * `audience`, the person behind the message can't talk to it; `routine_creator_reach`, a routine is behind it and
- * its creator's reach (a routine set to act) or its "only look and tell" (one set to read) doesn't take it there.
+ * its creator's reach (a routine's) doesn't take it there.
  */
 export type ReachReason = "not_in_channel" | "audience" | "routine_creator_reach";
 
@@ -37,7 +37,7 @@ export interface ReachEntry {
   private?: true;
   /** `not_in_channel` to an agent with no AI connected: nothing could answer it. */
   noAi?: true;
-  /** A routine set to only read named a member in its own message (`hand_off`): it wakes nobody. */
+  /** Old messages only: a routine then set to only read named a member in its own message, which woke nobody. */
   routinePost?: true;
   userId?: string;
   routine?: { id: string; name: string; creatorUserId: string | null; access: RoutineBrief["access"] };
@@ -70,9 +70,7 @@ export function reachNote(entries: ReachEntry[]): string {
         return `[Not delivered]: @${e.handle} isn't in this private conversation, so your mention wasn't forwarded (what's said here stays here). If it needs something, hand it with tell_agent in a note you write yourself, with only what it may know.`;
       const why =
         e.reason === "routine_creator_reach"
-          ? e.routine?.access === "read"
-            ? "the routine behind this was set to only look and tell, so it calls no other agent"
-            : "it only works with some people, and the person who set up the routine behind this isn't one of them"
+          ? "it only works with some people, and the person who set up the routine behind this isn't one of them"
           : "it only works with some people, and the person you are helping isn't one of them";
       return `[Not delivered]: @${e.handle} wasn't called: ${why}. The people here can see that; don't mention it again for this, say what you need from it instead.`;
     })
@@ -80,7 +78,7 @@ export function reachNote(entries: ReachEntry[]): string {
 }
 
 /**
- * Whose reach a message's mentions have: the person behind it, or the creator of the routine set to act behind it
+ * Whose reach a message's mentions have: the person behind it, or the creator of the routine behind it
  * (`routineCreatorOf`); `routine`: the routine its chain roots in, if any (its bounds hold, ADR 0053 §4).
  */
 export async function reachOfMessage(db: Database, message: Pick<Message, "orgId" | "id" | "agentRunId" | "meta">) {
@@ -105,8 +103,7 @@ export async function reachWillHand(
 ): Promise<string[]> {
   if (handles.length === 0 || channel.kind === "forum" || isAgentOnlyDm(channel)) return [];
   const behind = { orgId: run.orgId, id: run.triggerMessageId, agentRunId: run.id, meta: {} };
-  const { person, routine } = await reachOfMessage(db, behind);
-  if (routine?.access === "read") return [];
+  const { person } = await reachOfMessage(db, behind);
   const [rows, talks, chain] = await Promise.all([
     db
       .select()
@@ -123,18 +120,16 @@ export async function reachWillHand(
  * message once its mentions were dispatched: `outside`, agents of the workspace it @named that aren't members here
  * and that the judge read as needed, go as a hand-off note (`sendNote`, as `tell_agent`) when the person behind it
  * (or the routine's creator) may talk to them, from any conversation; `blocked`, members its mention didn't wake for
- * who is behind it; `routinePost`, members the own message (`hand_off`) of a routine set to only read named, which it
- * never wakes. Each
- * one is written on the message (`meta.reach`, the line under it, and the author's next context), in
+ * who is behind it. Each one is written on the message (`meta.reach`, the line under it, and the author's next context), in
  * `routing_decisions`, and, when a routine's creator couldn't reach an agent, told to that agent's owner.
  */
 export async function settleReach(
   deps: { db: Database; pubsub?: PubSub } & Partial<Pick<AiStatusDeps, "gateway" | "machines">>,
   message: Message,
-  input: { outside: string[]; blocked: string[]; routinePost?: string[] },
+  input: { outside: string[]; blocked: string[] },
 ): Promise<ReachEntry[]> {
   const { db } = deps;
-  const ids = [...new Set([...input.outside, ...input.blocked, ...(input.routinePost ?? [])])];
+  const ids = [...new Set([...input.outside, ...input.blocked])];
   if (ids.length === 0) return [];
   const rows = await db
     .select()
@@ -146,20 +141,16 @@ export async function settleReach(
   const routineRef = routine
     ? { id: routine.routineId, name: routine.name, creatorUserId: routine.creatorUserId, access: routine.access }
     : undefined;
-  // Whom the owner could let in: nobody when a routine that only looks is behind it (its access is what keeps it out).
-  const who = routine?.access === "read" ? null : person;
   const blockedOf = (a: { id: string; handle: string }, outside: boolean): ReachEntry => ({
     agentId: a.id,
     handle: a.handle,
     reason: blockedReason,
     ...(outside ? { outside: true as const } : {}),
-    ...(who ? { userId: who } : {}),
+    ...(person ? { userId: person } : {}),
     ...(routineRef ? { routine: routineRef } : {}),
   });
   const entries: ReachEntry[] = [];
   for (const a of rows.filter((r) => input.blocked.includes(r.id))) entries.push(blockedOf(a, false));
-  for (const a of rows.filter((r) => input.routinePost?.includes(r.id) && !input.blocked.includes(r.id)))
-    entries.push({ agentId: a.id, handle: a.handle, reason: blockedReason, routinePost: true, routine: routineRef });
   const outside = rows.filter((r) => input.outside.includes(r.id) && !input.blocked.includes(r.id));
   if (outside.length > 0) {
     const [where] = await db
@@ -174,13 +165,8 @@ export async function settleReach(
     const chain = runId ? [...(await chainOfRun(db, message.orgId, runId)), message.authorAgentId as string] : [];
     const place = where?.kind === "channel" ? `#${where.name}` : "a conversation";
     for (const a of outside) {
-      // A routine set to only look and tell reaches no other agent; one set to act, only its creator's.
-      const may =
-        !!runId &&
-        !!message.authorAgentId &&
-        routine?.access !== "read" &&
-        !chain.includes(a.id) &&
-        canTalkTo(a, person, talks);
+      // A routine reaches only its creator's agents.
+      const may = !!runId && !!message.authorAgentId && !chain.includes(a.id) && canTalkTo(a, person, talks);
       if (!may) {
         entries.push(blockedOf(a, true));
         continue;
@@ -239,15 +225,9 @@ export async function settleReach(
     .where(and(eq(messages.orgId, message.orgId), eq(messages.id, message.id)));
   const updated = await getMessage(db, message.orgId, message.id);
   if (updated && deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(updated));
-  // Only a routine set to act that its creator's reach kept out: the agent's owner may let its creator in.
+  // Only a routine its creator's reach kept out: the agent's owner may let its creator in.
   for (const e of entries) {
-    if (
-      e.reason !== "routine_creator_reach" ||
-      e.routinePost ||
-      e.routine?.access !== "act" ||
-      !e.routine.creatorUserId
-    )
-      continue;
+    if (e.reason !== "routine_creator_reach" || e.routinePost || !e.routine?.creatorUserId) continue;
     await notifyAgentUnreached(deps, {
       orgId: message.orgId,
       agentId: e.agentId,

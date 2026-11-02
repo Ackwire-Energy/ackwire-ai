@@ -212,18 +212,20 @@ describe("the tools on top", () => {
 });
 
 describe("the sidebar's parts", () => {
-  test("lines between the tools, the channels, the agents and the people; Agentes and Mensagens diretas aren't categories", async () => {
+  test("space, no lines, between the tools, the channels, the agents and the people; Canais, Agentes and Mensagens diretas aren't categories", async () => {
     const state = seedState();
     state.channelCategories = [{ id: "00000000-0000-4000-8000-0000000000f1", name: "Engenharia", position: 0 }];
     for (const c of state.channels) if (c.id === ENG_ID) c.categoryId = "00000000-0000-4000-8000-0000000000f1";
     await go(state);
     const section = (name: string) =>
       within(nav()).getByRole("button", { name }).closest(".sidebar__section") as HTMLElement;
-    expect(nav().querySelectorAll(".sidebar__divider")).toHaveLength(3);
-    for (const part of ["Agentes", "Mensagens diretas"]) {
-      expect(section(part).previousElementSibling?.className).toBe("sidebar__divider");
+    expect(nav().querySelectorAll(".sidebar__divider")).toHaveLength(0);
+    for (const part of ["Canais", "Agentes", "Mensagens diretas"]) {
+      expect(section(part).closest(".sidebar__block")?.previousElementSibling?.className).toBe("sidebar__block");
       expect(section(part).classList.contains("sidebar__section--part")).toBe(true);
     }
+    // The categories follow their part's channels, in its block.
+    expect(section("Engenharia").closest(".sidebar__block")).toBe(section("Canais").closest(".sidebar__block"));
     expect(section("Engenharia").classList.contains("sidebar__section--part")).toBe(false);
   });
 });

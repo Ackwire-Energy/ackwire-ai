@@ -17,10 +17,11 @@ import type RFB from "@novnc/novnc";
 import { type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
-import { matchesNow, useMatchMedia } from "@/hooks/useMatchMedia";
+import { matchesNow, TOUCH, useMatchMedia } from "@/hooks/useMatchMedia";
 import { heldPicture, holdPicture, liveCanvas, showsPicture } from "@/lib/canvas";
 import { useSaid } from "@/lib/toast";
 import { SocketFactoryContext } from "@/realtime/context";
+import { withAgentFace } from "../AgentAvatar";
 import { Cover } from "../browser/BrowserCard";
 import { CantShowCover, ScreenNotice } from "../computer/covers";
 import { DialogHead, FullButton, useDialogHead, useHandBack, useSayFailed } from "../computer/head";
@@ -52,9 +53,6 @@ const PICTURE_WAIT_MS = 10_000;
 const HOLD_MS = 3_000;
 /** A stream that changes mode in place and hasn't this long after the mode changed opens again in the new one. */
 const SWITCH_WAIT_MS = 3_000;
-
-/** A phone or tablet: a Keyboard button raises its keyboard. */
-const TOUCH = "(pointer: coarse)";
 
 /**
  * An agent's screen, live (ADR 0058), as the computer dialog's stage: noVNC on a socket of its own, which
@@ -534,7 +532,7 @@ export function DesktopView({
   return (
     <div className={cx("dsk", inControl && "is-control", final && "is-final")} data-state={shown}>
       <DialogHead
-        sub={sub}
+        sub={withAgentFace(sub, name, agentId)}
         actions={
           <>
             {inControl ? controlActs : watchActs}

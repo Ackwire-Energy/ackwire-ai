@@ -1,5 +1,5 @@
 /**
- * The kit a live block runs on (ADR 0109): the controls, numbers and charts every block gets, inside its sandboxed
+ * The kit a live block runs on (ADR 0113): the controls, numbers and charts every block gets, inside its sandboxed
  * frame, on the web and in the phone's web view alike. Only this runs before the agent's code, and it holds no secret:
  * a page can read or replace it, and nothing outside trusts what it says. It is text here because it never runs in
  * the app. Parts and how to use them: `BLOCK_MANUAL` in `packages/engine/src/blocks.ts`.

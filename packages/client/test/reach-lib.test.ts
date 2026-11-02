@@ -9,17 +9,11 @@ const ada = agent("a-ada", "ada", { canTalk: true, audience: { mode: "everyone",
 const dev = agent("a-dev", "dev", { canTalk: false });
 
 describe("routineReachWarnings", () => {
-  test("set to act: the agents its creator can't talk to, never its own agent, nor an email", () => {
+  test("the agents its creator can't talk to, never its own agent, nor an email", () => {
     const out = routineReachWarnings("Cobre o @gil e a @ada; avise gil@x.com e @dev", [gil, ada, dev], {
-      access: "act",
       agentId: dev.id,
     });
-    expect(out.map((w) => [w.agent.id, w.kind])).toEqual([["a-gil", "blocked"]]);
-  });
-
-  test("set to only look and tell: every agent not open to everyone", () => {
-    const out = routineReachWarnings("@GIL e @ada", [gil, ada], { access: "read", agentId: null });
-    expect(out.map((w) => [w.agent.id, w.kind])).toEqual([["a-gil", "read"]]);
+    expect(out.map((w) => w.agent.id)).toEqual(["a-gil"]);
   });
 });
 
@@ -32,7 +26,7 @@ describe("reachOf", () => {
     expect(reachOf({})).toEqual([]);
   });
 
-  test("a routine that only looks keeps the agent out by its access", () => {
+  test("old messages: a routine that only looked kept the agent out by its access", () => {
     const base = { agentId: "a", handle: "gil", reason: "routine_creator_reach" as const };
     expect(reachByAccess({ ...base, routine: { id: "r", name: "R", creatorUserId: "u", access: "read" } })).toBe(true);
     expect(reachByAccess({ ...base, routine: { id: "r", name: "R", creatorUserId: "u", access: "act" } })).toBe(false);
@@ -47,13 +41,11 @@ describe("someone else's routine, being edited", () => {
       audience: { mode: "people", userIds: ["u-bob"] },
     });
     const prompt = "Cobre o @gil";
-    expect(routineReachWarnings(prompt, [owned], { access: "act", agentId: null })).toEqual([]);
+    expect(routineReachWarnings(prompt, [owned], { agentId: null })).toEqual([]);
     expect(
-      routineReachWarnings(prompt, [owned], { access: "act", agentId: null, creatorUserId: "u-ana" }).map(
-        (w) => w.kind,
-      ),
-    ).toEqual(["blocked"]);
-    expect(routineReachWarnings(prompt, [owned], { access: "act", agentId: null, creatorUserId: "u-bob" })).toEqual([]);
+      routineReachWarnings(prompt, [owned], { agentId: null, creatorUserId: "u-ana" }).map((w) => w.agent.id),
+    ).toEqual(["a-gil"]);
+    expect(routineReachWarnings(prompt, [owned], { agentId: null, creatorUserId: "u-bob" })).toEqual([]);
   });
 });
 

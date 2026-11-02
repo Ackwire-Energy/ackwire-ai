@@ -86,7 +86,7 @@ export interface CodexBrainDeps {
   agent?(turn: BrainTurn): Promise<AgentScope | undefined>;
   /** Before a chat turn: the agent's checkouts updated, where it starts and the "# Your code" block (`prepareAgentCode`). */
   prepare?(turn: BrainTurn, signal: AbortSignal): Promise<{ cwd: string; prompt: string } | null>;
-  /** The turn's permission profile (missions: their own; other runs: `computerTurnProfile`). */
+  /** The turn's permission profile (missions: their own; other runs: `work`, ADR 0109). */
   permissions?(turn: BrainTurn): Promise<BrainTurnRequest["permissions"] | undefined>;
   /** False for a background run: the runner keeps no Codex process for it after the turn. */
   keepAlive?: boolean;

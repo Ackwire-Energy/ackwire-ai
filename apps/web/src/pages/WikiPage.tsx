@@ -19,6 +19,8 @@ import { ObsidianMark } from "@/components/wiki/ObsidianMark";
 import { useVaultDrop, VaultDropOverlay, WikiImportDialog } from "@/components/wiki/WikiImport";
 import { AuthorAvatar, typingIn, WikiReader } from "@/components/wiki/WikiReader";
 import { useDirectory } from "@/hooks/useDirectory";
+import { copyText } from "@/lib/context-menu";
+import { entityMenu } from "@/lib/entity-menu";
 import type { VaultFile } from "@/lib/obsidian";
 import { useToast } from "@/lib/toast";
 import "./wiki.css";
@@ -204,8 +206,29 @@ function WikiNav({
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const navigate = useNavigate();
+  const toast = useToast();
   const [q, setQ] = useState("");
   const [closed, setClosed] = useState<Set<string>>(new Set());
+  // A page's right click in the tree: open it, copy its [[link]] (its title's menu on the page has the rest).
+  const rowMenu = (p: WikiPageSummary) =>
+    entityMenu(() => [
+      { kind: "header", label: p.title },
+      {
+        kind: "item",
+        id: "open",
+        label: t("contextMenu.open"),
+        icon: "arrowRight",
+        run: () => void navigate({ to: "/org/$orgId/wiki/$slug", params: { orgId: org.id, slug: p.slug } }),
+      },
+      {
+        kind: "item",
+        id: "copy-link",
+        label: t("wiki.copyLink"),
+        icon: "link",
+        run: () => void copyText(`[[${p.title}]]`, () => toast.show(t("wiki.linkCopied", { title: p.title }))),
+      },
+    ]);
   const query = q.trim().toLowerCase();
   const filtering = Boolean(query || tag);
   const shown = useMemo(
@@ -230,6 +253,7 @@ function WikiNav({
       className="wiki-row"
       aria-current={p.slug === current ? "page" : undefined}
       onClick={onClose}
+      {...rowMenu(p)}
     >
       <Icon name={p.locked ? "lock" : "document"} size={14} />
       <span className="wiki-row__t">{p.title}</span>

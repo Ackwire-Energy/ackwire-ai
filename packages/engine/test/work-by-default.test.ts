@@ -4,7 +4,6 @@ import type { ModelRequest } from "@agenteschat/providers";
 import { systemText } from "@agenteschat/providers";
 import {
   approverIds,
-  computerTurnProfile,
   continueRun,
   createAgent,
   createAgentFromProposal,
@@ -132,12 +131,9 @@ async function reportWakes(run: { id: string }) {
   return woken;
 }
 
-/** Who is behind a run, and the permission profile of its computer turns. */
-const howItWorks = async (runId: string) => ({
-  behind: await runAuthorityById(f.db, f.org.id, runId),
-  profile: await computerTurnProfile(f.db, { orgId: f.org.id, runId }),
-});
-const forAna = () => ({ behind: { kind: "person", personId: f.owner.id }, profile: "work" }) as const;
+/** Who is behind a run (every run's computer turns work, ADR 0109). */
+const howItWorks = async (runId: string) => ({ behind: await runAuthorityById(f.db, f.org.id, runId) });
+const forAna = () => ({ behind: { kind: "person", personId: f.owner.id } }) as const;
 
 /** The run a message woke. */
 const wokenBy = async (messageId: string) =>
@@ -227,7 +223,6 @@ describe("work that comes back goes on for the person behind it", () => {
     // A task no run started (the server resumed it): nobody is behind it, and the agent still works.
     expect(await howItWorks(await ended(null))).toEqual({
       behind: { kind: "unattended", personId: null, reason: "agent" },
-      profile: "work",
     });
   });
 
@@ -257,7 +252,6 @@ describe("work that comes back goes on for the person behind it", () => {
     // Nobody is behind a routine's work: the run it wakes works as the agent itself, within that routine.
     expect(await howItWorks(woke?.runs[0]?.id ?? "")).toEqual({
       behind: { kind: "unattended", personId: null, reason: "routine", brief },
-      profile: "work",
     });
   });
 
@@ -435,20 +429,17 @@ describe("work that comes back goes on for the person behind it", () => {
 });
 
 describe("with nobody behind it, a run works as the agent itself", () => {
-  test("a routine's report wakes a run that works within that routine's access", async () => {
+  test("a routine's report wakes a run that works within that routine, whatever access it once stored", async () => {
     f = await setup();
-    const expected: Record<RoutineAccess, { profile: string; decisions: string[] }> = {
-      // Set to act: it hands the work on and does it (code, background tasks, other agents, other channels, PRs).
-      act: { profile: "work", decisions: ["allow", "allow", "allow", "allow", "allow"] },
-      // Set to only look and tell: what it read may be a stranger's, so the run it wakes only reads and replies.
-      read: { profile: "plan", decisions: ["refuse", "refuse", "refuse", "refuse", "refuse"] },
-    };
+    // ADR 0109: it hands the work on and does it (code, background tasks, other agents, other channels, PRs), also
+    // for a routine stored as "read" before every routine acted.
     for (const access of ["read", "act"] as const) {
       const { run, brief } = await routineRun(access);
       const woken = await reportWakes(run);
-      const { behind, profile } = await howItWorks(woken.id);
-      expect(behind).toEqual({ kind: "unattended", personId: null, reason: "routine_report", brief });
-      expect({ profile: profile as string, decisions: decisions(behind) as string[] }).toEqual(expected[access]);
+      const { behind } = await howItWorks(woken.id);
+      const read = { ...brief, access: "act" as const };
+      expect(behind).toEqual({ kind: "unattended", personId: null, reason: "routine_report", brief: read });
+      expect(decisions(behind)).toEqual(["allow", "allow", "allow", "allow", "allow"]);
     }
   });
 
@@ -470,9 +461,8 @@ describe("with nobody behind it, a run works as the agent itself", () => {
   test("an agent's own message wakes a run that works as the agent", async () => {
     f = await setup();
     const woken = await runOn((await agentLine("Lembrete: revisar o PR #12.")).id);
-    const { behind, profile } = await howItWorks(woken.id);
+    const { behind } = await howItWorks(woken.id);
     expect(behind).toEqual({ kind: "unattended", personId: null, reason: "agent" });
-    expect(profile).toBe("work");
     expect(decisions(behind)).toEqual(["allow", "allow", "allow", "allow", "allow"]);
   });
 
@@ -527,17 +517,15 @@ describe("with nobody behind it, a run works as the agent itself", () => {
   });
 });
 
-describe("only what a person set to read reads", () => {
-  test("a routine set to only look and tell reads; one that may act starts background tasks", async () => {
+describe("every routine works as its agent (ADR 0109)", () => {
+  test("a routine, also one stored as only looking, starts background tasks and runs code", async () => {
     f = await setup();
     const looks = await routineRun("read");
-    const { behind, profile } = await howItWorks(looks.run.id);
-    expect(profile).toBe("plan");
-    expect(toolPolicy(behind, TASK)).toEqual({ action: "refuse", reason: REFUSALS.routineReadOnly });
-    expect(toolPolicy(behind, CODE).action).toBe("refuse");
+    const { behind } = await howItWorks(looks.run.id);
+    expect(toolPolicy(behind, TASK).action).toBe("allow");
+    expect(toolPolicy(behind, CODE).action).toBe("allow");
     const acts = await routineRun("act");
     const acting = await howItWorks(acts.run.id);
-    expect(acting.profile).toBe("work");
     // The computer's own background task is code work, not a mission's tool.
     expect(toolPolicy(acting.behind, TASK).action).toBe("allow");
     // The mission's own `start_task` (no scope) stays the mission's.
@@ -547,7 +535,7 @@ describe("only what a person set to read reads", () => {
     });
   });
 
-  test("a reminder that asks the agent to do something at its time is no routine that only looks", async () => {
+  test("a reminder that asks the agent to do something at its time starts a run", async () => {
     f = await setup();
     const at = new Date(Date.now() + 3600_000);
     const remind = (askAgent: boolean) =>
@@ -562,7 +550,7 @@ describe("only what a person set to read reads", () => {
         askAgent,
       });
     const fired = await fire(f, (await remind(true)).id, at);
-    expect(await howItWorks(fired.agentRunId ?? "")).toMatchObject({ profile: "work" });
+    expect(fired.agentRunId).toBeTruthy();
     // A plain reminder only reminds: no run, so nothing to set.
     expect((await fire(f, (await remind(false)).id, at)).agentRunId).toBeNull();
   });

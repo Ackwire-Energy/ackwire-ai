@@ -10,7 +10,7 @@ import { tapHaptic } from "../shared/parts";
 const FACES = 4;
 
 /**
- * A vote in the conversation (ADR 0109), drawn by the app and never by a page: a vote is an act of the person's.
+ * A vote in the conversation (ADR 0113), drawn by the app and never by a page: a vote is an act of the person's.
  * Everyone sees the marks arrive (`poll.updated`).
  */
 export function PollCard({ id, version }: { id: string; version?: number }) {

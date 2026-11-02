@@ -19,7 +19,7 @@ import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tool
 const { agentRuns, agents, artifacts, channelMembers, channels, pollVotes, polls, users } = schema;
 
 /**
- * What lives in a conversation and not in the Drive (ADR 0109). A file is for keeping; a block is for using now: a
+ * What lives in a conversation and not in the Drive (ADR 0113). A file is for keeping; a block is for using now: a
  * small interactive thing in the agent's reply, and what the person picks comes back to the agent. A poll is the
  * same for several people, drawn by the apps themselves: a vote is an act of the person's, so no page may cast one.
  */

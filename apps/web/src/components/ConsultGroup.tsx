@@ -27,7 +27,7 @@ import type { TFunction } from "i18next";
 import { createContext, useContext, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { MessageBody } from "@/chat/MessageBody";
-import { AgentAvatar } from "@/components/AgentAvatar";
+import { AgentAvatar, withAgentFace, withAgentFaces } from "@/components/AgentAvatar";
 import { useChannelActions } from "@/components/channel-actions";
 import { useNow } from "@/components/missions/MissionBits";
 import { useOrg } from "@/components/org-context";
@@ -179,7 +179,7 @@ export function ConsultGroup({
         // The consultation card's words and type (prose, never the tools' mono): the question, the answer, who saw it.
         detail: openConsultation ? undefined : (
           <div className="ac-consult__body ac-consult__body--inline">
-            <small>{t(consultAskedKey(c), { name: from.name })}</small>
+            <small>{withAgentFace(t(consultAskedKey(c), { name: from.name }), from.name, askerId)}</small>
             <div className="ac-consult__text ac-consult__text--q">
               <MessageBody body={c.question} resolveMention={dir.mentionName} />
             </div>
@@ -261,7 +261,11 @@ export function ConsultAnswerLine({
     <div className="cn-line ac-iconline" data-message-id={message.id}>
       <Icon name="agent" size={14} />
       <span className="cn-line__text">
-        {t(consultFarKey(c), { to, from: from.name, of: from.of })} · {formatTime(i18n.language, message.createdAt)}
+        {withAgentFaces(t(consultFarKey(c), { to, from: from.name, of: from.of }), [
+          { name: to, agentId: c.consultedAgentId },
+          { name: from.name, agentId: c.agentId },
+        ])}{" "}
+        · {formatTime(i18n.language, message.createdAt)}
         {" · "}
         <button
           type="button"
@@ -295,7 +299,7 @@ export function ConsultHelpingTag({ consultation: c }: { consultation: RunConsul
   const from = agentGrammar(t, dir.agentById.get(c.agentId)?.name ?? t("channel.unknownAgent"));
   return (
     <span className="msg-reminder msg-talker">
-      {t("chat.consultPanel.helping", { name: from.name, article: from.article })}
+      {withAgentFace(t("chat.consultPanel.helping", { name: from.name, article: from.article }), from.name, c.agentId)}
       {actions?.openConsultation && (
         <>
           <span aria-hidden="true">·</span>

@@ -2,6 +2,7 @@ import type {
   BrowserFrame,
   BrowserHandoff,
   BrowserInputEvent,
+  BrowserProfileWait,
   BrowserStep,
   LiveRun,
   ScreenKind,
@@ -21,23 +22,30 @@ import {
   modifiersOf,
   pagePoint,
   pressEvents,
+  profileLiveKey,
   releaseEvent,
   rememberHeldPlace,
+  runProfile,
   textEvent,
   useAgentBrowserHandoff,
+  useAgentBrowserSettings,
   useAgentScreenControl,
   useBrowserHandoffMutations,
+  useBrowserProfileMutations,
+  useBrowserProfiles,
   useBrowserStuck,
   useDesktopStatus,
   useMachines,
   wheelEvent,
 } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
-import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { agentGrammar, isFeminineName } from "@agenteschat/client/lib/grammar";
+import { can as canDo } from "@agenteschat/client/lib/permissions";
 import { isBlankPage } from "@agenteschat/client/lib/sites";
 import {
   agentGradient,
   Button,
+  Chip,
   FilterToggle,
   Icon,
   type IconName,
@@ -50,6 +58,7 @@ import {
 import type { TFunction } from "i18next";
 import {
   type CSSProperties,
+  Fragment,
   type KeyboardEvent,
   type PointerEvent,
   type ReactNode,
@@ -58,10 +67,13 @@ import {
   useRef,
   useState,
 } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
+import { withAgentFace } from "@/components/AgentAvatar";
 import { useDirectory } from "@/hooks/useDirectory";
+import { TOUCH, useMatchMedia } from "@/hooks/useMatchMedia";
 import { useToast } from "@/lib/toast";
 import { useBrowserLive, useConnectionStatus, useStreams } from "@/realtime/context";
+import { AgentWho } from "../AgentAvatar";
 import { DialogHead, FullButton, FullScreenButton, useDialogHead, useHandBack, useSayFailed } from "../computer/head";
 import { useOpenComputer } from "../computer/open";
 import { useOrg } from "../org-context";
@@ -73,6 +85,8 @@ import { SiteIcon, siteName } from "./SiteIcon";
 import "./browser.css";
 
 const FAIL_REASONS = ["code", "password", "blocked"] as const;
+/** The scroll hint goes this long after the wheel's last tick. */
+const SCROLL_HINT_IDLE_MS = 1200;
 const KEYS = ["Tab", "Enter", "Backspace", "Escape"] as const;
 /** The keycaps of the keys popover (symbols; the key names are their labels). */
 const KEYCAP: Record<(typeof KEYS)[number], string> = { Tab: "⇥", Enter: "↵", Backspace: "⌫", Escape: "esc" };
@@ -185,6 +199,10 @@ export function titleKind(v: {
 export function RunBrowserCard({ run, name }: { run: LiveRun; name: string }) {
   const { org, me } = useOrg();
   const steps = browserSteps(run.work);
+  // In a shared profile (ADR 0110) the card shows the profile, to those who may watch it.
+  const settings = useAgentBrowserSettings(org.id, run.agentId, steps.length > 0);
+  const profiles = useBrowserProfiles(org.id, steps.length > 0);
+  const inProfile = runProfile(steps, settings.data?.profileId ?? null, profiles.data);
   const ended = run.status === "failed" || run.status === "canceled";
   const ask = !run.provisional && (ended || steps.length === 0);
   const open = useAgentBrowserHandoff(org.id, run.agentId, ask, HELD_STALE_MS);
@@ -198,6 +216,17 @@ export function RunBrowserCard({ run, name }: { run: LiveRun; name: string }) {
       runId={run.runId}
       place={{ channelId: run.channelId, threadId: run.threadId }}
       handoff={held ? (open.data ?? null) : null}
+      profileWait={run.browserWait ?? null}
+      {...(inProfile
+        ? {
+            profile: {
+              id: inProfile.id,
+              name: inProfile.name,
+              agentIds: inProfile.agentIds,
+              canDrive: canDo(org, "manage_connectors") && canDo(org, "control_computers"),
+            },
+          }
+        : {})}
     />
   );
 }
@@ -297,9 +326,18 @@ export function BrowserCard({
   onSettled,
   runId,
   place,
+  profile,
+  profileWait = null,
 }: {
   agentId: string;
   name: string;
+  /**
+   * A shared browser profile (ADR 0110) instead of the agent's browser: its live view (`profile:<id>`), "Fazer
+   * login" as the person's control of it, Devolver hands it back to its agents. `name` is the profile's.
+   */
+  profile?: { id: string; name: string; agentIds: string[]; canDrive: boolean };
+  /** Its run's browser command waits for a profile someone else has (the waiting box). */
+  profileWait?: BrowserProfileWait | null;
   /** What the agent did in its browser in this run (the log); none outside a run. */
   steps?: BrowserStep[];
   /** The run whose card this is: Assumir binds the take over to it (the card stays in its conversation). */
@@ -354,7 +392,10 @@ export function BrowserCard({
     return () => io.disconnect();
   }, []);
   const watching = !chat || visible || holding;
-  const live = useBrowserLive(agentId, watching);
+  const live = useBrowserLive(profile ? profileLiveKey(profile.id) : agentId, watching);
+  const profileActions = useBrowserProfileMutations(org.id);
+  // After Devolver on a profile: who may use it now, in place of the page.
+  const [handedProfile, setHandedProfile] = useState(false);
   const [still, setStill] = useState<typeof live.frame>(null);
   const [stoppedAt, setStoppedAt] = useState<string | null>(null);
   useEffect(() => {
@@ -363,15 +404,15 @@ export function BrowserCard({
     // A new page after Parar: the browser is open again (the agent, or a person opening a site).
     setStoppedAt(null);
   }, [live.frame]);
-  const openQ = useAgentBrowserHandoff(org.id, agentId);
+  const openQ = useAgentBrowserHandoff(org.id, agentId, !profile);
   // Watching is for everyone behind its work; driving it only for admins, its owner and who it asked (ADR 0040).
-  const control = useAgentScreenControl(org.id, agentId, !given);
-  const mayDrive = canTakeOver && (given !== null || control.data !== false);
+  const control = useAgentScreenControl(org.id, agentId, !given && !profile);
+  const mayDrive = canTakeOver && (profile ? profile.canDrive : given !== null || control.data !== false);
   const actions = useBrowserHandoffMutations(org.id);
   const machines = useMachines(org.id);
   const imgRef = useRef<HTMLImageElement>(null);
   // The agent's desktop runs (its Chrome shows there): "Ver a tela inteira" opens it in the computer dialog.
-  const desktop = useDesktopStatus(org.id, agentId);
+  const desktop = useDesktopStatus(org.id, agentId, { enabled: !profile });
   const onDesktop = desktop.data?.available === true && desktop.data.running;
 
   const handoff = newest(
@@ -403,10 +444,20 @@ export function BrowserCard({
   const [confirmStop, setConfirmStop] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
   const [goOpen, setGoOpen] = useState(false);
+  // On touch the text bar types into the page; a mouse and keyboard type into it directly (`onPageKey`).
+  const touch = useMatchMedia(TOUCH);
   const [full, setFull] = useState(false);
   // The wheel scrolls the conversation; a click into the page (in control) hands it to the page until Esc.
   const [capturing, setCapturing] = useState(false);
   const pageRef = useRef<HTMLDivElement>(null);
+  // The wheel is scrolling the page right now: only then the hint says how to give the wheel back.
+  const [scrolling, setScrolling] = useState(false);
+  const scrollIdle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stopScrolling = () => {
+    if (scrollIdle.current) clearTimeout(scrollIdle.current);
+    scrollIdle.current = null;
+    setScrolling(false);
+  };
 
   // The browser is closed (the server says so, or its stream ended), or a site the person typed is opening:
   // only a new frame ends either. Every retry's status clears the server's "closed" for a moment, so the
@@ -448,19 +499,20 @@ export function BrowserCard({
       if (document.fullscreenElement === el) document.exitFullscreen().catch(() => {});
     };
   }, [full]);
-  // Esc leaves full screen (after the page lets go of the wheel), before a dialog or the page hears it.
+  // Esc leaves full screen (a scroll's hint on screen goes first), before a dialog or the page hears it.
   useEffect(() => {
     if (!full) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.preventDefault();
       e.stopPropagation();
-      if (capturing) setCapturing(false);
-      else setFull(false);
+      const hinted = scrollIdle.current !== null;
+      setCapturing(false);
+      if (!hinted) setFull(false);
     };
     document.addEventListener("keydown", onKey, true);
     return () => document.removeEventListener("keydown", onKey, true);
-  }, [full, capturing]);
+  }, [full]);
 
   const send = (events: BrowserInputEvent[] | null) => {
     if (!inControl || !events?.length) return;
@@ -478,8 +530,6 @@ export function BrowserCard({
   // A mouse or a pen presses at once and drags while held, as on a computer; fingers go through
   // `createTouchInput` (a tap clicks, one moving finger drags, two scroll).
   const press = useRef<{ id: number; at: { x: number; y: number } } | null>(null);
-  // A mouse button held on the page: the scroll hint waits for its release, so a drag never reads as a scroll.
-  const [pressing, setPressing] = useState(false);
   const [fingers] = useState(() => createTouchInput((p, clamp) => toPageNow.current(p, clamp)));
   const landed = useRef({ x: 0, y: 0 });
   // A finger drags or scrolls: the hint says how to scroll.
@@ -511,7 +561,7 @@ export function BrowserCard({
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {}
     press.current = { id: e.pointerId, at };
-    setPressing(true);
+    stopScrolling();
     setCapturing(true);
     markAt(p);
     send(pressEvents(at, modifiersOf(e, remoteIsMac)));
@@ -524,7 +574,6 @@ export function BrowserCard({
     if (held && at && (e.buttons & 1) === 0) {
       // Its release went elsewhere (another window took it): this move is the release.
       press.current = null;
-      setPressing(false);
       send([releaseEvent(at)]);
       return;
     }
@@ -543,7 +592,6 @@ export function BrowserCard({
     const held = press.current;
     if (!held || held.id !== e.pointerId) return;
     press.current = null;
-    setPressing(false);
     const at = toPage(p, true) ?? held.at;
     const mods = modifiersOf(e, remoteIsMac);
     const moved = at.x !== held.at.x || at.y !== held.at.y;
@@ -559,7 +607,6 @@ export function BrowserCard({
     const held = press.current;
     if (!held || held.id !== e.pointerId) return;
     press.current = null;
-    setPressing(false);
     send([releaseEvent(held.at)]);
   };
 
@@ -572,7 +619,18 @@ export function BrowserCard({
     if (!capturing || !inControl || !imgRef.current || !live.frame) return;
     e.preventDefault();
     const at = toPage({ x: e.clientX, y: e.clientY });
-    if (at) send([wheelEvent(at, e.deltaX, e.deltaY)]);
+    if (!at) return;
+    send([wheelEvent(at, e.deltaX, e.deltaY)]);
+    setScrolling(true);
+    if (scrollIdle.current) clearTimeout(scrollIdle.current);
+    scrollIdle.current = setTimeout(stopScrolling, SCROLL_HINT_IDLE_MS);
+  };
+  useEffect(() => () => void (scrollIdle.current && clearTimeout(scrollIdle.current)), []);
+  // The mouse leaving the page gives the wheel back to the conversation.
+  const onPagePointerLeave = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "touch") return;
+    stopScrolling();
+    setCapturing(false);
   };
   // biome-ignore lint/correctness/useExhaustiveDependencies: the page element mounts with the first frame
   useEffect(() => {
@@ -583,13 +641,32 @@ export function BrowserCard({
     return () => el.removeEventListener("wheel", on);
   }, [Boolean(frame)]);
   useEffect(() => {
-    if (!capturing) return;
+    if (!capturing) {
+      if (scrollIdle.current) clearTimeout(scrollIdle.current);
+      scrollIdle.current = null;
+      setScrolling(false);
+      return;
+    }
     const out = (e: globalThis.PointerEvent) => {
       if (!pageRef.current?.contains(e.target as Node)) setCapturing(false);
     };
+    // Esc gives the wheel back wherever the focus is. It is the hint's own key only while the hint shows;
+    // otherwise it still reaches the page.
+    const esc = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== "Escape" || full) return;
+      if (scrollIdle.current) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      setCapturing(false);
+    };
     document.addEventListener("pointerdown", out, true);
-    return () => document.removeEventListener("pointerdown", out, true);
-  }, [capturing]);
+    document.addEventListener("keydown", esc, true);
+    return () => {
+      document.removeEventListener("pointerdown", out, true);
+      document.removeEventListener("keydown", esc, true);
+    };
+  }, [capturing, full]);
   useEffect(() => {
     if (inControl) return;
     setCapturing(false);
@@ -601,7 +678,6 @@ export function BrowserCard({
   useEffect(() => {
     if (pointing) return;
     press.current = null;
-    setPressing(false);
     fingers.cancel();
     setSliding(false);
   }, [pointing, fingers]);
@@ -611,11 +687,6 @@ export function BrowserCard({
 
   const onPageKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (!inControl) return;
-    if (capturing && e.key === "Escape") {
-      e.preventDefault();
-      setCapturing(false);
-      return;
-    }
     const events = keyboardEvents(e, remoteIsMac);
     if (!events) return;
     e.preventDefault();
@@ -634,6 +705,17 @@ export function BrowserCard({
   /** Pronto (a request) or Devolver (a take over), with what the person wants the agent to know. */
   const finish = () => {
     if (!handoff) return;
+    if (profile) {
+      profileActions.handback.mutate(profile.id, {
+        onSuccess: () => {
+          setHandingBack(false);
+          setHandedProfile(true);
+          onSettled?.();
+        },
+        onError: didntWork,
+      });
+      return;
+    }
     const words = backNote.trim();
     actions.done.mutate(words ? { handoffId: handoff.id, note: words } : handoff.id, {
       onSuccess: () => {
@@ -663,6 +745,16 @@ export function BrowserCard({
   };
 
   const takeover = () => {
+    if (profile) {
+      profileActions.takeover.mutate(profile.id, {
+        onSuccess: () => setHandedProfile(false),
+        onError: (err) =>
+          sayFailed(
+            (err as { status?: number }).status === 409 ? t("browser.profiles.busy") : t("browser.live.actionFailed"),
+          ),
+      });
+      return;
+    }
     actions.takeover.mutate(runId ? { agentId, runId } : agentId, {
       onSuccess: (h) => {
         setStoppedAt(null);
@@ -692,7 +784,10 @@ export function BrowserCard({
   /** A site typed in the address bar: the card waits for its first frame. */
   const openSite = (url: string) => {
     const before = live.frame;
-    return actions.open.mutateAsync({ agentId, url }).then(() => {
+    const opened = profile
+      ? profileActions.open.mutateAsync({ profileId: profile.id, url })
+      : actions.open.mutateAsync({ agentId, url });
+    return opened.then(() => {
       setGoOpen(false);
       setWait({ frame: before, why: "opening", site: hostAndPath(url)[0] || url });
     });
@@ -720,7 +815,7 @@ export function BrowserCard({
   const retry = () => {
     setAttempt((n) => n + 1);
     // Watching again after the restart too: this view's own watch may be what the server refused.
-    if (mayDrive) actions.restart.mutate(agentId, { onError: didntWork, onSettled: () => live.retry() });
+    if (mayDrive && !profile) actions.restart.mutate(agentId, { onError: didntWork, onSettled: () => live.retry() });
     else live.retry();
   };
 
@@ -728,6 +823,19 @@ export function BrowserCard({
   if (!given && handoff?.kind === "ask" && inControl) return null;
 
   const handBackLabel = handoff?.kind === "takeover" ? t("browser.inCard.handBack") : t("browser.inCard.done");
+
+  if (profile && handedProfile && !inControl) {
+    return (
+      <div className="brw-ac" ref={root}>
+        <p className="cmp-status is-done ac-iconline">
+          <Icon name="check" size={14} />
+          <span>
+            <ProfileDone agentIds={profile.agentIds} />
+          </span>
+        </p>
+      </div>
+    );
+  }
 
   // Parar (here, or by someone else: everyone watching hears it).
   const stopped = stoppedAt
@@ -808,11 +916,13 @@ export function BrowserCard({
           ? t("browser.inCard.opening")
           : t("browser.inCard.group", g);
   const sub = inControl
-    ? ask
-      ? host
-        ? t("browser.inCard.subControl", { site: host, ...g })
-        : t("browser.inCard.subControlAsked", g)
-      : t("browser.inCard.subTakeover", g)
+    ? profile
+      ? t("browser.profiles.controlSub")
+      : ask
+        ? host
+          ? t("browser.inCard.subControl", { site: host, ...g })
+          : t("browser.inCard.subControlAsked", g)
+        : t("browser.inCard.subTakeover", g)
     : otherInControl
       ? hidden
         ? t("browser.inCard.subHidden", { person: controllerName })
@@ -859,7 +969,7 @@ export function BrowserCard({
     )
   ) : confirmStop ? (
     <>
-      <span className="small muted">{t("browser.watch.stopAsk")}</span>
+      <span className="brw-stopask small muted">{t("browser.watch.stopAsk", g)}</span>
       <Button size="sm" variant="ghost" onClick={() => setConfirmStop(false)}>
         {t("browser.watch.no")}
       </Button>
@@ -883,17 +993,33 @@ export function BrowserCard({
             {t("browser.inCard.takeover")}
           </Button>
         )}
-        <Button
-          size="sm"
-          variant="ghost"
-          iconOnly
-          icon="stop"
-          aria-label={t("browser.inCard.stop")}
-          title={t("browser.inCard.stop")}
-          onClick={() => setConfirmStop(true)}
-        />
+        {!profile && (
+          <Button
+            size="sm"
+            variant="ghost"
+            iconOnly
+            icon="stop"
+            aria-label={t("browser.inCard.stop")}
+            title={t("browser.inCard.stop")}
+            onClick={() => setConfirmStop(true)}
+          />
+        )}
       </>
     ))
+  );
+  const goToggle = (tool: boolean) => (
+    <Button
+      size="sm"
+      variant="ghost"
+      iconOnly
+      icon="globe"
+      className={tool ? "brw-tfield__tool" : undefined}
+      aria-pressed={goShown}
+      aria-label={t("browser.inCard.goToggle")}
+      title={t("browser.inCard.goToggle")}
+      disabled={goForced}
+      onClick={() => setGoOpen((v) => !v)}
+    />
   );
   const controlActs = (
     <>
@@ -924,6 +1050,7 @@ export function BrowserCard({
           <span className="cmp-act-label">{handBackLabel}</span>
         </Button>
       )}
+      {!touch && goToggle(false)}
     </>
   );
   const seeWhole = onDesktop && !full && (
@@ -948,10 +1075,12 @@ export function BrowserCard({
   const subText = (
     <small>
       {spinning && <PixelSpinner size={14} color={color} />}
-      <span>{sub}</span>
+      <span>{withAgentFace(sub, name, agentId)}</span>
     </small>
   );
-  const cover = blocker ? (
+  const cover = profileWait ? (
+    <ProfileWaitCover wait={profileWait} waiter={{ agentId, name }} />
+  ) : blocker ? (
     <Cover color={color} text={blocker} />
   ) : hidden ? (
     // Its head says who is in control.
@@ -1006,8 +1135,9 @@ export function BrowserCard({
       {!surface && !framed && <SkyStrip color={color} muted={inControl} moving={live_} />}
       {framed ? (
         // The frame's top: where it is, and what it does now (its steps on hover), or the person's controls.
-        <div className="brw-mf__top">
+        <div className="brw-mf__top ac-on-dark">
           <span className="brw-mf__site">
+            {profile && <Chip>{profile.name}</Chip>}
             {asTitle === "host" ? <SiteIcon host={host} /> : <Icon name="globe" size={14} />}
             {titleText}
           </span>
@@ -1023,7 +1153,7 @@ export function BrowserCard({
             // Focusable so the steps also open from the keyboard.
             <span className="brw-mf__now" tabIndex={steps.length > 0 ? 0 : -1}>
               {spinning && <PixelSpinner size={14} color={color} />}
-              <span>{sub}</span>
+              <span>{withAgentFace(sub, name, agentId)}</span>
               {steps.length > 0 && (
                 <span className="brw-mf__hist" role="tooltip">
                   <ol>
@@ -1047,7 +1177,7 @@ export function BrowserCard({
         // The dialog's head says it; above the page, the site it is on.
         <>
           <DialogHead
-            sub={surfaceSub}
+            sub={withAgentFace(surfaceSub, name, agentId)}
             actions={
               <>
                 {inControl ? controlActs : watchActs}
@@ -1114,6 +1244,7 @@ export function BrowserCard({
               onPointerMove={onPagePointerMove}
               onPointerUp={onPagePointerUp}
               onPointerCancel={onPagePointerCancel}
+              onPointerLeave={onPagePointerLeave}
               onLostPointerCapture={onPagePointerCancel}
               onPaste={(e) => {
                 const pasted = e.clipboardData.getData("text");
@@ -1125,7 +1256,7 @@ export function BrowserCard({
             >
               <img ref={imgRef} src={src} alt={t("browser.live.page", g)} draggable={false} />
               {mark && <span key={mark.key} className="brw-mark" style={{ left: mark.x, top: mark.y }} />}
-              {(sliding || (capturing && !pressing)) && (
+              {(sliding || scrolling) && (
                 <span className="brw-ac__capture" role="status">
                   {sliding ? t("browser.inCard.touchHint") : t("browser.inCard.scrollHint")}
                 </span>
@@ -1204,35 +1335,49 @@ export function BrowserCard({
           // grows as it wraps (`.brw-ac__note`), so all of it stays in sight. Enter hands back as in the chat:
           // Shift+Enter, an input method's Enter and a phone's return key add a line instead.
           <div className="brw-ac__foot brw-ac__fail">
-            <b>{handoff?.kind === "ask" ? t("browser.inCard.doneTitle", g) : t("browser.inCard.backTitle", g)}</b>
-            <Textarea
-              rows={1}
-              autoGrow
-              className="brw-ac__note"
-              ref={backRef}
-              value={backNote}
-              onChange={(e) => setBackNote(e.target.value)}
-              placeholder={t("browser.inCard.backPlaceholder", g)}
-              aria-label={t("browser.inCard.backLabel", g)}
-              maxLength={1000}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") setHandingBack(false);
-                if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing || onScreenKeyboard()) return;
-                e.preventDefault();
-                finish();
-              }}
-            />
+            <b>
+              {profile
+                ? t("browser.profiles.backTitle", { name: profile.name })
+                : handoff?.kind === "ask"
+                  ? t("browser.inCard.doneTitle", g)
+                  : t("browser.inCard.backTitle", g)}
+            </b>
+            {!profile && (
+              <Textarea
+                rows={1}
+                autoGrow
+                className="brw-ac__note"
+                ref={backRef}
+                value={backNote}
+                onChange={(e) => setBackNote(e.target.value)}
+                placeholder={t("browser.inCard.backPlaceholder", g)}
+                aria-label={t("browser.inCard.backLabel", g)}
+                maxLength={1000}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setHandingBack(false);
+                  if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing || onScreenKeyboard()) return;
+                  e.preventDefault();
+                  finish();
+                }}
+              />
+            )}
             <div className="brw-ac__row">
               <span className="brw-grow" />
               <Button size="sm" variant="ghost" onClick={() => setHandingBack(false)}>
                 {t("browser.live.back")}
               </Button>
-              <Button size="sm" variant="primary" icon="check" loading={actions.done.isPending} onClick={finish}>
+              <Button
+                size="sm"
+                variant="primary"
+                icon="check"
+                loading={profile ? profileActions.handback.isPending : actions.done.isPending}
+                onClick={finish}
+              >
                 {handBackLabel}
               </Button>
             </div>
           </div>
-        ) : (
+        ) : touch ? (
           // One quiet field like the message composer: where the text goes, the field, Senha, Teclas, a site, send.
           <div className="brw-ac__foot brw-type">
             {keysOpen && (
@@ -1255,11 +1400,17 @@ export function BrowserCard({
             <label className="brw-tfield">
               <span className={mark ? "brw-tfield__to is-marked" : "brw-tfield__to"}>
                 <Icon name="pointer" size={14} />
-                {mark ? t("browser.inCard.targetMarked") : t("browser.inCard.targetNone")}
+                {mark && t("browser.inCard.targetMarked")}
               </span>
               <input
                 type={secure ? "password" : "text"}
-                placeholder={secure ? t("browser.inCard.typePlaceholderSecret") : t("browser.inCard.typePlaceholder")}
+                placeholder={
+                  !mark
+                    ? t("browser.inCard.typePlaceholderTouch")
+                    : secure
+                      ? t("browser.inCard.typePlaceholderSecret")
+                      : t("browser.inCard.typePlaceholder")
+                }
                 aria-label={t("browser.live.typeLabel")}
                 autoComplete={secure ? "current-password" : "off"}
                 value={text}
@@ -1293,18 +1444,7 @@ export function BrowserCard({
                 title={t("browser.inCard.keysLabel")}
                 onClick={() => setKeysOpen((v) => !v)}
               />
-              <Button
-                size="sm"
-                variant="ghost"
-                iconOnly
-                icon="globe"
-                className="brw-tfield__tool"
-                aria-pressed={goShown}
-                aria-label={t("browser.inCard.goToggle")}
-                title={t("browser.inCard.goToggle")}
-                disabled={goForced}
-                onClick={() => setGoOpen((v) => !v)}
-              />
+              {goToggle(true)}
               <Button
                 variant="primary"
                 size="sm"
@@ -1318,12 +1458,82 @@ export function BrowserCard({
               />
             </label>
           </div>
-        ))}
+        ) : null)}
       {otherInControl && !hidden && (
         <div className="brw-ac__foot">
           <span className="small muted">{t("browser.inCard.otherHelp", { person: controllerName })}</span>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Names with their faces, joined as people say them ("Ada, Bia e Atlas"). */
+function FacesList({ agentIds }: { agentIds: string[] }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const names = agentIds.map((id) => ({ id, name: dir.agentById.get(id)?.name ?? "" })).filter((a) => a.name);
+  return (
+    <>
+      {names.map((a, i) => (
+        <Fragment key={a.id}>
+          {i > 0 && (i === names.length - 1 ? ` ${t("newAgent.and")} ` : ", ")}
+          <AgentWho agentId={a.id} name={a.name} />
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
+/** After Devolver on a profile: who may use it now. */
+function ProfileDone({ agentIds }: { agentIds: string[] }) {
+  const { t } = useTranslation();
+  if (agentIds.length === 0) return <>{t("browser.profiles.doneNone")}</>;
+  return (
+    <Trans
+      i18nKey={agentIds.length === 1 ? "browser.profiles.doneOne" : "browser.profiles.done"}
+      components={{ names: <FacesList agentIds={agentIds} /> }}
+    />
+  );
+}
+
+/** The waiting box: who has the profile, and that this agent goes on by itself once they're done (2 short lines). */
+function ProfileWaitCover({ wait, waiter }: { wait: BrowserProfileWait; waiter: { agentId: string; name: string } }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const holder = wait.holder;
+  const holderName =
+    holder.type === "agent"
+      ? (dir.agentById.get(holder.agentId)?.name ?? "")
+      : (dir.memberById.get(holder.userId)?.name ?? t("channel.unknownPerson"));
+  const she = agentGrammar(t, holderName).she;
+  const w = agentGrammar(t, waiter.name);
+  return (
+    <div className="brw-dim">
+      <span className="brw-dim__box" role="status">
+        <span className="brw-dim__lines">
+          <span className="brw-dim__l1">
+            {holder.type === "agent" ? (
+              <Trans
+                i18nKey="browser.profiles.waiting"
+                values={{ profile: wait.name }}
+                components={{ who: <AgentWho agentId={holder.agentId} name={holderName} /> }}
+              />
+            ) : (
+              t("browser.profiles.waitingPerson", { person: holderName, profile: wait.name })
+            )}
+          </span>
+          <small>
+            <Trans
+              i18nKey={isFeminineName(waiter.name) ? "browser.profiles.waitingNextF" : "browser.profiles.waitingNextM"}
+              values={{ The: w.The, she }}
+              components={{ who: <AgentWho agentId={waiter.agentId} name={waiter.name} /> }}
+            />
+          </small>
+        </span>
+      </span>
     </div>
   );
 }

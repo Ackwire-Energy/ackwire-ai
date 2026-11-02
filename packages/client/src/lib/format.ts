@@ -133,13 +133,15 @@ export function upcomingAt(t: TFunction, locale: string, iso: string, now = new 
   return formatShortDate(locale, iso);
 }
 
-/** Time left: "23 h", "5 dias", "12 min". */
+/** Time left: "24 h", "5 dias", "45 min", to the nearest unit shown, so a fresh day reads "24 h" (at least 1 min). */
 export function timeLeft(t: TFunction, iso: string, now = new Date()) {
   const ms = new Date(iso).getTime() - now.getTime();
   if (ms <= 0) return null;
-  if (ms < 3_600_000) return t("format.inMinutes", { count: Math.max(1, Math.floor(ms / 60_000)) });
-  if (ms < 2 * 86_400_000) return t("format.inHours", { count: Math.floor(ms / 3_600_000) });
-  return t("format.inDays", { count: Math.floor(ms / 86_400_000) });
+  const minutes = Math.ceil(ms / 60_000);
+  if (minutes < 60) return t("format.inMinutes", { count: minutes });
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return t("format.inHours", { count: hours });
+  return t("format.inDays", { count: Math.round(hours / 24) });
 }
 
 /** "Ana" for "Ana Souza". */
@@ -183,4 +185,33 @@ export function parseDayInput(value: string, now = new Date()): string | null {
   const d = new Date(Number(m[3] ?? now.getFullYear()), Number(m[2]) - 1, Number(m[1]));
   if (d.getDate() !== Number(m[1]) || d.getMonth() !== Number(m[2]) - 1) return null;
   return toYmd(d);
+}
+
+/**
+ * A step's target cut to what names it on one short line, never with an ellipsis that hides what it is: a URL is its
+ * host ("console.example.com", with or without its scheme), a path its last part ("refresh.ts"), anything else its first `max` characters, cut at
+ * a word when one is near.
+ */
+export function shortTarget(text: string, max = 40) {
+  const s = text.trim();
+  let out = s;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) {
+    try {
+      out = new URL(s).host || s;
+    } catch {
+      out = s;
+    }
+  } else if (/^\S*\/\S*$/.test(s)) {
+    const parts = s.split("/").filter(Boolean);
+    const first = parts[0] ?? "";
+    const last = parts.at(-1) ?? s;
+    // "acme/repo", "10/31", "and/or" name nothing shorter: only a path or a host without its scheme is cut.
+    if (/^(\/|\.{1,2}\/|~)/.test(s)) out = last;
+    else if (first.includes(".")) out = first;
+    else if (/\.[a-z0-9]{1,6}$/i.test(last)) out = last;
+  }
+  if (out.length <= max) return out;
+  const cut = out.slice(0, max);
+  const space = cut.lastIndexOf(" ");
+  return space > max / 2 ? cut.slice(0, space) : cut;
 }

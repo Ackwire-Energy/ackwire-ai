@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { plainLines } from "../src/lib/markdown";
-import { around, emailTypoFix, excerpt, jwtEmail, matchesName, webmailOf } from "../src/lib/text";
+import { around, emailTypoFix, excerpt, holdsText, jwtEmail, matchesName, webmailOf } from "../src/lib/text";
 
 test("a name typed to confirm: case, extra spaces, width forms and invisible characters aside, never a part", () => {
   expect(matchesName(" new  AGENT ", "New agent")).toBe(true);
@@ -118,4 +118,14 @@ test("the address in an ID token's email claim, whatever its base64url and paddi
   expect(jwtEmail(token(null))).toBeUndefined();
   expect(jwtEmail("not.a-token!")).toBeUndefined();
   expect(jwtEmail("")).toBeUndefined();
+});
+
+test("holdsText: the same words, spacing aside, never a word cut in the middle", () => {
+  expect(holdsText("Achei: o painel.\n\nPreciso da sua sessão.", "Achei: o painel. Preciso  da sua sessão.")).toBe(
+    true,
+  );
+  expect(holdsText("Vou ver. Depois te conto.", "Vou ver.")).toBe(true);
+  expect(holdsText("Vou verificar o painel.", "Vou ver")).toBe(false);
+  expect(holdsText("Okay, feito.", "Ok")).toBe(false);
+  expect(holdsText("Outra coisa.", "Vou ver.")).toBe(false);
 });

@@ -29,6 +29,7 @@ export const BROWSER_TOOLS = [
   "browser_screenshot",
   "browser_ask_person",
   "browser_close",
+  "browser_profile",
 ] as const;
 
 export type BrowserToolName = (typeof BROWSER_TOOLS)[number];
@@ -64,6 +65,10 @@ export const BROWSER_TOOL_INFO: Record<BrowserToolName, { label: string; descrip
     description: "Asks a person to do something on the page (like signing in) and waits until they're done.",
   },
   browser_close: { label: "Close the browser", description: "Closes the agent's browser; logins stay saved." },
+  browser_profile: {
+    label: "Switch browser profile",
+    description: "Switches between the agent's own browser and the shared browser profiles it was given.",
+  },
 };
 
 /**

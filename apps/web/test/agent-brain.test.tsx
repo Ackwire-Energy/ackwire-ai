@@ -177,8 +177,8 @@ describe("Quem pensa (its dialog)", () => {
       "Usa o seu plano do ChatGPT",
     ]);
     expect(rows[0]?.getAttribute("aria-checked")).toBe("true");
-    // The API key is the agent itself; the plans are their makers' marks.
-    expect(rows[0]?.querySelector("canvas.ac-brain")?.getAttribute("data-kind")).toBe("agent");
+    // The API key by its model's maker; the plans by their makers' marks.
+    expect(rows[0]?.querySelector(".ac-brand[data-mark='claude']")).not.toBeNull();
     expect(rows[1]?.querySelector(".ac-brand[data-mark='claude']")).not.toBeNull();
     expect(rows[2]?.querySelector(".ac-brand[data-mark='openai']")).not.toBeNull();
     // The agent has no computer: a plan brain says where it will go, before it is chosen.

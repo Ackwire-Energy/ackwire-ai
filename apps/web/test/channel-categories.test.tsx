@@ -21,10 +21,12 @@ const go = async (state = seedState(), { api = createFakeApi(state), channel = G
   return state;
 };
 const nav = () => screen().getByRole("navigation", { name: "Navegação do workspace" });
-/** "Canais", the only channel section of a workspace with no categories. */
+/** "Canais", the sidebar's part with the channels in no category (all of them, with no categories). */
 const canais = () => within(nav()).getByRole("button", { name: "Canais" }).closest(".sidebar__section") as HTMLElement;
 const names = () =>
-  [...canais().querySelectorAll(".sidebar__section-body > a .sidebar__item-label")].map((l) => l.textContent);
+  [...canais().querySelectorAll(".sidebar__section-body a.sidebar__item > .sidebar__item-label")].map(
+    (l) => l.textContent,
+  );
 const row = (name: string) => within(canais()).getByRole("link", { name });
 const dataTransfer = { setData: () => {}, getData: () => "" };
 /** Drags `from` over the top or bottom half of `to` (a 0-tall box here) and drops it there. */
@@ -99,7 +101,21 @@ describe("Criar canal in a category made there (ADR 0080)", () => {
 
   test("the new channel lands in the category made from its picker, not before it exists", async () => {
     const state = await go();
-    await click(within(nav()).getByRole("button", { name: "Criar canal" }));
+    // Canais' +: Novo canal or Nova categoria.
+    const plus = within(nav()).getByRole("button", { name: "Novo canal ou categoria" });
+    await act(async () => {
+      fireEvent.keyDown(plus, { key: "Enter" });
+      fireEvent.keyUp(plus, { key: "Enter" });
+    });
+    await settle(2);
+    const menu = screen().getByRole("menu", { name: "Novo canal ou categoria" });
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((i) => i.textContent),
+    ).toEqual(["Novo canal", "Nova categoria"]);
+    await click(within(menu).getByRole("menuitem", { name: "Novo canal" }));
+    await settle(2);
     const dialog = screen().getByRole("dialog", { name: "Criar canal" });
     await type(within(dialog).getByLabelText("Nome"), "vendas");
     await pick(within(dialog).getByRole("combobox", { name: "Categoria" }), "Nova categoria…");
@@ -177,7 +193,12 @@ const channel = (name: string) => {
   if (!row) throw new Error(`no #${name} in the sidebar`);
   return row;
 };
-const shown = (el: Element) => window.getComputedStyle(el).display !== "none";
+/** In sight: neither it nor a box around it (a row with its hover buttons, a section) is hidden. */
+const shown = (el: Element) => {
+  for (let e: Element | null = el; e; e = e.parentElement)
+    if (window.getComputedStyle(e).display === "none") return false;
+  return true;
+};
 
 describe("a category in the sidebar (ADR 0080)", () => {
   test("its channels line up with the ones in none, under its header; a channel in none stays where it was", async () => {
@@ -185,8 +206,10 @@ describe("a category in the sidebar (ADR 0080)", () => {
     await go(withCategory());
     const { body } = category("Engenharia");
     expect(body.contains(channel("eng"))).toBe(true);
-    const loose = channel("general").parentElement as HTMLElement;
-    expect(loose.closest(".sidebar__section")).toBeNull();
+    // Under the Canais part, not in the category.
+    const loose = category("Canais").body;
+    expect(loose.contains(channel("general"))).toBe(true);
+    expect(body.contains(channel("general"))).toBe(false);
     // No step in: a channel's # sits in its header's chevron column, as the ones in no category (sidebar-css.test.ts).
     expect(window.getComputedStyle(body).paddingLeft).toBe(window.getComputedStyle(loose).paddingLeft);
     expect(window.getComputedStyle(body).paddingLeft).not.toBe("19px");
@@ -262,5 +285,78 @@ describe("a category in the sidebar (ADR 0080)", () => {
     await switchTo(ORG_ID);
     expect(open("Agentes")).toBe("false");
     expect(open("Canais")).toBe("true");
+  });
+});
+
+describe("dragging a channel into, out of and between categories (ADR 0080)", () => {
+  const DESIGN_ID = "00000000-0000-4000-8000-0000000000c3";
+  const head = (name: string) => category(name).root.querySelector(".sidebar__section-head") as HTMLElement;
+  /** Drags `from` over `to` (no row: the part's own space) and drops it; the mark its header got. */
+  const dragInto = async (from: Element, to: Element, header: () => Element) => {
+    await act(async () => fireEvent.dragStart(from, { dataTransfer }));
+    await act(async () => fireEvent.dragOver(to, { dataTransfer }));
+    const mark = header().getAttribute("data-drop");
+    await act(async () => fireEvent.drop(to, { dataTransfer }));
+    await settle(3);
+    return mark;
+  };
+
+  test("a channel in none goes in: on the category's header, between its rows at that place, or on its empty end", async () => {
+    const state = await go(withCategory());
+    expect(await dragOnto(channel("general"), head("Engenharia"), "top")).toBe("into");
+    expect(places(state)).toEqual([[GENERAL_ID, { categoryId: ENGINEERING }]]);
+    expect(category("Engenharia").body.contains(channel("general"))).toBe(true);
+    cleanup();
+
+    const again = await go(withCategory());
+    expect(await dragOnto(channel("general"), channel("design"), "top")).toBe("before");
+    expect(places(again)).toEqual([[GENERAL_ID, { categoryId: ENGINEERING, beforeChannelId: DESIGN_ID }]]);
+    cleanup();
+
+    // Not on a row: the category's own space (past its last row, a row's hover buttons) takes it too, at its end.
+    const third = await go(withCategory());
+    const body = category("Engenharia").body;
+    expect(await dragInto(channel("general"), body, () => head("Engenharia"))).toBe("into");
+    expect(places(third)).toEqual([[GENERAL_ID, { categoryId: ENGINEERING }]]);
+    expect(head("Engenharia").getAttribute("data-drop")).toBeNull();
+  });
+
+  test("out to Canais it leaves its category; let go on its own row, it stays where it was", async () => {
+    const state = await go(withCategory());
+    expect(await dragInto(channel("eng"), category("Canais").body, () => category("Canais").root)).toBe("into");
+    expect(places(state)).toEqual([[ENG_ID, { categoryId: null }]]);
+    expect(category("Canais").body.contains(channel("eng"))).toBe(true);
+
+    // A short drag that ends on the row it started from sends nothing (not "to the end of the part around it").
+    await act(async () => fireEvent.dragStart(channel("general"), { dataTransfer }));
+    const own = createEvent.dragOver(channel("general"), { dataTransfer });
+    await act(async () => fireEvent(channel("general"), own));
+    expect(own.defaultPrevented).toBe(false);
+    expect(category("Canais").root.getAttribute("data-drop")).toBeNull();
+    await act(async () => fireEvent.drop(channel("general"), { dataTransfer }));
+    await settle(3);
+    expect(places(state)).toHaveLength(1);
+  });
+
+  test("a member moves only the channels they created, into a category on its empty end; the categories stay put", async () => {
+    const state = withCategory();
+    const me = state.me;
+    if (me?.organizations[0]) me.organizations[0].role = "member";
+    for (const c of state.channels) c.createdByUserId = c.id === GENERAL_ID ? me?.user.id : "u-joao";
+    await go(state);
+    // The categories are the workspace's: only who manages channels drags them.
+    expect(head("Engenharia").getAttribute("draggable")).toBe("false");
+    expect(channel("eng").getAttribute("draggable")).toBe("false");
+    expect(channel("general").getAttribute("draggable")).toBe("true");
+    expect(await dragInto(channel("general"), category("Engenharia").body, () => head("Engenharia"))).toBe("into");
+    expect(places(state)).toEqual([[GENERAL_ID, { categoryId: ENGINEERING }]]);
+  });
+
+  test("into the part it's already in, a channel stays put: its category's header or body, Canais' body for one in none", async () => {
+    const state = await go(withCategory());
+    expect(await dragOnto(channel("eng"), head("Engenharia"), "top")).toBeNull();
+    expect(await dragInto(channel("eng"), category("Engenharia").body, () => head("Engenharia"))).toBeNull();
+    expect(await dragInto(channel("general"), category("Canais").body, () => category("Canais").root)).toBeNull();
+    expect(places(state)).toEqual([]);
   });
 });

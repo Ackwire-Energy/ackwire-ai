@@ -43,7 +43,7 @@ export function MessageFiles({ files, align = "start" }: { files: MessageFile[];
   const [width, setWidth] = useState(0);
 
   const images: { file: MessageFile; detail: ArtifactDetail | undefined }[] = [];
-  // What lives in the conversation isn't a file: the thing itself (ADR 0109).
+  // What lives in the conversation isn't a file: the thing itself (ADR 0113).
   const blocks: ArtifactDetail[] = [];
   const others: { file: MessageFile; detail: ArtifactDetail | undefined; failed: boolean }[] = [];
   live.forEach((file, i) => {

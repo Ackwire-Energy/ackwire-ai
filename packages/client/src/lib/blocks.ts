@@ -3,7 +3,7 @@ import { BLOCK_KIT_CSS, BLOCK_KIT_JS } from "./block-kit";
 import { isolatedPage } from "./isolated-page";
 
 /**
- * Live blocks in the apps (ADR 0109): the page a block runs as, and what the apps accept from it. A page is not to be
+ * Live blocks in the apps (ADR 0113): the page a block runs as, and what the apps accept from it. A page is not to be
  * trusted, so everything here reads what it says as data: the text it proposes is shown as plain text beside a button
  * that lives outside it, and the person sends it. Pure, shared by the web and the phone.
  */

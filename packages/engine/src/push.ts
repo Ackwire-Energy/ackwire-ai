@@ -80,6 +80,7 @@ export async function enqueuePush(
   row: NotificationRow,
   now = new Date(),
   prefs?: NoticePrefs,
+  dedupeKey = `push.send:${row.id}`,
 ): Promise<boolean> {
   if (row.count !== 1) return false;
   if (!pushWorthy(row, now, prefs ?? (await readNoticePrefs(db, row.orgId, row.userId)))) return false;
@@ -93,7 +94,7 @@ export async function enqueuePush(
     orgId: row.orgId,
     kind: "push.send",
     payload: { notificationId: row.id },
-    dedupeKey: `push.send:${row.id}`,
+    dedupeKey,
     maxAttempts: 4,
   });
   return true;
@@ -364,6 +365,7 @@ export async function deliverPush(
     highRisk,
     routine: latest.origin?.kind === "routine" ? latest.origin.routineName : null,
     screen: source.screen ?? null,
+    reminder: latest.reminder === true,
   };
 
   let sent = 0;

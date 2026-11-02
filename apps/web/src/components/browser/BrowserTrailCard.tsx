@@ -7,11 +7,12 @@ import {
   browserTrailPages,
   browserTrailSpanMs,
   type ScreenKind,
+  trailProfile,
 } from "@agenteschat/client";
 import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { formatDuration } from "@agenteschat/client/lib/work";
-import { agentGradient, BrowserMark, BrowserStrip, Icon } from "@agenteschat/ui";
+import { agentGradient, BrowserMark, BrowserStrip, Chip, Icon } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { type CSSProperties, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -78,6 +79,8 @@ export function BrowserTrailCard({
         ? tt("after.stoppedBy", { person: dir.memberById.get(by)?.name, time })
         : tt("after.stoppedAt", { time });
   const hosts = browserTrailHosts(steps);
+  // A shared profile (ADR 0110): its name then, before the site; the agent's own browser has none.
+  const profile = screen === "browser" ? trailProfile(steps) : null;
   // The site alone, short ("web.whatsapp.com" → "whatsapp.com"): the drawn page already says it browsed.
   const site = screen === "browser" ? hosts[0]?.replace(/^(www|web|m)\./, "") : hosts[0];
   const title = !site
@@ -108,6 +111,7 @@ export function BrowserTrailCard({
         title={toggle}
         onClick={() => setOpen((o) => !o)}
       >
+        {profile && <Chip>{profile}</Chip>}
         {hosts[0] ? (
           <SiteIcon host={hosts[0]} letterOnly={screen !== "browser"} />
         ) : (

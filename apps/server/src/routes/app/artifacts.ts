@@ -1,6 +1,7 @@
 import {
   ARTIFACT_LIMITS,
   type ArtifactDeps,
+  type ArtifactView,
   addFileVersion,
   artifactDownload,
   artifactFile,
@@ -15,11 +16,13 @@ import {
   listArtifacts,
   listArtifactVersions,
   listDeletedArtifacts,
+  purgeArtifactNow,
   replyToBlock,
   restoreArtifact,
   updateArtifact,
   ValidationError,
   votePoll,
+  withPersonFacts,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { createMiddleware } from "hono/factory";
@@ -86,6 +89,20 @@ const multipart = <T extends z.ZodType>(schema: T) => ({
   content: { "multipart/form-data": { schema } },
 });
 
+const Audience = z
+  .discriminatedUnion("kind", [
+    z.object({ kind: z.literal("workspace") }),
+    z.object({ kind: z.literal("channel"), name: z.string(), private: z.boolean() }),
+    z.object({
+      kind: z.literal("dm"),
+      with: Author.nullable().openapi({ description: "The other participant." }),
+      gone: z.literal(true).optional().openapi({
+        description: "The other side is an archived agent or a person who left: the DM can't be opened.",
+      }),
+    }),
+  ])
+  .openapi("ArtifactAudience", { description: "Who can see the file, from the conversation it came from." });
+
 const Artifact = z
   .object({
     id: z.uuid(),
@@ -104,6 +121,8 @@ const Artifact = z
         "HTML and files: never rendered on the app's origin (sandboxed iframe on another origin, or download).",
     }),
     inDrive: z.boolean().openapi({ description: "False for a block or a poll, which live in their conversation." }),
+    canDelete: z.boolean().openapi({ description: "I may move it to the trash (and restore it)." }),
+    audience: Audience,
   })
   .openapi("Artifact");
 
@@ -159,6 +178,12 @@ export function artifactRoutes(deps: AppDeps) {
     return a;
   };
   const person = (userId: string) => ({ type: "person" as const, userId });
+  /** One file with what the viewer may do with it and who can see it. */
+  const withFacts = async <T extends ArtifactView>(userId: string, orgId: string, a: T) => {
+    const [out] = await withPersonFacts(db, userId, orgId, [a]);
+    if (!out) throw new Error("withPersonFacts returned nothing for one file");
+    return out;
+  };
 
   app.openapi(
     createRoute({
@@ -191,7 +216,7 @@ export function artifactRoutes(deps: AppDeps) {
         channelId: query.channelId,
         ...(query.changed ? { changedBy: author } : { author }),
       });
-      return c.json({ artifacts: list }, 200);
+      return c.json({ artifacts: await withPersonFacts(db, c.get("user").id, orgId, list) }, 200);
     },
   );
 
@@ -215,13 +240,10 @@ export function artifactRoutes(deps: AppDeps) {
       responses: { 201: json(ArtifactDetail, "Created"), ...errors },
     }),
     async (c) => {
-      const created = await createArtifact(
-        artifacts(),
-        person(c.get("user").id),
-        c.req.valid("param").orgId,
-        c.req.valid("json"),
-      );
-      return c.json(created, 201);
+      const userId = c.get("user").id;
+      const { orgId } = c.req.valid("param");
+      const created = await createArtifact(artifacts(), person(userId), orgId, c.req.valid("json"));
+      return c.json(await withFacts(userId, orgId, created), 201);
     },
   );
 
@@ -248,13 +270,15 @@ export function artifactRoutes(deps: AppDeps) {
     async (c) => {
       const form = c.req.valid("form");
       const file = await uploaded(form.file);
-      const created = await createFileArtifact(artifacts(), person(c.get("user").id), c.req.valid("param").orgId, {
+      const userId = c.get("user").id;
+      const { orgId } = c.req.valid("param");
+      const created = await createFileArtifact(artifacts(), person(userId), orgId, {
         ...file,
         title: form.title?.trim() || file.name,
         channelId: form.channelId ?? null,
         threadId: form.threadId ?? null,
       });
-      return c.json(created, 201);
+      return c.json(await withFacts(userId, orgId, created), 201);
     },
   );
 
@@ -275,11 +299,12 @@ export function artifactRoutes(deps: AppDeps) {
       const { orgId, artifactId } = c.req.valid("param");
       const form = c.req.valid("form");
       const file = await uploaded(form.file);
-      const saved = await addFileVersion(artifacts(), person(c.get("user").id), orgId, artifactId, {
+      const userId = c.get("user").id;
+      const saved = await addFileVersion(artifacts(), person(userId), orgId, artifactId, {
         ...file,
         note: form.note ?? null,
       });
-      return c.json(saved, 200);
+      return c.json(await withFacts(userId, orgId, saved), 200);
     },
   );
 
@@ -296,7 +321,11 @@ export function artifactRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, artifactId } = c.req.valid("param");
       const { version } = c.req.valid("query");
-      return c.json(await getArtifact(artifacts(), person(c.get("user").id), orgId, artifactId, version), 200);
+      const userId = c.get("user").id;
+      return c.json(
+        await withFacts(userId, orgId, await getArtifact(artifacts(), person(userId), orgId, artifactId, version)),
+        200,
+      );
     },
   );
 
@@ -348,8 +377,9 @@ export function artifactRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, artifactId } = c.req.valid("param");
-      const saved = await updateArtifact(artifacts(), person(c.get("user").id), orgId, artifactId, c.req.valid("json"));
-      return c.json(saved, 200);
+      const userId = c.get("user").id;
+      const saved = await updateArtifact(artifacts(), person(userId), orgId, artifactId, c.req.valid("json"));
+      return c.json(await withFacts(userId, orgId, saved), 200);
     },
   );
 
@@ -539,6 +569,23 @@ export function artifactRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId } = c.req.valid("param");
       return c.json({ files: await listDeletedArtifacts(db, c.get("user").id, orgId) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/artifacts-trash/{artifactId}",
+      tags,
+      security,
+      summary: "Delete a file in the trash for good, now (the same people who may restore it)",
+      request: { params: ArtifactParams },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, artifactId } = c.req.valid("param");
+      await purgeArtifactNow(artifacts(), c.get("user").id, orgId, artifactId);
+      return c.body(null, 204);
     },
   );
 

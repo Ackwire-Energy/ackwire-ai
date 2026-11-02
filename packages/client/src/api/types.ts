@@ -984,7 +984,7 @@ export type ChannelEvent =
   | { type: "message.created"; channelId: string; messageId: string; message?: Message }
   /** Someone reacted or took it back: the message's reactions now (replace). */
   | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] }
-  /** A vote came in or the poll closed (ADR 0109). */
+  /** A vote came in or the poll closed (ADR 0113). */
   | { type: "poll.updated"; channelId: string; poll: Poll }
   | { type: "message.memories"; channelId: string; messageId: string; memories: MessageMemory[] }
   /** An agent message's receipts changed (linked to it, undone or redone): its whole list now (replace). */
@@ -1105,6 +1105,15 @@ export type ChannelEvent =
       threadId: string;
       runId: string;
       consultationId: string;
+    }
+  /** A browser command waits for a shared browser profile another holds (ADR 0110); `wait: null` once it ended. */
+  | {
+      type: "agent.browser.waiting";
+      channelId: string;
+      threadId: string;
+      agentId: string;
+      runId: string;
+      wait: BrowserProfileWait | null;
     }
   /** The agent's first words arrived. */
   | { type: "agent.typing"; channelId: string; threadId: string; agentId: string; runId: string }
@@ -2397,7 +2406,7 @@ export interface PollVote {
   option: number;
 }
 
-/** A vote among the people of a conversation (ADR 0109); its question and options are the artifact's content. */
+/** A vote among the people of a conversation (ADR 0113); its question and options are the artifact's content. */
 export interface Poll {
   id: string;
   closesAt: string;
@@ -2425,7 +2434,16 @@ export interface Artifact {
   untrusted: boolean;
   /** The creator, who asked the agent, the agent's owner and admins may delete it. */
   canDelete?: boolean;
+  /** Who can see it, from the conversation it came from (ADR 0111). */
+  audience: ArtifactAudience;
 }
+
+export type ArtifactAudience =
+  | { kind: "workspace" }
+  /** A public channel's files: anyone in the workspace may open them. */
+  | { kind: "channel"; name: string; private: boolean }
+  /** `with`: the other participant of the DM; `gone`: an archived agent or a person who left (the DM can't open). */
+  | { kind: "dm"; with: ArtifactAuthor | null; gone?: true };
 
 /** `GET …/artifacts-trash`: deleted files, kept for 30 days. */
 export interface TrashedArtifact extends Artifact {
@@ -2697,7 +2715,7 @@ export type RoutineTarget =
   | RoutineTargetInput
   | { type: "conversation"; channelId: string; threadId: string | null; reminder?: boolean; forUserId?: string };
 
-/** What a routine may do while nobody watches: look and tell (`read`), or also change things (`act`). */
+/** Every routine acts with its agent's own permissions (ADR 0109); `read` is an old stored value the server reads as `act`. */
 export type RoutineAccess = "read" | "act";
 /** When a routine speaks: on every run (`always`), or only when there is news (`when_new`). */
 export type RoutineReport = "always" | "when_new";
@@ -2834,7 +2852,7 @@ export interface RoutineInput {
     | { type: "once"; at: string; timezone?: string }
     | Omit<RoutineEmailTrigger, "status">
     | { type: "webhook" };
-  /** Default `read` ("Só olhar e contar"). */
+  /** Ignored: every routine acts (ADR 0109). */
   access?: RoutineAccess;
   /** Default `when_new` ("Só quando tiver novidade"). */
   report?: RoutineReport;
@@ -3128,6 +3146,8 @@ export interface Machine {
   /** `system`: each agent works as its own OS user, in its own folder (ADR 0057). Absent on older servers: `single`. */
   mode?: "system" | "single";
   runnerVersion: string;
+  /** ADR 0110: its runner can hold browser profiles; `false`: update the computer. */
+  browserProfiles?: boolean;
   /** `false`: started with `--no-exec` (files and uploads only). */
   execAllowed: boolean;
   pairedBy: { id: string; name: string } | null;
@@ -3846,7 +3866,9 @@ export type ImportSkipReason =
   /** A routine whose channel isn't coming (unpicked, or a private channel with that name exists). */
   | "channel_not_picked"
   | "invalid"
-  | "failed";
+  | "failed"
+  /** A note on a created routine: its agent already had the most active routines, so it arrived paused. */
+  | "too_many_routines";
 
 export interface ImportItemResult {
   kind: ImportItemKind;
@@ -3875,8 +3897,6 @@ export interface ImportInput {
    * in the plan's order (each call is safe to repeat).
    */
   pick?: string[];
-  /** `skill:key` of the skills to turn on for their agents; imported skills land off otherwise. */
-  enableSkills?: string[];
 }
 
 export interface ImportPlan {
@@ -4948,7 +4968,12 @@ export type NotificationKind =
    */
   | "invitation_accepted"
   /** ADR 0107 §7: the workspace used its Composio calls for the month (connector admins). `latest.title`: the month. */
-  | "composio_limit";
+  | "composio_limit"
+  /**
+   * ADR 0110: an agent's owner asks for one more browser profile for it (the people who grant profiles). Waiting;
+   * `source.agentId` and its name in `source.label`. Opens the agent's page.
+   */
+  | "browser_profile_request";
 
 /** Who did it; names and avatars come from the directory. */
 export interface NotificationActor {
@@ -5126,6 +5151,8 @@ export type SidebarItem = "approvals" | "threads" | "issues" | "wiki" | "drive" 
 export type SidebarPlace = "always" | "more" | "auto";
 /** Where I put each tool I moved, in one workspace (`GET …/me/sidebar`); the others keep their default. */
 export type SidebarItems = Partial<Record<SidebarItem, SidebarPlace>>;
+/** A section of the sidebar, in the order I put them (`SIDEBAR_SECTIONS` in packages/engine/src/sidebar-items.ts). */
+export type SidebarSection = "tools" | "channels" | "agents" | "people";
 
 export interface NotificationCount {
   unread: number;
@@ -5500,6 +5527,8 @@ export interface AgentBrowserSettings {
   /** The computer's own words, when it said why. */
   detail: string | null;
   machine: { id: string; name: string } | null;
+  /** Its default browser: a shared browser profile it may use (ADR 0110); null or absent = its own. */
+  profileId?: string | null;
 }
 
 /** `GET …/agents/{id}/desktop` (ADR 0058): the agent's desktop as this person sees it. */
@@ -5615,4 +5644,27 @@ export interface AgentPlanUsage {
   /** Every day of the month so far: tokens per source key. */
   days: { date: string; tokens: Record<string, number> }[];
   current: PlanAccountUsage | null;
+}
+
+/** Who has a shared browser profile now (ADR 0110): an agent's run or a person in control. */
+export type BrowserProfileHolder =
+  | { type: "agent"; agentId: string; since: string }
+  | { type: "person"; userId: string; since: string };
+
+/** A browser profile (ADR 0110): named, shared logins on one computer that the agents granted it use. */
+export interface BrowserProfile {
+  id: string;
+  machineId: string;
+  name: string;
+  createdAt: string;
+  agentIds: string[];
+  holder: BrowserProfileHolder | null;
+  lastUsedAt: string | null;
+}
+
+/** What an agent's browser command waits for. */
+export interface BrowserProfileWait {
+  profileId: string;
+  name: string;
+  holder: BrowserProfileHolder;
 }

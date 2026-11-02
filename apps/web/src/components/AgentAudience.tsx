@@ -88,7 +88,7 @@ export function AudienceChoice({
   compact?: boolean;
 }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const g = agentGrammar(t, agentName);
   const owner = ownerUserId ? dir.memberById.get(ownerUserId) : undefined;
@@ -155,7 +155,15 @@ export function AudienceChoice({
       {value.mode === "people" && (
         <div className="people-picker">
           <span className="ac-field__label">{t("audience.people")}</span>
-          {owner && <span className="small muted">{t("audience.ownerAlways", { name: owner.name })}</span>}
+          {owner && (
+            <span className="small muted">
+              {picked.size > 0
+                ? t("audience.ownerAlways", { name: owner.name })
+                : ownerUserId === me.user.id
+                  ? t("audience.onlyYouForNow")
+                  : t("audience.onlyOwnerForNow", { name: owner.name })}
+            </span>
+          )}
           {picked.size > 0 && (
             <TokenList label={t("audience.people")}>
               {candidates

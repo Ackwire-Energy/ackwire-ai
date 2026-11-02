@@ -60,7 +60,6 @@ import {
   liveHookUrl,
   type RoutineHookConfig,
   routineHookKeys,
-  testOnlyEvent,
   WEBHOOK_EVENT,
 } from "./routine-hooks";
 import { afterRoutineRunEnded, endRoutineRun } from "./routine-ledger";
@@ -295,6 +294,8 @@ export interface RoutineInput {
   access?: RoutineAccess;
   /** When it speaks (default `when_new`). */
   report?: RoutineReport;
+  /** Created paused: no next run, so the active-routine cap doesn't apply. */
+  paused?: boolean;
 }
 
 export type RoutineTriggerInput =
@@ -872,7 +873,9 @@ export async function getRoutineView(
   hooks?: RoutineHookConfig,
 ) {
   await requirePermission(db, actorId, orgId, "read");
-  const [view] = await views(db, [await loadRoutine(db, orgId, id)], actorId, hooks);
+  const row = await loadRoutine(db, orgId, id);
+  if (!(await routineSeer(db, orgId, actorId))(row)) throw new NotFoundError("Routine not found");
+  const [view] = await views(db, [row], actorId, hooks);
   return view as RoutineView;
 }
 
@@ -1130,7 +1133,7 @@ export async function createRoutine(
   await checkTarget(db, orgId, agent.id, input.target, actorId);
   const trigger = await resolveTrigger(deps, actorId, orgId, input.trigger);
   checkFrequency(trigger, input.target);
-  if (startsRuns(trigger.triggerType, input.target)) await checkRoutineCap(db, orgId, agent.id);
+  if (!input.paused && startsRuns(trigger.triggerType, input.target)) await checkRoutineCap(db, orgId, agent.id);
   if (input.trigger.type === "email") await checkWatchable(db, orgId, agent.id, input.trigger.accountId);
   const hooks = input.trigger.type === "webhook" ? hooksOf(deps) : null;
   const name = input.name?.trim().slice(0, 120) || prompt.split("\n")[0]?.slice(0, 60) || "Routine";
@@ -1143,6 +1146,7 @@ export async function createRoutine(
       prompt,
       target: input.target as unknown as Record<string, unknown>,
       ...trigger,
+      ...(input.paused ? { active: false, nextRunAt: null } : {}),
       access: routineAccessOf(input.access),
       report: routineReportOf(input.report),
       createdByUserId: actorId,
@@ -1176,7 +1180,36 @@ export async function listRoutines(db: Database, actorId: string, orgId: string,
     .from(routines)
     .where(and(eq(routines.orgId, orgId), isNull(routines.deletedAt)))
     .orderBy(routines.createdAt);
-  return views(db, rows, actorId, hooks);
+  const sees = await routineSeer(db, orgId, actorId);
+  return views(db, rows.filter(sees), actorId, hooks);
+}
+
+/**
+ * Whether `viewerId` sees a routine at all (its name, schedule, runs): who manages it (its creator, admins, the
+ * agent's owner), who manages agents, or who the agent answers. The agents list's own rule (`listsAgent` in the
+ * apps), so an agent hidden from someone doesn't show through its routines on Início, Rotinas or the calendar.
+ */
+export async function routineSeer(
+  db: Database,
+  orgId: string,
+  viewerId: string,
+): Promise<(r: Pick<RoutineRow, "agentId" | "createdByUserId">) => boolean> {
+  const [membership, agentRows] = await Promise.all([
+    getMembership(db, viewerId, orgId),
+    db
+      .select({
+        id: agents.id,
+        ownerUserId: agents.ownerUserId,
+        audienceMode: agents.audienceMode,
+        audienceUserIds: agents.audienceUserIds,
+      })
+      .from(agents)
+      .where(eq(agents.orgId, orgId)),
+  ]);
+  if (can(membership, "manage_routines") || can(membership, "manage_agents")) return () => true;
+  const talks = can(membership, "talk_to_agents");
+  const listed = new Set(agentRows.filter((a) => canTalkTo(a, viewerId, talks)).map((a) => a.id));
+  return (r) => r.createdByUserId === viewerId || listed.has(r.agentId);
 }
 
 /**
@@ -1292,15 +1325,11 @@ export async function updateRoutine(
   }
   if (patch.access !== undefined) set.access = routineAccessOf(patch.access);
   if (patch.report !== undefined) set.report = routineReportOf(patch.report);
-  // A routine set to act reaches what its creator reaches (their rooms, the agents they talk to), so
-  // only its creator may decide what it does with that; anyone else takes it over first.
-  const access = set.access ?? current.access;
+  // A routine reaches what its creator reaches (their rooms, the agents they talk to), so only its
+  // creator may decide what it does with that; anyone else takes it over first.
   if (
     actorId !== current.createdByUserId &&
-    access === "act" &&
-    (access !== current.access ||
-      (set.prompt !== undefined && set.prompt !== current.prompt) ||
-      set.agentId !== undefined)
+    ((set.prompt !== undefined && set.prompt !== current.prompt) || set.agentId !== undefined)
   ) {
     throw new ForbiddenError("Take the routine over before setting what it does as it acts", "routine.act_take_over");
   }
@@ -1353,10 +1382,10 @@ export async function updateRoutine(
     .where(and(eq(routines.id, current.id), eq(routines.orgId, orgId)))
     .returning();
   if (!row) throw new NotFoundError("Routine not found");
-  // What was approved ahead covered its next run at that time, for that agent, while it may act: a run moved or
-  // gone (paused: a one-off resumed never fires again), another agent or only looking needs a new approval.
+  // What was approved ahead covered its next run at that time, for that agent: a run moved or gone (paused: a
+  // one-off resumed never fires again) or another agent needs a new approval.
   const moved = current.nextRunAt?.getTime() !== row.nextRunAt?.getTime();
-  if (moved || row.agentId !== current.agentId || (row.access !== "act" && current.access === "act")) {
+  if (moved || row.agentId !== current.agentId) {
     await cancelRoutineAhead(deps, orgId, row.id, actorId);
   }
   if (mailTrigger || watched.has(current.id)) {
@@ -1545,6 +1574,7 @@ export async function listRoutineRuns(
 ): Promise<RoutineRunView[]> {
   await requirePermission(db, actorId, orgId, "read");
   const routine = await loadRoutine(db, orgId, id, { deleted: true });
+  if (!(await routineSeer(db, orgId, actorId))(routine)) throw new NotFoundError("Routine not found");
   const [runs, rights] = await Promise.all([
     db
       .select()
@@ -1839,7 +1869,7 @@ async function fireClaimedRun(deps: RoutineDeps, run: RunRow) {
     name: routine.name,
     creatorUserId: creator,
     deliverTo,
-    access: testOnlyEvent(run.event) ? "read" : routineAccessOf(routine.access),
+    access: routineAccessOf(routine.access),
     report: routineReportOf(routine.report),
     trigger: run.trigger,
     dueAt: run.at.toISOString(),
@@ -2010,8 +2040,7 @@ export async function createReminder(
       prompt: message,
       target: target as unknown as Record<string, unknown>,
       triggerType: "once",
-      // Asked to do something at that time, not only to look and tell (ADR 0053, addendum of 2026-10-31).
-      ...(input.askAgent ? { access: "act" } : {}),
+      access: "act",
       timezone: input.timezone,
       description: input.description,
       nextRunAt: input.at,

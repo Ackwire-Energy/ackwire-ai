@@ -418,18 +418,6 @@ function Details({ routine: r, refetch }: { routine: Routine; refetch: () => Pro
             </Section>
           ) : null}
 
-          <Section title={t("routines.panel.access")}>
-            <Block>
-              <InfoHint
-                name={t("common.about", { label: t("routines.panel.access") })}
-                text={t("routines.access.hint")}
-                variant="body"
-              >
-                <Text variant="body">{t(`routines.access.${r.access}`)}</Text>
-              </InfoHint>
-            </Block>
-          </Section>
-
           <Section title={t("routines.panel.report")}>
             <Block>
               <InfoHint

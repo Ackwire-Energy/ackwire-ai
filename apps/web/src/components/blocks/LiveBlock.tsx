@@ -152,7 +152,7 @@ function BlockFrame({
 }
 
 /**
- * A live block (ADR 0109): the agent's page in its frame, and under it, outside the frame, what would go back to the
+ * A live block (ADR 0113): the agent's page in its frame, and under it, outside the frame, what would go back to the
  * agent and the button that sends it. The page only proposes: it can't reach this button, and the person reads the
  * text before it goes.
  */

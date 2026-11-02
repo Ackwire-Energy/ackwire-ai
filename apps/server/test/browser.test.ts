@@ -290,4 +290,92 @@ describe("live view socket", () => {
       await Promise.race([server.stop(true), Bun.sleep(500)]);
     }
   });
+  test("input frames enter the live view in the order they came, even when a later one's checks end first", async () => {
+    const { owner, org } = await seeded();
+    const server = listen(t);
+    const live = t.engine.browserLive;
+    const limiter = t.adapters.rateLimiter;
+    const realConsume = limiter.consume;
+    const realInput = live.input;
+    try {
+      const frames: Record<string, unknown>[] = [];
+      const ws = new WebSocket(`ws://127.0.0.1:${server.port}/api/ws?orgId=${org.orgId}`, {
+        headers: { cookie: owner.cookie(), origin: ORIGIN },
+      } as unknown as string[]);
+      ws.onmessage = (e) => frames.push(JSON.parse(String(e.data)) as Record<string, unknown>);
+      await new Promise<void>((resolve, reject) => {
+        ws.onopen = () => resolve();
+        ws.onerror = () => reject(new Error("refused"));
+      });
+      const until = async (pred: (f: Record<string, unknown>) => boolean) => {
+        for (let i = 0; i < 100 && !frames.some(pred); i++) await Bun.sleep(20);
+        return frames.find(pred);
+      };
+      await until((f) => f.type === "ready");
+      ws.send(JSON.stringify({ type: "browser.watch", agentId: org.agentId }));
+      await until((f) => f.type === "browser.unavailable");
+      // The first frames' checks are the slowest: each later one would finish its await first.
+      let n = 0;
+      limiter.consume = async (key, rule) => {
+        if (key.startsWith("ws-browser:")) await Bun.sleep(Math.max(0, 60 - 10 * n++));
+        return realConsume(key, rule);
+      };
+      const typed: string[] = [];
+      let answered = 0;
+      live.input = async (_userId, _orgId, _agentId, events) => {
+        for (const e of events) if (e.kind === "text") typed.push(e.text);
+        // The computer's answer is slow too: it never holds back the frames behind it.
+        await Bun.sleep(1000);
+        answered++;
+        return { accepted: events.length, refused: false };
+      };
+      const word = "abcdef";
+      for (const ch of word) {
+        ws.send(JSON.stringify({ type: "browser.input", agentId: org.agentId, events: [{ kind: "text", text: ch }] }));
+      }
+      for (let i = 0; i < 50 && typed.length < word.length; i++) await Bun.sleep(10);
+      expect(typed.join("")).toBe(word);
+      expect(answered).toBe(0);
+      ws.close();
+    } finally {
+      limiter.consume = realConsume;
+      live.input = realInput;
+      await Promise.race([server.stop(true), Bun.sleep(500)]);
+    }
+  });
+  test("an input frame whose checks fail (the rate limiter is away) answers unavailable instead of vanishing", async () => {
+    const { owner, org } = await seeded();
+    const server = listen(t);
+    const limiter = t.adapters.rateLimiter;
+    const realConsume = limiter.consume;
+    try {
+      const frames: Record<string, unknown>[] = [];
+      const ws = new WebSocket(`ws://127.0.0.1:${server.port}/api/ws?orgId=${org.orgId}`, {
+        headers: { cookie: owner.cookie(), origin: ORIGIN },
+      } as unknown as string[]);
+      ws.onmessage = (e) => frames.push(JSON.parse(String(e.data)) as Record<string, unknown>);
+      await new Promise<void>((resolve, reject) => {
+        ws.onopen = () => resolve();
+        ws.onerror = () => reject(new Error("refused"));
+      });
+      const until = async (pred: (f: Record<string, unknown>) => boolean) => {
+        for (let i = 0; i < 100 && !frames.some(pred); i++) await Bun.sleep(20);
+        return frames.find(pred);
+      };
+      await until((f) => f.type === "ready");
+      limiter.consume = async (key, rule) => {
+        if (key.startsWith("ws-browser:")) throw new Error("limiter down");
+        return realConsume(key, rule);
+      };
+      ws.send(JSON.stringify({ type: "browser.input", agentId: org.agentId, events: [{ kind: "text", text: "a" }] }));
+      expect(await until((f) => f.type === "browser.unavailable")).toMatchObject({
+        agentId: org.agentId,
+        reason: "unavailable",
+      });
+      ws.close();
+    } finally {
+      limiter.consume = realConsume;
+      await Promise.race([server.stop(true), Bun.sleep(500)]);
+    }
+  });
 });

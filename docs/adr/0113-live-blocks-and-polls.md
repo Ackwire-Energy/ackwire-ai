@@ -1,4 +1,4 @@
-# 0109. Live blocks and polls: what an agent shows to be used, not kept
+# 0113. Live blocks and polls: what an agent shows to be used, not kept
 
 - Status: Accepted
 - Date: 2026-11-01

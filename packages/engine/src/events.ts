@@ -227,6 +227,22 @@ export type ChannelEvent =
       stream: "stdout" | "stderr";
       text: string;
     }
+  /**
+   * A browser command of the agent waits for a profile another agent or a person holds (ADR 0110): its card says
+   * who has it. `wait: null` once it got the turn or gave up.
+   */
+  | {
+      type: "agent.browser.waiting";
+      channelId: string;
+      threadId: string | null;
+      agentId: string;
+      runId: string;
+      wait: {
+        profileId: string;
+        name: string;
+        holder: { type: "agent"; agentId: string; since: string } | { type: "person"; userId: string; since: string };
+      } | null;
+    }
   /** The agent's first words arrived (switch "thinking" to "typing"). */
   | { type: "agent.typing"; channelId: string; threadId: string | null; agentId: string; runId: string }
   /** The agent stopped (done, failed or waiting for approval). */
@@ -463,7 +479,7 @@ export type ChannelEvent =
     }
   /** Someone reacted or took a reaction back: the message's reactions now (replace, don't merge). */
   | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] }
-  /** A vote came in or the poll closed (ADR 0109). */
+  /** A vote came in or the poll closed (ADR 0113). */
   | { type: "poll.updated"; channelId: string; poll: PollView }
   /** A message was pinned in this channel (`GET …/channels/{id}/pins` lists them, newest first). */
   | {

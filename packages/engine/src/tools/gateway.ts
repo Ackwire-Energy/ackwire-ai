@@ -452,11 +452,6 @@ export function createToolGateway(deps: {
     if (toolKind(tool).kind !== "external" || (actions.length > 0 && actions.every((a) => actionLevel(a) === "read"))) {
       return no("This doesn't ask a person at its time: there is nothing to approve ahead.");
     }
-    if (request.access !== "act") {
-      return no(
-        "This routine only looks and reports: give it access act (update_routine) before preparing an action for it.",
-      );
-    }
     const access = accessWithNeeds(await freshGrantedKeys(ctx.db, ctx.orgId, ctx.agentId), tool);
     if (!isAllowed(access.state)) return no(`Not allowed: this agent lacks the scope ${access.of.scope}.`);
     const problems = validateJson(tool.inputSchema, input);

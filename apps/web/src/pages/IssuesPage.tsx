@@ -26,7 +26,7 @@ import {
   Toolbar,
   WorkSweep,
 } from "@agenteschat/ui";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { type DragEvent, useDeferredValue, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
@@ -34,6 +34,8 @@ import { actorFromKey, NO_ACTOR, useActors } from "@/components/actors";
 import { useActorFilterOptions, useFilterCopy } from "@/components/filters";
 import { ErrorState, LoadingCards, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { copyText } from "@/lib/context-menu";
+import { entityMenu } from "@/lib/entity-menu";
 import {
   BOARD,
   columnIdOf,
@@ -200,6 +202,7 @@ export function IssuesPage() {
                   {t("issues.columns.add")}
                 </MenuItem>
                 <MenuCheckboxItem
+                  icon="eye"
                   checked={showCanceled}
                   onCheckedChange={setShowCanceled}
                   hint={all.filter((i) => i.status === "canceled").length}
@@ -489,6 +492,38 @@ function WhoLine({ issue: i }: { issue: Issue }) {
   );
 }
 
+/** An issue's right click (board card, list row): open beside the list, open its page, copy its link. */
+function useIssueMenu() {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const navigate = useNavigate();
+  const toast = useToast();
+  return (i: Issue, onOpen: () => void) =>
+    entityMenu(() => [
+      { kind: "header", label: `#${i.number} ${i.title}` },
+      { kind: "item", id: "open", label: t("contextMenu.open"), icon: "arrowRight", run: onOpen },
+      {
+        kind: "item",
+        id: "open-page",
+        label: t("contextMenu.openPage"),
+        icon: "expand",
+        run: () =>
+          void navigate({ to: "/org/$orgId/issues/$number", params: { orgId: org.id, number: String(i.number) } }),
+      },
+      { kind: "separator" },
+      {
+        kind: "item",
+        id: "copy-link",
+        label: t("contextMenu.copyLink"),
+        icon: "link",
+        run: () =>
+          void copyText(`${window.location.origin}/org/${org.id}/issues/${i.number}`, () =>
+            toast.show(t("contextMenu.linkCopied")),
+          ),
+      },
+    ]);
+}
+
 function IssueCard({
   issue: i,
   selected,
@@ -504,6 +539,7 @@ function IssueCard({
   const { org } = useOrg();
   const color = useAssigneeColor();
   const pr = i.pullRequests.at(-1);
+  const menu = useIssueMenu();
   return (
     <Link
       to="/org/$orgId/issues/$number"
@@ -515,6 +551,7 @@ function IssueCard({
       onDragStart={drag.onDragStart}
       onDragEnd={drag.onDragEnd}
       onClick={(e) => inPlaceClick(e, onOpen)}
+      {...menu(i, () => !selected && onOpen())}
       data-status={i.status}
       data-card={i.number}
     >
@@ -604,6 +641,7 @@ function IssueRows({
   const { t } = useTranslation();
   const { org } = useOrg();
   const color = useAssigneeColor();
+  const menu = useIssueMenu();
   return (
     <ul className="issue-list">
       {issues.map((i) => (
@@ -613,6 +651,7 @@ function IssueRows({
             params={{ orgId: org.id, number: String(i.number) }}
             className={cx("issue-list__row", i.number === openNumber && "is-on")}
             onClick={(e) => inPlaceClick(e, () => onOpen(i.number))}
+            {...menu(i, () => i.number !== openNumber && onOpen(i.number))}
           >
             <span className="issue-list__num tabular">#{i.number}</span>
             <span className="issue-list__title">

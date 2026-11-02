@@ -12,7 +12,7 @@ import "./blocks.css";
 const FACES = 5;
 
 /**
- * A vote in the conversation (ADR 0109). The app's own card, never a page: a vote is an act of the person's, and a
+ * A vote in the conversation (ADR 0113). The app's own card, never a page: a vote is an act of the person's, and a
  * page in a frame could cast one the moment it showed. Everyone sees the marks arrive (`poll.updated`).
  */
 export function PollCard({ id, version }: { id: string; version?: number }) {

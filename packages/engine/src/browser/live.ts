@@ -33,7 +33,22 @@ import {
   touchControl,
   webAddress,
 } from "./handoff";
+import {
+  getBrowserProfile,
+  profileControlRow,
+  profileIdOfKey,
+  profileScope,
+  requireProfileDriver,
+  requireProfileWatcher,
+  touchProfileControl,
+} from "./profiles";
 import type { BrowserFrame, BrowserPage, BrowserViewer, StreamRelay } from "./types";
+
+/** A browser profile's ops carry it (ADR 0110): its live view is keyed `profile:<id>` where an agent's id would be. */
+const profileOp = (key: string) => {
+  const id = profileIdOfKey(key);
+  return id ? { profile: { id } } : {};
+};
 
 const { agents, browserHandoffs } = schema;
 
@@ -61,7 +76,9 @@ const ofBrowser = (screen: unknown) => (screen ?? "browser") === "browser";
 /**
  * One batch of a person's input, smaller: a run of plain mouse moves (no
  * button held) keeps only its last one; moves while dragging and everything
- * else stay, in order.
+ * else stay, in order. Typed text stays one text per key: fields that react to
+ * each character (a code split into one box per digit) need the page's input
+ * handler to run between them.
  */
 export function coalesceInput(events: BrowserInputEvent[]): BrowserInputEvent[] {
   const out: BrowserInputEvent[] = [];
@@ -69,7 +86,8 @@ export function coalesceInput(events: BrowserInputEvent[]): BrowserInputEvent[] 
   const plainMove = (e: BrowserInputEvent | undefined, held: boolean) =>
     e?.kind === "mouse" && e.type === "mouseMoved" && !held && (e.button === undefined || e.button === "none");
   for (const e of events) {
-    if (plainMove(e, dragging) && plainMove(out.at(-1), dragging)) out[out.length - 1] = e;
+    const last = out.at(-1);
+    if (plainMove(e, dragging) && plainMove(last, dragging)) out[out.length - 1] = e;
     else out.push(e);
     if (e.kind === "mouse" && e.type === "mousePressed") dragging = true;
     if (e.kind === "mouse" && e.type === "mouseReleased") dragging = false;
@@ -313,9 +331,10 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     }
     state.mode = mode;
     try {
-      if (mode === null) await deps.hub.call(state.machineId, { op: "browser.stream.stop", agent });
+      if (mode === null)
+        await deps.hub.call(state.machineId, { op: "browser.stream.stop", agent, ...profileOp(agentId) });
       else {
-        await deps.hub.call(state.machineId, { op: "browser.stream.start", mode, agent });
+        await deps.hub.call(state.machineId, { op: "browser.stream.start", mode, agent, ...profileOp(agentId) });
         broadcastStatus(agentId, state);
       }
     } catch (error) {
@@ -441,6 +460,22 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
 
   const handoffDeps: HandoffDeps = { db: deps.db, pubsub: deps.pubsub, live: handoffHooks };
 
+  /** The open handoff of an agent's browser, or a person's control of a profile in the same shape. */
+  const controlRow = async (orgId: string, key: string): Promise<BrowserHandoffRow | null> => {
+    const profileId = profileIdOfKey(key);
+    if (!profileId) return openHandoffOf(deps.db, orgId, key);
+    const row = await getBrowserProfile(deps.db, orgId, profileId);
+    return row ? profileControlRow(row) : null;
+  };
+
+  /** The person in control is there: their control moves on (an agent's handoff, or the profile's hold). */
+  const touchFor = (key: string, handoffId: string, userId: string, force = false) => {
+    const profileId = profileIdOfKey(key);
+    return profileId
+      ? touchProfileControl(deps.db, profileId, userId)
+      : touchControl(deps.db, handoffId, userId, new Date(), force);
+  };
+
   /** Tells the computer (when its socket is here) the agent's open handoff, or that there is none: its tray shows it. */
   const tellComputer = async (machineId: string, orgId: string, agentId: string) => {
     if (!deps.hub.sendBrowserHandoff || !deps.hub.isLocal(machineId)) return;
@@ -481,7 +516,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       return;
     }
     // `browser.opened` (a person opened a page, a restart): the stream starts again, from a closed browser too.
-    void openHandoffOf(deps.db, state.orgId, agentId)
+    void controlRow(state.orgId, agentId)
       .then((row) => {
         if (live.get(agentId) !== state) return;
         if (event.type !== "browser.opened") return handoffChanged(agentId, state, row);
@@ -507,7 +542,11 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     if (old.mode !== null) {
       old.mode = null;
       void deps.hub
-        .call(old.machineId, { op: "browser.stream.stop", agent: { id: agentId, handle: old.handle } })
+        .call(old.machineId, {
+          op: "browser.stream.stop",
+          agent: { id: agentId, handle: old.handle },
+          ...profileOp(agentId),
+        })
         .catch(() => {});
     }
   }
@@ -517,6 +556,18 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     if (state.grace) clearTimeout(state.grace);
     const handoffId = state.handoff?.id;
     if (!handoffId) return;
+    if (profileIdOfKey(agentId)) {
+      // A profile's hold lapses by itself once its touches stop: the views here hear it then.
+      state.grace = setTimeout(() => {
+        state.grace = null;
+        if ([...state.viewers].some((v) => v.userId === userId)) return;
+        forget(agentId, state);
+        void controlRow(state.orgId, agentId)
+          .then((row) => handoffChanged(agentId, state, row))
+          .catch(() => {});
+      }, graceMs);
+      return;
+    }
     // Their deadline in the database: another server, or this one after a restart, ends it at the
     // same time, and coming back anywhere pushes it again. Only once their page showed: a view retrying on a
     // page that never came (leaving and watching again) never pushes it.
@@ -546,10 +597,16 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
   /** The last batch sent per person and agent: the next waits for it, so a drag's press, moves and release reach the runner in order. */
   const sending = new Map<string, Promise<unknown>>();
 
-  function flushInput(key: string, batch: InputBatch) {
-    if (batches.get(key) === batch) batches.delete(key);
+  /**
+   * Sends a gathered batch. While the one before is still on its way, it keeps gathering instead (unless `now`:
+   * it is full, or shutting down) and goes as soon as that one is back: input typed during a slow round trip
+   * reaches the computer as one batch, not as a queue of small ones that each wait their turn.
+   */
+  function flushInput(key: string, batch: InputBatch, now = false) {
     if (batch.timer) clearTimeout(batch.timer);
     batch.timer = null;
+    if (!now && sending.has(key)) return;
+    if (batches.get(key) === batch) batches.delete(key);
     const events = coalesceInput(batch.events);
     const sent = (sending.get(key) ?? Promise.resolve())
       .catch(() => {})
@@ -564,7 +621,10 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       );
     sending.set(key, sent);
     void sent.finally(() => {
-      if (sending.get(key) === sent) sending.delete(key);
+      if (sending.get(key) !== sent) return;
+      sending.delete(key);
+      const next = batches.get(key);
+      if (next && !next.timer) flushInput(key, next);
     });
   }
 
@@ -579,18 +639,29 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
      * person may see it (`requireBrowserAccess`). Returns the stop function.
      */
     async watch(viewer: LiveViewer, orgId: string, agentId: string): Promise<() => void> {
-      const [agent] = await deps.db
-        .select({ handle: agents.handle })
-        .from(agents)
-        .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
-      // The computer the browser runs on now (an open handoff's, a mission's, else the agent's).
-      const machineId = agent ? await browserMachineOf(deps.db, orgId, agentId) : null;
+      const profileId = profileIdOfKey(agentId);
+      let agent: { handle: string } | undefined;
+      let machineId: string | null = null;
+      if (profileId) {
+        const row = await getBrowserProfile(deps.db, orgId, profileId);
+        if (row) {
+          agent = { handle: profileScope(profileId).handle };
+          machineId = row.machineId;
+        }
+      } else {
+        [agent] = await deps.db
+          .select({ handle: agents.handle })
+          .from(agents)
+          .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
+        // The computer the browser runs on now (an open handoff's, a mission's, else the agent's).
+        machineId = agent ? await browserMachineOf(deps.db, orgId, agentId) : null;
+      }
       if (!agent || !machineId) {
         viewer.send({ type: "browser.unavailable", agentId, reason: "no_computer" });
         return () => {};
       }
       // Someone opened the agent's computer: its browser gets ready for the agent's next command meanwhile.
-      deps.warm?.({ orgId, agentId, machineId });
+      if (!profileId) deps.warm?.({ orgId, agentId, machineId });
       if (!deps.hub.isLocal(machineId)) {
         // Held by another replica (or not connected): frames only flow where the socket is.
         const machine = await getMachineById(deps.db, machineId);
@@ -623,8 +694,8 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
         live.set(agentId, state);
       }
       const current = state;
-      applyHandoff(current, await openHandoffOf(deps.db, orgId, agentId));
-      const shared = await openElsewhere(deps.db, orgId, agentId, "browser");
+      applyHandoff(current, await controlRow(orgId, agentId));
+      const shared = profileId ? null : await openElsewhere(deps.db, orgId, agentId, "browser");
       current.shared = shared ? handoffView(shared) : null;
       current.viewers.add(viewer);
       current.unsubscribe.set(
@@ -644,20 +715,23 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       // Watching keeps control only while the page shows: a view whose page never came lets it end, and the agent
       // goes on (its first frame keeps it then, `hubHooks.frame`).
       if (current.handoff && current.controllerUserId === viewer.userId && current.frame) {
-        await touchControl(deps.db, current.handoff.id, viewer.userId, new Date(), true).catch(() => {});
+        await touchFor(agentId, current.handoff.id, viewer.userId, true).catch(() => {});
       }
       viewer.send(status(agentId, current, viewer.userId));
       sendLatest(current, viewer);
       checked.set(`${viewer.userId}:${agentId}`, Date.now());
       // Access can end while watching (removed from the org, no longer the agent's owner…): checked again now and then.
       const recheck = setInterval(() => {
-        void requireBrowserAccess(deps.db, viewer.userId, orgId, agentId).then(
+        const allowed = profileId
+          ? requireProfileWatcher(deps.db, viewer.userId, orgId, profileId)
+          : requireBrowserAccess(deps.db, viewer.userId, orgId, agentId);
+        void allowed.then(
           () => {
             checked.set(`${viewer.userId}:${agentId}`, Date.now());
             // Watching the page keeps their control alive across servers and restarts (the grace in the database).
             const handoffId = current.handoff?.id;
             if (handoffId && current.controllerUserId === viewer.userId && current.frame) {
-              void touchControl(deps.db, handoffId, viewer.userId).catch(() => {});
+              void touchFor(agentId, handoffId, viewer.userId).catch(() => {});
             }
           },
           () => {
@@ -694,7 +768,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       const key = `${userId}:${agentId}`;
       let batch = batches.get(key);
       if (batch && batch.events.length + events.length > BROWSER_LIMITS.inputEvents) {
-        flushInput(key, batch);
+        flushInput(key, batch, true);
         batch = undefined;
       }
       if (!batch) {
@@ -713,7 +787,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
     /** Sends one gathered batch now (it filled up, or its time came). */
     flushInput: (key: string) => {
       const batch = batches.get(key);
-      if (batch) flushInput(key, batch);
+      if (batch) flushInput(key, batch, true);
     },
 
     /**
@@ -721,7 +795,8 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
      * handoff (checked against the database).
      */
     async sendInput(userId: string, orgId: string, agentId: string, events: BrowserInputEvent[]) {
-      const open = await openHandoffOf(deps.db, orgId, agentId);
+      const profileId = profileIdOfKey(agentId);
+      const open = await controlRow(orgId, agentId);
       if (open?.status !== "active" || open.controllerUserId !== userId) return { accepted: 0, refused: true };
       // Control changed where this process didn't hear it (another replica, a lost event): the others'
       // view is hidden here before any of the person's typing reaches the page.
@@ -731,7 +806,8 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       const key = `control:${userId}:${agentId}`;
       if (Date.now() - (checked.get(key) ?? 0) > recheckMs) {
         try {
-          await requireBrowserControl(deps.db, userId, orgId, agentId, open);
+          if (profileId) await requireProfileDriver(deps.db, userId, orgId, profileId);
+          else await requireBrowserControl(deps.db, userId, orgId, agentId, open);
           checked.set(key, Date.now());
         } catch {
           checked.delete(key);
@@ -739,16 +815,22 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
         }
       }
       // The person in control is here: their grace moves on (a write at most every 30 s).
-      await touchControl(deps.db, open.id, userId).catch(() => {});
-      const [agent] = await deps.db
-        .select({ handle: agents.handle })
-        .from(agents)
-        .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
-      if (!agent) return { accepted: 0, refused: true };
+      await touchFor(agentId, open.id, userId).catch(() => {});
+      let scope: AgentScope;
+      if (profileId) scope = profileScope(profileId);
+      else {
+        const [agent] = await deps.db
+          .select({ handle: agents.handle })
+          .from(agents)
+          .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
+        if (!agent) return { accepted: 0, refused: true };
+        scope = { id: agentId, handle: agent.handle };
+      }
       const reply = await deps.hub.call(open.machineId, {
         op: "browser.input",
         events,
-        agent: { id: agentId, handle: agent.handle },
+        agent: scope,
+        ...profileOp(agentId),
       });
       return { accepted: reply.accepted, refused: false };
     },
@@ -842,7 +924,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
         // The page shows at last for the person in control watching it: their control holds from now.
         const controller = state.controllerUserId;
         if (first && state.handoff && controller && [...state.viewers].some((v) => v.userId === controller)) {
-          void touchControl(deps.db, state.handoff.id, controller, new Date(), true).catch(() => {});
+          void touchFor(frame.agentId, state.handoff.id, controller, true).catch(() => {});
         }
       },
       streamEnded(machineId: string, frame: Extract<RunnerFrame, { type: "browser.stream.ended" }>) {
@@ -936,7 +1018,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       unsubscribeHandoffs?.();
       unsubscribeComputers?.();
       for (const state of live.values()) cancelStop(state);
-      for (const [key, batch] of batches) flushInput(key, batch);
+      for (const [key, batch] of batches) flushInput(key, batch, true);
     },
   };
   return api;

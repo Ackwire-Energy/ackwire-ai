@@ -1,6 +1,6 @@
 import type { ArtifactContent, ArtifactKind, ArtifactRef } from "../api/types";
 
-/** What the Drive filters by: a block or a poll lives in its conversation (ADR 0109). */
+/** What the Drive filters by: a block or a poll lives in its conversation (ADR 0113). */
 export const ARTIFACT_KINDS: ArtifactKind[] = ["document", "table", "diff", "diagram", "html", "file"];
 
 /** Each kind's design system icon (names from `@agenteschat/ui`'s `IconName`). */

@@ -10,7 +10,7 @@ import { getChannelCached } from "./context";
 import { schedulesOf } from "./context/summaries";
 import { isAgentOnlyDm } from "./dms";
 import { cutText } from "./format";
-import { ROUTINE_ACCESS, ROUTINE_REPORT, type RoutineAccess, routineAccessOf, routineReportOf } from "./routine-brief";
+import { ROUTINE_REPORT, routineReportOf } from "./routine-brief";
 import {
   cancelReminder,
   createReminder,
@@ -218,8 +218,6 @@ function whenParams(t: RoutineTrigger): AgentActionParams {
   }
 }
 
-const accessText = (r: RoutineView) =>
-  r.access === "act" ? "may act (changes inside agentes.chat; asks before changing connected apps)" : "only reads";
 const reportText = (r: RoutineView) =>
   r.report === "always" ? "reports every run" : "reports only when there is something new";
 
@@ -289,7 +287,7 @@ function routineLine(r: RoutineView, where: string, handle: string | null, promp
         : cutText(prompt.replace(/\s+/g, " "), 300);
   const runs = r.recentRuns.slice(0, LISTED_RUNS).map((run) => runText(run, zone));
   return [
-    `${r.id} — ${handle ? `@${handle} ` : ""}"${r.name}" (${stateText(r)}): ${whenText(r.trigger)}; next: ${next}; reports in ${where}; ${reportText(r)}; ${accessText(r)}`,
+    `${r.id} — ${handle ? `@${handle} ` : ""}"${r.name}" (${stateText(r)}): ${whenText(r.trigger)}; next: ${next}; reports in ${where}; ${reportText(r)}`,
     `  ${text}`,
     ...(runs.length > 0 ? [`  last runs: ${runs.join("; ")}`] : []),
   ].join("\n");
@@ -439,12 +437,6 @@ export const REPORT_SCHEMA = {
   enum: ROUTINE_REPORT,
   description: '"when_new" (default): only when there is something new; "always": a report every run.',
 };
-export const ACCESS_SCHEMA = {
-  type: "string",
-  enum: ROUTINE_ACCESS,
-  description:
-    '"read" (default): only look and report. "act": may also change things (tasks, memory, wiki, Drive, its own branches and PRs; changes in connected apps still ask first), tell or ask other agents, and post where the person can (their channels, their DM with you). Only when the person clearly wants changes made or messages sent.',
-};
 
 /** A webhook routine's address is a secret the agent never sees: the person copies it from the routine's page. */
 const WEBHOOK_HINT =
@@ -453,7 +445,7 @@ const WEBHOOK_HINT =
 /** The routine in one line for the agent to confirm. */
 const summaryOf = async (ctx: ToolContext, r: RoutineView) => {
   const next = r.nextRunAt ? `; next: ${describeWhen(new Date(r.nextRunAt), zoneOf(r.trigger))}` : "";
-  return `"${r.name}" (${r.active ? "active" : "paused"}): ${whenText(r.trigger)}${next}; reports in ${await whereOf(ctx, r)}; ${reportText(r)}; ${accessText(r)}`;
+  return `"${r.name}" (${r.active ? "active" : "paused"}): ${whenText(r.trigger)}${next}; reports in ${await whereOf(ctx, r)}; ${reportText(r)}`;
 };
 
 /**
@@ -529,7 +521,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
     {
       name: "create_routine",
       description:
-        'Create a routine: work you do on your own, in the background, on a schedule ("toda segunda às 9h", "dias úteis às 18h", "every hour") or when something happens (`trigger`). Each run gets `prompt` as its instructions and nobody watches it: it reports by handing its findings off to the conversation it reports to, where you then tell the people (with `access` "act" it may also tell or ask other agents and post where the person can). That is this conversation by default; set `channel` (its name, with or without #) when the person wants it in a channel ("manda no #general"). `report` says when it speaks, `access` what it may do on its own. When the person says "when a new email arrives" or "when a new error comes in", use `trigger` (an email filter or an event), never a schedule that checks again and again; "when another service calls it" or "by webhook" is a webhook trigger. A routine runs at most every 15 minutes. Only admins or your owner can create routines; the person sees it with Undo.',
+        'Create a routine: work you do on your own, in the background, on a schedule ("toda segunda às 9h", "dias úteis às 18h", "every hour") or when something happens (`trigger`). Each run gets `prompt` as its instructions and nobody watches it: it reports by handing its findings off to the conversation it reports to, where you then tell the people. It can do what you can (search the web, use your computer and browser, tell or ask other agents, post where the person can); changes in connected apps still ask a person first. That is this conversation by default; set `channel` (its name, with or without #) when the person wants it in a channel ("manda no #general"). `report` says when it speaks. When the person says "when a new email arrives" or "when a new error comes in", use `trigger` (an email filter or an event), never a schedule that checks again and again; "when another service calls it" or "by webhook" is a webhook trigger. A routine runs at most every 15 minutes. Only admins or your owner can create routines; the person sees it with Undo.',
       scope: SCHEDULE_SCOPE,
       inputSchema: {
         type: "object",
@@ -540,7 +532,6 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           title: { type: "string", maxLength: 120 },
           channel: { type: "string", maxLength: 100, description: "Report in this channel instead of here" },
           report: REPORT_SCHEMA,
-          access: ACCESS_SCHEMA,
         },
         required: ["prompt"],
         additionalProperties: false,
@@ -584,7 +575,6 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
                 ? channel.target
                 : { type: "conversation", ...conv, reminder: false },
             trigger,
-            access: routineAccessOf(input.access),
             report: routineReportOf(input.report),
           });
           // Recorded right after (reading the schedule may call a model: no transaction held around it).
@@ -703,7 +693,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
     {
       name: "update_routine",
       description:
-        'Change one of your routines (id from list_routines) when the person asks: `channel` moves where it reports ("manda no #general" — then nothing comes to the old conversation), `prompt` replaces its instructions, `schedule` its time ("dias úteis às 9h", "weekdays at 9am") or `trigger` what starts it (an email filter or an event instead of a schedule), `report` when it speaks, `access` what it may do on its own ("act" only when the person clearly wants changes made or messages sent), `active` pauses or resumes it. Only who created it, your owner or an admin can change it; the person sees it with Undo.',
+        'Change one of your routines (id from list_routines) when the person asks: `channel` moves where it reports ("manda no #general" — then nothing comes to the old conversation), `prompt` replaces its instructions, `schedule` its time ("dias úteis às 9h", "weekdays at 9am") or `trigger` what starts it (an email filter or an event instead of a schedule), `report` when it speaks, `active` pauses or resumes it. Only who created it, your owner or an admin can change it; the person sees it with Undo.',
       scope: SCHEDULE_SCOPE,
       inputSchema: {
         type: "object",
@@ -715,7 +705,6 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
           trigger: TRIGGER_SCHEMA,
           title: { type: "string", minLength: 1, maxLength: 120 },
           report: REPORT_SCHEMA,
-          access: ACCESS_SCHEMA,
           active: { type: "boolean" },
         },
         required: ["id"],
@@ -746,7 +735,6 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             ...(str(input.title) ? { name: str(input.title) } : {}),
             ...(trigger ? { trigger } : {}),
             ...(input.report !== undefined ? { report: routineReportOf(input.report) } : {}),
-            ...(input.access !== undefined ? { access: routineAccessOf(input.access) } : {}),
             ...(typeof input.active === "boolean" ? { active: input.active } : {}),
           });
           const afterRow = await routineRow(ctx.db, ctx.orgId, id);
@@ -896,7 +884,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
     {
       name: "schedule_action",
       description:
-        "Prepare a connected app's action for later (a post at a set time, a message to send tomorrow): the person approves that exact action now, on a card that says when it runs, and at that time it goes out by itself without asking again. Use it instead of a reminder or routine that would ask at the time. Give the exact `tool` and its full `arguments` (the whole text, the account: nothing left to decide later), `when` (the person's words or ISO 8601) or `routine` (the next run of one of your routines that may act), a short `title` in the person's language and `why`. Your turn waits for their decision. To change its content or time later, call it again with `replaces`: that needs a new approval. Never for merge, deploy, rollback and the like: those always ask at the time.",
+        "Prepare a connected app's action for later (a post at a set time, a message to send tomorrow): the person approves that exact action now, on a card that says when it runs, and at that time it goes out by itself without asking again. Use it instead of a reminder or routine that would ask at the time. Give the exact `tool` and its full `arguments` (the whole text, the account: nothing left to decide later), `when` (the person's words or ISO 8601) or `routine` (the next run of one of your routines), a short `title` in the person's language and `why`. Your turn waits for their decision. To change its content or time later, call it again with `replaces`: that needs a new approval. Never for merge, deploy, rollback and the like: those always ask at the time.",
       scope: SCHEDULE_SCOPE,
       inputSchema: {
         type: "object",
@@ -942,7 +930,6 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
             return { content: `${replaced.id} was prepared by another agent: only it changes it.`, isError: true };
           }
           // The run it is for: one of the agent's routines, a new one-off at `when`, else the run it replaces.
-          let access: RoutineAccess = "act";
           let slot: AheadRequest["slot"];
           const routineId = str(input.routine) || (str(input.when) ? "" : (replaced?.routineId ?? ""));
           if (routineId) {
@@ -959,7 +946,6 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
                 isError: true,
               };
             }
-            access = routineAccessOf(own.row.access);
             slot = async () => ({ routineId, runAt });
           } else if (str(input.when)) {
             const timezone = await routineTimezone(ctx.db, requester, ctx.orgId);
@@ -987,7 +973,7 @@ export function createScheduleToolSource(deps: Omit<RoutineDeps, "db">): ToolSou
               isError: true,
             };
           }
-          const prepared = await prepare({ tool: str(input.tool), input: args, why: str(input.why), access, slot });
+          const prepared = await prepare({ tool: str(input.tool), input: args, why: str(input.why), slot });
           if (!prepared.ok) return { content: prepared.message, isError: true };
           // Changed content or time: the earlier approval covers nothing any more.
           if (replaced) await cancelAheadApproval(routineDeps(ctx), requester, ctx.orgId, replaced.id);

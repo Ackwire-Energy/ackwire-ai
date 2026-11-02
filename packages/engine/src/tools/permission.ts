@@ -1,4 +1,5 @@
-import { and, eq, isNull, schema } from "@agenteschat/db";
+import { and, eq, isNull, schema, sql } from "@agenteschat/db";
+import { grantBrowserProfile, onSingleModeMachine } from "../browser/profiles";
 import {
   ALL_TOOLS,
   BUILTIN_SCOPES,
@@ -20,6 +21,8 @@ export interface MissingPermission {
   label: string;
   connectionId: string | null;
   scope: string;
+  /** A browser profile of the workspace (ADR 0110): granted on its own, never through "all tools". */
+  profileId?: string;
 }
 
 /**
@@ -51,6 +54,27 @@ export async function missingPermissions(ctx: Pick<ToolContext, "db" | "orgId" |
   for (const c of connections) {
     if (own.has(c.id) || held.has(c.id) || all) continue;
     out.push({ id: `connector:${c.id}`, label: c.label, connectionId: c.id, scope: CONNECTOR_ALL });
+  }
+  const { browserProfiles: p, browserProfileGrants: g } = schema;
+  const profiles = await ctx.db
+    .select({ id: p.id, name: p.name })
+    .from(p)
+    .where(
+      and(
+        eq(p.orgId, ctx.orgId),
+        isNull(p.deletedAt),
+        onSingleModeMachine,
+        sql`not exists (select 1 from ${g} where ${g.profileId} = ${p.id} and ${g.agentId} = ${ctx.agentId})`,
+      ),
+    );
+  for (const pr of profiles) {
+    out.push({
+      id: `browser-profile:${pr.id}`,
+      label: `Browser profile "${pr.name}"`,
+      connectionId: null,
+      scope: "",
+      profileId: pr.id,
+    });
   }
   return out;
 }
@@ -106,6 +130,12 @@ export function createPermissionToolSource(): ToolSource {
             return {
               content: `Nothing to turn on: ${labels.get(id) ?? id} is already on for you, or no longer exists.`,
             };
+          if (wanted.profileId) {
+            await grantBrowserProfile(c.db, c.orgId, wanted.profileId, c.agentId, { type: "agent", id: c.agentId });
+            return {
+              content: `Turned on: ${wanted.label}. Switch to it with browser_profile; carry on with the request.`,
+            };
+          }
           await grantScopes(c.db, c.orgId, c.agentId, [{ connectionId: wanted.connectionId, scope: wanted.scope }]);
           return {
             content: `Turned on: ${wanted.label}. Its tools are yours from your next step; carry on with the request.`,

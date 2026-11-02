@@ -2474,7 +2474,7 @@
   {
     "id": "block-what-if",
     "title": "\"quero mexer no preço e ver quanto sobra\"",
-    "source": "synthetic (live blocks, ADR 0109): when the agent shows something to use, opens a vote, or just answers",
+    "source": "synthetic (live blocks, ADR 0113): when the agent shows something to use, opens a vote, or just answers",
     "agent": {
       "name": "Lia",
       "role": "Finanças e operações",
@@ -2510,7 +2510,7 @@
   {
     "id": "block-side-by-side",
     "title": "\"me mostra os planos e deixa eu filtrar\"",
-    "source": "synthetic (live blocks, ADR 0109): when the agent shows something to use, opens a vote, or just answers",
+    "source": "synthetic (live blocks, ADR 0113): when the agent shows something to use, opens a vote, or just answers",
     "agent": {
       "name": "Lia",
       "role": "Finanças e operações",
@@ -2546,7 +2546,7 @@
   {
     "id": "block-short-form",
     "title": "formulário curto de pedido",
-    "source": "synthetic (live blocks, ADR 0109): when the agent shows something to use, opens a vote, or just answers",
+    "source": "synthetic (live blocks, ADR 0113): when the agent shows something to use, opens a vote, or just answers",
     "agent": {
       "name": "Lia",
       "role": "Finanças e operações",
@@ -2581,7 +2581,7 @@
   {
     "id": "no-block-one-number",
     "title": "um número não vira bloco",
-    "source": "synthetic (live blocks, ADR 0109): when the agent shows something to use, opens a vote, or just answers",
+    "source": "synthetic (live blocks, ADR 0113): when the agent shows something to use, opens a vote, or just answers",
     "agent": {
       "name": "Lia",
       "role": "Finanças e operações",
@@ -2618,7 +2618,7 @@
   {
     "id": "no-block-trend",
     "title": "tendência é gráfico, não bloco",
-    "source": "synthetic (live blocks, ADR 0109): when the agent shows something to use, opens a vote, or just answers",
+    "source": "synthetic (live blocks, ADR 0113): when the agent shows something to use, opens a vote, or just answers",
     "agent": {
       "name": "Lia",
       "role": "Finanças e operações",
@@ -2651,7 +2651,7 @@
   {
     "id": "no-block-report",
     "title": "relatório para guardar é arquivo",
-    "source": "synthetic (live blocks, ADR 0109): when the agent shows something to use, opens a vote, or just answers",
+    "source": "synthetic (live blocks, ADR 0113): when the agent shows something to use, opens a vote, or just answers",
     "agent": {
       "name": "Lia",
       "role": "Finanças e operações",
@@ -2687,7 +2687,7 @@
   {
     "id": "poll-group-decides",
     "title": "o grupo decide",
-    "source": "synthetic (live blocks, ADR 0109): when the agent shows something to use, opens a vote, or just answers",
+    "source": "synthetic (live blocks, ADR 0113): when the agent shows something to use, opens a vote, or just answers",
     "agent": {
       "name": "Lia",
       "role": "Finanças e operações",
@@ -2734,7 +2734,7 @@
   {
     "id": "no-poll-one-person",
     "title": "uma pessoa decidindo não é votação",
-    "source": "synthetic (live blocks, ADR 0109): when the agent shows something to use, opens a vote, or just answers",
+    "source": "synthetic (live blocks, ADR 0113): when the agent shows something to use, opens a vote, or just answers",
     "agent": {
       "name": "Lia",
       "role": "Finanças e operações",
@@ -2767,7 +2767,7 @@
   {
     "id": "no-block-for-password",
     "title": "senha não passa por bloco",
-    "source": "synthetic (live blocks, ADR 0109): when the agent shows something to use, opens a vote, or just answers",
+    "source": "synthetic (live blocks, ADR 0113): when the agent shows something to use, opens a vote, or just answers",
     "agent": {
       "name": "Lia",
       "role": "Finanças e operações",
@@ -2800,7 +2800,7 @@
   {
     "id": "routine-reports-without-block",
     "title": "rotina não mostra bloco",
-    "source": "synthetic (live blocks, ADR 0109): a routine's run has no block or vote, and the prompt doesn't offer them",
+    "source": "synthetic (live blocks, ADR 0113): a routine's run has no block or vote, and the prompt doesn't offer them",
     "agent": {
       "name": "Lia",
       "role": "Finanças e operações",

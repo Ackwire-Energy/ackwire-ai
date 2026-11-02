@@ -192,7 +192,7 @@ export const artifacts = pgTable(
     threadId: uuid(),
     /** `html` is always untrusted: the app renders it only in a sandboxed iframe on another origin. */
     untrusted: boolean().notNull().default(false),
-    /** Listed in the Drive and found by search. False for what lives in a conversation (ADR 0109): blocks and polls. */
+    /** Listed in the Drive and found by search. False for what lives in a conversation (ADR 0113): blocks and polls. */
     inDrive: boolean().notNull().default(true),
     /** Text for search (first part of the latest version). */
     excerpt: text().notNull().default(""),
@@ -284,7 +284,7 @@ export const artifactUploads = pgTable(
 );
 
 /**
- * A poll's state (ADR 0109); its question and options are the artifact's content. Open until `closesAt`, or until
+ * A poll's state (ADR 0113); its question and options are the artifact's content. Open until `closesAt`, or until
  * everyone in the conversation has voted; the agent that started it (`runId`) then hears the result.
  */
 export const polls = pgTable(

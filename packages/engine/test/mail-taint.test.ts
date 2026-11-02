@@ -117,7 +117,7 @@ test("the run a routine's report woke always asks before a send, whatever the ma
   expect(m.box.state.sent).toEqual([]);
 });
 
-test("a routine that may act gets a card for every send; one that only reads can't send at all", async () => {
+test("a routine gets a card for every send, also one stored as only reading (ADR 0109)", async () => {
   m = await mailSetup();
   const account = await imapAccount(m);
   await giveMail(m, account.id, "read_write", { allowedRecipients: ["@acme.com"], sendWithoutAsking: true });
@@ -129,8 +129,7 @@ test("a routine that may act gets a card for every send; one that only reads can
   expect(asked.approval.origin).toMatchObject({ kind: "routine", routineName: "Caixa de suporte" });
 
   const reading = await unwatchedRun("read");
-  const names = (await m.tools.list(reading)).map((t) => t.name);
-  expect(names).toContain("mail_support_search");
-  expect(names).not.toContain("mail_support_send");
-  expect(await send(reading, { ...SEND, why: WHY })).toMatchObject({ output: { isError: true } });
+  expect((await sendTool(reading))?.sensitive).toBe(true);
+  expect((await send(reading, { ...SEND, why: WHY })).type).toBe("approval");
+  expect(m.box.state.sent).toEqual([]);
 });

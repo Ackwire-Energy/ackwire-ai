@@ -10,7 +10,7 @@
 /* ── Shared ─────────────────────────────────────────────────────────────── */
 .mi-card {
   position: relative;
-  max-width: 680px;
+  max-width: var(--msg-card-w);
   margin-top: 10px;
   padding: 16px;
   border-radius: 20px;
