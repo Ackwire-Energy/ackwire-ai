@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Agent } from "../src/api/types";
-import { audienceWith } from "../src/lib/audience";
+import { audienceWith, consultableLocked, offersConsultable } from "../src/lib/audience";
 import { reachByAccess, reachKey, reachOf, reachOpens, routineReachWarnings } from "../src/lib/reach";
 
 const agent = (id: string, handle: string, extra: Partial<Agent> = {}) => ({ id, handle, ...extra }) as Agent;
@@ -96,5 +96,23 @@ describe("reachOpens", () => {
     expect(reachOpens({ ...base, reason: "not_in_channel" })).toBe(true);
     expect(reachOpens({ ...base, reason: "audience" })).toBe(false);
     expect(reachOpens({ agentId: "a", handle: "ivo", reason: "not_in_channel" })).toBe(false);
+  });
+});
+
+describe("Outros agentes podem consultar", () => {
+  test("offered when someone is left out, never on a plan answering only its owner", () => {
+    const owner = { mode: "owner" as const, userIds: [] };
+    expect(offersConsultable(owner, false)).toBe(true);
+    expect(offersConsultable(owner, true)).toBe(false);
+    expect(offersConsultable({ mode: "people", userIds: ["u"] }, true)).toBe(true);
+    expect(offersConsultable({ mode: "everyone", userIds: [] }, false)).toBe(false);
+  });
+
+  test("on a plan, once off, only its owner turns it back on", () => {
+    const off = { mode: "people" as const, userIds: [], consultable: false };
+    expect(consultableLocked(off, { owner: false, onPlan: true })).toBe(true);
+    expect(consultableLocked(off, { owner: true, onPlan: true })).toBe(false);
+    expect(consultableLocked(off, { owner: false, onPlan: false })).toBe(false);
+    expect(consultableLocked({ ...off, consultable: true }, { owner: false, onPlan: true })).toBe(false);
   });
 });

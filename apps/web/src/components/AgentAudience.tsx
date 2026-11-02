@@ -1,6 +1,6 @@
 import type { Agent, AgentAudience, AudienceMode } from "@agenteschat/client";
 import { useAgents, useAiStatus, useRoles } from "@agenteschat/client";
-import { audienceChip } from "@agenteschat/client/lib/audience";
+import { audienceChip, offersConsultable } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf, onlyOwnerReplies } from "@agenteschat/client/lib/no-ai";
 import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
@@ -84,6 +84,7 @@ export function AudienceChoice({
   agentName,
   idPrefix,
   compact,
+  onPlan = false,
 }: {
   value: AgentAudience;
   onChange: (next: AgentAudience) => void;
@@ -91,6 +92,8 @@ export function AudienceChoice({
   agentName: string;
   idPrefix: string;
   compact?: boolean;
+  /** It thinks with a person's plan (ADR 0059 §5). */
+  onPlan?: boolean;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -260,7 +263,7 @@ export function AudienceChoice({
           </div>
         </div>
       )}
-      {value.mode !== "everyone" && (
+      {offersConsultable(value, onPlan) && (
         <SettingRow
           title={t("audience.consultable", g)}
           description={t("audience.consultableHint", g)}

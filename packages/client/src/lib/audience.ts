@@ -66,6 +66,17 @@ export function audienceWidens(from: AgentAudience, to: AgentAudience, ownerUser
   );
 }
 
+/**
+ * Whether "Outros agentes podem consultar" applies: someone is left out, and it doesn't think with a plan answering only
+ * its owner (ADR 0059 §5), where nobody else is answered, consulted or not (same rule as the backend).
+ */
+export const offersConsultable = (a: AgentAudience, onPlan: boolean) =>
+  a.mode !== "everyone" && !(onPlan && a.mode === "owner");
+
+/** On a plan only its owner turns the switch back on (ADR 0059 §5); anyone else may only turn it off. */
+export const consultableLocked = (saved: AgentAudience, viewer: { owner: boolean; onPlan: boolean }) =>
+  viewer.onPlan && !viewer.owner && saved.consultable === false;
+
 /** Someone besides its owner can talk to the agent. */
 export const answersOthers = (a: AgentAudience, ownerUserId: string | null) =>
   audienceWidens({ mode: "owner", userIds: [] }, a, ownerUserId);

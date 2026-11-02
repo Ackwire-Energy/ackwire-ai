@@ -1,5 +1,6 @@
 import { useUpdateAgent } from "@agenteschat/client";
-import { audienceOf } from "@agenteschat/client/lib/audience";
+import { audienceOf, consultableLocked, offersConsultable } from "@agenteschat/client/lib/audience";
+import { engineOfBrain } from "@agenteschat/client/lib/brain";
 import { coordinatorNote } from "@agenteschat/client/lib/coordinator";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { cleanHandle, handleAfterRename, handleProblemText, takenHandles } from "@agenteschat/client/lib/new-agent";
@@ -40,10 +41,9 @@ export function AgentEditScreen({ id }: { id: string }) {
   const agent = dir.agentById.get(id);
   const update = useUpdateAgent(useOrgId(), id);
   const admin = can(org, "manage_agents");
-  const fields = editableFields({
-    admin,
-    owner: Boolean(meId && agent?.ownerUserId === meId),
-  });
+  const owner = Boolean(meId && agent?.ownerUserId === meId);
+  const fields = editableFields({ admin, owner });
+  const onPlan = engineOfBrain(agent?.brain?.kind) !== "agent";
   const saved = useMemo<AgentDraft | null>(
     () =>
       agent
@@ -212,7 +212,7 @@ export function AgentEditScreen({ id }: { id: string }) {
         </View>
 
         {/* Only an audience that leaves someone out has anyone to be consulted for. */}
-        {draft.audience.mode !== "everyone" ? (
+        {offersConsultable(draft.audience, onPlan) ? (
           <View style={styles.section}>
             <GroupedList>
               <GroupedRow
@@ -222,7 +222,9 @@ export function AgentEditScreen({ id }: { id: string }) {
                 sub={t("audience.consultableHint", agentGrammar(t, agent.name))}
                 subLines={4}
                 toggle={draft.audience.consultable !== false}
-                disabled={!fields.has("consultable")}
+                disabled={
+                  !fields.has("consultable") || (!!saved && consultableLocked(saved.audience, { owner, onPlan }))
+                }
                 onPress={() =>
                   set("audience", { ...draft.audience, consultable: draft.audience.consultable === false })
                 }

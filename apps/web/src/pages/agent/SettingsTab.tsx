@@ -423,6 +423,7 @@ export function SettingsTab({
                   ownerUserId={ownerId}
                   agentName={agent.name}
                   idPrefix="agp-audience"
+                  onPlan={onPlan}
                 />
                 {blocked && (
                   <SettingNote icon="lock" live>

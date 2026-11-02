@@ -113,6 +113,15 @@ describe("Quem pode falar com a Ada", () => {
     });
   });
 
+  test("on a plan answering only its owner the switch isn't offered: nobody else is answered, consulted or not", async () => {
+    const state = onlyOwner();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.brain = { kind: "claude_code", model: "Sonnet" };
+    await go(`agents/${ADA_ID}?tab=settings&sec=audience`, state);
+    const section = screen().getByRole("region", { name: "Quem pode falar com a Ada" });
+    expect(within(section).queryByRole("switch", { name: "Outros agentes podem consultar a Ada" })).toBeNull();
+  });
+
   test("an agent that doesn't answer me: chip, no @ suggestion, DM composer off with the notice", async () => {
     await go(`c/${ENG_ID}`, onlyOwner());
     const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
