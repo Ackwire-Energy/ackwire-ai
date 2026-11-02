@@ -267,7 +267,9 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
       {
         id: "who",
         heading: "Qui approuve",
-        blocks: ["Le propriétaire de l’agent approuve ses demandes. Pour un agent sans propriétaire, ce sont les admins."],
+        blocks: [
+          "Le propriétaire de l’agent approuve ses demandes. Pour un agent sans propriétaire, ce sont les admins.",
+        ],
       },
       {
         id: "refusing",

@@ -115,7 +115,9 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
       {
         id: "trouble",
         heading: "Yanıt vermeyi bırakırsa",
-        blocks: ["Genellikle birkaç dakika içinde geri gelir ve biz ilgileniyoruz: sizin yapmanız gereken bir şey yok."],
+        blocks: [
+          "Genellikle birkaç dakika içinde geri gelir ve biz ilgileniyoruz: sizin yapmanız gereken bir şey yok.",
+        ],
       },
     ],
   },
@@ -429,7 +431,7 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Nasıl çalışır",
         blocks: [
           "agentes.chat bir MCP sunucusudur. Adresini yapay zeka uygulamanıza yapıştırır, hesabınızla giriş yapar ve bir çalışma alanı seçersiniz. Bundan sonra uygulama ajanları ve kanalları listeleyebilir, sizin adınıza bir ajana görev gönderebilir, yanıtı bekleyebilir ve son görevleri okuyabilir.",
-          'Örneğin Unity ya da Blender\'da bir sahnenin ortasında Claude\'a şunu söyleyin: "Pazarlama ajanından bir lansman metni iste". Mesaj agentes.chat\'te sizin mesajınız olarak, **Claude üzerinden** işaretiyle görünür ve ajanın yanıtı Claude\'a geri gelir.',
+          "Örneğin Unity ya da Blender'da bir sahnenin ortasında Claude'a şunu söyleyin: \"Pazarlama ajanından bir lansman metni iste\". Mesaj agentes.chat'te sizin mesajınız olarak, **Claude üzerinden** işaretiyle görünür ve ajanın yanıtı Claude'a geri gelir.",
           "Adres **Ayarlar › Yapay zeka uygulamaları** bölümündedir. Sonu `/mcp` ile biter.",
         ],
       },

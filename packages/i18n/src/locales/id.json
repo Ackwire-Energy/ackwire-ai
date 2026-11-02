@@ -2243,12 +2243,17 @@
       "forwards": "Meneruskan <b>“{{subject}}”</b>",
       "forwardsFrom": "Meneruskan <b>“{{subject}}”</b>, dari {{from}}",
       "title": {
-        "draft_other": "Simpan draf untuk {{to}} dan {{more}} lainnya",
-        "draftReply_other": "Simpan draf balasan untuk {{to}} dan {{more}} lainnya",
+        "draft": "Simpan draf untuk {{to}}",
+        "draftMore": "Simpan draf untuk {{to}} dan {{more}} lainnya",
+        "draftReply": "Simpan draf balasan untuk {{to}}",
+        "draftReplyMore": "Simpan draf balasan untuk {{to}} dan {{more}} lainnya",
         "draftNoTo": "Simpan draf email",
-        "send_other": "Kirim email ke {{to}} dan {{more}} lainnya",
-        "reply_other": "Balas {{to}} dan {{more}} lainnya lewat email",
-        "forward_other": "Teruskan email ke {{to}} dan {{more}} lainnya"
+        "send": "Kirim email ke {{to}}",
+        "sendMore": "Kirim email ke {{to}} dan {{more}} lainnya",
+        "reply": "Balas {{to}} lewat email",
+        "replyMore": "Balas {{to}} dan {{more}} lainnya lewat email",
+        "forward": "Teruskan email ke {{to}}",
+        "forwardMore": "Teruskan email ke {{to}} dan {{more}} lainnya"
       }
     },
     "asks": "<b>{{agent}}</b> meminta persetujuan",

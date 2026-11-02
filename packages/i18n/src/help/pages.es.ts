@@ -115,9 +115,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
       {
         id: "trouble",
         heading: "Si deja de responder",
-        blocks: [
-          "Suele volver en unos minutos, y ya estamos en ello: no tienes que hacer nada.",
-        ],
+        blocks: ["Suele volver en unos minutos, y ya estamos en ello: no tienes que hacer nada."],
       },
     ],
   },
@@ -315,12 +313,16 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
       {
         id: "plans",
         heading: "Por qué tu plan elige solo para tus mensajes",
-        blocks: ["Los planes de Claude y ChatGPT son personales, así que tu plan elige solo para los mensajes que escribes tú."],
+        blocks: [
+          "Los planes de Claude y ChatGPT son personales, así que tu plan elige solo para los mensajes que escribes tú.",
+        ],
       },
       {
         id: "see",
         heading: "Ver quién eligió",
-        blocks: ["Abre la marca de verificación debajo de un mensaje. Su última línea dice quién eligió a los agentes."],
+        blocks: [
+          "Abre la marca de verificación debajo de un mensaje. Su última línea dice quién eligió a los agentes.",
+        ],
       },
     ],
   },

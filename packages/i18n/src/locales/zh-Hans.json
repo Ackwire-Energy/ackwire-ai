@@ -2237,12 +2237,17 @@
       "forwards": "转发 <b>“{{subject}}”</b>",
       "forwardsFrom": "转发 <b>“{{subject}}”</b>，来自 {{from}}",
       "title": {
-        "draft_other": "保存发给 {{to}} 及另外 {{more}} 人的草稿",
-        "draftReply_other": "保存回复 {{to}} 及另外 {{more}} 人的草稿",
+        "draft": "保存发给 {{to}} 的草稿",
+        "draftMore": "保存发给 {{to}} 及另外 {{more}} 人的草稿",
+        "draftReply": "保存回复 {{to}} 的草稿",
+        "draftReplyMore": "保存回复 {{to}} 及另外 {{more}} 人的草稿",
         "draftNoTo": "保存邮件草稿",
-        "send_other": "发送邮件给 {{to}} 及另外 {{more}} 人",
-        "reply_other": "通过邮件回复 {{to}} 及另外 {{more}} 人",
-        "forward_other": "转发邮件给 {{to}} 及另外 {{more}} 人"
+        "send": "发送邮件给 {{to}}",
+        "sendMore": "发送邮件给 {{to}} 及另外 {{more}} 人",
+        "reply": "通过邮件回复 {{to}}",
+        "replyMore": "通过邮件回复 {{to}} 及另外 {{more}} 人",
+        "forward": "转发邮件给 {{to}}",
+        "forwardMore": "转发邮件给 {{to}} 及另外 {{more}} 人"
       }
     },
     "asks": "<b>{{agent}}</b> 请求审批",

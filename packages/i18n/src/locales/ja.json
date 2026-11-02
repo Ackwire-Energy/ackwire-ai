@@ -2233,12 +2233,17 @@
       "forwards": "<b>「{{subject}}」</b>を転送",
       "forwardsFrom": "{{from}}からの<b>「{{subject}}」</b>を転送",
       "title": {
-        "draft_other": "{{to}}ほか{{more}}名宛ての下書きを保存",
-        "draftReply_other": "{{to}}ほか{{more}}名宛ての返信の下書きを保存",
+        "draft": "{{to}}宛ての下書きを保存",
+        "draftMore": "{{to}}ほか{{more}}名宛ての下書きを保存",
+        "draftReply": "{{to}}宛ての返信の下書きを保存",
+        "draftReplyMore": "{{to}}ほか{{more}}名宛ての返信の下書きを保存",
         "draftNoTo": "メールの下書きを保存",
-        "send_other": "{{to}}ほか{{more}}名にメールを送信",
-        "reply_other": "{{to}}ほか{{more}}名にメールで返信",
-        "forward_other": "{{to}}ほか{{more}}名にメールを転送"
+        "send": "{{to}}にメールを送信",
+        "sendMore": "{{to}}ほか{{more}}名にメールを送信",
+        "reply": "{{to}}にメールで返信",
+        "replyMore": "{{to}}ほか{{more}}名にメールで返信",
+        "forward": "{{to}}にメールを転送",
+        "forwardMore": "{{to}}ほか{{more}}名にメールを転送"
       }
     },
     "asks": "<b>{{agent}}</b>が承認を求めています",
@@ -8281,7 +8286,7 @@
     }
   },
   "toolNames": {
-    "order": "modifiers-first",
+    "order": "verb-last",
     "verb": {
       "get": "取得",
       "list": "一覧",

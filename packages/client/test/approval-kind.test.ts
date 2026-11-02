@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { resources } from "@agenteschat/i18n";
+import { LOCALE_CODES } from "@agenteschat/i18n/locale";
 import { QueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
+import i18next from "i18next";
 import { ApiError, type Approval, type ApprovalEmail, cacheApproval, keys } from "../src/index";
 import { aheadPhase, emailTitleWords } from "../src/lib/approval-kind";
 import { approvalOriginShort } from "../src/lib/approval-origin";
@@ -32,7 +35,7 @@ describe("a mail approval in words", () => {
   test("a reply draft, a draft, a draft to nobody yet", () => {
     expect(emailTitleWords(email())).toEqual({
       key: "approval.email.title.draftReply",
-      values: { to: "ana@acme.com", count: 1, more: 0 },
+      values: { to: "ana@acme.com", more: 0 },
     });
     expect(emailTitleWords(email({ original: null })).key).toBe("approval.email.title.draft");
     expect(emailTitleWords(email({ to: [] })).key).toBe("approval.email.title.draftNoTo");
@@ -41,8 +44,22 @@ describe("a mail approval in words", () => {
   test("sends count everyone it goes to", () => {
     expect(
       emailTitleWords(email({ verb: "send", original: null, cc: ["bia@acme.com"], bcc: ["boss@acme.com"] })),
-    ).toEqual({ key: "approval.email.title.send", values: { to: "ana@acme.com", count: 3, more: 2 } });
+    ).toEqual({ key: "approval.email.title.sendMore", values: { to: "ana@acme.com", more: 2 } });
     expect(emailTitleWords(email({ verb: "reply" })).key).toBe("approval.email.title.reply");
+  });
+
+  test("one recipient never reads 'and 0 more', in any language", () => {
+    for (const lng of LOCALE_CODES) {
+      const instance = i18next.createInstance();
+      void instance.init({ lng, fallbackLng: "en", resources, initAsync: false });
+      for (const verb of ["send", "reply", "forward"] as const) {
+        const one = emailTitleWords(email({ verb }));
+        const two = emailTitleWords(email({ verb, cc: ["bia@acme.com"] }));
+        const say = (w: typeof one) => instance.t(w.key, w.values as never) as string;
+        expect({ lng, verb, one: /\d/.test(say(one)) }).toEqual({ lng, verb, one: false });
+        expect({ lng, verb, two: say(two).includes("1") }).toEqual({ lng, verb, two: true });
+      }
+    }
   });
 
   test("where it came from, short", () => {

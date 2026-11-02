@@ -121,8 +121,7 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
   },
   import: {
     title: "에이전트 가져오기",
-    summary:
-      "다른 앱이나 다른 agentes.chat 워크스페이스에서 에이전트를 지침, 스킬, 루틴, 메모리와 함께 가져오세요.",
+    summary: "다른 앱이나 다른 agentes.chat 워크스페이스에서 에이전트를 지침, 스킬, 루틴, 메모리와 함께 가져오세요.",
     sections: [
       {
         id: "comes",
@@ -181,7 +180,13 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
           },
           "절대 담기지 않는 것:",
           {
-            list: ["API 키와 비밀번호", "커넥터와 로그인 정보", "컴퓨터", "대화, 메시지, 비공개 채널", "사용량, 비용, 활동 기록"],
+            list: [
+              "API 키와 비밀번호",
+              "커넥터와 로그인 정보",
+              "컴퓨터",
+              "대화, 메시지, 비공개 채널",
+              "사용량, 비용, 활동 기록",
+            ],
           },
           "파일을 쓰려면 다른 워크스페이스에서 **설정 › 가져오기와 내보내기**를 열고 .json 파일을 끌어다 놓으세요.",
         ],
@@ -195,7 +200,9 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
       {
         id: "links",
         heading: "링크",
-        blocks: ["[[를 입력하면 다른 페이지로 링크할 수 있어요. 백링크와 그래프에서 페이지가 어떻게 연결되는지 보여요."],
+        blocks: [
+          "[[를 입력하면 다른 페이지로 링크할 수 있어요. 백링크와 그래프에서 페이지가 어떻게 연결되는지 보여요.",
+        ],
       },
       {
         id: "agents",

@@ -5615,37 +5615,37 @@
     "value": "Forwards <b>“{{subject}}”</b>, from {{from}}"
   },
   "approval.email.title.draft": {
-    "value": {
-      "one": "Save a draft to {{to}}",
-      "other": "Save a draft to {{to}} and {{more}} more"
-    }
+    "value": "Save a draft to {{to}}"
+  },
+  "approval.email.title.draftMore": {
+    "value": "Save a draft to {{to}} and {{more}} more"
   },
   "approval.email.title.draftReply": {
-    "value": {
-      "one": "Save a draft reply to {{to}}",
-      "other": "Save a draft reply to {{to}} and {{more}} more"
-    }
+    "value": "Save a draft reply to {{to}}"
+  },
+  "approval.email.title.draftReplyMore": {
+    "value": "Save a draft reply to {{to}} and {{more}} more"
   },
   "approval.email.title.draftNoTo": {
     "value": "Save an email draft"
   },
   "approval.email.title.send": {
-    "value": {
-      "one": "Send an email to {{to}}",
-      "other": "Send an email to {{to}} and {{more}} more"
-    }
+    "value": "Send an email to {{to}}"
+  },
+  "approval.email.title.sendMore": {
+    "value": "Send an email to {{to}} and {{more}} more"
   },
   "approval.email.title.reply": {
-    "value": {
-      "one": "Reply to {{to}} by email",
-      "other": "Reply to {{to}} and {{more}} more by email"
-    }
+    "value": "Reply to {{to}} by email"
+  },
+  "approval.email.title.replyMore": {
+    "value": "Reply to {{to}} and {{more}} more by email"
   },
   "approval.email.title.forward": {
-    "value": {
-      "one": "Forward an email to {{to}}",
-      "other": "Forward an email to {{to}} and {{more}} more"
-    }
+    "value": "Forward an email to {{to}}"
+  },
+  "approval.email.title.forwardMore": {
+    "value": "Forward an email to {{to}} and {{more}} more"
   },
   "approval.asks": {
     "value": "<b>{{agent}}</b> asks for approval"

@@ -39,7 +39,9 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
       {
         id: "backups",
         heading: "备份和迁移",
-        blocks: ["**偏好设置 › 服务器** 中的 **立即备份** 会把数据库、文件和设置保存到你主文件夹的 `.agentes/backups` 中。"],
+        blocks: [
+          "**偏好设置 › 服务器** 中的 **立即备份** 会把数据库、文件和设置保存到你主文件夹的 `.agentes/backups` 中。",
+        ],
       },
     ],
   },
@@ -220,7 +222,9 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
       {
         id: "permissions",
         heading: "记忆不授予任何权限",
-        blocks: ["记忆中的任何内容都不会让智能体能做更多事。它能做什么，始终由 **工具和权限** 决定，敏感操作永远需要审批。"],
+        blocks: [
+          "记忆中的任何内容都不会让智能体能做更多事。它能做什么，始终由 **工具和权限** 决定，敏感操作永远需要审批。",
+        ],
       },
       {
         id: "proposals",

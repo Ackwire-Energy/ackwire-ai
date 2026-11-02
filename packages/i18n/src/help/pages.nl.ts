@@ -201,7 +201,9 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
       {
         id: "links",
         heading: "Links",
-        blocks: ["Typ [[ om naar een andere pagina te linken. Backlinks en de graaf laten zien hoe pagina's samenhangen."],
+        blocks: [
+          "Typ [[ om naar een andere pagina te linken. Backlinks en de graaf laten zien hoe pagina's samenhangen.",
+        ],
       },
       {
         id: "agents",
@@ -265,7 +267,9 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
       {
         id: "who",
         heading: "Wie goedkeurt",
-        blocks: ["De eigenaar van de agent keurt zijn verzoeken goed. Heeft een agent geen eigenaar, dan doen de beheerders het."],
+        blocks: [
+          "De eigenaar van de agent keurt zijn verzoeken goed. Heeft een agent geen eigenaar, dan doen de beheerders het.",
+        ],
       },
       {
         id: "refusing",

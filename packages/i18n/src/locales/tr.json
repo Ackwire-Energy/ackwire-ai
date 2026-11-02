@@ -2295,17 +2295,17 @@
       "forwards": "<b>“{{subject}}”</b> e-postasını iletir",
       "forwardsFrom": "{{from}} kişisinden gelen <b>“{{subject}}”</b> e-postasını iletir",
       "title": {
-        "draft_one": "{{to}} için taslak kaydet",
-        "draft_other": "{{to}} ve {{more}} kişi daha için taslak kaydet",
-        "draftReply_one": "{{to}} için yanıt taslağı kaydet",
-        "draftReply_other": "{{to}} ve {{more}} kişi daha için yanıt taslağı kaydet",
+        "draft": "{{to}} için taslak kaydet",
+        "draftMore": "{{to}} ve {{more}} kişi daha için taslak kaydet",
+        "draftReply": "{{to}} için yanıt taslağı kaydet",
+        "draftReplyMore": "{{to}} ve {{more}} kişi daha için yanıt taslağı kaydet",
         "draftNoTo": "E-posta taslağı kaydet",
-        "send_one": "{{to}} adresine e-posta gönder",
-        "send_other": "{{to}} ve {{more}} kişi daha için e-posta gönder",
-        "reply_one": "{{to}} kişisine e-postayla yanıt ver",
-        "reply_other": "{{to}} ve {{more}} kişi daha için e-postayla yanıt ver",
-        "forward_one": "{{to}} adresine e-posta ilet",
-        "forward_other": "{{to}} ve {{more}} kişi daha için e-posta ilet"
+        "send": "{{to}} adresine e-posta gönder",
+        "sendMore": "{{to}} ve {{more}} kişi daha için e-posta gönder",
+        "reply": "{{to}} kişisine e-postayla yanıt ver",
+        "replyMore": "{{to}} ve {{more}} kişi daha için e-postayla yanıt ver",
+        "forward": "{{to}} adresine e-posta ilet",
+        "forwardMore": "{{to}} ve {{more}} kişi daha için e-posta ilet"
       }
     },
     "asks": "<b>{{agent}}</b> onay istiyor",

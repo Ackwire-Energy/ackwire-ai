@@ -2311,17 +2311,17 @@
       "forwards": "Stuurt <b>“{{subject}}”</b> door",
       "forwardsFrom": "Stuurt <b>“{{subject}}”</b> door, van {{from}}",
       "title": {
-        "draft_one": "Concept opslaan voor {{to}}",
-        "draft_other": "Concept opslaan voor {{to}} en nog {{more}}",
-        "draftReply_one": "Concept-antwoord opslaan voor {{to}}",
-        "draftReply_other": "Concept-antwoord opslaan voor {{to}} en nog {{more}}",
+        "draft": "Concept opslaan voor {{to}}",
+        "draftMore": "Concept opslaan voor {{to}} en nog {{more}}",
+        "draftReply": "Concept-antwoord opslaan voor {{to}}",
+        "draftReplyMore": "Concept-antwoord opslaan voor {{to}} en nog {{more}}",
         "draftNoTo": "E-mailconcept opslaan",
-        "send_one": "E-mail sturen naar {{to}}",
-        "send_other": "E-mail sturen naar {{to}} en nog {{more}}",
-        "reply_one": "{{to}} per e-mail antwoorden",
-        "reply_other": "{{to}} en nog {{more}} per e-mail antwoorden",
-        "forward_one": "E-mail doorsturen naar {{to}}",
-        "forward_other": "E-mail doorsturen naar {{to}} en nog {{more}}"
+        "send": "E-mail sturen naar {{to}}",
+        "sendMore": "E-mail sturen naar {{to}} en nog {{more}}",
+        "reply": "{{to}} per e-mail antwoorden",
+        "replyMore": "{{to}} en nog {{more}} per e-mail antwoorden",
+        "forward": "E-mail doorsturen naar {{to}}",
+        "forwardMore": "E-mail doorsturen naar {{to}} en nog {{more}}"
       }
     },
     "asks": "<b>{{agent}}</b> vraagt om goedkeuring",

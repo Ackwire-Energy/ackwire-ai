@@ -2231,12 +2231,17 @@
       "forwards": "<b>“{{subject}}”</b> 전달",
       "forwardsFrom": "{{from}}의 <b>“{{subject}}”</b> 전달",
       "title": {
-        "draft_other": "{{to}} 외 {{more}}명에게 보낼 메일 임시 저장",
-        "draftReply_other": "{{to}} 외 {{more}}명에게 보낼 답장 임시 저장",
+        "draft": "{{to}}에게 보낼 메일 임시 저장",
+        "draftMore": "{{to}} 외 {{more}}명에게 보낼 메일 임시 저장",
+        "draftReply": "{{to}}에게 보낼 답장 임시 저장",
+        "draftReplyMore": "{{to}} 외 {{more}}명에게 보낼 답장 임시 저장",
         "draftNoTo": "이메일 임시 저장",
-        "send_other": "{{to}} 외 {{more}}명에게 이메일 보내기",
-        "reply_other": "{{to}} 외 {{more}}명에게 이메일로 답장",
-        "forward_other": "{{to}} 외 {{more}}명에게 이메일 전달"
+        "send": "{{to}}에게 이메일 보내기",
+        "sendMore": "{{to}} 외 {{more}}명에게 이메일 보내기",
+        "reply": "{{to}}에게 이메일로 답장",
+        "replyMore": "{{to}} 외 {{more}}명에게 이메일로 답장",
+        "forward": "{{to}}에게 이메일 전달",
+        "forwardMore": "{{to}} 외 {{more}}명에게 이메일 전달"
       }
     },
     "asks": "<b>{{agent}}</b>이(가) 승인을 요청해요",
@@ -8274,7 +8279,7 @@
     }
   },
   "toolNames": {
-    "order": "modifiers-first",
+    "order": "verb-last",
     "verb": {
       "get": "조회",
       "list": "목록 조회",

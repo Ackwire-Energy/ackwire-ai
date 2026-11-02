@@ -2307,17 +2307,17 @@
       "forwards": "Leitet <b>„{{subject}}“</b> weiter",
       "forwardsFrom": "Leitet <b>„{{subject}}“</b> weiter, von {{from}}",
       "title": {
-        "draft_one": "Entwurf an {{to}} speichern",
-        "draft_other": "Entwurf an {{to}} und {{more}} weitere speichern",
-        "draftReply_one": "Antwortentwurf an {{to}} speichern",
-        "draftReply_other": "Antwortentwurf an {{to}} und {{more}} weitere speichern",
+        "draft": "Entwurf an {{to}} speichern",
+        "draftMore": "Entwurf an {{to}} und {{more}} weitere speichern",
+        "draftReply": "Antwortentwurf an {{to}} speichern",
+        "draftReplyMore": "Antwortentwurf an {{to}} und {{more}} weitere speichern",
         "draftNoTo": "E-Mail-Entwurf speichern",
-        "send_one": "E-Mail an {{to}} senden",
-        "send_other": "E-Mail an {{to}} und {{more}} weitere senden",
-        "reply_one": "{{to}} per E-Mail antworten",
-        "reply_other": "{{to}} und {{more}} weiteren per E-Mail antworten",
-        "forward_one": "E-Mail an {{to}} weiterleiten",
-        "forward_other": "E-Mail an {{to}} und {{more}} weitere weiterleiten"
+        "send": "E-Mail an {{to}} senden",
+        "sendMore": "E-Mail an {{to}} und {{more}} weitere senden",
+        "reply": "{{to}} per E-Mail antworten",
+        "replyMore": "{{to}} und {{more}} weiteren per E-Mail antworten",
+        "forward": "E-Mail an {{to}} weiterleiten",
+        "forwardMore": "E-Mail an {{to}} und {{more}} weitere weiterleiten"
       }
     },
     "asks": "<b>{{agent}}</b> fragt nach einer Freigabe",
