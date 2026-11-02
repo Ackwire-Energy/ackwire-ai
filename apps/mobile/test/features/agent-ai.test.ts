@@ -16,6 +16,7 @@ import {
   modelRows,
   modelSections,
   newAgentAi,
+  pickedAi,
   setupWords,
   takenFrom,
   thinkingUsage,
@@ -752,13 +753,20 @@ describe("the agent's AI", () => {
   });
 
   test("Criar agente on the phone thinks with the last setup: the API's model and key, or a plan saved right after", async () => {
-    expect(newAgentAi(null)).toEqual({ model: "auto", credentialId: null, contextTokens: null, plan: null });
+    expect(newAgentAi(null)).toEqual({
+      model: "auto",
+      credentialId: null,
+      contextTokens: null,
+      plan: null,
+      connect: null,
+    });
     const api = { brain: "model" as const, model: "claude-opus-5-5", key: "k1", contextTokens: 400_000 };
     expect(newAgentAi(api)).toEqual({
       model: "claude-opus-5-5",
       credentialId: "k1",
       contextTokens: 400_000,
       plan: null,
+      connect: null,
     });
     // A model no key runs now starts on Automático, and a key the creator can't see isn't sent, as on the web.
     const runs = { ownerIsMe: true, usable: new Set(["claude-opus-5-5"]), keys: [] };
@@ -780,13 +788,49 @@ describe("the agent's AI", () => {
         account: { id: "a1", label: "Claude" },
         input,
       }),
-    ).toEqual({ model: "auto", credentialId: null, contextTokens: null, plan: { machineId: "m1", input } });
+    ).toEqual({
+      model: "auto",
+      credentialId: null,
+      contextTokens: null,
+      plan: { machineId: "m1", input },
+      connect: null,
+    });
     // The setup's Autonomia goes at creation, with the API's model or a plan.
     expect(newAgentAi({ ...api, autonomy: "never" })).toMatchObject({ model: "claude-opus-5-5", autonomy: "never" });
     const plan = { brain: "claude_code" as const, machineId: "m1", computer: "MacBook", account: null, input };
     expect(newAgentAi({ ...plan, autonomy: "always" })).toMatchObject({ model: "auto", autonomy: "always" });
     expect(newAgentAi(null).autonomy).toBeUndefined();
     expect(screen).toContain("...(thinks.autonomy ? { autonomy: thinks.autonomy } : {})");
+  });
+
+  test("Criar agente on the phone: anything Quem pensa offers, as the web's step sends it", async () => {
+    expect(pickedAi({ kind: "model", model: "claude-sonnet-5-5" })).toMatchObject({
+      model: "claude-sonnet-5-5",
+      plan: null,
+      connect: null,
+    });
+    expect(
+      pickedAi({ kind: "claude_code", choice: "opencode", machineId: "m1", accountId: "acc-go", model: "glm-5.3" }),
+    ).toMatchObject({
+      model: "auto",
+      plan: { machineId: "m1", input: { brain: "claude_code", account: "acc-go", model: "glm-5.3" } },
+    });
+    // Automático on a plan is the agent's own already: only the brain is saved.
+    expect(pickedAi({ kind: "codex", choice: "chatgpt", machineId: "m1", model: "auto" }).plan).toEqual({
+      machineId: "m1",
+      input: { brain: "codex" },
+    });
+    // A coding plan with no key yet: made on Automático, Connect opens on that plan once it exists.
+    expect(pickedAi({ kind: "connect", choice: "opencode" })).toMatchObject({
+      model: "auto",
+      plan: null,
+      connect: "opencode",
+    });
+    const screen = await Bun.file(
+      new URL("../../src/features/agents/NewAgentScreen.tsx", import.meta.url).pathname,
+    ).text();
+    expect(screen).toContain("openConnectAi({ agentId: agent.id, plan: thinks.connect })");
+    expect(screen).toContain("<BrainPickSheet");
   });
 });
 

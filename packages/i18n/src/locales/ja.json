@@ -3663,6 +3663,13 @@
     "defaultKeyDesc": "{{provider}} · 末尾 {{hint}}",
     "otherKeyDesc": "{{provider}} · 末尾 {{hint}}",
     "modelNeedsKey": "{{provider}}のAPIキーが必要です",
+    "brainPick": {
+      "searchPlaceholder": "モデル、プラン、開発元",
+      "connect": "{{plan}}を接続",
+      "connectText": "{{plan}}のキーが必要です。エージェントを作成した直後に追加します。",
+      "needsKey": "{{plan}}のキーが必要です",
+      "other": "別のものを選ぶ"
+    },
     "noKeys": "まだキーがありません",
     "budgetTitle": "月間予算",
     "budget": "月間予算（US$）",
@@ -7277,6 +7284,7 @@
       "freeTraining": "このモデルのプロバイダーは、リクエストを学習に使う場合があります。OpenCodeの「Settings › Privacy」で、無料モデルの許可をオンにしてください。オンにしないと、このモデルは応答しません。"
     },
     "recommended": "おすすめ",
+    "free": "無料",
     "modelHelp": "大きいモデルほど深く考え、プランの消費が早くなります。",
     "hidden": "考えるAIを選ぶのは{{owner}}または管理者です。",
     "hiddenAdmins": "考えるAIを選べるのは管理者だけです。",

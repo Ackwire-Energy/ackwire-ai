@@ -2,6 +2,7 @@ import {
   type AgentProposal,
   ApiError,
   useAgentProposal,
+  useAiAccounts,
   useApi,
   useBrainMachines,
   useCatalog,
@@ -20,6 +21,7 @@ import {
 import { LEVELS, type Level, nextLevel, saveLevels } from "@agenteschat/client/lib/access-levels";
 import { draftLevels, draftMailLevels, suggestedAiText } from "@agenteschat/client/lib/action-cards";
 import { newAgentStart, newAgentStartText } from "@agenteschat/client/lib/agent-setup";
+import { type BrainPickOption, brainPickOptions } from "@agenteschat/client/lib/brain-picker";
 import { connectedItems, itemName } from "@agenteschat/client/lib/connected";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { defaultPolicy, toMailLevel } from "@agenteschat/client/lib/mail";
@@ -37,7 +39,7 @@ import {
   takenHandles,
 } from "@agenteschat/client/lib/new-agent";
 import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
-import { modelChoices, usableModels } from "@agenteschat/client/lib/providers";
+import { AUTO, modelChoices, usableModels } from "@agenteschat/client/lib/providers";
 import { router, usePreventRemove } from "expo-router";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -46,7 +48,7 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import { AgentAvatar, Button, Card, fieldText, Icon, InfoHint, Row, Text, Toggle, useToast } from "@/ui";
-import { newAgentAi } from "../ai/logic";
+import { newAgentAi, pickedAi } from "../ai/logic";
 import { openConnectAi } from "../ai/NoAiCard";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { suggestAgentName } from "../new/logic";
@@ -57,6 +59,7 @@ import { chooseAction } from "../settings/parts";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { PushedHeader, successHaptic, tapHaptic, useSurface } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
+import { BrainPickSheet } from "./BrainPickSheet";
 import { type FullLook, fullLook } from "./edit";
 import { ErrorLine, HandleInput } from "./HandleInput";
 import { ImportAgents } from "./ImportAgents";
@@ -175,10 +178,20 @@ function NewAgentForm({
   const [withRoutine, setWithRoutine] = useState(Boolean(proposed?.routine));
   // Who thinks (ADR 0094): the workspace's last setup where it can think for an agent of mine, unless a proposal says.
   const keys = credentials.data ?? [];
-  const usable = usableModels(modelChoices(models.data?.models ?? [], keys, platform.data ?? false));
+  const choices = modelChoices(models.data?.models ?? [], keys, platform.data ?? false);
+  const usable = usableModels(choices);
   const start = proposed ? null : newAgentStart(lastSetup.data, { ownerIsMe: true, usable, keys });
   const [useLast, setUseLast] = useState(true);
-  const thinks = newAgentAi(start && useLast ? start : null);
+  // Or anything else the agent's page offers ("Quem pensa", the web's model step), from its sheet.
+  const aiAccounts = useAiAccounts(orgId, !proposed);
+  const brainOptions = brainPickOptions(t, i18n.language, {
+    api: choices,
+    machines: brainMachines.data ?? [],
+    accounts: aiAccounts.data?.accounts ?? [],
+  });
+  const [picked, setPicked] = useState<BrainPickOption | null>(null);
+  const [picking, setPicking] = useState(false);
+  const thinks = picked ? pickedAi(picked.pick) : newAgentAi(start && useLast ? start : null);
   const startText = start
     ? newAgentStartText(t, i18n.language, start, {
         models: models.data?.models ?? [],
@@ -379,6 +392,7 @@ function NewAgentForm({
       // when it has nothing to think with yet.
       void openDm({ agentId: agent.id }).then(() => {
         if (ai?.kind === "none") openConnectAi({ agentId: agent.id });
+        if (thinks.connect) openConnectAi({ agentId: agent.id, plan: thinks.connect });
       });
     } catch (e) {
       failed(e);
@@ -613,26 +627,55 @@ function NewAgentForm({
             {suggestedAiText(t, proposed.ai)}
           </Text>
         ) : null}
-        {start ? (
+        {proposed ? null : (
           <Card>
             <Row
               title={t("brain.title")}
-              subtitle={useLast ? t("newAgent.lastSetup", { setup: startText }) : t("brain.auto.label")}
+              subtitle={
+                picked
+                  ? picked.title
+                  : start && useLast
+                    ? t("newAgent.lastSetup", { setup: startText })
+                    : t("brain.auto.label")
+              }
               subtitleLines={2}
               chevron
               onPress={() =>
-                chooseAction(
-                  t("brain.title"),
-                  [
-                    { label: startText, onPress: () => setUseLast(true) },
-                    { label: t("brain.auto.label"), onPress: () => setUseLast(false) },
-                  ],
-                  t("common.cancel"),
-                )
+                start
+                  ? chooseAction(
+                      t("brain.title"),
+                      [
+                        {
+                          label: startText,
+                          onPress: () => {
+                            setPicked(null);
+                            setUseLast(true);
+                          },
+                        },
+                        { label: t("newAgent.brainPick.other"), onPress: () => setPicking(true) },
+                      ],
+                      t("common.cancel"),
+                    )
+                  : setPicking(true)
               }
             />
           </Card>
+        )}
+        {picked?.pick.kind === "connect" && picked.description ? (
+          <Text variant="footnote" tone="muted">
+            {picked.description}
+          </Text>
         ) : null}
+        <BrainPickSheet
+          open={picking}
+          onClose={() => setPicking(false)}
+          options={brainOptions}
+          value={picked?.value ?? (start && useLast ? undefined : AUTO)}
+          onPick={(o) => {
+            setPicked(o);
+            setUseLast(false);
+          }}
+        />
 
         <View style={styles.section}>
           {managesAgents ? (

@@ -3844,6 +3844,13 @@
     "defaultKeyDesc": "{{provider}} · eindigt op {{hint}}",
     "otherKeyDesc": "{{provider}} · eindigt op {{hint}}",
     "modelNeedsKey": "{{provider}}-API-sleutel nodig",
+    "brainPick": {
+      "searchPlaceholder": "Model, abonnement of maker",
+      "connect": "{{plan}} koppelen",
+      "connectText": "Een {{plan}}-sleutel nodig. Je voegt hem toe direct nadat je de agent hebt gemaakt.",
+      "needsKey": "{{plan}}-sleutel nodig",
+      "other": "Iets anders kiezen"
+    },
     "noKeys": "Nog geen sleutels",
     "budgetTitle": "Maandbudget",
     "budget": "Maandbudget (US$)",
@@ -7673,6 +7680,7 @@
       "freeTraining": "De aanbieder van dit model kan verzoeken gebruiken om het te trainen. Zet in OpenCode, bij Settings › Privacy, de toestemming voor gratis modellen aan. Zonder die toestemming antwoordt dit model niet."
     },
     "recommended": "Aanbevolen",
+    "free": "Gratis",
     "modelHelp": "Grotere modellen denken meer na en verbruiken het abonnement sneller.",
     "hidden": "{{owner}} of een beheerder kiest wie denkt.",
     "hiddenAdmins": "Alleen beheerders kiezen wie denkt.",

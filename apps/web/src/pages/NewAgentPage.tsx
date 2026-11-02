@@ -30,12 +30,19 @@ import {
   newAgentStartText,
 } from "@agenteschat/client/lib/agent-setup";
 import { ownSignInReady } from "@agenteschat/client/lib/ai-accounts";
+import { thinksWith } from "@agenteschat/client/lib/brain";
+import {
+  type BrainPickOption,
+  brainPickInput,
+  brainPickOptions,
+  brainPickValue,
+} from "@agenteschat/client/lib/brain-picker";
 import { type ConnectedItem, itemName } from "@agenteschat/client/lib/connected";
 import { errorText as failureText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { choiceOf, defaultPolicy, MAIL_ACTIONS, toMailLevel } from "@agenteschat/client/lib/mail";
-import { planOfKind } from "@agenteschat/client/lib/no-ai";
+import { type PlanChoice as AiPlan, planOfKind } from "@agenteschat/client/lib/no-ai";
 import { addsAgentsTo, can } from "@agenteschat/client/lib/permissions";
 import { AUTO, apiProviderOf, isAuto, modelChoices, usableModels } from "@agenteschat/client/lib/providers";
 import { scopeText } from "@agenteschat/client/lib/scopes";
@@ -74,17 +81,16 @@ import { LevelRow, useConnectedById } from "@/components/AccessLevels";
 import { AudienceChoice } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import {
+  BrainPickSelect,
   BudgetField,
   DEFAULT_KEY,
   InstructionTips,
   KeySelect,
   keyOptions,
   LookPicker,
-  ModelCards,
   NO_OWNER,
   OwnerSelect,
   OwnerValue,
-  PlanCards,
   type PlanChoice,
   usd,
 } from "@/components/AgentFields";
@@ -309,6 +315,8 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
       ? { kind: draft.ai.brain, machineId: draft.ai.machineId, accountId: draft.ai.accountId, label: draft.ai.label }
       : null,
   );
+  // Or a plan with nothing to think with yet (a coding plan's key): made on Automático, Connect opens on it after.
+  const [connectPlan, setConnectPlan] = useState<AiPlan | null>(null);
   const [key, setKey] = useState(DEFAULT_KEY);
   // Empty = the workspace default budget (every agent has one).
   const [budget, setBudget] = useState("");
@@ -330,6 +338,16 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
     [models.data, credentials.data, platform.data],
   );
   const usable = useMemo(() => usableModels(choices), [choices]);
+  // "Quem pensa": what the agent's page offers, every plan on every computer that runs it, in one list.
+  const brainOptions = useMemo(
+    () =>
+      brainPickOptions(t, locale, {
+        api: choices,
+        machines: brainMachines.data ?? [],
+        accounts: aiAccounts.data?.accounts ?? [],
+      }),
+    [t, locale, choices, brainMachines.data, aiAccounts.data],
+  );
   const taken = useMemo(() => takenHandles(agents.data ?? [], members.data ?? []), [agents.data, members.data]);
 
   // What it starts thinking with (ADR 0094): the last setup saved or used on other agents, where it can think for it.
@@ -346,6 +364,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
     const api = start?.brain === "model" ? start : null;
     setModel(api?.model ?? AUTO);
     setKey(api?.key ?? DEFAULT_KEY);
+    setConnectPlan(null);
     setPlan(
       start && start.brain !== "model"
         ? {
@@ -401,7 +420,8 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
     ownerUserId: ownerId,
     audience,
     budget,
-    modelOk: plan !== null || connectAfter || (isAuto(model) ? usable.size > 0 : usable.has(model)),
+    modelOk:
+      plan !== null || connectPlan !== null || connectAfter || (isAuto(model) ? usable.size > 0 : usable.has(model)),
   };
   const errors = tried.has(step) ? stepErrors(step, check) : [];
   const errorOf = (field: DraftError["field"]) => errors.find((e) => e.field === field);
@@ -447,13 +467,20 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
         )
       : null;
   const modelInfo = (models.data?.models ?? []).find((m) => m.id === model);
-  const modelLabel = plan
-    ? [t(`brain.card.${plan.kind}`), plan.label].filter(Boolean).join(" · ")
-    : connectAfter
-      ? t("actionCard.agentProposal.aiNone")
-      : isAuto(model)
-        ? t("brain.auto.label")
-        : (modelInfo?.label ?? model);
+  const brainValue = brainPickValue(
+    brainOptions,
+    connectPlan ? { kind: "connect", choice: connectPlan } : (plan ?? { kind: "model", model }),
+  );
+  const brainChosen = brainOptions.find((o) => o.value === brainValue);
+  const modelLabel = connectPlan
+    ? thinksWith(t, connectPlan, null)
+    : plan
+      ? (brainChosen?.title ?? [t(`brain.card.${plan.kind}`), plan.label].filter(Boolean).join(" · "))
+      : connectAfter
+        ? t("actionCard.agentProposal.aiNone")
+        : isAuto(model)
+          ? t("brain.auto.label")
+          : (modelInfo?.label ?? model);
   const apiProvider = apiProviderOf(model, models.data?.models ?? []);
   const keys = keyOptions(t, credentials.data ?? [], settings.data?.defaultCredentialId ?? null, apiProvider);
   // The key's maker: the one picked, else the workspace's default key, else the model's.
@@ -532,9 +559,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
         await api.agents.setBrain(
           org.id,
           agent.id,
-          start && start.brain !== "model" && onStart
-            ? start.input
-            : { brain: plan.kind, ...(plan.accountId ? { account: plan.accountId } : {}) },
+          start && start.brain !== "model" && onStart ? start.input : brainPickInput(plan),
         );
         // Saved with no account, it thinks with that computer's own sign-in, which thinks only for agents of whoever
         // connected it, where that CLI is signed in (never on the workspace's computer). Else, for an agent of the
@@ -609,6 +634,7 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
     // Reviewed over the conversation: it closes on it, as it was.
     onClose?.();
     if (plan && signIn) connect?.open({ agentId: agent.id, plan: planOfKind(plan.kind) });
+    if (connectPlan) connect?.open({ agentId: agent.id, plan: connectPlan });
     if (connectAfter) connect?.open({ agentId: agent.id, agentIds: [agent.id] });
   };
   const next = () => {
@@ -1282,35 +1308,38 @@ function NewAgentFlow({ from, onClose }: { from?: AgentProposal; onClose?: () =>
               <Switch id="ag-autonomy" checked={withAutonomy} onCheckedChange={setWithAutonomy} />
             </SettingRow>
           )}
-          <ModelCards
-            choices={choices}
-            value={plan ? undefined : model}
-            money
-            onChange={(id) => {
-              setModel(id);
-              setPlan(null);
+          <BrainPickSelect
+            options={brainOptions}
+            value={brainValue}
+            fallback={modelLabel}
+            onChange={(o: BrainPickOption) => {
+              const p = o.pick;
               setAiPicked(true);
-              mood.react(id.toLowerCase().includes("opus") ? "star" : "happy", 800);
+              mood.react(o.value.toLowerCase().includes("opus") ? "star" : "happy", 800);
+              if (p.kind === "model") {
+                setModel(p.model);
+                setPlan(null);
+                setConnectPlan(null);
+                return;
+              }
+              // A plan thinks on its computer: the agent's own model there, Automático carried onto it.
+              setModel(AUTO);
+              if (p.kind === "connect") {
+                setPlan(null);
+                setConnectPlan(p.choice);
+                return;
+              }
+              setConnectPlan(null);
+              setPlan({
+                kind: p.kind,
+                machineId: p.machineId,
+                ...(p.accountId ? { accountId: p.accountId, label: p.account } : {}),
+                model: p.model,
+              });
             }}
           />
-          <div className="newag__sect">
-            <div className="ac-hintline">
-              <h2>
-                <Icon name="computer" />
-                {t("newAgent.plans")}
-              </h2>
-              <InfoHint name={t("common.about", { label: t("newAgent.plans") })}>{t("newAgent.plansHelp")}</InfoHint>
-            </div>
-          </div>
-          <PlanCards
-            machines={brainMachines.data ?? []}
-            value={plan}
-            onChange={(choice) => {
-              setPlan(choice);
-              setAiPicked(true);
-              mood.react("happy", 800);
-            }}
-          />
+          {connectPlan && <SettingNote icon="key">{brainChosen?.description}</SettingNote>}
+          {brainChosen?.needs && <SettingNote icon="info">{t(`brain.modelHow.${brainChosen.needs}`)}</SettingNote>}
           {plan && (
             <span className="small muted">
               {t("newAgent.planOnlyOwner", {

@@ -3764,6 +3764,13 @@
     "defaultKeyDesc": "{{provider}} · sonu {{hint}}",
     "otherKeyDesc": "{{provider}} · sonu {{hint}}",
     "modelNeedsKey": "{{provider}} API anahtarı gerekli",
+    "brainPick": {
+      "searchPlaceholder": "Model, plan veya üretici",
+      "connect": "{{plan}} bağla",
+      "connectText": "{{plan}} anahtarı gerekir. Ajanı oluşturduktan hemen sonra eklersiniz.",
+      "needsKey": "{{plan}} anahtarı gerekli",
+      "other": "Başkasını seçin"
+    },
     "noKeys": "Henüz anahtar yok",
     "budgetTitle": "Aylık bütçe",
     "budget": "Aylık bütçe (US$)",
@@ -7534,6 +7541,7 @@
       "freeTraining": "Bu modelin sağlayıcısı, istekleri modeli eğitmek için kullanabilir. OpenCode'da Settings › Privacy altında ücretsiz modeller için izni açın. Bu olmadan bu model yanıt vermez."
     },
     "recommended": "Önerilen",
+    "free": "Ücretsiz",
     "modelHelp": "Büyük modeller daha çok düşünür ve planı daha hızlı tüketir.",
     "hidden": "Düşünen yapay zekayı {{owner}} veya bir yönetici seçer.",
     "hiddenAdmins": "Düşünen yapay zekayı yalnızca yöneticiler seçer.",

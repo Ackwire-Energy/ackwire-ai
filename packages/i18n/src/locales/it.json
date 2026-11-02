@@ -3961,6 +3961,13 @@
     "defaultKeyDesc": "{{provider}} · termina con {{hint}}",
     "otherKeyDesc": "{{provider}} · termina con {{hint}}",
     "modelNeedsKey": "Serve una chiave API {{provider}}",
+    "brainPick": {
+      "searchPlaceholder": "Modello, piano o produttore",
+      "connect": "Collega {{plan}}",
+      "connectText": "Serve una chiave {{plan}}. La aggiungi subito dopo aver creato l'agente.",
+      "needsKey": "Serve una chiave {{plan}}",
+      "other": "Scegli un altro"
+    },
     "noKeys": "Ancora nessuna chiave",
     "budgetTitle": "Budget mensile",
     "budget": "Budget mensile (US$)",
@@ -7952,6 +7959,7 @@
       "freeTraining": "Il provider di questo modello può usare le richieste per addestrarlo. In OpenCode, in Settings › Privacy, attiva il permesso per i modelli gratuiti. Senza, questo modello non risponde."
     },
     "recommended": "Consigliato",
+    "free": "Gratis",
     "modelHelp": "I modelli più grandi ragionano di più e consumano il piano più in fretta.",
     "hidden": "{{owner}} o un admin sceglie chi pensa.",
     "hiddenAdmins": "Solo gli admin scelgono chi pensa.",

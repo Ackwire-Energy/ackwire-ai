@@ -3662,6 +3662,14 @@ export const en = {
     defaultKeyDesc: "{{provider}} · ends in {{hint}}",
     otherKeyDesc: "{{provider}} · ends in {{hint}}",
     modelNeedsKey: "{{provider}} API key needed",
+    /** "Who thinks" on the new agent's model step: one searchable list of every model and plan. */
+    brainPick: {
+      searchPlaceholder: "Model, plan or maker",
+      connect: "Connect {{plan}}",
+      connectText: "Needs a {{plan}} key. You add it right after creating the agent.",
+      needsKey: "Needs a {{plan}} key",
+      other: "Choose another",
+    },
     noKeys: "No keys yet",
     budgetTitle: "Monthly budget",
     budget: "Monthly budget (US$)",
@@ -7239,6 +7247,8 @@ export const en = {
         "This model's provider may use requests to train it. In OpenCode, under Settings › Privacy, turn on the permission for free models. Without it, this model doesn't answer.",
     },
     recommended: "Recommended",
+    /** A model that costs nothing on its plan or key; search finds it by "free" too. */
+    free: "Free",
     modelHelp: "Bigger models think more and use up the plan faster.",
     hidden: "{{owner}} or an admin chooses who thinks.",
     hiddenAdmins: "Only admins choose who thinks.",

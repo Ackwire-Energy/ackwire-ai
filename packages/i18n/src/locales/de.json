@@ -3799,6 +3799,13 @@
     "defaultKeyDesc": "{{provider}} · endet auf {{hint}}",
     "otherKeyDesc": "{{provider}} · endet auf {{hint}}",
     "modelNeedsKey": "{{provider}}-API-Schlüssel nötig",
+    "brainPick": {
+      "searchPlaceholder": "Modell, Abo oder Hersteller",
+      "connect": "{{plan}} verbinden",
+      "connectText": "Braucht einen {{plan}}-Schlüssel. Du fügst ihn direkt nach dem Erstellen des Agenten hinzu.",
+      "needsKey": "Braucht einen {{plan}}-Schlüssel",
+      "other": "Anderes wählen"
+    },
     "noKeys": "Noch keine Schlüssel",
     "budgetTitle": "Monatsbudget",
     "budget": "Monatsbudget (US$)",
@@ -7591,6 +7598,7 @@
       "freeTraining": "Der Anbieter dieses Modells darf Anfragen nutzen, um es zu trainieren. Schalte in OpenCode unter Settings › Privacy die Berechtigung für kostenlose Modelle ein. Ohne sie antwortet dieses Modell nicht."
     },
     "recommended": "Empfohlen",
+    "free": "Kostenlos",
     "modelHelp": "Größere Modelle denken mehr nach und verbrauchen das Abo schneller.",
     "hidden": "{{owner}} oder ein Admin wählt, wer denkt.",
     "hiddenAdmins": "Nur Admins wählen, wer denkt.",

@@ -54,6 +54,23 @@ const open = async (state = seedState(), api = createFakeApi(state)) => {
 const createdWith = (state: ReturnType<typeof seedState>) =>
   state.calls.find((c) => c.method === "agents.create")?.args[1] as AgentInput | undefined;
 
+/** "Quem pensa" on the model step: its trigger reads the choice; its list, every model and plan, searched. */
+const brainBox = () => screen().getByRole("combobox", { name: "Quem pensa" });
+const openBrain = async () => {
+  await click(brainBox());
+  return screen().getByRole("listbox", { name: "Modelos" });
+};
+const chooseBrain = async (name: RegExp) => {
+  await openBrain();
+  await click(screen().getByRole("option", { name }));
+};
+const groupNames = (list: HTMLElement) =>
+  within(list)
+    .queryAllByRole("group")
+    .map((g) => g.getAttribute("aria-label"));
+const optionsIn = (list: HTMLElement, group: string) =>
+  within(within(list).getByRole("group", { name: group })).getAllByRole("option");
+
 describe("Criar agente: steps", () => {
   test("a focused flow: the rail with its steps instead of the sidebar; × and Cancelar leave", async () => {
     await open();
@@ -169,23 +186,21 @@ describe("Criar agente: steps", () => {
 
     await proceed();
     // "Automático" comes first and is chosen for every role; the fixed models follow.
-    const auto = screen().getByRole("button", { name: /^Automático/ });
-    expect(auto.getAttribute("aria-pressed")).toBe("true");
-    expect(auto.textContent).toContain("Escolhe o modelo e o esforço para cada tarefa");
-    expect(
-      screen()
-        .getByRole("button", { name: /^Claude Sonnet 5\.5/ })
-        .getAttribute("aria-pressed"),
-    ).toBe("false");
-    // Real catalog prices; a model without a key can't be picked.
-    expect(screen().getByRole("button", { name: /^Claude Sonnet 5\.5/ }).textContent).toContain(
-      "US$ 2 / 10 por milhão de tokens",
-    );
-    const gpt = screen().getByRole("button", { name: /^GPT-5/ });
+    expect(brainBox().textContent).toBe("AutomáticoEscolhe o modelo e o esforço para cada tarefa");
+    const list = await openBrain();
+    const [auto, ...rest] = within(list).getAllByRole("option");
+    expect(auto?.getAttribute("aria-selected")).toBe("true");
+    const sonnet = screen().getByRole("option", { name: /^Claude Sonnet 5\.5/ });
+    expect(sonnet.getAttribute("aria-selected")).toBe("false");
+    expect(rest.indexOf(sonnet)).toBeGreaterThanOrEqual(0);
+    // Claude's models by what each is for, as on the agent's page; a model without a key can't be picked.
+    expect(sonnet.textContent).toContain("Recomendado para a maioria");
+    const gpt = screen().getAllByRole("option", { name: /^GPT-5/ })[0] as HTMLElement;
     expect(gpt.getAttribute("aria-disabled")).toBe("true");
     expect(gpt.textContent).toContain("Precisa de uma chave de API OpenAI");
     await click(gpt);
-    expect(gpt.getAttribute("aria-pressed")).toBe("false");
+    expect(brainBox().textContent).toStartWith("Automático");
+    await press(screen().getByRole("combobox", { name: "Buscar modelos" }), "Escape");
 
     await proceed();
     expect(title()).toBe("Tudo certo com a Iris?");
@@ -454,14 +469,8 @@ describe("Criar agente: what gets created", () => {
     await startAs("Assistente");
     await proceed(4);
     expect(title()).toBe("Modelo e orçamento");
-    const sonnet = screen().getByRole("button", { name: /^Claude Sonnet 5\.5/ });
-    await click(sonnet);
-    expect(sonnet.getAttribute("aria-pressed")).toBe("true");
-    expect(
-      screen()
-        .getByRole("button", { name: /^Automático/ })
-        .getAttribute("aria-pressed"),
-    ).toBe("false");
+    await chooseBrain(/^Claude Sonnet 5\.5/);
+    expect(brainBox().textContent).toStartWith("Claude Sonnet 5.5");
     await proceed();
     expect(document.querySelector(".newag__review")?.textContent).toContain("Claude Sonnet 5.5 ·");
     await click(screen().getByRole("button", { name: "Criar Eva" }));
@@ -469,22 +478,18 @@ describe("Criar agente: what gets created", () => {
     expect(createdWith(state)?.model).toBe("claude-sonnet-5-5");
   });
 
-  test("model: OpenRouter's good picks as cards, never the rest of its list; a pick is what gets created", async () => {
+  test("model: OpenRouter's good picks first under their heading; a pick is what gets created", async () => {
     const seeded = seedState({ extraModels: OPENROUTER_MODELS });
     seeded.credentials.push(OPENROUTER_KEY);
     const state = await open(seeded);
     await startAs("Assistente");
     await proceed(4);
     expect(title()).toBe("Modelo e orçamento");
-    const cards = within(screen().getByRole("group", { name: "Modelo" }))
-      .getAllByRole("button")
-      .filter((c) => c.querySelector(".newag__model-prov")?.textContent === "OpenRouter");
-    expect(cards.map((c) => c.querySelector("b")?.textContent)).toEqual([
-      "Z.ai: GLM Latest",
-      "DeepSeek: DeepSeek Flash Latest",
-      "Claude Sonnet Latest",
-    ]);
-    await click(screen().getByRole("button", { name: /^Z\.ai: GLM Latest/ }));
+    const list = await openBrain();
+    expect(
+      optionsIn(list, "OpenRouter · Boas escolhas").map((o) => o.querySelector(".ac-menu__label span")?.textContent),
+    ).toEqual(["Z.ai: GLM Latest", "DeepSeek: DeepSeek Flash Latest", "Claude Sonnet Latest"]);
+    await click(screen().getByRole("option", { name: /^Z\.ai: GLM Latest/ }));
     await proceed();
     await click(screen().getByRole("button", { name: "Criar Eva" }));
     await settle(8);
@@ -536,30 +541,23 @@ describe("Criar agente: what gets created", () => {
     // No key: the API can't think, and Codex isn't on any computer.
     await proceed();
     expect(screen().getAllByText("Escolha um modelo que o workspace pode usar.").length).toBeGreaterThan(0);
-    expect(
-      screen()
-        .getByRole("button", { name: /^Codex.*Indisponível/ })
-        .getAttribute("aria-disabled"),
-    ).toBe("true");
-    const claude = screen().getByRole("button", { name: /^Claude Code/ });
-    // The workspace's only computer: the card doesn't name it.
-    expect(claude.querySelector(".newag__cost")).toBeNull();
-    expect(claude.textContent).not.toContain("Mac mini");
+    const list = await openBrain();
+    expect(optionsIn(list, "Plano do ChatGPT")[0]?.textContent).toBe("ChatGPTIndisponível");
+    expect(optionsIn(list, "Plano do ChatGPT")[0]?.getAttribute("aria-disabled")).toBe("true");
+    // The workspace's only computer: the heading doesn't name it.
+    expect(groupNames(list)).toContain("Plano do Claude");
+    const claude = optionsIn(list, "Plano do Claude")[0] as HTMLElement;
+    expect(claude.textContent).toBe("AutomáticoUsa o plano do Claude de quem conectou o computador.");
     await click(claude);
-    expect(claude.getAttribute("aria-pressed")).toBe("true");
+    expect(brainBox().textContent).toStartWith("Plano do Claude");
     // In the words of the switch it points to, "Atende outras pessoas".
     expect(
       screen().getByText(
         "No plano, a Eva começa atendendo só você. Na página da Eva, você pode escolher se ela atende outras pessoas.",
       ),
     ).toBeTruthy();
-    expect(
-      screen()
-        .getByRole("button", { name: /^Automático/ })
-        .getAttribute("aria-pressed"),
-    ).toBe("false");
     await proceed();
-    expect(document.querySelector(".newag__review")?.textContent).toContain("Claude Code");
+    expect(document.querySelector(".newag__review")?.textContent).toContain("Plano do Claude");
     await click(screen().getByRole("button", { name: "Criar Eva" }));
     await settle(8);
     const agentId = state.agents.find((a) => a.handle === "eva")?.id;
@@ -573,7 +571,7 @@ describe("Criar agente: what gets created", () => {
     expect(screen().queryByRole("dialog", { name: /^Conectar uma IA/ })).toBeNull();
   });
 
-  test("plan: with more than one computer, each card names its own", async () => {
+  test("plan: with more than one computer, each plan's heading names its own", async () => {
     const state = seedState();
     state.brainMachines = [
       {
@@ -592,15 +590,16 @@ describe("Criar agente: what gets created", () => {
     await open(state);
     await startAs("Assistente");
     await proceed(4);
-    const cards = within(screen().getByRole("group", { name: "Pelo plano, num computador" })).getAllByRole("button");
-    expect(cards.map((c) => c.querySelector(".newag__cost")?.textContent)).toEqual([
-      "MacBook",
-      "Mac mini · offline",
-      "Indisponível",
+    const list = await openBrain();
+    expect(groupNames(list).filter((g) => g?.startsWith("Plano do"))).toEqual([
+      "Plano do Claude · MacBook",
+      "Plano do Claude · Mac mini · offline",
+      "Plano do ChatGPT",
     ]);
+    expect(optionsIn(list, "Plano do ChatGPT")[0]?.textContent).toBe("ChatGPTIndisponível");
   });
 
-  test("plan: Cursor's card shows only where a computer runs it, with Cursor's mark (ADR 0114)", async () => {
+  test("plan: Cursor shows only where a computer runs it, with Cursor's mark (ADR 0114)", async () => {
     const state = seedState();
     state.brainMachines = [
       {
@@ -613,10 +612,99 @@ describe("Criar agente: what gets created", () => {
     await open(state);
     await startAs("Assistente");
     await proceed(4);
-    const group = screen().getByRole("group", { name: "Pelo plano, num computador" });
-    const cursor = within(group).getByRole("button", { name: /^Cursor/ });
+    const list = await openBrain();
+    const cursor = optionsIn(list, "Plano do Cursor")[0] as HTMLElement;
     expect(cursor.querySelector(".ac-brand[data-mark='cursor']")).not.toBeNull();
     expect(cursor.textContent).toContain("Usa o plano do Cursor de quem conectou o computador.");
+  });
+
+  test("plan: OpenCode Go's models in the same list, its free ones found by 'free'; a model of it is what thinks", async () => {
+    const state = seedState();
+    state.brainMachines = [
+      {
+        machineId: "machine_1",
+        name: "MacBook",
+        online: true,
+        options: [plan("claude_code", true), plan("codex", false)],
+      },
+    ];
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.setAiAccounts({
+      accounts: [
+        {
+          id: "acc-go",
+          kind: "claude_code",
+          label: "OpenCode Go",
+          email: null,
+          plan: null,
+          status: "active",
+          ownerId: state.me?.user.id ?? null,
+          ownerName: "Ana",
+          mine: true,
+          usedBy: [],
+          usage: null,
+          provider: "opencode",
+          keyHint: "abcd",
+          machineId: "machine_1",
+          computer: "MacBook",
+        },
+      ],
+      computers: [],
+    });
+    await open(state, api);
+    await startAs("Assistente");
+    await proceed(4);
+    const list = await openBrain();
+    expect(optionsIn(list, "OpenCode Go")).toHaveLength(29);
+    await typeIn(screen().getByRole("combobox", { name: "Buscar modelos" }), "free");
+    expect(
+      within(list)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["Beam FreeGrátis", "Iceman Contributor FreeGrátis"]);
+    await typeIn(screen().getByRole("combobox", { name: "Buscar modelos" }), "deepseek flash");
+    await click(screen().getByRole("option", { name: /^DeepSeek V4\.1 Flash/ }));
+    expect(brainBox().textContent).toStartWith("DeepSeek V4.1 Flash pelo OpenCode Go");
+    // What its account must allow, before it's created.
+    expect(screen().getByText(/Ligue a região Global no OpenCode/)).toBeTruthy();
+    await proceed();
+    await click(screen().getByRole("button", { name: "Criar Eva" }));
+    await settle(8);
+    const agentId = state.agents.find((a) => a.handle === "eva")?.id;
+    expect(state.calls.find((c) => c.method === "agents.setBrain")?.args).toEqual([
+      ORG_ID,
+      agentId,
+      { brain: "claude_code", account: "acc-go", model: "deepseek-v4.1-flash" },
+    ]);
+  });
+
+  test("plan: a coding plan with no key yet is one pick; Connect opens on it once the agent exists", async () => {
+    const state = seedState();
+    state.brainMachines = [
+      {
+        machineId: "machine_1",
+        name: "MacBook",
+        online: true,
+        options: [plan("claude_code", true), plan("codex", false)],
+      },
+    ];
+    await open(state);
+    await startAs("Assistente");
+    await proceed(4);
+    const list = await openBrain();
+    const models = optionsIn(list, "OpenCode Go");
+    expect(models[0]?.textContent).toBe(
+      "Conectar OpenCode GoPrecisa de uma chave OpenCode Go. Você coloca logo depois de criar o agente.",
+    );
+    expect(models.slice(1).every((o) => o.getAttribute("aria-disabled") === "true")).toBe(true);
+    await click(models[0] as HTMLElement);
+    expect(brainBox().textContent).toStartWith("OpenCode Go");
+    await proceed();
+    await click(screen().getByRole("button", { name: "Criar Eva" }));
+    await settle(8);
+    expect(createdWith(state)?.model).toBe("auto");
+    expect(state.calls.some((c) => c.method === "agents.setBrain")).toBe(false);
+    expect(screen().getByRole("dialog", { name: /^Conectar uma IA para .*Eva$/ })).toBeTruthy();
   });
 
   test("plan: Codex on the workspace's computer, whose own sign-in thinks for nobody: ChatGPT's sign-in opens once it's created", async () => {
@@ -635,9 +723,9 @@ describe("Criar agente: what gets created", () => {
     await startAs("Assistente");
     await proceed(4);
     expect(title()).toBe("Modelo e orçamento");
-    const codex = screen().getByRole("button", { name: /^Codex/ });
-    expect(codex.textContent).not.toContain("Computador da Acme");
-    await click(codex);
+    const list = await openBrain();
+    expect(groupNames(list)).toContain("Plano do ChatGPT");
+    await click(optionsIn(list, "Plano do ChatGPT")[0] as HTMLElement);
     await proceed();
     await click(screen().getByRole("button", { name: "Criar Eva" }));
     await settle(8);
@@ -685,10 +773,8 @@ describe("Criar agente: what gets created", () => {
     await startAs("Assistente");
     await proceed(4);
     expect(title()).toBe("Modelo e orçamento");
-    // Its only computer: the card doesn't name it.
-    const planCard = screen().getByRole("button", { name: /^Claude Code/ });
-    expect(planCard.getAttribute("aria-pressed")).toBe("true");
-    expect(planCard.textContent).not.toContain("Mac mini");
+    // Its account isn't one of the list's choices: the trigger names the plan as it was.
+    expect(brainBox().textContent).toBe("Claude Code · Claude");
     expect(screen().getByText("Começa com a última escolha: Opus pelo plano do Claude · Esforço alto.")).toBeTruthy();
     await proceed();
     await click(screen().getByRole("button", { name: "Criar Eva" }));
@@ -719,11 +805,7 @@ describe("Criar agente: what gets created", () => {
     arrive();
     await settle(8);
     await proceed(4);
-    expect(
-      screen()
-        .getByRole("button", { name: /^Claude Opus 5\.5/ })
-        .getAttribute("aria-pressed"),
-    ).toBe("true");
+    expect(brainBox().textContent).toStartWith("Claude Opus 5.5");
   });
 
   test("the last setup: the API's model, key and context window; someone else's plan leaves Automático", async () => {
@@ -732,11 +814,7 @@ describe("Criar agente: what gets created", () => {
     await open(state);
     await startAs("Assistente");
     await proceed(4);
-    expect(
-      screen()
-        .getByRole("button", { name: /^Claude Opus 5\.5/ })
-        .getAttribute("aria-pressed"),
-    ).toBe("true");
+    expect(brainBox().textContent).toStartWith("Claude Opus 5.5");
     expect(screen().getByText("Começa com a última escolha: Claude Opus 5.5.")).toBeTruthy();
     await proceed();
     await click(screen().getByRole("button", { name: "Criar Eva" }));
@@ -764,11 +842,7 @@ describe("Criar agente: what gets created", () => {
     await open(theirs);
     await startAs("Assistente");
     await proceed(4);
-    expect(
-      screen()
-        .getByRole("button", { name: /^Automático/ })
-        .getAttribute("aria-pressed"),
-    ).toBe("true");
+    expect(brainBox().textContent).toStartWith("Automático");
     expect(screen().queryByText(/^Começa com a última escolha/)).toBeNull();
   });
 
@@ -824,7 +898,7 @@ describe("Criar agente: what gets created", () => {
     await open(other);
     await startAs("Assistente");
     await proceed(4);
-    await click(screen().getByRole("button", { name: /^Claude Sonnet 5\.5/ }));
+    await chooseBrain(/^Claude Sonnet 5\.5/);
     expect(screen().queryByText(/^Começa com a última escolha/)).toBeNull();
     await proceed();
     await click(screen().getByRole("button", { name: "Criar Eva" }));
@@ -841,7 +915,7 @@ describe("Criar agente: what gets created", () => {
     await proceed(4);
     expect(screen().getByText("Começa com a última escolha: Automático.")).toBeTruthy();
     // Automático picked again is still the last setup, its Autonomia too: the switch is the way out.
-    await click(screen().getByRole("button", { name: /^Automático/ }));
+    await click(within(await openBrain()).getAllByRole("option")[0] as HTMLElement);
     const carry = screen().getByRole("switch", { name: "Levar a autonomia" });
     expect(carry.getAttribute("aria-checked")).toBe("true");
     await click(carry);

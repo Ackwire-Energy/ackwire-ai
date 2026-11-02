@@ -60,15 +60,20 @@ describe("provider marks where a provider is named", () => {
     expect(marks(screen().getByRole("option", { name: "OpenRouter" }))).toEqual(["openrouter"]);
   });
 
-  test("Criar agente: each model card names its provider with its mark", async () => {
+  test("Criar agente: each model in Quem pensa wears its provider's mark, under its provider's name", async () => {
     await open("agents/new");
     await startAs("Assistente");
     await proceed(4);
     expect(title()).toBe("Modelo e orçamento");
-    const card = (name: RegExp) => screen().getByRole("button", { name }).querySelector(".newag__model-prov");
-    expect(card(/^Claude Sonnet 5\.5/)?.textContent).toBe("Claude");
-    expect(marks(card(/^Claude Sonnet 5\.5/) as Element)).toEqual(["claude"]);
-    expect(marks(card(/^GPT-5/) as Element)).toEqual(["openai"]);
+    await act(async () => fireEvent.click(screen().getByRole("combobox", { name: "Quem pensa" })));
+    const option = (name: RegExp) => screen().getAllByRole("option", { name })[0] as Element;
+    expect(
+      option(/^Claude Sonnet 5\.5/)
+        .closest("[role='group']")
+        ?.getAttribute("aria-label"),
+    ).toBe("Claude");
+    expect(marks(option(/^Claude Sonnet 5\.5/))).toEqual(["claude"]);
+    expect(marks(option(/^GPT-5/))).toEqual(["openai"]);
   });
 
   test("the brain line: Claude's mark for Claude Code, Z.ai's for a GLM plan account, the model's maker's for the API", async () => {

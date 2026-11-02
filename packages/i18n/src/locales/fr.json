@@ -3959,6 +3959,13 @@
     "defaultKeyDesc": "{{provider}} · se termine par {{hint}}",
     "otherKeyDesc": "{{provider}} · se termine par {{hint}}",
     "modelNeedsKey": "Clé API {{provider}} nécessaire",
+    "brainPick": {
+      "searchPlaceholder": "Modèle, abonnement ou éditeur",
+      "connect": "Connecter {{plan}}",
+      "connectText": "Nécessite une clé {{plan}}. Vous l'ajoutez juste après avoir créé l'agent.",
+      "needsKey": "Nécessite une clé {{plan}}",
+      "other": "En choisir un autre"
+    },
     "noKeys": "Pas encore de clés",
     "budgetTitle": "Budget mensuel",
     "budget": "Budget mensuel (US$)",
@@ -7943,6 +7950,7 @@
       "freeTraining": "Le fournisseur de ce modèle peut utiliser les requêtes pour l'entraîner. Dans OpenCode, dans Settings › Privacy, activez l'autorisation pour les modèles gratuits. Sans elle, ce modèle ne répond pas."
     },
     "recommended": "Recommandé",
+    "free": "Gratuit",
     "modelHelp": "Les plus gros modèles réfléchissent davantage et consomment l'abonnement plus vite.",
     "hidden": "{{owner}} ou un admin choisit qui réfléchit.",
     "hiddenAdmins": "Seuls les admins choisissent qui réfléchit.",
