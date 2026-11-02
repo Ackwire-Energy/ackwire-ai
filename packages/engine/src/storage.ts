@@ -32,7 +32,7 @@ import { assertPublicHttpsUrl, type ResolveHost } from "./net-guard";
 import { requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 
-const { storageConfigs, storageMigrations, artifacts, artifactVersions, skillFiles } = schema;
+const { storageConfigs, storageMigrations, artifacts, artifactVersions, skillFiles, voiceClips } = schema;
 
 type StorageConfigRow = typeof storageConfigs.$inferSelect;
 type MigrationRow = typeof storageMigrations.$inferSelect;
@@ -456,21 +456,28 @@ export const storedBytesQueries = (db: Executor, orgId: string) =>
       })
       .from(skillFiles)
       .where(and(eq(skillFiles.orgId, orgId), isNotNull(skillFiles.blobKey))),
+    db
+      .select({
+        platform: sql<string>`coalesce(sum(${voiceClips.size}) filter (where ${voiceClips.storageConfigId} is null), 0)`,
+        own: sql<string>`coalesce(sum(${voiceClips.size}) filter (where ${voiceClips.storageConfigId} is not null), 0)`,
+      })
+      .from(voiceClips)
+      .where(and(eq(voiceClips.orgId, orgId), isNull(voiceClips.audioDeletedAt))),
   ] as const;
 
 /**
  * What a workspace's files take, summed from the size each one recorded when it was written: no bucket is listed and
  * no folder walked. It counts every version kept of the Drive's files (uploads, what agents make or bring from their
  * computers, files attached to messages, issues and wiki pages) and every stored file of its skills, deleted skills'
- * included, as their files stay. Left out: the Drive's trash, which goes for good after 30 days; the workspace's
+ * included, as their files stay, and the voice recordings still kept. Left out: the Drive's trash, which goes for good after 30 days; the workspace's
  * logo, connectors' icons and people's photos, small and with no size on record; the old copies a copy between
  * storages (`runMigration`) leaves where the files were.
  */
 export async function storedBytes(db: Executor, orgId: string): Promise<StoredBytes> {
-  const [[files], [skills]] = await Promise.all(storedBytesQueries(db, orgId));
+  const [[files], [skills], [voice]] = await Promise.all(storedBytesQueries(db, orgId));
   return {
-    platformBytes: Number(files?.platform ?? 0) + Number(skills?.platform ?? 0),
-    ownBucketBytes: Number(files?.own ?? 0) + Number(skills?.own ?? 0),
+    platformBytes: Number(files?.platform ?? 0) + Number(skills?.platform ?? 0) + Number(voice?.platform ?? 0),
+    ownBucketBytes: Number(files?.own ?? 0) + Number(skills?.own ?? 0) + Number(voice?.own ?? 0),
   };
 }
 
@@ -490,6 +497,15 @@ const notAt = (orgId: string, target: string | null) =>
     target ? undefined : sql`${artifactVersions.storageConfigId} is not null`,
   );
 
+/** Voice recordings not yet where new files go; those already swept have nothing to copy (ADR 0100). */
+const clipsNotAt = (orgId: string, target: string | null) =>
+  and(
+    eq(voiceClips.orgId, orgId),
+    isNull(voiceClips.audioDeletedAt),
+    target ? or(isNull(voiceClips.storageConfigId), ne(voiceClips.storageConfigId, target)) : undefined,
+    target ? undefined : sql`${voiceClips.storageConfigId} is not null`,
+  );
+
 /**
  * `POST …/storage/migrate` (admins): copies existing files to the current
  * storage and repoints them (job `storage.migrate`). A failed or interrupted
@@ -503,14 +519,22 @@ export async function startMigration(deps: StorageDeps, actorId: string, orgId: 
     .select({ n: sql<number>`count(*)::int` })
     .from(artifactVersions)
     .where(notAt(orgId, target));
-  const remaining = counted?.n ?? 0;
+  const [countedClips] = await deps.db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(voiceClips)
+    .where(clipsNotAt(orgId, target));
+  const remaining = (counted?.n ?? 0) + (countedClips?.n ?? 0);
   // Back onto this server's storage, the files it copies count against its limit.
   if (target === null) {
     const [moving] = await deps.db
       .select({ bytes: sql<string>`coalesce(sum(${artifactVersions.size}), 0)` })
       .from(artifactVersions)
       .where(notAt(orgId, null));
-    const bytes = Number(moving?.bytes ?? 0);
+    const [movingClips] = await deps.db
+      .select({ bytes: sql<string>`coalesce(sum(${voiceClips.size}), 0)` })
+      .from(voiceClips)
+      .where(clipsNotAt(orgId, null));
+    const bytes = Number(moving?.bytes ?? 0) + Number(movingClips?.bytes ?? 0);
     if (bytes > 0) await assertStorageRoom(deps.db, orgId, bytes, { daily: false });
   }
   const resume = last && last.status !== "done" && last.toStorageConfigId === target ? last : null;
@@ -642,6 +666,39 @@ export async function runMigration(deps: StorageDeps, migrationId: string, optio
         .update(storageMigrations)
         .set({ copied, cursor, updatedAt: new Date() })
         .where(eq(storageMigrations.id, m.id));
+    }
+  }
+  // Voice recordings after the Drive: each one copied stops matching, so a resumed copy needs no cursor.
+  for (;;) {
+    const batch = await db
+      .select()
+      .from(voiceClips)
+      .where(clipsNotAt(m.orgId, m.toStorageConfigId))
+      .limit(options.batch ?? 50);
+    if (batch.length === 0) break;
+    for (const clip of batch) {
+      try {
+        const source = await resolver.forConfig(m.orgId, clip.storageConfigId);
+        const object = await source.get(clip.blobKey);
+        if (!object) throw new StorageError("not_found", `missing object ${clip.blobKey}`);
+        const key = `${target.prefix}voice/${clip.id}`;
+        await target.store.put(key, object.body, { contentType: object.contentType });
+        await db
+          .update(voiceClips)
+          .set({ storageConfigId: target.storageConfigId, blobKey: key })
+          .where(eq(voiceClips.id, clip.id));
+        // As for the Drive's files: only our own store frees the old copy.
+        if (clip.storageConfigId === null && clip.blobKey !== key)
+          await source.delete(clip.blobKey).catch(() => undefined);
+      } catch (error) {
+        await db
+          .update(storageMigrations)
+          .set({ status: "failed", error: storageErrorText(error), copied, cursor, updatedAt: new Date() })
+          .where(eq(storageMigrations.id, m.id));
+        return;
+      }
+      copied++;
+      await db.update(storageMigrations).set({ copied, updatedAt: new Date() }).where(eq(storageMigrations.id, m.id));
     }
   }
   await db

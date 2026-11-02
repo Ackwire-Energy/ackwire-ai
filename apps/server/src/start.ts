@@ -308,6 +308,8 @@ async function boot(
   });
   // The saved Jev key, before anything calls Jev (vision reads it synchronously).
   await engine.jevKey.ready();
+  await engine.speech.ready();
+  log.info("voice messages", { engines: engine.speech.chain().map((e) => e.id) });
   // Off the boot path: it calls MillionSend once per mailbox left from the withdrawn path (ADR 0102).
   void retireMillionSendMailboxes({ db: database.db, keyWrappers: engine.mail.keyWrappers })
     .then((r) => {
@@ -321,6 +323,7 @@ async function boot(
     pubsub: adapters.pubsub,
     context: engine.context,
     artifacts: engine.artifacts,
+    voice: engine.voice,
     approvalDigest: { publicUrl: config.PUBLIC_URL, afterHours: config.APPROVAL_REMINDER_HOURS },
     mail: { deps: engine.mail, pollSeconds: config.MAIL_POLL_SECONDS },
     browserLive: engine.browserLive,
@@ -365,6 +368,8 @@ async function boot(
         router: engine.router,
         jevKey: engine.jevKey,
         gifKey: gifKey ?? undefined,
+        speech: engine.speech,
+        voice: engine.voice,
         gitProxy: engine.gitProxy,
         appleRevoke: appleTokenRevoker(config),
       },

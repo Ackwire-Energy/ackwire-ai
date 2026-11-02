@@ -123,6 +123,7 @@ export {
   type ComposerMentions,
   type ComposerProps,
   type ComposerSuggestion,
+  type ComposerVoice,
   type ComposerWorking,
   linkQuery,
   mentionQuery,
@@ -349,6 +350,17 @@ export {
   toolLevelTones,
 } from "./components/ToolPixels";
 export { type UsageDay, type UsageDayPart, UsageDays, UsageSwatch } from "./components/UsageDays";
+export {
+  stopVoicePlayback,
+  VoicePlayer,
+  type VoicePlayerLabels,
+  type VoicePlayerProps,
+} from "./components/VoicePlayer";
+export {
+  type VoiceNotice,
+  type VoiceTake,
+  voiceRecordingSupported,
+} from "./components/voice-recorder";
 export { Reaction, Reactions, type WorkStep, WorkSummary } from "./components/Work";
 export { WorkLine, WorkLineAction, type WorkLineTone, WorkPlan } from "./components/WorkLine";
 export { COMPUTER_GRID, COMPUTER_KINDS, COMPUTER_STATES, drawComputer } from "./computer/portrait.js";

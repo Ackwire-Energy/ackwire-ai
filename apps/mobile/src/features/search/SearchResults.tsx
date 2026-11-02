@@ -1,4 +1,5 @@
 import { useApi, useChannels, useDms, useSearch } from "@agenteschat/client";
+import { hitText } from "@agenteschat/client/lib/media";
 import { previewBody } from "@agenteschat/client/lib/message-body";
 import { can } from "@agenteschat/client/lib/permissions";
 import { router } from "expo-router";
@@ -171,7 +172,7 @@ export function SearchResults({ q }: { q: string }) {
                 return {
                   key: h.sourceId,
                   leading: <Tile icon="chat" size={34} />,
-                  label: previewOf(h.snippet || h.title),
+                  label: previewOf(hitText(t, h) || h.title),
                   hint: [where ? t("mobile.chats.waitIn", { where: `#${where}` }) : null, when.short(h.createdAt)]
                     .filter(Boolean)
                     .join(" · "),
