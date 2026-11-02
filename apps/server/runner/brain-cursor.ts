@@ -18,7 +18,7 @@ import {
 import { RunnerError } from "./errors";
 import { killTree } from "./exec";
 import { CURSOR_BIN, resolveCommand } from "./executors";
-import { CODEX_MCP_ENV, CODEX_MCP_SERVER } from "./mcp";
+import { CODEX_MCP_ENV, CODEX_MCP_SERVER, redactDeep } from "./mcp";
 import { resolveForAgent } from "./paths";
 import type { Spawn } from "./scope-gate";
 import { agentSecrets } from "./secrets";
@@ -204,6 +204,7 @@ export function cursorToolCall(
     }
   }
   if (isRecord(input) && typeof input.fileText === "string") input = { ...input, fileText: undefined };
+  input = redactDeep(input, clean);
   const result = isRecord(body.result) ? body.result : {};
   const success = result.success;
   const failure = result.error ?? result.failure ?? result.rejected;
@@ -233,12 +234,32 @@ export class CursorEventMapper {
   model?: string;
   answer?: string;
   streamed = "";
+  /** Redacted text kept back from the last delta (`hold`), so a secret split between deltas never leaves in pieces. */
+  private tail = "";
   completed = false;
   failed?: string;
   /** The turn used a tool: a cut now loses work. */
   private worked = false;
 
-  constructor(private readonly opts: { model?: string; redact?: (text: string) => string } = {}) {}
+  constructor(
+    private readonly opts: {
+      model?: string;
+      redact?: (text: string) => string;
+      /** Streamed text holds back this many characters (the longest secret − 1). */
+      hold?: number;
+    } = {},
+  ) {}
+
+  /** The text so far as a delta; `whole` false keeps back the last `hold` characters for the next one. */
+  private flush(text: string, whole: boolean): CodexBrainEvent[] {
+    if (!text && !(whole && this.tail)) return [];
+    const out = this.clean(this.tail + text);
+    const cut = whole ? out.length : Math.max(0, out.length - (this.opts.redact ? (this.opts.hold ?? 0) : 0));
+    this.tail = out.slice(cut);
+    if (cut === 0) return [];
+    this.streamed += out.slice(0, cut);
+    return [{ type: "text_delta", text: out.slice(0, cut) }];
+  }
 
   private clean(text: string) {
     return this.opts.redact ? this.opts.redact(text) : text;
@@ -266,17 +287,14 @@ export class CursorEventMapper {
         if (ev.timestamp_ms === undefined || ev.model_call_id !== undefined) return [];
         const content = isRecord(ev.message) && Array.isArray(ev.message.content) ? ev.message.content : [];
         const delta = content.map((c) => (isRecord(c) && c.type === "text" ? str(c.text) : "")).join("");
-        if (!delta) return [];
-        const clean = this.clean(delta);
-        this.streamed += clean;
-        return [{ type: "text_delta", text: clean }];
+        return delta ? this.flush(delta, false) : [];
       }
       case "tool_call": {
         if (ev.subtype !== "completed" || !isRecord(ev.tool_call)) return [];
         this.worked = true;
         const id = str(ev.call_id) || `cursor-${Math.random().toString(36).slice(2)}`;
         const call = cursorToolCall(id, ev.tool_call, (t) => this.clean(t));
-        return call ? [call] : [];
+        return call ? [...this.flush("", true), call] : [];
       }
       case "result": {
         if (ev.is_error === true || (ev.subtype !== undefined && ev.subtype !== "success")) {
@@ -309,6 +327,7 @@ export class CursorEventMapper {
 
   /** The turn's end: one `done`, or `error` (after `limit` when the plan ran out). */
   finish(input: { exitCode: number | null; sessionId: string; stderr?: string }): CodexBrainEvent[] {
+    const rest = this.flush("", true);
     const problem =
       this.failed ??
       (this.completed
@@ -316,9 +335,10 @@ export class CursorEventMapper {
         : input.exitCode === 0
           ? "Cursor ended without finishing the turn"
           : `Cursor exited with code ${input.exitCode ?? "?"}${input.stderr ? `: ${this.clean(input.stderr)}` : ""}`);
-    if (problem) return cursorProblem(problem, this.worked);
+    if (problem) return [...rest, ...cursorProblem(problem, this.worked)];
     const text = this.answer || this.streamed;
     return [
+      ...rest,
       ...(text && !this.streamed ? [{ type: "text_delta" as const, text }] : []),
       { type: "done", text, session: { id: input.sessionId } },
     ];
@@ -349,6 +369,8 @@ export interface CursorTurnOptions {
   runnerHome?: string;
   env?: Record<string, string>;
   redact?: (text: string) => string;
+  /** Streamed text holds back this many characters (the longest secret − 1). */
+  redactHold?: number;
   /** Tests: the executable. */
   bin?: string;
   spawn?: Spawn;
@@ -394,7 +416,7 @@ export async function runCursorTurn(input: CursorTurnInput, opts: CursorTurnOpti
     : opts.redact;
   const mapper = new CursorEventMapper({
     ...(input.model ? { model: input.model } : {}),
-    ...(redact ? { redact } : {}),
+    ...(redact ? { redact, hold: Math.max(opts.redactHold ?? 0, key ? key.length - 1 : 0) } : {}),
   });
 
   let child: ChildProcess;
@@ -532,7 +554,7 @@ export async function handleCursorBrainTurn(
       signal: scope.signal,
       runnerHome: ctx.runnerHome,
       ...(ctx.mcp ? { mcpCommand: ctx.mcp.command, socketPath: ctx.mcp.socketPath } : {}),
-      ...(secrets ? { env: secrets.env, redact: secrets.redact } : {}),
+      ...(secrets ? { env: secrets.env, redact: secrets.redact, redactHold: secrets.hold } : {}),
       ...(ctx.bin ? { bin: ctx.bin } : {}),
       ...(ctx.spawn ? { spawn: ctx.spawn } : {}),
     },

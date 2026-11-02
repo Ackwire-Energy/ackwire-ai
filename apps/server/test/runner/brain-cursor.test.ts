@@ -89,6 +89,37 @@ test("the prompt: a new chat leads with the context, a resumed one doesn't; a co
   expect(fitted).toContain("TAIL\n\nthe question");
 });
 
+test("secrets: a value split between deltas never leaves in pieces; one in a tool's input is redacted", () => {
+  const m = new CursorEventMapper({ redact: (t) => t.replaceAll("sk_live_42", "[secret]"), hold: 9 });
+  const delta = (text: string, at: number) => ({
+    type: "assistant",
+    message: { content: [{ type: "text", text }] },
+    timestamp_ms: at,
+  });
+  const events = [
+    delta("key sk_li", 1),
+    delta("ve_42 ok", 2),
+    {
+      type: "tool_call",
+      subtype: "completed",
+      call_id: "c1",
+      tool_call: {
+        shellToolCall: { args: { command: "curl -H 'Bearer sk_live_42'" }, result: { success: { stdout: "" } } },
+      },
+    },
+    delta("end", 3),
+    { type: "result", subtype: "success", result: "key sk_live_42 ok end" },
+  ].flatMap((l) => m.line(JSON.stringify(l)));
+  const streamed = events.flatMap((e) => (e.type === "text_delta" ? [e.text] : [])).join("");
+  expect(streamed).toBe("key [secret] ok");
+  expect(events.some((e) => e.type === "text_delta" && /sk_|live|_42/.test(e.text))).toBe(false);
+  expect(events.find((e) => e.type === "tool_call")).toMatchObject({ input: { command: "curl -H 'Bearer [secret]'" } });
+  expect(m.finish({ exitCode: 0, sessionId: "s" })).toEqual([
+    { type: "text_delta", text: "end" },
+    { type: "done", text: "key [secret] ok end", session: { id: "s" } },
+  ]);
+});
+
 test("stream-json: deltas only (never the flushes), Cursor's own tools executed, our bridge's left out, usage from the plan", () => {
   const m = new CursorEventMapper({ redact: (t) => t.replaceAll("s3cret", "[secret]") });
   const lines = [
