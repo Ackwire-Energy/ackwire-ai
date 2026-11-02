@@ -5,6 +5,7 @@ import {
   type BrainTurnRequest,
   brainTopic,
   CODEX_FOLDER_PROTOCOL,
+  CURSOR_PROTOCOL,
   type PubSub,
   parseBrainEvent,
   STEER_PROTOCOL,
@@ -53,12 +54,12 @@ export interface ComputerBrainLink {
     execAllowed: boolean;
     /** The runner's protocol (absent: not checked). */
     protocol?: number;
-    executors: { codex?: { version: string }; claude?: { version: string } };
+    executors: { codex?: { version: string }; claude?: { version: string }; cursor?: { version: string } };
     /** The owner paused the computer (protocol 9; absent: not checked). */
     paused?: { until: string | null; timezone: string | null } | null;
     name?: string;
     /** What the machine allows (protocol 10): with it, Codex needs its own tool on, not commands. */
-    access?: { tools: { claude: boolean; codex: boolean; commands: boolean } } | null;
+    access?: { tools: { claude: boolean; codex: boolean; cursor?: boolean; commands: boolean } } | null;
   } | null>;
   /** Sends `brain.turn` and calls `onEvent` per `brain.event`; resolves on `brain.done`. */
   turn(
@@ -128,15 +129,74 @@ function channel<T>() {
   };
 }
 
-export class CodexBrain implements Brain {
-  readonly kind = "codex" as const;
+/**
+ * What tells one runner-driven CLI brain from another: Codex, or Cursor (ADR 0114: `agent -p` per turn on runner
+ * protocol 36, no version gate, no live steering). Everything else, from the request to the events, is shared.
+ */
+interface CliBrainSpec {
+  kind: "codex" | "cursor";
+  name: string;
+  /** The runner protocol it needs. */
+  protocol: number;
+  /** The CLI is installed (`hello.executors`) and new enough; else why not. */
+  check(executors: { codex?: { version: string }; cursor?: { version: string } }): BrainEvent | null;
+}
 
-  constructor(private readonly deps: CodexBrainDeps) {}
+const CODEX_CLI: CliBrainSpec = {
+  kind: "codex",
+  name: "Codex",
+  protocol: BRAIN_PROTOCOL,
+  check({ codex }) {
+    if (!codex) {
+      return {
+        type: "error",
+        code: "codex_missing",
+        message: "Codex is not installed on the computer.",
+        retryable: true,
+      };
+    }
+    if (!codexVersionOk(codex.version)) {
+      return {
+        type: "error",
+        code: "codex_too_old",
+        message: `Codex on the computer is ${codex.version}. Agents need ${CODEX_MIN_VERSION} or newer (update it there).`,
+        retryable: true,
+      };
+    }
+    return null;
+  },
+};
+
+const CURSOR_CLI: CliBrainSpec = {
+  kind: "cursor",
+  name: "Cursor",
+  protocol: CURSOR_PROTOCOL,
+  check: ({ cursor }) =>
+    cursor
+      ? null
+      : {
+          type: "error",
+          code: "cursor_missing",
+          message: "Cursor's CLI is not installed on the computer.",
+          retryable: true,
+        },
+};
+
+export class CodexBrain implements Brain {
+  readonly kind: "codex" | "cursor";
+
+  constructor(
+    private readonly deps: CodexBrainDeps,
+    private readonly cli: CliBrainSpec = CODEX_CLI,
+  ) {
+    this.kind = cli.kind;
+  }
 
   async *run(turn: BrainTurn, io: BrainIO): AsyncIterable<BrainEvent> {
     const session = turn.session;
+    const { name } = this.cli;
     if (!session) {
-      yield { type: "error", code: "no_session", message: "The Codex brain needs a session on a computer." };
+      yield { type: "error", code: "no_session", message: `The ${name} brain needs a session on a computer.` };
       return;
     }
     const status = await this.deps.link.status(session.machineId);
@@ -149,12 +209,14 @@ export class CodexBrain implements Brain {
       yield { type: "error", code: "machine_paused", message, retryable: true };
       return;
     }
-    if (status.access ? status.access.tools.codex !== true : !status.execAllowed) {
-      yield status.access
+    const tools = status.access?.tools;
+    const toolOn = tools && (this.kind === "cursor" ? (tools.cursor ?? tools.codex) : tools.codex);
+    if (tools ? toolOn !== true : !status.execAllowed) {
+      yield tools
         ? {
             type: "error",
             code: "tool_off",
-            message: "Codex is turned off on the computer (its owner can turn it on in the agentes app).",
+            message: `${name} is turned off on the computer (its owner can turn it on in the agentes app).`,
             retryable: true,
           }
         : {
@@ -165,35 +227,21 @@ export class CodexBrain implements Brain {
           };
       return;
     }
-    if (status.protocol !== undefined && status.protocol < BRAIN_PROTOCOL) {
+    if (status.protocol !== undefined && status.protocol < this.cli.protocol) {
       yield {
         type: "error",
         code: "runner_outdated",
-        message: "The runner on the computer is too old for agents that think with Codex. Update it.",
+        message: `The runner on the computer is too old for agents that think with ${name}. Update it.`,
         retryable: true,
       };
       return;
     }
-    const codex = status.executors.codex;
-    if (!codex) {
-      yield {
-        type: "error",
-        code: "codex_missing",
-        message: "Codex is not installed on the computer.",
-        retryable: true,
-      };
+    const missing = this.cli.check(status.executors);
+    if (missing) {
+      yield missing;
       return;
     }
-    if (!codexVersionOk(codex.version)) {
-      yield {
-        type: "error",
-        code: "codex_too_old",
-        message: `Codex on the computer is ${codex.version}. Agents need ${CODEX_MIN_VERSION} or newer (update it there).`,
-        retryable: true,
-      };
-      return;
-    }
-    const account = accountUnavailable(status, turn.account, "codex");
+    const account = accountUnavailable(status, turn.account, this.kind);
     if (account) {
       yield { type: "error", code: account.code, message: account.message, retryable: true };
       return;
@@ -204,7 +252,7 @@ export class CodexBrain implements Brain {
       yield {
         type: "error",
         code: "runner_outdated",
-        message: "The runner on the computer is too old to keep Codex within this agent's permissions. Update it.",
+        message: `The runner on the computer is too old to keep ${name} within this agent's permissions. Update it.`,
         retryable: true,
       };
       return;
@@ -222,7 +270,7 @@ export class CodexBrain implements Brain {
     const toolNames = turn.tools.map((t) => t.name).sort();
     const request: BrainTurnRequest & { agent?: AgentScope } = {
       runId: turn.runId,
-      kind: "codex",
+      kind: this.kind,
       session: { id: session.id, resume: session.resume },
       cwd: code?.cwd || session.cwd,
       ...(turn.model ? { model: turn.model } : {}),
@@ -295,6 +343,17 @@ export class CodexBrain implements Brain {
       // The runner finished without saying how: what it streamed is the answer.
       yield { type: "done", text, session: { id: session.id } };
     }
+  }
+}
+
+/**
+ * The Cursor brain (ADR 0114): Cursor's CLI on the agent's computer with a person's Cursor plan, through the same
+ * `brain.turn` as Codex (`kind: "cursor"`, runner protocol 36, `brain-cursor.ts` there). A person's messages wait for
+ * the turn's end: the runner answers `brain.steer` with `unsupported`.
+ */
+export class CursorBrain extends CodexBrain {
+  constructor(deps: CodexBrainDeps) {
+    super(deps, CURSOR_CLI);
   }
 }
 

@@ -3,6 +3,7 @@ import {
   type AccountKind,
   BRAIN_PROTOCOL,
   type BrainEffort,
+  CURSOR_PROTOCOL,
   isBrainEffort,
   type OwnPlanUsage,
   PLAN_KEYS_PROTOCOL,
@@ -22,7 +23,7 @@ import { claudeCodeModel, isPlanModelId, planModel, planOf } from "@agenteschat/
 import { type Agent, getAgent, rememberAgentSetup, setupOfAgent } from "./agents";
 import { type AgentAudience, answersOthers, audienceOf, OWNER_ONLY, planSharing } from "./audience";
 import { recordAudit } from "./audit";
-import { type BrainKind, isComputerBrain } from "./brains/types";
+import { BRAIN_NAMES, type BrainKind, isComputerBrain } from "./brains/types";
 import { caches } from "./cache";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import {
@@ -60,7 +61,7 @@ import { closedRefusal } from "./standing";
  * resolves it per run (`brainFor`).
  */
 
-export const BRAIN_KINDS: readonly BrainKind[] = ["model", "claude_code", "codex"];
+export const BRAIN_KINDS: readonly BrainKind[] = ["model", "claude_code", "codex", "cursor"];
 export const isBrainKind = (v: unknown): v is BrainKind =>
   typeof v === "string" && (BRAIN_KINDS as readonly string[]).includes(v);
 /** An effort as stored: a level, or `auto` (the judge picks it per run). */
@@ -80,7 +81,28 @@ export interface BrainModelOption {
   recommended?: boolean;
   /** Its context window in tokens: which context limits are worth offering with it. */
   contextWindow?: number;
+  /**
+   * Cursor (ADR 0114): its CLI said the person's plan includes it. Other models Cursor bills at API prices; absent
+   * when the CLI didn't say.
+   */
+  inPlan?: boolean;
 }
+
+/**
+ * Cursor's models: what its CLI listed on the agent's computer (`agent models`), the plan's own first (its CLI's
+ * default runs when none is chosen). Any other name is accepted as typed.
+ */
+export const cursorModels = (listed: readonly { id: string; label?: string; inPlan?: boolean }[] = []) =>
+  [...listed]
+    .sort((a, b) => Number(b.inPlan === true) - Number(a.inPlan === true))
+    .map(
+      (m): BrainModelOption => ({
+        value: m.id,
+        label: m.label || m.id,
+        ...(catalogModelOf(m.id) ? { modelId: m.id } : {}),
+        ...(m.inPlan ? { inPlan: true } : {}),
+      }),
+    );
 
 /** Claude Code's aliases (`--model opus|sonnet|haiku`), mapped to today's ids in the catalog. */
 export const CLAUDE_CODE_MODELS: readonly BrainModelOption[] = [
@@ -99,21 +121,25 @@ export const codexModels = (): BrainModelOption[] =>
  * The model choices of a brain (none for the model brain: it uses the agent's model). A coding plan's are in its
  * catalog (`@agenteschat/providers/plans`), which the apps read.
  */
-export function brainModelOptions(kind: BrainKind): BrainModelOption[] {
-  return modelChoices(kind).map((o) =>
+export function brainModelOptions(
+  kind: BrainKind,
+  machine?: { executors?: schema.MachineExecutors | null } | null,
+): BrainModelOption[] {
+  return modelChoices(kind, machine).map((o) =>
     o.modelId ? { ...o, contextWindow: contextWindowOf(catalogModelOf(o.modelId) ?? o.modelId) } : o,
   );
 }
 
-function modelChoices(kind: BrainKind): BrainModelOption[] {
+function modelChoices(kind: BrainKind, machine?: { executors?: schema.MachineExecutors | null } | null) {
   if (kind === "claude_code") return [...CLAUDE_CODE_MODELS];
   if (kind === "codex") return codexModels();
+  if (kind === "cursor") return cursorModels(machine?.executors?.cursor?.models);
   return [];
 }
 
-/** What a computer brain runs with when nobody chose a model. */
+/** What a computer brain runs with when nobody chose a model (Cursor: its CLI's own default, null). */
 export function defaultBrainModel(kind: BrainKind): string | null {
-  if (kind === "model") return null;
+  if (kind === "model" || kind === "cursor") return null;
   const options = brainModelOptions(kind);
   return (options.find((o) => o.recommended) ?? options[0])?.value ?? (kind === "codex" ? "gpt-6.1-sol" : "sonnet");
 }
@@ -171,7 +197,7 @@ type MachineLike = Parameters<typeof machineExecutors>[0] & {
   id: string;
   name: string;
   /** Protocol 10: what the machine allows (the app's Ferramentas); absent on older runners. */
-  access?: { tools?: { claude?: boolean; codex?: boolean } } | null;
+  access?: { tools?: { claude?: boolean; codex?: boolean; cursor?: boolean } } | null;
 } & Parameters<typeof machineOnline>[0];
 
 /**
@@ -203,7 +229,27 @@ export function brainOptions(machine: MachineLike | null): BrainOption[] {
     { kind: "model", available: true, experimental: false, models: [], defaultModel: null },
     computer("claude_code", "claude"),
     computer("codex", "codex"),
+    cursorOption(machine),
   ];
+}
+
+/** Cursor (ADR 0114): runner protocol 36, its switch (or Codex's on a runner before it) and its CLI found there. */
+function cursorOption(machine: MachineLike | null): BrainOption {
+  const tools = machine?.access?.tools;
+  let reason: BrainUnavailable | undefined;
+  if (!machine) reason = "no_computer";
+  else if (!machine.execAllowed) reason = "exec_off";
+  else if (machine.protocol < CURSOR_PROTOCOL) reason = "runner_old";
+  else if (tools && (tools.cursor ?? tools.codex) === false) reason = "tool_off";
+  else if (!machine.executors?.cursor) reason = "not_installed";
+  return {
+    kind: "cursor",
+    available: !reason,
+    ...(reason ? { reason } : {}),
+    experimental: true,
+    models: brainModelOptions("cursor", machine),
+    defaultModel: null,
+  };
 }
 
 /** "Usar um computador": the agent's machine as the brain section shows it. */
@@ -464,7 +510,7 @@ export async function setAgentBrain(
   const { agent, admin, membership } = await agentBrainAccess(deps.db, userId, orgId, agentId);
   const from = brainOf(agent.brain);
   if (input.brain !== undefined && !isBrainKind(input.brain)) {
-    throw new ValidationError("Choose model, claude_code or codex", "brain.invalid");
+    throw new ValidationError("Choose model, claude_code, codex or cursor", "brain.invalid");
   }
   if (input.fallback !== undefined && typeof input.fallback !== "boolean") {
     throw new ValidationError("fallback is on or off", "brain.invalid");
@@ -483,7 +529,7 @@ export async function setAgentBrain(
     if (!option?.available) {
       throw new ConflictError(
         machine
-          ? `${brain === "codex" ? "Codex" : "Claude Code"} isn't available on ${machine.name}`
+          ? `${BRAIN_NAMES[brain]} isn't available on ${machine.name}`
           : "The agent needs a connected computer first",
         machine ? "brain.unavailable" : "brain.no_computer",
         { brain, reason: option?.reason ?? "no_computer", computer: machine?.name ?? null },
@@ -973,9 +1019,9 @@ export interface AiComputer {
    * A new sign-in there thinks for all of the caller's agents on it (protocol 29): Claude's, ChatGPT's and a
    * coding plan's key.
    */
-  shares: { claude_code: boolean; codex: boolean; key: boolean };
-  /** What it can think with now: Claude Code (Claude and the coding plans) and Codex (ChatGPT). */
-  brains: { claude_code: boolean; codex: boolean };
+  shares: { claude_code: boolean; codex: boolean; cursor: boolean; key: boolean };
+  /** What it can think with now: Claude Code (Claude and the coding plans), Codex (ChatGPT) and Cursor. */
+  brains: { claude_code: boolean; codex: boolean; cursor: boolean };
   /**
    * "Conta deste computador": each CLI's own sign-in there, on a computer the caller connected (it is theirs, and
    * the agents on it think with it when no account is picked). Claude Code when `claude auth status` said it is
@@ -1027,9 +1073,10 @@ export async function listAiAccounts(deps: BrainDeps, userId: string, orgId: str
         shares: {
           claude_code: sharesSignIns(m, "claude_code"),
           codex: sharesSignIns(m, "codex"),
+          cursor: sharesSignIns(m, "cursor"),
           key: sharesSignIns(m, "key"),
         },
-        brains: { claude_code: can("claude_code"), codex: can("codex") },
+        brains: { claude_code: can("claude_code"), codex: can("codex"), cursor: can("cursor") },
         own: m.pairedByUserId === userId ? ownSignIns(m.executors, can) : {},
       };
     }),

@@ -8,6 +8,7 @@ import {
   type BrainTurn,
   CodexBrain,
   type ContextDeps,
+  CursorBrain,
   composioConnectorsOf,
   connectOverHttp,
   createArtifactToolSource,
@@ -456,6 +457,15 @@ export function buildEngine(o: EngineOptions) {
         agent: agentScope,
         permissions: turnPermissions,
         keepAlive: !run.background,
+        prepare: prepareCode,
+      }),
+    // ADR 0114: Cursor's CLI, one process per turn (nothing kept alive between turns).
+    cursor: (_agent, _run, setup) =>
+      new CursorBrain({
+        link: brainLink,
+        mcp: async () => ({ token: setup.mcpToken() }),
+        agent: agentScope,
+        permissions: turnPermissions,
         prepare: prepareCode,
       }),
   };

@@ -50,7 +50,7 @@ export function noAiCardOf(meta: Record<string, unknown> | null | undefined): No
   const o = raw as Record<string, unknown>;
   if (typeof o.agentId !== "string") return null;
   const signedOut = o.reason === "not_signed_in";
-  const own = signedOut && (o.own === "claude_code" || o.own === "codex") ? o.own : null;
+  const own = signedOut && (o.own === "claude_code" || o.own === "codex" || o.own === "cursor") ? o.own : null;
   return {
     agentId: o.agentId,
     forUserId: typeof o.forUserId === "string" ? o.forUserId : null,
@@ -69,9 +69,14 @@ export const opensByItself = (x: { intent?: string; autoOpen?: boolean }) =>
   x.autoOpen === true && (x.intent === "claude" || x.intent === "chatgpt" || x.intent === "api_key");
 
 /** The brain a plan thinks with, on the agent's computer: a Claude plan through Claude Code, ChatGPT's through Codex. */
-export const PLAN_BRAIN: Record<"claude" | "chatgpt", MachineAccountKind> = { claude: "claude_code", chatgpt: "codex" };
+export const PLAN_BRAIN: Record<"claude" | "chatgpt" | "cursor", MachineAccountKind> = {
+  claude: "claude_code",
+  chatgpt: "codex",
+  cursor: "cursor",
+};
 /** The plan a CLI signs in to by itself (`PLAN_BRAIN` the other way): ChatGPT's for Codex, Claude's for Claude Code. */
-export const planOfKind = (kind: MachineAccountKind): "claude" | "chatgpt" => (kind === "codex" ? "chatgpt" : "claude");
+export const planOfKind = (kind: MachineAccountKind): "claude" | "chatgpt" | "cursor" =>
+  kind === "codex" ? "chatgpt" : kind === "cursor" ? "cursor" : "claude";
 
 type AiState = AiStatus["agents"][number]["state"];
 
@@ -79,18 +84,21 @@ type AiState = AiStatus["agents"][number]["state"];
 export const aiStateOf = (status: AiStatus | undefined, agentId: string): AiState | undefined =>
   status?.agents.find((a) => a.agentId === agentId)?.state;
 
-/** A plan a person signs in with, on the agent's computer: Claude's, ChatGPT's, or a coding plan's key. */
-export type PlanChoice = "claude" | "chatgpt" | PlanId;
+/**
+ * A plan a person signs in with, on the agent's computer: Claude's, ChatGPT's, Cursor's (a sign-in or its API key,
+ * ADR 0114), or a coding plan's key.
+ */
+export type PlanChoice = "claude" | "chatgpt" | "cursor" | PlanId;
 /** What the picker offers: a plan, or the workspace's API key. */
 export type AiChoice = PlanChoice | "key";
-/** Every picker's order: Claude (chosen first), ChatGPT, then the coding plans. */
-export const PLAN_CHOICES: readonly PlanChoice[] = ["claude", "chatgpt", ...PLAN_IDS];
-/** The account a plan signs in as: ChatGPT's through Codex; Claude's and every coding plan's through Claude Code. */
+/** Every picker's order: Claude (chosen first), ChatGPT, Cursor, then the coding plans. */
+export const PLAN_CHOICES: readonly PlanChoice[] = ["claude", "chatgpt", "cursor", ...PLAN_IDS];
+/** The account a plan signs in as: ChatGPT's through Codex, Cursor's through its CLI; the rest through Claude Code. */
 export const kindOf = (choice: PlanChoice): MachineAccountKind =>
-  choice === "chatgpt" ? PLAN_BRAIN.chatgpt : PLAN_BRAIN.claude;
-/** The plan an account signs in with: a coding plan's key, ChatGPT's through Codex, else Claude's. */
+  choice === "chatgpt" || choice === "cursor" ? PLAN_BRAIN[choice] : PLAN_BRAIN.claude;
+/** The plan an account signs in with: a coding plan's key, ChatGPT's through Codex, Cursor's, else Claude's. */
 export const planOfAccount = (a: Pick<MachineAccount, "kind" | "provider">): PlanChoice =>
-  isPlanId(a.provider) ? a.provider : a.kind === "codex" ? "chatgpt" : "claude";
+  isPlanId(a.provider) ? a.provider : planOfKind(a.kind);
 /**
  * What an agent's brain view thinks with, as the picker's choice: the API key on the model brain, else the plan of the
  * account it thinks with (the computer's own sign-in: Claude's or ChatGPT's).
@@ -211,7 +219,7 @@ export const firstAgent = <A extends { id: string }>(
 ) => agents.find((a) => a.id === asked) ?? agents.find((a) => !hasAi(a.id)) ?? agents[0];
 
 /** A plan signs in once per agent with the same account (`LOGIN_PER_AGENT`), so it can think for all of them. */
-export const signsInPerAgent = (choice: PlanChoice) => loginPerAgent(kindOf(choice), choice);
+export const signsInPerAgent = (choice: PlanChoice) => loginPerAgent(kindOf(choice), isPlanId(choice) ? choice : null);
 
 /** A plan's row in a computer's `shares` (`AiComputer`): Claude's and ChatGPT's sign-ins, or a coding plan's key. */
 export const shareOf = (choice: PlanChoice): keyof NonNullable<AiComputer["shares"]> =>
@@ -228,6 +236,7 @@ export type AgentAi = AiChoice | null;
 export function agentAi(agent: Pick<Agent, "brain"> | undefined, state: AiState | undefined): AgentAi {
   const brain = agent?.brain;
   if (brain?.kind === "codex") return "chatgpt";
+  if (brain?.kind === "cursor") return "cursor";
   if (brain?.kind === "claude_code") return isPlanId(brain.provider) ? brain.provider : "claude";
   return state === undefined || state === "no_ai" ? null : "key";
 }

@@ -3,6 +3,7 @@ import { lstat, mkdir, readdir, readFile, realpath, stat, writeFile } from "node
 import path from "node:path";
 import { ASK_AGAIN, inBrowserProfile } from "@agenteschat/adapters/command-policy";
 import {
+  type AccountKind,
   type AgentScope,
   browserSetupOf,
   type FileEntry,
@@ -23,6 +24,7 @@ import type { AccountGrant, AccountManager } from "./accounts";
 import type { BrainManager } from "./brain";
 import { type CodexBrainEvent, type CodexBrainTurnRequest, handleCodexBrainTurn } from "./brain-codex";
 import type { CodexAppServers } from "./brain-codex-app";
+import { type CursorBrainTurnRequest, handleCursorBrainTurn } from "./brain-cursor";
 import { routeWithPlan } from "./brain-route";
 import { type BrowserManager, browserSetupText } from "./browser";
 import { commandApproval, ownBranches } from "./command-gate";
@@ -195,8 +197,8 @@ export interface HandlerContext {
      * for an account root keeps (`agentHome`, protocol 29).
      */
     accounts?: {
-      accountDir(kind: "claude_code" | "codex", id: string): string | null;
-      agentHome?(kind: "claude_code" | "codex", id: string): string | null;
+      accountDir(kind: AccountKind, id: string): string | null;
+      agentHome?(kind: AccountKind, id: string): string | null;
     };
     /** How `codex exec` starts (a worker under systemd: in the agent's AI CLIs slice, `scope-gate.ts`). */
     spawn?: Spawn;
@@ -262,6 +264,7 @@ type Secrets = Awaited<ReturnType<typeof agentSecrets>>;
 const TOOL_LABEL: Record<keyof RunnerTools, string> = {
   claude: "Claude Code",
   codex: "Codex",
+  cursor: "Cursor",
   commands: "Commands",
   browser: "Browser",
   desktop: "The desktop",
@@ -867,10 +870,10 @@ async function doBrainTurn(
   scope: RequestScope,
   secrets: Secrets,
 ): Promise<MachineReplies["brain.turn"]> {
-  requireTool(ctx, req.kind === "codex" ? "codex" : "claude");
+  requireTool(ctx, req.kind === "codex" || req.kind === "cursor" ? req.kind : "claude");
   if (!req.agent) throw new RunnerError("bad_request", "A brain turn belongs to an agent");
   const runId = requireString(req.runId, "runId");
-  if (req.kind === "codex") return doCodexTurn(ctx, req, scope, runId);
+  if (req.kind === "codex" || req.kind === "cursor") return doCodexTurn(ctx, req, scope, runId);
   if (!ctx.brains) throw new RunnerError("bad_request", "This runner runs no brain turns");
   const final = await ctx.brains.turn(req, {
     agent: req.agent,
@@ -885,6 +888,9 @@ async function doBrainTurn(
   scope.emit?.({ type: "brain.done", runId });
   return { runId, final };
 }
+
+/** Cursor turns in progress: `brain.steer` answers `unsupported` for them (print mode takes nothing mid-turn). */
+const cursorRuns = new Set<string>();
 
 const STEER_UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
@@ -909,6 +915,7 @@ function doBrainSteer(
     if (typeof m.text !== "string" || !m.text.trim()) throw new RunnerError("bad_request", "Empty message");
     return { uuid: m.uuid, text: m.text.slice(0, STEER_LIMITS.text), ...(m.urgent === true ? { urgent: true } : {}) };
   });
+  if (cursorRuns.has(runId)) return { status: "unsupported", reason: "Cursor reads messages only between turns" };
   if (ctx.codex?.runs.has(runId)) {
     return ctx.codex.app
       ? ctx.codex.app.steer(String(req.agent.id), { runId, session, messages })
@@ -933,7 +940,7 @@ function signedOut(
   const accounts = ctx.accounts;
   if (!accounts || typeof req.account !== "string" || !req.account || final?.type !== "error") return;
   if (final.code !== "not_logged_in" && final.code !== "account_missing") return;
-  const kind = req.kind === "codex" ? "codex" : "claude_code";
+  const kind = req.kind === "codex" || req.kind === "cursor" ? req.kind : "claude_code";
   void (final.code === "not_logged_in" ? accounts.refused(kind, req.account) : Promise.resolve())
     .catch(() => undefined)
     .then(() => {
@@ -957,8 +964,11 @@ async function doCodexTurn(
   runId: string,
 ): Promise<MachineReplies["brain.turn"]> {
   const codex = ctx.codex;
-  if (!codex) throw new RunnerError("bad_request", "This runner runs no Codex brain turns");
-  let final: CodexBrainEvent = { type: "error", code: "codex_failed", message: "Codex ended without an answer." };
+  const cursor = req.kind === "cursor";
+  if (!codex) throw new RunnerError("bad_request", `This runner runs no ${cursor ? "Cursor" : "Codex"} brain turns`);
+  let final: CodexBrainEvent = cursor
+    ? { type: "error", code: "cursor_failed", message: "Cursor ended without an answer." }
+    : { type: "error", code: "codex_failed", message: "Codex ended without an answer." };
   let ended = false;
   const token = req.mcp?.token;
   // `handleRequest` made the workspace the agent's own folder already.
@@ -974,34 +984,50 @@ async function doCodexTurn(
       serverToken: token,
     });
   }
+  const emit = (event: CodexBrainEvent) => {
+    if (ended) return;
+    if (event.type === "done" || event.type === "error") {
+      final = event;
+      ended = true;
+    }
+    scope.emit?.({ type: "brain.event", runId, event });
+  };
+  if (cursor) cursorRuns.add(runId);
   try {
-    await handleCodexBrainTurn(
-      {
-        folder,
-        exec: toolOn(ctx, "codex"),
-        runnerHome: codex.runnerHome,
-        ...(ctx.secretsDir ? { secretsDir: ctx.secretsDir } : {}),
-        ...(codex.mcp ? { mcp: codex.mcp } : {}),
-        ...(ctx.grants ? { grants: ctx.grants } : {}),
-        ...(ctx.accounts || codex.accounts ? { accounts: ctx.accounts ?? codex.accounts } : {}),
-        ...(codex.app ? { app: codex.app } : {}),
-        ...(codex.spawn ? { spawn: codex.spawn } : {}),
-      },
-      req as unknown as CodexBrainTurnRequest,
-      {
-        signal: scope.signal,
-        emit: (event) => {
-          if (ended) return;
-          if (event.type === "done" || event.type === "error") {
-            final = event;
-            ended = true;
-          }
-          scope.emit?.({ type: "brain.event", runId, event });
+    if (cursor) {
+      await handleCursorBrainTurn(
+        {
+          folder,
+          exec: toolOn(ctx, "cursor"),
+          runnerHome: codex.runnerHome,
+          ...(ctx.secretsDir ? { secretsDir: ctx.secretsDir } : {}),
+          ...(codex.mcp ? { mcp: codex.mcp } : {}),
+          ...(ctx.grants ? { grants: ctx.grants } : {}),
+          ...(ctx.accounts || codex.accounts ? { accounts: ctx.accounts ?? codex.accounts } : {}),
+          ...(codex.spawn ? { spawn: codex.spawn } : {}),
         },
-      },
-    );
+        req as unknown as CursorBrainTurnRequest,
+        { signal: scope.signal, emit },
+      );
+    } else
+      await handleCodexBrainTurn(
+        {
+          folder,
+          exec: toolOn(ctx, "codex"),
+          runnerHome: codex.runnerHome,
+          ...(ctx.secretsDir ? { secretsDir: ctx.secretsDir } : {}),
+          ...(codex.mcp ? { mcp: codex.mcp } : {}),
+          ...(ctx.grants ? { grants: ctx.grants } : {}),
+          ...(ctx.accounts || codex.accounts ? { accounts: ctx.accounts ?? codex.accounts } : {}),
+          ...(codex.app ? { app: codex.app } : {}),
+          ...(codex.spawn ? { spawn: codex.spawn } : {}),
+        },
+        req as unknown as CodexBrainTurnRequest,
+        { signal: scope.signal, emit },
+      );
   } finally {
     codex.runs.delete(runId);
+    cursorRuns.delete(runId);
   }
   signedOut(ctx, req, final);
   scope.emit?.({ type: "brain.done", runId });

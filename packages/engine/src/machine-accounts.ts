@@ -5,6 +5,8 @@ import {
   type AccountKind,
   type AccountLoginState,
   accountCodeAad,
+  CURSOR_KEY_PROVIDER,
+  CURSOR_PROTOCOL,
   isAccountId,
   isAccountKind,
   isLoginEmail,
@@ -42,6 +44,7 @@ import {
   sharedSignIn,
 } from "@agenteschat/providers/plans";
 import { recordAudit } from "./audit";
+import { BRAIN_PLAN_NAMES } from "./brains/types";
 import { caches } from "./cache";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { type MachineCaller, MachineRequestError } from "./machine-hub";
@@ -153,7 +156,7 @@ const kindOf = (row: Pick<MachineAccountRow, "kind">): AccountKind =>
  * (others see the name).
  */
 export function defaultAccountLabel(kind: AccountKind, taken: readonly string[] = [], provider?: string | null) {
-  const base = planOf(provider)?.label ?? (kind === "codex" ? "ChatGPT" : "Claude");
+  const base = planOf(provider)?.label ?? BRAIN_PLAN_NAMES[kind];
   if (!taken.includes(base)) return base;
   for (let n = 2; ; n++) if (!taken.includes(`${base} ${n}`)) return `${base} ${n}`;
 }
@@ -611,7 +614,8 @@ export async function syncMachineAccounts(
       if (!elsewhere) {
         // Signed in on the computer itself (the desktop app): its pairer's.
         const owner = machine.pairedByUserId;
-        const provider = isPlanId(a.provider) ? a.provider : null;
+        const provider =
+          isPlanId(a.provider) || (a.kind === "cursor" && a.provider === CURSOR_KEY_PROVIDER) ? a.provider : null;
         const candidate = { orgId, machineId, id: a.id, kind: a.kind, createdBy: owner, provider };
         const same = await sameAccount(tx, candidate, a);
         if (same && (await duplicateOf(tx, candidate, a, a.shared === true))) {
@@ -721,7 +725,9 @@ export async function refreshAiAccounts(deps: MachineAccountHubDeps, userId: str
     .where(and(eq(machines.orgId, orgId), eq(machines.pairedByUserId, userId), isNull(machines.deletedAt)));
   const fresh = new Map<string, string[]>();
   for (const a of mine) fresh.set(a.machineId, [...(fresh.get(a.machineId) ?? []), a.id]);
-  for (const m of paired) fresh.set(m.id, [...(fresh.get(m.id) ?? []), ...Object.values(OWN_USAGE_ID)]);
+  // Cursor's CLI reports no plan usage to look up: only its turns say what they used.
+  const own = [OWN_USAGE_ID.claude_code, OWN_USAGE_ID.codex];
+  for (const m of paired) fresh.set(m.id, [...(fresh.get(m.id) ?? []), ...own]);
   await Promise.all(
     [...fresh].map(async ([machineId, ids]) => {
       const status = await deps.hub.status(machineId);
@@ -738,10 +744,10 @@ export async function refreshAiAccounts(deps: MachineAccountHubDeps, userId: str
  */
 export function sharesSignIns(
   machine: Pick<MachineRow, "protocol" | "executors">,
-  which: "claude_code" | "codex" | "key",
+  which: "claude_code" | "codex" | "cursor" | "key",
 ): boolean {
   if (machine.protocol < SHARED_ACCOUNTS_PROTOCOL) return false;
-  return machine.executors?.mode !== "system" || (which !== "codex" && SHARED_SIGN_INS[which]);
+  return machine.executors?.mode !== "system" || (which !== "codex" && which !== "cursor" && SHARED_SIGN_INS[which]);
 }
 
 /**
@@ -866,13 +872,16 @@ export async function getMachineAccounts(
 
 // ── Signing in (ADR 0041 §2, ADR 0059 §1) ───────────────────────────────────
 
+/** Where a person makes a Cursor API key (Cursor's dashboard, API Keys; cursor.com/docs/cli/reference/authentication). */
+export const CURSOR_KEYS_URL = "https://cursor.com/dashboard?tab=integrations";
+
 export interface AccountLoginView {
   loginId: string;
   kind: AccountKind;
   /** The provider's page (Claude's sign-in, Codex's device page, or where a plan's key is made). */
   url: string;
-  /** A key account's coding plan. */
-  provider?: PlanId;
+  /** A key account's coding plan, or `cursor` for a Cursor API key. */
+  provider?: PlanId | typeof CURSOR_KEY_PROVIDER;
   /** Claude Code: the key the browser seals the pasted code to (raw P-256, base64). */
   publicKey?: string;
   /** Codex: the one-time code to type on its page. */
@@ -909,11 +918,12 @@ export async function beginAccountLogin(
   /** A coding plan's key account on Claude Code (protocol 20): the key comes next, sealed like a code. */
   provider?: string,
 ): Promise<AccountLoginView> {
-  if (!isAccountKind(kind)) throw new ValidationError("Choose claude_code or codex", "account.invalid_kind");
+  if (!isAccountKind(kind)) throw new ValidationError("Choose claude_code, codex or cursor", "account.invalid_kind");
   if (email !== undefined && (kind !== "claude_code" || provider !== undefined || !isLoginEmail(email))) {
     throw new ValidationError("Use a plain email address, like ana@example.com", "account.invalid_email");
   }
-  if (provider !== undefined && (kind !== "claude_code" || !isPlanId(provider))) {
+  const cursorKey = kind === "cursor" && provider === CURSOR_KEY_PROVIDER;
+  if (provider !== undefined && !cursorKey && (kind !== "claude_code" || !isPlanId(provider))) {
     throw new ValidationError("Choose one of the coding plans", "account.invalid_plan");
   }
   const plan = planOf(provider);
@@ -929,7 +939,11 @@ export async function beginAccountLogin(
   } else if (!mayAddAccounts(machine, userId)) {
     throw new ForbiddenError("Only the person who connected this computer can add accounts to it", "account.not_owner");
   }
-  const protocol = await requireLive(deps, machine, plan ? PLAN_KEYS_PROTOCOL : ACCOUNTS_PROTOCOL);
+  const protocol = await requireLive(
+    deps,
+    machine,
+    kind === "cursor" ? CURSOR_PROTOCOL : plan ? PLAN_KEYS_PROTOCOL : ACCOUNTS_PROTOCOL,
+  );
   // Once for every agent of its owner there, where the runner can (protocol 29).
   const shared = protocol >= SHARED_ACCOUNTS_PROTOCOL && sharedSignIn(kind, provider);
   const again = accountId !== undefined;
@@ -944,7 +958,7 @@ export async function beginAccountLogin(
       label: defaultAccountLabel(kind, [], provider),
       status: "signing_in",
       createdBy: userId,
-      provider: plan ? provider : null,
+      provider: plan || cursorKey ? provider : null,
     });
   }
   const fail = async () => {
@@ -960,7 +974,7 @@ export async function beginAccountLogin(
       loginId,
       ...(again ? { again: true } : {}),
       ...(email ? { email } : {}),
-      ...(plan ? { provider } : {}),
+      ...(plan || cursorKey ? { provider } : {}),
       ...(shared ? { shared: true } : {}),
     });
   } catch (error) {
@@ -978,6 +992,16 @@ export async function beginAccountLogin(
       });
     }
     return { loginId, kind, url: plan.site, provider, publicKey, expiresAt };
+  }
+  if (cursorKey) {
+    // A Cursor API key: made in Cursor's dashboard, sealed to the computer like a plan's key.
+    if (!publicKey) {
+      await fail();
+      throw new ConflictError("The computer couldn't start the sign-in", "account.begin_failed", {
+        name: machine.name,
+      });
+    }
+    return { loginId, kind, url: CURSOR_KEYS_URL, provider: CURSOR_KEY_PROVIDER, publicKey, expiresAt };
   }
   // Only a provider page the person can open: never another scheme.
   let url: URL | null = null;

@@ -623,7 +623,7 @@ export interface AgentInput {
  * no agent, else the workspace's model (it has a key), else none (connected after it is created).
  */
 export type SuggestedAi =
-  | { kind: "account"; brain: "claude_code" | "codex"; machineId: string; accountId: string; label: string }
+  | { kind: "account"; brain: "claude_code" | "codex" | "cursor"; machineId: string; accountId: string; label: string }
   | { kind: "model" }
   | { kind: "none" };
 
@@ -3257,7 +3257,7 @@ export interface MachinePause {
 }
 
 /** A tool the person turns on or off on the machine. */
-export type MachineToolName = "claude" | "codex" | "commands";
+export type MachineToolName = "claude" | "codex" | "cursor" | "commands";
 
 /** A folder allowed on the machine and the agents (ids) that may use it; empty: allowed, no agent yet. */
 export interface MachineFolderGrant {
@@ -3272,7 +3272,13 @@ export interface MachineAccess {
    * `browser` (ADR 0040): the agent browser; absent on runners before protocol 12 (off). `desktop` and
    * `terminal` (ADR 0058): the agents' desktops and terminals; absent before protocol 18 (off).
    */
-  tools: Record<MachineToolName, boolean> & { browser?: boolean; desktop?: boolean; terminal?: boolean };
+  tools: Record<Exclude<MachineToolName, "cursor">, boolean> & {
+    /** Protocol 36 (ADR 0114): Cursor's CLI; absent on older runners, where it follows Codex's. */
+    cursor?: boolean;
+    browser?: boolean;
+    desktop?: boolean;
+    terminal?: boolean;
+  };
 }
 
 /** `POST …/machines/{id}/access/reduce`: the site can only take away, never grant. */
@@ -3313,7 +3319,7 @@ export interface DesktopRelease {
 }
 
 /** A computer brain that runs on a connected machine. */
-export type ComputerBrain = "claude_code" | "codex";
+export type ComputerBrain = "claude_code" | "codex" | "cursor";
 
 /** An agent waiting for an offline computer, and what it has waiting. */
 export interface OutageAgent {
@@ -4369,7 +4375,7 @@ export interface MissionSettings {
 }
 
 /** "Quem pensa" (ADR 0032): the API, or Claude Code / Codex on the agent's computer with a person's plan. */
-export type BrainKind = "model" | "claude_code" | "codex";
+export type BrainKind = "model" | "claude_code" | "codex" | "cursor";
 
 /** Why a computer brain can't be chosen now. */
 export type BrainUnavailable = "no_computer" | "exec_off" | "runner_old" | "tool_off" | "not_installed" | "outdated";
@@ -4382,6 +4388,8 @@ export interface BrainModelOption {
   recommended?: boolean;
   /** Its context window in tokens. */
   contextWindow?: number;
+  /** Cursor (ADR 0114): its CLI said the person's plan includes it; absent: it didn't say. */
+  inPlan?: boolean;
 }
 
 export interface BrainOption {
@@ -4448,7 +4456,7 @@ export type BrainEffort = "low" | "medium" | "high" | "xhigh" | "max";
 /** A level, or "Automático" (each run picks low, medium or high with the model). */
 export type BrainEffortSetting = BrainEffort | "auto";
 
-export type MachineAccountKind = "claude_code" | "codex";
+export type MachineAccountKind = "claude_code" | "codex" | "cursor";
 
 /** ADR 0041 §3, ADR 0059: a Claude Code or Codex account signed in on a connected computer (metadata only). */
 export interface MachineAccount {
@@ -4496,9 +4504,9 @@ export interface AiComputer {
   /** Its runner takes coding plans' keys. */
   keys: boolean;
   /** A new sign-in there thinks for all of the viewer's agents on it (absent: an older server). */
-  shares?: { claude_code: boolean; codex: boolean; key: boolean };
+  shares?: { claude_code: boolean; codex: boolean; cursor?: boolean; key: boolean };
   /** What it can think with now: Claude Code (Claude and the coding plans) and Codex (ChatGPT). */
-  brains: { claude_code: boolean; codex: boolean };
+  brains: { claude_code: boolean; codex: boolean; cursor?: boolean };
   /**
    * "Conta deste computador": each CLI's own sign-in there, on a computer the viewer connected (absent: a server
    * too old to say). Its plan and usage when the computer reported them.

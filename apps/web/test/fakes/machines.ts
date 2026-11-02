@@ -229,6 +229,9 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
         const expiresAt = new Date(ctx.now().getTime() + 15 * 60_000).toISOString();
         if (kind === "codex")
           return { loginId, kind, url: "https://auth.openai.com/codex/device", userCode: "ABCD-1234", expiresAt };
+        // Cursor's sign-in: its page, and the computer finishes by itself (no code).
+        if (kind === "cursor" && !options.provider)
+          return { loginId, kind, url: "https://cursor.com/loginDeepControl?challenge=fake", expiresAt };
         // A real one-time key, so the page can seal the code to it.
         const curve = { name: "ECDH", namedCurve: "P-256" };
         const eph = (await crypto.subtle.generateKey(curve, true, ["deriveBits"])) as CryptoKeyPair;
@@ -237,6 +240,16 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
         const plan = planOf(options.provider);
         if (plan && isPlanId(options.provider)) {
           return { loginId, kind, url: plan.site, provider: options.provider, publicKey, expiresAt };
+        }
+        if (kind === "cursor") {
+          return {
+            loginId,
+            kind,
+            url: "https://cursor.com/dashboard?tab=integrations",
+            provider: "cursor",
+            publicKey,
+            expiresAt,
+          };
         }
         return {
           loginId,

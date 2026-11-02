@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
 import { previewOf } from "./consultations";
 import { mediaKindOf, mediaWord } from "./media";
+import { brainName } from "./outages";
 import { usageWhen } from "./plan-usage";
 
 /** Notes of an agent waiting on its plan's limit or its budget (`meta.usageWait`): `{{when}}` from its reset. */
@@ -33,7 +34,7 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
   // A computer brain stopped mid-turn after its tools ran: what it wrote, then which tools it used.
   const cut = m.brainInterrupted as { brain?: unknown; text?: unknown; tools?: unknown } | undefined;
   if (cut && typeof cut === "object" && typeof cut.text === "string") {
-    const brain = cut.brain === "codex" ? "Codex" : "Claude Code";
+    const brain = brainName(typeof cut.brain === "string" ? cut.brain : null);
     const tools = Array.isArray(cut.tools) ? cut.tools.filter((x) => typeof x === "string").join(", ") : "";
     const note = `_${t("chat.body.brain_interrupted", {
       brain,
@@ -60,9 +61,10 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
   const busy = code === "brain_unavailable" && (m.brainUnavailable as { code?: unknown } | undefined)?.code === "busy";
   const noAi = code === "no_ai" ? (m.noAi as { reason?: unknown; own?: unknown } | undefined) : undefined;
   const signedOut = noAi?.reason === "not_signed_in";
-  const own = signedOut && (noAi?.own === "codex" || noAi?.own === "claude_code") ? noAi.own : null;
+  const own =
+    signedOut && (noAi?.own === "codex" || noAi?.own === "claude_code" || noAi?.own === "cursor") ? noAi.own : null;
   if (own) {
-    const brain = own === "codex" ? "Codex" : "Claude Code";
+    const brain = brainName(own);
     return t("chat.body.no_ai_not_signed_in", { brain, defaultValue: body });
   }
   if (USAGE_NOTES.has(code)) {

@@ -4,6 +4,7 @@ import { aiConnectIntent, type ConnectIntent } from "./ai-intent";
 import { type AgentAi, type AiStatusDeps, agentAiState, type NoAiReason, orgHasAi } from "./ai-status";
 import { audienceError, canTalkTo, type Speaker, speakerFor } from "./audience";
 import { recordAudit } from "./audit";
+import { BRAIN_NAMES } from "./brains/types";
 import { mayStopRun, runRequester } from "./cancel";
 import { requireChannelAccess } from "./channels";
 import { requesterOf, startOrJoinRun } from "./dispatch";
@@ -27,7 +28,7 @@ const { agentRunSteps, agentRuns, agents, messages, routingDecisions } = schema;
 export const NO_AI_TEXT = "I can't answer yet: I have no AI connected.";
 const NO_AI_SIGNED_OUT_TEXT = "I can't answer yet: my AI is signed out.";
 const noAiNotSignedInText = (own: NonNullable<AgentAi["own"]>) =>
-  `I can't answer yet: ${own === "codex" ? "Codex" : "Claude Code"} isn't signed in on my computer.`;
+  `I can't answer yet: ${BRAIN_NAMES[own]} isn't signed in on my computer.`;
 
 /** A conversation gets the card again only after this long (per agent; once while the organization has no AI). */
 export const NO_AI_CARD_EVERY_MS = 6 * 3600_000;

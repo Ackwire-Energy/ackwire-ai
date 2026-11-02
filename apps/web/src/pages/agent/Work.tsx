@@ -281,7 +281,7 @@ export function WorkCard({ onOpen, footer }: { onOpen: (dialog: WorkDialog) => v
         : ownSignInName(t, view?.ownSignIn === true && view.canUsePlans, view?.computer?.name ?? "");
   // Near or at its plan's limit: said where the account is.
   const usage =
-    !view || (kind !== "claude_code" && kind !== "codex")
+    !view || (kind !== "claude_code" && kind !== "codex" && kind !== "cursor")
       ? null
       : view.account
         ? view.accounts.find((a) => a.id === view.account)?.usage
@@ -739,7 +739,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const moves = home && home.machineId !== work.machineId ? home : null;
   const option = (home?.options ?? view.options).find((o) => o.kind === kind);
   // Accounts live on the agent's computer: none when the brain moves elsewhere or the app there is old.
-  const accountKind = kind === "claude_code" || kind === "codex" ? kind : null;
+  const accountKind = kind === "claude_code" || kind === "codex" || kind === "cursor" ? kind : null;
   const accountsOn = accountKind !== null && view.accountsSupported && view.computer !== null && !moves;
   const computerName = view.computer?.name ?? "";
   // What a sign-in just reported wins over the last fetch (an account signed in again shows active at once).
@@ -762,6 +762,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     "key",
     "claude",
     "chatgpt",
+    // Cursor (ADR 0114) only where a computer here runs it, or the agent thinks with it: Connect an AI shows it always.
+    ...(savedCard === "cursor" ||
+    [view.options, ...machines.map((m) => m.options)].flat().some((o) => o.kind === "cursor" && o.available)
+      ? (["cursor"] as const)
+      : []),
     ...PLAN_IDS.filter(
       (p) => p === savedCard || allAccounts.some((a) => a.provider === p && (a.mine || a.id === view.account)),
     ),
@@ -1207,10 +1212,14 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     ) : apiProvider ? (
       <ProviderLogo id={apiProvider} size="sm" />
     ) : null;
+  // Cursor (ADR 0114): the models its plan includes, and where the CLI said so, the rest at API prices.
+  const cursorPlanSays = kind === "cursor" && modelOptions.some((m) => m.inPlan);
   const modelLine = (m: BrainModelChoice) =>
     !plan && kind === "claude_code" && isClaudeAlias(m.value)
       ? t(`agentPage.work.brain.modelLine.${m.value}`)
-      : m.tag && t(`brain.modelTag.${m.tag}`);
+      : cursorPlanSays
+        ? t(m.inPlan ? "brain.cursorModel.inPlan" : "brain.cursorModel.apiPrice")
+        : m.tag && t(`brain.modelTag.${m.tag}`);
   const planModelOptionsShown: SelectOption[] = [
     { value: AUTO, label: t("brain.auto.label"), description: t("brain.auto.hint"), leading: autoMark },
     ...modelOptions.map((m) => {
@@ -1353,7 +1362,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
                   <ProviderLogo id={planMark(c)} off={off} />
                 ),
               title: c === "key" ? t("agentPage.work.brain.model") : planLabel(t, c),
-              tag: c === "chatgpt" ? t("brain.testing") : undefined,
+              tag: c === "chatgpt" || c === "cursor" ? t("brain.testing") : undefined,
               description:
                 c === "key"
                   ? t("agentPage.work.brain.modelText", g)
@@ -1803,6 +1812,7 @@ function ComputerForm({ onClose }: { onClose: () => void }) {
     const list = [
       ...(has(m.id, "claude_code") ? [t("brain.card.claude_code")] : []),
       ...(has(m.id, "codex") ? [t("brain.card.codex")] : []),
+      ...(has(m.id, "cursor") ? [t("brain.card.cursor")] : []),
       ...(browserOf(m) === "ready"
         ? [t("agentPage.work.computer.browser")]
         : browserOf(m) === "pending"

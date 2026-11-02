@@ -252,7 +252,7 @@ const Routine = z
       .nullable()
       .openapi({ description: "Its run waits for the agent's computer since then." }),
     brain: z.object({
-      kind: z.enum(["model", "claude_code", "codex"]),
+      kind: z.enum(["model", "claude_code", "codex", "cursor"]),
       machineName: z.string().nullable().openapi({ description: "The computer a computer brain runs on." }),
     }),
     health: z

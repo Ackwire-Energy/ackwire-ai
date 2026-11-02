@@ -259,7 +259,7 @@ export const Agent = z
     }),
     brain: z
       .object({
-        kind: z.enum(["model", "claude_code", "codex"]),
+        kind: z.enum(["model", "claude_code", "codex", "cursor"]),
         model: z
           .string()
           .nullable()
@@ -545,7 +545,7 @@ export const Model = z
   .openapi("Model");
 
 /** ADR 0032: who thinks for an agent. */
-export const BrainKind = z.enum(["model", "claude_code", "codex"]).openapi("BrainKind");
+export const BrainKind = z.enum(["model", "claude_code", "codex", "cursor"]).openapi("BrainKind");
 
 export const BrainOption = z
   .object({
@@ -555,7 +555,7 @@ export const BrainOption = z
       .enum(["no_computer", "exec_off", "runner_old", "tool_off", "not_installed", "outdated"])
       .optional()
       .openapi({ description: "Why it can't be chosen now (computer brains)." }),
-    experimental: z.boolean().openapi({ description: 'Still being tested ("Em teste"): Codex.' }),
+    experimental: z.boolean().openapi({ description: 'Still being tested ("Em teste"): Codex and Cursor.' }),
     models: z.array(
       z.object({
         value: z.string().openapi({ description: "What is stored and passed to the CLI (`opus`, `gpt-…`)." }),
@@ -567,6 +567,10 @@ export const BrainOption = z
           .int()
           .optional()
           .openapi({ description: "Its context window in tokens: the context limits worth offering with it." }),
+        inPlan: z
+          .boolean()
+          .optional()
+          .openapi({ description: "Cursor: its CLI said the person's plan includes it (others cost API prices)." }),
       }),
     ),
     defaultModel: z.string().nullable(),

@@ -71,6 +71,10 @@ export const MachineAccess = z
     tools: z.object({
       claude: z.boolean(),
       codex: z.boolean(),
+      cursor: z
+        .boolean()
+        .optional()
+        .openapi({ description: "Cursor's CLI (protocol 36, ADR 0114); absent = follows `codex`." }),
       commands: z.boolean(),
       browser: z
         .boolean()
@@ -248,7 +252,7 @@ const DeviceCode = z
 
 const AgentParams = OrgParams.extend({ agentId: z.uuid() });
 
-const ComputerBrain = z.enum(["claude_code", "codex"]);
+const ComputerBrain = z.enum(["claude_code", "codex", "cursor"]);
 const Platform = z.string().openapi({
   description: "`mac`, `windows`, `linux`, `other` (the workspace's own computer), or the runner's `os` as reported.",
 });
@@ -453,7 +457,9 @@ export function machineAppRoutes(deps: AppDeps) {
           z
             .object({
               removeFolder: z.object({ path: z.string().min(1).max(1024), agentId: z.uuid().optional() }).optional(),
-              disableTool: z.enum(["claude", "codex", "commands", "browser", "desktop", "terminal"]).optional(),
+              disableTool: z
+                .enum(["claude", "codex", "cursor", "commands", "browser", "desktop", "terminal"])
+                .optional(),
             })
             .strict(),
         ),

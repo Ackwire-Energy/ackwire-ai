@@ -98,31 +98,34 @@ describe("brain settings", () => {
       ["model", true, null],
       ["claude_code", false, "no_computer"],
       ["codex", false, "no_computer"],
+      ["cursor", false, "no_computer"],
     ]);
     expect(reasons(mac())).toEqual([
       ["model", true, null],
       ["claude_code", true, null],
       ["codex", false, "not_installed"],
+      // Cursor needs runner protocol 36 (`CURSOR_PROTOCOL`).
+      ["cursor", false, "runner_old"],
     ]);
     expect(reasons(mac({ execAllowed: false }))[1]).toEqual(["claude_code", false, "exec_off"]);
     expect(reasons(mac({ protocol: MISSION_PROTOCOL - 1 }))[1]).toEqual(["claude_code", false, "runner_old"]);
     // A runner with missions (protocol 5–7) but without `brain.turn`: the engine would refuse every run.
-    expect(reasons(mac({ protocol: BRAIN_PROTOCOL - 1 })).slice(1)).toEqual([
+    expect(reasons(mac({ protocol: BRAIN_PROTOCOL - 1 })).slice(1, 3)).toEqual([
       ["claude_code", false, "runner_old"],
       ["codex", false, "runner_old"],
     ]);
     expect(reasons(mac({ protocol: BRAIN_PROTOCOL }))[1]).toEqual(["claude_code", true, null]);
     const oldCodex = mac({ executors: { codex: { version: "codex-cli 0.100.0" }, detectedAt: "x" } });
-    expect(reasons(oldCodex).slice(1)).toEqual([
+    expect(reasons(oldCodex).slice(1, 3)).toEqual([
       ["claude_code", false, "not_installed"],
       ["codex", false, "outdated"],
     ]);
     const both = mac({ executors: { claude: { version: "2" }, codex: { version: "0.170.0" }, detectedAt: "x" } });
-    expect(brainOptions(both).every((o) => o.available)).toBe(true);
+    expect(brainOptions(both).every((o) => o.available || o.kind === "cursor")).toBe(true);
     expect(brainOptions(both).find((o) => o.kind === "codex")?.experimental).toBe(true);
     // Installed but turned off in the app's Tools: says so (not "not installed"); turned on, available.
     const off = mac({ ...both, access: { tools: { claude: false, codex: true } } });
-    expect(reasons(off).slice(1)).toEqual([
+    expect(reasons(off).slice(1, 3)).toEqual([
       ["claude_code", false, "tool_off"],
       ["codex", true, null],
     ]);

@@ -39,6 +39,7 @@ export class ControlError extends Error {
 export const TOOL_NAMES: readonly (keyof RunnerTools)[] = [
   "claude",
   "codex",
+  "cursor",
   "commands",
   "browser",
   "desktop",

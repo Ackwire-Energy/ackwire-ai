@@ -223,7 +223,7 @@ export interface OwnSignInRow {
 export function ownSignIns(view: Pick<AiAccounts, "computers"> | null | undefined): OwnSignInRow[] {
   const out: OwnSignInRow[] = [];
   for (const c of view?.computers ?? []) {
-    for (const kind of ["claude_code", "codex"] as const) {
+    for (const kind of ["claude_code", "codex", "cursor"] as const) {
       const own = c.own?.[kind];
       if (!own) continue;
       out.push({

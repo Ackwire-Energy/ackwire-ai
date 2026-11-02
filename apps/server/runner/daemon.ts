@@ -74,6 +74,7 @@ import { CodexAppServers } from "./brain-codex-app";
 import { BrowserManager } from "./browser";
 import { ensureBrowserBindPolicy, prepareAgents } from "./browser-bind-policy";
 import {
+  accessToStore,
   configPath,
   connectUrl,
   DEFAULT_AGENT_UID_RANGE,
@@ -629,7 +630,7 @@ export class RunnerDaemon implements RequestObserver {
       ...next,
       folders: next.folders.filter((f) => f.path !== this.shared && !f.agents.includes(ALL_AGENTS)),
     };
-    this.write({ ...(this.stored ?? {}), access, exec: next.tools.commands });
+    this.write({ ...(this.stored ?? {}), access: accessToStore(this.stored, access), exec: next.tools.commands });
   }
 
   private applyStored(next: StoredConfig | null, text: string | null, initial: boolean) {
@@ -747,6 +748,7 @@ export class RunnerDaemon implements RequestObserver {
     const label: Record<keyof RunnerTools, string> = {
       claude: "Claude Code",
       codex: "Codex",
+      cursor: "Cursor",
       commands: "commands",
       browser: "the browser",
       desktop: "the agents' desktops",
