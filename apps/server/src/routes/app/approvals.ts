@@ -108,6 +108,19 @@ export const Approval = z
     canCancel: z
       .boolean()
       .openapi({ description: "Approved ahead and not run yet, and you may withdraw it (`…/cancel`)." }),
+    approvers: z
+      .object({
+        label: z.string().openapi({ description: "Who decides, in words.", example: "Diretoria" }),
+        requestedByUserId: z.string().nullable().openapi({ description: "Whose request it was." }),
+        requesterDecides: z
+          .boolean()
+          .openapi({ description: "The requester approves by role, so they may decide it too." }),
+      })
+      .nullable()
+      .openapi({
+        description:
+          "Asked with `request_approval` (ADR 0126): who decides instead of the agent's owner and admins. Null: any other approval.",
+      }),
   })
   .openapi("Approval");
 

@@ -119,3 +119,34 @@ const NATIVE_LIGHT_SHADOWS: Partial<Record<ShadowName, ShadowLayer[]>> = {
 export function appShadows(scheme: Scheme): Record<ShadowName, ShadowLayer[]> {
   return scheme === "dark" ? tokenShadows.dark : { ...tokenShadows.light, ...NATIVE_LIGHT_SHADOWS };
 }
+
+/** A `#rrggbb` color at `alpha` (0–1), as `#rrggbbaa`. */
+export const withAlpha = (hex: string, alpha: number) =>
+  `${hex.slice(0, 7)}${Math.round(alpha * 255)
+    .toString(16)
+    .padStart(2, "0")}`;
+
+export type ToastTone = "success" | "info" | "warning" | "danger" | "neutral";
+
+/**
+ * A toast's tone: a failure (`x`, `alert`) is danger, a done check (or no icon) success, any other icon neutral.
+ * The web's toasts glow the same way per tone (`.ac-toast--*`).
+ */
+export const toastToneOf = (icon: string | undefined): ToastTone =>
+  icon === "x" || icon === "alert" ? "danger" : icon === undefined || icon === "check" ? "success" : "neutral";
+
+/** A tone's color: its icon's, and its glow's (neutral's glow is fainter than its icon). */
+export const toneColor = (colors: AppColors, tone: ToastTone) =>
+  ({ success: colors.ok, info: colors.agent, warning: colors.warn, danger: colors.danger, neutral: colors.ink2 })[tone];
+
+/**
+ * The tone's soft glow from the toast's right edge, as the web's (24% of the tone in light, 30% in dark, fading out
+ * over the last 45%): the gradient's colors and stops, left to right.
+ */
+export function toastGlow(colors: AppColors, tone: ToastTone, scheme: Scheme) {
+  const color = tone === "neutral" ? colors.faint : toneColor(colors, tone);
+  return {
+    colors: [withAlpha(color, 0), withAlpha(color, 0), withAlpha(color, scheme === "dark" ? 0.3 : 0.24)] as const,
+    locations: [0, 0.55, 1] as const,
+  };
+}

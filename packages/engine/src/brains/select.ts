@@ -93,6 +93,11 @@ export function notePlanLimit(
   });
 }
 
+/** A turn on this plan went through: the limit seen here no longer holds. */
+export function forgetPlanLimit(machineId: string, kind: BrainKind, accountId?: string) {
+  planLimits.delete(limitKey(machineId, kind, accountId));
+}
+
 /** Tests: forget the plan limits seen. */
 export function clearPlanLimits() {
   planLimits.clear();
@@ -314,6 +319,8 @@ export interface BrainPlan {
   effort?: BrainEffort;
   /** What the runner last said about the plan it thinks with (`storedPlanUsage`). */
   usage?: PlanUsage;
+  /** A mission's main session goes on although the agent's `promptKey` changed since its last run there. */
+  settingsChanged?: boolean;
 }
 
 /** What a Claude Code brain's model is when nobody chose one (Codex: its own default). */
@@ -459,7 +466,7 @@ async function sessionFor(
   run: AgentRun,
   kind: BrainKind,
   conversation: string,
-  options: { fresh?: boolean },
+  options: { fresh?: boolean; promptKey?: string },
   now: Date,
 ): Promise<{ id: string; resume: boolean }> {
   if (run.brainSessionId) {
@@ -478,6 +485,7 @@ async function sessionFor(
         // Qualified by hand: inside the subquery a bare "id" would be usage_records.id.
         input: sql<number>`coalesce((select max(u.input_tokens) from ${usageRecords} u
           where u.run_id = "agent_runs"."id" and u.provider = ${kind}), 0)`.mapWith(Number),
+        promptKey: sql<string | null>`${agentRuns.transcript}->>'promptKey'`,
       })
       .from(agentRuns)
       .where(
@@ -509,7 +517,10 @@ async function sessionFor(
     if (
       last?.sessionId &&
       now.getTime() - last.at.getTime() < SESSION_IDLE_MS &&
-      last.input < SESSION_MAX_INPUT_TOKENS
+      last.input < SESSION_MAX_INPUT_TOKENS &&
+      // A live session keeps the system prompt it started with: after an edit to the instructions (or anything
+      // else `promptKey` covers) a new one starts, with the conversation so far in its first prompt.
+      (options.promptKey === undefined || last.promptKey === options.promptKey)
     ) {
       id = last.sessionId;
     }
@@ -534,8 +545,11 @@ export async function resolveBrain(
   agent: Agent,
   run: AgentRun,
   conversation: string,
-  /** `fresh`: a new computer session whatever the conversation had (routine runs). */
-  options: { fresh?: boolean; now?: Date } = {},
+  /**
+   * `fresh`: a new computer session whatever the conversation had (routine runs). `promptKey`: the run's
+   * (`Transcript.promptKey`); the conversation's session is picked up only when it started with the same.
+   */
+  options: { fresh?: boolean; now?: Date; promptKey?: string } = {},
 ): Promise<BrainPlan> {
   const mission: MissionTurn | null = await missionTurnFor(deps.db, run).catch(() => null);
   const kind = brainFor(agent, run, mission);
@@ -568,6 +582,25 @@ export async function resolveBrain(
           machineId ? await planIsOwners(deps.db, agent, machineId, account) : true,
           usage,
         );
+  // A mission's main session stays (its decisions, inbox and items point at it): `settingsChanged` brings the edit.
+  const settingsChanged =
+    mission?.session?.resume && options.promptKey !== undefined
+      ? await deps.db
+          .select({ key: sql<string | null>`${schema.agentRuns.transcript}->>'promptKey'` })
+          .from(schema.agentRuns)
+          .where(
+            and(
+              eq(schema.agentRuns.orgId, run.orgId),
+              eq(schema.agentRuns.agentId, run.agentId),
+              eq(schema.agentRuns.threadRootId, run.threadRootId),
+              ne(schema.agentRuns.id, run.id),
+              sql`${schema.agentRuns.transcript}->>'promptKey' is not null`,
+            ),
+          )
+          .orderBy(desc(schema.agentRuns.createdAt))
+          .limit(1)
+          .then(([last]) => Boolean(last && last.key !== options.promptKey))
+      : false;
   const session: BrainSession | undefined =
     mission?.session ??
     (machineId
@@ -586,5 +619,6 @@ export async function resolveBrain(
     ...(account ? { account } : {}),
     ...(effort ? { effort } : {}),
     ...(usage ? { usage } : {}),
+    ...(settingsChanged ? { settingsChanged } : {}),
   };
 }

@@ -14,3 +14,10 @@ test("someone left: open apps read the people again, and the agents whose owner 
   expect(stale(keys.agentDetail("o1", "a1"))).toBe(true);
   expect(stale(keys.agentDetail("o1", "a2"))).toBe(false);
 });
+
+test("a role given or taken: the channel list is read again, since roles decide which channels are listed", () => {
+  const qc = new QueryClient();
+  qc.setQueryData(keys.channels("o1"), []);
+  applyWorkspaceEvent(qc, "o1", { type: "org.members" });
+  expect(qc.getQueryState(keys.channels("o1"))?.isInvalidated).toBe(true);
+});

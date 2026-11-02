@@ -311,6 +311,13 @@ export async function stopRun(
   // The worker running it (here or on another instance) aborts and posts what was written.
   abortLocalRun(run.id);
   if (deps.pubsub) await deps.pubsub.publish(RUN_CANCEL_TOPIC, { type: "run.cancel", runId: run.id }).catch(() => {});
+  // Waiting on its plan or budget: its note or card says it won't run when the limit is back.
+  const wait = (run.transcript as { waitingForBrain?: { code?: string } } | null)?.waitingForBrain;
+  if (previous === "waiting_input" && wait?.code) {
+    // Loaded here: the usage pause checks who may stop a run through this module.
+    const { USAGE_WAIT_CODES, usageWaitCanceled } = await import("./usage-pause");
+    if (USAGE_WAIT_CODES.has(wait.code)) await usageWaitCanceled(deps, run).catch(() => null);
+  }
   // Long work (ADR 0121): its end goes home now ("Parado por …"), whoever runs it; the card goes back to A fazer.
   if (run.workId) await endWork(deps, run, "canceled").catch(() => null);
   // A routine's background run is stopped quietly (ADR 0053 §6.7): nothing in a conversation, its ledger

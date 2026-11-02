@@ -55,6 +55,11 @@ export const channels = pgTable(
     name: text().notNull(),
     topic: text().notNull().default(""),
     visibility: channelVisibilityEnum().notNull().default("public"),
+    /**
+     * A private channel limited to departments or roles (ADR 0125): whoever holds one of these roles at the time
+     * also sees it and may join; losing them takes the person out. Empty: invite only. Always empty when public.
+     */
+    audienceRoleIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
     kind: channelKindEnum().notNull().default("channel"),
     /** DMs: the sorted participants (`a:<agentId>|u:<userId>`), unique per org, so a DM is opened, not duplicated. */
     dmKey: text(),

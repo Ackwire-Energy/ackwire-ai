@@ -13,7 +13,7 @@ import { isAuto } from "./providers";
 
 export * from "@agenteschat/providers/plans";
 
-export interface BrainModelChoice extends Pick<PlanModel, "label" | "tag" | "needs" | "maker"> {
+export interface BrainModelChoice extends Pick<PlanModel, "label" | "tag" | "needs" | "free" | "maker"> {
   value: string;
   /** Cursor: its CLI said the person's plan includes it (the others cost API prices there). */
   inPlan?: boolean;
@@ -33,6 +33,7 @@ export const brainModelChoices = (
         label: m.label,
         ...(m.tag ? { tag: m.tag } : {}),
         ...(m.needs ? { needs: m.needs } : {}),
+        ...(m.free ? { free: m.free } : {}),
         ...(m.maker ? { maker: m.maker } : {}),
       }))
     : models.map(({ value, label, inPlan }) => ({ value, label, ...(inPlan ? { inPlan } : {}) }));
