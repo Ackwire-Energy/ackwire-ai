@@ -669,13 +669,14 @@ const NOT_RUN_BY_RESTART =
 const CUT_BY_RESTART =
   "A server restart began while this call ran: it may have stopped partway, after doing part of its work. Check before running it again. What it returned:";
 
-const toolResultFor = (approval: Approval | undefined): { content: string; isError: boolean } => {
+/** `by`: the name of the person who refused it, when known. */
+const toolResultFor = (approval: Approval | undefined, by?: string | null): { content: string; isError: boolean } => {
   if (!approval) return { content: "The approval request is missing.", isError: true };
   // Asked ahead (`schedule_action`): the action was for later, so the answer says what happens then.
   const ahead = approval.runAt !== null;
   if (approval.status === "refused") {
     return {
-      content: `A person refused this action${ahead ? " ahead: it won't run at its time" : ""}. Do not retry it.${approval.reason ? ` Reason: ${approval.reason}` : ""}`,
+      content: `${by ?? "A person"} refused this action${ahead ? " ahead: it won't run at its time" : ""}. Do not retry it.${approval.reason ? ` Reason: ${approval.reason}` : ""}`,
       isError: true,
     };
   }
@@ -1640,7 +1641,11 @@ async function executeRunInner(
           // The approvals screen shows it ran (and what came back).
           const [ran] = await db.select().from(approvals).where(eq(approvals.id, approval.id));
           if (ran) await publishApproval({ db, pubsub: deps.pubsub }, ran, "approval.decided").catch(() => {});
-        } else result = toolResultFor(approval);
+        } else {
+          const by = approval?.status === "refused" ? approval.decidedByUserId : null;
+          const [person] = by ? await db.select({ name: users.name }).from(users).where(eq(users.id, by)) : [];
+          result = toolResultFor(approval, person?.name);
+        }
       }
       const line = `${call.name}${result?.isError ? " (not done)" : ""}: ${result?.content ?? ""}`;
       // Cut in the middle: a result in an outside envelope keeps its end and closing marker.

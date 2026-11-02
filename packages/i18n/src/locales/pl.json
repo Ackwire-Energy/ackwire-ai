@@ -2478,6 +2478,7 @@
     "refusedBy": "Odrzucił(a) {{name}} · {{when}}",
     "approvedByYou": "Zatwierdzone przez ciebie · {{when}}",
     "outcomeApprovedBy": "Zatwierdził(a) {{name}}",
+    "requesterDecides": "Prośba od osoby, która zatwierdza to w ramach swojej roli, więc też może zdecydować",
     "outcomeApprovedByYou": "Zatwierdzone przez ciebie",
     "outcomeRefusedBy": "Odrzucił(a) {{name}}",
     "outcomeRefusedByYou": "Odrzucone przez ciebie",

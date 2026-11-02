@@ -2348,6 +2348,7 @@
     "refusedBy": "Geweigerd door {{name}} · {{when}}",
     "approvedByYou": "Goedgekeurd door jou · {{when}}",
     "outcomeApprovedBy": "Goedgekeurd door {{name}}",
+    "requesterDecides": "Gevraagd door iemand die het via zijn rol goedkeurt, dus die mag ook beslissen",
     "outcomeApprovedByYou": "Goedgekeurd door jou",
     "outcomeRefusedBy": "Geweigerd door {{name}}",
     "outcomeRefusedByYou": "Geweigerd door jou",

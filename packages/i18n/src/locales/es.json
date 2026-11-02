@@ -2416,6 +2416,7 @@
     "refusedBy": "Rechazado por {{name}} · {{when}}",
     "approvedByYou": "Aprobado por ti · {{when}}",
     "outcomeApprovedBy": "Aprobado por {{name}}",
+    "requesterDecides": "Lo pidió alguien que lo aprueba por su rol, así que también puede decidirlo",
     "outcomeApprovedByYou": "Aprobado por ti",
     "outcomeRefusedBy": "Rechazado por {{name}}",
     "outcomeRefusedByYou": "Rechazado por ti",

@@ -2321,6 +2321,8 @@ export const ptBR = {
     refusedBy: "Recusado por {{name}} · {{when}}",
     approvedByYou: "Aprovado por você · {{when}}",
     outcomeApprovedBy: "Aprovado por {{name}}",
+    /** Um pedido da própria pessoa, que ela pode decidir por aprovar pela função (ADR 0126). */
+    requesterDecides: "Pedido por quem também aprova pela função, por isso pode decidir",
     outcomeApprovedByYou: "Aprovado por você",
     outcomeRefusedBy: "Recusado por {{name}}",
     outcomeRefusedByYou: "Recusado por você",

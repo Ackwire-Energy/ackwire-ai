@@ -2344,6 +2344,7 @@
     "refusedBy": "Abgelehnt von {{name}} · {{when}}",
     "approvedByYou": "Von dir freigegeben · {{when}}",
     "outcomeApprovedBy": "Freigegeben von {{name}}",
+    "requesterDecides": "Angefragt von jemandem, der es über seine Rolle freigibt und daher auch entscheiden kann",
     "outcomeApprovedByYou": "Von dir freigegeben",
     "outcomeRefusedBy": "Abgelehnt von {{name}}",
     "outcomeRefusedByYou": "Von dir abgelehnt",

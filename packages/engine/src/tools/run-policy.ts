@@ -190,6 +190,9 @@ export function toolKind(tool: PolicyTool): ToolKind {
   // Long work (ADR 0121): the run's own work only; who may go to the background is the tool source's.
   if (!tool.scope && SELF_WORK.has(tool.name)) return { kind: "self" };
   if (tool.name === "permission_prompt") return { kind: "computer" };
+  // The built-in `request_approval` (ADR 0126) only asks the people who decide, from any run (its card goes where the
+  // run reports); the mission's, with a scope, is the mission's.
+  if (tool.name === "request_approval" && tool.scope === "") return { kind: "self" };
   if (MISSION.has(tool.name)) return { kind: "mission" };
   if (ELSEWHERE.has(tool.name)) return { kind: "elsewhere" };
   if (HERE.has(tool.name)) return { kind: "here" };

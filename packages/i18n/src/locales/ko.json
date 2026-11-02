@@ -2268,6 +2268,7 @@
     "refusedBy": "{{name}}님이 거절함 · {{when}}",
     "approvedByYou": "내가 승인함 · {{when}}",
     "outcomeApprovedBy": "{{name}}님이 승인함",
+    "requesterDecides": "역할로 승인하는 사람이 요청했으므로 그 사람도 결정할 수 있습니다",
     "outcomeApprovedByYou": "내가 승인함",
     "outcomeRefusedBy": "{{name}}님이 거절함",
     "outcomeRefusedByYou": "내가 거절함",

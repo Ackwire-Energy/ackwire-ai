@@ -927,6 +927,11 @@ export function createToolGateway(deps: {
           : ctx.runId
             ? await consultationOrigin(ctx.db, ctx.orgId, ctx.runId)
             : null;
+        const asked =
+          tool.approvers && !tool.connectionId
+            ? await tool.approvers(call.input, ctx, authority?.personId ?? null)
+            : null;
+        if (asked && !asked.ok) return finish({ content: asked.message, isError: true }, "refused");
         const described = tool.describe?.(call.input) ?? { title: `${tool.name}`, detail: canonicalJson(call.input) };
         const connectionId = tool.connectionId ?? null;
         const [approval] = await ctx.db
@@ -951,6 +956,7 @@ export function createToolGateway(deps: {
             ownerUserId: owner,
             expiresAt: new Date(now().getTime() + APPROVAL_TTL_MS),
             approveAlways: remember,
+            approvers: asked?.approvers ?? null,
           })
           .onConflictDoNothing()
           .returning();

@@ -2418,6 +2418,7 @@
     "refusedBy": "Rifiutata da {{name}} · {{when}}",
     "approvedByYou": "Approvata da te · {{when}}",
     "outcomeApprovedBy": "Approvata da {{name}}",
+    "requesterDecides": "Richiesto da chi lo approva per ruolo, quindi può decidere anche lui",
     "outcomeApprovedByYou": "Approvata da te",
     "outcomeRefusedBy": "Rifiutata da {{name}}",
     "outcomeRefusedByYou": "Rifiutata da te",

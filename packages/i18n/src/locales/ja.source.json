@@ -5713,6 +5713,9 @@
   "approval.outcomeApprovedBy": {
     "value": "Approved by {{name}}"
   },
+  "approval.requesterDecides": {
+    "value": "Asked by someone who approves it by role, so they may decide it too"
+  },
   "approval.outcomeApprovedByYou": {
     "value": "Approved by you"
   },

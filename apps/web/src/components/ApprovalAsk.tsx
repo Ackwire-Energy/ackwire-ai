@@ -2,7 +2,13 @@ import type { Agent, Approval, Member } from "@agenteschat/client";
 import { approveAllScope, approveAlwaysOn, cardDeadline, itemOwnWords } from "@agenteschat/client/lib/approval-card";
 import { aheadPhase, approveAlwaysOffered } from "@agenteschat/client/lib/approval-kind";
 import { approvalOriginShort, approvalWhy } from "@agenteschat/client/lib/approval-origin";
-import { approvalSummary, approvalTitle, decisionOutcome } from "@agenteschat/client/lib/approval-words";
+import {
+  approvalSummary,
+  approvalTitle,
+  approvalWaitsFor,
+  decisionOutcome,
+  requesterDecidesLine,
+} from "@agenteschat/client/lib/approval-words";
 import { nextLabel } from "@agenteschat/client/lib/format";
 import { Button } from "@agenteschat/ui";
 import { useState } from "react";
@@ -46,6 +52,8 @@ export function ApprovalAsk({
   const span = Math.max(1, new Date(approval.expiresAt).getTime() - new Date(approval.createdAt).getTime() || DAY_MS);
   const left = Math.max(0, new Date(approval.expiresAt).getTime() - Date.now()) / span;
   const owner = agent?.ownerUserId ? members.get(agent.ownerUserId) : undefined;
+  const waits = approvalWaitsFor(approval, owner?.name);
+  const requester = requesterDecidesLine(t, approval);
   const title = approvalTitle(t, approval);
   const email = approval.email;
   // A connector's detail is its raw call (`tool · key=value`): its values in words instead, the call under "Ver detalhes".
@@ -59,7 +67,7 @@ export function ApprovalAsk({
       agent={agent}
       label={t("approval.group")}
       mine={approval.canDecide}
-      waitingFor={owner ? t("ask.waitingFor", { name: owner.name }) : t("approval.waitingAdmin")}
+      waitingFor={waits ? t("ask.waitingFor", { name: waits }) : t("approval.waitingAdmin")}
       lead={why ?? t("approval.askPlain")}
       object={{
         logo: <ConnectorMark approval={approval} />,
@@ -71,6 +79,7 @@ export function ApprovalAsk({
         <>
           <ExactAction approval={approval} />
           {origin && <p className="rq__origin">{tt(origin.key, origin.values)}</p>}
+          {requester && <p className="rq__origin">{requester}</p>}
           {approval.canDecide && !refusing && approveAlwaysOffered(approval) && (
             <div className="rq__always">
               <ApproveAlways approval={approval} agent={agent} />
@@ -118,6 +127,7 @@ export function ApprovalGroupAsk({
   const waiting = items.filter((a) => a.status === "pending");
   const mine = waiting.some((a) => a.canDecide);
   const owner = members.get(first.ownerUserId ?? agent?.ownerUserId ?? "");
+  const waits = approvalWaitsFor(first, owner?.name);
   const leadItem = waiting[0] ?? first;
   const why = approvalWhy(leadItem);
   const always = approveAlwaysOn(items);
@@ -131,7 +141,7 @@ export function ApprovalGroupAsk({
       agent={agent}
       label={t("approval.group")}
       mine={mine}
-      waitingFor={owner ? t("ask.waitingFor", { name: owner.name }) : t("approval.waitingAdmin")}
+      waitingFor={waits ? t("ask.waitingFor", { name: waits }) : t("approval.waitingAdmin")}
       lead={why ?? t("approval.askMany", { count: waiting.length })}
       body={
         <>

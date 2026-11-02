@@ -1219,6 +1219,13 @@
       "when": 1793605482256,
       "tag": "0175_locales",
       "breakpoints": true
+    },
+    {
+      "idx": 175,
+      "version": "7",
+      "when": 1793627986412,
+      "tag": "0180_approval_requests",
+      "breakpoints": true
     }
   ]
 }
