@@ -517,3 +517,49 @@ describe("receipts when the mention doesn't start a new run", () => {
     expect(s.m1?.agents).toEqual([["ada", "handled"]]);
   });
 });
+
+describe("a run waiting for its computer", () => {
+  const person = {
+    id: "m1",
+    channelId: "c1",
+    threadId: null,
+    author: { type: "person", id: "u1" },
+    body: "@nova @rio oi",
+    mentionedAgentIds: ["nova", "rio"],
+    mentionedUserIds: [],
+    agentRunId: null,
+    meta: {},
+    createdAt: "2026-11-02T10:00:00.000Z",
+  } as unknown as Message;
+  const handled = (agentId: string, runId: string, computer: "queued" | "away") =>
+    ({
+      type: "message.handled",
+      channelId: "c1",
+      messageId: "m1",
+      agentId,
+      runId,
+      status: "waiting_input",
+      computer,
+    }) as ChannelEvent;
+
+  test("in line for room or for the computer to come back: never 'waiting for your answer'", () => {
+    let s = seedReceipt({}, person);
+    s = applyReceiptEvent(s, handled("nova", "r1", "queued"));
+    expect(receiptView(s.m1).status).toEqual({ kind: "queued", agents: ["nova"] });
+    s = applyReceiptEvent(s, handled("rio", "r2", "away"));
+    expect(receiptView(s.m1).status).toEqual({ kind: "away", agents: ["rio"] });
+  });
+
+  test("the list's receipts say the same", () => {
+    const s = seedReceipt({}, {
+      ...person,
+      receipts: {
+        seenBy: ["nova"],
+        pickedBy: ["nova"],
+        handled: [{ agentId: "nova", runId: "r1", status: "waiting_input", computer: "queued" }],
+        blocked: [],
+      },
+    } as Message);
+    expect(receiptView(s.m1).status).toEqual({ kind: "queued", agents: ["nova"] });
+  });
+});

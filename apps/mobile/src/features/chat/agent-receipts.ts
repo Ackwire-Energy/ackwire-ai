@@ -46,6 +46,8 @@ export type ReceiptWords =
   | "receipts.waiting"
   | "receipts.asking"
   | "receipts.outage"
+  | "receipts.queued"
+  | "receipts.away"
   | "receipts.handled"
   | "receipts.failed"
   | "receipts.nobody"
@@ -86,8 +88,10 @@ export function receiptLine(receipt: MessageReceipt | undefined): ReceiptLine | 
       const words = { key: `receipts.${status.kind}` as const, agents: status.agents };
       return { ...faces(status.agents), mark: status.kind, words, label: words, action: null, alert: false };
     }
-    case "outage": {
-      const words = { key: "receipts.outage" as const, agents: status.agents };
+    case "outage":
+    case "queued":
+    case "away": {
+      const words = { key: `receipts.${status.kind}` as const, agents: status.agents };
       return { ...faces(status.agents), mark: "none", words, label: words, action: null, alert: false };
     }
     case "failed": {

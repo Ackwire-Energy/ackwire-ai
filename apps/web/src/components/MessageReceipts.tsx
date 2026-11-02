@@ -21,7 +21,15 @@ export function receiptIcon(view: ReceiptView): IconName {
   if (view.picking) return "waiting";
   const kind = view.status?.kind;
   if (kind === "failed" || kind === "no_ai") return "alert";
-  if (kind === "claimed" || kind === "waiting" || kind === "asking" || kind === "outage") return "waiting";
+  if (
+    kind === "claimed" ||
+    kind === "waiting" ||
+    kind === "asking" ||
+    kind === "outage" ||
+    kind === "queued" ||
+    kind === "away"
+  )
+    return "waiting";
   if (kind === "handled") return "checks";
   return "check";
 }
@@ -107,6 +115,8 @@ export function MessageReceipts({
   const worded =
     (status?.kind === "nobody" && !quietNobody) ||
     status?.kind === "outage" ||
+    status?.kind === "queued" ||
+    status?.kind === "away" ||
     status?.kind === "no_ai" ||
     status?.kind === "platform_cap" ||
     (status?.kind === "failed" && actions !== null && message.author.type === "person");
@@ -241,7 +251,7 @@ export function MessageReceipts({
   return (
     <div className="ac-receipt">
       {check}
-      {status?.kind === "outage" && (
+      {(status?.kind === "outage" || status?.kind === "queued" || status?.kind === "away") && (
         <span className="ac-receipt__words">
           <span>{statusText}</span>
         </span>
