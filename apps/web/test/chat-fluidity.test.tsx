@@ -44,6 +44,21 @@ describe("a streaming answer keeps its spacing", () => {
   });
 });
 
+describe("a streaming answer's done paragraphs stay put", () => {
+  test("a paragraph ending (the text ends on a blank line) doesn't redraw the ones above it or fade them in again", () => {
+    const view = render(<MessageBody body={"Um.\n\nDois.\n\nTres"} live />);
+    const blocks = () => [...view.container.querySelectorAll(".md--message > p")];
+    const [um, dois] = blocks();
+    for (const body of ["Um.\n\nDois.\n\nTres.\n\n", "Um.\n\nDois.\n\nTres.\n\nQuatro"]) {
+      view.rerender(<MessageBody body={body} live />);
+      expect(blocks()[0]).toBe(um as Element);
+      expect(blocks()[1]).toBe(dois as Element);
+      expect(um?.querySelector(".ac-word")).toBeNull();
+      expect(dois?.querySelector(".ac-word")).toBeNull();
+    }
+  });
+});
+
 describe("live answer → saved message", () => {
   test("the text the person was reading stays the same element when the message takes the block's place", async () => {
     const { ev } = await open();

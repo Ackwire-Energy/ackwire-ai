@@ -28,9 +28,14 @@ describe("splitSettled: done blocks vs the one still growing", () => {
     expect(splitSettled(text)).toEqual({ settled: "```\na\n\nb\n```", tail: "Depois" });
   });
 
-  test("a trailing blank line (nothing after it yet): one block, so the caret has text", () => {
-    const text = "Um.\n\nDois.\n\n";
-    expect(splitSettled(text)).toEqual({ settled: "", tail: text });
+  test("a trailing blank line (nothing after it yet): the split before it, so settled blocks stay and the caret has text", () => {
+    expect(splitSettled("Um.\n\nDois.\n\n")).toEqual({ settled: "Um.", tail: "Dois.\n\n" });
+    expect(splitSettled("Um.\n\n")).toEqual({ settled: "", tail: "Um.\n\n" });
+  });
+
+  test("a ``` line with words after it is not a fence (as the parser reads it): it doesn't close an open block", () => {
+    const text = "```\na\n```js title\n\nb\n```\n\nDepois";
+    expect(splitSettled(text)).toEqual({ settled: "```\na\n```js title\n\nb\n```", tail: "Depois" });
   });
 
   test("a list keeps growing in the tail", () => {
