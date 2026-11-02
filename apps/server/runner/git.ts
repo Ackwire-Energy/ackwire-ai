@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import type { EventEmitter } from "node:events";
-import { chmodSync, existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, chownSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   type AgentScope,
@@ -37,12 +37,15 @@ import { resolveInWorkspace } from "./paths";
  * - A clone runs apart from its request: it outlives a dropped socket, the
  *   answer past the deadline is `cloning`, and a later `git.sync` of the same
  *   folder waits for it again. At most `MAX_CLONES` run at once; it stops
- *   when git shows no progress for `CLONE_STALL_MS`, not at a fixed time.
- * - With a shared cache (`gitCache`, single-user runners), the repository is
- *   first fetched into `<cache>/<connection>/<owner>/<name>.git` with the
- *   agent's own credentials, and the clone borrows its objects
+ *   when git shows no progress for `CLONE_STALL_MS`, not at a fixed time. The
+ *   sync before a turn never waits for one.
+ * - With a GitHub token and a shared cache (`gitCache` in single-user mode,
+ *   root's `systemGitCache` through `cacheFill` in system mode), the
+ *   repository is first fetched into `<cache>/<connection>/<owner>/<name>.git`
+ *   with the agent's own token, and the clone borrows its objects
  *   (`--reference`); the cache never prunes. Otherwise a new clone is partial
- *   (`--filter=blob:none`).
+ *   (`--filter=blob:none`). A clone GitHub refuses tries once more through
+ *   the proxy.
  * - An existing checkout is fetched and its default branch fast-forwarded
  *   (never a merge, never over local changes). Failures (offline, refused)
  *   come back per repository; the request itself fails only on a bad request.
@@ -54,7 +57,7 @@ const AGENT_ID = /^[A-Za-z0-9-]{1,64}$/;
 const GITHUB_TOKEN = /^ghs_[A-Za-z0-9_]{20,255}$/;
 const GITHUB_ORIGIN = "https://github.com";
 
-/** Clones running at once on this runner; the others wait their turn. */
+/** Clones running at once on this computer (root's slots in system mode); the others wait their turn. */
 export const MAX_CLONES = 2;
 /** A clone that shows no progress for this long has stalled and is stopped. */
 export const CLONE_STALL_MS = 10 * 60_000;
@@ -75,6 +78,13 @@ export interface GitContext {
   gitCommand?: string;
   /** `<runner home>/git-cache`: the shared read-only mirrors (single-user runners only). */
   gitCache?: string;
+  /** Clone slots; this process's own by default (`localCloneSlot`). */
+  cloneSlot?: CloneSlots;
+  /** Root's shared cache (a system-mode worker): used instead of `gitCache`. */
+  cacheFill?: CacheFill;
+  /** Root's cache: git runs as its owner, with its own HOME, and these variables. */
+  runAs?: { uid: number; gid: number; home: string };
+  env?: Record<string, string>;
 }
 
 interface GitRun {
@@ -166,7 +176,10 @@ function runGit(
           GIT_ASKPASS: "",
           SSH_ASKPASS: "",
           LC_ALL: "C",
+          ...(ctx.runAs ? { HOME: ctx.runAs.home, XDG_CONFIG_HOME: "" } : {}),
+          ...ctx.env,
         },
+        ...(ctx.runAs ? { uid: ctx.runAs.uid, gid: ctx.runAs.gid } : {}),
         stdio: ["ignore", "pipe", "pipe"],
         detached: process.platform !== "win32",
         windowsHide: true,
@@ -360,25 +373,38 @@ interface CloneJob {
   listeners: Set<(chunk: string) => void>;
 }
 
+/**
+ * A clone slot: resolves with its release once one is free, calling `onWait` first when it has to wait. A
+ * system-mode worker asks root for one (`WorkerLink.cloneSlot`), so the cap is the computer's, not the agent's.
+ */
+export type CloneSlots = (onWait: () => void) => Promise<() => void>;
+
+/**
+ * Root's shared cache for a system-mode worker (`WorkerLink.cacheFill`, `systemGitCache`): the cached repository
+ * the agent may borrow from, fetched with its own GitHub token, or null.
+ */
+export type CacheFill = (input: { connection: string; repo: string; github: string }) => Promise<string | null>;
+
 const clones = new Map<string, CloneJob>();
 let clonesRunning = 0;
 const cloneQueue: (() => void)[] = [];
 
-// ponytail: the queue and the cache lock are per process; a system-mode runner has one worker process per agent,
-// so there the cap is per agent and the shared cache is off (a root-side clone service would make both per computer).
-async function cloneSlot(job: CloneJob): Promise<() => void> {
+/** This process's slots: the computer's in single-user mode, and in a system-mode runner's root. */
+export const localCloneSlot: CloneSlots = async (onWait) => {
   if (clonesRunning < MAX_CLONES) clonesRunning++;
   else {
-    job.status = WAITING_FOR_CLONE;
-    for (const l of job.listeners) l(`${WAITING_FOR_CLONE}\n`);
+    onWait();
     await new Promise<void>((resolve) => cloneQueue.push(resolve));
   }
+  let released = false;
   return () => {
+    if (released) return;
+    released = true;
     const next = cloneQueue.shift();
     if (next) next();
     else clonesRunning--;
   };
-}
+};
 
 const cacheLocks = new Map<string, Promise<unknown>>();
 
@@ -393,79 +419,176 @@ function locked<T>(key: string, fn: () => Promise<T>): Promise<T> {
 
 /** The connection id in our proxy URL (`…/api/git/{org}/{connection}/`). */
 const connectionOf = (base: string) => new URL(base).pathname.split("/").filter(Boolean).at(-1) ?? "default";
+const CONNECTION = /^[A-Za-z0-9_-]{1,64}$/;
 
 /**
- * Fetches `repo` into the shared cache with the agent's own credentials (so the agent reaches only what it may
- * fetch) and returns the cached repository, or null when it couldn't. Never pruned: checkouts borrow its objects.
+ * Fetches every branch and tag of `url` into the bare repository `dir` (made when it has no HEAD; `shared`:
+ * readable by whoever may enter `dir`) with the `auth` options. Never pruned: checkouts borrow its objects.
  */
-async function fillCache(ctx: GitContext, cacheRoot: string, base: string, repo: string, remote: Remote) {
-  const dir = path.join(cacheRoot, connectionOf(base), `${repo}.git`);
-  return locked(dir, async () => {
-    const opts = { cwd: cacheRoot, deadline: Date.now() + CLONE_MAX_MS, stallMs: CLONE_STALL_MS };
-    if (!existsSync(path.join(dir, "HEAD"))) {
-      mkdirSync(dir, { recursive: true, mode: 0o700 });
-      if ((await runGit(ctx, ["init", "--quiet", "--bare", dir], opts)).code !== 0) return null;
-      for (const [k, v] of [
-        ["gc.pruneExpire", "never"],
-        ["gc.cruftPacks", "true"],
-        ["fetch.prune", "false"],
-      ] as const) {
-        if ((await runGit(ctx, ["--git-dir", dir, "config", k, v], opts)).code !== 0) return null;
-      }
+async function fetchMirror(ctx: GitContext, dir: string, url: string, auth: string[], shared: boolean) {
+  const opts = { cwd: path.dirname(dir), deadline: Date.now() + CLONE_MAX_MS, stallMs: CLONE_STALL_MS };
+  if (!existsSync(path.join(dir, "HEAD"))) {
+    const init = ["init", "--quiet", "--bare", ...(shared ? ["--shared=all"] : []), dir];
+    if ((await runGit(ctx, init, opts)).code !== 0) return false;
+    for (const [k, v] of [
+      ["gc.pruneExpire", "never"],
+      ["gc.cruftPacks", "true"],
+      ["fetch.prune", "false"],
+    ] as const) {
+      if ((await runGit(ctx, ["--git-dir", dir, "config", k, v], opts)).code !== 0) return false;
     }
-    const fetched = await runGit(
-      ctx,
-      [
-        ...authArgs(remote),
-        "--git-dir",
-        dir,
-        "fetch",
-        "--progress",
-        "--no-prune",
-        remote.url,
-        "+refs/heads/*:refs/heads/*",
-        "+refs/tags/*:refs/tags/*",
-      ],
-      { ...opts, progress: true },
-    );
-    return fetched.code === 0 ? dir : null;
+  }
+  const fetched = await runGit(
+    ctx,
+    [
+      ...auth,
+      "--git-dir",
+      dir,
+      "fetch",
+      "--progress",
+      "--no-prune",
+      url,
+      "+refs/heads/*:refs/heads/*",
+      "+refs/tags/*:refs/tags/*",
+    ],
+    { ...opts, progress: true },
+  );
+  return fetched.code === 0;
+}
+
+/**
+ * Fetches `repo` into the single-user runner's cache with the agent's own credentials (so the agent reaches only
+ * what it may fetch) and returns the cached repository, or null when it couldn't.
+ */
+function fillCache(ctx: GitContext, cacheRoot: string, connection: string, repo: string, remote: Remote) {
+  const dir = path.join(cacheRoot, connection, `${repo}.git`);
+  return locked(dir, async () => {
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    return (await fetchMirror(ctx, dir, remote.url, authArgs(remote), false)) ? dir : null;
   });
 }
 
+/** git's helper in root's cache: the GitHub token from the fetch's own environment (only github.com is fetched). */
+const ENV_GITHUB_HELPER = `!f() { test "$1" = get || exit 0; echo username=x-access-token; printf 'password=%s\\n' "$AGENTES_GITHUB_TOKEN"; }; f`;
+
+export interface SystemGitCacheOptions {
+  /** `/var/cache/agentes-git`. */
+  root: string;
+  /** The system user `agentes-git` that owns the cached repositories (made on first use). */
+  owner: () => { uid: number; gid: number };
+  /** Lets one agent's uid into one cached repository (`setfacl -m u:<uid>:rx`); false when it couldn't. */
+  grant: (dir: string, uid: number) => boolean | Promise<boolean>;
+  gitCommand?: string;
+}
+
+/**
+ * Root's cache on a system-mode computer (ADR 0116 §4): `<root>/<connection>/<owner>/<name>.git`, a bare
+ * repository owned by `agentes-git`, mode 700, its contents readable by whoever may enter it. Each fill fetches
+ * from github.com with the asking agent's own single-repository token, as `agentes-git`; only when GitHub let that
+ * agent fetch does its uid get into that one repository (an ACL on its folder). An agent that was never let in
+ * can't read it, whoever else filled it.
+ */
+export function systemGitCache(o: SystemGitCacheOptions) {
+  return (input: { connection: string; repo: string; github: string; uid: number }): Promise<string | null> => {
+    if (
+      !CONNECTION.test(input.connection) ||
+      !isGitRepoName(input.repo) ||
+      !GITHUB_TOKEN.test(input.github) ||
+      !Number.isSafeInteger(input.uid)
+    ) {
+      return Promise.resolve(null);
+    }
+    const dir = path.join(o.root, input.connection, `${input.repo}.git`);
+    return locked(dir, async () => {
+      const owner = o.owner();
+      // Root's folders above it: anyone may pass through, nobody but root may list or change them.
+      for (const d of [o.root, path.join(o.root, input.connection), path.dirname(dir)]) {
+        mkdirSync(d, { recursive: true, mode: 0o711 });
+        chmodSync(d, 0o711);
+      }
+      const fresh = !existsSync(path.join(dir, "HEAD"));
+      if (fresh) {
+        mkdirSync(dir, { recursive: true, mode: 0o700 });
+        chownSync(dir, owner.uid, owner.gid);
+      }
+      const ctx: GitContext = {
+        folder: o.root,
+        gitDir: o.root,
+        agent: { id: "agentes-git", handle: "agentes-git", name: "agentes-git" },
+        signal: new AbortController().signal,
+        runAs: { ...owner, home: o.root },
+        env: { AGENTES_GITHUB_TOKEN: input.github },
+        ...(o.gitCommand ? { gitCommand: o.gitCommand } : {}),
+      };
+      const auth = ["-c", "credential.helper=", "-c", `credential.helper=${ENV_GITHUB_HELPER}`];
+      const fetched = await fetchMirror(ctx, dir, `${GITHUB_ORIGIN}/${input.repo}.git`, auth, true);
+      // `--shared=all` opens the folder itself to everyone: only the agents let in may enter it.
+      if (fresh) chmodSync(dir, 0o700);
+      return fetched && (await o.grant(dir, input.uid)) ? dir : null;
+    });
+  };
+}
+
+interface CloneInput {
+  repo: string;
+  base: GitSyncRepo;
+  abs: string;
+  /** Straight from GitHub when the request carried a token, else the proxy. */
+  remote: Remote;
+  /** Both through the proxy: where a clone GitHub refused tries again. */
+  proxyRemote: Remote;
+  /** The GitHub App token, for the shared cache. */
+  github?: string;
+  connection: string;
+  author: GitSyncRequest["author"];
+}
+
+/** The cached repository a clone may borrow from, or null (no cache here, or the fill failed). */
+async function cachedRepo(ctx: GitContext, job: CloneJob, input: CloneInput): Promise<string | null> {
+  // Through the proxy, a full fetch would cost the server what the partial clone spares it: the cache only with a token.
+  if (!input.github) return null;
+  if (ctx.cacheFill) {
+    job.status = "downloading into the computer's shared cache";
+    return ctx.cacheFill({ connection: input.connection, repo: input.repo, github: input.github }).catch(() => null);
+  }
+  return ctx.gitCache ? fillCache(ctx, ctx.gitCache, input.connection, input.repo, input.remote) : null;
+}
+
 /** Clones one repository, waiting for a free slot first; `ctx` is the job's own (no request's cancel or output). */
-async function runClone(
-  ctx: GitContext,
-  job: CloneJob,
-  input: {
-    repo: string;
-    base: GitSyncRepo;
-    abs: string;
-    remote: Remote;
-    proxyBase: string;
-    author: GitSyncRequest["author"];
-  },
-): Promise<GitSyncRepo> {
-  const release = await cloneSlot(job);
-  try {
-    mkdirSync(path.dirname(input.abs), { recursive: true });
-    const cached = ctx.gitCache ? await fillCache(ctx, ctx.gitCache, input.proxyBase, input.repo, input.remote) : null;
-    const cloned = await runGit(
+async function runClone(ctx: GitContext, job: CloneJob, input: CloneInput): Promise<GitSyncRepo> {
+  const release = await (ctx.cloneSlot ?? localCloneSlot)(() => {
+    job.status = WAITING_FOR_CLONE;
+    for (const l of job.listeners) l(`${WAITING_FOR_CLONE}\n`);
+  });
+  const clone = (remote: Remote, cached: string | null) =>
+    runGit(
       ctx,
       [
-        ...authArgs(input.remote),
+        ...authArgs(remote),
         "clone",
         ...(cached ? ["--reference", cached] : ["--filter=blob:none"]),
         "--progress",
         "--origin",
         "origin",
-        input.remote.url,
+        remote.url,
         input.abs,
       ],
       { cwd: path.dirname(input.abs), deadline: Date.now() + CLONE_MAX_MS, stallMs: CLONE_STALL_MS, progress: true },
     );
+  try {
+    mkdirSync(path.dirname(input.abs), { recursive: true });
+    let remote = input.remote;
+    let cloned = await clone(remote, await cachedRepo(ctx, job, input));
+    if (cloned.code !== 0 && remote.pushUrl && !cloned.stalled) {
+      // GitHub refused (the token ran out while the clone waited or filled the cache) or isn't reachable: once more
+      // through the proxy, which the next sync moves back to GitHub with a fresh token.
+      rmSync(input.abs, { recursive: true, force: true });
+      remote = input.proxyRemote;
+      cloned = await clone(remote, null);
+    }
     if (cloned.code !== 0) throw new Error(why(cloned, "git clone failed"));
     const deadline = Date.now() + 120_000;
-    await configure(ctx, input.abs, { remote: input.remote, author: input.author }, deadline);
+    await configure(ctx, input.abs, { remote, author: input.author }, deadline);
     const d = await describeCheckout(ctx, input.abs, deadline);
     return {
       ...input.base,
@@ -485,7 +608,7 @@ async function runClone(
 }
 
 /** Starts the clone of `key` apart from the request, or returns the one already running. */
-function startClone(ctx: GitContext, key: string, input: Parameters<typeof runClone>[2]) {
+function startClone(ctx: GitContext, key: string, input: CloneInput) {
   const running = clones.get(key);
   if (running) return running;
   const job: CloneJob = { done: Promise.resolve(input.base), status: "starting", listeners: new Set() };
@@ -506,29 +629,42 @@ function startClone(ctx: GitContext, key: string, input: Parameters<typeof runCl
   return job;
 }
 
-/** Waits for a clone until the request's deadline or cancel; `cloning` (it goes on) when it isn't done by then. */
-async function awaitClone(ctx: GitContext, job: CloneJob, base: GitSyncRepo, deadline: number): Promise<GitSyncRepo> {
-  const listener = (chunk: string) => ctx.output?.("stderr", chunk);
+/** A clone still going, as a sync answers it. */
+const cloningReply = (job: CloneJob, base: GitSyncRepo): GitSyncRepo => ({
+  ...base,
+  status: "cloning",
+  message: `still downloading in the background (${job.status})`.slice(0, GIT_SYNC_LIMITS.message),
+});
+
+/**
+ * Waits for a clone until the request's deadline or cancel; `cloning` (it goes on) when it isn't done by then.
+ * `queued`: the request that started it answers at once while it waits for a slot, so the agent hears that now; a
+ * later request for it waits, as asked.
+ */
+async function awaitClone(
+  ctx: GitContext,
+  job: CloneJob,
+  base: GitSyncRepo,
+  deadline: number,
+  queued = false,
+): Promise<GitSyncRepo> {
+  let stop = () => {};
+  const later = new Promise<null>((resolve) => {
+    stop = () => resolve(null);
+  });
+  const listener = (chunk: string) => {
+    ctx.output?.("stderr", chunk);
+    if (queued && job.status === WAITING_FOR_CLONE) stop();
+  };
   job.listeners.add(listener);
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  let onAbort: (() => void) | undefined;
+  if (queued && job.status === WAITING_FOR_CLONE) stop();
+  const timer = setTimeout(stop, Math.max(0, deadline - Date.now()));
+  ctx.signal.addEventListener("abort", stop, { once: true });
   try {
-    const later = new Promise<null>((resolve) => {
-      timer = setTimeout(() => resolve(null), Math.max(0, deadline - Date.now()));
-      onAbort = () => resolve(null);
-      ctx.signal.addEventListener("abort", onAbort, { once: true });
-    });
-    const result = await Promise.race([job.done, later]);
-    return (
-      result ?? {
-        ...base,
-        status: "cloning",
-        message: `still downloading in the background (${job.status})`.slice(0, GIT_SYNC_LIMITS.message),
-      }
-    );
+    return (await Promise.race([job.done, later])) ?? cloningReply(job, base);
   } finally {
     clearTimeout(timer);
-    if (onAbort) ctx.signal.removeEventListener("abort", onAbort);
+    ctx.signal.removeEventListener("abort", stop);
     job.listeners.delete(listener);
   }
 }
@@ -573,17 +709,20 @@ export async function gitSync(ctx: GitContext, req: GitSyncRequest): Promise<Mac
       if (target.rel === "") throw new RunnerError("bad_request", "dir can't be your folder itself");
       base.dir = target.rel;
       base.path = target.abs;
-      const githubFile = w.github
-        ? writeSecret(path.join(ctx.gitDir, "github", agentId, `${w.repo}.token`), w.github)
-        : undefined;
+      // A fresh token also reaches a clone still going (git reads the file when it authenticates).
+      const githubPath = path.join(ctx.gitDir, "github", agentId, `${w.repo}.token`);
+      const githubFile = w.github ? writeSecret(githubPath, w.github) : undefined;
       const remote = remoteFor(proxy, w.repo, tokenFile, githubFile);
       const key = `${agentId}\0${target.abs}`;
       const running = clones.get(key);
       if (running) {
-        // A clone of this folder is still going (started by an earlier request): wait for it, never touch it.
-        out.push(await awaitClone(ctx, running, base, deadline));
+        // A clone of this folder is still going (started by an earlier request): `git_clone` waits for it, the
+        // sync before a turn doesn't; neither touches it.
+        out.push(w.clone ? await awaitClone(ctx, running, base, deadline) : cloningReply(running, base));
         continue;
       }
+      // No token this time (the App, the repository or the agent's access is gone): none left on disk either.
+      if (!githubFile) rmSync(githubPath, { force: true });
       if (!target.exists) {
         if (!w.clone) {
           out.push({ ...base, status: "missing" });
@@ -594,10 +733,12 @@ export async function gitSync(ctx: GitContext, req: GitSyncRequest): Promise<Mac
           base,
           abs: target.abs,
           remote,
-          proxyBase: proxy.base,
+          proxyRemote: remoteFor(proxy, w.repo, tokenFile),
+          ...(w.github ? { github: w.github } : {}),
+          connection: connectionOf(proxy.base),
           author,
         });
-        out.push(await awaitClone(ctx, job, base, deadline));
+        out.push(await awaitClone(ctx, job, base, deadline, true));
         continue;
       }
       if (!statSync(target.abs).isDirectory() || !existsSync(path.join(target.abs, ".git"))) {

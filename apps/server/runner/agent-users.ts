@@ -320,3 +320,32 @@ export function agentGid(user: string, run: RunCommand = runSync): number {
   }
   return gid;
 }
+
+/** Root's shared git cache on a system-mode computer (ADR 0116 §4) and the system user that owns it. */
+export const GIT_CACHE_DIR = "/var/cache/agentes-git";
+export const GIT_CACHE_USER = "agentes-git";
+
+/** The cache's owner, made the first time (a system user nobody signs in as). */
+export function ensureGitCacheUser(run: RunCommand = runSync): { uid: number; gid: number } {
+  const id = (flag: string) => run("id", [flag, GIT_CACHE_USER]);
+  if (id("-u").code !== 0) {
+    run("useradd", [
+      "--system",
+      "--user-group",
+      "--no-create-home",
+      "--home-dir",
+      GIT_CACHE_DIR,
+      "--shell",
+      "/usr/sbin/nologin",
+      GIT_CACHE_USER,
+    ]);
+  }
+  const uid = id("-u");
+  const gid = id("-g");
+  if (uid.code !== 0 || gid.code !== 0) throw new RunnerError("internal", `${GIT_CACHE_USER} couldn't be made`);
+  return { uid: Number(uid.output.trim()), gid: Number(gid.output.trim()) };
+}
+
+/** Lets one agent's uid into one cached repository; false without `setfacl` (the clone then goes without the cache). */
+export const grantGitCache = (dir: string, uid: number, run: RunCommand = runSync) =>
+  run("setfacl", ["-m", `u:${uid}:rx`, dir]).code === 0;

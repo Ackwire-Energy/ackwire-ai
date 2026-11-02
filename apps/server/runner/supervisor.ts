@@ -41,6 +41,7 @@ import { backoffDelay } from "./connection";
 import { DESKTOP_USE_OPS } from "./desktop";
 import { SHOW_MS } from "./desktop-browser";
 import { errnoCode, RunnerError, toMachineError } from "./errors";
+import { localCloneSlot } from "./git";
 import type { RequestScope } from "./handlers";
 import { readJson, writeJson } from "./json-file";
 import { readLines } from "./lines";
@@ -104,6 +105,8 @@ const SCOPE_ENTERS_PER_MINUTE = 30;
 const SCOPE_SHOW_MS = 2000;
 const SCOPE_POLL_MS = 20;
 const SECRET_INSTALL_MS = 20_000;
+/** Clone slots one worker may hold or wait for at once. */
+const MAX_WORKER_SLOTS = 64;
 
 /** The broker is a child of the root runner home, never of an agent-owned home. */
 function secureSecretRoot(home: string, requireRoot = false): string {
@@ -203,6 +206,15 @@ export type WorkerLinkFrame =
   | { type: "scope.enter"; enterId: string; pid: number; kind: ScopeKind }
   /** To the worker: it is there, or why not (it starts where it is either way). */
   | { type: "scope.entered"; enterId: string; error?: string }
+  /** From the worker: one of the computer's clone slots (ADR 0116), until it sends `clone.release`. */
+  | { type: "clone.slot"; slotId: string }
+  /** To the worker: it waits for another download (`waiting`), then it has the slot. */
+  | { type: "clone.slotted"; slotId: string; waiting?: boolean }
+  | { type: "clone.release"; slotId: string }
+  /** From the worker: fill root's shared cache with its agent's GitHub token (`systemGitCache`). */
+  | { type: "cache.fill"; fillId: string; connection: string; repo: string; github: string }
+  /** To the worker: the cached repository its agent may borrow from, when there is one. */
+  | { type: "cache.filled"; fillId: string; dir?: string }
   | { type: "secret.install"; installId: string; agent: AgentScope; secret: ActivatedSecret }
   | {
       type: "secret.installed";
@@ -264,6 +276,8 @@ export interface SupervisorOptions {
   desktopViewers?: (agentId: string) => number;
   /** The account an agent thinks with now, still on this computer (the agents frame); null: none. */
   account?: (agentId: string) => string | null;
+  /** Root's shared git cache (`systemGitCache`); without it a worker's clones get none. */
+  gitCache?: (input: { connection: string; repo: string; github: string; uid: number }) => Promise<string | null>;
   /** Tests: the clock of the browser's lease. */
   now?: () => number;
   /** Tests: how long a click on Browser waits for its worker (`SHOW_MS`). */
@@ -310,6 +324,8 @@ interface Worker {
   browserLeaseAt: number;
   /** When it asked for its processes to be moved, in the last minute (`scope.enter`). */
   enters: number[];
+  /** Its clone slots, by its id (`release` once it has one): a worker that stops gives them back. */
+  slots: Map<string, { release?: () => void }>;
 }
 
 interface Show {
@@ -628,6 +644,7 @@ export class Supervisor {
         shows: new Map(),
         browserLeaseAt: 0,
         enters: [],
+        slots: new Map(),
       };
       this.workers.set(user.id, w);
     }
@@ -735,6 +752,8 @@ export class Supervisor {
       "The agent's worker on this computer stopped while this ran: it may have stopped partway or finished. Check before running it again.",
     );
     this.endShows(w, "The agent's worker stopped on this computer. Try again.");
+    for (const slot of w.slots.values()) slot.release?.();
+    w.slots.clear();
     w.attempt = Date.now() - w.startedAt >= WORKER_STABLE_MS ? 0 : w.attempt + 1;
     w.notBefore = w.attempt > 0 ? Date.now() + backoffDelay(w.attempt - 1) : 0;
     if (this.closed) return;
@@ -958,6 +977,19 @@ export class Supervisor {
       );
       return;
     }
+    // A clone outlives the worker's session (ADR 0116): its slot and its cache too.
+    if (f?.type === "clone.slot") return this.cloneSlot(w, typeof f.slotId === "string" ? f.slotId.slice(0, 64) : "");
+    if (f?.type === "clone.release") {
+      const id = typeof f.slotId === "string" ? f.slotId : "";
+      const slot = w.slots.get(id);
+      w.slots.delete(id);
+      slot?.release?.();
+      return;
+    }
+    if (f?.type === "cache.fill") {
+      void this.cacheFill(w, f);
+      return;
+    }
     // Counted whenever it comes: the worker's Chrome ran between its sessions too.
     if (f?.type === "browser.traffic") {
       if (inRange(f.up, [0, TRAFFIC_DELTA_MAX]) && inRange(f.down, [0, TRAFFIC_DELTA_MAX])) {
@@ -1034,6 +1066,36 @@ export class Supervisor {
           })
         : this.upload(req, body, f, e.scope.signal);
     void reply.then((r) => this.send(w, { type: "upload.reply", uploadId, ...r }));
+  }
+
+  /**
+   * A clone slot of the computer's (`localCloneSlot`: root's process holds them all), so the cap is per computer,
+   * whichever agents clone. One the worker no longer waits for (it stopped, or let go) goes to the next.
+   */
+  private cloneSlot(w: Worker, slotId: string) {
+    if (!slotId || w.slots.has(slotId) || w.slots.size >= MAX_WORKER_SLOTS) return;
+    const slot: { release?: () => void } = {};
+    w.slots.set(slotId, slot);
+    void localCloneSlot(() => this.write(w, { type: "clone.slotted", slotId, waiting: true })).then((release) => {
+      if (w.slots.get(slotId) !== slot) return release();
+      slot.release = release;
+      this.write(w, { type: "clone.slotted", slotId });
+    });
+  }
+
+  /** Root's shared cache, for the worker's own agent (its uid, never one the frame names). */
+  private async cacheFill(w: Worker, f: Record<string, unknown>) {
+    const fillId = typeof f.fillId === "string" ? f.fillId.slice(0, 64) : "";
+    const str = (v: unknown) => (typeof v === "string" ? v : "");
+    const dir = this.opts.gitCache
+      ? await this.opts
+          .gitCache({ connection: str(f.connection), repo: str(f.repo), github: str(f.github), uid: w.user.uid })
+          .catch((err: unknown) => {
+            this.opts.log(`[${w.user.user}] the git cache failed: ${err instanceof Error ? err.message : String(err)}`);
+            return null;
+          })
+      : null;
+    this.write(w, { type: "cache.filled", fillId, ...(dir ? { dir } : {}) });
   }
 
   /**

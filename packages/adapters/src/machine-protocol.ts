@@ -349,7 +349,7 @@ export const BROWSER_WARM_PROTOCOL = 27;
  * Protocol 35 (ADR 0116): `git.sync` repos may carry `github`, a short-lived single-repository GitHub App token
  * (contents: read). The checkout then fetches straight from github.com with it and pushes through our proxy
  * (`remote.origin.pushurl`). A clone outlives its request: past `timeoutSeconds` the answer is `cloning` and the
- * download goes on (at most two at once per runner, the rest wait); a later `git.sync` of the same folder waits
+ * download goes on (at most two at once per computer, the rest wait); a later `git.sync` of the same folder waits
  * for it again. The server sends `github` only to these runners and gives older ones the full clone deadline.
  */
 export const GIT_DIRECT_PROTOCOL = 35;

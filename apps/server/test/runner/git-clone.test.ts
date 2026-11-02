@@ -3,7 +3,13 @@ import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { MachineReplies, MachineRequest } from "@agenteschat/adapters/machine-protocol";
-import { credentialHelper, directCredentialHelper, MAX_CLONES, WAITING_FOR_CLONE } from "../../runner/git";
+import {
+  credentialHelper,
+  directCredentialHelper,
+  MAX_CLONES,
+  systemGitCache,
+  WAITING_FOR_CLONE,
+} from "../../runner/git";
 import { type HandlerContext, handleRequest, type RequestScope } from "../../runner/handlers";
 import { agentWorkspace } from "../../runner/paths";
 import { removeDirs, tempDir } from "./helpers";
@@ -64,7 +70,9 @@ beforeAll(() => {
   );
   process.env.GIT_CONFIG_GLOBAL = globalConfig;
   process.env.GIT_CONFIG_NOSYSTEM = "1";
-  for (const repo of ["acme/app", "acme/one", "acme/two", "acme/three", "acme/cached"]) remoteRepo(repo);
+  for (const repo of ["acme/app", "acme/one", "acme/two", "acme/three", "acme/cached", "acme/plain", "acme/fallback"]) {
+    remoteRepo(repo);
+  }
 });
 
 afterAll(() => {
@@ -171,6 +179,8 @@ test("with a GitHub App token: fetches straight from github.com, pushes through 
   expect(localConfig(checkout, "remote.origin.url")).toEqual([`${BASE}acme/app.git`]);
   expect(localConfig(checkout, "remote.origin.pushurl")).toEqual([]);
   expect(localConfig(checkout, "credential.helper")).toEqual(["", credentialHelper(proxyFile)]);
+  // ...and leaves no token on disk for it.
+  expect(existsSync(githubFile)).toBe(false);
 
   // Anything that isn't an App installation token is refused.
   expect(sync(ctx, [{ repo: "acme/app", clone: false, github: "gho_oauthtoken1234567890abcdef" }])).rejects.toThrow(
@@ -203,13 +213,23 @@ test(`at most ${MAX_CLONES} clones at once; the rest wait, and a clone outlives 
   ctx.gitCommand = fake;
   const starts = () => (existsSync(log) ? readFileSync(log, "utf8").trim().split("\n").length : 0);
 
-  // Three agents' clones at once, each request giving up after a second: all still going, one waiting its turn.
+  // Two clones at once, each request giving up after a second: both still going.
   const answers = await Promise.all(
-    ["acme/one", "acme/two", "acme/three"].map((repo) => sync(ctx, [{ repo, clone: true }], { timeoutSeconds: 1 })),
+    ["acme/one", "acme/two"].map((repo) => sync(ctx, [{ repo, clone: true }], { timeoutSeconds: 1 })),
   );
-  expect(answers.map((a) => a[0]?.status)).toEqual(["cloning", "cloning", "cloning"]);
+  expect(answers.map((a) => a[0]?.status)).toEqual(["cloning", "cloning"]);
+  // A third waits its turn, and says so at once instead of holding the request until its deadline.
+  let t0 = Date.now();
+  const third = await sync(ctx, [{ repo: "acme/three", clone: true }], { timeoutSeconds: 60 });
+  expect(Date.now() - t0).toBeLessThan(5000);
+  expect(third[0]?.status).toBe("cloning");
+  expect(third[0]?.message).toContain(WAITING_FOR_CLONE);
   expect(starts()).toBe(MAX_CLONES);
-  expect(answers.filter((a) => a[0]?.message?.includes(WAITING_FOR_CLONE))).toHaveLength(1);
+  // The sync before a turn doesn't wait for a clone going on either.
+  t0 = Date.now();
+  const preTurn = await sync(ctx, [{ repo: "acme/one", clone: false }], { timeoutSeconds: 20 });
+  expect(Date.now() - t0).toBeLessThan(5000);
+  expect(preTurn[0]?.status).toBe("cloning");
 
   // The downloads go on without anyone waiting; asking again waits for the same clone (no second one).
   writeFileSync(release, "");
@@ -257,4 +277,67 @@ test("the shared cache: fetched with the agent's own credentials, borrowed by cl
     renameSync(path.join(gone, "cached.git"), path.join(github, "acme", "cached.git"));
     renameSync(path.join(gone, "cached-proxy.git"), path.join(proxied, "acme", "cached.git"));
   }
+});
+
+test("without a GitHub token the cache is skipped: a partial clone through the proxy, as before", async () => {
+  const cache = tempDir("cache-");
+  dirs.push(cache);
+  const { ctx } = setup({ gitCache: cache });
+  const [cloned] = await sync(ctx, [{ repo: "acme/plain", clone: true }]);
+  expect(cloned?.status).toBe("cloned");
+  const checkout = path.join(await agentWorkspace(ctx.workspaceReal, AGENT), "repos", "acme", "plain");
+  expect(localConfig(checkout, "remote.origin.partialclonefilter")).toEqual(["blob:none"]);
+  expect(existsSync(path.join(cache, "conn", "acme", "plain.git"))).toBe(false);
+});
+
+test("a clone GitHub refuses (a token that ran out) tries once more through the proxy", async () => {
+  const { ctx } = setup();
+  const away = path.join(root, "away-fallback.git");
+  renameSync(path.join(github, "acme", "fallback.git"), away);
+  try {
+    const [cloned] = await sync(ctx, [{ repo: "acme/fallback", clone: true, github: GH_TOKEN }]);
+    expect(cloned?.status).toBe("cloned");
+    const checkout = path.join(await agentWorkspace(ctx.workspaceReal, AGENT), "repos", "acme", "fallback");
+    expect(localConfig(checkout, "remote.origin.url")).toEqual([`${BASE}acme/fallback.git`]);
+    expect(localConfig(checkout, "remote.origin.pushurl")).toEqual([]);
+  } finally {
+    renameSync(away, path.join(github, "acme", "fallback.git"));
+  }
+});
+
+test("root's cache on a system-mode computer: only an agent GitHub let fetch the repository is let into it", async () => {
+  const cacheRoot = tempDir("syscache-");
+  dirs.push(cacheRoot);
+  const granted: [string, number][] = [];
+  const fill = systemGitCache({
+    root: cacheRoot,
+    owner: () => ({ uid: process.getuid?.() ?? 0, gid: process.getgid?.() ?? 0 }),
+    grant: (dir, uid) => {
+      granted.push([dir, uid]);
+      return true;
+    },
+  });
+  const dir = await fill({ connection: "conn", repo: "acme/cached", github: GH_TOKEN, uid: 21000 });
+  const mirror = path.join(cacheRoot, "conn", "acme", "cached.git");
+  expect(dir).toBe(mirror);
+  expect(granted).toEqual([[mirror, 21000]]);
+  if (process.platform !== "win32") {
+    // Closed to everyone but its owner and the agents let in; the folders above it can't be listed.
+    expect(statSync(mirror).mode & 0o777).toBe(0o700);
+    expect(statSync(path.join(cacheRoot, "conn")).mode & 0o777).toBe(0o711);
+  }
+  expect(git(root, "--git-dir", mirror, "config", "gc.pruneExpire")).toBe("never");
+
+  // Another agent whose fetch GitHub refuses isn't let in, though the cache already holds the repository.
+  const away = path.join(root, "away-cached.git");
+  renameSync(path.join(github, "acme", "cached.git"), away);
+  try {
+    expect(await fill({ connection: "conn", repo: "acme/cached", github: GH_TOKEN, uid: 21001 })).toBeNull();
+  } finally {
+    renameSync(away, path.join(github, "acme", "cached.git"));
+  }
+  expect(granted).toEqual([[mirror, 21000]]);
+  // Nothing but a GitHub App token, a repository name and a connection id gets through.
+  expect(await fill({ connection: "../x", repo: "acme/cached", github: GH_TOKEN, uid: 21001 })).toBeNull();
+  expect(await fill({ connection: "conn", repo: "acme/cached", github: "gho_oauth", uid: 21001 })).toBeNull();
 });

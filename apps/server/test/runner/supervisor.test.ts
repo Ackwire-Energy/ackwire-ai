@@ -2524,3 +2524,49 @@ test("lines: split across chunks, UTF-8 kept whole, and a line too long is skipp
   expect(lines).toEqual(["olá", "a", "bc", "after", "end"]);
   expect(tooLong).toBe(2);
 });
+
+test("clone slots are the computer's: two at once across every agent's worker; a stopped worker gives its back; the cache sees the worker's own uid", async () => {
+  const filled: { repo: string; uid: number }[] = [];
+  const t = setup({
+    gitCache: async (input) => {
+      filled.push({ repo: input.repo, uid: input.uid });
+      return `/var/cache/agentes-git/conn/${input.repo}.git`;
+    },
+  });
+  t.sup.boot();
+  t.sup.attach();
+  // Both agents' workers running (each started by a request of its agent).
+  for (const agent of [ANA, BIA]) handleRequest(t.ctx, exec(agent), scope().scope).catch(() => {});
+  await waitFor(() => t.workers.length === 2);
+  const ana = t.last(ANA.id);
+  const bia = t.last(BIA.id);
+  ana.hello();
+  bia.hello();
+  const slotted = (w: FakeWorker, slotId: string) => w.of("clone.slotted").filter((f) => f.slotId === slotId);
+
+  ana.send({ type: "clone.slot", slotId: "1" });
+  ana.send({ type: "clone.slot", slotId: "2" });
+  await waitFor(() => ana.of("clone.slotted").length === 2);
+  bia.send({ type: "clone.slot", slotId: "1" });
+  await waitFor(() => slotted(bia, "1").length === 1);
+  expect(slotted(bia, "1")[0]?.waiting).toBe(true);
+
+  // Ana's first clone ends: Bia's starts.
+  ana.send({ type: "clone.release", slotId: "1" });
+  await waitFor(() => slotted(bia, "1").length === 2);
+  expect(slotted(bia, "1")[1]?.waiting).toBeUndefined();
+
+  // A third one waits until Ana's worker stops, which gives back the slot it held.
+  bia.send({ type: "clone.slot", slotId: "2" });
+  await waitFor(() => slotted(bia, "2").length === 1);
+  ana.crash();
+  await waitFor(() => slotted(bia, "2").length === 2);
+  bia.send({ type: "clone.release", slotId: "1" });
+  bia.send({ type: "clone.release", slotId: "2" });
+
+  // The cache is filled for the worker's own agent, whatever the frame says.
+  bia.send({ type: "cache.fill", fillId: "f1", connection: "conn", repo: "acme/app", github: "ghs_x", uid: 0 });
+  await waitFor(() => bia.of("cache.filled").length === 1);
+  expect(filled).toEqual([{ repo: "acme/app", uid: 21001 }]);
+  expect(bia.of("cache.filled")[0]?.dir).toBe("/var/cache/agentes-git/conn/acme/app.git");
+});
