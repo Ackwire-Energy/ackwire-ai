@@ -689,17 +689,19 @@ describe("Buscar no workspace", () => {
   });
 });
 
-test("the language picker: no 'Automático', the language in use chosen while the person never picked", async () => {
+test("the language picker: no 'Automático', the language on screen chosen while the person never picked", async () => {
   localStorage.removeItem("agentes.locale");
+  // The page is in Portuguese (as after the landing's cookie) while the browser says English.
+  expect(detectedLocale()).toBe("en");
   await go(seedState(), "settings/account");
   const box = screen().getByRole("combobox", { name: "Idioma" });
-  expect(box.textContent).toContain(localeInfo(detectedLocale()).native);
+  expect(box.textContent).toContain(localeInfo("pt-BR").native);
   box.focus();
   await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
   const options = screen().getAllByRole("option");
   expect(options.some((o) => /Autom/.test(o.textContent ?? ""))).toBe(false);
   expect(options.find((o) => o.getAttribute("aria-selected") === "true")?.textContent).toContain(
-    localeInfo(detectedLocale()).native,
+    localeInfo("pt-BR").native,
   );
   await act(async () => fireEvent.keyDown(document.activeElement ?? box, { key: "Escape" }));
 });

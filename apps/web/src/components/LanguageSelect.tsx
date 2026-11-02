@@ -1,4 +1,4 @@
-import type { AppLocale } from "@agenteschat/i18n/locale";
+import { type AppLocale, isAppLocale } from "@agenteschat/i18n/locale";
 import { Select } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -6,7 +6,7 @@ import { chooseLocale, detectedLocale, locales, readLocaleState } from "@/i18n";
 
 /**
  * The language picker: each language by its own name, the one in use chosen. Someone who never picked sees the
- * browser's language chosen and keeps following it (ADR 0122); a pick applies at once and stays on this browser;
+ * language on screen chosen (the landing's cookie can differ from the browser's) and keeps following it (ADR 0122); a pick applies at once and stays on this browser;
  * `onPick` tells the server when signed in.
  */
 export function LanguageSelect({
@@ -25,7 +25,8 @@ export function LanguageSelect({
   const { t, i18n } = useTranslation();
   const [choice, setChoice] = useState<AppLocale>(() => {
     const { stored } = readLocaleState();
-    return stored && stored !== "auto" ? stored : detectedLocale();
+    if (stored && stored !== "auto") return stored;
+    return isAppLocale(i18n.language) ? i18n.language : detectedLocale();
   });
   return (
     <Select
