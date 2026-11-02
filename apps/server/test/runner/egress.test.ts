@@ -94,6 +94,7 @@ test("system probe ignores user curl settings and inherited proxy or loader vari
     "AGENTES_NETWORK_OBSERVATION",
     "AGENTES_SHARED_BIN",
     "ANDROID_ADB_SERVER_PORT",
+    "GRADLE_OPTS",
     "HOME",
     "LANG",
     "LOGNAME",
