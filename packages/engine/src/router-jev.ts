@@ -8,7 +8,9 @@ import {
   type RouterStrategy,
   type RoutingInput,
   type RoutingResult,
+  SOCIAL_REACTIONS,
   SPOKEN_TO,
+  socialChoice,
   withAddressee,
 } from "./router";
 
@@ -96,9 +98,9 @@ export function createJevRouterStrategy(options: {
       const questions: Record<string, unknown> = {
         needs_agent: {
           type: "noul",
-          instructions: `Should any AI agent reply to \`latest_message\`? ${whoFor()} People in a team chat mostly talk among themselves: an agent should reply only when the message speaks to an agent (by @, by name or by its role), asks the agents or anyone something an agent can help with ("does anyone know…", "alguém sabe…"), speaks to the agents as a group, or continues a conversation with an agent. When unsure, no.`,
+          instructions: `Should any AI agent reply to \`latest_message\`? ${whoFor()} People in a team chat mostly talk among themselves: an agent should reply only when the message speaks to an agent (by @, by name or by its role), asks the agents or anyone something an agent can help with ("does anyone know…", "alguém sabe…"), speaks to the agents as a group, or continues a conversation with an agent. Also yes when the person insists or complains that nobody answered ("alô???", "ninguém vai responder?", a greeting again after nobody answered the first): they want an agent's reply. Otherwise, when unsure, no.`,
           criteria: {
-            true: "The message is for an agent or needs an agent's answer.",
+            true: "The message is for an agent or needs an agent's answer, or the person insists that nobody answered.",
             false: "People talking to each other, or unclear; no agent should interrupt.",
           },
         },
@@ -164,6 +166,13 @@ export function createJevRouterStrategy(options: {
           criteria: spoken,
         };
       }
+      if (input.authorUserId !== null) {
+        questions.social = {
+          type: "choice",
+          instructions: `Is \`latest_message\` purely social, needing no real answer, and which emoji fits it as a reaction? ${whoFor()} \`${NONE}\` when it asks or says anything that needs an answer, or the person wants an actual reply: they insist, or complain that nobody answered ("alô???", "ninguém vai responder?", a greeting again after nobody answered the first).`,
+          criteria: { ...SOCIAL_REACTIONS, [NONE]: "Needs a real answer, or isn't social." },
+        };
+      }
 
       const body = await callJev<{
         model?: string;
@@ -199,6 +208,8 @@ export function createJevRouterStrategy(options: {
         },
         new Map(input.candidates.map((c) => [c.agentId, clamp(to[c.handle])])),
       );
+      const social = answers.social?.choice;
+      const reaction = social ? socialChoice(social) : null;
       const choice = answers.best_agent?.choice;
       const bestPlaced = input.candidates.find((c) => c.handle === choice);
       const spokenTo = input.candidates.find((c) => c.agentId === scored.addressee);
@@ -218,6 +229,14 @@ export function createJevRouterStrategy(options: {
           ? { best: { agentId: bestPlaced.agentId, confidence: clamp(answers.best_agent?.confidence) } }
           : {}),
         ...(answers.already_answered ? { alreadyAnswered: clamp(answers.already_answered.noul) } : {}),
+        ...(social
+          ? {
+              social: {
+                react: reaction !== null && clamp(answers.social?.confidence) >= 0.5,
+                emoji: reaction ?? "",
+              },
+            }
+          : {}),
         ...(reason ? { reason } : {}),
         strategy: "jev",
         decidedBy: { step: "jev" },

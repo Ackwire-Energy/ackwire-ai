@@ -27,7 +27,7 @@ import { audienceSql } from "./audience";
 import { caches } from "./cache";
 import { summarizeGrants } from "./capabilities";
 import { quotedLine } from "./context";
-import { addAgentReaction } from "./context/feedback";
+import { addAgentReaction, isValidReaction, normalizeReaction } from "./context/feedback";
 import { createAgentRuns, requesterOf } from "./dispatch";
 import { type DecidedBy, MENTION_NEEDED } from "./events";
 import { cutText } from "./format";
@@ -120,6 +120,11 @@ export interface RoutingResult {
   best?: { agentId: string; confidence: number };
   /** The deciding step's own words (model text: stored after the step's name, never shown). */
   reason?: string;
+  /**
+   * A purely social message (a greeting, goodnight, goodbye, thanks, ok, congratulations) that needs no real answer:
+   * `react` with one fitting `emoji`. Missing when the step doesn't tell; then `socialReaction` stands in.
+   */
+  social?: { react: boolean; emoji: string };
   /** Usage record of the call the strategy made, if any. */
   usageRecordId?: string;
   /** Which strategy actually decided (`jev`, `llm:<model>`, `plan:<kind>`), when it isn't the configured one. */
@@ -293,6 +298,21 @@ export function selectAgents(
     .map(([agentId]) => agentId);
 }
 
+/** The only reactions a step may choose for a social message (`RoutingResult.social`), with when each fits. */
+export const SOCIAL_REACTIONS: Record<string, string> = {
+  "🌙": "Says good night, or that they are off to sleep.",
+  "☀️": "Says good morning.",
+  "👋": "Says hi, good afternoon, or bye.",
+  "🎉": "Congratulates or celebrates.",
+  "🙏": "Thanks.",
+  "❤️": "Shows affection.",
+  "👍": "An ok, an acknowledgement, or cheers.",
+};
+const bareEmoji = (e: string) => e.trim().replace(/\uFE0F/g, "");
+/** One of `SOCIAL_REACTIONS`, however the variation selector was written ("❤" is "❤️"), else null. */
+export const socialChoice = (emoji: string) =>
+  Object.keys(SOCIAL_REACTIONS).find((e) => bareEmoji(e) === bareEmoji(emoji)) ?? null;
+
 /** Who a message speaks to, in every step's words (Jev's questions and `ROUTER_SYSTEM`). */
 export const SPOKEN_TO =
   'A message speaks to the agent it asks to answer or to act (by @, by name or by its role), not to an agent it only names as someone to ask, involve or hand over to, or only talks about: "Mila, ask Omar for the sales numbers" speaks to Mila, and Mila asks Omar. A follow-up that names another agent only as someone to ask, involve or hand over to still speaks to the agent the person was just talking to: right after Omar spoke, "ask Mila if the PR is up" speaks to Omar.';
@@ -317,6 +337,7 @@ export const ROUTER_SYSTEM = [
   "Also give `needs_agent`: the probability that any agent at all should reply.",
   'And `for_everyone`: the probability that the message speaks to all the agents and each one has its own answer. A question or task with one answer (a number, a report, a fix) is for one agent, even when several could do it: then it is low. Something they share (the workspace computer, a repo, the team numbers) has one answer, even when the message says "our" or comes right after a question to each of them.',
   "And `already_answered`: the probability that an agent in <history> already answered what <message> asks, so another agent's answer would just repeat it.",
+  'And `social`: when <message> is purely social and needs no real answer (a greeting, good morning, good night, goodbye, thanks, an ok, cheers, congratulations), `react` true with the one emoji that fits it (🌙 good night or off to sleep, ☀️ good morning, 👋 hi or bye, 🎉 congratulations, 🙏 thanks, ❤️ affection, 👍 an ok); then needs_agent is low. Else `react` false and `emoji` "". When the person wants an actual reply (they ask, insist, or complain that nobody answered: "alô???", "ninguém vai responder?", a greeting again after nobody answered the first), `react` is false and needs_agent at least 0.5: an agent answers briefly.',
   "Keep `reason` under 15 words.",
 ].join("\n");
 
@@ -329,6 +350,12 @@ export function routerPrompt(input: RoutingInput) {
       needs_agent: { type: "number" },
       for_everyone: { type: "number" },
       already_answered: { type: "number" },
+      social: {
+        type: "object",
+        properties: { react: { type: "boolean" }, emoji: { enum: ["", ...Object.keys(SOCIAL_REACTIONS)] } },
+        required: ["react", "emoji"],
+        additionalProperties: false,
+      },
       scores: {
         type: "array",
         items: {
@@ -343,7 +370,7 @@ export function routerPrompt(input: RoutingInput) {
       },
       reason: { type: "string" },
     },
-    required: ["addressee", "needs_agent", "for_everyone", "already_answered", "scores", "reason"],
+    required: ["addressee", "needs_agent", "for_everyone", "already_answered", "social", "scores", "reason"],
     additionalProperties: false,
   };
   const agentsText = input.candidates
@@ -377,11 +404,11 @@ export function routerPrompt(input: RoutingInput) {
 export function scoresOf(
   input: Pick<RoutingInput, "candidates" | "authorUserId">,
   parsed: ReturnType<typeof parseRouterOutput>,
-): Pick<RoutingResult, "agents" | "needsAgent" | "forEveryone" | "alreadyAnswered" | "addressee"> {
+): Pick<RoutingResult, "agents" | "needsAgent" | "forEveryone" | "alreadyAnswered" | "addressee" | "social"> {
   const byHandle = new Map(input.candidates.map((c) => [c.handle, c.agentId]));
   const idOf = (handle: string) => byHandle.get(handle.replace(/^@/, "").toLowerCase());
   const to = parsed.addressee && asksAddressee(input) ? idOf(parsed.addressee) : undefined;
-  return withAddressee(
+  const scored = withAddressee(
     {
       agents: parsed.scores.flatMap((s) => {
         const agentId = idOf(s.handle);
@@ -393,6 +420,20 @@ export function scoresOf(
     },
     new Map(to ? [[to, 1]] : []),
   );
+  return parsed.social ? { ...scored, social: parsed.social } : scored;
+}
+
+/**
+ * A small model's `social`: a reaction only from `SOCIAL_REACTIONS`. Any other emoji (one the person's message pushed
+ * it toward, or text around it) is no choice: `socialReaction` decides.
+ */
+function socialOf(social: { react?: unknown; emoji?: unknown } | null | undefined): {
+  social?: { react: boolean; emoji: string };
+} {
+  if (typeof social?.react !== "boolean") return {};
+  if (!social.react) return { social: { react: false, emoji: "" } };
+  const emoji = typeof social.emoji === "string" ? socialChoice(social.emoji) : null;
+  return emoji ? { social: { react: true, emoji } } : {};
 }
 
 /** A small model's answer within this, or the next step decides. */
@@ -465,6 +506,7 @@ export function parseRouterJson(raw: unknown): {
   for_everyone: number;
   already_answered: number;
   scores: { handle: string; score: number }[];
+  social?: { react: boolean; emoji: string };
   reason: string;
 } {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new RouterOutputError();
@@ -473,6 +515,7 @@ export function parseRouterJson(raw: unknown): {
     needs_agent?: unknown;
     for_everyone?: unknown;
     already_answered?: unknown;
+    social?: { react?: unknown; emoji?: unknown } | null;
     scores?: unknown;
     reason?: unknown;
   };
@@ -490,6 +533,7 @@ export function parseRouterJson(raw: unknown): {
     for_everyone: typeof o.for_everyone === "number" ? o.for_everyone : 0,
     already_answered: typeof o.already_answered === "number" ? o.already_answered : 0,
     scores,
+    ...socialOf(o.social),
     reason: typeof o.reason === "string" ? o.reason : "",
   };
 }
@@ -612,7 +656,7 @@ export interface RouterDeps {
    * server). Absent or 0: no wait, and each message is decided alone.
    */
   quietMs?: number;
-  /** Where an agent's reaction to a person's thanks shows live (`thanksReaction`). */
+  /** Where an agent's reaction to a person's social message shows live (`RoutingResult.social`). */
   pubsub?: PubSub;
 }
 
@@ -654,7 +698,7 @@ export interface RouteResult {
   reason?: string;
   /** The step that picked (receipts). */
   decidedBy?: DecidedBy;
-  /** A person thanked the agent that just answered them, and nobody answers: that agent's reaction instead. */
+  /** A person's social message (a greeting, thanks, an ok) nobody answers: one agent's reaction instead. */
   reacted?: { agentId: string; reaction: string };
 }
 
@@ -1119,7 +1163,7 @@ export async function routeMessage(
       );
     return (row?.n ?? 0) >= DEFAULT_PICKS_PER_HOUR;
   };
-  // Whom a person's thanks is for: the agent that answered their own previous message in this conversation (the one
+  // The agent that answered this person's own previous message in this conversation (the one
   // they mentioned there, else the first to answer it), when only agents spoke since. Never one whose last words
   // asked them something: an "ok" there is an answer, not thanks. A quote or a thread reply to an agent never gets
   // here: the reply rule already gives that agent a run, which may pass.
@@ -1139,6 +1183,42 @@ export async function routeMessage(
       (m) => m.authorAgentId === agentId && (m === root || m.threadId === message.threadId),
     );
     return said?.body.trim().split("\n").at(-1)?.includes("?") ? null : agentId;
+  };
+  // A social message nobody answers (a greeting, goodnight, thanks, an ok) gets one agent's reaction, the emoji the
+  // step chose (`social`), else `socialReaction`'s. Who reacts: the agent it speaks to, else the one that just answered
+  // this person here, else, for a greeting or a congratulation to the room, the agent they talk with, else the best
+  // placed agent; thanks, an ok or affection are always for someone, so nobody then. Never between people, never on an
+  // agent's message.
+  const reactToSocial = async (decided: RoutingResult | null): Promise<RouteResult["reacted"]> => {
+    if (byAgent || toPerson || peopleTalking) return undefined;
+    const emoji = decided?.social ? (decided.social.react ? decided.social.emoji : "") : socialReaction(saidText);
+    const reaction = emoji ? normalizeReaction(emoji) : "";
+    if (!isValidReaction(reaction)) return undefined;
+    const named = address.filter((n) => n.agent && candidateIds.has(n.id));
+    const toRoom = !["+1", "🙏", "❤️", "❤"].includes(reaction);
+    const agentId =
+      (decided?.addressee && candidateIds.has(decided.addressee) ? decided.addressee : null) ??
+      (named.length === 1 ? named[0]?.id : null) ??
+      thankedAgent() ??
+      (toRoom
+        ? ((talkingWith && candidateIds.has(talkingWith) ? talkingWith : null) ??
+          bestPlaced(
+            (id) => Math.max(0, ...(decided?.agents ?? []).filter((a) => a.agentId === id).map((a) => a.score)),
+            decided?.best,
+          ))
+        : null);
+    if (!agentId) return undefined;
+    // Cosmetic: a reaction that fails never fails the routing.
+    return addAgentReaction(
+      db,
+      { orgId: message.orgId, agentId, messageId: message.id, reaction },
+      deps.pubsub,
+      // The person sees the reaction live on their own message; an inbox line about it is noise.
+      { notify: false },
+    ).then(
+      () => ({ agentId, reaction }),
+      () => undefined,
+    );
   };
   // Which default tier picked (R5): the agent the person talks with, the coordinator, the best placed agent.
   let fallback: "talk" | "coordinator" | "best" | null = null;
@@ -1233,7 +1313,14 @@ export async function routeMessage(
       .onConflictDoNothing()
       .returning({ id: routingDecisions.id });
     if (stored.length === 0) return { runs: [], skipped: "already_routed" };
-    return { runs: [], selected: [], seenBy: candidates.map((c) => c.agentId), reason: MENTION_NEEDED };
+    const reacted = await reactToSocial(null);
+    return {
+      runs: [],
+      selected: [],
+      ...(reacted ? { reacted } : {}),
+      seenBy: candidates.map((c) => c.agentId),
+      reason: MENTION_NEEDED,
+    };
   }
   const decided = result;
   const addressee = !byAgent && decided.addressee && candidateIds.has(decided.addressee) ? decided.addressee : null;
@@ -1382,22 +1469,7 @@ export async function routeMessage(
     return createAgentRuns(tx, message, chosen, "router", { joinChannelRun: message.authorType === "person" });
   });
   if (!runs) return { runs: [], skipped: "already_routed" };
-  const thanked = !byAgent && chosen.length === 0 && !toPerson && !peopleTalking ? thankedAgent() : null;
-  const reaction = thanked ? thanksReaction(saidText) : null;
-  let reacted: RouteResult["reacted"];
-  if (thanked && reaction) {
-    // Cosmetic: a reaction that fails never fails the routing.
-    reacted = await addAgentReaction(
-      db,
-      { orgId: message.orgId, agentId: thanked, messageId: message.id, reaction },
-      deps.pubsub,
-      // The person sees the reaction live on their own message; an inbox line about their own thanks is noise.
-      { notify: false },
-    ).then(
-      () => ({ agentId: thanked, reaction }),
-      () => undefined,
-    );
-  }
+  const reacted = chosen.length === 0 ? await reactToSocial(decided) : undefined;
   return {
     runs,
     selected: chosen,
@@ -1527,31 +1599,37 @@ export function isShortFollowUp(body: string) {
   return text.length <= 60 && text.split(/\s+/).length <= 8;
 }
 
-const THANKS_WORDS = new Set(
-  "vlw valeu valew obrigado obrigada obg obgd obgda brigado brigada brigadao obrigadao grato grata agradeco thanks thank thx ty tks tnx tysm gracias merci 🙏".split(
-    " ",
-  ),
-);
-const LOVE_WORDS = new Set(
-  "amo love amei lindo linda querido querida fofo fofa s2 ❤ 😍 🥰 💜 💙 💚 🧡 💛 🤍 😘".split(" "),
-);
-const OK_WORDS = new Set(
-  "ok okk okay blz beleza show top perfeito perfeita perfect great nice cool massa boa fechado certo entendi joia 👍 👌 🙌 💪 tranquilo awesome".split(
-    " ",
-  ),
-);
-/** Words that go with thanks without changing it ("vlw pai", "muito obrigado mesmo", "thank you so much"). */
-const THANKS_FILLER = new Set(
-  "pai mae cara mano man bro brother chefe meu minha muito muita mt mto demais mesmo ai ae hein de bola te you u so much a lot very again".split(
+// `socialReaction`'s words, each with its emoji, in the order they win ("valeu, boa noite" thanks).
+const SOCIAL_WORDS: [emoji: string, words: Set<string>][] = (
+  [
+    ["❤️", "amo love amei lindo linda querido querida fofo fofa s2 ❤ 😍 🥰 💜 💙 💚 🧡 💛 🤍 😘"],
+    ["🎉", "parabens congrats congratulations arrasou 🎉 🥳"],
+    [
+      "🙏",
+      "vlw valeu valew obrigado obrigada obg obgd obgda brigado brigada brigadao obrigadao grato grata agradeco thanks thank thx ty tks tnx tysm gracias merci 🙏",
+    ],
+    ["🌙", "noite night nite gn dormir sleep 🌙 😴"],
+    ["☀️", "dia morning gm ☀"],
+    ["👋", "oi ola opa eai eae salve hi hello hey tarde afternoon evening tchau bye flw falou fui ate amanha logo 👋"],
+    [
+      "+1",
+      "ok okk okay blz beleza show top perfeito perfeita perfect great nice cool massa boa fechado certo entendi joia 👍 👌 🙌 💪 tranquilo awesome",
+    ],
+  ] as const
+).map(([emoji, words]) => [emoji, new Set(words.split(" "))]);
+/** Words that go with them without changing them ("vlw pai", "boa noite pessoal", "thank you so much"). */
+const SOCIAL_FILLER = new Set(
+  "pai mae cara mano man bro brother chefe meu minha muito muita mt mto demais mesmo ai ae hein de bola te you u so much a lot very again bom good pessoal gente galera todos todo mundo all everyone guys team to indo vou mais".split(
     " ",
   ),
 );
 
 /**
- * The reaction a short thanks or acknowledgement gets (🙏 thanks, ❤️ affection, 👍 an ok), in Portuguese or
- * English: every word one of those or a filler, no question. Anything else: null.
+ * The reaction a short social message gets when no step chose one (`RoutingResult.social`): 🙏 thanks, ❤️ affection,
+ * 🎉 congratulations, 🌙 good night, ☀️ good morning, 👋 hi or bye, 👍 an ok, in Portuguese or English. Every word one
+ * of those or a filler, no question. Anything else: null.
  */
-export function thanksReaction(text: string): string | null {
+export function socialReaction(text: string): string | null {
   if (text.includes("?")) return null;
   const words = (
     fold(text)
@@ -1562,10 +1640,7 @@ export function thanksReaction(text: string): string | null {
     // "valeuuu", "okkk": a held letter counts once; "kkk" and "haha" are laughter.
     .map((w) => w.replace(/(\p{L})\1{2,}/gu, "$1"))
     .filter((w) => !/^(k+|(ha)+|rs+)$/.test(w));
-  if (words.length === 0 || words.length > 6) return null;
-  if (!words.every((w) => THANKS_WORDS.has(w) || LOVE_WORDS.has(w) || OK_WORDS.has(w) || THANKS_FILLER.has(w)))
-    return null;
-  if (words.some((w) => LOVE_WORDS.has(w))) return "❤️";
-  if (words.some((w) => THANKS_WORDS.has(w))) return "🙏";
-  return words.some((w) => OK_WORDS.has(w)) ? "+1" : null;
+  if (words.length === 0 || words.length > 8) return null;
+  if (!words.every((w) => SOCIAL_FILLER.has(w) || SOCIAL_WORDS.some(([, set]) => set.has(w)))) return null;
+  return SOCIAL_WORDS.find(([, set]) => words.some((w) => set.has(w)))?.[0] ?? null;
 }
