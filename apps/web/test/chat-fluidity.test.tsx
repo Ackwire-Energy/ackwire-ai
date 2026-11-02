@@ -57,6 +57,17 @@ describe("a streaming answer's done paragraphs stay put", () => {
       expect(dois?.querySelector(".ac-word")).toBeNull();
     }
   });
+
+  test("the final message keeps every block the live answer drew (not only the wrapper)", () => {
+    const body = "Um.\n\nDois.\n\nTres.\n\nQuatro.";
+    const view = render(<MessageBody body={body} live />);
+    const before = [...view.container.querySelectorAll(".md--message > *")];
+    view.rerender(<MessageBody body={body} />);
+    const after = [...view.container.querySelectorAll(".md--message > *")];
+    expect(after).toHaveLength(4);
+    for (const [i, el] of after.entries()) expect(el).toBe(before[i] as Element);
+    expect(view.container.querySelector(".ac-word")).toBeNull();
+  });
 });
 
 describe("live answer → saved message", () => {

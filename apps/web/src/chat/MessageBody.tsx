@@ -12,8 +12,9 @@ import { type ChannelRenderer, Markdown, type MentionRenderer, type WikiLinkRend
  *
  * `live` (an agent's answer still streaming): the finished blocks render once
  * and stay; only the last block re-renders as words arrive, each word fading
- * in (`.ac-word`). The final message renders without `live`: plain, so nothing
- * animates again when it takes the live row's place.
+ * in (`.ac-word`). The final message renders without `live` but split the same
+ * way: when it takes the live row's place its blocks are the same elements (a
+ * selection, an open code card or a chart stay), and nothing animates again.
  */
 export function MessageBody({
   body,
@@ -64,12 +65,19 @@ export function MessageBody({
   );
   // One `.md--message` around every block, live or final: the space between blocks never changes as a block settles
   // or as the final message takes the live row's place (two wrappers had none between them).
-  const { settled, tail } = live ? splitSettled(body) : { settled: "", tail: body };
+  const { settled, tail } = splitSettled(body);
   return (
     <ChartAccent.Provider value={accent}>
       <div className="md md--message">
         {settled && (
-          <SettledBlocks source={settled} mention={stableMention} channel={stableChannel} wikiLink={stableWiki} />
+          // Live: stable renderers, so a new function identity doesn't re-render it every frame. Final: the real ones
+          // (a mention resolved later still shows); the swap only re-renders the same blocks.
+          <SettledBlocks
+            source={settled}
+            mention={live ? stableMention : mention}
+            channel={live ? stableChannel : channel}
+            wikiLink={live ? stableWiki : wikiLink}
+          />
         )}
         <Markdown
           source={tail}
@@ -95,7 +103,7 @@ const SettledBlocks = memo(function SettledBlocks({
   source: string;
   mention: MentionRenderer;
   channel: ChannelRenderer;
-  wikiLink: WikiLinkRenderer;
+  wikiLink?: WikiLinkRenderer;
 }) {
   return <Markdown source={source} variant="message" mention={mention} channel={channel} wikiLink={wikiLink} bare />;
 });
