@@ -515,11 +515,6 @@ async function enqueueResume(tx: Executor, row: Pick<Approval, "id" | "orgId" | 
   }
 }
 
-async function mayDecide(db: Database, actorId: string, approval: Approval) {
-  const membership = await requirePermission(db, actorId, approval.orgId, "read");
-  return decides(approval, actorId, can(membership, "approve_actions"));
-}
-
 /**
  * Approves or refuses a pending approval. Only the agent's owner and org
  * admins may (a `request_permission` one: admins only, `adminsDecide`). The decision and the job that resumes the run commit together;
@@ -543,7 +538,8 @@ export async function decideApproval(
     .from(approvals)
     .where(and(eq(approvals.id, approvalId), eq(approvals.orgId, orgId)));
   if (!current) throw new NotFoundError("Approval not found");
-  if (!(await mayDecide(db, actorId, current))) {
+  const admin = can(await requirePermission(db, actorId, current.orgId, "read"), "approve_actions");
+  if (!decides(current, actorId, admin)) {
     throw new ForbiddenError(
       current.approvers?.requestedBy === actorId
         ? "You asked for this: someone else approves it"
@@ -580,6 +576,16 @@ export async function decideApproval(
     await enqueueResume(tx, row);
     const always = !expired && kind && row.connectionId ? { connectionId: row.connectionId, ...kind } : null;
     if (always) {
+      // The agent changed hands since it asked: what its old owner approves for good is dropped with the handover
+      // (`dropAgentRules`), so they make none now. Locked, so a handover running now waits for this rule and drops it.
+      const [agent] = await tx
+        .select({ ownerUserId: agents.ownerUserId })
+        .from(agents)
+        .where(eq(agents.id, row.agentId))
+        .for("share");
+      if (!admin && agent?.ownerUserId !== row.ownerUserId && agent?.ownerUserId !== actorId) {
+        throw new ConflictError("This request can't be approved for good", "approval.always_unavailable");
+      }
       await addApprovalRules(tx, { orgId, agentId: row.agentId, connectionId: always.connectionId }, always, actorId);
     }
     if (updated?.status === "refused") await settleAheadRoutine(tx, updated);
@@ -598,7 +604,7 @@ export async function decideApproval(
 /**
  * "Aprovar tudo" / "Agora não para todos" on a card: decides exactly these approvals (the items the card listed
  * when the person clicked, never one that joined since), each its own row, decision and audit. Only the items
- * this person may decide are decided (`mayDecide`, per item); the rest come back in `skipped`. Each run that
+ * this person may decide are decided (`decides`, per item); the rest come back in `skipped`. Each run that
  * asked resumes once, after all of its items here are decided in the same transaction.
  */
 export async function decideApprovals(
