@@ -609,7 +609,8 @@ const PLAN_PROVIDER = { claude_code: "anthropic", codex: "openai", cursor: "curs
 
 /**
  * "Pelo plano, num computador": Claude Code, Codex and Cursor on each computer that has them, as cards like the models';
- * one that no computer offers says why ("Sem computador", "Indisponível") instead. A card names its computer only
+ * one that no computer offers says why ("Sem computador", "Indisponível") instead, except Cursor, which only shows where
+ * it runs. A card names its computer only
  * where there is more than one (`namesComputers`), or when it is offline.
  */
 export function PlanCards({
@@ -637,6 +638,8 @@ export function PlanCards({
     <div className="newag__models" role="group" aria-label={t("newAgent.plans")}>
       {PLAN_KINDS.flatMap((kind) => {
         const on = machines.filter((m) => m.options.some((o) => o.kind === kind && o.available));
+        // Cursor (ADR 0114) only where a computer runs it; Claude Code and Codex say why they can't.
+        if (on.length === 0 && kind === "cursor") return [];
         if (on.length === 0)
           return [
             <button key={kind} type="button" className="newag__model" aria-disabled="true">

@@ -600,6 +600,25 @@ describe("Criar agente: what gets created", () => {
     ]);
   });
 
+  test("plan: Cursor's card shows only where a computer runs it, with Cursor's mark (ADR 0114)", async () => {
+    const state = seedState();
+    state.brainMachines = [
+      {
+        machineId: "machine_1",
+        name: "MacBook",
+        online: true,
+        options: [plan("claude_code", true), plan("codex", false), { ...plan("codex", true), kind: "cursor" as const }],
+      },
+    ];
+    await open(state);
+    await startAs("Assistente");
+    await proceed(4);
+    const group = screen().getByRole("group", { name: "Pelo plano, num computador" });
+    const cursor = within(group).getByRole("button", { name: /^Cursor/ });
+    expect(cursor.querySelector(".ac-brand[data-mark='cursor']")).not.toBeNull();
+    expect(cursor.textContent).toContain("Usa o plano do Cursor de quem conectou o computador.");
+  });
+
   test("plan: Codex on the workspace's computer, whose own sign-in thinks for nobody: ChatGPT's sign-in opens once it's created", async () => {
     const state = seedState();
     state.credentials = [];

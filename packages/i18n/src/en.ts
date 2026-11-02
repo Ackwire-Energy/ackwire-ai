@@ -2830,7 +2830,7 @@ export const en: Translations = {
             "Wrong account? Sign out there and try again. The account stays only on {{computer}}. You type your password on\u00a0{{brand}}'s\u00a0page.",
           open: { claude_code: "Sign in with Claude", codex: "Sign in with ChatGPT", cursor: "Sign in with Cursor" },
           /** Cursor's sign-in ends on the computer by itself once the person signs in on its page. */
-          cursorFinish: "Sign in on Cursor's page. {{computer}} finishes by itself.",
+          cursorFinish: "Sign in on Cursor's page, and the sign-in finishes on {{computer}} by itself.",
           cursorKey: "Use a Cursor API key instead",
           openAgain: "Open again",
           stepTwo: "Paste the code Claude shows",

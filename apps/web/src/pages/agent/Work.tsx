@@ -762,7 +762,11 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
     "key",
     "claude",
     "chatgpt",
-    "cursor",
+    // Cursor (ADR 0114) only where a computer here runs it, or the agent thinks with it: Connect an AI shows it always.
+    ...(savedCard === "cursor" ||
+    [view.options, ...machines.map((m) => m.options)].flat().some((o) => o.kind === "cursor" && o.available)
+      ? (["cursor"] as const)
+      : []),
     ...PLAN_IDS.filter(
       (p) => p === savedCard || allAccounts.some((a) => a.provider === p && (a.mine || a.id === view.account)),
     ),

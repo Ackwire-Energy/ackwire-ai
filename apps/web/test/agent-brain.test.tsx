@@ -194,6 +194,42 @@ describe("Quem pensa (its dialog)", () => {
     expect((within(d).getByRole("button", { name: "Usar" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
+  test("Cursor (ADR 0114): a plan card where the computer runs it, its models the plan's first, said so", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const base = fakeAgentBrain(ADA_ID);
+    const cursor = {
+      kind: "cursor" as const,
+      available: true,
+      experimental: true,
+      models: [
+        { value: "grok-5-code", label: "Grok 5 Code", inPlan: true },
+        { value: "claude-opus-5-5", label: "Claude Opus 5.5" },
+      ],
+      defaultModel: null,
+    };
+    const options = [...base.options, cursor];
+    const machines = [{ machineId: "machine_1", name: "MacBook", online: true, options }];
+    api.agents.brain = async () => ({ ...base, options, machines });
+    await open(state, api);
+    const d = await brainDialog();
+    const rows = within(within(d).getByRole("radiogroup", { name: "Quem pensa" })).getAllByRole("radio");
+    expect(rows.map((r) => r.querySelector(".ac-optrow__title")?.textContent)).toEqual([
+      "Chave de API",
+      "Claude",
+      "ChatGPTEm teste",
+      "CursorEm teste",
+    ]);
+    expect(rows[3]?.querySelector(".ac-brand[data-mark='cursor']")).not.toBeNull();
+    await act(async () => fireEvent.click(rows[3] as HTMLElement));
+    await settle(4);
+    const names = await modelNames(d);
+    expect(names.some((n) => n?.includes("Grok 5 Code") && n.includes("No seu plano do Cursor"))).toBe(true);
+    expect(names.some((n) => n?.includes("Claude Opus 5.5") && n.includes("O Cursor cobra pelo preço da API"))).toBe(
+      true,
+    );
+  });
+
   test("on the computer it already works on: no side words on the plans, no line by the buttons", async () => {
     const state = seedState();
     const api = createFakeApi(state);
