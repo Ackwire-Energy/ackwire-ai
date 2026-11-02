@@ -134,22 +134,41 @@ function jsonRpcText(text: string): string | null {
   }
 }
 
-/** Rewrites each SSE `data:` line that holds JSON; every other line passes as it came. */
-function sseJsonRpcLines(): TransformStream<string, string> {
+/**
+ * Rewrites each SSE event whose data is JSON as one `data:` line; every other line passes as it came. An event's data
+ * may span several `data:` lines (joined with \n) and lines may end in \r\n, \r or \n, as SSE allows.
+ */
+function sseJsonRpcEvents(): TransformStream<string, string> {
   let rest = "";
-  const line = (l: string) => {
-    if (!l.startsWith("data:")) return l;
-    const json = jsonRpcText(l.slice(5));
-    return json === null ? l : `data: ${json}`;
+  let data: string[] = [];
+  let raw: string[] = [];
+  const line = (l: string, out: TransformStreamDefaultController<string>) => {
+    if (l.startsWith("data:")) {
+      data.push(l.slice(l.startsWith("data: ") ? 6 : 5));
+      raw.push(l);
+      return;
+    }
+    if (l === "") {
+      const json = data.length > 0 ? jsonRpcText(data.join("\n")) : null;
+      for (const r of json === null ? raw : [`data: ${json}`]) out.enqueue(`${r}\n`);
+      data = [];
+      raw = [];
+    }
+    out.enqueue(`${l}\n`);
   };
   return new TransformStream({
     transform(chunk, out) {
-      const lines = (rest + chunk).split("\n");
-      rest = lines.pop() ?? "";
-      for (const l of lines) out.enqueue(`${line(l)}\n`);
+      const text = rest + chunk;
+      // A trailing \r may be the first half of \r\n: wait for the next chunk to tell.
+      const cut = text.endsWith("\r") ? text.length - 1 : text.length;
+      const lines = text.slice(0, cut).split(/\r\n|\r|\n/);
+      rest = (lines.pop() ?? "") + text.slice(cut);
+      for (const l of lines) line(l, out);
     },
     flush(out) {
-      if (rest) out.enqueue(line(rest));
+      if (rest.endsWith("\r")) line(rest.slice(0, -1), out);
+      else if (rest) raw.push(rest);
+      for (const r of raw) out.enqueue(`${r}\n`);
     },
   });
 }
@@ -172,7 +191,7 @@ export function tolerantMcpFetch(base: FetchLike = fetch): FetchLike {
     } else if (type.includes("text/event-stream")) {
       body = res.body
         .pipeThrough(new TextDecoderStream())
-        .pipeThrough(sseJsonRpcLines())
+        .pipeThrough(sseJsonRpcEvents())
         .pipeThrough(new TextEncoderStream());
     } else {
       return res;

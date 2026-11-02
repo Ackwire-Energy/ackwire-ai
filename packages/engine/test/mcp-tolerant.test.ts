@@ -6,11 +6,14 @@ import { type Fixture, setup } from "./fixtures";
 
 const SERVER = "https://cnpj.example.com/mcp";
 
+type Sse = "crlf" | "multiline" | "cr";
+
 /**
  * An MCP server over HTTP (no network) that, like some public servers, adds its own top-level member (`fonte`) to
- * every JSON-RPC answer. `sse`: answers as an event stream, cut in the middle of its lines.
+ * every JSON-RPC answer. `sse`: answers as an event stream cut in the middle of its lines, with \r\n line endings, the
+ * message pretty-printed over several `data:` lines, or bare \r line endings.
  */
-function chattyServer(mode: { sse?: boolean; down?: boolean } = {}) {
+function chattyServer(mode: { sse?: Sse; down?: boolean } = {}) {
   const fetch: FetchLike = async (_url, init) => {
     if (mode.down) return new Response("upstream timed out", { status: 502 });
     if ((init?.method ?? "GET") !== "POST") return new Response(null, { status: 405 });
@@ -31,7 +34,15 @@ function chattyServer(mode: { sse?: boolean; down?: boolean } = {}) {
           };
     const text = JSON.stringify({ jsonrpc: "2.0", id: msg.id, result, fonte: { nome: "Receita", em: "2026" } });
     if (!mode.sse) return new Response(text, { headers: { "content-type": "application/json" } });
-    const event = `event: message\r\ndata: ${text}\r\n\r\n`;
+    const event =
+      mode.sse === "multiline"
+        ? `event: message\n${JSON.stringify(JSON.parse(text), null, 2)
+            .split("\n")
+            .map((l) => `data: ${l}\n`)
+            .join("")}\n`
+        : mode.sse === "cr"
+          ? `event: message\rdata: ${text}\r\r`
+          : `event: message\r\ndata: ${text}\r\n\r\n`;
     const cut = Math.floor(event.length / 2);
     const enc = new TextEncoder();
     const body = new ReadableStream({
@@ -50,8 +61,8 @@ const over = (fetch: FetchLike) =>
   mcpSessionOver(new StreamableHTTPClientTransport(new URL(SERVER), { fetch: tolerantMcpFetch(fetch) }));
 
 describe("MCP servers that add their own members to JSON-RPC", () => {
-  for (const sse of [false, true]) {
-    test(`their tools are listed (${sse ? "event stream" : "JSON"})`, async () => {
+  for (const sse of [undefined, "crlf", "multiline", "cr"] as const) {
+    test(`their tools are listed (${sse ? `event stream, ${sse}` : "JSON"})`, async () => {
       const session = await over(chattyServer({ sse }));
       const tools = await session.listTools();
       expect(tools.map((t) => [t.name, t.readOnlyHint])).toEqual([
@@ -62,6 +73,23 @@ describe("MCP servers that add their own members to JSON-RPC", () => {
       await session.close();
     });
   }
+
+  test("an event with bare \\r line endings is passed on before the stream ends", async () => {
+    const enc = new TextEncoder();
+    const msg = `{"jsonrpc":"2.0","method":"notifications/tools/list_changed","fonte":{}}`;
+    const open = new ReadableStream<Uint8Array>({
+      start: (c) => c.enqueue(enc.encode(`data: ${msg}\r\rdata: next`)),
+    });
+    const fetch = tolerantMcpFetch(
+      async () => new Response(open, { headers: { "content-type": "text/event-stream" } }),
+    );
+    const res = await fetch(SERVER);
+    const reader = (res.body as ReadableStream<Uint8Array>).pipeThrough(new TextDecoderStream()).getReader();
+    let seen = "";
+    while (!seen.includes("\n\n")) seen += (await reader.read()).value;
+    expect(seen).toBe(`data: {"jsonrpc":"2.0","method":"notifications/tools/list_changed"}\n\n`);
+    await reader.cancel();
+  });
 
   test("the SDK alone refuses them: what the tolerant fetch is for", async () => {
     const transport = new StreamableHTTPClientTransport(new URL(SERVER), { fetch: chattyServer() });
