@@ -119,6 +119,7 @@ import { ChannelMembersSheet } from "./ChannelMembers";
 import { ChannelPicker } from "./ChannelPicker";
 import { ConversationSwitcher } from "./ConversationSwitcher";
 import { takeComposerRequest, useComposerRequest } from "./composer-request";
+import { DATE_PILL_IDLE_MS, DatePill } from "./DatePill";
 import { DmComputerButton } from "./DmComputerButton";
 import { EventLine } from "./EventLine";
 import { FirstDay } from "./FirstDay";
@@ -130,6 +131,7 @@ import { useChatLive } from "./live";
 import {
   buildRows,
   type ChatRow,
+  dayInView,
   mayStopRun,
   mergeTimeline,
   parseSlash,
@@ -733,6 +735,9 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
       if (dmAgentId && !steered && !isMediaAlone(message)) {
         live.expect(message.threadId ?? message.id, [dmAgentId], message.id);
       }
+      // A channel with agents: the router (or a mention) decides who answers, and `message.routed` always follows.
+      // A GIF or a sticker alone routes to nobody, so it gets no clock to keep.
+      if (channel && channelAgents.length > 0 && !isMediaAlone(message)) live.picking(message.id);
     },
     onFailed: (_error, { waits }) => {
       if (!waits) toast({ title: t("mobile.chat.notSent"), icon: "x" });
@@ -1079,8 +1084,26 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
   // Stickers play in the rows in view (a few of them), never under a sheet (ADR 0091).
   const [stickers] = useState(createStickerStage);
   useEffect(() => sheet.subscribe(stickers.setCovered), [sheet, stickers]);
+  // The floating date: the day at the top of what is in view, shown while the person drags or flings the list.
+  const [topDay, setTopDay] = useState<string | null>(null);
+  const dayShown = useSharedValue(0);
+  const dayTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const showDay = useCallback(() => {
+    clearTimeout(dayTimer.current);
+    dayShown.value = withTiming(1, { duration: 120 });
+  }, [dayShown]);
+  const hideDay = useCallback(() => {
+    clearTimeout(dayTimer.current);
+    dayTimer.current = setTimeout(() => {
+      dayShown.value = withTiming(0, { duration: 300 });
+    }, DATE_PILL_IDLE_MS);
+  }, [dayShown]);
+  useEffect(() => () => clearTimeout(dayTimer.current), []);
   const onViewable = useCallback<NonNullable<OnViewableItemsChanged<Row>>>(
-    ({ viewableItems }) => stickers.setOnScreen(stickerRowsOnScreen(viewableItems)),
+    ({ viewableItems }) => {
+      stickers.setOnScreen(stickerRowsOnScreen(viewableItems));
+      setTopDay((prev) => dayInView(viewableItems, prev));
+    },
     [stickers],
   );
   // While something covers the conversation (a sheet, the agent's computer) the list ignores the keyboard: it
@@ -1648,9 +1671,17 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                         viewabilityConfig={STICKER_VIEW}
                         onScrollBeginDrag={() => {
                           dragging.current = true;
+                          showDay();
                         }}
-                        onScrollEndDrag={releaseAtEnd}
-                        onMomentumScrollEnd={releaseAtEnd}
+                        onScrollEndDrag={() => {
+                          releaseAtEnd();
+                          hideDay();
+                        }}
+                        onMomentumScrollBegin={showDay}
+                        onMomentumScrollEnd={() => {
+                          releaseAtEnd();
+                          hideDay();
+                        }}
                         onStartReachedThreshold={0.5}
                         keyboardDismissMode="interactive"
                         keyboardShouldPersistTaps="handled"
@@ -1660,6 +1691,7 @@ function Chat({ channelId, threadId }: { channelId: string; threadId: string | n
                       />
                     </JumpToMessageContext.Provider>
                   </StickerStageContext.Provider>
+                  <DatePill day={topDay} shown={dayShown} top={hasPin ? 8 : headerHeight + 8} />
                 </View>
               </Animated.View>
               {showList ? null : (

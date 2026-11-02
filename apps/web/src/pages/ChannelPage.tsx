@@ -104,7 +104,7 @@ import { capitalize, dayLabel, formatFullDate, formatTime, joinNames } from "@ag
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import { hasWideBlock, mentionsHandle } from "@agenteschat/client/lib/markdown";
-import { isMediaAfterReply, messageMediaOf, quoteText } from "@agenteschat/client/lib/media";
+import { isMediaAfterReply, isMediaAlone, messageMediaOf, quoteText } from "@agenteschat/client/lib/media";
 import { serverBody } from "@agenteschat/client/lib/message-body";
 import {
   isOpenMission,
@@ -236,6 +236,7 @@ import {
 } from "@/components/ConsultGroup";
 import { CorrectionAsk } from "@/components/CorrectionAsk";
 import { type ChannelActions, ChannelActionsContext, useChannelActions } from "@/components/channel-actions";
+import { DatePill, type DatePillHandle } from "@/components/DatePill";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { useArchiveChannelWithUndo, useChannelMenu } from "@/components/entity-menus";
 import { ForumMessageCard, ForumSuggestionCard, forumSuggestionOf, forumTopicOfMessage } from "@/components/Forum";
@@ -775,6 +776,10 @@ function ChannelView({
         );
       const fresh = agents.filter((id) => !atWork(id));
       if (fresh.length > 0) live.expect(channel.id, local.id, fresh);
+      // No one guessed in a channel with agents: the router picks, and its `message.routed` always follows. The
+      // clock at once, as its own `message.routing` says; a GIF or a sticker alone routes to nobody, so no clock.
+      else if (agents.length === 0 && !chrome?.dmAgentId && channelAgents.length > 0 && !isMediaAlone(local))
+        live.apply({ type: "message.routing", channelId: channel.id, messageId: local.id, step: "plan" });
     },
     onSent: (message, local) => live.retarget(local.id, message.id),
     // A thread archived meanwhile (`thread.archived`), GIFs or stickers turned off or a GIF gone (`message.media_*`):
@@ -962,6 +967,7 @@ function ChannelView({
   // Newest at the bottom: follow new messages and streaming text while the person is at the
   // bottom; if they scrolled up, offer "Novas mensagens" instead of jumping.
   const scroller = useRef<HTMLElement>(null);
+  const datePill = useRef<DatePillHandle>(null);
   // Every conversation opens at its last message (coming back to one included).
   // Opened at a message: not pinned to the bottom until the person scrolls down.
   const stick = useRef(!focusMessageId);
@@ -1796,6 +1802,7 @@ function ChannelView({
                     </span>
                   </div>
                 )}
+                {olderState !== "loading" && <DatePill scroller={scroller} ref={datePill} />}
                 <AskRegistryProvider value={askRegistry}>
                   <section
                     ref={scroller}
@@ -1826,6 +1833,7 @@ function ChannelView({
                       // A drag selecting text past the top edge scrolls up too: the person is reading.
                       const upByPerson =
                         Date.now() - lastUpGesture.current < GESTURE_MS || (byPerson && selectingIn(e.currentTarget));
+                      if (byPerson) datePill.current?.poke();
                       if (byPerson && e.currentTarget.scrollTop < 240) loadOlder();
                       if (upByPerson && previousTop !== null && e.currentTarget.scrollTop < previousTop) {
                         letGo();
@@ -2348,7 +2356,6 @@ const Timeline = memo(function Timeline({
   );
   const rows: ReactElement<{ message?: MessageType }>[] = [];
   const afterUnshown = () => unshown.has(rows.at(-1)?.key ?? "");
-  const newestKey = items.findLast((i) => i.kind === "message")?.key;
   for (const [at, item] of items.entries()) {
     const grouped = item.kind === "message" && item.grouped && !afterUnshown();
     const after = items[at + 1];
@@ -2362,7 +2369,11 @@ const Timeline = memo(function Timeline({
       );
     }
     if (item.kind === "day") {
-      rows.push(<DayDivider key={item.key}>{dayLabel(t, i18n.language, item.iso)}</DayDivider>);
+      rows.push(
+        <DayDivider key={item.key} day={item.iso}>
+          {dayLabel(t, i18n.language, item.iso)}
+        </DayDivider>,
+      );
       continue;
     }
     if (item.kind !== "message") continue;
@@ -2387,7 +2398,6 @@ const Timeline = memo(function Timeline({
           contextMark={threadsView?.marks.has(m.id)}
           replyContext={item.context}
           lastOfRun={lastByRun.get(m.agentRunId) === item.key}
-          latest={item.key === newestKey}
           run={run}
         />
       ) : (
@@ -2403,7 +2413,6 @@ const Timeline = memo(function Timeline({
           dmPersonId={dmPersonId}
           seen={m.id === seenId}
           helping={m.agentRunId && !isMediaAfterReply(m.meta) ? consultGroups.helping.get(m.agentRunId) : undefined}
-          latest={item.key === newestKey}
           run={run}
         />
       ),
@@ -2507,7 +2516,6 @@ function RunBlock({
   contextMark?: boolean;
   replyContext?: ReplyRef;
   lastOfRun?: boolean;
-  latest?: boolean;
   run?: RunPosition;
 }) {
   const run = useStreams((s) => (message ? undefined : s.runs[runId]));
@@ -3118,7 +3126,6 @@ export const TimelineMessage = memo(function TimelineMessage({
   seen = false,
   helping,
   readOnly = false,
-  latest = true,
   run = "solo",
 }: {
   message: MessageType;
@@ -3143,11 +3150,6 @@ export const TimelineMessage = memo(function TimelineMessage({
   helping?: RunConsultation;
   /** Shown where the person can't act on it (a question opened in the panel): no feedback, reactions or menu. */
   readOnly?: boolean;
-  /**
-   * The conversation's newest message: only it says in words that no agent will answer ("Nenhum agente vai
-   * responder sem @"); older ones keep the check, with the same words in its popover.
-   */
-  latest?: boolean;
   /** Its place in its author's run (`runPosition`): on my own rows, which bubble corners square off. */
   run?: RunPosition;
 }) {
@@ -3489,12 +3491,12 @@ export const TimelineMessage = memo(function TimelineMessage({
       aside={
         receipted || seenSlot ? (
           <>
-            {receipted && <MessageReceipts message={m} part="check" latest={latest} />}
+            {receipted && <MessageReceipts message={m} part="check" />}
             {seenSlot && <SeenMark personId={seen ? dmPersonId : undefined} />}
           </>
         ) : undefined
       }
-      foot={receipted ? <MessageReceipts message={m} part="line" latest={latest} /> : undefined}
+      foot={receipted ? <MessageReceipts message={m} part="line" /> : undefined}
       menu={
         barred && menu.touch.length > 0
           ? { label: t("channel.actions", { name }), items: <MenuEntries entries={menu.touch} /> }

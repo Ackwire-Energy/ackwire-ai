@@ -128,6 +128,31 @@ describe("right click on a message", () => {
     expect(screen().queryByRole("menu", { name: "Ações" })).toBeNull();
   });
 
+  test("the last reaction cell opens every emoji for that message, from the right click and from '…'", async () => {
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState()) });
+    await settle(8);
+    const message = messageOf("o login está devolvendo 401");
+    await act(async () => fireEvent.contextMenu(message, { clientX: 40, clientY: 60 }));
+    await settle(2);
+    const menu = screen().getByRole("menu", { name: "Ações" });
+    await act(async () => fireEvent.click(within(menu).getByRole("menuitem", { name: "Adicionar reação" })));
+    await settle(4);
+    expect(screen().queryByRole("menu", { name: "Ações" })).toBeNull();
+    expect(screen().getByRole("dialog", { name: "Emojis" })).toBeTruthy();
+    await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
+    await settle(2);
+    expect(screen().queryByRole("dialog", { name: "Emojis" })).toBeNull();
+
+    const more = within(message).getAllByRole("button", { name: "Mais ações da mensagem" }).at(-1);
+    if (!more) throw new Error("no … button");
+    await act(async () => fireEvent.pointerDown(more, { button: 0, ctrlKey: false, pointerType: "mouse" }));
+    await settle(2);
+    const dropdown = screen().getByRole("menu");
+    await act(async () => fireEvent.click(within(dropdown).getByRole("menuitem", { name: "Adicionar reação" })));
+    await settle(4);
+    expect(screen().getByRole("dialog", { name: "Emojis" })).toBeTruthy();
+  });
+
   test("the system's look: the app draws it, and the choice comes back into the page", async () => {
     const drawn = inTheApp();
     setMenuLook("system");

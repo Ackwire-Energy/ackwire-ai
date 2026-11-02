@@ -4932,6 +4932,40 @@ html:not([data-pointer]) .tr-ok:focus-visible {
   box-shadow: var(--overlay);
   white-space: nowrap;
 }
+/* The day at the top of the list while the person scrolls (DatePill): the loading pill's look, fading in at once
+   and out a moment after the scroll stops. */
+.channel__date {
+  position: relative;
+  height: 0;
+  z-index: var(--z-sticky);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.channel__date[data-shown] {
+  opacity: 1;
+  transition-duration: 0.12s;
+}
+.channel__date-pill {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-muted);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  box-shadow: var(--overlay);
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .channel__date {
+    transition: none;
+  }
+}
 /*
  * Long conversations: the browser skips laying out and painting rows far off screen. That implies
  * paint containment, which would clip the floating action bar (it sits above the row), so a row

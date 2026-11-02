@@ -1627,6 +1627,11 @@ html:not([data-pointer]) .ac-select__trigger:focus-visible,
 .ac-menu__reaction--more[data-highlighted] {
   color: var(--ink);
 }
+/* Its two icons are wider than an emoji: the cell grows to fit them with its siblings' room on each side. */
+.ac-menu__reaction.ac-menu__reaction--more {
+  width: auto;
+  padding-inline: 6px;
+}
 .ac-menu__note {
   margin: 0;
   max-width: 260px;
@@ -2535,9 +2540,6 @@ html:not([data-pointer]) .ac-row:focus-visible {
   line-height: 20px;
   /* Over a modal dialog too, which turns the page's own off. */
   pointer-events: auto;
-}
-.ac-toast--error .ac-icon {
-  color: var(--danger);
 }
 .ac-toast__text {
   flex: 1;
@@ -4511,6 +4513,35 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
   align-items: center;
   gap: 12px;
   padding: 12px 14px 12px 12px;
+}
+/* Each tone's soft glow from the right edge over the glass, as the sidebar's chosen row has (layout.css,
+   `.sidebar__item[data-status="active"]::before`); its icon in the tone. After the glass rules: their `background`
+   shorthand would clear it. */
+.ac-toast {
+  --toast-tone: var(--faint);
+  background-image: linear-gradient(
+    to left,
+    color-mix(in srgb, var(--toast-tone) var(--toast-glow, 24%), transparent),
+    transparent 45%
+  );
+}
+[data-theme="dark"] .ac-toast {
+  --toast-glow: 30%;
+}
+.ac-toast--success {
+  --toast-tone: var(--ok);
+}
+.ac-toast--info {
+  --toast-tone: var(--agent);
+}
+.ac-toast--warning {
+  --toast-tone: var(--warn);
+}
+.ac-toast--error {
+  --toast-tone: var(--danger);
+}
+.ac-toast > .ac-icon {
+  color: var(--toast-tone);
 }
 
 /* Dialogs and sheets: e3 + top light, larger radius */
@@ -7616,6 +7647,9 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
   }
   .ac-menu__reaction {
     width: 40px;
+  }
+  .ac-menu__reaction.ac-menu__reaction--more {
+    padding-inline: 10px;
   }
 }
 

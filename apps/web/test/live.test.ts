@@ -7,6 +7,7 @@ import {
   emptyStreams,
   expectReply,
   expireTyping,
+  receiptTicks,
   receiptView,
   runsInChannel,
   seedReceipt,
@@ -515,5 +516,58 @@ describe("receipts when the mention doesn't start a new run", () => {
     s = applyReceiptEvent(s, ev({ type: "message.created", messageId: "m5", message: reply }));
     expect(receiptView(s.m2).status).toEqual({ kind: "handled", agents: ["theo"] });
     expect(s.m1?.agents).toEqual([["ada", "handled"]]);
+  });
+});
+
+describe("receipt ticks: clock, one, two", () => {
+  const ev = (e: Record<string, unknown>) => e as unknown as ChannelEvent;
+  const routed = (pickedBy: string[], seenBy = ["ada", "atlas"]) =>
+    applyReceiptEvent({}, ev({ type: "message.routed", channelId: "c1", messageId: "m1", seenBy, pickedBy }));
+
+  test("clock until an agent takes it; one tick while anyone it was for is on it; two once all of them acted", () => {
+    expect(receiptTicks(undefined)).toBe("clock");
+    expect(receiptTicks(applyReceiptEvent({}, ev({ type: "message.routing", messageId: "m1", step: "plan" })).m1)).toBe(
+      "clock",
+    );
+    let s = routed(["ada", "atlas"]);
+    // Picked, both still in line: nobody picked it up yet.
+    expect(receiptTicks(s.m1)).toBe("clock");
+    s = applyReceiptEvent(s, ev({ type: "message.claimed", messageId: "m1", agentId: "ada", runId: "r1" }));
+    expect(receiptTicks(s.m1)).toBe("check");
+    s = applyReceiptEvent(
+      s,
+      ev({ type: "message.handled", messageId: "m1", agentId: "ada", runId: "r1", status: "done" }),
+    );
+    // Ada answered, Atlas hasn't yet: still one.
+    expect(receiptTicks(s.m1)).toBe("check");
+    s = applyReceiptEvent(s, ev({ type: "message.claimed", messageId: "m1", agentId: "atlas", runId: "r2" }));
+    s = applyReceiptEvent(
+      s,
+      ev({ type: "run.finished", ...base, runId: "r2", agentId: "atlas", status: "waiting_approval" }),
+    );
+    expect(receiptTicks(s.m1)).toBe("check");
+    s = applyReceiptEvent(
+      s,
+      ev({ type: "message.handled", messageId: "m1", agentId: "atlas", runId: "r2", status: "done" }),
+    );
+    expect(receiptTicks(s.m1)).toBe("checks");
+  });
+
+  test("routed to nobody: everyone it reached decided not to answer, two ticks", () => {
+    expect(receiptTicks(routed([]).m1)).toBe("checks");
+  });
+
+  test("a mention guessed before the server confirms is still the clock", () => {
+    const s = seedReceipt({}, {
+      id: "m1",
+      channelId: "c1",
+      threadId: null,
+      author: { type: "person", id: "u1" },
+      body: "@ada oi",
+      mentionedAgentIds: ["ada"],
+      agentRunId: null,
+      createdAt: new Date().toISOString(),
+    } as Message);
+    expect(receiptTicks(s.m1)).toBe("clock");
   });
 });
