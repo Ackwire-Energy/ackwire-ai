@@ -3,6 +3,7 @@ import { asc, eq, schema } from "@agenteschat/db";
 import { type ModelRequest, systemText } from "@agenteschat/providers";
 import {
   addChannelMember,
+  consultationOrigin,
   createAgent,
   createArtifact,
   createChannel,
@@ -257,6 +258,48 @@ test("a consulted agent's approval for a routine's question shows where the rout
   const card = (await messagesIn(f, f.general.id)).find((m) => m.meta.approvalId === approval?.id);
   expect(card).toMatchObject({ authorAgentId: iris.id, threadId: null });
   expect(github.executed).toEqual([]);
+});
+
+test("a routine's creator outside the consulted agent's audience: its approval stays with the agents, not where the routine reports", async () => {
+  const github = fakeGithub();
+  f = await setup({
+    handOff: true,
+    askAgent: true,
+    toolSources: [github.source],
+    reply: (req) => {
+      if (req.outputSchema) return NO_ROUTE;
+      if (isRoutine(req))
+        return routineTurn(
+          req,
+          [{ name: "ask_agent", input: { agent: "@iris", question: "Pode fechar o PR #42?" } }],
+          "Pedi à Iris.",
+        );
+      return seen(req).includes("tool_result")
+        ? { chunks: ["Fechado."] }
+        : { chunks: [], toolUses: [{ name: "github_close_pr", input: { repo: "acme/app", pr: 42, why: "The PR #42 was replaced by #57: closing it keeps the queue honest." } }] };
+    },
+  });
+  const iris = await agentIn(f, "Iris", "iris");
+  // Iris answers only its owner; other agents may consult it (the default).
+  await f.db
+    .update(schema.agents)
+    .set({ audienceMode: "owner", ownerUserId: f.owner.id })
+    .where(eq(schema.agents.id, iris.id));
+  await grantScopes(f.db, f.org.id, iris.id, [{ connectionId: null, scope: "github:pr.write" }]);
+  const lia = await addMember(f.db, f.org.id, "member", "lia");
+  await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: lia.id });
+  // Her own agent runs the routine.
+  await f.db.update(schema.agents).set({ ownerUserId: lia.id }).where(eq(schema.agents.id, f.agent.id));
+  const routine = await channelRoutine(f, { access: "act", prompt: "Cuide da fila de PRs." }, lia.id);
+  await runRoutineNow(routineDeps(f), lia.id, f.org.id, routine.id);
+  await drainOutbox(f.db, f.handlers);
+
+  const [approval] = await f.db.select().from(schema.approvals);
+  expect(approval).toMatchObject({ agentId: iris.id, status: "pending" });
+  expect(approval?.channelId).not.toBe(f.general.id);
+  expect((await messagesIn(f, f.general.id)).some((m) => m.authorAgentId === iris.id)).toBe(false);
+  const [run] = (await runsOf(f)).filter((r) => r.agentId === iris.id);
+  expect(await consultationOrigin(f.db, f.org.id, run?.id ?? "")).toBeNull();
 });
 
 /** Iris and Dev hand the work back to each other forever. */

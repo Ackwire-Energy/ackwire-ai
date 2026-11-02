@@ -1761,6 +1761,7 @@ export async function consultationOrigin(
     if (!asker) break;
     const report = asker.background ? (await routineBriefOfRun(db, asker))?.deliverTo : undefined;
     if (report) {
+      if (await answersAgentsOnly(db, orgId, runId)) return null;
       return {
         channelId: report.channelId,
         threadRootId: report.threadId ?? asker.threadRootId,
