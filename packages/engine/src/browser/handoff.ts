@@ -754,7 +754,8 @@ export function createBrowserHandoffToolSource(
       : await browserHandoffRecipient({ db: ctx.db }, ctx.orgId, ctx.runId, ctx.agentId);
     // The card goes where the person asked can act on it: the run's conversation when they're in it, else their DM
     // with the agent (a run in a room between agents, or one they aren't in, would leave the request unreachable).
-    // Several drivers: one in the conversation keeps it there, else whoever asked for the work, else the first.
+    // Several drivers: one in the conversation keeps it there, else whoever asked for the work's DM; else it stays
+    // in the conversation and every driver gets it on the computer (a DM with an arbitrary one would be a stranger's).
     const runAt = runWhere(run);
     let asked = recipient;
     if (!asked && drivers) {
@@ -772,7 +773,7 @@ export function createBrowserHandoffToolSource(
       const requester = member?.userId
         ? null
         : await browserHandoffRecipient({ db: ctx.db }, ctx.orgId, ctx.runId, ctx.agentId);
-      asked = member?.userId ?? (requester && drivers.includes(requester) ? requester : (drivers[0] ?? null));
+      asked = member?.userId ?? (requester && drivers.includes(requester) ? requester : null);
     }
     const where =
       asked && !(await isChannelMember(ctx.db, run.orgId, runAt.channelId, asked))
