@@ -3648,6 +3648,43 @@ export const ptBR = {
     /** When something happened, after a verb: "Pediu pelo link em 22 out". */
     when: { on: "em {{date}}" },
     waitingTitle: "Esperando você",
+    more: "Mais ações para {{name}}",
+    // Remover do workspace, or leaving it: the confirmation says what goes with the person, from the server's preview.
+    remove: {
+      item: "Remover do workspace",
+      leave: "Sair do workspace",
+      title: "Remover {{name}} da {{org}}?",
+      leaveTitle: "Sair da {{org}}?",
+      access: "O acesso de {{name}} à {{org}} acaba agora, em todos os aparelhos.",
+      accessMine: "Seu acesso acaba agora, em todos os aparelhos. Para voltar, alguém precisa convidar você de novo.",
+      you: "você",
+      agents_one: "O agente de {{name}} passa a ter {{heir}} como responsável: {{names}}.",
+      agents_other: "Os agentes de {{name}} passam a ter {{heir}} como responsável: {{names}}.",
+      agentsMine_one: "Seu agente passa a ter {{heir}} como responsável: {{names}}.",
+      agentsMine_other: "Seus agentes passam a ter {{heir}} como responsável: {{names}}.",
+      losePlan_one:
+        "{{names}} pensava com um plano de {{name}} e fica sem ele. Escolha quem pensa na página do agente.",
+      losePlan_other:
+        "{{names}} pensavam com planos de {{name}} e ficam sem eles. Escolha quem pensa na página de cada um.",
+      losePlanMine_one: "{{names}} pensava com um plano seu e fica sem ele.",
+      losePlanMine_other: "{{names}} pensavam com planos seus e ficam sem eles.",
+      computers_one: "O computador que {{name}} conectou sai do workspace: {{names}}.",
+      computers_other: "Os computadores que {{name}} conectou saem do workspace: {{names}}.",
+      computersMine_one: "O computador que você conectou sai do workspace: {{names}}.",
+      computersMine_other: "Os computadores que você conectou saem do workspace: {{names}}.",
+      routines_one: "{{count}} rotina criada por {{name}} fica pausada.",
+      routines_other: "{{count}} rotinas criadas por {{name}} ficam pausadas.",
+      routinesMine_one: "{{count}} rotina sua fica pausada.",
+      routinesMine_other: "{{count}} rotinas suas ficam pausadas.",
+      messages: "As mensagens de {{name}} ficam onde estão.",
+      messagesMine: "Suas mensagens ficam onde estão.",
+      confirm: "Remover {{name}}",
+      confirmLeave: "Sair da {{org}}",
+      done: "{{name}} não faz mais parte da {{org}}.",
+      left: "Você saiu da {{org}}.",
+      goneTitle: "Você não faz mais parte da {{org}}",
+      goneText: "Seu acesso a este workspace acabou. Para voltar, peça um convite novo a quem é de lá.",
+    },
     // Addresses as chips, in the invite dialog and the onboarding's Team step (ADR 0090).
     chips: {
       check: "confira",

@@ -871,8 +871,124 @@ export async function changeMemberRole(
 }
 
 /**
- * Removes a member (or lets a member leave). The last owner can't leave. The computers they connected here go with
- * them (`personalMachines`).
+ * The member someone may remove, or themselves leaving: refused unless the actor may (`manage_members`, owners only by
+ * `manage_owners`, and only someone above them, ADR 0085). Null when they aren't a member.
+ */
+async function removableMember(db: Database, actorId: string, orgId: string, targetUserId: string) {
+  // Admins can remove a blocked member; a blocked person can't act, not even to leave.
+  const target = await getMembership(db, targetUserId, orgId, { includeBlocked: actorId !== targetUserId });
+  if (!target) return null;
+  if (actorId !== targetUserId) {
+    const actor = await requirePermission(db, actorId, orgId, "manage_members");
+    if (target.role === "owner" && !can(actor, "manage_owners"))
+      throw new ForbiddenError("Only owners can remove owners");
+    // Only someone above them (ADR 0085): their highest role below the actor's.
+    if (!outranks(actor, target.rank)) throw new ForbiddenError("Only someone above them can remove them");
+  }
+  return target;
+}
+
+/**
+ * Who answers for the agents of someone leaving: whoever removes them, or, when they leave themselves, the workspace's
+ * longest-standing other owner (the last owner can't leave, so one is there).
+ */
+async function heirOf(db: Executor, actorId: string, orgId: string, targetUserId: string) {
+  if (actorId !== targetUserId) return actorId;
+  const [owner] = await db
+    .select({ userId: organizationMembers.userId })
+    .from(organizationMembers)
+    .where(
+      and(
+        eq(organizationMembers.orgId, orgId),
+        eq(organizationMembers.role, "owner"),
+        ne(organizationMembers.userId, targetUserId),
+      ),
+    )
+    .orderBy(asc(organizationMembers.createdAt))
+    .limit(1);
+  return owner?.userId ?? null;
+}
+
+/** What goes with a person leaving the workspace, for the confirmation of `removeMember`. */
+export interface RemovalPreview {
+  /** Who answers for their agents from then on. */
+  heir: { userId: string; name: string } | null;
+  /** The agents they answer for. */
+  agents: { id: string; name: string }[];
+  /** Their agents (or others) that think with a plan they signed in, or on their computer: back to the API. */
+  losePlan: { id: string; name: string }[];
+  /** The computers they connected here: removed. */
+  computers: { id: string; name: string }[];
+  /** Their routines still on: paused. */
+  routines: number;
+}
+
+/** What `removeMember` would do, refused exactly as it would be (`removableMember`). */
+export async function removalPreview(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  targetUserId: string,
+): Promise<RemovalPreview | null> {
+  const target = await removableMember(db, actorId, orgId, targetUserId);
+  if (!target) return null;
+  const { personalMachines } = await import("./machines");
+  const computers = (await personalMachines(db, targetUserId, [orgId])).map(({ id, name }) => ({ id, name }));
+  const heirId = await heirOf(db, actorId, orgId, targetUserId);
+  const [heir] = heirId
+    ? await db.select({ userId: users.id, name: users.name }).from(users).where(eq(users.id, heirId))
+    : [];
+  const live = and(eq(agents.orgId, orgId), isNull(agents.deletedAt), isNull(agents.archivedAt));
+  const owned = await db
+    .select({ id: agents.id, name: agents.name })
+    .from(agents)
+    .where(and(live, eq(agents.ownerUserId, targetUserId)))
+    .orderBy(asc(agents.name));
+  const theirAccounts = db
+    .select({ id: schema.machineAccounts.id })
+    .from(schema.machineAccounts)
+    .where(
+      and(
+        eq(schema.machineAccounts.orgId, orgId),
+        eq(schema.machineAccounts.createdBy, targetUserId),
+        ne(schema.machineAccounts.status, "removing"),
+      ),
+    );
+  const onTheirs = computers.length
+    ? inArray(
+        agents.machineId,
+        computers.map((c) => c.id),
+      )
+    : undefined;
+  const losePlan = await db
+    .select({ id: agents.id, name: agents.name })
+    .from(agents)
+    .where(
+      and(
+        live,
+        inArray(agents.brain, ["claude_code", "codex"]),
+        or(inArray(agents.brainAccountId, theirAccounts), onTheirs),
+      ),
+    )
+    .orderBy(asc(agents.name));
+  const [routines] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(schema.routines)
+    .where(
+      and(
+        eq(schema.routines.orgId, orgId),
+        eq(schema.routines.createdByUserId, targetUserId),
+        eq(schema.routines.active, true),
+        isNull(schema.routines.deletedAt),
+      ),
+    );
+  return { heir: heir ?? null, agents: owned, losePlan, computers, routines: routines?.n ?? 0 };
+}
+
+/**
+ * Removes a member (or lets a member leave). The last owner can't leave. Their agents pass to whoever removes them
+ * (`heirOf`); the plans they signed in leave the agents, which go back to the API, and the computers they connected
+ * here go with them (`personalMachines`). Their messages stay.
  */
 export async function removeMember(
   db: Database,
@@ -881,20 +997,12 @@ export async function removeMember(
   targetUserId: string,
   options: { pubsub?: PubSub } = {},
 ) {
-  // Admins can remove a blocked member; a blocked person can't act, not even to leave.
-  const target = await getMembership(db, targetUserId, orgId, { includeBlocked: actorId !== targetUserId });
+  const target = await removableMember(db, actorId, orgId, targetUserId);
   if (!target) return;
-  if (actorId !== targetUserId) {
-    const actor = await requirePermission(db, actorId, orgId, "manage_members");
-    if (target.role === "owner" && !can(actor, "manage_owners"))
-      throw new ForbiddenError("Only owners can remove owners");
-    // Only someone above them (ADR 0085): their highest role below the actor's.
-    if (!outranks(actor, target.rank)) throw new ForbiddenError("Only someone above them can remove them");
-  }
   // Loaded here: these modules build on this one.
-  const { announceReleasedAccounts, releaseMemberAccounts } = await import("./machine-accounts");
+  const { announceReleasedAccounts, forgetAgents, releaseMemberAccounts } = await import("./machine-accounts");
   const { announceRemovedMachine, detachMachine, personalMachines } = await import("./machines");
-  const { released, removed } = await db.transaction(async (tx) => {
+  const { released, removed, handed } = await db.transaction(async (tx) => {
     await lockOrgMembers(tx, orgId);
     if (target.role === "owner" && (await ownerCount(tx, orgId)) <= 1) {
       throw new ConflictError("An organization needs at least one owner. Transfer ownership first.");
@@ -911,16 +1019,34 @@ export async function removeMember(
       .update(schema.wikiPages)
       .set({ audienceUserIds: sql`array_remove(${schema.wikiPages.audienceUserIds}, ${targetUserId})` })
       .where(and(eq(schema.wikiPages.orgId, orgId), sql`${targetUserId} = any(${schema.wikiPages.audienceUserIds})`));
+    // Their agents keep someone answering for them (approvals, budget alerts), before their plans are released: an
+    // agent on a computer of theirs then goes back to the API too (`releaseAgents`).
+    const heir = await heirOf(tx, actorId, orgId, targetUserId);
+    const handed = heir
+      ? await tx
+          .update(agents)
+          .set({ ownerUserId: heir, updatedAt: new Date() })
+          .where(and(eq(agents.orgId, orgId), eq(agents.ownerUserId, targetUserId)))
+          .returning({ id: agents.id })
+      : [];
     const action = actorId === targetUserId ? "member.left" : "member.removed";
-    await auditMember(tx, orgId, actorId, action, targetUserId, { role: target.role });
+    await auditMember(tx, orgId, actorId, action, targetUserId, {
+      role: target.role,
+      ...(handed.length ? { agentsTo: heir, agents: handed.map((a) => a.id) } : {}),
+    });
     // Their AI accounts on the organization's computers are signed out and removed (ADR 0059 §1).
     const released = await releaseMemberAccounts(tx, targetUserId, orgId);
     const removed = [];
     for (const computer of await personalMachines(tx, targetUserId, [orgId])) {
       removed.push({ computer, freed: await detachMachine(tx, computer) });
     }
-    return { released, removed };
+    return { released, removed, handed };
   });
+  forgetAgents(
+    orgId,
+    handed.map((a) => a.id),
+  );
+  if (handed.length) caches.agents.delete(`${orgId}:team`);
   await announceReleasedAccounts(options.pubsub, released);
   for (const { computer, freed } of removed) {
     await announceRemovedMachine({ db, pubsub: options.pubsub }, computer, { type: "person", id: actorId }, freed);

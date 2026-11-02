@@ -24,6 +24,7 @@ import {
   listInvitations,
   listMembers,
   listMemberships,
+  NotFoundError,
   needsWorkspaceAllowance,
   noticeInvitationAccepted,
   ONBOARDING_STEPS,
@@ -31,6 +32,7 @@ import {
   pinnedOwner,
   previewInvitation,
   queueInvitationEmail,
+  removalPreview,
   removeAvatar,
   removeMember,
   removeOrgLogo,
@@ -1163,6 +1165,37 @@ export function accountRoutes(deps: AppDeps) {
         pubsub: deps.adapters.pubsub,
       });
       return c.body(null, 204);
+    },
+  );
+
+  const Named = z.object({ id: z.string(), name: z.string() });
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/members/{userId}/removal",
+      tags,
+      security,
+      summary: "What removing a member (or leaving) does",
+      description: "Refused exactly as the removal would be. 404 when they aren't a member.",
+      request: { params: MemberParams },
+      responses: {
+        200: json(
+          z.object({
+            heir: z.object({ userId: z.string(), name: z.string() }).nullable(),
+            agents: z.array(Named),
+            losePlan: z.array(Named),
+            computers: z.array(Named),
+            routines: z.number().int(),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, userId } = c.req.valid("param");
+      const preview = await removalPreview(db, c.get("user").id, orgId, userId);
+      if (!preview) throw new NotFoundError("That user is not a member");
+      return c.json(preview, 200);
     },
   );
 

@@ -463,6 +463,43 @@ export function useSetMemberRoles(orgId: string) {
   });
 }
 
+/** What removing this person (or leaving) does, while the confirmation is open. */
+export const useRemovalPreview = (orgId: string, userId: string | null) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: ["org", orgId, "removal", userId],
+    queryFn: () => api.orgs.removal(orgId, userId ?? ""),
+    enabled: userId !== null,
+    staleTime: 0,
+  });
+};
+
+/** Removes a member, or leaves: the row goes at once; their agents' new owner and the counts follow. */
+export function useRemoveMember(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => api.orgs.removeMember(orgId, userId),
+    onMutate: async (userId) => {
+      await qc.cancelQueries({ queryKey: keys.people(orgId) });
+      const before = qc.getQueryData<Person[]>(keys.people(orgId));
+      if (before)
+        qc.setQueryData<Person[]>(
+          keys.people(orgId),
+          before.filter((p) => p.userId !== userId),
+        );
+      return { before };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.before) qc.setQueryData(keys.people(orgId), ctx.before);
+    },
+    onSettled: () => {
+      for (const key of [keys.people(orgId), keys.members(orgId), keys.overview(orgId), keys.agents(orgId), keys.me])
+        void qc.invalidateQueries({ queryKey: key });
+    },
+  });
+}
+
 export const useInvitations = (orgId: string, enabled = true) => {
   const api = useApi();
   return useQuery({ queryKey: keys.invitations(orgId), queryFn: () => api.orgs.invitations(orgId), enabled });

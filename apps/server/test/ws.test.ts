@@ -360,11 +360,18 @@ test("membership changes drop live subscriptions at once (channel, then organiza
   expect(stillHere).toMatchObject({ event: { type: "message.created" } });
   expect(a.frames.some((f) => f.type === "event" && f.channelId === channelId)).toBe(false);
 
-  // Removed from the organization: every subscription ends and the socket closes.
+  // Removed from the organization: the owner reads what it does first (their agents would pass to them), then every
+  // subscription ends, the socket closes, and her app's requests are refused.
+  const preview = await owner(`/api/app/organizations/${orgId}/members/${anaId}/removal`);
+  expect(((await preview.json()) as { heir: { userId: string } }).heir.userId).toBe((await meId(owner)) ?? "");
   expect((await owner(`/api/app/organizations/${orgId}/members/${anaId}`, { method: "DELETE" })).status).toBe(204);
   expect(await closed).toBe(4403);
   expect(a.frames).toContainEqual({ type: "unsubscribed", channelId: other.id, reason: "revoked" });
   expect(a.frames).toContainEqual({ type: "error", code: "membership_revoked" });
+  expect((await ana(`/api/app/organizations/${orgId}/channels`)).status).toBe(403);
+  expect((await owner(`/api/app/organizations/${orgId}/members/${anaId}/removal`)).status).toBe(404);
+  const me = (await (await ana("/api/app/me")).json()) as { organizations: { id: string }[] };
+  expect(me.organizations.map((o) => o.id)).not.toContain(orgId);
 });
 
 test("a missed revocation event is reconciled from durable membership", async () => {

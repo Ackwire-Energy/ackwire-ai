@@ -178,6 +178,8 @@ export interface FakeState {
   /** Secrets on agents' computers, by agent id (`secrets.list`). */
   agentSecrets?: Record<string, AgentSecret[]>;
   members: Member[];
+  /** Agents that think with a person's plan, by person (`orgs.removal`); unset = none. */
+  removalLosesPlan?: Record<string, { id: string; name: string }[]>;
   agents: Agent[];
   /** The workspace's groups of agents (`agentGroups.*`); unset = none. */
   agentGroups?: AgentGroup[];
@@ -1455,7 +1457,21 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
         const m = state.members.find((x) => x.userId === userId);
         if (m) m.role = role;
       },
-      removeMember: async (orgId, userId) => log("orgs.removeMember", orgId, userId),
+      removal: async (_orgId, userId) => {
+        const heir = state.members.find((m) => m.userId === state.me?.user.id);
+        return {
+          heir: heir ? { userId: heir.userId, name: heir.name } : null,
+          agents: state.agents.filter((a) => a.ownerUserId === userId).map((a) => ({ id: a.id, name: a.name })),
+          losePlan: state.removalLosesPlan?.[userId] ?? [],
+          computers: [],
+          routines: 0,
+        };
+      },
+      removeMember: async (orgId, userId) => {
+        log("orgs.removeMember", orgId, userId);
+        state.members = state.members.filter((m) => m.userId !== userId);
+        for (const a of state.agents) if (a.ownerUserId === userId) a.ownerUserId = state.me?.user.id ?? null;
+      },
       invitations: async () => structuredClone(state.invitations),
       invite: async (orgId, input) => {
         log("orgs.invite", orgId, input);

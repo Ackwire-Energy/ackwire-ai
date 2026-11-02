@@ -548,6 +548,10 @@ export function RealtimeProvider({
         void qc.invalidateQueries({ queryKey: keys.overview(orgId) });
       }
     });
+    // Taken out of the workspace: `me` without it shows "Você não faz mais parte" (routes/org.$orgId.tsx) at once.
+    const offError = conn.onError((code) => {
+      if (code === "membership_revoked") void qc.invalidateQueries({ queryKey: keys.me });
+    });
     conn.start();
     setConnection(conn);
     // Back from a sleep or a network change, the socket may be dead while it still says open: check it now.
@@ -562,6 +566,7 @@ export function RealtimeProvider({
       offReconnect();
       offOpen();
       offUser();
+      offError();
       conn.stop();
       setConnection(null);
     };
