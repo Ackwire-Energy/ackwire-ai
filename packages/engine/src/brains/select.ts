@@ -314,6 +314,8 @@ export interface BrainPlan {
   effort?: BrainEffort;
   /** What the runner last said about the plan it thinks with (`storedPlanUsage`). */
   usage?: PlanUsage;
+  /** A mission's main session goes on although the agent's `promptKey` changed since its last run there. */
+  settingsChanged?: boolean;
 }
 
 /** What a Claude Code brain's model is when nobody chose one (Codex: its own default). */
@@ -575,6 +577,25 @@ export async function resolveBrain(
           machineId ? await planIsOwners(deps.db, agent, machineId, account) : true,
           usage,
         );
+  // A mission's main session stays (its decisions, inbox and items point at it): `settingsChanged` brings the edit.
+  const settingsChanged =
+    mission?.session?.resume && options.promptKey !== undefined
+      ? await deps.db
+          .select({ key: sql<string | null>`${schema.agentRuns.transcript}->>'promptKey'` })
+          .from(schema.agentRuns)
+          .where(
+            and(
+              eq(schema.agentRuns.orgId, run.orgId),
+              eq(schema.agentRuns.agentId, run.agentId),
+              eq(schema.agentRuns.threadRootId, run.threadRootId),
+              ne(schema.agentRuns.id, run.id),
+              sql`${schema.agentRuns.transcript}->>'promptKey' is not null`,
+            ),
+          )
+          .orderBy(desc(schema.agentRuns.createdAt))
+          .limit(1)
+          .then(([last]) => Boolean(last && last.key !== options.promptKey))
+      : false;
   const session: BrainSession | undefined =
     mission?.session ??
     (machineId
@@ -593,5 +614,6 @@ export async function resolveBrain(
     ...(account ? { account } : {}),
     ...(effort ? { effort } : {}),
     ...(usage ? { usage } : {}),
+    ...(settingsChanged ? { settingsChanged } : {}),
   };
 }

@@ -295,7 +295,8 @@ export interface RunContext {
   issueId: string | null;
   /**
    * What a computer brain's system prompt holds that only a setting changes (the org's context, the agent's
-   * name, role and instructions, its team and skills): a session started with other text isn't picked up again.
+   * name, role and instructions, the team's roster and its skills): a session started with other text isn't
+   * picked up again.
    */
   sessionPrompt: string[];
 }
@@ -890,7 +891,23 @@ export async function buildRunContext(
     messages: toTurns(history, agent.id, names, trigger.id, { canAddAgents: channel.kind === "channel" }),
     stats: { historyMessages: history.length, systemChars, truncated: thread.length >= options.maxMessages },
     issueId: workIssueId ?? (typeof trigger.meta?.issueId === "string" ? trigger.meta.issueId : null),
-    sessionPrompt: [...system.filter((b) => b.cache).map((b) => b.text), team, JSON.stringify(options.skills ?? [])],
+    sessionPrompt: [
+      ...system.filter((b) => b.cache).map((b) => b.text),
+      // The roster, not "# Your team": that text follows the requester, so a person and an agent taking turns
+      // would start a new session every turn.
+      JSON.stringify(
+        teamRows.map((a) => [
+          a.id,
+          a.handle,
+          a.role,
+          a.audienceMode,
+          a.audienceUserIds,
+          a.audienceRoleIds,
+          a.consultable,
+        ]),
+      ),
+      JSON.stringify(options.skills ?? []),
+    ],
   };
 }
 

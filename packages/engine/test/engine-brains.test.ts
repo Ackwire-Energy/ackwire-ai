@@ -416,6 +416,129 @@ test("edited instructions or org context reach a kept-alive session's next turn:
   expect(systems[4]).toContain("We sell bikes.");
 });
 
+test("people taking turns keep one session; a repository added to the agent's access starts a new one", async () => {
+  const gh = fakeGithub();
+  f = await setup({ toolSources: [gh.source], askAgent: true });
+  await grantScopes(f.db, f.org.id, f.agent.id, ALL_GITHUB_SCOPES);
+  await computerAgent(f);
+  await f.db
+    .insert(schema.agentRepositories)
+    .values({ orgId: f.org.id, agentId: f.agent.id, repo: "acme/api", position: 0 });
+  // A teammate only its owner talks to: "# Your team" differs between the owner and another member.
+  const ops = await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: "Ops", handle: "ops", role: "Infra", instructions: "", credentialId: f.credential.id },
+    { model: "claude-sonnet-5-5" },
+  );
+  await f.db
+    .update(schema.agents)
+    .set({ audienceMode: "owner", consultable: false })
+    .where(eq(schema.agents.id, ops.id));
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+  const systems: string[] = [];
+  const { brain, seen } = scriptedComputerBrain((_n, turn) => {
+    systems.push(turn.system);
+    return [
+      { type: "usage", input: 40, output: 5, source: "plan", model: "claude-sonnet-5-5" },
+      { type: "done", text: "ok" },
+    ];
+  });
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  const question = await post(f, "@dev o deploy da api quebrou?");
+  await drainOutbox(f.db, handlers);
+  const reply = async (userId: string, body: string) => {
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, userId, f.org.id, f.general.id, {
+      body,
+      threadId: question.id,
+    });
+    await drainOutbox(f.db, handlers);
+  };
+
+  await reply(bia.id, "@dev e o do web?");
+  await reply(f.owner.id, "@dev e agora?");
+  expect(seen).toHaveLength(3);
+  expect(seen[1]?.session).toMatchObject({ id: seen[0]?.session?.id, resume: true });
+  expect(seen[2]?.session).toMatchObject({ id: seen[0]?.session?.id, resume: true });
+
+  await f.db
+    .insert(schema.agentRepositories)
+    .values({ orgId: f.org.id, agentId: f.agent.id, repo: "acme/web", position: 1 });
+  await reply(f.owner.id, "@dev pode olhar o acme/web?");
+  expect(seen[3]?.session?.resume).toBe(false);
+  expect(seen[3]?.session?.id).not.toBe(seen[2]?.session?.id);
+  expect(systems[3]).toContain("acme/web");
+});
+
+test("a mission's main session goes on after an edit to the instructions, and its next turn reads them", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f, { instructions: "Never query the database." });
+  const { brain, seen: turns } = scriptedComputerBrain(() => [
+    { type: "usage", input: 40, output: 5, source: "plan", model: "claude-sonnet-5-5" },
+    { type: "done", text: "ok" },
+  ]);
+  const seen = turns as (BrainTurn & { thisTurn?: string })[];
+  const handlers = createJobHandlers({
+    ...f.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  const home = await post(f, "@dev missão: relatório de pedidos");
+  await drainOutbox(f.db, handlers);
+  const mainSessionId = crypto.randomUUID();
+  const [mission] = await f.db
+    .insert(schema.missions)
+    .values({
+      orgId: f.org.id,
+      threadRootId: home.id,
+      channelId: f.general.id,
+      agentId: f.agent.id,
+      ownerId: f.owner.id,
+      machineId,
+      title: "Relatório",
+      goal: "Relatório de pedidos",
+      status: "active",
+      mainSessionId,
+    })
+    .returning();
+  // The mission engine started its main session (planning), so later turns resume it.
+  await f.db.insert(schema.missionEvents).values({
+    orgId: f.org.id,
+    missionId: mission?.id as string,
+    kind: "engine_session",
+    data: { sessionId: mainSessionId, runId: crypto.randomUUID() },
+  });
+  const reply = async (body: string) => {
+    await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, {
+      body,
+      threadId: home.id,
+    });
+    await drainOutbox(f.db, handlers);
+  };
+  await reply("@dev comece");
+  await reply("@dev e então?");
+  expect(seen[2]?.session).toMatchObject({ id: mainSessionId, resume: true });
+  expect(seen[2]?.thisTurn ?? "").not.toContain("# Your settings changed");
+
+  await f.db
+    .update(schema.agents)
+    .set({ instructions: "You may query the orders database." })
+    .where(eq(schema.agents.id, f.agent.id));
+  await reply("@dev agora pode consultar?");
+  expect(seen[3]?.session?.id).toBe(mainSessionId);
+  expect(seen[3]?.thisTurn).toContain("# Your settings changed");
+  expect(seen[3]?.thisTurn).toContain("You may query the orders database.");
+
+  await reply("@dev e o total?");
+  expect(seen[4]?.thisTurn ?? "").not.toContain("# Your settings changed");
+});
+
 test("a gated call through the bridge leaves the run waiting; the decision resumes the session with the result", async () => {
   const gh = fakeGithub();
   f = await setup({ toolSources: [gh.source] });
