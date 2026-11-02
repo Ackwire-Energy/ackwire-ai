@@ -83,4 +83,9 @@ export const STORAGE_KEYS = {
   joinAsked: "agentes.join.asked",
   /** Prefix (`.<user id>.<org id>`): "1" once a newcomer closed their welcome in #general (ADR 0090). */
   arrivalClosed: "agentes.arrival.closed",
+  /**
+   * Prefix (`.<user id>`): what that person typed in each conversation and didn't send (JSON by conversation,
+   * `@agenteschat/client/lib/composer-drafts`), forgotten on sign-out.
+   */
+  composerDrafts: "agentes.drafts",
 } as const;
