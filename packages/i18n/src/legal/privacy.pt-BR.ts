@@ -3,7 +3,7 @@ import type { LegalDocument } from "./types";
 export const privacyPtBR: LegalDocument = {
   title: "Política de privacidade",
   summary: "O que coletamos, o que os agentes enviam e para onde, quem pode ver o seu workspace e os seus direitos.",
-  updated: "2026-10-31",
+  updated: "2026-11-02",
   sections: [
     {
       id: "overview",
@@ -163,7 +163,7 @@ export const privacyPtBR: LegalDocument = {
       id: "changes",
       heading: "16. Mudanças nesta política",
       blocks: [
-        "Podemos atualizar esta política; mudanças relevantes serão anunciadas por e-mail ou no app antes de entrarem em vigor. A versão atual fica sempre nesta página. Se as versões em português e em inglês divergirem, prevalece a versão em inglês, exceto quando a lei exigir outra coisa.",
+        "Podemos atualizar esta política; mudanças relevantes serão anunciadas por e-mail ou no app antes de entrarem em vigor. A versão atual fica sempre nesta página. Se uma tradução divergir da versão em inglês, prevalece a versão em inglês, exceto quando a lei exigir outra coisa.",
       ],
     },
     {

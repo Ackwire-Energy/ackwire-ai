@@ -86,8 +86,11 @@ export function approvalTraits(a: Pick<Approval, "tool" | "scope" | "params">): 
  */
 export function emailTitleWords(email: ApprovalEmail): Words {
   const all = [...email.to, ...email.cc, ...email.bcc];
-  const values = { to: all[0] ?? "", count: all.length, more: Math.max(0, all.length - 1) };
-  if (email.verb !== "draft") return { key: `approval.email.title.${email.verb}`, values };
+  const more = Math.max(0, all.length - 1);
+  const values = { to: all[0] ?? "", more };
+  // One recipient has its own key: a count-keyed plural reads "and 0 more" where `_one` is missing (ja, zh-Hans).
+  const tail = more > 0 ? "More" : "";
+  if (email.verb !== "draft") return { key: `approval.email.title.${email.verb}${tail}`, values };
   if (all.length === 0) return { key: "approval.email.title.draftNoTo", values };
-  return { key: email.original ? "approval.email.title.draftReply" : "approval.email.title.draft", values };
+  return { key: `approval.email.title.${email.original ? "draftReply" : "draft"}${tail}`, values };
 }

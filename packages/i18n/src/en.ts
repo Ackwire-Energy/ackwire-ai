@@ -2253,17 +2253,17 @@ export const en = {
       forwards: "Forwards <b>“{{subject}}”</b>",
       forwardsFrom: "Forwards <b>“{{subject}}”</b>, from {{from}}",
       title: {
-        draft_one: "Save a draft to {{to}}",
-        draft_other: "Save a draft to {{to}} and {{more}} more",
-        draftReply_one: "Save a draft reply to {{to}}",
-        draftReply_other: "Save a draft reply to {{to}} and {{more}} more",
+        draft: "Save a draft to {{to}}",
+        draftMore: "Save a draft to {{to}} and {{more}} more",
+        draftReply: "Save a draft reply to {{to}}",
+        draftReplyMore: "Save a draft reply to {{to}} and {{more}} more",
         draftNoTo: "Save an email draft",
-        send_one: "Send an email to {{to}}",
-        send_other: "Send an email to {{to}} and {{more}} more",
-        reply_one: "Reply to {{to}} by email",
-        reply_other: "Reply to {{to}} and {{more}} more by email",
-        forward_one: "Forward an email to {{to}}",
-        forward_other: "Forward an email to {{to}} and {{more}} more",
+        send: "Send an email to {{to}}",
+        sendMore: "Send an email to {{to}} and {{more}} more",
+        reply: "Reply to {{to}} by email",
+        replyMore: "Reply to {{to}} and {{more}} more by email",
+        forward: "Forward an email to {{to}}",
+        forwardMore: "Forward an email to {{to}} and {{more}} more",
       },
     },
     asks: "<b>{{agent}}</b> asks for approval",
@@ -8071,6 +8071,10 @@ export const en = {
     },
   },
   toolNames: {
+    /**
+     * How a tool's name is built, kept in English: "modifiers-first" (Get campaign budget), "head-first" (pt-BR: Ver
+     * orçamento da campanha) or "verb-last" (ja, ko: the words, then the verb).
+     */
     order: "modifiers-first",
     verb: {
       get: "Get",

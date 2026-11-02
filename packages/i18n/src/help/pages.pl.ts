@@ -2,4 +2,514 @@ import type { HelpSlug } from "./index";
 import type { HelpDocument } from "./types";
 
 /** The help pages in pl: a page not here shows in English. */
-export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {};
+export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
+  "run-on-your-computer": {
+    title: "agentes.chat na twoim komputerze",
+    summary:
+      "Aplikacja agentes.chat może też uruchomić samo agentes.chat, na Macu, PC albo komputerze z Linuksem, dla ciebie lub małego zespołu.",
+    sections: [
+      {
+        id: "how",
+        heading: "Jak to działa",
+        blocks: [
+          "Działa wewnątrz aplikacji, z wbudowaną bazą danych, i trzyma wszystko w jednym folderze na tym komputerze: `.agentes` w twoim folderze domowym. Nie trzeba niczego więcej instalować: bez Dockera, bez konfigurowania bazy danych.",
+          "Uruchamia się razem z aplikacją i zatrzymuje, gdy ją zamkniesz. Przed zamknięciem aplikacja pyta, bo nikt nie skorzysta z agentes.chat, dopóki znów jej nie otworzysz.",
+        ],
+      },
+      {
+        id: "who",
+        heading: "Dla kogo to jest",
+        blocks: [
+          "Dla ciebie albo małego zespołu, dopóki ten komputer jest włączony. Dla większego zespołu albo serwera, który działa bez przerwy, zainstaluj agentes.chat na serwerze i wybierz w aplikacji **Połącz z moim serwerem**. Dane możesz tam przenieść później.",
+        ],
+      },
+      {
+        id: "agents",
+        heading: "Twoi agenci też tu pracują",
+        blocks: [
+          "Twoi agenci też pracują na tym komputerze, we własnych folderach, z przeglądarką oraz z Claude Code lub Codexem, jeśli są tu zainstalowane. Polecenia są wyłączone, dopóki nie włączysz ich w **Preferencje › Narzędzia**.",
+        ],
+      },
+      {
+        id: "reach",
+        heading: "Z telefonu i dla zespołu",
+        blocks: [
+          "**Dostęp z telefonu i dla zespołu** umieszcza agentes.chat w Tailscale, prywatnej sieci twoich urządzeń: dołączają do niej twój telefon i zaproszone osoby, a nikt inny nie dotrze do agentes.chat. Tailscale jest darmowy: https://tailscale.com/download. Gdy ta opcja jest wyłączona, agentes.chat działa tylko na tym komputerze.",
+        ],
+      },
+      {
+        id: "backups",
+        heading: "Kopie zapasowe i przenoszenie",
+        blocks: [
+          "**Utwórz kopię teraz** w **Preferencje › Serwery** zapisuje bazę danych, pliki i ustawienia w `.agentes/backups`, w twoim folderze domowym.",
+        ],
+      },
+    ],
+  },
+  computers: {
+    title: "Komputery dla twoich agentów",
+    summary:
+      "Agenci uruchamiają kod i pracują z plikami na komputerach, które podłączysz: na Macu lub PC z aplikacją agentes.chat albo na serwerze.",
+    sections: [
+      {
+        id: "mac",
+        heading: "Mac lub PC z aplikacją",
+        blocks: [
+          "Aplikacja agentes.chat otwiera twój serwer we własnym oknie, a jednym kliknięciem jego agenci zaczynają pracować na tym komputerze, we własnych folderach. Zainstaluj aplikację, otwórz ją, wybierz **Użyj własnego serwera › Połącz z moim serwerem** i wpisz adres serwera. Potem, po zalogowaniu, kliknij **Użyj tego Maca** (**Użyj tego PC** w Windowsie, **Użyj tego komputera** w Linuksie) w **Ustawienia › Komputery**.",
+        ],
+      },
+      {
+        id: "server",
+        heading: "Serwer lub komputer z Linuksem",
+        blocks: [
+          "W **Ustawienia › Komputery** skopiuj polecenie z sekcji **Inne sposoby** i uruchom je w terminalu tego komputera. Pokaże kod i link: otwórz link, sprawdź, czy kod się zgadza, i potwierdź swoim kontem. Wcześniej nie trzeba niczego instalować.",
+        ],
+      },
+      {
+        id: "folders",
+        heading: "Foldery",
+        blocks: [
+          "Każdy agent zawsze ma własny folder w `~/agentes/<workspace>`. Na kolejne foldery można zezwolić tylko na samym komputerze, nigdy ze strony: w aplikacji w **Preferencje › Foldery** albo na serwerze poleceniem `agentes-runner folders allow`. Każda przestrzeń robocza ma własne dozwolone foldery: to, na co zezwolisz w jednej, dotyczy tylko jej agentów. Usunięcie folderu niczego nie kasuje. Odbiera tylko dostęp.",
+        ],
+      },
+      {
+        id: "pausing",
+        heading: "Wstrzymywanie",
+        blocks: [
+          "W aplikacji osoba, która podłączyła komputer, może wstrzymać na nim agentów ikoną agentes.chat obok zegara. Nic nowego się nie zacznie, dopóki ich nie wznowi. To, co już działało, dobiegnie końca.",
+        ],
+      },
+      {
+        id: "organizations",
+        heading: "Kilka przestrzeni roboczych",
+        blocks: [
+          "Jeden komputer może pracować dla kilku przestrzeni roboczych. Każda ma na nim własnych agentów, foldery i zadania, a odłączenie jednej nie wpływa na pozostałe.",
+        ],
+      },
+    ],
+  },
+  "workspace-computer": {
+    title: "Komputer przestrzeni roboczej",
+    summary: "Każda przestrzeń robocza dostaje własny komputer, zawsze włączony, na którym pracują jej agenci.",
+    sections: [
+      {
+        id: "what",
+        heading: "Co to jest",
+        blocks: [
+          "Komputer tylko dla tej przestrzeni roboczej, zawsze włączony. Każdy agent ma na nim własnego użytkownika, z własnym folderem, ekranem, przeglądarką i plikami. Na stronie agenta możesz oglądać, jak pracuje, i przejąć kontrolę, gdy trzeba.",
+        ],
+      },
+      {
+        id: "plans",
+        heading: "Twoje plany AI",
+        blocks: [
+          "Twoi agenci mogą myśleć dzięki twojemu własnemu planowi AI, takiemu jak Claude, ChatGPT, GLM czy Kimi, zalogowanemu na tym komputerze: klucz API nie jest potrzebny. Konto zostaje na tym komputerze, a agentes.chat nigdy nie widzi hasła ani dostępu.",
+          "Plany Google AI Pro i Ultra tu nie działają: warunki Google nie pozwalają używać ich w innych produktach. Klucz API Gemini działa.",
+        ],
+      },
+      {
+        id: "size",
+        heading: "Jego parametry",
+        blocks: ["Procesory, pamięć i dysk znajdziesz w **Ustawienia › Komputery**."],
+      },
+      {
+        id: "trouble",
+        heading: "Gdy przestaje odpowiadać",
+        blocks: ["Zwykle wraca w ciągu kilku minut, a my już się tym zajmujemy: nie musisz nic robić."],
+      },
+    ],
+  },
+  import: {
+    title: "Przenieś swoich agentów",
+    summary:
+      "Przenieś agentów z innej aplikacji albo z innej przestrzeni roboczej agentes.chat, z ich instrukcjami, umiejętnościami, rutynami i pamięcią.",
+    sections: [
+      {
+        id: "comes",
+        heading: "Co zostaje przeniesione",
+        blocks: [
+          {
+            list: [
+              "Agenci, z nazwą, rolą, instrukcjami i wyglądem.",
+              "Umiejętności, włączone dla agentów, którzy je mieli.",
+              "Kanały publiczne, razem z agentami, którzy w nich są.",
+              "Rutyny, aktywne i według swojego harmonogramu. Jeśli chcesz, wstrzymaj je w **Rutyny**.",
+              "Pamięć: to, co pamięta każdy agent.",
+              "Własne pliki każdego agenta (folder plików OpenBot.run, workspace OpenClaw), w folderze z jego nazwą na **Drive**. Klucze, loginy i pliki systemowe zostają, a nic, co już tam jest, nie zostanie zastąpione.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "never",
+        heading: "Czego nigdy się nie przenosi",
+        blocks: [
+          "Klucze, hasła, loginy i historia czatów nigdy nie są przenoszone: agenci myślą dzięki AI przestrzeni roboczej. Niektóre rzeczy nie mają tu jeszcze odpowiednika albo nigdy nie powinny trafiać do pliku. Możesz je odtworzyć później.",
+          "Pliki i foldery są odczytywane w twojej przeglądarce. Link do GitHub przechodzi przez serwer przestrzeni roboczej. Pliki z kluczami i loginami nigdy nie są otwierane, a nic się nie zmieni, dopóki nie potwierdzisz.",
+        ],
+      },
+      {
+        id: "other-apps",
+        heading: "Z innej aplikacji",
+        blocks: [
+          "Wybierz **Grok Bot**, **ChatGPT dots** albo **Inna aplikacja**. Skopiuj prośbę, wklej ją w tamtej aplikacji, a potem przynieś to, co zwróci: upuść plik albo wklej całą odpowiedź. Gdzie wkleić ją w każdej aplikacji:",
+          {
+            list: [
+              "**Grok Bot**: w czacie ze swoim botem. Odpowie plikiem JSON: skopiuj całą odpowiedź.",
+              "**ChatGPT dots**: w nowym czacie. Pobierz plik, który utworzy.",
+              "**Claude**: w nowej rozmowie albo w projekcie twoich agentów. Pobierz plik, który utworzy.",
+              "**Manus**: w nowym zadaniu. Plik znajdziesz w wynikach zadania.",
+              "**Rakazo**: wyślij ją swojemu agentowi. Odpowie plikiem JSON: skopiuj całą odpowiedź.",
+              "**OpenBot**: prośba nie jest potrzebna. Przeciągnij folder najemcy (agents.yaml, agents/, model.yaml, skills.yaml) albo wklej link do niego na GitHub.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "export",
+        heading: "Eksport przestrzeni roboczej",
+        blocks: [
+          "**Ustawienia › Import i eksport › Eksportuj** pobiera plik .json, żeby przenieść agentów do innej przestrzeni roboczej albo zachować kopię. W pliku są:",
+          {
+            list: [
+              "Agenci, z instrukcjami, modelem i wyglądem",
+              "Umiejętności, z całym plikiem SKILL.md",
+              "Kanały publiczne, z ich agentami",
+              "Zaplanowane rutyny (po drugiej stronie trafiają jako aktywne)",
+              "Pamięć, którą widzą wszyscy w przestrzeni roboczej",
+            ],
+          },
+          "Nigdy nie ma w nim:",
+          {
+            list: [
+              "Kluczy API i haseł",
+              "Konektorów i loginów",
+              "Komputerów",
+              "Rozmów, wiadomości i kanałów prywatnych",
+              "Użycia, kosztów i historii aktywności",
+            ],
+          },
+          "Żeby użyć pliku, otwórz **Ustawienia › Import i eksport** w drugiej przestrzeni roboczej i upuść plik .json.",
+        ],
+      },
+    ],
+  },
+  wiki: {
+    title: "Wiki",
+    summary: "To, co wie firma, na stronach połączonych ze sobą.",
+    sections: [
+      {
+        id: "links",
+        heading: "Linki",
+        blocks: ["Wpisz [[, żeby dodać link do innej strony. Linki zwrotne i graf pokazują, jak łączą się strony."],
+      },
+      {
+        id: "agents",
+        heading: "Jak korzystają z niej agenci",
+        blocks: ["Agenci czytają wiki, gdy odpowiadają. Piszą w niej tylko wtedy, gdy ktoś o to poprosi."],
+      },
+      {
+        id: "obsidian",
+        heading: "Przenieś sejf Obsidian",
+        blocks: [
+          "Upuść folder sejfu albo jego plik .zip w kroku Kontekst podczas konfiguracji albo w imporcie samej wiki. [[Linki]], [[notatka|alias]] i [[notatka#sekcja]] dalej działają. Tagi są brane z frontmattera i z tekstu. Załączniki trafiają na Drive, a osadzone obrazy i pliki stają się kartami na stronie. Bloki wyróżnień zostają blokami wyróżnień. Zapytania Dataview trafiają jako tekst: poproś agenta, żeby zbudował tabelę. Kanwy i ustawienia Obsidiana (.obsidian) nie są przenoszone.",
+        ],
+      },
+    ],
+  },
+  memory: {
+    title: "Pamięć",
+    summary: "To, czego każdy agent uczy się z rozmów i poprawek zespołu.",
+    sections: [
+      {
+        id: "learns",
+        heading: "Jak uczą się agenci",
+        blocks: [
+          "Agenci uczą się z rozmów i z poprawek zespołu. To, co agent wie, trafia do jego kontekstu, gdy ma znaczenie. Na karcie **Pamięć** edytuj, przypnij albo zarchiwizuj to, co jest błędne lub nieaktualne.",
+        ],
+      },
+      {
+        id: "permissions",
+        heading: "Pamięć nie daje uprawnień",
+        blocks: [
+          "Nic w pamięci nie pozwala agentowi zrobić więcej. To, co może robić, określają jego **Narzędzia i dostęp**, a działania wrażliwe zawsze wymagają zatwierdzenia.",
+        ],
+      },
+      {
+        id: "proposals",
+        heading: "Proponowane zmiany",
+        blocks: [
+          "Gdy jakaś lekcja się powtarza, agent może zaproponować zmianę własnych instrukcji albo kontekstu przestrzeni roboczej. Nic się nie zmieni, dopóki ktoś tego nie zaakceptuje, a tekst można najpierw poprawić. Poprzednia wersja zostaje w historii. Odrzucona propozycja zostaje zapamiętana jako lekcja, więc nie wróci.",
+        ],
+      },
+    ],
+  },
+  approvals: {
+    title: "Zatwierdzenia",
+    summary: "Nic wrażliwego nie dzieje się bez człowieka.",
+    sections: [
+      {
+        id: "what",
+        heading: "Co wymaga zatwierdzenia",
+        blocks: [
+          "Gdy agent chce scalić zmiany, wdrożyć, wycofać wdrożenie, wysłać coś na zewnątrz albo usunąć dane, najpierw pyta, bez względu na to, jaki ma dostęp. Prośba pojawia się w **Zatwierdzenia** i na kanale, z dokładnym działaniem i powodem.",
+        ],
+      },
+      {
+        id: "exact",
+        heading: "Jedno zatwierdzenie, jedno działanie",
+        blocks: [
+          "Każde zatwierdzenie obejmuje jedno konkretne działanie, z jego wartościami. Jeśli agent cokolwiek zmieni, musi zapytać ponownie.",
+        ],
+      },
+      {
+        id: "who",
+        heading: "Kto zatwierdza",
+        blocks: ["Prośby agenta zatwierdza jego właściciel. Gdy agent nie ma właściciela, robią to administratorzy."],
+      },
+      {
+        id: "refusing",
+        heading: "Odrzucanie",
+        blocks: ["Jeśli chcesz, napisz dlaczego: agent to przeczyta, dostosuje plan i zapamięta to jako lekcję."],
+      },
+      {
+        id: "meetings",
+        heading: "Spotkania",
+        blocks: ["Agenci tylko proponują terminy. Zaproszenia dla ludzi zawsze wysyła osoba, która o nie poprosiła."],
+      },
+    ],
+  },
+  "who-answers": {
+    title: "Kto odpowiada na wiadomość",
+    summary: "Wzmianka wybiera agenta. Bez niej agentes.chat wybiera za ciebie, w tej kolejności.",
+    sections: [
+      {
+        id: "order",
+        heading: "Jak wiadomość trafia do agenta",
+        blocks: [
+          "Wiadomość, która @wspomina agenta, trafia do tego agenta. Wiadomość bez wzmianki czyta pierwsza z tych opcji, jaką ma przestrzeń robocza:",
+          {
+            list: [
+              "**Jev**, mały, szybki model stworzony do takich decyzji.",
+              "**Mały model na jednym z kluczy API przestrzeni roboczej**, na przykład Claude Haiku 5.5 albo GPT-6 Luna.",
+              "**Twój własny plan Claude lub ChatGPT**, dla wiadomości, które piszesz, na serwerze, który prowadzisz samodzielnie. Czyta je na komputerze, na którym jest zalogowany, i zajmuje to kilka sekund.",
+              "**Proste reguły**: odpowiedź agentowi trafia do niego, tak samo jak kolejna wiadomość zaraz po rozmowie z nim albo wiadomość na kanale, na którym poza tobą jest tylko jeden agent.",
+            ],
+          },
+          "Gdy żadna z tych opcji nie pasuje, nie odpowiada żaden agent. Wspomnij agenta, żeby go zawołać.",
+        ],
+      },
+      {
+        id: "jev",
+        heading: "Jev",
+        blocks: [
+          "Gdy twoja przestrzeń robocza działa na agentes.chat, Jev jest w cenie. Na serwerze, który prowadzisz samodzielnie, używa klucza TypeSafe właściciela, około 0,0001 USD za wiadomość: [Skonfiguruj Jeva](/help/jev#setup).",
+        ],
+      },
+      {
+        id: "plans",
+        heading: "Dlaczego twój plan wybiera tylko dla twoich wiadomości",
+        blocks: ["Plany Claude i ChatGPT są osobiste, więc twój plan wybiera tylko dla wiadomości, które piszesz ty."],
+      },
+      {
+        id: "see",
+        heading: "Kto wybrał",
+        blocks: ["Otwórz znacznik pod wiadomością. Ostatni wiersz mówi, kto wybrał agentów."],
+      },
+    ],
+  },
+  jev: {
+    title: "Jev",
+    summary:
+      "Szybki model od TypeSafe, który podejmuje drobne decyzje za twoich agentów. Na własnym serwerze jest opcjonalny, z twoim własnym kluczem.",
+    sections: [
+      {
+        id: "what",
+        heading: "Co robi",
+        blocks: [
+          {
+            list: [
+              "**Wybiera, kto odpowiada.** Wiadomość bez @wzmianki trafia do właściwego agenta w niecałą sekundę, nawet gdy twoi agenci myślą dzięki planowi i nie masz klucza API.",
+              "**Utrzymuje porządek w pamięci.** Wychwytuje powtórzenie albo nowszy fakt, nawet zapisane innymi słowami: powtórzenie łączy się z tym, co agent już wiedział, a nowszy fakt zastępuje stary. Raz dziennie porządkuje resztę.",
+              "**Widzi ekran.** W przeglądarce i na pulpicie agenci znajdują przyciski i pola na podstawie opisu, przyglądają się z bliska tym małym i sprawdzają na obrazie ekranu, czy krok się udał.",
+              "**Czyta mniej.** Każda tura wczytuje tylko narzędzia, których agent prawdopodobnie użyje, więc twoje AI czyta mniej i mniej kosztuje.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "without",
+        heading: "Bez niego",
+        blocks: [
+          "Wszystko dalej działa, tylko wolniej i mniej starannie.",
+          {
+            list: [
+              "**Kto odpowiada:** wybiera mały model na jednym z twoich kluczy API, na przykład Claude Haiku 5.5 albo GPT-6 Luna. Bez klucza dla wiadomości każdej osoby wybiera jej własny plan Claude lub ChatGPT, w kilka sekund. W pozostałych przypadkach odpowiedź albo kolejna wiadomość i tak trafia do swojego agenta. Wspomnij agenta, żeby go zawołać. [Jak wybierani są agenci](/help/who-answers)",
+              "**Pamięć:** powtórzenia tymi samymi słowami nadal się łączą. Powtórzenia i aktualizacje innymi słowami zostają osobno.",
+              "**Ekran:** agenci korzystają z numerów pokazanych na ekranie i dokładnych nazw. Nic nie jest odczytywane z obrazów.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "setup",
+        heading: "Konfiguracja",
+        blocks: [
+          {
+            list: [
+              "Otwórz https://console.typesafe.ai i zaloguj się przez Google albo e-mailem. Nowe konto zakłada się tak samo.",
+              "Doładuj środki w konsoli. Jev działa na przedpłatę.",
+              "Otwórz https://console.typesafe.ai/keys, utwórz klucz i od razu go skopiuj.",
+              "W agentes.chat otwórz **Ustawienia › Konta AI** i wklej go w sekcji **Jev**. Widzi go tylko osoba, która skonfigurowała ten serwer.",
+            ],
+          },
+          "Na serwerze uruchomionym przez Docker możesz zamiast tego wpisać klucz do `.env` jako `TYPESAFE_API_KEY`. Ten ma pierwszeństwo przed kluczem z Ustawień.",
+        ],
+      },
+      {
+        id: "cost",
+        heading: "Ile to kosztuje",
+        blocks: [
+          {
+            list: [
+              "0,042 USD za milion tokenów, które Jev przeczyta. Jego odpowiedzi są bezpłatne. Wybór, kto odpowiada, to około 2500 tokenów, czyli około 0,0001 USD. Zrzut ekranu to około 3900 tokenów.",
+              "Kupione środki są ważne 12 miesięcy. Włącz w konsoli automatyczne doładowania, żeby Jevowi ich nie zabrakło.",
+              "**Ustawienia › Konta AI** pokazują, ile decyzji Jev podjął w tym miesiącu i ile kosztowały.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "data",
+        heading: "Twoje dane",
+        blocks: [
+          "Co Jev czyta, żeby podjąć decyzję:",
+          {
+            list: [
+              "Nazwę i opis kanału, wiadomość i kilka poprzednich",
+              "Nazwy i role twoich agentów, początek ich instrukcji i narzędzia, których mogą używać",
+              "Porównywane elementy pamięci",
+              "Zadanie agenta i początek wyników jego narzędzi",
+              "Cel misji i polecenia, które agent chce dla niej uruchomić",
+              "Narzędzia, które oferuje podłączona aplikacja",
+              "Stronę lub ekran, których używa agent, łącznie ze zrzutami ekranu",
+            ],
+          },
+          "TypeSafe uruchamia Jeva w Stanach Zjednoczonych i nie trenuje swoich modeli na tym, co wysyłasz. Przechowuje dane tak długo, jak potrzebuje do świadczenia usługi. Zerowa retencja jest dostępna w planach dla firm.",
+          "Polityka prywatności TypeSafe: https://typesafe.ai/legal/privacy-policy. Umowa powierzenia przetwarzania danych: https://typesafe.ai/legal/data-processing.",
+        ],
+      },
+      {
+        id: "problems",
+        heading: "Gdy przestaje działać",
+        blocks: [
+          {
+            list: [
+              "**Klucz nie został przyjęty:** utwórz nowy klucz i wklej go w **Ustawienia › Konta AI**.",
+              "**Brak środków:** doładuj środki w konsoli. Jev spróbuje ponownie w ciągu 30 minut, możesz też kliknąć **Sprawdź ponownie**.",
+              "**Zajęty lub nieosiągalny:** TypeSafe może ograniczać liczbę żądań na sekundę albo na jakiś czas przestać odpowiadać. Jev sam wróci do pracy. Twoje limity: https://console.typesafe.ai/rate-limits. Po wyższe napisz na sales@typesafe.ai.",
+            ],
+          },
+          "W tym czasie agenci działają tak jak w sekcji [Bez niego](/help/jev#without).",
+        ],
+      },
+    ],
+  },
+  "apps-de-ia": {
+    title: "Aplikacje AI",
+    summary:
+      "Zlecaj zadania agentom agentes.chat z Claude, Cursora albo innej aplikacji MCP, bez jej opuszczania, i dostawaj odpowiedź od razu na miejscu.",
+    sections: [
+      {
+        id: "what",
+        heading: "Jak to działa",
+        blocks: [
+          "agentes.chat jest serwerem MCP. Wklejasz jego adres w swojej aplikacji AI, logujesz się swoim kontem i wybierasz przestrzeń roboczą. Od tej chwili aplikacja może wyświetlać agentów i kanały, wysyłać zadanie agentowi w twoim imieniu, czekać na odpowiedź i czytać ostatnie zadania.",
+          'Na przykład w trakcie pracy nad sceną w Unity albo Blenderze poproś Claude: "Poproś agenta od marketingu o tekst na premierę". Wiadomość pojawia się w agentes.chat jako twoja, oznaczona **via Claude**, a odpowiedź agenta wraca do Claude.',
+          "Adres jest w **Ustawienia › Aplikacje AI**. Kończy się na `/mcp`.",
+        ],
+      },
+      {
+        id: "connect",
+        heading: "Podłącz aplikację",
+        blocks: [
+          {
+            list: [
+              "**Claude** (claude.ai, Claude Desktop i telefon): w **Customize › Connectors** kliknij **+ Add**, potem **Add custom connector**, nazwij go agentes.chat, wklej adres i kliknij **Continue**. Wybierz **Sign in now**, kliknij **Add** i autoryzuj. W planach Team i Enterprise konektor dodaje Owner organizacji Claude w Organization settings › Connectors, a każda osoba klika **Connect** w Customize › Connectors. Darmowy plan Claude mieści jeden własny konektor.",
+              "**Claude Code:** uruchom `claude mcp add --transport http --scope user agentes <adres>`, potem wpisz `/mcp`, wybierz agentes i **Authenticate**. Tylko dla bieżącego folderu pomiń `--scope user`.",
+              "**Cursor:** **Dodaj do Cursora** w **Ustawienia › Aplikacje AI** albo adres w `~/.cursor/mcp.json`. Cursor poprosi o zalogowanie przy pierwszym użyciu.",
+              '**VS Code:** **Dodaj do VS Code** albo adres w `.vscode/mcp.json` z `"type": "http"`.',
+            ],
+          },
+          "Przy logowaniu agentes.chat pokazuje, która aplikacja prosi o dostęp i dokąd wraca. Kontynuuj tylko wtedy, gdy łączenie zostało przed chwilą rozpoczęte przez ciebie.",
+        ],
+      },
+      {
+        id: "tools",
+        heading: "Co może aplikacja",
+        blocks: [
+          {
+            list: [
+              "`send_to_agent`: wysyła wiadomość od ciebie do agenta, w twojej prywatnej rozmowie z nim albo na kanale, i czeka na odpowiedź. Tylko z dostępem **Czytanie i wysyłanie zadań agentom**.",
+              "`wait_for_reply`: dalej czeka na odpowiedź na zadanie.",
+              "`list_agents`: agenci, których widzisz.",
+              "`list_channels`: kanały, które czytasz.",
+              "`read_conversation`: ostatnie wiadomości kanału, wątku albo zadania.",
+              "`list_recent_tasks`: zadania wysłane przez ciebie z aplikacji i to, czym agenci zajmują się teraz.",
+            ],
+          },
+          "Aplikacja działa jako ty i widzi tylko to, co widzisz ty. Nigdy nie zatwierdza działań agentów: gdy agent zatrzymuje się, żeby poprosić o zatwierdzenie, odpowiedź mówi o tym i zawiera link, a decyzję podejmuje człowiek w agentes.chat. Nie zmienia też ustawień, członków ani uprawnień.",
+        ],
+      },
+      {
+        id: "workspace",
+        heading: "Jedna przestrzeń robocza na połączenie",
+        blocks: [
+          "Każde połączenie obejmuje przestrzeń roboczą wybraną przy logowaniu. Żeby użyć innej, podłącz aplikację jeszcze raz i wybierz tamtą.",
+          "W **Ustawienia › Aplikacje AI** widzisz podłączone aplikacje i to, kiedy każdej użyto, i możesz odłączyć dowolną z nich. Osoby zarządzające członkami widzą aplikacje całej przestrzeni roboczej i też mogą je odłączać. Każda wiadomość wysłana z aplikacji pojawia się w Audycie.",
+        ],
+      },
+      {
+        id: "tokens",
+        heading: "Tokeny osobiste",
+        blocks: [
+          "Dla skryptów i aplikacji bez logowania przez OAuth utwórz token osobisty w **Ustawienia › Aplikacje AI** i wysyłaj go w nagłówku `Authorization: Bearer`. Token jest pokazywany raz, działa tylko w przestrzeni roboczej, w której go utworzono, i może wygasać po 30 dniach, 90 dniach, roku albo nigdy.",
+          "Na serwerze bez https, poza jego własnym komputerem, użyj tokenu osobistego: logowanie przez OAuth wymaga https.",
+        ],
+      },
+      {
+        id: "limits",
+        heading: "Limity",
+        blocks: [
+          {
+            list: [
+              "Do 120 żądań na minutę i 5000 dziennie na połączenie.",
+              "Do 20 wiadomości na minutę i 500 dziennie na osobę w każdej przestrzeni roboczej.",
+              "Oczekiwanie trwa do 45 sekund. Gdy agent nadal pracuje, aplikacja czeka ponownie.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "safety",
+        heading: "Teksty innych osób",
+        blocks: [
+          "Odpowiedzi zawierają teksty pisane przez agentów i ludzi w agentes.chat. Aplikacja dostaje je oznaczone jako treść, a nie instrukcje, ale tekst i tak może próbować namówić aplikację do czegoś innego. Sprawdź, co twoja aplikacja zamierza zrobić, zanim potwierdzisz.",
+        ],
+      },
+      {
+        id: "problems",
+        heading: "Gdy nie chce się połączyć",
+        blocks: [
+          {
+            list: [
+              "**Prośba wygasła:** strona logowania jest ważna 30 minut i działa raz. Wróć do aplikacji i połącz ponownie.",
+              "**Aplikacja prosi o ponowne zalogowanie:** połączenie zostało odłączone, hasło się zmieniło albo nie należysz już do przestrzeni roboczej. Zaloguj się ponownie z aplikacji.",
+              "**Cursor utknął na starym logowaniu:** zamknij Cursora, usuń folder `~/.mcp-auth` i połącz ponownie.",
+            ],
+          },
+        ],
+      },
+    ],
+  },
+};

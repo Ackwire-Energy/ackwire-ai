@@ -13,6 +13,18 @@
   <array>
     <string>en</string>
     <string>pt-BR</string>
+    <string>es</string>
+    <string>fr</string>
+    <string>de</string>
+    <string>it</string>
+    <string>nl</string>
+    <string>ja</string>
+    <string>ko</string>
+    <string>zh-Hans</string>
+    <string>id</string>
+    <string>tr</string>
+    <string>pl</string>
+    <string>ru</string>
   </array>
   <key>CFBundleAllowMixedLocalizations</key>
   <true/>

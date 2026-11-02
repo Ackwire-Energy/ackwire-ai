@@ -59,10 +59,10 @@ describe("help pages", () => {
     await renderApp("/help/wiki", { api: signedOut() });
     expectPage(helpDocument("wiki", "pt-BR"));
     cleanup();
-    // A language with no translation of the page yet reads it in English.
+    // Every app language has the help pages: ?lang=fr is the French page.
     await renderApp("/help/wiki?lang=fr", { api: signedOut() });
-    expectPage(helpDocument("wiki", "en"));
-    expect(document.querySelector(".help")?.getAttribute("lang")).toBe("en");
+    expectPage(helpDocument("wiki", "fr"));
+    expect(document.querySelector(".help")?.getAttribute("lang")).toBe("fr");
   });
 
   test("the language switch changes the page and the address's lang, never the app's language", async () => {
