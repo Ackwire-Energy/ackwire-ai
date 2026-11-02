@@ -72,7 +72,7 @@ export async function changeSkillAsAgent(
   const own = skill.origin === "agent";
   if (own) {
     if (skill.ownerAgentId !== ctx.agentId) throw new ForbiddenError("That skill belongs to another agent.");
-    if (skill.locked) throw new ForbiddenError("A person locked this skill; it can't be changed.");
+    if (skill.locked) throw new ForbiddenError("A person locked this skill, so it can't be changed.");
     if (skill.body === text) return { action: "unchanged" };
   }
   if (own && trust === "high") {

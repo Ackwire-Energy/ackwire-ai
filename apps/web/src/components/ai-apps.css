@@ -237,15 +237,6 @@ html:not([data-pointer]) .apps-client:focus-visible {
   padding: 0;
   list-style: none;
 }
-.consent__list > li {
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
-  gap: 8px;
-  align-items: start;
-}
-.consent__list > li > .ac-icon {
-  margin-top: 2px;
-}
 .consent__list--can > li > .ac-icon {
   color: var(--ok);
 }

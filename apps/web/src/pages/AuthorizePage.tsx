@@ -335,17 +335,17 @@ function ConsentForm({
           <div className="apps-field" style={{ gap: 8 }}>
             <span className="newag__label">{t("apps.consent.can")}</span>
             <ul className="consent__list consent__list--can small">
-              <li>
+              <li className="ac-iconline">
                 <Icon name="check" size={16} />
                 <span>{t("apps.consent.canSee")}</span>
               </li>
               {access === "write" && (
-                <li>
+                <li className="ac-iconline">
                   <Icon name="check" size={16} />
                   <span>{t("apps.consent.canSend", { app })}</span>
                 </li>
               )}
-              <li>
+              <li className="ac-iconline">
                 <Icon name="check" size={16} />
                 <span>{t("apps.consent.canRead")}</span>
               </li>
@@ -355,7 +355,7 @@ function ConsentForm({
             <span className="newag__label">{t("apps.consent.never")}</span>
             <ul className="consent__list consent__list--never small">
               {(["neverApprove", "neverSettings", "neverHidden"] as const).map((key) => (
-                <li key={key}>
+                <li key={key} className="ac-iconline">
                   <Icon name="dash" size={16} />
                   <span>{t(`apps.consent.${key}`)}</span>
                 </li>
