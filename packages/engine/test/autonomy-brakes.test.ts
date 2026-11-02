@@ -17,6 +17,8 @@ import {
   insertMessage,
   type Judge,
   LATER_JOB,
+  LATER_LOOKS,
+  LATER_MAX_LOOKS,
   LOOP_MAX,
   type OutboxJob,
   postAutonomyDigests,
@@ -458,6 +460,21 @@ describe("one item is worked once, noise waits for a digest, repeats stop (ยง4โ€
     expect((await brakeWakes({ db: f.db, judge: fakeJudge(0) }, second, [ada.id])).held.get(ada.id)).toBe("later");
     const [later] = await jobsOf(LATER_JOB);
     expect(later?.payload).toMatchObject({ messageId: second.id, agentId: ada.id, look: 1 });
+  });
+
+  test("work held only for room is never digested as noise: past the hour it looks slower, after a day it starts", async () => {
+    f = await setup();
+    const ada = await agentOf("Ada", "ada", { maxUnrequested: 1 });
+    const first = await alert(f.agent.id, "Deploy falhou no job build-web");
+    await brakeWakes({ db: f.db, judge: fakeJudge(0) }, first, [ada.id]);
+    await working(ada.id, first.id);
+    const outage = await alert(f.agent.id, "Checkout fora do ar para todos os clientes");
+    const at = (look: number) => brakeWakes({ db: f.db, judge: null }, outage, [ada.id], { look });
+    expect((await at(LATER_LOOKS)).held.get(ada.id)).toBe("later");
+    const slow = (await jobsOf(LATER_JOB)).find((j) => j.payload.look === LATER_LOOKS + 1);
+    expect(slow?.nextAttemptAt.getTime()).toBeGreaterThan(Date.now() + 10 * 60_000);
+    expect((await at(LATER_MAX_LOOKS)).wake).toEqual([ada.id]);
+    expect(await signalsOf("digest")).toHaveLength(0);
   });
 
   test("only alerts count as items: hand-offs and recurring reports with a dashboard link never link or stop", async () => {

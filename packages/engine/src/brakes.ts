@@ -439,9 +439,14 @@ const unmention = (text: string) => text.replace(/@(?=[\w-])/g, "");
 /** Runs of an agent on one item within this window are attempts at it; past `LOOP_MAX` it stops and asks. */
 export const LOOP_WINDOW_MS = 24 * 3600_000;
 export const LOOP_MAX = 3;
-/** A deferred wake looks again this often, this many times (an hour), then goes to the digest. */
+/**
+ * A deferred wake looks again this often for an hour (`LATER_LOOKS`), then every `LATER_SLOW_LOOK_MS`; after a day
+ * (`LATER_MAX_LOOKS`) it starts anyway. Work held only for room is never dropped, nor told apart as noise.
+ */
 export const LATER_LOOK_MS = 2 * 60_000;
 export const LATER_LOOKS = 30;
+export const LATER_SLOW_LOOK_MS = 15 * 60_000;
+export const LATER_MAX_LOOKS = LATER_LOOKS + 23 * 4;
 export const LATER_JOB = "autonomy.later";
 
 export type BrakeOutcome = "linked" | "digest" | "loop" | "later";
@@ -641,19 +646,14 @@ async function brakeOne(
     return "digest";
   }
   // §7: at its cap of unrequested runs, or its computer already has turns waiting: later.
-  if (crowded || (await unrequestedAtCap(db, orgId, agentId))) {
-    if (look >= LATER_LOOKS) {
-      if (claim) await unclaim("digest");
-      else await record(db, "digest");
-      return "digest";
-    }
+  if (look < LATER_MAX_LOOKS && (crowded || (await unrequestedAtCap(db, orgId, agentId)))) {
     await unclaim(null);
     await enqueue(db, {
       orgId,
       kind: LATER_JOB,
       payload: { messageId: message.id, agentId, look: look + 1 },
       dedupeKey: `${LATER_JOB}:${message.id}:${agentId}:${look + 1}`,
-      runAt: new Date(Date.now() + LATER_LOOK_MS),
+      runAt: new Date(Date.now() + (look < LATER_LOOKS ? LATER_LOOK_MS : LATER_SLOW_LOOK_MS)),
     });
     if (look === 0) await record(db, "later", { doneAt: new Date() });
     return "later";
