@@ -737,4 +737,19 @@ describe("a call a rule approved for good", () => {
     expect(hints.slice(1)).toEqual(['chat.work.autoApprovedReads|{"name":"Ana"}', "chat.work.autoApprovedNobody"]);
     expect(hints).toHaveLength(3);
   });
+
+  test("live too: the line says it as soon as the call ends, and stays its own line", () => {
+    const sql = { connector: "Banco" };
+    const s = [
+      start("a", "banco_execute_sql", sql),
+      end("a"),
+      start("b", "banco_execute_sql", sql),
+      { ...end("b"), autoApproved: { by: "Ana", reads: true } } as Ev,
+    ].reduce(applyChannelEvent, emptyStreams);
+    const hints = toolItemsLive(s.runs.r1?.work ?? []).flatMap((i) =>
+      i.kind === "call" ? [toolLineHint(t, i.line)] : [],
+    );
+    expect(hints).toHaveLength(2);
+    expect(hints[1]).toBe('chat.work.autoApprovedReads|{"name":"Ana"}');
+  });
 });

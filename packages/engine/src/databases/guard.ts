@@ -392,7 +392,8 @@ export async function provenReadOnly(text: string): Promise<boolean> {
     names[0] === "pg_catalog" ? names.length === 2 : names.length === 1 && known.has(names[0] ?? "");
   walk(stmts, (key, node) => {
     if (key === "RangeTableSample") computes = false;
-    else if (key === "TypeCast") computes &&= builtin(svalsOf((node.typeName as Node | undefined)?.names).map(lower), BUILTIN_TYPES);
+    else if (key === "TypeCast")
+      computes &&= builtin(svalsOf((node.typeName as Node | undefined)?.names).map(lower), BUILTIN_TYPES);
     else if (key === "A_Expr" || key === "SubLink") {
       const names = svalsOf(key === "A_Expr" ? node.name : node.operName).map(lower);
       computes &&= names.length === 0 || builtin(names, BUILTIN_OPERATORS);

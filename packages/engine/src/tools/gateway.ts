@@ -275,8 +275,11 @@ export type ToolCall = { toolUseId: string; name: string; input: Record<string, 
 export type Approval = typeof approvals.$inferSelect;
 
 export type InvokeResult =
-  /** `ran`: the action approved ahead this call did, as it is now (its cards are told, `invokeWithChip`). */
-  | { type: "result"; output: ToolOutput; ran?: Approval }
+  /**
+   * `ran`: the action approved ahead this call did, as it is now (its cards are told, `invokeWithChip`).
+   * `autoApproved`: a rule ("Aprovar sempre") let it run, whose person and whether a reads one (its live line).
+   */
+  | { type: "result"; output: ToolOutput; ran?: Approval; autoApproved?: { by: string | null; reads: boolean } }
   | { type: "approval"; approval: Approval }
   /** `ask_user`: the executor posts the question and suspends the run. */
   | { type: "question"; text: string; choices: string[] | null; why: string }
@@ -796,7 +799,7 @@ export function createToolGateway(deps: {
           ...(autoApproved ? { autoApproved } : {}),
         });
         if (outcome) await audit(outcome, outcome === "done" ? {} : { reason: shown(output.content) });
-        return { type: "result" as const, output };
+        return { type: "result" as const, output, ...(autoApproved ? { autoApproved } : {}) };
       };
 
       if (unknownInDirectory) return finish({ content: unknownInDirectory, isError: true });

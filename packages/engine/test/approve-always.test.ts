@@ -738,7 +738,7 @@ describe("Aprovar sempre leituras", () => {
 
     // Another read of that project, without a why: it runs, and its line says who approved reads for good.
     const ran = await invoke(gateway, ctx, name, { project_id: "proj-a", query: "select count(*) from customers" });
-    expect(ran.type).toBe("result");
+    expect(ran.type === "result" && ran.autoApproved).toEqual({ by: f.owner.name, reads: true });
     expect(mcp.calls).toEqual([{ project_id: "proj-a", query: "select count(*) from customers" }]);
     const steps = await f.db.select().from(schema.agentRunSteps).where(eq(schema.agentRunSteps.runId, ctx.runId));
     const result = steps.filter((s) => s.kind === "tool_result").at(-1);

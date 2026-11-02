@@ -287,7 +287,7 @@ export const workCalls = (w: Work) => w.steps.reduce((n, s) => n + s.count, 0);
  */
 export function foldLiveWork(work: LiveWork[]): LiveWork[] {
   const plain = (w: LiveWork | undefined) =>
-    w?.kind === "call" && !w.code && w.output.length === 0
+    w?.kind === "call" && !w.code && w.output.length === 0 && !w.autoApproved
       ? { ...toolActivity(w.tool, w.connector, w.detail, w), tool: w.tool }
       : null;
   return work.filter((w, i) => {
@@ -511,7 +511,15 @@ export function toolItemsLive(work: LiveWork[], stopped = false): ToolItem[] {
     const state: ToolState = w.running ? (stopped ? "stop" : "run") : w.failed ? "fail" : w.held ? "stop" : "done";
     const hasCode = Boolean(w.code) || w.output.length > 0;
     const prev = items[items.length - 1];
-    if (prev?.kind === "call" && !hasCode && state !== "fail" && sameLine(prev.line, { ...a, tool: w.tool })) {
+    const autoApproved = w.autoApproved ?? null;
+    if (
+      prev?.kind === "call" &&
+      !hasCode &&
+      state !== "fail" &&
+      !autoApproved &&
+      !prev.line.autoApproved &&
+      sameLine(prev.line, { ...a, tool: w.tool })
+    ) {
       prev.line.count += 1;
       prev.line.state = state;
       prev.line.ms = prev.line.ms !== null && w.ms !== undefined ? prev.line.ms + w.ms : (prev.line.ms ?? w.ms ?? null);
@@ -532,6 +540,7 @@ export function toolItemsLive(work: LiveWork[], stopped = false): ToolItem[] {
         refusal: w.refusal ?? null,
         input: w.command ?? null,
         result: null,
+        ...(autoApproved ? { autoApproved } : {}),
         ...(w.code ? { code: w.code } : {}),
         ...(w.output.length > 0 ? { output: w.output } : {}),
       },
