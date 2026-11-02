@@ -196,6 +196,7 @@ export const keys = {
   working: (orgId: string) => ["org", orgId, "working"] as const,
   taskManager: (orgId: string) => ["org", orgId, "task-manager"] as const,
   taskSteps: (orgId: string, runId: string) => ["org", orgId, "task-manager", "steps", runId] as const,
+  computerQueue: (orgId: string, machineId: string) => ["org", orgId, "task-manager", "queue", machineId] as const,
   reminders: (orgId: string) => ["org", orgId, "reminders"] as const,
   /** Every mailbox read (prefix). */
   mail: (orgId: string) => ["org", orgId, "mail"] as const,

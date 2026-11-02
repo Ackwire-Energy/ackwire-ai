@@ -5534,6 +5534,38 @@ export interface ManagedTask {
   canStop: boolean;
   /** What it waits on when it isn't a person: its computer (full or away), its plan's limit, the budget. */
   held?: "computer_busy" | "computer_offline" | "plan" | "budget" | null;
+  /** Its place in its computer's line for room (people's turns first, then the longest wait). */
+  line?: { machineId: string; position: number; of: number; people: boolean; since: string | null } | null;
+}
+
+/** A computer with turns running or waiting for room (counts only). */
+export interface ComputerSummary {
+  id: string;
+  name: string;
+  working: number;
+  inLine: number;
+}
+
+/** One turn on a computer's line view: what it is for, never its content (ADR 0127). */
+export interface QueueTurn {
+  runId: string;
+  agentId: string;
+  kind: "person" | "agent" | "routine";
+  /** Who asked (the person only when you see the conversation, another agent, a routine's name); null: not shown. */
+  who: string | null;
+  /** What it is about, only when you see its conversation. */
+  label: string | null;
+  visible: boolean;
+  mine: boolean;
+  canStop: boolean;
+  since: string | null;
+}
+
+/** A computer's line (`GET …/machines/{id}/queue`): what runs now, then who waits, in the order they start. */
+export interface ComputerQueue {
+  computer: { id: string; name: string };
+  working: QueueTurn[];
+  line: (QueueTurn & { people: boolean })[];
 }
 
 /** A task that ended (`ended` of the task manager). */
@@ -5563,6 +5595,8 @@ export interface TaskSteps {
 export interface TaskManagerView {
   tasks: ManagedTask[];
   ended: EndedTask[];
+  /** Computers with turns running or waiting for room (absent on an older server). */
+  computers?: ComputerSummary[];
   /** Per agent with work in the last hour: tool calls per minute, 60 points, oldest first. */
   activity: Record<string, number[]>;
 }

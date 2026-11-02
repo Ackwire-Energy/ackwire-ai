@@ -4335,6 +4335,21 @@ export function useTaskSteps(orgId: string, runId: string | null, pollMs: number
   });
 }
 
+/** A computer's line ("Ver fila", ADR 0127): asked again every 3 s while shown. */
+export function useComputerQueue(orgId: string, machineId: string | null) {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.computerQueue(orgId, machineId ?? ""),
+    queryFn: () => {
+      const working = part(api, "working");
+      if (!working.computerQueue) throw new Error("This server can't show a computer's line yet");
+      return working.computerQueue(orgId, machineId ?? "");
+    },
+    enabled: machineId !== null && Boolean(api.working?.computerQueue),
+    refetchInterval: TASK_MANAGER_POLL_MS,
+  });
+}
+
 /**
  * "Parar" from the task manager or the chat's strip (ADR 0127): stops each task (with the reason the agent reads)
  * and refreshes the lists. Stopping several (an agent's "Parar todas") stops them one by one; one refused doesn't

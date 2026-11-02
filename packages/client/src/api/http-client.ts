@@ -57,6 +57,7 @@ import type {
   CodeSent,
   CommandApproval,
   ComposioUsage,
+  ComputerQueue,
   ComputerSetup,
   ComputerTarget,
   Connection,
@@ -277,6 +278,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       taskManager: (orgId, since) =>
         request<TaskManagerView>(`${org(orgId)}/task-manager`, { query: since ? { since } : {} }),
       taskSteps: (orgId, runId) => request<TaskSteps>(`${org(orgId)}/task-manager/${enc(runId)}/steps`),
+      computerQueue: (orgId, machineId) => request<ComputerQueue>(`${org(orgId)}/machines/${enc(machineId)}/queue`),
     },
     mail: {
       providers: (orgId) => request<MailProviders>(`${org(orgId)}/mail/providers`),

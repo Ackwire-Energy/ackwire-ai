@@ -2,7 +2,7 @@
 
 - Status: Accepted (built)
 - Date: 2026-11-02
-- Extends: ADR 0008 (runs), 0015 (tool gateway: `tool_call` steps), 0053 (routines' background runs), 0084 (agent status), 0121 (long work)
+- Extends: ADR 0008 (runs), 0015 (tool gateway: `tool_call` steps), 0032 ("Calm waits": the computer's line), 0053 (routines' background runs), 0084 (agent status), 0121 (long work)
 - Code: engine `packages/engine/src/task-manager.ts` (`taskManager`, `agentActivity`, `taskSteps`), `run-stopped.ts` (`tellAgentStopped`, `setStopReason`, `stoppedText`), `cancel.ts` (`cancelRun` takes `reason` and `tell`), `notices.ts` (`run_stopped`), `notification-producers.ts`; server `routes/app/management.ts` (`GET …/task-manager`, `GET …/task-manager/{id}/steps`, `POST …/runs/{id}/stop-reason`, `reason` on `POST …/runs/{id}/cancel`); client `lib/task-manager.ts`, `lib/notices.ts` (`stoppedNoticeOf`), `api/queries.ts` (`useTaskManager`, `useStopTasks`, `useStopReason`); web and phone screens and the chat's strip
 
 ## Context
@@ -44,10 +44,20 @@ Two stops tell nothing: "stop and send" (the message sent with it says what to d
 
 The reason can come with the stop (the "stop all" confirmation) or after it: `setStopReason` (`POST …/runs/{id}/stop-reason`) lets whoever stopped it add one, once; the notice's text changes and the agent reads it on its next turn.
 
-### 4. Where people see it
+### 4. The computer's line
+
+The engine keeps a line for a shared computer's room (ADR 0032, "Calm waits", `computer-queue.ts`): people's turns first, then the longest wait. The task manager shows it:
+
+- A task waiting for room carries `line` (its computer, its place, how many are in line, whether a person waits on it), ranked in SQL the way `roomHead` orders the line.
+- `computers` (in the same read) counts, per computer with work, the turns running and waiting: everyone may see how full a computer is.
+- `computerQueue` (`GET …/machines/{machineId}/queue`, "Ver fila"): what runs on a computer now and who waits, in order. Everyone in the workspace sees the line; a turn says what it is about only to who sees its conversation, otherwise only whose it is (a person, another agent, a routine). "Você vai primeiro" marks the caller's own turn a person waits on.
+
+Computers report no live memory, only the last day's average; the line says "full" by having people in it, not by a gauge.
+
+### 5. Where people see it
 
 - **The page** (web; on the phone, a pushed screen with the list): the agents as cards with their last half hour, a table of tasks grouped by agent with state, what each uses, how long, where it runs and Stop, the routines' background runs apart, and what ended today. Stopping several asks first, with an optional reason.
-- **The chat's strip**: in a DM with an agent, a line above the composer with that agent's tasks (the one of this conversation marked), each with Stop; "Stop all" turns the strip into its confirmation.
+- **In a DM with an agent**: a pill in the header ("3 tarefas · 1 espera você") opens the agent's tasks in the thread panel on the web (a pushed screen on the phone, as a thread): its tasks with their steps and Stop, "Stop all" with its confirmation, and, for a task in line, its place and the computer's line.
 
 ## Consequences
 

@@ -8,6 +8,7 @@ import {
   cancelRun,
   canTalkTo,
   canViewCost,
+  computerQueue,
   continueRun,
   GIF_RATINGS,
   getMembership,
@@ -338,8 +339,34 @@ const ManagedTask = z
       .openapi({
         description: "What it waits on when it isn't a person: its computer (full or away), its plan, the budget.",
       }),
+    line: z
+      .object({
+        machineId: z.uuid(),
+        position: z.number().int(),
+        of: z.number().int(),
+        people: z.boolean(),
+        since: z.string().nullable(),
+      })
+      .nullable()
+      .openapi({
+        description: "Its place in its computer's line for room: people's turns first, then the longest wait.",
+      }),
   })
   .openapi("ManagedTask");
+
+const QueueTurn = z
+  .object({
+    runId: z.uuid(),
+    agentId: z.uuid(),
+    kind: z.enum(["person", "agent", "routine"]),
+    who: z.string().nullable(),
+    label: z.string().nullable().openapi({ description: "Only when you see its conversation." }),
+    visible: z.boolean(),
+    mine: z.boolean(),
+    canStop: z.boolean(),
+    since: z.string().nullable(),
+  })
+  .openapi("QueueTurn");
 
 const EndedTask = z
   .object({
@@ -360,6 +387,9 @@ const TaskManagerView = z
   .object({
     tasks: z.array(ManagedTask),
     ended: z.array(EndedTask),
+    computers: z.array(
+      z.object({ id: z.uuid(), name: z.string(), working: z.number().int(), inLine: z.number().int() }),
+    ),
     activity: z
       .record(z.string(), z.array(z.number().int()))
       .openapi({ description: "Per agent: tool calls per minute over the last 60 minutes, oldest first." }),
@@ -1331,6 +1361,33 @@ export function managementRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId, runId } = c.req.valid("param");
       return c.json(await taskSteps(db, c.get("user").id, orgId, runId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/machines/{machineId}/queue",
+      tags: ["Usage"],
+      security,
+      summary: "A computer's line (ADR 0127): what runs on it now and who waits for room, in the order they start",
+      description:
+        "Everyone in the workspace sees it. A turn says what it is about only to who sees its conversation; otherwise only whose it is (a person, another agent, a routine).",
+      request: { params: OrgParams.extend({ machineId: z.uuid() }) },
+      responses: {
+        200: json(
+          z.object({
+            computer: z.object({ id: z.uuid(), name: z.string() }),
+            working: z.array(QueueTurn),
+            line: z.array(QueueTurn.extend({ people: z.boolean() })),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId, machineId } = c.req.valid("param");
+      return c.json(await computerQueue(db, c.get("user").id, orgId, machineId), 200);
     },
   );
 

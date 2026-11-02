@@ -69,6 +69,7 @@ import type {
   CodeSent,
   CommandApproval,
   ComposioUsage,
+  ComputerQueue,
   ComputerSetup,
   ComputerTarget,
   Connection,
@@ -1381,6 +1382,8 @@ export interface ApiClient {
     taskManager?(orgId: string, since?: string): Promise<TaskManagerView>;
     /** A task's steps for "Ver passos", to whoever sees it in the task manager (no inputs, no outputs). */
     taskSteps?(orgId: string, runId: string): Promise<TaskSteps>;
+    /** A computer's line ("Ver fila"): what runs on it and who waits for room, in order (ADR 0127). */
+    computerQueue?(orgId: string, machineId: string): Promise<ComputerQueue>;
   };
   /** People's mailboxes for agents (ADR 0038): Gmail/Outlook through Composio, the rest by IMAP/SMTP. */
   mail: {

@@ -3,6 +3,7 @@ import { eq, schema } from "@agenteschat/db";
 import {
   addRunStep,
   cancelRun,
+  computerQueue,
   drainOutbox,
   ForbiddenError,
   NotFoundError,
@@ -155,5 +156,48 @@ describe("the task manager", () => {
       .where(eq(schema.agentRuns.id, run.id));
     const view = await taskManager(f.db, f.owner.id, f.org.id);
     expect(view.tasks[0]).toMatchObject({ runId: run.id, status: "waiting_input", held: "computer_busy" });
+  });
+
+  test("the computer's line: places (people first), the computers row, what each viewer may read", async () => {
+    f = await setup();
+    const [machine] = await f.db.insert(schema.machines).values({ orgId: f.org.id, name: "Mac" }).returning();
+    if (!machine) throw new Error("no machine");
+    await ask("@dev roda os testes");
+    await ask("@dev e o lint");
+    const [a, b] = await runs();
+    if (!a || !b) throw new Error("no runs");
+    const inLine = (since: number, people: boolean) => ({
+      status: "waiting_input" as const,
+      waitingMachineId: machine.id,
+      transcript: {
+        waitingForBrain: { kind: "claude_code", code: "busy", waitId: "w" },
+        roomWaitSince: since,
+        roomPeople: people,
+      },
+    });
+    // The agents' turn waited longer, but a person waits on the other one: it goes first.
+    await f.db.update(schema.agentRuns).set(inLine(1_000, false)).where(eq(schema.agentRuns.id, a.id));
+    await f.db.update(schema.agentRuns).set(inLine(2_000, true)).where(eq(schema.agentRuns.id, b.id));
+
+    const view = await taskManager(f.db, f.owner.id, f.org.id);
+    expect(view.tasks.find((t) => t.runId === b.id)?.line).toMatchObject({
+      machineId: machine.id,
+      position: 1,
+      of: 2,
+      people: true,
+    });
+    expect(view.tasks.find((t) => t.runId === a.id)?.line).toMatchObject({ position: 2, of: 2, people: false });
+    expect(view.computers).toEqual([{ id: machine.id, name: "Mac", working: 0, inLine: 2 }]);
+
+    const queue = await computerQueue(f.db, f.owner.id, f.org.id, machine.id);
+    expect(queue.line.map((t) => t.runId)).toEqual([b.id, a.id]);
+    expect(queue.line[0]).toMatchObject({ kind: "person", visible: true, mine: true, canStop: true, people: true });
+    expect(queue.line[0]?.label).toContain("o lint");
+
+    // Someone outside the conversation sees the line, but not what it is about nor who asked.
+    const outsider = await addMember(f.db, f.org.id, "member", "caio");
+    const theirs = await computerQueue(f.db, outsider.id, f.org.id, machine.id);
+    expect(theirs.line).toHaveLength(2);
+    expect(theirs.line[0]).toMatchObject({ kind: "person", who: null, label: null, visible: false, canStop: false });
   });
 });

@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { EndedTask, ManagedTask, TaskNow } from "../api/types";
+import type { EndedTask, ManagedTask, QueueTurn, TaskNow } from "../api/types";
 import { type Activity, toolActivity } from "./activity";
 
 /**
@@ -28,6 +28,20 @@ export const waitsOnPerson = (t: Pick<ManagedTask, "status" | "held">) => {
   const w = waitsFor(t);
   return w === "ok" || w === "answer";
 };
+
+/**
+ * A task waiting for room on its computer, with its place in the line ("Na fila · 2º"); null for any other state.
+ * People's turns go first, then the longest wait (ADR 0032 "Calm waits").
+ */
+export const linePlace = (t: Pick<ManagedTask, "held" | "line">) =>
+  t.held === "computer_busy" && t.line ? t.line : null;
+
+/** Whose a turn on a computer's line is, in the person's words (`taskManager.queue.*`). */
+export function queueWho(t: TFunction, turn: Pick<QueueTurn, "kind" | "who">): string {
+  if (turn.kind === "routine") return t("taskManager.queue.routine", { name: turn.who ?? "" });
+  if (turn.kind === "agent") return t("taskManager.queue.agent", { name: turn.who ?? "" });
+  return turn.who ? t("taskManager.queue.person", { name: turn.who }) : t("taskManager.queue.personHidden");
+}
 
 /** The words of a wait (`taskManager.state.*`). */
 export const waitKey = (w: WaitReason) =>
