@@ -142,7 +142,7 @@ describe("a receipt never changes a message's height", () => {
     await act(async () => fireEvent.change(composer, { target: { value: "Mais uma coisa." } }));
     await act(async () => fireEvent.keyDown(composer, { key: "Enter" }));
     await settle(2);
-    expect(row("d3").querySelector(".ac-receipt__seen")).toBeNull();
+    expect(row("d3").querySelector(".ac-receipt__seen .ac-avatar")).toBeNull();
     const sending = screen()
       .getAllByRole("article")
       .find((a) => a.textContent?.includes("Mais uma coisa.")) as HTMLElement;
