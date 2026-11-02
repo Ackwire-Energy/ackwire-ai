@@ -49,6 +49,8 @@ export interface PlanModel {
   alias?: PlanAlias;
   tag?: PlanModelTag;
   needs?: PlanModelNeed;
+  /** It costs nothing on the plan (its maker's list prices it at 0): the pickers mark it "Free". */
+  free?: true;
   /**
    * Who makes it, on a plan that sells several makers' models (the picker groups them): an API provider's id
    * (`@agenteschat/providers`: its name and logo), else the maker's name.
@@ -153,7 +155,10 @@ export const CODING_PLANS = {
       // they're sent only once it allows that (paid and free are separate switches); none has an alias, so
       // "Automático" never picks one.
       // ponytail: hand-copied list, read the live list when OpenCode adds models faster than we copy them
-      // (opencode.ai/inference/go/v1/models: 28 on 2026-11-01, all of them here).
+      // (opencode.ai/inference/go/v1/models: 28 on 2026-11-02, all of them here). Zen's own free models
+      // (`deepseek-v4.1-flash-free`, `glm-5.3-flash-free`, `big-pickle`…) aren't Go's: OpenCode serves its free
+      // tier only to the OpenCode CLI ("Free-tier chat models require OpenCode", opencode.ai/v2/docs/console/models,
+      // read 2026-11-02), so they can't answer through Claude Code.
       models: [
         { id: "minimax-m3", label: "MiniMax M3", alias: "sonnet", maker: "minimax" },
         { id: "minimax-m3.1-flash", label: "MiniMax M3.1 Flash", maker: "minimax" },
@@ -197,8 +202,14 @@ export const CODING_PLANS = {
           needs: "paidTraining",
           maker: "Meta",
         },
-        { id: "beam-free", label: "Beam Free", needs: "freeTraining", maker: "Reflection" },
-        { id: "iceman-contributor-free", label: "Iceman Contributor Free", needs: "freeTraining", maker: "OpenCode" },
+        { id: "beam-free", label: "Beam Free", needs: "freeTraining", free: true, maker: "Reflection" },
+        {
+          id: "iceman-contributor-free",
+          label: "Iceman Contributor Free",
+          needs: "freeTraining",
+          free: true,
+          maker: "OpenCode",
+        },
       ],
       // Its models that aren't Claude refuse some of Claude Code's betas; the OpenCode CLI, if the agent runs
       // it, reads no project config that could point it elsewhere.

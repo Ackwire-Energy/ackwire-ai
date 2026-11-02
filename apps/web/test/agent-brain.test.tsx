@@ -348,6 +348,29 @@ describe("Quem pensa (its dialog)", () => {
     expect(brainCalls(state).at(-1)).toEqual({ brain: "codex", model: "gpt-6-luna", fallback: true });
   });
 
+  test("a saved plan no computer runs right now still saves its own model (Usar isn't stuck)", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const base = fakeAgentBrain(ADA_ID, { brain: "codex", model: null, effectiveModel: "gpt-6-sol" });
+    const options = base.options.map((o) =>
+      o.kind === "codex" ? { ...o, available: false, reason: "exec_off" as const } : o,
+    );
+    api.agents.brain = async () => ({
+      ...base,
+      options,
+      machines: [{ machineId: "machine_1", name: "MacBook", online: true, options }],
+    });
+    await open(state, api);
+    const d = await brainDialog();
+    const use = () => within(d).getByRole("button", { name: "Usar" }) as HTMLButtonElement;
+    expect(use().disabled).toBe(true);
+    await model(d, /Luna/);
+    expect(use().disabled).toBe(false);
+    await click(use());
+    await settle(6);
+    expect(brainCalls(state).at(-1)).toEqual({ brain: "codex", model: "gpt-6-luna", fallback: true });
+  });
+
   test("what no computer has can't be chosen, and says why", async () => {
     const state = seedState();
     const api = createFakeApi(state);

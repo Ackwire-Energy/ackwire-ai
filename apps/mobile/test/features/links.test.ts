@@ -13,6 +13,8 @@ describe("deep links", () => {
   test("a conversation, with or without its thread", () => {
     expect(chatHref("c1")).toBe("/chat/c1");
     expect(chatHref("c1", "t1")).toBe("/chat/c1?thread=t1");
+    expect(chatHref("c1", null, "m1")).toBe("/chat/c1?m=m1");
+    expect(chatHref("c1", "t1", "m1")).toBe("/chat/c1?thread=t1&m=m1");
     expect(chatHref("c1", "c1")).toBe("/chat/c1");
   });
 

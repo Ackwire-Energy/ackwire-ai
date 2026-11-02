@@ -13,8 +13,10 @@ import {
   aheadEndLine,
   approvalSummary,
   approvalTitle,
+  approvalWaitsFor,
   approveAlwaysHint,
   decisionOutcome,
+  requesterDecidesLine,
 } from "@agenteschat/client/lib/approval-words";
 import { nextLabel, timeLeft, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -67,9 +69,10 @@ export function decisionLabel(
 }
 
 /** Chip of a pending approval you can't decide: who it waits for. */
-function waitingFor(t: TFunction, agent: Agent | undefined, members: Map<string, Member>) {
+function waitingFor(t: TFunction, approval: Approval, agent: Agent | undefined, members: Map<string, Member>) {
   const owner = agent?.ownerUserId ? members.get(agent.ownerUserId) : undefined;
-  return owner ? t("approval.waitingFor", { name: owner.name }) : t("approval.waitingAdmin");
+  const waits = approvalWaitsFor(approval, owner?.name);
+  return waits ? t("approval.waitingFor", { name: waits }) : t("approval.waitingAdmin");
 }
 
 /**
@@ -227,6 +230,7 @@ export function InlineApproval({
           ? t("approval.ahead.ran", { when: whenAt(t, i18n.language, approval.executedAt) })
           : aheadEndLine(t, approval);
     const summary = approvalSummary(approval, i18n.language);
+    const requester = requesterDecidesLine(t, approval);
     return (
       <RequestDone
         done={approval.status === "approved"}
@@ -248,6 +252,7 @@ export function InlineApproval({
         {decisionOutcome(t, approval, me.user.id, (id) => members.get(id)?.name)}: <b>{approvalTitle(t, approval)}</b>
         {/* What was decided, so several requests for one tool are told apart. */}
         {summary && ` · ${summary}`}
+        {requester && ` · ${requester}`}
         {aheadText ? ` · ${aheadText}` : ended && ` · ${whenAt(t, i18n.language, ended)}`}
         {ahead === "scheduled" && approval.canCancel && <CancelAhead id={approval.id} />}
       </RequestDone>
@@ -271,14 +276,18 @@ export function InlineApproval({
           {...TYPED_VALUES}
         />
       }
-      statusLabel={approval.canDecide ? t("approval.waitingYou") : waitingFor(t, agent, members)}
+      statusLabel={approval.canDecide ? t("approval.waitingYou") : waitingFor(t, approval, agent, members)}
       origin={origin ? tt(origin.key, origin.values) : undefined}
       title={approvalTitle(t, approval)}
       action={approval.email ? <EmailLetter email={approval.email} /> : undefined}
       detail={
         approval.email
           ? expires || undefined
-          : [approval.connector ? approvalSummary(approval, i18n.language) : approval.detail, expires]
+          : [
+              approval.connector ? approvalSummary(approval, i18n.language) : approval.detail,
+              requesterDecidesLine(t, approval),
+              expires,
+            ]
               .filter(Boolean)
               .join(" · ")
       }

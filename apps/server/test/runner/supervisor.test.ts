@@ -2409,6 +2409,7 @@ test("the launch line: the agent's launcher, then this runner's worker with the 
   expect(Object.keys(cmd.env).sort()).toEqual([
     "AGENTES_SHARED_BIN",
     "ANDROID_ADB_SERVER_PORT",
+    "GRADLE_OPTS",
     "HOME",
     "LANG",
     "LOGNAME",

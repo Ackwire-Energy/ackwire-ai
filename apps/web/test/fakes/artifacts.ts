@@ -71,6 +71,8 @@ export function serializeContent(content: ArtifactContent): { text: string; type
       return { text: content.html, type: "text/html" };
     case "poll":
       return { text: content.question, type: "text/plain" };
+    case "choices":
+      return { text: content.questions.map((q) => q.question).join("\n"), type: "text/plain" };
   }
 }
 
@@ -232,6 +234,11 @@ export function createMockArtifacts(
     reply: async () => ({ id: mockId("msg") }),
     poll: async (_orgId, id) => openPoll(id),
     vote: async (_orgId, id) => openPoll(id),
+    choices: async (_orgId, id) => ({ id, answer: null }),
+    answerChoices: async (_orgId, id, picks) => ({
+      choices: { id, answer: { userId: "me", picks, messageId: null, at: new Date().toISOString() } },
+      messageId: mockId("msg"),
+    }),
     versions: async (orgId, id) =>
       (await find(orgId, id)).versions.map(({ content: _c, bytes: _b, ...v }) => clone(v)).reverse(),
     fileUrl: (orgId, id, options = {}) => {

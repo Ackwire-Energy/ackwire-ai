@@ -1,6 +1,24 @@
-import { keys, useChannels } from "@agenteschat/client";
+import { keys, type OrgRole, useChannels, useRoles } from "@agenteschat/client";
+import {
+  accessInput,
+  accessValid,
+  type ChannelAccess,
+  type ChannelAccessMode,
+} from "@agenteschat/client/lib/channel-access";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Button, Dialog, DialogBody, DialogFooter, Field, Input, RadioCard, RadioGroup } from "@agenteschat/ui";
+import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
+import {
+  Button,
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  Field,
+  Input,
+  RoleMark,
+  Select,
+  Token,
+  TokenList,
+} from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -9,6 +27,161 @@ import { useApi } from "@/api/context";
 import { CategorySelect } from "./ChannelCategoryDialogs";
 import { memberOf, PeoplePicker, type PickKey } from "./MemberPicker";
 import { useOrg } from "./org-context";
+import { RoleChecklist } from "./roles/RoleChecklist";
+
+const ACCESS_MODES: ChannelAccessMode[] = ["public", "private", "roles"];
+
+/**
+ * "Quem pode entrar": Público, Privado or Departamentos ou papéis (ADR 0125). The third shows the roles picked, each
+ * removable, and "Escolher papéis", which ticks them in a dialog of their own (it opens by itself while none is
+ * picked). Creating a channel and its details share it.
+ */
+export function ChannelAccessChoice({
+  value,
+  onChange,
+  idPrefix,
+  showError,
+}: {
+  value: ChannelAccess;
+  onChange: (next: ChannelAccess) => void;
+  idPrefix: string;
+  /** Say that a role is missing (after a try to save). */
+  showError?: boolean;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const roles = useRoles(org.id);
+  const candidates = sortRoles((roles.data?.roles ?? []).filter((r) => !isEveryone(r)));
+  const [choosing, setChoosing] = useState(false);
+  const pickedRoles = candidates.filter((r) => value.roleIds.includes(r.id));
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {/* A dropdown, as "Categoria" above it: three cards side by side broke their words in a narrow dialog. */}
+      <Field label={t("newChannel.visibility")} id={`${idPrefix}-vis`} help={t(`newChannel.${value.mode}Desc`)}>
+        <Select
+          value={value.mode}
+          onValueChange={(mode) => {
+            onChange({ ...value, mode });
+            if (mode === "roles" && value.roleIds.length === 0) setChoosing(true);
+          }}
+          options={ACCESS_MODES.map((mode) => ({
+            value: mode,
+            label: t(`newChannel.${mode}`),
+            description: t(`newChannel.${mode}Desc`),
+          }))}
+        />
+      </Field>
+      {value.mode === "roles" && pickedRoles.length > 0 && (
+        <TokenList label={t("newChannel.rolesPick")}>
+          {pickedRoles.map((r) => (
+            <li key={r.id}>
+              <Token
+                leading={<RoleMark color={r.color} icon={r.icon} size={18} />}
+                removeLabel={t("common.removeName", { name: r.name })}
+                onRemove={() => onChange({ ...value, roleIds: value.roleIds.filter((id) => id !== r.id) })}
+              >
+                {r.name}
+              </Token>
+            </li>
+          ))}
+        </TokenList>
+      )}
+      {value.mode === "roles" && (
+        <span>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={pickedRoles.length > 0 ? "edit" : "plus"}
+            onClick={() => setChoosing(true)}
+          >
+            {pickedRoles.length > 0 ? t("newChannel.rolesChange") : t("newChannel.rolesChoose")}
+          </Button>
+        </span>
+      )}
+      {value.mode === "roles" && (
+        <span className={`small ${showError && !accessValid(value) ? "ac-field__error" : "muted"}`}>
+          {showError && !accessValid(value) ? t("newChannel.rolesNeeded") : t("newChannel.rolesLeave")}
+        </span>
+      )}
+      {choosing && (
+        <ChannelRolesDialog
+          roles={candidates}
+          loaded={roles.isSuccess}
+          initial={value.roleIds}
+          idPrefix={idPrefix}
+          onPick={(roleIds) => onChange({ ...value, mode: "roles", roleIds })}
+          onClose={() => setChoosing(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** The roles a channel opens to, ticked in a dialog of their own: "Pronto" puts them on the field. */
+function ChannelRolesDialog({
+  roles,
+  loaded,
+  initial,
+  idPrefix,
+  onPick,
+  onClose,
+}: {
+  roles: readonly OrgRole[];
+  loaded: boolean;
+  initial: readonly string[];
+  idPrefix: string;
+  onPick: (roleIds: string[]) => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState<ReadonlySet<string>>(() => new Set(initial));
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => !open && onClose()}
+      title={t("newChannel.rolesPick")}
+      description={t("newChannel.rolesDesc")}
+      closeLabel={t("common.close")}
+      width={440}
+    >
+      <DialogBody>
+        {/* biome-ignore lint/a11y/useSemanticElements: a scroll region, not a fieldset */}
+        <div className="people-picker__results" role="region" aria-label={t("newChannel.rolesPick")}>
+          {roles.length === 0 && loaded ? (
+            <p className="small muted">{t("newChannel.rolesNone")}</p>
+          ) : (
+            <RoleChecklist
+              roles={roles}
+              picked={draft}
+              idPrefix={`${idPrefix}-pick`}
+              onToggle={(id, on) =>
+                setDraft((d) => {
+                  const next = new Set(d);
+                  if (on) next.add(id);
+                  else next.delete(id);
+                  return next;
+                })
+              }
+            />
+          )}
+        </div>
+        <span className="small muted">{t("newChannel.rolesLeave")}</span>
+      </DialogBody>
+      <DialogFooter>
+        <Button onClick={onClose}>{t("common.cancel")}</Button>
+        <Button
+          variant="primary"
+          onClick={() => {
+            onPick([...draft]);
+            onClose();
+          }}
+        >
+          {t("newChannel.rolesDone")}
+        </Button>
+      </DialogFooter>
+    </Dialog>
+  );
+}
 
 /** Same rule as the backend (CHANNEL_NAME_PATTERN): lower case, digits, - or _. */
 export const CHANNEL_NAME = /^[a-z0-9][a-z0-9_-]{0,79}$/;
@@ -30,7 +203,7 @@ export function channelNameError(name: string, taken: Set<string>): "invalid" | 
 }
 
 /**
- * "Criar canal", in one column: name, topic, sidebar category, public/private, then the initial members (people and
+ * "Criar canal", in one column: name, topic, sidebar category, who can join, then the initial members (people and
  * agents: search and a list that scrolls in its own box). The footer, with the count and Criar, stays in view.
  */
 export function NewChannelDialog({
@@ -51,7 +224,7 @@ export function NewChannelDialog({
   const channels = useChannels(org.id);
   const [name, setName] = useState("");
   const [topic, setTopic] = useState("");
-  const [visibility, setVisibility] = useState<"public" | "private">("public");
+  const [access, setAccess] = useState<ChannelAccess>({ mode: "public", roleIds: [] });
   const [categoryId, setCategoryId] = useState<string | null>(category);
   const [selected, setSelected] = useState<Set<PickKey>>(new Set());
   const [touched, setTouched] = useState(false);
@@ -59,7 +232,7 @@ export function NewChannelDialog({
     if (!open) return;
     setName("");
     setTopic("");
-    setVisibility("public");
+    setAccess({ mode: "public", roleIds: [] });
     setCategoryId(category);
     setSelected(new Set());
     setTouched(false);
@@ -71,7 +244,7 @@ export function NewChannelDialog({
       const channel = await api.chat.createChannel(org.id, {
         name,
         topic: topic.trim() || undefined,
-        visibility,
+        ...accessInput(access),
         ...(categoryId ? { categoryId } : {}),
       });
       for (const key of selected) await api.chat.addMember(org.id, channel.id, memberOf(key));
@@ -92,7 +265,7 @@ export function NewChannelDialog({
         onSubmit={(e) => {
           e.preventDefault();
           setTouched(true);
-          if (!error) create.mutate();
+          if (!error && accessValid(access)) create.mutate();
         }}
       >
         <DialogBody>
@@ -127,32 +300,7 @@ export function NewChannelDialog({
           <Field label={t("channelCategories.category")} id="ch-category" help={t("channelCategories.categoryHelp")}>
             <CategorySelect value={categoryId} onChange={setCategoryId} canCreate={can(org, "manage_channels")} />
           </Field>
-          <fieldset style={{ margin: 0, padding: 0, border: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-            <legend className="ac-field__label" style={{ padding: 0, marginBottom: 8 }} id="ch-vis">
-              {t("newChannel.visibility")}
-            </legend>
-            <RadioGroup
-              value={visibility}
-              onValueChange={setVisibility}
-              aria-labelledby="ch-vis"
-              style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}
-            >
-              <RadioCard
-                value="public"
-                id="ch-public"
-                checked={visibility === "public"}
-                title={t("newChannel.public")}
-                description={t("newChannel.publicDesc")}
-              />
-              <RadioCard
-                value="private"
-                id="ch-private"
-                checked={visibility === "private"}
-                title={t("newChannel.private")}
-                description={t("newChannel.privateDesc")}
-              />
-            </RadioGroup>
-          </fieldset>
+          <ChannelAccessChoice value={access} onChange={setAccess} idPrefix="ch" showError={touched} />
           <PeoplePicker
             label={t("newChannel.members")}
             searchLabel={t("newChannel.membersSearch")}

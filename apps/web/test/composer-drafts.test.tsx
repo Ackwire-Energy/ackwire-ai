@@ -28,19 +28,19 @@ test("a text left in a channel's composer is there again after a reload, and onl
   cleanup();
 
   // "Reload": the app starts again with the same browser storage.
-  await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+  await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state), reload: true });
   await settle(8);
   expect(box("Mensagem para #eng").value).toBe("metade de uma ideia");
   cleanup();
 
-  await renderApp(`/org/${ORG_ID}/c/${GENERAL_ID}`, { api: createFakeApi(state) });
+  await renderApp(`/org/${ORG_ID}/c/${GENERAL_ID}`, { api: createFakeApi(state), reload: true });
   await settle(8);
   expect(box("Mensagem para #general").value).toBe("");
 });
 
 test("leaving the conversation right after typing still keeps the text", async () => {
   const state = seedState();
-  await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+  await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state), reload: true });
   await settle(8);
   await type(box("Mensagem para #eng"), "rápido");
   cleanup();
@@ -49,7 +49,7 @@ test("leaving the conversation right after typing still keeps the text", async (
 
 test("sending clears the saved text", async () => {
   const state = seedState();
-  await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+  await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state), reload: true });
   await settle(8);
   const el = box("Mensagem para #eng");
   await type(el, "vai agora");

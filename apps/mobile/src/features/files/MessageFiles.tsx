@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Icon, Text } from "@/ui";
+import { ChoicesCard } from "../blocks/ChoicesCard";
 import { LiveBlockCard } from "../blocks/LiveBlock";
 import { PollCard } from "../blocks/PollCard";
 import { useColors, useOrgId } from "../shared/hooks";
@@ -48,7 +49,7 @@ export function MessageFiles({ files, align = "start" }: { files: MessageFile[];
   live.forEach((file, i) => {
     const q = queries[i];
     const detail = q?.data;
-    if (detail?.kind === "block" || detail?.kind === "poll") {
+    if (detail?.kind === "block" || detail?.kind === "poll" || detail?.kind === "choices") {
       blocks.push(detail);
       return;
     }
@@ -90,6 +91,8 @@ export function MessageFiles({ files, align = "start" }: { files: MessageFile[];
       {blocks.map((b) =>
         b.kind === "poll" ? (
           <PollCard key={b.id} id={b.id} version={b.shownVersion} />
+        ) : b.kind === "choices" ? (
+          <ChoicesCard key={b.id} id={b.id} version={b.shownVersion} />
         ) : (
           <LiveBlockCard key={b.id} id={b.id} version={b.shownVersion} />
         ),

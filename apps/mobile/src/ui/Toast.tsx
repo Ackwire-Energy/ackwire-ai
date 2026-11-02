@@ -1,11 +1,13 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AgentAvatar } from "@/agent/AgentAvatar";
 import { type AgentLookInput, lookOf } from "@/agent/looks";
 import { Glass } from "./Glass";
 import { Icon, type IconName } from "./Icon";
+import { type ToastTone, toastGlow, toastToneOf, toneColor } from "./palette";
 import { Text } from "./Text";
 import { useTheme } from "./theme";
 
@@ -14,6 +16,8 @@ export interface ToastInput {
   subtitle?: string;
   /** Default: a check (done). */
   icon?: IconName;
+  /** The glow's and the icon's color; by default from the icon (`toastToneOf`: a failure, done, anything else). */
+  tone?: ToastTone;
   /** Show this agent's face instead of the icon (looks from `rememberAgentLooks`). */
   agentId?: string;
   /** Or pass the look directly. */
@@ -49,7 +53,7 @@ export function ToastHost({ children }: { children?: ReactNode }) {
 }
 
 function ToastView({ item, onDone }: { item: ToastInput; onDone: () => void }) {
-  const { colors, shadows, motion, reducedMotion } = useTheme();
+  const { colors, shadows, motion, reducedMotion, scheme } = useTheme();
   const insets = useSafeAreaInsets();
   const y = useSharedValue(reducedMotion ? 0 : -200);
   const opacity = useSharedValue(0);
@@ -72,6 +76,8 @@ function ToastView({ item, onDone }: { item: ToastInput; onDone: () => void }) {
 
   const style = useAnimatedStyle(() => ({ opacity: opacity.value, transform: [{ translateY: y.value }] }));
   const look = item.agent ?? (item.agentId ? lookOf(item.agentId) : undefined);
+  const tone = item.tone ?? toastToneOf(item.icon);
+  const glow = toastGlow(colors, tone, scheme);
 
   return (
     <Animated.View
@@ -94,6 +100,14 @@ function ToastView({ item, onDone }: { item: ToastInput; onDone: () => void }) {
           paddingHorizontal: 14,
         }}
       >
+        <LinearGradient
+          colors={glow.colors}
+          locations={glow.locations}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={[StyleSheet.absoluteFill, { borderRadius: 22 }]}
+          pointerEvents="none"
+        />
         {look ? (
           <AgentAvatar agent={look} size={34} />
         ) : (
@@ -108,11 +122,7 @@ function ToastView({ item, onDone }: { item: ToastInput; onDone: () => void }) {
               justifyContent: "center",
             }}
           >
-            <Icon
-              name={item.icon ?? "check"}
-              size={18}
-              color={item.icon && item.icon !== "check" ? colors.ink2 : colors.ok}
-            />
+            <Icon name={item.icon ?? "check"} size={18} color={toneColor(colors, tone)} />
           </View>
         )}
         <View style={{ flex: 1, minWidth: 0 }}>

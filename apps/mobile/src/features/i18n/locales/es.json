@@ -45,6 +45,16 @@
     "pollAnswered_other": "{{count}} de {{total}} respondieron",
     "voteFailed": "Tu voto no se registró."
   },
+  "choices": {
+    "step": "{{step}} de {{total}}",
+    "back": "Volver",
+    "next": "Siguiente",
+    "close": "Cerrar",
+    "closed": "{{title}} · cerrado",
+    "reopen": "Mostrar de nuevo",
+    "answeredBy": "{{name}} eligió",
+    "failed": "Tu elección no se envió. Inténtalo de nuevo."
+  },
   "chart": {
     "pending": "Armando el gráfico…",
     "table": "Tabla",
@@ -519,7 +529,11 @@
     "full": "Este chat ya tiene 100 fijados. Desfija uno primero.",
     "mark": "Fijado",
     "none": "Todavía no hay nada fijado",
-    "empty": "Todavía no hay nada fijado aquí. Mantén presionado un mensaje y toca Fijar."
+    "empty": "Todavía no hay nada fijado aquí. Mantén presionado un mensaje y toca Fijar.",
+    "bar_one": "Mensajes fijados ({{count}})",
+    "bar_many": "Mensajes fijados ({{count}})",
+    "bar_other": "Mensajes fijados ({{count}})",
+    "unpinOf": "Dejar de fijar el mensaje de {{name}}"
   },
   "thread": {
     "threadIn": "Hilo en #{{channel}}",
@@ -755,7 +769,8 @@
     "title": "Actividad",
     "filter": {
       "all": "Todo",
-      "waiting": "Esperándote"
+      "waiting": "Esperándote",
+      "done": "Completadas"
     },
     "day": {
       "today": "Hoy",
@@ -868,6 +883,8 @@
     "markUnread": "Marcar como no leído",
     "unread": "Sin leer",
     "done": "Listo",
+    "restore": "Devolver",
+    "noneDone": "Nada marcado como completado en los últimos 30 días.",
     "more": "Ver más",
     "empty": "Nada te espera. Respira."
   },

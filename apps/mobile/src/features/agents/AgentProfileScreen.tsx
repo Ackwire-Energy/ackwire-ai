@@ -13,6 +13,7 @@ import {
   useUsage,
 } from "@agenteschat/client";
 import { approvalRuleWords } from "@agenteschat/client/lib/approval-words";
+import { seesDetails } from "@agenteschat/client/lib/audience";
 import { brainLine } from "@agenteschat/client/lib/brain";
 import { formatPercent, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -135,8 +136,10 @@ function Profile({ id }: { id: string }) {
   const underBar = AVATAR_TOP - (insets.top + BAR_HEIGHT);
   const avatarFade = useScrollFade(y, underBar - 30, underBar + 70);
   const agent = dir.agentById.get(id);
+  // Someone it doesn't answer (not its owner, not an admin) sees only its public card: no tools, memory or month.
+  const details = seesDetails(agent);
   const detail = useAgentDetail(orgId, id);
-  const access = useAgentAccess(orgId, id);
+  const access = useAgentAccess(orgId, id, details);
   const usage = useUsage(orgId);
   const forYou = useAgentForYou(orgId, id);
   const knows = useMemoryAboutMe(orgId, id);
@@ -180,9 +183,9 @@ function Profile({ id }: { id: string }) {
     new Intl.NumberFormat(i18n.language || "en", { style: "currency", currency: "USD" }).format(v);
   const originText = useMemoryOriginText();
 
-  const openDm = () =>
+  const openDm = (to: { agentId: string } | { userId: string } = { agentId: id }) =>
     api.dms
-      .open(orgId, { agentId: id })
+      .open(orgId, to)
       .then(({ channelId }) => {
         void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
         router.push(chatHref(channelId));
@@ -305,257 +308,273 @@ function Profile({ id }: { id: string }) {
             />
           ))}
           <View style={styles.acts}>
-            <Button
-              variant="primary"
-              wide
-              icon="chat"
-              label={t("mobile.agent.talk")}
-              disabled={agent?.canTalk === false}
-              onPress={() => void openDm()}
-            />
+            {details || !ownerId ? (
+              <Button
+                variant="primary"
+                wide
+                icon="chat"
+                label={t("mobile.agent.talk")}
+                disabled={agent?.canTalk === false}
+                onPress={() => void openDm()}
+              />
+            ) : (
+              <Button
+                variant="primary"
+                wide
+                icon="chat"
+                label={t("profile.askAccess")}
+                onPress={() => void openDm({ userId: ownerId })}
+              />
+            )}
           </View>
           {agent?.canTalk === false ? (
             <Text variant="small" tone="muted" style={styles.center}>
-              {t("mobile.agent.cantTalk")}
+              {details ? t("mobile.agent.cantTalk") : t("profile.detailsHidden", agentGrammar(name))}
             </Text>
           ) : null}
         </View>
 
-        {forYou.data || forYou.isError ? (
-          <Section
-            title={t("mobile.intentAgents.did.title", agentGrammar(name))}
-            {...(did.length > DID_SHOWN
-              ? {
-                  action: {
-                    label: allDid ? t("mobile.intentAgents.did.seeLess") : t("mobile.intentAgents.did.seeAll"),
-                    onPress: () => setAllDid((v) => !v),
-                  },
-                }
-              : {})}
-          >
-            {forYou.data && forYou.data.monthCount > 0 ? (
-              <Text variant="small" tone="muted" style={styles.lead}>
-                {t("mobile.intentAgents.did.month", { count: forYou.data.monthCount })}
-              </Text>
-            ) : null}
-            {/* Its month, day by day, in its own tones (the web's Atividade tab). */}
-            {detail.data && detail.data.runsThisMonth > 0 ? (
-              <View style={styles.pixels}>
-                <MonthPixels
-                  perDay={detail.data.runsByDay}
-                  color={look.color}
-                  label={t("agentPage.activity.chartLabel", {
-                    count: detail.data.runsThisMonth,
-                    month: new Intl.DateTimeFormat(when.locale, { month: "long", timeZone: "UTC" }).format(new Date()),
-                  })}
-                />
-              </View>
-            ) : null}
-            {did.length > 0 ? (
-              <Card>
-                {shownDid.map((l) => (
-                  <Row
-                    key={l.key}
-                    leading={<Tile icon={l.icon} />}
-                    title={t(`mobile.intentAgents.did.${l.title.key}`, l.title.values)}
-                    subtitle={
-                      l.sub
-                        ? "text" in l.sub
-                          ? l.sub.text
-                          : t(`mobile.intentAgents.did.${l.sub.key}`, l.sub.values ?? {})
-                        : undefined
+        {details ? (
+          <>
+            {forYou.data || forYou.isError ? (
+              <Section
+                title={t("mobile.intentAgents.did.title", agentGrammar(name))}
+                {...(did.length > DID_SHOWN
+                  ? {
+                      action: {
+                        label: allDid ? t("mobile.intentAgents.did.seeLess") : t("mobile.intentAgents.did.seeAll"),
+                        onPress: () => setAllDid((v) => !v),
+                      },
                     }
-                    meta={
-                      <Text variant="small" tone="faint">
-                        {when.short(l.at)}
-                      </Text>
-                    }
-                    {...(l.href ? { onPress: () => open(l.href) } : {})}
-                  />
-                ))}
-              </Card>
-            ) : (
-              <Text variant="small" tone="muted" style={styles.foot}>
-                {t(`mobile.intentAgents.did.empty${g}`, { name })}
-              </Text>
-            )}
-          </Section>
-        ) : null}
-
-        {knows.data ? (
-          <Section title={t("mobile.intentAgents.knows.title", agentGrammar(name))}>
-            {memories.length > 0 ? (
-              <>
-                <Card>
-                  {memories.map((m) => (
-                    <Row
-                      key={m.id}
-                      leading={<Tile icon="brain" />}
-                      title={m.text}
-                      subtitle={originText(m)}
-                      chevron={editable}
-                      {...(editable ? { onPress: () => fix(m) } : {})}
+                  : {})}
+              >
+                {forYou.data && forYou.data.monthCount > 0 ? (
+                  <Text variant="small" tone="muted" style={styles.lead}>
+                    {t("mobile.intentAgents.did.month", { count: forYou.data.monthCount })}
+                  </Text>
+                ) : null}
+                {/* Its month, day by day, in its own tones (the web's Atividade tab). */}
+                {detail.data && detail.data.runsThisMonth > 0 ? (
+                  <View style={styles.pixels}>
+                    <MonthPixels
+                      perDay={detail.data.runsByDay}
+                      color={look.color}
+                      label={t("agentPage.activity.chartLabel", {
+                        count: detail.data.runsThisMonth,
+                        month: new Intl.DateTimeFormat(when.locale, { month: "long", timeZone: "UTC" }).format(
+                          new Date(),
+                        ),
+                      })}
                     />
-                  ))}
-                </Card>
-                <Text variant="small" tone="muted" style={styles.foot}>
-                  {editable
-                    ? t(`mobile.intentAgents.knows.foot${g}`)
-                    : owner
-                      ? t("mobile.intentAgents.knows.footOwner", { name: owner })
-                      : t("mobile.intentAgents.knows.footAdmins")}
-                </Text>
-              </>
-            ) : (
-              <Text variant="small" tone="muted" style={styles.foot}>
-                {t(`mobile.intentAgents.knows.empty${g}`, { name })}
-              </Text>
-            )}
-          </Section>
-        ) : null}
-
-        <AgentComputerRow agentId={id} />
-
-        {thinks ? (
-          <Section title={t("mobile.intentAgents.thinks")}>
-            <Card>
-              {/* Its owner and admins open its AI: the account, the plan's usage, who it replies to. */}
-              <Row
-                leading={thinks.mark ? <ProviderLogo id={thinks.mark} size="sm" /> : undefined}
-                title={thinks.text}
-                {...(decides ? { chevron: true, onPress: () => openAgentAi(id) } : {})}
-              />
-            </Card>
-          </Section>
-        ) : null}
-
-        {access.data ? (
-          <Section title={t("mobile.intentAgents.uses.title", agentGrammar(name))}>
-            {uses.lines.length > 0 ? (
-              <Card>
-                {uses.lines.map((u) => (
-                  <Row
-                    key={u.key}
-                    leading={
-                      "area" in u.label ? (
-                        <Tile icon={AREA_ICON[u.label.area] ?? "doc"} />
-                      ) : (
-                        <ConnectorIcon
-                          def={(u.connectionId ? connected.get(u.connectionId)?.def : null) ?? null}
-                          image={u.connectionId ? connected.get(u.connectionId)?.image : null}
-                          label={u.label.text}
-                          size={36}
-                        />
-                      )
-                    }
-                    title={
-                      "area" in u.label
-                        ? t(`mobile.intentAgents.uses.area.${u.label.area}`, { defaultValue: u.label.area })
-                        : u.label.text
-                    }
-                    meta={
-                      <Text variant="small" tone="muted">
-                        {t(`mobile.intentAgents.uses.level.${u.level}`)}
-                      </Text>
-                    }
-                  />
-                ))}
-              </Card>
-            ) : (
-              <Text variant="small" tone="muted" style={styles.foot}>
-                {t("mobile.intentAgents.uses.empty")}
-              </Text>
-            )}
-            {uses.asks ? (
-              <Text variant="small" tone="muted" style={styles.foot}>
-                {decides
-                  ? t("mobile.intentAgents.uses.asksYou")
-                  : owner
-                    ? t("mobile.intentAgents.uses.asksOwner", { name: owner })
-                    : t("mobile.intentAgents.uses.asksAdmins")}
-              </Text>
-            ) : null}
-            {decides ? (
-              // Ferramentas: a new service for this agent starts in Conectores (who uses it is chosen there).
-              <View style={styles.foot}>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  icon="plus"
-                  label={t("mobile.connectors.fromAgent")}
-                  onPress={() => router.push("/connectors")}
-                />
-              </View>
-            ) : null}
-          </Section>
-        ) : null}
-
-        <AgentMailSection agentId={id} />
-
-        <AlwaysApproved agentId={id} name={name} mayRemove={mine || can(org, "approve_actions")} />
-
-        <Section title={t("mobile.agent.month")}>
-          <View style={styles.monthCards}>
-            {shown.plan ? (
-              <Card>
-                <View style={styles.spend}>
-                  <PlanMeter compact usage={shown.plan.usage} label={shown.plan.account} />
-                  {spend && shown.budget ? (
-                    <Text variant="caption" tone="muted">
-                      {spend.kind === "money"
-                        ? `${money(spend.spentUsd)} ${t("mobile.agent.ofBudget", { budget: money(spend.budgetUsd) })}`
-                        : `${formatPercent(i18n.language, spend.percent)} ${t("mobile.agent.ofMonthBudget")}`}
-                    </Text>
-                  ) : null}
-                </View>
-              </Card>
-            ) : spend && shown.budget ? (
-              <Card>
-                <View style={styles.spend}>
-                  <View style={styles.spendHead}>
-                    {spend.kind === "money" ? (
-                      <>
-                        <Text variant="body" tone="ink2">
-                          {money(spend.spentUsd)}
-                        </Text>
-                        <Text variant="small" tone="muted">
-                          {t("mobile.agent.ofBudget", { budget: money(spend.budgetUsd) })}
-                        </Text>
-                      </>
-                    ) : (
-                      <>
-                        <Text variant="body" tone="ink2">
-                          {formatPercent(i18n.language, spend.percent)}
-                        </Text>
-                        <Text variant="small" tone="muted">
-                          {t("mobile.agent.ofMonthBudget")}
-                        </Text>
-                      </>
-                    )}
                   </View>
-                  <SpendBar color={look.color} value={spend.fraction} />
-                  {spend.fraction >= 1 ? (
-                    <View style={styles.warn}>
-                      <Icon name="clock" size={14} color={c.muted} />
-                      <Text variant="caption" tone="muted">
-                        {t(`mobile.agent.exhausted${g}`, { name })}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-              </Card>
+                ) : null}
+                {did.length > 0 ? (
+                  <Card>
+                    {shownDid.map((l) => (
+                      <Row
+                        key={l.key}
+                        leading={<Tile icon={l.icon} />}
+                        title={t(`mobile.intentAgents.did.${l.title.key}`, l.title.values)}
+                        subtitle={
+                          l.sub
+                            ? "text" in l.sub
+                              ? l.sub.text
+                              : t(`mobile.intentAgents.did.${l.sub.key}`, l.sub.values ?? {})
+                            : undefined
+                        }
+                        meta={
+                          <Text variant="small" tone="faint">
+                            {when.short(l.at)}
+                          </Text>
+                        }
+                        {...(l.href ? { onPress: () => open(l.href) } : {})}
+                      />
+                    ))}
+                  </Card>
+                ) : (
+                  <Text variant="small" tone="muted" style={styles.foot}>
+                    {t(`mobile.intentAgents.did.empty${g}`, { name })}
+                  </Text>
+                )}
+              </Section>
             ) : null}
-            {/* Uso: the month by account and the plan it thinks with now, as the web's Uso tab. */}
-            <Card>
-              <Row
-                leading={<Tile icon="chart" />}
-                title={t("usageViews.agent.title", agentGrammar(name))}
-                chevron
-                onPress={() => openAgentUsage(id)}
-              />
-            </Card>
-          </View>
-        </Section>
+
+            {knows.data ? (
+              <Section title={t("mobile.intentAgents.knows.title", agentGrammar(name))}>
+                {memories.length > 0 ? (
+                  <>
+                    <Card>
+                      {memories.map((m) => (
+                        <Row
+                          key={m.id}
+                          leading={<Tile icon="brain" />}
+                          title={m.text}
+                          subtitle={originText(m)}
+                          chevron={editable}
+                          {...(editable ? { onPress: () => fix(m) } : {})}
+                        />
+                      ))}
+                    </Card>
+                    <Text variant="small" tone="muted" style={styles.foot}>
+                      {editable
+                        ? t(`mobile.intentAgents.knows.foot${g}`)
+                        : owner
+                          ? t("mobile.intentAgents.knows.footOwner", { name: owner })
+                          : t("mobile.intentAgents.knows.footAdmins")}
+                    </Text>
+                  </>
+                ) : (
+                  <Text variant="small" tone="muted" style={styles.foot}>
+                    {t(`mobile.intentAgents.knows.empty${g}`, { name })}
+                  </Text>
+                )}
+              </Section>
+            ) : null}
+
+            <AgentComputerRow agentId={id} />
+
+            {thinks ? (
+              <Section title={t("mobile.intentAgents.thinks")}>
+                <Card>
+                  {/* Its owner and admins open its AI: the account, the plan's usage, who it replies to. */}
+                  <Row
+                    leading={thinks.mark ? <ProviderLogo id={thinks.mark} size="sm" /> : undefined}
+                    title={thinks.text}
+                    {...(decides ? { chevron: true, onPress: () => openAgentAi(id) } : {})}
+                  />
+                </Card>
+              </Section>
+            ) : null}
+
+            {access.data ? (
+              <Section title={t("mobile.intentAgents.uses.title", agentGrammar(name))}>
+                {uses.lines.length > 0 ? (
+                  <Card>
+                    {uses.lines.map((u) => (
+                      <Row
+                        key={u.key}
+                        leading={
+                          "area" in u.label ? (
+                            <Tile icon={AREA_ICON[u.label.area] ?? "doc"} />
+                          ) : (
+                            <ConnectorIcon
+                              def={(u.connectionId ? connected.get(u.connectionId)?.def : null) ?? null}
+                              image={u.connectionId ? connected.get(u.connectionId)?.image : null}
+                              label={u.label.text}
+                              size={36}
+                            />
+                          )
+                        }
+                        title={
+                          "area" in u.label
+                            ? t(`mobile.intentAgents.uses.area.${u.label.area}`, { defaultValue: u.label.area })
+                            : u.label.text
+                        }
+                        meta={
+                          <Text variant="small" tone="muted">
+                            {t(`mobile.intentAgents.uses.level.${u.level}`)}
+                          </Text>
+                        }
+                      />
+                    ))}
+                  </Card>
+                ) : (
+                  <Text variant="small" tone="muted" style={styles.foot}>
+                    {t("mobile.intentAgents.uses.empty")}
+                  </Text>
+                )}
+                {uses.asks ? (
+                  <Text variant="small" tone="muted" style={styles.foot}>
+                    {decides
+                      ? t("mobile.intentAgents.uses.asksYou")
+                      : owner
+                        ? t("mobile.intentAgents.uses.asksOwner", { name: owner })
+                        : t("mobile.intentAgents.uses.asksAdmins")}
+                  </Text>
+                ) : null}
+                {decides ? (
+                  // Ferramentas: a new service for this agent starts in Conectores (who uses it is chosen there).
+                  <View style={styles.foot}>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon="plus"
+                      label={t("mobile.connectors.fromAgent")}
+                      onPress={() => router.push("/connectors")}
+                    />
+                  </View>
+                ) : null}
+              </Section>
+            ) : null}
+
+            <AgentMailSection agentId={id} />
+
+            <AlwaysApproved agentId={id} name={name} mayRemove={mine || can(org, "approve_actions")} />
+
+            <Section title={t("mobile.agent.month")}>
+              <View style={styles.monthCards}>
+                {shown.plan ? (
+                  <Card>
+                    <View style={styles.spend}>
+                      <PlanMeter compact usage={shown.plan.usage} label={shown.plan.account} />
+                      {spend && shown.budget ? (
+                        <Text variant="caption" tone="muted">
+                          {spend.kind === "money"
+                            ? `${money(spend.spentUsd)} ${t("mobile.agent.ofBudget", { budget: money(spend.budgetUsd) })}`
+                            : `${formatPercent(i18n.language, spend.percent)} ${t("mobile.agent.ofMonthBudget")}`}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </Card>
+                ) : spend && shown.budget ? (
+                  <Card>
+                    <View style={styles.spend}>
+                      <View style={styles.spendHead}>
+                        {spend.kind === "money" ? (
+                          <>
+                            <Text variant="body" tone="ink2">
+                              {money(spend.spentUsd)}
+                            </Text>
+                            <Text variant="small" tone="muted">
+                              {t("mobile.agent.ofBudget", { budget: money(spend.budgetUsd) })}
+                            </Text>
+                          </>
+                        ) : (
+                          <>
+                            <Text variant="body" tone="ink2">
+                              {formatPercent(i18n.language, spend.percent)}
+                            </Text>
+                            <Text variant="small" tone="muted">
+                              {t("mobile.agent.ofMonthBudget")}
+                            </Text>
+                          </>
+                        )}
+                      </View>
+                      <SpendBar color={look.color} value={spend.fraction} />
+                      {spend.fraction >= 1 ? (
+                        <View style={styles.warn}>
+                          <Icon name="clock" size={14} color={c.muted} />
+                          <Text variant="caption" tone="muted">
+                            {t(`mobile.agent.exhausted${g}`, { name })}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  </Card>
+                ) : null}
+                {/* Uso: the month by account and the plan it thinks with now, as the web's Uso tab. */}
+                <Card>
+                  <Row
+                    leading={<Tile icon="chart" />}
+                    title={t("usageViews.agent.title", agentGrammar(name))}
+                    chevron
+                    onPress={() => openAgentUsage(id)}
+                  />
+                </Card>
+              </View>
+            </Section>
+          </>
+        ) : null}
       </Animated.ScrollView>
       <View style={styles.bar} pointerEvents="box-none">
         {/* Its person changes its look; admins, everything ("Editar", as the web's Configurações). */}

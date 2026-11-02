@@ -11,7 +11,8 @@ import { organizations } from "./tenancy";
  *
  * `kind`, `actors`, `source` and `latest` are validated in code
  * (packages/engine/src/notifications.ts). `done_at` set = out of the inbox
- * (by the person, or auto-resolved: question answered, approval decided…).
+ * (by the person, or auto-resolved: question answered, approval decided…);
+ * `done_by_user` tells the person's own "Concluir" apart (the "Concluídas" view).
  */
 export const notifications = pgTable(
   "notifications",
@@ -36,6 +37,7 @@ export const notifications = pgTable(
     latest: jsonb().$type<Record<string, unknown>>().notNull().default({}),
     readAt: timestamp({ withTimezone: true }),
     doneAt: timestamp({ withTimezone: true }),
+    doneByUser: boolean().notNull().default(false),
     snoozedUntil: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
@@ -43,6 +45,8 @@ export const notifications = pgTable(
   (t) => [
     // The inbox: a person's open notifications, newest first.
     index("notifications_inbox").on(t.orgId, t.userId, t.updatedAt).where(sql`${t.doneAt} is null`),
+    // "Concluídas": what the person marked done, the latest first.
+    index("notifications_done").on(t.orgId, t.userId, t.doneAt).where(sql`${t.doneByUser} and ${t.doneAt} is not null`),
     // At most one open, unread row per group: new events merge into it.
     uniqueIndex("notifications_open_group")
       .on(t.orgId, t.userId, t.groupKey)
