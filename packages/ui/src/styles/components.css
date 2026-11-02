@@ -5194,12 +5194,35 @@ html:not([data-pointer]) .ac-hint:focus-visible {
   width: 14px;
   height: 14px;
 }
-/* Left of the bubble, on hover: the action bar, its middle on the bubble's top edge, as on everyone's rows. */
-.ac-msg--own > .ac-msg__body > .ac-msg__actions,
-.ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
-  top: 0;
-  right: calc(100% + 8px);
-  left: auto;
+/*
+ * Off touch (the exact opposite of the touch block below, so no pointer setup falls between them), on hover: three
+ * flat icons 2px left of the bubble, on its first line, reversed on screen so Reagir is nearest it, as
+ * Messenger and Instagram do. No plate, so they read as the bubble's; inside the row, so they never cover the one
+ * above. Their middle on the first line's capitals, as an `.ac-iconline` lead: the bubble's 7px padding, half its
+ * 15.5px / 1.7 line, minus half a 30px button. 84px wide, so the row's 96px left padding holds them at any width.
+ */
+@media not ((hover: none) or (pointer: coarse)) {
+  .ac-msg--own > .ac-msg__body > .ac-msg__actions,
+  .ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
+    top: calc(7px + 15.5px * 1.7 / 2 - var(--cap-mid) - 15px);
+    right: calc(100% + 2px);
+    flex-direction: row-reverse;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+  }
+  .ac-msg--own > .ac-msg__body > .ac-msg__actions .ac-btn--sm {
+    min-width: 28px;
+    width: 28px;
+    height: 30px;
+    border-radius: 15px;
+    color: var(--faint);
+  }
+  .ac-msg--own > .ac-msg__body > .ac-msg__actions .ac-btn--sm:is(:hover, [aria-expanded="true"]) {
+    color: var(--ink);
+    background: var(--plate);
+  }
 }
 /*
  * A touch screen's bar (a keyboard's there: a tap opens the menu) has no room left of a phone-width bubble, and a
