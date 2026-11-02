@@ -2413,6 +2413,20 @@ export function useAcceptToolChange(orgId: string) {
   });
 }
 
+/** "Aceitar todas" on one connection's changed tools (ADR 0117). */
+export function useAcceptConnectionToolChanges(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (connectionId: string) => api.customConnectors.acceptConnectionToolChanges(orgId, connectionId),
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: keys.toolChanges(orgId) }),
+        qc.invalidateQueries({ queryKey: keys.customServers(orgId) }),
+      ]),
+  });
+}
+
 export function useCustomServerAction(orgId: string) {
   const api = useApi();
   const qc = useQueryClient();

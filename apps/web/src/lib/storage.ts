@@ -85,4 +85,9 @@ export const STORAGE_KEYS = {
   arrivalClosed: "agentes.arrival.closed",
   /** Prefix (`.<user id>.<org id>`): that person's recent searches there, newest first (JSON array, ADR 0123). */
   searchRecent: "agentes.search.recent",
+  /**
+   * Prefix (`.<user id>`): what that person typed in each conversation and didn't send (JSON by conversation,
+   * `@agenteschat/client/lib/composer-drafts`), forgotten on sign-out.
+   */
+  composerDrafts: "agentes.drafts",
 } as const;
