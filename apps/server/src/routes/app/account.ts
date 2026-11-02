@@ -6,6 +6,7 @@ import {
   appleSignInTokens,
   avatarFile,
   CODE_LENGTH,
+  can,
   canCreateWorkspace,
   changeMemberRole,
   cloudNotice,
@@ -1024,7 +1025,8 @@ export function accountRoutes(deps: AppDeps) {
           role: membership.role,
           permissions: [...membership.permissions],
           rank: membership.rank,
-          context: org?.context ?? "",
+          // What the agents know of the workspace: only for who configures it.
+          context: can(membership, "configure") ? (org?.context ?? "") : "",
           logo: org?.logo ?? null,
         },
         200,

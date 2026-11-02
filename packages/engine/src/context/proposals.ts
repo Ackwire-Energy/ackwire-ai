@@ -24,7 +24,7 @@ import {
   withAccessLines,
 } from "../access";
 import { type Agent, getAgent, updateAgent } from "../agents";
-import { audienceNotice, canTalkTo, speakerFor } from "../audience";
+import { audienceNotice, canTalkTo, seesAgentDetails, speakerFor } from "../audience";
 import { recordAudit } from "../audit";
 import { caches } from "../cache";
 import { sha256 } from "../crypto";
@@ -33,7 +33,7 @@ import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from ".
 import { publishUserEvent } from "../events";
 import { cutText } from "../format";
 import type { Judge } from "../judge";
-import { can, requirePermission } from "../organizations";
+import { can, type Membership, requirePermission } from "../organizations";
 import { enqueue } from "../outbox";
 import { maySql } from "../permissions";
 import { deliverNoticeToRun } from "../run-resume";
@@ -219,6 +219,33 @@ async function proposalsVisible<T extends Proposal>(db: Database, actorId: strin
   );
 }
 
+/**
+ * Without `review_memory`: the workspace's context only for who configures it, and an agent's instructions, role
+ * and access only for who sees how it works (`seesAgentDetails`).
+ */
+async function proposalsShown<T extends Proposal>(db: Database, actorId: string, membership: Membership, rows: T[]) {
+  const seen = new Map<string, boolean>();
+  const out: T[] = [];
+  for (const r of rows) {
+    if (r.target === "org_context") {
+      if (can(membership, "configure")) out.push(r);
+      continue;
+    }
+    if (!r.agentId) {
+      out.push(r);
+      continue;
+    }
+    let sees = seen.get(r.agentId);
+    if (sees === undefined) {
+      const agent = await getAgent(db, r.orgId, r.agentId);
+      sees = !!agent && seesAgentDetails(agent, actorId, membership);
+      seen.set(r.agentId, sees);
+    }
+    if (sees) out.push(r);
+  }
+  return out;
+}
+
 async function mayDecide(db: Database, actorId: string, p: Proposal) {
   const membership = await requirePermission(db, actorId, p.orgId, "read");
   if (isAgentSetting(p)) {
@@ -254,7 +281,9 @@ export async function listProposals(
     // Pending first: decided ones are what the cap leaves out.
     .orderBy(desc(sql`${contextProposals.status} = 'pending'`), desc(contextProposals.createdAt))
     .limit(200);
-  const rows = can(membership, "review_memory") ? all : await proposalsVisible(db, actorId, orgId, all);
+  const rows = can(membership, "review_memory")
+    ? all
+    : await proposalsVisible(db, actorId, orgId, await proposalsShown(db, actorId, membership, all));
   const out: (Proposal & { canDecide: boolean })[] = [];
   for (const r of rows) out.push({ ...r, canDecide: r.status === "pending" && (await mayDecide(db, actorId, r)) });
   return out;

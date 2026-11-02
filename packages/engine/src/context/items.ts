@@ -14,6 +14,7 @@ import {
 } from "@agenteschat/db";
 import { setsCredential } from "@agenteschat/ui/names";
 import { getAgent } from "../agents";
+import { seesAgentDetails } from "../audience";
 import { caches } from "../cache";
 import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { type Judge, triesToChangePermissions } from "../judge";
@@ -486,10 +487,10 @@ export async function listAgentMemoryRows(db: Database, actorId: string, orgId: 
  * same rule as `listAgentMemoryRows`, most recently changed first.
  */
 export async function listOrgMemoryRows(db: Database, actorId: string, orgId: string, limit = 300) {
-  await requirePermission(db, actorId, orgId, "read");
+  const membership = await requirePermission(db, actorId, orgId, "read");
   const visible = await userVisibleChannels(db, orgId, actorId);
   const rows = await db
-    .select({ item: contextItems })
+    .select({ item: contextItems, agent: agents })
     .from(contextItems)
     .innerJoin(agents, and(eq(agents.id, contextItems.agentId), isNull(agents.archivedAt)))
     .where(
@@ -502,7 +503,9 @@ export async function listOrgMemoryRows(db: Database, actorId: string, orgId: st
     )
     .orderBy(desc(contextItems.updatedAt))
     .limit(limit);
-  return { items: rows.map((r) => r.item), visible };
+  // An agent's memory is part of how it works: only for who sees its details.
+  const items = rows.filter((r) => seesAgentDetails(r.agent, actorId, membership)).map((r) => r.item);
+  return { items, visible };
 }
 
 /**
