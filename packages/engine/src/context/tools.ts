@@ -121,7 +121,10 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             const label = item ? itemLabel(item) : `[${h.kind}]`;
             return `${label} id=${h.sourceId} (${h.createdAt.toISOString().slice(0, 10)}) ${h.snippet.replace(/\s+/g, " ")}`;
           });
-        return { content: untrustedBlock("workspace search", [...lines, ...steps].join("\n")), data: { hits: hits.length + steps.length } };
+        return {
+          content: untrustedBlock("workspace search", [...lines, ...steps].join("\n")),
+          data: { hits: hits.length + steps.length },
+        };
       },
     },
     {

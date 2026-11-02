@@ -12,7 +12,7 @@ import {
 } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { type Agent, listAgents } from "../agents";
-import { audienceError, canTalkTo } from "../audience";
+import { audienceError, canTalkTo, speakerOf } from "../audience";
 import { recordAudit } from "../audit";
 import { listChannels, requireChannelAccess } from "../channels";
 import { consultationWait } from "../consultations";
@@ -21,7 +21,7 @@ import { openDm } from "../dms";
 import { ConflictError, ForbiddenError, NotFoundError, TooManyError, ValidationError } from "../errors";
 import type { Judge } from "../judge";
 import { getMessage, listMessages, type MessageView, postPersonMessage } from "../messages";
-import { can, getMembership } from "../organizations";
+import { getMembership } from "../organizations";
 import type { Talker } from "../talker";
 import { listWorkingRuns } from "../working";
 import type { AppPrincipal } from "./grants";
@@ -630,7 +630,7 @@ export function buildAppsMcpServer(deps: AppsToolDeps, p: AppPrincipal, version:
       }
       const agent = await resolveAgent(deps, p, args.agent);
       const membership = await getMembership(deps.db, p.userId, p.orgId);
-      if (!canTalkTo(agent, p.userId, can(membership, "talk_to_agents"))) throw await audienceError(deps.db, agent);
+      if (!canTalkTo(agent, p.userId, speakerOf(membership))) throw await audienceError(deps.db, agent);
       let channelId: string;
       let body = args.message;
       if (args.channel_id) {
@@ -717,7 +717,7 @@ export function buildAppsMcpServer(deps: AppsToolDeps, p: AppPrincipal, version:
     },
     async (args) => {
       const membership = await getMembership(deps.db, p.userId, p.orgId);
-      const talks = can(membership, "talk_to_agents");
+      const talks = speakerOf(membership);
       const all = (await listAgents(deps.db, p.userId, p.orgId)).filter((a) =>
         matches(args.query, a.name, a.handle, a.role),
       );
