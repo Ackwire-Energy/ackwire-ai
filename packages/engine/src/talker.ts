@@ -2,6 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, gt, schema, sql } from "@agenteschat/db";
 import { type Agent, getAgentCached } from "./agents";
 import { runBrainOf } from "./brains/select";
+import { endsAsking } from "./brakes";
 import { publishMessageCreated } from "./events";
 import type { ModelGateway } from "./gateway";
 import { insertMessage, type Message, messageView } from "./messages";
@@ -270,7 +271,8 @@ export function createTalker(deps: TalkerDeps): Talker {
           now: at,
         });
         const answer = await ask(deps, run, agent, snapshot);
-        if (answer === null) return decide("pass");
+        // A question the cheap model let pass ("??", "what are you doing?") still hears where the work is (ADR 0131 §2).
+        if (answer === null && !endsAsking(message.body)) return decide("pass");
         // The cheap model couldn't answer (no API key, an outage, too slow): the server's own status line, so a
         // person asking a working agent always hears what it does (ADR 0131 §2).
         const reply = typeof answer === "string" ? { text: answer, meta: {} } : await statusReply(deps.db, run, at);

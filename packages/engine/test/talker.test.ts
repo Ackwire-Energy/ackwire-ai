@@ -226,6 +226,15 @@ describe("talker: fast replies while the task waits", () => {
     expect(await talkerMessages()).toHaveLength(0);
     await f.close();
 
+    // A question it lets pass still gets the server's status line (ADR 0131 §2).
+    const ping = await waitingOnQuestion(() => ({ chunks: ['{"action":"pass","text":""}'] }));
+    await ping.write("??");
+    expect(ping.decisions).toEqual(["reply"]);
+    expect((await talkerMessages()).map((m) => (m.meta as Record<string, unknown>).bodyCode)).toEqual([
+      "talker_status",
+    ]);
+    await f.close();
+
     const never = new Promise<void>(() => {});
     const late = await waitingOnQuestion(() => ({ chunks: ['{"action":', '"reply"}'], hold: never }), {
       timeoutMs: 50,
