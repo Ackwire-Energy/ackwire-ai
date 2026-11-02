@@ -63,6 +63,7 @@ import type {
   Channel,
   ChannelCard,
   ChannelCategory,
+  ChannelInput,
   ChannelMember,
   CodeSent,
   CommandApproval,
@@ -579,10 +580,7 @@ export interface ApiClient {
   };
   chat: {
     channels(orgId: string): Promise<Channel[]>;
-    createChannel(
-      orgId: string,
-      input: { name: string; topic?: string; visibility?: "public" | "private"; categoryId?: string | null },
-    ): Promise<Channel>;
+    createChannel(orgId: string, input: ChannelInput & { name: string; categoryId?: string | null }): Promise<Channel>;
     /** The sidebar's categories, in order (ADR 0080). */
     categories(orgId: string): Promise<ChannelCategory[]>;
     /** Admins: a category at the end, optionally taking `channelIds` along. */
@@ -601,11 +599,7 @@ export interface ApiClient {
     join(orgId: string, channelId: string): Promise<void>;
     /** A `#channel` link's card; 404 for a channel I can't see (private and not mine). Archived ones too. */
     card(orgId: string, channelId: string): Promise<ChannelCard>;
-    update(
-      orgId: string,
-      channelId: string,
-      input: { name?: string; topic?: string; visibility?: "public" | "private" },
-    ): Promise<Channel>;
+    update(orgId: string, channelId: string, input: ChannelInput & { name?: string }): Promise<Channel>;
     /** Creator or admin: the channel leaves everyone's list (its messages are kept). */
     archive(orgId: string, channelId: string): Promise<void>;
     /** "Desfazer" right after archiving. */

@@ -1,5 +1,5 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, type Database, eq, isNull, rowsOf, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, inArray, isNull, rowsOf, type SQL, schema, sql } from "@agenteschat/db";
 import { caches } from "./cache";
 import { endOfCategory, requireCategoryInOrg } from "./channel-categories";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
@@ -25,11 +25,119 @@ export type Channel = typeof channels.$inferSelect;
 
 export const CHANNEL_NAME_PATTERN = /^[a-z0-9][a-z0-9_-]{0,79}$/;
 
+/** The most departments or roles a channel is limited to (ADR 0125), as for an agent's audience. */
+export const CHANNEL_ROLES_MAX = 100;
+
+/**
+ * A private channel limited to departments or roles (ADR 0125) that `userId` may see and join: they hold one of its
+ * roles now. Membership checks stay the only way in to its messages; this only lists it and lets them join.
+ */
+export function channelAudienceSql(alias: string, userId: SQL): SQL {
+  const c = sql.raw(alias);
+  return sql`(${c}.visibility = 'private' and cardinality(${c}.audience_role_ids) > 0 and exists (
+    select 1 from organization_member_roles cmr where cmr.org_id = ${c}.org_id and cmr.user_id = ${userId}
+      and cmr.role_id = any(${c}.audience_role_ids)))`;
+}
+
+/**
+ * The roles a private channel is limited to (ADR 0125), checked: each a custom role of the workspace (not
+ * `everyone`, which is "Público"). A public channel takes none.
+ */
+export async function channelRoleIds(
+  db: Executor,
+  orgId: string,
+  visibility: "public" | "private",
+  roleIds: readonly string[] | undefined,
+): Promise<string[]> {
+  const wanted = [...new Set(roleIds ?? [])];
+  if (wanted.length === 0) return [];
+  if (visibility === "public") throw new ValidationError("Only a private channel is limited to roles");
+  if (wanted.length > CHANNEL_ROLES_MAX) throw new ValidationError(`At most ${CHANNEL_ROLES_MAX} roles`);
+  const known = await db
+    .select({ id: schema.orgRoles.id })
+    .from(schema.orgRoles)
+    .where(
+      and(eq(schema.orgRoles.orgId, orgId), eq(schema.orgRoles.kind, "custom"), inArray(schema.orgRoles.id, wanted)),
+    );
+  if (known.length !== wanted.length) throw new ValidationError("Every role must be one of the workspace's");
+  return wanted;
+}
+
+/** A person taken out of a channel: who, from where. */
+export interface ChannelLeaver {
+  channelId: string;
+  userId: string;
+}
+
+/**
+ * Takes people out of channels limited to roles they no longer hold (ADR 0125), in the caller's transaction:
+ * `people` lost `roleIds` (taken from them, or deleted), or `channel` stopped taking `roleIds`. Only a channel still
+ * limited to roles, and only someone who holds none of its roles now; its creator stays. Someone added by name who
+ * never held a dropped role stays too.
+ */
+export async function dropRoleLeavers(
+  tx: Executor,
+  orgId: string,
+  lost: { people: readonly string[]; roleIds: readonly string[] } | { channelId: string; roleIds: readonly string[] },
+): Promise<ChannelLeaver[]> {
+  if (lost.roleIds.length === 0) return [];
+  const list = (ids: readonly string[]) =>
+    sql.join(
+      ids.map((id) => sql`${id}`),
+      sql`, `,
+    );
+  const roles = sql`array[${list(lost.roleIds)}]::uuid[]`;
+  const which =
+    "people" in lost
+      ? lost.people.length === 0
+        ? undefined
+        : sql`cm.user_id in (${list(lost.people)}) and c.audience_role_ids && ${roles}`
+      : sql`c.id = ${lost.channelId}::uuid and exists (select 1 from organization_member_roles held
+            where held.org_id = c.org_id and held.user_id = cm.user_id and held.role_id = any(${roles}))`;
+  if (!which) return [];
+  const rows = rowsOf<{ channel_id: string; user_id: string }>(
+    await tx.execute(sql`delete from ${channelMembers} cm using ${channels} c
+      where cm.channel_id = c.id and cm.org_id = c.org_id and c.org_id = ${orgId}::uuid and c.kind = 'channel'
+        and c.visibility = 'private' and cardinality(c.audience_role_ids) > 0 and cm.user_id is not null
+        and ${which}
+        and c.created_by_user_id is distinct from cm.user_id
+        and not exists (select 1 from organization_member_roles still where still.org_id = c.org_id
+          and still.user_id = cm.user_id and still.role_id = any(c.audience_role_ids))
+      returning cm.channel_id, cm.user_id`),
+  );
+  return rows.map((r) => ({ channelId: r.channel_id, userId: r.user_id }));
+}
+
+/**
+ * Tells everyone that people left channels (after the transaction that took them out): their live subscriptions end
+ * first, then their sidebars and the channels hear it.
+ */
+export async function announceChannelLeavers(pubsub: PubSub | undefined, orgId: string, leavers: ChannelLeaver[]) {
+  for (const { channelId, userId } of leavers) {
+    caches.channelMembers.delete(`${orgId}:${channelId}`);
+    const removed = {
+      type: "channel.member_removed" as const,
+      channelId,
+      member: { type: "person" as const, id: userId },
+    };
+    await publishOrgEvent(pubsub, { type: "membership.revoked", orgId, userId, channelId });
+    await publishUserEvent(pubsub, orgId, userId, removed);
+    await publishChannelEvent(pubsub, removed);
+  }
+}
+
 export async function createChannel(
   db: Database,
   actorId: string,
   orgId: string,
-  input: { name: string; topic?: string; visibility?: "public" | "private"; categoryId?: string | null },
+  input: {
+    name: string;
+    topic?: string;
+    visibility?: "public" | "private";
+    /** Private only: people holding one of these roles also see it and may join (ADR 0125). */
+    audienceRoleIds?: string[];
+    categoryId?: string | null;
+  },
 ): Promise<Channel> {
   await requirePermission(db, actorId, orgId, "create_channels");
   // Whoever may create a channel may put it in an existing category (arranging categories is for admins).
@@ -40,6 +148,8 @@ export async function createChannel(
   if (!CHANNEL_NAME_PATTERN.test(name)) {
     throw new ValidationError("channel name: lower-case letters, digits, - or _ (max 80)");
   }
+  const visibility = input.visibility ?? "public";
+  const audienceRoleIds = await channelRoleIds(db, orgId, visibility, input.audienceRoleIds);
   try {
     return await db.transaction(async (tx) => {
       const [channel] = await tx
@@ -48,7 +158,8 @@ export async function createChannel(
           orgId,
           name,
           topic: input.topic ?? "",
-          visibility: input.visibility ?? "public",
+          visibility,
+          audienceRoleIds,
           createdByUserId: actorId,
           categoryId,
           position: await endOfCategory(tx, orgId, categoryId),
@@ -90,6 +201,8 @@ export interface ChannelListItem {
   name: string;
   topic: string;
   visibility: "public" | "private";
+  /** Private and limited to these roles (ADR 0125); empty otherwise. */
+  audienceRoleIds: string[];
   createdByUserId: string | null;
   createdAt: Date;
   /** Its sidebar category; null: on top, with none. */
@@ -116,6 +229,7 @@ interface ChannelListRow {
   name: string;
   topic: string;
   visibility: "public" | "private";
+  audience_role_ids: string[] | string;
   created_by_user_id: string | null;
   created_at: Date | string;
   category_id: string | null;
@@ -133,16 +247,19 @@ interface ChannelListRow {
 }
 
 const asDate = (v: Date | string) => (v instanceof Date ? v : new Date(v));
+/** A uuid[] from a raw query: an array, or its text form (`{a,b}`) on some drivers. */
+const uuidArray = (v: string[] | string | null) =>
+  Array.isArray(v) ? v : v && v !== "{}" ? v.slice(1, -1).split(",") : [];
 
 /**
- * Channels the user can see: every public channel plus private ones they
- * belong to, in sidebar order (then by name), with their unread count and last message, in one
+ * Channels the user can see: every public channel, private ones they
+ * belong to and those limited to a role they hold (ADR 0125), in sidebar order (then by name), with their unread count and last message, in one
  * query (a lateral read per channel on `(channel_id, created_at)`).
  */
 export async function listChannels(db: Database, userId: string, orgId: string): Promise<ChannelListItem[]> {
   await requirePermission(db, userId, orgId, "read");
   const rows = rowsOf<ChannelListRow>(
-    await db.execute(sql`select c.id, c.org_id, c.name, c.topic, c.visibility, c.created_by_user_id, c.created_at,
+    await db.execute(sql`select c.id, c.org_id, c.name, c.topic, c.visibility, c.audience_role_ids, c.created_by_user_id, c.created_at,
         c.category_id, c.position,
         (cm.id is not null) as is_member, coalesce(un.n, 0) as unread_count,
         lm.id as last_id, lm.body as last_body, lm.meta as last_meta, lm.created_at as last_at, lm.author_type as last_author_type,
@@ -179,7 +296,7 @@ export async function listChannels(db: Database, userId: string, orgId: string):
         ) unread
       ) un on true
       where c.org_id = ${orgId}::uuid and c.archived_at is null and c.kind = 'channel'
-        and (c.visibility = 'public' or cm.id is not null)
+        and (c.visibility = 'public' or cm.id is not null or ${channelAudienceSql("c", sql`${userId}`)})
       order by c.position asc, c.name asc`),
   );
   return rows.map((r) => {
@@ -191,6 +308,7 @@ export async function listChannels(db: Database, userId: string, orgId: string):
       name: r.name,
       topic: r.topic,
       visibility: r.visibility,
+      audienceRoleIds: uuidArray(r.audience_role_ids),
       createdByUserId: r.created_by_user_id,
       createdAt: asDate(r.created_at),
       categoryId: r.category_id,
@@ -220,6 +338,8 @@ export interface ChannelCard {
   name: string;
   topic: string;
   visibility: "public" | "private";
+  /** Private and limited to these roles (ADR 0125): I hold one, or I'm in it. */
+  audienceRoleIds: string[];
   isMember: boolean;
   archived: boolean;
   /** People in it. */
@@ -229,7 +349,7 @@ export interface ChannelCard {
 }
 
 /**
- * The card of a channel I can see: public, or private and mine; archived ones too. Any other id (a private
+ * The card of a channel I can see: public, private and mine, or limited to a role I hold; archived ones too. Any other id (a private
  * channel I'm not in, a DM, another organization's) is "not found", so a link tells nothing about it.
  */
 export async function channelCard(
@@ -244,12 +364,15 @@ export async function channelCard(
     name: string;
     topic: string;
     visibility: "public" | "private";
+    audience_role_ids: string[] | string;
     archived: boolean;
     is_member: boolean;
+    by_role: boolean;
     people: number | string;
     agents: number | string;
   }>(
-    await db.execute(sql`select c.id, c.name, c.topic, c.visibility, (c.archived_at is not null) as archived,
+    await db.execute(sql`select c.id, c.name, c.topic, c.visibility, c.audience_role_ids,
+        (c.archived_at is not null) as archived, ${channelAudienceSql("c", sql`${userId}`)} as by_role,
         exists (select 1 from ${channelMembers} m where m.channel_id = c.id and m.user_id = ${userId}) as is_member,
         (select count(*) from ${channelMembers} m where m.channel_id = c.id and m.user_id is not null) as people,
         (select count(*) from ${channelMembers} m join ${agents} a on a.id = m.agent_id
@@ -257,12 +380,14 @@ export async function channelCard(
       from ${channels} c
       where c.id = ${channelId}::uuid and c.org_id = ${orgId}::uuid and c.kind = 'channel'`),
   );
-  if (!row || (row.visibility === "private" && row.is_member !== true)) throw new NotFoundError("Channel not found");
+  if (!row || (row.visibility === "private" && row.is_member !== true && row.by_role !== true))
+    throw new NotFoundError("Channel not found");
   return {
     id: row.id,
     name: row.name,
     topic: row.topic,
     visibility: row.visibility,
+    audienceRoleIds: uuidArray(row.audience_role_ids),
     isMember: row.is_member === true,
     archived: row.archived === true,
     people: Number(row.people),
@@ -327,15 +452,23 @@ export async function requireChannelAccess(db: Database, userId: string, orgId: 
   return { channel, membership };
 }
 
-/** Joins a public channel. Private channels need an invitation from a member. */
+/**
+ * Joins a public channel, or a private one limited to a role the person holds (ADR 0125). Other private channels
+ * need an invitation from a member.
+ */
 export async function joinChannel(db: Database, userId: string, orgId: string, channelId: string) {
   await requirePermission(db, userId, orgId, "read");
   const [channel] = await db
-    .select()
+    .select({
+      kind: channels.kind,
+      visibility: channels.visibility,
+      byRole: channelAudienceSql("channels", sql`${userId}`),
+    })
     .from(channels)
     .where(and(eq(channels.id, channelId), eq(channels.orgId, orgId)));
   if (!channel) throw new NotFoundError("Channel not found");
-  if (channel.visibility !== "public" || channel.kind === "dm") throw new ForbiddenError("This channel is private");
+  if (channel.kind === "dm" || (channel.visibility !== "public" && channel.byRole !== true))
+    throw new ForbiddenError("This channel is private");
   await db.insert(channelMembers).values({ orgId, channelId, userId }).onConflictDoNothing();
 }
 
@@ -521,21 +654,16 @@ export async function removeChannelMember(
       ),
     );
   caches.channelMembers.delete(`${orgId}:${channelId}`);
-  if ("agentId" in member) caches.scopes.deletePrefix(`${orgId}:${member.agentId}:visible`);
-  const removed = {
-    type: "channel.member_removed" as const,
-    channelId,
-    member:
-      "userId" in member
-        ? { type: "person" as const, id: member.userId }
-        : { type: "agent" as const, id: member.agentId },
-  };
-  // Revoke first, so the removed person's subscription ends before the channel hears about it.
   if ("userId" in member) {
-    await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId: member.userId, channelId });
-    await publishUserEvent(options.pubsub, orgId, member.userId, removed);
+    await announceChannelLeavers(options.pubsub, orgId, [{ channelId, userId: member.userId }]);
+    return;
   }
-  await publishChannelEvent(options.pubsub, removed);
+  caches.scopes.deletePrefix(`${orgId}:${member.agentId}:visible`);
+  await publishChannelEvent(options.pubsub, {
+    type: "channel.member_removed",
+    channelId,
+    member: { type: "agent", id: member.agentId },
+  });
 }
 
 /** The channel, when `actorId` may archive it or bring it back: its creator or an admin. */

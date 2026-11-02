@@ -177,7 +177,7 @@ export function channelRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/channels/{channelId}",
       tags,
       security,
-      summary: "Rename, change topic or visibility (creator or admin)",
+      summary: "Rename, change topic or who may join (creator or admin)",
       request: {
         params: ChannelParams,
         body: body(
@@ -185,6 +185,10 @@ export function channelRoutes(deps: AppDeps) {
             name: z.string().min(1).max(80).optional(),
             topic: z.string().max(500).optional(),
             visibility: z.enum(["public", "private"]).optional(),
+            audienceRoleIds: z.array(z.uuid()).max(100).optional().openapi({
+              description:
+                "Private only: people holding one of these roles (departments) also see it and may join (ADR 0125); empty: invite only.",
+            }),
           }),
         ),
       },
@@ -192,13 +196,14 @@ export function channelRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId, channelId } = c.req.valid("param");
-      const r = await updateChannel(db, c.get("user").id, orgId, channelId, c.req.valid("json"));
+      const r = await updateChannel(db, c.get("user").id, orgId, channelId, c.req.valid("json"), opts);
       return c.json(
         {
           id: r.id,
           name: r.name,
           topic: r.topic,
           visibility: r.visibility,
+          audienceRoleIds: r.audienceRoleIds,
           isMember: true,
           createdByUserId: r.createdByUserId,
           createdAt: r.createdAt.toISOString(),

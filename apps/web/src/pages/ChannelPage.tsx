@@ -83,6 +83,7 @@ import { looksLikeApiKey } from "@agenteschat/client/lib/api-key-text";
 import { approvalCardItems, asOfNow, cardDeadline } from "@agenteschat/client/lib/approval-card";
 import { artifactRefs } from "@agenteschat/client/lib/artifacts";
 import { audienceNotice, canTalk } from "@agenteschat/client/lib/audience";
+import { accessInput, accessOf, accessValid, type ChannelAccess } from "@agenteschat/client/lib/channel-access";
 import { channelRefsOf } from "@agenteschat/client/lib/channel-refs";
 import {
   entersWithMotion,
@@ -272,7 +273,7 @@ import {
 import { MissionCommandCard } from "@/components/missions/MissionCommandCard";
 import { NewMissionDialog } from "@/components/missions/MissionDialogs";
 import { NavToggle } from "@/components/NavDrawer";
-import { CHANNEL_NAME, toChannelName } from "@/components/NewChannelDialog";
+import { CHANNEL_NAME, ChannelAccessChoice, toChannelName } from "@/components/NewChannelDialog";
 import { KeyGuardDialog, NoAiBanner, NoAiCard, useNoAiAutoOpen } from "@/components/NoAi";
 import { useOrg } from "@/components/org-context";
 import { AuthorStatus } from "@/components/Presence";
@@ -3858,6 +3859,12 @@ function MessageApproval({
 /** Above this many members the channel details list gets a search field. */
 const DETAILS_SEARCH_FROM = 8;
 
+const ACCESS_LABEL = {
+  public: "channel.visibilityPublic",
+  private: "channel.visibilityPrivate",
+  roles: "newChannel.roles",
+} as const;
+
 /**
  * "Detalhes do canal": the description edited in place under the name
  * (saves on blur, Enter or close), members grouped as agents and people, one "⋯" per row with how an
@@ -3899,6 +3906,21 @@ function ChannelDetails({
   const [saved, setSaved] = useState(false);
   const [addingHere, setAdding] = useState(false);
   const adding = addingHere || (startAdding && editable);
+  // Who can join (ADR 0125): saved on each change once it means something (a role picked under "Departamentos").
+  const [access, setAccess] = useState<ChannelAccess>(() => accessOf(channel));
+  const accessKey = `${channel.visibility}:${(channel.audienceRoleIds ?? []).join(",")}`;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `accessKey` stands for the channel's access
+  useEffect(() => {
+    if (open) setAccess(accessOf(channel));
+  }, [open, accessKey]);
+  const changeAccess = (next: ChannelAccess) => {
+    setAccess(next);
+    if (!accessValid(next)) return;
+    update.mutate(accessInput(next), {
+      onSuccess: () => setSaved(true),
+      onError: (e) => toast.show(errorText(t, e), "error"),
+    });
+  };
   // Who is about to be removed: asked first, in a dialog of its own.
   const [removing, setRemoving] = useState<{ kind: "person" | "agent"; id: string; name: string } | null>(null);
   // The last description sent: blur and close both save, and closing with the X does both.
@@ -4023,7 +4045,7 @@ function ChannelDetails({
         }}
         subtitle={t("channel.detailsSub", {
           category: categoryName,
-          visibility: channel.visibility === "private" ? t("channel.visibilityPrivate") : t("channel.visibilityPublic"),
+          visibility: t(ACCESS_LABEL[accessOf(channel).mode]),
         })}
         title={
           <>
@@ -4082,6 +4104,9 @@ function ChannelDetails({
             <Field label={t("channelCategories.category")} id="channel-edit-category">
               <CategorySelect value={channel.categoryId ?? null} onChange={moveTo} canCreate={editable} />
             </Field>
+            {channel.name !== "general" && (
+              <ChannelAccessChoice value={access} onChange={changeAccess} idPrefix="channel-edit" />
+            )}
           </DialogBody>
         )}
         <DialogSearchList

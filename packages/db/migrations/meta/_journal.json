@@ -1219,6 +1219,13 @@
       "when": 1793605482256,
       "tag": "0175_locales",
       "breakpoints": true
+    },
+    {
+      "idx": 175,
+      "version": "7",
+      "when": 1793627909237,
+      "tag": "0179_channel_audience",
+      "breakpoints": true
     }
   ]
 }

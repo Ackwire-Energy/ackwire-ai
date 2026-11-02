@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, inArray, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "./audit";
+import { announceChannelLeavers, type ChannelLeaver, dropRoleLeavers } from "./channels";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import {
   announceMembers,
@@ -288,8 +289,20 @@ export async function deleteRole(
   const role = await loadRole(db, orgId, roleId);
   if (role.kind === "everyone") throw new ForbiddenError("Every workspace keeps its base role", "role.base");
   if (!mayEdit(actor, role)) throw new ForbiddenError("Only someone above this role changes it", "role.above_you");
-  await db.transaction(async (tx) => {
+  const leavers = await db.transaction(async (tx) => {
+    const holders = (
+      await tx
+        .select({ userId: organizationMemberRoles.userId })
+        .from(organizationMemberRoles)
+        .where(and(eq(organizationMemberRoles.orgId, orgId), eq(organizationMemberRoles.roleId, role.id)))
+    ).map((r) => r.userId);
     await tx.delete(orgRoles).where(eq(orgRoles.id, role.id));
+    // Its holders leave the channels they were in through it alone (ADR 0125); then the channels forget it.
+    const left = await dropRoleLeavers(tx, orgId, { people: holders, roleIds: [role.id] });
+    await tx
+      .update(schema.channels)
+      .set({ audienceRoleIds: sql`array_remove(${schema.channels.audienceRoleIds}, ${role.id}::uuid)` })
+      .where(and(eq(schema.channels.orgId, orgId), sql`${role.id}::uuid = any(${schema.channels.audienceRoleIds})`));
     await recordAudit(tx, {
       orgId,
       actor: { type: "person", id: actorId },
@@ -297,7 +310,9 @@ export async function deleteRole(
       target: { type: "role", id: role.id },
       details: { name: role.name, permissions: role.permissions },
     });
+    return left;
   });
+  await announceChannelLeavers(options.pubsub, orgId, leavers);
   await announceRoles(options.pubsub, orgId);
 }
 
@@ -419,7 +434,7 @@ export async function setMemberRoles(
     throw new ForbiddenError("Only someone above them changes their roles", "role.above_you");
   const next = [...new Set(roleIds)];
   // Read and checked under the lock: two people changing the same person's roles at once never undo each other.
-  const changed = await db.transaction(async (tx) => {
+  const changed = await db.transaction(async (tx): Promise<false | ChannelLeaver[]> => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`org-members:${orgId}`}))`);
     const before = await memberRoleIds(tx, orgId, targetUserId);
     const added = next.filter((id) => !before.includes(id));
@@ -437,6 +452,8 @@ export async function setMemberRoles(
           ),
         );
     await addMemberRolesInTx(tx, orgId, targetUserId, added);
+    // Channels limited to the roles taken away (ADR 0125) let them go, unless another of theirs still opens them.
+    const left = await dropRoleLeavers(tx, orgId, { people: [targetUserId], roleIds: removed });
     const names = await tx
       .select({ id: orgRoles.id, name: orgRoles.name })
       .from(orgRoles)
@@ -450,9 +467,12 @@ export async function setMemberRoles(
       target: { type: "person", id: targetUserId },
       details: { added: added.map(nameOf), removed: removed.map(nameOf) },
     });
-    return true;
+    return left;
   });
-  if (changed) await announceMembers(options.pubsub, orgId);
+  if (changed) {
+    await announceChannelLeavers(options.pubsub, orgId, changed);
+    await announceMembers(options.pubsub, orgId);
+  }
   return next;
 }
 

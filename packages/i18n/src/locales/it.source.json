@@ -4730,6 +4730,24 @@
   "newChannel.privateDesc": {
     "value": "Only who is added."
   },
+  "newChannel.roles": {
+    "value": "Departments or roles"
+  },
+  "newChannel.rolesDesc": {
+    "value": "Whoever holds a role you pick sees and joins it, now or later."
+  },
+  "newChannel.rolesPick": {
+    "value": "Roles that see the channel"
+  },
+  "newChannel.rolesNone": {
+    "value": "The workspace has no roles yet."
+  },
+  "newChannel.rolesNeeded": {
+    "value": "Pick at least one role."
+  },
+  "newChannel.rolesLeave": {
+    "value": "Whoever loses the role leaves the channel."
+  },
   "newChannel.members": {
     "value": "Initial members"
   },

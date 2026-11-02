@@ -296,6 +296,9 @@ export const Channel = z
     name: z.string(),
     topic: z.string(),
     visibility: z.enum(["public", "private"]),
+    audienceRoleIds: z.array(z.uuid()).optional().openapi({
+      description: "Private and limited to these roles (departments, ADR 0125); empty: public or invite only.",
+    }),
     isMember: z.boolean(),
     createdByUserId: z
       .string()
