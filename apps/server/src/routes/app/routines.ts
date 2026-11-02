@@ -258,7 +258,7 @@ const Routine = z
       ])
       .openapi({
         description:
-          "`needs_webhook`: its event comes through a webhook this workspace doesn't have yet. `usage_paused`: its run paused near its plan's or budget's limit (`usagePause`).",
+          "`needs_webhook`: its event comes through a webhook this workspace doesn't have yet. `usage_paused`: its run waits on its plan or budget, paused near the limit or stopped at it (`usagePause`).",
       }),
     waitingFor: z
       .object({ machineId: z.uuid(), machineName: z.string(), since: z.string() })
@@ -268,6 +268,10 @@ const Routine = z
       .object({
         source: z.enum(["plan", "budget"]),
         resetsAt: z.string().nullable().openapi({ description: "When it picks up by itself; null: not known yet." }),
+        limit: z.boolean().openapi({
+          description: "Stopped at the limit itself, not paused near it: nothing to continue, it runs after the reset.",
+        }),
+        plan: z.string().nullable().openapi({ description: 'The plan it waits for ("Claude"); null for a budget.' }),
         extraOff: z.boolean().openapi({
           description:
             "A plan pause whose window is used up, on an agent whose long work may not use paid extra usage: continuing is refused.",
@@ -278,7 +282,10 @@ const Routine = z
         }),
       })
       .nullable()
-      .openapi({ description: "Its run paused near a limit (ADR 0118); Continuar agora is `POST …/continue`." }),
+      .openapi({
+        description:
+          "Its run waits on its plan or budget (ADR 0118); Continuar agora is `POST …/continue` (not at the limit itself), Don't run it is `POST …/stop`.",
+      }),
     brain: z.object({
       kind: z.enum(["model", "claude_code", "codex", "cursor"]),
       machineName: z.string().nullable().openapi({ description: "The computer a computer brain runs on." }),

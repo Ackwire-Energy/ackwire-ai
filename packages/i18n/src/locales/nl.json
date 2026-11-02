@@ -1416,7 +1416,6 @@
       "button_other": "Vastgezette berichten ({{count}})",
       "label": "Vastgezette berichten in #{{channel}}",
       "in": "Vastgezet in #{{channel}}",
-      "empty": "Nog niets vastgezet. Zet een bericht vast via het menu ervan.",
       "unpin": "Bericht van {{name}} losmaken"
     },
     "membersButton_one": "Kanaalleden ({{count}})",
@@ -1551,7 +1550,8 @@
       "outage": "De AI-aanbieder ligt eruit · probeert het zelf opnieuw",
       "handled": "Beantwoord",
       "failed": "Mislukt",
-      "referenced": "Alleen genoemd"
+      "referenced": "Alleen genoemd",
+      "reacted": "Reageerde"
     },
     "failedShort": "Kon niet antwoorden",
     "popoverTitle": "Agents",
@@ -1770,6 +1770,10 @@
     "forbidden": "Alleen wie het vroeg, de eigenaar van de agent of een beheerder kan nu doorgaan",
     "resumed": "{{agent}} heeft het werk weer opgepakt",
     "ended": "Dit werk is beëindigd voordat het werd opgepakt",
+    "canceled": "Geannuleerd. Het draait niet als de limiet opnieuw begint.",
+    "dontRun": "Niet uitvoeren",
+    "dontRunHint": "Annuleren: er draait niets als de limiet opnieuw begint",
+    "dontRunForbidden": "Alleen wie het vroeg, de eigenaar van de agent of een beheerder kan het annuleren",
     "extraTitle": "Lang werk mag betaald extra gebruik gebruiken",
     "extraHint": "Met extra gebruik aan in het abonnement gaat lang werk door na 95%. Uit pauzeert het bij 95% en gaat het verder als het abonnement opnieuw begint."
   },
@@ -1962,6 +1966,15 @@
     "publicDesc": "Iedereen in de werkruimte ziet het en kan meedoen.",
     "private": "Privé",
     "privateDesc": "Alleen wie wordt toegevoegd.",
+    "roles": "Afdelingen of rollen",
+    "rolesDesc": "Wie een van de gekozen rollen heeft, ziet het kanaal en kan erin, nu of later.",
+    "rolesPick": "Rollen die het kanaal zien",
+    "rolesNone": "De workspace heeft nog geen rollen.",
+    "rolesNeeded": "Kies minstens één rol.",
+    "rolesLeave": "Wie de rol verliest, verlaat het kanaal.",
+    "publicTitle": "#{{channel}} openbaar maken?",
+    "publicBody": "Iedereen in de workspace kan erbij en alle berichten lezen, ook de oudere.",
+    "publicConfirm": "Openbaar maken",
     "members": "Eerste leden",
     "membersSearch": "Mensen of agents zoeken",
     "membersEmpty": "Niemand gevonden voor „{{q}}”.",
@@ -2069,7 +2082,10 @@
     "can": "Kan",
     "budgetUsed": "{{percent}} van het budget gebruikt deze maand",
     "spendLabel": "Budget gebruikt deze maand",
-    "former": "Niet meer in deze werkruimte"
+    "former": "Niet meer in deze werkruimte",
+    "askAccess": "Toegang vragen",
+    "detailsHiddenTitle": "Hoe het werkt",
+    "detailsHidden": "Alleen de mensen aan wie {{name}} antwoordt, de verantwoordelijke en admins zien de instructies, tools, het geheugen en het gebruik."
   },
   "presence": {
     "online": "Online",
@@ -2348,6 +2364,7 @@
     "refusedBy": "Geweigerd door {{name}} · {{when}}",
     "approvedByYou": "Goedgekeurd door jou · {{when}}",
     "outcomeApprovedBy": "Goedgekeurd door {{name}}",
+    "requesterDecides": "Gevraagd door iemand die het via zijn rol goedkeurt, dus die mag ook beslissen",
     "outcomeApprovedByYou": "Goedgekeurd door jou",
     "outcomeRefusedBy": "Geweigerd door {{name}}",
     "outcomeRefusedByYou": "Geweigerd door jou",
@@ -2476,7 +2493,8 @@
       "mentions": "Vermeldingen",
       "waiting": "Wacht op jou",
       "unread": "Ongelezen",
-      "reactions": "Reacties"
+      "reactions": "Reacties",
+      "done": "Afgerond"
     },
     "keys": {
       "title": "Sneltoetsen",
@@ -2617,6 +2635,8 @@
     "replyTip": "Antwoorden · R",
     "done": "Afgehandeld",
     "doneTip": "Afgehandeld · E",
+    "restore": "Terugzetten",
+    "restoreTip": "Terugzetten · E",
     "snooze": "Herinner me later",
     "snoozeShort": "Herinneren",
     "open": "Openen",
@@ -2649,6 +2669,7 @@
       "done": "Gemarkeerd als afgehandeld",
       "doneQuestion": "{{name}} wacht nog. De vraag blijft in het gesprek.",
       "doneApproval": "De aanvraag blijft bij Goedkeuringen.",
+      "restored": "Terug in je inbox",
       "undo": "Ongedaan maken",
       "readAll_one": "{{count}} als gelezen gemarkeerd",
       "readAll_other": "{{count}} als gelezen gemarkeerd",
@@ -2665,6 +2686,7 @@
     "noneWaiting": "Niemand wacht op jou.",
     "noneUnread": "Alles gelezen.",
     "noneHere": "Hier is voorlopig niets.",
+    "noneDone": "Niets als afgerond gemarkeerd in de afgelopen 30 dagen.",
     "more": "Meer tonen"
   },
   "approvals": {
@@ -3844,6 +3866,13 @@
     "defaultKeyDesc": "{{provider}} · eindigt op {{hint}}",
     "otherKeyDesc": "{{provider}} · eindigt op {{hint}}",
     "modelNeedsKey": "{{provider}}-API-sleutel nodig",
+    "brainPick": {
+      "searchPlaceholder": "Model, abonnement of maker",
+      "connect": "{{plan}} koppelen",
+      "connectText": "Een {{plan}}-sleutel nodig. Je voegt hem toe direct nadat je de agent hebt gemaakt.",
+      "needsKey": "{{plan}}-sleutel nodig",
+      "other": "Iets anders kiezen"
+    },
     "noKeys": "Nog geen sleutels",
     "budgetTitle": "Maandbudget",
     "budget": "Maandbudget (US$)",
@@ -4818,7 +4847,9 @@
       "usagePaused": "Gepauzeerd tot {{until}} (limiet van het abonnement)",
       "usagePausedUnknown": "Gepauzeerd tot het abonnement opnieuw begint (limiet van het abonnement)",
       "usagePausedBudget": "Gepauzeerd tot {{until}} (budgetlimiet)",
-      "usagePausedBudgetUnknown": "Gepauzeerd tot het budget wordt vernieuwd (budgetlimiet)"
+      "usagePausedBudgetUnknown": "Gepauzeerd tot het budget wordt vernieuwd (budgetlimiet)",
+      "waitingPlan": "Wacht op het {{plan}}-abonnement · draait om {{until}}",
+      "waitingPlanUnknown": "Wacht tot het {{plan}}-abonnement opnieuw begint"
     },
     "pausedReason": {
       "creator_left": "Gepauzeerd: wie hem maakte, heeft de werkruimte verlaten",
@@ -4868,6 +4899,8 @@
       "waiting": "Wacht tot iemand antwoordt",
       "waitingApproval": "Wacht op jouw goedkeuring",
       "waitingComputer": "Wacht op de computer",
+      "waitingPlan": "Wacht tot het abonnement opnieuw begint",
+      "waitingBudget": "Wacht tot het budget vernieuwt",
       "reported": "Heeft gemeld wat hij vond",
       "silent": "Niets nieuws, bleef stil",
       "failed": "Werkte niet",
@@ -4925,6 +4958,10 @@
     "stoppedToast": "Run gestopt.",
     "usagePause": {
       "line": "Hij gaat vanzelf verder als de limiet opnieuw begint. Er wordt niets in het gesprek gepost.",
+      "lineLimit": "Hij draait vanzelf als de limiet opnieuw begint. Er wordt niets in het gesprek gepost.",
+      "dontRun": "Niet uitvoeren",
+      "dontRunName": "{{name}} niet uitvoeren als de limiet opnieuw begint",
+      "canceledToast": "Geannuleerd. Het draait niet als de limiet opnieuw begint.",
       "continuedToast": "Run gaat verder.",
       "forbidden": "Alleen wie de routine maakte, de eigenaar van de agent of een beheerder kan hem nu laten doorgaan",
       "extra_off": "Het venster van dit abonnement is op en het lange werk van deze agent gebruikt geen betaald extra gebruik. Zet dat aan in de AI-instellingen om nu door te gaan, of hij gaat verder na de reset",
@@ -7673,6 +7710,7 @@
       "freeTraining": "De aanbieder van dit model kan verzoeken gebruiken om het te trainen. Zet in OpenCode, bij Settings › Privacy, de toestemming voor gratis modellen aan. Zonder die toestemming antwoordt dit model niet."
     },
     "recommended": "Aanbevolen",
+    "free": "Gratis",
     "modelHelp": "Grotere modellen denken meer na en verbruiken het abonnement sneller.",
     "hidden": "{{owner}} of een beheerder kiest wie denkt.",
     "hiddenAdmins": "Alleen beheerders kiezen wie denkt.",
@@ -7835,7 +7873,8 @@
       "html": "HTML-pagina",
       "file": "Bestand",
       "block": "Blok",
-      "poll": "Peiling"
+      "poll": "Peiling",
+      "choices": "Keuzes"
     },
     "version": "v{{version}}",
     "createdBy": "{{kind}} · gemaakt door {{name}}",
@@ -7916,6 +7955,16 @@
     "pollAnswered_other": "{{count}} van {{total}} hebben geantwoord",
     "voteFailed": "Je stem is niet doorgekomen."
   },
+  "choices": {
+    "step": "{{step}} van {{total}}",
+    "back": "Terug",
+    "next": "Volgende",
+    "close": "Sluiten",
+    "closed": "{{title}} · gesloten",
+    "reopen": "Opnieuw tonen",
+    "answeredBy": "{{name}} koos",
+    "failed": "Je keuze is niet verstuurd. Probeer het opnieuw."
+  },
   "drive": {
     "title": "Drive",
     "subtitle": "Alles wat mensen en agents hebben gemaakt of geüpload.",
@@ -7953,7 +8002,8 @@
       "html": "HTML-pagina's",
       "file": "Bestanden",
       "block": "Blokken",
-      "poll": "Peilingen"
+      "poll": "Peilingen",
+      "choices": "Keuzes"
     },
     "kindCount": "{{kind}}: {{count}}",
     "view": "Weergave",
@@ -9426,7 +9476,72 @@
     "hint": "Zoekt in de kanalen waar je in zit.",
     "inChannel": "in #{{channel}}",
     "count_one": "{{count}} resultaat",
-    "count_other": "{{count}} resultaten"
+    "count_other": "{{count}} resultaten",
+    "countMore": "{{count}}+ resultaten",
+    "words": {
+      "ops": {
+        "from": "van",
+        "in": "in",
+        "has": "heeft",
+        "mentions": "noemt",
+        "before": "voor",
+        "after": "na",
+        "during": "tijdens",
+        "author": "auteur",
+        "pinned": "vastgezet"
+      },
+      "has": {
+        "link": "link",
+        "file": "bestand",
+        "image": "afbeelding",
+        "card": "kaart"
+      },
+      "author": {
+        "person": "persoon",
+        "agent": "agent"
+      }
+    },
+    "options": "Zoekopties",
+    "option": {
+      "from": "Van een bepaalde persoon of agent",
+      "in": "Verstuurd in een bepaald kanaal of DM",
+      "has": "Bevat een link, bestand, afbeelding of kaart",
+      "mentions": "Noemt een bepaalde persoon of agent",
+      "before": "Voor een datum",
+      "after": "Na een datum",
+      "during": "Op een dag, in een maand of een jaar",
+      "author": "Geschreven door mensen of door agents",
+      "pinned": "Vastgezette berichten"
+    },
+    "moreFilters": "Meer filters",
+    "hasLabel": {
+      "link": "Link",
+      "file": "Bestand",
+      "image": "Afbeelding",
+      "card": "Kaart"
+    },
+    "authorLabel": {
+      "person": "Mensen",
+      "agent": "Agents"
+    },
+    "pinnedChip": "Vastgezet",
+    "removeFilter": "{{filter}} verwijderen",
+    "filtersApplied_one": "{{count}} filter",
+    "filtersApplied_other": "{{count}} filters",
+    "recent": "Recente zoekopdrachten",
+    "clearRecent": "Wissen",
+    "pickDate": "Datum",
+    "dateHint": "Typ een datum: 2026-10-05, 2026-10 of 2026",
+    "noMatch": "Niemand met die naam hier.",
+    "noPlace": "Geen kanaal of DM met die naam.",
+    "sort": {
+      "label": "Sorteren",
+      "newest": "Nieuwste",
+      "oldest": "Oudste",
+      "relevance": "Meest relevant"
+    },
+    "searchHere": "Zoeken in dit gesprek",
+    "dm": "DM met {{name}}"
   },
   "files": {
     "upload": "Bestand uploaden",
@@ -10637,7 +10752,7 @@
       "waitingComputer": "Wacht op de computer",
       "paused": "Gepauzeerd op de limiet van het abonnement",
       "pausedUntil": "Gepauzeerd op de limiet van het abonnement · terug om {{time}}",
-      "done": "Klaar in {{duration}}",
+      "done": "Afgerond in {{duration}}",
       "failed": "Niet afgemaakt",
       "canceled": "Gestopt door {{name}} na {{duration}}",
       "canceledAnon": "Gestopt na {{duration}}"
@@ -11064,9 +11179,11 @@
       "plan_limit_wait": "Het {{plan}}-abonnement heeft de limiet bereikt. Ik antwoord {{when}}, als de limiet is gereset.",
       "plan_limit_wait_unknown": "Het {{plan}}-abonnement heeft de limiet bereikt. Ik antwoord zodra de limiet reset.",
       "budget_wait": "Mijn budget voor deze maand is op. Ik ga {{when}} verder, of eerder als een beheerder het verhoogt.",
+      "usage_wait_canceled": "Geannuleerd. Het draait niet als de limiet opnieuw begint.",
       "usage_paused": "{{agent}} heeft dit werk gepauzeerd · {{plan}}-abonnement op {{percent}}% {{window}}",
       "usage_paused_budget": "{{agent}} heeft dit werk gepauzeerd · maandbudget op {{percent}}%",
       "work_auto_moved": "Dit duurt even, dus ik ga op de achtergrond verder. Ik post hier updates, de volgende over ongeveer {{minutes}} min.",
+      "work_auto_movedOver": "Dit duurt even, dus ik ga op de achtergrond verder. Ik post hier updates.",
       "work_end_done": "Klaar ({{minutes}} min).",
       "work_end_failed": "Dit werk op de achtergrond is niet afgerond ({{minutes}} min).",
       "work_end_failedWhy": "Dit werk op de achtergrond is niet afgerond ({{minutes}} min): {{why}}.",

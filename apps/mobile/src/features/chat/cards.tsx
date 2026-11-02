@@ -20,7 +20,13 @@ import {
 } from "@agenteschat/client/lib/approval-card";
 import { aheadPhase } from "@agenteschat/client/lib/approval-kind";
 import { approvalWhy } from "@agenteschat/client/lib/approval-origin";
-import { approvalSummary, decisionOutcome } from "@agenteschat/client/lib/approval-words";
+import {
+  approvalGroupWaitsFor,
+  approvalSummary,
+  approvalWaitsFor,
+  decisionOutcome,
+  requesterDecidesLine,
+} from "@agenteschat/client/lib/approval-words";
 import { consultAskedKey } from "@agenteschat/client/lib/consult-group";
 import { nextLabel } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -242,7 +248,7 @@ function ApprovalGroupAsk({ items }: { items: Approval[] }) {
   const { ids, waiting: count, blocked } = approveAllScope(items);
   const high = items.some((a) => ids.includes(a.id) && approvalRisk(a) === "high");
   const ownerId = first.ownerUserId ?? dir.agentById.get(first.agentId)?.ownerUserId ?? null;
-  const owner = ownerId ? dir.memberById.get(ownerId)?.name : undefined;
+  const owner = approvalGroupWaitsFor(items, ownerId ? dir.memberById.get(ownerId)?.name : undefined);
   const deadline = cardDeadline(items);
   const leadItem = waiting[0] ?? first;
   const always = approveAlwaysOn(items);
@@ -473,7 +479,8 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
   const g = genderOf(name);
   const high = approvalRisk(a) === "high";
   const ownerId = a.ownerUserId ?? dir.agentById.get(a.agentId)?.ownerUserId ?? null;
-  const owner = ownerId ? dir.memberById.get(ownerId)?.name : undefined;
+  const owner = approvalWaitsFor(a, ownerId ? dir.memberById.get(ownerId)?.name : undefined);
+  const requester = requesterDecidesLine(t, a);
   const approve = (always = false) =>
     decide.mutate(
       { id: a.id, decision: "approve", always },
@@ -533,6 +540,11 @@ function ApprovalAsk({ approval: a }: { approval: Approval }) {
                     {origin}
                   </Text>
                 </View>
+              ) : null}
+              {requester ? (
+                <Text variant="footnote" tone="muted">
+                  {requester}
+                </Text>
               ) : null}
               {a.canDecide ? (
                 <ApproveAlways approval={a} name={name} disabled={decide.isPending} onPress={() => approve(true)} />

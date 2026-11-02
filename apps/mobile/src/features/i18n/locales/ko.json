@@ -41,6 +41,16 @@
     "pollAnswered_other": "{{total}}명 중 {{count}}명 응답",
     "voteFailed": "투표가 반영되지 않았어요."
   },
+  "choices": {
+    "step": "{{step}}/{{total}}",
+    "back": "이전",
+    "next": "다음",
+    "close": "닫기",
+    "closed": "{{title}} · 닫힘",
+    "reopen": "다시 보기",
+    "answeredBy": "{{name}}이(가) 선택함",
+    "failed": "선택이 전송되지 않았어요. 다시 시도해 주세요."
+  },
   "chart": {
     "pending": "차트를 만드는 중…",
     "table": "표",
@@ -489,7 +499,9 @@
     "full": "이 채팅에는 이미 100개가 고정되어 있어요. 먼저 하나를 해제하세요.",
     "mark": "고정됨",
     "none": "아직 고정된 항목이 없어요",
-    "empty": "아직 여기에 고정된 항목이 없어요. 메시지를 길게 누르고 고정을 탭하세요."
+    "empty": "아직 여기에 고정된 항목이 없어요. 메시지를 길게 누르고 고정을 탭하세요.",
+    "bar_other": "고정된 메시지({{count}})",
+    "unpinOf": "{{name}}의 메시지 고정 해제"
   },
   "thread": {
     "threadIn": "#{{channel}}의 스레드",
@@ -709,7 +721,8 @@
     "title": "활동",
     "filter": {
       "all": "전체",
-      "waiting": "내 확인 대기"
+      "waiting": "내 확인 대기",
+      "done": "완료"
     },
     "day": {
       "today": "오늘",
@@ -756,6 +769,8 @@
     "markUnread": "안 읽음으로 표시",
     "unread": "안 읽음",
     "done": "완료",
+    "restore": "되돌리기",
+    "noneDone": "최근 30일 동안 완료로 표시한 항목이 없어요.",
     "more": "더 보기",
     "empty": "나를 기다리는 일이 없어요. 한숨 돌리세요."
   },

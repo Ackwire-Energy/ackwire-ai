@@ -1,4 +1,5 @@
 import { useChannelCard, useChannels, useJoinChannel } from "@agenteschat/client";
+import { joinable } from "@agenteschat/client/lib/channel-access";
 import { channelCardFacts, resolveChannelRef } from "@agenteschat/client/lib/channel-refs";
 import { Button, Chip, Icon, Popover, useHoverCard } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -120,7 +121,7 @@ function ChannelCardBody({ channelId, onDone }: { channelId: string; onDone: () 
       <p className="small muted channel-card__facts">{channelCardFacts(t, c)}</p>
       {!c.archived && (
         <div className="profile-card__actions">
-          {!c.isMember && c.visibility === "public" && (
+          {joinable(c) && (
             <Button
               size="sm"
               variant="primary"

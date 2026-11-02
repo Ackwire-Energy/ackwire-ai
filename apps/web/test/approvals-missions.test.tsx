@@ -119,3 +119,23 @@ describe("Aprovações: a request's details", () => {
     }
   });
 });
+
+describe("Aprovações: asked of a role (request_approval)", () => {
+  test("waits for the role, not the agent's owner; the role decides, and the requester who approves by role is said", async () => {
+    const state = seedState();
+    const merge = state.approvals.find((a) => a.id === "ap-merge");
+    if (!merge) throw new Error("no approval");
+    Object.assign(merge, {
+      tool: "request_approval",
+      canDecide: false,
+      approvers: { label: "Diretoria", requestedByUserId: "u-requester", requesterDecides: true },
+    });
+    await renderApp(`/org/${ORG_ID}/approvals?open=ap-merge`, { api: createFakeApi(state) });
+    await settle(8);
+    const card = document.querySelector('.ap-card[data-id="ap-merge"]');
+    expect(card?.textContent).toContain("Aguardando Diretoria");
+    const deciders = [...document.querySelectorAll(".ap-deciders li")].map((li) => li.textContent);
+    expect(deciders).toEqual(["DDiretoria"]);
+    expect(document.body.textContent).toContain("Pedido por quem também aprova pela função");
+  });
+});

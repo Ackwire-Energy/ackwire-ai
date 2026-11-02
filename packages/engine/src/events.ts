@@ -4,7 +4,7 @@ import type { AgentActionView } from "./agent-actions";
 import type { ConnectIntent } from "./ai-intent";
 import type { ApprovalView } from "./approvals";
 import type { ArtifactView } from "./artifacts";
-import type { PollView } from "./blocks";
+import type { ChoicesView, PollView } from "./blocks";
 import type { BrowserHandoffView } from "./browser/handoff";
 import type { CalendarEventView } from "./calendar";
 import type { IssueActivityView, IssueView } from "./issues";
@@ -492,6 +492,8 @@ export type ChannelEvent =
   | { type: "message.reactions"; channelId: string; messageId: string; reactions: ReactionCount[] }
   /** A vote came in or the poll closed (ADR 0113). */
   | { type: "poll.updated"; channelId: string; poll: PollView }
+  /** A choice card was answered (ADR 0124). */
+  | { type: "choices.updated"; channelId: string; choices: ChoicesView }
   /** A message was pinned in this channel (`GET …/channels/{id}/pins` lists them, newest first). */
   | {
       type: "message.pinned";

@@ -53,6 +53,7 @@ import type {
   ChannelCard,
   ChannelCategory,
   ChannelMember,
+  Choices,
   CodeSent,
   CommandApproval,
   ComposioUsage,
@@ -160,6 +161,7 @@ import type {
   SandboxSettings,
   ScheduleParse,
   ScopeGrant,
+  SearchFilterInput,
   SearchHit,
   SecretRequest,
   ServerTelemetry,
@@ -193,6 +195,14 @@ import type {
   WorkingRun,
   WorkspaceLimits,
 } from "./types";
+
+/** Search filters as query parameters (lists comma-separated). */
+const filterQuery = (f: SearchFilterInput | undefined) =>
+  f
+    ? Object.fromEntries(
+        Object.entries(f).map(([k, v]) => [k, Array.isArray(v) ? v.join(",") || undefined : v === true ? "true" : v]),
+      )
+    : {};
 
 const org = (orgId: string) => `/api/app/organizations/${enc(orgId)}`;
 /** The most agents one `POST …/agent-setup` takes (the server's `SETUP_AGENTS_MAX`). */
@@ -815,7 +825,7 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       query: async (orgId, input) =>
         (
           await request<{ hits: SearchHit[] }>(`${org(orgId)}/search`, {
-            query: { q: input.q, kinds: input.kinds?.join(","), limit: input.limit },
+            query: { q: input.q, kinds: input.kinds?.join(","), limit: input.limit, ...filterQuery(input.filters) },
           })
         ).hits,
     },
@@ -1014,6 +1024,11 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
       poll: (orgId, id) => request<Poll>(`${org(orgId)}/polls/${enc(id)}`),
       vote: (orgId, id, options) =>
         request<Poll>(`${org(orgId)}/polls/${enc(id)}/vote`, { method: "PUT", json: { options } }),
+      choices: (orgId, id) => request<Choices>(`${org(orgId)}/choices/${enc(id)}`),
+      answerChoices: (orgId, id, picks, clientId) =>
+        request<{ choices: Choices; messageId: string }>(`${org(orgId)}/choices/${enc(id)}/answer`, {
+          json: { picks, clientId },
+        }),
       versions: async (orgId, id) =>
         (await request<{ versions: ArtifactVersion[] }>(`${org(orgId)}/artifacts/${enc(id)}/versions`)).versions,
       download: (orgId, id, version) =>
