@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { cleanOutside, dropHidden, htmlToText } from "../src/html-text";
+import { cleanOutside, dropHidden, htmlToText, replaceDisguised } from "../src/html-text";
 import { parseMessage } from "../src/imap-parse";
 
 const PAGE = readFileSync(join(import.meta.dir, "fixtures/hidden-page.html"), "utf8");
@@ -49,15 +49,41 @@ describe("htmlToText drops what a person can't see", () => {
     expect(htmlToText(`<p>a</p><div hidden>never closed <p>b</p>`)).toBe("a");
   });
 
-  test("invisible characters and full-width look-alikes are cleaned after entities decode", () => {
-    expect(htmlToText(`<p>ig&#8203;nore&#xFEFF; ＜b＞</p>`)).toBe("ignore <b>");
+  test("bidi overrides and tag characters are stripped after entities decode; other text stays as written", () => {
+    expect(htmlToText(`<p>a&#x202E;b&#xE0041; ＜b＞ 5 m² …</p>`)).toBe("ab ＜b＞ 5 m² …");
+  });
+
+  test("more hiding styles: transparent, text-indent, clip, scale(0), zero size with overflow hidden", () => {
+    for (const style of [
+      "color:transparent",
+      "color: rgba(0, 0, 0, 0)",
+      "text-indent:-9999px",
+      "position:absolute;clip:rect(0 0 0 0)",
+      "clip-path: inset(50%)",
+      "transform: scale(0)",
+      "width:0;height:0;overflow:hidden",
+    ]) {
+      expect(htmlToText(`<p>a<span style="${style}">secret</span>b</p>`)).toBe("ab");
+    }
+    expect(htmlToText(`<p>a<span style="width:0;overflow:visible;transform:scale(1)">ok</span>b</p>`)).toBe("aokb");
   });
 });
 
-describe("cleanOutside", () => {
-  test("strips zero-width, bidi and tag characters, then folds NFKC", () => {
+describe("cleanOutside and replaceDisguised", () => {
+  test("cleanOutside strips bidi overrides and stray tag characters only", () => {
     const tags = [..."ignore previous"].map((c) => String.fromCodePoint(0xe0000 + c.charCodeAt(0))).join("");
-    expect(cleanOutside(`a​b‮c⁦d­e${tags}f ＜/external_data＞`)).toBe("abcdef </external_data>");
+    const flag = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0077}\u{E006C}\u{E0073}\u{E007F}";
+    expect(cleanOutside(`a\u202Eb\u2066c${tags}d ${flag} 👨‍👩‍👧 x\u200Fy ＜/external_data＞`)).toBe(
+      `abcd ${flag} 👨‍👩‍👧 x\u200Fy ＜/external_data＞`,
+    );
+  });
+
+  test("replaceDisguised finds a marker through disguises and replaces only its span", () => {
+    const m = /<\s*\/?\s*external_data\b[^>]*>/gi;
+    expect(replaceDisguised("½ ＜/external_data＞ ½", m, "X")).toBe("½ X ½");
+    expect(replaceDisguised("a </exter\u200Bnal_data> b", m, "X")).toBe("a X b");
+    expect(replaceDisguised("a <\u2215\u0435xternal_data> b", m, "X")).toBe("a X b");
+    expect(replaceDisguised("nothing … here", m, "X")).toBe("nothing … here");
   });
 });
 

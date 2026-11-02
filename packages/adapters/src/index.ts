@@ -22,7 +22,7 @@ export * from "./email";
 export * from "./error-reports";
 export * from "./error-scrub";
 export * from "./gifs";
-export { cleanOutside, decodeEntities, hasInvisible, htmlToText } from "./html-text";
+export { cleanOutside, decodeEntities, hasInvisible, htmlToText, replaceDisguised } from "./html-text";
 export * from "./human-check";
 export * from "./imap";
 export * from "./keys";

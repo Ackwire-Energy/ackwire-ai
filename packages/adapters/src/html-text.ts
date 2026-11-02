@@ -1,20 +1,119 @@
 /**
  * Outside HTML and text made safe to read (ADR 0117): one HTML-to-text converter for web pages, mail and
  * search results, which drops what a person never sees on the page (so hidden text can't speak to the
- * model), and one cleaner for any outside text, which strips invisible characters and folds look-alike
- * forms (full-width brackets) into plain ones before envelope markers are checked.
+ * model), one cleaner for any outside text, which strips characters that hide or reorder text, and a
+ * marker finder that sees through invisible characters and look-alike forms without changing the text.
  */
 
-/** Zero-width, bidi, word-joiner, BOM, soft hyphen and Unicode tag characters: invisible on screen. */
-const INVISIBLE = /[\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF\u00AD]|[\u{E0000}-\u{E007F}]/gu;
+/** Bidi overrides and isolates: they reorder what a person sees on screen. */
+const BIDI_CONTROLS = /[\u202A-\u202E\u2066-\u2069]/gu;
+/**
+ * Unicode tag characters, an invisible ASCII side channel, except inside an emoji subdivision flag
+ * (U+1F3F4, tags, cancel tag), which stays whole.
+ */
+const STRAY_TAGS = /(\u{1F3F4}[\u{E0020}-\u{E007E}]+\u{E007F})|[\u{E0000}-\u{E007F}]/gu;
 
-/** Outside text without invisible characters, NFKC-folded (full-width `＜` becomes `<`). */
+/**
+ * Outside text without the characters that hide or reorder text (bidi overrides and isolates, stray tag
+ * characters). Everything else stays exactly as written (ZWJ emoji, RLM/LRM, ellipses, full-width forms), so
+ * text an agent reads and writes back is unchanged; disguised markers are found by `replaceDisguised`.
+ */
 export function cleanOutside(text: string): string {
-  return text.replace(INVISIBLE, "").normalize("NFKC");
+  return text.replace(BIDI_CONTROLS, "").replace(STRAY_TAGS, (_m, flag?: string) => flag ?? "");
 }
 
-/** Whether the text carries invisible characters `cleanOutside` would strip. */
-export const hasInvisible = (text: string) => text.search(INVISIBLE) !== -1;
+/** Whether the text carries characters `cleanOutside` strips. */
+export const hasInvisible = (text: string) => cleanOutside(text) !== text;
+
+/**
+ * Ignored when looking for a disguised marker: zero-width, joiners, bidi marks, soft hyphen, combining grapheme
+ * joiner, Mongolian vowel separator, Hangul fillers, variation selectors and tag characters.
+ */
+const SKIPPED_IN_MARKERS =
+  // biome-ignore lint/suspicious/noMisleadingCharacterClass: tested on one code point at a time, never on a sequence
+  /[\u00AD\u034F\u115F\u1160\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\u3164\uFE00-\uFE0F\uFEFF]|[\u{E0000}-\u{E007F}\u{E0100}-\u{E01EF}]/u;
+
+/** Look-alikes NFKC leaves alone, for the characters of envelope markers (Cyrillic, Greek, angle brackets, slashes). */
+const CONFUSABLES: Record<string, string> = {
+  а: "a",
+  с: "c",
+  ԁ: "d",
+  е: "e",
+  ɡ: "g",
+  һ: "h",
+  і: "i",
+  ӏ: "l",
+  о: "o",
+  р: "p",
+  ѕ: "s",
+  т: "t",
+  ս: "u",
+  ԝ: "w",
+  х: "x",
+  α: "a",
+  ε: "e",
+  ι: "i",
+  ο: "o",
+  ρ: "p",
+  τ: "t",
+  υ: "u",
+  А: "A",
+  В: "B",
+  С: "C",
+  Е: "E",
+  Н: "H",
+  І: "I",
+  М: "M",
+  О: "O",
+  Р: "P",
+  Т: "T",
+  Х: "X",
+  "‹": "<",
+  "〈": "<",
+  "⟨": "<",
+  "˂": "<",
+  "›": ">",
+  "〉": ">",
+  "⟩": ">",
+  "˃": ">",
+  "∕": "/",
+  "⁄": "/",
+  "⧸": "/",
+};
+
+/**
+ * `text` with every match of `pattern` (global) replaced, matching on a folded copy (invisible characters
+ * skipped, NFKC and look-alike letters folded) so a disguised marker is found, while the rest of the text stays as
+ * written. The replaced span covers the disguise.
+ */
+export function replaceDisguised(text: string, pattern: RegExp, replacement: string): string {
+  let folded = "";
+  const from: number[] = [];
+  const to: number[] = [];
+  let i = 0;
+  for (const ch of text) {
+    const end = i + ch.length;
+    if (!SKIPPED_IN_MARKERS.test(ch)) {
+      const f = CONFUSABLES[ch] ?? ch.normalize("NFKC");
+      folded += f;
+      for (let k = 0; k < f.length; k++) {
+        from.push(i);
+        to.push(end);
+      }
+    }
+    i = end;
+  }
+  let out = "";
+  let last = 0;
+  for (const m of folded.matchAll(pattern)) {
+    const start = from[m.index] ?? text.length;
+    const stop = to[m.index + m[0].length - 1] ?? text.length;
+    if (start < last) continue;
+    out += text.slice(last, start) + replacement;
+    last = stop;
+  }
+  return last === 0 ? text : out + text.slice(last);
+}
 
 const NAMED_ENTITIES: Record<string, string> = {
   amp: "&",
@@ -156,10 +255,16 @@ function styleHides(style: string): boolean {
   if (decl.has("font-size") && isZero(get("font-size"))) return true;
   const color = get("color");
   if (color && (color === get("background-color") || color === get("background"))) return true;
-  if (/^(absolute|fixed)$/.test(get("position"))) {
-    const far = (v: string) => /^-\d+(\.\d+)?px$/.test(v) && Number.parseFloat(v) <= -1000;
-    if (far(get("left")) || far(get("top"))) return true;
-  }
+  if (/^(transparent|rgba\(.*,0(\.0*)?\)|#[0-9a-f]{6}00|#[0-9a-f]{3}0)$/.test(color)) return true;
+  const far = (v: string) => /^-\d+(\.\d+)?px$/.test(v) && Number.parseFloat(v) <= -1000;
+  if (/^(absolute|fixed)$/.test(get("position")) && (far(get("left")) || far(get("top")))) return true;
+  if (far(get("text-indent"))) return true;
+  if (/^rect\(0(px)?,?0(px)?,?0(px)?,?0(px)?\)$/.test(get("clip")) || /^inset\(50%\)$/.test(get("clip-path")))
+    return true;
+  if (/^scale\(0(\.0*)?(,0(\.0*)?)?\)$/.test(get("transform"))) return true;
+  const overflowHidden = /^(hidden|clip)$/.test(get("overflow"));
+  if (overflowHidden && ((decl.has("width") && isZero(get("width"))) || (decl.has("height") && isZero(get("height")))))
+    return true;
   return false;
 }
 
