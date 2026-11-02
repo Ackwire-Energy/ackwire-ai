@@ -658,7 +658,9 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     },
     [LEARN_JOB]: async (job) => {
       if (!deps.context) return;
-      await learnRun(deps.context, { orgId: orgOf(job), runId: String(job.payload.runId) });
+      const res = await learnRun(deps.context, { orgId: orgOf(job), runId: String(job.payload.runId) });
+      // Its run went on after the turn that queued it: the outbox's backoff brings it back once the run ends.
+      if (res.skipped === "running") throw Object.assign(new Error("its run is still going"), { retryable: true });
     },
     // A reply a while ago: the thread's title and "resolved?" suggestion, unless a newer reply came.
     "threads.assess": async (job) => {

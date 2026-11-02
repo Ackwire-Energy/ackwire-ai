@@ -678,4 +678,21 @@ describe("learning guards", () => {
     const plain = (await items()).find((i) => i.content.startsWith("The office plant"));
     expect([plain?.createdByKind, plain ? isHowTo(plain) : null]).toEqual(["agent", false]);
   });
+
+  test("a run with two finished turns counts its how-to once, and learning waits for the run to end", async () => {
+    f = await setup();
+    const { run } = await personRun();
+    await invoke(run, "save_how_to", { title: "List the Northwind models", how: `GET ${MODELS_URL} with the key` });
+    const [note] = await items();
+    if (!note) throw new Error("no note");
+    const { run: used } = await personRun("@dev the northwind models again");
+    await addRunStep(f.db, used, "context", { memoryItems: [note.id] });
+    await afterTurnDone(f.context, used, { judged: true, signal: "none" });
+    await afterTurnDone(f.context, used, { judged: true, signal: "none" });
+    expect((await items())[0]?.recurrence).toBe(2);
+
+    await f.db.update(schema.agentRuns).set({ status: "running" }).where(eq(schema.agentRuns.id, used.id));
+    expect((await learnRun(f.context, { orgId: f.org.id, runId: used.id })).skipped).toBe("running");
+    expect(await f.db.select().from(schema.agentLearningDays)).toEqual([]);
+  });
 });

@@ -5,6 +5,7 @@ import { cutText, cutTextEnd } from "../format";
 import { agentBudgetState } from "../gateway";
 import { enqueue } from "../outbox";
 import { personBehindCall } from "../requester";
+import { addRunStep } from "../runs";
 import type { ToolContext } from "../tools/types";
 import { consolidateItem, type Evidence, howToSql, howToSubject, looksLikeSecret, type NewContextItem } from "./items";
 import { changeSkillAsAgent } from "./learned-skills";
@@ -66,12 +67,15 @@ export async function afterTurnDone(
   try {
     const { db } = deps;
     const cfg = learnConfig(deps);
-    const [calls, usedHowTos] = await Promise.all([runCalls(db, run), injectedHowTos(db, run)]);
-    if (usedHowTos.length > 0)
+    const [calls, { ids: usedHowTos, counted }] = await Promise.all([runCalls(db, run), injectedHowTos(db, run)]);
+    // Once per run, however many turns it ends: a run that took more messages is still one reuse.
+    if (usedHowTos.length > 0 && !counted) {
       await db
         .update(contextItems)
         .set({ recurrence: sql`${contextItems.recurrence} + 1`, updatedAt: new Date() })
         .where(inArray(contextItems.id, usedHowTos));
+      await addRunStep(db, run, "context", { [HOW_TOS_COUNTED]: true });
+    }
     if (cfg.maxPerAgentDay <= 0 || calls.some((c) => WROTE_MEMORY.has(c.name))) return false;
     const learn = input.judged
       ? input.signal !== undefined && input.signal !== "none"
@@ -102,7 +106,10 @@ export function fixedAfterFailing(calls: RunCall[], min: number) {
 const repeatedTask = (calls: RunCall[]) =>
   calls.some((c) => c.name === "search_context" && (c.result?.content ?? "").includes("[your earlier step]"));
 
-/** How-to notes this run's memory carried (the `context` step's `memoryItems`). */
+/** The `context` step's mark that this run's how-tos were counted (`afterTurnDone`). */
+const HOW_TOS_COUNTED = "howTosCounted";
+
+/** How-to notes this run's memory carried (the `context` step's `memoryItems`), and whether they were counted. */
 async function injectedHowTos(db: Database, run: EndedRun) {
   const steps = await db
     .select({ data: agentRunSteps.data })
@@ -111,12 +118,13 @@ async function injectedHowTos(db: Database, run: EndedRun) {
   const ids = [
     ...new Set(steps.flatMap((s) => (Array.isArray(s.data.memoryItems) ? (s.data.memoryItems as string[]) : []))),
   ];
-  if (ids.length === 0) return [];
+  const counted = steps.some((s) => s.data[HOW_TOS_COUNTED] === true);
+  if (ids.length === 0) return { ids: [], counted };
   const rows = await db
     .select({ id: contextItems.id })
     .from(contextItems)
     .where(and(eq(contextItems.orgId, run.orgId), inArray(contextItems.id, ids), howToSql()));
-  return rows.map((r) => r.id);
+  return { ids: rows.map((r) => r.id), counted };
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -204,7 +212,8 @@ function parseLearnOutput(text: string): { items: LearnedItem[]; skillFixes: { s
 }
 
 export interface LearnResult {
-  skipped?: "missing" | "cap_reached" | "busy" | "budget" | "no_model";
+  /** `running`: the run took more messages after the turn that queued this; the job retries (`jobs.ts`). */
+  skipped?: "missing" | "cap_reached" | "busy" | "running" | "budget" | "no_model";
   saved: { id: string; action: string; trust: string; scopeType: string }[];
   rejected: { content: string; reason: "no_sources" | "secret" | "refused" }[];
   skills: { slug: string; action: string }[];
@@ -232,6 +241,8 @@ export async function learnRun(deps: ContextDeps, input: { orgId: string; runId:
     .from(agentRuns)
     .where(and(eq(agentRuns.orgId, input.orgId), eq(agentRuns.id, input.runId)));
   if (!run) return { ...out, skipped: "missing" };
+  // Before the daily count: the run's last turn end finds the whole run, not just its first turn.
+  if (run.status === "queued" || run.status === "running") return { ...out, skipped: "running" };
   const [busy] = await db
     .select({ id: agentRuns.id })
     .from(agentRuns)
