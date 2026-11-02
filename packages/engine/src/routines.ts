@@ -873,7 +873,9 @@ export async function getRoutineView(
   hooks?: RoutineHookConfig,
 ) {
   await requirePermission(db, actorId, orgId, "read");
-  const [view] = await views(db, [await loadRoutine(db, orgId, id)], actorId, hooks);
+  const row = await loadRoutine(db, orgId, id);
+  if (!(await routineSeer(db, orgId, actorId))(row)) throw new NotFoundError("Routine not found");
+  const [view] = await views(db, [row], actorId, hooks);
   return view as RoutineView;
 }
 
@@ -1172,42 +1174,45 @@ function hooksOf(deps: RoutineDeps): RoutineHookConfig {
 
 /** The organization's routines as the person sees them (ADR 0053 §9: outcomes only where they don't read). */
 export async function listRoutines(db: Database, actorId: string, orgId: string, hooks?: RoutineHookConfig) {
-  const membership = await requirePermission(db, actorId, orgId, "read");
+  await requirePermission(db, actorId, orgId, "read");
   const rows = await db
     .select()
     .from(routines)
     .where(and(eq(routines.orgId, orgId), isNull(routines.deletedAt)))
     .orderBy(routines.createdAt);
-  return views(db, await visibleRoutines(db, membership, actorId, rows), actorId, hooks);
+  const sees = await routineSeer(db, orgId, actorId);
+  return views(db, rows.filter(sees), actorId, hooks);
 }
 
 /**
- * Only routines of agents the person may talk to (the same audience rule as the agents list), besides their own
- * and their agents'; admins of routines or agents see them all.
+ * Whether `viewerId` sees a routine at all (its name, schedule, runs): who manages it (its creator, admins, the
+ * agent's owner), who manages agents, or who the agent answers. The agents list's own rule (`listsAgent` in the
+ * apps), so an agent hidden from someone doesn't show through its routines on Início, Rotinas or the calendar.
  */
-async function visibleRoutines(
+export async function routineSeer(
   db: Database,
-  membership: Awaited<ReturnType<typeof requirePermission>>,
-  actorId: string,
-  rows: RoutineRow[],
-) {
-  if (!rows.length || can(membership, "manage_routines") || can(membership, "manage_agents")) return rows;
-  const ids = [...new Set(rows.map((r) => r.agentId))];
-  const owned = await db
-    .select({
-      id: agents.id,
-      ownerUserId: agents.ownerUserId,
-      audienceMode: agents.audienceMode,
-      audienceUserIds: agents.audienceUserIds,
-      audienceRoleIds: agents.audienceRoleIds,
-      consultable: agents.consultable,
-      brain: agents.brain,
-    })
-    .from(agents)
-    .where(inArray(agents.id, ids));
-  const speaker = speakerOf(membership);
-  const open = new Set(owned.filter((a) => canTalkTo(a, actorId, speaker)).map((a) => a.id));
-  return rows.filter((r) => r.createdByUserId === actorId || open.has(r.agentId));
+  orgId: string,
+  viewerId: string,
+): Promise<(r: Pick<RoutineRow, "agentId" | "createdByUserId">) => boolean> {
+  const [membership, agentRows] = await Promise.all([
+    getMembership(db, viewerId, orgId),
+    db
+      .select({
+        id: agents.id,
+        ownerUserId: agents.ownerUserId,
+        audienceMode: agents.audienceMode,
+        audienceUserIds: agents.audienceUserIds,
+        audienceRoleIds: agents.audienceRoleIds,
+        consultable: agents.consultable,
+        brain: agents.brain,
+      })
+      .from(agents)
+      .where(eq(agents.orgId, orgId)),
+  ]);
+  if (can(membership, "manage_routines") || can(membership, "manage_agents")) return () => true;
+  const talks = speakerOf(membership);
+  const listed = new Set(agentRows.filter((a) => canTalkTo(a, viewerId, talks)).map((a) => a.id));
+  return (r) => r.createdByUserId === viewerId || listed.has(r.agentId);
 }
 
 /**
@@ -1572,6 +1577,7 @@ export async function listRoutineRuns(
 ): Promise<RoutineRunView[]> {
   await requirePermission(db, actorId, orgId, "read");
   const routine = await loadRoutine(db, orgId, id, { deleted: true });
+  if (!(await routineSeer(db, orgId, actorId))(routine)) throw new NotFoundError("Routine not found");
   const [runs, rights] = await Promise.all([
     db
       .select()
