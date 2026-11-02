@@ -823,6 +823,8 @@ export const featureKeysPtBR = {
       connector_tool_changed_other: "Um servidor conectado mudou ferramentas que você aprovou",
       computer_disk_full_one: "O disco de um computador está quase cheio",
       computer_disk_full_other: "O disco de um computador está quase cheio",
+      app_created_one: "Um app de IA criou coisas para você",
+      app_created_other: "Um app de IA criou coisas para você",
     },
     markRead: "Marcar como lida",
     markUnread: "Marcar como não lida",

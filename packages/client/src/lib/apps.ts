@@ -1,7 +1,15 @@
 import type { TFunction } from "i18next";
 import { ApiError } from "../api/http";
-import type { AppAccess, AppConsent, AppDisplayKind, AppsList, ConnectedApp, PersonalToken } from "../api/types";
-import { formatShortDate, relativeTime } from "./format";
+import type {
+  AppAccess,
+  AppConsent,
+  AppDisplayKind,
+  AppNotification,
+  AppsList,
+  ConnectedApp,
+  PersonalToken,
+} from "../api/types";
+import { formatShortDate, joinNames, relativeTime } from "./format";
 
 /*
  * AI apps (ADR 0119) in words and marks, for the web and the phone alike: which mark stands for an app, how long a
@@ -45,9 +53,36 @@ export function appName(name: string): { short: string; full: string | null } {
   return { short: `${chars.slice(0, APP_NAME_CHARS).join("").trimEnd()}…`, full: name.trim() };
 }
 
-/** The access a consent pre-selects: sending when the app asked for it. */
+/** The access a consent pre-selects: the widest the app asked for. */
 export const requestedAccess = (consent: AppConsent): AppAccess =>
-  consent.request.access.requested.includes("write") ? "write" : "read";
+  (["manage", "write"] as const).find((a) => consent.request.access.requested.includes(a)) ?? "read";
+
+/** What an app's creations are counted by, in the order its notice names them. */
+const CREATED_KINDS = ["agent", "routine", "skill", "memory", "channel"] as const;
+
+/** "Claude criou 3 agentes e 2 rotinas pelo app": the line of an `app_created` notice. */
+export function appCreatedLine(t: TFunction, n: Pick<AppNotification, "latest">): string {
+  const created = n.latest.created ?? {};
+  const what = CREATED_KINDS.filter((k) => (created[k] ?? 0) > 0).map((k) =>
+    t(`apps.created.${k}`, { count: created[k] }),
+  );
+  return t("apps.created.notice", { app: n.latest.title ?? "", what: joinNames(what, t("notifications.and")) });
+}
+
+/**
+ * The import's "From your AI app" option: the address to connect and the request to paste, or unavailable where
+ * apps that call from their own servers can't reach this one (a self-hosted server on a private host). Null while
+ * loading.
+ */
+export function aiAppImport(t: TFunction, list: Pick<AppsList, "serverUrl" | "serverPublic"> | undefined) {
+  if (!list) return null;
+  if (!list.serverPublic) return { available: false as const };
+  return {
+    available: true as const,
+    url: list.serverUrl,
+    prompt: t("onboarding.import.aiApp.prompt", { url: list.serverUrl }),
+  };
+}
 
 /** The workspace a consent pre-selects: the current one, else the first one that isn't paused. */
 export const defaultWorkspace = (consent: AppConsent) =>

@@ -223,6 +223,7 @@ function ConsentForm({
           ? t("apps.consent.thisComputer")
           : "Cursor";
   const canWrite = consent.request.access.requested.includes("write");
+  const canManage = consent.request.access.requested.includes("manage");
   const only = consent.workspaces.length === 1 ? consent.workspaces[0] : null;
   // Every workspace paused (on hold until billing is paid, say): Permitir can't be pressed, so the page says why.
   const nonePickable = !defaultWorkspace(consent);
@@ -318,6 +319,15 @@ function ConsentForm({
             value={access}
             onValueChange={setAccess}
             options={[
+              ...(canManage
+                ? [
+                    {
+                      value: "manage" as const,
+                      title: t("apps.consent.manage"),
+                      description: t("apps.consent.manageHelp"),
+                    },
+                  ]
+                : []),
               ...(canWrite
                 ? [
                     {
@@ -339,10 +349,16 @@ function ConsentForm({
                 <Icon name="check" size={16} />
                 <span>{t("apps.consent.canSee")}</span>
               </li>
-              {access === "write" && (
+              {access !== "read" && (
                 <li className="ac-iconline">
                   <Icon name="check" size={16} />
                   <span>{t("apps.consent.canSend", { app })}</span>
+                </li>
+              )}
+              {access === "manage" && (
+                <li className="ac-iconline">
+                  <Icon name="check" size={16} />
+                  <span>{t("apps.consent.canManage")}</span>
                 </li>
               )}
               <li className="ac-iconline">

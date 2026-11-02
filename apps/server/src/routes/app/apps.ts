@@ -6,6 +6,7 @@ import {
   createPersonalToken,
   decideConsent,
   listApps,
+  reachableFromInternet,
   revokeGrant,
   TOKEN_EXPIRY_DAYS,
 } from "@agenteschat/engine";
@@ -26,7 +27,10 @@ import {
 
 const tags = ["AI apps"];
 
-const Access = z.enum(["read", "write"]);
+const Access = z.enum(APP_SCOPES).openapi({
+  description:
+    "`read`: reads. `write`: also sends tasks. `manage`: also creates and edits agents, routines and skills.",
+});
 const DisplayKind = z.enum(["verified", "https", "loopback", "app_scheme"]);
 const Person = z.object({ id: z.string(), name: z.string() });
 
@@ -63,6 +67,10 @@ const ConsentView = z.object({
 
 const AppsList = z.object({
   serverUrl: z.string().openapi({ description: "What people paste into their app: this server's `/mcp`." }),
+  serverPublic: z.boolean().openapi({
+    description:
+      "Whether apps that call from their own servers (claude.ai, ChatGPT) can reach it: https on a public name. False on a self-hosted server on a private host.",
+  }),
   apps: z.array(
     z.object({
       id: z.string(),
@@ -144,7 +152,7 @@ export function appRoutes(deps: AppDeps) {
       security,
       summary: "Allow or deny the app",
       description:
-        "Answers once. `allow` needs `orgId` (a workspace of yours that isn't paused) and `access` (`write` by default: reads and sends tasks, `read`: only reads). Either way `redirectTo` is where the browser goes, back in the app (with `error=access_denied` on deny); go there once. 403 `not_member`, 409 `workspace_paused` or `request_used`, 410 `request_expired`.",
+        "Answers once. `allow` needs `orgId` (a workspace of yours that isn't paused) and `access` (`write` by default: reads and sends tasks; `read`: only reads; `manage`: also creates and edits agents, routines and skills, when the app asked for it). Either way `redirectTo` is where the browser goes, back in the app (with `error=access_denied` on deny); go there once. 403 `not_member`, 409 `workspace_paused` or `request_used`, 410 `request_expired`.",
       request: {
         params: RequestParams,
         body: body(
@@ -185,7 +193,14 @@ export function appRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId } = c.req.valid("param");
       const list = await listApps(db, c.get("user").id, orgId, { all: c.req.valid("query").all === "1" });
-      return c.json({ serverUrl: appsUrls(deps.config.PUBLIC_URL).resource, ...list }, 200);
+      return c.json(
+        {
+          serverUrl: appsUrls(deps.config.PUBLIC_URL).resource,
+          serverPublic: reachableFromInternet(deps.config.PUBLIC_URL),
+          ...list,
+        },
+        200,
+      );
     },
   );
 

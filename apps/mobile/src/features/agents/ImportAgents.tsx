@@ -1,3 +1,5 @@
+import { useApps } from "@agenteschat/client";
+import { aiAppImport, appsSettingsUrl } from "@agenteschat/client/lib/apps";
 import {
   bundleOrigin,
   cardName,
@@ -18,7 +20,9 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { serverUrl } from "@/lib/server";
 import { AgentAvatar, Button, Card, Icon, LogoMark, Text, Toggle, useTheme } from "@/ui";
+import { openPage } from "../ai/parts";
 import { tapHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { fullLook } from "./edit";
@@ -40,7 +44,76 @@ import type { AgentImport } from "./useAgentImport";
  * files or paste its reply; the plan shows the agents found and what comes with them. The footer's button imports.
  */
 export function ImportAgents({ imp, orgId }: { imp: AgentImport; orgId: string }) {
-  return imp.planned ? <Preview imp={imp} orgId={orgId} /> : <Picker imp={imp} />;
+  return imp.planned ? (
+    <Preview imp={imp} orgId={orgId} />
+  ) : (
+    <>
+      <AiAppImport orgId={orgId} />
+      <Picker imp={imp} />
+    </>
+  );
+}
+
+/**
+ * "Do seu app de IA" (ADR 0119): the person connects their AI app to this server and asks it to create here what it
+ * has, the most reliable way. Where apps on the internet can't reach this server, one line says why instead.
+ */
+export function AiAppImport({ orgId }: { orgId: string }) {
+  const { t } = useTranslation();
+  const { colors: c } = useTheme();
+  const option = aiAppImport(t, useApps(orgId).data);
+  const [copied, setCopied] = useState<"ok" | "failed" | null>(null);
+  if (!option) return null;
+  if (!option.available) return <Note icon="info">{t("onboarding.import.aiApp.private")}</Note>;
+  return (
+    <Card>
+      <View style={styles.request}>
+        <View style={styles.previewHead}>
+          <View style={[styles.tile, { width: 34, height: 34, backgroundColor: c.sunken, borderColor: c.line }]}>
+            <Icon name="agent" size={18} color={c.muted} />
+          </View>
+          <Text variant="body" style={[styles.bold, styles.fill]} accessibilityRole="header">
+            {t("onboarding.import.aiApp.title")}
+          </Text>
+        </View>
+        <Text variant="footnote" tone="muted">
+          {t("onboarding.import.aiApp.lead")}
+        </Text>
+        <Text variant="footnote" tone="ink2">
+          {`1. ${t("onboarding.import.aiApp.connect")} ${option.url}`}
+        </Text>
+        <Button
+          variant="secondary"
+          size="sm"
+          label={t("onboarding.import.aiApp.howTo")}
+          onPress={() => openPage(appsSettingsUrl(serverUrl(), orgId))}
+        />
+        <Text variant="footnote" tone="ink2">
+          {`2. ${t("onboarding.import.aiApp.allow")}`}
+        </Text>
+        <Text variant="footnote" tone="ink2">
+          {`3. ${t("onboarding.import.aiApp.paste")}`}
+        </Text>
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={copied === "ok" ? "check" : "copy"}
+          label={copied === "ok" ? t("common.copied") : t("onboarding.import.aiApp.copy")}
+          onPress={() =>
+            void Clipboard.setStringAsync(option.prompt).then(
+              () => setCopied("ok"),
+              () => setCopied("failed"),
+            )
+          }
+        />
+        {copied ? (
+          <Text variant="footnote" tone="muted" accessibilityLiveRegion="polite">
+            {copied === "ok" ? t("onboarding.import.aiApp.copied") : t("mobile.newAgent.import.copyFailed")}
+          </Text>
+        ) : null}
+      </View>
+    </Card>
+  );
 }
 
 /** A source's logo on a neutral tile: our own mark for our export, an icon for any other app. */

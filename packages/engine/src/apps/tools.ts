@@ -1,5 +1,11 @@
 import { randomBytes } from "node:crypto";
-import { channelTopic, type GifProvider, type PubSub, type RateLimiter } from "@agenteschat/adapters";
+import {
+  type BlobStoreResolver,
+  channelTopic,
+  type GifProvider,
+  type PubSub,
+  type RateLimiter,
+} from "@agenteschat/adapters";
 import { and, type Database, desc, eq, gte, inArray, isNull, lte, or, schema, sql } from "@agenteschat/db";
 import {
   type AuthInfo,
@@ -16,6 +22,7 @@ import { audienceError, canTalkTo, speakerOf } from "../audience";
 import { recordAudit } from "../audit";
 import { listChannels, requireChannelAccess } from "../channels";
 import { consultationWait } from "../consultations";
+import type { ContextDeps } from "../context/summaries";
 import { sha256 } from "../crypto";
 import { openDm } from "../dms";
 import { ConflictError, ForbiddenError, NotFoundError, TooManyError, ValidationError } from "../errors";
@@ -25,7 +32,8 @@ import { getMembership } from "../organizations";
 import type { Talker } from "../talker";
 import { listWorkingRuns } from "../working";
 import type { AppPrincipal } from "./grants";
-import { appsUrls } from "./urls";
+import { type APP_MANAGE_TOOL_NAMES, registerManageTools } from "./manage-tools";
+import { type AppScope, appsUrls } from "./urls";
 
 const { agentRuns, appSends, approvals, messages, users, agents, channels } = schema;
 
@@ -43,6 +51,10 @@ export interface AppsToolDeps {
   judge?: Judge;
   talker?: Talker;
   gifs?: GifProvider | null;
+  /** Reads routine schedule phrases (the workspace's cheap model). */
+  context?: ContextDeps;
+  /** Where skills keep their files (`create_skill`). */
+  blobs?: BlobStoreResolver;
   /** Wakes the in-process workers after a send (the agent starts sooner than at the next poll). */
   wakeWorkers?: () => void;
   /** Unknown failures, for the error reporter; their text never reaches the app. */
@@ -468,8 +480,8 @@ function listed(schema: z.ZodObject) {
   };
 }
 
-type ToolConfig<S extends z.ZodObject> = {
-  scope: "read" | "write";
+export type ToolConfig<S extends z.ZodObject> = {
+  scope: AppScope;
   title: string;
   description: string;
   input: S;
@@ -478,6 +490,15 @@ type ToolConfig<S extends z.ZodObject> = {
   idempotent: boolean;
   openWorld: boolean;
 };
+
+type AppToolName = (typeof APP_TOOL_NAMES)[number] | (typeof APP_MANAGE_TOOL_NAMES)[number];
+
+/** Registers a tool on this request's server when the connection holds its scope. */
+export type RegisterTool = <S extends z.ZodObject>(
+  name: AppToolName,
+  cfg: ToolConfig<S>,
+  run: (args: z.output<S>, signal: AbortSignal | undefined) => Promise<Record<string, unknown>>,
+) => void;
 
 const AGENT = z.string().min(1).max(64).describe("Agent id or handle (from list_agents)");
 
@@ -559,7 +580,7 @@ async function resolveAgent(deps: AppsToolDeps, p: AppPrincipal, ref: string) {
   return agent;
 }
 
-/** One McpServer per request, from the principal: write tools only for a grant that may write. */
+/** One McpServer per request, from the principal: each tool only for a connection that holds its scope. */
 export function buildAppsMcpServer(deps: AppsToolDeps, p: AppPrincipal, version: string) {
   const urls = appsUrls(deps.publicUrl);
   const server = new McpServer(
@@ -576,8 +597,8 @@ export function buildAppsMcpServer(deps: AppsToolDeps, p: AppPrincipal, version:
     // Every element of a tool's arguments is walked before its schema refuses them: a wide array costs CPU.
     { instructions: appsInstructions(p), maxToolInputElements: 10_000 },
   );
-  const tool = <S extends z.ZodObject>(
-    name: (typeof APP_TOOL_NAMES)[number],
+  const tool: RegisterTool = <S extends z.ZodObject>(
+    name: AppToolName,
     cfg: ToolConfig<S>,
     run: (args: z.output<S>, signal: AbortSignal | undefined) => Promise<Record<string, unknown>>,
   ) => {
@@ -922,6 +943,7 @@ export function buildAppsMcpServer(deps: AppsToolDeps, p: AppPrincipal, version:
     },
   );
 
+  registerManageTools(deps, p, tool);
   return server;
 }
 

@@ -2,11 +2,21 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ConnectedApp, PersonalToken } from "@agenteschat/client";
-import { appFacts, appMark, appsSettingsUrl, tokenFacts } from "@agenteschat/client/lib/apps";
+import {
+  aiAppImport,
+  appCreatedLine,
+  appFacts,
+  appMark,
+  appsSettingsUrl,
+  requestedAccess,
+  tokenFacts,
+} from "@agenteschat/client/lib/apps";
+import { openTarget } from "@agenteschat/client/lib/notifications";
 import { appVia } from "@agenteschat/client/lib/via";
 import { markOf } from "@agenteschat/ui/brand/marks";
+import { notificationHref } from "../../src/features/links/logic";
 import { visibleSections } from "../../src/features/settings/logic";
-import { translator } from "./fixtures";
+import { notification, translator } from "./fixtures";
 
 const NOW = new Date("2026-11-01T12:00:00Z");
 const app = (over: Partial<ConnectedApp> = {}): ConnectedApp => ({
@@ -70,5 +80,42 @@ describe("Apps de IA on the phone (ADR 0119)", () => {
   test("the screen is in the stack, pushed", () => {
     const layout = readFileSync(join(import.meta.dir, "..", "..", "app", "(app)", "_layout.tsx"), "utf8");
     expect(layout).toContain(`name="settings/apps" options={{ ...pushed, ...scrollUnder }}`);
+  });
+
+  test("what an AI app created, in one line in both languages, opening the newest agent or routine", async () => {
+    const pt = await translator("pt-BR");
+    const en = await translator("en");
+    const n = notification({
+      id: "n",
+      kind: "app_created",
+      latest: { title: "Claude", created: { agent: 3, routine: 2 } },
+      source: { agentId: "0192f0a0-0000-7000-8000-0000000000aa" },
+    });
+    expect(appCreatedLine(pt, n)).toBe("Claude criou 3 agentes e 2 rotinas pelo app");
+    expect(appCreatedLine(en, { latest: { title: "Claude", created: { skill: 1 } } })).toBe(
+      "Claude created 1 skill through the app",
+    );
+    expect(openTarget(n)).toEqual({ to: "/org/$orgId/agents/$agentId", params: { agentId: n.source.agentId ?? "" } });
+    expect(notificationHref(n)).toBe(`/agent/${n.source.agentId}`);
+    expect(openTarget({ ...n, source: { routineId: "r-1" } })).toEqual({
+      to: "/org/$orgId/routines",
+      search: { open: "r-1" },
+    });
+  });
+
+  test("the import's AI app option: the address and the request, or unavailable on a private server", async () => {
+    const pt = await translator("pt-BR");
+    expect(aiAppImport(pt, undefined)).toBeNull();
+    expect(aiAppImport(pt, { serverUrl: "http://10.0.0.5/mcp", serverPublic: false })).toEqual({ available: false });
+    const ready = aiAppImport(pt, { serverUrl: "https://app.agentes.chat/mcp", serverPublic: true });
+    expect(ready?.available && ready.prompt).toStartWith("Conecte https://app.agentes.chat/mcp e, para cada agente");
+  });
+
+  test("the consent picks the widest access the app asked for", () => {
+    const consent = (requested: ("read" | "write" | "manage")[]) =>
+      ({ request: { access: { requested } } }) as Parameters<typeof requestedAccess>[0];
+    expect(requestedAccess(consent(["read", "write", "manage"]))).toBe("manage");
+    expect(requestedAccess(consent(["read", "write"]))).toBe("write");
+    expect(requestedAccess(consent(["read"]))).toBe("read");
   });
 });
