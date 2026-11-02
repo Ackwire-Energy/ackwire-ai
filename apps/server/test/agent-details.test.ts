@@ -4,11 +4,19 @@ import { browser, createTestServer, joinByInvitation, seedOrg, signUp, type Test
 let t: TestServer;
 afterEach(() => t.close());
 
-type ListedAgent = { id: string; handle: string; instructions: string; seesDetails: boolean; canTalk: boolean };
+type ListedAgent = {
+  id: string;
+  handle: string;
+  instructions: string;
+  seesDetails: boolean;
+  canTalk: boolean;
+  budgetUsedPercent?: number;
+};
 
 const DETAIL_READS = [
   "access",
   "approval-rules",
+  "browser",
   "databases",
   "learned-skills",
   "mail",
@@ -23,7 +31,7 @@ test("someone an agent doesn't answer sees only its public card, on every route 
   t = await createTestServer();
   const owner = browser(t);
   await signUp(owner, "owner@example.com");
-  const { orgId } = await seedOrg(owner);
+  const { orgId, credentialId } = await seedOrg(owner);
   const bia = await joinByInvitation(t, owner, orgId, "bia@example.com");
   const org = `/api/app/organizations/${orgId}`;
 
@@ -31,6 +39,8 @@ test("someone an agent doesn't answer sees only its public card, on every route 
     json: {
       name: "Rex",
       handle: "rex",
+      model: "claude-sonnet-5-5",
+      credentialId,
       instructions: "The pricing table lives in sheet 4.",
       audience: { mode: "owner", userIds: [] },
     },
@@ -47,6 +57,8 @@ test("someone an agent doesn't answer sees only its public card, on every route 
   const rexListed = listed.find((a) => a.id === rex.id);
   expect(rexListed?.seesDetails).toBe(false);
   expect(rexListed?.instructions).toBe("");
+  expect(rexListed && "budgetUsedPercent" in rexListed).toBe(false);
+  expect(listed.find((a) => a.id === ana.id)?.budgetUsedPercent).toBe(0);
   expect(listed.find((a) => a.id === ana.id)?.instructions).toBe("Answer support questions.");
   expect(listed.find((a) => a.id === ana.id)?.seesDetails).toBe(true);
 
@@ -55,8 +67,10 @@ test("someone an agent doesn't answer sees only its public card, on every route 
     instructions: string;
     seesDetails: boolean;
     channels: unknown[];
+    credentialId: string | null;
   };
   expect(detail.seesDetails).toBe(false);
+  expect(detail.credentialId).toBeNull();
   expect(detail.instructions).toBe("");
   expect(Array.isArray(detail.channels)).toBe(true);
 
@@ -72,6 +86,9 @@ test("someone an agent doesn't answer sees only its public card, on every route 
     expect({ part, status: res.status }).toEqual({ part, status: 403 });
     expect(((await res.json()) as { error: { code: string } }).error.code).toBe("agent.details_hidden");
   }
+  // The workspace's memory list, filtered to Rex, says nothing either.
+  const items = (await (await bia(`${org}/context-items?agentId=${rex.id}`)).json()) as { items: unknown[] };
+  expect(items.items).toEqual([]);
   // What it learned from her is still hers to see.
   expect((await bia(`${org}/agents/${rex.id}/memories?about=me`)).status).toBe(200);
   // Ana answers her: her tools and memory are open to her.

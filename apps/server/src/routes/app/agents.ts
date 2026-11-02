@@ -109,7 +109,7 @@ const toAgent = (
     instructions: seesDetails ? rest.instructions : "",
     seesDetails,
     ...(brain ? { brain } : {}),
-    ...(budgetUsedPercent !== undefined ? { budgetUsedPercent } : {}),
+    ...(budgetUsedPercent !== undefined && seesDetails ? { budgetUsedPercent } : {}),
     ...(seesCost
       ? { monthlyBudgetUsd: monthlyBudgetNanoUsd === null ? null : nanoUsdToUsd(monthlyBudgetNanoUsd) }
       : {}),

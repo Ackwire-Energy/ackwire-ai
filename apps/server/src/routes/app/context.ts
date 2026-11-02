@@ -129,6 +129,7 @@ export function requireSession(auth: Auth) {
 const AGENT_DETAIL_READS = new Set([
   "access",
   "approval-rules",
+  "browser",
   "databases",
   "learned-skills",
   "mail",

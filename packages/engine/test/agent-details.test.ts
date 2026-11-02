@@ -1,6 +1,17 @@
 import { afterEach, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
-import { addChannelMember, consolidateItem, listOrgMemoryRows, listProposals } from "../src";
+import {
+  addChannelMember,
+  consolidateItem,
+  createRole,
+  decideProposal,
+  drainOutbox,
+  listContextItems,
+  listOrgMemoryRows,
+  listProposals,
+  searchForUser,
+  setMemberRoles,
+} from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
@@ -54,4 +65,67 @@ test("an agent's memory and proposed instructions only for who sees how it works
   await answers(f, "everyone");
   expect((await listOrgMemoryRows(f.db, bia.id, f.org.id)).items.map((i) => i.id)).toEqual([lesson.item.id]);
   expect((await listProposals(f.db, bia.id, f.org.id)).map((p) => p.id)).toEqual([forAgent?.id ?? ""]);
+});
+
+test("an agent's memory stays hidden from its list and from search; a person's preferences stay theirs", async () => {
+  f = await setup();
+  const bia = await addMember(f.db, f.org.id, "member", "Bia");
+  await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
+  await answers(f, "owner");
+  const item = (content: string, scope: { scopeType: "agent" | "person"; agentId: string | null; scopeId?: string }) =>
+    consolidateItem(f.db, {
+      orgId: f.org.id,
+      kind: "lesson",
+      ...scope,
+      channelIds: [],
+      content,
+      evidence: [{ type: "human", ref: "x", at: "" }],
+      confidence: 0.9,
+    });
+  const lesson = await item("Customer Acme pays late.", { scopeType: "agent", agentId: f.agent.id });
+  await item("Owner wants a summary when invoices are late.", {
+    scopeType: "person",
+    agentId: null,
+    scopeId: f.owner.id,
+  });
+  await drainOutbox(f.db, f.handlers);
+  const deps = { db: f.db, search: f.search, gateway: f.gateway };
+  const found = async (userId: string) =>
+    (await searchForUser(deps, userId, f.org.id, { text: "late" })).filter((h) => h.kind === "context_item").length;
+
+  expect(await listContextItems(f.db, bia.id, f.org.id, { agentId: f.agent.id })).toEqual([]);
+  expect(await listContextItems(f.db, bia.id, f.org.id)).toEqual([]);
+  expect(await found(bia.id)).toBe(0);
+  expect((await listContextItems(f.db, f.owner.id, f.org.id, { agentId: f.agent.id })).map((i) => i.id)).toEqual([
+    lesson.item.id,
+  ]);
+  expect(await found(f.owner.id)).toBe(2);
+
+  await answers(f, "everyone");
+  expect((await listContextItems(f.db, bia.id, f.org.id)).map((i) => i.id)).toEqual([lesson.item.id]);
+  expect(await found(bia.id)).toBe(1);
+});
+
+test("reviewing memory without configuring the workspace neither lists nor decides its context's proposals", async () => {
+  f = await setup();
+  const bia = await addMember(f.db, f.org.id, "member", "Bia");
+  const reviewers = await createRole(f.db, f.owner.id, f.org.id, { name: "Revisores", permissions: ["review_memory"] });
+  await setMemberRoles(f.db, f.owner.id, f.org.id, bia.id, [reviewers.id]);
+  const [forOrg] = await f.db
+    .insert(schema.contextProposals)
+    .values({
+      orgId: f.org.id,
+      target: "org_context",
+      agentId: null,
+      baseHash: "x",
+      proposedText: "Answer briefly.",
+      diff: "+ Answer briefly.",
+      rationale: "Seen 2×.",
+      itemIds: [],
+    })
+    .returning();
+  if (!forOrg) throw new Error("expected a proposal");
+  expect(await listProposals(f.db, bia.id, f.org.id)).toEqual([]);
+  await expect(decideProposal(f.db, bia.id, f.org.id, forOrg.id, "reject")).rejects.toThrow();
+  expect((await listProposals(f.db, f.owner.id, f.org.id)).map((p) => p.canDecide)).toEqual([true]);
 });

@@ -1006,7 +1006,7 @@ export function managementRoutes(deps: AppDeps) {
           instructions: seesDetails ? v.instructions : "",
           model: v.model,
           ownerUserId: v.ownerUserId,
-          credentialId: d.agent.credentialId,
+          credentialId: seesDetails ? d.agent.credentialId : null,
           budgetUsedPercent: month.budgetUsedPercent,
           ...(seesCost
             ? {

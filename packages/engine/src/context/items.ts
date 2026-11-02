@@ -14,7 +14,7 @@ import {
 } from "@agenteschat/db";
 import { setsCredential } from "@agenteschat/ui/names";
 import { getAgent } from "../agents";
-import { seesAgentDetails } from "../audience";
+import { agentIdsWithDetails, seesAgentDetails } from "../audience";
 import { caches } from "../cache";
 import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { type Judge, triesToChangePermissions } from "../judge";
@@ -435,13 +435,18 @@ export async function listContextItems(
   } = {},
 ) {
   const membership = await requirePermission(db, actorId, orgId, "read");
-  const visible = await userVisibleChannels(db, orgId, actorId);
+  const [visible, seen] = await Promise.all([
+    userVisibleChannels(db, orgId, actorId),
+    agentIdsWithDetails(db, actorId, orgId),
+  ]);
   return db
     .select()
     .from(contextItems)
     .where(
       and(
         eq(contextItems.orgId, orgId),
+        // An agent's memory is part of how it works: only for who sees its details.
+        or(isNull(contextItems.agentId), inArray(contextItems.agentId, [...seen])),
         // A person's preferences: theirs, and who reviews memory.
         can(membership, "review_memory")
           ? undefined

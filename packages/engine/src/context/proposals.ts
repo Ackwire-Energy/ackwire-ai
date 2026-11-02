@@ -184,11 +184,11 @@ export const ownerDecides = (p: Pick<Proposal, "target" | "access">) =>
   p.target === "agent_instructions" || (p.target === "agent_access" && !p.access?.some((l) => l.on));
 
 /**
- * Who decides: who reviews memory (instructions, org context) or manages agents (role, access), plus the
- * agent's owner when `ownerDecides`.
+ * Who decides: who reviews memory (instructions), configures the workspace (org context) or manages agents
+ * (role, access), plus the agent's owner when `ownerDecides`.
  */
 async function deciders(db: Database, p: Proposal) {
-  const key = isAgentSetting(p) ? "manage_agents" : "review_memory";
+  const key = isAgentSetting(p) ? "manage_agents" : p.target === "org_context" ? "configure" : "review_memory";
   const admins = await db
     .select({ userId: organizationMembers.userId })
     .from(organizationMembers)
@@ -220,8 +220,8 @@ async function proposalsVisible<T extends Proposal>(db: Database, actorId: strin
 }
 
 /**
- * Without `review_memory`: the workspace's context only for who configures it, and an agent's instructions, role
- * and access only for who sees how it works (`seesAgentDetails`).
+ * The workspace's context only for who configures it, and an agent's instructions, role and access only for who
+ * sees how it works (`seesAgentDetails`), `review_memory` or not.
  */
 async function proposalsShown<T extends Proposal>(db: Database, actorId: string, membership: Membership, rows: T[]) {
   const seen = new Map<string, boolean>();
@@ -252,6 +252,7 @@ async function mayDecide(db: Database, actorId: string, p: Proposal) {
     if (can(membership, "manage_agents")) return true;
     return ownerDecides(p) && !!p.agentId && (await getAgent(db, p.orgId, p.agentId))?.ownerUserId === actorId;
   }
+  if (p.target === "org_context") return can(membership, "configure");
   if (can(membership, "review_memory")) return true;
   if (p.target === "agent_instructions" && p.agentId) {
     const agent = await getAgent(db, p.orgId, p.agentId);
@@ -281,9 +282,8 @@ export async function listProposals(
     // Pending first: decided ones are what the cap leaves out.
     .orderBy(desc(sql`${contextProposals.status} = 'pending'`), desc(contextProposals.createdAt))
     .limit(200);
-  const rows = can(membership, "review_memory")
-    ? all
-    : await proposalsVisible(db, actorId, orgId, await proposalsShown(db, actorId, membership, all));
+  const shown = await proposalsShown(db, actorId, membership, all);
+  const rows = can(membership, "review_memory") ? shown : await proposalsVisible(db, actorId, orgId, shown);
   const out: (Proposal & { canDecide: boolean })[] = [];
   for (const r of rows) out.push({ ...r, canDecide: r.status === "pending" && (await mayDecide(db, actorId, r)) });
   return out;
